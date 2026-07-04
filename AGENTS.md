@@ -12,3 +12,5 @@
 ## 按任务阅读
 
 1. [技术栈说明](docs/tech-stack.md)
+2. [第一步总览](docs/first-step.md)
+3. [UI 规范](docs/ui.md)
