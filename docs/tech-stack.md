@@ -2,6 +2,7 @@
 
 ## 推荐主栈
 
+- 包管理：pnpm
 - 桌面壳：Electron
 - 前端框架：React
 - 类型系统：TypeScript
@@ -19,6 +20,16 @@
 - 运行期 Agent 工具协议：MCP + 自定义 JSON-RPC tools
 - 打包发布：electron-builder 或 Electron Forge
 
+## 包管理和版本策略
+
+项目使用 pnpm 作为唯一包管理器。
+
+依赖版本必须使用精确版本号，不得使用 `^`、`~`、范围版本或通配版本。
+
+`.npmrc` 必须保持 `save-exact=true`。
+
+依赖版本门禁由 `pnpm check:deps` 执行；可执行脚本以根目录 `package.json` 为唯一事实来源。
+
 ## 选择 Electron 的原因
 
 cleancode 需要深度集成本地 CLI、伪终端、文件系统、日志流、插件和多进程运行。Electron 的 Node.js 能力和桌面生态更适合快速搭建这类运行期 Agent 工作台。
@@ -26,6 +37,23 @@ cleancode 需要深度集成本地 CLI、伪终端、文件系统、日志流、
 ## 架构约束
 
 架构规则以 [架构文档](architecture.md) 为唯一事实来源。本文只说明技术选择，不重新定义分层、依赖方向或业务事实来源。
+
+## 工程质量工具
+
+项目使用以下工程质量工具：
+
+- ESLint：检查 TypeScript、React、Node.js 配置脚本和测试代码质量。
+- Prettier：统一代码和配置文件格式。
+- Vitest：运行应用开发测试。
+- dependency-cruiser：检查循环依赖、未声明依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
+- Knip：检查未使用文件、导出、依赖和脚本配置。
+- Husky：接入 Git pre-commit 钩子。
+- lint-staged：保留暂存文件级检查能力，作为轻量门禁扩展点。
+- 自定义 `check:deps`：确保依赖版本全部精确锁定。
+
+本地质量门禁统一通过 `pnpm pre-commit` 执行。
+
+`pnpm pre-commit` 的执行顺序必须由根目录 `package.json` 的 `pre-commit` 脚本定义。当前门禁必须覆盖依赖版本检查、格式检查、Lint、类型检查、测试、依赖方向检查和未使用代码检查。
 
 ## 前端层
 

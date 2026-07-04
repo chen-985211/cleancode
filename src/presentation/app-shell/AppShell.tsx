@@ -7,8 +7,7 @@ export function AppShell() {
         <p className="app-shell__eyebrow">cleancode</p>
         <h1 id="app-shell-title">Workspace ready</h1>
         <p className="app-shell__summary">
-          Electron, React, TypeScript, Vite, and Vitest are ready for the first
-          DDD-guided feature.
+          Electron, React, TypeScript, Vite, and Vitest are ready for the first DDD-guided feature.
         </p>
       </section>
     </main>
