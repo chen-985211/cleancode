@@ -1,8 +1,11 @@
 node_modules/
+.vite/
+coverage/
 dist/
 dist-electron/
 out/
 build/
+release/
 .DS_Store
 *.log
 .env

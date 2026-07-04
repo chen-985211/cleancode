@@ -1,0 +1,38 @@
+.app-shell {
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+  padding: 32px;
+}
+
+.app-shell__panel {
+  width: min(100%, 560px);
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 28px;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 0.08);
+}
+
+.app-shell__eyebrow {
+  margin: 0 0 12px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.app-shell__panel h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.app-shell__summary {
+  margin: 14px 0 0;
+  color: #4b5563;
+  font-size: 15px;
+  line-height: 1.6;
+}
