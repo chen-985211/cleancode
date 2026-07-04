@@ -1,0 +1,8 @@
+{
+  "name": "cleancode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-driven block-based desktop workbench.",
+  "type": "module",
+  "scripts": {}
+}
