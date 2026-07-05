@@ -1,4 +1,4 @@
-import { GitBranch, Plus, Settings, Sparkles } from 'lucide-react'
+import { GitBranch, Plus, Settings, Sparkles, Trash2 } from 'lucide-react'
 
 import type { WorkbenchSnapshot } from './types'
 
@@ -7,6 +7,7 @@ interface ProjectSidebarProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isDesktopRuntime: boolean
   readonly onAddProject: () => void
+  readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
   readonly onSelectWorkbench: (workbench: WorkbenchSnapshot) => void
 }
 
@@ -15,6 +16,7 @@ export function ProjectSidebar({
   currentWorkbench,
   isDesktopRuntime,
   onAddProject,
+  onRemoveProject,
   onSelectWorkbench
 }: ProjectSidebarProps) {
   return (
@@ -48,6 +50,7 @@ export function ProjectSidebar({
             key={workbench.project.id}
             workbench={workbench}
             currentWorkbench={currentWorkbench}
+            onRemoveProject={onRemoveProject}
             onSelectWorkbench={onSelectWorkbench}
           />
         ))}
@@ -67,22 +70,39 @@ export function ProjectSidebar({
 interface ProjectCardProps {
   readonly workbench: WorkbenchSnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
   readonly onSelectWorkbench: (workbench: WorkbenchSnapshot) => void
 }
 
-function ProjectCard({ workbench, currentWorkbench, onSelectWorkbench }: ProjectCardProps) {
+function ProjectCard({
+  workbench,
+  currentWorkbench,
+  onRemoveProject,
+  onSelectWorkbench
+}: ProjectCardProps) {
   const isCurrentProject = currentWorkbench?.project.id === workbench.project.id
 
   return (
-    <section className="project-card">
-      <button
-        className="project-card__header"
-        type="button"
-        onClick={() => onSelectWorkbench(workbench)}
-      >
-        <span className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'} />
-        <span className="truncate">{workbench.project.name}</span>
-      </button>
+    <section className="project-card" role="group" aria-label={`项目 ${workbench.project.name}`}>
+      <div className="project-card__header">
+        <button
+          className="project-card__select"
+          type="button"
+          onClick={() => onSelectWorkbench(workbench)}
+        >
+          <span className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'} />
+          <span className="truncate">{workbench.project.name}</span>
+        </button>
+        <button
+          className="project-card__remove icon-button"
+          type="button"
+          aria-label="移除项目"
+          title="从列表移除项目"
+          onClick={() => onRemoveProject(workbench)}
+        >
+          <Trash2 size={14} aria-hidden="true" />
+        </button>
+      </div>
       <div className="workspace-list">
         {workbench.project.workspaces.map((workspace) => (
           <button

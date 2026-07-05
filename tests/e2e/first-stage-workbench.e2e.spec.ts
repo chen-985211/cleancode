@@ -184,6 +184,32 @@ describe('first-stage workbench e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it('removes a remembered project from the sidebar without deleting the project directory', async () => {
+    await expectDesktopRuntime(page)
+
+    await page.getByRole('button', { name: '添加项目' }).click()
+    const projectCard = page.getByRole('group', { name: `项目 ${basename(projectDirectory)}` })
+
+    await projectCard.waitFor()
+    await projectCard.getByRole('button', { name: '移除项目' }).click()
+    await projectCard.waitFor({ state: 'detached' })
+
+    const registry = JSON.parse(
+      await readFile(join(registryDirectory, 'project-registry.json'), 'utf8')
+    ) as { projectDirectories: string[] }
+
+    expect(registry.projectDirectories).toEqual([])
+    expect(await pathExists(projectDirectory)).toBe(true)
+    expect(await page.getByRole('button', { name: '新建终端积木' }).isDisabled()).toBe(true)
+
+    await electronApp.close()
+    electronApp = await launchApp(projectDirectory, registryDirectory, appStateDirectory)
+    page = await electronApp.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await expectDesktopRuntime(page)
+    expect(await page.getByRole('button', { name: basename(projectDirectory) }).count()).toBe(0)
+  })
 })
 
 async function launchApp(

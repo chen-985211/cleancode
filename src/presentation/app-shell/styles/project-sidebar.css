@@ -76,7 +76,7 @@
   margin-top: 12px;
 }
 
-.project-card__header,
+.project-card__select,
 .workspace-row {
   display: flex;
   width: 100%;
@@ -90,12 +90,39 @@
 }
 
 .project-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   gap: 10px;
   height: 44px;
-  padding: 0 12px;
+  padding: 0 8px 0 12px;
   border-bottom: 1px solid #e8edf5;
+}
+
+.project-card__select {
+  flex: 1 1 auto;
+  gap: 10px;
+  height: 100%;
   font-size: 13px;
   font-weight: 650;
+}
+
+.project-card__remove {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  color: #98a2b3;
+  opacity: 0;
+}
+
+.project-card:hover .project-card__remove,
+.project-card:focus-within .project-card__remove {
+  opacity: 1;
+}
+
+.project-card__remove:hover {
+  color: #dc2626;
+  background: #fef2f2;
 }
 
 .project-dot,

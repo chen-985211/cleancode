@@ -26,6 +26,18 @@ export class ProjectRegistry {
     ])
   }
 
+  forgetProject(directory: string): ProjectRegistry {
+    const normalizedDirectory = directory.trim()
+
+    if (!normalizedDirectory) {
+      return this
+    }
+
+    return new ProjectRegistry(
+      this.projectDirectories.filter((entry) => entry !== normalizedDirectory)
+    )
+  }
+
   toSnapshot(): ProjectRegistrySnapshot {
     return {
       projectDirectories: this.projectDirectories

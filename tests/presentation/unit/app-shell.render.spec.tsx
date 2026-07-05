@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 
 describe('app shell', () => {
   beforeEach(() => {
@@ -44,6 +45,7 @@ describe('app shell', () => {
         appName: 'cleancode',
         listWorkbenches: vi.fn(async () => []),
         addProject: vi.fn(),
+        removeProject: vi.fn(),
         createTerminalBlock: vi.fn(),
         updateTerminalBlockMetadata: vi.fn(),
         moveBlock: vi.fn(),
@@ -68,4 +70,68 @@ describe('app shell', () => {
     expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
     expect(screen.queryByText('浏览器预览模式')).not.toBeInTheDocument()
   })
+
+  it('removes a remembered project through the desktop runtime API', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const removeProject = vi.fn(async () => [])
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        appName: 'cleancode',
+        listWorkbenches: vi.fn(async () => [workbench]),
+        addProject: vi.fn(),
+        removeProject,
+        createTerminalBlock: vi.fn(),
+        updateTerminalBlockMetadata: vi.fn(),
+        moveBlock: vi.fn(),
+        deleteBlock: vi.fn(),
+        saveGraph: vi.fn(),
+        startTerminal: vi.fn(),
+        writeTerminal: vi.fn(),
+        resizeTerminal: vi.fn(),
+        interruptTerminal: vi.fn(),
+        terminateTerminal: vi.fn(),
+        onTerminalOutput: vi.fn(() => vi.fn()),
+        onTerminalExit: vi.fn(() => vi.fn())
+      }
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '移除项目' }))
+
+    await waitFor(() =>
+      expect(removeProject).toHaveBeenCalledWith({ projectDirectory: '/tmp/alpha-project' })
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('group', { name: '项目 alpha-project' })).not.toBeInTheDocument()
+    )
+    expect(screen.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+  })
 })
+
+function createWorkbenchSnapshot(directory: string, name: string): WorkbenchSnapshot {
+  return {
+    project: {
+      id: `project-${name}`,
+      name,
+      directory,
+      workspaces: [
+        {
+          name: 'main',
+          directory,
+          gitBranch: null,
+          isCurrent: true
+        }
+      ]
+    },
+    graph: {
+      id: `graph-${name}`,
+      projectId: `project-${name}`,
+      workspaceName: 'main',
+      blocks: []
+    }
+  }
+}

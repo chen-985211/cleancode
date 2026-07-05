@@ -10,6 +10,7 @@ import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/a
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { CreateProjectUseCase } from '../../contexts/project/application/use-cases/CreateProjectUseCase'
+import { ForgetProjectUseCase } from '../../contexts/project/application/use-cases/ForgetProjectUseCase'
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
 import { RememberProjectUseCase } from '../../contexts/project/application/use-cases/RememberProjectUseCase'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
@@ -86,6 +87,17 @@ ipcMain.handle('cleancode:add-project', async (): Promise<WorkbenchSnapshot | nu
 ipcMain.handle('cleancode:list-workbenches', async (): Promise<WorkbenchSnapshot[]> => {
   return loadRememberedWorkbenches()
 })
+
+ipcMain.handle(
+  'cleancode:remove-project',
+  async (_event, command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]> => {
+    await new ForgetProjectUseCase(getProjectRegistryRepository()).execute({
+      directory: command.projectDirectory
+    })
+
+    return loadRememberedWorkbenches()
+  }
+)
 
 ipcMain.handle(
   'cleancode:create-terminal-block',

@@ -22,6 +22,7 @@ declare global {
       appName: 'cleancode'
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       addProject(): Promise<WorkbenchSnapshot | null>
+      removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
       createTerminalBlock(command: {
         readonly projectDirectory: string
         readonly workspaceName: string

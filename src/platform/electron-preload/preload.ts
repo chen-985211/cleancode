@@ -4,6 +4,7 @@ const cleancodeApi = {
   appName: 'cleancode',
   listWorkbenches: () => ipcRenderer.invoke('cleancode:list-workbenches'),
   addProject: () => ipcRenderer.invoke('cleancode:add-project'),
+  removeProject: (command: unknown) => ipcRenderer.invoke('cleancode:remove-project', command),
   createTerminalBlock: (command: unknown) =>
     ipcRenderer.invoke('cleancode:create-terminal-block', command),
   updateTerminalBlockMetadata: (command: unknown) =>
