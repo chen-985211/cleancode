@@ -4,7 +4,7 @@
 
 本文定义 cleancode 第一阶段的整体方向。
 
-本文不是 Spec，不替代 Spec，也不替代 Plan。正式功能开发仍必须遵守 [AI 协作流程](ai-workflow.md)。
+本文不是 Spec，不替代 Spec，也不替代 Plan。正式功能开发仍必须遵守 [开发协作规范](development.md)。
 
 本文不重新定义架构规则。架构规则、限界上下文、分层规则、依赖方向和事实来源以 [架构文档](architecture.md) 为唯一事实来源。
 

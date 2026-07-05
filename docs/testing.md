@@ -4,7 +4,7 @@
 
 本文定义 cleancode 项目的测试组织方式和测试编写规则。
 
-本文不重新定义架构规则。架构规则以 [架构文档](architecture.md) 为唯一事实来源。AI 编码行为以 [AI 开发规范](ai-rules.md) 为准。
+本文不重新定义架构规则。架构规则以 [架构文档](architecture.md) 为唯一事实来源。AI 编码行为以 [开发协作规范](development.md) 为准。
 
 ## 核心原则
 
