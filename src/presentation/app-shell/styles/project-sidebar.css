@@ -92,7 +92,6 @@
 .project-card__header {
   display: flex;
   align-items: center;
-  gap: 6px;
   gap: 10px;
   height: 44px;
   padding: 0 8px 0 12px;

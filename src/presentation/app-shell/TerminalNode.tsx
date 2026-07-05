@@ -6,9 +6,9 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, Pencil, RotateCcw, Square, Terminal, Trash2, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { TerminalNodeIcon } from './TerminalNodeIcons'
 import { TerminalViewport } from './TerminalViewport'
 import {
   terminalNodeMinimumSize,
@@ -109,7 +109,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isVisible={data.isSelected}
         minWidth={terminalNodeMinimumSize.width}
         minHeight={terminalNodeMinimumSize.height}
-        color="#2563eb"
+        color="#94a3b8"
         handleClassName="terminal-node__resize-handle nodrag"
         lineClassName="terminal-node__resize-line"
         onResizeEnd={resizeTerminalBlock}
@@ -195,12 +195,21 @@ function TerminalHeader({
   return (
     <div className="terminal-node__header">
       <span className="terminal-node__icon">
-        <Terminal size={17} aria-hidden="true" />
+        <TerminalNodeIcon name="terminal" size={23} />
       </span>
       <div className="terminal-node__title">
         <strong>{blockName}</strong>
         <span>{blockDescription}</span>
       </div>
+      <span className={terminalStateClassName}>
+        {isRunning
+          ? '运行中'
+          : sessionStatus === 'failed'
+            ? '失败'
+            : sessionStatus === 'exited'
+              ? '已退出'
+              : '未启动'}
+      </span>
       <div
         className="terminal-node__actions nodrag"
         onPointerDown={(event) => event.stopPropagation()}
@@ -212,7 +221,7 @@ function TerminalHeader({
           title="编辑终端信息"
           onClick={onStartEditing}
         >
-          <Pencil size={14} aria-hidden="true" />
+          <TerminalNodeIcon name="edit" />
         </button>
         <button
           className="terminal-node__action"
@@ -222,7 +231,7 @@ function TerminalHeader({
           disabled={!isRunning}
           onClick={onStop}
         >
-          <Square size={13} aria-hidden="true" />
+          <TerminalNodeIcon name="stop" />
         </button>
         <button
           className="terminal-node__action"
@@ -231,7 +240,7 @@ function TerminalHeader({
           title="重启终端"
           onClick={onRestart}
         >
-          <RotateCcw size={14} aria-hidden="true" />
+          <TerminalNodeIcon name="restart" />
         </button>
         <button
           className="terminal-node__action terminal-node__action--danger"
@@ -240,18 +249,9 @@ function TerminalHeader({
           title="删除终端"
           onClick={onDelete}
         >
-          <Trash2 size={14} aria-hidden="true" />
+          <TerminalNodeIcon name="delete" />
         </button>
       </div>
-      <span className={terminalStateClassName}>
-        {isRunning
-          ? '运行中'
-          : sessionStatus === 'failed'
-            ? '失败'
-            : sessionStatus === 'exited'
-              ? '已退出'
-              : '未启动'}
-      </span>
     </div>
   )
 }
@@ -299,7 +299,7 @@ function TerminalMetadataForm({
           title="保存终端信息"
           disabled={!trimmedDraftName}
         >
-          <Check size={14} aria-hidden="true" />
+          <TerminalNodeIcon name="check" />
         </button>
         <button
           className="terminal-node__action"
@@ -308,7 +308,7 @@ function TerminalMetadataForm({
           title="取消编辑终端信息"
           onClick={onCancel}
         >
-          <X size={14} aria-hidden="true" />
+          <TerminalNodeIcon name="close" />
         </button>
       </div>
     </form>

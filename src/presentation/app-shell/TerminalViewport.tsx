@@ -176,11 +176,14 @@ function installXterm({
     cursorBlink: true,
     fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
     fontSize: 12,
+    fontWeight: 500,
+    lineHeight: 1.32,
     rows: 9,
     theme: {
-      background: '#0b0f14',
-      foreground: '#d7e2ee',
+      background: '#080d13',
+      foreground: '#d6dee8',
       cursor: '#f8fafc',
+      selectionBackground: '#2d415c',
       green: '#49d17c',
       blue: '#60a5fa'
     }
