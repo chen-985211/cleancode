@@ -10,13 +10,9 @@ import type { TerminalOutputEvent } from '../../contexts/run/application/ports/T
 import { AgentPanel } from './AgentPanel'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
+import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
 import { TerminalNode } from './TerminalNode'
-import {
-  getTerminalMiniMapNodeClassName,
-  getTerminalMiniMapNodeColor,
-  getTerminalMiniMapNodeStrokeColor
-} from './terminalMinimapAppearance'
 import {
   defaultTerminalDimensions,
   terminalOutputBrowserEventName,
@@ -29,6 +25,7 @@ import {
 } from './types'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import { updateTerminalBlockStatus, updateTerminalStatus } from './terminalStateUpdates'
+import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 
@@ -100,6 +97,11 @@ export function AppShell() {
   const terminalBlocksById = useMemo(() => {
     return new Map((graph?.blocks ?? []).map((block) => [block.id, block]))
   }, [graph])
+  const minimapAppearance = useTerminalMinimapAppearance({
+    terminalStates,
+    selectedTerminalBlockId,
+    hoveredTerminalBlockId
+  })
 
   const rememberWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
     setWorkbenches((entries) => putWorkbenchFirst(entries, workbench))
@@ -403,31 +405,15 @@ export function AppShell() {
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
-  const getMiniMapNodeColor = useCallback(
-    (node: TerminalFlowNode): string => getTerminalMiniMapNodeColor(node, terminalStates),
-    [terminalStates]
-  )
-
-  const getMiniMapNodeStrokeColor = useCallback(
-    (node: TerminalFlowNode): string =>
-      getTerminalMiniMapNodeStrokeColor({
-        node,
-        terminalStates,
-        selectedTerminalBlockId,
-        hoveredTerminalBlockId
+  const updateGraphViewport = useCallback(
+    (viewport: WorkbenchSnapshot['graph']['viewport']) =>
+      updateGraphViewportInWorkbench({
+        currentWorkbench,
+        currentWorkspace,
+        viewport,
+        setCurrentGraph
       }),
-    [hoveredTerminalBlockId, selectedTerminalBlockId, terminalStates]
-  )
-
-  const getMiniMapNodeClassName = useCallback(
-    (node: TerminalFlowNode): string =>
-      getTerminalMiniMapNodeClassName({
-        node,
-        terminalStates,
-        selectedTerminalBlockId,
-        hoveredTerminalBlockId
-      }),
-    [hoveredTerminalBlockId, selectedTerminalBlockId, terminalStates]
+    [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
   useEffect(() => {
@@ -488,10 +474,11 @@ export function AppShell() {
         onNodesChange={onNodesChange}
         onNodeClick={selectTerminalBlock}
         onNodeDragStop={moveBlock}
+        onViewportChange={updateGraphViewport}
         onMinimapNodeClick={focusTerminalBlock}
-        getMiniMapNodeColor={getMiniMapNodeColor}
-        getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
-        getMiniMapNodeClassName={getMiniMapNodeClassName}
+        getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
+        getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
+        getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
       />
       <AgentPanel />
     </main>

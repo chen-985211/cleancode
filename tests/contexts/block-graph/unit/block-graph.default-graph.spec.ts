@@ -1,5 +1,6 @@
 import {
   BlockGraph,
+  defaultCanvasViewport,
   defaultTerminalBlockSize
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 
@@ -13,6 +14,7 @@ describe('default block graph', () => {
     expect(graph.projectId).toBe('project-1')
     expect(graph.workspaceName).toBe('main')
     expect(graph.blocks).toEqual([])
+    expect(graph.toSnapshot().viewport).toEqual(defaultCanvasViewport)
   })
 
   it('creates, edits, moves, and deletes terminal blocks', () => {

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 
 import {
   BlockGraph,
+  defaultCanvasViewport,
   defaultTerminalBlockSize
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
@@ -52,6 +53,7 @@ describe('block graph filesystem repository', () => {
       id: graph.id,
       projectId: 'project-1',
       workspaceName: 'main',
+      viewport: defaultCanvasViewport,
       blocks: [
         {
           id: terminalBlock.id,
@@ -98,6 +100,7 @@ describe('block graph filesystem repository', () => {
 
     expect(openedGraph?.toSnapshot()).toEqual({
       ...legacyGraph,
+      viewport: defaultCanvasViewport,
       blocks: [
         {
           ...legacyGraph.blocks[0],
@@ -107,6 +110,11 @@ describe('block graph filesystem repository', () => {
     })
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
     expect(migratedGraph.id).toBe(legacyGraph.id)
+    expect(migratedGraph).toEqual(
+      expect.objectContaining({
+        viewport: defaultCanvasViewport
+      })
+    )
     expect(migratedGraph.blocks).toEqual([
       expect.objectContaining({
         name: 'Legacy Terminal',

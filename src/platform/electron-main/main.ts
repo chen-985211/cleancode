@@ -7,8 +7,12 @@ import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/u
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
 import { SaveDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/SaveDefaultGraphUseCase'
+import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
-import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  BlockGraphSnapshot,
+  CanvasViewportSnapshot
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { CreateProjectUseCase } from '../../contexts/project/application/use-cases/CreateProjectUseCase'
 import { ForgetProjectUseCase } from '../../contexts/project/application/use-cases/ForgetProjectUseCase'
@@ -39,6 +43,7 @@ const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
 const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository)
 const saveDefaultGraphUseCase = new SaveDefaultGraphUseCase(graphRepository)
+const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepository)
 const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCase(graphRepository)
 const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
@@ -160,6 +165,20 @@ ipcMain.handle(
     }
   ): Promise<BlockGraphSnapshot> => {
     return resizeTerminalBlockUseCase.execute(command)
+  }
+)
+
+ipcMain.handle(
+  'cleancode:update-graph-viewport',
+  async (
+    _event,
+    command: {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly viewport: CanvasViewportSnapshot
+    }
+  ): Promise<BlockGraphSnapshot> => {
+    return updateGraphViewportUseCase.execute(command)
   }
 )
 

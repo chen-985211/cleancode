@@ -7,11 +7,24 @@ import {
   type Edge,
   type NodeChange,
   type NodeTypes,
-  type ReactFlowInstance
+  type ReactFlowInstance,
+  type Viewport
 } from '@xyflow/react'
 import { Box, Map as MapIcon, Maximize2, Minimize2, Minus, Terminal, ZoomIn } from 'lucide-react'
-import { useState, type MouseEvent, type MutableRefObject, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type MutableRefObject,
+  type ReactNode
+} from 'react'
 
+import {
+  defaultCanvasViewport,
+  maximumCanvasZoom,
+  minimumCanvasZoom
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
   MinimapNodeInteractionContext,
   type MinimapNodeInteractionContextValue
@@ -36,6 +49,7 @@ interface WorkbenchCanvasProps {
     event: globalThis.MouseEvent | TouchEvent,
     node: TerminalFlowNode
   ) => void
+  readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onMinimapNodeClick: (blockId: string) => void
   readonly getMiniMapNodeColor: (node: TerminalFlowNode) => string
   readonly getMiniMapNodeStrokeColor: (node: TerminalFlowNode) => string
@@ -54,6 +68,7 @@ export function WorkbenchCanvas({
   onNodesChange,
   onNodeClick,
   onNodeDragStop,
+  onViewportChange,
   onMinimapNodeClick,
   getMiniMapNodeColor,
   getMiniMapNodeStrokeColor,
@@ -62,12 +77,35 @@ export function WorkbenchCanvas({
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
+  const restoredGraphIdRef = useRef<string | null>(null)
+  const isRestoringViewportRef = useRef(false)
   const canvasSurfaceClassName = [
     'canvas-surface',
     isDraggingTerminalNode ? 'canvas-surface--dragging-terminal' : ''
   ]
     .filter(Boolean)
     .join(' ')
+
+  useEffect(() => {
+    const instance = reactFlowInstanceRef.current
+
+    if (
+      !instance ||
+      !currentWorkbench ||
+      restoredGraphIdRef.current === currentWorkbench.graph.id
+    ) {
+      return
+    }
+
+    restoreCanvasViewport({
+      instance,
+      viewport: currentWorkbench.graph.viewport,
+      graphId: currentWorkbench.graph.id,
+      restoredGraphIdRef,
+      isRestoringViewportRef,
+      setViewportZoom
+    })
+  }, [currentWorkbench, reactFlowInstanceRef])
 
   return (
     <section className="app-shell__workspace" aria-label="积木画布">
@@ -89,6 +127,19 @@ export function WorkbenchCanvas({
           nodeTypes={nodeTypes}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance
+
+            if (currentWorkbench) {
+              restoreCanvasViewport({
+                instance,
+                viewport: currentWorkbench.graph.viewport,
+                graphId: currentWorkbench.graph.id,
+                restoredGraphIdRef,
+                isRestoringViewportRef,
+                setViewportZoom
+              })
+              return
+            }
+
             setViewportZoom(instance.getZoom())
           }}
           onNodesChange={onNodesChange}
@@ -99,9 +150,14 @@ export function WorkbenchCanvas({
             onNodeDragStop(event, node)
           }}
           onMove={(_event, viewport) => setViewportZoom(viewport.zoom)}
-          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-          minZoom={0.35}
-          maxZoom={1.6}
+          onMoveEnd={(_event, viewport) => {
+            if (!isRestoringViewportRef.current) {
+              onViewportChange(toCanvasViewportSnapshot(viewport))
+            }
+          }}
+          defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
+          minZoom={minimumCanvasZoom}
+          maxZoom={maximumCanvasZoom}
         >
           <Background color="#d7deea" gap={20} size={1.2} />
           <Controls position="bottom-left" showInteractive={false} />
@@ -132,6 +188,42 @@ export function WorkbenchCanvas({
       />
     </section>
   )
+}
+
+interface RestoreCanvasViewportInput {
+  readonly instance: ReactFlowInstance<TerminalFlowNode, Edge>
+  readonly viewport: WorkbenchSnapshot['graph']['viewport']
+  readonly graphId: string
+  readonly restoredGraphIdRef: MutableRefObject<string | null>
+  readonly isRestoringViewportRef: MutableRefObject<boolean>
+  readonly setViewportZoom: (zoom: number) => void
+}
+
+function restoreCanvasViewport({
+  instance,
+  viewport,
+  graphId,
+  restoredGraphIdRef,
+  isRestoringViewportRef,
+  setViewportZoom
+}: RestoreCanvasViewportInput): void {
+  restoredGraphIdRef.current = graphId
+  isRestoringViewportRef.current = true
+  setViewportZoom(viewport.zoom)
+
+  void instance.setViewport(viewport, { duration: 0 }).finally(() => {
+    window.setTimeout(() => {
+      isRestoringViewportRef.current = false
+    }, 0)
+  })
+}
+
+function toCanvasViewportSnapshot(viewport: Viewport): WorkbenchSnapshot['graph']['viewport'] {
+  return {
+    x: viewport.x,
+    y: viewport.y,
+    zoom: viewport.zoom
+  }
 }
 
 interface CanvasMinimapProps {

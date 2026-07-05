@@ -8,6 +8,12 @@ export interface TerminalBlockSizeSnapshot {
   readonly height: number
 }
 
+export interface CanvasViewportSnapshot {
+  readonly x: number
+  readonly y: number
+  readonly zoom: number
+}
+
 export interface TerminalBlockSnapshot {
   readonly id: string
   readonly type: 'terminal'
@@ -21,7 +27,12 @@ export interface BlockGraphSnapshot {
   readonly id: string
   readonly projectId: string
   readonly workspaceName: string
+  readonly viewport: CanvasViewportSnapshot
   readonly blocks: readonly TerminalBlockSnapshot[]
+}
+
+type RestorableBlockGraphSnapshot = Omit<BlockGraphSnapshot, 'viewport'> & {
+  readonly viewport?: Partial<CanvasViewportSnapshot>
 }
 
 export interface CreateDefaultGraphInput {
@@ -47,6 +58,15 @@ export interface ResizeTerminalBlockInput {
   readonly size: Partial<TerminalBlockSizeSnapshot>
 }
 
+export const defaultCanvasViewport: CanvasViewportSnapshot = {
+  x: 0,
+  y: 0,
+  zoom: 1
+}
+
+export const minimumCanvasZoom = 0.35
+export const maximumCanvasZoom = 1.6
+
 export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
   width: 420,
   height: 306
@@ -62,21 +82,36 @@ export class BlockGraph {
     public readonly id: string,
     public readonly projectId: string,
     public readonly workspaceName: string,
+    private viewportSnapshot: CanvasViewportSnapshot,
     private blockSnapshots: TerminalBlockSnapshot[]
   ) {}
 
   static createDefault(input: CreateDefaultGraphInput): BlockGraph {
-    return new BlockGraph(input.id ?? createGraphId(), input.projectId, input.workspaceName, [])
+    return new BlockGraph(
+      input.id ?? createGraphId(),
+      input.projectId,
+      input.workspaceName,
+      defaultCanvasViewport,
+      []
+    )
   }
 
-  static fromSnapshot(snapshot: BlockGraphSnapshot): BlockGraph {
-    return new BlockGraph(snapshot.id, snapshot.projectId, snapshot.workspaceName, [
-      ...snapshot.blocks.map(normalizeTerminalBlock)
-    ])
+  static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
+    return new BlockGraph(
+      snapshot.id,
+      snapshot.projectId,
+      snapshot.workspaceName,
+      normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
+      [...snapshot.blocks.map(normalizeTerminalBlock)]
+    )
   }
 
   get blocks(): readonly TerminalBlockSnapshot[] {
     return this.blockSnapshots
+  }
+
+  get viewport(): CanvasViewportSnapshot {
+    return this.viewportSnapshot
   }
 
   createTerminalBlock(input: CreateTerminalBlockInput): TerminalBlockSnapshot {
@@ -98,6 +133,10 @@ export class BlockGraph {
     this.blockSnapshots = this.blockSnapshots.map((block) =>
       block.id === blockId ? { ...block, position } : block
     )
+  }
+
+  updateViewport(viewport: Partial<CanvasViewportSnapshot>): void {
+    this.viewportSnapshot = normalizeCanvasViewport(viewport, this.viewportSnapshot)
   }
 
   resizeTerminalBlock(blockId: string, input: ResizeTerminalBlockInput['size']): void {
@@ -156,6 +195,7 @@ export class BlockGraph {
       id: this.id,
       projectId: this.projectId,
       workspaceName: this.workspaceName,
+      viewport: this.viewportSnapshot,
       blocks: this.blockSnapshots
     }
   }
@@ -167,6 +207,33 @@ function createGraphId(): string {
 
 function createBlockId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `block-${Date.now()}-${Math.random()}`
+}
+
+function normalizeCanvasViewport(
+  viewport: Partial<CanvasViewportSnapshot> | undefined,
+  fallback: CanvasViewportSnapshot
+): CanvasViewportSnapshot {
+  return {
+    x: normalizeViewportCoordinate(viewport?.x, fallback.x),
+    y: normalizeViewportCoordinate(viewport?.y, fallback.y),
+    zoom: normalizeCanvasZoom(viewport?.zoom, fallback.zoom)
+  }
+}
+
+function normalizeViewportCoordinate(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return value
+}
+
+function normalizeCanvasZoom(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.min(maximumCanvasZoom, Math.max(minimumCanvasZoom, value))
 }
 
 function normalizeTerminalBlock(block: TerminalBlockSnapshot): TerminalBlockSnapshot {

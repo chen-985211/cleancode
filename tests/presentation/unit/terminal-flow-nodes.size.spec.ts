@@ -11,6 +11,7 @@ describe('terminal flow nodes', () => {
       id: 'graph-1',
       projectId: 'project-1',
       workspaceName: 'main',
+      viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [
         {
           id: 'terminal-1',

@@ -49,6 +49,7 @@ describe('app shell', () => {
         createTerminalBlock: vi.fn(),
         updateTerminalBlockMetadata: vi.fn(),
         resizeTerminalBlock: vi.fn(),
+        updateGraphViewport: vi.fn(),
         moveBlock: vi.fn(),
         deleteBlock: vi.fn(),
         saveGraph: vi.fn(),
@@ -86,6 +87,7 @@ describe('app shell', () => {
         createTerminalBlock: vi.fn(),
         updateTerminalBlockMetadata: vi.fn(),
         resizeTerminalBlock: vi.fn(),
+        updateGraphViewport: vi.fn(),
         moveBlock: vi.fn(),
         deleteBlock: vi.fn(),
         saveGraph: vi.fn(),
@@ -133,6 +135,7 @@ function createWorkbenchSnapshot(directory: string, name: string): WorkbenchSnap
       id: `graph-${name}`,
       projectId: `project-${name}`,
       workspaceName: 'main',
+      viewport: { x: 0, y: 0, zoom: 1 },
       blocks: []
     }
   }

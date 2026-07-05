@@ -3,6 +3,7 @@
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
+  CanvasViewportSnapshot,
   TerminalBlockSizeSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
@@ -43,6 +44,11 @@ declare global {
         readonly workspaceName: string
         readonly blockId: string
         readonly size: TerminalBlockSizeSnapshot
+      }): Promise<BlockGraphSnapshot>
+      updateGraphViewport(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly viewport: CanvasViewportSnapshot
       }): Promise<BlockGraphSnapshot>
       moveBlock(command: {
         readonly projectDirectory: string
