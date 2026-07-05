@@ -298,6 +298,8 @@ async function expectTerminalLooksLikePlainShell(page: Page): Promise<void> {
   await terminalNode.getByRole('button', { name: 'Terminal 1 停止当前命令' }).waitFor()
   await terminalNode.getByRole('button', { name: 'Terminal 1 重启终端' }).waitFor()
   await terminalNode.getByRole('button', { name: 'Terminal 1 删除终端' }).waitFor()
+  expect(await terminalNode.locator('.terminal-output-mirror').count()).toBe(0)
+  expect(await terminalNode.locator('[data-terminal-output-tail="true"]').count()).toBe(1)
   expect(await terminalNode.locator('.terminal-frame__bar').count()).toBe(0)
   expect(await terminalNode.locator('.terminal-node__footer').count()).toBe(0)
   expect(await terminalNode.getByText('start shell').count()).toBe(0)

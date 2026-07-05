@@ -60,7 +60,14 @@ export function WorkbenchCanvas({
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
+  const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
+  const canvasSurfaceClassName = [
+    'canvas-surface',
+    isDraggingTerminalNode ? 'canvas-surface--dragging-terminal' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <section className="app-shell__workspace" aria-label="积木画布">
@@ -75,7 +82,7 @@ export function WorkbenchCanvas({
           新建终端积木
         </button>
       </header>
-      <div className="canvas-surface">
+      <div className={canvasSurfaceClassName}>
         <ReactFlow<TerminalFlowNode, Edge>
           nodes={nodes}
           edges={[]}
@@ -86,7 +93,11 @@ export function WorkbenchCanvas({
           }}
           onNodesChange={onNodesChange}
           onNodeClick={onNodeClick}
-          onNodeDragStop={onNodeDragStop}
+          onNodeDragStart={() => setIsDraggingTerminalNode(true)}
+          onNodeDragStop={(event, node) => {
+            setIsDraggingTerminalNode(false)
+            onNodeDragStop(event, node)
+          }}
           onMove={(_event, viewport) => setViewportZoom(viewport.zoom)}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}
           minZoom={0.35}

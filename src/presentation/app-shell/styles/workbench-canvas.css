@@ -114,6 +114,13 @@
     stroke-width 150ms ease;
 }
 
+.canvas-surface--dragging-terminal .canvas-minimap__node-shell,
+.canvas-surface--dragging-terminal .canvas-minimap__node-header,
+.canvas-surface--dragging-terminal .canvas-minimap__node-screen,
+.canvas-surface--dragging-terminal .canvas-minimap__node-status {
+  transition: none;
+}
+
 .canvas-minimap__node-header {
   opacity: 0.18;
 }

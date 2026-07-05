@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
+import { appendTerminalOutputTail } from './terminalOutputTail'
 import {
   terminalOutputBrowserEventName,
   type TerminalDimensions,
@@ -24,9 +25,9 @@ export function TerminalViewport({
   onInput
 }: TerminalViewportProps) {
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
-  const outputMirrorRef = useRef<HTMLPreElement | null>(null)
+  const outputTailElementRef = useRef<HTMLPreElement | null>(null)
   const xtermRef = useRef<XTerm | null>(null)
-  const outputTextRef = useRef(session.output)
+  const outputTailRef = useRef(appendTerminalOutputTail('', session.output))
   const blockRef = useRef(block)
   const sessionRef = useRef(session)
   const onDimensionsChangeRef = useRef(onDimensionsChange)
@@ -50,16 +51,16 @@ export function TerminalViewport({
   }, [onDimensionsChange])
 
   useEffect(() => {
-    if (outputMirrorRef.current) {
-      outputMirrorRef.current.textContent = outputTextRef.current
+    if (outputTailElementRef.current) {
+      outputTailElementRef.current.textContent = outputTailRef.current
     }
   })
 
   useEffect(() => {
     const appendOutput = (output: string): void => {
-      outputTextRef.current = `${outputTextRef.current}${output}`
-      if (outputMirrorRef.current) {
-        outputMirrorRef.current.textContent = outputTextRef.current
+      outputTailRef.current = appendTerminalOutputTail(outputTailRef.current, output)
+      if (outputTailElementRef.current) {
+        outputTailElementRef.current.textContent = outputTailRef.current
       }
       xtermRef.current?.write(output, () => {
         if (sessionRef.current.status === 'running' && shouldKeepTerminalFocusRef.current) {
@@ -143,9 +144,10 @@ export function TerminalViewport({
         onFocus={focusTerminal}
       />
       <pre
-        className="terminal-output-mirror"
-        ref={outputMirrorRef}
+        className="terminal-output-tail"
+        ref={outputTailElementRef}
         aria-label={`${block.name} 文本输出`}
+        data-terminal-output-tail="true"
       />
     </div>
   )
