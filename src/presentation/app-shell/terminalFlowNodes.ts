@@ -2,6 +2,7 @@ import type { TerminalBlockSnapshot } from '../../contexts/block-graph/applicati
 import {
   createIdleTerminalState,
   type TerminalBlockMetadataInput,
+  type TerminalBlockSizeInput,
   type TerminalDimensions,
   type TerminalFlowNode,
   type TerminalViewState,
@@ -19,6 +20,10 @@ interface TerminalFlowNodeHandlers {
   ) => Promise<void>
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
+  readonly onResizeBlock: (
+    block: TerminalBlockSnapshot,
+    size: TerminalBlockSizeInput
+  ) => Promise<void>
 }
 
 interface CreateTerminalFlowNodesInput {
@@ -45,6 +50,10 @@ export function createTerminalFlowNodes({
       type: 'terminal',
       position: block.position,
       selected: isSelected,
+      style: {
+        width: block.size.width,
+        height: block.size.height
+      },
       data: {
         block,
         session: terminalStates[block.id] ?? createIdleTerminalState(),

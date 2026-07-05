@@ -2,7 +2,8 @@
 
 import type {
   BlockGraphSnapshot,
-  BlockPositionSnapshot
+  BlockPositionSnapshot,
+  TerminalBlockSizeSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
@@ -36,6 +37,12 @@ declare global {
         readonly blockId: string
         readonly name: string
         readonly description: string
+      }): Promise<BlockGraphSnapshot>
+      resizeTerminalBlock(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly size: TerminalBlockSizeSnapshot
       }): Promise<BlockGraphSnapshot>
       moveBlock(command: {
         readonly projectDirectory: string

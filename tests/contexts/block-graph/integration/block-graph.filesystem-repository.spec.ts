@@ -2,7 +2,10 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:f
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
+import {
+  BlockGraph,
+  defaultTerminalBlockSize
+} from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 
 describe('block graph filesystem repository', () => {
@@ -33,9 +36,12 @@ describe('block graph filesystem repository', () => {
 
     await repository.saveDefaultGraph(projectDirectory, graph)
 
-    const openedGraph = await new FileSystemBlockGraphRepository(
-      appStateDirectory
-    ).findDefaultGraph(projectDirectory, 'main')
+    const reopenedRepository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const openedGraph = await reopenedRepository.findDefaultGraph(projectDirectory, 'main')
+    const openedSnapshot = await reopenedRepository.findDefaultGraphSnapshot(
+      projectDirectory,
+      'main'
+    )
     const graphMetadata = JSON.parse(
       await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
     ) as { id: string }
@@ -52,41 +58,61 @@ describe('block graph filesystem repository', () => {
           type: 'terminal',
           name: 'Terminal',
           description: 'Local shell',
-          position: { x: 240, y: 180 }
+          position: { x: 240, y: 180 },
+          size: defaultTerminalBlockSize
         }
       ]
     })
+    expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
   })
 
   it('migrates a legacy default graph from the opened project directory', async () => {
-    const graph = BlockGraph.createDefault({
+    const legacyGraph = {
+      id: 'legacy-graph',
       projectId: 'legacy-project',
-      workspaceName: 'main'
-    })
-
-    graph.createTerminalBlock({
-      name: 'Legacy Terminal',
-      description: '本地终端',
-      position: { x: 300, y: 220 }
-    })
+      workspaceName: 'main',
+      blocks: [
+        {
+          id: 'legacy-terminal',
+          type: 'terminal',
+          name: 'Legacy Terminal',
+          description: '本地终端',
+          position: { x: 300, y: 220 }
+        }
+      ]
+    }
     await mkdir(join(projectDirectory, '.cleancode', 'workspaces', 'main'), {
       recursive: true
     })
     await writeFile(
       join(projectDirectory, '.cleancode', 'workspaces', 'main', 'default-graph.json'),
-      `${JSON.stringify(graph.toSnapshot(), null, 2)}\n`
+      `${JSON.stringify(legacyGraph, null, 2)}\n`
     )
 
-    const openedGraph = await new FileSystemBlockGraphRepository(
-      appStateDirectory
-    ).findDefaultGraph(projectDirectory, 'main')
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const openedGraph = await repository.findDefaultGraph(projectDirectory, 'main')
+    const openedSnapshot = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
     const migratedGraph = JSON.parse(
       await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
     ) as { id: string; blocks: Array<{ name: string }> }
 
-    expect(openedGraph?.toSnapshot()).toEqual(graph.toSnapshot())
-    expect(migratedGraph.id).toBe(graph.id)
-    expect(migratedGraph.blocks.map((block) => block.name)).toEqual(['Legacy Terminal'])
+    expect(openedGraph?.toSnapshot()).toEqual({
+      ...legacyGraph,
+      blocks: [
+        {
+          ...legacyGraph.blocks[0],
+          size: defaultTerminalBlockSize
+        }
+      ]
+    })
+    expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
+    expect(migratedGraph.id).toBe(legacyGraph.id)
+    expect(migratedGraph.blocks).toEqual([
+      expect.objectContaining({
+        name: 'Legacy Terminal',
+        size: defaultTerminalBlockSize
+      })
+    ])
   })
 })
 

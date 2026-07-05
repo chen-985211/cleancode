@@ -1,4 +1,7 @@
-import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
+import {
+  BlockGraph,
+  defaultTerminalBlockSize
+} from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 
 describe('default block graph', () => {
   it('belongs to the current project main workspace', () => {
@@ -35,7 +38,8 @@ describe('default block graph', () => {
         type: 'terminal',
         name: 'Frontend Server',
         description: 'Runs pnpm dev.',
-        position: { x: 420, y: 260 }
+        position: { x: 420, y: 260 },
+        size: defaultTerminalBlockSize
       })
     ])
 

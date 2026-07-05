@@ -5,6 +5,7 @@ import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/applicati
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
+import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
 import { SaveDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/SaveDefaultGraphUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -35,6 +36,7 @@ const createProjectUseCase = new CreateProjectUseCase(projectRepository)
 const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
+const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository)
 const saveDefaultGraphUseCase = new SaveDefaultGraphUseCase(graphRepository)
 const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCase(graphRepository)
@@ -143,6 +145,21 @@ ipcMain.handle(
     }
   ): Promise<BlockGraphSnapshot> => {
     return updateTerminalBlockMetadataUseCase.execute(command)
+  }
+)
+
+ipcMain.handle(
+  'cleancode:resize-terminal-block',
+  async (
+    _event,
+    command: {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly blockId: string
+      readonly size: { readonly width: number; readonly height: number }
+    }
+  ): Promise<BlockGraphSnapshot> => {
+    return resizeTerminalBlockUseCase.execute(command)
   }
 )
 

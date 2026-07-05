@@ -1,8 +1,10 @@
 import type { Node } from '@xyflow/react'
 
-import type {
-  BlockGraphSnapshot,
-  TerminalBlockSnapshot
+import {
+  type BlockGraphSnapshot,
+  minimumTerminalBlockSize,
+  type TerminalBlockSnapshot,
+  type TerminalBlockSizeSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
@@ -28,6 +30,8 @@ export interface TerminalBlockMetadataInput {
   readonly description: string
 }
 
+export type TerminalBlockSizeInput = TerminalBlockSizeSnapshot
+
 interface TerminalNodeData extends Record<string, unknown> {
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
@@ -43,6 +47,10 @@ interface TerminalNodeData extends Record<string, unknown> {
   ) => Promise<void>
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
+  readonly onResizeBlock: (
+    block: TerminalBlockSnapshot,
+    size: TerminalBlockSizeInput
+  ) => Promise<void>
 }
 
 export type TerminalFlowNode = Node<TerminalNodeData, 'terminal'>
@@ -52,10 +60,7 @@ export const defaultTerminalDimensions: TerminalDimensions = {
   rows: 24
 }
 
-export const terminalNodeDefaultSize = {
-  width: 420,
-  height: 306
-}
+export const terminalNodeMinimumSize = minimumTerminalBlockSize
 
 export const terminalOutputBrowserEventName = 'cleancode-terminal-output'
 

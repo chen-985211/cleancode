@@ -9,6 +9,8 @@ const cleancodeApi = {
     ipcRenderer.invoke('cleancode:create-terminal-block', command),
   updateTerminalBlockMetadata: (command: unknown) =>
     ipcRenderer.invoke('cleancode:update-terminal-block-metadata', command),
+  resizeTerminalBlock: (command: unknown) =>
+    ipcRenderer.invoke('cleancode:resize-terminal-block', command),
   moveBlock: (command: unknown) => ipcRenderer.invoke('cleancode:move-block', command),
   deleteBlock: (command: unknown) => ipcRenderer.invoke('cleancode:delete-block', command),
   saveGraph: (command: unknown) => ipcRenderer.invoke('cleancode:save-graph', command),

@@ -8,17 +8,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { AgentPanel } from './AgentPanel'
-import {
-  getTerminalStatusColor,
-  type MinimapNodeInteractionContextValue
-} from './minimapInteraction'
+import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
+import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
 import { TerminalNode } from './TerminalNode'
 import {
+  getTerminalMiniMapNodeClassName,
+  getTerminalMiniMapNodeColor,
+  getTerminalMiniMapNodeStrokeColor
+} from './terminalMinimapAppearance'
+import {
   defaultTerminalDimensions,
-  terminalNodeDefaultSize,
   terminalOutputBrowserEventName,
   type TerminalBlockMetadataInput,
+  type TerminalBlockSizeInput,
   type TerminalDimensions,
   type TerminalFlowNode,
   type TerminalViewState,
@@ -211,8 +214,8 @@ export function AppShell() {
       }
 
       const node = reactFlowInstance.getNode(blockId)
-      const measuredWidth = node?.measured?.width ?? terminalNodeDefaultSize.width
-      const measuredHeight = node?.measured?.height ?? terminalNodeDefaultSize.height
+      const measuredWidth = node?.measured?.width ?? block.size.width
+      const measuredHeight = node?.measured?.height ?? block.size.height
       const position = node?.position ?? block.position
       const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
 
@@ -388,37 +391,42 @@ export function AppShell() {
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
+  const resizeTerminalBlock = useCallback(
+    (block: TerminalBlockSnapshot, size: TerminalBlockSizeInput) =>
+      resizeTerminalBlockInWorkbench({
+        currentWorkbench,
+        currentWorkspace,
+        block,
+        size,
+        setCurrentGraph
+      }),
+    [currentWorkbench, currentWorkspace, setCurrentGraph]
+  )
+
   const getMiniMapNodeColor = useCallback(
-    (node: TerminalFlowNode): string =>
-      getTerminalStatusColor(terminalStates[node.id]?.status ?? 'idle'),
+    (node: TerminalFlowNode): string => getTerminalMiniMapNodeColor(node, terminalStates),
     [terminalStates]
   )
 
   const getMiniMapNodeStrokeColor = useCallback(
-    (node: TerminalFlowNode): string => {
-      if (selectedTerminalBlockId === node.id) {
-        return '#2563eb'
-      }
-
-      if (hoveredTerminalBlockId === node.id) {
-        return '#7c9df5'
-      }
-
-      return terminalStates[node.id]?.status === 'running' ? '#16a34a' : '#9fb7ef'
-    },
+    (node: TerminalFlowNode): string =>
+      getTerminalMiniMapNodeStrokeColor({
+        node,
+        terminalStates,
+        selectedTerminalBlockId,
+        hoveredTerminalBlockId
+      }),
     [hoveredTerminalBlockId, selectedTerminalBlockId, terminalStates]
   )
 
   const getMiniMapNodeClassName = useCallback(
     (node: TerminalFlowNode): string =>
-      [
-        'canvas-minimap__node',
-        `canvas-minimap__node--${terminalStates[node.id]?.status ?? 'idle'}`,
-        selectedTerminalBlockId === node.id ? 'canvas-minimap__node--selected' : '',
-        hoveredTerminalBlockId === node.id ? 'canvas-minimap__node--highlighted' : ''
-      ]
-        .filter(Boolean)
-        .join(' '),
+      getTerminalMiniMapNodeClassName({
+        node,
+        terminalStates,
+        selectedTerminalBlockId,
+        hoveredTerminalBlockId
+      }),
     [hoveredTerminalBlockId, selectedTerminalBlockId, terminalStates]
   )
 
@@ -438,7 +446,8 @@ export function AppShell() {
           onDelete: deleteTerminalBlock,
           onUpdateMetadata: updateTerminalBlockMetadata,
           onInput: writeTerminal,
-          onResize: resizeTerminal
+          onResize: resizeTerminal,
+          onResizeBlock: resizeTerminalBlock
         }
       })
     )
@@ -453,7 +462,8 @@ export function AppShell() {
     terminalStates,
     updateTerminalBlockMetadata,
     writeTerminal,
-    resizeTerminal
+    resizeTerminal,
+    resizeTerminalBlock
   ])
 
   return (

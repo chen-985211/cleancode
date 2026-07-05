@@ -63,7 +63,7 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
     )
 
     if (graph) {
-      return graph
+      return normalizeGraphSnapshot(graph)
     }
 
     const legacyGraph = await readGraphSnapshot(
@@ -74,9 +74,11 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
       return null
     }
 
-    await this.saveDefaultGraph(projectDirectory, BlockGraph.fromSnapshot(legacyGraph))
+    const migratedGraph = BlockGraph.fromSnapshot(legacyGraph)
 
-    return legacyGraph
+    await this.saveDefaultGraph(projectDirectory, migratedGraph)
+
+    return migratedGraph.toSnapshot()
   }
 }
 
@@ -96,4 +98,8 @@ function isMissingFileError(error: unknown): boolean {
   return (
     error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT'
   )
+}
+
+function normalizeGraphSnapshot(snapshot: BlockGraphSnapshot): BlockGraphSnapshot {
+  return BlockGraph.fromSnapshot(snapshot).toSnapshot()
 }

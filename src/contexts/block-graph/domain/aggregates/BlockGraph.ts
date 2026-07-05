@@ -3,12 +3,18 @@ export interface BlockPositionSnapshot {
   readonly y: number
 }
 
+export interface TerminalBlockSizeSnapshot {
+  readonly width: number
+  readonly height: number
+}
+
 export interface TerminalBlockSnapshot {
   readonly id: string
   readonly type: 'terminal'
   readonly name: string
   readonly description: string
   readonly position: BlockPositionSnapshot
+  readonly size: TerminalBlockSizeSnapshot
 }
 
 export interface BlockGraphSnapshot {
@@ -29,11 +35,26 @@ export interface CreateTerminalBlockInput {
   readonly name: string
   readonly description: string
   readonly position: BlockPositionSnapshot
+  readonly size?: Partial<TerminalBlockSizeSnapshot>
 }
 
 export interface UpdateTerminalBlockMetadataInput {
   readonly name: string
   readonly description: string
+}
+
+export interface ResizeTerminalBlockInput {
+  readonly size: Partial<TerminalBlockSizeSnapshot>
+}
+
+export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
+  width: 420,
+  height: 306
+}
+
+export const minimumTerminalBlockSize: TerminalBlockSizeSnapshot = {
+  width: 360,
+  height: 240
 }
 
 export class BlockGraph {
@@ -50,7 +71,7 @@ export class BlockGraph {
 
   static fromSnapshot(snapshot: BlockGraphSnapshot): BlockGraph {
     return new BlockGraph(snapshot.id, snapshot.projectId, snapshot.workspaceName, [
-      ...snapshot.blocks
+      ...snapshot.blocks.map(normalizeTerminalBlock)
     ])
   }
 
@@ -64,7 +85,8 @@ export class BlockGraph {
       type: 'terminal',
       name: input.name,
       description: input.description,
-      position: input.position
+      position: input.position,
+      size: normalizeTerminalBlockSize(input.size)
     }
 
     this.blockSnapshots = [...this.blockSnapshots, block]
@@ -76,6 +98,25 @@ export class BlockGraph {
     this.blockSnapshots = this.blockSnapshots.map((block) =>
       block.id === blockId ? { ...block, position } : block
     )
+  }
+
+  resizeTerminalBlock(blockId: string, input: ResizeTerminalBlockInput['size']): void {
+    let hasUpdatedBlock = false
+    const size = normalizeTerminalBlockSize(input)
+
+    this.blockSnapshots = this.blockSnapshots.map((block) => {
+      if (block.id !== blockId) {
+        return block
+      }
+
+      hasUpdatedBlock = true
+
+      return { ...block, size }
+    })
+
+    if (!hasUpdatedBlock) {
+      throw new Error('Terminal block was not found.')
+    }
   }
 
   updateTerminalBlockMetadata(blockId: string, input: UpdateTerminalBlockMetadataInput): void {
@@ -126,4 +167,36 @@ function createGraphId(): string {
 
 function createBlockId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `block-${Date.now()}-${Math.random()}`
+}
+
+function normalizeTerminalBlock(block: TerminalBlockSnapshot): TerminalBlockSnapshot {
+  return {
+    ...block,
+    size: normalizeTerminalBlockSize(block.size)
+  }
+}
+
+function normalizeTerminalBlockSize(
+  size: Partial<TerminalBlockSizeSnapshot> | undefined
+): TerminalBlockSizeSnapshot {
+  return {
+    width: normalizeSizeValue(
+      size?.width,
+      minimumTerminalBlockSize.width,
+      defaultTerminalBlockSize.width
+    ),
+    height: normalizeSizeValue(
+      size?.height,
+      minimumTerminalBlockSize.height,
+      defaultTerminalBlockSize.height
+    )
+  }
+}
+
+function normalizeSizeValue(value: number | undefined, minimum: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback
+  }
+
+  return Math.max(minimum, Math.round(value))
 }

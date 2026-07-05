@@ -1,9 +1,22 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import {
+  Handle,
+  NodeResizer,
+  Position,
+  type NodeProps,
+  type ResizeDragEvent,
+  type ResizeParams
+} from '@xyflow/react'
 import { Check, Pencil, RotateCcw, Square, Terminal, Trash2, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { TerminalViewport } from './TerminalViewport'
-import type { TerminalDimensions, TerminalFlowNode, TerminalViewState } from './types'
+import {
+  terminalNodeMinimumSize,
+  type TerminalBlockSizeInput,
+  type TerminalDimensions,
+  type TerminalFlowNode,
+  type TerminalViewState
+} from './types'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -66,6 +79,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     setIsEditingMetadata(true)
   }, [block.description, block.name])
 
+  const resizeTerminalBlock = useCallback(
+    (_event: ResizeDragEvent, size: ResizeParams) => {
+      void data.onResizeBlock(block, toTerminalBlockSizeInput(size))
+    },
+    [block, data]
+  )
+
   const saveMetadata = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
@@ -85,6 +105,15 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   return (
     <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
+      <NodeResizer
+        isVisible={data.isSelected}
+        minWidth={terminalNodeMinimumSize.width}
+        minHeight={terminalNodeMinimumSize.height}
+        color="#2563eb"
+        handleClassName="terminal-node__resize-handle nodrag"
+        lineClassName="terminal-node__resize-line"
+        onResizeEnd={resizeTerminalBlock}
+      />
       <Handle
         className="terminal-node__handle terminal-node__handle--input"
         type="target"
@@ -132,6 +161,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     </section>
   )
 })
+
+function toTerminalBlockSizeInput(size: ResizeParams): TerminalBlockSizeInput {
+  return {
+    width: Math.round(size.width),
+    height: Math.round(size.height)
+  }
+}
 
 interface TerminalHeaderProps {
   readonly blockName: string
