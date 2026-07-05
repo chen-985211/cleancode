@@ -1,0 +1,132 @@
+:root {
+  --cc-background: #f7f8fb;
+  --cc-surface: #ffffff;
+  --cc-surface-subtle: #f3f5f9;
+  --cc-surface-raised: #ffffff;
+  --cc-foreground: #172033;
+  --cc-muted: #667085;
+  --cc-border: #dbe2ed;
+  --cc-border-strong: #c9d3e2;
+  --cc-primary: #2563eb;
+  --cc-primary-soft: #e8f0ff;
+  --cc-success: #16a34a;
+  --cc-success-soft: #e8f8ef;
+  --cc-warning: #f59e0b;
+  --cc-danger: #dc2626;
+  --cc-terminal: #0b0f14;
+  --cc-shadow: 0 16px 45px rgb(16 24 40 / 0.08);
+}
+
+.app-shell {
+  display: grid;
+  width: 100%;
+  min-width: 960px;
+  height: 100%;
+  min-height: 640px;
+  grid-template-columns: 276px minmax(440px, 1fr) 316px;
+  overflow: hidden;
+  background: var(--cc-background);
+  color: var(--cc-foreground);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgb(37 99 235 / 0.35);
+  outline-offset: 2px;
+}
+
+.sidebar-action,
+.toolbar-button,
+.agent-next-action {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.sidebar-action:hover,
+.toolbar-button:hover:not(:disabled),
+.agent-next-action:hover:not(:disabled) {
+  border-color: #8fb2ff;
+  box-shadow: 0 8px 22px rgb(37 99 235 / 0.08);
+}
+
+.icon-button {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #667085;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: var(--cc-border);
+  background: #ffffff;
+  color: #1d2939;
+}
+
+.icon-button--small {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.icon-button--send {
+  color: #ffffff;
+  background: var(--cc-primary);
+}
+
+.project-sidebar,
+.agent-panel {
+  min-width: 0;
+  background: rgb(255 255 255 / 0.92);
+}
+
+.truncate {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1120px) {
+  .app-shell {
+    grid-template-columns: 240px minmax(420px, 1fr) 280px;
+  }
+
+  .sidebar-action {
+    font-size: 12px;
+  }
+}

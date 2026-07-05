@@ -10,6 +10,7 @@
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "check:deps": "node scripts/check-exact-deps.mjs",
+    "check:max-lines": "node scripts/check-max-lines.mjs --all",
     "depcruise": "depcruise src tests --config .dependency-cruiser.cjs",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,tsx}\" \"*.{js,cjs,mjs,ts,json,html}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.{ts,tsx}\" \"*.{js,cjs,mjs,ts,json,html}\"",
@@ -17,7 +18,7 @@
     "lint": "eslint . --max-warnings=0",
     "lint:staged": "lint-staged",
     "prepare": "husky",
-    "pre-commit": "pnpm check:deps && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm knip",
+    "pre-commit": "pnpm check:deps && pnpm check:max-lines && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm knip",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

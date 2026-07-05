@@ -1,0 +1,131 @@
+.agent-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--cc-border);
+}
+
+.agent-panel__tabs {
+  display: grid;
+  height: 58px;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--cc-border);
+}
+
+.agent-panel__tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #475467;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.agent-panel__tabs .agent-panel__tab-active {
+  border-bottom-color: var(--cc-primary);
+  color: var(--cc-primary);
+}
+
+.agent-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid #e7ecf4;
+  padding: 18px 16px;
+}
+
+.agent-panel__icon {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--cc-primary);
+  background: var(--cc-primary-soft);
+}
+
+.agent-panel__status {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.agent-panel__body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 16px;
+}
+
+.agent-message,
+.agent-suggestion,
+.agent-next-action {
+  width: 100%;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.agent-message {
+  padding: 14px;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.agent-message--muted {
+  background: #f7f8fb;
+}
+
+.agent-suggestion {
+  margin-top: 14px;
+  padding: 13px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.agent-next-action {
+  margin-top: 10px;
+  justify-content: flex-start;
+  padding: 0 12px;
+}
+
+.agent-panel__composer {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #e7ecf4;
+  padding: 14px;
+}
+
+.agent-panel__composer input {
+  min-width: 0;
+  height: 38px;
+  flex: 1;
+  border: 1px solid #b7c7ea;
+  border-radius: 8px;
+  padding: 0 11px;
+  color: #344054;
+  font: inherit;
+  font-size: 13px;
+}
+
+.agent-panel__footer {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid #e7ecf4;
+  padding: 0 14px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.agent-panel__footer .icon-button {
+  margin-left: auto;
+}

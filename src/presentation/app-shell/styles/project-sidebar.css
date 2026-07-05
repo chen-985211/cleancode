@@ -1,0 +1,159 @@
+.project-sidebar {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--cc-border);
+  padding: 22px 20px;
+}
+
+.project-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 760;
+}
+
+.brand-mark {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfd8e6;
+  border-radius: 8px;
+  color: var(--cc-primary);
+  background: #ffffff;
+}
+
+.project-sidebar__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 36px;
+}
+
+.sidebar-action {
+  color: var(--cc-primary);
+  border-color: #c7d8ff;
+  background: #fbfdff;
+}
+
+.project-sidebar__label {
+  margin-top: 28px;
+  color: var(--cc-muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.runtime-warning {
+  margin-top: 16px;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  background: #fff7ed;
+  padding: 10px 11px;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-list {
+  min-height: 0;
+  margin-top: 10px;
+  overflow-y: auto;
+}
+
+.project-card {
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.project-card + .project-card {
+  margin-top: 12px;
+}
+
+.project-card__header,
+.workspace-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--cc-foreground);
+  font: inherit;
+  text-align: left;
+}
+
+.project-card__header {
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e8edf5;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.project-dot,
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #98a2b3;
+}
+
+.project-dot--active,
+.status-dot,
+.status-dot--running {
+  background: var(--cc-success);
+}
+
+.workspace-list {
+  padding: 8px;
+}
+
+.workspace-row {
+  gap: 8px;
+  height: 38px;
+  border-radius: 7px;
+  padding: 0 10px;
+  color: #344054;
+  font-size: 13px;
+}
+
+.workspace-row:hover,
+.workspace-row--active {
+  background: var(--cc-surface-subtle);
+}
+
+.workspace-row--active {
+  color: #1d4ed8;
+}
+
+.badge {
+  flex: 0 0 auto;
+  border: 1px solid #b9cdfd;
+  border-radius: 6px;
+  padding: 2px 5px;
+  background: #eff5ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge--git {
+  border-color: #9ee5b6;
+  background: #effcf4;
+  color: #14833b;
+}
+
+.project-sidebar__settings {
+  position: absolute;
+  bottom: 18px;
+  left: 20px;
+}

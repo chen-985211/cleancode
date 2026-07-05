@@ -127,6 +127,8 @@ Electron 启动、IPC、依赖装配和配置必须放在 `platform` 内。
 
 开发协作 AI 不得绕过失败的质量门禁。若门禁失败，必须先修复失败原因，再重新运行门禁。
 
+代码文件必须保持在 500 行以内。`pnpm check:max-lines` 会全量检查 `src`、`tests` 和 `scripts` 代码文件。若文件超过 500 行，必须先按职责拆分为更小模块，不得继续在大文件中追加代码。
+
 依赖变更必须保持精确版本，并通过 `pnpm check:deps`。
 
 涉及构建、打包、Electron 入口、Vite 配置或运行时装配的变更，除 `pnpm pre-commit` 外还必须运行 `pnpm build`。
