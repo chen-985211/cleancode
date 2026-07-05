@@ -1,0 +1,46 @@
+import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
+
+describe('default block graph', () => {
+  it('belongs to the current project main workspace', () => {
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    expect(graph.projectId).toBe('project-1')
+    expect(graph.workspaceName).toBe('main')
+    expect(graph.blocks).toEqual([])
+  })
+
+  it('creates, edits, moves, and deletes terminal blocks', () => {
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    const terminalBlock = graph.createTerminalBlock({
+      name: 'Frontend',
+      description: 'Runs the frontend dev server.',
+      position: { x: 160, y: 220 }
+    })
+    graph.updateTerminalBlockMetadata(terminalBlock.id, {
+      name: 'Frontend Server',
+      description: 'Runs pnpm dev.'
+    })
+    graph.moveBlock(terminalBlock.id, { x: 420, y: 260 })
+
+    expect(graph.blocks).toEqual([
+      expect.objectContaining({
+        id: terminalBlock.id,
+        type: 'terminal',
+        name: 'Frontend Server',
+        description: 'Runs pnpm dev.',
+        position: { x: 420, y: 260 }
+      })
+    ])
+
+    graph.deleteBlock(terminalBlock.id)
+
+    expect(graph.blocks).toEqual([])
+  })
+})

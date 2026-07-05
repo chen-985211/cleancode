@@ -1,9 +1,77 @@
 /// <reference types="vite/client" />
 
+import type {
+  BlockGraphSnapshot,
+  BlockPositionSnapshot
+} from './contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
+import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type {
+  TerminalExitEvent,
+  TerminalOutputEvent
+} from './contexts/run/application/ports/TerminalProcessPort'
+
+interface WorkbenchSnapshot {
+  readonly project: ProjectSnapshot
+  readonly graph: BlockGraphSnapshot
+}
+
 declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      listWorkbenches(): Promise<WorkbenchSnapshot[]>
+      addProject(): Promise<WorkbenchSnapshot | null>
+      createTerminalBlock(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly name: string
+        readonly description: string
+        readonly position: BlockPositionSnapshot
+      }): Promise<BlockGraphSnapshot>
+      updateTerminalBlockMetadata(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly name: string
+        readonly description: string
+      }): Promise<BlockGraphSnapshot>
+      moveBlock(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly position: BlockPositionSnapshot
+      }): Promise<BlockGraphSnapshot>
+      deleteBlock(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+      }): Promise<BlockGraphSnapshot>
+      saveGraph(command: {
+        readonly projectDirectory: string
+        readonly graph: BlockGraphSnapshot
+      }): Promise<BlockGraphSnapshot>
+      startTerminal(command: {
+        readonly terminalBlockId: string
+        readonly workspaceName: string
+        readonly workingDirectory: string
+        readonly shell?: string
+        readonly columns?: number
+        readonly rows?: number
+      }): Promise<TerminalSessionSnapshot>
+      writeTerminal(command: {
+        readonly sessionId: string
+        readonly input: string
+      }): Promise<TerminalSessionSnapshot>
+      resizeTerminal(command: {
+        readonly sessionId: string
+        readonly columns: number
+        readonly rows: number
+      }): Promise<void>
+      interruptTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      terminateTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
+      onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }
   }
 }
