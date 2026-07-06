@@ -1,3 +1,5 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 export interface BranchWorkspaceSnapshot {
   readonly name: string
   readonly directory: string
@@ -61,7 +63,10 @@ export class Project {
     const currentWorkspace = this.workspaceSnapshots.find((workspace) => workspace.isCurrent)
 
     if (!currentWorkspace) {
-      throw new Error('Project has no current branch workspace.')
+      throw createExpectedAppError(
+        'PROJECT_HAS_NO_CURRENT_WORKSPACE',
+        'Project has no current branch workspace.'
+      )
     }
 
     return currentWorkspace
@@ -103,11 +108,17 @@ export class Project {
     )
 
     if (this.workspaceSnapshots.some((workspace) => workspace.name === workspaceName)) {
-      throw new Error('Branch workspace already exists.')
+      throw createExpectedAppError(
+        'BRANCH_WORKSPACE_ALREADY_EXISTS',
+        'Branch workspace already exists.'
+      )
     }
 
     if (this.workspaceSnapshots.some((workspace) => workspace.gitBranch === gitBranch)) {
-      throw new Error('Git branch is already bound to a workspace.')
+      throw createExpectedAppError(
+        'GIT_BRANCH_IS_ALREADY_BOUND_TO_WORKSPACE',
+        'Git branch is already bound to a workspace.'
+      )
     }
 
     return new Project(this.id, this.name, this.directory, [
@@ -196,7 +207,7 @@ export class Project {
     })
 
     if (!hasWorkspace) {
-      throw new Error('Branch workspace was not found.')
+      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
     }
 
     return new Project(this.id, this.name, this.directory, workspaces)
@@ -209,7 +220,10 @@ export class Project {
     )
 
     if (normalizedWorkspaceName === 'main') {
-      throw new Error('Main workspace cannot be archived.')
+      throw createExpectedAppError(
+        'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED',
+        'Main workspace cannot be archived.'
+      )
     }
 
     const archivedWorkspace = this.workspaceSnapshots.find(
@@ -217,11 +231,14 @@ export class Project {
     )
 
     if (!archivedWorkspace) {
-      throw new Error('Branch workspace was not found.')
+      throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
     }
 
     if (!archivedWorkspace.gitBranch) {
-      throw new Error('Only Git worktree workspaces can be archived.')
+      throw createExpectedAppError(
+        'ONLY_GIT_WORKTREE_WORKSPACES_CAN_BE_ARCHIVED',
+        'Only Git worktree workspaces can be archived.'
+      )
     }
 
     const workspaces = this.workspaceSnapshots
@@ -326,7 +343,7 @@ function normalizeRequiredText(value: string, emptyMessage: string): string {
   const normalizedValue = value.trim()
 
   if (!normalizedValue) {
-    throw new Error(emptyMessage)
+    throw createExpectedAppError('INVALID_CLEANCODE_PROJECT_METADATA', emptyMessage)
   }
 
   return normalizedValue

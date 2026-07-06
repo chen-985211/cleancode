@@ -4,6 +4,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { createClientAppError } from '../../../src/shared-kernel/application/errors/AppError'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 
 describe('app shell worktree archive', () => {
@@ -71,7 +72,12 @@ describe('app shell worktree archive', () => {
   it('shows a clear error when the worktree has uncommitted changes', async () => {
     const workbench = createWorkbenchWithTestWorktree(false)
     const archiveBranchWorkspace = vi.fn(async () => {
-      throw new Error('Branch workspace has uncommitted changes.')
+      throw createClientAppError({
+        code: 'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES',
+        correlationId: 'operation-2',
+        isExpected: true,
+        message: 'Branch workspace has uncommitted changes.'
+      })
     })
 
     Object.defineProperty(window, 'cleancode', {

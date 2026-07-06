@@ -1,4 +1,5 @@
 import { Project } from '../../domain/aggregates/Project'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
@@ -18,7 +19,7 @@ export class CheckoutMainWorkspaceBranchUseCase {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!projectSnapshot) {
-      throw new Error('Project was not found.')
+      throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
     }
 
     const branchName = normalizeBranchName(command.branchName)
@@ -26,21 +27,27 @@ export class CheckoutMainWorkspaceBranchUseCase {
     const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
 
     if (!inspection.isGitRepository) {
-      throw new Error('Project is not a Git repository.')
+      throw createExpectedAppError('NOT_GIT_REPOSITORY', 'Project is not a Git repository.')
     }
 
     const targetBranch = inspection.branches.find((branch) => branch.name === branchName)
 
     if (!targetBranch) {
-      throw new Error('Git branch was not found.')
+      throw createExpectedAppError('GIT_BRANCH_NOT_FOUND', 'Git branch was not found.')
     }
 
     if (targetBranch.worktreeDirectory && !targetBranch.isCurrent) {
-      throw new Error('Git branch is already checked out in another worktree.')
+      throw createExpectedAppError(
+        'GIT_BRANCH_CHECKED_OUT_IN_WORKTREE',
+        'Git branch is already checked out in another worktree.'
+      )
     }
 
     if (!(await this.gitWorkspacePort.isWorkingTreeClean(project.directory))) {
-      throw new Error('Main workspace has uncommitted changes.')
+      throw createExpectedAppError(
+        'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES',
+        'Main workspace has uncommitted changes.'
+      )
     }
 
     await this.gitWorkspacePort.checkoutBranch({
@@ -72,7 +79,7 @@ function normalizeBranchName(branchName: string): string {
   const normalizedBranchName = branchName.trim()
 
   if (!normalizedBranchName) {
-    throw new Error('Git branch cannot be empty.')
+    throw createExpectedAppError('GIT_BRANCH_NOT_FOUND', 'Git branch cannot be empty.')
   }
 
   return normalizedBranchName

@@ -9,10 +9,7 @@ import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/applicati
 import { SaveDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/SaveDefaultGraphUseCase'
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
-import type {
-  BlockGraphSnapshot,
-  CanvasViewportSnapshot
-} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { ArchiveBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
 import { CheckoutMainWorkspaceBranchUseCase } from '../../contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
@@ -33,8 +30,12 @@ import {
 } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
 import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
-import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
+import { consoleLogger } from '../logging/ConsoleLogSink'
+import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
+import { registerProjectIpcHandlers } from './projectIpcHandlers'
+import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 
 interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
@@ -104,258 +105,46 @@ const createMainWindow = (): void => {
   void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
 }
 
-ipcMain.handle('cleancode:add-project', async (): Promise<WorkbenchSnapshot | null> => {
-  const projectDirectory = await selectProjectDirectory()
-
-  if (!projectDirectory) {
-    return null
-  }
-
-  const project = await createOrOpenProjectUseCase.execute({
-    directory: projectDirectory,
-    name: inferProjectName(projectDirectory)
-  })
-
-  await rememberProject(project.directory)
-
-  return loadWorkbench(project)
+registerProjectIpcHandlers({
+  archiveBranchWorkspace: (command) => archiveBranchWorkspaceUseCase.execute(command),
+  checkoutMainWorkspaceBranch: (command) => checkoutMainWorkspaceBranchUseCase.execute(command),
+  createBranchWorkspace: (command) => createBranchWorkspaceUseCase.execute(command),
+  createOrOpenProject: (command) => createOrOpenProjectUseCase.execute(command),
+  forgetProject: async (directory) => {
+    await new ForgetProjectUseCase(getProjectRegistryRepository()).execute({ directory })
+  },
+  inferProjectName,
+  ipcMain,
+  loadRememberedWorkbenches,
+  loadWorkbench,
+  logger: consoleLogger,
+  rememberProject,
+  selectProjectDirectory,
+  switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command)
 })
 
-ipcMain.handle('cleancode:list-workbenches', async (): Promise<WorkbenchSnapshot[]> => {
-  return loadRememberedWorkbenches()
+registerBlockGraphIpcHandlers({
+  createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
+  deleteBlock: (command) => deleteBlockUseCase.execute(command),
+  ipcMain,
+  logger: consoleLogger,
+  moveBlock: (command) => moveBlockUseCase.execute(command),
+  resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
+  saveGraph: (command) => saveDefaultGraphUseCase.execute(command),
+  updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),
+  updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command)
 })
 
-ipcMain.handle(
-  'cleancode:create-branch-workspace',
-  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
-    const project = await createBranchWorkspaceUseCase.execute({
-      projectDirectory: readStringField(command, 'projectDirectory'),
-      branchName: readStringField(command, 'branchName')
-    })
-
-    return loadWorkbench(project)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:switch-branch-workspace',
-  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
-    const project = await switchBranchWorkspaceUseCase.execute({
-      projectDirectory: readStringField(command, 'projectDirectory'),
-      workspaceName: readStringField(command, 'workspaceName')
-    })
-
-    return loadWorkbench(project)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:archive-branch-workspace',
-  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
-    const project = await archiveBranchWorkspaceUseCase.execute({
-      projectDirectory: readStringField(command, 'projectDirectory'),
-      workspaceName: readStringField(command, 'workspaceName')
-    })
-
-    return loadWorkbench(project)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:checkout-main-workspace-branch',
-  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
-    const project = await checkoutMainWorkspaceBranchUseCase.execute({
-      projectDirectory: readStringField(command, 'projectDirectory'),
-      branchName: readStringField(command, 'branchName')
-    })
-
-    return loadWorkbench(project)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:remove-project',
-  async (_event, command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]> => {
-    await new ForgetProjectUseCase(getProjectRegistryRepository()).execute({
-      directory: command.projectDirectory
-    })
-
-    return loadRememberedWorkbenches()
-  }
-)
-
-ipcMain.handle(
-  'cleancode:create-terminal-block',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly name: string
-      readonly description: string
-      readonly position: { readonly x: number; readonly y: number }
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return createTerminalBlockUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:move-block',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly blockId: string
-      readonly position: { readonly x: number; readonly y: number }
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return moveBlockUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:update-terminal-block-metadata',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly blockId: string
-      readonly name: string
-      readonly description: string
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return updateTerminalBlockMetadataUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:resize-terminal-block',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly blockId: string
-      readonly size: { readonly width: number; readonly height: number }
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return resizeTerminalBlockUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:update-graph-viewport',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly viewport: CanvasViewportSnapshot
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return updateGraphViewportUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:delete-block',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly workspaceName: string
-      readonly blockId: string
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return deleteBlockUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:save-graph',
-  async (
-    _event,
-    command: {
-      readonly projectDirectory: string
-      readonly graph: BlockGraphSnapshot
-    }
-  ): Promise<BlockGraphSnapshot> => {
-    return saveDefaultGraphUseCase.execute(command)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:start-terminal',
-  async (
-    event,
-    command: {
-      readonly terminalBlockId: string
-      readonly workspaceName: string
-      readonly workingDirectory: string
-      readonly shell?: string
-      readonly columns?: number
-      readonly rows?: number
-    }
-  ): Promise<TerminalSessionSnapshot> => {
-    const sender = event.sender
-
-    return terminalSessionService.start({
-      terminalBlockId: command.terminalBlockId,
-      workspaceName: command.workspaceName,
-      workingDirectory: command.workingDirectory,
-      shell: command.shell,
-      columns: command.columns,
-      rows: command.rows,
-      onOutput: (outputEvent) => {
-        if (!sender.isDestroyed()) {
-          sender.send('cleancode:terminal-output', outputEvent)
-        }
-      },
-      onExit: (exitEvent) => {
-        if (!sender.isDestroyed()) {
-          sender.send('cleancode:terminal-exit', exitEvent)
-        }
-      }
-    })
-  }
-)
-
-ipcMain.handle(
-  'cleancode:resize-terminal',
-  (
-    _event,
-    command: { readonly sessionId: string; readonly columns: number; readonly rows: number }
-  ) => {
-    terminalSessionService.resize(command.sessionId, command.columns, command.rows)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:write-terminal',
-  (
-    _event,
-    command: { readonly sessionId: string; readonly input: string }
-  ): TerminalSessionSnapshot => {
-    return terminalSessionService.write(command.sessionId, command.input)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:interrupt-terminal',
-  (_event, command: { readonly sessionId: string }): TerminalSessionSnapshot => {
-    return terminalSessionService.interrupt(command.sessionId)
-  }
-)
-
-ipcMain.handle(
-  'cleancode:terminate-terminal',
-  (_event, command: { readonly sessionId: string }): TerminalSessionSnapshot => {
-    return terminalSessionService.terminate(command.sessionId)
-  }
-)
+registerTerminalIpcHandlers({
+  interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
+  ipcMain,
+  logger: consoleLogger,
+  resizeTerminal: (sessionId, columns, rows) =>
+    terminalSessionService.resize(sessionId, columns, rows),
+  startTerminal: (command) => terminalSessionService.start(command),
+  terminateTerminal: (sessionId) => terminalSessionService.terminate(sessionId),
+  writeTerminal: (sessionId, input) => terminalSessionService.write(sessionId, input)
+})
 
 async function selectProjectDirectory(): Promise<string | null> {
   if (process.env.CLEANCODE_TEST_PROJECT_DIRECTORY) {
@@ -373,7 +162,10 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
   const currentWorkspace = project.workspaces.find((workspace) => workspace.isCurrent)
 
   if (!currentWorkspace) {
-    throw new Error('Project has no current branch workspace.')
+    throw createExpectedAppError(
+      'PROJECT_HAS_NO_CURRENT_WORKSPACE',
+      'Project has no current branch workspace.'
+    )
   }
 
   const graph = await getDefaultGraphUseCase.execute({
@@ -416,18 +208,6 @@ async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
   }
 
   return workbenches
-}
-
-function readStringField(command: unknown, fieldName: string): string {
-  if (!isRecord(command) || typeof command[fieldName] !== 'string') {
-    throw new Error(`Invalid IPC command: ${fieldName} is required.`)
-  }
-
-  return command[fieldName]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }
 
 function getProjectRegistryRepository(): FileSystemProjectRegistryRepository {

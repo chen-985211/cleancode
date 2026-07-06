@@ -1,5 +1,6 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 
+import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseBranchWorkspaceActionsInput {
@@ -79,7 +80,7 @@ export function useBranchWorkspaceActions({
         clearCurrentBlockSelection()
         replaceWorkbench(createdWorkbench)
       } catch (error) {
-        setBranchWorkspaceActionError(resolveBranchWorkspaceActionErrorMessage(error))
+        setBranchWorkspaceActionError(resolveUserFacingErrorMessage(error, '工作区操作失败。'))
       }
     },
     [
@@ -116,7 +117,7 @@ export function useBranchWorkspaceActions({
           replaceWorkbench(archivedWorkbench)
         }
       } catch (error) {
-        setBranchWorkspaceActionError(resolveBranchWorkspaceActionErrorMessage(error))
+        setBranchWorkspaceActionError(resolveUserFacingErrorMessage(error, '工作区操作失败。'))
       }
     },
     [
@@ -159,20 +160,4 @@ export function useBranchWorkspaceActions({
     dismissBranchWorkspaceActionError,
     selectWorkspace
   }
-}
-
-function resolveBranchWorkspaceActionErrorMessage(error: unknown): string {
-  if (
-    error instanceof Error &&
-    (error.message.includes('Git branch already exists') ||
-      error.message.includes('Branch workspace already exists'))
-  ) {
-    return 'Git 分支已存在，无法创建同名工作区。'
-  }
-
-  if (error instanceof Error && error.message.includes('uncommitted changes')) {
-    return '工作区有未提交更改，无法归档。'
-  }
-
-  return error instanceof Error ? error.message : '工作区操作失败。'
 }

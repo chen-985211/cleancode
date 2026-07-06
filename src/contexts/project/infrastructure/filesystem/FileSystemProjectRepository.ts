@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { ProjectRepository } from '../../application/ports/ProjectRepository'
 import { Project } from '../../domain/aggregates/Project'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const projectsDirectoryName = 'projects'
 const legacyMetadataDirectoryName = '.cleancode'
@@ -73,7 +74,10 @@ function parseProjectSnapshot(metadata: string, directory: string): ProjectSnaps
   const parsed = JSON.parse(metadata) as Partial<ProjectSnapshot>
 
   if (!parsed.id || !parsed.name || !Array.isArray(parsed.workspaces)) {
-    throw new Error('Invalid cleancode project metadata.')
+    throw createExpectedAppError(
+      'INVALID_CLEANCODE_PROJECT_METADATA',
+      'Invalid cleancode project metadata.'
+    )
   }
 
   return {

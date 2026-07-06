@@ -1,4 +1,5 @@
 import { ArchiveBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
+import type { AppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
 import type {
   GitRepositoryInspection,
   GitWorkspacePort,
@@ -72,12 +73,13 @@ describe('archive branch workspace use case', () => {
     git.workingTreeClean = false
     repository.remember(createProjectWithFeatureWorkspace(true))
 
-    await expect(
+    await expectAppErrorCode(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
         workspaceName: 'feature/sidebar'
-      })
-    ).rejects.toThrow('Branch workspace has uncommitted changes.')
+      }),
+      'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES'
+    )
 
     expect(git.cleanChecks).toEqual(['/work/worktrees/app/feature/sidebar'])
     expect(git.removeBranchWorktreeCalls).toEqual([])
@@ -120,12 +122,13 @@ describe('archive branch workspace use case', () => {
     const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git)
     repository.remember(createProjectWithFeatureWorkspace(false))
 
-    await expect(
+    await expectAppErrorCode(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
         workspaceName: 'main'
-      })
-    ).rejects.toThrow('Main workspace cannot be archived.')
+      }),
+      'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED'
+    )
 
     expect(git.removeBranchWorktreeCalls).toEqual([])
     expect(repository.savedProjects).toEqual([])
@@ -152,4 +155,8 @@ function createProjectWithFeatureWorkspace(featureIsCurrent: boolean): ProjectSn
       }
     ]
   }
+}
+
+async function expectAppErrorCode(promise: Promise<unknown>, code: AppErrorCode): Promise<void> {
+  await expect(promise).rejects.toMatchObject({ code })
 }

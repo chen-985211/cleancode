@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { ProjectRegistry } from '../../domain/aggregates/ProjectRegistry'
 import type { ProjectRegistrySnapshot } from '../../application/dto/ProjectRegistrySnapshot'
 import type { ProjectRegistryRepository } from '../../application/ports/ProjectRegistryRepository'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export class FileSystemProjectRegistryRepository implements ProjectRegistryRepository {
   constructor(private readonly registryPath: string) {}
@@ -36,7 +37,10 @@ function parseProjectRegistry(metadata: string): ProjectRegistrySnapshot {
   const parsed = JSON.parse(metadata) as Partial<ProjectRegistrySnapshot>
 
   if (!Array.isArray(parsed.projectDirectories)) {
-    throw new Error('Invalid cleancode project registry.')
+    throw createExpectedAppError(
+      'INVALID_CLEANCODE_PROJECT_REGISTRY',
+      'Invalid cleancode project registry.'
+    )
   }
 
   return {

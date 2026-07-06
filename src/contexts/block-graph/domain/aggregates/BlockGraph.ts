@@ -1,3 +1,5 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 export interface BlockPositionSnapshot {
   readonly x: number
   readonly y: number
@@ -154,7 +156,7 @@ export class BlockGraph {
     })
 
     if (!hasUpdatedBlock) {
-      throw new Error('Terminal block was not found.')
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
   }
 
@@ -162,7 +164,10 @@ export class BlockGraph {
     const name = input.name.trim()
 
     if (!name) {
-      throw new Error('Terminal block name cannot be empty.')
+      throw createExpectedAppError(
+        'TERMINAL_BLOCK_NAME_EMPTY',
+        'Terminal block name cannot be empty.'
+      )
     }
 
     let hasUpdatedBlock = false
@@ -182,7 +187,7 @@ export class BlockGraph {
     })
 
     if (!hasUpdatedBlock) {
-      throw new Error('Terminal block was not found.')
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
   }
 

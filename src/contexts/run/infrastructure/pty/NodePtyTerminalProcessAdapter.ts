@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import type { IPty } from 'node-pty'
 import { spawn as spawnPtyProcess } from 'node-pty'
 
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   StartTerminalProcessCommand,
   TerminalProcessHandle,
@@ -73,7 +74,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const ptyProcess = this.processes.get(sessionId)
 
     if (!ptyProcess) {
-      throw new Error('Terminal process was not found.')
+      throw createExpectedAppError('TERMINAL_PROCESS_NOT_FOUND', 'Terminal process was not found.')
     }
 
     return ptyProcess

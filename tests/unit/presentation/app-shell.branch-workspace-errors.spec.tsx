@@ -4,6 +4,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { createClientAppError } from '../../../src/shared-kernel/application/errors/AppError'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 
 describe('app shell branch workspace errors', () => {
@@ -19,7 +20,12 @@ describe('app shell branch workspace errors', () => {
       gitBranch: 'main'
     })
     const createBranchWorkspace = vi.fn(async () => {
-      throw new Error('Git branch already exists.')
+      throw createClientAppError({
+        code: 'GIT_BRANCH_ALREADY_EXISTS',
+        correlationId: 'operation-1',
+        isExpected: true,
+        message: 'Git branch already exists.'
+      })
     })
 
     Object.defineProperty(window, 'cleancode', {

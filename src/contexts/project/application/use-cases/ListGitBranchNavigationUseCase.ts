@@ -1,3 +1,4 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { GitBranchNavigationSnapshot } from '../dto/GitBranchNavigationSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
@@ -16,7 +17,7 @@ export class ListGitBranchNavigationUseCase {
     const project = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!project) {
-      throw new Error('Project was not found.')
+      throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
     }
 
     const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)

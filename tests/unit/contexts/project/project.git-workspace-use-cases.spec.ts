@@ -363,7 +363,7 @@ describe('project git workspace use cases', () => {
         projectDirectory: '/work/app',
         branchName: 'feature/free'
       })
-    ).rejects.toThrow('Main workspace has uncommitted changes.')
+    ).rejects.toMatchObject({ code: 'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES' })
 
     expect(git.checkoutBranchCalls).toEqual([])
   })
@@ -408,7 +408,7 @@ describe('project git workspace use cases', () => {
         projectDirectory: '/work/app',
         branchName: 'feature/worktree'
       })
-    ).rejects.toThrow('Git branch is already checked out in another worktree.')
+    ).rejects.toMatchObject({ code: 'GIT_BRANCH_CHECKED_OUT_IN_WORKTREE' })
 
     expect(git.checkoutBranchCalls).toEqual([])
   })

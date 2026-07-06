@@ -1,3 +1,4 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { BlockGraphSnapshot, CanvasViewportSnapshot } from '../dto/BlockGraphSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 
@@ -17,7 +18,7 @@ export class UpdateGraphViewportUseCase {
     )
 
     if (!graph) {
-      throw new Error('Default block graph was not created.')
+      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
     }
 
     graph.updateViewport(command.viewport)

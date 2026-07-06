@@ -1,36 +1,40 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+import {
+  createClientAppError,
+  isSerializedAppError
+} from '../../shared-kernel/application/errors/AppError'
+import type { IpcInvokeResult } from '../ipc/registerIpcHandler'
+
 const cleancodeApi = {
   appName: 'cleancode',
-  listWorkbenches: () => ipcRenderer.invoke('cleancode:list-workbenches'),
-  addProject: () => ipcRenderer.invoke('cleancode:add-project'),
-  removeProject: (command: unknown) => ipcRenderer.invoke('cleancode:remove-project', command),
+  listWorkbenches: () => invokeCleancode('cleancode:list-workbenches'),
+  addProject: () => invokeCleancode('cleancode:add-project'),
+  removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
   createBranchWorkspace: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:create-branch-workspace', command),
+    invokeCleancode('cleancode:create-branch-workspace', command),
   switchBranchWorkspace: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:switch-branch-workspace', command),
+    invokeCleancode('cleancode:switch-branch-workspace', command),
   archiveBranchWorkspace: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:archive-branch-workspace', command),
+    invokeCleancode('cleancode:archive-branch-workspace', command),
   checkoutMainWorkspaceBranch: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:checkout-main-workspace-branch', command),
+    invokeCleancode('cleancode:checkout-main-workspace-branch', command),
   createTerminalBlock: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:create-terminal-block', command),
+    invokeCleancode('cleancode:create-terminal-block', command),
   updateTerminalBlockMetadata: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:update-terminal-block-metadata', command),
+    invokeCleancode('cleancode:update-terminal-block-metadata', command),
   resizeTerminalBlock: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:resize-terminal-block', command),
+    invokeCleancode('cleancode:resize-terminal-block', command),
   updateGraphViewport: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:update-graph-viewport', command),
-  moveBlock: (command: unknown) => ipcRenderer.invoke('cleancode:move-block', command),
-  deleteBlock: (command: unknown) => ipcRenderer.invoke('cleancode:delete-block', command),
-  saveGraph: (command: unknown) => ipcRenderer.invoke('cleancode:save-graph', command),
-  startTerminal: (command: unknown) => ipcRenderer.invoke('cleancode:start-terminal', command),
-  writeTerminal: (command: unknown) => ipcRenderer.invoke('cleancode:write-terminal', command),
-  resizeTerminal: (command: unknown) => ipcRenderer.invoke('cleancode:resize-terminal', command),
-  interruptTerminal: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:interrupt-terminal', command),
-  terminateTerminal: (command: unknown) =>
-    ipcRenderer.invoke('cleancode:terminate-terminal', command),
+    invokeCleancode('cleancode:update-graph-viewport', command),
+  moveBlock: (command: unknown) => invokeCleancode('cleancode:move-block', command),
+  deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
+  saveGraph: (command: unknown) => invokeCleancode('cleancode:save-graph', command),
+  startTerminal: (command: unknown) => invokeCleancode('cleancode:start-terminal', command),
+  writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
+  resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),
+  interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
+  terminateTerminal: (command: unknown) => invokeCleancode('cleancode:terminate-terminal', command),
   onTerminalOutput: (listener: (event: unknown) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, outputEvent: unknown) => {
       listener(outputEvent)
@@ -52,3 +56,37 @@ const cleancodeApi = {
 } as const
 
 contextBridge.exposeInMainWorld('cleancode', cleancodeApi)
+
+async function invokeCleancode<TResult>(channel: string, command?: unknown): Promise<TResult> {
+  const result = (await ipcRenderer.invoke(channel, command)) as IpcInvokeResult<TResult>
+
+  if (isIpcFailureResult(result)) {
+    throw createClientAppError(result.error)
+  }
+
+  if (isIpcSuccessResult(result)) {
+    return result.value
+  }
+
+  throw createClientAppError({
+    code: 'UNEXPECTED_ERROR',
+    isExpected: false,
+    message: 'Unexpected application error.'
+  })
+}
+
+function isIpcSuccessResult<TResult>(
+  result: IpcInvokeResult<TResult> | unknown
+): result is Extract<IpcInvokeResult<TResult>, { readonly ok: true }> {
+  return isRecord(result) && result.ok === true && 'value' in result
+}
+
+function isIpcFailureResult<TResult>(
+  result: IpcInvokeResult<TResult> | unknown
+): result is Extract<IpcInvokeResult<TResult>, { readonly ok: false }> {
+  return isRecord(result) && result.ok === false && isSerializedAppError(result.error)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}

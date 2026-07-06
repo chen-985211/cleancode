@@ -1,3 +1,5 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+
 export type TerminalSessionStatus = 'idle' | 'running' | 'exited' | 'failed'
 
 export interface TerminalSessionSnapshot {
@@ -63,7 +65,10 @@ export class TerminalSession {
 
   recordInput(input: string): void {
     if (this.statusValue !== 'running') {
-      throw new Error('Terminal session is not running.')
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_NOT_RUNNING',
+        'Terminal session is not running.'
+      )
     }
 
     this.recordedInput.push(input)

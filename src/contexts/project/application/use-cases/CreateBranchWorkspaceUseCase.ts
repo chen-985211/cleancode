@@ -1,4 +1,5 @@
 import { Project } from '../../domain/aggregates/Project'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { BranchWorkspaceDirectoryPort } from '../ports/BranchWorkspaceDirectoryPort'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
@@ -20,7 +21,7 @@ export class CreateBranchWorkspaceUseCase {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!projectSnapshot) {
-      throw new Error('Project was not found.')
+      throw createExpectedAppError('PROJECT_NOT_FOUND', 'Project was not found.')
     }
 
     const branchName = command.branchName.trim()
@@ -28,15 +29,18 @@ export class CreateBranchWorkspaceUseCase {
     const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
 
     if (!inspection.isGitRepository) {
-      throw new Error('Project is not a Git repository.')
+      throw createExpectedAppError('NOT_GIT_REPOSITORY', 'Project is not a Git repository.')
     }
 
     if (!inspection.currentBranch) {
-      throw new Error('Git repository has no current branch.')
+      throw createExpectedAppError(
+        'GIT_REPOSITORY_HAS_NO_CURRENT_BRANCH',
+        'Git repository has no current branch.'
+      )
     }
 
     if (inspection.localBranches.includes(branchName)) {
-      throw new Error('Git branch already exists.')
+      throw createExpectedAppError('GIT_BRANCH_ALREADY_EXISTS', 'Git branch already exists.')
     }
 
     const worktreeDirectory = this.branchWorkspaceDirectoryPort.resolveBranchWorkspaceDirectory({

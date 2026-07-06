@@ -1,4 +1,5 @@
 import { TerminalSession } from '../../domain/aggregates/TerminalSession'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type {
   TerminalExitEvent,
@@ -114,7 +115,7 @@ export class TerminalSessionService {
     const session = this.sessions.get(sessionId)
 
     if (!session) {
-      throw new Error('Terminal session was not found.')
+      throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
     }
 
     return session
@@ -124,7 +125,10 @@ export class TerminalSessionService {
     const session = this.requireSession(sessionId)
 
     if (session.status !== 'running') {
-      throw new Error('Terminal session is not running.')
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_NOT_RUNNING',
+        'Terminal session is not running.'
+      )
     }
 
     return session
