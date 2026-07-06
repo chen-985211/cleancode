@@ -28,6 +28,7 @@ import {
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import { updateTerminalBlockStatus, updateTerminalStatus } from './terminalStateUpdates'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
+import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 
@@ -110,6 +111,13 @@ export function AppShell() {
     setCurrentWorkbench(workbench)
   }, [])
 
+  const replaceWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
+    setWorkbenches((entries) =>
+      entries.map((entry) => (entry.project.id === workbench.project.id ? workbench : entry))
+    )
+    setCurrentWorkbench(workbench)
+  }, [])
+
   const setCurrentGraph = useCallback((graphSnapshot: WorkbenchSnapshot['graph']): void => {
     const blockIds = new Set(graphSnapshot.blocks.map((block) => block.id))
 
@@ -123,12 +131,6 @@ export function AppShell() {
         entry.project.id === graphSnapshot.projectId ? { ...entry, graph: graphSnapshot } : entry
       )
     )
-  }, [])
-
-  const selectWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
-    setSelectedTerminalBlockId(null)
-    setHoveredTerminalBlockId(null)
-    setCurrentWorkbench(workbench)
   }, [])
 
   const addProject = useCallback(async () => {
@@ -159,6 +161,14 @@ export function AppShell() {
       sessionIds.map((sessionId) => window.cleancode?.terminateTerminal({ sessionId }))
     )
   }, [])
+
+  const { checkoutMainBranch, createBranchWorkspace, selectWorkspace } = useBranchWorkspaceActions({
+    currentWorkbench,
+    replaceWorkbench,
+    setHoveredTerminalBlockId,
+    setSelectedTerminalBlockId,
+    terminateWorkbenchTerminalSessions
+  })
 
   const removeProject = useCallback(
     async (workbench: WorkbenchSnapshot) => {
@@ -454,8 +464,10 @@ export function AppShell() {
         currentWorkbench={currentWorkbench}
         isDesktopRuntime={isDesktopRuntime}
         onAddProject={addProject}
+        onCheckoutMainBranch={checkoutMainBranch}
+        onCreateBranchWorkspace={createBranchWorkspace}
         onRemoveProject={removeProject}
-        onSelectWorkbench={selectWorkbench}
+        onSelectWorkspace={selectWorkspace}
       />
       <WorkbenchCanvas
         isDesktopRuntime={isDesktopRuntime}

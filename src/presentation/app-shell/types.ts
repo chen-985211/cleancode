@@ -6,11 +6,13 @@ import {
   type TerminalBlockSnapshot,
   type TerminalBlockSizeSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 
 export interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
+  readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }
 

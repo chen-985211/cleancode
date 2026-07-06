@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
+import {
+  createRuntimeApi,
+  createWorkbenchSnapshot
+} from '../../fixtures/presentation/appShellFixtures'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 
 describe('app shell', () => {
   beforeEach(() => {
@@ -107,6 +110,8 @@ describe('app shell', () => {
     render(<AppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
+    expect(within(projectCard).getByText('默认工作区')).toBeInTheDocument()
+
     fireEvent.click(within(projectCard).getByRole('button', { name: '移除项目' }))
 
     await waitFor(() =>
@@ -117,29 +122,330 @@ describe('app shell', () => {
     )
     expect(screen.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
   })
-})
 
-function createWorkbenchSnapshot(directory: string, name: string): WorkbenchSnapshot {
-  return {
-    project: {
-      id: `project-${name}`,
-      name,
-      directory,
+  it('creates a git branch workspace through the desktop runtime API', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const featureWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaceName: 'feature/sidebar',
+      workspaceDirectory: '/tmp/alpha-project-worktrees/feature-sidebar',
+      gitBranch: 'feature/sidebar'
+    })
+    const createBranchWorkspace = vi.fn(async () => featureWorkbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        createBranchWorkspace
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '新建分支工作区' }))
+    fireEvent.change(within(projectCard).getByLabelText('分支名称'), {
+      target: { value: 'feature/sidebar' }
+    })
+    fireEvent.click(within(projectCard).getByRole('button', { name: '创建分支工作区' }))
+
+    await waitFor(() =>
+      expect(createBranchWorkspace).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        branchName: 'feature/sidebar'
+      })
+    )
+    await screen.findByRole('button', { name: /feature\/sidebar/ })
+  })
+
+  it('switches branch workspaces through the desktop runtime API', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
           name: 'main',
-          directory,
-          gitBranch: null,
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: true
+        },
+        {
+          name: 'feature/sidebar',
+          directory: '/tmp/alpha-project-worktrees/feature-sidebar',
+          gitBranch: 'feature/sidebar',
+          isCurrent: false
+        }
+      ]
+    })
+    const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaceName: 'feature/sidebar',
+      workspaceDirectory: '/tmp/alpha-project-worktrees/feature-sidebar',
+      gitBranch: 'feature/sidebar'
+    })
+    const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        switchBranchWorkspace
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: /feature\/sidebar/ }))
+
+    await waitFor(() =>
+      expect(switchBranchWorkspace).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'feature/sidebar'
+      })
+    )
+    await screen.findByText('/tmp/alpha-project-worktrees/feature-sidebar')
+  })
+
+  it('shows the bound branch as a default-workspace selector instead of listing every branch', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaces: [
+        {
+          name: 'main',
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: true
+        },
+        {
+          name: 'feature/worktree',
+          directory: '/tmp/alpha-project-worktrees/feature-worktree',
+          gitBranch: 'feature/worktree',
+          isCurrent: false
+        }
+      ],
+      gitBranches: [
+        {
+          name: 'feature/free',
+          isCurrent: false,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: null,
+          isSelectableInMainWorkspace: true
+        },
+        {
+          name: 'feature/worktree',
+          isCurrent: false,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: '/tmp/alpha-project-worktrees/feature-worktree',
+          isSelectableInMainWorkspace: false
+        },
+        {
+          name: 'main',
+          isCurrent: true,
+          isMainWorkspaceBranch: true,
+          worktreeDirectory: '/tmp/alpha-project',
+          isSelectableInMainWorkspace: false
+        }
+      ]
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    expect(within(projectCard).getByRole('button', { name: '切换到默认工作区 main' })).toBeEnabled()
+    expect(
+      within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' })
+    ).toBeEnabled()
+    expect(within(projectCard).getByText('默认工作区')).toBeInTheDocument()
+    expect(within(projectCard).queryByRole('button', { name: /feature\/free/ })).toBeNull()
+    expect(
+      within(projectCard).getByRole('button', { name: 'feature/worktree worktree' })
+    ).toBeEnabled()
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))
+
+    const branchDialog = await screen.findByRole('dialog', { name: '选择默认工作区分支' })
+    const branchOptionButtons = within(branchDialog).getAllByRole('button')
+
+    expect(within(branchDialog).getByPlaceholderText('搜索分支')).toBeInTheDocument()
+    expect(branchOptionButtons[0]).toHaveAccessibleName('main')
+    expect(within(branchDialog).getByRole('button', { name: /feature\/free/ })).toBeEnabled()
+    expect(
+      within(branchDialog).getByRole('button', { name: /feature\/worktree.*独立工作区/ })
+    ).toBeDisabled()
+
+    fireEvent.pointerDown(document.body)
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '选择默认工作区分支' })).not.toBeInTheDocument()
+    )
+  })
+
+  it('switches to main when clicking the default workspace row body', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaceName: 'test',
+      workspaceDirectory: '/tmp/alpha-project-worktrees/test',
+      gitBranch: 'test',
+      workspaces: [
+        {
+          name: 'main',
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: false
+        },
+        {
+          name: 'test',
+          directory: '/tmp/alpha-project-worktrees/test',
+          gitBranch: 'test',
+          isCurrent: true
+        }
+      ],
+      gitBranches: [
+        {
+          name: 'main',
+          isCurrent: false,
+          isMainWorkspaceBranch: true,
+          worktreeDirectory: '/tmp/alpha-project',
+          isSelectableInMainWorkspace: false
+        },
+        {
+          name: 'test',
+          isCurrent: true,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: '/tmp/alpha-project-worktrees/test',
+          isSelectableInMainWorkspace: false
+        }
+      ]
+    })
+    const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranch: 'main'
+    })
+    const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        switchBranchWorkspace
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '切换到默认工作区 main' }))
+
+    await waitFor(() =>
+      expect(switchBranchWorkspace).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'main'
+      })
+    )
+    expect(screen.queryByRole('dialog', { name: '选择默认工作区分支' })).not.toBeInTheDocument()
+  })
+
+  it('marks worktree rows without repeating the branch name or current marker', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaces: [
+        {
+          name: 'main',
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: false
+        },
+        {
+          name: 'test',
+          directory: '/tmp/alpha-project-worktrees/test',
+          gitBranch: 'test',
           isCurrent: true
         }
       ]
-    },
-    graph: {
-      id: `graph-${name}`,
-      projectId: `project-${name}`,
-      workspaceName: 'main',
-      viewport: { x: 0, y: 0, zoom: 1 },
-      blocks: []
-    }
-  }
-}
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    expect(within(projectCard).getByRole('button', { name: 'test worktree' })).toBeEnabled()
+    expect(within(projectCard).queryByText('当前')).not.toBeInTheDocument()
+    expect(within(projectCard).queryByRole('button', { name: 'test 当前 test' })).toBeNull()
+  })
+
+  it('checks out a selectable local branch in the main workspace', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranches: [
+        {
+          name: 'main',
+          isCurrent: true,
+          isMainWorkspaceBranch: true,
+          worktreeDirectory: '/tmp/alpha-project',
+          isSelectableInMainWorkspace: false
+        },
+        {
+          name: 'feature/free',
+          isCurrent: false,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: null,
+          isSelectableInMainWorkspace: true
+        }
+      ]
+    })
+    const checkedOutWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranch: 'feature/free',
+      gitBranches: [
+        {
+          name: 'main',
+          isCurrent: false,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: null,
+          isSelectableInMainWorkspace: true
+        },
+        {
+          name: 'feature/free',
+          isCurrent: true,
+          isMainWorkspaceBranch: true,
+          worktreeDirectory: '/tmp/alpha-project',
+          isSelectableInMainWorkspace: false
+        }
+      ]
+    })
+    const checkoutMainWorkspaceBranch = vi.fn(async () => checkedOutWorkbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        checkoutMainWorkspaceBranch
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: '选择默认工作区分支' })).getByRole(
+        'button',
+        { name: /feature\/free/ }
+      )
+    )
+
+    await waitFor(() =>
+      expect(checkoutMainWorkspaceBranch).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        branchName: 'feature/free'
+      })
+    )
+    await screen.findByRole('button', { name: '切换到默认工作区 feature/free' })
+    expect(screen.queryByText('默认工作区')).not.toBeInTheDocument()
+  })
+})

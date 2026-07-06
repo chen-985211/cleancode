@@ -14,29 +14,56 @@ import type {
   CanvasViewportSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
-import { CreateProjectUseCase } from '../../contexts/project/application/use-cases/CreateProjectUseCase'
+import { CheckoutMainWorkspaceBranchUseCase } from '../../contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
+import { CreateBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
+import { CreateOrOpenProjectUseCase } from '../../contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
 import { ForgetProjectUseCase } from '../../contexts/project/application/use-cases/ForgetProjectUseCase'
+import { ListGitBranchNavigationUseCase } from '../../contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
 import { RememberProjectUseCase } from '../../contexts/project/application/use-cases/RememberProjectUseCase'
+import { SwitchBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
+import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
+import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
 import { FileSystemProjectRegistryRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRegistryRepository'
 import {
   FileSystemProjectRepository,
   inferProjectName
 } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
+import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 
 interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
+  readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
-const createProjectUseCase = new CreateProjectUseCase(projectRepository)
+const gitWorkspaceAdapter = new GitCliWorkspaceAdapter()
+const branchWorkspaceDirectoryResolver = new FileSystemBranchWorkspaceDirectoryResolver()
+const createOrOpenProjectUseCase = new CreateOrOpenProjectUseCase(
+  projectRepository,
+  gitWorkspaceAdapter
+)
+const createBranchWorkspaceUseCase = new CreateBranchWorkspaceUseCase(
+  projectRepository,
+  gitWorkspaceAdapter,
+  branchWorkspaceDirectoryResolver
+)
+const switchBranchWorkspaceUseCase = new SwitchBranchWorkspaceUseCase(projectRepository)
+const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
+  projectRepository,
+  gitWorkspaceAdapter
+)
+const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
+  projectRepository,
+  gitWorkspaceAdapter
+)
 const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
@@ -79,12 +106,10 @@ ipcMain.handle('cleancode:add-project', async (): Promise<WorkbenchSnapshot | nu
     return null
   }
 
-  const project =
-    (await projectRepository.findByDirectory(projectDirectory)) ??
-    (await createProjectUseCase.execute({
-      directory: projectDirectory,
-      name: inferProjectName(projectDirectory)
-    }))
+  const project = await createOrOpenProjectUseCase.execute({
+    directory: projectDirectory,
+    name: inferProjectName(projectDirectory)
+  })
 
   await rememberProject(project.directory)
 
@@ -94,6 +119,42 @@ ipcMain.handle('cleancode:add-project', async (): Promise<WorkbenchSnapshot | nu
 ipcMain.handle('cleancode:list-workbenches', async (): Promise<WorkbenchSnapshot[]> => {
   return loadRememberedWorkbenches()
 })
+
+ipcMain.handle(
+  'cleancode:create-branch-workspace',
+  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
+    const project = await createBranchWorkspaceUseCase.execute({
+      projectDirectory: readStringField(command, 'projectDirectory'),
+      branchName: readStringField(command, 'branchName')
+    })
+
+    return loadWorkbench(project)
+  }
+)
+
+ipcMain.handle(
+  'cleancode:switch-branch-workspace',
+  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
+    const project = await switchBranchWorkspaceUseCase.execute({
+      projectDirectory: readStringField(command, 'projectDirectory'),
+      workspaceName: readStringField(command, 'workspaceName')
+    })
+
+    return loadWorkbench(project)
+  }
+)
+
+ipcMain.handle(
+  'cleancode:checkout-main-workspace-branch',
+  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
+    const project = await checkoutMainWorkspaceBranchUseCase.execute({
+      projectDirectory: readStringField(command, 'projectDirectory'),
+      branchName: readStringField(command, 'branchName')
+    })
+
+    return loadWorkbench(project)
+  }
+)
 
 ipcMain.handle(
   'cleancode:remove-project',
@@ -303,8 +364,13 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
     projectDirectory: project.directory,
     workspaceName: currentWorkspace.name
   })
+  const gitBranches = (
+    await listGitBranchNavigationUseCase.execute({
+      projectDirectory: project.directory
+    })
+  ).branches
 
-  return { project, graph }
+  return { project, gitBranches, graph }
 }
 
 async function rememberProject(directory: string): Promise<void> {
@@ -317,9 +383,14 @@ async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
 
   for (const directory of registry.projectDirectories) {
     try {
-      const project = await projectRepository.findByDirectory(directory)
+      const rememberedProject = await projectRepository.findByDirectory(directory)
 
-      if (project) {
+      if (rememberedProject) {
+        const project = await createOrOpenProjectUseCase.execute({
+          directory: rememberedProject.directory,
+          name: rememberedProject.name
+        })
+
         workbenches.push(await loadWorkbench(project))
       }
     } catch {
@@ -328,6 +399,18 @@ async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
   }
 
   return workbenches
+}
+
+function readStringField(command: unknown, fieldName: string): string {
+  if (!isRecord(command) || typeof command[fieldName] !== 'string') {
+    throw new Error(`Invalid IPC command: ${fieldName} is required.`)
+  }
+
+  return command[fieldName]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }
 
 function getProjectRegistryRepository(): FileSystemProjectRegistryRepository {

@@ -5,6 +5,12 @@ const cleancodeApi = {
   listWorkbenches: () => ipcRenderer.invoke('cleancode:list-workbenches'),
   addProject: () => ipcRenderer.invoke('cleancode:add-project'),
   removeProject: (command: unknown) => ipcRenderer.invoke('cleancode:remove-project', command),
+  createBranchWorkspace: (command: unknown) =>
+    ipcRenderer.invoke('cleancode:create-branch-workspace', command),
+  switchBranchWorkspace: (command: unknown) =>
+    ipcRenderer.invoke('cleancode:switch-branch-workspace', command),
+  checkoutMainWorkspaceBranch: (command: unknown) =>
+    ipcRenderer.invoke('cleancode:checkout-main-workspace-branch', command),
   createTerminalBlock: (command: unknown) =>
     ipcRenderer.invoke('cleancode:create-terminal-block', command),
   updateTerminalBlockMetadata: (command: unknown) =>

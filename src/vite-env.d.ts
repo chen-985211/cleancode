@@ -6,6 +6,7 @@ import type {
   CanvasViewportSnapshot,
   TerminalBlockSizeSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
 import type {
@@ -15,6 +16,7 @@ import type {
 
 interface WorkbenchSnapshot {
   readonly project: ProjectSnapshot
+  readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }
 
@@ -25,6 +27,18 @@ declare global {
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
+      createBranchWorkspace(command: {
+        readonly projectDirectory: string
+        readonly branchName: string
+      }): Promise<WorkbenchSnapshot>
+      switchBranchWorkspace(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+      }): Promise<WorkbenchSnapshot>
+      checkoutMainWorkspaceBranch(command: {
+        readonly projectDirectory: string
+        readonly branchName: string
+      }): Promise<WorkbenchSnapshot>
       createTerminalBlock(command: {
         readonly projectDirectory: string
         readonly workspaceName: string
