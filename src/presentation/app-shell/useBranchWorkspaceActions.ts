@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkbenchSnapshot } from './types'
 
@@ -17,10 +17,14 @@ export function useBranchWorkspaceActions({
   setSelectedTerminalBlockId,
   terminateWorkbenchTerminalSessions
 }: UseBranchWorkspaceActionsInput) {
+  const [branchWorkspaceActionError, setBranchWorkspaceActionError] = useState<string | null>(null)
   const clearCurrentBlockSelection = useCallback(() => {
     setSelectedTerminalBlockId(null)
     setHoveredTerminalBlockId(null)
   }, [setHoveredTerminalBlockId, setSelectedTerminalBlockId])
+  const dismissBranchWorkspaceActionError = useCallback(() => {
+    setBranchWorkspaceActionError(null)
+  }, [])
 
   const selectWorkspace = useCallback(
     async (workbench: WorkbenchSnapshot, workspaceName: string): Promise<void> => {
@@ -80,6 +84,43 @@ export function useBranchWorkspaceActions({
     ]
   )
 
+  const archiveBranchWorkspace = useCallback(
+    async (workbench: WorkbenchSnapshot, workspaceName: string): Promise<void> => {
+      setBranchWorkspaceActionError(null)
+
+      try {
+        const selectedWorkspace = currentWorkbench?.project.workspaces.find(
+          (workspace) => workspace.name === workspaceName
+        )
+        const shouldTerminateCurrentWorkspace =
+          currentWorkbench?.project.id === workbench.project.id &&
+          Boolean(selectedWorkspace?.isCurrent)
+
+        if (shouldTerminateCurrentWorkspace && currentWorkbench) {
+          await terminateWorkbenchTerminalSessions(currentWorkbench)
+        }
+
+        const archivedWorkbench = await window.cleancode?.archiveBranchWorkspace({
+          projectDirectory: workbench.project.directory,
+          workspaceName
+        })
+
+        if (archivedWorkbench) {
+          clearCurrentBlockSelection()
+          replaceWorkbench(archivedWorkbench)
+        }
+      } catch (error) {
+        setBranchWorkspaceActionError(resolveBranchWorkspaceActionErrorMessage(error))
+      }
+    },
+    [
+      clearCurrentBlockSelection,
+      currentWorkbench,
+      replaceWorkbench,
+      terminateWorkbenchTerminalSessions
+    ]
+  )
+
   const checkoutMainBranch = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
       if (currentWorkbench?.project.id === workbench.project.id) {
@@ -104,5 +145,20 @@ export function useBranchWorkspaceActions({
     ]
   )
 
-  return { checkoutMainBranch, createBranchWorkspace, selectWorkspace }
+  return {
+    archiveBranchWorkspace,
+    branchWorkspaceActionError,
+    checkoutMainBranch,
+    createBranchWorkspace,
+    dismissBranchWorkspaceActionError,
+    selectWorkspace
+  }
+}
+
+function resolveBranchWorkspaceActionErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.includes('uncommitted changes')) {
+    return '工作区有未提交更改，无法归档。'
+  }
+
+  return error instanceof Error ? error.message : '工作区操作失败。'
 }

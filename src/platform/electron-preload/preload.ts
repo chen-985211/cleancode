@@ -9,6 +9,8 @@ const cleancodeApi = {
     ipcRenderer.invoke('cleancode:create-branch-workspace', command),
   switchBranchWorkspace: (command: unknown) =>
     ipcRenderer.invoke('cleancode:switch-branch-workspace', command),
+  archiveBranchWorkspace: (command: unknown) =>
+    ipcRenderer.invoke('cleancode:archive-branch-workspace', command),
   checkoutMainWorkspaceBranch: (command: unknown) =>
     ipcRenderer.invoke('cleancode:checkout-main-workspace-branch', command),
   createTerminalBlock: (command: unknown) =>

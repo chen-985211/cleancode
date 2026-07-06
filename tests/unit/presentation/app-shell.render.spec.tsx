@@ -155,7 +155,7 @@ describe('app shell', () => {
         branchName: 'feature/sidebar'
       })
     )
-    await screen.findByRole('button', { name: /feature\/sidebar/ })
+    await screen.findByRole('button', { name: 'feature/sidebar worktree' })
   })
 
   it('switches branch workspaces through the desktop runtime API', async () => {
@@ -193,7 +193,7 @@ describe('app shell', () => {
     render(<AppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
-    fireEvent.click(within(projectCard).getByRole('button', { name: /feature\/sidebar/ }))
+    fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/sidebar worktree' }))
 
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({

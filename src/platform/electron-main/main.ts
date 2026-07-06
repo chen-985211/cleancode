@@ -14,6 +14,7 @@ import type {
   CanvasViewportSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
+import { ArchiveBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
 import { CheckoutMainWorkspaceBranchUseCase } from '../../contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
 import { CreateBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { CreateOrOpenProjectUseCase } from '../../contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
@@ -54,6 +55,10 @@ const createBranchWorkspaceUseCase = new CreateBranchWorkspaceUseCase(
   projectRepository,
   gitWorkspaceAdapter,
   branchWorkspaceDirectoryResolver
+)
+const archiveBranchWorkspaceUseCase = new ArchiveBranchWorkspaceUseCase(
+  projectRepository,
+  gitWorkspaceAdapter
 )
 const switchBranchWorkspaceUseCase = new SwitchBranchWorkspaceUseCase(projectRepository)
 const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
@@ -136,6 +141,18 @@ ipcMain.handle(
   'cleancode:switch-branch-workspace',
   async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
     const project = await switchBranchWorkspaceUseCase.execute({
+      projectDirectory: readStringField(command, 'projectDirectory'),
+      workspaceName: readStringField(command, 'workspaceName')
+    })
+
+    return loadWorkbench(project)
+  }
+)
+
+ipcMain.handle(
+  'cleancode:archive-branch-workspace',
+  async (_event, command: unknown): Promise<WorkbenchSnapshot> => {
+    const project = await archiveBranchWorkspaceUseCase.execute({
       projectDirectory: readStringField(command, 'projectDirectory'),
       workspaceName: readStringField(command, 'workspaceName')
     })

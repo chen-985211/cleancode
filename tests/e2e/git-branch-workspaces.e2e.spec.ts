@@ -172,6 +172,47 @@ describe('git branch workspaces e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'archives a clean worktree while keeping its git branch selectable',
+    async () => {
+      await expectDesktopRuntime(page)
+
+      await page.getByRole('button', { name: '添加项目' }).click()
+
+      const projectCard = page.getByRole('group', { name: `项目 ${basename(projectDirectory)}` })
+      const featureWorktreeDirectory = branchWorktreeDirectory(projectDirectory, 'feature/sidebar')
+
+      await projectCard.getByRole('button', { name: '新建分支工作区' }).click()
+      await projectCard.getByLabel('分支名称').fill('feature/sidebar')
+      await projectCard.getByRole('button', { name: '创建分支工作区' }).click()
+      await projectCard.getByRole('button', { name: /feature\/sidebar.*worktree/ }).waitFor()
+      await access(join(featureWorktreeDirectory, '.git'))
+
+      await projectCard.getByRole('button', { name: '打开 feature/sidebar 工作区菜单' }).click()
+      await projectCard.getByRole('menuitem', { name: '归档工作区' }).click()
+
+      const archiveDialog = page.getByRole('dialog', { name: '归档工作区 feature/sidebar' })
+
+      await archiveDialog.waitFor()
+      expect(await archiveDialog.textContent()).toContain('归档前将自动切回默认工作区')
+
+      await archiveDialog.getByRole('button', { name: '归档工作区' }).click()
+      await archiveDialog.waitFor({ state: 'detached' })
+      await projectCard
+        .getByRole('button', { name: /feature\/sidebar.*worktree/ })
+        .waitFor({ state: 'detached' })
+      await expectPathMissing(featureWorktreeDirectory)
+      await expectLocalBranch(projectDirectory, 'feature/sidebar')
+
+      const branchDialog = await openDefaultBranchSelector(projectCard)
+      const archivedBranch = branchDialog.getByRole('button', { name: /^feature\/sidebar$/ })
+
+      await archivedBranch.waitFor()
+      expect(await archivedBranch.isEnabled()).toBe(true)
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function initializeGitProject(directory: string): Promise<void> {
@@ -313,6 +354,20 @@ async function expectCurrentGitBranch(directory: string, branchName: string): Pr
   }
 
   expect(currentBranch).toBe(branchName)
+}
+
+async function expectPathMissing(path: string): Promise<void> {
+  await expect(access(path)).rejects.toMatchObject({ code: 'ENOENT' })
+}
+
+async function expectLocalBranch(directory: string, branchName: string): Promise<void> {
+  const { stdout } = await execGit(directory, ['branch', '--format=%(refname:short)'])
+  const branchNames = stdout
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
+
+  expect(branchNames).toContain(branchName)
 }
 
 async function execGit(directory: string, args: readonly string[]) {

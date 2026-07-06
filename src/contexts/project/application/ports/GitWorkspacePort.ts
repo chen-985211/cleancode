@@ -22,9 +22,20 @@ export interface CheckoutBranchCommand {
   readonly branchName: string
 }
 
+export interface RemoveBranchWorktreeCommand {
+  readonly repositoryDirectory: string
+  readonly worktreeDirectory: string
+}
+
+export interface PruneWorktreesCommand {
+  readonly repositoryDirectory: string
+}
+
 export interface GitWorkspacePort {
   inspectRepository(directory: string): Promise<GitRepositoryInspection>
   createBranchWorktree(command: CreateBranchWorktreeCommand): Promise<void>
   isWorkingTreeClean(directory: string): Promise<boolean>
   checkoutBranch(command: CheckoutBranchCommand): Promise<void>
+  removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void>
+  pruneWorktrees(command: PruneWorktreesCommand): Promise<void>
 }

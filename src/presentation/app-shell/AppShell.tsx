@@ -162,7 +162,7 @@ export function AppShell() {
     )
   }, [])
 
-  const { checkoutMainBranch, createBranchWorkspace, selectWorkspace } = useBranchWorkspaceActions({
+  const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
     replaceWorkbench,
     setHoveredTerminalBlockId,
@@ -463,11 +463,14 @@ export function AppShell() {
         workbenches={workbenches}
         currentWorkbench={currentWorkbench}
         isDesktopRuntime={isDesktopRuntime}
+        actionError={branchWorkspaceActions.branchWorkspaceActionError}
         onAddProject={addProject}
-        onCheckoutMainBranch={checkoutMainBranch}
-        onCreateBranchWorkspace={createBranchWorkspace}
+        onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+        onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+        onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
+        onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
         onRemoveProject={removeProject}
-        onSelectWorkspace={selectWorkspace}
+        onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
       />
       <WorkbenchCanvas
         isDesktopRuntime={isDesktopRuntime}

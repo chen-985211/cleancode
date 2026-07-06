@@ -7,7 +7,9 @@ import type {
   CheckoutBranchCommand,
   CreateBranchWorktreeCommand,
   GitRepositoryInspection,
-  GitWorkspacePort
+  GitWorkspacePort,
+  PruneWorktreesCommand,
+  RemoveBranchWorktreeCommand
 } from '../../../../src/contexts/project/application/ports/GitWorkspacePort'
 import type { ProjectRepository } from '../../../../src/contexts/project/application/ports/ProjectRepository'
 import type { ProjectSnapshot } from '../../../../src/contexts/project/application/dto/ProjectSnapshot'
@@ -43,6 +45,8 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
   createBranchWorktreeCalls: CreateBranchWorktreeCommand[] = []
   createBranchWorktreeError: Error | null = null
   checkoutBranchCalls: CheckoutBranchCommand[] = []
+  removeBranchWorktreeCalls: RemoveBranchWorktreeCommand[] = []
+  pruneWorktreesCalls: PruneWorktreesCommand[] = []
   workingTreeClean = true
 
   async inspectRepository(): Promise<GitRepositoryInspection> {
@@ -63,6 +67,14 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
 
   async checkoutBranch(command: CheckoutBranchCommand): Promise<void> {
     this.checkoutBranchCalls.push(command)
+  }
+
+  async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
+    this.removeBranchWorktreeCalls.push(command)
+  }
+
+  async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
+    this.pruneWorktreesCalls.push(command)
   }
 }
 

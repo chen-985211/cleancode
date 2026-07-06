@@ -6,7 +6,9 @@ import type {
   CreateBranchWorktreeCommand,
   GitBranchInspection,
   GitRepositoryInspection,
-  GitWorkspacePort
+  GitWorkspacePort,
+  PruneWorktreesCommand,
+  RemoveBranchWorktreeCommand
 } from '../../application/ports/GitWorkspacePort'
 
 const execFileAsync = promisify(execFile)
@@ -69,6 +71,14 @@ export class GitCliWorkspaceAdapter implements GitWorkspacePort {
 
   async checkoutBranch(command: CheckoutBranchCommand): Promise<void> {
     await runGit(command.repositoryDirectory, ['checkout', command.branchName])
+  }
+
+  async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
+    await runGit(command.repositoryDirectory, ['worktree', 'remove', command.worktreeDirectory])
+  }
+
+  async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
+    await runGit(command.repositoryDirectory, ['worktree', 'prune'])
   }
 }
 

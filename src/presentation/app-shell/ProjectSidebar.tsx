@@ -1,17 +1,28 @@
-import { Check, ChevronDown, GitBranch, Plus, Search, Settings, Trash2 } from 'lucide-react'
+import {
+  Archive,
+  ChevronDown,
+  GitBranch,
+  MoreHorizontal,
+  Plus,
+  Settings,
+  Trash2,
+  X
+} from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import type { WorkbenchSnapshot } from './types'
-
-type GitBranchNavigationItem = WorkbenchSnapshot['gitBranches'][number]
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isDesktopRuntime: boolean
+  readonly actionError: string | null
   readonly onAddProject: () => void
+  readonly onArchiveBranchWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
+  readonly onDismissActionError: () => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
   readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
 }
@@ -20,9 +31,12 @@ export function ProjectSidebar({
   workbenches,
   currentWorkbench,
   isDesktopRuntime,
+  actionError,
   onAddProject,
+  onArchiveBranchWorkspace,
   onCheckoutMainBranch,
   onCreateBranchWorkspace,
+  onDismissActionError,
   onRemoveProject,
   onSelectWorkspace
 }: ProjectSidebarProps) {
@@ -44,6 +58,20 @@ export function ProjectSidebar({
           浏览器预览不连接本地文件系统和终端。请用桌面应用运行真实功能。
         </div>
       ) : null}
+      {actionError ? (
+        <div className="project-sidebar-alert" role="alert">
+          <span>{actionError}</span>
+          <button
+            className="project-sidebar-alert__close"
+            type="button"
+            aria-label="关闭提示"
+            title="关闭提示"
+            onClick={onDismissActionError}
+          >
+            <X size={13} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <div className="project-sidebar__label">项目</div>
       <div className="project-list">
         {workbenches.map((workbench) => (
@@ -51,6 +79,7 @@ export function ProjectSidebar({
             key={workbench.project.id}
             workbench={workbench}
             currentWorkbench={currentWorkbench}
+            onArchiveBranchWorkspace={onArchiveBranchWorkspace}
             onCheckoutMainBranch={onCheckoutMainBranch}
             onCreateBranchWorkspace={onCreateBranchWorkspace}
             onRemoveProject={onRemoveProject}
@@ -73,6 +102,7 @@ export function ProjectSidebar({
 interface ProjectCardProps {
   readonly workbench: WorkbenchSnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly onArchiveBranchWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
@@ -82,6 +112,7 @@ interface ProjectCardProps {
 function ProjectCard({
   workbench,
   currentWorkbench,
+  onArchiveBranchWorkspace,
   onCheckoutMainBranch,
   onCreateBranchWorkspace,
   onRemoveProject,
@@ -95,7 +126,13 @@ function ProjectCard({
   const [branchName, setBranchName] = useState('')
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
+  const [openWorkspaceMenuName, setOpenWorkspaceMenuName] = useState<string | null>(null)
+  const [archiveWorkspaceName, setArchiveWorkspaceName] = useState<string | null>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
+  const workspaceMenuRootRef = useRef<HTMLDivElement>(null)
+  const archiveWorkspace = archiveWorkspaceName
+    ? workbench.project.workspaces.find((workspace) => workspace.name === archiveWorkspaceName)
+    : null
   const submitBranchWorkspace = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
 
@@ -143,6 +180,28 @@ function ProjectCard({
       document.removeEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
     }
   }, [isBranchSelectorOpen])
+
+  useEffect(() => {
+    if (!openWorkspaceMenuName) {
+      return undefined
+    }
+
+    const closeWorkspaceMenuWhenClickingOutside = (event: PointerEvent): void => {
+      const target = event.target
+
+      if (target instanceof Node && workspaceMenuRootRef.current?.contains(target)) {
+        return
+      }
+
+      setOpenWorkspaceMenuName(null)
+    }
+
+    document.addEventListener('pointerdown', closeWorkspaceMenuWhenClickingOutside)
+
+    return () => {
+      document.removeEventListener('pointerdown', closeWorkspaceMenuWhenClickingOutside)
+    }
+  }, [openWorkspaceMenuName])
 
   return (
     <section className="project-card" role="group" aria-label={`项目 ${workbench.project.name}`}>
@@ -197,7 +256,13 @@ function ProjectCard({
             <div
               className="workspace-group"
               key={workspace.name}
-              ref={workspace.name === 'main' ? branchSelectorRootRef : undefined}
+              ref={
+                workspace.name === 'main'
+                  ? branchSelectorRootRef
+                  : openWorkspaceMenuName === workspace.name
+                    ? workspaceMenuRootRef
+                    : undefined
+              }
             >
               {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
                 <>
@@ -253,26 +318,68 @@ function ProjectCard({
                   ) : null}
                 </>
               ) : (
-                <button
-                  aria-label={workspaceButtonLabel}
-                  className={
-                    isActiveWorkspace ? 'workspace-row workspace-row--active' : 'workspace-row'
-                  }
-                  type="button"
-                  onClick={() => onSelectWorkspace(workbench, workspace.name)}
-                >
-                  <GitBranch size={14} aria-hidden="true" />
-                  <span className="truncate">{workspace.name}</span>
-                  {shouldShowDefaultWorkspaceBadge ? (
-                    <span className="badge badge--default-workspace">默认工作区</span>
+                <>
+                  <div
+                    className={[
+                      isActiveWorkspace ? 'workspace-row workspace-row--active' : 'workspace-row',
+                      isWorktreeWorkspace ? 'workspace-row--with-actions' : null
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <button
+                      aria-label={workspaceButtonLabel}
+                      className="workspace-row__select"
+                      type="button"
+                      onClick={() => onSelectWorkspace(workbench, workspace.name)}
+                    >
+                      <GitBranch size={14} aria-hidden="true" />
+                      <span className="truncate">{workspace.name}</span>
+                      {shouldShowDefaultWorkspaceBadge ? (
+                        <span className="badge badge--default-workspace">默认工作区</span>
+                      ) : null}
+                      {isWorktreeWorkspace ? (
+                        <span className="badge badge--worktree">worktree</span>
+                      ) : null}
+                      {shouldShowGitBranchBadge ? (
+                        <span className="badge badge--git">{workspace.gitBranch}</span>
+                      ) : null}
+                    </button>
+                    {isWorktreeWorkspace ? (
+                      <button
+                        className="workspace-row__menu-button"
+                        type="button"
+                        aria-label={`打开 ${workspace.name} 工作区菜单`}
+                        aria-haspopup="menu"
+                        aria-expanded={openWorkspaceMenuName === workspace.name}
+                        title="更多"
+                        onClick={() =>
+                          setOpenWorkspaceMenuName((menuName) =>
+                            menuName === workspace.name ? null : workspace.name
+                          )
+                        }
+                      >
+                        <MoreHorizontal size={15} aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
+                  {openWorkspaceMenuName === workspace.name ? (
+                    <div className="workspace-row-menu" role="menu">
+                      <button
+                        className="workspace-row-menu__item workspace-row-menu__item--danger"
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setArchiveWorkspaceName(workspace.name)
+                          setOpenWorkspaceMenuName(null)
+                        }}
+                      >
+                        <Archive size={14} aria-hidden="true" />
+                        归档工作区
+                      </button>
+                    </div>
                   ) : null}
-                  {isWorktreeWorkspace ? (
-                    <span className="badge badge--worktree">worktree</span>
-                  ) : null}
-                  {shouldShowGitBranchBadge ? (
-                    <span className="badge badge--git">{workspace.gitBranch}</span>
-                  ) : null}
-                </button>
+                </>
               )}
               {workspace.name !== 'main' && workspace.gitBranch ? (
                 <span className="workspace-git-branch sr-only">{workspace.gitBranch}</span>
@@ -295,105 +402,56 @@ function ProjectCard({
           </form>
         ) : null}
       </div>
+      {archiveWorkspace ? (
+        <ArchiveWorkspaceDialog
+          workspaceName={archiveWorkspace.name}
+          isCurrentWorkspace={archiveWorkspace.isCurrent && isCurrentProject}
+          onCancel={() => setArchiveWorkspaceName(null)}
+          onConfirm={() => {
+            onArchiveBranchWorkspace(workbench, archiveWorkspace.name)
+            setArchiveWorkspaceName(null)
+          }}
+        />
+      ) : null}
     </section>
   )
 }
 
-interface BranchSelectorPopoverProps {
-  readonly branches: readonly GitBranchNavigationItem[]
-  readonly searchQuery: string
-  readonly onSearchQueryChange: (query: string) => void
-  readonly onChooseBranch: (branch: GitBranchNavigationItem) => void
+interface ArchiveWorkspaceDialogProps {
+  readonly workspaceName: string
+  readonly isCurrentWorkspace: boolean
+  readonly onCancel: () => void
+  readonly onConfirm: () => void
 }
 
-function BranchSelectorPopover({
-  branches,
-  searchQuery,
-  onSearchQueryChange,
-  onChooseBranch
-}: BranchSelectorPopoverProps) {
-  const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
-  const visibleBranches = normalizedQuery
-    ? branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery))
-    : branches
-  const orderedVisibleBranches = orderBranchSelectorItems(visibleBranches)
-
+function ArchiveWorkspaceDialog({
+  workspaceName,
+  isCurrentWorkspace,
+  onCancel,
+  onConfirm
+}: ArchiveWorkspaceDialogProps) {
   return (
-    <div className="branch-selector-popover" role="dialog" aria-label="选择默认工作区分支">
-      <label className="sr-only" htmlFor="branch-selector-search">
-        搜索分支
-      </label>
-      <div className="branch-selector-search">
-        <Search size={15} aria-hidden="true" />
-        <input
-          id="branch-selector-search"
-          value={searchQuery}
-          onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder="搜索分支"
-        />
+    <div
+      className="archive-workspace-dialog"
+      role="dialog"
+      aria-label={`归档工作区 ${workspaceName}`}
+    >
+      <div className="archive-workspace-dialog__header">
+        <Archive size={16} aria-hidden="true" />
+        <span>归档工作区 {workspaceName}</span>
       </div>
-      <div className="branch-selector-label">分支</div>
-      <div className="branch-selector-options">
-        {orderedVisibleBranches.map((branch) => {
-          const isWorktreeBranch = Boolean(
-            branch.worktreeDirectory && !branch.isMainWorkspaceBranch
-          )
-          const isDisabled = !branch.isSelectableInMainWorkspace && !branch.isMainWorkspaceBranch
-
-          return (
-            <button
-              className={
-                branch.isMainWorkspaceBranch
-                  ? 'branch-selector-option branch-selector-option--current'
-                  : 'branch-selector-option'
-              }
-              key={branch.name}
-              type="button"
-              disabled={isDisabled}
-              onClick={() => onChooseBranch(branch)}
-            >
-              <GitBranch size={15} aria-hidden="true" />
-              <span className="branch-selector-option__content">
-                <span className="truncate">{branch.name}</span>
-                {isWorktreeBranch ? (
-                  <span className="branch-selector-option__meta">独立工作区</span>
-                ) : null}
-              </span>
-              {branch.isMainWorkspaceBranch ? <Check size={17} aria-hidden="true" /> : null}
-            </button>
-          )
-        })}
-        {visibleBranches.length === 0 ? (
-          <div className="branch-selector-empty" role="status">
-            没有匹配的分支
-          </div>
-        ) : null}
+      <p>
+        将移除这个 worktree 目录，但保留 Git 分支 {workspaceName}。之后可以从默认工作区重新创建。
+      </p>
+      {isCurrentWorkspace ? <p>当前正在使用该工作区，归档前将自动切回默认工作区。</p> : null}
+      <div className="archive-workspace-dialog__actions">
+        <button type="button" onClick={onCancel}>
+          取消
+        </button>
+        <button className="archive-workspace-dialog__confirm" type="button" onClick={onConfirm}>
+          归档工作区
+        </button>
       </div>
-      <button className="branch-selector-create" type="button" disabled>
-        <Plus size={16} aria-hidden="true" />
-        创建并检出新分支...
-      </button>
     </div>
   )
-}
-
-function orderBranchSelectorItems(
-  branches: readonly GitBranchNavigationItem[]
-): GitBranchNavigationItem[] {
-  return [...branches].sort(
-    (leftBranch, rightBranch) =>
-      getBranchSelectorPriority(leftBranch) - getBranchSelectorPriority(rightBranch)
-  )
-}
-
-function getBranchSelectorPriority(branch: GitBranchNavigationItem): number {
-  if (branch.name === 'main') {
-    return 0
-  }
-
-  if (branch.isMainWorkspaceBranch) {
-    return 1
-  }
-
-  return 2
 }

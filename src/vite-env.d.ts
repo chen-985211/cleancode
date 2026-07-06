@@ -35,6 +35,10 @@ declare global {
         readonly projectDirectory: string
         readonly workspaceName: string
       }): Promise<WorkbenchSnapshot>
+      archiveBranchWorkspace(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+      }): Promise<WorkbenchSnapshot>
       checkoutMainWorkspaceBranch(command: {
         readonly projectDirectory: string
         readonly branchName: string

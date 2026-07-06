@@ -202,6 +202,43 @@ export class Project {
     return new Project(this.id, this.name, this.directory, workspaces)
   }
 
+  archiveBranchWorkspace(workspaceName: string): Project {
+    const normalizedWorkspaceName = normalizeRequiredText(
+      workspaceName,
+      'Branch workspace name cannot be empty.'
+    )
+
+    if (normalizedWorkspaceName === 'main') {
+      throw new Error('Main workspace cannot be archived.')
+    }
+
+    const archivedWorkspace = this.workspaceSnapshots.find(
+      (workspace) => workspace.name === normalizedWorkspaceName
+    )
+
+    if (!archivedWorkspace) {
+      throw new Error('Branch workspace was not found.')
+    }
+
+    if (!archivedWorkspace.gitBranch) {
+      throw new Error('Only Git worktree workspaces can be archived.')
+    }
+
+    const workspaces = this.workspaceSnapshots
+      .filter((workspace) => workspace.name !== normalizedWorkspaceName)
+      .map((workspace) => ({
+        ...workspace,
+        isCurrent: archivedWorkspace.isCurrent ? workspace.name === 'main' : workspace.isCurrent
+      }))
+
+    return new Project(
+      this.id,
+      this.name,
+      this.directory,
+      normalizeBranchWorkspaces(this.directory, workspaces)
+    )
+  }
+
   toSnapshot(): ProjectSnapshot {
     return {
       id: this.id,

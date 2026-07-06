@@ -103,6 +103,29 @@ describe('project git workspace adapter', () => {
     await expect(adapter.isWorkingTreeClean(projectDirectory)).resolves.toBe(false)
   })
 
+  it('removes a branch worktree without deleting the git branch', async () => {
+    const adapter = new GitCliWorkspaceAdapter()
+    const worktreeDirectory = join(appStateDirectory, 'feature-sidebar')
+
+    await initializeGitProject(projectDirectory)
+    await adapter.createBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      branchName: 'feature/sidebar',
+      worktreeDirectory
+    })
+
+    await adapter.removeBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      worktreeDirectory
+    })
+    await adapter.pruneWorktrees({
+      repositoryDirectory: projectDirectory
+    })
+
+    await expect(access(worktreeDirectory)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(listLocalBranches(projectDirectory)).resolves.toContain('feature/sidebar')
+  })
+
   it('resolves branch worktree directories inside a centralized sibling worktrees directory', () => {
     const resolver = new FileSystemBranchWorkspaceDirectoryResolver()
 
@@ -130,4 +153,15 @@ async function getCurrentBranch(directory: string): Promise<string> {
   const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: directory })
 
   return stdout.trim()
+}
+
+async function listLocalBranches(directory: string): Promise<string[]> {
+  const { stdout } = await execFileAsync('git', ['branch', '--format=%(refname:short)'], {
+    cwd: directory
+  })
+
+  return stdout
+    .split('\n')
+    .map((branch) => branch.trim())
+    .filter(Boolean)
 }

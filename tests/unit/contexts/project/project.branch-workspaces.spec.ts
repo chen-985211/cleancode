@@ -79,6 +79,73 @@ describe('project branch workspaces', () => {
     })
   })
 
+  it('archives a non-current git branch workspace while keeping the current workspace', () => {
+    const project = Project.create({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app'
+    })
+      .bindMainWorkspaceToGit({
+        directory: '/work/app',
+        gitBranch: 'main'
+      })
+      .addBranchWorkspace({
+        name: 'feature/sidebar',
+        directory: '/state/worktrees/feature-sidebar',
+        gitBranch: 'feature/sidebar'
+      })
+      .switchCurrentWorkspace('main')
+      .archiveBranchWorkspace('feature/sidebar')
+
+    expect(project.currentWorkspace.name).toBe('main')
+    expect(project.workspaces).toEqual([
+      {
+        name: 'main',
+        directory: '/work/app',
+        gitBranch: 'main',
+        isCurrent: true
+      }
+    ])
+  })
+
+  it('archives the current git branch workspace by selecting main as the fallback workspace', () => {
+    const project = Project.create({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app'
+    })
+      .bindMainWorkspaceToGit({
+        directory: '/work/app',
+        gitBranch: 'main'
+      })
+      .addBranchWorkspace({
+        name: 'feature/sidebar',
+        directory: '/state/worktrees/feature-sidebar',
+        gitBranch: 'feature/sidebar'
+      })
+      .archiveBranchWorkspace('feature/sidebar')
+
+    expect(project.currentWorkspace).toEqual({
+      name: 'main',
+      directory: '/work/app',
+      gitBranch: 'main',
+      isCurrent: true
+    })
+    expect(project.workspaces.map((workspace) => workspace.name)).toEqual(['main'])
+  })
+
+  it('rejects archiving the main workspace', () => {
+    const project = Project.create({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app'
+    })
+
+    expect(() => project.archiveBranchWorkspace('main')).toThrow(
+      'Main workspace cannot be archived.'
+    )
+  })
+
   it('rejects duplicate branch workspaces', () => {
     const project = Project.create({
       id: 'project-1',
