@@ -1,4 +1,4 @@
-import { GitBranch, Plus, Settings, Sparkles, Trash2 } from 'lucide-react'
+import { GitBranch, Plus, Settings, Trash2 } from 'lucide-react'
 
 import type { WorkbenchSnapshot } from './types'
 
@@ -21,12 +21,6 @@ export function ProjectSidebar({
 }: ProjectSidebarProps) {
   return (
     <aside className="project-sidebar" aria-label="项目与分支工作区">
-      <div className="project-sidebar__brand">
-        <span className="brand-mark">
-          <Sparkles size={18} aria-hidden="true" />
-        </span>
-        <span>cleancode</span>
-      </div>
       <div className="project-sidebar__actions">
         <button
           className="sidebar-action"

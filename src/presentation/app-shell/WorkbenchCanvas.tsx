@@ -149,18 +149,18 @@ export function WorkbenchCanvas({
 
   return (
     <section className="app-shell__workspace" aria-label="积木画布">
-      <header className="app-shell__toolbar" aria-label="工作台工具栏">
-        <button
-          className="toolbar-button toolbar-button--primary"
-          type="button"
-          onClick={onCreateTerminalBlock}
-          disabled={!isDesktopRuntime || !currentWorkbench}
-        >
-          <Terminal size={16} aria-hidden="true" />
-          新建终端积木
-        </button>
-      </header>
       <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
+        <div className="app-shell__toolbar" aria-label="工作台工具栏">
+          <button
+            className="toolbar-button toolbar-button--primary"
+            type="button"
+            onClick={onCreateTerminalBlock}
+            disabled={!isDesktopRuntime || !currentWorkbench}
+          >
+            <Terminal size={16} aria-hidden="true" />
+            新建终端积木
+          </button>
+        </div>
         <ReactFlow<TerminalFlowNode, Edge>
           nodes={nodes}
           edges={[]}

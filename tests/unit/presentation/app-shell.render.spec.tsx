@@ -16,6 +16,7 @@ describe('app shell', () => {
     const toolbar = within(screen.getByLabelText('工作台工具栏'))
 
     expect(screen.getByRole('main', { name: 'cleancode workspace' })).toBeInTheDocument()
+    expect(screen.queryByText('cleancode')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeDisabled()
     expect(toolbar.getAllByRole('button')).toHaveLength(1)

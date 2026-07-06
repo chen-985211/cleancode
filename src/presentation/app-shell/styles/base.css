@@ -1,12 +1,16 @@
 :root {
-  --cc-background: #f7f8fb;
+  --cc-background: #f3f6fb;
+  --cc-canvas: #fbfcff;
+  --cc-chrome: #f6f8fc;
+  --cc-chrome-raised: #fafcff;
   --cc-surface: #ffffff;
   --cc-surface-subtle: #f3f5f9;
   --cc-surface-raised: #ffffff;
   --cc-foreground: #172033;
   --cc-muted: #667085;
-  --cc-border: #dbe2ed;
-  --cc-border-strong: #c9d3e2;
+  --cc-border: #e2e8f2;
+  --cc-border-strong: #cdd7e6;
+  --cc-divider: rgb(207 216 229 / 0.72);
   --cc-primary: #2563eb;
   --cc-primary-soft: #e8f0ff;
   --cc-success: #16a34a;
@@ -111,7 +115,7 @@ input:focus-visible {
 .project-sidebar,
 .agent-panel {
   min-width: 0;
-  background: rgb(255 255 255 / 0.92);
+  background: var(--cc-chrome);
 }
 
 .truncate {

@@ -3,28 +3,31 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: #fbfcff;
+  background: var(--cc-canvas);
 }
 
 .app-shell__toolbar {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 6;
   display: flex;
-  height: 58px;
-  flex: 0 0 auto;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid var(--cc-border);
-  background: rgb(255 255 255 / 0.9);
-  padding: 0 18px;
+  pointer-events: none;
 }
 
 .toolbar-button {
   height: 34px;
   padding: 0 12px;
+  pointer-events: auto;
 }
 
 .toolbar-button--primary {
-  border-color: #d0dcf8;
+  border-color: rgb(157 181 224 / 0.62);
+  background: rgb(255 255 255 / 0.72);
   color: var(--cc-primary);
+  box-shadow: 0 10px 26px rgb(37 99 235 / 0.07);
 }
 
 .canvas-surface {
@@ -34,7 +37,7 @@
 }
 
 .react-flow {
-  --xy-background-color: #fbfcff;
+  --xy-background-color: var(--cc-canvas);
   --xy-node-boxshadow-default: none;
   --xy-node-border-default: none;
   background-image: radial-gradient(circle at 1px 1px, rgb(148 163 184 / 0.42) 1px, transparent 0);
@@ -228,8 +231,8 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid var(--cc-border);
-  background: #ffffff;
+  border-top: 1px solid rgb(226 232 242 / 0.72);
+  background: rgb(250 252 255 / 0.88);
   padding: 0 16px;
   color: #667085;
   font-size: 12px;

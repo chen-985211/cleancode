@@ -3,46 +3,25 @@
   display: flex;
   min-height: 0;
   flex-direction: column;
-  border-right: 1px solid var(--cc-border);
-  padding: 22px 20px;
-}
-
-.project-sidebar__brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #111827;
-  font-size: 20px;
-  font-weight: 760;
-}
-
-.brand-mark {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #cfd8e6;
-  border-radius: 8px;
-  color: var(--cc-primary);
-  background: #ffffff;
+  border-right: 1px solid var(--cc-divider);
+  padding: 0 20px 18px;
 }
 
 .project-sidebar__actions {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
-  margin-top: 36px;
+  margin-top: 20px;
 }
 
 .sidebar-action {
   color: var(--cc-primary);
-  border-color: #c7d8ff;
-  background: #fbfdff;
+  border-color: rgb(157 181 224 / 0.62);
+  background: rgb(255 255 255 / 0.58);
 }
 
 .project-sidebar__label {
-  margin-top: 28px;
+  margin-top: 24px;
   color: var(--cc-muted);
   font-size: 13px;
   font-weight: 650;
@@ -67,13 +46,23 @@
 
 .project-card {
   overflow: hidden;
-  border: 1px solid var(--cc-border);
+  border: 1px solid rgb(211 220 234 / 0.62);
   border-radius: 8px;
-  background: #ffffff;
+  background: rgb(255 255 255 / 0.48);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.76) inset;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .project-card + .project-card {
   margin-top: 12px;
+}
+
+.project-card:hover,
+.project-card:focus-within {
+  border-color: rgb(181 195 218 / 0.76);
+  background: rgb(255 255 255 / 0.68);
 }
 
 .project-card__select,
@@ -95,7 +84,7 @@
   gap: 10px;
   height: 44px;
   padding: 0 8px 0 12px;
-  border-bottom: 1px solid #e8edf5;
+  border-bottom: 1px solid rgb(226 232 242 / 0.62);
 }
 
 .project-card__select {
@@ -134,7 +123,6 @@
 }
 
 .project-dot--active,
-.status-dot,
 .status-dot--running {
   background: var(--cc-success);
 }
@@ -154,11 +142,12 @@
 
 .workspace-row:hover,
 .workspace-row--active {
-  background: var(--cc-surface-subtle);
+  background: rgb(238 244 255 / 0.74);
 }
 
 .workspace-row--active {
   color: #1d4ed8;
+  box-shadow: 0 0 0 1px rgb(37 99 235 / 0.08) inset;
 }
 
 .badge {
