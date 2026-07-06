@@ -23,6 +23,6 @@ export function getTerminalStatusColor(status: TerminalSessionStatus): string {
     case 'exited':
       return '#94a3b8'
     case 'idle':
-      return '#9fb7ef'
+      return '#93a4bd'
   }
 }

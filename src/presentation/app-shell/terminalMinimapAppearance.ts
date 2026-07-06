@@ -26,10 +26,10 @@ export function getTerminalMiniMapNodeStrokeColor({
   }
 
   if (hoveredTerminalBlockId === node.id) {
-    return '#7c9df5'
+    return '#8fa9f7'
   }
 
-  return terminalStates[node.id]?.status === 'running' ? '#16a34a' : '#9fb7ef'
+  return terminalStates[node.id]?.status === 'running' ? '#22c55e' : '#d3dbe8'
 }
 
 export function getTerminalMiniMapNodeClassName({

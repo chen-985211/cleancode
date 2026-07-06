@@ -1,7 +1,6 @@
 import {
   Background,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   type Edge,
@@ -10,26 +9,16 @@ import {
   type ReactFlowInstance,
   type Viewport
 } from '@xyflow/react'
-import { Box, Map as MapIcon, Maximize2, Minimize2, Minus, Terminal, ZoomIn } from 'lucide-react'
-import {
-  useEffect,
-  useRef,
-  useState,
-  type MouseEvent,
-  type MutableRefObject,
-  type ReactNode
-} from 'react'
+import { Box, Terminal } from 'lucide-react'
+import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
 
 import {
   defaultCanvasViewport,
   maximumCanvasZoom,
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  MinimapNodeInteractionContext,
-  type MinimapNodeInteractionContextValue
-} from './minimapInteraction'
-import { MinimapTerminalNode } from './MinimapTerminalNode'
+import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
+import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { TerminalFlowNode, WorkbenchSnapshot } from './types'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
@@ -77,6 +66,9 @@ export function WorkbenchCanvas({
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
+  const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
   const canvasSurfaceClassName = [
@@ -85,6 +77,53 @@ export function WorkbenchCanvas({
   ]
     .filter(Boolean)
     .join(' ')
+  const moveCanvasViewportToMinimapCenter = (
+    center: MinimapViewportCenter,
+    persistViewport: boolean
+  ): void => {
+    const instance = reactFlowInstanceRef.current
+
+    if (!instance) {
+      return
+    }
+
+    centerCanvasViewportOnMinimapPoint({
+      center,
+      canvasSize,
+      instance,
+      persistViewport,
+      onViewportChange,
+      setCanvasViewport,
+      setViewportZoom
+    })
+  }
+
+  useEffect(() => {
+    const canvasSurface = canvasSurfaceRef.current
+
+    if (!canvasSurface) {
+      return undefined
+    }
+
+    const updateCanvasSize = (): void => {
+      setCanvasSize({
+        width: canvasSurface.clientWidth,
+        height: canvasSurface.clientHeight
+      })
+    }
+
+    updateCanvasSize()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return undefined
+    }
+
+    const resizeObserver = new ResizeObserver(updateCanvasSize)
+
+    resizeObserver.observe(canvasSurface)
+
+    return () => resizeObserver.disconnect()
+  }, [])
 
   useEffect(() => {
     const instance = reactFlowInstanceRef.current
@@ -103,7 +142,8 @@ export function WorkbenchCanvas({
       graphId: currentWorkbench.graph.id,
       restoredGraphIdRef,
       isRestoringViewportRef,
-      setViewportZoom
+      setViewportZoom,
+      setCanvasViewport
     })
   }, [currentWorkbench, reactFlowInstanceRef])
 
@@ -120,7 +160,7 @@ export function WorkbenchCanvas({
           新建终端积木
         </button>
       </header>
-      <div className={canvasSurfaceClassName}>
+      <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
         <ReactFlow<TerminalFlowNode, Edge>
           nodes={nodes}
           edges={[]}
@@ -135,12 +175,16 @@ export function WorkbenchCanvas({
                 graphId: currentWorkbench.graph.id,
                 restoredGraphIdRef,
                 isRestoringViewportRef,
-                setViewportZoom
+                setViewportZoom,
+                setCanvasViewport
               })
               return
             }
 
-            setViewportZoom(instance.getZoom())
+            const viewport = instance.getViewport()
+
+            setViewportZoom(viewport.zoom)
+            setCanvasViewport(toCanvasViewportSnapshot(viewport))
           }}
           onNodesChange={onNodesChange}
           onNodeClick={onNodeClick}
@@ -149,7 +193,12 @@ export function WorkbenchCanvas({
             setIsDraggingTerminalNode(false)
             onNodeDragStop(event, node)
           }}
-          onMove={(_event, viewport) => setViewportZoom(viewport.zoom)}
+          onMove={(_event, viewport) => {
+            const canvasViewportSnapshot = toCanvasViewportSnapshot(viewport)
+
+            setViewportZoom(canvasViewportSnapshot.zoom)
+            setCanvasViewport(canvasViewportSnapshot)
+          }}
           onMoveEnd={(_event, viewport) => {
             if (!isRestoringViewportRef.current) {
               onViewportChange(toCanvasViewportSnapshot(viewport))
@@ -164,6 +213,9 @@ export function WorkbenchCanvas({
           <Panel className="canvas-minimap-panel" position="top-left">
             <CanvasMinimap
               isCollapsed={isMinimapCollapsed}
+              nodes={nodes}
+              canvasViewport={canvasViewport}
+              canvasSize={canvasSize}
               viewportZoom={viewportZoom}
               minimapNodeInteraction={minimapNodeInteraction}
               onToggleCollapsed={() => setIsMinimapCollapsed((collapsed) => !collapsed)}
@@ -173,6 +225,8 @@ export function WorkbenchCanvas({
                 void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
               }
               onMinimapNodeClick={onMinimapNodeClick}
+              onViewportCenterPreview={(center) => moveCanvasViewportToMinimapCenter(center, false)}
+              onViewportCenterCommit={(center) => moveCanvasViewportToMinimapCenter(center, true)}
               getMiniMapNodeColor={getMiniMapNodeColor}
               getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
               getMiniMapNodeClassName={getMiniMapNodeClassName}
@@ -197,6 +251,7 @@ interface RestoreCanvasViewportInput {
   readonly restoredGraphIdRef: MutableRefObject<string | null>
   readonly isRestoringViewportRef: MutableRefObject<boolean>
   readonly setViewportZoom: (zoom: number) => void
+  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
 }
 
 function restoreCanvasViewport({
@@ -205,11 +260,13 @@ function restoreCanvasViewport({
   graphId,
   restoredGraphIdRef,
   isRestoringViewportRef,
-  setViewportZoom
+  setViewportZoom,
+  setCanvasViewport
 }: RestoreCanvasViewportInput): void {
   restoredGraphIdRef.current = graphId
   isRestoringViewportRef.current = true
   setViewportZoom(viewport.zoom)
+  setCanvasViewport(viewport)
 
   void instance.setViewport(viewport, { duration: 0 }).finally(() => {
     window.setTimeout(() => {
@@ -226,110 +283,43 @@ function toCanvasViewportSnapshot(viewport: Viewport): WorkbenchSnapshot['graph'
   }
 }
 
-interface CanvasMinimapProps {
-  readonly isCollapsed: boolean
-  readonly viewportZoom: number
-  readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
-  readonly onToggleCollapsed: () => void
-  readonly onZoomOut: () => void
-  readonly onZoomIn: () => void
-  readonly onFitCanvas: () => void
-  readonly onMinimapNodeClick: (blockId: string) => void
-  readonly getMiniMapNodeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeStrokeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeClassName: (node: TerminalFlowNode) => string
+interface CenterCanvasViewportOnMinimapPointInput {
+  readonly center: MinimapViewportCenter
+  readonly canvasSize: { readonly width: number; readonly height: number }
+  readonly instance: ReactFlowInstance<TerminalFlowNode, Edge>
+  readonly persistViewport: boolean
+  readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+  readonly setViewportZoom: (zoom: number) => void
 }
 
-function CanvasMinimap({
-  isCollapsed,
-  viewportZoom,
-  minimapNodeInteraction,
-  onToggleCollapsed,
-  onZoomOut,
-  onZoomIn,
-  onFitCanvas,
-  onMinimapNodeClick,
-  getMiniMapNodeColor,
-  getMiniMapNodeStrokeColor,
-  getMiniMapNodeClassName
-}: CanvasMinimapProps) {
-  return (
-    <div className="canvas-minimap">
-      <div className="canvas-minimap__header">
-        <span>小地图</span>
-        <button
-          className="icon-button icon-button--small"
-          type="button"
-          aria-label={isCollapsed ? '展开小地图' : '收起小地图'}
-          title={isCollapsed ? '展开小地图' : '收起小地图'}
-          onClick={onToggleCollapsed}
-        >
-          {isCollapsed ? (
-            <Maximize2 size={13} aria-hidden="true" />
-          ) : (
-            <Minimize2 size={13} aria-hidden="true" />
-          )}
-        </button>
-      </div>
-      {!isCollapsed ? (
-        <>
-          <MinimapNodeInteractionContext.Provider value={minimapNodeInteraction}>
-            <MiniMap<TerminalFlowNode>
-              pannable
-              zoomable
-              ariaLabel="积木导航小地图"
-              nodeComponent={MinimapTerminalNode}
-              nodeColor={getMiniMapNodeColor}
-              nodeStrokeColor={getMiniMapNodeStrokeColor}
-              nodeClassName={getMiniMapNodeClassName}
-              nodeBorderRadius={8}
-              nodeStrokeWidth={3}
-              maskColor="rgb(37 99 235 / 0.08)"
-              maskStrokeColor="rgb(37 99 235 / 0.28)"
-              maskStrokeWidth={1.5}
-              onNodeClick={(event, node) => {
-                event.stopPropagation()
-                onMinimapNodeClick(node.id)
-              }}
-            />
-          </MinimapNodeInteractionContext.Provider>
-          <div className="canvas-minimap__controls">
-            <MinimapControlButton label="小地图缩小" title="缩小画布" onClick={onZoomOut}>
-              <Minus size={13} aria-hidden="true" />
-            </MinimapControlButton>
-            <span>{Math.round(viewportZoom * 100)}%</span>
-            <MinimapControlButton label="小地图放大" title="放大画布" onClick={onZoomIn}>
-              <ZoomIn size={13} aria-hidden="true" />
-            </MinimapControlButton>
-            <MinimapControlButton label="小地图适应" title="适应画布" onClick={onFitCanvas}>
-              <MapIcon size={13} aria-hidden="true" />
-            </MinimapControlButton>
-          </div>
-        </>
-      ) : null}
-    </div>
-  )
+function centerCanvasViewportOnMinimapPoint({
+  center,
+  canvasSize,
+  instance,
+  persistViewport,
+  onViewportChange,
+  setCanvasViewport,
+  setViewportZoom
+}: CenterCanvasViewportOnMinimapPointInput): void {
+  const zoom = instance.getZoom()
+  const viewport = {
+    x: resolveCanvasDimension(canvasSize.width, 960) / 2 - center.x * zoom,
+    y: resolveCanvasDimension(canvasSize.height, 640) / 2 - center.y * zoom,
+    zoom
+  }
+
+  setViewportZoom(zoom)
+  setCanvasViewport(viewport)
+  void instance.setViewport(viewport, { duration: 0 })
+
+  if (persistViewport) {
+    onViewportChange(viewport)
+  }
 }
 
-interface MinimapControlButtonProps {
-  readonly label: string
-  readonly title: string
-  readonly onClick: () => void
-  readonly children: ReactNode
-}
-
-function MinimapControlButton({ label, title, onClick, children }: MinimapControlButtonProps) {
-  return (
-    <button
-      className="icon-button icon-button--small"
-      type="button"
-      aria-label={label}
-      title={title}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
+function resolveCanvasDimension(value: number, fallback: number): number {
+  return value > 0 ? value : fallback
 }
 
 function CanvasEmptyState({ isDesktopRuntime }: { readonly isDesktopRuntime: boolean }) {

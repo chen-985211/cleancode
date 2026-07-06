@@ -34,10 +34,10 @@ export function MinimapTerminalNode({
   const { focusBlock, getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
   const statusColor = color ?? '#98a2b3'
-  const effectiveStrokeColor = selected ? '#2563eb' : (strokeColor ?? '#9fb7ef')
+  const effectiveStrokeColor = selected ? '#5c85f5' : (strokeColor ?? '#d3dbe8')
   const effectiveStrokeWidth = selected
-    ? Math.max(strokeWidth ?? 2, 4)
-    : Math.max(strokeWidth ?? 2, 2)
+    ? Math.max(strokeWidth ?? 1.2, 2)
+    : Math.max(strokeWidth ?? 1.1, 1.1)
   const headerHeight = Math.max(6, Math.min(height * 0.28, 18))
   const inset = Math.max(3, Math.min(width, height) * 0.08)
   const screenY = y + headerHeight + inset
@@ -103,7 +103,7 @@ export function MinimapTerminalNode({
         width={Math.max(4, width - inset * 2)}
         height={screenHeight}
         rx={Math.max(2, borderRadius * 0.45)}
-        fill="#0b0f14"
+        fill="#141a24"
       />
     </g>
   )
