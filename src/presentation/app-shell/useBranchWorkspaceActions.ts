@@ -60,21 +60,27 @@ export function useBranchWorkspaceActions({
 
   const createBranchWorkspace = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
-      const createdWorkbench = await window.cleancode?.createBranchWorkspace({
-        projectDirectory: workbench.project.directory,
-        branchName
-      })
+      setBranchWorkspaceActionError(null)
 
-      if (!createdWorkbench) {
-        return
+      try {
+        const createdWorkbench = await window.cleancode?.createBranchWorkspace({
+          projectDirectory: workbench.project.directory,
+          branchName
+        })
+
+        if (!createdWorkbench) {
+          return
+        }
+
+        if (currentWorkbench?.project.id === workbench.project.id) {
+          await terminateWorkbenchTerminalSessions(currentWorkbench)
+        }
+
+        clearCurrentBlockSelection()
+        replaceWorkbench(createdWorkbench)
+      } catch (error) {
+        setBranchWorkspaceActionError(resolveBranchWorkspaceActionErrorMessage(error))
       }
-
-      if (currentWorkbench?.project.id === workbench.project.id) {
-        await terminateWorkbenchTerminalSessions(currentWorkbench)
-      }
-
-      clearCurrentBlockSelection()
-      replaceWorkbench(createdWorkbench)
     },
     [
       clearCurrentBlockSelection,
@@ -156,6 +162,14 @@ export function useBranchWorkspaceActions({
 }
 
 function resolveBranchWorkspaceActionErrorMessage(error: unknown): string {
+  if (
+    error instanceof Error &&
+    (error.message.includes('Git branch already exists') ||
+      error.message.includes('Branch workspace already exists'))
+  ) {
+    return 'Git 分支已存在，无法创建同名工作区。'
+  }
+
   if (error instanceof Error && error.message.includes('uncommitted changes')) {
     return '工作区有未提交更改，无法归档。'
   }
