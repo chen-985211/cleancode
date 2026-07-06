@@ -20,7 +20,11 @@
     "prepare": "husky",
     "pre-commit": "pnpm check:deps && pnpm check:max-lines && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm knip",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "pnpm test:unit && pnpm test:integration && pnpm test:contract && pnpm test:e2e",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:contract": "vitest run tests/contract --passWithNoTests",
+    "test:e2e": "vitest run tests/e2e",
     "test:watch": "vitest"
   },
   "dependencies": {

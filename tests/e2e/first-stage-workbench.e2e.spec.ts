@@ -380,14 +380,14 @@ async function expectMinimapCanFocusTerminal(page: Page, terminalName: string): 
   const minimapTerminal = page.locator(`[aria-label="聚焦终端 ${terminalName}"]`)
 
   await minimapTerminal.waitFor()
-  await minimapTerminal.hover()
+  await hoverLocatorCenter(page, minimapTerminal.locator('.canvas-minimap__node-screen'))
   await page.waitForFunction(
     () =>
       document
         .querySelector('.terminal-node')
         ?.classList.contains('terminal-node--navigation-highlighted') ?? false
   )
-  await minimapTerminal.click()
+  await clickLocatorCenter(page, minimapTerminal.locator('.canvas-minimap__node-screen'))
   await page.waitForFunction(
     () =>
       document.querySelector('.terminal-node')?.classList.contains('terminal-node--selected') ??

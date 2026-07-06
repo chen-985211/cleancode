@@ -8,7 +8,7 @@ import {
   collectLineViolations,
   countTextLines,
   isCodeFile
-} from '../../scripts/check-max-lines.mjs'
+} from '../../../scripts/check-max-lines.mjs'
 
 describe('max lines quality gate', () => {
   it('counts text lines without treating a trailing newline as another line', () => {
@@ -20,7 +20,7 @@ describe('max lines quality gate', () => {
 
   it('only checks project code files', () => {
     expect(isCodeFile('src/presentation/app-shell/AppShell.tsx')).toBe(true)
-    expect(isCodeFile('tests/support/check-max-lines.spec.ts')).toBe(true)
+    expect(isCodeFile('tests/unit/support/check-max-lines.spec.ts')).toBe(true)
     expect(isCodeFile('scripts/check-max-lines.mjs')).toBe(true)
     expect(isCodeFile('scripts/check-max-lines.d.mts')).toBe(true)
     expect(isCodeFile('docs/architecture.md')).toBe(false)
