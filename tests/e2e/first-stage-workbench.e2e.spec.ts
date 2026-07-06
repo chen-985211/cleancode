@@ -18,6 +18,18 @@ const electronBuildTimeoutMs = 45_000
 const electronLaunchTimeoutMs = 30_000
 const electronScenarioTimeoutMs = 60_000
 
+interface TerminalBlockRecord {
+  readonly name: string
+  readonly position: {
+    readonly x: number
+    readonly y: number
+  }
+  readonly size: {
+    readonly width: number
+    readonly height: number
+  }
+}
+
 describe('first-stage workbench e2e', () => {
   let projectDirectory: string
   let registryDirectory: string
@@ -58,6 +70,7 @@ describe('first-stage workbench e2e', () => {
       await page.getByRole('button', { name: '添加项目' }).click()
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await expectTerminalLooksLikePlainShell(page)
+      await expectNewTerminalIsFocused(page)
       await page.getByText('运行中').waitFor()
       await expectMinimapCanFocusTerminal(page, 'Terminal 1')
       await page.getByRole('button', { name: 'Terminal 1 编辑终端信息' }).click()
@@ -156,6 +169,28 @@ describe('first-stage workbench e2e', () => {
       }
 
       expect(graphAfterDelete.blocks).toHaveLength(0)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'places newly created terminal blocks without overlapping existing blocks',
+    async () => {
+      await expectDesktopRuntime(page)
+
+      await page.getByRole('button', { name: '添加项目' }).click()
+
+      for (let terminalIndex = 1; terminalIndex <= 5; terminalIndex += 1) {
+        await page.getByRole('button', { name: '新建终端积木' }).click()
+        await page.getByText(`Terminal ${terminalIndex}`).waitFor()
+      }
+
+      const graph = JSON.parse(await readOnlyJsonFile(appStateDirectory, 'default-graph.json')) as {
+        blocks: TerminalBlockRecord[]
+      }
+
+      expect(graph.blocks).toHaveLength(5)
+      expectTerminalBlocksDoNotOverlap(graph.blocks)
     },
     electronScenarioTimeoutMs
   )
@@ -304,6 +339,41 @@ async function expectTerminalLooksLikePlainShell(page: Page): Promise<void> {
   expect(await terminalNode.locator('.terminal-node__footer').count()).toBe(0)
   expect(await terminalNode.getByText('start shell').count()).toBe(0)
   expect(await terminalNode.getByText('按 Enter').count()).toBe(0)
+}
+
+async function expectNewTerminalIsFocused(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      document.querySelector('.terminal-node')?.classList.contains('terminal-node--selected') ??
+      false
+  )
+  await waitForTerminalViewportHitTarget(page)
+}
+
+function expectTerminalBlocksDoNotOverlap(blocks: TerminalBlockRecord[]): void {
+  const overlappingPairs: string[] = []
+
+  for (let leftIndex = 0; leftIndex < blocks.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < blocks.length; rightIndex += 1) {
+      const leftBlock = blocks[leftIndex]!
+      const rightBlock = blocks[rightIndex]!
+
+      if (terminalBlocksOverlap(leftBlock, rightBlock)) {
+        overlappingPairs.push(`${leftBlock.name} overlaps ${rightBlock.name}`)
+      }
+    }
+  }
+
+  expect(overlappingPairs).toEqual([])
+}
+
+function terminalBlocksOverlap(leftBlock: TerminalBlockRecord, rightBlock: TerminalBlockRecord) {
+  return (
+    leftBlock.position.x < rightBlock.position.x + rightBlock.size.width &&
+    leftBlock.position.x + leftBlock.size.width > rightBlock.position.x &&
+    leftBlock.position.y < rightBlock.position.y + rightBlock.size.height &&
+    leftBlock.position.y + leftBlock.size.height > rightBlock.position.y
+  )
 }
 
 async function expectMinimapCanFocusTerminal(page: Page, terminalName: string): Promise<void> {

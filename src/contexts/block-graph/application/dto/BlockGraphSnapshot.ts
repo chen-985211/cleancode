@@ -8,6 +8,7 @@ export type {
 
 export {
   defaultCanvasViewport,
+  defaultTerminalBlockSize,
   maximumCanvasZoom,
   minimumCanvasZoom,
   minimumTerminalBlockSize

@@ -8,10 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { AgentPanel } from './AgentPanel'
+import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
+import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { TerminalNode } from './TerminalNode'
 import {
   defaultTerminalDimensions,
@@ -185,10 +187,8 @@ export function AppShell() {
       return
     }
 
-    const position = {
-      x: 180 + currentWorkbench.graph.blocks.length * 44,
-      y: 270 + currentWorkbench.graph.blocks.length * 32
-    }
+    const existingBlockIds = new Set(currentWorkbench.graph.blocks.map((block) => block.id))
+    const position = resolveNewTerminalBlockPosition(currentWorkbench.graph.blocks)
     const graphSnapshot = await window.cleancode?.createTerminalBlock({
       projectDirectory: currentWorkbench.project.directory,
       workspaceName: currentWorkspace.name,
@@ -199,6 +199,17 @@ export function AppShell() {
 
     if (graphSnapshot) {
       setCurrentGraph(graphSnapshot)
+      const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
+
+      if (createdBlock) {
+        focusTerminalBlockInCanvas({
+          block: createdBlock,
+          reactFlowInstance: reactFlowInstanceRef.current,
+          duration: 0,
+          setSelectedTerminalBlockId,
+          setHoveredTerminalBlockId
+        })
+      }
     }
   }, [currentWorkbench, currentWorkspace, setCurrentGraph])
 
@@ -209,33 +220,17 @@ export function AppShell() {
   const focusTerminalBlock = useCallback(
     (blockId: string) => {
       const block = terminalBlocksById.get(blockId)
-      const reactFlowInstance = reactFlowInstanceRef.current
 
-      if (!block || !reactFlowInstance) {
+      if (!block) {
         return
       }
 
-      const node = reactFlowInstance.getNode(blockId)
-      const measuredWidth = node?.measured?.width ?? block.size.width
-      const measuredHeight = node?.measured?.height ?? block.size.height
-      const position = node?.position ?? block.position
-      const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
-
-      setSelectedTerminalBlockId(blockId)
-      setHoveredTerminalBlockId(null)
-      void reactFlowInstance.setCenter(
-        position.x + measuredWidth / 2,
-        position.y + measuredHeight / 2,
-        {
-          zoom: nextZoom,
-          duration: 220
-        }
-      )
-      window.setTimeout(() => {
-        document
-          .querySelector<HTMLElement>(`[data-terminal-block-id="${blockId}"] .terminal-viewport`)
-          ?.focus()
-      }, 240)
+      focusTerminalBlockInCanvas({
+        block,
+        reactFlowInstance: reactFlowInstanceRef.current,
+        setSelectedTerminalBlockId,
+        setHoveredTerminalBlockId
+      })
     },
     [terminalBlocksById]
   )
