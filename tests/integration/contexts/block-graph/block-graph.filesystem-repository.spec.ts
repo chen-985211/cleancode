@@ -8,6 +8,7 @@ import {
   defaultTerminalBlockSize
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
+import { getAppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('block graph filesystem repository', () => {
   let projectDirectory: string
@@ -163,14 +164,76 @@ describe('block graph filesystem repository', () => {
       })
     ])
   })
+
+  it('keeps concurrent saves to the same graph path ordered and parseable', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const slowGraph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    const latestGraph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    for (let index = 0; index < 1_500; index += 1) {
+      slowGraph.createTerminalBlock({
+        name: `Slow Terminal ${index}`,
+        description: 'Large snapshot',
+        position: { x: index, y: index }
+      })
+    }
+    latestGraph.createTerminalBlock({
+      name: 'Latest Terminal',
+      description: 'Last requested snapshot',
+      position: { x: 80, y: 120 }
+    })
+
+    await Promise.all([
+      repository.saveDefaultGraph(projectDirectory, slowGraph),
+      repository.saveDefaultGraph(projectDirectory, latestGraph)
+    ])
+
+    const graphFile = await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
+    const savedGraph = JSON.parse(graphFile) as { id: string; blocks: Array<{ name: string }> }
+
+    expect(savedGraph.id).toBe(latestGraph.id)
+    expect(savedGraph.blocks).toEqual([
+      expect.objectContaining({
+        name: 'Latest Terminal'
+      })
+    ])
+  })
+
+  it('reports corrupted persisted graph snapshots as a stable app error', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    await repository.saveDefaultGraph(projectDirectory, graph)
+
+    const graphPath = await findOnlyFileNamed(appStateDirectory, 'default-graph.json')
+
+    await writeFile(graphPath, '{ "id": "graph-1" }\n}\n')
+
+    await expect(repository.findDefaultGraphSnapshot(projectDirectory, 'main')).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'BLOCK_GRAPH_SNAPSHOT_CORRUPTED'
+    )
+  })
 })
 
 async function readOnlyJsonFile(directory: string, fileName: string): Promise<string> {
+  return readFile(await findOnlyFileNamed(directory, fileName), 'utf8')
+}
+
+async function findOnlyFileNamed(directory: string, fileName: string): Promise<string> {
   const matches = await findFilesNamed(directory, fileName)
 
   expect(matches).toHaveLength(1)
 
-  return readFile(matches[0]!, 'utf8')
+  return matches[0]!
 }
 
 async function findFilesNamed(directory: string, fileName: string): Promise<string[]> {

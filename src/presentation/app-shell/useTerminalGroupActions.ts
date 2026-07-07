@@ -10,12 +10,20 @@ import {
   type TerminalGroupMetadataInput,
   type WorkbenchSnapshot
 } from './types'
+import type { TerminalSessionActionOptions } from './useTerminalSessions'
 
 interface UseTerminalGroupActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly interruptTerminal: (block: TerminalBlockSnapshot) => Promise<void>
-  readonly restartTerminal: (block: TerminalBlockSnapshot) => Promise<void>
+  readonly quickLaunchTerminal: (
+    block: TerminalBlockSnapshot,
+    options?: TerminalSessionActionOptions
+  ) => Promise<void>
+  readonly restartTerminal: (
+    block: TerminalBlockSnapshot,
+    options?: TerminalSessionActionOptions
+  ) => Promise<void>
   readonly selectedTerminalBlockIds: readonly string[]
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
   readonly setCurrentGraph: (graphSnapshot: WorkbenchSnapshot['graph']) => void
@@ -32,6 +40,7 @@ export function useTerminalGroupActions({
   currentWorkbench,
   currentWorkspace,
   interruptTerminal,
+  quickLaunchTerminal,
   restartTerminal,
   selectedTerminalBlockIds,
   selectedUngroupedTerminalBlockIds,
@@ -72,6 +81,11 @@ export function useTerminalGroupActions({
     () => ({
       onStartGroup: (group: TerminalGroupSnapshot) => {
         for (const block of getGroupMemberBlocks(group)) {
+          if (block.launchCommand.trim()) {
+            void quickLaunchTerminal(block, { shouldFocus: false })
+            continue
+          }
+
           void startTerminal(block, defaultTerminalDimensions)
         }
       },
@@ -82,7 +96,7 @@ export function useTerminalGroupActions({
       },
       onRestartGroup: (group: TerminalGroupSnapshot) => {
         for (const block of getGroupMemberBlocks(group)) {
-          void restartTerminal(block)
+          void restartTerminal(block, { shouldFocus: false })
         }
       },
       onUpdateGroupMetadata: (group: TerminalGroupSnapshot, metadata: TerminalGroupMetadataInput) =>
@@ -170,6 +184,7 @@ export function useTerminalGroupActions({
     [
       getGroupMemberBlocks,
       interruptTerminal,
+      quickLaunchTerminal,
       restartTerminal,
       runGraphMutation,
       selectedTerminalBlockIds,

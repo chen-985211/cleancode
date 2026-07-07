@@ -233,7 +233,9 @@
   pointer-events: none;
 }
 
-.terminal-node-icon {
+.terminal-node__icon svg,
+.terminal-node__action svg,
+.terminal-node__group-select svg {
   position: relative;
   z-index: 1;
   display: block;

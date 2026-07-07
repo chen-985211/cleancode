@@ -381,6 +381,7 @@ export function AppShell() {
     currentWorkbench,
     currentWorkspace,
     interruptTerminal,
+    quickLaunchTerminal,
     restartTerminal,
     selectedTerminalBlockIds,
     selectedUngroupedTerminalBlockIds,

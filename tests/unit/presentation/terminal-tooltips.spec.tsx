@@ -35,6 +35,37 @@ describe('terminal tooltips', () => {
     expectTooltip('Terminal 重启终端', '重启终端')
     expectTooltip('Terminal 删除终端', '删除终端')
   })
+
+  it('orders terminal actions like the shared terminal group actions', () => {
+    render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={createTerminalNodeData()}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const actionNames = screen
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'))
+
+    expect(actionNames).toEqual([
+      'Terminal 快速启动',
+      'Terminal 停止当前命令',
+      'Terminal 重启终端',
+      'Terminal 编辑终端信息',
+      'Terminal 删除终端'
+    ])
+  })
 })
 
 function createTerminalNodeData(): TerminalFlowNode['data'] {

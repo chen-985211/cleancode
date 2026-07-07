@@ -20,6 +20,10 @@ interface UseTerminalSessionsInput {
   readonly focusTerminalBlock: (blockId: string) => void
 }
 
+export interface TerminalSessionActionOptions {
+  readonly shouldFocus?: boolean
+}
+
 export function useTerminalSessions({
   currentWorkspace,
   focusTerminalBlock
@@ -196,16 +200,19 @@ export function useTerminalSessions({
   )
 
   const restartTerminal = useCallback(
-    async (block: TerminalBlockSnapshot) => {
+    async (block: TerminalBlockSnapshot, options: TerminalSessionActionOptions = {}) => {
       await terminateTerminalSession(block)
       await startTerminal(block, defaultTerminalDimensions)
-      window.setTimeout(() => focusTerminalBlock(block.id), 80)
+
+      if (shouldFocusTerminalAfterAction(options)) {
+        window.setTimeout(() => focusTerminalBlock(block.id), 80)
+      }
     },
     [focusTerminalBlock, startTerminal, terminateTerminalSession]
   )
 
   const quickLaunchTerminal = useCallback(
-    async (block: TerminalBlockSnapshot) => {
+    async (block: TerminalBlockSnapshot, options: TerminalSessionActionOptions = {}) => {
       const launchCommand = block.launchCommand.trim()
 
       if (!launchCommand || !window.cleancode) {
@@ -229,7 +236,9 @@ export function useTerminalSessions({
           })
         }
 
-        window.setTimeout(() => focusTerminalBlock(block.id), 80)
+        if (shouldFocusTerminalAfterAction(options)) {
+          window.setTimeout(() => focusTerminalBlock(block.id), 80)
+        }
       } finally {
         quickLaunchesRef.current.delete(block.id)
       }
@@ -324,6 +333,10 @@ export function useTerminalSessions({
     terminateWorkbenchTerminalSessions,
     writeTerminal
   }
+}
+
+function shouldFocusTerminalAfterAction(options: TerminalSessionActionOptions): boolean {
+  return options.shouldFocus !== false
 }
 
 interface TerminalInputBuffer {

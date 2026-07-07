@@ -6,9 +6,9 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
+import { Check, Edit3, Play, RefreshCw, Square, Terminal, Trash2, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
-import { TerminalNodeIcon } from './TerminalNodeIcons'
 import { TerminalViewport } from './TerminalViewport'
 import {
   terminalNodeMinimumSize,
@@ -267,7 +267,7 @@ function TerminalHeader({
   return (
     <div className="terminal-node__header">
       <span className="terminal-node__icon">
-        <TerminalNodeIcon name="terminal" size={23} />
+        <Terminal size={23} aria-hidden="true" />
       </span>
       {isTerminalGroupSelectionMode ? (
         <button
@@ -289,7 +289,7 @@ function TerminalHeader({
             onToggleTerminalGroupCandidate()
           }}
         >
-          {isSelectedForTerminalGroup ? <TerminalNodeIcon name="check" size={16} /> : null}
+          {isSelectedForTerminalGroup ? <Check size={16} aria-hidden="true" /> : null}
         </button>
       ) : null}
       <div className="terminal-node__title">
@@ -310,16 +310,6 @@ function TerminalHeader({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={`${blockName} 编辑终端信息`}
-          title="编辑终端信息"
-          data-cc-tooltip="编辑终端信息"
-          onClick={onStartEditing}
-        >
-          <TerminalNodeIcon name="edit" />
-        </button>
-        <button
           className={[
             'terminal-node__action',
             'terminal-node__action--launch',
@@ -332,7 +322,7 @@ function TerminalHeader({
           data-launch-command-state={launchCommandState}
           onClick={onQuickLaunch}
         >
-          <TerminalNodeIcon name="play" />
+          <Play size={15} aria-hidden="true" />
         </button>
         <button
           className="terminal-node__action"
@@ -343,7 +333,7 @@ function TerminalHeader({
           disabled={!isRunning}
           onClick={onStop}
         >
-          <TerminalNodeIcon name="stop" />
+          <Square size={14} aria-hidden="true" />
         </button>
         <button
           className="terminal-node__action"
@@ -353,7 +343,17 @@ function TerminalHeader({
           data-cc-tooltip="重启终端"
           onClick={onRestart}
         >
-          <TerminalNodeIcon name="restart" />
+          <RefreshCw size={15} aria-hidden="true" />
+        </button>
+        <button
+          className="terminal-node__action"
+          type="button"
+          aria-label={`${blockName} 编辑终端信息`}
+          title="编辑终端信息"
+          data-cc-tooltip="编辑终端信息"
+          onClick={onStartEditing}
+        >
+          <Edit3 size={15} aria-hidden="true" />
         </button>
         <button
           className="terminal-node__action terminal-node__action--danger"
@@ -363,7 +363,7 @@ function TerminalHeader({
           data-cc-tooltip="删除终端"
           onClick={onDelete}
         >
-          <TerminalNodeIcon name="delete" />
+          <Trash2 size={15} aria-hidden="true" />
         </button>
       </div>
     </div>
@@ -449,7 +449,7 @@ function TerminalMetadataForm({
           data-cc-tooltip="保存终端信息"
           disabled={!trimmedDraftName}
         >
-          <TerminalNodeIcon name="check" />
+          <Check size={15} aria-hidden="true" />
         </button>
         <button
           className="terminal-node__action"
@@ -459,7 +459,7 @@ function TerminalMetadataForm({
           data-cc-tooltip="取消编辑"
           onClick={onCancel}
         >
-          <TerminalNodeIcon name="close" />
+          <X size={15} aria-hidden="true" />
         </button>
       </div>
     </form>

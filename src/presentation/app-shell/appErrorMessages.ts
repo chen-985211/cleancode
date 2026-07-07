@@ -1,6 +1,7 @@
 import { getAppErrorCode, type AppErrorCode } from '../../shared-kernel/application/errors/AppError'
 
 const userFacingMessages: Partial<Record<AppErrorCode, string>> = {
+  BLOCK_GRAPH_SNAPSHOT_CORRUPTED: '项目画布数据已损坏，请先恢复数据后再打开。',
   BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES: '工作区有未提交更改，无法归档。',
   BRANCH_WORKSPACE_NOT_FOUND: '分支工作区不存在，请刷新后重试。',
   GIT_BRANCH_ALREADY_EXISTS: 'Git 分支已存在，无法创建同名工作区。',
