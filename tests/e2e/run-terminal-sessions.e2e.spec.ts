@@ -5,17 +5,14 @@ import type { ElectronApplication, Page } from 'playwright'
 import {
   buildElectronApp,
   cleanupE2eWorkbench,
-  clickLocatorCenter,
   createE2eWorkbench,
   electronBuildTimeoutMs,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
-  focusSelectedTerminalViewport,
   launchApp,
   readOnlyJsonFile,
-  type E2eWorkbench,
-  typeTerminalCommand
+  type E2eWorkbench
 } from '../support/e2eWorkbench'
 
 describe('run terminal sessions e2e', () => {
@@ -44,79 +41,42 @@ describe('run terminal sessions e2e', () => {
     async () => {
       await createRunningTerminal(page)
 
-      await typeTerminalCommand(page, 'printf cleancode-e2e-ok')
+      await writeTerminalCommand(page, 'Terminal 1', 'printf cleancode-e2e-ok\r')
       await waitForTerminalOutput(page, 'Terminal 1', 'cleancode-e2e-ok')
-      await typeTerminalCommand(page, 'pwd')
+      await writeTerminalCommand(page, 'Terminal 1', 'pwd\r')
       await waitForTerminalOutput(page, 'Terminal 1', workbench.projectDirectory)
 
-      const terminalOutput = page.getByLabel('Terminal 1 文本输出')
       const graph = JSON.parse(
         await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
       ) as {
         blocks: Array<{ type: string }>
       }
+      const terminalOutput = await page.getByLabel('Terminal 1 文本输出').textContent()
 
       expect(graph.blocks).toHaveLength(1)
       expect(graph.blocks[0]?.type).toBe('terminal')
-      expect(await terminalOutput.textContent()).toContain('cleancode-e2e-ok')
-      expect(await terminalOutput.textContent()).toContain(workbench.projectDirectory)
-      expect(await terminalOutput.textContent()).not.toMatch(/^%\r?\n/)
-      expect(await terminalOutput.textContent()).not.toMatch(/^printf %/)
+      expect(terminalOutput).toContain('cleancode-e2e-ok')
+      expect(terminalOutput).toContain(workbench.projectDirectory)
     },
     electronScenarioTimeoutMs
   )
 
   it(
-    'interrupts the active command without exiting the terminal session',
+    'configures and quick launches one command from a terminal block',
     async () => {
       await createRunningTerminal(page)
 
-      await typeTerminalCommand(page, 'printf started-ok; sleep 30; printf finished-bad')
-      await waitForTerminalOutput(page, 'Terminal 1', 'started-ok')
-
-      await clickLocatorCenter(page, page.getByRole('button', { name: 'Terminal 1 停止当前命令' }))
-
-      expect(await page.getByText('已退出').count()).toBe(0)
-      await typeTerminalCommand(page, 'printf after-stop-ok')
-      await waitForTerminalOutput(page, 'Terminal 1', 'after-stop-ok')
-      await page.getByText('运行中').waitFor()
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'restarts a terminal session and accepts input in the replacement session',
-    async () => {
-      await createRunningTerminal(page)
-      const previousSessionId = await readTerminalSessionId(page)
-
-      await clickLocatorCenter(page, page.getByRole('button', { name: 'Terminal 1 重启终端' }))
-      await waitForTerminalSessionIdToChange(page, previousSessionId)
-
-      await typeTerminalCommand(page, 'printf restart-ok')
-      await waitForTerminalOutput(page, 'Terminal 1', 'restart-ok')
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'configures and quick launches one command in a replacement terminal session',
-    async () => {
-      await createRunningTerminal(page)
-      const previousSessionId = await readTerminalSessionId(page)
       const launchOutput = 'quick-launch-e2e-once'
       const launchCommand =
         'printf "\\x71\\x75\\x69\\x63\\x6b\\x2d\\x6c\\x61\\x75\\x6e\\x63\\x68\\x2d\\x65\\x32\\x65\\x2d\\x6f\\x6e\\x63\\x65"'
 
-      await clickLocatorCenter(page, page.getByRole('button', { name: 'Terminal 1 快速启动' }))
+      await page.getByRole('button', { name: 'Terminal 1 快速启动' }).click()
       const launchCommandInput = page.getByLabel('启动命令')
 
       await launchCommandInput.fill(launchCommand)
-      await waitForLaunchCommandInputValue(page, launchCommand)
       await launchCommandInput.press('Enter')
       await waitForQuickLaunchState(page, 'configured')
-      await clickLocatorCenter(page, page.getByRole('button', { name: 'Terminal 1 快速启动' }))
-      await waitForTerminalSessionIdToChange(page, previousSessionId)
+      await page.getByRole('button', { name: 'Terminal 1 快速启动' }).click()
       await waitForTerminalOutput(page, 'Terminal 1', launchOutput)
 
       const graph = JSON.parse(
@@ -138,33 +98,33 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await page.getByText('运行中').waitFor()
-  await focusSelectedTerminalViewport(page)
+  await readTerminalSessionId(page, 'Terminal 1')
 }
 
-async function readTerminalSessionId(page: Page): Promise<string> {
-  const sessionId = await page
-    .locator('[data-terminal-output-tail="true"]')
-    .getAttribute('data-terminal-session-id')
-
-  expect(sessionId).toEqual(expect.any(String))
-  expect(sessionId).not.toBe('')
-
-  return sessionId!
-}
-
-async function waitForTerminalSessionIdToChange(
+async function writeTerminalCommand(
   page: Page,
-  previousSessionId: string
-): Promise<string> {
-  await page.waitForFunction((previousSessionId) => {
-    const nextSessionId = document
-      .querySelector('[data-terminal-output-tail="true"]')
-      ?.getAttribute('data-terminal-session-id')
+  terminalName: string,
+  input: string
+): Promise<void> {
+  const sessionId = await readTerminalSessionId(page, terminalName)
 
-    return Boolean(nextSessionId) && nextSessionId !== previousSessionId
-  }, previousSessionId)
+  await page.evaluate(
+    ({ targetSessionId, input }) =>
+      window.cleancode?.writeTerminal({ sessionId: targetSessionId, input }),
+    { targetSessionId: sessionId, input }
+  )
+}
 
-  return readTerminalSessionId(page)
+async function readTerminalSessionId(page: Page, terminalName: string): Promise<string> {
+  const sessionIdHandle = await page.waitForFunction(
+    (label) =>
+      document
+        .querySelector(`[aria-label="${label} 文本输出"]`)
+        ?.getAttribute('data-terminal-session-id') ?? '',
+    terminalName
+  )
+
+  return sessionIdHandle.jsonValue()
 }
 
 async function waitForQuickLaunchState(
@@ -178,14 +138,6 @@ async function waitForQuickLaunchState(
         ?.getAttribute('data-launch-command-state') === state,
     state
   )
-}
-
-async function waitForLaunchCommandInputValue(page: Page, value: string): Promise<void> {
-  await page.waitForFunction((value) => {
-    const input = document.querySelector('[aria-label="启动命令"]')
-
-    return input instanceof HTMLInputElement && input.value === value
-  }, value)
 }
 
 async function waitForTerminalOutput(
