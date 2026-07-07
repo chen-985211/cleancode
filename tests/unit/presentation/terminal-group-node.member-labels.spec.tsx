@@ -124,6 +124,7 @@ function createTerminalBlock(
     type: 'terminal',
     name,
     description: 'Local shell',
+    launchCommand: '',
     position: { x, y: 240 },
     size: defaultTerminalBlockSize
   }

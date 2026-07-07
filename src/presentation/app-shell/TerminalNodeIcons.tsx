@@ -1,7 +1,7 @@
 import type { SVGProps } from 'react'
 
 export type TerminalNodeIconName =
-  'check' | 'close' | 'delete' | 'edit' | 'restart' | 'stop' | 'terminal'
+  'check' | 'close' | 'delete' | 'edit' | 'play' | 'restart' | 'stop' | 'terminal'
 
 interface TerminalNodeIconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {
   readonly name: TerminalNodeIconName
@@ -56,6 +56,14 @@ function renderTerminalNodeIcon(name: TerminalNodeIconName) {
           <path d="m6.15 13.85.58-2.35 5.94-5.94a1.18 1.18 0 0 1 1.68 1.67L8.4 13.17l-2.25.68Z" />
           <path d="m11.75 6.55 1.7 1.7" />
         </g>
+      )
+    case 'play':
+      return (
+        <path
+          d="M7.15 5.85v8.3c0 .65.7 1.05 1.26.72l6.2-3.74a.84.84 0 0 0 0-1.44l-6.2-3.86c-.56-.35-1.26.06-1.26.72Z"
+          fill="currentColor"
+          opacity="0.94"
+        />
       )
     case 'restart':
       return (

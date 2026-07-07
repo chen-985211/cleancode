@@ -19,6 +19,7 @@ describe('terminal flow nodes', () => {
           type: 'terminal',
           name: 'Terminal 1',
           description: '本地终端',
+          launchCommand: '',
           position: { x: 180, y: 270 },
           size: { width: 760, height: 420 }
         }
@@ -30,6 +31,7 @@ describe('terminal flow nodes', () => {
     const handlers = {
       onStart: vi.fn(),
       onStop: vi.fn(),
+      onQuickLaunch: vi.fn(),
       onRestart: vi.fn(),
       onDelete: vi.fn(),
       onUpdateMetadata: vi.fn(),

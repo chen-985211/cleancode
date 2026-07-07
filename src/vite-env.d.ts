@@ -62,6 +62,7 @@ declare global {
         readonly blockId: string
         readonly name: string
         readonly description: string
+        readonly launchCommand: string
       }): Promise<BlockGraphSnapshot>
       updateTerminalGroupMetadata(command: {
         readonly projectDirectory: string

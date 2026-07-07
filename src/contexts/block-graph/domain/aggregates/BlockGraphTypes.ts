@@ -24,6 +24,7 @@ export interface TerminalBlockSnapshot {
   readonly type: 'terminal'
   readonly name: string
   readonly description: string
+  readonly launchCommand: string
   readonly position: BlockPositionSnapshot
   readonly size: TerminalBlockSizeSnapshot
 }
@@ -47,10 +48,19 @@ export interface BlockGraphSnapshot {
   readonly terminalGroups: readonly TerminalGroupSnapshot[]
 }
 
+export type RestorableTerminalBlockSnapshot = Omit<
+  TerminalBlockSnapshot,
+  'launchCommand' | 'size'
+> & {
+  readonly launchCommand?: string
+  readonly size?: Partial<TerminalBlockSizeSnapshot>
+}
+
 export type RestorableBlockGraphSnapshot = Omit<
   BlockGraphSnapshot,
-  'terminalGroups' | 'viewport'
+  'blocks' | 'terminalGroups' | 'viewport'
 > & {
+  readonly blocks: readonly RestorableTerminalBlockSnapshot[]
   readonly viewport?: Partial<CanvasViewportSnapshot>
   readonly terminalGroups?: readonly Partial<TerminalGroupSnapshot>[]
 }
@@ -72,6 +82,7 @@ export interface CreateTerminalBlockInput {
 export interface UpdateTerminalBlockMetadataInput {
   readonly name: string
   readonly description: string
+  readonly launchCommand: string
 }
 
 export interface ResizeTerminalBlockInput {

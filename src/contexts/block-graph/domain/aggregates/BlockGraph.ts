@@ -13,6 +13,7 @@ import {
   type CreateTerminalGroupInput,
   type ResizeTerminalBlockInput,
   type RestorableBlockGraphSnapshot,
+  type RestorableTerminalBlockSnapshot,
   type TerminalBlockSizeSnapshot,
   type TerminalBlockSnapshot,
   type TerminalGroupSnapshot,
@@ -35,6 +36,7 @@ export type {
   CreateTerminalBlockInput,
   CreateTerminalGroupInput,
   ResizeTerminalBlockInput,
+  RestorableBlockGraphSnapshot,
   TerminalBlockSizeSnapshot,
   TerminalBlockSnapshot,
   TerminalGroupSnapshot,
@@ -103,6 +105,7 @@ export class BlockGraph {
       type: 'terminal',
       name: input.name,
       description: input.description,
+      launchCommand: '',
       position: input.position,
       size: normalizeTerminalBlockSize(input.size)
     }
@@ -166,7 +169,8 @@ export class BlockGraph {
       return {
         ...block,
         name,
-        description: input.description.trim()
+        description: input.description.trim(),
+        launchCommand: normalizeTerminalLaunchCommand(input.launchCommand)
       }
     })
 
@@ -428,11 +432,9 @@ export class BlockGraph {
 function createGraphId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `graph-${Date.now()}-${Math.random()}`
 }
-
 function createBlockId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `block-${Date.now()}-${Math.random()}`
 }
-
 function createTerminalGroupId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `terminal-group-${Date.now()}-${Math.random()}`
 }
@@ -452,23 +454,23 @@ function normalizeViewportCoordinate(value: number | undefined, fallback: number
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback
   }
-
   return value
 }
-
 function normalizeCanvasZoom(value: number | undefined, fallback: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback
   }
-
   return Math.min(maximumCanvasZoom, Math.max(minimumCanvasZoom, value))
 }
-
-function normalizeTerminalBlock(block: TerminalBlockSnapshot): TerminalBlockSnapshot {
+function normalizeTerminalBlock(block: RestorableTerminalBlockSnapshot): TerminalBlockSnapshot {
   return {
     ...block,
+    launchCommand: normalizeTerminalLaunchCommand(block.launchCommand),
     size: normalizeTerminalBlockSize(block.size)
   }
+}
+function normalizeTerminalLaunchCommand(command: string | undefined): string {
+  return command?.trim() ?? ''
 }
 
 function normalizeTerminalBlockSize(
@@ -492,6 +494,5 @@ function normalizeSizeValue(value: number | undefined, minimum: number, fallback
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return fallback
   }
-
   return Math.max(minimum, Math.round(value))
 }

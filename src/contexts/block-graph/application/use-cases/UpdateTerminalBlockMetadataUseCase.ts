@@ -8,6 +8,7 @@ export interface UpdateTerminalBlockMetadataCommand {
   readonly blockId: string
   readonly name: string
   readonly description: string
+  readonly launchCommand: string
 }
 
 export class UpdateTerminalBlockMetadataUseCase {
@@ -25,7 +26,8 @@ export class UpdateTerminalBlockMetadataUseCase {
 
     graph.updateTerminalBlockMetadata(command.blockId, {
       name: command.name,
-      description: command.description
+      description: command.description,
+      launchCommand: command.launchCommand
     })
 
     await this.graphRepository.saveDefaultGraph(command.projectDirectory, graph)

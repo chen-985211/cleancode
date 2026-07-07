@@ -39,6 +39,11 @@ describe('block graph filesystem repository', () => {
       description: 'Local shell',
       position: { x: 760, y: 180 }
     })
+    graph.updateTerminalBlockMetadata(terminalBlock.id, {
+      name: 'Terminal',
+      description: 'Local shell',
+      launchCommand: ' pnpm dev '
+    })
 
     graph.createTerminalGroup({
       id: 'development-group',
@@ -71,6 +76,7 @@ describe('block graph filesystem repository', () => {
           type: 'terminal',
           name: 'Terminal',
           description: 'Local shell',
+          launchCommand: 'pnpm dev',
           position: { x: 240, y: 180 },
           size: defaultTerminalBlockSize
         },
@@ -79,6 +85,7 @@ describe('block graph filesystem repository', () => {
           type: 'terminal',
           name: 'Terminal 2',
           description: 'Local shell',
+          launchCommand: '',
           position: { x: 760, y: 180 },
           size: defaultTerminalBlockSize
         }
@@ -134,6 +141,7 @@ describe('block graph filesystem repository', () => {
       blocks: [
         {
           ...legacyGraph.blocks[0],
+          launchCommand: '',
           size: defaultTerminalBlockSize
         }
       ],
@@ -150,6 +158,7 @@ describe('block graph filesystem repository', () => {
     expect(migratedGraph.blocks).toEqual([
       expect.objectContaining({
         name: 'Legacy Terminal',
+        launchCommand: '',
         size: defaultTerminalBlockSize
       })
     ])

@@ -6,6 +6,7 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
   defaultTerminalDimensions,
+  type TerminalDimensions,
   type TerminalGroupMetadataInput,
   type WorkbenchSnapshot
 } from './types'
@@ -22,8 +23,8 @@ interface UseTerminalGroupActionsInput {
   readonly setSelectedTerminalGroupId: (groupId: string | null) => void
   readonly startTerminal: (
     block: TerminalBlockSnapshot,
-    dimensions: typeof defaultTerminalDimensions
-  ) => Promise<void>
+    dimensions: TerminalDimensions
+  ) => Promise<unknown>
   readonly terminalBlocksById: ReadonlyMap<string, TerminalBlockSnapshot>
 }
 

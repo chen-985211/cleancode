@@ -49,6 +49,7 @@ function createGraph(): BlockGraphSnapshot {
         type: 'terminal',
         name: 'Backend',
         description: 'Runs the API server.',
+        launchCommand: '',
         position: { x: 320, y: 240 },
         size: { width: 420, height: 306 }
       },
@@ -57,6 +58,7 @@ function createGraph(): BlockGraphSnapshot {
         type: 'terminal',
         name: 'Frontend',
         description: 'Runs the web server.',
+        launchCommand: '',
         position: { x: 820, y: 240 },
         size: { width: 420, height: 306 }
       }
@@ -86,6 +88,7 @@ function createHandlers() {
   return {
     onStart: vi.fn(),
     onStop: vi.fn(),
+    onQuickLaunch: vi.fn(),
     onRestart: vi.fn(),
     onDelete: vi.fn(),
     onUpdateMetadata: vi.fn(),

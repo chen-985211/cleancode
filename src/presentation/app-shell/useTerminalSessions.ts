@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { updateTerminalBlockStatus, updateTerminalStatus } from './terminalStateUpdates'
@@ -27,6 +28,7 @@ export function useTerminalSessions({
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
+  const quickLaunchesRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     terminalStatesRef.current = terminalStates
@@ -99,6 +101,7 @@ export function useTerminalSessions({
 
       inputBuffersRef.current.clear()
       inputWriteQueuesRef.current.clear()
+      quickLaunchesRef.current.clear()
     },
     []
   )
@@ -133,9 +136,12 @@ export function useTerminalSessions({
   }, [clearPendingTerminalInput, updateTerminalStates])
 
   const startTerminal = useCallback(
-    async (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => {
+    async (
+      block: TerminalBlockSnapshot,
+      dimensions: TerminalDimensions
+    ): Promise<TerminalSessionSnapshot | undefined> => {
       if (!currentWorkspace) {
-        return
+        return undefined
       }
 
       clearPendingTerminalInput(block.id)
@@ -153,10 +159,12 @@ export function useTerminalSessions({
           [block.id]: {
             sessionId: session.id,
             status: session.status,
-            output: states[block.id]?.output ?? ''
+            output: ''
           }
         }))
       }
+
+      return session
     },
     [clearPendingTerminalInput, currentWorkspace, updateTerminalStates]
   )
@@ -192,6 +200,39 @@ export function useTerminalSessions({
       await terminateTerminalSession(block)
       await startTerminal(block, defaultTerminalDimensions)
       window.setTimeout(() => focusTerminalBlock(block.id), 80)
+    },
+    [focusTerminalBlock, startTerminal, terminateTerminalSession]
+  )
+
+  const quickLaunchTerminal = useCallback(
+    async (block: TerminalBlockSnapshot) => {
+      const launchCommand = block.launchCommand.trim()
+
+      if (!launchCommand || !window.cleancode) {
+        return
+      }
+
+      if (quickLaunchesRef.current.has(block.id)) {
+        return
+      }
+
+      quickLaunchesRef.current.add(block.id)
+
+      try {
+        await terminateTerminalSession(block)
+        const session = await startTerminal(block, defaultTerminalDimensions)
+
+        if (session?.status === 'running') {
+          await window.cleancode.writeTerminal({
+            sessionId: session.id,
+            input: `${launchCommand}\r`
+          })
+        }
+
+        window.setTimeout(() => focusTerminalBlock(block.id), 80)
+      } finally {
+        quickLaunchesRef.current.delete(block.id)
+      }
     },
     [focusTerminalBlock, startTerminal, terminateTerminalSession]
   )
@@ -272,6 +313,7 @@ export function useTerminalSessions({
 
   return {
     interruptTerminal,
+    quickLaunchTerminal,
     resizeTerminal,
     restartTerminal,
     setTerminalStates: updateTerminalStates,

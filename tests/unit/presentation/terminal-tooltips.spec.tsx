@@ -30,6 +30,7 @@ describe('terminal tooltips', () => {
     )
 
     expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
+    expectTooltip('Terminal 快速启动', '配置启动命令')
     expectTooltip('Terminal 停止当前命令', '停止当前命令')
     expectTooltip('Terminal 重启终端', '重启终端')
     expectTooltip('Terminal 删除终端', '删除终端')
@@ -42,6 +43,7 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
     type: 'terminal' as const,
     name: 'Terminal',
     description: 'Local shell',
+    launchCommand: '',
     position: { x: 240, y: 180 },
     size: defaultTerminalBlockSize
   }
@@ -55,6 +57,7 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
     isNavigationHighlighted: false,
     onStart: vi.fn(),
     onStop: vi.fn(),
+    onQuickLaunch: vi.fn(),
     onRestart: vi.fn(),
     onDelete: vi.fn(),
     onUpdateMetadata: vi.fn(),

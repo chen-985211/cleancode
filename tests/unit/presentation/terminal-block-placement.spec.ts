@@ -45,6 +45,7 @@ function createTerminalBlock(
     type: 'terminal',
     name,
     description: '本地终端',
+    launchCommand: '',
     position: { x, y },
     size
   }

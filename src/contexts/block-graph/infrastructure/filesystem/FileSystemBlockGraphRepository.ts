@@ -3,7 +3,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import type { BlockGraphRepository } from '../../application/ports/BlockGraphRepository'
-import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
+import type {
+  BlockGraphSnapshot,
+  RestorableBlockGraphSnapshot
+} from '../../application/dto/BlockGraphSnapshot'
 import { BlockGraph } from '../../domain/aggregates/BlockGraph'
 
 const graphFileName = 'default-graph.json'
@@ -82,9 +85,9 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
   }
 }
 
-async function readGraphSnapshot(graphPath: string): Promise<BlockGraphSnapshot | null> {
+async function readGraphSnapshot(graphPath: string): Promise<RestorableBlockGraphSnapshot | null> {
   try {
-    return JSON.parse(await readFile(graphPath, 'utf8')) as BlockGraphSnapshot
+    return JSON.parse(await readFile(graphPath, 'utf8')) as RestorableBlockGraphSnapshot
   } catch (error) {
     if (isMissingFileError(error)) {
       return null
@@ -100,6 +103,6 @@ function isMissingFileError(error: unknown): boolean {
   )
 }
 
-function normalizeGraphSnapshot(snapshot: BlockGraphSnapshot): BlockGraphSnapshot {
+function normalizeGraphSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraphSnapshot {
   return BlockGraph.fromSnapshot(snapshot).toSnapshot()
 }

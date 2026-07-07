@@ -25,6 +25,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [draftName, setDraftName] = useState(block.name)
   const [draftDescription, setDraftDescription] = useState(block.description)
+  const [draftLaunchCommand, setDraftLaunchCommand] = useState(block.launchCommand)
+  const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
   const hasRequestedAutoStartRef = useRef(false)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
@@ -81,8 +83,18 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const startEditingMetadata = useCallback(() => {
     setDraftName(block.name)
     setDraftDescription(block.description)
+    setDraftLaunchCommand(block.launchCommand)
+    setShouldFocusLaunchCommand(false)
     setIsEditingMetadata(true)
-  }, [block.description, block.name])
+  }, [block.description, block.launchCommand, block.name])
+
+  const startEditingLaunchCommand = useCallback(() => {
+    setDraftName(block.name)
+    setDraftDescription(block.description)
+    setDraftLaunchCommand(block.launchCommand)
+    setShouldFocusLaunchCommand(true)
+    setIsEditingMetadata(true)
+  }, [block.description, block.launchCommand, block.name])
 
   const requestTerminalFocus = useCallback(() => {
     setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)
@@ -97,6 +109,16 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     data.onRestart(block)
     requestTerminalFocus()
   }, [block, data, requestTerminalFocus])
+
+  const quickLaunchTerminal = useCallback(() => {
+    if (!block.launchCommand.trim()) {
+      startEditingLaunchCommand()
+      return
+    }
+
+    data.onQuickLaunch(block)
+    requestTerminalFocus()
+  }, [block, data, requestTerminalFocus, startEditingLaunchCommand])
 
   const resizeTerminalBlock = useCallback(
     (_event: ResizeDragEvent, size: ResizeParams) => {
@@ -115,11 +137,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
       await data.onUpdateMetadata(block, {
         name: trimmedDraftName,
-        description: draftDescription.trim()
+        description: draftDescription.trim(),
+        launchCommand: draftLaunchCommand.trim()
       })
+      setShouldFocusLaunchCommand(false)
       setIsEditingMetadata(false)
     },
-    [block, data, draftDescription, trimmedDraftName]
+    [block, data, draftDescription, draftLaunchCommand, trimmedDraftName]
   )
 
   return (
@@ -141,6 +165,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       <TerminalHeader
         blockName={block.name}
         blockDescription={block.description}
+        blockLaunchCommand={block.launchCommand}
         terminalStateClassName={terminalStateClassName}
         isRunning={isRunning}
         isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
@@ -150,6 +175,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
         onStartEditing={startEditingMetadata}
         onStop={stopTerminal}
+        onQuickLaunch={quickLaunchTerminal}
         onRestart={restartTerminal}
         onDelete={() => data.onDelete(block)}
       />
@@ -157,19 +183,25 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         <TerminalMetadataForm
           draftName={draftName}
           draftDescription={draftDescription}
+          draftLaunchCommand={draftLaunchCommand}
+          shouldFocusLaunchCommand={shouldFocusLaunchCommand}
           trimmedDraftName={trimmedDraftName}
           onDraftNameChange={setDraftName}
           onDraftDescriptionChange={setDraftDescription}
+          onDraftLaunchCommandChange={setDraftLaunchCommand}
           onSave={saveMetadata}
           onCancel={() => {
             setDraftName(block.name)
             setDraftDescription(block.description)
+            setDraftLaunchCommand(block.launchCommand)
+            setShouldFocusLaunchCommand(false)
             setIsEditingMetadata(false)
           }}
         />
       ) : null}
       <div className="terminal-frame">
         <TerminalViewport
+          key={session.sessionId ?? 'idle'}
           block={block}
           session={session}
           focusRequestId={focusRequestId}
@@ -196,6 +228,7 @@ function toTerminalBlockSizeInput(size: ResizeParams): TerminalBlockSizeInput {
 interface TerminalHeaderProps {
   readonly blockName: string
   readonly blockDescription: string
+  readonly blockLaunchCommand: string
   readonly terminalStateClassName: string
   readonly isRunning: boolean
   readonly isTerminalGroupSelectionMode: boolean
@@ -205,6 +238,7 @@ interface TerminalHeaderProps {
   readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
   readonly onStop: () => void
+  readonly onQuickLaunch: () => void
   readonly onRestart: () => void
   readonly onDelete: () => void
 }
@@ -212,6 +246,7 @@ interface TerminalHeaderProps {
 function TerminalHeader({
   blockName,
   blockDescription,
+  blockLaunchCommand,
   terminalStateClassName,
   isRunning,
   isTerminalGroupSelectionMode,
@@ -221,9 +256,14 @@ function TerminalHeader({
   onToggleTerminalGroupCandidate,
   onStartEditing,
   onStop,
+  onQuickLaunch,
   onRestart,
   onDelete
 }: TerminalHeaderProps) {
+  const canQuickLaunch = blockLaunchCommand.trim().length > 0
+  const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
+  const quickLaunchTooltip = canQuickLaunch ? '快速启动' : '配置启动命令'
+
   return (
     <div className="terminal-node__header">
       <span className="terminal-node__icon">
@@ -280,6 +320,21 @@ function TerminalHeader({
           <TerminalNodeIcon name="edit" />
         </button>
         <button
+          className={[
+            'terminal-node__action',
+            'terminal-node__action--launch',
+            `terminal-node__action--launch-${launchCommandState}`
+          ].join(' ')}
+          type="button"
+          aria-label={`${blockName} 快速启动`}
+          title={quickLaunchTooltip}
+          data-cc-tooltip={quickLaunchTooltip}
+          data-launch-command-state={launchCommandState}
+          onClick={onQuickLaunch}
+        >
+          <TerminalNodeIcon name="play" />
+        </button>
+        <button
           className="terminal-node__action"
           type="button"
           aria-label={`${blockName} 停止当前命令`}
@@ -318,9 +373,12 @@ function TerminalHeader({
 interface TerminalMetadataFormProps {
   readonly draftName: string
   readonly draftDescription: string
+  readonly draftLaunchCommand: string
+  readonly shouldFocusLaunchCommand: boolean
   readonly trimmedDraftName: string
   readonly onDraftNameChange: (value: string) => void
   readonly onDraftDescriptionChange: (value: string) => void
+  readonly onDraftLaunchCommandChange: (value: string) => void
   readonly onSave: (event: FormEvent<HTMLFormElement>) => void
   readonly onCancel: () => void
 }
@@ -328,29 +386,61 @@ interface TerminalMetadataFormProps {
 function TerminalMetadataForm({
   draftName,
   draftDescription,
+  draftLaunchCommand,
+  shouldFocusLaunchCommand,
   trimmedDraftName,
   onDraftNameChange,
   onDraftDescriptionChange,
+  onDraftLaunchCommandChange,
   onSave,
   onCancel
 }: TerminalMetadataFormProps) {
+  const launchCommandInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (shouldFocusLaunchCommand) {
+      launchCommandInputRef.current?.focus()
+    }
+  }, [shouldFocusLaunchCommand])
+
   return (
     <form
       className="terminal-metadata-form nodrag"
+      aria-label="编辑终端信息"
       onSubmit={onSave}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <input
-        aria-label="终端名称"
-        value={draftName}
-        onChange={(event) => onDraftNameChange(event.currentTarget.value)}
-      />
-      <input
-        aria-label="终端描述"
-        value={draftDescription}
-        onChange={(event) => onDraftDescriptionChange(event.currentTarget.value)}
-      />
-      <div className="terminal-metadata-form__actions">
+      <div className="terminal-metadata-form__fields">
+        <label className="terminal-metadata-field">
+          <span>名称</span>
+          <input
+            aria-label="终端名称"
+            placeholder="例如：Web Server"
+            value={draftName}
+            onChange={(event) => onDraftNameChange(event.currentTarget.value)}
+          />
+        </label>
+        <label className="terminal-metadata-field">
+          <span>描述</span>
+          <input
+            aria-label="终端描述"
+            placeholder="例如：本地开发服务"
+            value={draftDescription}
+            onChange={(event) => onDraftDescriptionChange(event.currentTarget.value)}
+          />
+        </label>
+        <label className="terminal-metadata-field">
+          <span>启动命令</span>
+          <input
+            aria-label="启动命令"
+            ref={launchCommandInputRef}
+            placeholder="例如：pnpm dev"
+            value={draftLaunchCommand}
+            onChange={(event) => onDraftLaunchCommandChange(event.currentTarget.value)}
+          />
+        </label>
+      </div>
+      <div className="terminal-metadata-form__footer">
         <button
           className="terminal-node__action terminal-node__action--confirm"
           type="submit"

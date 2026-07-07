@@ -8,6 +8,12 @@ export interface RuntimeApiOverrides {
   readonly createBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
+  readonly updateTerminalBlockMetadata?: ReturnType<typeof vi.fn>
+  readonly startTerminal?: ReturnType<typeof vi.fn>
+  readonly writeTerminal?: ReturnType<typeof vi.fn>
+  readonly terminateTerminal?: ReturnType<typeof vi.fn>
+  readonly onTerminalOutput?: ReturnType<typeof vi.fn>
+  readonly onTerminalExit?: ReturnType<typeof vi.fn>
 }
 
 export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
@@ -22,7 +28,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     createTerminalBlock: vi.fn(),
     createTerminalGroup: vi.fn(),
-    updateTerminalBlockMetadata: vi.fn(),
+    updateTerminalBlockMetadata: overrides.updateTerminalBlockMetadata ?? vi.fn(),
     updateTerminalGroupMetadata: vi.fn(),
     setTerminalGroupCollapsed: vi.fn(),
     addTerminalToGroup: vi.fn(),
@@ -34,13 +40,13 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     moveTerminalGroup: vi.fn(),
     deleteBlock: vi.fn(),
     saveGraph: vi.fn(),
-    startTerminal: vi.fn(),
-    writeTerminal: vi.fn(),
+    startTerminal: overrides.startTerminal ?? vi.fn(),
+    writeTerminal: overrides.writeTerminal ?? vi.fn(),
     resizeTerminal: vi.fn(),
     interruptTerminal: vi.fn(),
-    terminateTerminal: vi.fn(),
-    onTerminalOutput: vi.fn(() => vi.fn()),
-    onTerminalExit: vi.fn(() => vi.fn())
+    terminateTerminal: overrides.terminateTerminal ?? vi.fn(),
+    onTerminalOutput: overrides.onTerminalOutput ?? vi.fn(() => vi.fn()),
+    onTerminalExit: overrides.onTerminalExit ?? vi.fn(() => vi.fn())
   }
 }
 

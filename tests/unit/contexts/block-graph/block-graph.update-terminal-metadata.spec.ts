@@ -41,13 +41,15 @@ describe('update terminal block metadata', () => {
       workspaceName: 'main',
       blockId: terminalBlock.id,
       name: 'API Server',
-      description: 'Runs backend tasks'
+      description: 'Runs backend tasks',
+      launchCommand: ' pnpm dev:api '
     })
 
     expect(updatedGraph.blocks[0]).toMatchObject({
       id: terminalBlock.id,
       name: 'API Server',
-      description: 'Runs backend tasks'
+      description: 'Runs backend tasks',
+      launchCommand: 'pnpm dev:api'
     })
     expect(repository.savedGraph?.toSnapshot()).toEqual(updatedGraph)
   })

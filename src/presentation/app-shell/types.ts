@@ -31,6 +31,7 @@ export interface TerminalDimensions {
 export interface TerminalBlockMetadataInput {
   readonly name: string
   readonly description: string
+  readonly launchCommand: string
 }
 
 export interface TerminalGroupMetadataInput {
@@ -48,6 +49,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly isNavigationHighlighted: boolean
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onStop: (block: TerminalBlockSnapshot) => void
+  readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
   readonly onUpdateMetadata: (

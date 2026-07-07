@@ -40,6 +40,7 @@ export interface BlockGraphIpcHandlersInput {
     readonly blockId: string
     readonly name: string
     readonly description: string
+    readonly launchCommand: string
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
@@ -171,6 +172,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
       readonly blockId: string
       readonly name: string
       readonly description: string
+      readonly launchCommand: string
     },
     BlockGraphSnapshot
   >({

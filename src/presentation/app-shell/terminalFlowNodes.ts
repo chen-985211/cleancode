@@ -24,6 +24,7 @@ const collapsedTerminalGroupMemberRowGap = 8
 interface TerminalFlowNodeHandlers {
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onStop: (block: TerminalBlockSnapshot) => void
+  readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
   readonly onUpdateMetadata: (

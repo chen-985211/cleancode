@@ -30,7 +30,8 @@ describe('default block graph', () => {
     })
     graph.updateTerminalBlockMetadata(terminalBlock.id, {
       name: 'Frontend Server',
-      description: 'Runs pnpm dev.'
+      description: 'Runs pnpm dev.',
+      launchCommand: ' pnpm dev '
     })
     graph.moveBlock(terminalBlock.id, { x: 420, y: 260 })
 
@@ -40,6 +41,7 @@ describe('default block graph', () => {
         type: 'terminal',
         name: 'Frontend Server',
         description: 'Runs pnpm dev.',
+        launchCommand: 'pnpm dev',
         position: { x: 420, y: 260 },
         size: defaultTerminalBlockSize
       })
@@ -48,5 +50,27 @@ describe('default block graph', () => {
     graph.deleteBlock(terminalBlock.id)
 
     expect(graph.blocks).toEqual([])
+  })
+
+  it('restores legacy terminal blocks with an empty launch command', () => {
+    const graph = BlockGraph.fromSnapshot({
+      id: 'legacy-graph',
+      projectId: 'project-1',
+      workspaceName: 'main',
+      blocks: [
+        {
+          id: 'terminal-1',
+          type: 'terminal',
+          name: 'Terminal 1',
+          description: '本地终端',
+          position: { x: 160, y: 220 }
+        }
+      ]
+    })
+
+    expect(graph.toSnapshot().blocks[0]).toMatchObject({
+      id: 'terminal-1',
+      launchCommand: ''
+    })
   })
 })

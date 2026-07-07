@@ -282,6 +282,26 @@
   color: #bbf7d0;
 }
 
+.terminal-node__action--launch-configured {
+  border-color: rgb(74 222 128 / 0.24);
+  color: #86efac;
+}
+
+.terminal-node__action--launch-configured:hover:not(:disabled) {
+  background: rgb(34 197 94 / 0.12);
+  color: #bbf7d0;
+}
+
+.terminal-node__action--launch-unconfigured {
+  border-color: rgb(96 165 250 / 0.24);
+  color: #93c5fd;
+}
+
+.terminal-node__action--launch-unconfigured:hover:not(:disabled) {
+  background: rgb(59 130 246 / 0.12);
+  color: #bfdbfe;
+}
+
 .terminal-node__action--danger {
   color: #bdc8d8;
 }
@@ -333,38 +353,6 @@
 .terminal-state--failed::before {
   background: #f87171;
   box-shadow: 0 0 10px rgb(248 113 113 / 0.3);
-}
-
-.terminal-metadata-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) auto;
-  gap: 8px;
-  border-bottom: 1px solid rgb(148 163 184 / 0.13);
-  padding: 8px 10px;
-  background: var(--terminal-shell-muted);
-}
-
-.terminal-metadata-form input {
-  min-width: 0;
-  height: 30px;
-  border: 1px solid rgb(148 163 184 / 0.18);
-  border-radius: 8px;
-  background: rgb(2 6 23 / 0.34);
-  padding: 0 9px;
-  color: var(--terminal-foreground);
-  font: inherit;
-  font-size: 12px;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset;
-}
-
-.terminal-metadata-form input::placeholder {
-  color: rgb(148 163 184 / 0.62);
-}
-
-.terminal-metadata-form__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .terminal-frame {

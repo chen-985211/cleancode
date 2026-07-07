@@ -129,6 +129,7 @@ export function AppShell() {
   )
   const {
     interruptTerminal,
+    quickLaunchTerminal,
     resizeTerminal,
     restartTerminal,
     startTerminal,
@@ -142,7 +143,6 @@ export function AppShell() {
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
     hoveredTerminalBlockId
   })
-
   const rememberWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
     setWorkbenches((entries) => putWorkbenchFirst(entries, workbench))
     setCurrentWorkbench(workbench)
@@ -356,7 +356,8 @@ export function AppShell() {
         workspaceName: currentWorkspace.name,
         blockId: block.id,
         name: metadata.name,
-        description: metadata.description
+        description: metadata.description,
+        launchCommand: metadata.launchCommand
       })
 
       if (graphSnapshot) {
@@ -365,7 +366,6 @@ export function AppShell() {
     },
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
-
   const resizeTerminalBlock = useCallback(
     (block: TerminalBlockSnapshot, size: TerminalBlockSizeInput) =>
       resizeTerminalBlockInWorkbench({
@@ -377,7 +377,6 @@ export function AppShell() {
       }),
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
-
   const terminalGroupActions = useTerminalGroupActions({
     currentWorkbench,
     currentWorkspace,
@@ -391,7 +390,6 @@ export function AppShell() {
     startTerminal,
     terminalBlocksById
   })
-
   const updateGraphViewport = useCallback(
     (viewport: WorkbenchSnapshot['graph']['viewport']) =>
       updateGraphViewportInWorkbench({
@@ -417,6 +415,7 @@ export function AppShell() {
         handlers: {
           onStart: startTerminal,
           onStop: interruptTerminal,
+          onQuickLaunch: quickLaunchTerminal,
           onRestart: restartTerminal,
           onDelete: deleteTerminalBlock,
           onUpdateMetadata: updateTerminalBlockMetadata,
@@ -433,6 +432,7 @@ export function AppShell() {
     graph,
     hoveredTerminalBlockId,
     interruptTerminal,
+    quickLaunchTerminal,
     resizeTerminal,
     resizeTerminalBlock,
     restartTerminal,
@@ -447,7 +447,6 @@ export function AppShell() {
     updateTerminalBlockMetadata,
     writeTerminal
   ])
-
   const minimapNodes = useMemo(
     () => nodes.filter((node): node is TerminalFlowNode => node.type === 'terminal'),
     [nodes]

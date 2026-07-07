@@ -2,6 +2,7 @@ export type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
+  RestorableBlockGraphSnapshot,
   TerminalBlockSizeSnapshot,
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
