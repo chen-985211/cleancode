@@ -30,6 +30,36 @@
   box-shadow: 0 10px 26px rgb(37 99 235 / 0.07);
 }
 
+.toolbar-selection-status {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgb(157 181 224 / 0.58);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.78);
+  padding: 0 10px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: auto;
+  box-shadow: 0 10px 26px rgb(37 99 235 / 0.07);
+}
+
+.toolbar-selection-status strong {
+  display: inline-flex;
+  min-width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .canvas-surface {
   position: relative;
   min-height: 0;

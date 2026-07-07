@@ -14,6 +14,7 @@ import {
 interface TerminalViewportProps {
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
+  readonly focusRequestId: number
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
 }
@@ -21,6 +22,7 @@ interface TerminalViewportProps {
 export function TerminalViewport({
   block,
   session,
+  focusRequestId,
   onDimensionsChange,
   onInput
 }: TerminalViewportProps) {
@@ -41,6 +43,14 @@ export function TerminalViewport({
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  useEffect(() => {
+    outputTailRef.current = appendTerminalOutputTail('', session.output)
+
+    if (outputTailElementRef.current) {
+      outputTailElementRef.current.textContent = outputTailRef.current
+    }
+  }, [session.output])
 
   useEffect(() => {
     onInputRef.current = onInput
@@ -83,9 +93,7 @@ export function TerminalViewport({
   const focusTerminal = useCallback(() => {
     shouldKeepTerminalFocusRef.current = true
     xtermRef.current?.focus()
-    terminalElementRef.current
-      ?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')
-      ?.focus({ preventScroll: true })
+    refocusXtermHelperTextarea(terminalElementRef.current, shouldKeepTerminalFocusRef)
   }, [])
 
   useEffect(() => {
@@ -95,6 +103,7 @@ export function TerminalViewport({
 
     return installXterm({
       element: terminalElementRef.current,
+      initialOutput: outputTailRef.current,
       xtermRef,
       shouldKeepTerminalFocusRef,
       onDimensionsChangeRef,
@@ -120,6 +129,12 @@ export function TerminalViewport({
       focusTerminal()
     }
   }, [focusTerminal, session.sessionId, session.status])
+
+  useEffect(() => {
+    if (focusRequestId > 0) {
+      focusTerminal()
+    }
+  }, [focusRequestId, focusTerminal])
 
   if (isTestRuntime()) {
     return (
@@ -148,6 +163,7 @@ export function TerminalViewport({
         ref={outputTailElementRef}
         aria-label={`${block.name} 文本输出`}
         data-terminal-output-tail="true"
+        data-terminal-session-id={session.sessionId ?? ''}
       />
     </div>
   )
@@ -155,6 +171,7 @@ export function TerminalViewport({
 
 interface InstallXtermInput {
   readonly element: HTMLDivElement
+  readonly initialOutput: string
   readonly xtermRef: MutableRefObject<XTerm | null>
   readonly shouldKeepTerminalFocusRef: MutableRefObject<boolean>
   readonly onDimensionsChangeRef: MutableRefObject<(dimensions: TerminalDimensions) => void>
@@ -164,6 +181,7 @@ interface InstallXtermInput {
 
 function installXterm({
   element,
+  initialOutput,
   xtermRef,
   shouldKeepTerminalFocusRef,
   onDimensionsChangeRef,
@@ -211,9 +229,7 @@ function installXterm({
   const focusTerminalElement = (): void => {
     shouldKeepTerminalFocusRef.current = true
     terminal.focus()
-    element.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus({
-      preventScroll: true
-    })
+    refocusXtermHelperTextarea(element, shouldKeepTerminalFocusRef)
   }
 
   terminal.loadAddon(fitAddon)
@@ -223,6 +239,9 @@ function installXterm({
   element.addEventListener('mousedown', focusTerminalElement, true)
   element.addEventListener('click', focusTerminalElement, true)
   fitAndReportDimensions()
+  if (initialOutput.length > 0) {
+    terminal.write(initialOutput)
+  }
   const resizeObserver = new ResizeObserver(fitAndReportDimensions)
 
   resizeObserver.observe(element)
@@ -245,4 +264,26 @@ function installXterm({
 
 function isTestRuntime(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom')
+}
+
+function refocusXtermHelperTextarea(
+  element: HTMLElement | null,
+  shouldKeepTerminalFocusRef: MutableRefObject<boolean>
+): void {
+  const focusIfPreferred = () => {
+    if (shouldKeepTerminalFocusRef.current) {
+      focusXtermHelperTextarea(element)
+    }
+  }
+
+  focusIfPreferred()
+  window.requestAnimationFrame(focusIfPreferred)
+  window.setTimeout(focusIfPreferred, 40)
+  window.setTimeout(focusIfPreferred, 100)
+}
+
+function focusXtermHelperTextarea(element: HTMLElement | null): void {
+  element
+    ?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')
+    ?.focus({ preventScroll: true })
 }

@@ -2,50 +2,89 @@ import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 
-import { applyNodeChanges, type Edge, type NodeChange, type ReactFlowInstance } from '@xyflow/react'
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import type { Edge, NodeChange, ReactFlowInstance } from '@xyflow/react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type SetStateAction
+} from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { AgentPanel } from './AgentPanel'
+import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
+import { findCurrentWorkspace } from './findCurrentWorkspace'
 import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
-import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
+import { TerminalGroupNode } from './TerminalGroupNode'
 import { TerminalNode } from './TerminalNode'
-import {
-  defaultTerminalDimensions,
-  terminalOutputBrowserEventName,
-  type TerminalBlockMetadataInput,
-  type TerminalBlockSizeInput,
-  type TerminalDimensions,
-  type TerminalFlowNode,
-  type TerminalViewState,
-  type WorkbenchSnapshot
-} from './types'
+import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
-import { updateTerminalBlockStatus, updateTerminalStatus } from './terminalStateUpdates'
-import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
+import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
-import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
+import { useTerminalGroupActions } from './useTerminalGroupActions'
+import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
+import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
+import { useTerminalSessions } from './useTerminalSessions'
+import type {
+  TerminalBlockMetadataInput,
+  TerminalBlockSizeInput,
+  TerminalFlowNode,
+  WorkbenchFlowNode,
+  WorkbenchSnapshot
+} from './types'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
+import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
+
+const workbenchNodeTypes = { terminal: TerminalNode, terminalGroup: TerminalGroupNode }
 
 export function AppShell() {
   const isDesktopRuntime = Boolean(window.cleancode)
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
   const [currentWorkbench, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(null)
-  const [terminalStates, setTerminalStates] = useState<Record<string, TerminalViewState>>({})
-  const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
-  const [nodes, setNodes] = useState<TerminalFlowNode[]>([])
-  const reactFlowInstanceRef = useRef<ReactFlowInstance<TerminalFlowNode, Edge> | null>(null)
-  const [selectedTerminalBlockId, setSelectedTerminalBlockId] = useState<string | null>(null)
+  const [nodes, setNodes] = useState<WorkbenchFlowNode[]>([])
+  const [selectedTerminalBlockIds, setSelectedTerminalBlockIds] = useState<string[]>([])
+  const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
+  const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
   const graph = currentWorkbench?.graph ?? null
-  const currentWorkspace = currentWorkbench?.project.workspaces.find(
-    (workspace) => workspace.isCurrent
+  const currentWorkspace = findCurrentWorkspace(currentWorkbench)
+  const terminalBlocksById = useMemo(
+    () => new Map((graph?.blocks ?? []).map((block) => [block.id, block])),
+    [graph]
   )
+  const setSelectedTerminalBlockId = useCallback((value: SetStateAction<string | null>) => {
+    if (value === null) {
+      setSelectedTerminalGroupId(null)
+    }
+
+    setSelectedTerminalBlockIds((currentIds) => {
+      const currentId = currentIds[0] ?? null
+      const nextId = typeof value === 'function' ? value(currentId) : value
+
+      return nextId ? [nextId] : []
+    })
+  }, [])
+  const {
+    beginTerminalGroupSelection,
+    cancelTerminalGroupSelection,
+    completeTerminalGroupSelection,
+    isTerminalGroupSelectionMode,
+    selectTerminalBlock,
+    selectTerminalGroup,
+    selectedUngroupedTerminalBlockIds,
+    ungroupedTerminalBlockCount
+  } = useTerminalGroupSelectionMode({
+    graph,
+    selectedTerminalBlockIds,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  })
 
   useEffect(() => {
     const api = window.cleancode
@@ -70,39 +109,37 @@ export function AppShell() {
     }
   }, [])
 
-  useEffect(() => {
-    terminalStatesRef.current = terminalStates
-  }, [terminalStates])
+  const focusTerminalBlock = useCallback(
+    (blockId: string) => {
+      const block = terminalBlocksById.get(blockId)
 
-  useEffect(() => {
-    const api = window.cleancode
+      if (!block) {
+        return
+      }
 
-    if (!api) {
-      return undefined
-    }
-
-    const unsubscribeOutput = api.onTerminalOutput((event) => {
-      window.dispatchEvent(
-        new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, { detail: event })
-      )
-    })
-    const unsubscribeExit = api.onTerminalExit((event) => {
-      setTerminalStates((states) => updateTerminalStatus(states, event.sessionId, 'exited'))
-    })
-
-    return () => {
-      unsubscribeOutput()
-      unsubscribeExit()
-    }
-  }, [])
-
-  const nodeTypes = useMemo(() => ({ terminal: TerminalNode }), [])
-  const terminalBlocksById = useMemo(() => {
-    return new Map((graph?.blocks ?? []).map((block) => [block.id, block]))
-  }, [graph])
+      focusTerminalBlockInCanvas({
+        block,
+        reactFlowInstance: reactFlowInstanceRef.current,
+        setHoveredTerminalBlockId,
+        setSelectedTerminalBlockId
+      })
+      setSelectedTerminalGroupId(null)
+    },
+    [setSelectedTerminalBlockId, terminalBlocksById]
+  )
+  const {
+    interruptTerminal,
+    resizeTerminal,
+    restartTerminal,
+    startTerminal,
+    terminalStates,
+    terminateTerminalSession,
+    terminateWorkbenchTerminalSessions,
+    writeTerminal
+  } = useTerminalSessions({ currentWorkspace, focusTerminalBlock })
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
-    selectedTerminalBlockId,
+    selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
     hoveredTerminalBlockId
   })
 
@@ -120,8 +157,12 @@ export function AppShell() {
 
   const setCurrentGraph = useCallback((graphSnapshot: WorkbenchSnapshot['graph']): void => {
     const blockIds = new Set(graphSnapshot.blocks.map((block) => block.id))
+    const groupIds = new Set(graphSnapshot.terminalGroups.map((group) => group.id))
 
-    setSelectedTerminalBlockId((blockId) => (blockId && blockIds.has(blockId) ? blockId : null))
+    setSelectedTerminalBlockIds((blockIdsSnapshot) =>
+      blockIdsSnapshot.filter((blockId) => blockIds.has(blockId))
+    )
+    setSelectedTerminalGroupId((groupId) => (groupId && groupIds.has(groupId) ? groupId : null))
     setHoveredTerminalBlockId((blockId) => (blockId && blockIds.has(blockId) ? blockId : null))
     setCurrentWorkbench((workbench) =>
       workbench ? { ...workbench, graph: graphSnapshot } : workbench
@@ -133,35 +174,6 @@ export function AppShell() {
     )
   }, [])
 
-  const addProject = useCallback(async () => {
-    const workbench = await window.cleancode?.addProject()
-
-    if (workbench) {
-      rememberWorkbench(workbench)
-    }
-  }, [rememberWorkbench])
-
-  const terminateWorkbenchTerminalSessions = useCallback(async (workbench: WorkbenchSnapshot) => {
-    const terminalStatesByBlockId = terminalStatesRef.current
-    const sessionIds = workbench.graph.blocks
-      .map((block) => terminalStatesByBlockId[block.id]?.sessionId)
-      .filter((sessionId): sessionId is string => Boolean(sessionId))
-
-    setTerminalStates((states) => {
-      const nextStates = { ...states }
-
-      for (const block of workbench.graph.blocks) {
-        delete nextStates[block.id]
-      }
-
-      return nextStates
-    })
-
-    await Promise.all(
-      sessionIds.map((sessionId) => window.cleancode?.terminateTerminal({ sessionId }))
-    )
-  }, [])
-
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
     replaceWorkbench,
@@ -169,6 +181,14 @@ export function AppShell() {
     setSelectedTerminalBlockId,
     terminateWorkbenchTerminalSessions
   })
+
+  const addProject = useCallback(async () => {
+    const workbench = await window.cleancode?.addProject()
+
+    if (workbench) {
+      rememberWorkbench(workbench)
+    }
+  }, [rememberWorkbench])
 
   const removeProject = useCallback(
     async (workbench: WorkbenchSnapshot) => {
@@ -182,7 +202,8 @@ export function AppShell() {
         return
       }
 
-      setSelectedTerminalBlockId(null)
+      setSelectedTerminalBlockIds([])
+      setSelectedTerminalGroupId(null)
       setHoveredTerminalBlockId(null)
       setWorkbenches(rememberedWorkbenches)
       setCurrentWorkbench((current) =>
@@ -198,13 +219,12 @@ export function AppShell() {
     }
 
     const existingBlockIds = new Set(currentWorkbench.graph.blocks.map((block) => block.id))
-    const position = resolveNewTerminalBlockPosition(currentWorkbench.graph.blocks)
     const graphSnapshot = await window.cleancode?.createTerminalBlock({
       projectDirectory: currentWorkbench.project.directory,
       workspaceName: currentWorkspace.name,
       name: `Terminal ${currentWorkbench.graph.blocks.length + 1}`,
       description: '本地终端',
-      position
+      position: resolveNewTerminalBlockPosition(currentWorkbench.graph.blocks)
     })
 
     if (graphSnapshot) {
@@ -214,36 +234,46 @@ export function AppShell() {
       if (createdBlock) {
         focusTerminalBlockInCanvas({
           block: createdBlock,
-          reactFlowInstance: reactFlowInstanceRef.current,
           duration: 0,
-          setSelectedTerminalBlockId,
-          setHoveredTerminalBlockId
+          reactFlowInstance: reactFlowInstanceRef.current,
+          setHoveredTerminalBlockId,
+          setSelectedTerminalBlockId
         })
       }
     }
-  }, [currentWorkbench, currentWorkspace, setCurrentGraph])
+  }, [currentWorkbench, currentWorkspace, setCurrentGraph, setSelectedTerminalBlockId])
 
-  const onNodesChange = useCallback((changes: NodeChange<TerminalFlowNode>[]) => {
-    setNodes((currentNodes) => applyNodeChanges(changes, currentNodes))
+  const createTerminalGroup = useCallback(async () => {
+    if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
+      return
+    }
+
+    const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
+    const graphSnapshot = await window.cleancode?.createTerminalGroup({
+      projectDirectory: currentWorkbench.project.directory,
+      workspaceName: currentWorkspace.name,
+      name: currentWorkbench.graph.terminalGroups.length === 0 ? '启动项目' : '终端组合',
+      memberBlockIds: selectedUngroupedTerminalBlockIds
+    })
+
+    if (graphSnapshot) {
+      setCurrentGraph(graphSnapshot)
+      completeTerminalGroupSelection()
+      setSelectedTerminalGroupId(
+        graphSnapshot.terminalGroups.find((group) => !existingGroupIds.has(group.id))?.id ?? null
+      )
+    }
+  }, [
+    currentWorkbench,
+    currentWorkspace,
+    completeTerminalGroupSelection,
+    selectedUngroupedTerminalBlockIds,
+    setCurrentGraph
+  ])
+
+  const onNodesChange = useCallback((changes: NodeChange<WorkbenchFlowNode>[]) => {
+    setNodes((currentNodes) => applyWorkbenchNodeChanges(changes, currentNodes))
   }, [])
-
-  const focusTerminalBlock = useCallback(
-    (blockId: string) => {
-      const block = terminalBlocksById.get(blockId)
-
-      if (!block) {
-        return
-      }
-
-      focusTerminalBlockInCanvas({
-        block,
-        reactFlowInstance: reactFlowInstanceRef.current,
-        setSelectedTerminalBlockId,
-        setHoveredTerminalBlockId
-      })
-    },
-    [terminalBlocksById]
-  )
 
   const minimapNodeInteraction = useMemo<MinimapNodeInteractionContextValue>(
     () => ({
@@ -254,106 +284,44 @@ export function AppShell() {
     [focusTerminalBlock, terminalBlocksById]
   )
 
-  const selectTerminalBlock = useCallback((_event: MouseEvent, node: TerminalFlowNode) => {
-    setSelectedTerminalBlockId(node.id)
-  }, [])
+  const selectWorkbenchNode = useCallback(
+    (event: MouseEvent, node: WorkbenchFlowNode) => {
+      if (node.type === 'terminal') {
+        selectTerminalBlock(node.id, event.shiftKey)
+        return
+      }
 
-  const moveBlock = useCallback(
-    async (_event: globalThis.MouseEvent | TouchEvent, node: TerminalFlowNode) => {
+      selectTerminalGroup(node.id)
+    },
+    [selectTerminalBlock, selectTerminalGroup]
+  )
+
+  const moveWorkbenchNode = useCallback(
+    async (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => {
       if (!currentWorkbench || !currentWorkspace) {
         return
       }
 
-      const graphSnapshot = await window.cleancode?.moveBlock({
-        projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
-        blockId: node.id,
-        position: node.position
-      })
+      const graphSnapshot =
+        node.type === 'terminal'
+          ? await window.cleancode?.moveBlock({
+              projectDirectory: currentWorkbench.project.directory,
+              workspaceName: currentWorkspace.name,
+              blockId: node.id,
+              position: node.position
+            })
+          : await window.cleancode?.moveTerminalGroup({
+              projectDirectory: currentWorkbench.project.directory,
+              workspaceName: currentWorkspace.name,
+              terminalGroupId: node.id,
+              position: node.position
+            })
 
       if (graphSnapshot) {
         setCurrentGraph(graphSnapshot)
       }
     },
     [currentWorkbench, currentWorkspace, setCurrentGraph]
-  )
-
-  const startTerminal = useCallback(
-    async (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => {
-      if (!currentWorkspace) {
-        return
-      }
-
-      const session = await window.cleancode?.startTerminal({
-        terminalBlockId: block.id,
-        workspaceName: currentWorkspace.name,
-        workingDirectory: currentWorkspace.directory,
-        columns: dimensions.columns,
-        rows: dimensions.rows
-      })
-
-      if (session) {
-        setTerminalStates((states) => ({
-          ...states,
-          [block.id]: {
-            sessionId: session.id,
-            status: session.status,
-            output: states[block.id]?.output ?? ''
-          }
-        }))
-      }
-    },
-    [currentWorkspace]
-  )
-
-  const interruptTerminal = useCallback(async (block: TerminalBlockSnapshot) => {
-    const terminalState = terminalStatesRef.current[block.id]
-
-    if (terminalState?.sessionId && terminalState.status === 'running') {
-      await window.cleancode?.interruptTerminal({ sessionId: terminalState.sessionId })
-    }
-  }, [])
-
-  const terminateTerminalSession = useCallback(async (block: TerminalBlockSnapshot) => {
-    const terminalState = terminalStatesRef.current[block.id]
-
-    setTerminalStates((states) => updateTerminalBlockStatus(states, block.id, 'exited'))
-
-    if (terminalState?.sessionId && window.cleancode) {
-      await window.cleancode.terminateTerminal({ sessionId: terminalState.sessionId })
-    }
-  }, [])
-
-  const restartTerminal = useCallback(
-    async (block: TerminalBlockSnapshot) => {
-      await terminateTerminalSession(block)
-      await startTerminal(block, defaultTerminalDimensions)
-      window.setTimeout(() => focusTerminalBlock(block.id), 80)
-    },
-    [focusTerminalBlock, startTerminal, terminateTerminalSession]
-  )
-
-  const writeTerminal = useCallback(async (block: TerminalBlockSnapshot, input: string) => {
-    const terminalState = terminalStatesRef.current[block.id]
-
-    if (terminalState?.sessionId && terminalState.status === 'running' && window.cleancode) {
-      await window.cleancode.writeTerminal({ sessionId: terminalState.sessionId, input })
-    }
-  }, [])
-
-  const resizeTerminal = useCallback(
-    async (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => {
-      const terminalState = terminalStatesRef.current[block.id]
-
-      if (terminalState?.sessionId && terminalState.status === 'running') {
-        await window.cleancode?.resizeTerminal({
-          sessionId: terminalState.sessionId,
-          columns: dimensions.columns,
-          rows: dimensions.rows
-        })
-      }
-    },
-    []
   )
 
   const deleteTerminalBlock = useCallback(
@@ -410,6 +378,20 @@ export function AppShell() {
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
+  const terminalGroupActions = useTerminalGroupActions({
+    currentWorkbench,
+    currentWorkspace,
+    interruptTerminal,
+    restartTerminal,
+    selectedTerminalBlockIds,
+    selectedUngroupedTerminalBlockIds,
+    setCurrentGraph,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId,
+    startTerminal,
+    terminalBlocksById
+  })
+
   const updateGraphViewport = useCallback(
     (viewport: WorkbenchSnapshot['graph']['viewport']) =>
       updateGraphViewportInWorkbench({
@@ -422,13 +404,15 @@ export function AppShell() {
   )
 
   useEffect(() => {
-    // React Flow owns transient drag state; this effect resynchronizes nodes when graph/session state changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- React Flow owns transient drag state.
     setNodes(
       createTerminalFlowNodes({
         graph,
-        selectedTerminalBlockId,
         hoveredTerminalBlockId,
+        selectedTerminalBlockIds,
+        selectedTerminalGroupId,
+        selectedUngroupedTerminalBlockIds,
+        isTerminalGroupSelectionMode,
         terminalStates,
         handlers: {
           onStart: startTerminal,
@@ -438,7 +422,9 @@ export function AppShell() {
           onUpdateMetadata: updateTerminalBlockMetadata,
           onInput: writeTerminal,
           onResize: resizeTerminal,
-          onResizeBlock: resizeTerminalBlock
+          onResizeBlock: resizeTerminalBlock,
+          onToggleTerminalGroupCandidate: (block) => selectTerminalBlock(block.id, true),
+          ...terminalGroupActions
         }
       })
     )
@@ -447,15 +433,25 @@ export function AppShell() {
     graph,
     hoveredTerminalBlockId,
     interruptTerminal,
+    resizeTerminal,
+    resizeTerminalBlock,
     restartTerminal,
-    selectedTerminalBlockId,
+    selectedTerminalBlockIds,
+    selectedTerminalGroupId,
+    selectedUngroupedTerminalBlockIds,
+    isTerminalGroupSelectionMode,
     startTerminal,
+    terminalGroupActions,
+    selectTerminalBlock,
     terminalStates,
     updateTerminalBlockMetadata,
-    writeTerminal,
-    resizeTerminal,
-    resizeTerminalBlock
+    writeTerminal
   ])
+
+  const minimapNodes = useMemo(
+    () => nodes.filter((node): node is TerminalFlowNode => node.type === 'terminal'),
+    [nodes]
+  )
 
   return (
     <main className="app-shell" aria-label="cleancode workspace">
@@ -477,13 +473,21 @@ export function AppShell() {
         currentWorkbench={currentWorkbench}
         currentWorkspace={currentWorkspace}
         nodes={nodes}
-        nodeTypes={nodeTypes}
+        minimapNodes={minimapNodes}
+        nodeTypes={workbenchNodeTypes}
         reactFlowInstanceRef={reactFlowInstanceRef}
         minimapNodeInteraction={minimapNodeInteraction}
         onCreateTerminalBlock={createTerminalBlock}
+        onBeginTerminalGroupSelection={beginTerminalGroupSelection}
+        onCreateTerminalGroup={createTerminalGroup}
+        onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
+        isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+        selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
+        canBeginTerminalGroupSelection={ungroupedTerminalBlockCount >= 2}
+        canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
         onNodesChange={onNodesChange}
-        onNodeClick={selectTerminalBlock}
-        onNodeDragStop={moveBlock}
+        onNodeClick={selectWorkbenchNode}
+        onNodeDragStop={moveWorkbenchNode}
         onViewportChange={updateGraphViewport}
         onMinimapNodeClick={focusTerminalBlock}
         getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}

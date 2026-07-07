@@ -3,7 +3,8 @@ export type {
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
   TerminalBlockSizeSnapshot,
-  TerminalBlockSnapshot
+  TerminalBlockSnapshot,
+  TerminalGroupSnapshot
 } from '../../domain/aggregates/BlockGraph'
 
 export {

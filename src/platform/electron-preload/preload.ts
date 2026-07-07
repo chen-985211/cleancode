@@ -21,13 +21,27 @@ const cleancodeApi = {
     invokeCleancode('cleancode:checkout-main-workspace-branch', command),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
+  createTerminalGroup: (command: unknown) =>
+    invokeCleancode('cleancode:create-terminal-group', command),
   updateTerminalBlockMetadata: (command: unknown) =>
     invokeCleancode('cleancode:update-terminal-block-metadata', command),
+  updateTerminalGroupMetadata: (command: unknown) =>
+    invokeCleancode('cleancode:update-terminal-group-metadata', command),
+  setTerminalGroupCollapsed: (command: unknown) =>
+    invokeCleancode('cleancode:set-terminal-group-collapsed', command),
+  addTerminalToGroup: (command: unknown) =>
+    invokeCleancode('cleancode:add-terminal-to-group', command),
+  removeTerminalFromGroup: (command: unknown) =>
+    invokeCleancode('cleancode:remove-terminal-from-group', command),
+  dissolveTerminalGroup: (command: unknown) =>
+    invokeCleancode('cleancode:dissolve-terminal-group', command),
   resizeTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:resize-terminal-block', command),
   updateGraphViewport: (command: unknown) =>
     invokeCleancode('cleancode:update-graph-viewport', command),
   moveBlock: (command: unknown) => invokeCleancode('cleancode:move-block', command),
+  moveTerminalGroup: (command: unknown) =>
+    invokeCleancode('cleancode:move-terminal-group', command),
   deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
   saveGraph: (command: unknown) => invokeCleancode('cleancode:save-graph', command),
   startTerminal: (command: unknown) => invokeCleancode('cleancode:start-terminal', command),

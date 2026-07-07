@@ -50,12 +50,47 @@ declare global {
         readonly description: string
         readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
+      createTerminalGroup(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly name: string
+        readonly memberBlockIds: readonly string[]
+      }): Promise<BlockGraphSnapshot>
       updateTerminalBlockMetadata(command: {
         readonly projectDirectory: string
         readonly workspaceName: string
         readonly blockId: string
         readonly name: string
         readonly description: string
+      }): Promise<BlockGraphSnapshot>
+      updateTerminalGroupMetadata(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
+        readonly name: string
+      }): Promise<BlockGraphSnapshot>
+      setTerminalGroupCollapsed(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
+        readonly isCollapsed: boolean
+      }): Promise<BlockGraphSnapshot>
+      addTerminalToGroup(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
+        readonly blockId: string
+      }): Promise<BlockGraphSnapshot>
+      removeTerminalFromGroup(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
+        readonly blockId: string
+      }): Promise<BlockGraphSnapshot>
+      dissolveTerminalGroup(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
       }): Promise<BlockGraphSnapshot>
       resizeTerminalBlock(command: {
         readonly projectDirectory: string
@@ -72,6 +107,12 @@ declare global {
         readonly projectDirectory: string
         readonly workspaceName: string
         readonly blockId: string
+        readonly position: BlockPositionSnapshot
+      }): Promise<BlockGraphSnapshot>
+      moveTerminalGroup(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly terminalGroupId: string
         readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       deleteBlock(command: {

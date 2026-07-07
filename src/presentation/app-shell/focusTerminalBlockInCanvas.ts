@@ -1,11 +1,11 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import type { TerminalFlowNode } from './types'
+import type { WorkbenchFlowNode } from './types'
 
 interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
-  readonly reactFlowInstance: ReactFlowInstance<TerminalFlowNode, Edge> | null
+  readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
   readonly duration?: number
   readonly setSelectedTerminalBlockId: (blockId: string | null) => void
   readonly setHoveredTerminalBlockId: (blockId: string | null) => void
@@ -40,8 +40,11 @@ export function focusTerminalBlockInCanvas({
     }
   )
   window.setTimeout(() => {
-    document
-      .querySelector<HTMLElement>(`[data-terminal-block-id="${block.id}"] .terminal-viewport`)
-      ?.focus()
+    const terminalNode = document.querySelector<HTMLElement>(
+      `[data-terminal-block-id="${block.id}"]`
+    )
+
+    terminalNode?.querySelector<HTMLElement>('.terminal-viewport')?.focus()
+    terminalNode?.querySelector<HTMLElement>('.xterm-helper-textarea')?.focus()
   }, duration + 20)
 }

@@ -21,10 +21,17 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     createTerminalBlock: vi.fn(),
+    createTerminalGroup: vi.fn(),
     updateTerminalBlockMetadata: vi.fn(),
+    updateTerminalGroupMetadata: vi.fn(),
+    setTerminalGroupCollapsed: vi.fn(),
+    addTerminalToGroup: vi.fn(),
+    removeTerminalFromGroup: vi.fn(),
+    dissolveTerminalGroup: vi.fn(),
     resizeTerminalBlock: vi.fn(),
     updateGraphViewport: vi.fn(),
     moveBlock: vi.fn(),
+    moveTerminalGroup: vi.fn(),
     deleteBlock: vi.fn(),
     saveGraph: vi.fn(),
     startTerminal: vi.fn(),
@@ -86,7 +93,8 @@ export function createWorkbenchSnapshot(
       projectId: `project-${name}`,
       workspaceName,
       viewport: { x: 0, y: 0, zoom: 1 },
-      blocks: []
+      blocks: [],
+      terminalGroups: []
     }
   }
 }

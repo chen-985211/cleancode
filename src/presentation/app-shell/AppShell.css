@@ -2,5 +2,7 @@
 @import './styles/project-sidebar.css';
 @import './styles/project-sidebar-archive.css';
 @import './styles/workbench-canvas.css';
+@import './styles/tooltips.css';
+@import './styles/terminal-group-node.css';
 @import './styles/terminal-node.css';
 @import './styles/agent-panel.css';

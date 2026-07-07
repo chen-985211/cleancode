@@ -1,83 +1,55 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  defaultCanvasViewport,
+  defaultTerminalBlockSize,
+  maximumCanvasZoom,
+  minimumCanvasZoom,
+  minimumTerminalBlockSize,
+  type BlockGraphSnapshot,
+  type BlockPositionSnapshot,
+  type CanvasViewportSnapshot,
+  type CreateDefaultGraphInput,
+  type CreateTerminalBlockInput,
+  type CreateTerminalGroupInput,
+  type ResizeTerminalBlockInput,
+  type RestorableBlockGraphSnapshot,
+  type TerminalBlockSizeSnapshot,
+  type TerminalBlockSnapshot,
+  type TerminalGroupSnapshot,
+  type UpdateTerminalBlockMetadataInput,
+  type UpdateTerminalGroupMetadataInput
+} from './BlockGraphTypes'
+import {
+  defaultTerminalGroupSize,
+  hasEnoughTerminalGroupMembers,
+  normalizeTerminalGroupBounds,
+  normalizeTerminalGroupMemberIds,
+  normalizeTerminalGroups
+} from '../services/TerminalGroupRules'
 
-export interface BlockPositionSnapshot {
-  readonly x: number
-  readonly y: number
-}
+export type {
+  BlockGraphSnapshot,
+  BlockPositionSnapshot,
+  CanvasViewportSnapshot,
+  CreateDefaultGraphInput,
+  CreateTerminalBlockInput,
+  CreateTerminalGroupInput,
+  ResizeTerminalBlockInput,
+  TerminalBlockSizeSnapshot,
+  TerminalBlockSnapshot,
+  TerminalGroupSnapshot,
+  UpdateTerminalBlockMetadataInput,
+  UpdateTerminalGroupMetadataInput
+} from './BlockGraphTypes'
 
-export interface TerminalBlockSizeSnapshot {
-  readonly width: number
-  readonly height: number
-}
-
-export interface CanvasViewportSnapshot {
-  readonly x: number
-  readonly y: number
-  readonly zoom: number
-}
-
-export interface TerminalBlockSnapshot {
-  readonly id: string
-  readonly type: 'terminal'
-  readonly name: string
-  readonly description: string
-  readonly position: BlockPositionSnapshot
-  readonly size: TerminalBlockSizeSnapshot
-}
-
-export interface BlockGraphSnapshot {
-  readonly id: string
-  readonly projectId: string
-  readonly workspaceName: string
-  readonly viewport: CanvasViewportSnapshot
-  readonly blocks: readonly TerminalBlockSnapshot[]
-}
-
-type RestorableBlockGraphSnapshot = Omit<BlockGraphSnapshot, 'viewport'> & {
-  readonly viewport?: Partial<CanvasViewportSnapshot>
-}
-
-export interface CreateDefaultGraphInput {
-  readonly id?: string
-  readonly projectId: string
-  readonly workspaceName: string
-}
-
-export interface CreateTerminalBlockInput {
-  readonly id?: string
-  readonly name: string
-  readonly description: string
-  readonly position: BlockPositionSnapshot
-  readonly size?: Partial<TerminalBlockSizeSnapshot>
-}
-
-export interface UpdateTerminalBlockMetadataInput {
-  readonly name: string
-  readonly description: string
-}
-
-export interface ResizeTerminalBlockInput {
-  readonly size: Partial<TerminalBlockSizeSnapshot>
-}
-
-export const defaultCanvasViewport: CanvasViewportSnapshot = {
-  x: 0,
-  y: 0,
-  zoom: 1
-}
-
-export const minimumCanvasZoom = 0.35
-export const maximumCanvasZoom = 1.6
-
-export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
-  width: 420,
-  height: 306
-}
-
-export const minimumTerminalBlockSize: TerminalBlockSizeSnapshot = {
-  width: 360,
-  height: 240
-}
+export {
+  defaultCanvasViewport,
+  defaultTerminalBlockSize,
+  maximumCanvasZoom,
+  minimumCanvasZoom,
+  minimumTerminalBlockSize
+} from './BlockGraphTypes'
+export { defaultTerminalGroupSize } from '../services/TerminalGroupRules'
 
 export class BlockGraph {
   private constructor(
@@ -85,7 +57,8 @@ export class BlockGraph {
     public readonly projectId: string,
     public readonly workspaceName: string,
     private viewportSnapshot: CanvasViewportSnapshot,
-    private blockSnapshots: TerminalBlockSnapshot[]
+    private blockSnapshots: TerminalBlockSnapshot[],
+    private terminalGroupSnapshots: TerminalGroupSnapshot[]
   ) {}
 
   static createDefault(input: CreateDefaultGraphInput): BlockGraph {
@@ -94,17 +67,21 @@ export class BlockGraph {
       input.projectId,
       input.workspaceName,
       defaultCanvasViewport,
+      [],
       []
     )
   }
 
   static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
+    const blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
+
     return new BlockGraph(
       snapshot.id,
       snapshot.projectId,
       snapshot.workspaceName,
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
-      [...snapshot.blocks.map(normalizeTerminalBlock)]
+      blocks,
+      normalizeTerminalGroups(snapshot.terminalGroups, blocks, createTerminalGroupId)
     )
   }
 
@@ -114,6 +91,10 @@ export class BlockGraph {
 
   get viewport(): CanvasViewportSnapshot {
     return this.viewportSnapshot
+  }
+
+  get terminalGroups(): readonly TerminalGroupSnapshot[] {
+    return this.terminalGroupSnapshots
   }
 
   createTerminalBlock(input: CreateTerminalBlockInput): TerminalBlockSnapshot {
@@ -135,6 +116,7 @@ export class BlockGraph {
     this.blockSnapshots = this.blockSnapshots.map((block) =>
       block.id === blockId ? { ...block, position } : block
     )
+    this.normalizeGroupsContainingBlock(blockId)
   }
 
   updateViewport(viewport: Partial<CanvasViewportSnapshot>): void {
@@ -158,6 +140,8 @@ export class BlockGraph {
     if (!hasUpdatedBlock) {
       throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
     }
+
+    this.normalizeGroupsContainingBlock(blockId)
   }
 
   updateTerminalBlockMetadata(blockId: string, input: UpdateTerminalBlockMetadataInput): void {
@@ -193,6 +177,186 @@ export class BlockGraph {
 
   deleteBlock(blockId: string): void {
     this.blockSnapshots = this.blockSnapshots.filter((block) => block.id !== blockId)
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots
+      .map((group) => ({
+        ...group,
+        memberBlockIds: group.memberBlockIds.filter((memberBlockId) => memberBlockId !== blockId)
+      }))
+      .filter(hasEnoughTerminalGroupMembers)
+      .map((group) => normalizeTerminalGroupBounds(group, this.blockSnapshots))
+  }
+
+  createTerminalGroup(input: CreateTerminalGroupInput): TerminalGroupSnapshot {
+    const name = input.name.trim()
+
+    if (!name) {
+      throw createExpectedAppError(
+        'TERMINAL_GROUP_NAME_EMPTY',
+        'Terminal group name cannot be empty.'
+      )
+    }
+
+    const memberBlockIds = normalizeTerminalGroupMemberIds(input.memberBlockIds)
+
+    this.ensureTerminalGroupMembersCanBeGrouped(memberBlockIds)
+
+    const group = normalizeTerminalGroupBounds(
+      {
+        id: input.id ?? createTerminalGroupId(),
+        type: 'terminal-group',
+        name,
+        position: { x: 0, y: 0 },
+        size: defaultTerminalGroupSize,
+        isCollapsed: false,
+        memberBlockIds
+      },
+      this.blockSnapshots
+    )
+
+    this.terminalGroupSnapshots = [...this.terminalGroupSnapshots, group]
+
+    return group
+  }
+
+  updateTerminalGroupMetadata(
+    terminalGroupId: string,
+    input: UpdateTerminalGroupMetadataInput
+  ): void {
+    const name = input.name.trim()
+
+    if (!name) {
+      throw createExpectedAppError(
+        'TERMINAL_GROUP_NAME_EMPTY',
+        'Terminal group name cannot be empty.'
+      )
+    }
+
+    let hasUpdatedGroup = false
+
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
+      if (group.id !== terminalGroupId) {
+        return group
+      }
+
+      hasUpdatedGroup = true
+
+      return { ...group, name }
+    })
+
+    if (!hasUpdatedGroup) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+  }
+
+  setTerminalGroupCollapsed(terminalGroupId: string, isCollapsed: boolean): void {
+    let hasUpdatedGroup = false
+
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
+      if (group.id !== terminalGroupId) {
+        return group
+      }
+
+      hasUpdatedGroup = true
+
+      return { ...group, isCollapsed }
+    })
+
+    if (!hasUpdatedGroup) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+  }
+
+  moveTerminalGroup(terminalGroupId: string, position: BlockPositionSnapshot): void {
+    const group = this.requireTerminalGroup(terminalGroupId)
+    const delta = {
+      x: position.x - group.position.x,
+      y: position.y - group.position.y
+    }
+    const memberBlockIds = new Set(group.memberBlockIds)
+
+    this.blockSnapshots = this.blockSnapshots.map((block) =>
+      memberBlockIds.has(block.id)
+        ? {
+            ...block,
+            position: {
+              x: block.position.x + delta.x,
+              y: block.position.y + delta.y
+            }
+          }
+        : block
+    )
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((currentGroup) =>
+      currentGroup.id === terminalGroupId
+        ? normalizeTerminalGroupBounds({ ...currentGroup, position }, this.blockSnapshots)
+        : currentGroup
+    )
+  }
+
+  addTerminalToGroup(terminalGroupId: string, blockId: string): void {
+    this.requireTerminalBlock(blockId)
+
+    if (this.findTerminalGroupByBlockId(blockId)) {
+      throw createExpectedAppError(
+        'TERMINAL_BLOCK_ALREADY_GROUPED',
+        'Terminal block already belongs to a group.'
+      )
+    }
+
+    let hasUpdatedGroup = false
+
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
+      if (group.id !== terminalGroupId) {
+        return group
+      }
+
+      hasUpdatedGroup = true
+
+      return normalizeTerminalGroupBounds(
+        {
+          ...group,
+          memberBlockIds: [...group.memberBlockIds, blockId]
+        },
+        this.blockSnapshots
+      )
+    })
+
+    if (!hasUpdatedGroup) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+  }
+
+  removeTerminalFromGroup(terminalGroupId: string, blockId: string): void {
+    let hasUpdatedGroup = false
+
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots
+      .map((group) => {
+        if (group.id !== terminalGroupId) {
+          return group
+        }
+
+        hasUpdatedGroup = true
+
+        return {
+          ...group,
+          memberBlockIds: group.memberBlockIds.filter((memberBlockId) => memberBlockId !== blockId)
+        }
+      })
+      .filter(hasEnoughTerminalGroupMembers)
+      .map((group) => normalizeTerminalGroupBounds(group, this.blockSnapshots))
+
+    if (!hasUpdatedGroup) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+  }
+
+  dissolveTerminalGroup(terminalGroupId: string): void {
+    const nextGroups = this.terminalGroupSnapshots.filter((group) => group.id !== terminalGroupId)
+
+    if (nextGroups.length === this.terminalGroupSnapshots.length) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+
+    this.terminalGroupSnapshots = nextGroups
   }
 
   toSnapshot(): BlockGraphSnapshot {
@@ -201,8 +365,63 @@ export class BlockGraph {
       projectId: this.projectId,
       workspaceName: this.workspaceName,
       viewport: this.viewportSnapshot,
-      blocks: this.blockSnapshots
+      blocks: this.blockSnapshots,
+      terminalGroups: this.terminalGroupSnapshots
     }
+  }
+
+  private ensureTerminalGroupMembersCanBeGrouped(memberBlockIds: readonly string[]): void {
+    if (memberBlockIds.length < 2) {
+      throw createExpectedAppError(
+        'TERMINAL_GROUP_REQUIRES_TWO_MEMBERS',
+        'Terminal group must contain at least two terminals.'
+      )
+    }
+
+    for (const memberBlockId of memberBlockIds) {
+      this.requireTerminalBlock(memberBlockId)
+
+      if (this.findTerminalGroupByBlockId(memberBlockId)) {
+        throw createExpectedAppError(
+          'TERMINAL_BLOCK_ALREADY_GROUPED',
+          'Terminal block already belongs to a group.'
+        )
+      }
+    }
+  }
+
+  private requireTerminalBlock(blockId: string): TerminalBlockSnapshot {
+    const block = this.blockSnapshots.find((candidateBlock) => candidateBlock.id === blockId)
+
+    if (!block) {
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    }
+
+    return block
+  }
+
+  private requireTerminalGroup(terminalGroupId: string): TerminalGroupSnapshot {
+    const group = this.terminalGroupSnapshots.find(
+      (candidateGroup) => candidateGroup.id === terminalGroupId
+    )
+
+    if (!group) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+
+    return group
+  }
+
+  private findTerminalGroupByBlockId(blockId: string): TerminalGroupSnapshot | undefined {
+    return this.terminalGroupSnapshots.find((group) => group.memberBlockIds.includes(blockId))
+  }
+
+  private normalizeGroupsContainingBlock(blockId: string): void {
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
+      group.memberBlockIds.includes(blockId)
+        ? normalizeTerminalGroupBounds(group, this.blockSnapshots)
+        : group
+    )
   }
 }
 
@@ -212,6 +431,10 @@ function createGraphId(): string {
 
 function createBlockId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `block-${Date.now()}-${Math.random()}`
+}
+
+function createTerminalGroupId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `terminal-group-${Date.now()}-${Math.random()}`
 }
 
 function normalizeCanvasViewport(

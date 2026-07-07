@@ -1,13 +1,20 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 
+import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
+import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
+import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
+import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
+import { RemoveTerminalFromGroupUseCase } from '../../contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
 import { SaveDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/SaveDefaultGraphUseCase'
+import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
+import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
@@ -72,11 +79,18 @@ const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
 )
 const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
+const createTerminalGroupUseCase = new CreateTerminalGroupUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
+const moveTerminalGroupUseCase = new MoveTerminalGroupUseCase(graphRepository)
+const addTerminalToGroupUseCase = new AddTerminalToGroupUseCase(graphRepository)
+const removeTerminalFromGroupUseCase = new RemoveTerminalFromGroupUseCase(graphRepository)
+const dissolveTerminalGroupUseCase = new DissolveTerminalGroupUseCase(graphRepository)
 const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository)
 const saveDefaultGraphUseCase = new SaveDefaultGraphUseCase(graphRepository)
+const setTerminalGroupCollapsedUseCase = new SetTerminalGroupCollapsedUseCase(graphRepository)
 const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepository)
+const updateTerminalGroupMetadataUseCase = new UpdateTerminalGroupMetadataUseCase(graphRepository)
 const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCase(graphRepository)
 const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
@@ -124,14 +138,21 @@ registerProjectIpcHandlers({
 })
 
 registerBlockGraphIpcHandlers({
+  addTerminalToGroup: (command) => addTerminalToGroupUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
+  createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
   deleteBlock: (command) => deleteBlockUseCase.execute(command),
+  dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
   ipcMain,
   logger: consoleLogger,
   moveBlock: (command) => moveBlockUseCase.execute(command),
+  moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
+  removeTerminalFromGroup: (command) => removeTerminalFromGroupUseCase.execute(command),
   resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
   saveGraph: (command) => saveDefaultGraphUseCase.execute(command),
+  setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),
+  updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command),
   updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command)
 })
 

@@ -9,7 +9,7 @@ import {
   type ReactFlowInstance,
   type Viewport
 } from '@xyflow/react'
-import { Box, Terminal } from 'lucide-react'
+import { Box, Check, Terminal, X } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
 
 import {
@@ -19,7 +19,7 @@ import {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
-import type { TerminalFlowNode, WorkbenchSnapshot } from './types'
+import type { TerminalFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -27,16 +27,24 @@ interface WorkbenchCanvasProps {
   readonly isDesktopRuntime: boolean
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
-  readonly nodes: TerminalFlowNode[]
+  readonly nodes: WorkbenchFlowNode[]
+  readonly minimapNodes: TerminalFlowNode[]
   readonly nodeTypes: NodeTypes
-  readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<TerminalFlowNode, Edge> | null>
+  readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly onCreateTerminalBlock: () => void
-  readonly onNodesChange: (changes: NodeChange<TerminalFlowNode>[]) => void
-  readonly onNodeClick: (event: MouseEvent, node: TerminalFlowNode) => void
+  readonly onBeginTerminalGroupSelection: () => void
+  readonly onCreateTerminalGroup: () => void
+  readonly onCancelTerminalGroupSelection: () => void
+  readonly isTerminalGroupSelectionMode: boolean
+  readonly selectedTerminalGroupCandidateCount: number
+  readonly canBeginTerminalGroupSelection: boolean
+  readonly canCreateTerminalGroup: boolean
+  readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop: (
     event: globalThis.MouseEvent | TouchEvent,
-    node: TerminalFlowNode
+    node: WorkbenchFlowNode
   ) => void
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onMinimapNodeClick: (blockId: string) => void
@@ -50,10 +58,18 @@ export function WorkbenchCanvas({
   currentWorkbench,
   currentWorkspace,
   nodes,
+  minimapNodes,
   nodeTypes,
   reactFlowInstanceRef,
   minimapNodeInteraction,
   onCreateTerminalBlock,
+  onBeginTerminalGroupSelection,
+  onCreateTerminalGroup,
+  onCancelTerminalGroupSelection,
+  isTerminalGroupSelectionMode,
+  selectedTerminalGroupCandidateCount,
+  canBeginTerminalGroupSelection,
+  canCreateTerminalGroup,
   onNodesChange,
   onNodeClick,
   onNodeDragStop,
@@ -160,8 +176,43 @@ export function WorkbenchCanvas({
             <Terminal size={16} aria-hidden="true" />
             新建终端积木
           </button>
+          {isTerminalGroupSelectionMode ? (
+            <>
+              <span className="toolbar-selection-status" role="status">
+                选择要组合的终端
+                <strong>{selectedTerminalGroupCandidateCount}</strong>
+              </span>
+              <button
+                className="toolbar-button toolbar-button--primary"
+                type="button"
+                onClick={onCreateTerminalGroup}
+                disabled={!canCreateTerminalGroup}
+              >
+                <Check size={16} aria-hidden="true" />
+                创建组合
+              </button>
+              <button
+                className="toolbar-button"
+                type="button"
+                onClick={onCancelTerminalGroupSelection}
+              >
+                <X size={16} aria-hidden="true" />
+                取消
+              </button>
+            </>
+          ) : (
+            <button
+              className="toolbar-button"
+              type="button"
+              onClick={onBeginTerminalGroupSelection}
+              disabled={!isDesktopRuntime || !currentWorkbench || !canBeginTerminalGroupSelection}
+            >
+              <Box size={16} aria-hidden="true" />
+              组合终端
+            </button>
+          )}
         </div>
-        <ReactFlow<TerminalFlowNode, Edge>
+        <ReactFlow<WorkbenchFlowNode, Edge>
           nodes={nodes}
           edges={[]}
           nodeTypes={nodeTypes}
@@ -213,7 +264,7 @@ export function WorkbenchCanvas({
           <Panel className="canvas-minimap-panel" position="top-left">
             <CanvasMinimap
               isCollapsed={isMinimapCollapsed}
-              nodes={nodes}
+              nodes={minimapNodes}
               canvasViewport={canvasViewport}
               canvasSize={canvasSize}
               viewportZoom={viewportZoom}
@@ -245,7 +296,7 @@ export function WorkbenchCanvas({
 }
 
 interface RestoreCanvasViewportInput {
-  readonly instance: ReactFlowInstance<TerminalFlowNode, Edge>
+  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly viewport: WorkbenchSnapshot['graph']['viewport']
   readonly graphId: string
   readonly restoredGraphIdRef: MutableRefObject<string | null>
@@ -286,7 +337,7 @@ function toCanvasViewportSnapshot(viewport: Viewport): WorkbenchSnapshot['graph'
 interface CenterCanvasViewportOnMinimapPointInput {
   readonly center: MinimapViewportCenter
   readonly canvasSize: { readonly width: number; readonly height: number }
-  readonly instance: ReactFlowInstance<TerminalFlowNode, Edge>
+  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly persistViewport: boolean
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void

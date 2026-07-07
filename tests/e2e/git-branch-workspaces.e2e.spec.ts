@@ -16,7 +16,6 @@ import {
 
 const execFileAsync = promisify(execFile)
 const electronBuildTimeoutMs = 45_000
-const electronLaunchTimeoutMs = 30_000
 const electronScenarioTimeoutMs = 60_000
 const gitLocalEnvironmentVariables = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES',
@@ -40,7 +39,7 @@ describe('git branch workspaces e2e', () => {
   let projectDirectory: string
   let registryDirectory: string
   let appStateDirectory: string
-  let electronApp: ElectronApplication
+  let electronApp: ElectronApplication | null
   let page: Page
 
   beforeAll(async () => {
@@ -57,15 +56,19 @@ describe('git branch workspaces e2e', () => {
     electronApp = await launchApp(projectDirectory, registryDirectory, appStateDirectory)
     page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')
-  }, electronLaunchTimeoutMs)
+  }, electronScenarioTimeoutMs)
 
   afterEach(async () => {
-    await electronApp.close()
+    if (electronApp) {
+      await electronApp.close()
+      electronApp = null
+    }
+
     await rm(projectWorktreesDirectory(projectDirectory), { recursive: true, force: true })
     await rm(projectDirectory, { recursive: true, force: true })
     await rm(registryDirectory, { recursive: true, force: true })
     await rm(appStateDirectory, { recursive: true, force: true })
-  })
+  }, electronScenarioTimeoutMs)
 
   it(
     'creates a git worktree branch workspace and switches terminal working directories',
@@ -258,9 +261,13 @@ async function expectTerminalPwd(
   terminalName: string,
   expectedDirectory: string
 ): Promise<void> {
-  await focusTerminalViewport(page)
-  await page.keyboard.type('pwd')
-  await page.keyboard.press('Enter')
+  const sessionId = await readTerminalSessionId(page, terminalName)
+
+  await page.evaluate(
+    ({ input, targetSessionId }) =>
+      window.cleancode?.writeTerminal({ sessionId: targetSessionId, input }),
+    { targetSessionId: sessionId, input: 'pwd\r' }
+  )
   await page.waitForFunction(
     ({ label, directory }) =>
       document
@@ -270,13 +277,16 @@ async function expectTerminalPwd(
   )
 }
 
-async function focusTerminalViewport(page: Page): Promise<void> {
-  const terminalViewport = page.locator('.terminal-node--selected .terminal-viewport')
-
-  await clickLocatorCenter(page, terminalViewport)
-  await page.waitForFunction(
-    () => document.activeElement?.classList.contains('xterm-helper-textarea') ?? false
+async function readTerminalSessionId(page: Page, terminalName: string): Promise<string> {
+  const sessionIdHandle = await page.waitForFunction(
+    (label) =>
+      document
+        .querySelector(`[aria-label="${label} 文本输出"]`)
+        ?.getAttribute('data-terminal-session-id') ?? '',
+    terminalName
   )
+
+  return sessionIdHandle.jsonValue()
 }
 
 async function openDefaultBranchSelector(projectCard: Locator): Promise<Locator> {
@@ -311,18 +321,6 @@ async function expectBranchSelectorOpensBesideDefaultBranch(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-async function clickLocatorCenter(page: Page, locator: Locator): Promise<void> {
-  await locator.waitFor({ state: 'visible' })
-  const boundingBox = await locator.boundingBox()
-
-  expect(boundingBox).not.toBeNull()
-
-  await page.mouse.click(
-    boundingBox!.x + boundingBox!.width / 2,
-    boundingBox!.y + boundingBox!.height / 2
-  )
 }
 
 async function expectDesktopRuntime(page: Page): Promise<void> {

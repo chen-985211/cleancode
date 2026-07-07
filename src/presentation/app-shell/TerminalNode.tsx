@@ -25,6 +25,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [draftName, setDraftName] = useState(block.name)
   const [draftDescription, setDraftDescription] = useState(block.description)
+  const [focusRequestId, setFocusRequestId] = useState(0)
   const hasRequestedAutoStartRef = useRef(false)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
   const trimmedDraftName = draftName.trim()
@@ -38,6 +39,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     'terminal-node',
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
+    data.isTerminalGroupSelectionMode ? 'terminal-node--group-selection-mode' : '',
+    data.isTerminalGroupSelectionMode && data.isSelected
+      ? 'terminal-node--group-candidate-selected'
+      : '',
     data.isNavigationHighlighted ? 'terminal-node--navigation-highlighted' : ''
   ]
     .filter(Boolean)
@@ -79,6 +84,20 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     setIsEditingMetadata(true)
   }, [block.description, block.name])
 
+  const requestTerminalFocus = useCallback(() => {
+    setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)
+  }, [])
+
+  const stopTerminal = useCallback(() => {
+    data.onStop(block)
+    requestTerminalFocus()
+  }, [block, data, requestTerminalFocus])
+
+  const restartTerminal = useCallback(() => {
+    data.onRestart(block)
+    requestTerminalFocus()
+  }, [block, data, requestTerminalFocus])
+
   const resizeTerminalBlock = useCallback(
     (_event: ResizeDragEvent, size: ResizeParams) => {
       void data.onResizeBlock(block, toTerminalBlockSizeInput(size))
@@ -106,7 +125,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   return (
     <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
       <NodeResizer
-        isVisible={data.isSelected}
+        isVisible={data.isSelected && !data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}
         minHeight={terminalNodeMinimumSize.height}
         color="#94a3b8"
@@ -124,10 +143,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         blockDescription={block.description}
         terminalStateClassName={terminalStateClassName}
         isRunning={isRunning}
+        isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
+        isSelectedForTerminalGroup={data.isSelected}
+        canSelectForTerminalGroup={data.canSelectForTerminalGroup}
         sessionStatus={session.status}
+        onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
         onStartEditing={startEditingMetadata}
-        onStop={() => data.onStop(block)}
-        onRestart={() => data.onRestart(block)}
+        onStop={stopTerminal}
+        onRestart={restartTerminal}
         onDelete={() => data.onDelete(block)}
       />
       {isEditingMetadata ? (
@@ -149,6 +172,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         <TerminalViewport
           block={block}
           session={session}
+          focusRequestId={focusRequestId}
           onDimensionsChange={handleDimensionsChange}
           onInput={data.onInput}
         />
@@ -174,7 +198,11 @@ interface TerminalHeaderProps {
   readonly blockDescription: string
   readonly terminalStateClassName: string
   readonly isRunning: boolean
+  readonly isTerminalGroupSelectionMode: boolean
+  readonly isSelectedForTerminalGroup: boolean
+  readonly canSelectForTerminalGroup: boolean
   readonly sessionStatus: TerminalViewState['status']
+  readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
   readonly onStop: () => void
   readonly onRestart: () => void
@@ -186,7 +214,11 @@ function TerminalHeader({
   blockDescription,
   terminalStateClassName,
   isRunning,
+  isTerminalGroupSelectionMode,
+  isSelectedForTerminalGroup,
+  canSelectForTerminalGroup,
   sessionStatus,
+  onToggleTerminalGroupCandidate,
   onStartEditing,
   onStop,
   onRestart,
@@ -197,6 +229,29 @@ function TerminalHeader({
       <span className="terminal-node__icon">
         <TerminalNodeIcon name="terminal" size={23} />
       </span>
+      {isTerminalGroupSelectionMode ? (
+        <button
+          className={[
+            'terminal-node__group-select nodrag',
+            isSelectedForTerminalGroup ? 'terminal-node__group-select--selected' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          type="button"
+          aria-pressed={isSelectedForTerminalGroup}
+          aria-label={`${blockName} ${isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}`}
+          title={isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}
+          data-cc-tooltip={isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}
+          disabled={!canSelectForTerminalGroup}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleTerminalGroupCandidate()
+          }}
+        >
+          {isSelectedForTerminalGroup ? <TerminalNodeIcon name="check" size={16} /> : null}
+        </button>
+      ) : null}
       <div className="terminal-node__title">
         <strong>{blockName}</strong>
         <span>{blockDescription}</span>
@@ -219,6 +274,7 @@ function TerminalHeader({
           type="button"
           aria-label={`${blockName} 编辑终端信息`}
           title="编辑终端信息"
+          data-cc-tooltip="编辑终端信息"
           onClick={onStartEditing}
         >
           <TerminalNodeIcon name="edit" />
@@ -228,6 +284,7 @@ function TerminalHeader({
           type="button"
           aria-label={`${blockName} 停止当前命令`}
           title="停止当前命令 (Ctrl+C)"
+          data-cc-tooltip="停止当前命令"
           disabled={!isRunning}
           onClick={onStop}
         >
@@ -238,6 +295,7 @@ function TerminalHeader({
           type="button"
           aria-label={`${blockName} 重启终端`}
           title="重启终端"
+          data-cc-tooltip="重启终端"
           onClick={onRestart}
         >
           <TerminalNodeIcon name="restart" />
@@ -247,6 +305,7 @@ function TerminalHeader({
           type="button"
           aria-label={`${blockName} 删除终端`}
           title="删除终端"
+          data-cc-tooltip="删除终端"
           onClick={onDelete}
         >
           <TerminalNodeIcon name="delete" />
@@ -297,6 +356,7 @@ function TerminalMetadataForm({
           type="submit"
           aria-label="保存终端信息"
           title="保存终端信息"
+          data-cc-tooltip="保存终端信息"
           disabled={!trimmedDraftName}
         >
           <TerminalNodeIcon name="check" />
@@ -306,6 +366,7 @@ function TerminalMetadataForm({
           type="button"
           aria-label="取消编辑终端信息"
           title="取消编辑终端信息"
+          data-cc-tooltip="取消编辑"
           onClick={onCancel}
         >
           <TerminalNodeIcon name="close" />

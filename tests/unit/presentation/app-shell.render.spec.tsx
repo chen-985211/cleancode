@@ -22,8 +22,9 @@ describe('app shell', () => {
     expect(screen.queryByText('cleancode')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeDisabled()
-    expect(toolbar.getAllByRole('button')).toHaveLength(1)
+    expect(toolbar.getAllByRole('button')).toHaveLength(2)
     expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+    expect(toolbar.getByRole('button', { name: '组合终端' })).toBeDisabled()
     expect(screen.getByLabelText('积木画布')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '积木导航小地图' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
@@ -53,10 +54,17 @@ describe('app shell', () => {
         addProject: vi.fn(),
         removeProject: vi.fn(),
         createTerminalBlock: vi.fn(),
+        createTerminalGroup: vi.fn(),
         updateTerminalBlockMetadata: vi.fn(),
+        updateTerminalGroupMetadata: vi.fn(),
+        setTerminalGroupCollapsed: vi.fn(),
+        addTerminalToGroup: vi.fn(),
+        removeTerminalFromGroup: vi.fn(),
+        dissolveTerminalGroup: vi.fn(),
         resizeTerminalBlock: vi.fn(),
         updateGraphViewport: vi.fn(),
         moveBlock: vi.fn(),
+        moveTerminalGroup: vi.fn(),
         deleteBlock: vi.fn(),
         saveGraph: vi.fn(),
         startTerminal: vi.fn(),
@@ -74,8 +82,9 @@ describe('app shell', () => {
 
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeEnabled()
-    expect(toolbar.getAllByRole('button')).toHaveLength(1)
+    expect(toolbar.getAllByRole('button')).toHaveLength(2)
     expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+    expect(toolbar.getByRole('button', { name: '组合终端' })).toBeDisabled()
     expect(screen.queryByText('浏览器预览模式')).not.toBeInTheDocument()
   })
 
@@ -91,10 +100,17 @@ describe('app shell', () => {
         addProject: vi.fn(),
         removeProject,
         createTerminalBlock: vi.fn(),
+        createTerminalGroup: vi.fn(),
         updateTerminalBlockMetadata: vi.fn(),
+        updateTerminalGroupMetadata: vi.fn(),
+        setTerminalGroupCollapsed: vi.fn(),
+        addTerminalToGroup: vi.fn(),
+        removeTerminalFromGroup: vi.fn(),
+        dissolveTerminalGroup: vi.fn(),
         resizeTerminalBlock: vi.fn(),
         updateGraphViewport: vi.fn(),
         moveBlock: vi.fn(),
+        moveTerminalGroup: vi.fn(),
         deleteBlock: vi.fn(),
         saveGraph: vi.fn(),
         startTerminal: vi.fn(),

@@ -34,6 +34,17 @@ describe('block graph filesystem repository', () => {
       description: 'Local shell',
       position: { x: 240, y: 180 }
     })
+    const secondTerminalBlock = graph.createTerminalBlock({
+      name: 'Terminal 2',
+      description: 'Local shell',
+      position: { x: 760, y: 180 }
+    })
+
+    graph.createTerminalGroup({
+      id: 'development-group',
+      name: '启动项目',
+      memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
+    })
 
     await repository.saveDefaultGraph(projectDirectory, graph)
 
@@ -62,6 +73,25 @@ describe('block graph filesystem repository', () => {
           description: 'Local shell',
           position: { x: 240, y: 180 },
           size: defaultTerminalBlockSize
+        },
+        {
+          id: secondTerminalBlock.id,
+          type: 'terminal',
+          name: 'Terminal 2',
+          description: 'Local shell',
+          position: { x: 760, y: 180 },
+          size: defaultTerminalBlockSize
+        }
+      ],
+      terminalGroups: [
+        {
+          id: 'development-group',
+          type: 'terminal-group',
+          name: '启动项目',
+          position: { x: 208, y: 104 },
+          size: { width: 1004, height: 458 },
+          isCollapsed: false,
+          memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
         }
       ]
     })
@@ -106,13 +136,15 @@ describe('block graph filesystem repository', () => {
           ...legacyGraph.blocks[0],
           size: defaultTerminalBlockSize
         }
-      ]
+      ],
+      terminalGroups: []
     })
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
     expect(migratedGraph.id).toBe(legacyGraph.id)
     expect(migratedGraph).toEqual(
       expect.objectContaining({
-        viewport: defaultCanvasViewport
+        viewport: defaultCanvasViewport,
+        terminalGroups: []
       })
     )
     expect(migratedGraph.blocks).toEqual([

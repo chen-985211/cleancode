@@ -16,10 +16,22 @@ export interface BlockGraphIpcHandlersInput {
     readonly description: string
     readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
+  readonly createTerminalGroup: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly name: string
+    readonly memberBlockIds: readonly string[]
+  }) => Promise<BlockGraphSnapshot>
   readonly moveBlock: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
     readonly blockId: string
+    readonly position: { readonly x: number; readonly y: number }
+  }) => Promise<BlockGraphSnapshot>
+  readonly moveTerminalGroup: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
     readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalBlockMetadata: (command: {
@@ -28,6 +40,35 @@ export interface BlockGraphIpcHandlersInput {
     readonly blockId: string
     readonly name: string
     readonly description: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly updateTerminalGroupMetadata: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
+    readonly name: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly setTerminalGroupCollapsed: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
+    readonly isCollapsed: boolean
+  }) => Promise<BlockGraphSnapshot>
+  readonly addTerminalToGroup: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
+    readonly blockId: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly removeTerminalFromGroup: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
+    readonly blockId: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly dissolveTerminalGroup: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly terminalGroupId: string
   }) => Promise<BlockGraphSnapshot>
   readonly resizeTerminalBlock: (command: {
     readonly projectDirectory: string
@@ -75,6 +116,24 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     {
       readonly projectDirectory: string
       readonly workspaceName: string
+      readonly name: string
+      readonly memberBlockIds: readonly string[]
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:create-terminal-group',
+    handler: (command) => input.createTerminalGroup(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'createTerminalGroup',
+    scope: 'block-graph',
+    successLogLevel: 'info'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
       readonly blockId: string
       readonly position: { readonly x: number; readonly y: number }
     },
@@ -85,6 +144,23 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'moveBlock',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+      readonly position: { readonly x: number; readonly y: number }
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:move-terminal-group',
+    handler: (command) => input.moveTerminalGroup(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'moveTerminalGroup',
     scope: 'block-graph'
   })
 
@@ -104,6 +180,91 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     logger: input.logger,
     operation: 'updateTerminalBlockMetadata',
     scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+      readonly name: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:update-terminal-group-metadata',
+    handler: (command) => input.updateTerminalGroupMetadata(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateTerminalGroupMetadata',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+      readonly isCollapsed: boolean
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:set-terminal-group-collapsed',
+    handler: (command) => input.setTerminalGroupCollapsed(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'setTerminalGroupCollapsed',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+      readonly blockId: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:add-terminal-to-group',
+    handler: (command) => input.addTerminalToGroup(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'addTerminalToGroup',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+      readonly blockId: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:remove-terminal-from-group',
+    handler: (command) => input.removeTerminalFromGroup(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'removeTerminalFromGroup',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly terminalGroupId: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:dissolve-terminal-group',
+    handler: (command) => input.dissolveTerminalGroup(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'dissolveTerminalGroup',
+    scope: 'block-graph',
+    successLogLevel: 'info'
   })
 
   registerIpcHandler<

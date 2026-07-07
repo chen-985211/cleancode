@@ -12,6 +12,7 @@ describe('terminal flow nodes', () => {
       projectId: 'project-1',
       workspaceName: 'main',
       viewport: { x: 0, y: 0, zoom: 1 },
+      terminalGroups: [],
       blocks: [
         {
           id: 'terminal-1',
@@ -34,7 +35,8 @@ describe('terminal flow nodes', () => {
       onUpdateMetadata: vi.fn(),
       onInput: vi.fn(),
       onResize: vi.fn(),
-      onResizeBlock: vi.fn(async () => undefined)
+      onResizeBlock: vi.fn(async () => undefined),
+      onToggleTerminalGroupCandidate: vi.fn()
     }
 
     const nodes = createTerminalFlowNodes({
