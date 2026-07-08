@@ -10,6 +10,7 @@ import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 
 const reactFlowSpies = vi.hoisted(() => ({
+  fitView: vi.fn(async () => undefined),
   setCenter: vi.fn(async () => undefined)
 }))
 
@@ -44,6 +45,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell create terminal focus', () => {
   beforeEach(() => {
+    reactFlowSpies.fitView.mockClear()
     reactFlowSpies.setCenter.mockClear()
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -79,6 +81,43 @@ describe('app shell create terminal focus', () => {
       })
     )
   })
+
+  it('fits the canvas when entering terminal group selection mode', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [
+          {
+            ...workbench,
+            graph: {
+              ...workbench.graph,
+              blocks: [
+                createTerminalBlockSnapshot({ id: 'terminal-1', name: 'Terminal 1' }),
+                createTerminalBlockSnapshot({
+                  id: 'terminal-2',
+                  name: 'Terminal 2',
+                  position: { x: 980, y: 240 }
+                })
+              ]
+            }
+          }
+        ])
+      })
+    })
+
+    render(<AppShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+
+    await waitFor(() =>
+      expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
+        padding: 0.22,
+        duration: 180
+      })
+    )
+  })
 })
 
 interface MockReactFlowProps {
@@ -94,7 +133,7 @@ interface MockReactFlowInstance {
   readonly setViewport: () => Promise<void>
   readonly zoomOut: () => Promise<void>
   readonly zoomIn: () => Promise<void>
-  readonly fitView: () => Promise<void>
+  readonly fitView: typeof reactFlowSpies.fitView
 }
 
 function createMockReactFlowInstance(): MockReactFlowInstance {
@@ -106,18 +145,24 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     setViewport: async () => undefined,
     zoomOut: async () => undefined,
     zoomIn: async () => undefined,
-    fitView: async () => undefined
+    fitView: reactFlowSpies.fitView
   }
 }
 
-function createTerminalBlockSnapshot() {
+function createTerminalBlockSnapshot(
+  input: {
+    readonly id?: string
+    readonly name?: string
+    readonly position?: { readonly x: number; readonly y: number }
+  } = {}
+) {
   return {
-    id: 'created-terminal',
+    id: input.id ?? 'created-terminal',
     type: 'terminal' as const,
-    name: 'Terminal 1',
+    name: input.name ?? 'Terminal 1',
     description: '本地终端',
     launchCommand: '',
-    position: { x: 450, y: 240 },
+    position: input.position ?? { x: 450, y: 240 },
     size: { width: 420, height: 306 }
   }
 }

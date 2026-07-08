@@ -113,6 +113,10 @@ export function WorkbenchCanvas({
       setViewportZoom
     })
   }
+  const beginTerminalGroupSelection = (): void => {
+    onBeginTerminalGroupSelection()
+    void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
+  }
 
   useEffect(() => {
     const canvasSurface = canvasSurfaceRef.current
@@ -204,7 +208,7 @@ export function WorkbenchCanvas({
             <button
               className="toolbar-button"
               type="button"
-              onClick={onBeginTerminalGroupSelection}
+              onClick={beginTerminalGroupSelection}
               disabled={!isDesktopRuntime || !currentWorkbench || !canBeginTerminalGroupSelection}
             >
               <Box size={16} aria-hidden="true" />
