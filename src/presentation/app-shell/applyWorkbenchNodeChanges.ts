@@ -9,26 +9,36 @@ const terminalGroupShellPadding = {
 
 export function applyWorkbenchNodeChanges(
   changes: NodeChange<WorkbenchFlowNode>[],
-  nodes: WorkbenchFlowNode[]
+  nodes: WorkbenchFlowNode[],
+  options: ApplyWorkbenchNodeChangesOptions = {}
 ): WorkbenchFlowNode[] {
+  const shouldResizeExpandedTerminalGroups = options.shouldResizeExpandedTerminalGroups ?? true
   const groupDeltas = collectTerminalGroupDragDeltas(changes, nodes)
   const changedNodes = applyNodeChanges(changes, nodes)
 
   if (groupDeltas.length === 0) {
-    return resizeExpandedTerminalGroupShells(changedNodes)
+    return shouldResizeExpandedTerminalGroups
+      ? resizeExpandedTerminalGroupShells(changedNodes)
+      : changedNodes
   }
 
-  return resizeExpandedTerminalGroupShells(
-    changedNodes.map((node) => {
-      if (node.type !== 'terminal') {
-        return node
-      }
+  const nodesWithMovedGroupMembers = changedNodes.map((node) => {
+    if (node.type !== 'terminal') {
+      return node
+    }
 
-      const delta = groupDeltas.find((entry) => entry.memberBlockIds.has(node.id))
+    const delta = groupDeltas.find((entry) => entry.memberBlockIds.has(node.id))
 
-      return delta ? moveNodeByDelta(node, delta) : node
-    })
-  )
+    return delta ? moveNodeByDelta(node, delta) : node
+  })
+
+  return shouldResizeExpandedTerminalGroups
+    ? resizeExpandedTerminalGroupShells(nodesWithMovedGroupMembers)
+    : nodesWithMovedGroupMembers
+}
+
+interface ApplyWorkbenchNodeChangesOptions {
+  readonly shouldResizeExpandedTerminalGroups?: boolean
 }
 
 interface TerminalGroupDragDelta {

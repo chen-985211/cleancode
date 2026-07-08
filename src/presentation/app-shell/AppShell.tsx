@@ -28,6 +28,7 @@ import { createTerminalFlowNodes } from './terminalFlowNodes'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
+import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
 import { useMinimapNodeFocus } from './useMinimapNodeFocus'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
@@ -83,8 +84,7 @@ export function AppShell() {
     isTerminalGroupSelectionMode,
     selectTerminalBlock,
     selectTerminalGroup,
-    selectedUngroupedTerminalBlockIds,
-    ungroupedTerminalBlockCount
+    selectedUngroupedTerminalBlockIds
   } = useTerminalGroupSelectionMode({
     graph,
     selectedTerminalBlockIds,
@@ -262,9 +262,29 @@ export function AppShell() {
     setCurrentGraph
   ])
 
-  const onNodesChange = useCallback((changes: NodeChange<WorkbenchFlowNode>[]) => {
-    setNodes((currentNodes) => applyWorkbenchNodeChanges(changes, currentNodes))
-  }, [])
+  const onNodesChange = useCallback(
+    (changes: NodeChange<WorkbenchFlowNode>[]) => {
+      setNodes((currentNodes) =>
+        applyWorkbenchNodeChanges(changes, currentNodes, {
+          shouldResizeExpandedTerminalGroups: !isTerminalGroupSelectionMode
+        })
+      )
+    },
+    [isTerminalGroupSelectionMode]
+  )
+  const {
+    clearTerminalGroupDropPreview,
+    moveWorkbenchNode,
+    previewTerminalGroupDrop,
+    terminalGroupDropAction
+  } = useTerminalGroupDragActions({
+    currentWorkbench,
+    currentWorkspace,
+    graph,
+    isTerminalGroupSelectionMode,
+    nodes,
+    setCurrentGraph
+  })
 
   const minimapNodeInteraction = useMemo<MinimapNodeInteractionContextValue>(
     () => ({
@@ -286,34 +306,6 @@ export function AppShell() {
       selectTerminalGroup(node.id)
     },
     [selectTerminalBlock, selectTerminalGroup]
-  )
-
-  const moveWorkbenchNode = useCallback(
-    async (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => {
-      if (!currentWorkbench || !currentWorkspace) {
-        return
-      }
-
-      const graphSnapshot =
-        node.type === 'terminal'
-          ? await window.cleancode?.moveBlock({
-              projectDirectory: currentWorkbench.project.directory,
-              workspaceName: currentWorkspace.name,
-              blockId: node.id,
-              position: node.position
-            })
-          : await window.cleancode?.moveTerminalGroup({
-              projectDirectory: currentWorkbench.project.directory,
-              workspaceName: currentWorkspace.name,
-              terminalGroupId: node.id,
-              position: node.position
-            })
-
-      if (graphSnapshot) {
-        setCurrentGraph(graphSnapshot)
-      }
-    },
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
   const deleteTerminalBlock = useCallback(
@@ -403,6 +395,7 @@ export function AppShell() {
         selectedTerminalGroupId,
         selectedUngroupedTerminalBlockIds,
         isTerminalGroupSelectionMode,
+        terminalGroupDropAction,
         terminalStates,
         handlers: {
           onStart: startTerminal,
@@ -437,6 +430,7 @@ export function AppShell() {
     selectedTerminalGroupId,
     selectedUngroupedTerminalBlockIds,
     isTerminalGroupSelectionMode,
+    terminalGroupDropAction,
     startTerminal,
     terminalGroupActions,
     selectTerminalBlock,
@@ -483,10 +477,12 @@ export function AppShell() {
         onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
         isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
         selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
-        canBeginTerminalGroupSelection={ungroupedTerminalBlockCount >= 2}
+        canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
         canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
         onNodesChange={onNodesChange}
         onNodeClick={selectWorkbenchNode}
+        onNodeDrag={previewTerminalGroupDrop}
+        onNodeDragStart={clearTerminalGroupDropPreview}
         onNodeDragStop={moveWorkbenchNode}
         onViewportChange={updateGraphViewport}
         onMinimapNodeClick={focusWorkbenchNode}

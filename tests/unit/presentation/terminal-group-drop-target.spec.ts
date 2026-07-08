@@ -1,0 +1,223 @@
+import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import {
+  createIdleTerminalState,
+  type TerminalFlowNode,
+  type TerminalGroupFlowNode
+} from '../../../src/presentation/app-shell/types'
+import { resolveTerminalGroupDropAction } from '../../../src/presentation/app-shell/terminalGroupDropTarget'
+
+describe('terminal group drop target', () => {
+  it('joins an ungrouped terminal when its center is dropped inside a group', () => {
+    const action = resolveTerminalGroupDropAction({
+      graph: createGraph(),
+      draggedNode: createTerminalNode({
+        id: 'worker-terminal',
+        position: { x: 420, y: 260 }
+      }),
+      nodes: [
+        createGroupNode({
+          id: 'development-group',
+          position: { x: 300, y: 180 },
+          size: { width: 760, height: 380 },
+          memberBlockIds: ['backend-terminal', 'frontend-terminal']
+        })
+      ]
+    })
+
+    expect(action).toEqual({
+      type: 'join-group',
+      terminalGroupId: 'development-group'
+    })
+  })
+
+  it('leaves a group when a member terminal is dropped outside its group bounds', () => {
+    const action = resolveTerminalGroupDropAction({
+      graph: createGraph({
+        memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
+      }),
+      draggedNode: createTerminalNode({
+        id: 'backend-terminal',
+        position: { x: 1180, y: 260 }
+      }),
+      nodes: [
+        createGroupNode({
+          id: 'development-group',
+          position: { x: 300, y: 180 },
+          size: { width: 760, height: 380 },
+          memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
+        })
+      ]
+    })
+
+    expect(action).toEqual({
+      type: 'leave-group',
+      terminalGroupId: 'development-group',
+      willDissolveGroup: false
+    })
+  })
+
+  it('marks the leave action as dissolving when the group would have one member left', () => {
+    const action = resolveTerminalGroupDropAction({
+      graph: createGraph(),
+      draggedNode: createTerminalNode({
+        id: 'backend-terminal',
+        position: { x: 1180, y: 260 }
+      }),
+      nodes: [
+        createGroupNode({
+          id: 'development-group',
+          position: { x: 300, y: 180 },
+          size: { width: 760, height: 380 },
+          memberBlockIds: ['backend-terminal', 'frontend-terminal']
+        })
+      ]
+    })
+
+    expect(action).toEqual({
+      type: 'leave-group',
+      terminalGroupId: 'development-group',
+      willDissolveGroup: true
+    })
+  })
+
+  it('uses persisted group bounds when deciding whether a member leaves the group', () => {
+    const action = resolveTerminalGroupDropAction({
+      graph: createGraph({
+        memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
+      }),
+      draggedNode: createTerminalNode({
+        id: 'backend-terminal',
+        position: { x: 1180, y: 260 }
+      }),
+      nodes: [
+        createGroupNode({
+          id: 'development-group',
+          position: { x: 300, y: 180 },
+          size: { width: 1400, height: 380 },
+          memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
+        })
+      ]
+    })
+
+    expect(action).toEqual({
+      type: 'leave-group',
+      terminalGroupId: 'development-group',
+      willDissolveGroup: false
+    })
+  })
+})
+
+function createGraph(
+  input: {
+    readonly memberBlockIds?: readonly string[]
+  } = {}
+): BlockGraphSnapshot {
+  const memberBlockIds = input.memberBlockIds ?? ['backend-terminal', 'frontend-terminal']
+
+  return {
+    id: 'graph-1',
+    projectId: 'project-1',
+    workspaceName: 'main',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    blocks: [
+      createBlock('backend-terminal', { x: 320, y: 240 }),
+      createBlock('frontend-terminal', { x: 780, y: 240 }),
+      createBlock('worker-terminal', { x: 1120, y: 240 })
+    ],
+    terminalGroups: [
+      {
+        id: 'development-group',
+        type: 'terminal-group',
+        name: '启动项目',
+        position: { x: 300, y: 180 },
+        size: { width: 760, height: 380 },
+        isCollapsed: false,
+        memberBlockIds
+      }
+    ]
+  }
+}
+
+function createBlock(id: string, position: { readonly x: number; readonly y: number }) {
+  return {
+    id,
+    type: 'terminal' as const,
+    name: id,
+    description: '本地终端',
+    launchCommand: '',
+    position,
+    size: { width: 420, height: 306 }
+  }
+}
+
+function createTerminalNode(input: {
+  readonly id: string
+  readonly position: { readonly x: number; readonly y: number }
+}): TerminalFlowNode {
+  const block = createBlock(input.id, input.position)
+
+  return {
+    id: input.id,
+    type: 'terminal',
+    position: input.position,
+    style: block.size,
+    data: {
+      block,
+      session: createIdleTerminalState(),
+      isSelected: false,
+      isTerminalGroupSelectionMode: true,
+      canSelectForTerminalGroup: true,
+      isNavigationHighlighted: false,
+      onStart: vi.fn(),
+      onStop: vi.fn(),
+      onQuickLaunch: vi.fn(),
+      onRestart: vi.fn(),
+      onDelete: vi.fn(),
+      onUpdateMetadata: vi.fn(),
+      onInput: vi.fn(),
+      onResize: vi.fn(),
+      onResizeBlock: vi.fn(),
+      onToggleTerminalGroupCandidate: vi.fn()
+    }
+  }
+}
+
+function createGroupNode(input: {
+  readonly id: string
+  readonly position: { readonly x: number; readonly y: number }
+  readonly size: { readonly width: number; readonly height: number }
+  readonly memberBlockIds: readonly string[]
+}): TerminalGroupFlowNode {
+  return {
+    id: input.id,
+    type: 'terminalGroup',
+    position: input.position,
+    style: input.size,
+    data: {
+      group: {
+        id: input.id,
+        type: 'terminal-group',
+        name: '启动项目',
+        position: input.position,
+        size: input.size,
+        isCollapsed: false,
+        memberBlockIds: input.memberBlockIds
+      },
+      memberBlocks: [],
+      memberStates: {},
+      selectedUngroupedTerminalBlockIds: [],
+      selectedMemberBlockIds: [],
+      isSelected: false,
+      dropFeedback: null,
+      onStartGroup: vi.fn(),
+      onStopGroup: vi.fn(),
+      onRestartGroup: vi.fn(),
+      onUpdateGroupMetadata: vi.fn(),
+      onToggleGroupCollapsed: vi.fn(),
+      onAddSelectedTerminalsToGroup: vi.fn(),
+      onRemoveSelectedTerminalsFromGroup: vi.fn(),
+      onRemoveTerminalFromGroup: vi.fn(),
+      onDissolveGroup: vi.fn()
+    }
+  }
+}

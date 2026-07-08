@@ -42,6 +42,11 @@ interface WorkbenchCanvasProps {
   readonly canCreateTerminalGroup: boolean
   readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDrag: (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDragStart: (
+    event: globalThis.MouseEvent | TouchEvent,
+    node: WorkbenchFlowNode
+  ) => void
   readonly onNodeDragStop: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
@@ -72,6 +77,8 @@ export function WorkbenchCanvas({
   canCreateTerminalGroup,
   onNodesChange,
   onNodeClick,
+  onNodeDrag,
+  onNodeDragStart,
   onNodeDragStop,
   onViewportChange,
   onMinimapNodeClick,
@@ -183,7 +190,7 @@ export function WorkbenchCanvas({
           {isTerminalGroupSelectionMode ? (
             <>
               <span className="toolbar-selection-status" role="status">
-                选择要组合的终端
+                组合编辑
                 <strong>{selectedTerminalGroupCandidateCount}</strong>
               </span>
               <button
@@ -201,7 +208,7 @@ export function WorkbenchCanvas({
                 onClick={onCancelTerminalGroupSelection}
               >
                 <X size={16} aria-hidden="true" />
-                取消
+                完成
               </button>
             </>
           ) : (
@@ -243,7 +250,11 @@ export function WorkbenchCanvas({
           }}
           onNodesChange={onNodesChange}
           onNodeClick={onNodeClick}
-          onNodeDragStart={() => setIsDraggingTerminalNode(true)}
+          onNodeDragStart={(event, node) => {
+            setIsDraggingTerminalNode(true)
+            onNodeDragStart(event, node)
+          }}
+          onNodeDrag={onNodeDrag}
           onNodeDragStop={(event, node) => {
             setIsDraggingTerminalNode(false)
             onNodeDragStop(event, node)

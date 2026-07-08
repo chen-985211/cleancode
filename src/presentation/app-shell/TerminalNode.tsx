@@ -268,6 +268,7 @@ function TerminalHeader({
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
   const launchCommandTooltip = canQuickLaunch ? '启动命令' : '配置启动命令'
+  const terminalGroupSelectionLabel = isSelectedForTerminalGroup ? '已选择终端' : '选择终端'
   const restartEmptySession = useCallback(() => {
     setIsMoreMenuOpen(false)
     onRestart()
@@ -288,9 +289,9 @@ function TerminalHeader({
             .join(' ')}
           type="button"
           aria-pressed={isSelectedForTerminalGroup}
-          aria-label={`${blockName} ${isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}`}
-          title={isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}
-          data-cc-tooltip={isSelectedForTerminalGroup ? '已选择加入组合' : '选择加入组合'}
+          aria-label={`${blockName} ${terminalGroupSelectionLabel}`}
+          title={terminalGroupSelectionLabel}
+          data-cc-tooltip={terminalGroupSelectionLabel}
           disabled={!canSelectForTerminalGroup}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {

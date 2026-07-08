@@ -2,12 +2,14 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
 import {
   createIdleTerminalState,
   type TerminalBlockMetadataInput,
   type TerminalBlockSizeInput,
   type TerminalDimensions,
   type TerminalFlowNode,
+  type TerminalGroupDropFeedback,
   type TerminalGroupFlowNode,
   type TerminalGroupMetadataInput,
   type TerminalViewState,
@@ -68,6 +70,7 @@ interface CreateTerminalFlowNodesInput {
   readonly selectedTerminalGroupId?: string | null
   readonly selectedUngroupedTerminalBlockIds?: readonly string[]
   readonly isTerminalGroupSelectionMode?: boolean
+  readonly terminalGroupDropAction?: TerminalGroupDropAction
   readonly hoveredTerminalBlockId: string | null
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
@@ -80,6 +83,7 @@ export function createTerminalFlowNodes({
   selectedTerminalGroupId,
   selectedUngroupedTerminalBlockIds = [],
   isTerminalGroupSelectionMode = false,
+  terminalGroupDropAction = { type: 'none' },
   hoveredTerminalBlockId,
   terminalStates,
   handlers
@@ -103,6 +107,7 @@ export function createTerminalFlowNodes({
       selectedBlockIds,
       selectedTerminalGroupId: selectedTerminalGroupId ?? null,
       selectedUngroupedTerminalBlockIds,
+      terminalGroupDropAction,
       terminalStates
     })
   )
@@ -111,7 +116,7 @@ export function createTerminalFlowNodes({
     .map((block) =>
       createTerminalFlowNode({
         block,
-        canSelectForTerminalGroup: !groupedMemberIds.has(block.id),
+        canSelectForTerminalGroup: isTerminalGroupSelectionMode || !groupedMemberIds.has(block.id),
         handlers,
         isNavigationHighlighted: hoveredTerminalBlockId === block.id,
         isSelected: selectedBlockIds.has(block.id),
@@ -170,6 +175,7 @@ interface CreateTerminalGroupFlowNodeInput {
   readonly selectedBlockIds: ReadonlySet<string>
   readonly selectedTerminalGroupId: string | null
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
+  readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: Partial<TerminalGroupFlowNodeHandlers>
 }
@@ -180,6 +186,7 @@ function createTerminalGroupFlowNode({
   selectedBlockIds,
   selectedTerminalGroupId,
   selectedUngroupedTerminalBlockIds,
+  terminalGroupDropAction,
   terminalStates,
   handlers
 }: CreateTerminalGroupFlowNodeInput): TerminalGroupFlowNode {
@@ -214,6 +221,7 @@ function createTerminalGroupFlowNode({
         selectedBlockIds.has(blockId)
       ),
       isSelected: selectedTerminalGroupId === group.id,
+      dropFeedback: resolveTerminalGroupDropFeedback(group.id, terminalGroupDropAction),
       onStartGroup: handlers.onStartGroup ?? noopTerminalGroupAction,
       onStopGroup: handlers.onStopGroup ?? noopTerminalGroupAction,
       onRestartGroup: handlers.onRestartGroup ?? noopTerminalGroupAction,
@@ -227,6 +235,21 @@ function createTerminalGroupFlowNode({
       onDissolveGroup: handlers.onDissolveGroup ?? noopTerminalGroupPromiseAction
     }
   }
+}
+
+function resolveTerminalGroupDropFeedback(
+  terminalGroupId: string,
+  action: TerminalGroupDropAction
+): TerminalGroupDropFeedback | null {
+  if (action.type === 'join-group' && action.terminalGroupId === terminalGroupId) {
+    return 'join'
+  }
+
+  if (action.type === 'leave-group' && action.terminalGroupId === terminalGroupId) {
+    return action.willDissolveGroup ? 'dissolve' : 'leave'
+  }
+
+  return null
 }
 
 function noopTerminalGroupAction(): void {}

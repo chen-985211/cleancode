@@ -208,6 +208,7 @@ function createCollapsedTerminalGroupFlowNode(): TerminalGroupFlowNode {
       selectedUngroupedTerminalBlockIds: [],
       selectedMemberBlockIds: [],
       isSelected: true,
+      dropFeedback: null,
       onStartGroup: vi.fn(),
       onStopGroup: vi.fn(),
       onRestartGroup: vi.fn(),

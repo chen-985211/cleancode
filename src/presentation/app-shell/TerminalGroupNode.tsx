@@ -31,7 +31,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const className = [
     'terminal-group-node',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
-    data.isSelected ? 'terminal-group-node--selected' : ''
+    data.isSelected ? 'terminal-group-node--selected' : '',
+    data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -98,6 +99,11 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             <>
               <strong>{group.name}</strong>
               <span>{status.label}</span>
+              {data.dropFeedback ? (
+                <span className="terminal-group-node__drop-hint">
+                  {getDropFeedbackLabel(data.dropFeedback)}
+                </span>
+              ) : null}
             </>
           )}
         </div>
@@ -215,6 +221,20 @@ interface IconButtonProps {
   readonly isExpanded?: boolean
   readonly onClick: () => void
   readonly children: ReactNode
+}
+
+function getDropFeedbackLabel(
+  feedback: NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>
+) {
+  if (feedback === 'join') {
+    return '松开加入组合'
+  }
+
+  if (feedback === 'leave') {
+    return '松开移出组合'
+  }
+
+  return '松开后解散组合'
 }
 
 function IconButton({

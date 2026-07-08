@@ -74,10 +74,21 @@ describe('terminal group member labels', () => {
     expect(screen.getByRole('button', { name: 'Backend 移出组合' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Frontend 移出组合' })).toBeInTheDocument()
   })
+
+  it('shows drop feedback while editing group membership', () => {
+    render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({ isCollapsed: false, dropFeedback: 'dissolve' })}
+      />
+    )
+
+    expect(screen.getByText('松开后解散组合')).toBeInTheDocument()
+  })
 })
 
 function createTerminalGroupNodeProps(input: {
   readonly isCollapsed: boolean
+  readonly dropFeedback?: TerminalGroupFlowNode['data']['dropFeedback']
   readonly onRemoveSelectedTerminalsFromGroup?: TerminalGroupFlowNode['data']['onRemoveSelectedTerminalsFromGroup']
   readonly selectedMemberBlockIds?: readonly string[]
 }): Parameters<typeof TerminalGroupNode>[0] {
@@ -105,6 +116,7 @@ function createTerminalGroupNodeProps(input: {
       selectedUngroupedTerminalBlockIds: [],
       selectedMemberBlockIds: input.selectedMemberBlockIds ?? [],
       isSelected: false,
+      dropFeedback: input.dropFeedback ?? null,
       onStartGroup: vi.fn(),
       onStopGroup: vi.fn(),
       onRestartGroup: vi.fn(),

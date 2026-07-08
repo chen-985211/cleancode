@@ -95,6 +95,36 @@ describe('terminal flow nodes for terminal groups', () => {
       }
     })
   })
+
+  it('keeps grouped terminal nodes selectable while editing group membership', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph({ isCollapsed: false }),
+      selectedTerminalBlockIds: ['backend-terminal'],
+      hoveredTerminalBlockId: null,
+      isTerminalGroupSelectionMode: true,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers()
+    })
+
+    expect(nodes[1]).toMatchObject({
+      id: 'backend-terminal',
+      type: 'terminal',
+      selected: true,
+      data: {
+        isSelected: true,
+        isTerminalGroupSelectionMode: true,
+        canSelectForTerminalGroup: true
+      }
+    })
+    expect(nodes[0]).toMatchObject({
+      id: 'development-group',
+      type: 'terminalGroup',
+      data: {
+        selectedMemberBlockIds: ['backend-terminal'],
+        selectedUngroupedTerminalBlockIds: []
+      }
+    })
+  })
 })
 
 function createGraph(input: {

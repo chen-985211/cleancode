@@ -65,6 +65,38 @@ describe('workbench node changes', () => {
       expect.objectContaining({ id: 'frontend-terminal', position: { x: 1120, y: 240 } })
     ])
   })
+
+  it('does not grow a terminal group shell while editing group membership', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph(),
+      selectedTerminalGroupId: 'development-group',
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers()
+    })
+    const changes: NodeChange<WorkbenchFlowNode>[] = [
+      {
+        id: 'frontend-terminal',
+        type: 'position',
+        position: { x: 1120, y: 240 },
+        dragging: true
+      }
+    ]
+
+    const changedNodes = applyWorkbenchNodeChanges(changes, nodes, {
+      shouldResizeExpandedTerminalGroups: false
+    })
+
+    expect(changedNodes).toEqual([
+      expect.objectContaining({
+        id: 'development-group',
+        position: { x: 288, y: 164 },
+        style: { width: 984, height: 458 }
+      }),
+      expect.objectContaining({ id: 'backend-terminal', position: { x: 320, y: 240 } }),
+      expect.objectContaining({ id: 'frontend-terminal', position: { x: 1120, y: 240 } })
+    ])
+  })
 })
 
 function createGraph(): BlockGraphSnapshot {

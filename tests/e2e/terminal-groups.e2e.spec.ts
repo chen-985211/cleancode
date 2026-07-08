@@ -42,8 +42,8 @@ describe('terminal groups e2e', () => {
       await createTwoTerminalBlocks(page, workbench)
 
       await page.getByRole('button', { name: '组合终端' }).click()
-      await page.getByRole('button', { name: 'Terminal 1 选择加入组合' }).click()
-      await page.getByRole('button', { name: 'Terminal 2 选择加入组合' }).click()
+      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
+      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
       await page.getByRole('button', { name: '创建组合' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
 
@@ -85,16 +85,80 @@ describe('terminal groups e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'adds a terminal to an existing group by dropping it in group edit mode',
+    async () => {
+      await createTerminalBlocks(page, workbench, 3)
+
+      await page.getByRole('button', { name: '组合终端' }).click()
+      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
+      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
+      await ensureTerminalNotSelectedForGroup(page, 'Terminal 3')
+      await page.getByRole('button', { name: '创建组合' }).click()
+      await waitForTerminalGroup(workbench, (group) => group.memberBlockIds.length === 2)
+
+      const graphBeforeDrop = await readGraph(workbench)
+      const terminalThree = graphBeforeDrop.blocks.find((block) => block.name === 'Terminal 3')!
+
+      await page.getByRole('button', { name: '组合终端' }).click()
+      await dragTerminalHeaderToGroupCenter(page, terminalThree.id)
+
+      await waitForTerminalGroup(
+        workbench,
+        (group) =>
+          group.memberBlockIds.length === 3 && group.memberBlockIds.includes(terminalThree.id)
+      )
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'removes a member terminal by dropping it outside in group edit mode',
+    async () => {
+      await createTerminalBlocks(page, workbench, 3)
+
+      await page.getByRole('button', { name: '组合终端' }).click()
+      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
+      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
+      await ensureTerminalSelectedForGroup(page, 'Terminal 3')
+      await page.getByRole('button', { name: '创建组合' }).click()
+      await waitForTerminalGroup(workbench, (group) => group.memberBlockIds.length === 3)
+
+      const graphBeforeDrop = await readGraph(workbench)
+      const terminalOne = graphBeforeDrop.blocks.find((block) => block.name === 'Terminal 1')!
+
+      await page.getByRole('button', { name: '组合终端' }).click()
+      await dragTerminalHeaderOutsideGroup(page, terminalOne.id)
+
+      await waitForTerminalGroup(
+        workbench,
+        (group) =>
+          group.memberBlockIds.length === 2 && !group.memberBlockIds.includes(terminalOne.id)
+      )
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function createTwoTerminalBlocks(page: Page, workbench: E2eWorkbench): Promise<void> {
+  await createTerminalBlocks(page, workbench, 2)
+}
+
+async function createTerminalBlocks(
+  page: Page,
+  workbench: E2eWorkbench,
+  count: number
+): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
-  await page.getByLabel('Terminal 1 文本输出').waitFor()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
-  await page.getByLabel('Terminal 2 文本输出').waitFor()
-  await waitForGraph(workbench, (graph) => graph.blocks.length === 2)
+
+  for (let index = 1; index <= count; index += 1) {
+    await page.getByRole('button', { name: '新建终端积木' }).click()
+    await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
+  }
+
+  await waitForGraph(workbench, (graph) => graph.blocks.length === count)
 }
 
 async function dragTerminalHeader(
@@ -115,6 +179,82 @@ async function dragTerminalHeader(
     headerBox.y + headerBox.height / 2 + deltaY,
     { steps: 18 }
   )
+  await page.mouse.up()
+}
+
+async function ensureTerminalSelectedForGroup(page: Page, terminalName: string): Promise<void> {
+  if (await page.getByRole('button', { name: `${terminalName} 已选择终端` }).count()) {
+    return
+  }
+
+  await page.getByRole('button', { name: `${terminalName} 选择终端` }).click()
+}
+
+async function ensureTerminalNotSelectedForGroup(page: Page, terminalName: string): Promise<void> {
+  const selectedButton = page.getByRole('button', { name: `${terminalName} 已选择终端` })
+
+  if ((await selectedButton.count()) === 0) {
+    return
+  }
+
+  await selectedButton.click()
+}
+
+async function dragTerminalHeaderToGroupCenter(page: Page, terminalBlockId: string): Promise<void> {
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  const terminalHeader = page.locator(
+    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
+  )
+  const terminalBox = await readRequiredBoundingBox(terminal)
+  const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
+  const terminalCenterOffset = {
+    x: terminalBox.x + terminalBox.width / 2 - (headerBox.x + headerBox.width / 2),
+    y: terminalBox.y + terminalBox.height / 2 - (headerBox.y + headerBox.height / 2)
+  }
+  const start = {
+    x: headerBox.x + headerBox.width / 2,
+    y: headerBox.y + headerBox.height / 2
+  }
+  const target = {
+    x: groupBox.x + groupBox.width / 2 - terminalCenterOffset.x,
+    y: groupBox.y + groupBox.height / 2 - terminalCenterOffset.y
+  }
+
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(target.x, target.y, { steps: 24 })
+  await page.mouse.up()
+}
+
+async function dragTerminalHeaderOutsideGroup(page: Page, terminalBlockId: string): Promise<void> {
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  const terminalHeader = page.locator(
+    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
+  )
+  const terminalBox = await readRequiredBoundingBox(terminal)
+  const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
+  const terminalCenterOffset = {
+    x: terminalBox.x + terminalBox.width / 2 - (headerBox.x + headerBox.width / 2),
+    y: terminalBox.y + terminalBox.height / 2 - (headerBox.y + headerBox.height / 2)
+  }
+  const start = {
+    x: headerBox.x + headerBox.width / 2,
+    y: headerBox.y + headerBox.height / 2
+  }
+  const targetTerminalCenter = {
+    x: groupBox.x + groupBox.width + terminalBox.width / 2 + 140,
+    y: terminalBox.y + terminalBox.height / 2
+  }
+  const target = {
+    x: targetTerminalCenter.x - terminalCenterOffset.x,
+    y: targetTerminalCenter.y - terminalCenterOffset.y
+  }
+
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(target.x, target.y, { steps: 24 })
   await page.mouse.up()
 }
 

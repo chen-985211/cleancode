@@ -88,6 +88,26 @@ describe('app shell', () => {
     expect(screen.queryByText('浏览器预览模式')).not.toBeInTheDocument()
   })
 
+  it('allows entering terminal group editing whenever a workbench is open', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+    const toolbar = within(screen.getByLabelText('工作台工具栏'))
+
+    fireEvent.click(await toolbar.findByRole('button', { name: '组合终端' }))
+
+    expect(toolbar.getByText('组合编辑')).toBeInTheDocument()
+    expect(toolbar.getByRole('button', { name: '创建组合' })).toBeDisabled()
+    expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
+  })
+
   it('removes a remembered project through the desktop runtime API', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const removeProject = vi.fn(async () => [])

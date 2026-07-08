@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction
-} from 'react'
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkbenchSnapshot } from './types'
 
@@ -36,21 +29,10 @@ export function useTerminalGroupSelectionMode({
     [groupedTerminalBlockIds, selectedTerminalBlockIds]
   )
 
-  useEffect(() => {
-    if (isTerminalGroupSelectionMode && ungroupedTerminalBlockIds.length < 2) {
-      setIsTerminalGroupSelectionMode(false)
-    }
-  }, [isTerminalGroupSelectionMode, ungroupedTerminalBlockIds.length])
-
   const beginTerminalGroupSelection = useCallback(() => {
-    if (ungroupedTerminalBlockIds.length < 2) {
-      return
-    }
-
-    setSelectedTerminalBlockIds([])
     setSelectedTerminalGroupId(null)
     setIsTerminalGroupSelectionMode(true)
-  }, [setSelectedTerminalBlockIds, setSelectedTerminalGroupId, ungroupedTerminalBlockIds.length])
+  }, [setSelectedTerminalGroupId])
 
   const cancelTerminalGroupSelection = useCallback(() => {
     setIsTerminalGroupSelectionMode(false)
@@ -65,10 +47,6 @@ export function useTerminalGroupSelectionMode({
   const selectTerminalBlock = useCallback(
     (blockId: string, shouldToggle: boolean) => {
       if (isTerminalGroupSelectionMode) {
-        if (groupedTerminalBlockIds.has(blockId)) {
-          return
-        }
-
         setSelectedTerminalGroupId(null)
         setSelectedTerminalBlockIds((blockIds) => toggleTerminalSelection(blockIds, blockId, true))
         return
@@ -82,12 +60,7 @@ export function useTerminalGroupSelectionMode({
         setSelectedTerminalGroupId(null)
       }
     },
-    [
-      groupedTerminalBlockIds,
-      isTerminalGroupSelectionMode,
-      setSelectedTerminalBlockIds,
-      setSelectedTerminalGroupId
-    ]
+    [isTerminalGroupSelectionMode, setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
   )
 
   const selectTerminalGroup = useCallback(

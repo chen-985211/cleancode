@@ -39,6 +39,7 @@ export interface TerminalGroupMetadataInput {
 }
 
 export type TerminalBlockSizeInput = TerminalBlockSizeSnapshot
+export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 interface TerminalNodeData extends Record<string, unknown> {
   readonly block: TerminalBlockSnapshot
@@ -74,6 +75,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
   readonly selectedMemberBlockIds: readonly string[]
   readonly isSelected: boolean
+  readonly dropFeedback: TerminalGroupDropFeedback | null
   readonly onStartGroup: (group: TerminalGroupSnapshot) => void
   readonly onStopGroup: (group: TerminalGroupSnapshot) => void
   readonly onRestartGroup: (group: TerminalGroupSnapshot) => void

@@ -35,6 +35,30 @@
     0 0 0 1px rgb(255 255 255 / 0.86) inset;
 }
 
+.terminal-group-node--drop-join {
+  border-color: rgb(34 197 94 / 0.62);
+  box-shadow:
+    0 0 0 2px rgb(34 197 94 / 0.16),
+    0 18px 48px rgb(15 23 42 / 0.14),
+    0 0 0 1px rgb(255 255 255 / 0.88) inset;
+}
+
+.terminal-group-node--drop-leave {
+  border-color: rgb(59 130 246 / 0.6);
+  box-shadow:
+    0 0 0 2px rgb(59 130 246 / 0.16),
+    0 18px 48px rgb(15 23 42 / 0.14),
+    0 0 0 1px rgb(255 255 255 / 0.88) inset;
+}
+
+.terminal-group-node--drop-dissolve {
+  border-color: rgb(245 158 11 / 0.64);
+  box-shadow:
+    0 0 0 2px rgb(245 158 11 / 0.18),
+    0 18px 48px rgb(15 23 42 / 0.14),
+    0 0 0 1px rgb(255 255 255 / 0.88) inset;
+}
+
 .terminal-group-node__header {
   display: grid;
   min-height: 0;
@@ -79,6 +103,33 @@
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1.15;
+}
+
+.terminal-group-node__drop-hint {
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid rgb(148 163 184 / 0.22);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.72);
+  padding: 3px 7px;
+}
+
+.terminal-group-node--drop-join .terminal-group-node__drop-hint {
+  border-color: rgb(34 197 94 / 0.28);
+  background: rgb(240 253 244 / 0.92);
+  color: #15803d;
+}
+
+.terminal-group-node--drop-leave .terminal-group-node__drop-hint {
+  border-color: rgb(59 130 246 / 0.28);
+  background: rgb(239 246 255 / 0.92);
+  color: #1d4ed8;
+}
+
+.terminal-group-node--drop-dissolve .terminal-group-node__drop-hint {
+  border-color: rgb(245 158 11 / 0.32);
+  background: rgb(255 251 235 / 0.94);
+  color: #a16207;
 }
 
 .terminal-group-node__actions {
