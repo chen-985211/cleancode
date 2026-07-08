@@ -96,6 +96,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
 export type WorkbenchFlowNode = TerminalFlowNode | TerminalGroupFlowNode
+export type MinimapFlowNode = TerminalFlowNode | TerminalGroupFlowNode
 
 export const defaultTerminalDimensions: TerminalDimensions = {
   columns: 80,

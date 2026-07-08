@@ -6,8 +6,8 @@ import {
   MinimapNodeInteractionContext,
   type MinimapNodeInteractionContextValue
 } from './minimapInteraction'
-import { MinimapTerminalNode } from './MinimapTerminalNode'
-import type { TerminalFlowNode } from './types'
+import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
+import type { MinimapFlowNode } from './types'
 
 interface CanvasSize {
   readonly width: number
@@ -21,7 +21,7 @@ export interface MinimapViewportCenter {
 
 interface CanvasMinimapProps {
   readonly isCollapsed: boolean
-  readonly nodes: TerminalFlowNode[]
+  readonly nodes: MinimapFlowNode[]
   readonly canvasViewport: CanvasViewportSnapshot
   readonly canvasSize: CanvasSize
   readonly viewportZoom: number
@@ -33,13 +33,13 @@ interface CanvasMinimapProps {
   readonly onMinimapNodeClick: (blockId: string) => void
   readonly onViewportCenterPreview: (center: MinimapViewportCenter) => void
   readonly onViewportCenterCommit: (center: MinimapViewportCenter) => void
-  readonly getMiniMapNodeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeStrokeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeClassName: (node: TerminalFlowNode) => string
+  readonly getMiniMapNodeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeStrokeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeClassName: (node: MinimapFlowNode) => string
 }
 
 interface MinimapFrame {
-  readonly node: TerminalFlowNode
+  readonly node: MinimapFlowNode
   readonly x: number
   readonly y: number
   readonly width: number
@@ -163,9 +163,11 @@ export function CanvasMinimap({
                   rx={16}
                 />
                 {frames.map((frame) => (
-                  <MinimapTerminalNode
+                  <MinimapWorkbenchNode
                     key={frame.node.id}
                     id={frame.node.id}
+                    variant={frame.node.type === 'terminalGroup' ? 'terminalGroup' : 'terminal'}
+                    kindLabel={frame.node.type === 'terminalGroup' ? '终端组合' : '终端'}
                     x={frame.x}
                     y={frame.y}
                     width={frame.width}
@@ -315,11 +317,11 @@ function resolveViewportFrame(
   }
 }
 
-function toMinimapFrame(node: TerminalFlowNode): MinimapFrame {
-  const width =
-    node.measured?.width ?? resolveDimension(node.style?.width) ?? node.data.block.size.width
+function toMinimapFrame(node: MinimapFlowNode): MinimapFrame {
+  const fallbackSize = node.type === 'terminal' ? node.data.block.size : node.data.group.size
+  const width = node.measured?.width ?? resolveDimension(node.style?.width) ?? fallbackSize.width
   const height =
-    node.measured?.height ?? resolveDimension(node.style?.height) ?? node.data.block.size.height
+    node.measured?.height ?? resolveDimension(node.style?.height) ?? fallbackSize.height
 
   return {
     node,
@@ -354,7 +356,7 @@ function resolveSvgPoint(
 }
 
 function isMinimapNodeTarget(target: EventTarget): boolean {
-  return target instanceof Element && Boolean(target.closest('[data-minimap-terminal-id]'))
+  return target instanceof Element && Boolean(target.closest('[data-minimap-node-id]'))
 }
 
 function resolveCanvasDimension(value: number, fallback: number): number {

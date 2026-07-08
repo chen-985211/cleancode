@@ -4,7 +4,8 @@ import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
 import {
   createIdleTerminalState,
-  type TerminalFlowNode
+  type TerminalFlowNode,
+  type TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
 
 describe('canvas minimap', () => {
@@ -59,6 +60,39 @@ describe('canvas minimap', () => {
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps collapsed terminal groups visible as minimap nodes', () => {
+    const onMinimapNodeClick = vi.fn()
+    const minimapNodeInteraction = createMinimapNodeInteraction()
+
+    const { container } = render(
+      <CanvasMinimap
+        isCollapsed={false}
+        nodes={[createCollapsedTerminalGroupFlowNode()]}
+        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
+        canvasSize={{ width: 960, height: 640 }}
+        viewportZoom={1}
+        minimapNodeInteraction={minimapNodeInteraction}
+        onToggleCollapsed={vi.fn()}
+        onZoomOut={vi.fn()}
+        onZoomIn={vi.fn()}
+        onFitCanvas={vi.fn()}
+        onMinimapNodeClick={onMinimapNodeClick}
+        onViewportCenterPreview={vi.fn()}
+        onViewportCenterCommit={vi.fn()}
+        getMiniMapNodeColor={() => '#22c55e'}
+        getMiniMapNodeStrokeColor={() => '#d3dbe8'}
+        getMiniMapNodeClassName={() => 'canvas-minimap__node'}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '聚焦终端组合 启动项目' }))
+
+    expect(container.querySelector('.canvas-minimap__group-member')).toBeInTheDocument()
+    expect(container.querySelector('.canvas-minimap__node-screen')).not.toBeInTheDocument()
+    expect(minimapNodeInteraction.focusBlock).toHaveBeenCalledWith('development-group')
+    expect(onMinimapNodeClick).toHaveBeenCalledWith('development-group')
+  })
+
   it('emits preview and commit centers while panning the minimap viewport', () => {
     const onViewportCenterPreview = vi.fn()
     const onViewportCenterCommit = vi.fn()
@@ -101,7 +135,12 @@ describe('canvas minimap', () => {
 
 function createMinimapNodeInteraction(): MinimapNodeInteractionContextValue {
   return {
-    getLabel: (blockId) => (blockId === 'terminal-1' ? 'Terminal 1' : blockId),
+    getLabel: (blockId) =>
+      blockId === 'terminal-1'
+        ? 'Terminal 1'
+        : blockId === 'development-group'
+          ? '启动项目'
+          : blockId,
     focusBlock: vi.fn(),
     setHoveredBlockId: vi.fn()
   }
@@ -140,6 +179,44 @@ function createTerminalFlowNode(): TerminalFlowNode {
       onToggleTerminalGroupCandidate: vi.fn()
     }
   } as TerminalFlowNode
+}
+
+function createCollapsedTerminalGroupFlowNode(): TerminalGroupFlowNode {
+  return {
+    id: 'development-group',
+    type: 'terminalGroup',
+    position: { x: 300, y: 180 },
+    selected: true,
+    style: {
+      width: 360,
+      height: 174
+    },
+    data: {
+      group: {
+        id: 'development-group',
+        type: 'terminal-group',
+        name: '启动项目',
+        memberBlockIds: ['terminal-1', 'terminal-2'],
+        position: { x: 300, y: 180 },
+        size: { width: 984, height: 458 },
+        isCollapsed: true
+      },
+      memberBlocks: [],
+      memberStates: {},
+      selectedUngroupedTerminalBlockIds: [],
+      selectedMemberBlockIds: [],
+      isSelected: true,
+      onStartGroup: vi.fn(),
+      onStopGroup: vi.fn(),
+      onRestartGroup: vi.fn(),
+      onUpdateGroupMetadata: vi.fn(),
+      onToggleGroupCollapsed: vi.fn(),
+      onAddSelectedTerminalsToGroup: vi.fn(),
+      onRemoveSelectedTerminalsFromGroup: vi.fn(),
+      onRemoveTerminalFromGroup: vi.fn(),
+      onDissolveGroup: vi.fn()
+    }
+  } as TerminalGroupFlowNode
 }
 
 function installPointerCaptureStubs(element: SVGSVGElement): void {

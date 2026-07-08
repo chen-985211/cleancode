@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import type { TerminalFlowNode, TerminalViewState } from './types'
+import type { MinimapFlowNode, TerminalViewState } from './types'
 import {
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeColor,
@@ -19,12 +19,12 @@ export function useTerminalMinimapAppearance({
   hoveredTerminalBlockId
 }: TerminalMinimapAppearanceInput) {
   const getMiniMapNodeColor = useCallback(
-    (node: TerminalFlowNode): string => getTerminalMiniMapNodeColor(node, terminalStates),
+    (node: MinimapFlowNode): string => getTerminalMiniMapNodeColor(node, terminalStates),
     [terminalStates]
   )
 
   const getMiniMapNodeStrokeColor = useCallback(
-    (node: TerminalFlowNode): string =>
+    (node: MinimapFlowNode): string =>
       getTerminalMiniMapNodeStrokeColor({
         node,
         terminalStates,
@@ -35,7 +35,7 @@ export function useTerminalMinimapAppearance({
   )
 
   const getMiniMapNodeClassName = useCallback(
-    (node: TerminalFlowNode): string =>
+    (node: MinimapFlowNode): string =>
       getTerminalMiniMapNodeClassName({
         node,
         terminalStates,

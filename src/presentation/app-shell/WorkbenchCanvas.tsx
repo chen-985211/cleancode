@@ -19,7 +19,7 @@ import {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
-import type { TerminalFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -28,7 +28,7 @@ interface WorkbenchCanvasProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly nodes: WorkbenchFlowNode[]
-  readonly minimapNodes: TerminalFlowNode[]
+  readonly minimapNodes: MinimapFlowNode[]
   readonly nodeTypes: NodeTypes
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
@@ -48,9 +48,9 @@ interface WorkbenchCanvasProps {
   ) => void
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onMinimapNodeClick: (blockId: string) => void
-  readonly getMiniMapNodeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeStrokeColor: (node: TerminalFlowNode) => string
-  readonly getMiniMapNodeClassName: (node: TerminalFlowNode) => string
+  readonly getMiniMapNodeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeStrokeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeClassName: (node: MinimapFlowNode) => string
 }
 
 export function WorkbenchCanvas({

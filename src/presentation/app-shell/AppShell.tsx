@@ -17,7 +17,6 @@ import type { TerminalBlockSnapshot } from '../../contexts/block-graph/applicati
 import { AgentPanel } from './AgentPanel'
 import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
-import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
@@ -29,12 +28,13 @@ import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
+import { useMinimapNodeFocus } from './useMinimapNodeFocus'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
 import type {
   TerminalBlockMetadataInput,
   TerminalBlockSizeInput,
-  TerminalFlowNode,
+  MinimapFlowNode,
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
@@ -56,6 +56,10 @@ export function AppShell() {
   const currentWorkspace = findCurrentWorkspace(currentWorkbench)
   const terminalBlocksById = useMemo(
     () => new Map((graph?.blocks ?? []).map((block) => [block.id, block])),
+    [graph]
+  )
+  const terminalGroupsById = useMemo(
+    () => new Map((graph?.terminalGroups ?? []).map((group) => [group.id, group])),
     [graph]
   )
   const setSelectedTerminalBlockId = useCallback((value: SetStateAction<string | null>) => {
@@ -109,24 +113,15 @@ export function AppShell() {
     }
   }, [])
 
-  const focusTerminalBlock = useCallback(
-    (blockId: string) => {
-      const block = terminalBlocksById.get(blockId)
-
-      if (!block) {
-        return
-      }
-
-      focusTerminalBlockInCanvas({
-        block,
-        reactFlowInstance: reactFlowInstanceRef.current,
-        setHoveredTerminalBlockId,
-        setSelectedTerminalBlockId
-      })
-      setSelectedTerminalGroupId(null)
-    },
-    [setSelectedTerminalBlockId, terminalBlocksById]
-  )
+  const { focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
+    terminalBlocksById,
+    terminalGroupsById,
+    reactFlowInstanceRef,
+    setHoveredTerminalBlockId,
+    setSelectedTerminalBlockId,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  })
   const {
     interruptTerminal,
     quickLaunchTerminal,
@@ -232,16 +227,10 @@ export function AppShell() {
       const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
 
       if (createdBlock) {
-        focusTerminalBlockInCanvas({
-          block: createdBlock,
-          duration: 0,
-          reactFlowInstance: reactFlowInstanceRef.current,
-          setHoveredTerminalBlockId,
-          setSelectedTerminalBlockId
-        })
+        focusTerminalBlock(createdBlock.id, 0)
       }
     }
-  }, [currentWorkbench, currentWorkspace, setCurrentGraph, setSelectedTerminalBlockId])
+  }, [currentWorkbench, currentWorkspace, focusTerminalBlock, setCurrentGraph])
 
   const createTerminalGroup = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
@@ -277,11 +266,12 @@ export function AppShell() {
 
   const minimapNodeInteraction = useMemo<MinimapNodeInteractionContextValue>(
     () => ({
-      getLabel: (blockId) => terminalBlocksById.get(blockId)?.name ?? blockId,
-      focusBlock: focusTerminalBlock,
+      getLabel: (blockId) =>
+        terminalBlocksById.get(blockId)?.name ?? terminalGroupsById.get(blockId)?.name ?? blockId,
+      focusBlock: focusWorkbenchNode,
       setHoveredBlockId: setHoveredTerminalBlockId
     }),
-    [focusTerminalBlock, terminalBlocksById]
+    [focusWorkbenchNode, terminalBlocksById, terminalGroupsById]
   )
 
   const selectWorkbenchNode = useCallback(
@@ -449,7 +439,11 @@ export function AppShell() {
     writeTerminal
   ])
   const minimapNodes = useMemo(
-    () => nodes.filter((node): node is TerminalFlowNode => node.type === 'terminal'),
+    () =>
+      nodes.filter(
+        (node): node is MinimapFlowNode =>
+          node.type === 'terminal' || (node.type === 'terminalGroup' && node.data.group.isCollapsed)
+      ),
     [nodes]
   )
 
@@ -489,7 +483,7 @@ export function AppShell() {
         onNodeClick={selectWorkbenchNode}
         onNodeDragStop={moveWorkbenchNode}
         onViewportChange={updateGraphViewport}
-        onMinimapNodeClick={focusTerminalBlock}
+        onMinimapNodeClick={focusWorkbenchNode}
         getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
         getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
         getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
