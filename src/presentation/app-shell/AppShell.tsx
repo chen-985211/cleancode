@@ -229,7 +229,7 @@ export function AppShell() {
       const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
 
       if (createdBlock) {
-        focusTerminalBlock(createdBlock.id, 0)
+        focusTerminalBlock(createdBlock.id, 0, createdBlock)
       }
     }
   }, [currentWorkbench, currentWorkspace, focusTerminalBlock, setCurrentGraph])

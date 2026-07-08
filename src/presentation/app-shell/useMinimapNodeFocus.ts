@@ -28,8 +28,9 @@ export function useMinimapNodeFocus({
   setSelectedTerminalGroupId
 }: UseMinimapNodeFocusInput) {
   const focusTerminalBlock = useCallback(
-    (blockId: string, duration?: number) => {
-      const block = terminalBlocksById.get(blockId)
+    (blockId: string, duration?: number, fallbackBlock?: TerminalBlockSnapshot) => {
+      const block =
+        terminalBlocksById.get(blockId) ?? (fallbackBlock?.id === blockId ? fallbackBlock : null)
 
       if (!block) {
         return
