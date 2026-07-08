@@ -6,7 +6,7 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, Edit3, Play, RefreshCw, Square, Terminal, Trash2, X } from 'lucide-react'
+import { Check, Edit3, MoreHorizontal, Play, Square, Terminal, Trash2, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { TerminalViewport } from './TerminalViewport'
@@ -260,9 +260,14 @@ function TerminalHeader({
   onRestart,
   onDelete
 }: TerminalHeaderProps) {
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
-  const quickLaunchTooltip = canQuickLaunch ? '快速启动' : '配置启动命令'
+  const launchCommandTooltip = canQuickLaunch ? '启动命令' : '配置启动命令'
+  const restartEmptySession = useCallback(() => {
+    setIsMoreMenuOpen(false)
+    onRestart()
+  }, [onRestart])
 
   return (
     <div className="terminal-node__header">
@@ -316,9 +321,9 @@ function TerminalHeader({
             `terminal-node__action--launch-${launchCommandState}`
           ].join(' ')}
           type="button"
-          aria-label={`${blockName} 快速启动`}
-          title={quickLaunchTooltip}
-          data-cc-tooltip={quickLaunchTooltip}
+          aria-label={`${blockName} 启动命令`}
+          title={launchCommandTooltip}
+          data-cc-tooltip={launchCommandTooltip}
           data-launch-command-state={launchCommandState}
           onClick={onQuickLaunch}
         >
@@ -335,16 +340,35 @@ function TerminalHeader({
         >
           <Square size={14} aria-hidden="true" />
         </button>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={`${blockName} 重启终端`}
-          title="重启终端"
-          data-cc-tooltip="重启终端"
-          onClick={onRestart}
-        >
-          <RefreshCw size={15} aria-hidden="true" />
-        </button>
+        <span className="terminal-node__more-action">
+          <button
+            className="terminal-node__action"
+            type="button"
+            aria-label={`${blockName} 更多终端操作`}
+            aria-expanded={isMoreMenuOpen}
+            aria-haspopup="true"
+            title="更多终端操作"
+            data-cc-tooltip="更多终端操作"
+            onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+          >
+            <MoreHorizontal size={15} aria-hidden="true" />
+          </button>
+          {isMoreMenuOpen ? (
+            <div className="terminal-node__action-menu">
+              <button
+                className="terminal-node__menu-action"
+                type="button"
+                aria-label={`${blockName} 重开空终端会话`}
+                title="重开空终端会话，不执行启动命令"
+                data-cc-tooltip="重开空终端会话，不执行启动命令"
+                onClick={restartEmptySession}
+              >
+                <Terminal size={14} aria-hidden="true" />
+                <span>重开空终端会话</span>
+              </button>
+            </div>
+          ) : null}
+        </span>
         <button
           className="terminal-node__action"
           type="button"

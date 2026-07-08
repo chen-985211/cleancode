@@ -5,10 +5,11 @@ import {
   Maximize2,
   Minimize2,
   Minus,
+  MoreHorizontal,
   Play,
   Plus,
-  RefreshCw,
   Square,
+  Terminal,
   Trash2,
   Unlink,
   X
@@ -23,6 +24,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 }: NodeProps<TerminalGroupFlowNode>) {
   const group = data.group
   const [isEditingName, setIsEditingName] = useState(false)
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const [draftName, setDraftName] = useState(group.name)
   const trimmedDraftName = draftName.trim()
   const status = getTerminalGroupStatus(data.memberBlocks, data.memberStates)
@@ -43,6 +45,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       }
 
       await data.onUpdateGroupMetadata(group, { name: trimmedDraftName })
+      setIsMoreMenuOpen(false)
       setIsEditingName(false)
     },
     [data, group, trimmedDraftName]
@@ -84,6 +87,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
                 data-cc-tooltip="取消"
                 onClick={() => {
                   setDraftName(group.name)
+                  setIsMoreMenuOpen(false)
                   setIsEditingName(false)
                 }}
               >
@@ -103,26 +107,47 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             onPointerDown={(event) => event.stopPropagation()}
           >
             <IconButton
-              label={`${group.name} 启动全部`}
-              title="启动全部"
+              label={`${group.name} 启动组合命令`}
+              title="启动组合命令"
               onClick={() => data.onStartGroup(group)}
             >
               <Play size={15} aria-hidden="true" />
             </IconButton>
             <IconButton
-              label={`${group.name} 停止全部`}
-              title="停止全部"
+              label={`${group.name} 停止全部当前命令`}
+              title="停止全部当前命令"
               onClick={() => data.onStopGroup(group)}
             >
               <Square size={14} aria-hidden="true" />
             </IconButton>
-            <IconButton
-              label={`${group.name} 重启全部`}
-              title="重启全部"
-              onClick={() => data.onRestartGroup(group)}
-            >
-              <RefreshCw size={15} aria-hidden="true" />
-            </IconButton>
+            <span className="terminal-group-node__more-action">
+              <IconButton
+                label={`${group.name} 更多组合操作`}
+                title="更多组合操作"
+                isExpanded={isMoreMenuOpen}
+                onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+              >
+                <MoreHorizontal size={15} aria-hidden="true" />
+              </IconButton>
+              {isMoreMenuOpen ? (
+                <div className="terminal-group-node__action-menu">
+                  <button
+                    className="terminal-group-node__menu-action"
+                    type="button"
+                    aria-label={`${group.name} 重开组合终端会话`}
+                    title="重开组合终端会话，不执行启动命令"
+                    data-cc-tooltip="重开组合终端会话，不执行启动命令"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false)
+                      data.onRestartGroup(group)
+                    }}
+                  >
+                    <Terminal size={14} aria-hidden="true" />
+                    <span>重开组合终端会话</span>
+                  </button>
+                </div>
+              ) : null}
+            </span>
             <IconButton
               label={`${group.name} 编辑组合名称`}
               title="编辑组合名称"
@@ -187,16 +212,26 @@ interface IconButtonProps {
   readonly label: string
   readonly title: string
   readonly disabled?: boolean
+  readonly isExpanded?: boolean
   readonly onClick: () => void
   readonly children: ReactNode
 }
 
-function IconButton({ label, title, disabled = false, onClick, children }: IconButtonProps) {
+function IconButton({
+  label,
+  title,
+  disabled = false,
+  isExpanded,
+  onClick,
+  children
+}: IconButtonProps) {
   return (
     <button
       className="terminal-group-node__action"
       type="button"
       aria-label={label}
+      aria-expanded={isExpanded}
+      aria-haspopup={isExpanded === undefined ? undefined : true}
       title={title}
       data-cc-tooltip={title}
       disabled={disabled}

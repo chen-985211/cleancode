@@ -107,7 +107,7 @@ describe('app shell terminal launch command', () => {
     render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
-      name: 'Terminal 1 快速启动'
+      name: 'Terminal 1 启动命令'
     })
 
     expect(quickLaunchButton).toBeEnabled()
@@ -161,7 +161,7 @@ describe('app shell terminal launch command', () => {
     render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
-      name: 'Terminal 1 快速启动'
+      name: 'Terminal 1 启动命令'
     })
 
     expect(quickLaunchButton).toHaveAttribute('data-launch-command-state', 'configured')
@@ -214,7 +214,7 @@ describe('app shell terminal launch command', () => {
     render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
-      name: 'Terminal 1 快速启动'
+      name: 'Terminal 1 启动命令'
     })
 
     fireEvent.click(quickLaunchButton)
@@ -279,11 +279,12 @@ describe('app shell terminal launch command', () => {
 
     render(<AppShell />)
 
-    const restartButton = await screen.findByRole('button', {
-      name: 'Terminal 1 重启终端'
+    const moreButton = await screen.findByRole('button', {
+      name: 'Terminal 1 更多终端操作'
     })
 
-    fireEvent.click(restartButton)
+    fireEvent.click(moreButton)
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
 
     expect(emitTerminalOutput).toEqual(expect.any(Function))
@@ -299,7 +300,8 @@ describe('app shell terminal launch command', () => {
       expect(screen.getByLabelText('Terminal 1 文本输出')).toHaveTextContent('restart-stale-output')
     )
 
-    fireEvent.click(restartButton)
+    fireEvent.click(moreButton)
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(2))
     await waitFor(() =>
@@ -331,7 +333,7 @@ describe('app shell terminal launch command', () => {
     render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
-      name: 'Terminal 1 快速启动'
+      name: 'Terminal 1 启动命令'
     })
 
     fireEvent.click(quickLaunchButton)

@@ -41,6 +41,18 @@ describe('terminal group member labels', () => {
     expect(screen.getByRole('button', { name: '启动项目 移出选中终端' })).toBeDisabled()
   })
 
+  it('keeps terminal session restart behind the group more action', () => {
+    render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
+
+    expect(
+      screen.queryByRole('button', { name: '启动项目 重开组合终端会话' })
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 更多组合操作' }))
+
+    expect(screen.getByRole('button', { name: '启动项目 重开组合终端会话' })).toBeInTheDocument()
+  })
+
   it('keeps the group header compact while editing the group name', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
@@ -49,9 +61,11 @@ describe('terminal group member labels', () => {
     expect(screen.getByRole('textbox', { name: '组合名称' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '保存组合名称' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '取消编辑组合名称' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '启动项目 启动全部' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '启动项目 停止全部' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '启动项目 重启全部' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启动项目 启动组合命令' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '启动项目 停止全部当前命令' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '启动项目 更多组合操作' })).not.toBeInTheDocument()
   })
 
   it('keeps member labels available while the group is collapsed', () => {

@@ -62,7 +62,7 @@ describe('run terminal sessions e2e', () => {
   )
 
   it(
-    'configures and quick launches one command from a terminal block',
+    'configures and starts one launch command from a terminal block',
     async () => {
       await createRunningTerminal(page)
 
@@ -70,13 +70,13 @@ describe('run terminal sessions e2e', () => {
       const launchCommand =
         'printf "\\x71\\x75\\x69\\x63\\x6b\\x2d\\x6c\\x61\\x75\\x6e\\x63\\x68\\x2d\\x65\\x32\\x65\\x2d\\x6f\\x6e\\x63\\x65"'
 
-      await page.getByRole('button', { name: 'Terminal 1 快速启动' }).click()
-      const launchCommandInput = page.getByLabel('启动命令')
+      await page.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
+      const launchCommandInput = page.getByRole('textbox', { name: '启动命令' })
 
       await launchCommandInput.fill(launchCommand)
       await launchCommandInput.press('Enter')
       await waitForQuickLaunchState(page, 'configured')
-      await page.getByRole('button', { name: 'Terminal 1 快速启动' }).click()
+      await page.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
       await waitForTerminalOutput(page, 'Terminal 1', launchOutput)
 
       const graph = JSON.parse(
@@ -134,7 +134,7 @@ async function waitForQuickLaunchState(
   await page.waitForFunction(
     (state) =>
       document
-        .querySelector('[aria-label="Terminal 1 快速启动"]')
+        .querySelector('[aria-label="Terminal 1 启动命令"]')
         ?.getAttribute('data-launch-command-state') === state,
     state
   )

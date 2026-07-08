@@ -95,7 +95,7 @@ describe('app shell terminal group actions', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '启动项目 启动全部' }))
+    fireEvent.click(await screen.findByRole('button', { name: '启动项目 启动组合命令' }))
 
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(2))
     expect(startTerminal).toHaveBeenCalledWith(
@@ -129,7 +129,8 @@ describe('app shell terminal group actions', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '启动项目 重启全部' }))
+    fireEvent.click(await screen.findByRole('button', { name: '启动项目 更多组合操作' }))
+    fireEvent.click(await screen.findByRole('button', { name: '启动项目 重开组合终端会话' }))
 
     await waitFor(() => expect(runtimeApi.startTerminal).toHaveBeenCalledTimes(2))
     await act(async () => {

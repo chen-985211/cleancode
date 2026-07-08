@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
@@ -30,10 +30,14 @@ describe('terminal tooltips', () => {
     )
 
     expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
-    expectTooltip('Terminal 快速启动', '配置启动命令')
+    expectTooltip('Terminal 启动命令', '配置启动命令')
     expectTooltip('Terminal 停止当前命令', '停止当前命令')
-    expectTooltip('Terminal 重启终端', '重启终端')
+    expectTooltip('Terminal 更多终端操作', '更多终端操作')
     expectTooltip('Terminal 删除终端', '删除终端')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+
+    expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
   })
 
   it('orders terminal actions like the shared terminal group actions', () => {
@@ -59,9 +63,9 @@ describe('terminal tooltips', () => {
       .map((button) => button.getAttribute('aria-label'))
 
     expect(actionNames).toEqual([
-      'Terminal 快速启动',
+      'Terminal 启动命令',
       'Terminal 停止当前命令',
-      'Terminal 重启终端',
+      'Terminal 更多终端操作',
       'Terminal 编辑终端信息',
       'Terminal 删除终端'
     ])
