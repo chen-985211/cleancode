@@ -87,6 +87,8 @@ describe('canvas minimap', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦终端组合 启动项目' }))
 
+    expect(container.querySelector('.canvas-minimap__node--terminal-group')).toBeInTheDocument()
+    expect(container.querySelector('.canvas-minimap__group-ring')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__group-member')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__node-screen')).not.toBeInTheDocument()
     expect(minimapNodeInteraction.focusBlock).toHaveBeenCalledWith('development-group')

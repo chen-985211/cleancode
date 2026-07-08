@@ -22,10 +22,11 @@ interface TerminalBlockRect {
 export function resolveNewTerminalBlockPosition(
   existingBlocks: readonly TerminalBlockSnapshot[]
 ): BlockPositionSnapshot {
+  const placementOrigin = resolvePlacementOrigin(existingBlocks)
   const candidateCount = Math.max((existingBlocks.length + 1) * terminalPlacementColumns, 24)
 
   for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
-    const position = createCandidatePosition(candidateIndex)
+    const position = createCandidatePosition(candidateIndex, placementOrigin)
 
     if (!positionOverlapsExistingBlocks(position, defaultTerminalBlockSize, existingBlocks)) {
       return position
@@ -35,13 +36,16 @@ export function resolveNewTerminalBlockPosition(
   return createPositionAfterCurrentGraphBounds(existingBlocks)
 }
 
-function createCandidatePosition(candidateIndex: number): BlockPositionSnapshot {
+function createCandidatePosition(
+  candidateIndex: number,
+  placementOrigin: BlockPositionSnapshot
+): BlockPositionSnapshot {
   const column = candidateIndex % terminalPlacementColumns
   const row = Math.floor(candidateIndex / terminalPlacementColumns)
 
   return {
-    x: terminalPlacementOrigin.x + column * (defaultTerminalBlockSize.width + terminalPlacementGap),
-    y: terminalPlacementOrigin.y + row * (defaultTerminalBlockSize.height + terminalPlacementGap)
+    x: placementOrigin.x + column * (defaultTerminalBlockSize.width + terminalPlacementGap),
+    y: placementOrigin.y + row * (defaultTerminalBlockSize.height + terminalPlacementGap)
   }
 }
 
@@ -77,6 +81,21 @@ function createPositionAfterCurrentGraphBounds(
     x: graphBounds.right + terminalPlacementGap,
     y: graphBounds.top
   }
+}
+
+function resolvePlacementOrigin(
+  existingBlocks: readonly TerminalBlockSnapshot[]
+): BlockPositionSnapshot {
+  if (existingBlocks.length === 0) {
+    return terminalPlacementOrigin
+  }
+
+  return existingBlocks
+    .map((block) => block.position)
+    .reduce((origin, position) => ({
+      x: Math.min(origin.x, position.x),
+      y: Math.min(origin.y, position.y)
+    }))
 }
 
 function createRect(

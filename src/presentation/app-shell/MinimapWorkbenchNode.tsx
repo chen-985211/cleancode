@@ -38,6 +38,12 @@ export function MinimapWorkbenchNode({
   const { focusBlock, getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
   const statusColor = color ?? '#98a2b3'
+  const nodeClassName = [
+    className,
+    variant === 'terminalGroup' ? 'canvas-minimap__node--terminal-group' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
   const effectiveStrokeColor = selected ? '#5c85f5' : (strokeColor ?? '#d3dbe8')
   const effectiveStrokeWidth = selected
     ? Math.max(strokeWidth ?? 1.2, 2)
@@ -60,7 +66,7 @@ export function MinimapWorkbenchNode({
 
   return (
     <g
-      className={className}
+      className={nodeClassName}
       role="button"
       tabIndex={0}
       aria-label={`聚焦${kindLabel} ${label}`}
@@ -191,9 +197,22 @@ function MinimapGroupPreview({
   const memberStartY = headerY + headerInnerHeight + inset * 0.8
   const rowGap = Math.max(3, inset * 0.3)
   const rowHeight = Math.max(7, Math.min(14, (height - memberStartY + y - inset) / 2.25))
+  const ringInset = Math.max(4, Math.min(10, inset * 0.48))
 
   return (
     <>
+      <rect
+        className="canvas-minimap__group-ring"
+        x={x - ringInset}
+        y={y - ringInset}
+        width={width + ringInset * 2}
+        height={height + ringInset * 2}
+        rx={borderRadius + ringInset * 0.65}
+        fill="#eff6ff"
+        stroke="#8fa9f7"
+        strokeWidth={Math.max(1.4, strokeWidth + 0.35)}
+        opacity={0.72}
+      />
       <rect
         className="canvas-minimap__group-shell"
         x={x}

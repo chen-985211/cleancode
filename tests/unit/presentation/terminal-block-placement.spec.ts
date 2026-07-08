@@ -32,6 +32,15 @@ describe('terminal block placement', () => {
 
     expect(position).toEqual({ x: 1148, y: 270 })
   })
+
+  it('keeps new terminals close to the existing workbench cluster', () => {
+    const position = resolveNewTerminalBlockPosition([
+      createTerminalBlock('Terminal 1', 680, 520),
+      createTerminalBlock('Terminal 2', 1160, 520)
+    ])
+
+    expect(position).toEqual({ x: 1648, y: 520 })
+  })
 })
 
 function createTerminalBlock(

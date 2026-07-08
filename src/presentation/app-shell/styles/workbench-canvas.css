@@ -169,10 +169,21 @@
   vector-effect: non-scaling-stroke;
 }
 
+.canvas-minimap__group-ring,
+.canvas-minimap__group-shell,
+.canvas-minimap__group-header,
+.canvas-minimap__group-member {
+  vector-effect: non-scaling-stroke;
+}
+
 .canvas-minimap__node-shell,
 .canvas-minimap__node-header,
 .canvas-minimap__node-screen,
-.canvas-minimap__node-status {
+.canvas-minimap__node-status,
+.canvas-minimap__group-ring,
+.canvas-minimap__group-shell,
+.canvas-minimap__group-header,
+.canvas-minimap__group-member {
   transition:
     fill 150ms ease,
     opacity 150ms ease,
@@ -183,7 +194,11 @@
 .canvas-surface--dragging-terminal .canvas-minimap__node-shell,
 .canvas-surface--dragging-terminal .canvas-minimap__node-header,
 .canvas-surface--dragging-terminal .canvas-minimap__node-screen,
-.canvas-surface--dragging-terminal .canvas-minimap__node-status {
+.canvas-surface--dragging-terminal .canvas-minimap__node-status,
+.canvas-surface--dragging-terminal .canvas-minimap__group-ring,
+.canvas-surface--dragging-terminal .canvas-minimap__group-shell,
+.canvas-surface--dragging-terminal .canvas-minimap__group-header,
+.canvas-surface--dragging-terminal .canvas-minimap__group-member {
   transition: none;
 }
 
@@ -211,6 +226,13 @@
 .canvas-minimap__node--selected .canvas-minimap__node-shell {
   stroke: #5c85f5;
   stroke-width: 2.3;
+}
+
+.canvas-minimap__node--terminal-group:hover .canvas-minimap__group-ring,
+.canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring,
+.canvas-minimap__node--terminal-group.canvas-minimap__node--selected .canvas-minimap__group-ring {
+  opacity: 0.9;
+  stroke: #5c85f5;
 }
 
 .canvas-minimap__controls {
