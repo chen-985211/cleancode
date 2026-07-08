@@ -44,10 +44,10 @@ export function MinimapWorkbenchNode({
   ]
     .filter(Boolean)
     .join(' ')
-  const effectiveStrokeColor = selected ? '#5c85f5' : (strokeColor ?? '#d3dbe8')
+  const effectiveStrokeColor = selected ? '#34d399' : (strokeColor ?? '#dbe3ef')
   const effectiveStrokeWidth = selected
-    ? Math.max(strokeWidth ?? 1.2, 2)
-    : Math.max(strokeWidth ?? 1.1, 1.1)
+    ? Math.max(strokeWidth ?? 1.2, 1.75)
+    : Math.max(strokeWidth ?? 1, 1)
   const headerHeight = Math.max(6, Math.min(height * 0.28, 18))
   const inset = Math.max(3, Math.min(width, height) * 0.08)
   const activate = (event: SyntheticEvent<SVGGElement>): void => {
@@ -89,6 +89,7 @@ export function MinimapWorkbenchNode({
           statusColor={statusColor}
           strokeColor={effectiveStrokeColor}
           strokeWidth={effectiveStrokeWidth}
+          selected={selected}
         />
       ) : (
         <MinimapTerminalPreview
@@ -119,6 +120,7 @@ interface MinimapPreviewProps {
   readonly statusColor: string
   readonly strokeColor: string
   readonly strokeWidth: number
+  readonly selected?: boolean
 }
 
 function MinimapTerminalPreview({
@@ -188,7 +190,8 @@ function MinimapGroupPreview({
   headerHeight,
   statusColor,
   strokeColor,
-  strokeWidth
+  strokeWidth,
+  selected = false
 }: MinimapPreviewProps) {
   const contentX = x + inset
   const contentWidth = Math.max(4, width - inset * 2)
@@ -208,10 +211,10 @@ function MinimapGroupPreview({
         width={width + ringInset * 2}
         height={height + ringInset * 2}
         rx={borderRadius + ringInset * 0.65}
-        fill="#eff6ff"
-        stroke="#8fa9f7"
-        strokeWidth={Math.max(1.4, strokeWidth + 0.35)}
-        opacity={0.72}
+        fill="#f0fdf4"
+        stroke={selected ? '#86efac' : 'transparent'}
+        strokeWidth={Math.max(1.3, strokeWidth + 0.2)}
+        opacity={selected ? 0.72 : 0}
       />
       <rect
         className="canvas-minimap__group-shell"

@@ -89,10 +89,47 @@ describe('canvas minimap', () => {
 
     expect(container.querySelector('.canvas-minimap__node--terminal-group')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__group-ring')).toBeInTheDocument()
+    expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
+      'stroke',
+      '#86efac'
+    )
+    expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
+      'opacity',
+      '0.72'
+    )
     expect(container.querySelector('.canvas-minimap__group-member')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__node-screen')).not.toBeInTheDocument()
     expect(minimapNodeInteraction.focusBlock).toHaveBeenCalledWith('development-group')
     expect(onMinimapNodeClick).toHaveBeenCalledWith('development-group')
+  })
+
+  it('keeps the collapsed terminal group outer ring transparent until selected', () => {
+    const { container } = render(
+      <CanvasMinimap
+        isCollapsed={false}
+        nodes={[createCollapsedTerminalGroupFlowNode({ selected: false })]}
+        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
+        canvasSize={{ width: 960, height: 640 }}
+        viewportZoom={1}
+        minimapNodeInteraction={createMinimapNodeInteraction()}
+        onToggleCollapsed={vi.fn()}
+        onZoomOut={vi.fn()}
+        onZoomIn={vi.fn()}
+        onFitCanvas={vi.fn()}
+        onMinimapNodeClick={vi.fn()}
+        onViewportCenterPreview={vi.fn()}
+        onViewportCenterCommit={vi.fn()}
+        getMiniMapNodeColor={() => '#22c55e'}
+        getMiniMapNodeStrokeColor={() => '#dbe3ef'}
+        getMiniMapNodeClassName={() => 'canvas-minimap__node'}
+      />
+    )
+
+    expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute('opacity', '0')
+    expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
+      'stroke',
+      'transparent'
+    )
   })
 
   it('emits preview and commit centers while panning the minimap viewport', () => {
@@ -183,12 +220,16 @@ function createTerminalFlowNode(): TerminalFlowNode {
   } as TerminalFlowNode
 }
 
-function createCollapsedTerminalGroupFlowNode(): TerminalGroupFlowNode {
+function createCollapsedTerminalGroupFlowNode(
+  input: { readonly selected?: boolean } = {}
+): TerminalGroupFlowNode {
+  const selected = input.selected ?? true
+
   return {
     id: 'development-group',
     type: 'terminalGroup',
     position: { x: 300, y: 180 },
-    selected: true,
+    selected,
     style: {
       width: 360,
       height: 174
@@ -207,7 +248,7 @@ function createCollapsedTerminalGroupFlowNode(): TerminalGroupFlowNode {
       memberStates: {},
       selectedUngroupedTerminalBlockIds: [],
       selectedMemberBlockIds: [],
-      isSelected: true,
+      isSelected: selected,
       dropFeedback: null,
       onStartGroup: vi.fn(),
       onStopGroup: vi.fn(),

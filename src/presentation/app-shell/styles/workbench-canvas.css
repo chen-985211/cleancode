@@ -213,8 +213,8 @@
 .canvas-minimap__node:hover .canvas-minimap__node-shell,
 .canvas-minimap__node--highlighted .canvas-minimap__node-shell,
 .canvas-minimap__node:focus-visible .canvas-minimap__node-shell {
-  stroke: #8fa9f7;
-  stroke-width: 2;
+  stroke: #86efac;
+  stroke-width: 1.5;
 }
 
 .canvas-minimap__node:hover .canvas-minimap__node-header,
@@ -224,15 +224,15 @@
 }
 
 .canvas-minimap__node--selected .canvas-minimap__node-shell {
-  stroke: #5c85f5;
-  stroke-width: 2.3;
+  stroke: #34d399;
+  stroke-width: 1.85;
 }
 
 .canvas-minimap__node--terminal-group:hover .canvas-minimap__group-ring,
 .canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring,
 .canvas-minimap__node--terminal-group.canvas-minimap__node--selected .canvas-minimap__group-ring {
-  opacity: 0.9;
-  stroke: #5c85f5;
+  opacity: 0.72;
+  stroke: #86efac;
 }
 
 .canvas-minimap__controls {

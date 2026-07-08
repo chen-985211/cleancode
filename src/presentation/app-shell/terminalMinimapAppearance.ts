@@ -18,19 +18,18 @@ export function getTerminalMiniMapNodeColor(
 
 export function getTerminalMiniMapNodeStrokeColor({
   node,
-  terminalStates,
   selectedTerminalBlockId,
   hoveredTerminalBlockId
 }: TerminalMinimapAppearanceInput): string {
   if (node.selected || selectedTerminalBlockId === node.id) {
-    return '#2563eb'
+    return '#34d399'
   }
 
   if (node.type === 'terminal' && hoveredTerminalBlockId === node.id) {
-    return '#8fa9f7'
+    return '#86efac'
   }
 
-  return resolveMinimapNodeStatus(node, terminalStates) === 'running' ? '#22c55e' : '#d3dbe8'
+  return '#dbe3ef'
 }
 
 export function getTerminalMiniMapNodeClassName({
