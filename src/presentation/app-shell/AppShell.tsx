@@ -19,6 +19,7 @@ import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
+import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
 import { TerminalGroupNode } from './TerminalGroupNode'
 import { TerminalNode } from './TerminalNode'
@@ -52,6 +53,7 @@ export function AppShell() {
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
+  const graphUsedForNodesRef = useRef<WorkbenchSnapshot['graph'] | null>(null)
   const graph = currentWorkbench?.graph ?? null
   const currentWorkspace = findCurrentWorkspace(currentWorkbench)
   const terminalBlocksById = useMemo(
@@ -393,9 +395,8 @@ export function AppShell() {
   )
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- React Flow owns transient drag state.
-    setNodes(
-      createTerminalFlowNodes({
+    setNodes((currentNodes) => {
+      const nextNodes = createTerminalFlowNodes({
         graph,
         hoveredTerminalBlockId,
         selectedTerminalBlockIds,
@@ -417,7 +418,12 @@ export function AppShell() {
           ...terminalGroupActions
         }
       })
-    )
+      const shouldPreserveTransientLayout = graphUsedForNodesRef.current === graph
+      graphUsedForNodesRef.current = graph
+      return shouldPreserveTransientLayout
+        ? preserveWorkbenchNodeTransientLayout(nextNodes, currentNodes)
+        : nextNodes
+    })
   }, [
     deleteTerminalBlock,
     graph,

@@ -28,6 +28,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [draftLaunchCommand, setDraftLaunchCommand] = useState(block.launchCommand)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
+  const [isResizingBlock, setIsResizingBlock] = useState(false)
   const hasRequestedAutoStartRef = useRef(false)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
   const trimmedDraftName = draftName.trim()
@@ -122,6 +123,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   const resizeTerminalBlock = useCallback(
     (_event: ResizeDragEvent, size: ResizeParams) => {
+      setIsResizingBlock(false)
       void data.onResizeBlock(block, toTerminalBlockSizeInput(size))
     },
     [block, data]
@@ -155,6 +157,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         color="#94a3b8"
         handleClassName="terminal-node__resize-handle nodrag"
         lineClassName="terminal-node__resize-line"
+        onResizeStart={() => setIsResizingBlock(true)}
         onResizeEnd={resizeTerminalBlock}
       />
       <Handle
@@ -205,6 +208,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           block={block}
           session={session}
           focusRequestId={focusRequestId}
+          isResizeSuspended={isResizingBlock}
           onDimensionsChange={handleDimensionsChange}
           onInput={data.onInput}
         />

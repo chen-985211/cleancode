@@ -335,16 +335,6 @@ export function useTerminalSessions({
   }
 }
 
-function shouldFocusTerminalAfterAction(options: TerminalSessionActionOptions): boolean {
-  return options.shouldFocus !== false
-}
-
-interface TerminalInputBuffer {
-  readonly sessionId: string
-  readonly input: string
-  readonly timerId: number | null
-}
-
 function appendTerminalOutput(
   states: Record<string, TerminalViewState>,
   event: TerminalOutputEvent
@@ -357,6 +347,16 @@ function appendTerminalOutput(
         : state
     ])
   )
+}
+
+function shouldFocusTerminalAfterAction(options: TerminalSessionActionOptions): boolean {
+  return options.shouldFocus !== false
+}
+
+interface TerminalInputBuffer {
+  readonly sessionId: string
+  readonly input: string
+  readonly timerId: number | null
 }
 
 function findTerminalBlockIdBySession(

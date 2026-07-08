@@ -1,6 +1,13 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type FocusEvent,
+  type MutableRefObject
+} from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
@@ -15,6 +22,7 @@ interface TerminalViewportProps {
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
   readonly focusRequestId: number
+  readonly isResizeSuspended?: boolean
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
 }
@@ -23,6 +31,7 @@ export function TerminalViewport({
   block,
   session,
   focusRequestId,
+  isResizeSuspended = false,
   onDimensionsChange,
   onInput
 }: TerminalViewportProps) {
@@ -34,15 +43,15 @@ export function TerminalViewport({
   const sessionRef = useRef(session)
   const onDimensionsChangeRef = useRef(onDimensionsChange)
   const onInputRef = useRef(onInput)
-  const shouldKeepTerminalFocusRef = useRef(false)
+  const isResizeSuspendedRef = useRef(isResizeSuspended)
+  const resumeResizeFitRef = useRef<() => void>(() => undefined)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     blockRef.current = block
-  }, [block])
-
-  useEffect(() => {
     sessionRef.current = session
-  }, [session])
+    onInputRef.current = onInput
+    onDimensionsChangeRef.current = onDimensionsChange
+  }, [block, onDimensionsChange, onInput, session])
 
   useEffect(() => {
     outputTailRef.current = appendTerminalOutputTail('', session.output)
@@ -53,12 +62,14 @@ export function TerminalViewport({
   }, [session.output])
 
   useEffect(() => {
-    onInputRef.current = onInput
-  }, [onInput])
+    const wasResizeSuspended = isResizeSuspendedRef.current
 
-  useEffect(() => {
-    onDimensionsChangeRef.current = onDimensionsChange
-  }, [onDimensionsChange])
+    isResizeSuspendedRef.current = isResizeSuspended
+
+    if (wasResizeSuspended && !isResizeSuspended) {
+      resumeResizeFitRef.current()
+    }
+  }, [isResizeSuspended])
 
   useEffect(() => {
     if (outputTailElementRef.current) {
@@ -72,11 +83,7 @@ export function TerminalViewport({
       if (outputTailElementRef.current) {
         outputTailElementRef.current.textContent = outputTailRef.current
       }
-      xtermRef.current?.write(output, () => {
-        if (sessionRef.current.status === 'running' && shouldKeepTerminalFocusRef.current) {
-          xtermRef.current?.focus()
-        }
-      })
+      xtermRef.current?.write(output)
     }
     const handleTerminalOutput = (event: Event): void => {
       const outputEvent = (event as CustomEvent<TerminalOutputEvent>).detail
@@ -91,10 +98,16 @@ export function TerminalViewport({
   }, [])
 
   const focusTerminal = useCallback(() => {
-    shouldKeepTerminalFocusRef.current = true
     xtermRef.current?.focus()
-    refocusXtermHelperTextarea(terminalElementRef.current, shouldKeepTerminalFocusRef)
   }, [])
+  const focusTerminalFromViewportFocus = useCallback(
+    (event: FocusEvent<HTMLDivElement>) => {
+      if (event.target === terminalElementRef.current) {
+        focusTerminal()
+      }
+    },
+    [focusTerminal]
+  )
 
   useEffect(() => {
     if (isTestRuntime() || !terminalElementRef.current) {
@@ -105,30 +118,13 @@ export function TerminalViewport({
       element: terminalElementRef.current,
       initialOutput: outputTailRef.current,
       xtermRef,
-      shouldKeepTerminalFocusRef,
+      isResizeSuspendedRef,
+      resumeResizeFitRef,
       onDimensionsChangeRef,
       onInputRef,
       blockRef
     })
   }, [])
-
-  useEffect(() => {
-    const updateFocusPreference = (event: PointerEvent): void => {
-      shouldKeepTerminalFocusRef.current = Boolean(
-        terminalElementRef.current?.contains(event.target as globalThis.Node)
-      )
-    }
-
-    document.addEventListener('pointerdown', updateFocusPreference, true)
-
-    return () => document.removeEventListener('pointerdown', updateFocusPreference, true)
-  }, [])
-
-  useEffect(() => {
-    if (session.status === 'running') {
-      focusTerminal()
-    }
-  }, [focusTerminal, session.sessionId, session.status])
 
   useEffect(() => {
     if (focusRequestId > 0) {
@@ -138,9 +134,12 @@ export function TerminalViewport({
 
   if (isTestRuntime()) {
     return (
-      <pre className="terminal-fallback" aria-label={`${block.name} 文本输出`}>
-        {session.output}
-      </pre>
+      <pre
+        className="terminal-fallback"
+        ref={outputTailElementRef}
+        aria-label={`${block.name} 文本输出`}
+        data-terminal-session-id={session.sessionId ?? ''}
+      />
     )
   }
 
@@ -148,15 +147,12 @@ export function TerminalViewport({
     <div
       className="terminal-output-shell nodrag nopan nowheel"
       onPointerDownCapture={focusTerminal}
-      onClickCapture={focusTerminal}
     >
       <div
         className="terminal-viewport nodrag nopan nowheel"
         ref={terminalElementRef}
         tabIndex={0}
-        onPointerDown={focusTerminal}
-        onClick={focusTerminal}
-        onFocus={focusTerminal}
+        onFocus={focusTerminalFromViewportFocus}
       />
       <pre
         className="terminal-output-tail"
@@ -173,7 +169,8 @@ interface InstallXtermInput {
   readonly element: HTMLDivElement
   readonly initialOutput: string
   readonly xtermRef: MutableRefObject<XTerm | null>
-  readonly shouldKeepTerminalFocusRef: MutableRefObject<boolean>
+  readonly isResizeSuspendedRef: MutableRefObject<boolean>
+  readonly resumeResizeFitRef: MutableRefObject<() => void>
   readonly onDimensionsChangeRef: MutableRefObject<(dimensions: TerminalDimensions) => void>
   readonly onInputRef: MutableRefObject<(block: TerminalBlockSnapshot, input: string) => void>
   readonly blockRef: MutableRefObject<TerminalBlockSnapshot>
@@ -183,12 +180,15 @@ function installXterm({
   element,
   initialOutput,
   xtermRef,
-  shouldKeepTerminalFocusRef,
+  isResizeSuspendedRef,
+  resumeResizeFitRef,
   onDimensionsChangeRef,
   onInputRef,
   blockRef
 }: InstallXtermInput) {
   let lastReportedDimensions: TerminalDimensions | null = null
+  let pendingFitAnimationFrame: number | null = null
+  let hasDeferredResizeFit = false
   const terminal = new XTerm({
     convertEol: true,
     cursorBlink: true,
@@ -226,37 +226,57 @@ function installXterm({
     fitAddon.fit()
     reportDimensions()
   }
+  const requestFitAndReportDimensions = (): void => {
+    if (isResizeSuspendedRef.current) {
+      hasDeferredResizeFit = true
+      return
+    }
+
+    if (pendingFitAnimationFrame !== null) {
+      return
+    }
+
+    pendingFitAnimationFrame = window.requestAnimationFrame(() => {
+      pendingFitAnimationFrame = null
+      fitAndReportDimensions()
+    })
+  }
   const focusTerminalElement = (): void => {
-    shouldKeepTerminalFocusRef.current = true
     terminal.focus()
-    refocusXtermHelperTextarea(element, shouldKeepTerminalFocusRef)
   }
 
   terminal.loadAddon(fitAddon)
   terminal.open(element)
   xtermRef.current = terminal
   element.addEventListener('pointerdown', focusTerminalElement, true)
-  element.addEventListener('mousedown', focusTerminalElement, true)
-  element.addEventListener('click', focusTerminalElement, true)
   fitAndReportDimensions()
   if (initialOutput.length > 0) {
     terminal.write(initialOutput)
   }
-  const resizeObserver = new ResizeObserver(fitAndReportDimensions)
+  const resizeObserver = new ResizeObserver(requestFitAndReportDimensions)
 
   resizeObserver.observe(element)
+  resumeResizeFitRef.current = () => {
+    if (!hasDeferredResizeFit) {
+      return
+    }
+
+    hasDeferredResizeFit = false
+    requestFitAndReportDimensions()
+  }
   const dataSubscription = terminal.onData((input) => {
-    shouldKeepTerminalFocusRef.current = true
     onInputRef.current(blockRef.current, input)
-    terminal.focus()
   })
 
   return () => {
+    if (pendingFitAnimationFrame !== null) {
+      window.cancelAnimationFrame(pendingFitAnimationFrame)
+    }
+
     element.removeEventListener('pointerdown', focusTerminalElement, true)
-    element.removeEventListener('mousedown', focusTerminalElement, true)
-    element.removeEventListener('click', focusTerminalElement, true)
     dataSubscription.dispose()
     resizeObserver.disconnect()
+    resumeResizeFitRef.current = () => undefined
     terminal.dispose()
     xtermRef.current = null
   }
@@ -264,26 +284,4 @@ function installXterm({
 
 function isTestRuntime(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom')
-}
-
-function refocusXtermHelperTextarea(
-  element: HTMLElement | null,
-  shouldKeepTerminalFocusRef: MutableRefObject<boolean>
-): void {
-  const focusIfPreferred = () => {
-    if (shouldKeepTerminalFocusRef.current) {
-      focusXtermHelperTextarea(element)
-    }
-  }
-
-  focusIfPreferred()
-  window.requestAnimationFrame(focusIfPreferred)
-  window.setTimeout(focusIfPreferred, 40)
-  window.setTimeout(focusIfPreferred, 100)
-}
-
-function focusXtermHelperTextarea(element: HTMLElement | null): void {
-  element
-    ?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')
-    ?.focus({ preventScroll: true })
 }
