@@ -30,8 +30,10 @@ import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
+import { useInitialWorkbenchLoad } from './useInitialWorkbenchLoad'
 import { useMinimapNodeFocus } from './useMinimapNodeFocus'
 import { useProjectGitStateSynchronization } from './useProjectGitStateSynchronization'
+import { useTerminalWorkspaceSynchronization } from './useTerminalWorkspaceSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
 import type {
@@ -93,28 +95,7 @@ export function AppShell() {
     setSelectedTerminalGroupId
   })
 
-  useEffect(() => {
-    const api = window.cleancode
-
-    if (!api) {
-      return undefined
-    }
-
-    let isMounted = true
-
-    void api.listWorkbenches().then((rememberedWorkbenches) => {
-      if (!isMounted || rememberedWorkbenches.length === 0) {
-        return
-      }
-
-      setWorkbenches((entries) => (entries.length > 0 ? entries : rememberedWorkbenches))
-      setCurrentWorkbench((workbench) => workbench ?? rememberedWorkbenches[0] ?? null)
-    })
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  useInitialWorkbenchLoad({ setCurrentWorkbench, setWorkbenches })
 
   const { focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
     terminalBlocksById,
@@ -126,10 +107,13 @@ export function AppShell() {
     setSelectedTerminalGroupId
   })
   const {
+    findTerminalBlockIdForSession,
     interruptTerminal,
+    moveTerminalSessionToWorkspace,
     quickLaunchTerminal,
     resizeTerminal,
     restartTerminal,
+    runningSessionIds,
     startTerminal,
     terminalStates,
     terminateTerminalSession,
@@ -153,7 +137,13 @@ export function AppShell() {
     setCurrentWorkbench(workbench)
   }, [])
   useProjectGitStateSynchronization({ currentWorkbench, replaceWorkbench })
-
+  useTerminalWorkspaceSynchronization({
+    currentWorkbench,
+    findTerminalBlockIdForSession,
+    moveTerminalSessionToWorkspace,
+    replaceWorkbench,
+    runningSessionIds
+  })
   const setCurrentGraph = useCallback((graphSnapshot: WorkbenchSnapshot['graph']): void => {
     const blockIds = new Set(graphSnapshot.blocks.map((block) => block.id))
     const groupIds = new Set(graphSnapshot.terminalGroups.map((group) => group.id))

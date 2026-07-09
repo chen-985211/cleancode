@@ -8,6 +8,11 @@ export interface TerminalExitEvent {
   readonly exitCode: number | null
 }
 
+export interface TerminalWorkingDirectorySnapshot {
+  readonly sessionId: string
+  readonly workingDirectory: string
+}
+
 export interface StartTerminalProcessCommand {
   readonly sessionId: string
   readonly workingDirectory: string
@@ -26,6 +31,7 @@ export interface TerminalProcessPort {
   start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle>
   write(sessionId: string, input: string): void
   resize(sessionId: string, columns: number, rows: number): void
+  readWorkingDirectory(sessionId: string): Promise<string | null>
   stop(sessionId: string): void
   disposeAll(): void
 }

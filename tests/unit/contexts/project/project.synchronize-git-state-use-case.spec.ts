@@ -146,6 +146,125 @@ describe('project git state synchronization use case', () => {
     ])
     expect(repository.savedProjects.at(-1)).toEqual(project)
   })
+
+  it('discovers external worktrees and drops stale worktree workspaces', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    const synchronizeProjectGitState = new SynchronizeProjectGitStateUseCase(repository, git)
+
+    repository.remember({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app',
+      workspaces: [
+        {
+          name: 'main',
+          directory: '/work/app',
+          gitBranch: 'main',
+          isCurrent: true
+        },
+        {
+          name: 'feature/stale',
+          directory: '/work/app-stale',
+          gitBranch: 'feature/stale',
+          isCurrent: false
+        }
+      ]
+    })
+    git.inspection = {
+      isGitRepository: true,
+      currentBranch: 'main',
+      localBranches: ['feature/sidebar', 'feature/stale', 'main'],
+      branches: [
+        {
+          name: 'feature/sidebar',
+          worktreeDirectory: '/work/app-sidebar',
+          isCurrent: false
+        },
+        {
+          name: 'feature/stale',
+          worktreeDirectory: null,
+          isCurrent: false
+        },
+        {
+          name: 'main',
+          worktreeDirectory: '/work/app',
+          isCurrent: true
+        }
+      ]
+    }
+
+    const project = await synchronizeProjectGitState.execute({ projectDirectory: '/work/app' })
+
+    expect(project?.workspaces).toEqual([
+      {
+        name: 'main',
+        directory: '/work/app',
+        gitBranch: 'main',
+        isCurrent: true
+      },
+      {
+        name: 'feature/sidebar',
+        directory: '/work/app-sidebar',
+        gitBranch: 'feature/sidebar',
+        isCurrent: false
+      }
+    ])
+  })
+
+  it('falls back to the main workspace when the current worktree disappears', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    const synchronizeProjectGitState = new SynchronizeProjectGitStateUseCase(repository, git)
+
+    repository.remember({
+      id: 'project-1',
+      directory: '/work/app',
+      name: 'app',
+      workspaces: [
+        {
+          name: 'main',
+          directory: '/work/app',
+          gitBranch: 'main',
+          isCurrent: false
+        },
+        {
+          name: 'feature/sidebar',
+          directory: '/work/app-sidebar',
+          gitBranch: 'feature/sidebar',
+          isCurrent: true
+        }
+      ]
+    })
+    git.inspection = {
+      isGitRepository: true,
+      currentBranch: 'main',
+      localBranches: ['feature/sidebar', 'main'],
+      branches: [
+        {
+          name: 'feature/sidebar',
+          worktreeDirectory: null,
+          isCurrent: false
+        },
+        {
+          name: 'main',
+          worktreeDirectory: '/work/app',
+          isCurrent: true
+        }
+      ]
+    }
+
+    const project = await synchronizeProjectGitState.execute({ projectDirectory: '/work/app' })
+
+    expect(project?.workspaces).toEqual([
+      {
+        name: 'main',
+        directory: '/work/app',
+        gitBranch: 'main',
+        isCurrent: true
+      }
+    ])
+  })
 })
 
 function createProjectSnapshot(gitBranch: string): ProjectSnapshot {

@@ -1,7 +1,10 @@
+import { execFile } from 'node:child_process'
 import { accessSync, chmodSync, constants, existsSync } from 'node:fs'
+import { readlink, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { platform } from 'node:os'
 import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 
 import type { IPty } from 'node-pty'
 import { spawn as spawnPtyProcess } from 'node-pty'
@@ -14,6 +17,7 @@ import type {
 } from '../../application/ports/TerminalProcessPort'
 
 const nodeRequire = createRequire(import.meta.url)
+const execFileAsync = promisify(execFile)
 
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
@@ -51,6 +55,16 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const terminalProcess = this.requireProcess(sessionId)
 
     terminalProcess.process.resize(columns, rows)
+  }
+
+  async readWorkingDirectory(sessionId: string): Promise<string | null> {
+    const terminalProcess = this.processes.get(sessionId)
+
+    if (!terminalProcess) {
+      return null
+    }
+
+    return readProcessWorkingDirectory(terminalProcess.process.pid)
   }
 
   stop(sessionId: string): void {
@@ -99,6 +113,56 @@ function createProcessEnvironment(): Record<string, string> {
   return {
     ...inheritedEnvironment,
     PROMPT_EOL_MARK: ''
+  }
+}
+
+async function readProcessWorkingDirectory(processId: number): Promise<string | null> {
+  if (platform() === 'darwin') {
+    return readDarwinProcessWorkingDirectory(processId)
+  }
+
+  if (platform() === 'linux') {
+    return normalizeExistingDirectory(await readLinuxProcessWorkingDirectory(processId))
+  }
+
+  return null
+}
+
+async function readDarwinProcessWorkingDirectory(processId: number): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      'lsof',
+      ['-a', '-p', String(processId), '-d', 'cwd', '-Fn'],
+      { timeout: 1000 }
+    )
+    const directory = stdout
+      .split('\n')
+      .find((line) => line.startsWith('n'))
+      ?.slice(1)
+
+    return normalizeExistingDirectory(directory ?? null)
+  } catch {
+    return null
+  }
+}
+
+async function readLinuxProcessWorkingDirectory(processId: number): Promise<string | null> {
+  try {
+    return await readlink(`/proc/${processId}/cwd`)
+  } catch {
+    return null
+  }
+}
+
+async function normalizeExistingDirectory(directory: string | null): Promise<string | null> {
+  if (!directory) {
+    return null
+  }
+
+  try {
+    return await realpath(directory)
+  } catch {
+    return directory
   }
 }
 

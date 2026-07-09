@@ -11,7 +11,8 @@ import type { ProjectSnapshot } from './contexts/project/application/dto/Project
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
 import type {
   TerminalExitEvent,
-  TerminalOutputEvent
+  TerminalOutputEvent,
+  TerminalWorkingDirectorySnapshot
 } from './contexts/run/application/ports/TerminalProcessPort'
 
 interface WorkbenchSnapshot {
@@ -146,6 +147,9 @@ declare global {
         readonly rows: number
       }): Promise<void>
       interruptTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      listTerminalWorkingDirectories(command: {
+        readonly sessionIds: readonly string[]
+      }): Promise<TerminalWorkingDirectorySnapshot[]>
       terminateTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void

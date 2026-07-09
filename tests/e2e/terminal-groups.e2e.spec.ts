@@ -183,6 +183,8 @@ async function dragTerminalHeader(
 }
 
 async function ensureTerminalSelectedForGroup(page: Page, terminalName: string): Promise<void> {
+  await waitForTerminalGroupSelectionButton(page, terminalName)
+
   if (await page.getByRole('button', { name: `${terminalName} 已选择终端` }).count()) {
     return
   }
@@ -191,6 +193,8 @@ async function ensureTerminalSelectedForGroup(page: Page, terminalName: string):
 }
 
 async function ensureTerminalNotSelectedForGroup(page: Page, terminalName: string): Promise<void> {
+  await waitForTerminalGroupSelectionButton(page, terminalName)
+
   const selectedButton = page.getByRole('button', { name: `${terminalName} 已选择终端` })
 
   if ((await selectedButton.count()) === 0) {
@@ -198,6 +202,21 @@ async function ensureTerminalNotSelectedForGroup(page: Page, terminalName: strin
   }
 
   await selectedButton.click()
+}
+
+async function waitForTerminalGroupSelectionButton(
+  page: Page,
+  terminalName: string
+): Promise<void> {
+  await page.waitForFunction(
+    (name) =>
+      Array.from(document.querySelectorAll('button')).some((button) => {
+        const label = button.getAttribute('aria-label')
+
+        return label === `${name} 选择终端` || label === `${name} 已选择终端`
+      }),
+    terminalName
+  )
 }
 
 async function dragTerminalHeaderToGroupCenter(page: Page, terminalBlockId: string): Promise<void> {

@@ -50,6 +50,8 @@ const cleancodeApi = {
   writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
   resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),
   interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
+  listTerminalWorkingDirectories: (command: unknown) =>
+    invokeCleancode('cleancode:list-terminal-working-directories', command),
   terminateTerminal: (command: unknown) => invokeCleancode('cleancode:terminate-terminal', command),
   onTerminalOutput: (listener: (event: unknown) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, outputEvent: unknown) => {

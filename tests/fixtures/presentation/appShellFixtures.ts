@@ -9,10 +9,13 @@ export interface RuntimeApiOverrides {
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
+  readonly createTerminalBlock?: ReturnType<typeof vi.fn>
+  readonly resizeTerminalBlock?: ReturnType<typeof vi.fn>
   readonly updateTerminalBlockMetadata?: ReturnType<typeof vi.fn>
   readonly startTerminal?: ReturnType<typeof vi.fn>
   readonly writeTerminal?: ReturnType<typeof vi.fn>
   readonly terminateTerminal?: ReturnType<typeof vi.fn>
+  readonly listTerminalWorkingDirectories?: ReturnType<typeof vi.fn>
   readonly onTerminalOutput?: ReturnType<typeof vi.fn>
   readonly onTerminalExit?: ReturnType<typeof vi.fn>
 }
@@ -28,7 +31,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     synchronizeProjectGitState: overrides.synchronizeProjectGitState ?? vi.fn(async () => null),
-    createTerminalBlock: vi.fn(),
+    createTerminalBlock: overrides.createTerminalBlock ?? vi.fn(),
     createTerminalGroup: vi.fn(),
     updateTerminalBlockMetadata: overrides.updateTerminalBlockMetadata ?? vi.fn(),
     updateTerminalGroupMetadata: vi.fn(),
@@ -36,7 +39,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     addTerminalToGroup: vi.fn(),
     removeTerminalFromGroup: vi.fn(),
     dissolveTerminalGroup: vi.fn(),
-    resizeTerminalBlock: vi.fn(),
+    resizeTerminalBlock: overrides.resizeTerminalBlock ?? vi.fn(),
     updateGraphViewport: vi.fn(),
     moveBlock: vi.fn(),
     moveTerminalGroup: vi.fn(),
@@ -46,6 +49,8 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     writeTerminal: overrides.writeTerminal ?? vi.fn(),
     resizeTerminal: vi.fn(),
     interruptTerminal: vi.fn(),
+    listTerminalWorkingDirectories:
+      overrides.listTerminalWorkingDirectories ?? vi.fn(async () => []),
     terminateTerminal: overrides.terminateTerminal ?? vi.fn(),
     onTerminalOutput: overrides.onTerminalOutput ?? vi.fn(() => vi.fn()),
     onTerminalExit: overrides.onTerminalExit ?? vi.fn(() => vi.fn())

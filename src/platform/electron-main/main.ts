@@ -165,6 +165,8 @@ registerBlockGraphIpcHandlers({
 registerTerminalIpcHandlers({
   interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
   ipcMain,
+  listTerminalWorkingDirectories: (sessionIds) =>
+    terminalSessionService.listWorkingDirectories(sessionIds),
   logger: consoleLogger,
   resizeTerminal: (sessionId, columns, rows) =>
     terminalSessionService.resize(sessionId, columns, rows),

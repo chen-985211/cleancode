@@ -1,6 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseBranchWorkspaceActionsInput {
@@ -37,8 +38,6 @@ export function useBranchWorkspaceActions({
         if (selectedWorkspace?.isCurrent) {
           return
         }
-
-        await terminateWorkbenchTerminalSessions(currentWorkbench)
       }
 
       const switchedWorkbench = await window.cleancode?.switchBranchWorkspace({
@@ -47,16 +46,12 @@ export function useBranchWorkspaceActions({
       })
 
       if (switchedWorkbench) {
+        window.dispatchEvent(new CustomEvent(manualWorkspaceSelectionBrowserEventName))
         clearCurrentBlockSelection()
         replaceWorkbench(switchedWorkbench)
       }
     },
-    [
-      clearCurrentBlockSelection,
-      currentWorkbench,
-      replaceWorkbench,
-      terminateWorkbenchTerminalSessions
-    ]
+    [clearCurrentBlockSelection, currentWorkbench, replaceWorkbench]
   )
 
   const createBranchWorkspace = useCallback(
@@ -73,22 +68,13 @@ export function useBranchWorkspaceActions({
           return
         }
 
-        if (currentWorkbench?.project.id === workbench.project.id) {
-          await terminateWorkbenchTerminalSessions(currentWorkbench)
-        }
-
         clearCurrentBlockSelection()
         replaceWorkbench(createdWorkbench)
       } catch (error) {
         setBranchWorkspaceActionError(resolveUserFacingErrorMessage(error, '工作区操作失败。'))
       }
     },
-    [
-      clearCurrentBlockSelection,
-      currentWorkbench,
-      replaceWorkbench,
-      terminateWorkbenchTerminalSessions
-    ]
+    [clearCurrentBlockSelection, replaceWorkbench]
   )
 
   const archiveBranchWorkspace = useCallback(
@@ -130,10 +116,6 @@ export function useBranchWorkspaceActions({
 
   const checkoutMainBranch = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
-      if (currentWorkbench?.project.id === workbench.project.id) {
-        await terminateWorkbenchTerminalSessions(currentWorkbench)
-      }
-
       const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
         projectDirectory: workbench.project.directory,
         branchName
@@ -144,12 +126,7 @@ export function useBranchWorkspaceActions({
         replaceWorkbench(checkedOutWorkbench)
       }
     },
-    [
-      clearCurrentBlockSelection,
-      currentWorkbench,
-      replaceWorkbench,
-      terminateWorkbenchTerminalSessions
-    ]
+    [clearCurrentBlockSelection, replaceWorkbench]
   )
 
   return {

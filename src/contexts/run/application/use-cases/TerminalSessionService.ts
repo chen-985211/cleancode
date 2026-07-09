@@ -4,7 +4,8 @@ import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type {
   TerminalExitEvent,
   TerminalOutputEvent,
-  TerminalProcessPort
+  TerminalProcessPort,
+  TerminalWorkingDirectorySnapshot
 } from '../ports/TerminalProcessPort'
 
 export interface StartTerminalSessionCommand {
@@ -20,12 +21,13 @@ export interface StartTerminalSessionCommand {
 
 export class TerminalSessionService {
   private readonly sessions = new Map<string, TerminalSession>()
-  private readonly sessionIdsByTerminalBlock = new Map<string, string>()
+  private readonly sessionIdsByWorkspaceTerminalBlock = new Map<string, string>()
 
   constructor(private readonly terminalProcessPort: TerminalProcessPort) {}
 
   async start(command: StartTerminalSessionCommand): Promise<TerminalSessionSnapshot> {
-    const existingSessionId = this.sessionIdsByTerminalBlock.get(command.terminalBlockId)
+    const terminalBlockKey = createTerminalBlockKey(command.workspaceName, command.terminalBlockId)
+    const existingSessionId = this.sessionIdsByWorkspaceTerminalBlock.get(terminalBlockKey)
 
     if (existingSessionId) {
       this.terminate(existingSessionId)
@@ -49,21 +51,21 @@ export class TerminalSessionService {
         onOutput: command.onOutput,
         onExit: (event) => {
           session.markExited({ exitCode: event.exitCode })
-          this.sessionIdsByTerminalBlock.delete(command.terminalBlockId)
+          this.sessionIdsByWorkspaceTerminalBlock.delete(terminalBlockKey)
           command.onExit(event)
         }
       })
     } catch (error) {
       session.markFailed({ reason: getErrorMessage(error) })
       this.sessions.set(session.id, session)
-      this.sessionIdsByTerminalBlock.set(command.terminalBlockId, session.id)
+      this.sessionIdsByWorkspaceTerminalBlock.set(terminalBlockKey, session.id)
 
       return session.toSnapshot()
     }
 
     session.markRunning({ processId: processHandle.processId })
     this.sessions.set(session.id, session)
-    this.sessionIdsByTerminalBlock.set(command.terminalBlockId, session.id)
+    this.sessionIdsByWorkspaceTerminalBlock.set(terminalBlockKey, session.id)
 
     return session.toSnapshot()
   }
@@ -89,12 +91,38 @@ export class TerminalSessionService {
     this.terminalProcessPort.resize(sessionId, columns, rows)
   }
 
+  async listWorkingDirectories(
+    sessionIds: readonly string[]
+  ): Promise<TerminalWorkingDirectorySnapshot[]> {
+    const workingDirectories: TerminalWorkingDirectorySnapshot[] = []
+
+    for (const sessionId of sessionIds) {
+      const session = this.sessions.get(sessionId)
+
+      if (!session || session.status !== 'running') {
+        continue
+      }
+
+      const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(sessionId)
+
+      if (!workingDirectory) {
+        continue
+      }
+
+      workingDirectories.push({ sessionId, workingDirectory })
+    }
+
+    return workingDirectories
+  }
+
   terminate(sessionId: string): TerminalSessionSnapshot {
     const session = this.requireSession(sessionId)
 
     this.terminalProcessPort.stop(sessionId)
     session.markExited({ exitCode: null })
-    this.sessionIdsByTerminalBlock.delete(session.terminalBlockId)
+    this.sessionIdsByWorkspaceTerminalBlock.delete(
+      createTerminalBlockKey(session.workspaceName, session.terminalBlockId)
+    )
 
     return session.toSnapshot()
   }
@@ -108,7 +136,7 @@ export class TerminalSessionService {
       }
     }
 
-    this.sessionIdsByTerminalBlock.clear()
+    this.sessionIdsByWorkspaceTerminalBlock.clear()
   }
 
   private requireSession(sessionId: string): TerminalSession {
@@ -137,4 +165,8 @@ export class TerminalSessionService {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function createTerminalBlockKey(workspaceName: string, terminalBlockId: string): string {
+  return `${workspaceName}\0${terminalBlockId}`
 }

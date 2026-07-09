@@ -58,11 +58,77 @@ describe('terminal session service', () => {
     expect(session.processId).toBeNull()
     expect(session.failureReason).toBe('PTY unavailable')
   })
+
+  it('lists current working directories for running terminal sessions', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+    const session = await service.start({
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    terminalProcessPort.workingDirectories.set(session.id, '/work/app-worktree/src')
+
+    await expect(service.listWorkingDirectories([session.id, 'missing-session'])).resolves.toEqual([
+      {
+        sessionId: session.id,
+        workingDirectory: '/work/app-worktree/src'
+      }
+    ])
+  })
+
+  it('does not list working directories for exited terminal sessions', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+    const session = await service.start({
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    terminalProcessPort.workingDirectories.set(session.id, '/work/app')
+    service.terminate(session.id)
+
+    await expect(service.listWorkingDirectories([session.id])).resolves.toEqual([])
+  })
+
+  it('keeps terminal sessions in different workspaces independent', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+    const mainSession = await service.start({
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    const featureSession = await service.start({
+      terminalBlockId: 'block-1',
+      workspaceName: 'feature/sidebar',
+      workingDirectory: '/work/app-sidebar',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    expect(mainSession.status).toBe('running')
+    expect(featureSession.status).toBe('running')
+    expect(terminalProcessPort.stoppedSessionIds).toEqual([])
+  })
 })
 
 class RecordingTerminalProcessPort implements TerminalProcessPort {
   readonly writes: Array<{ readonly sessionId: string; readonly input: string }> = []
   readonly stoppedSessionIds: string[] = []
+  readonly workingDirectories = new Map<string, string>()
 
   async start(): Promise<{ readonly processId: number }> {
     return { processId: 101 }
@@ -78,6 +144,10 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
 
   stop(sessionId: string): void {
     this.stoppedSessionIds.push(sessionId)
+  }
+
+  async readWorkingDirectory(sessionId: string): Promise<string | null> {
+    return this.workingDirectories.get(sessionId) ?? null
   }
 
   disposeAll(): void {
@@ -100,6 +170,10 @@ class FailingTerminalProcessPort implements TerminalProcessPort {
 
   stop(): void {
     return undefined
+  }
+
+  async readWorkingDirectory(): Promise<string | null> {
+    return null
   }
 
   disposeAll(): void {

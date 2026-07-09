@@ -1,7 +1,8 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type {
   TerminalExitEvent,
-  TerminalOutputEvent
+  TerminalOutputEvent,
+  TerminalWorkingDirectorySnapshot
 } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
@@ -29,6 +30,9 @@ export interface TerminalIpcHandlersInput {
   readonly resizeTerminal: (sessionId: string, columns: number, rows: number) => void
   readonly writeTerminal: (sessionId: string, input: string) => TerminalSessionSnapshot
   readonly interruptTerminal: (sessionId: string) => TerminalSessionSnapshot
+  readonly listTerminalWorkingDirectories: (
+    sessionIds: readonly string[]
+  ) => Promise<TerminalWorkingDirectorySnapshot[]>
   readonly terminateTerminal: (sessionId: string) => TerminalSessionSnapshot
 }
 
@@ -105,6 +109,18 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'interruptTerminal',
+    scope: 'run.terminal'
+  })
+
+  registerIpcHandler<
+    { readonly sessionIds: readonly string[] },
+    TerminalWorkingDirectorySnapshot[]
+  >({
+    channel: 'cleancode:list-terminal-working-directories',
+    handler: (command) => input.listTerminalWorkingDirectories(command.sessionIds),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listTerminalWorkingDirectories',
     scope: 'run.terminal'
   })
 
