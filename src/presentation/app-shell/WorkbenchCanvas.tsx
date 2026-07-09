@@ -274,7 +274,7 @@ export function WorkbenchCanvas({
           minZoom={minimumCanvasZoom}
           maxZoom={maximumCanvasZoom}
         >
-          <Background color="#d7deea" gap={20} size={1.2} />
+          <Background color="var(--cc-border-strong)" gap={24} size={1} />
           <Controls position="bottom-left" showInteractive={false} />
           <Panel className="canvas-minimap-panel" position="top-left">
             <CanvasMinimap

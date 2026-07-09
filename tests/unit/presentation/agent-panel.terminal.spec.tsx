@@ -181,6 +181,7 @@ describe('agent panel terminal', () => {
 
     render(<AppShell />)
 
+    expect(await screen.findByRole('region', { name: 'Codex CLI 会话' })).toBeInTheDocument()
     expect(await screen.findByLabelText('Codex CLI 终端')).toBeInTheDocument()
     expect(screen.queryByLabelText('Agent 指令')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '发送 Agent 指令' })).not.toBeInTheDocument()

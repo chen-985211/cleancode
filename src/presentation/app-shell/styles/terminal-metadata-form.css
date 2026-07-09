@@ -1,22 +1,18 @@
 .terminal-metadata-form {
   position: absolute;
   z-index: 6;
-  top: 51px;
+  top: 53px;
   right: 10px;
   display: flex;
   width: min(430px, calc(100% - 20px));
   box-sizing: border-box;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid rgb(148 163 184 / 0.24);
+  border: 1px solid var(--cc-border-strong);
   border-radius: 11px;
-  padding: 11px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.025)),
-    rgb(11 18 27 / 0.96);
-  box-shadow:
-    0 18px 42px rgb(2 6 23 / 0.42),
-    0 1px 0 rgb(255 255 255 / 0.08) inset;
+  padding: 12px;
+  background: rgb(255 255 255 / 0.98);
+  box-shadow: var(--cc-shadow-floating);
 }
 
 .terminal-metadata-form__fields {
@@ -32,9 +28,9 @@
 }
 
 .terminal-metadata-field span {
-  color: #94a3b8;
-  font-size: 10.5px;
-  font-weight: 700;
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
 }
@@ -43,17 +39,15 @@
   min-width: 0;
   height: 32px;
   box-sizing: border-box;
-  border: 1px solid rgb(148 163 184 / 0.2);
+  border: 1px solid var(--cc-border);
   border-radius: 8px;
-  background: rgb(2 6 23 / 0.4);
+  background: var(--cc-surface);
   padding: 0 10px;
-  color: var(--terminal-foreground);
+  color: var(--cc-foreground);
   font: inherit;
   font-size: 12px;
   outline: none;
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.045) inset,
-    0 1px 1px rgb(2 6 23 / 0.16);
+  box-shadow: 0 1px 2px rgb(20 27 45 / 0.05);
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
@@ -61,15 +55,13 @@
 }
 
 .terminal-metadata-form input::placeholder {
-  color: rgb(148 163 184 / 0.58);
+  color: #9aa2af;
 }
 
 .terminal-metadata-form input:focus {
-  border-color: rgb(96 165 250 / 0.56);
-  background: rgb(2 6 23 / 0.52);
-  box-shadow:
-    0 0 0 2px rgb(96 165 250 / 0.18),
-    0 1px 0 rgb(255 255 255 / 0.055) inset;
+  border-color: rgb(47 103 216 / 0.56);
+  background: var(--cc-surface);
+  box-shadow: 0 0 0 3px rgb(47 103 216 / 0.12);
 }
 
 .terminal-metadata-form__footer {

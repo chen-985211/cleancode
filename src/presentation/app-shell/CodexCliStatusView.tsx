@@ -10,7 +10,7 @@ export type CodexCliPanelState =
 export function CodexCliStatusView({ state }: { readonly state: CodexCliPanelState }) {
   if (state.status === 'unavailable') {
     return (
-      <div className="agent-runtime-card agent-runtime-card--muted">
+      <div className="agent-runtime-card agent-runtime-card--muted" aria-live="polite">
         <span className="agent-runtime-card__icon">
           <Terminal size={15} aria-hidden="true" />
         </span>
@@ -24,7 +24,7 @@ export function CodexCliStatusView({ state }: { readonly state: CodexCliPanelSta
 
   if (state.status === 'checking') {
     return (
-      <div className="agent-runtime-card agent-runtime-card--checking">
+      <div className="agent-runtime-card agent-runtime-card--checking" aria-live="polite">
         <span className="agent-runtime-card__icon">
           <Loader2 size={15} aria-hidden="true" />
         </span>
@@ -38,13 +38,13 @@ export function CodexCliStatusView({ state }: { readonly state: CodexCliPanelSta
 
   if (state.installation.status === 'installed') {
     return (
-      <div className="agent-runtime-card agent-runtime-card--installed">
+      <div className="agent-runtime-card agent-runtime-card--installed" aria-live="polite">
         <span className="agent-runtime-card__icon">
           <Terminal size={15} aria-hidden="true" />
         </span>
         <div className="agent-runtime-card__content">
           <span>Codex CLI</span>
-          <code>{state.installation.version}</code>
+          <code title={state.installation.version ?? undefined}>{state.installation.version}</code>
         </div>
         <strong>
           <CheckCircle2 size={13} aria-hidden="true" />
@@ -55,13 +55,13 @@ export function CodexCliStatusView({ state }: { readonly state: CodexCliPanelSta
   }
 
   return (
-    <div className="agent-runtime-card agent-runtime-card--missing">
+    <div className="agent-runtime-card agent-runtime-card--missing" aria-live="polite">
       <span className="agent-runtime-card__icon">
         <Download size={15} aria-hidden="true" />
       </span>
       <div className="agent-runtime-card__content">
         <span>Codex CLI</span>
-        <code>{state.installation.installCommand}</code>
+        <code title={state.installation.installCommand}>{state.installation.installCommand}</code>
       </div>
       <strong>未安装</strong>
     </div>

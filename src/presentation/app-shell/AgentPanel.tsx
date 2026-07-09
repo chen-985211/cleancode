@@ -221,6 +221,9 @@ export function AgentPanel({
       approval.projectDirectory === currentWorkbench?.project.directory &&
       approval.workspaceName === currentWorkspace?.name
   )
+  const statusLabel = resolveStatusLabel(codexCliState, session)
+  const statusTone = resolveStatusTone(codexCliState, session)
+  const workspaceLabel = resolveWorkspaceLabel(currentWorkbench, currentWorkspace)
 
   async function approveApproval(approval: AgentToolApprovalRequest): Promise<void> {
     setPendingApprovals((approvals) =>
@@ -246,12 +249,12 @@ export function AgentPanel({
             </span>
             <div className="agent-panel__heading">
               <strong>Codex CLI</strong>
-              <span>{resolveWorkspaceLabel(currentWorkbench, currentWorkspace)}</span>
+              <span title={workspaceLabel}>{workspaceLabel}</span>
             </div>
           </div>
-          <span className="agent-panel__status">
-            <span className="status-dot" />
-            {resolveStatusLabel(codexCliState, session)}
+          <span className="agent-panel__status" data-tone={statusTone} aria-live="polite">
+            <span className="agent-panel__status-dot" aria-hidden="true" />
+            {statusLabel}
           </span>
         </div>
         <CodexCliStatusView state={codexCliState} />
@@ -263,15 +266,17 @@ export function AgentPanel({
             <strong>需要授权</strong>
             <span>{activeApproval.summary}</span>
           </div>
-          <button type="button" onClick={() => void approveApproval(activeApproval)}>
-            确认删除
-          </button>
-          <button type="button" onClick={() => void rejectApproval(activeApproval)}>
-            拒绝
-          </button>
+          <div className="agent-approval__actions">
+            <button type="button" onClick={() => void approveApproval(activeApproval)}>
+              确认删除
+            </button>
+            <button type="button" onClick={() => void rejectApproval(activeApproval)}>
+              拒绝
+            </button>
+          </div>
         </div>
       ) : null}
-      <div className="agent-panel__terminal-shell">
+      <div className="agent-panel__terminal-shell" role="region" aria-label="Codex CLI 会话">
         {currentWorkspaceKey ? (
           <AgentTerminalSurface
             activeOutput={activeOutput}
@@ -343,6 +348,21 @@ function resolveStatusLabel(
   }
 
   return session?.status === 'running' ? '已连接' : '已安装'
+}
+
+function resolveStatusTone(
+  state: CodexCliPanelState,
+  session: AgentSessionSnapshot | null
+): 'neutral' | 'success' | 'warning' {
+  if (state.status !== 'ready') {
+    return 'neutral'
+  }
+
+  if (state.installation.status !== 'installed') {
+    return 'warning'
+  }
+
+  return session?.status === 'running' ? 'success' : 'neutral'
 }
 
 function resolveWorkspaceLabel(

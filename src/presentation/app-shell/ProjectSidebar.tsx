@@ -209,6 +209,7 @@ function ProjectCard({
         <button
           className="project-card__select"
           type="button"
+          title={workbench.project.name}
           onClick={() => onSelectWorkspace(workbench, currentProjectWorkspace?.name ?? 'main')}
         >
           <span className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'} />
@@ -275,8 +276,10 @@ function ProjectCard({
                   >
                     <button
                       aria-label={`切换到默认工作区 ${boundBranchName}`}
+                      aria-current={isActiveWorkspace ? 'page' : undefined}
                       className="default-branch-selector__select"
                       type="button"
+                      title={boundBranchName}
                       onClick={() => onSelectWorkspace(workbench, 'main')}
                     >
                       <GitBranch size={14} aria-hidden="true" />
@@ -329,8 +332,10 @@ function ProjectCard({
                   >
                     <button
                       aria-label={workspaceButtonLabel}
+                      aria-current={isActiveWorkspace ? 'page' : undefined}
                       className="workspace-row__select"
                       type="button"
+                      title={workspace.name}
                       onClick={() => onSelectWorkspace(workbench, workspace.name)}
                     >
                       <GitBranch size={14} aria-hidden="true" />

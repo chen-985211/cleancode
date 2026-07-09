@@ -1,33 +1,41 @@
 :root {
-  --cc-background: #f3f6fb;
-  --cc-canvas: #fbfcff;
-  --cc-chrome: #f6f8fc;
-  --cc-chrome-raised: #fafcff;
+  --cc-background: #eef1f5;
+  --cc-canvas: #f8f9fb;
+  --cc-chrome: #f3f5f8;
+  --cc-chrome-raised: #f8f9fb;
   --cc-surface: #ffffff;
-  --cc-surface-subtle: #f3f5f9;
+  --cc-surface-subtle: #f0f2f5;
   --cc-surface-raised: #ffffff;
-  --cc-foreground: #172033;
-  --cc-muted: #667085;
-  --cc-border: #e2e8f2;
-  --cc-border-strong: #cdd7e6;
-  --cc-divider: rgb(207 216 229 / 0.72);
-  --cc-primary: #2563eb;
-  --cc-primary-soft: #e8f0ff;
-  --cc-success: #16a34a;
-  --cc-success-soft: #e8f8ef;
-  --cc-warning: #f59e0b;
-  --cc-danger: #dc2626;
-  --cc-terminal: #0b0f14;
-  --cc-shadow: 0 16px 45px rgb(16 24 40 / 0.08);
+  --cc-foreground: #1b1e27;
+  --cc-muted: #6b7280;
+  --cc-muted-strong: #4b5563;
+  --cc-border: #dfe3ea;
+  --cc-border-strong: #c9cfd9;
+  --cc-divider: rgb(198 205 216 / 0.78);
+  --cc-primary: #2f67d8;
+  --cc-primary-hover: #2458bd;
+  --cc-primary-soft: #e9f0ff;
+  --cc-success: #238a55;
+  --cc-success-soft: #e8f6ee;
+  --cc-warning: #b7791f;
+  --cc-warning-soft: #fff6df;
+  --cc-danger: #c2414f;
+  --cc-danger-soft: #fff0f1;
+  --cc-ring: rgb(47 103 216 / 0.34);
+  --cc-terminal: #0b1017;
+  --cc-shadow: 0 10px 30px rgb(20 27 45 / 0.09);
+  --cc-shadow-floating: 0 16px 38px rgb(20 27 45 / 0.13);
 }
 
 .app-shell {
   display: grid;
   width: 100%;
-  min-width: 960px;
+  min-width: 0;
   height: 100%;
-  min-height: 640px;
-  grid-template-columns: 276px minmax(440px, 1fr) 316px;
+  min-height: 0;
+  grid-template-columns:
+    clamp(220px, 17vw, 252px) minmax(440px, 1fr)
+    clamp(300px, 23vw, 360px);
   overflow: hidden;
   background: var(--cc-background);
   color: var(--cc-foreground);
@@ -44,8 +52,9 @@ input:disabled {
 }
 
 button:focus-visible,
-input:focus-visible {
-  outline: 2px solid rgb(37 99 235 / 0.35);
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--cc-ring);
   outline-offset: 2px;
 }
 
@@ -53,17 +62,17 @@ input:focus-visible {
 .toolbar-button,
 .agent-next-action {
   display: inline-flex;
-  height: 38px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--cc-border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   transition:
     border-color 150ms ease,
     background 150ms ease,
@@ -74,21 +83,21 @@ input:focus-visible {
 .sidebar-action:hover,
 .toolbar-button:hover:not(:disabled),
 .agent-next-action:hover:not(:disabled) {
-  border-color: #8fb2ff;
-  box-shadow: 0 8px 22px rgb(37 99 235 / 0.08);
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
 }
 
 .icon-button {
   display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #667085;
+  color: var(--cc-muted);
   transition:
     border-color 150ms ease,
     background 150ms ease,
@@ -97,8 +106,8 @@ input:focus-visible {
 
 .icon-button:hover:not(:disabled) {
   border-color: var(--cc-border);
-  background: #ffffff;
-  color: #1d2939;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
 }
 
 .icon-button--small {
@@ -127,7 +136,7 @@ input:focus-visible {
 
 @media (max-width: 1120px) {
   .app-shell {
-    grid-template-columns: 240px minmax(420px, 1fr) 280px;
+    grid-template-columns: 220px minmax(400px, 1fr) 292px;
   }
 
   .sidebar-action {

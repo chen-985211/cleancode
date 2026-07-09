@@ -23,12 +23,9 @@
 
 .terminal-node__action-menu {
   min-width: 172px;
-  border: 1px solid rgb(148 163 184 / 0.22);
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.025)), rgb(9 15 24 / 0.98);
-  box-shadow:
-    0 14px 32px rgb(2 6 23 / 0.34),
-    0 1px 0 rgb(255 255 255 / 0.08) inset;
+  border: 1px solid var(--cc-border-strong);
+  background: rgb(255 255 255 / 0.98);
+  box-shadow: var(--cc-shadow-floating);
 }
 
 .terminal-group-node__action-menu {
@@ -56,8 +53,8 @@
 }
 
 .terminal-node__menu-action {
-  color: #c9d5e4;
-  font-weight: 700;
+  color: var(--cc-muted-strong);
+  font-weight: 600;
 }
 
 .terminal-group-node__menu-action {
@@ -74,8 +71,8 @@
 }
 
 .terminal-node__menu-action:hover {
-  background: rgb(148 163 184 / 0.12);
-  color: #f8fafc;
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
 }
 
 .terminal-group-node__menu-action:hover {
