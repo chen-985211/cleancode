@@ -1,6 +1,14 @@
 /// <reference types="vite/client" />
 
 import type {
+  AgentGraphUpdatedEvent,
+  AgentPtyExitEvent,
+  AgentPtyOutputEvent,
+  AgentSessionSnapshot,
+  AgentToolApprovalRequest
+} from './contexts/agent/application/dto/AgentSessionProtocol'
+import type { CodexCliInstallationSnapshot } from './contexts/agent/application/ports/CodexCliPort'
+import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
@@ -47,6 +55,34 @@ declare global {
       synchronizeProjectGitState(command: {
         readonly projectDirectory: string
       }): Promise<WorkbenchSnapshot | null>
+      inspectCodexCli(): Promise<CodexCliInstallationSnapshot>
+      attachAgentSession(command: {
+        readonly columns?: number
+        readonly projectDirectory: string
+        readonly rows?: number
+        readonly workspaceDirectory: string
+        readonly workspaceName: string
+      }): Promise<AgentSessionSnapshot>
+      writeAgentSession(command: {
+        readonly input: string
+        readonly sessionId: string
+      }): Promise<void>
+      resizeAgentSession(command: {
+        readonly columns: number
+        readonly rows: number
+        readonly sessionId: string
+      }): Promise<void>
+      disposeAgentWorkspaceSession(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+      }): Promise<void>
+      disposeProjectAgentSessions(command: { readonly projectDirectory: string }): Promise<void>
+      approveAgentTool(command: { readonly approvalId: string }): Promise<void>
+      rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
+      onAgentPtyOutput(listener: (event: AgentPtyOutputEvent) => void): () => void
+      onAgentPtyExit(listener: (event: AgentPtyExitEvent) => void): () => void
+      onAgentGraphUpdated(listener: (event: AgentGraphUpdatedEvent) => void): () => void
+      onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void
       createTerminalBlock(command: {
         readonly projectDirectory: string
         readonly workspaceName: string

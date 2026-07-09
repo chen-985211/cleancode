@@ -1,6 +1,15 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'node:path'
 
+import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
+import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
+import { InspectCodexCliUseCase } from '../../contexts/agent/application/use-cases/InspectCodexCliUseCase'
+import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
+import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/NodeCodexCliAdapter'
+import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
+import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
+import { NodePtyCodexAgentProcessAdapter } from '../../contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
@@ -41,6 +50,7 @@ import { TerminalSessionService } from '../../contexts/run/application/use-cases
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
+import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
@@ -98,6 +108,34 @@ const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepositor
 const updateTerminalGroupMetadataUseCase = new UpdateTerminalGroupMetadataUseCase(graphRepository)
 const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCase(graphRepository)
 const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
+const codexCliAdapter = new NodeCodexCliAdapter()
+const inspectCodexCliUseCase = new InspectCodexCliUseCase(codexCliAdapter)
+const agentAuditRepository = new FileSystemAgentAuditRepository(
+  join(appStateDirectoryPath, 'agent-audit.jsonl')
+)
+const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
+  createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
+  createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
+  deleteBlock: (command) => deleteBlockUseCase.execute(command),
+  dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
+  getDefaultGraph: getDefaultGraphForAgent,
+  moveBlock: (command) => moveBlockUseCase.execute(command),
+  moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
+  resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
+  setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
+  updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),
+  updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command)
+})
+const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
+  agentBlockGraphToolAdapter,
+  agentAuditRepository
+)
+const agentSessionService = new AgentSessionService(
+  new NodePtyCodexAgentProcessAdapter(),
+  new CleancodeMcpHttpServer(),
+  (command) => executeAgentToolUseCase.execute(command)
+)
+const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 
 const createMainWindow = (): void => {
@@ -175,6 +213,53 @@ registerTerminalIpcHandlers({
   writeTerminal: (sessionId, input) => terminalSessionService.write(sessionId, input)
 })
 
+registerAgentIpcHandlers({
+  approveAgentTool: (approvalId) => agentSessionService.approveTool({ approvalId }),
+  attachAgentSession: (command) =>
+    isAgentAutostartDisabledForTest
+      ? Promise.resolve(createDisabledAgentSessionSnapshot(command))
+      : agentSessionService.attach(command),
+  disposeAgentWorkspaceSession: (command) => {
+    if (!isAgentAutostartDisabledForTest) {
+      agentSessionService.disposeSession(command)
+    }
+  },
+  disposeProjectAgentSessions: (projectDirectory) => {
+    if (!isAgentAutostartDisabledForTest) {
+      agentSessionService.disposeProject(projectDirectory)
+    }
+  },
+  inspectCodexCli: () => inspectCodexCliUseCase.execute(),
+  ipcMain,
+  logger: consoleLogger,
+  rejectAgentTool: (approvalId) => agentSessionService.rejectTool({ approvalId }),
+  resizeAgentSession: (sessionId, columns, rows) => {
+    if (!isAgentAutostartDisabledForTest) {
+      agentSessionService.resize({ columns, rows, sessionId })
+    }
+  },
+  writeAgentSession: (sessionId, input) => {
+    if (!isAgentAutostartDisabledForTest) {
+      agentSessionService.write({ input, sessionId })
+    }
+  }
+})
+
+function createDisabledAgentSessionSnapshot(command: {
+  readonly projectDirectory: string
+  readonly workspaceDirectory: string
+  readonly workspaceName: string
+}): AgentSessionSnapshot {
+  return {
+    processId: null,
+    projectDirectory: command.projectDirectory,
+    sessionId: `test-agent-${command.workspaceName}`,
+    status: 'exited',
+    workspaceDirectory: command.workspaceDirectory,
+    workspaceName: command.workspaceName
+  }
+}
+
 async function selectProjectDirectory(): Promise<string | null> {
   if (process.env.CLEANCODE_TEST_PROJECT_DIRECTORY) {
     return process.env.CLEANCODE_TEST_PROJECT_DIRECTORY
@@ -209,6 +294,19 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
   ).branches
 
   return { project, gitBranches, graph }
+}
+
+async function getDefaultGraphForAgent(command: {
+  readonly projectDirectory: string
+  readonly workspaceName: string
+}): Promise<BlockGraphSnapshot> {
+  const project = await projectRepository.findByDirectory(command.projectDirectory)
+
+  return getDefaultGraphUseCase.execute({
+    projectDirectory: command.projectDirectory,
+    projectId: project?.id ?? command.projectDirectory,
+    workspaceName: command.workspaceName
+  })
 }
 
 async function rememberProject(directory: string): Promise<void> {
@@ -276,4 +374,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   terminalSessionService.stopAll()
+  agentSessionService.disposeAll()
 })

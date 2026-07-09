@@ -21,6 +21,27 @@ const cleancodeApi = {
     invokeCleancode('cleancode:checkout-main-workspace-branch', command),
   synchronizeProjectGitState: (command: unknown) =>
     invokeCleancode('cleancode:synchronize-project-git-state', command),
+  inspectCodexCli: () => invokeCleancode('cleancode:inspect-codex-cli'),
+  attachAgentSession: (command: unknown) =>
+    invokeCleancode('cleancode:attach-agent-session', command),
+  writeAgentSession: (command: unknown) =>
+    invokeCleancode('cleancode:write-agent-session', command),
+  resizeAgentSession: (command: unknown) =>
+    invokeCleancode('cleancode:resize-agent-session', command),
+  disposeAgentWorkspaceSession: (command: unknown) =>
+    invokeCleancode('cleancode:dispose-agent-workspace-session', command),
+  disposeProjectAgentSessions: (command: unknown) =>
+    invokeCleancode('cleancode:dispose-project-agent-sessions', command),
+  approveAgentTool: (command: unknown) => invokeCleancode('cleancode:approve-agent-tool', command),
+  rejectAgentTool: (command: unknown) => invokeCleancode('cleancode:reject-agent-tool', command),
+  onAgentPtyOutput: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-pty-output', listener),
+  onAgentPtyExit: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-pty-exit', listener),
+  onAgentGraphUpdated: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-graph-updated', listener),
+  onAgentToolApprovalRequested: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-tool-approval-requested', listener),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
   createTerminalGroup: (command: unknown) =>
@@ -74,6 +95,16 @@ const cleancodeApi = {
 } as const
 
 contextBridge.exposeInMainWorld('cleancode', cleancodeApi)
+
+function subscribeRendererEvent(channel: string, listener: (event: unknown) => void): () => void {
+  const subscription = (_event: Electron.IpcRendererEvent, payload: unknown) => {
+    listener(payload)
+  }
+
+  ipcRenderer.on(channel, subscription)
+
+  return () => ipcRenderer.removeListener(channel, subscription)
+}
 
 async function invokeCleancode<TResult>(channel: string, command?: unknown): Promise<TResult> {
   const result = (await ipcRenderer.invoke(channel, command)) as IpcInvokeResult<TResult>

@@ -44,6 +44,7 @@ export function launchApp(workbench: E2eWorkbench): Promise<ElectronApplication>
     cwd: process.cwd(),
     env: {
       ...process.env,
+      CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '1',
       CLEANCODE_TEST_PROJECT_DIRECTORY: workbench.projectDirectory,
       CLEANCODE_TEST_APP_STATE_DIRECTORY: workbench.appStateDirectory,
       CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(

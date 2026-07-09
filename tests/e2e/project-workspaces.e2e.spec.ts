@@ -82,5 +82,4 @@ async function expectNoBrowserPreviewData(page: Page): Promise<void> {
   expect(await page.getByRole('button', { name: '打开项目' }).count()).toBe(0)
   expect(await page.getByText('添加数据库终端').count()).toBe(0)
   expect(await page.getByText('添加测试终端').count()).toBe(0)
-  expect(await page.getByText('Codex').count()).toBe(0)
 }

@@ -30,7 +30,7 @@ describe('app shell', () => {
     expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
     expect(screen.queryByText('小地图')).not.toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'Agent 面板' })).toBeInTheDocument()
-    expect(screen.getByText('本地 Agent')).toBeInTheDocument()
+    expect(screen.getAllByText('Codex CLI').length).toBeGreaterThan(0)
     expect(screen.getByText('未接入')).toBeInTheDocument()
     expect(screen.getByText('浏览器预览模式')).toBeInTheDocument()
     expect(screen.queryByText('cleancode-demo')).not.toBeInTheDocument()

@@ -9,6 +9,18 @@ export interface RuntimeApiOverrides {
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
+  readonly inspectCodexCli?: ReturnType<typeof vi.fn>
+  readonly attachAgentSession?: ReturnType<typeof vi.fn>
+  readonly writeAgentSession?: ReturnType<typeof vi.fn>
+  readonly resizeAgentSession?: ReturnType<typeof vi.fn>
+  readonly disposeAgentWorkspaceSession?: ReturnType<typeof vi.fn>
+  readonly disposeProjectAgentSessions?: ReturnType<typeof vi.fn>
+  readonly approveAgentTool?: ReturnType<typeof vi.fn>
+  readonly rejectAgentTool?: ReturnType<typeof vi.fn>
+  readonly onAgentPtyOutput?: ReturnType<typeof vi.fn>
+  readonly onAgentPtyExit?: ReturnType<typeof vi.fn>
+  readonly onAgentGraphUpdated?: ReturnType<typeof vi.fn>
+  readonly onAgentToolApprovalRequested?: ReturnType<typeof vi.fn>
   readonly createTerminalBlock?: ReturnType<typeof vi.fn>
   readonly resizeTerminalBlock?: ReturnType<typeof vi.fn>
   readonly updateTerminalBlockMetadata?: ReturnType<typeof vi.fn>
@@ -31,6 +43,35 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     synchronizeProjectGitState: overrides.synchronizeProjectGitState ?? vi.fn(async () => null),
+    inspectCodexCli:
+      overrides.inspectCodexCli ??
+      vi.fn(async () => ({
+        installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+        status: 'missing',
+        version: null
+      })),
+    attachAgentSession:
+      overrides.attachAgentSession ??
+      vi.fn(async (command) => ({
+        processId: 1,
+        projectDirectory: command.projectDirectory,
+        sessionId: `agent-${command.workspaceName}`,
+        status: 'running',
+        workspaceDirectory: command.workspaceDirectory,
+        workspaceName: command.workspaceName
+      })),
+    writeAgentSession: overrides.writeAgentSession ?? vi.fn(async () => undefined),
+    resizeAgentSession: overrides.resizeAgentSession ?? vi.fn(async () => undefined),
+    disposeAgentWorkspaceSession:
+      overrides.disposeAgentWorkspaceSession ?? vi.fn(async () => undefined),
+    disposeProjectAgentSessions:
+      overrides.disposeProjectAgentSessions ?? vi.fn(async () => undefined),
+    approveAgentTool: overrides.approveAgentTool ?? vi.fn(async () => undefined),
+    rejectAgentTool: overrides.rejectAgentTool ?? vi.fn(async () => undefined),
+    onAgentPtyOutput: overrides.onAgentPtyOutput ?? vi.fn(() => vi.fn()),
+    onAgentPtyExit: overrides.onAgentPtyExit ?? vi.fn(() => vi.fn()),
+    onAgentGraphUpdated: overrides.onAgentGraphUpdated ?? vi.fn(() => vi.fn()),
+    onAgentToolApprovalRequested: overrides.onAgentToolApprovalRequested ?? vi.fn(() => vi.fn()),
     createTerminalBlock: overrides.createTerminalBlock ?? vi.fn(),
     createTerminalGroup: vi.fn(),
     updateTerminalBlockMetadata: overrides.updateTerminalBlockMetadata ?? vi.fn(),
