@@ -31,6 +31,7 @@ import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
 import { useMinimapNodeFocus } from './useMinimapNodeFocus'
+import { useProjectGitStateSynchronization } from './useProjectGitStateSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
 import type {
@@ -151,6 +152,7 @@ export function AppShell() {
     )
     setCurrentWorkbench(workbench)
   }, [])
+  useProjectGitStateSynchronization({ currentWorkbench, replaceWorkbench })
 
   const setCurrentGraph = useCallback((graphSnapshot: WorkbenchSnapshot['graph']): void => {
     const blockIds = new Set(graphSnapshot.blocks.map((block) => block.id))

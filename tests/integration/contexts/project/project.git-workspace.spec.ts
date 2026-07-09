@@ -5,6 +5,9 @@ import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../../../src/contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
+import { CreateOrOpenProjectUseCase } from '../../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
+import { SynchronizeProjectGitStateUseCase } from '../../../../src/contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
+import { FileSystemProjectRepository } from '../../../../src/contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
 import { GitCliWorkspaceAdapter } from '../../../../src/contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 
 const execFileAsync = promisify(execFile)
@@ -101,6 +104,40 @@ describe('project git workspace adapter', () => {
     await expect(getCurrentBranch(projectDirectory)).resolves.toBe('feature/free')
     await writeFile(join(projectDirectory, 'dirty.txt'), 'dirty\n')
     await expect(adapter.isWorkingTreeClean(projectDirectory)).resolves.toBe(false)
+  })
+
+  it('synchronizes the stored main workspace branch after an external checkout', async () => {
+    const repository = new FileSystemProjectRepository(appStateDirectory)
+    const adapter = new GitCliWorkspaceAdapter()
+    const createOrOpenProject = new CreateOrOpenProjectUseCase(repository, adapter)
+    const synchronizeProjectGitState = new SynchronizeProjectGitStateUseCase(repository, adapter)
+
+    await initializeGitProject(projectDirectory)
+    await execFileAsync('git', ['branch', 'feature/free'], { cwd: projectDirectory })
+    await createOrOpenProject.execute({
+      directory: projectDirectory,
+      name: 'app'
+    })
+
+    await execFileAsync('git', ['checkout', 'feature/free'], { cwd: projectDirectory })
+    const project = await synchronizeProjectGitState.execute({ projectDirectory })
+
+    expect(project?.workspaces[0]).toMatchObject({
+      name: 'main',
+      directory: projectDirectory,
+      gitBranch: 'feature/free',
+      isCurrent: true
+    })
+    await expect(repository.findByDirectory(projectDirectory)).resolves.toMatchObject({
+      workspaces: [
+        {
+          name: 'main',
+          directory: projectDirectory,
+          gitBranch: 'feature/free',
+          isCurrent: true
+        }
+      ]
+    })
   })
 
   it('removes a branch worktree without deleting the git branch', async () => {

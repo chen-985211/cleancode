@@ -27,6 +27,7 @@ import { ListGitBranchNavigationUseCase } from '../../contexts/project/applicati
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
 import { RememberProjectUseCase } from '../../contexts/project/application/use-cases/RememberProjectUseCase'
 import { SwitchBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
+import { SynchronizeProjectGitStateUseCase } from '../../contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
@@ -74,6 +75,10 @@ const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCas
   gitWorkspaceAdapter
 )
 const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
+  projectRepository,
+  gitWorkspaceAdapter
+)
+const synchronizeProjectGitStateUseCase = new SynchronizeProjectGitStateUseCase(
   projectRepository,
   gitWorkspaceAdapter
 )
@@ -134,7 +139,8 @@ registerProjectIpcHandlers({
   logger: consoleLogger,
   rememberProject,
   selectProjectDirectory,
-  switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command)
+  switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command),
+  synchronizeProjectGitState: (command) => synchronizeProjectGitStateUseCase.execute(command)
 })
 
 registerBlockGraphIpcHandlers({

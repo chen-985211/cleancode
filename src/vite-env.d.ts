@@ -43,6 +43,9 @@ declare global {
         readonly projectDirectory: string
         readonly branchName: string
       }): Promise<WorkbenchSnapshot>
+      synchronizeProjectGitState(command: {
+        readonly projectDirectory: string
+      }): Promise<WorkbenchSnapshot | null>
       createTerminalBlock(command: {
         readonly projectDirectory: string
         readonly workspaceName: string

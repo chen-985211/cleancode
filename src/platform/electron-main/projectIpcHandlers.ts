@@ -37,6 +37,9 @@ export interface ProjectIpcHandlersInput {
     readonly projectDirectory: string
     readonly branchName: string
   }) => Promise<ProjectSnapshot>
+  readonly synchronizeProjectGitState: (command: {
+    readonly projectDirectory: string
+  }) => Promise<ProjectSnapshot | null>
   readonly forgetProject: (directory: string) => Promise<void>
   readonly rememberProject: (directory: string) => Promise<void>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<WorkbenchSnapshot>
@@ -144,6 +147,21 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     operation: 'checkoutMainWorkspaceBranch',
     scope: 'project.git',
     successLogLevel: 'info'
+  })
+
+  registerIpcHandler<unknown, WorkbenchSnapshot | null>({
+    channel: 'cleancode:synchronize-project-git-state',
+    handler: async (command) => {
+      const project = await input.synchronizeProjectGitState({
+        projectDirectory: readStringField(command, 'projectDirectory')
+      })
+
+      return project ? input.loadWorkbench(project) : null
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'synchronizeProjectGitState',
+    scope: 'project.git'
   })
 
   registerIpcHandler<{ readonly projectDirectory: string }, WorkbenchSnapshot[]>({

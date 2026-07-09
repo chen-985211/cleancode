@@ -19,6 +19,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:archive-branch-workspace', command),
   checkoutMainWorkspaceBranch: (command: unknown) =>
     invokeCleancode('cleancode:checkout-main-workspace-branch', command),
+  synchronizeProjectGitState: (command: unknown) =>
+    invokeCleancode('cleancode:synchronize-project-git-state', command),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
   createTerminalGroup: (command: unknown) =>
