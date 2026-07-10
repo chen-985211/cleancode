@@ -288,10 +288,9 @@ export function AppShell() {
     () => ({
       getLabel: (blockId) =>
         terminalBlocksById.get(blockId)?.name ?? terminalGroupsById.get(blockId)?.name ?? blockId,
-      focusBlock: focusWorkbenchNode,
       setHoveredBlockId: setHoveredTerminalBlockId
     }),
-    [focusWorkbenchNode, terminalBlocksById, terminalGroupsById]
+    [terminalBlocksById, terminalGroupsById]
   )
 
   const selectWorkbenchNode = useCallback(

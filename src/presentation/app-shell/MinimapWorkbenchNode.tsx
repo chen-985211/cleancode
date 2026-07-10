@@ -35,7 +35,7 @@ export function MinimapWorkbenchNode({
   selected,
   onClick
 }: MinimapWorkbenchNodeProps) {
-  const { focusBlock, getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
+  const { getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
   const statusColor = color ?? '#98a2b3'
   const nodeClassName = [
@@ -44,7 +44,7 @@ export function MinimapWorkbenchNode({
   ]
     .filter(Boolean)
     .join(' ')
-  const effectiveStrokeColor = selected ? '#34d399' : (strokeColor ?? '#dbe3ef')
+  const effectiveStrokeColor = strokeColor ?? 'var(--cc-border-strong)'
   const effectiveStrokeWidth = selected
     ? Math.max(strokeWidth ?? 1.2, 1.75)
     : Math.max(strokeWidth ?? 1, 1)
@@ -52,7 +52,6 @@ export function MinimapWorkbenchNode({
   const inset = Math.max(3, Math.min(width, height) * 0.08)
   const activate = (event: SyntheticEvent<SVGGElement>): void => {
     event.stopPropagation()
-    focusBlock(id)
     onClick?.(event as MouseEvent<SVGGElement>, id)
   }
   const activateFromKeyboard = (event: KeyboardEvent<SVGGElement>): void => {
@@ -61,6 +60,11 @@ export function MinimapWorkbenchNode({
     }
 
     event.preventDefault()
+
+    if (event.repeat) {
+      return
+    }
+
     activate(event)
   }
 
@@ -71,7 +75,6 @@ export function MinimapWorkbenchNode({
       tabIndex={0}
       aria-label={`聚焦${kindLabel} ${label}`}
       data-minimap-node-id={id}
-      onMouseDown={activate}
       onClick={activate}
       onKeyDown={activateFromKeyboard}
       onMouseEnter={() => setHoveredBlockId(variant === 'terminal' ? id : null)}
@@ -147,7 +150,7 @@ function MinimapTerminalPreview({
         width={width}
         height={height}
         rx={borderRadius}
-        fill="#ffffff"
+        fill="var(--cc-surface)"
         stroke={strokeColor}
         strokeWidth={strokeWidth}
       />
@@ -174,7 +177,7 @@ function MinimapTerminalPreview({
         width={Math.max(4, width - inset * 2)}
         height={screenHeight}
         rx={Math.max(2, borderRadius * 0.45)}
-        fill="#141a24"
+        fill="#1b2430"
       />
     </>
   )
@@ -211,8 +214,8 @@ function MinimapGroupPreview({
         width={width + ringInset * 2}
         height={height + ringInset * 2}
         rx={borderRadius + ringInset * 0.65}
-        fill="#f0fdf4"
-        stroke={selected ? '#86efac' : 'transparent'}
+        fill="var(--cc-primary-soft)"
+        stroke={selected ? 'var(--cc-primary)' : 'transparent'}
         strokeWidth={Math.max(1.3, strokeWidth + 0.2)}
         opacity={selected ? 0.72 : 0}
       />
@@ -223,7 +226,7 @@ function MinimapGroupPreview({
         width={width}
         height={height}
         rx={borderRadius}
-        fill="#f8fafc"
+        fill="var(--cc-chrome-raised)"
         stroke={strokeColor}
         strokeWidth={strokeWidth}
       />
@@ -234,8 +237,8 @@ function MinimapGroupPreview({
         width={contentWidth}
         height={headerInnerHeight}
         rx={Math.max(2, borderRadius * 0.55)}
-        fill="#ffffff"
-        stroke="#dbe3ef"
+        fill="var(--cc-surface)"
+        stroke="var(--cc-border)"
         strokeWidth={1}
       />
       <circle
@@ -299,8 +302,8 @@ function MinimapGroupMemberRow({
         width={width}
         height={height}
         rx={radius}
-        fill="#ffffff"
-        stroke="#dbe3ef"
+        fill="var(--cc-surface)"
+        stroke="var(--cc-border)"
         strokeWidth={1}
       />
       <circle

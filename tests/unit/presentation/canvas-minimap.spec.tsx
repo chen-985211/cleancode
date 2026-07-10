@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
@@ -55,9 +55,145 @@ describe('canvas minimap', () => {
     expect(onZoomIn).toHaveBeenCalledTimes(1)
     expect(onZoomOut).toHaveBeenCalledTimes(1)
     expect(onFitCanvas).toHaveBeenCalledTimes(1)
-    expect(minimapNodeInteraction.focusBlock).toHaveBeenCalledWith('terminal-1')
     expect(onMinimapNodeClick).toHaveBeenCalledWith('terminal-1')
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the minimap framing stable when canvas selection changes', () => {
+    const firstNode = createTerminalFlowNode({ selected: false })
+    const secondNode = createTerminalFlowNode({
+      id: 'terminal-2',
+      name: 'Terminal 2',
+      position: { x: 1480, y: 760 },
+      selected: true
+    })
+    const props = createCanvasMinimapProps()
+    const { rerender } = render(<CanvasMinimap {...props} nodes={[firstNode, secondNode]} />)
+    const minimap = screen.getByRole('img', { name: '积木导航小地图' })
+    const selectedViewBox = minimap.getAttribute('viewBox')
+
+    rerender(
+      <CanvasMinimap
+        {...props}
+        nodes={[
+          firstNode,
+          createTerminalFlowNode({
+            id: 'terminal-2',
+            name: 'Terminal 2',
+            position: { x: 1480, y: 760 },
+            selected: false
+          })
+        ]}
+      />
+    )
+
+    expect(minimap).toHaveAttribute('viewBox', selectedViewBox)
+  })
+
+  it('updates the minimap framing when node geometry changes', () => {
+    const firstNode = createTerminalFlowNode({ selected: false })
+    const props = createCanvasMinimapProps()
+    const { rerender } = render(
+      <CanvasMinimap
+        {...props}
+        nodes={[
+          firstNode,
+          createTerminalFlowNode({
+            id: 'terminal-2',
+            name: 'Terminal 2',
+            position: { x: 860, y: 420 },
+            selected: false
+          })
+        ]}
+      />
+    )
+    const minimap = screen.getByRole('img', { name: '积木导航小地图' })
+    const originalViewBox = minimap.getAttribute('viewBox')
+
+    rerender(
+      <CanvasMinimap
+        {...props}
+        nodes={[
+          firstNode,
+          createTerminalFlowNode({
+            id: 'terminal-2',
+            name: 'Terminal 2',
+            position: { x: 1480, y: 760 },
+            selected: false
+          })
+        ]}
+      />
+    )
+
+    expect(minimap.getAttribute('viewBox')).not.toBe(originalViewBox)
+  })
+
+  it('matches the minimap framing to the rendered map aspect ratio', () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} />)
+
+    const viewBox = screen
+      .getByRole('img', { name: '积木导航小地图' })
+      .getAttribute('viewBox')
+      ?.split(' ')
+      .map(Number)
+
+    expect(viewBox).toHaveLength(4)
+    expect(viewBox![2]! / viewBox![3]!).toBeCloseTo(220 / 156, 6)
+  })
+
+  it('focuses a minimap node once for each pointer or keyboard activation', () => {
+    const focusNode = vi.fn()
+
+    render(<CanvasMinimap {...createCanvasMinimapProps()} onMinimapNodeClick={focusNode} />)
+
+    const node = screen.getByRole('button', { name: '聚焦终端 Terminal 1' })
+
+    fireEvent.mouseDown(node, { button: 0 })
+    fireEvent.click(node, { button: 0 })
+
+    expect(focusNode).toHaveBeenCalledTimes(1)
+
+    focusNode.mockClear()
+    fireEvent.keyDown(node, { key: 'Enter' })
+
+    expect(focusNode).toHaveBeenCalledTimes(1)
+
+    focusNode.mockClear()
+    fireEvent.keyDown(node, { key: ' ' })
+
+    expect(focusNode).toHaveBeenCalledTimes(1)
+
+    focusNode.mockClear()
+    fireEvent.keyDown(node, { key: ' ', repeat: false })
+    fireEvent.keyDown(node, { key: ' ', repeat: true })
+
+    expect(focusNode).toHaveBeenCalledTimes(1)
+  })
+
+  it('exposes the side controls as an ordered minimap control group', () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />)
+
+    const controlGroup = screen.getByRole('group', { name: '小地图控制' })
+    const controls = within(controlGroup).getAllByRole('button')
+
+    expect(controls.map((control) => control.getAttribute('aria-label'))).toEqual([
+      '收起小地图',
+      '小地图放大',
+      '小地图缩小',
+      '小地图适应'
+    ])
+    expect(within(controlGroup).getByLabelText('画布缩放比例')).toHaveTextContent('70%')
+  })
+
+  it('keeps only the minimap restore control visible while collapsed', () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} isCollapsed />)
+
+    const controlGroup = screen.getByRole('group', { name: '小地图控制' })
+
+    expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
+    expect(within(controlGroup).getAllByRole('button')).toHaveLength(1)
+    expect(within(controlGroup).getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('画布缩放比例')).not.toBeInTheDocument()
   })
 
   it('keeps collapsed terminal groups visible as minimap nodes', () => {
@@ -91,7 +227,7 @@ describe('canvas minimap', () => {
     expect(container.querySelector('.canvas-minimap__group-ring')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
       'stroke',
-      '#86efac'
+      'var(--cc-primary)'
     )
     expect(container.querySelector('.canvas-minimap__group-ring')).toHaveAttribute(
       'opacity',
@@ -99,7 +235,6 @@ describe('canvas minimap', () => {
     )
     expect(container.querySelector('.canvas-minimap__group-member')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__node-screen')).not.toBeInTheDocument()
-    expect(minimapNodeInteraction.focusBlock).toHaveBeenCalledWith('development-group')
     expect(onMinimapNodeClick).toHaveBeenCalledWith('development-group')
   })
 
@@ -172,6 +307,27 @@ describe('canvas minimap', () => {
   })
 })
 
+function createCanvasMinimapProps() {
+  return {
+    isCollapsed: false,
+    nodes: [createTerminalFlowNode()],
+    canvasViewport: { x: 0, y: 0, zoom: 1 },
+    canvasSize: { width: 960, height: 640 },
+    viewportZoom: 1,
+    minimapNodeInteraction: createMinimapNodeInteraction(),
+    onToggleCollapsed: vi.fn(),
+    onZoomOut: vi.fn(),
+    onZoomIn: vi.fn(),
+    onFitCanvas: vi.fn(),
+    onMinimapNodeClick: vi.fn(),
+    onViewportCenterPreview: vi.fn(),
+    onViewportCenterCommit: vi.fn(),
+    getMiniMapNodeColor: () => '#22c55e',
+    getMiniMapNodeStrokeColor: () => '#d3dbe8',
+    getMiniMapNodeClassName: () => 'canvas-minimap__node'
+  } satisfies Parameters<typeof CanvasMinimap>[0]
+}
+
 function createMinimapNodeInteraction(): MinimapNodeInteractionContextValue {
   return {
     getLabel: (blockId) =>
@@ -180,29 +336,40 @@ function createMinimapNodeInteraction(): MinimapNodeInteractionContextValue {
         : blockId === 'development-group'
           ? '启动项目'
           : blockId,
-    focusBlock: vi.fn(),
     setHoveredBlockId: vi.fn()
   }
 }
 
-function createTerminalFlowNode(): TerminalFlowNode {
+function createTerminalFlowNode(
+  input: {
+    readonly id?: string
+    readonly name?: string
+    readonly position?: { readonly x: number; readonly y: number }
+    readonly selected?: boolean
+  } = {}
+): TerminalFlowNode {
+  const id = input.id ?? 'terminal-1'
+  const name = input.name ?? 'Terminal 1'
+  const position = input.position ?? { x: 160, y: 220 }
+  const selected = input.selected ?? true
+
   return {
-    id: 'terminal-1',
+    id,
     type: 'terminal',
-    position: { x: 160, y: 220 },
-    selected: true,
+    position,
+    selected,
     data: {
       block: {
-        id: 'terminal-1',
+        id,
         type: 'terminal',
-        name: 'Terminal 1',
+        name,
         description: '本地终端',
         launchCommand: '',
-        position: { x: 160, y: 220 },
+        position,
         size: { width: 420, height: 306 }
       },
       session: createIdleTerminalState(),
-      isSelected: true,
+      isSelected: selected,
       isTerminalGroupSelectionMode: false,
       canSelectForTerminalGroup: true,
       isNavigationHighlighted: false,

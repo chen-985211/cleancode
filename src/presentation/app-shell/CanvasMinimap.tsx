@@ -1,4 +1,4 @@
-import { Map as MapIcon, Maximize2, Minimize2, Minus, ZoomIn } from 'lucide-react'
+import { ChevronLeft, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
 import { useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -53,10 +53,12 @@ interface MinimapViewBox {
   readonly height: number
 }
 
-const minimapMapWidth = 260
-const minimapMapHeight = 152
+const minimapMapWidth = 220
+const minimapMapHeight = 156
 const minimapMapAspect = minimapMapWidth / minimapMapHeight
 const minimapNodePadding = 132
+const minimapMinimumWidth = 720
+const minimapMinimumHeight = 440
 
 export function CanvasMinimap({
   isCollapsed,
@@ -189,30 +191,36 @@ export function CanvasMinimap({
           </div>
         </div>
       ) : null}
-      <div className="canvas-minimap__controls" aria-label="小地图控制">
-        <MinimapControlButton
-          label={isCollapsed ? '展开小地图' : '收起小地图'}
-          title={isCollapsed ? '展开小地图' : '收起小地图'}
-          onClick={onToggleCollapsed}
-        >
-          {isCollapsed ? (
-            <Maximize2 size={13} aria-hidden="true" />
-          ) : (
-            <Minimize2 size={13} aria-hidden="true" />
-          )}
-        </MinimapControlButton>
+      <div className="canvas-minimap__controls" role="group" aria-label="小地图控制">
+        <div className="canvas-minimap__control-group canvas-minimap__control-group--top">
+          <MinimapControlButton
+            label={isCollapsed ? '展开小地图' : '收起小地图'}
+            title={isCollapsed ? '展开小地图' : '收起小地图'}
+            onClick={onToggleCollapsed}
+          >
+            {isCollapsed ? (
+              <MapIcon size={14} aria-hidden="true" />
+            ) : (
+              <ChevronLeft size={14} aria-hidden="true" />
+            )}
+          </MinimapControlButton>
+        </div>
         {!isCollapsed ? (
           <>
-            <MinimapControlButton label="小地图放大" title="放大画布" onClick={onZoomIn}>
-              <ZoomIn size={13} aria-hidden="true" />
-            </MinimapControlButton>
-            <span>{Math.round(viewportZoom * 100)}%</span>
-            <MinimapControlButton label="小地图缩小" title="缩小画布" onClick={onZoomOut}>
-              <Minus size={13} aria-hidden="true" />
-            </MinimapControlButton>
-            <MinimapControlButton label="小地图适应" title="适应画布" onClick={onFitCanvas}>
-              <MapIcon size={13} aria-hidden="true" />
-            </MinimapControlButton>
+            <div className="canvas-minimap__control-group canvas-minimap__control-group--zoom">
+              <MinimapControlButton label="小地图放大" title="放大画布" onClick={onZoomIn}>
+                <Plus size={14} aria-hidden="true" />
+              </MinimapControlButton>
+              <output aria-label="画布缩放比例">{Math.round(viewportZoom * 100)}%</output>
+              <MinimapControlButton label="小地图缩小" title="缩小画布" onClick={onZoomOut}>
+                <Minus size={14} aria-hidden="true" />
+              </MinimapControlButton>
+            </div>
+            <div className="canvas-minimap__control-group canvas-minimap__control-group--bottom">
+              <MinimapControlButton label="小地图适应" title="适应画布" onClick={onFitCanvas}>
+                <Scan size={14} aria-hidden="true" />
+              </MinimapControlButton>
+            </div>
           </>
         ) : null}
       </div>
@@ -246,46 +254,48 @@ function resolveMinimapViewBox(frames: MinimapFrame[]): MinimapViewBox {
     return centeredViewBox({ x: 0, y: 0 }, 960, 960 / minimapMapAspect)
   }
 
-  const focusedFrame = frames.find((frame) => frame.node.selected) ?? frames[0]!
-  const center = {
-    x: focusedFrame.x + focusedFrame.width / 2,
-    y: focusedFrame.y + focusedFrame.height / 2
-  }
+  const firstFrame = frames[0]!
   const graphBounds = frames.reduce(
     (bounds, frame) => ({
       minX: Math.min(bounds.minX, frame.x),
       minY: Math.min(bounds.minY, frame.y),
       maxX: Math.max(bounds.maxX, frame.x + frame.width),
-      maxY: Math.max(bounds.maxY, frame.y + frame.height)
+      maxY: Math.max(bounds.maxY, frame.y + frame.height),
+      maximumNodeWidth: Math.max(bounds.maximumNodeWidth, frame.width),
+      maximumNodeHeight: Math.max(bounds.maximumNodeHeight, frame.height)
     }),
     {
-      minX: focusedFrame.x,
-      minY: focusedFrame.y,
-      maxX: focusedFrame.x + focusedFrame.width,
-      maxY: focusedFrame.y + focusedFrame.height
+      minX: firstFrame.x,
+      minY: firstFrame.y,
+      maxX: firstFrame.x + firstFrame.width,
+      maxY: firstFrame.y + firstFrame.height,
+      maximumNodeWidth: firstFrame.width,
+      maximumNodeHeight: firstFrame.height
     }
   )
-
-  let halfWidth = Math.max(
-    focusedFrame.width * 1.12,
-    center.x - graphBounds.minX + minimapNodePadding,
-    graphBounds.maxX - center.x + minimapNodePadding,
-    360
-  )
-  let halfHeight = Math.max(
-    focusedFrame.height * 1.12,
-    center.y - graphBounds.minY + minimapNodePadding,
-    graphBounds.maxY - center.y + minimapNodePadding,
-    220
-  )
-
-  if (halfWidth / halfHeight > minimapMapAspect) {
-    halfHeight = halfWidth / minimapMapAspect
-  } else {
-    halfWidth = halfHeight * minimapMapAspect
+  const center = {
+    x: (graphBounds.minX + graphBounds.maxX) / 2,
+    y: (graphBounds.minY + graphBounds.maxY) / 2
   }
 
-  return centeredViewBox(center, halfWidth * 2, halfHeight * 2)
+  let width = Math.max(
+    graphBounds.maxX - graphBounds.minX + minimapNodePadding * 2,
+    graphBounds.maximumNodeWidth * 2.24,
+    minimapMinimumWidth
+  )
+  let height = Math.max(
+    graphBounds.maxY - graphBounds.minY + minimapNodePadding * 2,
+    graphBounds.maximumNodeHeight * 2.24,
+    minimapMinimumHeight
+  )
+
+  if (width / height > minimapMapAspect) {
+    height = width / minimapMapAspect
+  } else {
+    width = height * minimapMapAspect
+  }
+
+  return centeredViewBox(center, width, height)
 }
 
 function centeredViewBox(

@@ -155,13 +155,14 @@
   display: inline-flex;
   overflow: visible;
   align-items: stretch;
-  gap: 0;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
-  background: rgb(255 255 255 / 0.9);
-  padding: 5px;
-  box-shadow: 0 4px 16px rgb(20 27 45 / 0.08);
-  backdrop-filter: blur(10px);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 0.94);
+  padding: 4px;
+  box-shadow:
+    0 1px 2px rgb(20 27 45 / 0.06),
+    0 6px 20px rgb(20 27 45 / 0.08);
+  backdrop-filter: blur(12px);
 }
 
 .canvas-minimap__panel {
@@ -170,17 +171,18 @@
 }
 
 .canvas-minimap--collapsed {
+  border-radius: 9px;
   padding: 3px;
 }
 
 .canvas-minimap__map-frame {
-  width: 240px;
-  height: 140px;
+  width: 220px;
+  height: 156px;
   overflow: hidden;
   box-sizing: border-box;
   border-radius: 7px;
-  background: var(--cc-canvas);
-  box-shadow: 0 0 0 1px rgb(201 207 217 / 0.82) inset;
+  background: #f5f7fa;
+  box-shadow: 0 0 0 1px rgb(201 207 217 / 0.68) inset;
 }
 
 .canvas-minimap__map {
@@ -202,9 +204,9 @@
 }
 
 .canvas-minimap__viewport-frame {
-  fill: rgb(47 103 216 / 0.045);
-  stroke: rgb(47 103 216 / 0.46);
-  stroke-width: 1.25;
+  fill: rgb(47 103 216 / 0.055);
+  stroke: rgb(47 103 216 / 0.55);
+  stroke-width: 1.35;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -256,13 +258,13 @@
 }
 
 .canvas-minimap__node-screen {
-  opacity: 0.95;
+  opacity: 0.88;
 }
 
 .canvas-minimap__node:hover .canvas-minimap__node-shell,
 .canvas-minimap__node--highlighted .canvas-minimap__node-shell,
 .canvas-minimap__node:focus-visible .canvas-minimap__node-shell {
-  stroke: #86efac;
+  stroke: var(--cc-primary);
   stroke-width: 1.5;
 }
 
@@ -273,7 +275,7 @@
 }
 
 .canvas-minimap__node--selected .canvas-minimap__node-shell {
-  stroke: #34d399;
+  stroke: var(--cc-primary);
   stroke-width: 1.85;
 }
 
@@ -281,39 +283,68 @@
 .canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring,
 .canvas-minimap__node--terminal-group.canvas-minimap__node--selected .canvas-minimap__group-ring {
   opacity: 0.72;
-  stroke: #86efac;
+  stroke: var(--cc-primary);
 }
 
 .canvas-minimap__controls {
   display: flex;
-  align-self: center;
+  width: 34px;
+  min-height: 156px;
+  box-sizing: border-box;
+  flex: 0 0 34px;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  margin-left: 5px;
+  justify-content: space-between;
+  margin-left: 4px;
   border-left: 1px solid var(--cc-border);
-  padding-left: 5px;
+  border-radius: 0 7px 7px 0;
+  background: rgb(243 245 248 / 0.78);
+  padding: 2px 0 2px 4px;
   color: var(--cc-muted);
-  font-size: 11px;
   font-weight: 600;
 }
 
 .canvas-minimap--collapsed .canvas-minimap__controls {
+  width: auto;
+  min-height: 0;
+  flex-basis: auto;
   margin-left: 0;
   border-left: 0;
-  padding-left: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.canvas-minimap__control-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .canvas-minimap__controls .icon-button--small {
-  width: 25px;
-  height: 25px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--cc-muted-strong);
 }
 
-.canvas-minimap__controls span {
-  min-width: 25px;
+.canvas-minimap__controls .icon-button--small:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.92);
+  color: var(--cc-primary);
+  box-shadow: 0 1px 2px rgb(20 27 45 / 0.08);
+}
+
+.canvas-minimap__controls output {
+  display: inline-flex;
+  width: 28px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.7);
   color: var(--cc-muted-strong);
-  font-size: 10px;
+  font-size: 9px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
@@ -373,6 +404,6 @@
 
 @media (max-width: 1080px) {
   .app-shell__toolbar {
-    top: 172px;
+    top: 188px;
   }
 }

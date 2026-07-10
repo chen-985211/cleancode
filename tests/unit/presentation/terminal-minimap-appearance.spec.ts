@@ -2,6 +2,7 @@ import {
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeStrokeColor
 } from '../../../src/presentation/app-shell/terminalMinimapAppearance'
+import { getTerminalStatusColor } from '../../../src/presentation/app-shell/minimapInteraction'
 import {
   createIdleTerminalState,
   type TerminalFlowNode
@@ -20,7 +21,7 @@ describe('terminal minimap appearance', () => {
         selectedTerminalBlockId: null,
         hoveredTerminalBlockId: null
       })
-    ).toBe('#dbe3ef')
+    ).toBe('var(--cc-border-strong)')
     expect(
       getTerminalMiniMapNodeClassName({
         node,
@@ -43,7 +44,7 @@ describe('terminal minimap appearance', () => {
         selectedTerminalBlockId: null,
         hoveredTerminalBlockId: null
       })
-    ).toBe('#34d399')
+    ).toBe('var(--cc-primary)')
     expect(
       getTerminalMiniMapNodeStrokeColor({
         node,
@@ -51,7 +52,12 @@ describe('terminal minimap appearance', () => {
         selectedTerminalBlockId: null,
         hoveredTerminalBlockId: 'terminal-1'
       })
-    ).toBe('#86efac')
+    ).toBe('var(--cc-primary)')
+  })
+
+  it('reserves semantic colors for terminal run states', () => {
+    expect(getTerminalStatusColor('running')).toBe('var(--cc-success)')
+    expect(getTerminalStatusColor('failed')).toBe('var(--cc-danger)')
   })
 })
 

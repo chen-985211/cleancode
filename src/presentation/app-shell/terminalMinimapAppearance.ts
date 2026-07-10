@@ -22,14 +22,14 @@ export function getTerminalMiniMapNodeStrokeColor({
   hoveredTerminalBlockId
 }: TerminalMinimapAppearanceInput): string {
   if (node.selected || selectedTerminalBlockId === node.id) {
-    return '#34d399'
+    return 'var(--cc-primary)'
   }
 
   if (node.type === 'terminal' && hoveredTerminalBlockId === node.id) {
-    return '#86efac'
+    return 'var(--cc-primary)'
   }
 
-  return '#dbe3ef'
+  return 'var(--cc-border-strong)'
 }
 
 export function getTerminalMiniMapNodeClassName({

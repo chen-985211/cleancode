@@ -4,22 +4,20 @@ import type { TerminalSessionStatus } from '../../contexts/run/application/dto/T
 
 export interface MinimapNodeInteractionContextValue {
   readonly getLabel: (blockId: string) => string
-  readonly focusBlock: (blockId: string) => void
   readonly setHoveredBlockId: (blockId: string | null) => void
 }
 
 export const MinimapNodeInteractionContext = createContext<MinimapNodeInteractionContextValue>({
   getLabel: (blockId) => blockId,
-  focusBlock: () => undefined,
   setHoveredBlockId: () => undefined
 })
 
 export function getTerminalStatusColor(status: TerminalSessionStatus): string {
   switch (status) {
     case 'running':
-      return '#22c55e'
+      return 'var(--cc-success)'
     case 'failed':
-      return '#ef4444'
+      return 'var(--cc-danger)'
     case 'exited':
       return '#94a3b8'
     case 'idle':
