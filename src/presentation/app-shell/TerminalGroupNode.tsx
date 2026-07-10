@@ -1,22 +1,20 @@
 import type { NodeProps } from '@xyflow/react'
-import {
-  Check,
-  Edit3,
-  Maximize2,
-  Minimize2,
-  Minus,
-  MoreHorizontal,
-  Play,
-  Plus,
-  Square,
-  Terminal,
-  Trash2,
-  Unlink,
-  X
-} from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import {
+  GroupAddIcon,
+  GroupCollapseIcon,
+  GroupDissolveIcon,
+  GroupEditIcon,
+  GroupExpandIcon,
+  GroupMemberUnlinkIcon,
+  GroupRemoveIcon,
+  GroupRestartIcon,
+  GroupStartIcon,
+  GroupStopIcon
+} from './TerminalGroupIcons'
 import type { TerminalGroupFlowNode, TerminalViewState } from './types'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
@@ -24,10 +22,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 }: NodeProps<TerminalGroupFlowNode>) {
   const group = data.group
   const [isEditingName, setIsEditingName] = useState(false)
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const [draftName, setDraftName] = useState(group.name)
   const trimmedDraftName = draftName.trim()
-  const status = getTerminalGroupStatus(data.memberBlocks, data.memberStates)
+  const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
@@ -46,11 +43,20 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       }
 
       await data.onUpdateGroupMetadata(group, { name: trimmedDraftName })
-      setIsMoreMenuOpen(false)
       setIsEditingName(false)
     },
     [data, group, trimmedDraftName]
   )
+
+  const startEditingName = useCallback(() => {
+    setDraftName(group.name)
+    setIsEditingName(true)
+  }, [group.name])
+
+  const cancelEditingName = useCallback(() => {
+    setDraftName(group.name)
+    setIsEditingName(false)
+  }, [group.name])
 
   return (
     <section className={className} data-terminal-group-id={group.id}>
@@ -64,41 +70,23 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       >
         <div className="terminal-group-node__title">
           {isEditingName ? (
-            <form className="terminal-group-name-form nodrag" onSubmit={saveName}>
+            <form
+              id={nameFormId}
+              className="terminal-group-name-form nodrag"
+              onSubmit={saveName}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
               <input
                 aria-label="组合名称"
                 value={draftName}
                 onChange={(event) => setDraftName(event.target.value)}
               />
-              <button
-                className="terminal-group-node__action"
-                type="submit"
-                aria-label="保存组合名称"
-                title="保存组合名称"
-                data-cc-tooltip="保存组合名称"
-                disabled={!trimmedDraftName}
-              >
-                <Check size={15} aria-hidden="true" />
-              </button>
-              <button
-                className="terminal-group-node__action"
-                type="button"
-                aria-label="取消编辑组合名称"
-                title="取消"
-                data-cc-tooltip="取消"
-                onClick={() => {
-                  setDraftName(group.name)
-                  setIsMoreMenuOpen(false)
-                  setIsEditingName(false)
-                }}
-              >
-                <X size={15} aria-hidden="true" />
-              </button>
             </form>
           ) : (
             <>
-              <strong>{group.name}</strong>
-              <span>{status.label}</span>
+              <strong className="terminal-group-node__name" title={group.name}>
+                {group.name}
+              </strong>
               {data.dropFeedback ? (
                 <span className="terminal-group-node__drop-hint">
                   {getDropFeedbackLabel(data.dropFeedback)}
@@ -107,101 +95,40 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             </>
           )}
         </div>
-        {isEditingName ? null : (
-          <div
-            className="terminal-group-node__actions nodrag"
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <IconButton
-              label={`${group.name} 启动组合命令`}
-              title="启动组合命令"
-              onClick={() => data.onStartGroup(group)}
-            >
-              <Play size={15} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              label={`${group.name} 停止全部当前命令`}
-              title="停止全部当前命令"
-              onClick={() => data.onStopGroup(group)}
-            >
-              <Square size={14} aria-hidden="true" />
-            </IconButton>
-            <span className="terminal-group-node__more-action">
-              <IconButton
-                label={`${group.name} 更多组合操作`}
-                title="更多组合操作"
-                isExpanded={isMoreMenuOpen}
-                onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
-              >
-                <MoreHorizontal size={15} aria-hidden="true" />
-              </IconButton>
-              {isMoreMenuOpen ? (
-                <div className="terminal-group-node__action-menu">
-                  <button
-                    className="terminal-group-node__menu-action"
-                    type="button"
-                    aria-label={`${group.name} 重开组合终端会话`}
-                    title="重开组合终端会话，不执行启动命令"
-                    data-cc-tooltip="重开组合终端会话，不执行启动命令"
-                    onClick={() => {
-                      setIsMoreMenuOpen(false)
-                      data.onRestartGroup(group)
-                    }}
-                  >
-                    <Terminal size={14} aria-hidden="true" />
-                    <span>重开组合终端会话</span>
-                  </button>
-                </div>
-              ) : null}
-            </span>
-            <IconButton
-              label={`${group.name} 编辑组合名称`}
-              title="编辑组合名称"
-              onClick={() => setIsEditingName(true)}
-            >
-              <Edit3 size={15} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              label={`${group.name} ${group.isCollapsed ? '展开组合' : '折叠组合'}`}
-              title={group.isCollapsed ? '展开组合' : '折叠组合'}
-              onClick={() => void data.onToggleGroupCollapsed(group, !group.isCollapsed)}
-            >
-              {group.isCollapsed ? (
-                <Maximize2 size={15} aria-hidden="true" />
-              ) : (
-                <Minimize2 size={15} aria-hidden="true" />
-              )}
-            </IconButton>
-            <IconButton
-              label={`${group.name} 添加选中终端`}
-              title="添加选中终端"
-              disabled={data.selectedUngroupedTerminalBlockIds.length === 0}
-              onClick={() => void data.onAddSelectedTerminalsToGroup(group)}
-            >
-              <Plus size={15} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              label={`${group.name} 移出选中终端`}
-              title="移出选中终端"
-              disabled={data.selectedMemberBlockIds.length === 0}
-              onClick={() => void data.onRemoveSelectedTerminalsFromGroup(group)}
-            >
-              <Minus size={15} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              label={`${group.name} 解散组合`}
-              title="解散组合"
-              onClick={() => void data.onDissolveGroup(group)}
-            >
-              <Trash2 size={15} aria-hidden="true" />
-            </IconButton>
-          </div>
+
+        {isEditingName ? (
+          group.isCollapsed ? null : (
+            <EditActions
+              formId={nameFormId}
+              canSave={Boolean(trimmedDraftName)}
+              onCancel={cancelEditingName}
+            />
+          )
+        ) : group.isCollapsed ? (
+          <DisclosureButton data={data} />
+        ) : (
+          <GroupActionToolbar data={data} onEdit={startEditingName} isInline />
         )}
       </div>
+
+      {group.isCollapsed ? (
+        isEditingName ? (
+          <div className="terminal-group-node__toolbar terminal-group-node__toolbar--editing">
+            <EditActions
+              formId={nameFormId}
+              canSave={Boolean(trimmedDraftName)}
+              onCancel={cancelEditingName}
+            />
+          </div>
+        ) : (
+          <GroupActionToolbar data={data} onEdit={startEditingName} />
+        )
+      ) : null}
+
       {group.isCollapsed ? (
         <div className="terminal-group-node__members">
           {data.memberBlocks.map((block) => (
-            <MemberPill
+            <MemberRow
               key={block.id}
               block={block}
               state={data.memberStates[block.id]}
@@ -214,13 +141,254 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   )
 })
 
+interface GroupActionToolbarProps {
+  readonly data: TerminalGroupFlowNode['data']
+  readonly isInline?: boolean
+  readonly onEdit: () => void
+}
+
+function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolbarProps) {
+  const group = data.group
+
+  return (
+    <div
+      className={[
+        'terminal-group-node__toolbar',
+        'nodrag',
+        isInline ? 'terminal-group-node__toolbar--inline' : ''
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div
+        className="terminal-group-node__action-group terminal-group-node__action-group--runtime"
+        data-control-group="runtime"
+      >
+        <IconButton
+          label={`${group.name} 启动组合命令`}
+          title="启动组合命令"
+          tone="primary"
+          surface="raised"
+          onClick={() => data.onStartGroup(group)}
+        >
+          <GroupStartIcon />
+        </IconButton>
+        <IconButton
+          label={`${group.name} 停止全部当前命令`}
+          title="停止全部当前命令"
+          surface="raised"
+          onClick={() => data.onStopGroup(group)}
+        >
+          <GroupStopIcon />
+        </IconButton>
+        <IconButton
+          label={`${group.name} 重开组合终端会话`}
+          title="重开组合终端会话，不执行启动命令"
+          surface="raised"
+          onClick={() => data.onRestartGroup(group)}
+        >
+          <GroupRestartIcon />
+        </IconButton>
+      </div>
+
+      <span
+        className="terminal-group-node__toolbar-divider terminal-group-node__toolbar-divider--runtime"
+        aria-hidden="true"
+      />
+
+      <div
+        className="terminal-group-node__action-group terminal-group-node__action-group--structure"
+        data-control-group="structure"
+      >
+        <IconButton
+          label={`${group.name} 编辑组合名称`}
+          title="编辑组合名称"
+          surface="raised"
+          onClick={onEdit}
+        >
+          <GroupEditIcon />
+        </IconButton>
+        {isInline ? <DisclosureButton data={data} /> : null}
+        <div className="terminal-group-node__membership-actions" data-control-group="membership">
+          <IconButton
+            label={`${group.name} 添加选中终端`}
+            title="添加选中终端"
+            disabled={data.selectedUngroupedTerminalBlockIds.length === 0}
+            onClick={() => void data.onAddSelectedTerminalsToGroup(group)}
+          >
+            <GroupAddIcon />
+          </IconButton>
+          <IconButton
+            label={`${group.name} 移出选中终端`}
+            title="移出选中终端"
+            disabled={data.selectedMemberBlockIds.length === 0}
+            onClick={() => void data.onRemoveSelectedTerminalsFromGroup(group)}
+          >
+            <GroupRemoveIcon />
+          </IconButton>
+        </div>
+      </div>
+
+      <span
+        className="terminal-group-node__toolbar-divider terminal-group-node__toolbar-divider--structure"
+        aria-hidden="true"
+      />
+
+      <div
+        className="terminal-group-node__action-group terminal-group-node__action-group--danger"
+        data-control-group="danger"
+      >
+        <IconButton
+          label={`${group.name} 解散组合`}
+          title="解散组合，保留成员终端"
+          tone="danger"
+          surface="raised"
+          onClick={() => void data.onDissolveGroup(group)}
+        >
+          <GroupDissolveIcon />
+        </IconButton>
+      </div>
+    </div>
+  )
+}
+
+interface DisclosureButtonProps {
+  readonly data: TerminalGroupFlowNode['data']
+}
+
+function DisclosureButton({ data }: DisclosureButtonProps) {
+  const group = data.group
+  const action = group.isCollapsed ? '展开' : '折叠'
+
+  return (
+    <button
+      className="terminal-group-node__disclosure nodrag"
+      type="button"
+      aria-label={`${group.name} ${action}组合`}
+      aria-expanded={!group.isCollapsed}
+      title={`${action}组合`}
+      data-cc-tooltip={`${action}组合`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={() => void data.onToggleGroupCollapsed(group, !group.isCollapsed)}
+    >
+      {group.isCollapsed ? <GroupExpandIcon /> : <GroupCollapseIcon />}
+      <span>{action}</span>
+    </button>
+  )
+}
+
+interface EditActionsProps {
+  readonly canSave: boolean
+  readonly formId: string
+  readonly onCancel: () => void
+}
+
+function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
+  return (
+    <div
+      className="terminal-group-node__edit-actions nodrag"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <button
+        className="terminal-group-node__action terminal-group-node__action--primary"
+        type="submit"
+        form={formId}
+        aria-label="保存组合名称"
+        title="保存组合名称"
+        data-cc-tooltip="保存组合名称"
+        disabled={!canSave}
+      >
+        <Check size={15} aria-hidden="true" />
+      </button>
+      <button
+        className="terminal-group-node__action"
+        type="button"
+        aria-label="取消编辑组合名称"
+        title="取消"
+        data-cc-tooltip="取消"
+        onClick={onCancel}
+      >
+        <X size={15} aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
 interface IconButtonProps {
   readonly label: string
   readonly title: string
+  readonly tone?: 'primary' | 'danger'
+  readonly surface?: 'raised'
   readonly disabled?: boolean
-  readonly isExpanded?: boolean
   readonly onClick: () => void
   readonly children: ReactNode
+}
+
+function IconButton({
+  label,
+  title,
+  tone,
+  surface,
+  disabled = false,
+  onClick,
+  children
+}: IconButtonProps) {
+  return (
+    <button
+      className={['terminal-group-node__action', tone ? `terminal-group-node__action--${tone}` : '']
+        .filter(Boolean)
+        .join(' ')}
+      type="button"
+      aria-label={label}
+      data-control-surface={surface}
+      title={title}
+      data-cc-tooltip={title}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+interface MemberRowProps {
+  readonly block: TerminalBlockSnapshot
+  readonly state: TerminalViewState | undefined
+  readonly onRemove: () => void
+}
+
+function MemberRow({ block, state, onRemove }: MemberRowProps) {
+  const status = state?.status ?? 'idle'
+
+  return (
+    <div className={`terminal-group-node__member terminal-group-node__member--${status}`}>
+      <span className="terminal-group-node__member-status" aria-hidden="true" />
+      <span className="terminal-group-node__member-name" title={block.name}>
+        {block.name}
+      </span>
+      <span className="terminal-group-node__member-status-label">
+        {terminalStatusLabels[status]}
+      </span>
+      <button
+        className="terminal-group-node__member-remove nodrag"
+        type="button"
+        aria-label={`${block.name} 移出组合`}
+        data-cc-tooltip="移出组合"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onRemove}
+      >
+        <GroupMemberUnlinkIcon />
+      </button>
+    </div>
+  )
+}
+
+const terminalStatusLabels: Record<TerminalViewState['status'], string> = {
+  idle: '未启动',
+  running: '运行中',
+  exited: '已退出',
+  failed: '失败'
 }
 
 function getDropFeedbackLabel(
@@ -235,83 +403,4 @@ function getDropFeedbackLabel(
   }
 
   return '松开后解散组合'
-}
-
-function IconButton({
-  label,
-  title,
-  disabled = false,
-  isExpanded,
-  onClick,
-  children
-}: IconButtonProps) {
-  return (
-    <button
-      className="terminal-group-node__action"
-      type="button"
-      aria-label={label}
-      aria-expanded={isExpanded}
-      aria-haspopup={isExpanded === undefined ? undefined : true}
-      title={title}
-      data-cc-tooltip={title}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
-}
-
-interface MemberPillProps {
-  readonly block: TerminalBlockSnapshot
-  readonly state: TerminalViewState | undefined
-  readonly onRemove: () => void
-}
-
-function MemberPill({ block, state, onRemove }: MemberPillProps) {
-  const status = state?.status ?? 'idle'
-
-  return (
-    <span className={`terminal-group-node__member terminal-group-node__member--${status}`}>
-      <span className="terminal-group-node__member-status" aria-hidden="true" />
-      <span className="terminal-group-node__member-name">{block.name}</span>
-      <button
-        className="terminal-group-node__member-remove nodrag"
-        type="button"
-        aria-label={`${block.name} 移出组合`}
-        title="移出组合"
-        data-cc-tooltip="移出组合"
-        onClick={onRemove}
-      >
-        <Unlink size={12} aria-hidden="true" />
-      </button>
-    </span>
-  )
-}
-
-function getTerminalGroupStatus(
-  memberBlocks: readonly TerminalBlockSnapshot[],
-  memberStates: Record<string, TerminalViewState>
-): { readonly label: string } {
-  const totalCount = memberBlocks.length
-  const runningCount = memberBlocks.filter(
-    (block) => memberStates[block.id]?.status === 'running'
-  ).length
-  const failedCount = memberBlocks.filter(
-    (block) => memberStates[block.id]?.status === 'failed'
-  ).length
-
-  if (failedCount > 0) {
-    return { label: '有失败' }
-  }
-
-  if (totalCount > 0 && runningCount === totalCount) {
-    return { label: `${runningCount}/${totalCount} 运行中` }
-  }
-
-  if (runningCount > 0) {
-    return { label: '部分运行' }
-  }
-
-  return { label: '未启动' }
 }

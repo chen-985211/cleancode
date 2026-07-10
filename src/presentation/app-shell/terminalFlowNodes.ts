@@ -18,10 +18,9 @@ import {
 } from './types'
 
 const collapsedTerminalGroupWidth = 360
-const collapsedTerminalGroupHeaderHeight = 80
-const collapsedTerminalGroupMemberListVerticalPadding = 26
-const collapsedTerminalGroupMemberRowHeight = 30
-const collapsedTerminalGroupMemberRowGap = 8
+const collapsedTerminalGroupIdentityHeight = 44
+const collapsedTerminalGroupToolbarHeight = 44
+const collapsedTerminalGroupMemberRowHeight = 36
 
 interface TerminalFlowNodeHandlers {
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
@@ -266,14 +265,12 @@ function createCollapsedTerminalGroupSize(memberCount: number): {
   readonly width: number
   readonly height: number
 } {
-  const visibleMemberCount = Math.max(memberCount, 1)
-  const memberListHeight =
-    collapsedTerminalGroupMemberListVerticalPadding +
-    visibleMemberCount * collapsedTerminalGroupMemberRowHeight +
-    (visibleMemberCount - 1) * collapsedTerminalGroupMemberRowGap
+  const visibleMemberCount = Math.max(memberCount, 0)
+  const memberListHeight = visibleMemberCount * collapsedTerminalGroupMemberRowHeight
 
   return {
     width: collapsedTerminalGroupWidth,
-    height: collapsedTerminalGroupHeaderHeight + memberListHeight
+    height:
+      collapsedTerminalGroupIdentityHeight + collapsedTerminalGroupToolbarHeight + memberListHeight
   }
 }

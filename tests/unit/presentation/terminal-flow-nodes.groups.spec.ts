@@ -51,16 +51,36 @@ describe('terminal flow nodes for terminal groups', () => {
     })
 
     expect(nodes.map((node) => node.id)).toEqual(['development-group'])
-    expect(nodes[0]).toMatchObject({
-      id: 'development-group',
-      type: 'terminalGroup',
-      style: { width: 360, height: 174 }
-    })
+    expect(nodes[0]).toMatchObject({ id: 'development-group', type: 'terminalGroup' })
   })
 
-  it('grows collapsed terminal groups to keep member labels inside the node', () => {
+  it.each([
+    { memberCount: 2, expectedHeight: 160 },
+    { memberCount: 5, expectedHeight: 268 },
+    { memberCount: 10, expectedHeight: 448 }
+  ])(
+    'sizes a collapsed terminal group for $memberCount visible member summaries',
+    ({ memberCount, expectedHeight }) => {
+      const nodes = createTerminalFlowNodes({
+        graph: createGraph({ isCollapsed: true, memberCount }),
+        selectedTerminalBlockIds: [],
+        selectedTerminalGroupId: 'development-group',
+        hoveredTerminalBlockId: null,
+        terminalStates: createTerminalStates(),
+        handlers: createHandlers()
+      })
+
+      expect(nodes[0]).toMatchObject({
+        id: 'development-group',
+        type: 'terminalGroup',
+        style: { width: 360, height: expectedHeight }
+      })
+    }
+  )
+
+  it('keeps the persisted terminal group dimensions when the group is expanded', () => {
     const nodes = createTerminalFlowNodes({
-      graph: createGraph({ isCollapsed: true, includeWorker: true }),
+      graph: createGraph({ isCollapsed: false, memberCount: 10 }),
       selectedTerminalBlockIds: [],
       selectedTerminalGroupId: 'development-group',
       hoveredTerminalBlockId: null,
@@ -71,7 +91,7 @@ describe('terminal flow nodes for terminal groups', () => {
     expect(nodes[0]).toMatchObject({
       id: 'development-group',
       type: 'terminalGroup',
-      style: { width: 360, height: 212 }
+      style: { width: 984, height: 458 }
     })
   })
 
@@ -129,12 +149,33 @@ describe('terminal flow nodes for terminal groups', () => {
 
 function createGraph(input: {
   readonly isCollapsed: boolean
-  readonly includeWorker?: boolean
+  readonly memberCount?: number
 }): BlockGraphSnapshot {
-  const memberBlockIds = input.includeWorker
-    ? ['backend-terminal', 'frontend-terminal', 'worker-terminal']
-    : ['backend-terminal', 'frontend-terminal']
-  const blocks: TerminalBlockSnapshot[] = [
+  const blocks = createTerminalBlocks(input.memberCount ?? 2)
+  const memberBlockIds = blocks.map((block) => block.id)
+
+  return {
+    id: 'graph-1',
+    projectId: 'project-1',
+    workspaceName: 'main',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    blocks,
+    terminalGroups: [
+      {
+        id: 'development-group',
+        type: 'terminal-group',
+        name: '启动项目',
+        position: { x: 288, y: 164 },
+        size: { width: 984, height: 458 },
+        isCollapsed: input.isCollapsed,
+        memberBlockIds
+      }
+    ]
+  }
+}
+
+function createTerminalBlocks(memberCount: number): TerminalBlockSnapshot[] {
+  const coreBlocks: TerminalBlockSnapshot[] = [
     {
       id: 'backend-terminal',
       type: 'terminal',
@@ -152,36 +193,22 @@ function createGraph(input: {
       launchCommand: '',
       position: { x: 820, y: 240 },
       size: { width: 420, height: 306 }
-    },
-    {
-      id: 'worker-terminal',
-      type: 'terminal',
-      name: 'Worker',
-      description: 'Runs background jobs.',
-      launchCommand: '',
-      position: { x: 1320, y: 240 },
-      size: { width: 420, height: 306 }
     }
   ]
+  const additionalBlocks = Array.from(
+    { length: Math.max(memberCount - coreBlocks.length, 0) },
+    (_, index): TerminalBlockSnapshot => ({
+      id: `worker-terminal-${index + 1}`,
+      type: 'terminal',
+      name: `Worker ${index + 1}`,
+      description: 'Runs background jobs.',
+      launchCommand: '',
+      position: { x: 1320 + index * 500, y: 240 },
+      size: { width: 420, height: 306 }
+    })
+  )
 
-  return {
-    id: 'graph-1',
-    projectId: 'project-1',
-    workspaceName: 'main',
-    viewport: { x: 0, y: 0, zoom: 1 },
-    blocks: blocks.filter((block) => memberBlockIds.includes(block.id)),
-    terminalGroups: [
-      {
-        id: 'development-group',
-        type: 'terminal-group',
-        name: '启动项目',
-        position: { x: 288, y: 164 },
-        size: { width: 984, height: 458 },
-        isCollapsed: input.isCollapsed,
-        memberBlockIds
-      }
-    ]
-  }
+  return [...coreBlocks, ...additionalBlocks].slice(0, memberCount)
 }
 
 function createTerminalStates(): Record<string, TerminalViewState> {
