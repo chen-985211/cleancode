@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="warm-base" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7F3EA"/>
+      <stop offset="0.48" stop-color="#EAE6DE"/>
+      <stop offset="1" stop-color="#D9D7D4"/>
+    </linearGradient>
+    <radialGradient id="surface-light" cx="28%" cy="14%" r="92%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.72"/>
+      <stop offset="0.48" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="icon-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#4A4A45" flood-opacity="0.26"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#4A4A45" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#icon-shadow)">
+    <rect
+      x="64"
+      y="48"
+      width="896"
+      height="896"
+      rx="224"
+      fill="url(#warm-base)"
+      stroke="#FFFFFF"
+      stroke-opacity="0.76"
+      stroke-width="8"
+    />
+    <rect x="76" y="60" width="872" height="872" rx="212" fill="url(#surface-light)"/>
+    <rect
+      x="80"
+      y="64"
+      width="864"
+      height="864"
+      rx="208"
+      fill="none"
+      stroke="#C7C2BA"
+      stroke-opacity="0.42"
+      stroke-width="4"
+    />
+    <path
+      d="M740 307 A290 290 0 1 0 740 717"
+      transform="translate(512 512) scale(0.84) translate(-512 -512)"
+      fill="none"
+      stroke="#171713"
+      stroke-width="156"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

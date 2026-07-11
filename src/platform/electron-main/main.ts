@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
@@ -51,6 +52,7 @@ import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
+import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
@@ -138,7 +140,7 @@ const agentSessionService = new AgentSessionService(
 const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 
-const createMainWindow = (): void => {
+const createMainWindow = (appIconPath: string | undefined): void => {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -146,6 +148,7 @@ const createMainWindow = (): void => {
     minHeight: 640,
     title: 'cleancode',
     backgroundColor: '#f7f8fa',
+    icon: appIconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.mjs'),
       contextIsolation: true,
@@ -357,11 +360,22 @@ function getAppStateDirectoryPath(): string {
 }
 
 app.whenReady().then(() => {
-  createMainWindow()
+  const appIconPath = resolveAppIconPath({
+    fileExists: existsSync,
+    isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
+    mainDirectory: __dirname,
+    projectDirectory: process.cwd()
+  })
+
+  if (process.platform === 'darwin' && appIconPath) {
+    app.dock?.setIcon(appIconPath)
+  }
+
+  createMainWindow(appIconPath)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow()
+      createMainWindow(appIconPath)
     }
   })
 })
