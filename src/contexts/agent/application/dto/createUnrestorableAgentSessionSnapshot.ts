@@ -1,6 +1,7 @@
 import type { AgentSessionSnapshot } from './AgentSessionProtocol'
 
 export function createUnrestorableAgentSessionSnapshot(input: {
+  readonly agentId: string
   readonly gitBranch: string | null
   readonly projectDirectory: string
   readonly projectId: string
@@ -9,6 +10,7 @@ export function createUnrestorableAgentSessionSnapshot(input: {
   readonly workspaceName: string
 }): AgentSessionSnapshot {
   return {
+    agentId: input.agentId,
     codexThreadId: null,
     gitBranch: input.gitBranch,
     processId: null,

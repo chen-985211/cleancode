@@ -24,6 +24,14 @@ const cleancodeApi = {
   inspectCodexCli: () => invokeCleancode('cleancode:inspect-codex-cli'),
   attachAgentSession: (command: unknown) =>
     invokeCleancode('cleancode:attach-agent-session', command),
+  createWorkspaceAgent: (command: unknown) =>
+    invokeCleancode('cleancode:create-workspace-agent', command),
+  renameWorkspaceAgent: (command: unknown) =>
+    invokeCleancode('cleancode:rename-workspace-agent', command),
+  updateWorkspaceAgentLayout: (command: unknown) =>
+    invokeCleancode('cleancode:update-workspace-agent-layout', command),
+  removeWorkspaceAgent: (command: unknown) =>
+    invokeCleancode('cleancode:remove-workspace-agent', command),
   writeAgentSession: (command: unknown) =>
     invokeCleancode('cleancode:write-agent-session', command),
   resizeAgentSession: (command: unknown) =>

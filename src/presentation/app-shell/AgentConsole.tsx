@@ -1,5 +1,5 @@
 import type { Terminal as XTerm } from '@xterm/xterm'
-import { Bot, ShieldAlert } from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -14,23 +14,32 @@ import type {
   AgentSessionSnapshot,
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { defaultAgentXtermDimensions, installAgentXterm } from './agentTerminalXterm'
+import { AgentConsoleActions } from './AgentConsoleActions'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
 import type { WorkbenchSnapshot } from './types'
 
 interface AgentConsoleProps {
+  readonly agent?: WorkspaceAgentSnapshot
   readonly currentWorkbench?: WorkbenchSnapshot | null
   readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
+  readonly onRemove?: (agent: WorkspaceAgentSnapshot) => Promise<void>
+  readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
 }
 
 export function AgentConsole({
+  agent,
   currentWorkbench = null,
   currentWorkspace = null,
-  onGraphUpdated
+  onGraphUpdated,
+  onRemove,
+  onRename
 }: AgentConsoleProps) {
+  const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
   const [codexCliState, setCodexCliState] = useState<CodexCliPanelState>(() =>
     window.cleancode ? { status: 'checking' } : { status: 'unavailable' }
   )
@@ -38,7 +47,11 @@ export function AgentConsole({
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
   const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
-  const currentWorkspaceKey = createWorkspaceKey(currentWorkbench, currentWorkspace)
+  const currentWorkspaceKey = createWorkspaceKey(
+    currentWorkbench,
+    currentWorkspace,
+    activeAgent.agentId
+  )
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const activeSessionId = session?.sessionId
@@ -108,6 +121,7 @@ export function AgentConsole({
 
     const unsubscribeOutput =
       api.onAgentPtyOutput?.((event) => {
+        if (event.agentId && event.agentId !== activeAgent.agentId) return
         const nextOutput = appendAgentOutput(outputBySessionRef.current, event)
 
         if (event.sessionId === sessionRef.current?.sessionId) {
@@ -117,6 +131,7 @@ export function AgentConsole({
       }) ?? noop
     const unsubscribeExit =
       api.onAgentPtyExit?.((event) => {
+        if (event.agentId && event.agentId !== activeAgent.agentId) return
         if (event.sessionId === sessionRef.current?.sessionId) {
           setSession((currentSession) =>
             currentSession && currentSession.sessionId === event.sessionId
@@ -128,6 +143,7 @@ export function AgentConsole({
     const unsubscribeGraph =
       api.onAgentGraphUpdated?.((event) => {
         if (
+          (!event.agentId || event.agentId === activeAgent.agentId) &&
           currentProjectDirectory === event.projectDirectory &&
           currentWorkspaceName === event.workspaceName
         ) {
@@ -136,7 +152,9 @@ export function AgentConsole({
       }) ?? noop
     const unsubscribeApproval =
       api.onAgentToolApprovalRequested?.((approval) => {
-        setPendingApprovals((approvals) => [...approvals, approval])
+        if (!approval.agentId || approval.agentId === activeAgent.agentId) {
+          setPendingApprovals((approvals) => [...approvals, approval])
+        }
       }) ?? noop
 
     return () => {
@@ -145,7 +163,7 @@ export function AgentConsole({
       unsubscribeGraph()
       unsubscribeApproval()
     }
-  }, [currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
+  }, [activeAgent.agentId, currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
 
   useEffect(() => {
     let isCurrent = true
@@ -163,6 +181,7 @@ export function AgentConsole({
       const restartMode =
         restartRequest?.workspaceKey === currentWorkspaceKey ? restartRequest.mode : undefined
       const nextSession = await api.attachAgentSession({
+        agentId: activeAgent.agentId,
         columns: dimensionsRef.current.columns,
         gitBranch: currentWorkspace.gitBranch,
         persistenceMode:
@@ -194,7 +213,7 @@ export function AgentConsole({
     return () => {
       isCurrent = false
     }
-  }, [attachAttempt, currentWorkbench, currentWorkspace, currentWorkspaceKey])
+  }, [activeAgent.agentId, attachAttempt, currentWorkbench, currentWorkspace, currentWorkspaceKey])
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -238,11 +257,10 @@ export function AgentConsole({
 
   const activeApproval = pendingApprovals.find(
     (approval) =>
+      (!approval.agentId || approval.agentId === activeAgent.agentId) &&
       approval.projectDirectory === currentWorkbench?.project.directory &&
       approval.workspaceName === currentWorkspace?.name
   )
-  const workspaceLabel = resolveWorkspaceLabel(currentWorkbench, currentWorkspace)
-
   function restartSession(mode: 'new' | 'retry'): void {
     if (!currentWorkspaceKey) {
       return
@@ -270,15 +288,11 @@ export function AgentConsole({
     <div className="agent-console">
       <div className="agent-console__header">
         <div className="agent-console__title-row">
-          <div className="agent-console__identity">
-            <span className="agent-console__icon">
-              <Bot size={17} aria-hidden="true" />
-            </span>
-            <div className="agent-console__heading">
-              <strong>Codex CLI</strong>
-              <span title={workspaceLabel}>{workspaceLabel}</span>
-            </div>
-          </div>
+          {agent && onRename && onRemove ? (
+            <AgentConsoleActions agent={agent} onRemove={onRemove} onRename={onRename} />
+          ) : (
+            <strong className="agent-console__title">{activeAgent.name}</strong>
+          )}
         </div>
         <CodexCliStatusView
           state={codexCliState}
@@ -359,24 +373,27 @@ function appendAgentOutput(
   return nextOutput
 }
 
-function resolveWorkspaceLabel(
-  workbench: WorkbenchSnapshot | null,
-  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
-): string {
-  if (!workbench || !workspace) {
-    return '未选择工作区'
-  }
-
-  return `${workbench.project.name} / ${workspace.name} · ${workspace.gitBranch ?? '无分支'}`
-}
-
 function createWorkspaceKey(
   workbench: WorkbenchSnapshot | null,
-  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null,
+  agentId: string
 ): string | null {
   return workbench && workspace
-    ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}`
+    ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}\0${agentId}`
     : null
+}
+
+function createFallbackAgent(
+  workbench: WorkbenchSnapshot | null,
+  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+): WorkspaceAgentSnapshot {
+  return {
+    agentId: 'default-agent',
+    layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+    name: 'Agent 1',
+    projectId: workbench?.project.id ?? 'unselected-project',
+    workspaceName: workspace?.name ?? 'unselected-workspace'
+  }
 }
 
 function isTestRuntime(): boolean {

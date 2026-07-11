@@ -79,15 +79,25 @@ describe('terminal minimap appearance', () => {
 
 function createAgentConsoleNode(): AgentConsoleFlowNode {
   return {
-    id: 'agent-console',
+    id: 'agent:agent-1',
     type: 'agentConsole',
     position: { x: 540, y: 120 },
     selected: false,
     style: { width: 440, height: 520 },
     data: {
+      agent: {
+        agentId: 'agent-1',
+        layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+        name: 'Agent 1',
+        projectId: 'project-1',
+        workspaceName: 'main'
+      },
       currentWorkbench: null,
       currentWorkspace: null,
-      onGraphUpdated: vi.fn()
+      onGraphUpdated: vi.fn(),
+      onRemove: vi.fn(async () => undefined),
+      onRename: vi.fn(async () => undefined),
+      onResize: vi.fn(async () => undefined)
     }
   }
 }

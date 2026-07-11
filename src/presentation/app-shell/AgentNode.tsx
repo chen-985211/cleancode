@@ -17,8 +17,8 @@ export const AgentNode = memo(function AgentNode({
     <section
       className={className}
       role="region"
-      aria-label="Codex Agent 控制台"
-      data-agent-console-node
+      aria-label={`${data.agent.name} 控制台`}
+      data-agent-console-node={data.agent.agentId}
     >
       <NodeResizer
         isVisible={selected}
@@ -27,11 +27,17 @@ export const AgentNode = memo(function AgentNode({
         color="#94a3b8"
         handleClassName="agent-console-node__resize-handle nodrag"
         lineClassName="agent-console-node__resize-line"
+        onResizeEnd={(_event, params) => {
+          void data.onResize(data.agent, params.width, params.height)
+        }}
       />
       <AgentConsole
+        agent={data.agent}
         currentWorkbench={data.currentWorkbench}
         currentWorkspace={data.currentWorkspace}
         onGraphUpdated={data.onGraphUpdated}
+        onRemove={data.onRemove}
+        onRename={data.onRename}
       />
     </section>
   )

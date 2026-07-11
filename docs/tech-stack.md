@@ -68,11 +68,11 @@ Node.js 运行时承载基础设施适配器和应用层用例执行环境。积
 
 第一版优先支持运行期本地 CLI Agent。node-pty 只作为基础设施适配器启动交互式终端，运行期 Agent 工具协议必须进入应用层用例后才能操作积木图。
 
-Codex Agent 对话通过 Codex CLI thread UUID 恢复。cleancode 只在应用层仓储中保存项目、工作区、Git 分支到 UUID 的绑定；PTY、进程号、终端输出和运行中的 turn 不持久化。嵌入式 Codex 子进程通过进程级 `notify` 配置向仅监听本机回环地址的随机令牌通道报告 UUID，不修改用户的全局 Codex 配置。
+Codex Agent 对话通过 Codex CLI thread UUID 恢复。cleancode 在应用层仓储中保存工作区 Agent 的稳定身份、名称、画布布局，以及“项目、工作区、Git 分支、agentId”到 UUID 的绑定；PTY、进程号、终端输出和运行中的 turn 不持久化。同一工作区可同时启动多个以 sessionId 隔离的 Codex PTY 和 MCP 端点。嵌入式 Codex 子进程通过进程级 `notify` 配置向仅监听本机回环地址的随机令牌通道报告 UUID，不修改用户的全局 Codex 配置。
 
 ## 存储层
 
-当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图和 Agent 会话绑定，使用 JSONL 保存 Agent 审计记录。需要原子替换的 JSON 仓储必须采用临时文件、同步和重命名流程。所有读写必须通过应用层仓储端口完成；文件型产物保存在当前分支工作区对应的本地目录。SQLite 可在数据规模或查询需求增长后作为基础设施替代实现评估。
+当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 保存 Agent 审计记录。Agent 存储 schema 升级必须迁移旧版分支 thread 绑定。需要原子替换的 JSON 仓储必须采用临时文件、同步和重命名流程。所有读写必须通过应用层仓储端口完成；文件型产物保存在当前分支工作区对应的本地目录。SQLite 可在数据规模或查询需求增长后作为基础设施替代实现评估。
 
 ## 后续可评估技术
 

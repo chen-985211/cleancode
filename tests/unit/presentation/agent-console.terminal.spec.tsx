@@ -352,6 +352,7 @@ describe('agent console terminal', () => {
 
     await waitFor(() => expect(approvalListener).toBeTruthy())
     ;(approvalListener as unknown as (event: AgentToolApprovalRequest) => void)({
+      agentId: 'default-agent',
       approvalId: 'approval-1',
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
@@ -366,6 +367,7 @@ describe('agent console terminal', () => {
     expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-1' })
 
     ;(approvalListener as unknown as (event: AgentToolApprovalRequest) => void)({
+      agentId: 'default-agent',
       approvalId: 'approval-2',
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',

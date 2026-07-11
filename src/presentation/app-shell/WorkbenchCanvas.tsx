@@ -9,7 +9,7 @@ import {
   type ReactFlowInstance,
   type Viewport
 } from '@xyflow/react'
-import { Box, Check, Terminal, X } from 'lucide-react'
+import { Bot, Box, Check, Terminal, X } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
 
 import {
@@ -33,6 +33,7 @@ interface WorkbenchCanvasProps {
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly onCreateTerminalBlock: () => void
+  readonly onCreateWorkspaceAgent: () => void
   readonly onBeginTerminalGroupSelection: () => void
   readonly onCreateTerminalGroup: () => void
   readonly onCancelTerminalGroupSelection: () => void
@@ -68,6 +69,7 @@ export function WorkbenchCanvas({
   reactFlowInstanceRef,
   minimapNodeInteraction,
   onCreateTerminalBlock,
+  onCreateWorkspaceAgent,
   onBeginTerminalGroupSelection,
   onCreateTerminalGroup,
   onCancelTerminalGroupSelection,
@@ -186,6 +188,15 @@ export function WorkbenchCanvas({
           >
             <Terminal size={16} aria-hidden="true" />
             新建终端积木
+          </button>
+          <button
+            className="toolbar-button"
+            type="button"
+            onClick={onCreateWorkspaceAgent}
+            disabled={!isDesktopRuntime || !currentWorkbench}
+          >
+            <Bot size={16} aria-hidden="true" />
+            新建 Agent
           </button>
           {isTerminalGroupSelectionMode ? (
             <>

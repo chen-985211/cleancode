@@ -52,6 +52,15 @@ function hasPersistedLayoutChanged(
     )
   }
 
+  if (currentNode.type === 'agentConsole' && nextNode.type === 'agentConsole') {
+    return (
+      !isPositionEqual(
+        currentNode.data.agent.layout.position,
+        nextNode.data.agent.layout.position
+      ) || !isSizeEqual(currentNode.data.agent.layout.size, nextNode.data.agent.layout.size)
+    )
+  }
+
   return false
 }
 

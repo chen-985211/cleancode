@@ -85,8 +85,13 @@ describe('agent IPC contract', () => {
     const sender = createSender()
     const attachAgentSession = vi.fn<AgentIpcHandlersInput['attachAgentSession']>(
       async (command) => {
-        command.onOutput({ data: 'Codex ready\r\n', sessionId: 'agent-session-1' })
+        command.onOutput({
+          agentId: command.agentId,
+          data: 'Codex ready\r\n',
+          sessionId: 'agent-session-1'
+        })
         command.onToolApprovalRequested({
+          agentId: command.agentId,
           approvalId: 'approval-1',
           projectDirectory: command.projectDirectory,
           sessionId: 'agent-session-1',
@@ -95,6 +100,7 @@ describe('agent IPC contract', () => {
           workspaceName: command.workspaceName
         })
         command.onGraphUpdated({
+          agentId: command.agentId,
           graph: {
             blocks: [],
             id: 'graph-1',
@@ -109,6 +115,7 @@ describe('agent IPC contract', () => {
         })
 
         return {
+          agentId: command.agentId,
           codexThreadId: null,
           gitBranch: command.gitBranch ?? null,
           processId: 42,
@@ -128,6 +135,7 @@ describe('agent IPC contract', () => {
       ipcMain.invoke(
         'cleancode:attach-agent-session',
         {
+          agentId: 'agent-2',
           columns: 100,
           gitBranch: 'feature/login',
           projectDirectory: '/repo/app',
@@ -141,6 +149,7 @@ describe('agent IPC contract', () => {
     ).resolves.toEqual({
       ok: true,
       value: {
+        agentId: 'agent-2',
         codexThreadId: null,
         gitBranch: 'feature/login',
         processId: 42,
@@ -154,6 +163,7 @@ describe('agent IPC contract', () => {
     })
     expect(attachAgentSession).toHaveBeenCalledWith(
       expect.objectContaining({
+        agentId: 'agent-2',
         columns: 100,
         gitBranch: 'feature/login',
         projectDirectory: '/repo/app',
@@ -164,6 +174,7 @@ describe('agent IPC contract', () => {
       })
     )
     expect(sender.send).toHaveBeenCalledWith('cleancode:agent-pty-output', {
+      agentId: 'agent-2',
       data: 'Codex ready\r\n',
       sessionId: 'agent-session-1'
     })
@@ -174,6 +185,64 @@ describe('agent IPC contract', () => {
     expect(sender.send).toHaveBeenCalledWith(
       'cleancode:agent-graph-updated',
       expect.objectContaining({ sessionId: 'agent-session-1' })
+    )
+  })
+
+  it('creates, renames, lays out, and removes workspace Agents through dedicated channels', async () => {
+    const ipcMain = new FakeIpcMain()
+    const createWorkspaceAgent = vi.fn(async () => createWorkspaceAgentSnapshot('agent-2'))
+    const renameWorkspaceAgent = vi.fn(async () => ({
+      ...createWorkspaceAgentSnapshot('agent-2'),
+      name: 'Review Agent'
+    }))
+    const updateWorkspaceAgentLayout = vi.fn(async () => ({
+      ...createWorkspaceAgentSnapshot('agent-2'),
+      layout: { position: { x: 720, y: 240 }, size: { width: 520, height: 460 } }
+    }))
+    const removeWorkspaceAgent = vi.fn(async () => [createWorkspaceAgentSnapshot('agent-1')])
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({
+        createWorkspaceAgent,
+        ipcMain,
+        removeWorkspaceAgent,
+        renameWorkspaceAgent,
+        updateWorkspaceAgentLayout
+      })
+    )
+
+    await ipcMain.invoke('cleancode:create-workspace-agent', {
+      layout: { position: { x: 620, y: 160 }, size: { width: 440, height: 520 } },
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    await ipcMain.invoke('cleancode:rename-workspace-agent', {
+      agentId: 'agent-2',
+      name: 'Review Agent',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    await ipcMain.invoke('cleancode:update-workspace-agent-layout', {
+      agentId: 'agent-2',
+      layout: { position: { x: 720, y: 240 }, size: { width: 520, height: 460 } },
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    await ipcMain.invoke('cleancode:remove-workspace-agent', {
+      agentId: 'agent-2',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    expect(createWorkspaceAgent).toHaveBeenCalledOnce()
+    expect(renameWorkspaceAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'agent-2', name: 'Review Agent' })
+    )
+    expect(updateWorkspaceAgentLayout).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'agent-2' })
+    )
+    expect(removeWorkspaceAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'agent-2' })
     )
   })
 
@@ -244,19 +313,24 @@ describe('agent IPC contract', () => {
 function createAgentIpcHandlersInput(input: {
   readonly approveAgentTool?: AgentIpcHandlersInput['approveAgentTool']
   readonly attachAgentSession?: AgentIpcHandlersInput['attachAgentSession']
+  readonly createWorkspaceAgent?: AgentIpcHandlersInput['createWorkspaceAgent']
   readonly disposeAgentWorkspaceSession?: AgentIpcHandlersInput['disposeAgentWorkspaceSession']
   readonly disposeProjectAgentSessions?: AgentIpcHandlersInput['disposeProjectAgentSessions']
   readonly inspectCodexCli?: AgentIpcHandlersInput['inspectCodexCli']
   readonly ipcMain: IpcMainLike
   readonly rejectAgentTool?: AgentIpcHandlersInput['rejectAgentTool']
+  readonly removeWorkspaceAgent?: AgentIpcHandlersInput['removeWorkspaceAgent']
+  readonly renameWorkspaceAgent?: AgentIpcHandlersInput['renameWorkspaceAgent']
   readonly resizeAgentSession?: AgentIpcHandlersInput['resizeAgentSession']
   readonly writeAgentSession?: AgentIpcHandlersInput['writeAgentSession']
+  readonly updateWorkspaceAgentLayout?: AgentIpcHandlersInput['updateWorkspaceAgentLayout']
 }): AgentIpcHandlersInput {
   return {
     approveAgentTool: input.approveAgentTool ?? (() => undefined),
     attachAgentSession:
       input.attachAgentSession ??
       (async (command) => ({
+        agentId: command.agentId,
         codexThreadId: null,
         gitBranch: command.gitBranch ?? null,
         processId: 1,
@@ -267,6 +341,8 @@ function createAgentIpcHandlersInput(input: {
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })),
+    createWorkspaceAgent:
+      input.createWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-2')),
     disposeAgentWorkspaceSession: input.disposeAgentWorkspaceSession ?? (async () => undefined),
     disposeProjectAgentSessions: input.disposeProjectAgentSessions ?? (async () => undefined),
     inspectCodexCli:
@@ -279,8 +355,24 @@ function createAgentIpcHandlersInput(input: {
     ipcMain: input.ipcMain,
     logger: new SilentLogger(),
     rejectAgentTool: input.rejectAgentTool ?? (() => undefined),
+    removeWorkspaceAgent:
+      input.removeWorkspaceAgent ?? (async () => [createWorkspaceAgentSnapshot('agent-1')]),
+    renameWorkspaceAgent:
+      input.renameWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-1')),
     resizeAgentSession: input.resizeAgentSession ?? (() => undefined),
-    writeAgentSession: input.writeAgentSession ?? (() => undefined)
+    writeAgentSession: input.writeAgentSession ?? (() => undefined),
+    updateWorkspaceAgentLayout:
+      input.updateWorkspaceAgentLayout ?? (async () => createWorkspaceAgentSnapshot('agent-1'))
+  }
+}
+
+function createWorkspaceAgentSnapshot(agentId: string) {
+  return {
+    agentId,
+    layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+    name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
+    projectId: 'project-1',
+    workspaceName: 'main'
   }
 }
 

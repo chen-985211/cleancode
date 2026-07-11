@@ -57,7 +57,7 @@ describe('app shell minimap', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '聚焦 Agent Codex CLI' }))
+    fireEvent.click(await screen.findByRole('button', { name: '聚焦 Agent Agent 1' }))
 
     expect(document.querySelector('[data-agent-console-node]')).toHaveClass(
       'agent-console-node--selected'

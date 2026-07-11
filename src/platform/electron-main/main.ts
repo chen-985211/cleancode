@@ -3,9 +3,15 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
 import { InspectCodexCliUseCase } from '../../contexts/agent/application/use-cases/InspectCodexCliUseCase'
+import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
+import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
+import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
+import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
 import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/NodeCodexCliAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
@@ -59,6 +65,7 @@ import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 
 interface WorkbenchSnapshot {
+  readonly agents: readonly WorkspaceAgentSnapshot[]
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
@@ -115,6 +122,12 @@ const agentAuditRepository = new FileSystemAgentAuditRepository(
 const agentSessionRepository = new FileSystemAgentSessionRepository(
   join(appStateDirectoryPath, 'agent-sessions.json')
 )
+const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(agentSessionRepository)
+const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(agentSessionRepository)
+const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
+const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
+  agentSessionRepository
+)
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
@@ -137,6 +150,10 @@ const agentSessionService = new AgentSessionService(
   new CleancodeMcpHttpServer(),
   (command) => executeAgentToolUseCase.execute(command),
   agentSessionRepository
+)
+const removeWorkspaceAgentUseCase = new RemoveWorkspaceAgentUseCase(
+  agentSessionRepository,
+  agentSessionService
 )
 const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
   projectRepository,
@@ -233,6 +250,7 @@ registerAgentIpcHandlers({
     isAgentAutostartDisabledForTest
       ? Promise.resolve(createDisabledAgentSessionSnapshot(command))
       : agentSessionService.attach(command),
+  createWorkspaceAgent: (command) => createWorkspaceAgentUseCase.execute(command),
   disposeAgentWorkspaceSession: (command) =>
     isAgentAutostartDisabledForTest
       ? Promise.resolve()
@@ -245,6 +263,8 @@ registerAgentIpcHandlers({
   ipcMain,
   logger: consoleLogger,
   rejectAgentTool: (approvalId) => agentSessionService.rejectTool({ approvalId }),
+  removeWorkspaceAgent: (command) => removeWorkspaceAgentUseCase.execute(command),
+  renameWorkspaceAgent: (command) => renameWorkspaceAgentUseCase.execute(command),
   resizeAgentSession: (sessionId, columns, rows) => {
     if (!isAgentAutostartDisabledForTest) {
       agentSessionService.resize({ columns, rows, sessionId })
@@ -254,10 +274,12 @@ registerAgentIpcHandlers({
     if (!isAgentAutostartDisabledForTest) {
       agentSessionService.write({ input, sessionId })
     }
-  }
+  },
+  updateWorkspaceAgentLayout: (command) => updateWorkspaceAgentLayoutUseCase.execute(command)
 })
 
 function createDisabledAgentSessionSnapshot(command: {
+  readonly agentId: string
   readonly gitBranch?: string | null
   readonly projectDirectory: string
   readonly projectId: string
@@ -265,6 +287,7 @@ function createDisabledAgentSessionSnapshot(command: {
   readonly workspaceName: string
 }): AgentSessionSnapshot {
   return {
+    agentId: command.agentId,
     codexThreadId: null,
     gitBranch: command.gitBranch ?? null,
     processId: null,
@@ -304,13 +327,17 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
     projectDirectory: project.directory,
     workspaceName: currentWorkspace.name
   })
+  const agents = await listWorkspaceAgentsUseCase.execute({
+    projectId: project.id,
+    workspaceName: currentWorkspace.name
+  })
   const gitBranches = (
     await listGitBranchNavigationUseCase.execute({
       projectDirectory: project.directory
     })
   ).branches
 
-  return { project, gitBranches, graph }
+  return { agents, project, gitBranches, graph }
 }
 
 async function getDefaultGraphForAgent(command: {

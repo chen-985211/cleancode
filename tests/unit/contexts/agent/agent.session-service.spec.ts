@@ -10,7 +10,7 @@ import type {
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { ExecuteAgentToolCommand } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
-import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 
 describe('agent session service', () => {
@@ -19,6 +19,7 @@ describe('agent session service', () => {
     const service = createSessionService({ processPort })
 
     const firstSession = await service.attach({
+      agentId: 'agent-1',
       columns: 100,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
@@ -30,6 +31,7 @@ describe('agent session service', () => {
       workspaceName: 'main'
     })
     const reattachedSession = await service.attach({
+      agentId: 'agent-1',
       columns: 120,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
@@ -41,6 +43,7 @@ describe('agent session service', () => {
       workspaceName: 'main'
     })
     const branchSession = await service.attach({
+      agentId: 'agent-2',
       columns: 80,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
@@ -63,6 +66,47 @@ describe('agent session service', () => {
     ])
   })
 
+  it('runs multiple Agents in the same workspace without stopping each other', async () => {
+    const processPort = new RecordingCodexAgentProcessPort()
+    const service = createSessionService({ processPort })
+
+    const first = await attachMainSession(service, { agentId: 'agent-1' })
+    const second = await attachMainSession(service, { agentId: 'agent-2' })
+
+    expect(first.agentId).toBe('agent-1')
+    expect(second.agentId).toBe('agent-2')
+    expect(processPort.starts).toHaveLength(2)
+    expect(processPort.stops).toEqual([])
+  })
+
+  it('suspends and resumes every Agent in a physical workspace directory', async () => {
+    const processPort = new RecordingCodexAgentProcessPort()
+    const service = createSessionService({ processPort })
+    const first = await attachMainSession(service, { agentId: 'agent-1' })
+    const second = await attachMainSession(service, { agentId: 'agent-2' })
+
+    await expect(service.suspendWorkspaceDirectory('/repo/app')).resolves.toBe(true)
+    expect(processPort.stops).toEqual([first.sessionId, second.sessionId])
+
+    await service.resumeWorkspaceDirectory('/repo/app')
+    expect(processPort.starts).toHaveLength(4)
+  })
+
+  it('ignores a stale resize emitted after its Agent session has been disposed', async () => {
+    const processPort = new RecordingCodexAgentProcessPort()
+    const service = createSessionService({ processPort })
+    const session = await attachMainSession(service)
+
+    await service.disposeAgent({
+      agentId: 'agent-1',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    service.resize({ columns: 120, rows: 36, sessionId: session.sessionId })
+
+    expect(processPort.resizes).toEqual([])
+  })
+
   it('keeps separate Codex sessions for different branches in the same workspace', async () => {
     const processPort = new RecordingCodexAgentProcessPort()
     const service = createSessionService({ processPort })
@@ -74,6 +118,7 @@ describe('agent session service', () => {
     }
     const mainBranchCommand = {
       ...callbacks,
+      agentId: 'agent-1',
       gitBranch: 'main',
       projectDirectory: '/repo/app',
       projectId: 'project-1',
@@ -82,6 +127,7 @@ describe('agent session service', () => {
     }
     const featureBranchCommand = {
       ...callbacks,
+      agentId: 'agent-1',
       gitBranch: 'feature/login',
       projectDirectory: '/repo/app',
       projectId: 'project-1',
@@ -314,20 +360,46 @@ class RecordingAgentSessionRepository implements AgentSessionRepository {
   readonly sessions = new Map<string, AgentSession>()
 
   async find(scope: AgentConversationScope): Promise<AgentSession | null> {
-    return this.sessions.get(scope.key) ?? null
+    const snapshot = scope.toSnapshot()
+    const agent = this.sessions.get(
+      agentKey(snapshot.projectId, snapshot.workspaceName, snapshot.agentId)
+    )
+    return agent ? AgentSession.fromSnapshot(agent.toSnapshot(), scope) : null
+  }
+
+  async findAgent(
+    projectId: string,
+    workspaceName: string,
+    agentId: string
+  ): Promise<AgentSession | null> {
+    return this.sessions.get(agentKey(projectId, workspaceName, agentId)) ?? null
+  }
+
+  async findWorkspace(projectId: string, workspaceName: string): Promise<readonly AgentSession[]> {
+    return [...this.sessions.values()].filter(
+      (agent) => agent.projectId === projectId && agent.workspaceName === workspaceName
+    )
   }
 
   async save(session: AgentSession): Promise<void> {
-    this.sessions.set(session.scope.key, session)
+    this.sessions.set(agentKey(session.projectId, session.workspaceName, session.id), session)
   }
 
   async delete(scope: AgentConversationScope): Promise<void> {
-    this.sessions.delete(scope.key)
+    const session = await this.find(scope)
+    if (session) {
+      session.clearCodexThread(scope.toSnapshot().gitBranch)
+      await this.save(session)
+    }
+  }
+
+  async deleteAgent(projectId: string, workspaceName: string, agentId: string): Promise<void> {
+    this.sessions.delete(agentKey(projectId, workspaceName, agentId))
   }
 
   async deleteProject(projectId: string): Promise<void> {
     for (const [key, session] of this.sessions.entries()) {
-      if (session.scope.toSnapshot().projectId === projectId) {
+      if (session.projectId === projectId) {
         this.sessions.delete(key)
       }
     }
@@ -339,17 +411,23 @@ async function attachMainSession(
   input: Partial<Parameters<AgentSessionService['attach']>[0]> = {}
 ): Promise<Awaited<ReturnType<AgentSessionService['attach']>>> {
   return service.attach({
+    agentId: 'agent-1',
     columns: 80,
     onExit: () => undefined,
     onGraphUpdated: () => undefined,
     onOutput: () => undefined,
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
+    projectId: 'project-1',
     rows: 24,
     workspaceDirectory: '/repo/app',
     workspaceName: 'main',
     ...input
   })
+}
+
+function agentKey(projectId: string, workspaceName: string, agentId: string): string {
+  return JSON.stringify([projectId, workspaceName, agentId])
 }
 
 function completedToolResult(toolCallId: string): AgentToolExecutionResult {

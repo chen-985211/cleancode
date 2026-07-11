@@ -5,6 +5,7 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import type { WorkbenchFlowNode } from './types'
 
@@ -12,7 +13,7 @@ interface UseMinimapNodeFocusInput {
   readonly terminalBlocksById: ReadonlyMap<string, TerminalBlockSnapshot>
   readonly terminalGroupsById: ReadonlyMap<string, TerminalGroupSnapshot>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
-  readonly setIsAgentConsoleSelected: (isSelected: boolean) => void
+  readonly setSelectedAgentId: (agentId: string | null) => void
   readonly setHoveredTerminalBlockId: (blockId: string | null) => void
   readonly setSelectedTerminalBlockId: (value: SetStateAction<string | null>) => void
   readonly setSelectedTerminalBlockIds: (blockIds: string[]) => void
@@ -23,7 +24,7 @@ export function useMinimapNodeFocus({
   terminalBlocksById,
   terminalGroupsById,
   reactFlowInstanceRef,
-  setIsAgentConsoleSelected,
+  setSelectedAgentId,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
   setSelectedTerminalBlockIds,
@@ -38,7 +39,7 @@ export function useMinimapNodeFocus({
         return
       }
 
-      setIsAgentConsoleSelected(false)
+      setSelectedAgentId(null)
       focusTerminalBlockInCanvas({
         block,
         duration,
@@ -50,7 +51,7 @@ export function useMinimapNodeFocus({
     },
     [
       reactFlowInstanceRef,
-      setIsAgentConsoleSelected,
+      setSelectedAgentId,
       setHoveredTerminalBlockId,
       setSelectedTerminalBlockId,
       setSelectedTerminalGroupId,
@@ -66,7 +67,7 @@ export function useMinimapNodeFocus({
         return
       }
 
-      setIsAgentConsoleSelected(false)
+      setSelectedAgentId(null)
       setSelectedTerminalBlockIds([])
       setSelectedTerminalGroupId(group.id)
       setHoveredTerminalBlockId(null)
@@ -94,7 +95,7 @@ export function useMinimapNodeFocus({
     },
     [
       reactFlowInstanceRef,
-      setIsAgentConsoleSelected,
+      setSelectedAgentId,
       setHoveredTerminalBlockId,
       setSelectedTerminalBlockIds,
       setSelectedTerminalGroupId,
@@ -102,39 +103,44 @@ export function useMinimapNodeFocus({
     ]
   )
 
-  const focusAgentConsole = useCallback(() => {
-    setIsAgentConsoleSelected(true)
-    setSelectedTerminalBlockIds([])
-    setSelectedTerminalGroupId(null)
-    setHoveredTerminalBlockId(null)
+  const focusAgentConsole = useCallback(
+    (nodeId: string) => {
+      const agentId = readAgentIdFromFlowNodeId(nodeId)
+      if (!agentId) return
+      setSelectedAgentId(agentId)
+      setSelectedTerminalBlockIds([])
+      setSelectedTerminalGroupId(null)
+      setHoveredTerminalBlockId(null)
 
-    const reactFlowInstance = reactFlowInstanceRef.current
-    const node = reactFlowInstance?.getNode('agent-console')
+      const reactFlowInstance = reactFlowInstanceRef.current
+      const node = reactFlowInstance?.getNode(nodeId)
 
-    if (!reactFlowInstance || !node) {
-      return
-    }
+      if (!reactFlowInstance || !node) {
+        return
+      }
 
-    const width = node.measured?.width ?? resolveDimension(node.style?.width) ?? 440
-    const height = node.measured?.height ?? resolveDimension(node.style?.height) ?? 520
-    const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
+      const width = node.measured?.width ?? resolveDimension(node.style?.width) ?? 440
+      const height = node.measured?.height ?? resolveDimension(node.style?.height) ?? 520
+      const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
 
-    void reactFlowInstance.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
-      zoom: nextZoom,
-      duration: 220
-    })
-  }, [
-    reactFlowInstanceRef,
-    setHoveredTerminalBlockId,
-    setIsAgentConsoleSelected,
-    setSelectedTerminalBlockIds,
-    setSelectedTerminalGroupId
-  ])
+      void reactFlowInstance.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+        zoom: nextZoom,
+        duration: 220
+      })
+    },
+    [
+      reactFlowInstanceRef,
+      setHoveredTerminalBlockId,
+      setSelectedAgentId,
+      setSelectedTerminalBlockIds,
+      setSelectedTerminalGroupId
+    ]
+  )
 
   const focusWorkbenchNode = useCallback(
     (nodeId: string) => {
-      if (nodeId === 'agent-console') {
-        focusAgentConsole()
+      if (readAgentIdFromFlowNodeId(nodeId)) {
+        focusAgentConsole(nodeId)
         return
       }
 

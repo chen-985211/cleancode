@@ -1,6 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 
-import { createAgentConsoleFlowNode } from './agentConsoleFlowNode'
+import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentConsoleFlowNode'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
@@ -14,7 +15,7 @@ interface UseWorkbenchFlowNodesInput {
   readonly graph: WorkbenchSnapshot['graph'] | null
   readonly handlers: TerminalFlowNodeHandlers
   readonly hoveredTerminalBlockId: string | null
-  readonly isAgentConsoleSelected: boolean
+  readonly selectedAgentId: string | null
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalBlockIds: readonly string[]
   readonly selectedTerminalGroupId: string | null
@@ -23,6 +24,13 @@ interface UseWorkbenchFlowNodesInput {
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
+  readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
+  readonly onRenameAgent: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+  readonly onResizeAgent: (
+    agent: WorkspaceAgentSnapshot,
+    width: number,
+    height: number
+  ) => Promise<void>
 }
 
 export function useWorkbenchFlowNodes({
@@ -31,7 +39,7 @@ export function useWorkbenchFlowNodes({
   graph,
   handlers,
   hoveredTerminalBlockId,
-  isAgentConsoleSelected,
+  selectedAgentId,
   isTerminalGroupSelectionMode,
   selectedTerminalBlockIds,
   selectedTerminalGroupId,
@@ -39,7 +47,10 @@ export function useWorkbenchFlowNodes({
   setCurrentGraph,
   setNodes,
   terminalGroupDropAction,
-  terminalStates
+  terminalStates,
+  onRemoveAgent,
+  onRenameAgent,
+  onResizeAgent
 }: UseWorkbenchFlowNodesInput): void {
   const graphIdUsedForNodesRef = useRef<string | null>(null)
 
@@ -56,13 +67,20 @@ export function useWorkbenchFlowNodes({
         terminalGroupDropAction,
         terminalStates
       })
+      const agents = resolveWorkspaceAgents(currentWorkbench, currentWorkspace ?? null)
       const nextNodes = [
-        createAgentConsoleFlowNode({
-          currentWorkbench,
-          currentWorkspace: currentWorkspace ?? null,
-          isSelected: isAgentConsoleSelected,
-          onGraphUpdated: setCurrentGraph
-        }),
+        ...agents.map((agent) =>
+          createAgentConsoleFlowNode({
+            agent,
+            currentWorkbench,
+            currentWorkspace: currentWorkspace ?? null,
+            isSelected: selectedAgentId === agent.agentId,
+            onGraphUpdated: setCurrentGraph,
+            onRemove: onRemoveAgent,
+            onRename: onRenameAgent,
+            onResize: onResizeAgent
+          })
+        ),
         ...terminalNodes
       ]
       const graphId = graph?.id ?? null
@@ -79,7 +97,7 @@ export function useWorkbenchFlowNodes({
     graph,
     handlers,
     hoveredTerminalBlockId,
-    isAgentConsoleSelected,
+    selectedAgentId,
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
@@ -87,6 +105,18 @@ export function useWorkbenchFlowNodes({
     setCurrentGraph,
     setNodes,
     terminalGroupDropAction,
-    terminalStates
+    terminalStates,
+    onRemoveAgent,
+    onRenameAgent,
+    onResizeAgent
   ])
+}
+
+function resolveWorkspaceAgents(
+  workbench: WorkbenchSnapshot | null,
+  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+): readonly WorkspaceAgentSnapshot[] {
+  if (workbench?.agents) return workbench.agents
+  const legacyAgent = createLegacyAgentSnapshot(workbench, workspace)
+  return legacyAgent ? [legacyAgent] : []
 }

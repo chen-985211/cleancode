@@ -1,4 +1,5 @@
 export interface AgentConversationScopeSnapshot {
+  readonly agentId: string
   readonly gitBranch: string | null
   readonly projectId: string
   readonly workspaceName: string
@@ -9,6 +10,7 @@ export class AgentConversationScope {
 
   static create(input: AgentConversationScopeSnapshot): AgentConversationScope {
     return new AgentConversationScope({
+      agentId: requireValue(input.agentId, 'agentId'),
       gitBranch: normalizeOptionalValue(input.gitBranch),
       projectId: requireValue(input.projectId, 'projectId'),
       workspaceName: requireValue(input.workspaceName, 'workspaceName')
@@ -19,7 +21,8 @@ export class AgentConversationScope {
     return JSON.stringify([
       this.snapshot.projectId,
       this.snapshot.workspaceName,
-      this.snapshot.gitBranch
+      this.snapshot.gitBranch,
+      this.snapshot.agentId
     ])
   }
 

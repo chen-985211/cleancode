@@ -141,7 +141,7 @@ describe('agent console Codex status', () => {
     render(<AgentConsole />)
 
     await waitFor(() => expect(screen.getByText('桌面运行时未连接')).toBeInTheDocument())
-    expect(screen.getAllByText('Codex CLI')).toHaveLength(1)
+    expect(screen.queryByText('Codex CLI')).not.toBeInTheDocument()
     expect(screen.queryByText('未接入')).not.toBeInTheDocument()
     expect(screen.queryByText('已安装')).not.toBeInTheDocument()
     expect(screen.queryByText('未安装')).not.toBeInTheDocument()

@@ -7,7 +7,9 @@ import type {
   AgentSessionSnapshot,
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
+import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { CodexCliInstallationSnapshot } from './contexts/agent/application/ports/CodexCliPort'
+import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
@@ -24,6 +26,7 @@ import type {
 } from './contexts/run/application/ports/TerminalProcessPort'
 
 interface WorkbenchSnapshot {
+  readonly agents: readonly WorkspaceAgentSnapshot[]
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
@@ -57,6 +60,7 @@ declare global {
       }): Promise<WorkbenchSnapshot | null>
       inspectCodexCli(): Promise<CodexCliInstallationSnapshot>
       attachAgentSession(command: {
+        readonly agentId: string
         readonly columns?: number
         readonly gitBranch?: string | null
         readonly persistenceMode?: 'ephemeral' | 'persistent'
@@ -67,6 +71,28 @@ declare global {
         readonly workspaceDirectory: string
         readonly workspaceName: string
       }): Promise<AgentSessionSnapshot>
+      createWorkspaceAgent(command: {
+        readonly layout: AgentLayoutSnapshot
+        readonly projectId: string
+        readonly workspaceName: string
+      }): Promise<WorkspaceAgentSnapshot>
+      renameWorkspaceAgent(command: {
+        readonly agentId: string
+        readonly name: string
+        readonly projectId: string
+        readonly workspaceName: string
+      }): Promise<WorkspaceAgentSnapshot>
+      updateWorkspaceAgentLayout(command: {
+        readonly agentId: string
+        readonly layout: AgentLayoutSnapshot
+        readonly projectId: string
+        readonly workspaceName: string
+      }): Promise<WorkspaceAgentSnapshot>
+      removeWorkspaceAgent(command: {
+        readonly agentId: string
+        readonly projectId: string
+        readonly workspaceName: string
+      }): Promise<readonly WorkspaceAgentSnapshot[]>
       writeAgentSession(command: {
         readonly input: string
         readonly sessionId: string

@@ -5,8 +5,8 @@ export interface StartCodexAgentProcessCommand {
   readonly columns: number
   readonly mcpServerUrl: string
   readonly onCodexThreadIdentified: (threadId: string) => void
-  readonly onExit: (event: AgentPtyExitEvent) => void
-  readonly onOutput: (event: AgentPtyOutputEvent) => void
+  readonly onExit: (event: Omit<AgentPtyExitEvent, 'agentId'>) => void
+  readonly onOutput: (event: Omit<AgentPtyOutputEvent, 'agentId'>) => void
   readonly rows: number
   readonly resumeThreadId?: string
   readonly sessionId: string

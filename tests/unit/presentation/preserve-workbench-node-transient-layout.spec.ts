@@ -82,6 +82,13 @@ describe('preserve workbench node transient layout', () => {
     expect(preserveWorkbenchNodeTransientLayout([nextNode], [currentNode])).toEqual([nextNode])
   })
 
+  it('uses the next Agent layout when its persisted canvas geometry changes', () => {
+    const currentNode = createAgentNode({ x: 320, y: 140 }, { width: 440, height: 520 })
+    const nextNode = createAgentNode({ x: 700, y: 220 }, { width: 520, height: 460 })
+
+    expect(preserveWorkbenchNodeTransientLayout([nextNode], [currentNode])).toEqual([nextNode])
+  })
+
   it('uses the next layout for newly created nodes', () => {
     const nextNode = createTerminalNode({
       position: { x: 120, y: 80 },
@@ -146,6 +153,34 @@ function createTerminalNode({
       onResize: vi.fn(),
       onResizeBlock: vi.fn(),
       onToggleTerminalGroupCandidate: vi.fn()
+    }
+  }
+}
+
+function createAgentNode(
+  position: { readonly x: number; readonly y: number },
+  size: { readonly width: number; readonly height: number }
+): WorkbenchFlowNode {
+  const agent = {
+    agentId: 'agent-1',
+    layout: { position, size },
+    name: 'Agent 1',
+    projectId: 'project-1',
+    workspaceName: 'main'
+  }
+  return {
+    id: 'agent:agent-1',
+    type: 'agentConsole',
+    position,
+    style: size,
+    data: {
+      agent,
+      currentWorkbench: null,
+      currentWorkspace: null,
+      onGraphUpdated: vi.fn(),
+      onRemove: vi.fn(),
+      onRename: vi.fn(),
+      onResize: vi.fn()
     }
   }
 }

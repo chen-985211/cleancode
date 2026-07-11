@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react'
+import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 
 import {
   type BlockGraphSnapshot,
@@ -12,6 +13,7 @@ import type { ProjectSnapshot } from '../../contexts/project/application/dto/Pro
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 
 export interface WorkbenchSnapshot {
+  readonly agents?: readonly WorkspaceAgentSnapshot[]
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
@@ -98,9 +100,13 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
 interface AgentConsoleNodeData extends Record<string, unknown> {
+  readonly agent: WorkspaceAgentSnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
+  readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
+  readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+  readonly onResize: (agent: WorkspaceAgentSnapshot, width: number, height: number) => Promise<void>
 }
 
 export type AgentConsoleFlowNode = Node<AgentConsoleNodeData, 'agentConsole'>

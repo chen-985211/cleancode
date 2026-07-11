@@ -11,6 +11,10 @@ export interface RuntimeApiOverrides {
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
   readonly inspectCodexCli?: ReturnType<typeof vi.fn>
   readonly attachAgentSession?: ReturnType<typeof vi.fn>
+  readonly createWorkspaceAgent?: ReturnType<typeof vi.fn>
+  readonly renameWorkspaceAgent?: ReturnType<typeof vi.fn>
+  readonly updateWorkspaceAgentLayout?: ReturnType<typeof vi.fn>
+  readonly removeWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly writeAgentSession?: ReturnType<typeof vi.fn>
   readonly resizeAgentSession?: ReturnType<typeof vi.fn>
   readonly disposeAgentWorkspaceSession?: ReturnType<typeof vi.fn>
@@ -53,6 +57,9 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     attachAgentSession:
       overrides.attachAgentSession ??
       vi.fn(async (command) => ({
+        agentId: command.agentId,
+        codexThreadId: null,
+        gitBranch: command.gitBranch ?? null,
         processId: 1,
         projectDirectory: command.projectDirectory,
         sessionId: `agent-${command.workspaceName}`,
@@ -60,6 +67,10 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })),
+    createWorkspaceAgent: overrides.createWorkspaceAgent ?? vi.fn(),
+    renameWorkspaceAgent: overrides.renameWorkspaceAgent ?? vi.fn(),
+    updateWorkspaceAgentLayout: overrides.updateWorkspaceAgentLayout ?? vi.fn(),
+    removeWorkspaceAgent: overrides.removeWorkspaceAgent ?? vi.fn(),
     writeAgentSession: overrides.writeAgentSession ?? vi.fn(async () => undefined),
     resizeAgentSession: overrides.resizeAgentSession ?? vi.fn(async () => undefined),
     disposeAgentWorkspaceSession:

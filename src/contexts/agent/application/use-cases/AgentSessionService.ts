@@ -11,11 +11,20 @@ import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/Agent
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { CodexAgentProcessPort } from '../ports/CodexAgentProcessPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
-import { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
+import type { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
 import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
 import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
+import {
+  createAgentSessionCallbacks,
+  createAgentConversationScope,
+  createAgentRuntimeSessionId,
+  createCanceledAgentToolResult,
+  toAgentSessionSnapshot,
+  type AgentSessionCallbacks
+} from './AgentSessionRuntimeState'
 
 export interface AttachAgentSessionCommand {
+  readonly agentId: string
   readonly columns?: number
   readonly gitBranch?: string | null
   readonly onExit: (event: AgentPtyExitEvent) => void
@@ -46,7 +55,7 @@ export class AgentSessionService {
   ) {}
 
   async attach(command: AttachAgentSessionCommand): Promise<AgentSessionSnapshot> {
-    const scope = createConversationScope(command)
+    const scope = createAgentConversationScope(command)
     const sessionKey = scope.key
     const existingSession = this.sessions.get(sessionKey)
 
@@ -56,14 +65,18 @@ export class AgentSessionService {
         this.processPort.resize(existingSession.sessionId, command.columns, command.rows)
       }
 
-      return toSnapshot(existingSession)
+      return toAgentSessionSnapshot(existingSession)
     }
 
     if (existingSession) {
       await this.disposeManagedSession(sessionKey, existingSession)
     }
 
-    await this.suspendOtherScopeInDirectory(command.workspaceDirectory, sessionKey)
+    await this.disposeOtherScopeForAgentInDirectory(
+      command.workspaceDirectory,
+      command.agentId,
+      sessionKey
+    )
 
     const shouldPersist = command.persistenceMode !== 'ephemeral'
 
@@ -78,17 +91,19 @@ export class AgentSessionService {
     } catch {
       const scopeSnapshot = scope.toSnapshot()
       return createUnrestorableAgentSessionSnapshot({
+        agentId: command.agentId,
         gitBranch: scopeSnapshot.gitBranch,
         projectDirectory: command.projectDirectory,
         projectId: scopeSnapshot.projectId,
-        sessionId: createAgentSessionId(),
+        sessionId: createAgentRuntimeSessionId(),
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })
     }
 
     const session: ManagedAgentSession = {
-      callbacks: createCallbacks(command),
+      agentId: command.agentId,
+      callbacks: createAgentSessionCallbacks(command),
       codexThreadId: persistedSession?.boundCodexThreadId ?? null,
       columns: command.columns ?? 88,
       gitBranch: scope.toSnapshot().gitBranch,
@@ -101,7 +116,7 @@ export class AgentSessionService {
       projectId: scope.toSnapshot().projectId,
       rows: command.rows ?? 24,
       scope,
-      sessionId: createAgentSessionId(),
+      sessionId: createAgentRuntimeSessionId(),
       status: 'running',
       workspaceDirectory: command.workspaceDirectory,
       workspaceName: command.workspaceName
@@ -123,7 +138,7 @@ export class AgentSessionService {
       session.status = persistedSession ? 'restore_failed' : 'failed'
     }
 
-    return toSnapshot(session)
+    return toAgentSessionSnapshot(session)
   }
 
   write(command: { readonly input: string; readonly sessionId: string }): void {
@@ -137,45 +152,50 @@ export class AgentSessionService {
   }): void {
     const session = this.findSessionById(command.sessionId)
 
-    if (session) {
-      session.columns = command.columns
-      session.rows = command.rows
-    }
-
-    this.processPort.resize(command.sessionId, command.columns, command.rows)
-  }
-
-  async suspendWorkspaceDirectory(workspaceDirectory: string): Promise<boolean> {
-    const session = [...this.sessions.values()].find(
-      (candidate) =>
-        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'running'
-    )
-
-    if (!session) {
-      return false
-    }
-
-    session.isStopping = true
-    session.status = 'suspended'
-    await this.processPort.stop(session.sessionId)
-    await this.waitForPendingPersistence()
-    session.isStopping = false
-    session.processId = null
-    return true
-  }
-
-  async resumeWorkspaceDirectory(workspaceDirectory: string): Promise<void> {
-    const session = [...this.sessions.values()].find(
-      (candidate) =>
-        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'suspended'
-    )
-
     if (!session) {
       return
     }
 
-    session.status = 'running'
-    await this.startManagedProcess(session)
+    session.columns = command.columns
+    session.rows = command.rows
+    this.processPort.resize(command.sessionId, command.columns, command.rows)
+  }
+
+  async suspendWorkspaceDirectory(workspaceDirectory: string): Promise<boolean> {
+    const sessions = [...this.sessions.values()].filter(
+      (candidate) =>
+        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'running'
+    )
+
+    if (sessions.length === 0) {
+      return false
+    }
+
+    for (const session of sessions) {
+      session.isStopping = true
+      session.status = 'suspended'
+    }
+    await Promise.all(sessions.map((session) => this.processPort.stop(session.sessionId)))
+    await this.waitForPendingPersistence()
+    for (const session of sessions) {
+      session.isStopping = false
+      session.processId = null
+    }
+    return true
+  }
+
+  async resumeWorkspaceDirectory(workspaceDirectory: string): Promise<void> {
+    const sessions = [...this.sessions.values()].filter(
+      (candidate) =>
+        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'suspended'
+    )
+
+    await Promise.all(
+      sessions.map(async (session) => {
+        session.status = 'running'
+        await this.startManagedProcess(session)
+      })
+    )
   }
 
   async executeMcpTool(command: AgentMcpToolCallCommand): Promise<AgentToolExecutionResult> {
@@ -192,6 +212,7 @@ export class AgentSessionService {
     if (firstResult.status !== 'awaiting_approval') {
       if (firstResult.status === 'completed') {
         session.callbacks.onGraphUpdated({
+          agentId: session.agentId,
           graph: firstResult.graph,
           projectDirectory: session.projectDirectory,
           sessionId: session.sessionId,
@@ -231,6 +252,22 @@ export class AgentSessionService {
     }
   }
 
+  async disposeAgent(command: {
+    readonly agentId: string
+    readonly projectId: string
+    readonly workspaceName: string
+  }): Promise<void> {
+    for (const [sessionKey, session] of this.sessions.entries()) {
+      if (
+        session.agentId === command.agentId &&
+        session.projectId === command.projectId &&
+        session.workspaceName === command.workspaceName
+      ) {
+        await this.disposeManagedSession(sessionKey, session)
+      }
+    }
+  }
+
   async disposeProject(projectDirectory: string): Promise<void> {
     for (const session of [...this.sessions.values()]) {
       if (session.projectDirectory === projectDirectory) {
@@ -255,7 +292,7 @@ export class AgentSessionService {
   }
 
   private updateCallbacks(session: ManagedAgentSession, command: AttachAgentSessionCommand): void {
-    session.callbacks = createCallbacks(command)
+    session.callbacks = createAgentSessionCallbacks(command)
   }
 
   private persistCodexThread(session: ManagedAgentSession, threadId: string): void {
@@ -264,8 +301,9 @@ export class AgentSessionService {
     }
 
     const persistence = (async () => {
-      const persistedSession = AgentSession.start(session.scope)
-      persistedSession.bindCodexThread(CodexThreadId.create(threadId))
+      const persistedSession =
+        (await this.sessionRepository.find(session.scope)) ?? AgentSession.start(session.scope)
+      persistedSession.bindCodexThread(session.scope, CodexThreadId.create(threadId))
       await this.sessionRepository.save(persistedSession)
       session.codexThreadId = threadId
     })().catch(() => {
@@ -296,9 +334,9 @@ export class AgentSessionService {
         }
 
         session.status = 'exited'
-        session.callbacks.onExit(event)
+        session.callbacks.onExit({ ...event, agentId: session.agentId })
       },
-      onOutput: (event) => session.callbacks.onOutput(event),
+      onOutput: (event) => session.callbacks.onOutput({ ...event, agentId: session.agentId }),
       resumeThreadId: session.codexThreadId ?? undefined,
       rows: session.rows,
       sessionId: session.sessionId,
@@ -308,12 +346,17 @@ export class AgentSessionService {
     session.processId = handle.processId
   }
 
-  private async suspendOtherScopeInDirectory(
+  private async disposeOtherScopeForAgentInDirectory(
     workspaceDirectory: string,
+    agentId: string,
     activeScopeKey: string
   ): Promise<void> {
     for (const [sessionKey, session] of this.sessions.entries()) {
-      if (sessionKey !== activeScopeKey && session.workspaceDirectory === workspaceDirectory) {
+      if (
+        sessionKey !== activeScopeKey &&
+        session.agentId === agentId &&
+        session.workspaceDirectory === workspaceDirectory
+      ) {
         await this.disposeManagedSession(sessionKey, session)
       }
     }
@@ -350,6 +393,7 @@ export class AgentSessionService {
     result: Extract<AgentToolExecutionResult, { readonly status: 'awaiting_approval' }>
   ): Promise<AgentToolExecutionResult> {
     const request: AgentToolApprovalRequest = {
+      agentId: session.agentId,
       approvalId: result.toolCallId,
       projectDirectory: session.projectDirectory,
       sessionId: session.sessionId,
@@ -380,7 +424,9 @@ export class AgentSessionService {
     this.pendingApprovals.delete(approvalId)
 
     if (decision === 'rejected') {
-      pendingApproval.resolve(createCanceledToolResult(approvalId, 'User rejected the tool call.'))
+      pendingApproval.resolve(
+        createCanceledAgentToolResult(approvalId, 'User rejected the tool call.')
+      )
       return
     }
 
@@ -388,12 +434,15 @@ export class AgentSessionService {
       const session = this.findSessionById(pendingApproval.sessionId)
 
       if (!session) {
-        pendingApproval.resolve(createCanceledToolResult(approvalId, 'Agent session was disposed.'))
+        pendingApproval.resolve(
+          createCanceledAgentToolResult(approvalId, 'Agent session was disposed.')
+        )
         return
       }
 
       if (result.status === 'completed') {
         session.callbacks.onGraphUpdated({
+          agentId: session.agentId,
           graph: result.graph,
           projectDirectory: session.projectDirectory,
           sessionId: session.sessionId,
@@ -412,12 +461,15 @@ export class AgentSessionService {
       }
 
       this.pendingApprovals.delete(approvalId)
-      pendingApproval.resolve(createCanceledToolResult(approvalId, 'Agent session was disposed.'))
+      pendingApproval.resolve(
+        createCanceledAgentToolResult(approvalId, 'Agent session was disposed.')
+      )
     }
   }
 }
 
 interface ManagedAgentSession {
+  readonly agentId: string
   callbacks: AgentSessionCallbacks
   codexThreadId: string | null
   columns: number
@@ -437,59 +489,9 @@ interface ManagedAgentSession {
   readonly workspaceName: string
 }
 
-interface AgentSessionCallbacks {
-  readonly onExit: (event: AgentPtyExitEvent) => void
-  readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
-  readonly onOutput: (event: AgentPtyOutputEvent) => void
-  readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
-}
-
 interface PendingToolApproval {
   readonly command: ExecuteAgentToolCommand
   readonly request: AgentToolApprovalRequest
   readonly resolve: (result: AgentToolExecutionResult) => void
   readonly sessionId: string
-}
-
-function createCallbacks(command: AttachAgentSessionCommand): AgentSessionCallbacks {
-  return {
-    onExit: command.onExit,
-    onGraphUpdated: command.onGraphUpdated,
-    onOutput: command.onOutput,
-    onToolApprovalRequested: command.onToolApprovalRequested
-  }
-}
-
-function toSnapshot(session: ManagedAgentSession): AgentSessionSnapshot {
-  return {
-    codexThreadId: session.codexThreadId,
-    gitBranch: session.gitBranch,
-    processId: session.processId,
-    projectDirectory: session.projectDirectory,
-    projectId: session.projectId,
-    sessionId: session.sessionId,
-    status: session.status,
-    workspaceDirectory: session.workspaceDirectory,
-    workspaceName: session.workspaceName
-  }
-}
-
-function createCanceledToolResult(toolCallId: string, reason: string): AgentToolExecutionResult {
-  return {
-    output: { reason, type: 'tool_canceled' },
-    status: 'canceled',
-    toolCallId
-  }
-}
-
-function createConversationScope(command: AttachAgentSessionCommand): AgentConversationScope {
-  return AgentConversationScope.create({
-    gitBranch: command.gitBranch ?? null,
-    projectId: command.projectId ?? command.projectDirectory,
-    workspaceName: command.workspaceName
-  })
-}
-
-function createAgentSessionId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `agent-session-${Date.now()}-${Math.random()}`
 }
