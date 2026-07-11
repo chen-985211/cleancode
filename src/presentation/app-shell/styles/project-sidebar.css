@@ -435,46 +435,6 @@
   font-weight: 600;
 }
 
-.branch-workspace-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 7px;
-  margin-top: 6px;
-  border: 1px solid var(--cc-border);
-  border-radius: 9px;
-  background: var(--cc-surface);
-  padding: 8px;
-  box-shadow: 0 6px 18px var(--cc-shadow-color);
-}
-
-.branch-workspace-form input {
-  min-width: 0;
-  height: 32px;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
-  background: var(--cc-surface);
-  padding: 0 9px;
-  color: var(--cc-foreground);
-  font: inherit;
-  font-size: 12px;
-}
-
-.branch-workspace-form button {
-  height: 32px;
-  border: 1px solid var(--cc-primary);
-  border-radius: 7px;
-  background: var(--cc-primary);
-  color: var(--cc-surface);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.branch-workspace-form button:hover {
-  border-color: var(--cc-primary-hover);
-  background: var(--cc-primary-hover);
-}
-
 .sr-only {
   position: absolute;
   width: 1px;

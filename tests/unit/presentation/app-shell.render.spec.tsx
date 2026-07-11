@@ -164,41 +164,6 @@ describe('app shell', () => {
     expect(screen.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
   })
 
-  it('creates a git branch workspace through the desktop runtime API', async () => {
-    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
-    const featureWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-      workspaceName: 'feature/sidebar',
-      workspaceDirectory: '/tmp/alpha-project-worktrees/feature-sidebar',
-      gitBranch: 'feature/sidebar'
-    })
-    const createBranchWorkspace = vi.fn(async () => featureWorkbench)
-
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench]),
-        createBranchWorkspace
-      })
-    })
-
-    render(<AppShell />)
-    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
-
-    fireEvent.click(within(projectCard).getByRole('button', { name: '新建分支工作区' }))
-    fireEvent.change(within(projectCard).getByLabelText('分支名称'), {
-      target: { value: 'feature/sidebar' }
-    })
-    fireEvent.click(within(projectCard).getByRole('button', { name: '创建分支工作区' }))
-
-    await waitFor(() =>
-      expect(createBranchWorkspace).toHaveBeenCalledWith({
-        projectDirectory: '/tmp/alpha-project',
-        branchName: 'feature/sidebar'
-      })
-    )
-    await screen.findByRole('button', { name: 'feature/sidebar 独立工作区' })
-  })
-
   it('switches branch workspaces through the desktop runtime API', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [

@@ -8,10 +8,12 @@ import {
   Trash2,
   X
 } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
+import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspaceForm'
 import type { WorkbenchSnapshot } from './types'
+import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
@@ -114,30 +116,26 @@ function ProjectCard({
   const currentProjectWorkspace = workbench.project.workspaces.find(
     (workspace) => workspace.isCurrent
   )
-  const [isCreatingBranchWorkspace, setIsCreatingBranchWorkspace] = useState(false)
-  const [branchName, setBranchName] = useState('')
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuName, setOpenWorkspaceMenuName] = useState<string | null>(null)
   const [archiveWorkspaceName, setArchiveWorkspaceName] = useState<string | null>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
   const workspaceMenuRootRef = useRef<HTMLDivElement>(null)
+  const {
+    branchName,
+    formRef,
+    isOpen: isBranchWorkspaceFormOpen,
+    setBranchName,
+    submit: submitBranchWorkspace,
+    toggle: toggleBranchWorkspaceForm,
+    triggerRef
+  } = useProjectSidebarBranchWorkspaceForm((newBranchName) =>
+    onCreateBranchWorkspace(workbench, newBranchName)
+  )
   const archiveWorkspace = archiveWorkspaceName
     ? workbench.project.workspaces.find((workspace) => workspace.name === archiveWorkspaceName)
     : null
-  const submitBranchWorkspace = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault()
-
-    const normalizedBranchName = branchName.trim()
-
-    if (!normalizedBranchName) {
-      return
-    }
-
-    onCreateBranchWorkspace(workbench, normalizedBranchName)
-    setBranchName('')
-    setIsCreatingBranchWorkspace(false)
-  }
   const closeBranchSelector = (): void => {
     setIsBranchSelectorOpen(false)
     setBranchSearchQuery('')
@@ -212,7 +210,8 @@ function ProjectCard({
           type="button"
           aria-label="新建分支工作区"
           title="新建分支工作区"
-          onClick={() => setIsCreatingBranchWorkspace((isCreating) => !isCreating)}
+          ref={triggerRef}
+          onClick={toggleBranchWorkspaceForm}
         >
           <Plus size={14} aria-hidden="true" />
         </button>
@@ -403,19 +402,14 @@ function ProjectCard({
             </div>
           )
         })}
-        {isCreatingBranchWorkspace ? (
-          <form className="branch-workspace-form" onSubmit={submitBranchWorkspace}>
-            <label className="sr-only" htmlFor={`${workbench.project.id}-branch-name`}>
-              分支名称
-            </label>
-            <input
-              id={`${workbench.project.id}-branch-name`}
-              value={branchName}
-              onChange={(event) => setBranchName(event.target.value)}
-              placeholder="分支名称"
-            />
-            <button type="submit">创建分支工作区</button>
-          </form>
+        {isBranchWorkspaceFormOpen ? (
+          <ProjectSidebarBranchWorkspaceForm
+            branchName={branchName}
+            formRef={formRef}
+            projectId={workbench.project.id}
+            onBranchNameChange={setBranchName}
+            onSubmit={submitBranchWorkspace}
+          />
         ) : null}
       </div>
       {archiveWorkspace ? (

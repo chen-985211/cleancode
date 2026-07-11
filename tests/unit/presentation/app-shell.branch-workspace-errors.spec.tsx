@@ -43,7 +43,7 @@ describe('app shell branch workspace errors', () => {
     fireEvent.change(within(projectCard).getByLabelText('分支名称'), {
       target: { value: 'main' }
     })
-    fireEvent.click(within(projectCard).getByRole('button', { name: '创建分支工作区' }))
+    fireEvent.click(within(projectCard).getByRole('button', { name: '创建 Worktree' }))
 
     await waitFor(() =>
       expect(createBranchWorkspace).toHaveBeenCalledWith({

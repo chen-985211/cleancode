@@ -1,0 +1,42 @@
+.branch-workspace-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  margin-top: 4px;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface-subtle);
+  padding: 6px;
+}
+
+.branch-workspace-form input {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 6px;
+  background: var(--cc-surface);
+  padding: 0 8px;
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 11px;
+}
+
+.branch-workspace-form button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--cc-primary-border);
+  border-radius: 6px;
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary-hover);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.branch-workspace-form button:hover {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-border);
+}

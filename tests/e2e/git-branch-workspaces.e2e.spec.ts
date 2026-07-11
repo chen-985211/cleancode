@@ -80,7 +80,7 @@ describe('git branch workspaces e2e', () => {
 
       await projectCard.getByRole('button', { name: '新建分支工作区' }).click()
       await projectCard.getByLabel('分支名称').fill('feature/sidebar')
-      await projectCard.getByRole('button', { name: '创建分支工作区' }).click()
+      await projectCard.getByRole('button', { name: '创建 Worktree' }).click()
       await projectCard.getByRole('button', { name: /feature\/sidebar.*独立工作区/ }).waitFor()
       await access(join(featureWorktreeDirectory, '.git'))
       await expectCurrentGitBranch(featureWorktreeDirectory, 'feature/sidebar')
