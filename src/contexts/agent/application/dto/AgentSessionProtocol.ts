@@ -28,10 +28,13 @@ export interface AgentToolApprovalRequest {
 }
 
 export interface AgentSessionSnapshot {
+  readonly codexThreadId: string | null
+  readonly gitBranch: string | null
   readonly processId: number | null
   readonly projectDirectory: string
+  readonly projectId: string
   readonly sessionId: string
-  readonly status: 'running' | 'exited' | 'failed'
+  readonly status: 'running' | 'suspended' | 'exited' | 'failed' | 'restore_failed'
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }

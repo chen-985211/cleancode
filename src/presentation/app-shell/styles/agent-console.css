@@ -269,6 +269,26 @@
   animation: agent-spin 900ms linear infinite;
 }
 
+.agent-runtime-notice__actions {
+  display: inline-flex;
+  margin-left: auto;
+  gap: 4px;
+}
+
+.agent-runtime-notice__actions button {
+  height: 22px;
+  border: 1px solid rgb(147 103 31 / 0.28);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0 6px;
+}
+
+.agent-runtime-notice__actions button:hover {
+  background: rgb(147 103 31 / 0.08);
+}
+
 @keyframes agent-spin {
   to {
     transform: rotate(360deg);

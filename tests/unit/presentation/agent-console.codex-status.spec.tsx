@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
 import {
@@ -87,6 +87,54 @@ describe('agent console Codex status', () => {
     expect(await screen.findByText('Codex 会话启动失败')).toBeInTheDocument()
     expect(screen.queryByText('已安装')).not.toBeInTheDocument()
     expect(screen.queryByText('已连接')).not.toBeInTheDocument()
+  })
+
+  it('offers restrained retry and new-conversation actions when restoration fails', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app', { gitBranch: 'feature/login' })
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const attachAgentSession = vi.fn(async () => ({
+      codexThreadId: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33',
+      gitBranch: 'feature/login',
+      processId: null,
+      projectDirectory: '/repo/app',
+      projectId: workbench.project.id,
+      sessionId: 'agent-session-failed',
+      status: 'restore_failed' as const,
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    }))
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession,
+        inspectCodexCli: vi.fn(async () => ({
+          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+          status: 'installed',
+          version: 'codex-cli 0.143.0'
+        }))
+      })
+    })
+
+    render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
+
+    expect(await screen.findByText('无法恢复上次对话')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重试' }))
+    await waitFor(() =>
+      expect(attachAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          gitBranch: 'feature/login',
+          projectId: workbench.project.id,
+          restartMode: 'retry'
+        })
+      )
+    )
+    fireEvent.click(screen.getByRole('button', { name: '新对话' }))
+    await waitFor(() =>
+      expect(attachAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ restartMode: 'new' })
+      )
+    )
   })
 
   it('keeps the browser preview honest when the desktop runtime is unavailable', async () => {

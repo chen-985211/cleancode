@@ -9,6 +9,9 @@ import type {
 } from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { ExecuteAgentToolCommand } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
+import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
+import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 
 describe('agent session service', () => {
   it('keeps one background Codex PTY per workspace and reattaches without restarting it', async () => {
@@ -58,6 +61,64 @@ describe('agent session service', () => {
     expect(processPort.resizes).toEqual([
       { columns: 120, rows: 40, sessionId: firstSession.sessionId }
     ])
+  })
+
+  it('keeps separate Codex sessions for different branches in the same workspace', async () => {
+    const processPort = new RecordingCodexAgentProcessPort()
+    const service = createSessionService({ processPort })
+    const callbacks = {
+      onExit: () => undefined,
+      onGraphUpdated: () => undefined,
+      onOutput: () => undefined,
+      onToolApprovalRequested: () => undefined
+    }
+    const mainBranchCommand = {
+      ...callbacks,
+      gitBranch: 'main',
+      projectDirectory: '/repo/app',
+      projectId: 'project-1',
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    }
+    const featureBranchCommand = {
+      ...callbacks,
+      gitBranch: 'feature/login',
+      projectDirectory: '/repo/app',
+      projectId: 'project-1',
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    }
+
+    const mainSession = await service.attach(mainBranchCommand)
+    const featureSession = await service.attach(featureBranchCommand)
+
+    expect(featureSession.sessionId).not.toBe(mainSession.sessionId)
+    expect(processPort.starts).toHaveLength(2)
+  })
+
+  it('resumes the persisted Codex thread after the application service is recreated', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const firstProcessPort = new RecordingCodexAgentProcessPort()
+    const firstService = createSessionService({ processPort: firstProcessPort, repository })
+    const command = {
+      gitBranch: 'main',
+      projectId: 'project-1'
+    }
+
+    await attachMainSession(firstService, command)
+    firstProcessPort.starts[0]?.onCodexThreadIdentified('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+    await vi.waitFor(() => expect(repository.sessions.size).toBe(1))
+
+    const restartedProcessPort = new RecordingCodexAgentProcessPort()
+    const restartedService = createSessionService({
+      processPort: restartedProcessPort,
+      repository
+    })
+    await attachMainSession(restartedService, command)
+
+    expect(restartedProcessPort.starts[0]?.resumeThreadId).toBe(
+      '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    )
   })
 
   it('passes user input and terminal resize to the bound Codex PTY', async () => {
@@ -132,7 +193,7 @@ describe('agent session service', () => {
       toolName: 'delete_terminal_group'
     })
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
-    service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
+    await service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
 
     await expect(disposedResultPromise).resolves.toMatchObject({
       status: 'canceled',
@@ -166,7 +227,7 @@ describe('agent session service', () => {
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
     service.approveTool({ approvalId: 'approval-2' })
     await vi.waitFor(() => expect(executeAgentTool).toHaveBeenCalledTimes(2))
-    service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
+    await service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
     resolveApprovedExecution(completedToolResult('approval-2'))
 
     await expect(resultPromise).resolves.toMatchObject({
@@ -201,11 +262,11 @@ class RecordingCodexAgentProcessPort implements CodexAgentProcessPort {
     this.resizes.push({ columns, rows, sessionId })
   }
 
-  stop(sessionId: string): void {
+  async stop(sessionId: string): Promise<void> {
     this.stops.push(sessionId)
   }
 
-  disposeAll(): void {
+  async disposeAll(): Promise<void> {
     this.stops.push('*')
   }
 }
@@ -238,13 +299,39 @@ function createSessionService(
     readonly executeAgentTool?: ExecuteAgentTool
     readonly mcpServerPort?: AgentMcpServerPort
     readonly processPort?: CodexAgentProcessPort
+    readonly repository?: AgentSessionRepository
   } = {}
 ): AgentSessionService {
   return new AgentSessionService(
     input.processPort ?? new RecordingCodexAgentProcessPort(),
     input.mcpServerPort ?? new RecordingMcpServerPort(),
-    input.executeAgentTool ?? (async () => completedToolResult('tool-call-1'))
+    input.executeAgentTool ?? (async () => completedToolResult('tool-call-1')),
+    input.repository ?? new RecordingAgentSessionRepository()
   )
+}
+
+class RecordingAgentSessionRepository implements AgentSessionRepository {
+  readonly sessions = new Map<string, AgentSession>()
+
+  async find(scope: AgentConversationScope): Promise<AgentSession | null> {
+    return this.sessions.get(scope.key) ?? null
+  }
+
+  async save(session: AgentSession): Promise<void> {
+    this.sessions.set(session.scope.key, session)
+  }
+
+  async delete(scope: AgentConversationScope): Promise<void> {
+    this.sessions.delete(scope.key)
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    for (const [key, session] of this.sessions.entries()) {
+      if (session.scope.toSnapshot().projectId === projectId) {
+        this.sessions.delete(key)
+      }
+    }
+  }
 }
 
 async function attachMainSession(

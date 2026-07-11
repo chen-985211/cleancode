@@ -109,8 +109,11 @@ describe('agent IPC contract', () => {
         })
 
         return {
+          codexThreadId: null,
+          gitBranch: command.gitBranch ?? null,
           processId: 42,
           projectDirectory: command.projectDirectory,
+          projectId: command.projectId,
           sessionId: 'agent-session-1',
           status: 'running',
           workspaceDirectory: command.workspaceDirectory,
@@ -126,7 +129,9 @@ describe('agent IPC contract', () => {
         'cleancode:attach-agent-session',
         {
           columns: 100,
+          gitBranch: 'feature/login',
           projectDirectory: '/repo/app',
+          projectId: 'project-1',
           rows: 32,
           workspaceDirectory: '/repo/app-worktrees/feature',
           workspaceName: 'feature'
@@ -136,8 +141,11 @@ describe('agent IPC contract', () => {
     ).resolves.toEqual({
       ok: true,
       value: {
+        codexThreadId: null,
+        gitBranch: 'feature/login',
         processId: 42,
         projectDirectory: '/repo/app',
+        projectId: 'project-1',
         sessionId: 'agent-session-1',
         status: 'running',
         workspaceDirectory: '/repo/app-worktrees/feature',
@@ -147,7 +155,9 @@ describe('agent IPC contract', () => {
     expect(attachAgentSession).toHaveBeenCalledWith(
       expect.objectContaining({
         columns: 100,
+        gitBranch: 'feature/login',
         projectDirectory: '/repo/app',
+        projectId: 'project-1',
         rows: 32,
         workspaceDirectory: '/repo/app-worktrees/feature',
         workspaceName: 'feature'
@@ -247,15 +257,18 @@ function createAgentIpcHandlersInput(input: {
     attachAgentSession:
       input.attachAgentSession ??
       (async (command) => ({
+        codexThreadId: null,
+        gitBranch: command.gitBranch ?? null,
         processId: 1,
         projectDirectory: command.projectDirectory,
+        projectId: command.projectId,
         sessionId: 'agent-session-1',
         status: 'running' as const,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })),
-    disposeAgentWorkspaceSession: input.disposeAgentWorkspaceSession ?? (() => undefined),
-    disposeProjectAgentSessions: input.disposeProjectAgentSessions ?? (() => undefined),
+    disposeAgentWorkspaceSession: input.disposeAgentWorkspaceSession ?? (async () => undefined),
+    disposeProjectAgentSessions: input.disposeProjectAgentSessions ?? (async () => undefined),
     inspectCodexCli:
       input.inspectCodexCli ??
       (async () => ({

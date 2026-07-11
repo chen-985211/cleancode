@@ -15,6 +15,7 @@ describe('Codex agent PTY process adapter', () => {
     await writeFile(
       scriptPath,
       [
+        'import { spawnSync } from "node:child_process"',
         'process.stdout.write(JSON.stringify({',
         '  argv: process.argv.slice(2),',
         '  cwd: process.cwd(),',
@@ -22,6 +23,15 @@ describe('Codex agent PTY process adapter', () => {
         '  lowercaseNoProxy: process.env.no_proxy,',
         '  token: process.env.CLEANCODE_MCP_TOKEN',
         '}) + "\\n")',
+        'const notifyArg = process.argv.find((arg) => arg.startsWith("notify="))',
+        'if (notifyArg) {',
+        '  const notify = JSON.parse(notifyArg.slice("notify=".length))',
+        '  spawnSync(notify[0], [...notify.slice(1), JSON.stringify({',
+        '    type: "agent-turn-complete",',
+        '    "thread-id": "0190d8a1-8b7d-7d75-9f62-7a663ef87e33",',
+        '    cwd: process.cwd()',
+        '  })], { env: process.env })',
+        '}',
         'process.stdin.on("data", (chunk) => process.stdout.write("INPUT:" + chunk.toString()))'
       ].join('\n')
     )
@@ -32,16 +42,20 @@ describe('Codex agent PTY process adapter', () => {
   })
 
   afterEach(async () => {
-    adapter.disposeAll()
+    await adapter.disposeAll()
     await rm(workingDirectory, { recursive: true, force: true })
   })
 
   it('starts Codex in the workspace directory with MCP configuration and streams stdin/stdout', async () => {
     let output = ''
+    let identifiedThreadId = ''
     const handle = await adapter.start({
       bearerToken: 'token-1',
       columns: 90,
       mcpServerUrl: 'http://127.0.0.1:43123/mcp',
+      onCodexThreadIdentified: (threadId) => {
+        identifiedThreadId = threadId
+      },
       onExit: () => undefined,
       onOutput: (event) => {
         output += event.data
@@ -52,6 +66,7 @@ describe('Codex agent PTY process adapter', () => {
     })
 
     await waitUntil(() => output.includes('"argv"'))
+    await waitUntil(() => Boolean(identifiedThreadId))
     adapter.write('agent-session-1', 'hello codex\r')
     await waitUntil(() => output.includes('INPUT:hello codex'))
 
@@ -74,7 +89,32 @@ describe('Codex agent PTY process adapter', () => {
     expect(output).toContain('mcp_servers.cleancode.bearer_token_env_var')
     expect(output).toContain('mcp_servers.cleancode.default_tools_approval_mode')
     expect(output).toContain('approve')
+    expect(identifiedThreadId).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
   }, 10_000)
+
+  it('starts a persisted conversation with the exact Codex resume thread id', async () => {
+    let output = ''
+
+    await adapter.start({
+      bearerToken: 'token-1',
+      columns: 90,
+      mcpServerUrl: 'http://127.0.0.1:43123/mcp',
+      onCodexThreadIdentified: () => undefined,
+      onExit: () => undefined,
+      onOutput: (event) => {
+        output += event.data
+      },
+      resumeThreadId: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33',
+      rows: 28,
+      sessionId: 'agent-session-resumed',
+      workspaceDirectory: workingDirectory
+    })
+
+    await waitUntil(() => output.includes('"argv"'))
+
+    expect(output).toContain('resume')
+    expect(output).toContain('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+  })
 })
 
 async function waitUntil(assertion: () => boolean): Promise<void> {

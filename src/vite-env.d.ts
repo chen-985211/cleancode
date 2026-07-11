@@ -58,7 +58,11 @@ declare global {
       inspectCodexCli(): Promise<CodexCliInstallationSnapshot>
       attachAgentSession(command: {
         readonly columns?: number
+        readonly gitBranch?: string | null
+        readonly persistenceMode?: 'ephemeral' | 'persistent'
         readonly projectDirectory: string
+        readonly projectId: string
+        readonly restartMode?: 'new' | 'retry'
         readonly rows?: number
         readonly workspaceDirectory: string
         readonly workspaceName: string

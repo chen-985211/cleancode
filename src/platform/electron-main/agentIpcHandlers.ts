@@ -20,11 +20,15 @@ export interface AgentIpcHandlersInput {
   readonly approveAgentTool: (approvalId: string) => void
   readonly attachAgentSession: (command: {
     readonly columns?: number
+    readonly gitBranch?: string | null
     readonly onExit: (event: AgentPtyExitEvent) => void
     readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
     readonly onOutput: (event: AgentPtyOutputEvent) => void
     readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
+    readonly persistenceMode?: 'ephemeral' | 'persistent'
     readonly projectDirectory: string
+    readonly projectId: string
+    readonly restartMode?: 'new' | 'retry'
     readonly rows?: number
     readonly workspaceDirectory: string
     readonly workspaceName: string
@@ -32,8 +36,8 @@ export interface AgentIpcHandlersInput {
   readonly disposeAgentWorkspaceSession: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
-  }) => void
-  readonly disposeProjectAgentSessions: (projectDirectory: string) => void
+  }) => Promise<void>
+  readonly disposeProjectAgentSessions: (projectDirectory: string) => Promise<void>
   readonly inspectCodexCli: () => Promise<CodexCliInstallationSnapshot>
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
@@ -55,7 +59,11 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
   registerIpcHandler<
     {
       readonly columns?: number
+      readonly gitBranch?: string | null
       readonly projectDirectory: string
+      readonly projectId: string
+      readonly persistenceMode?: 'ephemeral' | 'persistent'
+      readonly restartMode?: 'new' | 'retry'
       readonly rows?: number
       readonly workspaceDirectory: string
       readonly workspaceName: string
@@ -68,13 +76,17 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
 
       return input.attachAgentSession({
         columns: command.columns,
+        gitBranch: command.gitBranch,
         onExit: (exitEvent) => sendIfAlive(sender, 'cleancode:agent-pty-exit', exitEvent),
         onGraphUpdated: (graphEvent) =>
           sendIfAlive(sender, 'cleancode:agent-graph-updated', graphEvent),
         onOutput: (outputEvent) => sendIfAlive(sender, 'cleancode:agent-pty-output', outputEvent),
         onToolApprovalRequested: (approvalEvent) =>
           sendIfAlive(sender, 'cleancode:agent-tool-approval-requested', approvalEvent),
+        persistenceMode: command.persistenceMode,
         projectDirectory: command.projectDirectory,
+        projectId: command.projectId,
+        restartMode: command.restartMode,
         rows: command.rows,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName

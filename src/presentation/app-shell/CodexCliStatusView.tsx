@@ -9,9 +9,13 @@ export type CodexCliPanelState =
   | { readonly status: 'ready'; readonly installation: CodexCliInstallationSnapshot }
 
 export function CodexCliStatusView({
+  onNewConversation,
+  onRetryRestore,
   state,
   sessionStatus
 }: {
+  readonly onNewConversation?: () => void
+  readonly onRetryRestore?: () => void
   readonly state: CodexCliPanelState
   readonly sessionStatus: AgentSessionSnapshot['status'] | null
 }) {
@@ -48,6 +52,23 @@ export function CodexCliStatusView({
       <div className="agent-runtime-notice" role="status" data-tone="warning">
         <CircleAlert size={14} aria-hidden="true" />
         <span>Codex 会话启动失败</span>
+      </div>
+    )
+  }
+
+  if (sessionStatus === 'restore_failed') {
+    return (
+      <div className="agent-runtime-notice" role="status" data-tone="warning">
+        <CircleAlert size={14} aria-hidden="true" />
+        <span>无法恢复上次对话</span>
+        <span className="agent-runtime-notice__actions">
+          <button type="button" onClick={onRetryRestore}>
+            重试
+          </button>
+          <button type="button" onClick={onNewConversation}>
+            新对话
+          </button>
+        </span>
       </div>
     )
   }

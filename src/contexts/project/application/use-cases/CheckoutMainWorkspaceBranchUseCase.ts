@@ -3,6 +3,7 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import type { WorkspaceAgentLifecyclePort } from '../ports/WorkspaceAgentLifecyclePort'
 
 export interface CheckoutMainWorkspaceBranchCommand {
   readonly projectDirectory: string
@@ -12,7 +13,8 @@ export interface CheckoutMainWorkspaceBranchCommand {
 export class CheckoutMainWorkspaceBranchUseCase {
   constructor(
     private readonly projectRepository: ProjectRepository,
-    private readonly gitWorkspacePort: GitWorkspacePort
+    private readonly gitWorkspacePort: GitWorkspacePort,
+    private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort
   ) {}
 
   async execute(command: CheckoutMainWorkspaceBranchCommand): Promise<ProjectSnapshot> {
@@ -50,10 +52,20 @@ export class CheckoutMainWorkspaceBranchUseCase {
       )
     }
 
-    await this.gitWorkspacePort.checkoutBranch({
-      repositoryDirectory: project.directory,
-      branchName
-    })
+    const wasAgentSuspended = await this.workspaceAgentLifecyclePort.suspend(project.directory)
+
+    try {
+      await this.gitWorkspacePort.checkoutBranch({
+        repositoryDirectory: project.directory,
+        branchName
+      })
+    } catch (error) {
+      if (wasAgentSuspended) {
+        await this.workspaceAgentLifecyclePort.resume(project.directory)
+      }
+
+      throw error
+    }
 
     const worktrees = inspection.branches
       .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
@@ -73,6 +85,11 @@ export class CheckoutMainWorkspaceBranchUseCase {
 
     return updatedProject.toSnapshot()
   }
+}
+
+const noopWorkspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = {
+  resume: async () => undefined,
+  suspend: async () => false
 }
 
 function normalizeBranchName(branchName: string): string {

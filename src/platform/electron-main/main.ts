@@ -10,6 +10,7 @@ import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/
 import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/NodeCodexCliAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
 import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
+import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
 import { NodePtyCodexAgentProcessAdapter } from '../../contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
@@ -82,10 +83,6 @@ const archiveBranchWorkspaceUseCase = new ArchiveBranchWorkspaceUseCase(
   gitWorkspaceAdapter
 )
 const switchBranchWorkspaceUseCase = new SwitchBranchWorkspaceUseCase(projectRepository)
-const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
-  projectRepository,
-  gitWorkspaceAdapter
-)
 const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
   projectRepository,
   gitWorkspaceAdapter
@@ -115,6 +112,9 @@ const inspectCodexCliUseCase = new InspectCodexCliUseCase(codexCliAdapter)
 const agentAuditRepository = new FileSystemAgentAuditRepository(
   join(appStateDirectoryPath, 'agent-audit.jsonl')
 )
+const agentSessionRepository = new FileSystemAgentSessionRepository(
+  join(appStateDirectoryPath, 'agent-sessions.json')
+)
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
@@ -135,7 +135,18 @@ const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
 const agentSessionService = new AgentSessionService(
   new NodePtyCodexAgentProcessAdapter(),
   new CleancodeMcpHttpServer(),
-  (command) => executeAgentToolUseCase.execute(command)
+  (command) => executeAgentToolUseCase.execute(command),
+  agentSessionRepository
+)
+const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
+  projectRepository,
+  gitWorkspaceAdapter,
+  {
+    resume: (workspaceDirectory) =>
+      agentSessionService.resumeWorkspaceDirectory(workspaceDirectory),
+    suspend: (workspaceDirectory) =>
+      agentSessionService.suspendWorkspaceDirectory(workspaceDirectory)
+  }
 )
 const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
@@ -222,16 +233,14 @@ registerAgentIpcHandlers({
     isAgentAutostartDisabledForTest
       ? Promise.resolve(createDisabledAgentSessionSnapshot(command))
       : agentSessionService.attach(command),
-  disposeAgentWorkspaceSession: (command) => {
-    if (!isAgentAutostartDisabledForTest) {
-      agentSessionService.disposeSession(command)
-    }
-  },
-  disposeProjectAgentSessions: (projectDirectory) => {
-    if (!isAgentAutostartDisabledForTest) {
-      agentSessionService.disposeProject(projectDirectory)
-    }
-  },
+  disposeAgentWorkspaceSession: (command) =>
+    isAgentAutostartDisabledForTest
+      ? Promise.resolve()
+      : agentSessionService.disposeSession(command),
+  disposeProjectAgentSessions: (projectDirectory) =>
+    isAgentAutostartDisabledForTest
+      ? Promise.resolve()
+      : agentSessionService.disposeProject(projectDirectory),
   inspectCodexCli: () => inspectCodexCliUseCase.execute(),
   ipcMain,
   logger: consoleLogger,
@@ -249,13 +258,18 @@ registerAgentIpcHandlers({
 })
 
 function createDisabledAgentSessionSnapshot(command: {
+  readonly gitBranch?: string | null
   readonly projectDirectory: string
+  readonly projectId: string
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }): AgentSessionSnapshot {
   return {
+    codexThreadId: null,
+    gitBranch: command.gitBranch ?? null,
     processId: null,
     projectDirectory: command.projectDirectory,
+    projectId: command.projectId,
     sessionId: `test-agent-${command.workspaceName}`,
     status: 'exited',
     workspaceDirectory: command.workspaceDirectory,
@@ -386,7 +400,23 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => {
+let isReadyToQuit = false
+let isPreparingToQuit = false
+
+app.on('before-quit', (event) => {
+  if (isReadyToQuit) {
+    return
+  }
+
+  event.preventDefault()
+  if (isPreparingToQuit) {
+    return
+  }
+
+  isPreparingToQuit = true
   terminalSessionService.stopAll()
-  agentSessionService.disposeAll()
+  void agentSessionService.disposeAll().finally(() => {
+    isReadyToQuit = true
+    app.quit()
+  })
 })

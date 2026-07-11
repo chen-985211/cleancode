@@ -36,6 +36,7 @@ export function AgentConsole({
   )
   const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
   const [activeOutput, setActiveOutput] = useState('')
+  const [attachAttempt, setAttachAttempt] = useState(0)
   const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
   const currentWorkspaceKey = createWorkspaceKey(currentWorkbench, currentWorkspace)
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
@@ -44,6 +45,10 @@ export function AgentConsole({
   const activeOutputRef = useRef(activeOutput)
   const dimensionsRef = useRef(defaultAgentXtermDimensions)
   const outputBySessionRef = useRef(new Map<string, string>())
+  const restartRequestRef = useRef<{
+    readonly mode: 'new' | 'retry'
+    readonly workspaceKey: string
+  } | null>(null)
   const sessionRef = useRef<AgentSessionSnapshot | null>(null)
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
   const xtermRef = useRef<XTerm | null>(null)
@@ -154,9 +159,19 @@ export function AgentConsole({
         return
       }
 
+      const restartRequest = restartRequestRef.current
+      const restartMode =
+        restartRequest?.workspaceKey === currentWorkspaceKey ? restartRequest.mode : undefined
       const nextSession = await api.attachAgentSession({
         columns: dimensionsRef.current.columns,
+        gitBranch: currentWorkspace.gitBranch,
+        persistenceMode:
+          currentWorkspace.gitBranch || currentWorkbench.gitBranches.length === 0
+            ? 'persistent'
+            : 'ephemeral',
         projectDirectory: currentWorkbench.project.directory,
+        projectId: currentWorkbench.project.id,
+        restartMode,
         rows: dimensionsRef.current.rows,
         workspaceDirectory: currentWorkspace.directory,
         workspaceName: currentWorkspace.name
@@ -166,6 +181,9 @@ export function AgentConsole({
         return
       }
 
+      if (restartMode) {
+        restartRequestRef.current = null
+      }
       setSession(nextSession)
       const restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
       setActiveOutput(restoredOutput)
@@ -176,7 +194,7 @@ export function AgentConsole({
     return () => {
       isCurrent = false
     }
-  }, [currentWorkbench, currentWorkspace])
+  }, [attachAttempt, currentWorkbench, currentWorkspace, currentWorkspaceKey])
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -225,6 +243,15 @@ export function AgentConsole({
   )
   const workspaceLabel = resolveWorkspaceLabel(currentWorkbench, currentWorkspace)
 
+  function restartSession(mode: 'new' | 'retry'): void {
+    if (!currentWorkspaceKey) {
+      return
+    }
+
+    restartRequestRef.current = { mode, workspaceKey: currentWorkspaceKey }
+    setAttachAttempt((attempt) => attempt + 1)
+  }
+
   async function approveApproval(approval: AgentToolApprovalRequest): Promise<void> {
     setPendingApprovals((approvals) =>
       approvals.filter((candidate) => candidate.approvalId !== approval.approvalId)
@@ -253,7 +280,12 @@ export function AgentConsole({
             </div>
           </div>
         </div>
-        <CodexCliStatusView state={codexCliState} sessionStatus={session?.status ?? null} />
+        <CodexCliStatusView
+          state={codexCliState}
+          sessionStatus={session?.status ?? null}
+          onNewConversation={() => restartSession('new')}
+          onRetryRestore={() => restartSession('retry')}
+        />
       </div>
       {activeApproval ? (
         <div className="agent-approval" role="group" aria-label="Agent 工具授权">
@@ -335,14 +367,16 @@ function resolveWorkspaceLabel(
     return '未选择工作区'
   }
 
-  return `${workbench.project.name} / ${workspace.name}`
+  return `${workbench.project.name} / ${workspace.name} · ${workspace.gitBranch ?? '无分支'}`
 }
 
 function createWorkspaceKey(
   workbench: WorkbenchSnapshot | null,
   workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
 ): string | null {
-  return workbench && workspace ? `${workbench.project.directory}\0${workspace.name}` : null
+  return workbench && workspace
+    ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}`
+    : null
 }
 
 function isTestRuntime(): boolean {

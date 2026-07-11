@@ -13,6 +13,7 @@ import type {
   StartCodexAgentProcessCommand
 } from '../../application/ports/CodexAgentProcessPort'
 import { codexAgentDeveloperInstructions } from '../../application/dto/AgentToolProtocol'
+import { CodexThreadIdentityReporter } from './CodexThreadIdentityReporter'
 
 const nodeRequire = createRequire(import.meta.url)
 const localMcpNoProxyHosts = ['127.0.0.1', 'localhost', '::1']
@@ -34,19 +35,35 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
 
   async start(command: StartCodexAgentProcessCommand): Promise<CodexAgentProcessHandle> {
     ensureNodePtySpawnHelperIsExecutable()
-
-    const ptyProcess = spawnPtyProcess(this.command, [...this.createArgs(command)], {
-      cols: command.columns,
-      cwd: command.workspaceDirectory,
-      env: createProcessEnvironment(command.bearerToken),
-      name: 'xterm-256color',
-      rows: command.rows
+    const identityReporter = await CodexThreadIdentityReporter.start({
+      onThreadIdentified: command.onCodexThreadIdentified,
+      workspaceDirectory: command.workspaceDirectory
     })
+    let ptyProcess: IPty
 
-    this.processes.set(command.sessionId, { process: ptyProcess })
+    try {
+      ptyProcess = spawnPtyProcess(this.command, [...this.createArgs(command)], {
+        cols: command.columns,
+        cwd: command.workspaceDirectory,
+        env: createProcessEnvironment(command.bearerToken, identityReporter),
+        name: 'xterm-256color',
+        rows: command.rows
+      })
+    } catch (error) {
+      await identityReporter.close()
+      throw error
+    }
+
+    let resolveExit = (): void => undefined
+    const exit = new Promise<void>((resolve) => {
+      resolveExit = resolve
+    })
+    this.processes.set(command.sessionId, { exit, identityReporter, process: ptyProcess })
     ptyProcess.onData((data) => command.onOutput({ data, sessionId: command.sessionId }))
     ptyProcess.onExit((event) => {
       this.processes.delete(command.sessionId)
+      void identityReporter.close()
+      resolveExit()
       command.onExit({ exitCode: event.exitCode, sessionId: command.sessionId })
     })
 
@@ -61,26 +78,30 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
     this.requireProcess(sessionId).process.resize(columns, rows)
   }
 
-  stop(sessionId: string): void {
+  async stop(sessionId: string): Promise<void> {
     const managedProcess = this.processes.get(sessionId)
 
     if (!managedProcess) {
-      return
+      return Promise.resolve()
     }
 
     managedProcess.process.kill()
-    this.processes.delete(sessionId)
-  }
+    const didExit = await waitForProcessExit(managedProcess.exit)
 
-  disposeAll(): void {
-    for (const sessionId of this.processes.keys()) {
-      this.stop(sessionId)
+    if (!didExit) {
+      this.processes.delete(sessionId)
+      await managedProcess.identityReporter.close()
     }
   }
 
+  async disposeAll(): Promise<void> {
+    await Promise.all([...this.processes.keys()].map((sessionId) => this.stop(sessionId)))
+  }
+
   private createArgs(command: StartCodexAgentProcessCommand): readonly string[] {
-    return [
+    const sharedArgs = [
       ...this.baseArgs,
+      ...(command.resumeThreadId ? ['resume', command.resumeThreadId] : []),
       '--no-alt-screen',
       '-C',
       command.workspaceDirectory,
@@ -97,8 +118,12 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
       '--config',
       'mcp_servers.cleancode.enabled=true',
       '--config',
+      `notify=${JSON.stringify([process.execPath, '-e', codexNotifyReporterScript])}`,
+      '--config',
       'mcp_servers.cleancode.default_tools_approval_mode="approve"'
     ]
+
+    return sharedArgs
   }
 
   private requireProcess(sessionId: string): ManagedCodexAgentProcess {
@@ -117,10 +142,15 @@ function toTomlString(value: string): string {
 }
 
 interface ManagedCodexAgentProcess {
+  readonly exit: Promise<void>
+  readonly identityReporter: CodexThreadIdentityReporter
   readonly process: IPty
 }
 
-function createProcessEnvironment(bearerToken: string): Record<string, string> {
+function createProcessEnvironment(
+  bearerToken: string,
+  identityReporter: CodexThreadIdentityReporter
+): Record<string, string> {
   const inheritedEnvironment = Object.fromEntries(
     Object.entries(process.env).filter((entry): entry is [string, string] => {
       return typeof entry[1] === 'string'
@@ -134,11 +164,30 @@ function createProcessEnvironment(bearerToken: string): Record<string, string> {
 
   return {
     ...inheritedEnvironment,
+    CLEANCODE_CODEX_NOTIFY_TOKEN: identityReporter.token,
+    CLEANCODE_CODEX_NOTIFY_URL: identityReporter.url,
     CLEANCODE_MCP_TOKEN: bearerToken,
+    ELECTRON_RUN_AS_NODE: '1',
     NO_PROXY: noProxy,
     no_proxy: noProxy,
     PROMPT_EOL_MARK: ''
   }
+}
+
+const codexNotifyReporterScript = [
+  'const body=process.argv.at(-1);',
+  'fetch(process.env.CLEANCODE_CODEX_NOTIFY_URL,{',
+  'method:"POST",',
+  'headers:{authorization:`Bearer ${process.env.CLEANCODE_CODEX_NOTIFY_TOKEN}`},',
+  'body',
+  '}).catch(()=>{});'
+].join('')
+
+async function waitForProcessExit(exit: Promise<void>): Promise<boolean> {
+  return Promise.race([
+    exit.then(() => true),
+    new Promise<false>((resolveTimeout) => setTimeout(() => resolveTimeout(false), 3_000))
+  ])
 }
 
 function mergeNoProxyHosts(
