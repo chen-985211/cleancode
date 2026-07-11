@@ -18,6 +18,7 @@ import {
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
+import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
@@ -94,6 +95,7 @@ export function WorkbenchCanvas({
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
+  const activeDraggedNodeIdRef = useRef<string | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
   const canvasSurfaceClassName = [
@@ -259,16 +261,25 @@ export function WorkbenchCanvas({
             setViewportZoom(viewport.zoom)
             setCanvasViewport(toCanvasViewportSnapshot(viewport))
           }}
-          onNodesChange={onNodesChange}
+          onNodesChange={(changes) =>
+            onNodesChange(
+              isolateWorkbenchNodeDragChanges(changes, nodes, activeDraggedNodeIdRef.current)
+            )
+          }
           onNodeClick={onNodeClick}
           onNodeDragStart={(event, node) => {
+            activeDraggedNodeIdRef.current = node.id
             setIsDraggingTerminalNode(true)
             onNodeDragStart(event, node)
           }}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={(event, node) => {
-            setIsDraggingTerminalNode(false)
-            onNodeDragStop(event, node)
+            try {
+              setIsDraggingTerminalNode(false)
+              onNodeDragStop(event, node)
+            } finally {
+              activeDraggedNodeIdRef.current = null
+            }
           }}
           onMove={(_event, viewport) => {
             const canvasViewportSnapshot = toCanvasViewportSnapshot(viewport)
@@ -282,6 +293,8 @@ export function WorkbenchCanvas({
             }
           }}
           defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
+          multiSelectionKeyCode={null}
+          selectionKeyCode={null}
           minZoom={minimumCanvasZoom}
           maxZoom={maximumCanvasZoom}
         >
