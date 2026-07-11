@@ -332,7 +332,7 @@ describe('agent console terminal', () => {
         expect.objectContaining({ workspaceName: 'main' })
       )
     )
-    fireEvent.click(await screen.findByRole('button', { name: 'feature worktree' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'feature 独立工作区' }))
 
     await waitFor(() =>
       expect(attachAgentSession).toHaveBeenLastCalledWith(

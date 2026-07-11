@@ -152,7 +152,10 @@
   box-shadow: 0 0 0 2px var(--cc-chrome);
 }
 
-.project-dot--active,
+.project-dot--active {
+  background: var(--cc-success);
+}
+
 .status-dot--running {
   background: var(--cc-success);
 }
@@ -181,8 +184,7 @@
   font-size: 12px;
   transition:
     background 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
+    color 140ms ease;
 }
 
 .workspace-row:hover,
@@ -197,7 +199,6 @@
   background: var(--cc-primary-soft);
   color: var(--cc-primary-hover);
   font-weight: 620;
-  box-shadow: inset 2px 0 0 var(--cc-primary);
 }
 
 .default-branch-selector {
@@ -219,6 +220,8 @@
 }
 
 .default-branch-selector__select {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   flex: 1 1 auto;
   gap: 8px;
   padding: 0 7px 0 8px;
@@ -262,13 +265,28 @@
 
 .badge--default-workspace {
   max-width: 62px;
-}
-
-.badge--worktree {
-  max-width: 54px;
   border-color: var(--cc-border);
   background: var(--cc-surface-subtle);
   color: var(--cc-muted-strong);
+}
+
+.workspace-row__branch-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-row__branch-icon svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.workspace-row__name {
+  display: block;
 }
 
 .branch-selector-popover {

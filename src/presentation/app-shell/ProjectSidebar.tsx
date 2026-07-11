@@ -1,4 +1,13 @@
-import { Archive, ChevronDown, GitBranch, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
+import {
+  Archive,
+  ChevronDown,
+  Folders,
+  GitBranch,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  X
+} from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
@@ -222,15 +231,18 @@ function ProjectCard({
           const isActiveWorkspace = workspace.isCurrent && isCurrentProject
           const boundBranchName = workspace.gitBranch ?? workspace.name
           const isDefaultWorkspace = workspace.name === 'main'
+          const isGitUninitialized =
+            isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
           const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
+          const workspaceDisplayName = isGitUninitialized ? 'Git 未初始化' : workspace.name
           const shouldShowDefaultWorkspaceBadge =
             isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
           const shouldShowGitBranchBadge =
             Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.name
           const workspaceButtonLabel = [
-            workspace.name,
+            workspaceDisplayName,
             shouldShowDefaultWorkspaceBadge ? '默认工作区' : null,
-            isWorktreeWorkspace ? 'worktree' : null,
+            isWorktreeWorkspace ? '独立工作区' : null,
             shouldShowGitBranchBadge ? workspace.gitBranch : null
           ]
             .filter(Boolean)
@@ -265,8 +277,10 @@ function ProjectCard({
                       title={boundBranchName}
                       onClick={() => onSelectWorkspace(workbench, 'main')}
                     >
-                      <GitBranch size={14} aria-hidden="true" />
-                      <span className="truncate">{boundBranchName}</span>
+                      <span className="workspace-row__branch-icon" aria-hidden="true">
+                        <GitBranch size={14} />
+                      </span>
+                      <span className="workspace-row__name truncate">{boundBranchName}</span>
                       {shouldShowDefaultWorkspaceBadge ? (
                         <span className="badge badge--default-workspace">默认工作区</span>
                       ) : null}
@@ -318,19 +332,33 @@ function ProjectCard({
                       aria-current={isActiveWorkspace ? 'page' : undefined}
                       className="workspace-row__select"
                       type="button"
-                      title={workspace.name}
+                      title={workspaceDisplayName}
                       onClick={() => onSelectWorkspace(workbench, workspace.name)}
                     >
-                      <GitBranch size={14} aria-hidden="true" />
-                      <span className="truncate">{workspace.name}</span>
-                      {shouldShowDefaultWorkspaceBadge ? (
-                        <span className="badge badge--default-workspace">默认工作区</span>
-                      ) : null}
-                      {isWorktreeWorkspace ? (
-                        <span className="badge badge--worktree">worktree</span>
-                      ) : null}
-                      {shouldShowGitBranchBadge ? (
-                        <span className="badge badge--git">{workspace.gitBranch}</span>
+                      <span className="workspace-row__branch-icon" aria-hidden="true">
+                        <GitBranch size={14} />
+                      </span>
+                      <span className="workspace-row__name truncate">{workspaceDisplayName}</span>
+                      {shouldShowDefaultWorkspaceBadge ||
+                      isWorktreeWorkspace ||
+                      shouldShowGitBranchBadge ? (
+                        <span className="workspace-row__metadata">
+                          {shouldShowDefaultWorkspaceBadge ? (
+                            <span className="badge badge--default-workspace">默认工作区</span>
+                          ) : null}
+                          {isWorktreeWorkspace ? (
+                            <span
+                              className="workspace-row__kind"
+                              aria-hidden="true"
+                              title="独立工作区"
+                            >
+                              <Folders size={12} />
+                            </span>
+                          ) : null}
+                          {shouldShowGitBranchBadge ? (
+                            <span className="badge badge--git">{workspace.gitBranch}</span>
+                          ) : null}
+                        </span>
                       ) : null}
                     </button>
                     {isWorktreeWorkspace ? (

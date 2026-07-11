@@ -153,8 +153,6 @@ describe('app shell', () => {
     render(<AppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
-    expect(within(projectCard).getByText('默认工作区')).toBeInTheDocument()
-
     fireEvent.click(within(projectCard).getByRole('button', { name: '移除项目' }))
 
     await waitFor(() =>
@@ -198,7 +196,7 @@ describe('app shell', () => {
         branchName: 'feature/sidebar'
       })
     )
-    await screen.findByRole('button', { name: 'feature/sidebar worktree' })
+    await screen.findByRole('button', { name: 'feature/sidebar 独立工作区' })
   })
 
   it('switches branch workspaces through the desktop runtime API', async () => {
@@ -236,7 +234,7 @@ describe('app shell', () => {
     render(<AppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
-    fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/sidebar worktree' }))
+    fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/sidebar 独立工作区' }))
 
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
@@ -304,9 +302,16 @@ describe('app shell', () => {
     ).toBeEnabled()
     expect(within(projectCard).getByText('默认工作区')).toBeInTheDocument()
     expect(within(projectCard).queryByRole('button', { name: /feature\/free/ })).toBeNull()
-    expect(
-      within(projectCard).getByRole('button', { name: 'feature/worktree worktree' })
-    ).toBeEnabled()
+    const worktreeWorkspaceButton = within(projectCard).getByRole('button', {
+      name: 'feature/worktree 独立工作区'
+    })
+
+    expect(worktreeWorkspaceButton).toBeEnabled()
+    const worktreeIndicator = within(worktreeWorkspaceButton).getByTitle('独立工作区')
+
+    expect(worktreeIndicator).toBeInTheDocument()
+    expect(worktreeIndicator.querySelector('.lucide-folders')).toBeInTheDocument()
+    expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))
 
@@ -418,7 +423,7 @@ describe('app shell', () => {
     render(<AppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
-    expect(within(projectCard).getByRole('button', { name: 'test worktree' })).toBeEnabled()
+    expect(within(projectCard).getByRole('button', { name: 'test 独立工作区' })).toBeEnabled()
     expect(within(projectCard).queryByText('当前')).not.toBeInTheDocument()
     expect(within(projectCard).queryByRole('button', { name: 'test 当前 test' })).toBeNull()
   })

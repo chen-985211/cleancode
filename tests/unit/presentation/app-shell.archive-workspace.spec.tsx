@@ -66,7 +66,7 @@ describe('app shell worktree archive', () => {
       })
     )
     await screen.findByRole('button', { name: '切换到默认工作区 main' })
-    expect(within(projectCard).queryByRole('button', { name: 'test worktree' })).toBeNull()
+    expect(within(projectCard).queryByRole('button', { name: 'test 独立工作区' })).toBeNull()
   })
 
   it('shows a clear error when the worktree has uncommitted changes', async () => {
@@ -100,7 +100,7 @@ describe('app shell worktree archive', () => {
     )
 
     expect(await screen.findByRole('alert')).toHaveTextContent('工作区有未提交更改，无法归档。')
-    expect(within(projectCard).getByRole('button', { name: 'test worktree' })).toBeEnabled()
+    expect(within(projectCard).getByRole('button', { name: 'test 独立工作区' })).toBeEnabled()
 
     fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
 

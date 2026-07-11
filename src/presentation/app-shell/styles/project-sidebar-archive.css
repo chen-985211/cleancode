@@ -36,17 +36,44 @@
 }
 
 .workspace-row__select {
-  display: flex;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   min-width: 0;
   height: 100%;
   flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   border: 0;
+  padding: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
+}
+
+.workspace-row__metadata {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.workspace-row__kind {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--cc-muted);
+}
+
+.workspace-row__kind svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
 }
 
 .workspace-row--with-actions {
