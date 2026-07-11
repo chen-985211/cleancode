@@ -2,11 +2,13 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
+import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
 import { terminalOutputBrowserEventName } from '../../../src/presentation/app-shell/types'
 
 interface FakeTerminalInstance {
   cols: number
   rows: number
+  options: { theme?: Record<string, string> }
   readonly focus: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
@@ -36,6 +38,7 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeTerminalInstance {
     cols = 80
     rows = 24
+    options: { theme?: Record<string, string> }
     textarea: HTMLTextAreaElement | null = null
 
     readonly focus = vi.fn(() => {
@@ -62,7 +65,8 @@ vi.mock('@xterm/xterm', () => ({
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
     readonly dispose = vi.fn()
 
-    constructor() {
+    constructor(options: { theme?: Record<string, string> }) {
+      this.options = options
       xtermMockState.terminals.push(this)
     }
   }
@@ -155,6 +159,20 @@ describe('terminal viewport interaction', () => {
     expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
     expect(terminal.focus).not.toHaveBeenCalled()
     expect(helperTextareaFocus).not.toHaveBeenCalled()
+  })
+
+  it('updates the existing terminal theme without reinstalling xterm', async () => {
+    document.documentElement.style.setProperty('--cc-terminal-background', '#10151d')
+    renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+
+    expect(terminal.options.theme?.background).toBe('#10151d')
+
+    document.documentElement.style.setProperty('--cc-terminal-background', '#f6f8fb')
+    window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
+
+    expect(terminal.options.theme?.background).toBe('#f6f8fb')
+    expect(xtermMockState.terminals).toHaveLength(1)
   })
 
   it('coalesces resize observer bursts before reporting terminal dimensions', async () => {

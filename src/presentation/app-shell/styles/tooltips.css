@@ -8,11 +8,11 @@
   left: 50%;
   z-index: 40;
   max-width: 220px;
-  border: 1px solid rgb(15 23 42 / 0.18);
+  border: 1px solid var(--cc-backdrop);
   border-radius: 7px;
-  background: rgb(15 23 42 / 0.94);
-  box-shadow: 0 10px 24px rgb(15 23 42 / 0.2);
-  color: #f8fafc;
+  background: var(--cc-backdrop);
+  box-shadow: 0 10px 24px var(--cc-backdrop);
+  color: var(--cc-tooltip-foreground);
   content: attr(data-cc-tooltip);
   font-size: 11px;
   font-weight: 650;
@@ -36,7 +36,7 @@
   z-index: 41;
   width: 8px;
   height: 8px;
-  background: rgb(15 23 42 / 0.94);
+  background: var(--cc-backdrop);
   clip-path: polygon(50% 100%, 0 0, 100% 0);
   content: '';
   opacity: 0;

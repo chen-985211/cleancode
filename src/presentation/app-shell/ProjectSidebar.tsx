@@ -1,13 +1,4 @@
-import {
-  Archive,
-  ChevronDown,
-  GitBranch,
-  MoreHorizontal,
-  Plus,
-  Settings,
-  Trash2,
-  X
-} from 'lucide-react'
+import { Archive, ChevronDown, GitBranch, MoreHorizontal, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
@@ -87,14 +78,6 @@ export function ProjectSidebar({
           />
         ))}
       </div>
-      <button
-        className="project-sidebar__settings icon-button"
-        type="button"
-        aria-label="设置"
-        title="设置"
-      >
-        <Settings size={16} aria-hidden="true" />
-      </button>
     </aside>
   )
 }

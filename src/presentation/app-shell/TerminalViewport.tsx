@@ -12,6 +12,7 @@ import {
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { appendTerminalOutputTail } from './terminalOutputTail'
+import { readTerminalTheme, synchronizeTerminalTheme } from './terminalTheme'
 import {
   terminalOutputBrowserEventName,
   type TerminalDimensions,
@@ -197,14 +198,7 @@ function installXterm({
     fontWeight: 500,
     lineHeight: 1.32,
     rows: 9,
-    theme: {
-      background: '#080d13',
-      foreground: '#d6dee8',
-      cursor: '#f8fafc',
-      selectionBackground: '#2d415c',
-      green: '#49d17c',
-      blue: '#60a5fa'
-    }
+    theme: readTerminalTheme()
   })
   const fitAddon = new FitAddon()
   const reportDimensions = (): void => {
@@ -267,6 +261,7 @@ function installXterm({
   const dataSubscription = terminal.onData((input) => {
     onInputRef.current(blockRef.current, input)
   })
+  const stopSynchronizingTheme = synchronizeTerminalTheme(terminal)
 
   return () => {
     if (pendingFitAnimationFrame !== null) {
@@ -275,6 +270,7 @@ function installXterm({
 
     element.removeEventListener('pointerdown', focusTerminalElement, true)
     dataSubscription.dispose()
+    stopSynchronizingTheme()
     resizeObserver.disconnect()
     resumeResizeFitRef.current = () => undefined
     terminal.dispose()

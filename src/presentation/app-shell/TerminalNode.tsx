@@ -154,7 +154,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isVisible={data.isSelected && !data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}
         minHeight={terminalNodeMinimumSize.height}
-        color="#94a3b8"
+        color="var(--cc-muted)"
         handleClassName="terminal-node__resize-handle nodrag"
         lineClassName="terminal-node__resize-line"
         onResizeStart={() => setIsResizingBlock(true)}

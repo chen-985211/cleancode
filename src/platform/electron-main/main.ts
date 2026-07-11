@@ -63,6 +63,7 @@ import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
+import { resolveWindowFrameOptions } from './windowFrameOptions'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -177,6 +178,7 @@ const createMainWindow = (appIconPath: string | undefined): void => {
     title: 'cleancode',
     backgroundColor: '#f7f8fa',
     icon: appIconPath,
+    ...resolveWindowFrameOptions(process.platform),
     webPreferences: {
       preload: join(__dirname, '../preload/preload.mjs'),
       contextIsolation: true,

@@ -3,11 +3,11 @@
   align-items: flex-start;
   gap: 8px;
   margin-top: 10px;
-  border: 1px solid rgb(194 65 79 / 0.25);
+  border: 1px solid var(--cc-danger-border);
   border-radius: 8px;
   background: var(--cc-danger-soft);
   padding: 9px 9px 9px 10px;
-  color: #a53745;
+  color: var(--cc-danger-strong);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -32,7 +32,7 @@
 }
 
 .project-sidebar-alert__close:hover {
-  background: rgb(194 65 79 / 0.09);
+  background: var(--cc-danger-border);
 }
 
 .workspace-row__select {
@@ -85,7 +85,7 @@
 
 .workspace-row__menu-button:hover,
 .workspace-row__menu-button[aria-expanded='true'] {
-  background: rgb(47 103 216 / 0.1);
+  background: var(--cc-primary-border);
   color: var(--cc-primary-hover);
 }
 
@@ -129,7 +129,7 @@
 
 .workspace-row-menu__item--danger:hover {
   background: var(--cc-danger-soft);
-  color: #a53745;
+  color: var(--cc-danger-strong);
 }
 
 .archive-workspace-dialog {
@@ -147,7 +147,7 @@
   padding: 18px;
   color: var(--cc-muted-strong);
   box-shadow:
-    0 0 0 100vmax rgb(15 23 42 / 0.38),
+    0 0 0 100vmax var(--cc-backdrop),
     var(--cc-shadow-floating);
 }
 
@@ -203,11 +203,11 @@
 .archive-workspace-dialog__actions .archive-workspace-dialog__confirm {
   border-color: var(--cc-danger);
   background: var(--cc-danger);
-  color: #ffffff;
+  color: var(--cc-surface);
 }
 
 .archive-workspace-dialog__actions .archive-workspace-dialog__confirm:hover {
-  border-color: #a53745;
-  background: #a53745;
-  color: #ffffff;
+  border-color: var(--cc-danger-strong);
+  background: var(--cc-danger-strong);
+  color: var(--cc-surface);
 }

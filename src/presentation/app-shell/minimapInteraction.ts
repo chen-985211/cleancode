@@ -19,8 +19,8 @@ export function getTerminalStatusColor(status: TerminalSessionStatus): string {
     case 'failed':
       return 'var(--cc-danger)'
     case 'exited':
-      return '#94a3b8'
+      return 'var(--cc-muted)'
     case 'idle':
-      return '#93a4bd'
+      return 'var(--cc-muted)'
   }
 }

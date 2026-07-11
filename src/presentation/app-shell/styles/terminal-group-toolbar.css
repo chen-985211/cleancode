@@ -12,8 +12,8 @@
   padding: 7px 12px 7px 15px;
   background: var(--terminal-group-toolbar);
   box-shadow:
-    0 1px 0 #e3e7ed inset,
-    0 -1px 0 #e3e7ed inset;
+    0 1px 0 var(--cc-border) inset,
+    0 -1px 0 var(--cc-border) inset;
   overflow: visible;
 }
 
@@ -36,7 +36,7 @@
   width: 1px;
   height: 20px;
   flex: 0 0 1px;
-  background: #d8dde5;
+  background: var(--cc-border-strong);
 }
 
 .terminal-group-node__toolbar-divider--runtime {
@@ -62,7 +62,7 @@
   border-radius: 7px;
   padding: 0;
   background: transparent;
-  color: #596373;
+  color: var(--cc-muted-strong);
   font: inherit;
   box-shadow: none;
   transition:
@@ -75,9 +75,9 @@
 .terminal-group-node__action-group > .terminal-group-node__action {
   background: var(--terminal-group-control);
   box-shadow:
-    0 0 0 1px #dce1e8 inset,
-    0 1px 0 rgb(255 255 255 / 0.98) inset,
-    0 2px 5px rgb(20 27 45 / 0.06);
+    0 0 0 1px var(--cc-border) inset,
+    0 1px 0 var(--cc-neutral-overlay) inset,
+    0 2px 5px var(--cc-shadow-color);
 }
 
 .terminal-group-node__action svg,
@@ -100,32 +100,32 @@
   background: var(--terminal-group-control-hover);
   color: var(--terminal-group-foreground);
   box-shadow:
-    0 0 0 1px #cfd6e0 inset,
-    0 1px 0 rgb(255 255 255 / 0.98) inset,
-    0 3px 7px rgb(20 27 45 / 0.08);
+    0 0 0 1px var(--cc-border-strong) inset,
+    0 1px 0 var(--cc-neutral-overlay) inset,
+    0 3px 7px var(--cc-shadow-color);
 }
 
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
   box-shadow:
-    0 0 0 1px #cfd6e0 inset,
-    0 1px 3px rgb(20 27 45 / 0.11) inset;
+    0 0 0 1px var(--cc-border-strong) inset,
+    0 1px 3px var(--cc-shadow-color) inset;
 }
 
 .terminal-group-node__action--primary {
-  --terminal-group-icon-cutout: #eaf4ff;
-  background: #eaf4ff !important;
+  --terminal-group-icon-cutout: var(--cc-primary-soft);
+  background: var(--cc-primary-soft) !important;
   color: var(--terminal-group-azure);
   box-shadow:
-    0 0 0 1px #cddff5 inset !important,
-    0 1px 0 rgb(255 255 255 / 0.94) inset !important,
-    0 3px 8px rgb(39 136 247 / 0.13) !important;
+    0 0 0 1px var(--cc-primary-border) inset !important,
+    0 1px 0 var(--cc-neutral-overlay) inset !important,
+    0 3px 8px var(--cc-primary-ring) !important;
 }
 
 .terminal-group-node__action--primary:hover:not(:disabled) {
-  --terminal-group-icon-cutout: #e2f0ff;
-  background: #e2f0ff !important;
-  color: #1478e9;
+  --terminal-group-icon-cutout: var(--cc-primary-soft);
+  background: var(--cc-primary-soft) !important;
+  color: var(--cc-primary-hover);
 }
 
 .terminal-group-node__action--primary svg {
@@ -140,20 +140,20 @@
 .terminal-group-node__action-group--danger .terminal-group-node__action {
   width: 32px;
   flex-basis: 32px;
-  color: #596373;
+  color: var(--cc-muted-strong);
 }
 
 .terminal-group-node__action--danger:hover:not(:disabled) {
-  --terminal-group-icon-cutout: #fff2f2;
-  background: #fff2f2;
-  color: #4f5866;
+  --terminal-group-icon-cutout: var(--cc-danger-soft);
+  background: var(--cc-danger-soft);
+  color: var(--cc-muted-strong);
   box-shadow:
-    0 0 0 1px rgb(207 114 107 / 0.22) inset,
-    0 2px 6px rgb(194 65 79 / 0.08);
+    0 0 0 1px var(--cc-danger-border) inset,
+    0 2px 6px var(--cc-danger-border);
 }
 
 .terminal-group-node__action:disabled {
-  color: #8d97a6;
+  color: var(--cc-muted);
   cursor: not-allowed;
   opacity: 0.68;
 }
@@ -172,9 +172,9 @@
   border-radius: 7px;
   background: var(--terminal-group-control);
   box-shadow:
-    0 0 0 1px #dce1e8 inset,
-    0 1px 0 rgb(255 255 255 / 0.98) inset,
-    0 2px 5px rgb(20 27 45 / 0.06);
+    0 0 0 1px var(--cc-border) inset,
+    0 1px 0 var(--cc-neutral-overlay) inset,
+    0 2px 5px var(--cc-shadow-color);
 }
 
 .terminal-group-node__membership-actions::after {
@@ -184,7 +184,7 @@
   bottom: 1px;
   left: 50%;
   width: 1px;
-  background: #e0e4ea;
+  background: var(--cc-border-strong);
   content: '';
   pointer-events: none;
 }
@@ -214,9 +214,9 @@
   border-radius: 7px;
   background: var(--terminal-group-control);
   box-shadow:
-    0 0 0 1px #dce1e8 inset,
-    0 1px 0 rgb(255 255 255 / 0.98) inset,
-    0 2px 5px rgb(20 27 45 / 0.06);
+    0 0 0 1px var(--cc-border) inset,
+    0 1px 0 var(--cc-neutral-overlay) inset,
+    0 2px 5px var(--cc-shadow-color);
 }
 
 .terminal-group-node__edit-actions .terminal-group-node__action {
@@ -292,6 +292,6 @@
 }
 
 .terminal-group-icon__disconnect-accent {
-  fill: #d76d63;
-  stroke: #d76d63;
+  fill: var(--cc-danger);
+  stroke: var(--cc-danger);
 }

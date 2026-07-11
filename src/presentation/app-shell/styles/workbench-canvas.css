@@ -16,10 +16,10 @@
   gap: 3px;
   border: 1px solid var(--cc-border);
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.9);
+  background: var(--cc-neutral-overlay);
   padding: 4px;
   pointer-events: none;
-  box-shadow: 0 4px 16px rgb(20 27 45 / 0.08);
+  box-shadow: 0 4px 16px var(--cc-shadow-color);
   backdrop-filter: blur(10px);
 }
 
@@ -36,14 +36,14 @@
 .toolbar-button--primary {
   border-color: transparent;
   background: var(--cc-primary);
-  color: #ffffff;
-  box-shadow: 0 1px 2px rgb(20 27 45 / 0.14);
+  color: var(--cc-surface);
+  box-shadow: 0 1px 2px var(--cc-shadow-color);
 }
 
 .toolbar-button--primary:hover:not(:disabled) {
   border-color: transparent;
   background: var(--cc-primary-hover);
-  color: #ffffff;
+  color: var(--cc-surface);
 }
 
 .toolbar-selection-status {
@@ -67,7 +67,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgb(255 255 255 / 0.82);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-primary);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -120,8 +120,8 @@
   overflow: hidden;
   border: 1px solid var(--cc-border);
   border-radius: 9px;
-  background: rgb(255 255 255 / 0.9);
-  box-shadow: 0 4px 16px rgb(20 27 45 / 0.07);
+  background: var(--cc-neutral-overlay);
+  box-shadow: 0 4px 16px var(--cc-shadow-color);
   backdrop-filter: blur(10px);
 }
 
@@ -161,11 +161,11 @@
   align-items: stretch;
   border: 1px solid var(--cc-border);
   border-radius: 11px;
-  background: rgb(255 255 255 / 0.94);
+  background: var(--cc-neutral-overlay);
   padding: 4px;
   box-shadow:
-    0 1px 2px rgb(20 27 45 / 0.06),
-    0 6px 20px rgb(20 27 45 / 0.08);
+    0 1px 2px var(--cc-shadow-color),
+    0 6px 20px var(--cc-shadow-color);
   backdrop-filter: blur(12px);
 }
 
@@ -185,8 +185,8 @@
   overflow: hidden;
   box-sizing: border-box;
   border-radius: 7px;
-  background: #f5f7fa;
-  box-shadow: 0 0 0 1px rgb(201 207 217 / 0.68) inset;
+  background: var(--cc-surface-subtle);
+  box-shadow: 0 0 0 1px var(--cc-border) inset;
 }
 
 .canvas-minimap__map {
@@ -208,8 +208,8 @@
 }
 
 .canvas-minimap__viewport-frame {
-  fill: rgb(47 103 216 / 0.055);
-  stroke: rgb(47 103 216 / 0.55);
+  fill: var(--cc-primary-border);
+  stroke: var(--cc-primary-border);
   stroke-width: 1.35;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
@@ -306,7 +306,7 @@
   margin-left: 4px;
   border-left: 1px solid var(--cc-border);
   border-radius: 0 7px 7px 0;
-  background: rgb(243 245 248 / 0.78);
+  background: var(--cc-chrome-translucent);
   padding: 2px 0 2px 4px;
   color: var(--cc-muted);
   font-weight: 600;
@@ -338,9 +338,9 @@
 
 .canvas-minimap__controls .icon-button--small:hover:not(:disabled) {
   border-color: transparent;
-  background: rgb(255 255 255 / 0.92);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-primary);
-  box-shadow: 0 1px 2px rgb(20 27 45 / 0.08);
+  box-shadow: 0 1px 2px var(--cc-shadow-color);
 }
 
 .canvas-minimap__controls output {
@@ -350,7 +350,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 5px;
-  background: rgb(255 255 255 / 0.7);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-muted-strong);
   font-size: 9px;
   font-variant-numeric: tabular-nums;
@@ -372,14 +372,14 @@
   gap: 10px;
   border: 1px solid var(--cc-border);
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.92);
+  background: var(--cc-neutral-overlay);
   padding: 9px 13px;
   color: var(--cc-muted-strong);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
   text-align: center;
-  box-shadow: 0 4px 16px rgb(20 27 45 / 0.08);
+  box-shadow: 0 4px 16px var(--cc-shadow-color);
   backdrop-filter: blur(10px);
 }
 

@@ -13,7 +13,7 @@
   min-width: 172px;
   border: 1px solid var(--cc-border-strong);
   border-radius: 10px;
-  background: rgb(255 255 255 / 0.98);
+  background: var(--cc-neutral-overlay);
   box-shadow: var(--cc-shadow-floating);
   padding: 4px;
 }

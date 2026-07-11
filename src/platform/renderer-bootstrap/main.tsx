@@ -2,7 +2,10 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { AppShell } from '../../presentation/app-shell/AppShell'
+import { applyInitialThemePreference } from '../../presentation/app-shell/themePreference'
 import './renderer.css'
+
+applyInitialThemePreference()
 
 const rootElement = document.getElementById('root')
 

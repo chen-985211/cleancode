@@ -11,7 +11,7 @@
   border: 1px solid var(--cc-border-strong);
   border-radius: 11px;
   padding: 12px;
-  background: rgb(255 255 255 / 0.98);
+  background: var(--cc-neutral-overlay);
   box-shadow: var(--cc-shadow-floating);
 }
 
@@ -47,7 +47,7 @@
   font: inherit;
   font-size: 12px;
   outline: none;
-  box-shadow: 0 1px 2px rgb(20 27 45 / 0.05);
+  box-shadow: 0 1px 2px var(--cc-shadow-color);
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease,
@@ -55,13 +55,13 @@
 }
 
 .terminal-metadata-form input::placeholder {
-  color: #9aa2af;
+  color: var(--cc-disabled);
 }
 
 .terminal-metadata-form input:focus {
-  border-color: rgb(47 103 216 / 0.56);
+  border-color: var(--cc-primary-border);
   background: var(--cc-surface);
-  box-shadow: 0 0 0 3px rgb(47 103 216 / 0.12);
+  box-shadow: 0 0 0 3px var(--cc-primary-border);
 }
 
 .terminal-metadata-form__footer {

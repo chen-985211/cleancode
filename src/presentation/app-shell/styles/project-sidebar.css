@@ -19,11 +19,11 @@
   border-color: var(--cc-border-strong);
   background: var(--cc-surface);
   color: var(--cc-primary);
-  box-shadow: 0 1px 1px rgb(20 27 45 / 0.04);
+  box-shadow: 0 1px 1px var(--cc-shadow-color);
 }
 
 .sidebar-action:hover:not(:disabled) {
-  border-color: rgb(47 103 216 / 0.45);
+  border-color: var(--cc-primary-border);
   background: var(--cc-primary-soft);
   color: var(--cc-primary-hover);
 }
@@ -38,11 +38,11 @@
 
 .runtime-warning {
   margin-top: 10px;
-  border: 1px solid rgb(183 121 31 / 0.28);
+  border: 1px solid var(--cc-warning-border);
   border-radius: 8px;
   background: var(--cc-warning-soft);
   padding: 9px 10px;
-  color: #865812;
+  color: var(--cc-warning-strong);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -99,7 +99,7 @@
 }
 
 .project-card__select:hover {
-  background: rgb(255 255 255 / 0.58);
+  background: var(--cc-neutral-overlay);
 }
 
 .project-card__branch,
@@ -187,7 +187,7 @@
 
 .workspace-row:hover,
 .workspace-row:focus-within {
-  background: rgb(255 255 255 / 0.64);
+  background: var(--cc-neutral-overlay);
   color: var(--cc-foreground);
 }
 
@@ -234,7 +234,7 @@
 
 .default-branch-selector__toggle:hover,
 .default-branch-selector__toggle[aria-expanded='true'] {
-  background: rgb(47 103 216 / 0.1);
+  background: var(--cc-primary-border);
   color: var(--cc-primary-hover);
 }
 
@@ -242,10 +242,10 @@
   max-width: 76px;
   flex: 0 1 auto;
   overflow: hidden;
-  border: 1px solid rgb(47 103 216 / 0.22);
+  border: 1px solid var(--cc-primary-border);
   border-radius: 5px;
   padding: 1px 4px;
-  background: rgb(47 103 216 / 0.08);
+  background: var(--cc-primary-border);
   color: var(--cc-primary-hover);
   font-size: 9px;
   font-weight: 700;
@@ -255,9 +255,9 @@
 }
 
 .badge--git {
-  border-color: rgb(35 138 85 / 0.22);
+  border-color: var(--cc-success-border);
   background: var(--cc-success-soft);
-  color: #1f784b;
+  color: var(--cc-success);
 }
 
 .badge--default-workspace {
@@ -297,9 +297,9 @@
 }
 
 .branch-selector-search:focus-within {
-  border-color: rgb(47 103 216 / 0.5);
+  border-color: var(--cc-primary-border);
   background: var(--cc-surface);
-  box-shadow: 0 0 0 3px rgb(47 103 216 / 0.09);
+  box-shadow: 0 0 0 3px var(--cc-primary-border);
 }
 
 .branch-selector-search input {
@@ -331,7 +331,7 @@
   max-height: 190px;
   overflow-y: auto;
   padding-right: 2px;
-  scrollbar-color: rgb(107 114 128 / 0.36) transparent;
+  scrollbar-color: var(--cc-scrollbar) transparent;
   scrollbar-width: thin;
 }
 
@@ -345,7 +345,7 @@
 
 .branch-selector-options::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgb(107 114 128 / 0.28);
+  background: var(--cc-scrollbar);
 }
 
 .branch-selector-option,
@@ -426,7 +426,7 @@
   border-radius: 9px;
   background: var(--cc-surface);
   padding: 8px;
-  box-shadow: 0 6px 18px rgb(20 27 45 / 0.06);
+  box-shadow: 0 6px 18px var(--cc-shadow-color);
 }
 
 .branch-workspace-form input {
@@ -446,7 +446,7 @@
   border: 1px solid var(--cc-primary);
   border-radius: 7px;
   background: var(--cc-primary);
-  color: #ffffff;
+  color: var(--cc-surface);
   font: inherit;
   font-size: 12px;
   font-weight: 650;
@@ -464,10 +464,4 @@
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-.project-sidebar__settings {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
 }

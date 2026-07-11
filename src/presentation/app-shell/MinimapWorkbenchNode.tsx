@@ -38,7 +38,7 @@ export function MinimapWorkbenchNode({
   const { getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
   const accessibleKindLabel = variant === 'agentConsole' ? ` ${kindLabel}` : kindLabel
-  const statusColor = color ?? '#98a2b3'
+  const statusColor = color ?? 'var(--cc-muted)'
   const nodeClassName = Array.from(
     new Set([
       ...className.split(' '),
@@ -253,7 +253,7 @@ function MinimapTerminalPreview({
         width={Math.max(4, width - inset * 2)}
         height={screenHeight}
         rx={Math.max(2, borderRadius * 0.45)}
-        fill="#1b2430"
+        fill="var(--cc-foreground)"
       />
     </>
   )
@@ -331,7 +331,7 @@ function MinimapGroupPreview({
         width={Math.max(12, contentWidth * 0.38)}
         height={Math.max(3, Math.min(5, headerInnerHeight * 0.22))}
         rx={2}
-        fill="#64748b"
+        fill="var(--cc-muted)"
         opacity={0.35}
       />
       {[0, 1].map((index) => (
@@ -396,7 +396,7 @@ function MinimapGroupMemberRow({
         width={Math.max(10, width * 0.5)}
         height={3}
         rx={1.5}
-        fill="#64748b"
+        fill="var(--cc-muted)"
         opacity={0.28}
       />
     </>

@@ -2,6 +2,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
 import type { MutableRefObject } from 'react'
 
+import { readTerminalTheme, synchronizeTerminalTheme } from './terminalTheme'
 import type { TerminalDimensions } from './types'
 
 const defaultAgentTerminalDimensions: TerminalDimensions = {
@@ -26,14 +27,7 @@ export function installAgentXterm(input: {
     fontWeight: 500,
     lineHeight: 1.32,
     rows: defaultAgentTerminalDimensions.rows,
-    theme: {
-      background: '#080d13',
-      blue: '#60a5fa',
-      cursor: '#f8fafc',
-      foreground: '#d6dee8',
-      green: '#49d17c',
-      selectionBackground: '#2d415c'
-    }
+    theme: readTerminalTheme()
   })
   const fitAddon = new FitAddon()
   const reportDimensions = (): void => {
@@ -69,6 +63,7 @@ export function installAgentXterm(input: {
   fitAddon.fit()
   reportDimensions()
   const dataSubscription = terminal.onData(input.onInput)
+  const stopSynchronizingTheme = synchronizeTerminalTheme(terminal)
   if (input.initialOutput) {
     terminal.write(input.initialOutput)
   }
@@ -81,6 +76,7 @@ export function installAgentXterm(input: {
     }
 
     dataSubscription.dispose()
+    stopSynchronizingTheme()
     resizeObserver.disconnect()
     terminal.dispose()
     input.xtermRef.current = null

@@ -1,0 +1,277 @@
+.app-titlebar {
+  position: absolute;
+  z-index: 50;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  height: var(--cc-titlebar-height);
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--cc-divider);
+  background: var(--cc-chrome-translucent);
+  padding: 0 10px 0 78px;
+  color: var(--cc-foreground);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-app-region: drag;
+}
+
+.app-titlebar__name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-titlebar__theme-button,
+.theme-settings-drawer__close {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.app-titlebar__theme-button:hover,
+.theme-settings-drawer__close:hover {
+  border-color: var(--cc-border);
+  background: var(--cc-surface-hover);
+  color: var(--cc-foreground);
+}
+
+.app-titlebar__palette-icon {
+  width: 18px;
+  height: 18px;
+  background: var(--cc-muted-strong);
+  mask: url('../assets/theme-palette.svg') center / contain no-repeat;
+}
+
+.app-titlebar__theme-button:hover .app-titlebar__palette-icon {
+  background: var(--cc-foreground);
+}
+
+.theme-settings-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: var(--cc-titlebar-height) 0 0;
+  background: var(--cc-backdrop);
+  backdrop-filter: blur(2px);
+  animation: theme-backdrop-in 160ms ease-out;
+}
+
+.theme-settings-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  width: min(390px, calc(100vw - 24px));
+  height: 100%;
+  flex-direction: column;
+  border-left: 1px solid var(--cc-border);
+  background: var(--cc-surface-raised);
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-floating);
+  animation: theme-drawer-in 180ms ease-out;
+}
+
+.theme-settings-drawer__header {
+  display: flex;
+  min-height: 86px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--cc-border);
+  padding: 20px 18px 16px 22px;
+}
+
+.theme-settings-drawer__header h2,
+.theme-settings-drawer__header p {
+  margin: 0;
+}
+
+.theme-settings-drawer__header h2 {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.theme-settings-drawer__header p {
+  margin-top: 5px;
+  color: var(--cc-muted);
+  font-size: 12px;
+}
+
+.theme-settings-options {
+  margin: 0;
+  border: 0;
+  padding: 24px 22px;
+}
+
+.theme-settings-options legend {
+  padding: 0;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.theme-settings-options__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.theme-option {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.theme-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.theme-option__preview {
+  position: relative;
+  display: grid;
+  height: 68px;
+  grid-template-columns: 31% 1fr;
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 9px;
+  background: var(--theme-preview-background);
+  box-shadow: var(--cc-shadow-xs);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.theme-option:hover .theme-option__preview {
+  border-color: var(--cc-border-strong);
+  transform: translateY(-1px);
+}
+
+.theme-option input:checked + .theme-option__preview {
+  border-color: var(--cc-primary);
+  box-shadow: 0 0 0 2px var(--cc-primary-ring);
+}
+
+.theme-option input:focus-visible + .theme-option__preview {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+
+.theme-option__preview--light {
+  --theme-preview-background: var(--cc-preview-light-background);
+  --theme-preview-surface: var(--cc-preview-light-surface);
+  --theme-preview-muted: var(--cc-preview-light-muted);
+}
+
+.theme-option__preview--dark {
+  --theme-preview-background: var(--cc-preview-dark-background);
+  --theme-preview-surface: var(--cc-preview-dark-surface);
+  --theme-preview-muted: var(--cc-preview-dark-muted);
+}
+
+.theme-option__preview--system {
+  --theme-preview-background: linear-gradient(
+    90deg,
+    var(--cc-preview-light-background) 0 50%,
+    var(--cc-preview-dark-background) 50%
+  );
+  --theme-preview-surface: linear-gradient(
+    90deg,
+    var(--cc-preview-light-surface) 0 28%,
+    var(--cc-preview-dark-surface) 28%
+  );
+  --theme-preview-muted: var(--cc-preview-dark-muted);
+}
+
+.theme-option__preview-sidebar {
+  border-right: 1px solid var(--cc-border);
+  background: var(--theme-preview-surface);
+}
+
+.theme-option__preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 10px;
+  border-radius: 4px;
+  background: var(--theme-preview-surface);
+  padding: 8px;
+}
+
+.theme-option__preview-content span {
+  display: block;
+  width: 75%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--theme-preview-muted);
+}
+
+.theme-option__preview-content span:nth-child(2) {
+  width: 48%;
+}
+
+.theme-option__check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--cc-primary);
+  color: var(--cc-primary-contrast);
+  box-shadow: var(--cc-shadow-xs);
+}
+
+.theme-option__label {
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  font-weight: 620;
+  text-align: center;
+}
+
+@keyframes theme-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes theme-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-titlebar {
+    padding-left: 74px;
+  }
+
+  .theme-settings-drawer {
+    width: min(360px, calc(100vw - 12px));
+  }
+}

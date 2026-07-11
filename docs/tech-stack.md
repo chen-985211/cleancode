@@ -51,10 +51,11 @@ cleancode 需要深度集成本地 CLI、伪终端、文件系统、日志流、
 - lint-staged：保留暂存文件级检查能力，作为轻量门禁扩展点。
 - 自定义 `check:deps`：确保依赖版本全部精确锁定。
 - 自定义 `check:logging`：确保生产代码使用统一日志、错误码和 IPC 错误边界。
+- 自定义 `check:theme`：确保生产 UI 只通过集中主题定义和语义 token 使用颜色。
 
 本地质量门禁统一通过 `pnpm pre-commit` 执行。
 
-`pnpm pre-commit` 的执行顺序必须由根目录 `package.json` 的 `pre-commit` 脚本定义。当前门禁必须覆盖依赖版本检查、代码行数检查、日志规范检查、格式检查、Lint、类型检查、测试、依赖方向检查和未使用代码检查。
+`pnpm pre-commit` 的执行顺序必须由根目录 `package.json` 的 `pre-commit` 脚本定义。当前门禁必须覆盖依赖版本检查、代码行数检查、日志规范检查、主题规范检查、格式检查、Lint、类型检查、测试、依赖方向检查和未使用代码检查。
 
 ## 前端层
 

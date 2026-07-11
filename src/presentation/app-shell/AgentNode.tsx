@@ -28,7 +28,7 @@ export const AgentNode = memo(function AgentNode({
         isVisible={selected}
         minWidth={minimumAgentConsoleSize.width}
         minHeight={minimumAgentConsoleSize.height}
-        color="#94a3b8"
+        color="var(--cc-muted)"
         handleClassName="agent-console-node__resize-handle nodrag"
         lineClassName="agent-console-node__resize-line"
         onResizeEnd={(_event, params) => {

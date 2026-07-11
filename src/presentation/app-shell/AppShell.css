@@ -1,4 +1,6 @@
+@import './styles/theme.css';
 @import './styles/base.css';
+@import './styles/theme-settings.css';
 @import './styles/project-sidebar.css';
 @import './styles/project-sidebar-archive.css';
 @import './styles/workbench-canvas.css';

@@ -11,6 +11,7 @@ import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
+import { resolveNodeSize } from './resolveNodeSize'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
@@ -33,6 +34,7 @@ import type {
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
+import { ThemeSettingsRoot } from './ThemeSettingsRoot'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
@@ -440,6 +442,7 @@ export function AppShell() {
 
   return (
     <main className="app-shell" aria-label="cleancode workspace">
+      <ThemeSettingsRoot />
       <ProjectSidebar
         workbenches={workbenches}
         currentWorkbench={currentWorkbench}
@@ -492,8 +495,4 @@ export function AppShell() {
       />
     </main>
   )
-}
-
-function resolveNodeSize(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }

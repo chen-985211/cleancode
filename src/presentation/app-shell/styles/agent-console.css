@@ -12,9 +12,9 @@
 }
 
 .agent-console-node--selected {
-  border-color: #7fa2e5;
+  border-color: var(--cc-primary);
   box-shadow:
-    0 0 0 2px rgb(47 103 216 / 0.18),
+    0 0 0 2px var(--cc-primary-border),
     var(--cc-shadow-floating);
 }
 
@@ -181,10 +181,10 @@
   flex-direction: column;
   margin: 8px 10px 10px;
   overflow: hidden;
-  border: 1px solid #252e3a;
+  border: 1px solid var(--cc-terminal-black);
   border-radius: 11px;
   background: var(--cc-terminal);
-  box-shadow: 0 1px 3px rgb(20 27 45 / 0.16);
+  box-shadow: 0 1px 3px var(--cc-shadow-color);
 }
 
 .agent-terminal-viewport {
@@ -205,7 +205,7 @@
   min-height: 0;
   margin: 0;
   overflow: auto;
-  color: #d6dee8;
+  color: var(--cc-terminal-foreground);
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
@@ -219,9 +219,9 @@
   min-height: 42px;
   resize: none;
   border: 0;
-  border-top: 1px solid rgb(148 163 184 / 0.22);
-  background: #0f1620;
-  color: #d6dee8;
+  border-top: 1px solid var(--cc-border);
+  background: var(--cc-terminal-background);
+  color: var(--cc-terminal-foreground);
   font: inherit;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
@@ -234,7 +234,7 @@
   display: grid;
   flex: 1;
   place-items: center;
-  color: #8d99a8;
+  color: var(--cc-muted);
   font-size: 12px;
 }
 
@@ -244,7 +244,7 @@
   align-items: center;
   gap: 7px 8px;
   margin: 10px 12px 0;
-  border: 1px solid #ecd9aa;
+  border: 1px solid var(--cc-warning-border);
   border-radius: 9px;
   background: var(--cc-warning-soft);
   color: var(--cc-warning);
@@ -258,7 +258,7 @@
 }
 
 .agent-approval__copy strong {
-  color: #79510f;
+  color: var(--cc-warning-strong);
   font-size: 12px;
   font-weight: 650;
   line-height: 1.2;
@@ -266,7 +266,7 @@
 
 .agent-approval__copy span {
   overflow: hidden;
-  color: #8a641f;
+  color: var(--cc-warning-strong);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -298,12 +298,12 @@
 .agent-approval button:first-of-type {
   border-color: var(--cc-danger);
   background: var(--cc-danger);
-  color: #ffffff;
+  color: var(--cc-surface);
 }
 
 .agent-approval button:first-of-type:hover {
-  border-color: #a73543;
-  background: #a73543;
+  border-color: var(--cc-danger-strong);
+  background: var(--cc-danger-strong);
 }
 
 .agent-runtime-notice {
@@ -319,8 +319,8 @@
 }
 
 .agent-runtime-notice[data-tone='warning'] {
-  background: rgb(255 246 223 / 0.72);
-  color: #93671f;
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning-strong);
 }
 
 .agent-runtime-notice svg {
@@ -353,7 +353,7 @@
 
 .agent-runtime-notice__actions button {
   height: 22px;
-  border: 1px solid rgb(147 103 31 / 0.28);
+  border: 1px solid var(--cc-warning-border);
   border-radius: 5px;
   background: transparent;
   color: inherit;
@@ -362,7 +362,7 @@
 }
 
 .agent-runtime-notice__actions button:hover {
-  background: rgb(147 103 31 / 0.08);
+  background: var(--cc-warning-border);
 }
 
 @keyframes agent-spin {

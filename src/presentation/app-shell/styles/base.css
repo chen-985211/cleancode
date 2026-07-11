@@ -1,39 +1,12 @@
-:root {
-  --cc-background: #eef1f5;
-  --cc-canvas: #f8f9fb;
-  --cc-chrome: #f3f5f8;
-  --cc-chrome-raised: #f8f9fb;
-  --cc-surface: #ffffff;
-  --cc-surface-subtle: #f0f2f5;
-  --cc-surface-raised: #ffffff;
-  --cc-foreground: #1b1e27;
-  --cc-muted: #6b7280;
-  --cc-muted-strong: #4b5563;
-  --cc-border: #dfe3ea;
-  --cc-border-strong: #c9cfd9;
-  --cc-divider: rgb(198 205 216 / 0.78);
-  --cc-primary: #2f67d8;
-  --cc-primary-hover: #2458bd;
-  --cc-primary-soft: #e9f0ff;
-  --cc-success: #238a55;
-  --cc-success-soft: #e8f6ee;
-  --cc-warning: #b7791f;
-  --cc-warning-soft: #fff6df;
-  --cc-danger: #c2414f;
-  --cc-danger-soft: #fff0f1;
-  --cc-ring: rgb(47 103 216 / 0.34);
-  --cc-terminal: #0b1017;
-  --cc-shadow: 0 10px 30px rgb(20 27 45 / 0.09);
-  --cc-shadow-floating: 0 16px 38px rgb(20 27 45 / 0.13);
-}
-
 .app-shell {
+  position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
   height: 100%;
   min-height: 0;
   grid-template-columns: clamp(220px, 17vw, 252px) minmax(440px, 1fr);
+  padding-top: var(--cc-titlebar-height);
   overflow: hidden;
   background: var(--cc-background);
   color: var(--cc-foreground);
@@ -115,7 +88,7 @@ textarea:focus-visible {
 }
 
 .icon-button--send {
-  color: #ffffff;
+  color: var(--cc-primary-contrast);
   background: var(--cc-primary);
 }
 

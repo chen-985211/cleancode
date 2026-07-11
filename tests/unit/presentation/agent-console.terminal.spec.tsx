@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import { installAgentXterm } from '../../../src/presentation/app-shell/agentTerminalXterm'
+import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -11,6 +12,7 @@ import {
 interface FakeAgentTerminalInstance {
   cols: number
   rows: number
+  options: { theme?: Record<string, string> }
   readonly dispose: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
@@ -33,6 +35,7 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminalInstance {
     cols = 88
     rows = 24
+    options: { theme?: Record<string, string> }
     dataListener: ((input: string) => void) | null = null
 
     readonly dispose = vi.fn()
@@ -52,7 +55,8 @@ vi.mock('@xterm/xterm', () => ({
       }
     })
 
-    constructor() {
+    constructor(options: { theme?: Record<string, string> }) {
+      this.options = options
       agentXtermMockState.terminals.push(this)
     }
   }
@@ -113,6 +117,31 @@ describe('agent console terminal', () => {
     expect(onInput).toHaveBeenCalledWith('\u001b[1;1R')
 
     dispose()
+  })
+
+  it('updates the existing Codex terminal when the effective theme changes', () => {
+    document.documentElement.style.setProperty('--cc-terminal-background', '#10151d')
+    const dispose = installAgentXterm({
+      element: document.createElement('div'),
+      initialOutput: '',
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      xtermRef: { current: null }
+    })
+    const terminal = agentXtermMockState.terminals[0]
+
+    expect(terminal?.options.theme?.background).toBe('#10151d')
+
+    document.documentElement.style.setProperty('--cc-terminal-background', '#f6f8fb')
+    window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
+
+    expect(terminal?.options.theme?.background).toBe('#f6f8fb')
+
+    dispose()
+    document.documentElement.style.setProperty('--cc-terminal-background', '#202631')
+    window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
+
+    expect(terminal?.options.theme?.background).toBe('#f6f8fb')
   })
 
   it('installs xterm after the current workspace appears asynchronously', async () => {

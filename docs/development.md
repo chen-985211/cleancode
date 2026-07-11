@@ -379,6 +379,8 @@ Large Change 或运行时风险变更必须显式检查以下事项，并在最�
 
 `pnpm pre-commit` 是本地统一质量门禁。门禁的可执行事实来源是根目录 `package.json` 的 `pre-commit` 脚本。
 
+生产 UI 的颜色必须来自集中主题定义和语义 token。`pnpm check:theme` 必须检查生产界面的 CSS、SVG、TypeScript 和 TSX，禁止在集中主题定义之外新增颜色字面量。检查器规则、允许范围和可执行事实来源以 `scripts/check-theme.mjs` 为准。
+
 开发协作 AI 不得绕过失败的质量门禁。若门禁失败，必须先修复失败原因，再重新运行门禁。
 
 代码文件必须保持在 500 行以内。`pnpm check:max-lines` 会全量检查 `src`、`tests` 和 `scripts` 代码文件。若文件超过 500 行，必须先按职责拆分为更小模块，不得继续在大文件中追加代码。
