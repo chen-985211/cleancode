@@ -107,6 +107,10 @@
   z-index: 3 !important;
 }
 
+.react-flow__node-agentConsole {
+  z-index: 2 !important;
+}
+
 .react-flow__node.selected {
   z-index: 4 !important;
 }
@@ -231,6 +235,8 @@
 .canvas-minimap__node-header,
 .canvas-minimap__node-screen,
 .canvas-minimap__node-status,
+.canvas-minimap__agent-icon,
+.canvas-minimap__agent-body,
 .canvas-minimap__group-ring,
 .canvas-minimap__group-shell,
 .canvas-minimap__group-header,
@@ -246,6 +252,8 @@
 .canvas-surface--dragging-terminal .canvas-minimap__node-header,
 .canvas-surface--dragging-terminal .canvas-minimap__node-screen,
 .canvas-surface--dragging-terminal .canvas-minimap__node-status,
+.canvas-surface--dragging-terminal .canvas-minimap__agent-icon,
+.canvas-surface--dragging-terminal .canvas-minimap__agent-body,
 .canvas-surface--dragging-terminal .canvas-minimap__group-ring,
 .canvas-surface--dragging-terminal .canvas-minimap__group-shell,
 .canvas-surface--dragging-terminal .canvas-minimap__group-header,
@@ -352,18 +360,27 @@
 
 .canvas-empty {
   position: absolute;
-  inset: 0;
+  right: 50%;
+  bottom: 18px;
+  z-index: 5;
   display: flex;
+  max-width: min(520px, calc(100% - 160px));
+  transform: translateX(50%);
   pointer-events: none;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 32px;
-  color: var(--cc-muted);
-  font-size: 13px;
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.92);
+  padding: 9px 13px;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
   text-align: center;
+  box-shadow: 0 4px 16px rgb(20 27 45 / 0.08);
+  backdrop-filter: blur(10px);
 }
 
 .app-shell__statusbar {
@@ -400,10 +417,4 @@
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@media (max-width: 1080px) {
-  .app-shell__toolbar {
-    top: 188px;
-  }
 }

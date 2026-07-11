@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 import {
   createRuntimeApi,
@@ -43,6 +43,25 @@ describe('app shell minimap', () => {
 
     expect(await screen.findByRole('button', { name: '聚焦终端 Terminal 1' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '聚焦终端组合 启动项目' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the Agent console visible and selectable from the minimap', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '聚焦 Agent Codex CLI' }))
+
+    expect(document.querySelector('[data-agent-console-node]')).toHaveClass(
+      'agent-console-node--selected'
+    )
   })
 })
 

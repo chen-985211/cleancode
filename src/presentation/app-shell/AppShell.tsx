@@ -3,28 +3,15 @@ import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 
 import type { Edge, NodeChange, ReactFlowInstance } from '@xyflow/react'
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-  type SetStateAction
-} from 'react'
+import { useCallback, useMemo, useRef, useState, type MouseEvent, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { AgentPanel } from './AgentPanel'
 import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
-import { TerminalGroupNode } from './TerminalGroupNode'
-import { TerminalNode } from './TerminalNode'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
-import { createTerminalFlowNodes } from './terminalFlowNodes'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
@@ -36,6 +23,7 @@ import { useProjectGitStateSynchronization } from './useProjectGitStateSynchroni
 import { useTerminalWorkspaceSynchronization } from './useTerminalWorkspaceSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
+import { useWorkbenchFlowNodes } from './useWorkbenchFlowNodes'
 import type {
   TerminalBlockMetadataInput,
   TerminalBlockSizeInput,
@@ -44,9 +32,8 @@ import type {
   WorkbenchSnapshot
 } from './types'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
+import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
-
-const workbenchNodeTypes = { terminal: TerminalNode, terminalGroup: TerminalGroupNode }
 
 export function AppShell() {
   const isDesktopRuntime = Boolean(window.cleancode)
@@ -55,9 +42,9 @@ export function AppShell() {
   const [nodes, setNodes] = useState<WorkbenchFlowNode[]>([])
   const [selectedTerminalBlockIds, setSelectedTerminalBlockIds] = useState<string[]>([])
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
+  const [isAgentConsoleSelected, setIsAgentConsoleSelected] = useState(false)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
-  const graphUsedForNodesRef = useRef<WorkbenchSnapshot['graph'] | null>(null)
   const graph = currentWorkbench?.graph ?? null
   const currentWorkspace = findCurrentWorkspace(currentWorkbench)
   const terminalBlocksById = useMemo(
@@ -101,6 +88,7 @@ export function AppShell() {
     terminalBlocksById,
     terminalGroupsById,
     reactFlowInstanceRef,
+    setIsAgentConsoleSelected,
     setHoveredTerminalBlockId,
     setSelectedTerminalBlockId,
     setSelectedTerminalBlockIds,
@@ -262,6 +250,14 @@ export function AppShell() {
 
   const onNodesChange = useCallback(
     (changes: NodeChange<WorkbenchFlowNode>[]) => {
+      const agentSelectionChange = changes.find(
+        (change) => change.type === 'select' && change.id === 'agent-console'
+      )
+
+      if (agentSelectionChange?.type === 'select') {
+        setIsAgentConsoleSelected(agentSelectionChange.selected)
+      }
+
       setNodes((currentNodes) =>
         applyWorkbenchNodeChanges(changes, currentNodes, {
           shouldResizeExpandedTerminalGroups: !isTerminalGroupSelectionMode
@@ -287,7 +283,11 @@ export function AppShell() {
   const minimapNodeInteraction = useMemo<MinimapNodeInteractionContextValue>(
     () => ({
       getLabel: (blockId) =>
-        terminalBlocksById.get(blockId)?.name ?? terminalGroupsById.get(blockId)?.name ?? blockId,
+        blockId === 'agent-console'
+          ? 'Codex CLI'
+          : (terminalBlocksById.get(blockId)?.name ??
+            terminalGroupsById.get(blockId)?.name ??
+            blockId),
       setHoveredBlockId: setHoveredTerminalBlockId
     }),
     [terminalBlocksById, terminalGroupsById]
@@ -295,6 +295,15 @@ export function AppShell() {
 
   const selectWorkbenchNode = useCallback(
     (event: MouseEvent, node: WorkbenchFlowNode) => {
+      if (node.type === 'agentConsole') {
+        setIsAgentConsoleSelected(true)
+        setSelectedTerminalBlockIds([])
+        setSelectedTerminalGroupId(null)
+        return
+      }
+
+      setIsAgentConsoleSelected(false)
+
       if (node.type === 'terminal') {
         selectTerminalBlock(node.id, event.shiftKey)
         return
@@ -383,63 +392,58 @@ export function AppShell() {
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
 
-  useEffect(() => {
-    setNodes((currentNodes) => {
-      const nextNodes = createTerminalFlowNodes({
-        graph,
-        hoveredTerminalBlockId,
-        selectedTerminalBlockIds,
-        selectedTerminalGroupId,
-        selectedUngroupedTerminalBlockIds,
-        isTerminalGroupSelectionMode,
-        terminalGroupDropAction,
-        terminalStates,
-        handlers: {
-          onStart: startTerminal,
-          onStop: interruptTerminal,
-          onQuickLaunch: quickLaunchTerminal,
-          onRestart: restartTerminal,
-          onDelete: deleteTerminalBlock,
-          onUpdateMetadata: updateTerminalBlockMetadata,
-          onInput: writeTerminal,
-          onResize: resizeTerminal,
-          onResizeBlock: resizeTerminalBlock,
-          onToggleTerminalGroupCandidate: (block) => selectTerminalBlock(block.id, true),
-          ...terminalGroupActions
-        }
-      })
-      const shouldPreserveTransientLayout = graphUsedForNodesRef.current === graph
-      graphUsedForNodesRef.current = graph
-      return shouldPreserveTransientLayout
-        ? preserveWorkbenchNodeTransientLayout(nextNodes, currentNodes)
-        : nextNodes
-    })
-  }, [
-    deleteTerminalBlock,
+  const terminalFlowNodeHandlers = useMemo(
+    () => ({
+      onStart: startTerminal,
+      onStop: interruptTerminal,
+      onQuickLaunch: quickLaunchTerminal,
+      onRestart: restartTerminal,
+      onDelete: deleteTerminalBlock,
+      onUpdateMetadata: updateTerminalBlockMetadata,
+      onInput: writeTerminal,
+      onResize: resizeTerminal,
+      onResizeBlock: resizeTerminalBlock,
+      onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) =>
+        selectTerminalBlock(block.id, true),
+      ...terminalGroupActions
+    }),
+    [
+      deleteTerminalBlock,
+      interruptTerminal,
+      quickLaunchTerminal,
+      resizeTerminal,
+      resizeTerminalBlock,
+      restartTerminal,
+      selectTerminalBlock,
+      startTerminal,
+      terminalGroupActions,
+      updateTerminalBlockMetadata,
+      writeTerminal
+    ]
+  )
+  useWorkbenchFlowNodes({
+    currentWorkbench,
+    currentWorkspace,
     graph,
+    handlers: terminalFlowNodeHandlers,
     hoveredTerminalBlockId,
-    interruptTerminal,
-    quickLaunchTerminal,
-    resizeTerminal,
-    resizeTerminalBlock,
-    restartTerminal,
+    isAgentConsoleSelected,
+    isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
     selectedUngroupedTerminalBlockIds,
-    isTerminalGroupSelectionMode,
+    setCurrentGraph,
+    setNodes,
     terminalGroupDropAction,
-    startTerminal,
-    terminalGroupActions,
-    selectTerminalBlock,
-    terminalStates,
-    updateTerminalBlockMetadata,
-    writeTerminal
-  ])
+    terminalStates
+  })
   const minimapNodes = useMemo(
     () =>
       nodes.filter(
         (node): node is MinimapFlowNode =>
-          node.type === 'terminal' || (node.type === 'terminalGroup' && node.data.group.isCollapsed)
+          node.type === 'agentConsole' ||
+          node.type === 'terminal' ||
+          (node.type === 'terminalGroup' && node.data.group.isCollapsed)
       ),
     [nodes]
   )
@@ -486,11 +490,6 @@ export function AppShell() {
         getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
         getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
         getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
-      />
-      <AgentPanel
-        currentWorkbench={currentWorkbench}
-        currentWorkspace={currentWorkspace}
-        onGraphUpdated={setCurrentGraph}
       />
     </main>
   )

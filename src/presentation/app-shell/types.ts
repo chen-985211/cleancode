@@ -97,8 +97,15 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 }
 
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
-export type WorkbenchFlowNode = TerminalFlowNode | TerminalGroupFlowNode
-export type MinimapFlowNode = TerminalFlowNode | TerminalGroupFlowNode
+interface AgentConsoleNodeData extends Record<string, unknown> {
+  readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+  readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
+}
+
+export type AgentConsoleFlowNode = Node<AgentConsoleNodeData, 'agentConsole'>
+export type WorkbenchFlowNode = AgentConsoleFlowNode | TerminalFlowNode | TerminalGroupFlowNode
+export type MinimapFlowNode = WorkbenchFlowNode
 
 export const defaultTerminalDimensions: TerminalDimensions = {
   columns: 80,

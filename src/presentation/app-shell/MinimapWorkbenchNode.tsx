@@ -4,7 +4,7 @@ import { MinimapNodeInteractionContext } from './minimapInteraction'
 
 interface MinimapWorkbenchNodeProps {
   readonly id: string
-  readonly variant: 'terminal' | 'terminalGroup'
+  readonly variant: 'agentConsole' | 'terminal' | 'terminalGroup'
   readonly kindLabel: string
   readonly x: number
   readonly y: number
@@ -37,11 +37,15 @@ export function MinimapWorkbenchNode({
 }: MinimapWorkbenchNodeProps) {
   const { getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
+  const accessibleKindLabel = variant === 'agentConsole' ? ` ${kindLabel}` : kindLabel
   const statusColor = color ?? '#98a2b3'
-  const nodeClassName = [
-    className,
-    variant === 'terminalGroup' ? 'canvas-minimap__node--terminal-group' : ''
-  ]
+  const nodeClassName = Array.from(
+    new Set([
+      ...className.split(' '),
+      variant === 'terminalGroup' ? 'canvas-minimap__node--terminal-group' : '',
+      variant === 'agentConsole' ? 'canvas-minimap__node--agent-console' : ''
+    ])
+  )
     .filter(Boolean)
     .join(' ')
   const effectiveStrokeColor = strokeColor ?? 'var(--cc-border-strong)'
@@ -73,7 +77,7 @@ export function MinimapWorkbenchNode({
       className={nodeClassName}
       role="button"
       tabIndex={0}
-      aria-label={`聚焦${kindLabel} ${label}`}
+      aria-label={`聚焦${accessibleKindLabel} ${label}`}
       data-minimap-node-id={id}
       onClick={activate}
       onKeyDown={activateFromKeyboard}
@@ -93,6 +97,19 @@ export function MinimapWorkbenchNode({
           strokeColor={effectiveStrokeColor}
           strokeWidth={effectiveStrokeWidth}
           selected={selected}
+        />
+      ) : variant === 'agentConsole' ? (
+        <MinimapAgentPreview
+          x={x}
+          y={y}
+          width={width}
+          height={height}
+          borderRadius={borderRadius}
+          inset={inset}
+          headerHeight={headerHeight}
+          statusColor={statusColor}
+          strokeColor={effectiveStrokeColor}
+          strokeWidth={effectiveStrokeWidth}
         />
       ) : (
         <MinimapTerminalPreview
@@ -124,6 +141,65 @@ interface MinimapPreviewProps {
   readonly strokeColor: string
   readonly strokeWidth: number
   readonly selected?: boolean
+}
+
+function MinimapAgentPreview({
+  x,
+  y,
+  width,
+  height,
+  borderRadius,
+  inset,
+  headerHeight,
+  statusColor,
+  strokeColor,
+  strokeWidth
+}: MinimapPreviewProps) {
+  const contentY = y + headerHeight + inset * 1.2
+
+  return (
+    <>
+      <rect
+        className="canvas-minimap__node-shell canvas-minimap__agent-shell"
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={borderRadius}
+        fill="var(--cc-surface)"
+        stroke={strokeColor}
+        strokeWidth={strokeWidth}
+      />
+      <rect
+        className="canvas-minimap__node-header canvas-minimap__agent-header"
+        x={x + inset}
+        y={y + inset}
+        width={Math.max(4, width - inset * 2)}
+        height={Math.max(5, headerHeight - inset * 0.45)}
+        rx={Math.max(2, borderRadius * 0.55)}
+        fill={statusColor}
+      />
+      <rect
+        className="canvas-minimap__agent-icon"
+        x={x + inset * 1.35}
+        y={y + inset * 1.25}
+        width={Math.max(4, inset * 1.3)}
+        height={Math.max(4, inset * 1.3)}
+        rx={Math.max(1.5, borderRadius * 0.32)}
+        fill="var(--cc-surface)"
+        opacity={0.9}
+      />
+      <rect
+        className="canvas-minimap__agent-body"
+        x={x + inset}
+        y={contentY}
+        width={Math.max(4, width - inset * 2)}
+        height={Math.max(5, height - headerHeight - inset * 2.2)}
+        rx={Math.max(2, borderRadius * 0.45)}
+        fill="var(--cc-surface-subtle)"
+      />
+    </>
+  )
 }
 
 function MinimapTerminalPreview({

@@ -66,7 +66,7 @@ vi.mock('@xterm/addon-fit', () => ({
   }
 }))
 
-describe('agent panel terminal', () => {
+describe('agent console terminal', () => {
   let originalUserAgent: string
   let originalResizeObserver: typeof ResizeObserver | undefined
 
@@ -181,7 +181,7 @@ describe('agent panel terminal', () => {
 
     render(<AppShell />)
 
-    expect(await screen.findByRole('region', { name: 'Codex CLI 会话' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Codex CLI 会话')).toBeInTheDocument()
     expect(await screen.findByLabelText('Codex CLI 终端')).toBeInTheDocument()
     expect(screen.queryByLabelText('Agent 指令')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '发送 Agent 指令' })).not.toBeInTheDocument()
@@ -202,6 +202,36 @@ describe('agent panel terminal', () => {
       input: '创建一个前端终端\n',
       sessionId: 'agent-session-1'
     })
+  })
+
+  it('keeps the current Agent session attached when its canvas node is selected', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const attachAgentSession = vi.fn(async () => ({
+      processId: 42,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      status: 'running',
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    }))
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession,
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(1))
+    const agentConsole = document.querySelector('[data-agent-console-node]')
+
+    expect(agentConsole).toBeInTheDocument()
+    fireEvent.click(agentConsole!)
+
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(1))
   })
 
   it('keeps separate background Codex sessions when switching workspaces', async () => {
@@ -332,7 +362,7 @@ describe('agent panel terminal', () => {
 
     expect(await screen.findByText('需要授权')).toBeInTheDocument()
     expect(screen.getByText('删除终端积木 terminal-1')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
+    fireEvent.click(screen.getByText('确认删除'))
     expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-1' })
 
     ;(approvalListener as unknown as (event: AgentToolApprovalRequest) => void)({
@@ -343,7 +373,7 @@ describe('agent panel terminal', () => {
       toolName: 'delete_terminal_group',
       workspaceName: 'main'
     })
-    fireEvent.click(await screen.findByRole('button', { name: '拒绝' }))
+    fireEvent.click(await screen.findByText('拒绝'))
     expect(rejectAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-2' })
   })
 })

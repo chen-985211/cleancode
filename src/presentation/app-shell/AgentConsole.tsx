@@ -20,17 +20,17 @@ import { appendTerminalOutputTail } from './terminalOutputTail'
 import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
 import type { WorkbenchSnapshot } from './types'
 
-interface AgentPanelProps {
+interface AgentConsoleProps {
   readonly currentWorkbench?: WorkbenchSnapshot | null
   readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
 }
 
-export function AgentPanel({
+export function AgentConsole({
   currentWorkbench = null,
   currentWorkspace = null,
   onGraphUpdated
-}: AgentPanelProps) {
+}: AgentConsoleProps) {
   const [codexCliState, setCodexCliState] = useState<CodexCliPanelState>(() =>
     window.cleancode ? { status: 'checking' } : { status: 'unavailable' }
   )
@@ -38,6 +38,8 @@ export function AgentPanel({
   const [activeOutput, setActiveOutput] = useState('')
   const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
   const currentWorkspaceKey = createWorkspaceKey(currentWorkbench, currentWorkspace)
+  const currentProjectDirectory = currentWorkbench?.project.directory ?? null
+  const currentWorkspaceName = currentWorkspace?.name ?? null
   const activeSessionId = session?.sessionId
   const activeOutputRef = useRef(activeOutput)
   const dimensionsRef = useRef(defaultAgentXtermDimensions)
@@ -95,7 +97,7 @@ export function AgentPanel({
   useEffect(() => {
     const api = window.cleancode
 
-    if (!api) {
+    if (!api || !currentProjectDirectory || !currentWorkspaceName) {
       return undefined
     }
 
@@ -121,8 +123,8 @@ export function AgentPanel({
     const unsubscribeGraph =
       api.onAgentGraphUpdated?.((event) => {
         if (
-          currentWorkbench?.project.directory === event.projectDirectory &&
-          currentWorkspace?.name === event.workspaceName
+          currentProjectDirectory === event.projectDirectory &&
+          currentWorkspaceName === event.workspaceName
         ) {
           onGraphUpdated?.(event.graph)
         }
@@ -138,7 +140,7 @@ export function AgentPanel({
       unsubscribeGraph()
       unsubscribeApproval()
     }
-  }, [currentWorkbench?.project.directory, currentWorkspace?.name, onGraphUpdated])
+  }, [currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
 
   useEffect(() => {
     let isCurrent = true
@@ -221,8 +223,6 @@ export function AgentPanel({
       approval.projectDirectory === currentWorkbench?.project.directory &&
       approval.workspaceName === currentWorkspace?.name
   )
-  const statusLabel = resolveStatusLabel(codexCliState, session)
-  const statusTone = resolveStatusTone(codexCliState, session)
   const workspaceLabel = resolveWorkspaceLabel(currentWorkbench, currentWorkspace)
 
   async function approveApproval(approval: AgentToolApprovalRequest): Promise<void> {
@@ -240,24 +240,20 @@ export function AgentPanel({
   }
 
   return (
-    <aside className="agent-panel" aria-label="Agent 面板">
-      <div className="agent-panel__header">
-        <div className="agent-panel__title-row">
-          <div className="agent-panel__identity">
-            <span className="agent-panel__icon">
+    <div className="agent-console">
+      <div className="agent-console__header">
+        <div className="agent-console__title-row">
+          <div className="agent-console__identity">
+            <span className="agent-console__icon">
               <Bot size={17} aria-hidden="true" />
             </span>
-            <div className="agent-panel__heading">
+            <div className="agent-console__heading">
               <strong>Codex CLI</strong>
               <span title={workspaceLabel}>{workspaceLabel}</span>
             </div>
           </div>
-          <span className="agent-panel__status" data-tone={statusTone} aria-live="polite">
-            <span className="agent-panel__status-dot" aria-hidden="true" />
-            {statusLabel}
-          </span>
         </div>
-        <CodexCliStatusView state={codexCliState} />
+        <CodexCliStatusView state={codexCliState} sessionStatus={session?.status ?? null} />
       </div>
       {activeApproval ? (
         <div className="agent-approval" role="group" aria-label="Agent 工具授权">
@@ -276,7 +272,7 @@ export function AgentPanel({
           </div>
         </div>
       ) : null}
-      <div className="agent-panel__terminal-shell" role="region" aria-label="Codex CLI 会话">
+      <div className="agent-console__terminal-shell" role="region" aria-label="Codex CLI 会话">
         {currentWorkspaceKey ? (
           <AgentTerminalSurface
             activeOutput={activeOutput}
@@ -284,10 +280,10 @@ export function AgentPanel({
             onFallbackInput={writeAgentInput}
           />
         ) : (
-          <div className="agent-panel__empty">未选择工作区</div>
+          <div className="agent-console__empty">未选择工作区</div>
         )}
       </div>
-    </aside>
+    </div>
   )
 }
 
@@ -329,40 +325,6 @@ function appendAgentOutput(
 
   outputBySession.set(event.sessionId, nextOutput)
   return nextOutput
-}
-
-function resolveStatusLabel(
-  state: CodexCliPanelState,
-  session: AgentSessionSnapshot | null
-): string {
-  if (state.status === 'unavailable') {
-    return '未接入'
-  }
-
-  if (state.status === 'checking') {
-    return '检查中'
-  }
-
-  if (state.installation.status !== 'installed') {
-    return '未安装'
-  }
-
-  return session?.status === 'running' ? '已连接' : '已安装'
-}
-
-function resolveStatusTone(
-  state: CodexCliPanelState,
-  session: AgentSessionSnapshot | null
-): 'neutral' | 'success' | 'warning' {
-  if (state.status !== 'ready') {
-    return 'neutral'
-  }
-
-  if (state.installation.status !== 'installed') {
-    return 'warning'
-  }
-
-  return session?.status === 'running' ? 'success' : 'neutral'
 }
 
 function resolveWorkspaceLabel(

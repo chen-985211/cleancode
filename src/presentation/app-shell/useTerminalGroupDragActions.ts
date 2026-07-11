@@ -57,6 +57,11 @@ export function useTerminalGroupDragActions({
         return
       }
 
+      if (node.type === 'agentConsole') {
+        setTerminalGroupDropAction({ type: 'none' })
+        return
+      }
+
       if (node.type === 'terminal') {
         const dropAction = isTerminalGroupSelectionMode
           ? resolveTerminalGroupDropAction({

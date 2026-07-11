@@ -168,8 +168,8 @@ export function CanvasMinimap({
                   <MinimapWorkbenchNode
                     key={frame.node.id}
                     id={frame.node.id}
-                    variant={frame.node.type === 'terminalGroup' ? 'terminalGroup' : 'terminal'}
-                    kindLabel={frame.node.type === 'terminalGroup' ? '终端组合' : '终端'}
+                    variant={resolveMinimapNodeVariant(frame.node)}
+                    kindLabel={resolveMinimapNodeKindLabel(frame.node)}
                     x={frame.x}
                     y={frame.y}
                     width={frame.width}
@@ -328,7 +328,12 @@ function resolveViewportFrame(
 }
 
 function toMinimapFrame(node: MinimapFlowNode): MinimapFrame {
-  const fallbackSize = node.type === 'terminal' ? node.data.block.size : node.data.group.size
+  const fallbackSize =
+    node.type === 'agentConsole'
+      ? { width: 440, height: 520 }
+      : node.type === 'terminal'
+        ? node.data.block.size
+        : node.data.group.size
   const width = node.measured?.width ?? resolveDimension(node.style?.width) ?? fallbackSize.width
   const height =
     node.measured?.height ?? resolveDimension(node.style?.height) ?? fallbackSize.height
@@ -340,6 +345,20 @@ function toMinimapFrame(node: MinimapFlowNode): MinimapFrame {
     width,
     height
   }
+}
+
+function resolveMinimapNodeVariant(
+  node: MinimapFlowNode
+): 'agentConsole' | 'terminal' | 'terminalGroup' {
+  return node.type
+}
+
+function resolveMinimapNodeKindLabel(node: MinimapFlowNode): string {
+  if (node.type === 'agentConsole') {
+    return 'Agent'
+  }
+
+  return node.type === 'terminalGroup' ? '终端组合' : '终端'
 }
 
 function resolveSvgPoint(

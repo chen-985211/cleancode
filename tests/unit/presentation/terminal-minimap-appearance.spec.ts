@@ -1,9 +1,11 @@
 import {
+  getTerminalMiniMapNodeColor,
   getTerminalMiniMapNodeClassName,
   getTerminalMiniMapNodeStrokeColor
 } from '../../../src/presentation/app-shell/terminalMinimapAppearance'
 import { getTerminalStatusColor } from '../../../src/presentation/app-shell/minimapInteraction'
 import {
+  type AgentConsoleFlowNode,
   createIdleTerminalState,
   type TerminalFlowNode
 } from '../../../src/presentation/app-shell/types'
@@ -59,7 +61,36 @@ describe('terminal minimap appearance', () => {
     expect(getTerminalStatusColor('running')).toBe('var(--cc-success)')
     expect(getTerminalStatusColor('failed')).toBe('var(--cc-danger)')
   })
+
+  it('keeps the Agent minimap node neutral without a terminal run-state class', () => {
+    const node = createAgentConsoleNode()
+
+    expect(getTerminalMiniMapNodeColor(node, {})).toBe('var(--cc-muted)')
+    expect(
+      getTerminalMiniMapNodeClassName({
+        node,
+        terminalStates: {},
+        selectedTerminalBlockId: null,
+        hoveredTerminalBlockId: null
+      })
+    ).toBe('canvas-minimap__node canvas-minimap__node--agent-console')
+  })
 })
+
+function createAgentConsoleNode(): AgentConsoleFlowNode {
+  return {
+    id: 'agent-console',
+    type: 'agentConsole',
+    position: { x: 540, y: 120 },
+    selected: false,
+    style: { width: 440, height: 520 },
+    data: {
+      currentWorkbench: null,
+      currentWorkspace: null,
+      onGraphUpdated: vi.fn()
+    }
+  }
+}
 
 function createTerminalNode(input: { readonly selected: boolean }): TerminalFlowNode {
   return {

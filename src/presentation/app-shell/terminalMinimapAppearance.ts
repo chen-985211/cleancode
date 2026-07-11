@@ -13,6 +13,10 @@ export function getTerminalMiniMapNodeColor(
   node: MinimapFlowNode,
   terminalStates: Record<string, TerminalViewState>
 ): string {
+  if (node.type === 'agentConsole') {
+    return 'var(--cc-muted)'
+  }
+
   return getTerminalStatusColor(resolveMinimapNodeStatus(node, terminalStates))
 }
 
@@ -38,6 +42,16 @@ export function getTerminalMiniMapNodeClassName({
   selectedTerminalBlockId,
   hoveredTerminalBlockId
 }: TerminalMinimapAppearanceInput): string {
+  if (node.type === 'agentConsole') {
+    return [
+      'canvas-minimap__node',
+      'canvas-minimap__node--agent-console',
+      node.selected ? 'canvas-minimap__node--selected' : ''
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
+
   const status = resolveMinimapNodeStatus(node, terminalStates)
 
   return [
@@ -57,6 +71,10 @@ function resolveMinimapNodeStatus(
   node: MinimapFlowNode,
   terminalStates: Record<string, TerminalViewState>
 ): TerminalSessionStatus {
+  if (node.type === 'agentConsole') {
+    return 'idle'
+  }
+
   if (node.type === 'terminal') {
     return terminalStates[node.id]?.status ?? 'idle'
   }
