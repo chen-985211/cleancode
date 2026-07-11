@@ -9,7 +9,11 @@ export const AgentNode = memo(function AgentNode({
   data,
   selected
 }: NodeProps<AgentConsoleFlowNode>) {
-  const className = ['agent-console-node', selected ? 'agent-console-node--selected' : '']
+  const className = [
+    'agent-console-node',
+    'nowheel',
+    selected ? 'agent-console-node--selected' : ''
+  ]
     .filter(Boolean)
     .join(' ')
 

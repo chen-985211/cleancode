@@ -33,6 +33,7 @@ describe('app shell Agent console', () => {
     const agentConsole = canvas.querySelector('[data-agent-console-node="agent-1"]')
 
     expect(agentConsole).toHaveAttribute('aria-label', '实现 Agent 控制台')
+    expect(agentConsole).toHaveClass('nowheel')
     expect(within(canvas).getByText('实现 Agent')).toBeInTheDocument()
     expect(within(canvas).getByText('审查 Agent')).toBeInTheDocument()
     expect(agentConsole?.querySelector('.agent-console__icon')).not.toBeInTheDocument()
