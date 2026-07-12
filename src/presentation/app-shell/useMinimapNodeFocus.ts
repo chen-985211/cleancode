@@ -5,6 +5,7 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import type { WorkbenchFlowNode } from './types'
@@ -119,8 +120,12 @@ export function useMinimapNodeFocus({
         return
       }
 
-      const width = node.measured?.width ?? resolveDimension(node.style?.width) ?? 440
-      const height = node.measured?.height ?? resolveDimension(node.style?.height) ?? 520
+      const width =
+        node.measured?.width ?? resolveDimension(node.style?.width) ?? defaultAgentLayoutSize.width
+      const height =
+        node.measured?.height ??
+        resolveDimension(node.style?.height) ??
+        defaultAgentLayoutSize.height
       const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
 
       void reactFlowInstance.setCenter(node.position.x + width / 2, node.position.y + height / 2, {

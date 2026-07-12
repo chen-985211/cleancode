@@ -15,6 +15,10 @@ import type {
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import {
+  defaultAgentLayoutPosition,
+  defaultAgentLayoutSize
+} from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { defaultAgentXtermDimensions, installAgentXterm } from './agentTerminalXterm'
 import { AgentConsoleActions } from './AgentConsoleActions'
@@ -389,7 +393,7 @@ function createFallbackAgent(
 ): WorkspaceAgentSnapshot {
   return {
     agentId: 'default-agent',
-    layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+    layout: { position: defaultAgentLayoutPosition, size: defaultAgentLayoutSize },
     name: 'Agent 1',
     projectId: workbench?.project.id ?? 'unselected-project',
     workspaceName: workspace?.name ?? 'unselected-workspace'

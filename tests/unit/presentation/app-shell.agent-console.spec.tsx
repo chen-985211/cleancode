@@ -81,19 +81,17 @@ describe('app shell Agent console', () => {
     })
   })
 
-  it('creates and removes one Agent while preserving its sibling', async () => {
+  it('creates another Agent with the compact default layout', async () => {
     const baseWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const first = createAgent('agent-1', 'Agent 1', baseWorkbench.project.id)
     const second = createAgent('agent-2', 'Agent 2', baseWorkbench.project.id, 680)
     const createWorkspaceAgent = vi.fn(async () => second)
-    const removeWorkspaceAgent = vi.fn(async () => [first])
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
         createWorkspaceAgent,
-        listWorkbenches: vi.fn(async () => [{ ...baseWorkbench, agents: [first] }]),
-        removeWorkspaceAgent
+        listWorkbenches: vi.fn(async () => [{ ...baseWorkbench, agents: [first] }])
       })
     })
 
@@ -103,18 +101,16 @@ describe('app shell Agent console', () => {
       expect(document.querySelectorAll('[data-agent-console-node]')).toHaveLength(2)
     )
 
-    expect(document.querySelector('[aria-label="Agent 2 更多操作"]')).not.toBeInTheDocument()
-    fireEvent.click(document.querySelector('[aria-label="移除 Agent 2"]')!)
-    const dialog = document.querySelector('[aria-label="移除 Agent"]')!
-    fireEvent.click(within(dialog as HTMLElement).getByText('移除'))
-
-    await waitFor(() =>
-      expect(document.querySelectorAll('[data-agent-console-node]')).toHaveLength(1)
-    )
-    expect(screen.getByText('Agent 1')).toBeInTheDocument()
-    expect(removeWorkspaceAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ agentId: 'agent-2' })
-    )
+    expect(createWorkspaceAgent).toHaveBeenCalledWith({
+      layout: {
+        position: { x: 808, y: 140 },
+        size: { width: 720, height: 460 }
+      },
+      projectId: baseWorkbench.project.id,
+      workspaceName: 'main'
+    })
+    expect(document.querySelector('[aria-label="移除 Agent 2"]')).not.toBeInTheDocument()
+    expect(document.querySelector('[aria-label="Agent 2 更多操作"]')).toBeInTheDocument()
   })
 })
 

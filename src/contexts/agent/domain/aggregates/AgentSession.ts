@@ -6,6 +6,9 @@ export interface AgentLayoutSnapshot {
   readonly size: { readonly height: number; readonly width: number }
 }
 
+export const defaultAgentLayoutPosition = { x: 540, y: 120 } as const
+export const defaultAgentLayoutSize = { width: 720, height: 460 } as const
+
 export interface AgentConversationBindingSnapshot {
   readonly codexThreadId: string
   readonly gitBranch: string | null
@@ -54,7 +57,10 @@ export class AgentSession {
     const snapshot = scope.toSnapshot()
     const session = AgentSession.create({
       agentId: snapshot.agentId,
-      layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+      layout: {
+        position: defaultAgentLayoutPosition,
+        size: defaultAgentLayoutSize
+      },
       name: 'Agent 1',
       projectId: snapshot.projectId,
       workspaceName: snapshot.workspaceName

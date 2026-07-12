@@ -19,6 +19,10 @@ describe('manage workspace Agents', () => {
 
     expect(first).toHaveLength(1)
     expect(first[0]?.name).toBe('Agent 1')
+    expect(first[0]?.layout).toEqual({
+      position: { x: 540, y: 120 },
+      size: { width: 720, height: 460 }
+    })
     expect(reopened).toEqual([])
   })
 

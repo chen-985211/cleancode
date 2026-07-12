@@ -75,6 +75,8 @@
   --cc-terminal-bright-magenta: #a565cb;
   --cc-terminal-bright-cyan: #188fa8;
   --cc-terminal-bright-white: #ffffff;
+  --cc-agent-terminal-source-light-background: #f7f9fc;
+  --cc-agent-terminal-source-dark-background: #0b1017;
   --cc-preview-light-background: #f7f9fc;
   --cc-preview-light-surface: #ffffff;
   --cc-preview-light-muted: #c8d0dc;

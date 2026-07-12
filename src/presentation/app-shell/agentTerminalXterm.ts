@@ -2,7 +2,8 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
 import type { MutableRefObject } from 'react'
 
-import { readTerminalTheme, synchronizeTerminalTheme } from './terminalTheme'
+import { readTerminalTheme } from './terminalTheme'
+import type { EffectiveTheme } from './themePreference'
 import type { TerminalDimensions } from './types'
 
 const defaultAgentTerminalDimensions: TerminalDimensions = {
@@ -19,6 +20,7 @@ export function installAgentXterm(input: {
 }): () => void {
   let pendingFitAnimationFrame: number | null = null
   let lastReportedDimensions: TerminalDimensions | null = null
+  input.element.dataset.agentTerminalSourceTheme = readEffectiveTheme()
   const terminal = new XTerm({
     convertEol: true,
     cursorBlink: true,
@@ -63,7 +65,6 @@ export function installAgentXterm(input: {
   fitAddon.fit()
   reportDimensions()
   const dataSubscription = terminal.onData(input.onInput)
-  const stopSynchronizingTheme = synchronizeTerminalTheme(terminal)
   if (input.initialOutput) {
     terminal.write(input.initialOutput)
   }
@@ -76,11 +77,15 @@ export function installAgentXterm(input: {
     }
 
     dataSubscription.dispose()
-    stopSynchronizingTheme()
     resizeObserver.disconnect()
     terminal.dispose()
     input.xtermRef.current = null
+    delete input.element.dataset.agentTerminalSourceTheme
   }
 }
 
 export const defaultAgentXtermDimensions = defaultAgentTerminalDimensions
+
+function readEffectiveTheme(): EffectiveTheme {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}

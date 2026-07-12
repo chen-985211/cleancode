@@ -1,11 +1,7 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConsoleFlowNode, WorkbenchSnapshot } from './types'
-
-const defaultAgentConsoleSize = {
-  width: 440,
-  height: 520
-}
 
 export const minimumAgentConsoleSize = {
   width: 420,
@@ -73,7 +69,7 @@ export function createLegacyAgentSnapshot(
     agentId: 'default-agent',
     layout: {
       position: { x: resolveDefaultAgentConsoleX(), y: 120 },
-      size: defaultAgentConsoleSize
+      size: defaultAgentLayoutSize
     },
     name: 'Agent 1',
     projectId: currentWorkbench?.project.id ?? 'unselected-project',

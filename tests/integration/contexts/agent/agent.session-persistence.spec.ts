@@ -40,6 +40,10 @@ describe('filesystem Agent session repository', () => {
     const agents = await reopenedRepository.findWorkspace('project-1', 'main')
 
     expect(agents?.map((agent) => agent.id)).toEqual(['agent-1', 'agent-2'])
+    expect(agents?.[0]?.layout).toEqual({
+      position: { x: 540, y: 120 },
+      size: { width: 440, height: 520 }
+    })
     expect(agents?.[0]?.findCodexThreadId('main')).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
     expect(agents?.[1]?.findCodexThreadId('main')).toBe('0190d8a2-4f13-7e17-a0c1-64c303571909')
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 2 })

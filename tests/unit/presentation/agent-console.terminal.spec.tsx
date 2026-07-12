@@ -119,10 +119,12 @@ describe('agent console terminal', () => {
     dispose()
   })
 
-  it('updates the existing Codex terminal when the effective theme changes', () => {
+  it('keeps one Codex terminal palette so buffered truecolor output stays coherent', () => {
+    document.documentElement.dataset.theme = 'dark'
     document.documentElement.style.setProperty('--cc-terminal-background', '#10151d')
+    const element = document.createElement('div')
     const dispose = installAgentXterm({
-      element: document.createElement('div'),
+      element,
       initialOutput: '',
       onDimensionsChange: vi.fn(),
       onInput: vi.fn(),
@@ -131,17 +133,21 @@ describe('agent console terminal', () => {
     const terminal = agentXtermMockState.terminals[0]
 
     expect(terminal?.options.theme?.background).toBe('#10151d')
+    expect(element).toHaveAttribute('data-agent-terminal-source-theme', 'dark')
 
+    document.documentElement.dataset.theme = 'light'
     document.documentElement.style.setProperty('--cc-terminal-background', '#f6f8fb')
     window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
 
-    expect(terminal?.options.theme?.background).toBe('#f6f8fb')
+    expect(terminal?.options.theme?.background).toBe('#10151d')
+    expect(agentXtermMockState.terminals).toHaveLength(1)
 
     dispose()
+    expect(element).not.toHaveAttribute('data-agent-terminal-source-theme')
     document.documentElement.style.setProperty('--cc-terminal-background', '#202631')
     window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
 
-    expect(terminal?.options.theme?.background).toBe('#f6f8fb')
+    expect(terminal?.options.theme?.background).toBe('#10151d')
   })
 
   it('installs xterm after the current workspace appears asynchronously', async () => {

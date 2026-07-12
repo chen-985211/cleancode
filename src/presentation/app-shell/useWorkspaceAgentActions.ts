@@ -1,6 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { resolveNewAgentConsolePosition } from './agentConsolePlacement'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchSnapshot } from './types'
@@ -49,7 +50,7 @@ export function useWorkspaceAgentActions({
     const created = await window.cleancode?.createWorkspaceAgent({
       layout: {
         position,
-        size: { width: 440, height: 520 }
+        size: defaultAgentLayoutSize
       },
       projectId: currentWorkbench.project.id,
       workspaceName: currentWorkspace.name

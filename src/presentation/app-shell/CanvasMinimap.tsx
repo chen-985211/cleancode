@@ -2,6 +2,7 @@ import { ChevronLeft, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
 import { useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import {
   MinimapNodeInteractionContext,
   type MinimapNodeInteractionContextValue
@@ -330,7 +331,7 @@ function resolveViewportFrame(
 function toMinimapFrame(node: MinimapFlowNode): MinimapFrame {
   const fallbackSize =
     node.type === 'agentConsole'
-      ? { width: 440, height: 520 }
+      ? defaultAgentLayoutSize
       : node.type === 'terminal'
         ? node.data.block.size
         : node.data.group.size

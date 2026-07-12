@@ -1,7 +1,11 @@
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
-import { AgentSession } from '../../domain/aggregates/AgentSession'
+import {
+  AgentSession,
+  defaultAgentLayoutPosition,
+  defaultAgentLayoutSize
+} from '../../domain/aggregates/AgentSession'
 
 export interface ListWorkspaceAgentsCommand {
   readonly projectId: string
@@ -20,7 +24,10 @@ export class ListWorkspaceAgentsUseCase {
 
     const defaultAgent = AgentSession.create({
       agentId: createAgentId(),
-      layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+      layout: {
+        position: defaultAgentLayoutPosition,
+        size: defaultAgentLayoutSize
+      },
       name: 'Agent 1',
       projectId: command.projectId,
       workspaceName: command.workspaceName
