@@ -24,7 +24,17 @@ import { defaultAgentXtermDimensions, installAgentXterm } from './agentTerminalX
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
-import type { WorkbenchSnapshot } from './types'
+import type { TerminalDimensions, WorkbenchSnapshot } from './types'
+
+interface AgentTerminalMeasurement {
+  readonly dimensions: TerminalDimensions
+  readonly workspaceKey: string
+}
+
+interface AgentSessionBinding {
+  readonly session: AgentSessionSnapshot
+  readonly workspaceKey: string
+}
 
 interface AgentConsoleProps {
   readonly agent?: WorkspaceAgentSnapshot
@@ -51,6 +61,7 @@ export function AgentConsole({
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
   const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
+  const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
   const currentWorkspaceKey = createWorkspaceKey(
     currentWorkbench,
     currentWorkspace,
@@ -60,12 +71,13 @@ export function AgentConsole({
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const activeSessionId = session?.sessionId
   const activeOutputRef = useRef(activeOutput)
-  const dimensionsRef = useRef(defaultAgentXtermDimensions)
+  const dimensionsRef = useRef<AgentTerminalMeasurement | null>(null)
   const outputBySessionRef = useRef(new Map<string, string>())
   const restartRequestRef = useRef<{
     readonly mode: 'new' | 'retry'
     readonly workspaceKey: string
   } | null>(null)
+  const sessionBindingRef = useRef<AgentSessionBinding | null>(null)
   const sessionRef = useRef<AgentSessionSnapshot | null>(null)
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
   const xtermRef = useRef<XTerm | null>(null)
@@ -176,8 +188,28 @@ export function AgentConsole({
       const api = window.cleancode
 
       if (!api?.attachAgentSession || !currentWorkbench || !currentWorkspace) {
+        sessionBindingRef.current = null
+        sessionRef.current = null
         setSession(null)
         setActiveOutput('')
+        return
+      }
+
+      if (sessionBindingRef.current?.workspaceKey !== currentWorkspaceKey) {
+        sessionBindingRef.current = null
+        sessionRef.current = null
+        setSession(null)
+        setActiveOutput('')
+      }
+
+      const measuredDimensions = isTestRuntime()
+        ? defaultAgentXtermDimensions
+        : dimensionsRef.current?.workspaceKey === currentWorkspaceKey &&
+            measuredTerminalKey === currentWorkspaceKey
+          ? dimensionsRef.current.dimensions
+          : null
+
+      if (!measuredDimensions || !currentWorkspaceKey) {
         return
       }
 
@@ -186,7 +218,7 @@ export function AgentConsole({
         restartRequest?.workspaceKey === currentWorkspaceKey ? restartRequest.mode : undefined
       const nextSession = await api.attachAgentSession({
         agentId: activeAgent.agentId,
-        columns: dimensionsRef.current.columns,
+        columns: measuredDimensions.columns,
         gitBranch: currentWorkspace.gitBranch,
         persistenceMode:
           currentWorkspace.gitBranch || currentWorkbench.gitBranches.length === 0
@@ -195,7 +227,7 @@ export function AgentConsole({
         projectDirectory: currentWorkbench.project.directory,
         projectId: currentWorkbench.project.id,
         restartMode,
-        rows: dimensionsRef.current.rows,
+        rows: measuredDimensions.rows,
         workspaceDirectory: currentWorkspace.directory,
         workspaceName: currentWorkspace.name
       })
@@ -207,9 +239,22 @@ export function AgentConsole({
       if (restartMode) {
         restartRequestRef.current = null
       }
+      sessionBindingRef.current = { session: nextSession, workspaceKey: currentWorkspaceKey }
+      sessionRef.current = nextSession
       setSession(nextSession)
       const restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
       setActiveOutput(restoredOutput)
+
+      const latestMeasurement = dimensionsRef.current
+      if (
+        latestMeasurement?.workspaceKey === currentWorkspaceKey &&
+        !haveSameDimensions(measuredDimensions, latestMeasurement.dimensions)
+      ) {
+        void api.resizeAgentSession?.({
+          ...latestMeasurement.dimensions,
+          sessionId: nextSession.sessionId
+        })
+      }
     }
 
     void attachSession()
@@ -217,7 +262,14 @@ export function AgentConsole({
     return () => {
       isCurrent = false
     }
-  }, [activeAgent.agentId, attachAttempt, currentWorkbench, currentWorkspace, currentWorkspaceKey])
+  }, [
+    activeAgent.agentId,
+    attachAttempt,
+    currentWorkbench,
+    currentWorkspace,
+    currentWorkspaceKey,
+    measuredTerminalKey
+  ])
 
   useEffect(() => {
     if (!activeSessionId) {
@@ -244,13 +296,17 @@ export function AgentConsole({
       element: terminalElementRef.current,
       initialOutput: activeOutputRef.current,
       onDimensionsChange: (dimensions) => {
-        dimensionsRef.current = dimensions
-        const activeSession = sessionRef.current
+        if (!currentWorkspaceKey) return
+        dimensionsRef.current = { dimensions, workspaceKey: currentWorkspaceKey }
+        setMeasuredTerminalKey((currentKey) =>
+          currentKey === currentWorkspaceKey ? currentKey : currentWorkspaceKey
+        )
+        const activeBinding = sessionBindingRef.current
 
-        if (activeSession) {
+        if (activeBinding?.workspaceKey === currentWorkspaceKey) {
           void window.cleancode?.resizeAgentSession({
             ...dimensions,
-            sessionId: activeSession.sessionId
+            sessionId: activeBinding.session.sessionId
           })
         }
       },
@@ -361,7 +417,11 @@ function AgentTerminalSurface({
     )
   }
 
-  return <div className="agent-terminal-viewport" ref={terminalElementRef} />
+  return (
+    <div className="agent-terminal-frame">
+      <div className="agent-terminal-viewport" ref={terminalElementRef} />
+    </div>
+  )
 }
 
 function appendAgentOutput(
@@ -406,4 +466,8 @@ function isTestRuntime(): boolean {
 
 function noop(): void {
   return undefined
+}
+
+function haveSameDimensions(left: TerminalDimensions, right: TerminalDimensions): boolean {
+  return left.columns === right.columns && left.rows === right.rows
 }

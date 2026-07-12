@@ -32,9 +32,9 @@ export function installAgentXterm(input: {
     theme: readTerminalTheme()
   })
   const fitAddon = new FitAddon()
-  const reportDimensions = (): void => {
-    const dimensions = { columns: terminal.cols, rows: terminal.rows }
-
+  const reportDimensions = (
+    dimensions: TerminalDimensions = { columns: terminal.cols, rows: terminal.rows }
+  ): void => {
     if (
       dimensions.columns <= 0 ||
       dimensions.rows <= 0 ||
@@ -62,6 +62,9 @@ export function installAgentXterm(input: {
   terminal.loadAddon(fitAddon)
   terminal.open(input.element)
   input.xtermRef.current = terminal
+  const resizeSubscription = terminal.onResize(({ cols, rows }) => {
+    reportDimensions({ columns: cols, rows })
+  })
   fitAddon.fit()
   reportDimensions()
   const dataSubscription = terminal.onData(input.onInput)
@@ -77,6 +80,7 @@ export function installAgentXterm(input: {
     }
 
     dataSubscription.dispose()
+    resizeSubscription.dispose()
     resizeObserver.disconnect()
     terminal.dispose()
     input.xtermRef.current = null

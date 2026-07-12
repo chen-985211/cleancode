@@ -26,6 +26,7 @@
 - [技术栈说明](docs/tech-stack.md)：说明 Electron、React、React Flow、Zustand、Vitest、Playwright 等技术选择和使用边界。
 - [UI 契约](docs/ui.md)：定义长期有效的工作台信息架构、对象语义、交互不变量、状态反馈和视觉原则。
 - [UI 路线图](docs/ui-roadmap.md)：记录尚未确认、尚未实现或等待实现对齐的 UI 方向；不作为当前功能或验收事实来源。
+- [终端渲染排障指南](docs/terminal-rendering.md)：沉淀 xterm、PTY 行列同步、滚动条几何、CJK cell 度量和 Electron 视觉验证经验。
 - [积木动作模型](docs/block-action-model.md)：定义积木动作的功能意图、作用对象和类型边界，并记录多积木类型的后续规划。
 - [日志与错误规范](docs/logging.md)：定义诊断日志、应用错误、IPC 错误传递和日志门禁规则。
 
@@ -34,6 +35,8 @@
 如果任务涉及技术选型、运行环境、工具链、依赖、构建配置或框架使用，开发协作 AI 必须继续阅读 [技术栈说明](docs/tech-stack.md)。
 
 如果任务涉及界面、交互、视觉、组件、布局或前端体验，开发协作 AI 必须继续阅读 [UI 契约](docs/ui.md)。
+
+如果任务涉及 xterm、PTY 行列同步、终端字符宽度、CJK 或 emoji 渲染、终端滚动条、终端黑边或可见字符裁剪，开发协作 AI 必须继续阅读 [终端渲染排障指南](docs/terminal-rendering.md)。
 
 如果任务涉及 UI 规划、未来功能、未实现方向或产品路线图，开发协作 AI 必须继续阅读 [UI 路线图](docs/ui-roadmap.md)。路线图不得被当作当前功能清单或验收标准。
 

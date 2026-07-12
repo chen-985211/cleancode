@@ -75,6 +75,91 @@ describe('workspace Agents e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'keeps the Agent terminal scrollbar on the right edge of its content frame',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+
+      const rightInsets = await page
+        .locator('.agent-terminal-viewport')
+        .first()
+        .evaluate((element) => {
+          const terminalShell = element.closest('.agent-console__terminal-shell')
+          const scrollbarViewport = element.querySelector('.xterm-viewport')
+
+          if (!terminalShell || !scrollbarViewport) {
+            throw new Error('Agent terminal layout is incomplete.')
+          }
+
+          const shellRight = terminalShell.getBoundingClientRect().right
+
+          return {
+            scrollbar: shellRight - scrollbarViewport.getBoundingClientRect().right,
+            terminal: shellRight - element.getBoundingClientRect().right,
+            thumbBorder: Number.parseFloat(
+              getComputedStyle(scrollbarViewport, '::-webkit-scrollbar-thumb').borderRightWidth
+            )
+          }
+        })
+
+      expect(rightInsets.terminal).toBeLessThanOrEqual(1)
+      expect(rightInsets.scrollbar).toBeLessThanOrEqual(1)
+      expect(rightInsets.thumbBorder).toBe(0)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'keeps full-width punctuation at a stable Agent terminal cell width',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+
+      const punctuationWidths = await page
+        .locator('.agent-terminal-viewport')
+        .first()
+        .evaluate((element) => {
+          const helperContainer = element.querySelector('.xterm-helpers')
+          const rows = element.querySelector('.xterm-rows')
+
+          if (!helperContainer || !rows) {
+            throw new Error('Agent terminal text metrics are unavailable.')
+          }
+
+          const rowStyle = getComputedStyle(rows)
+          const measure = (text: string): number => {
+            const sample = document.createElement('span')
+            sample.textContent = text
+            sample.style.display = 'inline-block'
+            sample.style.fontFamily = rowStyle.fontFamily
+            sample.style.fontKerning = 'none'
+            sample.style.fontSize = rowStyle.fontSize
+            sample.style.fontWeight = rowStyle.fontWeight
+            sample.style.position = 'absolute'
+            sample.style.visibility = 'hidden'
+            sample.style.whiteSpace = 'pre'
+            helperContainer.append(sample)
+            const width = sample.offsetWidth
+            sample.remove()
+            return width
+          }
+
+          return {
+            repeated: measure('，'.repeat(32)) / 32,
+            single: measure('，')
+          }
+        })
+
+      expect(Math.abs(punctuationWidths.repeated - punctuationWidths.single)).toBeLessThanOrEqual(
+        0.1
+      )
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function waitForAgentCount(page: Page, count: number): Promise<void> {

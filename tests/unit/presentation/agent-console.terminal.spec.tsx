@@ -16,6 +16,7 @@ interface FakeAgentTerminalInstance {
   readonly dispose: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
+  readonly onResize: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
@@ -49,6 +50,7 @@ vi.mock('@xterm/xterm', () => ({
 
       return { dispose: vi.fn() }
     })
+    readonly onResize = vi.fn(() => ({ dispose: vi.fn() }))
     readonly write = vi.fn((output: string) => {
       if (output.includes('\u001b[6n')) {
         this.dataListener?.('\u001b[1;1R')
@@ -182,7 +184,11 @@ describe('agent console terminal', () => {
 
     await waitFor(() => expect(attachAgentSession).toHaveBeenCalled())
     await waitFor(() => expect(agentXtermMockState.terminals).toHaveLength(1))
-    expect(agentXtermMockState.terminals[0]?.open).toHaveBeenCalled()
+    const terminalViewport = document.querySelector('.agent-terminal-viewport')
+
+    expect(terminalViewport).toBeInTheDocument()
+    expect(terminalViewport?.parentElement).toHaveClass('agent-terminal-frame')
+    expect(agentXtermMockState.terminals[0]?.open).toHaveBeenCalledWith(terminalViewport)
   })
 
   it('attaches a real Codex CLI PTY for the current workspace directory instead of showing a chat composer', async () => {
