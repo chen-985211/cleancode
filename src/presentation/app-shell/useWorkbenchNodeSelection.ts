@@ -44,30 +44,33 @@ export function useWorkbenchNodeSelection({
 
   const selectWorkbenchNode = useCallback(
     (event: MouseEvent, node: WorkbenchFlowNode) => {
-      if (node.type === 'agentConsole') {
-        setSelectedAgentId(node.data.agent.agentId)
-        setSelectedTerminalBlockIds([])
-        setSelectedTerminalGroupId(null)
-        return
-      }
-
-      setSelectedAgentId(null)
-
-      if (node.type === 'terminal') {
-        selectTerminalBlock(node.id, event.shiftKey)
-        return
-      }
-
-      selectTerminalGroup(node.id)
+      void event
+      if (node.type === 'terminalGroup') selectTerminalGroup(node.id)
     },
-    [
-      selectTerminalBlock,
-      selectTerminalGroup,
-      setSelectedAgentId,
-      setSelectedTerminalBlockIds,
-      setSelectedTerminalGroupId
-    ]
+    [selectTerminalGroup]
   )
 
-  return { onNodesChange, selectWorkbenchNode }
+  const selectAgentFromTitle = useCallback(
+    (agentId: string) => {
+      setSelectedAgentId(agentId)
+      setSelectedTerminalBlockIds([])
+      setSelectedTerminalGroupId(null)
+    },
+    [setSelectedAgentId, setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
+  )
+
+  const selectTerminalFromTitle = useCallback(
+    (blockId: string, additive: boolean) => {
+      setSelectedAgentId(null)
+      selectTerminalBlock(blockId, additive)
+    },
+    [selectTerminalBlock, setSelectedAgentId]
+  )
+
+  return {
+    onNodesChange,
+    selectAgentFromTitle,
+    selectTerminalFromTitle,
+    selectWorkbenchNode
+  }
 }

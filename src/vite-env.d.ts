@@ -167,6 +167,7 @@ declare global {
         readonly projectDirectory: string
         readonly workspaceName: string
         readonly blockId: string
+        readonly position: BlockPositionSnapshot
         readonly size: TerminalBlockSizeSnapshot
       }): Promise<BlockGraphSnapshot>
       updateGraphViewport(command: {

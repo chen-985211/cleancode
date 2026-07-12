@@ -5,7 +5,12 @@ import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentCo
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
-import type { TerminalViewState, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type {
+  TerminalViewState,
+  WorkbenchFlowNode,
+  WorkbenchNodeLayoutInput,
+  WorkbenchSnapshot
+} from './types'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
@@ -28,9 +33,9 @@ interface UseWorkbenchFlowNodesInput {
   readonly onRenameAgent: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onResizeAgent: (
     agent: WorkspaceAgentSnapshot,
-    width: number,
-    height: number
+    layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
+  readonly onSelectAgent: (agentId: string) => void
 }
 
 export function useWorkbenchFlowNodes({
@@ -50,7 +55,8 @@ export function useWorkbenchFlowNodes({
   terminalStates,
   onRemoveAgent,
   onRenameAgent,
-  onResizeAgent
+  onResizeAgent,
+  onSelectAgent
 }: UseWorkbenchFlowNodesInput): void {
   const graphIdUsedForNodesRef = useRef<string | null>(null)
 
@@ -78,7 +84,8 @@ export function useWorkbenchFlowNodes({
             onGraphUpdated: setCurrentGraph,
             onRemove: onRemoveAgent,
             onRename: onRenameAgent,
-            onResize: onResizeAgent
+            onResize: onResizeAgent,
+            onSelect: () => onSelectAgent(agent.agentId)
           })
         ),
         ...terminalNodes
@@ -108,7 +115,8 @@ export function useWorkbenchFlowNodes({
     terminalStates,
     onRemoveAgent,
     onRenameAgent,
-    onResizeAgent
+    onResizeAgent,
+    onSelectAgent
   ])
 }
 

@@ -4,8 +4,7 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-  type SyntheticEvent
+  type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
@@ -13,18 +12,19 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 export function AgentConsoleActions({
   agent,
   onRemove,
-  onRename
+  onRename,
+  onSelect
 }: {
   readonly agent: WorkspaceAgentSnapshot
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+  readonly onSelect?: () => void
 }) {
   const [mode, setMode] = useState<'closed' | 'menu' | 'remove' | 'rename'>('closed')
   const [name, setName] = useState(agent.name)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const actionsRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const stopPropagation = (event: SyntheticEvent): void => event.stopPropagation()
 
   useEffect(() => {
     if (mode !== 'menu') return undefined
@@ -81,12 +81,7 @@ export function AgentConsoleActions({
   }
 
   return (
-    <div
-      className="agent-console-actions"
-      ref={actionsRef}
-      onClick={stopPropagation}
-      onPointerDown={stopPropagation}
-    >
+    <div className="agent-console-actions" ref={actionsRef}>
       {mode === 'rename' ? (
         <form
           className="agent-console-actions__editor nodrag"
@@ -104,10 +99,14 @@ export function AgentConsoleActions({
         </form>
       ) : (
         <button
-          className="agent-console-actions__title nodrag"
+          className="agent-console-actions__title"
           type="button"
           aria-label={`${agent.name}，双击重命名`}
           title="双击重命名"
+          onClick={(event) => {
+            event.stopPropagation()
+            onSelect?.()
+          }}
           onDoubleClick={(event) => {
             event.stopPropagation()
             startRename()
@@ -130,7 +129,10 @@ export function AgentConsoleActions({
             aria-haspopup="menu"
             title="更多操作"
             disabled={isSubmitting}
-            onClick={() => setMode((current) => (current === 'menu' ? 'closed' : 'menu'))}
+            onClick={(event) => {
+              event.stopPropagation()
+              setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
+            }}
           >
             <MoreHorizontal size={15} aria-hidden="true" />
           </button>

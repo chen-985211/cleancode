@@ -1,0 +1,4 @@
+.agent-console-node__resize-handle,
+.terminal-node__resize-handle {
+  z-index: 7;
+}

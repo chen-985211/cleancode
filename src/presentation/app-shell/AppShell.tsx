@@ -1,7 +1,6 @@
 import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
-
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
 
@@ -10,7 +9,6 @@ import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { resizeTerminalBlockInWorkbench } from './resizeTerminalBlockInWorkbench'
 import { resolveNodeSize } from './resolveNodeSize'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
@@ -18,6 +16,7 @@ import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
 import { useTerminalGroupSelectionMode } from './useTerminalGroupSelectionMode'
+import { useTerminalBlockResizeAction } from './useTerminalBlockResizeAction'
 import { useInitialWorkbenchLoad } from './useInitialWorkbenchLoad'
 import { useMinimapNodeFocus } from './useMinimapNodeFocus'
 import { useProjectGitStateSynchronization } from './useProjectGitStateSynchronization'
@@ -29,13 +28,13 @@ import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import type {
   TerminalBlockMetadataInput,
-  TerminalBlockSizeInput,
   MinimapFlowNode,
   WorkbenchFlowNode,
   WorkbenchSnapshot
 } from './types'
 import { ThemeSettingsRoot } from './ThemeSettingsRoot'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
+import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 
@@ -48,6 +47,7 @@ export function AppShell() {
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
+  const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
   const graph = currentWorkbench?.graph ?? null
   const currentWorkspace = findCurrentWorkspace(currentWorkbench)
@@ -137,6 +137,7 @@ export function AppShell() {
   } = useWorkspaceAgentActions({
     currentWorkbench,
     currentWorkspace,
+    layoutCommitQueue,
     setCurrentWorkbench,
     setSelectedAgentId,
     setWorkbenches
@@ -265,15 +266,16 @@ export function AppShell() {
     setCurrentGraph
   ])
 
-  const { onNodesChange, selectWorkbenchNode } = useWorkbenchNodeSelection({
-    isTerminalGroupSelectionMode,
-    selectTerminalBlock,
-    selectTerminalGroup,
-    setNodes,
-    setSelectedAgentId,
-    setSelectedTerminalBlockIds,
-    setSelectedTerminalGroupId
-  })
+  const { onNodesChange, selectAgentFromTitle, selectTerminalFromTitle, selectWorkbenchNode } =
+    useWorkbenchNodeSelection({
+      isTerminalGroupSelectionMode,
+      selectTerminalBlock,
+      selectTerminalGroup,
+      setNodes,
+      setSelectedAgentId,
+      setSelectedTerminalBlockIds,
+      setSelectedTerminalGroupId
+    })
   const {
     clearTerminalGroupDropPreview,
     moveWorkbenchNode,
@@ -284,6 +286,7 @@ export function AppShell() {
     currentWorkspace,
     graph,
     isTerminalGroupSelectionMode,
+    layoutCommitQueue,
     nodes,
     setCurrentGraph
   })
@@ -345,17 +348,12 @@ export function AppShell() {
     },
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
-  const resizeTerminalBlock = useCallback(
-    (block: TerminalBlockSnapshot, size: TerminalBlockSizeInput) =>
-      resizeTerminalBlockInWorkbench({
-        currentWorkbench,
-        currentWorkspace,
-        block,
-        size,
-        setCurrentGraph
-      }),
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
-  )
+  const resizeTerminalBlock = useTerminalBlockResizeAction({
+    currentWorkbench,
+    currentWorkspace,
+    layoutCommitQueue,
+    setCurrentGraph
+  })
   const terminalGroupActions = useTerminalGroupActions({
     currentWorkbench,
     currentWorkspace,
@@ -392,6 +390,8 @@ export function AppShell() {
       onInput: writeTerminal,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
+      onSelect: (block: TerminalBlockSnapshot, additive: boolean) =>
+        selectTerminalFromTitle(block.id, additive),
       onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) =>
         selectTerminalBlock(block.id, true),
       ...terminalGroupActions
@@ -403,6 +403,7 @@ export function AppShell() {
       resizeTerminal,
       resizeTerminalBlock,
       restartTerminal,
+      selectTerminalFromTitle,
       selectTerminalBlock,
       startTerminal,
       terminalGroupActions,
@@ -427,7 +428,8 @@ export function AppShell() {
     terminalStates,
     onRemoveAgent: removeWorkspaceAgent,
     onRenameAgent: renameWorkspaceAgent,
-    onResizeAgent: resizeWorkspaceAgent
+    onResizeAgent: resizeWorkspaceAgent,
+    onSelectAgent: selectAgentFromTitle
   })
   const minimapNodes = useMemo(
     () =>

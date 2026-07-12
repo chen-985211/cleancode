@@ -20,7 +20,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
-    NodeResizer: () => null,
+    NodeResizeControl: () => null,
     Panel: ({
       children,
       className

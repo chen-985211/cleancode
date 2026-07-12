@@ -23,7 +23,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
-    NodeResizer: () => null,
+    NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
     ReactFlow: ({ children, nodes = [], nodeTypes = {}, onInit }: MockReactFlowProps) => {

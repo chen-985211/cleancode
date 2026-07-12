@@ -27,7 +27,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Background: () => null,
     Controls: () => null,
     Handle: () => null,
-    NodeResizer: () => null,
+    NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
     ReactFlow: (props: MockReactFlowProps) => {
@@ -157,8 +157,8 @@ describe('app shell terminal group edit mode', () => {
     expect(backendNode).toBeDefined()
     expect(frontendNode).toBeDefined()
 
-    reactFlowProps.latest?.onNodeClick?.({ shiftKey: false } as MouseEvent, backendNode!)
-    reactFlowProps.latest?.onNodeClick?.({ shiftKey: true } as MouseEvent, frontendNode!)
+    backendNode?.data.onSelect?.(false)
+    frontendNode?.data.onSelect?.(true)
 
     fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
     fireEvent.click(await screen.findByRole('button', { name: '创建组合' }))
@@ -200,7 +200,7 @@ describe('app shell terminal group edit mode', () => {
       }
     })
 
-    reactFlowProps.latest?.onNodeClick?.({ shiftKey: false } as MouseEvent, backendNode!)
+    backendNode?.data.onToggleTerminalGroupCandidate(backendNode.data.block)
 
     await waitFor(() => {
       const groupNode = reactFlowProps.latest?.nodes.find(

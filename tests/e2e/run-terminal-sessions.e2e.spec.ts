@@ -17,6 +17,17 @@ import {
   readOnlyJsonFile,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import {
+  readRequiredBoundingBox,
+  readTerminalBlockPosition,
+  readTerminalBlockSize,
+  resizeTerminalBlockFromBottomRight,
+  startTerminalBlockResizeFromBottomRight,
+  startTerminalBlockResizeFromTopLeft,
+  waitForTerminalBlockPositionChange,
+  waitForTerminalBlockSizeChange,
+  waitForTerminalSelectionState
+} from '../support/terminalResizeE2e'
 
 describe('run terminal sessions e2e', () => {
   let workbench: E2eWorkbench
@@ -150,6 +161,51 @@ describe('run terminal sessions e2e', () => {
       expect(afterSize.height - beforeSize.height).toBeGreaterThan(80)
       expect(afterBox.width - beforeBox.width).toBeGreaterThan(120)
       expect(afterBox.height - beforeBox.height).toBeGreaterThan(80)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'selects a terminal only from its title and resizes its unselected top-left corner',
+    async () => {
+      await createRunningTerminal(page)
+
+      const terminalBlock = page.locator('[data-terminal-block-id]').first()
+      const agentHeader = page.locator('.agent-console__header').first()
+      await agentHeader.click()
+      await waitForTerminalSelectionState(page, false)
+
+      await terminalBlock.locator('.terminal-frame').click()
+      await waitForTerminalSelectionState(page, false)
+      await terminalBlock.locator('.terminal-node__header').click()
+      await waitForTerminalSelectionState(page, true)
+      await agentHeader.click()
+      await waitForTerminalSelectionState(page, false)
+
+      const beforeBox = await readRequiredBoundingBox(terminalBlock)
+      const beforePosition = await readTerminalBlockPosition(workbench)
+      const beforeSize = await readTerminalBlockSize(workbench)
+      const resizeDrag = await startTerminalBlockResizeFromTopLeft(page)
+
+      await page.mouse.move(resizeDrag.startX - 100, resizeDrag.startY - 80, { steps: 18 })
+      await page.mouse.up()
+
+      const afterPosition = await waitForTerminalBlockPositionChange(workbench, beforePosition)
+      const afterSize = await waitForTerminalBlockSizeChange(workbench, beforeSize)
+      const afterBox = await readRequiredBoundingBox(terminalBlock)
+
+      expect(afterPosition.x).toBeLessThan(beforePosition.x - 60)
+      expect(afterPosition.y).toBeLessThan(beforePosition.y - 45)
+      expect(afterSize.width).toBeGreaterThan(beforeSize.width + 60)
+      expect(afterSize.height).toBeGreaterThan(beforeSize.height + 45)
+      expect(
+        Math.abs(afterPosition.x + afterSize.width - (beforePosition.x + beforeSize.width))
+      ).toBeLessThan(2)
+      expect(
+        Math.abs(afterPosition.y + afterSize.height - (beforePosition.y + beforeSize.height))
+      ).toBeLessThan(2)
+      expect(afterBox.width).toBeGreaterThan(beforeBox.width + 60)
+      expect(afterBox.height).toBeGreaterThan(beforeBox.height + 45)
     },
     electronScenarioTimeoutMs
   )
@@ -310,119 +366,6 @@ function readFakeAgentSizes(output: string) {
     columns: Number(match[1]),
     rows: Number(match[2])
   }))
-}
-
-async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
-  const box = await locator.boundingBox()
-
-  expect(box).not.toBeNull()
-
-  return box!
-}
-
-async function resizeTerminalBlockFromBottomRight(
-  page: Page,
-  deltaX: number,
-  deltaY: number
-): Promise<void> {
-  const resizeDrag = await startTerminalBlockResizeFromBottomRight(page)
-
-  await page.mouse.move(resizeDrag.startX + deltaX, resizeDrag.startY + deltaY, { steps: 18 })
-  await page.mouse.up()
-}
-
-async function startTerminalBlockResizeFromBottomRight(page: Page): Promise<{
-  readonly startX: number
-  readonly startY: number
-}> {
-  await page.locator('[data-terminal-block-id] .terminal-node__header').first().click()
-  await page.waitForFunction(
-    () => document.querySelectorAll('.terminal-node__resize-handle').length > 0
-  )
-
-  const handles = page.locator('.terminal-node__resize-handle')
-  const handleCount = await handles.count()
-  let bottomRightHandleBox: { x: number; y: number; width: number; height: number } | null = null
-
-  for (let index = 0; index < handleCount; index += 1) {
-    const box = await handles.nth(index).boundingBox()
-
-    if (!box) {
-      continue
-    }
-
-    if (!bottomRightHandleBox || box.x + box.y > bottomRightHandleBox.x + bottomRightHandleBox.y) {
-      bottomRightHandleBox = box
-    }
-  }
-
-  expect(bottomRightHandleBox).not.toBeNull()
-
-  const startX = bottomRightHandleBox!.x + bottomRightHandleBox!.width / 2
-  const startY = bottomRightHandleBox!.y + bottomRightHandleBox!.height / 2
-
-  await page.mouse.move(startX, startY)
-  await page.mouse.down()
-
-  return { startX, startY }
-}
-
-async function readTerminalBlockPosition(workbench: E2eWorkbench) {
-  const graph = JSON.parse(
-    await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-  ) as {
-    blocks: Array<{ position: { x: number; y: number } }>
-  }
-
-  return graph.blocks[0]!.position
-}
-
-async function readTerminalBlockSize(workbench: E2eWorkbench) {
-  const graph = JSON.parse(
-    await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-  ) as {
-    blocks: Array<{ size: { width: number; height: number } }>
-  }
-
-  return graph.blocks[0]!.size
-}
-
-async function waitForTerminalBlockPositionChange(
-  workbench: E2eWorkbench,
-  beforePosition: { readonly x: number; readonly y: number }
-) {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const position = await readTerminalBlockPosition(workbench)
-
-    if (position.x !== beforePosition.x || position.y !== beforePosition.y) {
-      return position
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readTerminalBlockPosition(workbench)
-}
-
-async function waitForTerminalBlockSizeChange(
-  workbench: E2eWorkbench,
-  beforeSize: { readonly width: number; readonly height: number }
-) {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const size = await readTerminalBlockSize(workbench)
-
-    if (size.width !== beforeSize.width || size.height !== beforeSize.height) {
-      return size
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readTerminalBlockSize(workbench)
 }
 
 async function writeFakeAgentScript(workbench: E2eWorkbench): Promise<string> {

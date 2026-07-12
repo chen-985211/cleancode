@@ -43,6 +43,7 @@ interface AgentConsoleProps {
   readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
   readonly onRemove?: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+  readonly onSelect?: () => void
 }
 
 export function AgentConsole({
@@ -51,7 +52,8 @@ export function AgentConsole({
   currentWorkspace = null,
   onGraphUpdated,
   onRemove,
-  onRename
+  onRename,
+  onSelect
 }: AgentConsoleProps) {
   const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
   const [codexCliState, setCodexCliState] = useState<CodexCliPanelState>(() =>
@@ -346,10 +348,22 @@ export function AgentConsole({
 
   return (
     <div className="agent-console">
-      <div className="agent-console__header">
+      <div
+        className="agent-console__header"
+        onClick={(event) => {
+          if (!(event.target as HTMLElement).closest('button, input, form, [role="menu"]')) {
+            onSelect?.()
+          }
+        }}
+      >
         <div className="agent-console__title-row">
           {agent && onRename && onRemove ? (
-            <AgentConsoleActions agent={agent} onRemove={onRemove} onRename={onRename} />
+            <AgentConsoleActions
+              agent={agent}
+              onRemove={onRemove}
+              onRename={onRename}
+              onSelect={onSelect ?? noop}
+            />
           ) : (
             <strong className="agent-console__title">{activeAgent.name}</strong>
           )}

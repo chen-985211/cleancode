@@ -19,13 +19,15 @@ describe('Agent console flow node', () => {
       onGraphUpdated: vi.fn(),
       onRemove: vi.fn(async () => undefined),
       onRename: vi.fn(async () => undefined),
-      onResize: vi.fn(async () => undefined)
+      onResize: vi.fn(async () => undefined),
+      onSelect: vi.fn()
     })
 
     expect(node).toMatchObject({
       dragHandle: '.agent-console__header',
       id: 'agent:agent-1',
       position: { x: 320, y: 140 },
+      selectable: false,
       selected: false,
       type: 'agentConsole'
     })

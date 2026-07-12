@@ -5,7 +5,6 @@ import {
   type BlockGraphSnapshot,
   minimumTerminalBlockSize,
   type TerminalBlockSnapshot,
-  type TerminalBlockSizeSnapshot,
   type TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
@@ -40,7 +39,10 @@ export interface TerminalGroupMetadataInput {
   readonly name: string
 }
 
-export type TerminalBlockSizeInput = TerminalBlockSizeSnapshot
+export interface WorkbenchNodeLayoutInput {
+  readonly position: { readonly x: number; readonly y: number }
+  readonly size: { readonly width: number; readonly height: number }
+}
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 interface TerminalNodeData extends Record<string, unknown> {
@@ -63,8 +65,9 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onResizeBlock: (
     block: TerminalBlockSnapshot,
-    size: TerminalBlockSizeInput
+    layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
+  readonly onSelect?: (additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) => void
 }
 
@@ -106,7 +109,11 @@ interface AgentConsoleNodeData extends Record<string, unknown> {
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
-  readonly onResize: (agent: WorkspaceAgentSnapshot, width: number, height: number) => Promise<void>
+  readonly onResize: (
+    agent: WorkspaceAgentSnapshot,
+    layout: WorkbenchNodeLayoutInput
+  ) => Promise<void>
+  readonly onSelect?: () => void
 }
 
 export type AgentConsoleFlowNode = Node<AgentConsoleNodeData, 'agentConsole'>

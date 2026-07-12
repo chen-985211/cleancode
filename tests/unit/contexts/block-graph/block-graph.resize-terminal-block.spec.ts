@@ -27,7 +27,7 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 }
 
 describe('resize terminal block', () => {
-  it('persists terminal block size through the resize use case', async () => {
+  it('persists the terminal final rectangle through the resize use case', async () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
       workspaceName: 'main'
@@ -44,11 +44,13 @@ describe('resize terminal block', () => {
       projectDirectory: '/tmp/project',
       workspaceName: 'main',
       blockId: terminalBlock.id,
+      position: { x: 180, y: 140 },
       size: { width: 760, height: 420 }
     })
 
     expect(updatedGraph.blocks[0]).toMatchObject({
       id: terminalBlock.id,
+      position: { x: 180, y: 140 },
       size: { width: 760, height: 420 }
     })
     expect(repository.savedGraph?.toSnapshot()).toEqual(updatedGraph)
@@ -65,9 +67,13 @@ describe('resize terminal block', () => {
       position: { x: 320, y: 240 }
     })
 
-    graph.resizeTerminalBlock(terminalBlock.id, { width: 120, height: 90 })
+    graph.resizeTerminalBlock(terminalBlock.id, {
+      position: { x: 180, y: 140 },
+      size: { width: 120, height: 90 }
+    })
 
     expect(graph.toSnapshot().blocks[0]).toMatchObject({
+      position: { x: 180, y: 140 },
       size: minimumTerminalBlockSize
     })
   })

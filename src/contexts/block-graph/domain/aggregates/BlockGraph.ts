@@ -126,9 +126,9 @@ export class BlockGraph {
     this.viewportSnapshot = normalizeCanvasViewport(viewport, this.viewportSnapshot)
   }
 
-  resizeTerminalBlock(blockId: string, input: ResizeTerminalBlockInput['size']): void {
+  resizeTerminalBlock(blockId: string, input: ResizeTerminalBlockInput): void {
     let hasUpdatedBlock = false
-    const size = normalizeTerminalBlockSize(input)
+    const size = normalizeTerminalBlockSize(input.size)
 
     this.blockSnapshots = this.blockSnapshots.map((block) => {
       if (block.id !== blockId) {
@@ -137,7 +137,7 @@ export class BlockGraph {
 
       hasUpdatedBlock = true
 
-      return { ...block, size }
+      return { ...block, position: input.position, size }
     })
 
     if (!hasUpdatedBlock) {

@@ -75,6 +75,7 @@ export interface BlockGraphIpcHandlersInput {
     readonly projectDirectory: string
     readonly workspaceName: string
     readonly blockId: string
+    readonly position: { readonly x: number; readonly y: number }
     readonly size: { readonly width: number; readonly height: number }
   }) => Promise<BlockGraphSnapshot>
   readonly updateGraphViewport: (command: {
@@ -274,6 +275,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
       readonly projectDirectory: string
       readonly workspaceName: string
       readonly blockId: string
+      readonly position: { readonly x: number; readonly y: number }
       readonly size: { readonly width: number; readonly height: number }
     },
     BlockGraphSnapshot

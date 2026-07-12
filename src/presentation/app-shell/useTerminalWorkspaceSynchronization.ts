@@ -209,6 +209,7 @@ async function ensureTerminalBlockForMigratedSession({
     projectDirectory,
     workspaceName,
     blockId: createdBlock.id,
+    position: sourceBlock.position,
     size: sourceBlock.size
   })
   const updatedGraph = await api?.updateTerminalBlockMetadata({

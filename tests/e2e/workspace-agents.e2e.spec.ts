@@ -11,6 +11,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  readOnlyJsonFile,
   waitForJsonFile,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
@@ -113,6 +114,56 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
+    'selects an Agent from its title and resizes its unselected top-left corner',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+
+      const agent = page.locator('[data-agent-console-node]').first()
+      await waitForAgentSelectionState(page, 'unselected')
+      await agent.locator('.agent-console__terminal-shell').click()
+      await waitForAgentSelectionState(page, 'unselected')
+
+      const beforeBox = await readRequiredBoundingBox(agent)
+      const beforeLayout = await readAgentLayout(workbench)
+      const resizeDrag = await startAgentResizeFromTopLeft(page)
+
+      await page.mouse.move(resizeDrag.startX - 100, resizeDrag.startY - 80, { steps: 18 })
+      await page.mouse.up()
+
+      const afterLayout = await waitForAgentLayoutChange(workbench, beforeLayout)
+      const afterBox = await readRequiredBoundingBox(agent)
+
+      expect(afterLayout.position.x).toBeLessThan(beforeLayout.position.x - 60)
+      expect(afterLayout.position.y).toBeLessThan(beforeLayout.position.y - 45)
+      expect(afterLayout.size.width).toBeGreaterThan(beforeLayout.size.width + 60)
+      expect(afterLayout.size.height).toBeGreaterThan(beforeLayout.size.height + 45)
+      expect(
+        Math.abs(
+          afterLayout.position.x +
+            afterLayout.size.width -
+            (beforeLayout.position.x + beforeLayout.size.width)
+        )
+      ).toBeLessThan(2)
+      expect(
+        Math.abs(
+          afterLayout.position.y +
+            afterLayout.size.height -
+            (beforeLayout.position.y + beforeLayout.size.height)
+        )
+      ).toBeLessThan(2)
+      expect(afterBox.width).toBeGreaterThan(beforeBox.width + 60)
+      expect(afterBox.height).toBeGreaterThan(beforeBox.height + 45)
+      await waitForAgentSelectionState(page, 'unselected')
+
+      await agent.locator('.agent-console__header').click()
+      await waitForAgentSelectionState(page, 'selected')
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'keeps full-width punctuation at a stable Agent terminal cell width',
     async () => {
       await expectDesktopRuntime(page)
@@ -168,6 +219,85 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
       document.querySelectorAll('[data-agent-console-node]').length === expectedCount,
     count
   )
+}
+
+async function waitForAgentSelectionState(
+  page: Page,
+  state: 'selected' | 'unselected'
+): Promise<void> {
+  await page.waitForFunction(
+    (expectedState) =>
+      document.querySelector('[data-agent-console-node]')?.getAttribute('data-selection-state') ===
+      expectedState,
+    state
+  )
+}
+
+interface AgentLayout {
+  readonly position: { readonly x: number; readonly y: number }
+  readonly size: { readonly width: number; readonly height: number }
+}
+
+async function readAgentLayout(workbench: E2eWorkbench): Promise<AgentLayout> {
+  const store = JSON.parse(
+    await readOnlyJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
+  ) as { workspaces: Array<{ agents: Array<{ layout: AgentLayout }> }> }
+
+  return store.workspaces[0]!.agents[0]!.layout
+}
+
+async function waitForAgentLayoutChange(
+  workbench: E2eWorkbench,
+  beforeLayout: AgentLayout
+): Promise<AgentLayout> {
+  const deadline = Date.now() + 5_000
+
+  while (Date.now() < deadline) {
+    const layout = await readAgentLayout(workbench)
+
+    if (
+      layout.position.x !== beforeLayout.position.x ||
+      layout.position.y !== beforeLayout.position.y ||
+      layout.size.width !== beforeLayout.size.width ||
+      layout.size.height !== beforeLayout.size.height
+    ) {
+      return layout
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+
+  return readAgentLayout(workbench)
+}
+
+async function startAgentResizeFromTopLeft(page: Page): Promise<{
+  readonly startX: number
+  readonly startY: number
+}> {
+  await page.waitForFunction(
+    () => document.querySelectorAll('.agent-console-node__resize-handle').length === 4
+  )
+  const handles = page.locator('.agent-console-node__resize-handle')
+  const boxes = await Promise.all(
+    Array.from({ length: await handles.count() }, (_, index) => handles.nth(index).boundingBox())
+  )
+  const topLeft = boxes
+    .filter((box): box is NonNullable<typeof box> => Boolean(box))
+    .sort((left, right) => left.x + left.y - (right.x + right.y))[0]
+
+  expect(topLeft).toBeDefined()
+  const startX = topLeft!.x + topLeft!.width / 2
+  const startY = topLeft!.y + topLeft!.height / 2
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+
+  return { startX, startY }
+}
+
+async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
+  const box = await locator.boundingBox()
+  expect(box).not.toBeNull()
+  return box!
 }
 
 async function selectTheme(page: Page, name: '浅色' | '深色'): Promise<void> {

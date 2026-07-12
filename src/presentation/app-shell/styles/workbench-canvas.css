@@ -99,6 +99,14 @@
   z-index: 0;
 }
 
+.react-flow__pane.draggable {
+  cursor: grab;
+}
+
+.react-flow__pane.dragging {
+  cursor: grabbing;
+}
+
 .react-flow__nodes {
   z-index: 2;
 }
@@ -113,6 +121,16 @@
 
 .react-flow__node.selected {
   z-index: 4 !important;
+}
+
+.terminal-node__header,
+.agent-console__header {
+  cursor: grab;
+}
+
+.react-flow__node.dragging .terminal-node__header,
+.react-flow__node.dragging .agent-console__header {
+  cursor: grabbing;
 }
 
 .react-flow__controls {

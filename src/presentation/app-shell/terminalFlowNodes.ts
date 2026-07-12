@@ -6,13 +6,13 @@ import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
 import {
   createIdleTerminalState,
   type TerminalBlockMetadataInput,
-  type TerminalBlockSizeInput,
   type TerminalDimensions,
   type TerminalFlowNode,
   type TerminalGroupDropFeedback,
   type TerminalGroupFlowNode,
   type TerminalGroupMetadataInput,
   type TerminalViewState,
+  type WorkbenchNodeLayoutInput,
   type WorkbenchFlowNode,
   type WorkbenchSnapshot
 } from './types'
@@ -36,8 +36,9 @@ interface TerminalFlowNodeHandlers {
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onResizeBlock: (
     block: TerminalBlockSnapshot,
-    size: TerminalBlockSizeInput
+    layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
+  readonly onSelect?: (block: TerminalBlockSnapshot, additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) => void
 }
 
@@ -150,6 +151,7 @@ function createTerminalFlowNode({
     id: block.id,
     type: 'terminal',
     position: block.position,
+    selectable: false,
     selected: isSelected,
     zIndex: 3,
     style: {
@@ -163,7 +165,8 @@ function createTerminalFlowNode({
       isTerminalGroupSelectionMode,
       canSelectForTerminalGroup,
       isNavigationHighlighted,
-      ...handlers
+      ...handlers,
+      onSelect: (additive) => handlers.onSelect?.(block, additive)
     }
   }
 }

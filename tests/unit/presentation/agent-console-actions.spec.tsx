@@ -11,6 +11,28 @@ const agent = {
 }
 
 describe('Agent console actions', () => {
+  it('selects the whole Agent from the title area without treating actions as selection', () => {
+    const onSelect = vi.fn()
+
+    render(
+      <AgentConsoleActions
+        agent={agent}
+        onRemove={vi.fn()}
+        onRename={vi.fn()}
+        onSelect={onSelect}
+      />
+    )
+
+    const title = screen.getByRole('button', { name: 'Agent 2，双击重命名' })
+    fireEvent.click(title)
+
+    expect(onSelect).toHaveBeenCalledOnce()
+    expect(title).not.toHaveClass('nodrag')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
+    expect(onSelect).toHaveBeenCalledOnce()
+  })
+
   it('keeps secondary actions in a compact menu and starts inline rename from it', () => {
     render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
 

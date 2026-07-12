@@ -1,6 +1,5 @@
 import {
   Handle,
-  NodeResizer,
   Position,
   type NodeProps,
   type ResizeDragEvent,
@@ -10,12 +9,14 @@ import { Check, Edit3, MoreHorizontal, Play, Square, Terminal, Trash2, X } from 
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { TerminalViewport } from './TerminalViewport'
+import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
+import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import {
   terminalNodeMinimumSize,
-  type TerminalBlockSizeInput,
   type TerminalDimensions,
   type TerminalFlowNode,
-  type TerminalViewState
+  type TerminalViewState,
+  type WorkbenchNodeLayoutInput
 } from './types'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
@@ -122,9 +123,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   }, [block, data, requestTerminalFocus, startEditingLaunchCommand])
 
   const resizeTerminalBlock = useCallback(
-    (_event: ResizeDragEvent, size: ResizeParams) => {
+    (_event: ResizeDragEvent, layout: ResizeParams) => {
       setIsResizingBlock(false)
-      void data.onResizeBlock(block, toTerminalBlockSizeInput(size))
+      void data.onResizeBlock(block, toWorkbenchNodeLayoutInput(layout))
     },
     [block, data]
   )
@@ -150,13 +151,11 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   return (
     <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
-      <NodeResizer
-        isVisible={data.isSelected && !data.isTerminalGroupSelectionMode}
+      <WorkbenchNodeResizer
+        isVisible={!data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}
         minHeight={terminalNodeMinimumSize.height}
-        color="var(--cc-muted)"
-        handleClassName="terminal-node__resize-handle nodrag"
-        lineClassName="terminal-node__resize-line"
+        className="terminal-node__resize-handle nodrag"
         onResizeStart={() => setIsResizingBlock(true)}
         onResizeEnd={resizeTerminalBlock}
       />
@@ -175,6 +174,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isSelectedForTerminalGroup={data.isSelected}
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
         sessionStatus={session.status}
+        onSelect={(additive) => data.onSelect?.(additive)}
         onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
         onStartEditing={startEditingMetadata}
         onStop={stopTerminal}
@@ -218,14 +218,15 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         type="source"
         position={Position.Right}
       />
+      {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>
   )
 })
 
-function toTerminalBlockSizeInput(size: ResizeParams): TerminalBlockSizeInput {
+function toWorkbenchNodeLayoutInput(layout: ResizeParams): WorkbenchNodeLayoutInput {
   return {
-    width: Math.round(size.width),
-    height: Math.round(size.height)
+    position: { x: Math.round(layout.x), y: Math.round(layout.y) },
+    size: { width: Math.round(layout.width), height: Math.round(layout.height) }
   }
 }
 
@@ -239,6 +240,7 @@ interface TerminalHeaderProps {
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly sessionStatus: TerminalViewState['status']
+  readonly onSelect: (additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
   readonly onStop: () => void
@@ -257,6 +259,7 @@ function TerminalHeader({
   isSelectedForTerminalGroup,
   canSelectForTerminalGroup,
   sessionStatus,
+  onSelect,
   onToggleTerminalGroupCandidate,
   onStartEditing,
   onStop,
@@ -275,7 +278,7 @@ function TerminalHeader({
   }, [onRestart])
 
   return (
-    <div className="terminal-node__header">
+    <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
         <Terminal size={23} aria-hidden="true" />
       </span>
@@ -318,6 +321,7 @@ function TerminalHeader({
       <div
         className="terminal-node__actions nodrag"
         onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <button
           className={[

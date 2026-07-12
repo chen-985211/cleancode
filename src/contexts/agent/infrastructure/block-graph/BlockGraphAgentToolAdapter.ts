@@ -62,6 +62,7 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly projectDirectory: string
     readonly workspaceName: string
     readonly blockId: string
+    readonly position: BlockPositionSnapshot
     readonly size: TerminalBlockSizeSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly setTerminalGroupCollapsed: (command: {
@@ -120,6 +121,7 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       graph = await this.tools.resizeTerminalBlock({
         ...context,
         blockId: createdBlock.id,
+        position: createdBlock.position,
         size: input.size
       })
     }
@@ -161,9 +163,11 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     }
 
     if (input.size) {
+      const resizedBlock = requireTerminalBlock(graph, input.blockId)
       graph = await this.tools.resizeTerminalBlock({
         ...context,
         blockId: input.blockId,
+        position: resizedBlock.position,
         size: input.size
       })
     }
@@ -245,4 +249,17 @@ function findCreatedTerminalBlock(
   }
 
   return createdBlock
+}
+
+function requireTerminalBlock(
+  graph: BlockGraphSnapshot,
+  blockId: string
+): BlockGraphSnapshot['blocks'][number] {
+  const block = graph.blocks.find((candidate) => candidate.id === blockId)
+
+  if (!block) {
+    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+  }
+
+  return block
 }

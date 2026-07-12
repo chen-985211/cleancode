@@ -86,6 +86,7 @@ export interface UpdateTerminalBlockMetadataInput {
 }
 
 export interface ResizeTerminalBlockInput {
+  readonly position: BlockPositionSnapshot
   readonly size: Partial<TerminalBlockSizeSnapshot>
 }
 

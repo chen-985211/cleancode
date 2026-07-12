@@ -1,7 +1,7 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
-import type { AgentConsoleFlowNode, WorkbenchSnapshot } from './types'
+import type { AgentConsoleFlowNode, WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 
 export const minimumAgentConsoleSize = {
   width: 420,
@@ -16,7 +16,11 @@ interface CreateAgentConsoleFlowNodeInput {
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
-  readonly onResize: (agent: WorkspaceAgentSnapshot, width: number, height: number) => Promise<void>
+  readonly onResize: (
+    agent: WorkspaceAgentSnapshot,
+    layout: WorkbenchNodeLayoutInput
+  ) => Promise<void>
+  readonly onSelect?: () => void
 }
 
 export function createAgentConsoleFlowNode({
@@ -27,13 +31,15 @@ export function createAgentConsoleFlowNode({
   onGraphUpdated,
   onRemove,
   onRename,
-  onResize
+  onResize,
+  onSelect
 }: CreateAgentConsoleFlowNodeInput): AgentConsoleFlowNode {
   return {
     id: toAgentFlowNodeId(agent.agentId),
     type: 'agentConsole',
     dragHandle: '.agent-console__header',
     position: agent.layout.position,
+    selectable: false,
     selected: isSelected,
     zIndex: 4,
     style: agent.layout.size,
@@ -44,7 +50,8 @@ export function createAgentConsoleFlowNode({
       onGraphUpdated,
       onRemove,
       onRename,
-      onResize
+      onResize,
+      onSelect
     }
   }
 }

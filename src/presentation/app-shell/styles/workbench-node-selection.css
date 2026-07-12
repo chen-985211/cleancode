@@ -1,0 +1,9 @@
+.workbench-node-selection-veil {
+  position: absolute;
+  z-index: 6;
+  inset: -1px;
+  border: 1px dashed var(--cc-primary-border);
+  border-radius: inherit;
+  background: var(--cc-selection-overlay);
+  pointer-events: none;
+}

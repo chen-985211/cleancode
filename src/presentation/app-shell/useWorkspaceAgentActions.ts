@@ -4,19 +4,22 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { resolveNewAgentConsolePosition } from './agentConsolePlacement'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
-import type { WorkbenchSnapshot } from './types'
+import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
+import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 export function useWorkspaceAgentActions({
   currentWorkbench,
   currentWorkspace,
+  layoutCommitQueue,
   setCurrentWorkbench,
   setSelectedAgentId,
   setWorkbenches
 }: {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
   readonly setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
@@ -61,6 +64,28 @@ export function useWorkspaceAgentActions({
     }
   }, [currentWorkbench, currentWorkspace, setSelectedAgentId, setWorkspaceAgents])
 
+  const updateAgentInWorkspace = useCallback(
+    (updated: WorkspaceAgentSnapshot): void => {
+      const update = (workbench: WorkbenchSnapshot): WorkbenchSnapshot => {
+        if (
+          workbench.project.id !== updated.projectId ||
+          findCurrentWorkspace(workbench)?.name !== updated.workspaceName
+        ) {
+          return workbench
+        }
+
+        return {
+          ...workbench,
+          agents: replaceAgent(workbench.agents ?? [], updated)
+        }
+      }
+
+      setCurrentWorkbench((workbench) => (workbench ? update(workbench) : workbench))
+      setWorkbenches((entries) => entries.map(update))
+    },
+    [setCurrentWorkbench, setWorkbenches]
+  )
+
   const renameWorkspaceAgent = useCallback(
     async (agent: WorkspaceAgentSnapshot, name: string) => {
       const updated = await window.cleancode?.renameWorkspaceAgent({
@@ -71,14 +96,37 @@ export function useWorkspaceAgentActions({
       })
       if (updated) updateAgentInWorkspace(updated)
     },
-    [currentWorkbench?.agents, setWorkspaceAgents]
+    [updateAgentInWorkspace]
+  )
+
+  const updateWorkspaceAgentLayout = useCallback(
+    async (
+      agent: WorkspaceAgentSnapshot,
+      position: { readonly x: number; readonly y: number },
+      size: { readonly width: number; readonly height: number }
+    ): Promise<void> => {
+      await layoutCommitQueue.enqueue(
+        `agent:${agent.projectId}:${agent.workspaceName}:${agent.agentId}`,
+        () =>
+          window.cleancode?.updateWorkspaceAgentLayout({
+            agentId: agent.agentId,
+            layout: { position, size },
+            projectId: agent.projectId,
+            workspaceName: agent.workspaceName
+          }) ?? Promise.resolve(undefined),
+        (updated) => {
+          if (updated) updateAgentInWorkspace(updated)
+        }
+      )
+    },
+    [layoutCommitQueue, updateAgentInWorkspace]
   )
 
   const resizeWorkspaceAgent = useCallback(
-    async (agent: WorkspaceAgentSnapshot, width: number, height: number) => {
-      await updateWorkspaceAgentLayout(agent, agent.layout.position, { width, height })
+    async (agent: WorkspaceAgentSnapshot, layout: WorkbenchNodeLayoutInput) => {
+      await updateWorkspaceAgentLayout(agent, layout.position, layout.size)
     },
-    [currentWorkbench?.agents, setWorkspaceAgents]
+    [updateWorkspaceAgentLayout]
   )
 
   const moveWorkspaceAgent = useCallback(
@@ -87,7 +135,7 @@ export function useWorkspaceAgentActions({
       position: { readonly x: number; readonly y: number },
       size: { readonly width: number; readonly height: number }
     ) => updateWorkspaceAgentLayout(agent, position, size),
-    [currentWorkbench?.agents, setWorkspaceAgents]
+    [updateWorkspaceAgentLayout]
   )
 
   const removeWorkspaceAgent = useCallback(
@@ -108,28 +156,6 @@ export function useWorkspaceAgentActions({
     removeWorkspaceAgent,
     renameWorkspaceAgent,
     resizeWorkspaceAgent
-  }
-
-  async function updateWorkspaceAgentLayout(
-    agent: WorkspaceAgentSnapshot,
-    position: { readonly x: number; readonly y: number },
-    size: { readonly width: number; readonly height: number }
-  ): Promise<void> {
-    const updated = await window.cleancode?.updateWorkspaceAgentLayout({
-      agentId: agent.agentId,
-      layout: { position, size },
-      projectId: agent.projectId,
-      workspaceName: agent.workspaceName
-    })
-    if (updated) updateAgentInWorkspace(updated)
-  }
-
-  function updateAgentInWorkspace(updated: WorkspaceAgentSnapshot): void {
-    setWorkspaceAgents(
-      updated.projectId,
-      updated.workspaceName,
-      replaceAgent(currentWorkbench?.agents ?? [], updated)
-    )
   }
 }
 

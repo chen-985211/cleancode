@@ -27,6 +27,7 @@
   --cc-primary-border: rgb(47 103 216 / 46%);
   --cc-primary-ring: rgb(47 103 216 / 18%);
   --cc-primary-wash: rgb(47 103 216 / 10%);
+  --cc-selection-overlay: rgb(47 103 216 / 5%);
   --cc-primary-canvas-mark: rgb(47 103 216 / 6%);
   --cc-success: #238a55;
   --cc-success-strong: #176e41;
@@ -112,6 +113,7 @@
   --cc-primary-border: rgb(117 160 245 / 54%);
   --cc-primary-ring: rgb(117 160 245 / 24%);
   --cc-primary-wash: rgb(117 160 245 / 13%);
+  --cc-selection-overlay: rgb(117 160 245 / 7%);
   --cc-primary-canvas-mark: rgb(117 160 245 / 9%);
   --cc-success: #52c488;
   --cc-success-strong: #72d6a1;

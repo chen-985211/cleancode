@@ -62,6 +62,13 @@ describe('app shell minimap', () => {
     expect(document.querySelector('[data-agent-console-node]')).toHaveClass(
       'agent-console-node--selected'
     )
+    expect(document.querySelector('[data-agent-console-node]')).toHaveAttribute(
+      'data-selection-state',
+      'selected'
+    )
+    expect(
+      document.querySelector('[data-agent-console-node] [data-workbench-node-selection]')
+    ).toHaveAttribute('aria-hidden', 'true')
   })
 })
 

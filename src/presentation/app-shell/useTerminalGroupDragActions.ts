@@ -5,6 +5,7 @@ import {
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -13,6 +14,7 @@ interface UseTerminalGroupDragActionsInput {
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly graph: WorkbenchSnapshot['graph'] | null
   readonly isTerminalGroupSelectionMode: boolean
+  readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
   readonly nodes: readonly WorkbenchFlowNode[]
   readonly setCurrentGraph: (graphSnapshot: WorkbenchSnapshot['graph']) => void
 }
@@ -22,6 +24,7 @@ export function useTerminalGroupDragActions({
   currentWorkspace,
   graph,
   isTerminalGroupSelectionMode,
+  layoutCommitQueue,
   nodes,
   setCurrentGraph
 }: UseTerminalGroupDragActionsInput) {
@@ -70,24 +73,30 @@ export function useTerminalGroupDragActions({
               nodes
             })
           : { type: 'none' as const }
-        let graphSnapshot = await window.cleancode?.moveBlock({
-          projectDirectory: currentWorkbench.project.directory,
-          workspaceName: currentWorkspace.name,
-          blockId: node.id,
-          position: node.position
-        })
+        await layoutCommitQueue.enqueue(
+          `terminal:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+          async () => {
+            let graphSnapshot = await window.cleancode?.moveBlock({
+              projectDirectory: currentWorkbench.project.directory,
+              workspaceName: currentWorkspace.name,
+              blockId: node.id,
+              position: node.position
+            })
 
-        graphSnapshot =
-          (await applyTerminalGroupDropAction({
-            action: dropAction,
-            blockId: node.id,
-            currentWorkbench,
-            currentWorkspace
-          })) ?? graphSnapshot
+            graphSnapshot =
+              (await applyTerminalGroupDropAction({
+                action: dropAction,
+                blockId: node.id,
+                currentWorkbench,
+                currentWorkspace
+              })) ?? graphSnapshot
 
-        if (graphSnapshot) {
-          setCurrentGraph(graphSnapshot)
-        }
+            return graphSnapshot
+          },
+          (graphSnapshot) => {
+            if (graphSnapshot) setCurrentGraph(graphSnapshot)
+          }
+        )
 
         setTerminalGroupDropAction({ type: 'none' })
         return
@@ -106,7 +115,14 @@ export function useTerminalGroupDragActions({
 
       setTerminalGroupDropAction({ type: 'none' })
     },
-    [currentWorkbench, currentWorkspace, isTerminalGroupSelectionMode, nodes, setCurrentGraph]
+    [
+      currentWorkbench,
+      currentWorkspace,
+      isTerminalGroupSelectionMode,
+      layoutCommitQueue,
+      nodes,
+      setCurrentGraph
+    ]
   )
 
   return {
