@@ -159,26 +159,29 @@
   color: var(--cc-danger-strong);
 }
 
-.archive-workspace-dialog {
+.project-sidebar-confirmation-dialog__backdrop {
   position: fixed;
-  top: 50%;
-  left: 50%;
+  inset: 0;
   z-index: 60;
+  display: grid;
+  place-items: center;
+  background: var(--cc-backdrop);
+  padding: 16px;
+}
+
+.project-sidebar-confirmation-dialog {
   width: min(360px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  transform: translate(-50%, -50%);
   border: 1px solid var(--cc-border);
   border-radius: 12px;
   background: var(--cc-surface-raised);
   padding: 18px;
   color: var(--cc-muted-strong);
-  box-shadow:
-    0 0 0 100vmax var(--cc-backdrop),
-    var(--cc-shadow-floating);
+  box-shadow: var(--cc-shadow-floating);
 }
 
-.archive-workspace-dialog__header {
+.project-sidebar-confirmation-dialog__header {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -189,12 +192,12 @@
   overflow-wrap: anywhere;
 }
 
-.archive-workspace-dialog__header svg {
+.project-sidebar-confirmation-dialog__header svg {
   flex: 0 0 auto;
   color: var(--cc-danger);
 }
 
-.archive-workspace-dialog p {
+.project-sidebar-confirmation-dialog p {
   margin: 10px 0 0;
   color: var(--cc-muted);
   font-size: 12px;
@@ -202,14 +205,14 @@
   overflow-wrap: anywhere;
 }
 
-.archive-workspace-dialog__actions {
+.project-sidebar-confirmation-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 18px;
 }
 
-.archive-workspace-dialog__actions button {
+.project-sidebar-confirmation-dialog__actions button {
   height: 32px;
   border: 1px solid var(--cc-border);
   border-radius: 7px;
@@ -221,19 +224,19 @@
   font-weight: 600;
 }
 
-.archive-workspace-dialog__actions button:hover {
+.project-sidebar-confirmation-dialog__actions button:hover {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
 }
 
-.archive-workspace-dialog__actions .archive-workspace-dialog__confirm {
+.project-sidebar-confirmation-dialog__actions .project-sidebar-confirmation-dialog__confirm {
   border-color: var(--cc-danger);
   background: var(--cc-danger);
   color: var(--cc-surface);
 }
 
-.archive-workspace-dialog__actions .archive-workspace-dialog__confirm:hover {
+.project-sidebar-confirmation-dialog__actions .project-sidebar-confirmation-dialog__confirm:hover {
   border-color: var(--cc-danger-strong);
   background: var(--cc-danger-strong);
   color: var(--cc-surface);

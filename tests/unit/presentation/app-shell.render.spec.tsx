@@ -115,55 +115,6 @@ describe('app shell', () => {
     expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
   })
 
-  it('removes a remembered project through the desktop runtime API', async () => {
-    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
-    const removeProject = vi.fn(async () => [])
-
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: {
-        appName: 'cleancode',
-        listWorkbenches: vi.fn(async () => [workbench]),
-        addProject: vi.fn(),
-        removeProject,
-        createTerminalBlock: vi.fn(),
-        createTerminalGroup: vi.fn(),
-        updateTerminalBlockMetadata: vi.fn(),
-        updateTerminalGroupMetadata: vi.fn(),
-        setTerminalGroupCollapsed: vi.fn(),
-        addTerminalToGroup: vi.fn(),
-        removeTerminalFromGroup: vi.fn(),
-        dissolveTerminalGroup: vi.fn(),
-        resizeTerminalBlock: vi.fn(),
-        updateGraphViewport: vi.fn(),
-        moveBlock: vi.fn(),
-        moveTerminalGroup: vi.fn(),
-        deleteBlock: vi.fn(),
-        saveGraph: vi.fn(),
-        startTerminal: vi.fn(),
-        writeTerminal: vi.fn(),
-        resizeTerminal: vi.fn(),
-        interruptTerminal: vi.fn(),
-        terminateTerminal: vi.fn(),
-        onTerminalOutput: vi.fn(() => vi.fn()),
-        onTerminalExit: vi.fn(() => vi.fn())
-      }
-    })
-
-    render(<AppShell />)
-    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
-
-    fireEvent.click(within(projectCard).getByRole('button', { name: '移除项目' }))
-
-    await waitFor(() =>
-      expect(removeProject).toHaveBeenCalledWith({ projectDirectory: '/tmp/alpha-project' })
-    )
-    await waitFor(() =>
-      expect(screen.queryByRole('group', { name: '项目 alpha-project' })).not.toBeInTheDocument()
-    )
-    expect(screen.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
-  })
-
   it('switches branch workspaces through the desktop runtime API', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [

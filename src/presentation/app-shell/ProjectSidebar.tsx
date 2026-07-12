@@ -12,6 +12,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspaceForm'
+import { ProjectSidebarConfirmationDialog } from './ProjectSidebarConfirmationDialog'
+import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
 import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 
@@ -120,7 +122,9 @@ function ProjectCard({
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuName, setOpenWorkspaceMenuName] = useState<string | null>(null)
   const [archiveWorkspaceName, setArchiveWorkspaceName] = useState<string | null>(null)
+  const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
+  const removeProjectButtonRef = useRef<HTMLButtonElement>(null)
   const workspaceMenuRootRef = useRef<HTMLDivElement>(null)
   const {
     branchName,
@@ -220,7 +224,8 @@ function ProjectCard({
           type="button"
           aria-label="移除项目"
           title="从列表移除项目"
-          onClick={() => onRemoveProject(workbench)}
+          ref={removeProjectButtonRef}
+          onClick={() => setIsRemoveProjectDialogOpen((isOpen) => !isOpen)}
         >
           <Trash2 size={14} aria-hidden="true" />
         </button>
@@ -412,6 +417,17 @@ function ProjectCard({
           />
         ) : null}
       </div>
+      {isRemoveProjectDialogOpen ? (
+        <ProjectSidebarProjectRemovalPopover
+          projectName={workbench.project.name}
+          triggerRef={removeProjectButtonRef}
+          onCancel={() => setIsRemoveProjectDialogOpen(false)}
+          onConfirm={() => {
+            setIsRemoveProjectDialogOpen(false)
+            onRemoveProject(workbench)
+          }}
+        />
+      ) : null}
       {archiveWorkspace ? (
         <ArchiveWorkspaceDialog
           workspaceName={archiveWorkspace.name}
@@ -441,27 +457,15 @@ function ArchiveWorkspaceDialog({
   onConfirm
 }: ArchiveWorkspaceDialogProps) {
   return (
-    <div
-      className="archive-workspace-dialog"
-      role="dialog"
-      aria-label={`归档工作区 ${workspaceName}`}
-    >
-      <div className="archive-workspace-dialog__header">
-        <Archive size={16} aria-hidden="true" />
-        <span>归档工作区 {workspaceName}</span>
-      </div>
-      <p>
-        将移除这个 worktree 目录，但保留 Git 分支 {workspaceName}。之后可以从默认工作区重新创建。
-      </p>
-      {isCurrentWorkspace ? <p>当前正在使用该工作区，归档前将自动切回默认工作区。</p> : null}
-      <div className="archive-workspace-dialog__actions">
-        <button type="button" onClick={onCancel}>
-          取消
-        </button>
-        <button className="archive-workspace-dialog__confirm" type="button" onClick={onConfirm}>
-          归档工作区
-        </button>
-      </div>
-    </div>
+    <ProjectSidebarConfirmationDialog
+      ariaLabel={`归档工作区 ${workspaceName}`}
+      confirmLabel="归档工作区"
+      description={`将移除这个 worktree 目录，但保留 Git 分支 ${workspaceName}。之后可以从默认工作区重新创建。`}
+      detail={isCurrentWorkspace ? '当前正在使用该工作区，归档前将自动切回默认工作区。' : undefined}
+      icon={<Archive size={16} aria-hidden="true" />}
+      title={`归档工作区 ${workspaceName}`}
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
   )
 }

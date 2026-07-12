@@ -1,0 +1,63 @@
+.project-removal-popover {
+  position: absolute;
+  top: 32px;
+  right: 0;
+  z-index: 55;
+  width: 188px;
+  border: 1px solid var(--cc-border);
+  border-radius: 9px;
+  background: var(--cc-surface-raised);
+  padding: 10px;
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-floating);
+}
+
+.project-removal-popover strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-removal-popover p {
+  margin: 4px 0 0;
+  color: var(--cc-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.project-removal-popover__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.project-removal-popover__actions button {
+  height: 27px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-surface);
+  padding: 0 9px;
+  color: var(--cc-muted-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.project-removal-popover__actions button:hover {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.project-removal-popover__actions .project-removal-popover__confirm {
+  border-color: var(--cc-danger-border);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.project-removal-popover__actions .project-removal-popover__confirm:hover {
+  border-color: var(--cc-danger);
+  background: var(--cc-danger);
+  color: var(--cc-surface);
+}

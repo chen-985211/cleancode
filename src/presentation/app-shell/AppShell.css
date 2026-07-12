@@ -4,6 +4,7 @@
 @import './styles/project-sidebar.css';
 @import './styles/project-sidebar-branch-workspace-form.css';
 @import './styles/project-sidebar-archive.css';
+@import './styles/project-sidebar-project-removal.css';
 @import './styles/workbench-canvas.css';
 @import './styles/tooltips.css';
 @import './styles/terminal-group-node.css';
