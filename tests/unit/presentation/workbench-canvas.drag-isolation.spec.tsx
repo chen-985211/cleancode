@@ -104,6 +104,19 @@ describe('workbench canvas drag isolation', () => {
     expect(reactFlowProps.latest?.multiSelectionKeyCode).toBeNull()
     expect(reactFlowProps.latest?.selectionKeyCode).toBeNull()
   })
+
+  it('delegates empty canvas clicks to the workbench selection model', () => {
+    const { agentNode, terminalNode } = createNodes()
+    const onPaneClick = vi.fn()
+
+    renderCanvas([agentNode, terminalNode], vi.fn(), onPaneClick)
+
+    act(() => {
+      reactFlowProps.latest?.onPaneClick?.()
+    })
+
+    expect(onPaneClick).toHaveBeenCalledOnce()
+  })
 })
 
 interface MockReactFlowProps {
@@ -111,12 +124,14 @@ interface MockReactFlowProps {
   readonly multiSelectionKeyCode?: string | null
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  readonly onPaneClick?: () => void
   readonly selectionKeyCode?: string | null
 }
 
 function renderCanvas(
   nodes: WorkbenchFlowNode[],
-  onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void,
+  onPaneClick = vi.fn()
 ): void {
   render(
     <WorkbenchCanvas
@@ -139,6 +154,7 @@ function renderCanvas(
       canCreateTerminalGroup={false}
       onNodesChange={onNodesChange}
       onNodeClick={vi.fn()}
+      onPaneClick={onPaneClick}
       onNodeDrag={vi.fn()}
       onNodeDragStart={vi.fn()}
       onNodeDragStop={vi.fn()}

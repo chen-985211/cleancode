@@ -85,7 +85,6 @@ export function AppShell() {
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
   })
-
   useInitialWorkbenchLoad({ setCurrentWorkbench, setWorkbenches })
 
   const { focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
@@ -266,16 +265,16 @@ export function AppShell() {
     setCurrentGraph
   ])
 
-  const { onNodesChange, selectAgentFromTitle, selectTerminalFromTitle, selectWorkbenchNode } =
-    useWorkbenchNodeSelection({
-      isTerminalGroupSelectionMode,
-      selectTerminalBlock,
-      selectTerminalGroup,
-      setNodes,
-      setSelectedAgentId,
-      setSelectedTerminalBlockIds,
-      setSelectedTerminalGroupId
-    })
+  const workbenchNodeSelection = useWorkbenchNodeSelection({
+    isTerminalGroupSelectionMode,
+    selectTerminalBlock,
+    selectTerminalGroup,
+    setNodes,
+    setSelectedAgentId,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  })
+  const { selectTerminalFromTitle } = workbenchNodeSelection
   const {
     clearTerminalGroupDropPreview,
     moveWorkbenchNode,
@@ -429,7 +428,7 @@ export function AppShell() {
     onRemoveAgent: removeWorkspaceAgent,
     onRenameAgent: renameWorkspaceAgent,
     onResizeAgent: resizeWorkspaceAgent,
-    onSelectAgent: selectAgentFromTitle
+    onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
   const minimapNodes = useMemo(
     () =>
@@ -476,8 +475,9 @@ export function AppShell() {
         selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
         canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
         canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
-        onNodesChange={onNodesChange}
-        onNodeClick={selectWorkbenchNode}
+        onNodesChange={workbenchNodeSelection.onNodesChange}
+        onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
+        onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
         onNodeDrag={previewTerminalGroupDrop}
         onNodeDragStart={clearTerminalGroupDropPreview}
         onNodeDragStop={(event, node) => {

@@ -67,7 +67,14 @@ export function useWorkbenchNodeSelection({
     [selectTerminalBlock, setSelectedAgentId]
   )
 
+  const clearWorkbenchSelection = useCallback(() => {
+    setSelectedAgentId(null)
+    setSelectedTerminalBlockIds([])
+    setSelectedTerminalGroupId(null)
+  }, [setSelectedAgentId, setSelectedTerminalBlockIds, setSelectedTerminalGroupId])
+
   return {
+    clearWorkbenchSelection,
     onNodesChange,
     selectAgentFromTitle,
     selectTerminalFromTitle,

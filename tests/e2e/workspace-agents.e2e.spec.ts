@@ -275,15 +275,27 @@ async function startAgentResizeFromTopLeft(page: Page): Promise<{
   readonly startY: number
 }> {
   await page.waitForFunction(
-    () => document.querySelectorAll('.agent-console-node__resize-handle').length === 4
+    () =>
+      Array.from(document.querySelectorAll('.agent-console-node__resize-handle')).filter(
+        (element) => {
+          const bounds = element.getBoundingClientRect()
+          return bounds.width > 0 && bounds.height > 0
+        }
+      ).length === 4
   )
   const handles = page.locator('.agent-console-node__resize-handle')
-  const boxes = await Promise.all(
-    Array.from({ length: await handles.count() }, (_, index) => handles.nth(index).boundingBox())
+  const boxes = await handles.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect()
+      return {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height
+      }
+    })
   )
-  const topLeft = boxes
-    .filter((box): box is NonNullable<typeof box> => Boolean(box))
-    .sort((left, right) => left.x + left.y - (right.x + right.y))[0]
+  const topLeft = boxes.sort((left, right) => left.x + left.y - (right.x + right.y))[0]
 
   expect(topLeft).toBeDefined()
   const startX = topLeft!.x + topLeft!.width / 2
@@ -295,9 +307,15 @@ async function startAgentResizeFromTopLeft(page: Page): Promise<{
 }
 
 async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
-  const box = await locator.boundingBox()
-  expect(box).not.toBeNull()
-  return box!
+  return locator.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: bounds.height
+    }
+  })
 }
 
 async function selectTheme(page: Page, name: '浅色' | '深色'): Promise<void> {

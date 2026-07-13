@@ -44,6 +44,7 @@ interface WorkbenchCanvasProps {
   readonly canCreateTerminalGroup: boolean
   readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onPaneClick: () => void
   readonly onNodeDrag: (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart: (
     event: globalThis.MouseEvent | TouchEvent,
@@ -80,6 +81,7 @@ export function WorkbenchCanvas({
   canCreateTerminalGroup,
   onNodesChange,
   onNodeClick,
+  onPaneClick,
   onNodeDrag,
   onNodeDragStart,
   onNodeDragStop,
@@ -267,6 +269,7 @@ export function WorkbenchCanvas({
             )
           }
           onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
           onNodeDragStart={(event, node) => {
             activeDraggedNodeIdRef.current = node.id
             setIsDraggingTerminalNode(true)
