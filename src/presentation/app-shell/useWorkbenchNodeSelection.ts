@@ -44,10 +44,12 @@ export function useWorkbenchNodeSelection({
 
   const selectWorkbenchNode = useCallback(
     (event: MouseEvent, node: WorkbenchFlowNode) => {
-      void event
-      if (node.type === 'terminalGroup') selectTerminalGroup(node.id)
+      if (node.type !== 'terminalGroup' || !isWorkbenchNodeTitleClick(event)) return
+
+      setSelectedAgentId(null)
+      selectTerminalGroup(node.id)
     },
-    [selectTerminalGroup]
+    [selectTerminalGroup, setSelectedAgentId]
   )
 
   const selectAgentFromTitle = useCallback(
@@ -62,9 +64,10 @@ export function useWorkbenchNodeSelection({
   const selectTerminalFromTitle = useCallback(
     (blockId: string, additive: boolean) => {
       setSelectedAgentId(null)
+      setSelectedTerminalGroupId(null)
       selectTerminalBlock(blockId, additive)
     },
-    [selectTerminalBlock, setSelectedAgentId]
+    [selectTerminalBlock, setSelectedAgentId, setSelectedTerminalGroupId]
   )
 
   const clearWorkbenchSelection = useCallback(() => {
@@ -80,4 +83,14 @@ export function useWorkbenchNodeSelection({
     selectTerminalFromTitle,
     selectWorkbenchNode
   }
+}
+
+function isWorkbenchNodeTitleClick(event: MouseEvent): boolean {
+  const target = event.target
+
+  return (
+    target instanceof Element &&
+    Boolean(target.closest('[data-workbench-node-title="true"]')) &&
+    !target.closest('button, input, form, [role="menu"]')
+  )
 }

@@ -27,6 +27,7 @@ describe('terminal flow nodes for terminal groups', () => {
     expect(nodes[0]).toMatchObject({
       id: 'development-group',
       type: 'terminalGroup',
+      selectable: false,
       position: { x: 288, y: 164 },
       style: { width: 984, height: 458 },
       data: {

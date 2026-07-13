@@ -203,6 +203,7 @@ function createTerminalGroupFlowNode({
     id: group.id,
     type: 'terminalGroup',
     position: group.position,
+    selectable: false,
     selected: selectedTerminalGroupId === group.id,
     zIndex: 1,
     style: {

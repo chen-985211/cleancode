@@ -264,6 +264,23 @@ describe('terminal group member labels', () => {
 
     expect(screen.getByText('松开后解散组合')).toBeInTheDocument()
   })
+
+  it('uses the title as its only selection target and shows the shared selection veil', () => {
+    const { container } = render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: true,
+          data: { isSelected: true }
+        })}
+      />
+    )
+
+    expect(screen.getByText('启动项目').closest('.terminal-group-node__header')).toHaveAttribute(
+      'data-workbench-node-title',
+      'true'
+    )
+    expect(container.querySelector('[data-workbench-node-selection]')).toBeInTheDocument()
+  })
 })
 
 function createTerminalGroupNodeProps(input: {

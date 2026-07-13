@@ -39,15 +39,6 @@
   background: var(--terminal-group-surface);
 }
 
-.terminal-group-node--selected {
-  box-shadow:
-    0 0 0 2px var(--cc-primary-border),
-    0 3px 8px var(--cc-shadow-color),
-    0 17px 34px var(--cc-shadow-color),
-    0 0 0 1px var(--cc-primary-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset;
-}
-
 .terminal-group-node--drop-join {
   box-shadow:
     0 0 0 2px var(--cc-success-border),

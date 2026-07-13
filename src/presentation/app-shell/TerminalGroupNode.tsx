@@ -16,6 +16,7 @@ import {
   GroupStopIcon
 } from './TerminalGroupIcons'
 import type { TerminalGroupFlowNode, TerminalViewState } from './types'
+import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
@@ -28,7 +29,6 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const className = [
     'terminal-group-node',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
-    data.isSelected ? 'terminal-group-node--selected' : '',
     data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : ''
   ]
     .filter(Boolean)
@@ -61,6 +61,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   return (
     <section className={className} data-terminal-group-id={group.id}>
       <div
+        data-workbench-node-title="true"
         className={[
           'terminal-group-node__header',
           isEditingName ? 'terminal-group-node__header--editing' : ''
@@ -137,6 +138,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           ))}
         </div>
       ) : null}
+      {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>
   )
 })
