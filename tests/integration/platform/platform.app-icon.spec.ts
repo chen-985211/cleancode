@@ -49,4 +49,28 @@ describe('platform app icon', () => {
     expect(existsSync(join(projectDirectory, 'public', 'app-icon.png'))).toBe(true)
     expect(indexHtml).toContain('<link rel="icon" type="image/svg+xml" href="/app-icon.svg" />')
   })
+
+  it('keeps the dock artwork within balanced margins with an optically compensated mark', () => {
+    const svg = readFileSync(join(process.cwd(), 'public', 'app-icon.svg'), 'utf8')
+    const basePlate = svg.match(
+      /<rect\s+x="([\d.]+)"\s+y="([\d.]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/
+    )
+    const markTransform = svg.match(
+      /<path[\s\S]*?transform="translate\(([\d.]+) ([\d.]+)\) scale\(([\d.]+)\)/
+    )
+
+    expect(basePlate).not.toBeNull()
+    expect(markTransform).not.toBeNull()
+
+    const [, x, y, width, height] = basePlate!
+    const [, markX, markY, markScale] = markTransform!
+
+    expect(Number(width) / 1024).toBeLessThanOrEqual(0.81)
+    expect(Number(x) + Number(width) / 2).toBe(512)
+    expect(Number(y) + Number(height) / 2).toBe(512)
+    expect(Number(markX)).toBeGreaterThanOrEqual(516)
+    expect(Number(markX)).toBeLessThanOrEqual(524)
+    expect(Number(markY)).toBe(512)
+    expect(Number(markScale)).toBeLessThanOrEqual(0.8)
+  })
 })
