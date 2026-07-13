@@ -49,6 +49,10 @@ describe('app shell', () => {
     expect(screen.queryByText('本地 Agent 入口已预留。')).not.toBeInTheDocument()
     expect(screen.queryByText('Codex')).not.toBeInTheDocument()
     expect(screen.queryByText('待接入')).not.toBeInTheDocument()
+    expect(screen.queryByText('React Flow')).not.toBeInTheDocument()
+    expect(
+      screen.getByLabelText('积木画布').querySelector('.react-flow__controls')
+    ).not.toBeInTheDocument()
   })
 
   it('enables project actions only when the desktop runtime API exists', () => {

@@ -133,40 +133,6 @@
   cursor: grabbing;
 }
 
-.react-flow__controls {
-  z-index: 5;
-  overflow: hidden;
-  border: 1px solid var(--cc-border);
-  border-radius: 9px;
-  background: var(--cc-neutral-overlay);
-  box-shadow: 0 4px 16px var(--cc-shadow-color);
-  backdrop-filter: blur(10px);
-}
-
-.react-flow__controls-button {
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-bottom: 1px solid var(--cc-border);
-  background: transparent;
-  color: var(--cc-muted-strong);
-}
-
-.react-flow__controls-button:hover {
-  background: var(--cc-surface-subtle);
-  color: var(--cc-foreground);
-}
-
-.react-flow__controls-button:last-child {
-  border-bottom: 0;
-}
-
-.react-flow__controls-button svg {
-  width: 13px;
-  height: 13px;
-  fill: currentcolor;
-}
-
 .canvas-minimap-panel {
   z-index: 5;
   margin: 12px;

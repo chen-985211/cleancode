@@ -1,6 +1,5 @@
 import {
   Background,
-  Controls,
   Panel,
   ReactFlow,
   type Edge,
@@ -300,9 +299,9 @@ export function WorkbenchCanvas({
           selectionKeyCode={null}
           minZoom={minimumCanvasZoom}
           maxZoom={maximumCanvasZoom}
+          proOptions={{ hideAttribution: true }}
         >
           <Background color="var(--cc-border-strong)" gap={24} size={1} />
-          <Controls position="bottom-left" showInteractive={false} />
           <Panel className="canvas-minimap-panel" position="top-left">
             <CanvasMinimap
               isCollapsed={isMinimapCollapsed}
