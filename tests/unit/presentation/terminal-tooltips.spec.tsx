@@ -150,7 +150,7 @@ describe('terminal tooltips', () => {
     fireEvent.click(container.querySelector('.terminal-node__header')!)
     expect(onSelect).toHaveBeenCalledOnce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 重开空终端会话' }))
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
@@ -206,12 +206,16 @@ describe('terminal tooltips', () => {
     expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
     expectTooltip('Terminal 启动命令', '配置启动命令')
     expectTooltip('Terminal 停止当前命令', '停止当前命令')
-    expectTooltip('Terminal 更多终端操作', '更多终端操作')
+    expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
     expectTooltip('Terminal 删除终端', '删除终端')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 更多终端操作' }))
+    const restartButton = screen.getByRole('button', { name: 'Terminal 重开空终端会话' })
+    expect(restartButton.querySelector('[data-icon="group-restart"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Terminal 更多终端操作' })).not.toBeInTheDocument()
 
-    expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
+    const deleteButton = screen.getByRole('button', { name: 'Terminal 删除终端' })
+    expect(deleteButton.querySelector('.lucide-x')).not.toBeNull()
+    expect(deleteButton.querySelector('.lucide-trash-2')).toBeNull()
   })
 
   it('orders terminal actions like the shared terminal group actions', () => {
@@ -239,7 +243,7 @@ describe('terminal tooltips', () => {
     expect(actionNames).toEqual([
       'Terminal 启动命令',
       'Terminal 停止当前命令',
-      'Terminal 更多终端操作',
+      'Terminal 重开空终端会话',
       'Terminal 编辑终端信息',
       'Terminal 删除终端'
     ])

@@ -53,7 +53,7 @@ describe('app shell create terminal focus', () => {
     })
   })
 
-  it('centers the terminal block returned by creation before the next graph render catches up', async () => {
+  it('animates toward the terminal block returned by creation before the next graph render catches up', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const createdBlock = createTerminalBlockSnapshot()
     const runtimeApi = createRuntimeApi({
@@ -75,9 +75,9 @@ describe('app shell create terminal focus', () => {
     fireEvent.click(await screen.findByRole('button', { name: '新建终端积木' }))
 
     await waitFor(() =>
-      expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(660, 393, {
+      expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(730, 420, {
         zoom: 1,
-        duration: 0
+        duration: 220
       })
     )
   })
@@ -163,6 +163,6 @@ function createTerminalBlockSnapshot(
     description: '本地终端',
     launchCommand: '',
     position: input.position ?? { x: 450, y: 240 },
-    size: { width: 420, height: 306 }
+    size: { width: 560, height: 360 }
   }
 }

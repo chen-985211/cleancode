@@ -5,9 +5,10 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, Edit3, MoreHorizontal, Play, Square, Terminal, Trash2, X } from 'lucide-react'
+import { Check, Edit3, Play, Square, Terminal, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { GroupRestartIcon } from './TerminalGroupIcons'
 import { TerminalViewport } from './TerminalViewport'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
@@ -267,20 +268,14 @@ function TerminalHeader({
   onRestart,
   onDelete
 }: TerminalHeaderProps) {
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
   const launchCommandTooltip = canQuickLaunch ? '启动命令' : '配置启动命令'
   const terminalGroupSelectionLabel = isSelectedForTerminalGroup ? '已选择终端' : '选择终端'
-  const restartEmptySession = useCallback(() => {
-    setIsMoreMenuOpen(false)
-    onRestart()
-  }, [onRestart])
-
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
-        <Terminal size={23} aria-hidden="true" />
+        <Terminal size={19} aria-hidden="true" />
       </span>
       {isTerminalGroupSelectionMode ? (
         <button
@@ -307,17 +302,19 @@ function TerminalHeader({
       ) : null}
       <div className="terminal-node__title">
         <strong>{blockName}</strong>
-        <span>{blockDescription}</span>
+        <div className="terminal-node__meta">
+          <span className="terminal-node__description">{blockDescription}</span>
+          <span className={terminalStateClassName}>
+            {isRunning
+              ? '运行中'
+              : sessionStatus === 'failed'
+                ? '失败'
+                : sessionStatus === 'exited'
+                  ? '已退出'
+                  : '未启动'}
+          </span>
+        </div>
       </div>
-      <span className={terminalStateClassName}>
-        {isRunning
-          ? '运行中'
-          : sessionStatus === 'failed'
-            ? '失败'
-            : sessionStatus === 'exited'
-              ? '已退出'
-              : '未启动'}
-      </span>
       <div
         className="terminal-node__actions nodrag"
         onPointerDown={(event) => event.stopPropagation()}
@@ -349,35 +346,17 @@ function TerminalHeader({
         >
           <Square size={14} aria-hidden="true" />
         </button>
-        <span className="terminal-node__more-action">
-          <button
-            className="terminal-node__action"
-            type="button"
-            aria-label={`${blockName} 更多终端操作`}
-            aria-expanded={isMoreMenuOpen}
-            aria-haspopup="true"
-            title="更多终端操作"
-            data-cc-tooltip="更多终端操作"
-            onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
-          >
-            <MoreHorizontal size={15} aria-hidden="true" />
-          </button>
-          {isMoreMenuOpen ? (
-            <div className="terminal-node__action-menu">
-              <button
-                className="terminal-node__menu-action"
-                type="button"
-                aria-label={`${blockName} 重开空终端会话`}
-                title="重开空终端会话，不执行启动命令"
-                data-cc-tooltip="重开空终端会话，不执行启动命令"
-                onClick={restartEmptySession}
-              >
-                <Terminal size={14} aria-hidden="true" />
-                <span>重开空终端会话</span>
-              </button>
-            </div>
-          ) : null}
-        </span>
+        <button
+          className="terminal-node__action"
+          type="button"
+          aria-label={`${blockName} 重开空终端会话`}
+          title="重开空终端会话，不执行启动命令"
+          data-cc-tooltip="重开空终端会话，不执行启动命令"
+          onClick={onRestart}
+        >
+          <GroupRestartIcon size={16} />
+        </button>
+        <span className="terminal-node__action-divider" aria-hidden="true" />
         <button
           className="terminal-node__action"
           type="button"
@@ -396,7 +375,7 @@ function TerminalHeader({
           data-cc-tooltip="删除终端"
           onClick={onDelete}
         >
-          <Trash2 size={15} aria-hidden="true" />
+          <X size={15} aria-hidden="true" />
         </button>
       </div>
     </div>

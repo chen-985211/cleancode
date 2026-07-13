@@ -52,6 +52,21 @@ describe('default block graph', () => {
     expect(graph.blocks).toEqual([])
   })
 
+  it('creates terminal blocks with a spacious landscape layout', () => {
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    const terminalBlock = graph.createTerminalBlock({
+      name: 'Terminal 1',
+      description: '本地终端',
+      position: { x: 180, y: 270 }
+    })
+
+    expect(terminalBlock.size).toEqual({ width: 560, height: 360 })
+  })
+
   it('restores legacy terminal blocks with an empty launch command', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'legacy-graph',

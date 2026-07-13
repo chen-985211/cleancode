@@ -398,6 +398,9 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await page.getByText('运行中').waitFor()
   await readTerminalSessionId(page, 'Terminal 1')
+  await page.waitForFunction(() =>
+    document.activeElement?.classList.contains('xterm-helper-textarea')
+  )
 }
 
 async function writeTerminalCommand(

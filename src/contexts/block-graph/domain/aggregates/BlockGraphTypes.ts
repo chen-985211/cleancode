@@ -110,8 +110,8 @@ export const minimumCanvasZoom = 0.35
 export const maximumCanvasZoom = 1.6
 
 export const defaultTerminalBlockSize: TerminalBlockSizeSnapshot = {
-  width: 420,
-  height: 306
+  width: 560,
+  height: 360
 }
 
 export const minimumTerminalBlockSize: TerminalBlockSizeSnapshot = {

@@ -100,7 +100,6 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
@@ -163,7 +162,6 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() =>
@@ -216,7 +214,6 @@ describe('app shell worktree directory synchronization', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 更多终端操作' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
 
     await waitFor(() =>
