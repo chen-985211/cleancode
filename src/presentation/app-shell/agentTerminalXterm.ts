@@ -3,6 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import type { MutableRefObject } from 'react'
 
 import { readTerminalTheme } from './terminalTheme'
+import { installTerminalSelectionCopy } from './terminalSelectionCopy'
 import type { EffectiveTheme } from './themePreference'
 import type { TerminalDimensions } from './types'
 
@@ -28,6 +29,7 @@ export function installAgentXterm(input: {
     fontSize: 12,
     fontWeight: 500,
     lineHeight: 1.32,
+    macOptionClickForcesSelection: true,
     rows: defaultAgentTerminalDimensions.rows,
     theme: readTerminalTheme()
   })
@@ -61,6 +63,7 @@ export function installAgentXterm(input: {
 
   terminal.loadAddon(fitAddon)
   terminal.open(input.element)
+  installTerminalSelectionCopy(terminal)
   input.xtermRef.current = terminal
   const resizeSubscription = terminal.onResize(({ cols, rows }) => {
     reportDimensions({ columns: cols, rows })

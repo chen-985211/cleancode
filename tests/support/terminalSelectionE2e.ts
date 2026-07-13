@@ -1,0 +1,186 @@
+import type { Locator, Page } from 'playwright'
+
+export type CanvasZoomDirection = 'in' | 'out'
+
+export async function setCanvasZoomFromDefault(
+  page: Page,
+  direction: CanvasZoomDirection
+): Promise<number> {
+  const expectedZoom = direction === 'in' ? 1.2 : 1 / 1.2
+  const buttonName = direction === 'in' ? '小地图放大' : '小地图缩小'
+
+  await page.waitForFunction(() => {
+    const viewport = document.querySelector('.react-flow__viewport')
+
+    if (!viewport) return false
+    return Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - 1) <= 0.001
+  })
+  await page.getByRole('button', { name: buttonName }).click()
+  await page.waitForFunction((expected) => {
+    const viewport = document.querySelector('.react-flow__viewport')
+
+    if (!viewport) return false
+    return (
+      Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - expected) <= 0.001
+    )
+  }, expectedZoom)
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+  )
+
+  return readCanvasZoom(page)
+}
+
+export async function readCanvasViewportTransform(page: Page): Promise<string> {
+  return page
+    .locator('.react-flow__viewport')
+    .evaluate((viewport) => getComputedStyle(viewport).transform)
+}
+
+export async function selectExactXtermText(
+  page: Page,
+  terminal: Locator,
+  targetText: string
+): Promise<void> {
+  const selection = await terminal.evaluate((element, target) => {
+    const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
+    const row = rows.findLast((candidate) => candidate.textContent?.includes(target))
+
+    if (!row) {
+      throw new Error(`Unable to measure xterm selection target: ${target}`)
+    }
+
+    const rowText = row.textContent ?? ''
+    const startColumn = rowText.indexOf(target)
+    const rowBounds = row.getBoundingClientRect()
+    const range = document.createRange()
+    const textNodes = Array.from(row.childNodes).flatMap((child) =>
+      child.nodeType === Node.TEXT_NODE
+        ? [child]
+        : Array.from(child.childNodes).filter((node) => node.nodeType === Node.TEXT_NODE)
+    )
+    let currentOffset = 0
+    let startNode: Node | null = null
+    let startOffset = 0
+    let endNode: Node | null = null
+    let endOffset = 0
+
+    for (const textNode of textNodes) {
+      const length = textNode.textContent?.length ?? 0
+
+      if (!startNode && startColumn >= currentOffset && startColumn < currentOffset + length) {
+        startNode = textNode
+        startOffset = startColumn - currentOffset
+      }
+      if (
+        startColumn + target.length > currentOffset &&
+        startColumn + target.length <= currentOffset + length
+      ) {
+        endNode = textNode
+        endOffset = startColumn + target.length - currentOffset
+        break
+      }
+      currentOffset += length
+    }
+
+    if (!startNode || !endNode) {
+      throw new Error(`Unable to locate xterm text nodes for: ${target}`)
+    }
+
+    range.setStart(startNode, startOffset)
+    range.setEnd(endNode, endOffset)
+    const targetBounds = range.getBoundingClientRect()
+    const cellWidth = targetBounds.width / target.length
+
+    if (startColumn < 0 || !Number.isFinite(cellWidth) || cellWidth <= 0 || rowBounds.height <= 0) {
+      throw new Error(`Invalid xterm selection geometry for: ${target}`)
+    }
+
+    return {
+      endX: targetBounds.right - 0.25 * cellWidth,
+      startX: targetBounds.left + 0.25 * cellWidth,
+      y: rowBounds.top + rowBounds.height / 2
+    }
+  }, targetText)
+
+  await page.mouse.move(selection.startX, selection.y)
+  await page.mouse.down()
+  await page.mouse.move(selection.endX, selection.y, { steps: 12 })
+  await page.mouse.up()
+}
+
+export async function readXtermAsciiCellCenter(
+  terminal: Locator,
+  input: { readonly column: number; readonly rowMarker: string }
+): Promise<{ readonly row: number; readonly x: number; readonly y: number }> {
+  return terminal.evaluate((element, target) => {
+    const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
+    const row = rows.find((candidate) => candidate.textContent?.includes(target.rowMarker))
+
+    if (!row) throw new Error(`Unable to find xterm row: ${target.rowMarker}`)
+    const rowText = row.textContent ?? ''
+    const characterOffset = target.column - 1
+    const textNodes = Array.from(row.querySelectorAll('span'))
+      .flatMap((span) => Array.from(span.childNodes))
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+    let remainingOffset = characterOffset
+    let textNode: Node | null = null
+
+    for (const candidate of textNodes) {
+      const length = candidate.textContent?.length ?? 0
+
+      if (remainingOffset < length) {
+        textNode = candidate
+        break
+      }
+      remainingOffset -= length
+    }
+
+    if (
+      !textNode ||
+      characterOffset < 0 ||
+      remainingOffset < 0 ||
+      remainingOffset >= (textNode.textContent?.length ?? 0)
+    ) {
+      throw new Error(`Unable to find xterm column ${target.column} in: ${rowText}`)
+    }
+
+    const range = document.createRange()
+    range.setStart(textNode, remainingOffset)
+    range.setEnd(textNode, remainingOffset + 1)
+    const bounds = range.getBoundingClientRect()
+    const rowBounds = row.getBoundingClientRect()
+
+    return {
+      row: rows.indexOf(row) + 1,
+      x: bounds.left + bounds.width / 2,
+      y: rowBounds.top + rowBounds.height / 2
+    }
+  }, input)
+}
+
+export async function readXtermSelection(terminal: Locator): Promise<string> {
+  return terminal.locator('.xterm').evaluate((element) => {
+    const clipboardData = new DataTransfer()
+
+    element.dispatchEvent(
+      new ClipboardEvent('copy', { bubbles: true, clipboardData, cancelable: true })
+    )
+    return clipboardData.getData('text/plain')
+  })
+}
+
+async function readCanvasZoom(page: Page): Promise<number> {
+  return page.locator('.react-flow__viewport').evaluate((viewport) => {
+    const zoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
+
+    if (!Number.isFinite(zoom)) {
+      throw new Error(`Unable to read canvas zoom from: ${viewport.style.transform}`)
+    }
+
+    return zoom
+  })
+}

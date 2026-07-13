@@ -13,6 +13,7 @@
 - 终端最右侧的中文、全角标点或 emoji 显示一半、消失或提前换行。
 - xterm 可见列数与 CLI 实际换行位置不一致。
 - 调整 Agent 节点大小、画布缩放或切换工作区后，输出布局异常。
+- 非 100% 画布缩放下，鼠标选区、链接命中或 TUI 鼠标点击偏离指针位置。
 - 滚动条没有贴住终端最右边，增加“安全区域”后反而更突兀。
 - 终端底部出现不属于内容的黑边或实色条。
 - DOM 中能找到完整文本，但截图里仍有字符被裁掉。
@@ -35,16 +36,22 @@ xterm 缓冲区中的 cell
   -> Chromium 字体与 CSS Text 排版
   -> React Flow 缩放和像素取整
   -> 屏幕上的最终字形
+
+屏幕上的鼠标坐标
+  -> 逆变换 React Flow 的缩放
+  -> xterm 本地像素坐标
+  -> xterm cell 和选区位置
 ```
 
 第一条链路决定“程序认为一行有多少列”，第二条链路决定“这些 cell 最终画在哪里”。任意一条出错都可能表现成右侧缺字，但修复方式完全不同。
 
-排查时至少要把问题拆成四层：
+排查时至少要把问题拆成五层：
 
 1. **PTY 网格**：子进程启动和后续 resize 收到的 `columns`、`rows` 是否正确。
 2. **xterm 生命周期**：是否在可见容器完成首次有效测量前就 attach，异步 attach 期间的 resize 是否丢失。
 3. **浏览器字形度量**：隐藏测量节点与可见行对同一字符的宽度理解是否一致。
 4. **外层布局**：终端内容、滚动条、边框和 padding 的几何关系是否正确。
+5. **输入坐标**：浏览器 `clientX`、`clientY` 是否先从缩放后的屏幕坐标还原为 xterm 本地坐标，再换算成 cell。
 
 不要用其中一层的修复去掩盖另一层的问题。
 
@@ -113,18 +120,36 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 
 `space-all` 的目的不是美化普通段落，而是让全角标点在测量和显示时都保持全宽，维护 terminal cell 的确定性。W3C 的 `text-spacing` shorthand 也把 `space-all` 与 `no-autospace` 的组合定义为关闭全部自动文本间距。该行为定义可参阅 [CSS Text Module Level 4](https://www.w3.org/TR/css-text-4/#text-spacing-trim-property)。本次 E2E 直接证明的是组合后的字宽结果，没有分别证明两个 longhand 各自都是必要条件。
 
+## 画布缩放下的鼠标坐标
+
+xterm 6.0.0 的鼠标坐标换算使用 `getBoundingClientRect()` 取得元素左上角，再直接用未缩放的 cell 宽高换算列和行。React Flow 在祖先元素上应用 `translate(...) scale(zoom)` 后，`clientX - rect.left` 与 `clientY - rect.top` 已经是缩放后的屏幕距离，而 cell 尺寸仍是布局坐标。两套单位混用会让选区、链接命中、自动滚动和开启鼠标协议的 TUI 一起偏移；缩放越偏离 100%，误差越明显。
+
+当前项目通过 `pnpm-workspace.yaml` 中的精确版本 `patchedDependencies` 修补 `@xterm/xterm@6.0.0`。公共换算入口先恢复本地坐标：
+
+```txt
+scaleX = rect.width / element.offsetWidth
+scaleY = rect.height / element.offsetHeight
+
+localX = (clientX - rect.left) / scaleX - leftPadding
+localY = (clientY - rect.top) / scaleY - topPadding
+```
+
+这里必须先逆缩放，再减去以布局像素表示的 xterm padding。补丁修改可读源码和当前 Vite renderer 实际加载的 ESM 产物；项目没有加载 CommonJS 产物，因此不复制一份巨大的单行 bundle 补丁。依赖入口或打包方式改变时，必须重新核对这个假设。
+
+该换算支持当前 React Flow 使用的正向、轴对齐 `translate + scale`，并在 100% 缩放下保持等价；它不承诺支持旋转、倾斜或负缩放。补丁只修复指针坐标，不改变 FitAddon、PTY 行列、文本 reflow 或 session 生命周期。上游跟踪见 [xterm.js #6023](https://github.com/xtermjs/xterm.js/issues/6023)；升级 xterm 时应先检查上游是否已修复，再删除本地补丁并运行完整缩放回归。
+
 ## 关键证据
 
 下面的数据来自本次 macOS、Electron、xterm DOM renderer 环境，用于说明证据链，不是跨平台阈值：
 
-| 检查项 | 修复前 | 修复后/验收值 | 说明 |
-| --- | ---: | ---: | --- |
-| PTY 首次 attach | 可能使用默认 `88 x 24` | 使用当前 xterm 首次有效实测值 | 避免启动阶段网格不一致 |
-| viewport 相对终端外框右侧 inset | `10px` | `0px`，自动化容差 `<= 1px` | 证明滚动条真正贴边，而非只在内层容器贴边 |
-| 连续 32 个 `，` 的平均宽度 | `6.1875px` | 与单字符差值 `<= 0.1px` | 修复前被上下文压缩 |
-| 单个 `，` 的宽度 | `12px` | 与连续样本保持一致 | 终端双宽 cell 的测量必须稳定 |
-| 最后字形相对行右边界 | 曾正向溢出约 `11.69px` | `-7.8px` | 负数表示字形安全落在行内 |
-| 水平溢出 | 可见裁剪 | `0px` | 最终 Electron 几何检查 |
+| 检查项                          |                 修复前 |                 修复后/验收值 | 说明                                     |
+| ------------------------------- | ---------------------: | ----------------------------: | ---------------------------------------- |
+| PTY 首次 attach                 | 可能使用默认 `88 x 24` | 使用当前 xterm 首次有效实测值 | 避免启动阶段网格不一致                   |
+| viewport 相对终端外框右侧 inset |                 `10px` |    `0px`，自动化容差 `<= 1px` | 证明滚动条真正贴边，而非只在内层容器贴边 |
+| 连续 32 个 `，` 的平均宽度      |             `6.1875px` |       与单字符差值 `<= 0.1px` | 修复前被上下文压缩                       |
+| 单个 `，` 的宽度                |                 `12px` |            与连续样本保持一致 | 终端双宽 cell 的测量必须稳定             |
+| 最后字形相对行右边界            | 曾正向溢出约 `11.69px` |                      `-7.8px` | 负数表示字形安全落在行内                 |
+| 水平溢出                        |               可见裁剪 |                         `0px` | 最终 Electron 几何检查                   |
 
 最有价值的转折点是：DOM 行文本完整，但最后一个 span 的 `right` 大于所在 `.xterm-rows > div` 的 `right`。这直接证明问题是可见裁剪，而不是终端输出丢失。
 
@@ -141,6 +166,7 @@ Agent 控制台当前应维护以下不变量。普通终端可以复用排查�
 7. 文字内边距与滚动条轨道分层，滚动条相对终端内容外框贴右。
 8. 行内最后一个可见字形不超过行右边界，终端没有水平溢出。
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
+10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
 
 ## 排障流程
 
@@ -260,6 +286,12 @@ xterm open
 - attach Promise pending 时发生 resize，Promise 完成后没有补发最新行列。
 - 工作区已经切换，旧 session 返回后仍成为 `sessionRef.current`。
 
+### 第六步：分别验证屏幕坐标和 cell 坐标
+
+不要只在 100% 缩放下拖选一段大致文本。准备带有前后保护字符的 ASCII 行，在小于 100%、100% 和大于 100% 三种缩放下按可见字形边界拖选，并断言复制结果完全相等。保护字符能暴露一列左右的偏移，节点位置与 React Flow viewport transform 则应在拖选前后保持不变。
+
+终端应用若开启 SGR mouse 等鼠标协议，还要运行一个确定性的 TUI fixture，记录 PTY 实际收到的按下、移动和抬起 cell。选区与鼠标协议共用 xterm 坐标入口，但二者都通过真实 Electron 才能证明浏览器 transform、DOM 几何和 xterm 换算已经对齐。
+
 ## 无效或不完整的修复
 
 ### 只增加右侧安全区域
@@ -277,6 +309,10 @@ xterm buffer 和 DOM 中存在字符，不代表字形没有被 `.xterm-rows > d
 ### 只比较 xterm 内层元素
 
 内层 viewport 贴住 xterm，不代表它贴住用户看到的终端外框。外层 padding 是这次滚动条 inset 被遗漏的直接原因。
+
+### 只阻止 React Flow 拖拽
+
+`nodrag`、`nopan`、`nowheel` 可以阻止终端手势被画布接管，是选区交互的必要边界，但不会修正 xterm 内部的坐标单位。若缩放后仍用屏幕距离除以未缩放 cell 尺寸，节点不再移动，选中的字符和 TUI 收到的 cell 仍然会偏移。
 
 ### 在空终端上截图
 
@@ -314,6 +350,9 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 - xterm viewport 和 scrollbar 相对终端外框的右侧 inset 不超过 1px。
 - 单个全角标点与重复全角标点的平均宽度差不超过 0.1px。
+- 放大画布下 Agent 按可见字形拖选，复制结果精确匹配目标文本，节点和 viewport 不移动。
+
+[run-terminal-sessions.e2e.spec.ts](../tests/e2e/run-terminal-sessions.e2e.spec.ts) 还覆盖普通终端在默认与缩小画布下的精确选区，以及缩小画布下 SGR mouse 的按下、移动、抬起 cell。这样组合覆盖小于 100%、100% 和大于 100% 三个坐标区间，同时证明普通终端与 Agent 两个 surface。
 
 这里使用 E2E 的理由不是“改动发生在 UI”，而是 jsdom 不执行 Chromium 的真实 CSS Text 排版，也不能可信测量 WebKit scrollbar pseudo-element。
 
@@ -344,6 +383,9 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [ ] DOM 行尾文本完整，最后字形 `right <= row.right`。
 - [ ] 没有水平 overflow，也没有底部黑边。
 - [ ] 浅色、深色和非 100% 画布缩放均检查。
+- [ ] 小于 100%、100% 和大于 100% 下，精确拖选不会多选或漏选保护字符。
+- [ ] 开启鼠标协议后，PTY 收到的按下、移动和抬起 cell 与可见指针位置一致。
+- [ ] 终端选区前后节点位置和画布 transform 不变。
 - [ ] 截图已经由人实际打开查看。
 - [ ] 按 [开发协作规范](development.md) 和 [测试规范](testing.md) 运行对应目标测试与最终门禁。
 
@@ -353,3 +395,5 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [xterm.js Terminal API](https://xtermjs.org/docs/api/terminal/classes/terminal/)：`onResize`、`open`、`rows`、`cols` 等终端生命周期接口。
 - [node-pty](https://github.com/microsoft/node-pty)：PTY 启动与 resize 的基础设施能力。
 - [CSS Text Module Level 4：`text-spacing-trim`](https://www.w3.org/TR/css-text-4/#text-spacing-trim-property)：全角标点上下文间距的规范来源。
+- [xterm.js #6023](https://github.com/xtermjs/xterm.js/issues/6023)：祖先 CSS transform 导致鼠标坐标偏移的上游跟踪。
+- [pnpm：Patch dependencies](https://pnpm.io/cli/patch)：生成和维护精确依赖补丁的官方流程。

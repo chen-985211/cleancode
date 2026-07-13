@@ -8,14 +8,19 @@ import { terminalOutputBrowserEventName } from '../../../src/presentation/app-sh
 interface FakeTerminalInstance {
   cols: number
   rows: number
-  options: { theme?: Record<string, string> }
+  options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+  selection: string
+  readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
   readonly focus: ReturnType<typeof vi.fn>
+  readonly getSelection: ReturnType<typeof vi.fn>
+  readonly hasSelection: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
   textarea: HTMLTextAreaElement | null
+  customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
 }
 
 interface FakeFitAddonInstance {
@@ -38,12 +43,18 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeTerminalInstance {
     cols = 80
     rows = 24
-    options: { theme?: Record<string, string> }
+    options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+    selection = ''
     textarea: HTMLTextAreaElement | null = null
 
+    readonly attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
+      this.customKeyEventHandler = handler
+    })
     readonly focus = vi.fn(() => {
       this.textarea?.focus()
     })
+    readonly getSelection = vi.fn(() => this.selection)
+    readonly hasSelection = vi.fn(() => this.selection.length > 0)
 
     readonly write = vi.fn((_output: string, callback?: () => void) => {
       callback?.()
@@ -65,7 +76,12 @@ vi.mock('@xterm/xterm', () => ({
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
     readonly dispose = vi.fn()
 
-    constructor(options: { theme?: Record<string, string> }) {
+    customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
+
+    constructor(options: {
+      macOptionClickForcesSelection?: boolean
+      theme?: Record<string, string>
+    }) {
       this.options = options
       xtermMockState.terminals.push(this)
     }
@@ -123,6 +139,7 @@ describe('terminal viewport interaction', () => {
   })
 
   afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard')
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
       value: originalUserAgent
@@ -159,6 +176,39 @@ describe('terminal viewport interaction', () => {
     expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
     expect(terminal.focus).not.toHaveBeenCalled()
     expect(helperTextareaFocus).not.toHaveBeenCalled()
+  })
+
+  it('copies selected terminal output while preserving Ctrl+C when there is no selection', async () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    })
+    renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+    const copyHandler = terminal.customKeyEventHandler
+
+    expect(terminal.options.macOptionClickForcesSelection).toBe(true)
+    expect(copyHandler).not.toBeNull()
+
+    const interruptEvent = new KeyboardEvent('keydown', {
+      cancelable: true,
+      ctrlKey: true,
+      key: 'c'
+    })
+    expect(copyHandler?.(interruptEvent)).toBe(true)
+    expect(interruptEvent.defaultPrevented).toBe(false)
+    expect(writeText).not.toHaveBeenCalled()
+
+    terminal.selection = 'selected terminal output'
+    const copyEvent = new KeyboardEvent('keydown', {
+      cancelable: true,
+      ctrlKey: true,
+      key: 'c'
+    })
+    expect(copyHandler?.(copyEvent)).toBe(false)
+    expect(copyEvent.defaultPrevented).toBe(true)
+    expect(writeText).toHaveBeenCalledWith('selected terminal output')
   })
 
   it('updates the existing terminal theme without reinstalling xterm', async () => {

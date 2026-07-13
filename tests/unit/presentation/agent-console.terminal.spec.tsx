@@ -12,14 +12,19 @@ import {
 interface FakeAgentTerminalInstance {
   cols: number
   rows: number
-  options: { theme?: Record<string, string> }
+  options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+  selection: string
+  readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
+  readonly getSelection: ReturnType<typeof vi.fn>
+  readonly hasSelection: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
   readonly onResize: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
+  customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
   dataListener: ((input: string) => void) | null
 }
 
@@ -36,10 +41,16 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminalInstance {
     cols = 88
     rows = 24
-    options: { theme?: Record<string, string> }
+    options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+    selection = ''
     dataListener: ((input: string) => void) | null = null
 
+    readonly attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
+      this.customKeyEventHandler = handler
+    })
     readonly dispose = vi.fn()
+    readonly getSelection = vi.fn(() => this.selection)
+    readonly hasSelection = vi.fn(() => this.selection.length > 0)
     readonly open = vi.fn()
     readonly reset = vi.fn()
     readonly loadAddon = vi.fn((addon: FakeAgentFitAddonInstance) => {
@@ -57,7 +68,12 @@ vi.mock('@xterm/xterm', () => ({
       }
     })
 
-    constructor(options: { theme?: Record<string, string> }) {
+    customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
+
+    constructor(options: {
+      macOptionClickForcesSelection?: boolean
+      theme?: Record<string, string>
+    }) {
       this.options = options
       agentXtermMockState.terminals.push(this)
     }
@@ -92,6 +108,7 @@ describe('agent console terminal', () => {
   })
 
   afterEach(() => {
+    Reflect.deleteProperty(navigator, 'clipboard')
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
       value: originalUserAgent
@@ -152,6 +169,38 @@ describe('agent console terminal', () => {
     expect(terminal?.options.theme?.background).toBe('#10151d')
   })
 
+  it('copies selected Codex output with the native copy shortcut', () => {
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    })
+    const dispose = installAgentXterm({
+      element: document.createElement('div'),
+      initialOutput: '',
+      onDimensionsChange: vi.fn(),
+      onInput: vi.fn(),
+      xtermRef: { current: null }
+    })
+    const terminal = agentXtermMockState.terminals[0]!
+    const copyHandler = terminal.customKeyEventHandler
+
+    terminal.selection = 'selected Codex output'
+    const copyEvent = new KeyboardEvent('keydown', {
+      cancelable: true,
+      key: 'c',
+      metaKey: true
+    })
+
+    expect(terminal.options.macOptionClickForcesSelection).toBe(true)
+    expect(copyHandler).not.toBeNull()
+    expect(copyHandler?.(copyEvent)).toBe(false)
+    expect(copyEvent.defaultPrevented).toBe(true)
+    expect(writeText).toHaveBeenCalledWith('selected Codex output')
+
+    dispose()
+  })
+
   it('installs xterm after the current workspace appears asynchronously', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
     const attachAgentSession = vi.fn(async () => ({
@@ -187,7 +236,13 @@ describe('agent console terminal', () => {
     const terminalViewport = document.querySelector('.agent-terminal-viewport')
 
     expect(terminalViewport).toBeInTheDocument()
-    expect(terminalViewport?.parentElement).toHaveClass('agent-terminal-frame')
+    expect(terminalViewport?.parentElement).toHaveClass(
+      'agent-terminal-frame',
+      'nodrag',
+      'nopan',
+      'nowheel'
+    )
+    expect(terminalViewport).toHaveClass('nodrag', 'nopan', 'nowheel')
     expect(agentXtermMockState.terminals[0]?.open).toHaveBeenCalledWith(terminalViewport)
   })
 

@@ -12,6 +12,7 @@ import {
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { appendTerminalOutputTail } from './terminalOutputTail'
+import { installTerminalSelectionCopy } from './terminalSelectionCopy'
 import { readTerminalTheme, synchronizeTerminalTheme } from './terminalTheme'
 import {
   terminalOutputBrowserEventName,
@@ -197,6 +198,7 @@ function installXterm({
     fontSize: 12,
     fontWeight: 500,
     lineHeight: 1.32,
+    macOptionClickForcesSelection: true,
     rows: 9,
     theme: readTerminalTheme()
   })
@@ -241,6 +243,7 @@ function installXterm({
 
   terminal.loadAddon(fitAddon)
   terminal.open(element)
+  installTerminalSelectionCopy(terminal)
   xtermRef.current = terminal
   element.addEventListener('pointerdown', focusTerminalElement, true)
   fitAndReportDimensions()

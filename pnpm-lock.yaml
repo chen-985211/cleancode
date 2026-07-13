@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@xterm/xterm@6.0.0':
+    hash: 06e8a7d45ba8e042e46127fa585843db842ec491a041c186063d1d2a46097b2d
+    path: patches/@xterm__xterm@6.0.0.patch
+
 importers:
 
   .:
@@ -13,7 +18,7 @@ importers:
         version: 0.11.0
       '@xterm/xterm':
         specifier: 6.0.0
-        version: 6.0.0
+        version: 6.0.0(patch_hash=06e8a7d45ba8e042e46127fa585843db842ec491a041c186063d1d2a46097b2d)
       '@xyflow/react':
         specifier: 12.11.1
         version: 12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -3443,7 +3448,7 @@ snapshots:
 
   '@xterm/addon-fit@0.11.0': {}
 
-  '@xterm/xterm@6.0.0': {}
+  '@xterm/xterm@6.0.0(patch_hash=06e8a7d45ba8e042e46127fa585843db842ec491a041c186063d1d2a46097b2d)': {}
 
   '@xyflow/react@12.11.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
     dependencies:

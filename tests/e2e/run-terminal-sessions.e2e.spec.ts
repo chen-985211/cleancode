@@ -1,10 +1,12 @@
 // @vitest-environment node
 
-import { writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import type { ElectronApplication, Page } from 'playwright'
 
+import {
+  waitForMouseReports,
+  writeFakeAgentScript,
+  writeMouseReporterScript
+} from '../fixtures/contexts/run/fakeTerminalPrograms'
 import {
   buildElectronApp,
   cleanupE2eWorkbench,
@@ -28,6 +30,13 @@ import {
   waitForTerminalBlockSizeChange,
   waitForTerminalSelectionState
 } from '../support/terminalResizeE2e'
+import {
+  readCanvasViewportTransform,
+  readXtermAsciiCellCenter,
+  readXtermSelection,
+  selectExactXtermText,
+  setCanvasZoomFromDefault
+} from '../support/terminalSelectionE2e'
 
 describe('run terminal sessions e2e', () => {
   let workbench: E2eWorkbench
@@ -71,6 +80,52 @@ describe('run terminal sessions e2e', () => {
       expect(graph.blocks[0]?.type).toBe('terminal')
       expect(terminalOutput).toContain('cleancode-e2e-ok')
       expect(terminalOutput).toContain(workbench.projectDirectory)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'selects exact terminal text on a zoomed canvas without moving the node',
+    async () => {
+      await createRunningTerminal(page)
+      const controlText = 'cleancode-selection-control'
+      const copiedText = 'cleancode-terminal-selection'
+      const outputLine = `left-guard-${copiedText}-right-guard`
+      const terminal = page.locator('[data-terminal-block-id] .terminal-viewport')
+
+      await writeTerminalCommand(page, 'Terminal 1', `printf 'left-${controlText}-right\\n'\r`)
+      await waitForTerminalOutput(page, 'Terminal 1', controlText)
+      await selectExactXtermText(page, terminal, controlText)
+      expect(await readXtermSelection(terminal)).toBe(controlText)
+      await writeTerminalCommand(page, 'Terminal 1', `printf '\\n\\n\\n${outputLine}\\n'\r`)
+      await waitForTerminalOutput(page, 'Terminal 1', outputLine)
+      const zoom = await setCanvasZoomFromDefault(page, 'out')
+
+      const originalClipboard = await electronApp.evaluate(({ clipboard }) => clipboard.readText())
+
+      try {
+        await electronApp.evaluate(({ clipboard }) => clipboard.clear())
+        const beforePosition = await readTerminalBlockPosition(workbench)
+        const beforeViewport = await readCanvasViewportTransform(page)
+
+        await selectExactXtermText(page, terminal, copiedText)
+
+        expect(zoom).toBeLessThan(1)
+        expect(await readXtermSelection(terminal)).toBe(copiedText)
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C')
+
+        const clipboardText = await electronApp.evaluate(({ clipboard }) => clipboard.readText())
+        const afterPosition = await readTerminalBlockPosition(workbench)
+
+        expect(clipboardText).toBe(copiedText)
+        expect(afterPosition).toEqual(beforePosition)
+        expect(await readCanvasViewportTransform(page)).toBe(beforeViewport)
+      } finally {
+        await electronApp.evaluate(
+          ({ clipboard }, text) => clipboard.writeText(text),
+          originalClipboard
+        )
+      }
     },
     electronScenarioTimeoutMs
   )
@@ -236,7 +291,7 @@ describe('run terminal sessions e2e', () => {
     async () => {
       await createRunningTerminal(page)
 
-      const fakeAgentScriptPath = await writeFakeAgentScript(workbench)
+      const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
 
       await writeTerminalCommand(
         page,
@@ -274,7 +329,7 @@ describe('run terminal sessions e2e', () => {
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await readTerminalSessionId(page, 'Terminal 2')
 
-      const fakeAgentScriptPath = await writeFakeAgentScript(workbench)
+      const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
 
       await writeTerminalCommand(
         page,
@@ -287,6 +342,51 @@ describe('run terminal sessions e2e', () => {
       await page.keyboard.press('Enter')
 
       await waitForTerminalOutput(page, 'Terminal 2', 'second-terminal-focus-ok')
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'reports exact TUI mouse cells on a zoomed canvas without moving the node',
+    async () => {
+      await createRunningTerminal(page)
+      const { reportPath, scriptPath } = await writeMouseReporterScript(workbench.projectDirectory)
+
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        `node ${JSON.stringify(scriptPath)} ${JSON.stringify(reportPath)}\r`
+      )
+      await waitForTerminalOutput(page, 'Terminal 1', 'MOUSE_REPORTER_READY')
+      const zoom = await setCanvasZoomFromDefault(page, 'out')
+      const terminal = page.locator('[data-terminal-block-id] .terminal-viewport')
+      const beforePosition = await readTerminalBlockPosition(workbench)
+      const beforeViewport = await readCanvasViewportTransform(page)
+      const start = await readXtermAsciiCellCenter(terminal, { column: 12, rowMarker: 'ROW_3-' })
+      const end = await readXtermAsciiCellCenter(terminal, { column: 24, rowMarker: 'ROW_6-' })
+
+      await page.mouse.move(start.x, start.y)
+      await page.mouse.down()
+      await page.mouse.move(end.x, end.y, { steps: 12 })
+      await page.mouse.up()
+      const reports = await waitForMouseReports(reportPath, ['down', 'move', 'up'])
+
+      expect(zoom).toBeLessThan(1)
+      expect(reports.find((report) => report.kind === 'down')).toMatchObject({
+        column: 12,
+        row: start.row
+      })
+      expect(reports.filter((report) => report.kind === 'move').at(-1)).toMatchObject({
+        column: 24,
+        row: end.row
+      })
+      expect(reports.find((report) => report.kind === 'up')).toMatchObject({
+        column: 24,
+        row: end.row
+      })
+      expect(await readTerminalBlockPosition(workbench)).toEqual(beforePosition)
+      expect(await readCanvasViewportTransform(page)).toBe(beforeViewport)
+      await writeTerminalCommand(page, 'Terminal 1', '\u0003')
     },
     electronScenarioTimeoutMs
   )
@@ -366,46 +466,4 @@ function readFakeAgentSizes(output: string) {
     columns: Number(match[1]),
     rows: Number(match[2])
   }))
-}
-
-async function writeFakeAgentScript(workbench: E2eWorkbench): Promise<string> {
-  const scriptPath = join(workbench.projectDirectory, 'fake-agent-tui.mjs')
-
-  await writeFile(
-    scriptPath,
-    `
-const CSI = '\\x1b['
-let resizeCount = 0
-
-function draw(label) {
-  process.stdout.write(
-    \`\${CSI}H\${CSI}2JFAKE_AGENT_READY\\n\${label}\\nSIZE:\${process.stdout.columns}x\${process.stdout.rows}\\n\`
-  )
-}
-
-function cleanup() {
-  process.stdout.write(\`\${CSI}?1006l\${CSI}?1002l\${CSI}?1000l\${CSI}?1049l\`)
-  process.exit(0)
-}
-
-process.stdin.setRawMode?.(true)
-process.stdin.resume()
-process.stdout.write(\`\${CSI}?1049h\${CSI}?1000h\${CSI}?1002h\${CSI}?1006h\`)
-draw('START')
-
-process.stdout.on('resize', () => {
-  resizeCount += 1
-  draw(\`SIGWINCH:\${resizeCount}\`)
-})
-
-process.stdin.on('data', (data) => {
-  if (data.includes(3)) {
-    cleanup()
-  }
-})
-`,
-    'utf8'
-  )
-
-  return scriptPath
 }

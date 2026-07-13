@@ -15,6 +15,12 @@ import {
   waitForJsonFile,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import {
+  readCanvasViewportTransform,
+  readXtermSelection,
+  selectExactXtermText,
+  setCanvasZoomFromDefault
+} from '../support/terminalSelectionE2e'
 
 describe('workspace Agents e2e', () => {
   let workbench: E2eWorkbench
@@ -109,6 +115,53 @@ describe('workspace Agents e2e', () => {
       expect(rightInsets.terminal).toBeLessThanOrEqual(1)
       expect(rightInsets.scrollbar).toBeLessThanOrEqual(1)
       expect(rightInsets.thumbBorder).toBe(0)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'selects exact Agent output on a zoomed canvas without moving the node',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+      await page.getByText('Codex 会话已结束').waitFor()
+
+      const agent = page.locator('[data-agent-console-node]').first()
+      const agentId = await agent.getAttribute('data-agent-console-node')
+      const selectedText = 'cleancode-agent-selection'
+      const outputLine = `left-guard-${selectedText}-right-guard`
+
+      expect(agentId).not.toBeNull()
+      await electronApp.evaluate(
+        ({ BrowserWindow }, event) => {
+          BrowserWindow.getAllWindows()[0]?.webContents.send('cleancode:agent-pty-output', event)
+        },
+        {
+          agentId: agentId!,
+          data: `\r\n\r\n\r\n${outputLine}\r\n`,
+          sessionId: 'test-agent-main'
+        }
+      )
+      await page.waitForFunction(
+        (text) =>
+          Array.from(document.querySelectorAll('.agent-terminal-viewport .xterm-rows > div')).some(
+            (row) => row.textContent?.includes(text)
+          ),
+        outputLine
+      )
+
+      const zoom = await setCanvasZoomFromDefault(page, 'in')
+      const terminal = agent.locator('.agent-terminal-viewport')
+      const beforeLayout = await readAgentLayout(workbench)
+      const beforeViewport = await readCanvasViewportTransform(page)
+
+      await selectExactXtermText(page, terminal, selectedText)
+
+      expect(zoom).toBeGreaterThan(1)
+      expect(await readXtermSelection(terminal)).toBe(selectedText)
+      expect(await readAgentLayout(workbench)).toEqual(beforeLayout)
+      expect(await readCanvasViewportTransform(page)).toBe(beforeViewport)
     },
     electronScenarioTimeoutMs
   )

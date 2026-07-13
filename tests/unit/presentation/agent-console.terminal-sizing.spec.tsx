@@ -10,7 +10,10 @@ import {
 interface FakeAgentTerminal {
   cols: number
   rows: number
+  readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
+  readonly getSelection: ReturnType<typeof vi.fn>
+  readonly hasSelection: ReturnType<typeof vi.fn>
   readonly loadAddon: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
   readonly onResize: ReturnType<typeof vi.fn>
@@ -44,7 +47,10 @@ vi.mock('@xterm/xterm', () => ({
     rows = 24
     resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null = null
 
+    readonly attachCustomKeyEventHandler = vi.fn()
     readonly dispose = vi.fn()
+    readonly getSelection = vi.fn(() => '')
+    readonly hasSelection = vi.fn(() => false)
     readonly open = vi.fn()
     readonly reset = vi.fn()
     readonly write = vi.fn()

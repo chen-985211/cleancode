@@ -432,8 +432,8 @@ function AgentTerminalSurface({
   }
 
   return (
-    <div className="agent-terminal-frame">
-      <div className="agent-terminal-viewport" ref={terminalElementRef} />
+    <div className="agent-terminal-frame nodrag nopan nowheel">
+      <div className="agent-terminal-viewport nodrag nopan nowheel" ref={terminalElementRef} />
     </div>
   )
 }
