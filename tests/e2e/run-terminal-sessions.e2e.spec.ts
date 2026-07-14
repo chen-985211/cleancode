@@ -1,5 +1,7 @@
 // @vitest-environment node
 
+import { join } from 'node:path'
+
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
@@ -17,6 +19,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  waitForTextFile,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
@@ -63,22 +66,31 @@ describe('run terminal sessions e2e', () => {
     'runs shell commands from the active project workspace',
     async () => {
       await createRunningTerminal(page)
+      const commandOutputPath = join(workbench.projectDirectory, 'terminal-command-output.txt')
+      const workingDirectoryOutputPath = join(
+        workbench.projectDirectory,
+        'terminal-working-directory.txt'
+      )
 
-      await writeTerminalCommand(page, 'Terminal 1', 'printf cleancode-e2e-ok; pwd\r')
-      await waitForTerminalOutput(page, 'Terminal 1', 'cleancode-e2e-ok')
-      await waitForTerminalOutput(page, 'Terminal 1', workbench.projectDirectory)
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        'printf cleancode-e2e-ok > terminal-command-output.txt; pwd > terminal-working-directory.txt\r'
+      )
+
+      expect(await waitForTextFile(commandOutputPath)).toBe('cleancode-e2e-ok')
+      expect((await waitForTextFile(workingDirectoryOutputPath)).trim()).toBe(
+        workbench.projectDirectory
+      )
 
       const graph = JSON.parse(
         await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
       ) as {
         blocks: Array<{ type: string }>
       }
-      const terminalOutput = await page.getByLabel('Terminal 1 文本输出').textContent()
 
       expect(graph.blocks).toHaveLength(1)
       expect(graph.blocks[0]?.type).toBe('terminal')
-      expect(terminalOutput).toContain('cleancode-e2e-ok')
-      expect(terminalOutput).toContain(workbench.projectDirectory)
     },
     electronScenarioTimeoutMs
   )

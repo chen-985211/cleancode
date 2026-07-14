@@ -4,7 +4,7 @@
 
 本文沉淀 cleancode 中 xterm、PTY 行列同步、终端滚动条和 CJK 字符裁剪问题的工程经验。它用于帮助开发者定位和验证终端渲染缺陷，不重新定义产品语义、架构边界或测试规则。
 
-架构规则以 [架构文档](architecture.md) 为准，测试层级与门禁以 [测试规范](testing.md) 为准，Electron、xterm.js 和 node-pty 的技术选择以 [技术栈说明](tech-stack.md) 为准，Agent 控制台和终端积木的稳定用户界面契约以 [UI 契约](ui.md) 为准。本文记录的具体选择属于当前技术栈下的实现与排障方式；若依赖版本或渲染器变化，必须重新测量，不得把本文中的一次观测值当成永久常量。
+架构规则以 [架构文档](architecture.md) 为准，测试层级与门禁以 [测试规范](testing.md) 为准，Electron、xterm.js 和 node-pty 的技术选择以 [技术栈说明](tech-stack.md) 为准，Agent 控制台和终端积木的稳定用户界面契约以 [UI 契约](../product/ui.md) 为准。本文记录的具体选择属于当前技术栈下的实现与排障方式；若依赖版本或渲染器变化，必须重新测量，不得把本文中的一次观测值当成永久常量。
 
 ## 适用范围
 
@@ -73,7 +73,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 如果 attach Promise 尚未完成时尺寸再次变化，在 session 返回后补发最新 resize。
 - 测量结果和 session 都必须带当前 workspace key，旧工作区迟到的 Promise 不得绑定到新工作区。
 
-当前实现位于 [AgentConsole.tsx](../src/presentation/app-shell/AgentConsole.tsx) 和 [agentTerminalXterm.ts](../src/presentation/app-shell/agentTerminalXterm.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 node-pty 只消费 attach/resize 命令，不反向猜测 UI 尺寸。
+当前实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [agentTerminalXterm.ts](../../src/presentation/app-shell/agentTerminalXterm.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 node-pty 只消费 attach/resize 命令，不反向猜测 UI 尺寸。
 
 ### 2. 右侧 padding 把滚动条整体推向左边
 
@@ -99,7 +99,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 }
 ```
 
-左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。对应样式位于 [agent-console.css](../src/presentation/app-shell/styles/agent-console.css)。
+左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。对应样式位于 [agent-console.css](../../src/presentation/app-shell/styles/agent-console.css)。
 
 ### 3. Chromium 对连续全角标点进行上下文压缩
 
@@ -328,7 +328,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 ### Unit：证明异步生命周期
 
-[agent-console.terminal-sizing.spec.tsx](../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖：
+[agent-console.terminal-sizing.spec.tsx](../../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖：
 
 - 首次有效测量前不 attach。
 - attach pending 期间的新尺寸会在 session 返回后同步。
@@ -339,20 +339,20 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 ### 其余 Unit、Integration 和 Contract：证明边界传递
 
-- [agent.session-service.spec.ts](../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
-- [agent.codex-pty-process.spec.ts](../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts) 使用真实 node-pty 和本地 fake Codex 进程，证明 Agent PTY 适配器能够启动并传递输入输出。
-- [agent.ipc.spec.ts](../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
-- [NodePtyCodexAgentProcessAdapter.ts](../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts) 最终把 attach 行列传给 `node-pty.spawn`，并把 resize 转成 PTY 的 `resize(columns, rows)`。
+- [agent.session-service.spec.ts](../../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
+- [agent.codex-pty-process.spec.ts](../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts) 使用真实 node-pty 和本地 fake Codex 进程，证明 Agent PTY 适配器能够启动并传递输入输出。
+- [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
+- [NodePtyCodexAgentProcessAdapter.ts](../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts) 最终把 attach 行列传给 `node-pty.spawn`，并把 resize 转成 PTY 的 `resize(columns, rows)`。
 
 ### Electron E2E：只证明真实浏览器几何
 
-[workspace-agents.e2e.spec.ts](../tests/e2e/workspace-agents.e2e.spec.ts) 保留两个低层环境无法可靠证明的回归：
+[workspace-agents.e2e.spec.ts](../../tests/e2e/workspace-agents.e2e.spec.ts) 保留两个低层环境无法可靠证明的回归：
 
 - xterm viewport 和 scrollbar 相对终端外框的右侧 inset 不超过 1px。
 - 单个全角标点与重复全角标点的平均宽度差不超过 0.1px。
 - 放大画布下 Agent 按可见字形拖选，复制结果精确匹配目标文本，节点和 viewport 不移动。
 
-[run-terminal-sessions.e2e.spec.ts](../tests/e2e/run-terminal-sessions.e2e.spec.ts) 还覆盖普通终端在默认与缩小画布下的精确选区，以及缩小画布下 SGR mouse 的按下、移动、抬起 cell。这样组合覆盖小于 100%、100% 和大于 100% 三个坐标区间，同时证明普通终端与 Agent 两个 surface。
+[run-terminal-sessions.e2e.spec.ts](../../tests/e2e/run-terminal-sessions.e2e.spec.ts) 还覆盖普通终端在默认与缩小画布下的精确选区，以及缩小画布下 SGR mouse 的按下、移动、抬起 cell。这样组合覆盖小于 100%、100% 和大于 100% 三个坐标区间，同时证明普通终端与 Agent 两个 surface。
 
 这里使用 E2E 的理由不是“改动发生在 UI”，而是 jsdom 不执行 Chromium 的真实 CSS Text 排版，也不能可信测量 WebKit scrollbar pseudo-element。
 

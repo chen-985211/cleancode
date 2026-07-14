@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { access, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -29,10 +29,12 @@ export async function buildElectronApp(): Promise<void> {
 }
 
 export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> {
+  const temporaryDirectory = await realpath(tmpdir())
+
   return {
-    projectDirectory: await mkdtemp(join(tmpdir(), `${prefix}-project-`)),
-    registryDirectory: await mkdtemp(join(tmpdir(), `${prefix}-registry-`)),
-    appStateDirectory: await mkdtemp(join(tmpdir(), `${prefix}-state-`))
+    projectDirectory: await mkdtemp(join(temporaryDirectory, `${prefix}-project-`)),
+    registryDirectory: await mkdtemp(join(temporaryDirectory, `${prefix}-registry-`)),
+    appStateDirectory: await mkdtemp(join(temporaryDirectory, `${prefix}-state-`))
   }
 }
 
@@ -85,6 +87,20 @@ export async function waitForJsonFile(directory: string, fileName: string): Prom
   }
 
   return readOnlyJsonFile(directory, fileName)
+}
+
+export async function waitForTextFile(filePath: string): Promise<string> {
+  const deadline = Date.now() + 5_000
+
+  while (Date.now() < deadline) {
+    try {
+      return await readFile(filePath, 'utf8')
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+
+  return readFile(filePath, 'utf8')
 }
 
 export async function pathExists(path: string): Promise<boolean> {

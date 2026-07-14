@@ -1,0 +1,234 @@
+# 终端依赖工作流
+
+## 文档地位
+
+本文是当前已实现“终端依赖工作流”能力的统一维护入口，集中描述统一语言、上下文协作、状态所有权、执行语义、实现入口和验证矩阵。
+
+本文不重新定义全仓架构和 UI 总则：
+
+- 限界上下文、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准。
+- 用户可见的稳定交互以[UI 契约](../../product/ui.md)为准。
+- 积木动作的功能意图和作用对象以[积木动作模型](../block-graph/block-action-model.md)为准。
+- 测试层级和组织以[测试规范](../../engineering/testing.md)为准。
+
+代码和自动化测试是当前可执行行为的最终证据。本文与实现不一致时，必须先确认目标语义，再在同一任务中同步领域模型、用例、测试和本文。
+
+## 能力状态与范围
+
+终端依赖工作流已经实现。当前只编排 `Terminal` 积木，不把终端组合、Codex Agent 控制台或未来其他积木类型作为工作流节点。
+
+当前能力包括：
+
+- 保存终端之间的有向依赖连接。
+- 从指定终端运行该终端及其全部后代。
+- 按任务退出码或服务就绪条件判断上游是否可以放行下游。
+- 支持并行根节点、汇合等待、失败传播、超时和停止。
+- 在终端节点、连线和工具栏中投影工作流状态。
+
+当前不包括：
+
+- 在节点之间自动传递标准输出、文件或结构化产物。
+- 编排 Agent、Preview、HTTP 请求或终端组合。
+- 持久化或恢复一次正在进行的运行实例。
+- 分布式执行、远程主机和跨项目工作流。
+
+## 统一语言
+
+| 术语       | 含义                                                             |
+| ---------- | ---------------------------------------------------------------- |
+| 终端依赖   | 一条从上游终端指向下游终端的有向连接                             |
+| 上游       | 必须先成功或就绪的终端                                           |
+| 下游       | 等待全部直接上游满足条件后才可运行的终端                         |
+| 工作流范围 | 本次计划包含的终端集合；当前 UI 使用“指定终端及其后代”           |
+| 任务       | 通过真实进程退出码判断完成结果的有限命令                         |
+| 服务       | 达到输出文本或 TCP 端口条件后视为就绪、并继续保持运行的命令      |
+| 就绪       | 服务已经满足依赖条件，可以放行下游，但进程仍在运行               |
+| 阻塞       | 由于某个上游失败而不会再运行                                     |
+| 停止       | 用户停止活动工作流后，运行中、就绪或尚未开始的节点进入的终止结果 |
+
+## 上下文边界
+
+终端依赖工作流跨越 BlockGraph 与 Run，但运行生命周期由 Run 上下文拥有。
+
+| 责任                       | Owner                | 稳定协作方式                        |
+| -------------------------- | -------------------- | ----------------------------------- |
+| 终端、执行配置和有向连接   | `BlockGraph` 聚合    | BlockGraph 应用层用例和持久化仓储   |
+| 自连接、重复连接和环校验   | BlockGraph 领域规则  | 聚合根与领域服务                    |
+| 从图生成不可变执行计划     | BlockGraph 领域服务  | `TerminalWorkflowPlanPort` 返回 DTO |
+| 当前运行状态和状态迁移     | Run 的 `WorkflowRun` | Run 领域模型                        |
+| 调度、超时、就绪和停止协调 | Run 应用层           | `TerminalWorkflowService`           |
+| PTY 命令执行与进程停止     | Run 基础设施         | `TerminalWorkflowRuntimePort`       |
+| TCP 就绪探测               | Run 基础设施         | `TcpReadinessPort`                  |
+| IPC 注册和依赖装配         | Platform             | Electron main/preload 契约          |
+| 节点、连线和状态反馈       | Presentation         | 订阅运行事件形成派生视图            |
+
+Run 不得直接读取或修改 `BlockGraph` 聚合。它只能通过 `TerminalWorkflowPlanPort` 获取启动时生成的不可变计划；计划中的后续运行状态不反写为图结构事实。
+
+## 状态所有权与持久化
+
+以下内容随工作区持久化：
+
+- 终端启动命令。
+- 任务或服务执行配置。
+- 终端之间的依赖连接。
+
+以下内容只存在于当前应用进程：
+
+- 活动 `WorkflowRun`。
+- 节点的等待、运行、就绪、成功、失败、阻塞和停止状态。
+- 工作流命令 PTY、计时器、TCP 探测和输出匹配缓冲。
+
+表现层中的节点徽标、连线颜色和工具栏状态都是运行快照的派生投影，不是新的事实来源。应用重启后恢复连接和执行配置，但不恢复上一次活动工作流。
+
+## 图与计划规则
+
+依赖方向使用 `source -> target`：source 是上游，target 是下游。
+
+BlockGraph 必须保持：
+
+1. 连接两端都是当前图中的终端。
+2. 不允许终端连接自己。
+3. 不允许同一对终端存在重复方向连接。
+4. 不允许新增连接后形成有向环。
+5. 删除终端时同时删除关联连接。
+6. 连接、执行配置和终端元数据通过聚合根修改并一起保存。
+
+生成计划时：
+
+- “从此处运行流程”只包含起点和从该起点可达的后代。
+- 计划内每个终端都必须配置启动命令，缺失时拒绝启动。
+- 计划按稳定拓扑顺序排列，并保存每个节点的直接依赖 ID。
+- 工作流启动后使用该不可变计划；运行中的图编辑不改变已经启动的计划。
+
+## 执行模式
+
+### 任务
+
+任务适合安装依赖、构建、测试、生成文件等会自行退出的命令。
+
+- 使用独立命令 PTY 执行，不解析 shell 提示符。
+- 真实退出码出现在 `successExitCodes` 中时成功。
+- 退出码不在允许集合、无法取得退出码或启动失败时失败。
+- `timeoutMs` 非空时，超时会终止任务并标记失败。
+- 任务结束后保留已产生的输出，并可切换为空交互式 shell。
+
+默认配置是任务模式、成功退出码 `[0]`、不设置超时。
+
+### 服务
+
+服务适合开发服务器、数据库代理和 watcher 等持续运行命令。
+
+- 输出就绪：PTY 输出按字面量包含配置文本时就绪。
+- TCP 就绪：本机指定端口可以建立连接时就绪。
+- 服务在就绪后继续运行；“就绪”不是进程结束。
+- 服务在用户停止工作流前意外退出时失败。
+- 未在 `readinessTimeoutMs` 内就绪时失败并停止。
+
+输出匹配不是正则表达式，也不解析 shell 提示符。TCP 探测当前只面向本机端口。
+
+## 调度与状态迁移
+
+工作流节点初始为 `waiting`。
+
+```txt
+waiting
+  -> running
+      -> succeeded   (任务成功退出)
+      -> ready       (服务满足就绪条件)
+      -> failed      (启动、退出码、超时或就绪失败)
+      -> stopped     (用户停止)
+  -> blocked         (任一上游失败或已阻塞)
+  -> stopped         (尚未运行时用户停止)
+```
+
+调度规则：
+
+1. 没有上游的根节点可以并行启动。
+2. 下游等待全部直接上游进入 `succeeded` 或 `ready`。
+3. 汇合节点不会因为其中一个上游先完成而提前启动。
+4. 上游失败只阻塞其后代；互不依赖的分支继续运行。
+5. 服务就绪可以放行下游，同时让整体工作流保持活动状态。
+
+工作流聚合状态：
+
+- 存在 `running` 或 `waiting` 节点时为运行中。
+- 没有等待/运行节点但仍有就绪服务时为就绪。
+- 存在失败节点且没有仍可推进的节点时为失败。
+- 全部任务成功且没有活动服务时为成功。
+- 用户请求停止且所有活动节点已停止时为已停止。
+
+## 启动与停止
+
+同一工作区同一时间只保留一个活动工作流。启动新工作流时，Run 应用服务先停止该工作区已有工作流，再生成并运行新计划。
+
+当前 UI 从终端节点的“从此处运行流程”动作发起，不提供空闲态全局运行按钮。普通“启动命令”只运行当前终端，不触发依赖级联。
+
+停止时：
+
+1. 禁止继续调度新的等待节点。
+2. 尚未启动的等待节点标记为停止。
+3. 按逆拓扑顺序停止运行中或已就绪的 PTY。
+4. 清理任务超时、服务就绪超时和 TCP 探测。
+5. 保留已有终端输出，并将终端交还为空交互式会话。
+
+顶部“停止流程”只在工作流活动期间出现。单个终端的“停止当前命令”与停止整个工作流是两个不同作用范围的动作。
+
+## 失败与用户反馈
+
+以下失败必须具有稳定错误码或运行失败原因：
+
+- 计划内终端缺少启动命令。
+- 图或终端不存在。
+- 自连接、重复连接或形成环。
+- 同一连接不存在却请求删除。
+- 命令 PTY 启动失败。
+- 任务退出码不符合成功条件。
+- 任务或服务超时。
+- 服务就绪前意外退出。
+
+上游失败后，下游显示阻塞而不是伪装成未运行。连线和节点可以辅助展示状态，但颜色不得成为唯一信息载体。
+
+## 实现入口
+
+| 层级                   | 入口                                                                                                                                                                                                                                               |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BlockGraph domain      | [`TerminalWorkflowRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowRules.ts)、[`TerminalWorkflowPlan.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan.ts)                                   |
+| BlockGraph application | [`BuildTerminalWorkflowPlanUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase.ts) 及连接/断开/配置用例                                                                                          |
+| Run domain             | [`WorkflowRun.ts`](../../../src/contexts/run/domain/aggregates/WorkflowRun.ts)                                                                                                                                                                     |
+| Run application        | [`TerminalWorkflowService.ts`](../../../src/contexts/run/application/use-cases/TerminalWorkflowService.ts) 和 `TerminalWorkflow*Port`                                                                                                              |
+| Run infrastructure     | [`TerminalSessionWorkflowRuntimeAdapter.ts`](../../../src/contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter.ts)、[`NodeTcpReadinessAdapter.ts`](../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter.ts) |
+| Platform               | [`terminalWorkflowIpcHandlers.ts`](../../../src/platform/electron-main/terminalWorkflowIpcHandlers.ts) 与 preload                                                                                                                                  |
+| Presentation           | [`useTerminalWorkflow.ts`](../../../src/presentation/app-shell/useTerminalWorkflow.ts)、[`terminalWorkflowEdges.ts`](../../../src/presentation/app-shell/terminalWorkflowEdges.ts)、终端节点与工具栏                                               |
+
+## 验证矩阵
+
+低层测试证明规则和状态，高层测试只证明真实跨边界主路径：
+
+| 层级                | 证明内容                                       | 主要测试                                                                                                                                                                                                                                                                   |
+| ------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit / BlockGraph   | 连接不变量、计划范围、拓扑和配置               | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.build-terminal-workflow-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.build-terminal-workflow-plan.spec.ts) |
+| Unit / Run          | 状态迁移、并行、汇合、失败传播、停止和服务就绪 | [`run.workflow-run.spec.ts`](../../../tests/unit/contexts/run/run.workflow-run.spec.ts)、[`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)                                                                 |
+| Unit / Presentation | 表单解析、事件投影、连线和工具栏状态           | [`terminal-metadata-workflow-config.spec.tsx`](../../../tests/unit/presentation/terminal-metadata-workflow-config.spec.tsx)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                                         |
+| Integration         | 真实 PTY、计划适配器和工作流协作               | [`run.terminal-workflow.spec.ts`](../../../tests/integration/contexts/run/run.terminal-workflow.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)                                                                   |
+| Contract            | Electron IPC 输入、输出和事件契约              | [`run.terminal-workflow-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-workflow-ipc.spec.ts)                                                                                                                                                              |
+| E2E                 | 用户连接两个终端并从上游运行到下游成功         | [`terminal-workflows.e2e.spec.ts`](../../../tests/e2e/terminal-workflows.e2e.spec.ts)                                                                                                                                                                                      |
+
+手工验收至少覆盖：
+
+1. 上游任务成功后下游才启动。
+2. 上游失败时下游阻塞。
+3. 服务输出或端口就绪后下游启动，而服务保持运行。
+4. 活动期间停止流程后不再启动新节点。
+5. 重启应用后连接和执行配置恢复，旧运行状态不恢复。
+
+## 维护规则
+
+修改终端依赖工作流时按 owner 同步文档：
+
+- 改变上下文边界、事实来源或依赖方向：更新架构文档和本文。
+- 改变状态迁移、调度、任务/服务或停止语义：更新本文与 Run/BlockGraph 行为测试。
+- 改变用户可见入口、状态或文案的不变量：更新 UI 契约、本文和表现层测试。
+- 改变动作作用对象：更新积木动作模型。
+- 改变 PTY、TCP、IPC 或技术选择：更新技术栈、对应集成/契约测试；涉及渲染几何时再更新终端渲染排障指南。
+
+不得只更新本文而不更新实现和测试，也不得把未来跨类型工作流写成当前能力；未实现方向应进入 UI 路线图或后续独立 Spec。
