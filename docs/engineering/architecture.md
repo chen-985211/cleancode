@@ -145,7 +145,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - `BlockGraph`：积木图上下文的聚合根。
 - `TerminalSession`：运行上下文的普通终端 PTY 会话聚合根。
 - `WorkflowRun`：运行上下文的终端依赖工作流聚合根。
-- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、名称、画布布局和各 Git 分支的对话恢复绑定。
+- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、名称、画布布局、CleanCode 原生 MCP 能力开关和各 Git 分支的对话恢复绑定。
 
 聚合外部只能通过聚合根修改聚合内部状态。任何代码不得绕过聚合根直接修改聚合内部实体或集合。
 
@@ -174,7 +174,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 普通终端 PTY 会话生命周期的唯一事实来源：`TerminalSession` 聚合。
 - 终端依赖工作流运行生命周期的唯一事实来源：`WorkflowRun` 聚合。
 - 运行期 Agent 操作历史的唯一事实来源：Agent 上下文的审计记录。
-- 工作区 Agent 的稳定身份、名称和已提交画布布局的唯一事实来源：`AgentSession` 聚合及其仓储。
+- 工作区 Agent 的稳定身份、名称、已提交画布布局和 CleanCode 原生 MCP 能力开关的唯一事实来源：`AgentSession` 聚合及其仓储。
 - Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、工作区、Git 分支和 `agentId` 组成，绑定值是 Codex thread UUID。
 - Codex 对话内容的唯一事实来源：Codex CLI 自身持久化的 thread；cleancode 不复制或解析对话正文。
 - 当前 Agent PTY、进程号、终端输出尾部和运行中 turn 属于易失运行时状态，不是持久化业务事实。

@@ -5,27 +5,47 @@ import type {
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
 export interface AgentToolDefinition {
+  readonly annotations: AgentToolAnnotations
   readonly name: AgentToolName
   readonly description: string
   readonly inputSchema: AgentToolInputSchema
   readonly requiresApproval: boolean
 }
 
+interface AgentToolAnnotations {
+  readonly destructiveHint: boolean
+  readonly openWorldHint: boolean
+  readonly readOnlyHint: boolean
+}
+
 type AgentToolInputSchema = Record<string, unknown>
 
 export const cleancodeMcpInstructions = [
-  'Cleancode canvas contract: use this MCP server for terminal blocks, terminal groups, canvas layout, and block graph changes in the cleancode workspace. Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for cleancode canvas terminal blocks.',
-  'Recommended workflow: call inspect_graph before canvas layout changes, create terminal blocks with create_block, then group existing block ids with create_terminal_group. Deletion tools require independent cleancode UI approval.'
+  'CleanCode canvas scope / CleanCode 画布语义：while this MCP server is enabled, unqualified requests such as “终端”, “整理终端”, “终端布局”, “终端组合”, terminal organization, or terminal layout mean CleanCode canvas terminal blocks and groups, not repository code. Call inspect_graph before reading or searching repository files. Only treat explicit source-code terms such as “终端源码”, “Terminal component”, xterm, PTY, or terminal module implementation as project-code work.',
+  'For canvas work, call inspect_graph before changes, create terminal blocks with create_block, then group existing block ids with create_terminal_group. Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. Deletion tools require independent CleanCode UI approval; this MCP does not override Codex sandbox or approval settings.'
 ].join('\n')
 
-export const codexAgentDeveloperInstructions = [
-  'You are running inside the cleancode right-side Codex CLI panel.',
-  cleancodeMcpInstructions,
-  'For normal source-code tasks, read and edit the repository as usual. For requests about the cleancode canvas, terminal blocks, terminal groups, or block graph, use the cleancode MCP tools instead of changing repository files.'
-].join('\n')
+const readOnlyToolAnnotations: AgentToolAnnotations = {
+  destructiveHint: false,
+  openWorldHint: false,
+  readOnlyHint: true
+}
+
+const nonDestructiveWriteToolAnnotations: AgentToolAnnotations = {
+  destructiveHint: false,
+  openWorldHint: false,
+  readOnlyHint: false
+}
+
+const destructiveWriteToolAnnotations: AgentToolAnnotations = {
+  destructiveHint: true,
+  openWorldHint: false,
+  readOnlyHint: false
+}
 
 export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   {
+    annotations: readOnlyToolAnnotations,
     description:
       'Inspect the current cleancode canvas block graph for this branch workspace. Call this before creating, updating, grouping, or deleting terminal blocks.',
     inputSchema: objectSchema({
@@ -38,6 +58,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: false
   },
   {
+    annotations: nonDestructiveWriteToolAnnotations,
     description:
       'Create a terminal block on the cleancode canvas. Use this for visual workspace terminals; do not create .vscode/tasks.json or package scripts as a substitute.',
     inputSchema: objectSchema(
@@ -68,6 +89,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: false
   },
   {
+    annotations: nonDestructiveWriteToolAnnotations,
     description:
       'Update an existing terminal block on the cleancode canvas: metadata, launch command, position, or size.',
     inputSchema: objectSchema(
@@ -97,6 +119,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: false
   },
   {
+    annotations: destructiveWriteToolAnnotations,
     description:
       'Delete a terminal block from the cleancode canvas. This destructive action requires separate cleancode UI approval.',
     inputSchema: objectSchema(
@@ -112,6 +135,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: true
   },
   {
+    annotations: nonDestructiveWriteToolAnnotations,
     description:
       'Create a terminal group on the cleancode canvas from existing terminal blocks. Use member block ids returned by inspect_graph or create_block.',
     inputSchema: objectSchema(
@@ -133,6 +157,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: false
   },
   {
+    annotations: nonDestructiveWriteToolAnnotations,
     description:
       'Update an existing terminal group on the cleancode canvas: name, position, or collapsed state.',
     inputSchema: objectSchema(
@@ -157,6 +182,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
     requiresApproval: false
   },
   {
+    annotations: destructiveWriteToolAnnotations,
     description:
       'Delete a terminal group from the cleancode canvas without deleting member terminals. This destructive action requires separate cleancode UI approval.',
     inputSchema: objectSchema(

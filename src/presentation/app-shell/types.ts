@@ -1,5 +1,6 @@
 import type { Node } from '@xyflow/react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 
 import {
   type BlockGraphSnapshot,
@@ -115,6 +116,10 @@ interface AgentConsoleNodeData extends Record<string, unknown> {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
+  readonly onMcpCapabilityChange: (
+    agent: WorkspaceAgentSnapshot,
+    enabled: boolean
+  ) => Promise<UpdateWorkspaceAgentMcpCapabilityResult | undefined>
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onResize: (

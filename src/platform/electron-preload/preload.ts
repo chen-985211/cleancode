@@ -30,6 +30,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:rename-workspace-agent', command),
   updateWorkspaceAgentLayout: (command: unknown) =>
     invokeCleancode('cleancode:update-workspace-agent-layout', command),
+  updateWorkspaceAgentMcpCapability: (command: unknown) =>
+    invokeCleancode('cleancode:update-workspace-agent-mcp-capability', command),
   removeWorkspaceAgent: (command: unknown) =>
     invokeCleancode('cleancode:remove-workspace-agent', command),
   writeAgentSession: (command: unknown) =>

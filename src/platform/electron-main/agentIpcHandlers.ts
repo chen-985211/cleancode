@@ -6,6 +6,7 @@ import type {
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { CodexCliInstallationSnapshot } from '../../contexts/agent/application/ports/CodexCliPort'
 import type { AgentLayoutSnapshot } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
@@ -69,6 +70,12 @@ export interface AgentIpcHandlersInput {
     readonly projectId: string
     readonly workspaceName: string
   }) => Promise<WorkspaceAgentSnapshot>
+  readonly updateWorkspaceAgentMcpCapability: (command: {
+    readonly agentId: string
+    readonly cleancodeMcpEnabled: boolean
+    readonly projectId: string
+    readonly workspaceName: string
+  }) => Promise<UpdateWorkspaceAgentMcpCapabilityResult>
 }
 
 export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
@@ -175,6 +182,32 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     logger: input.logger,
     operation: 'updateWorkspaceAgentLayout',
     scope: 'agent'
+  })
+
+  registerIpcHandler<
+    {
+      readonly agentId: string
+      readonly cleancodeMcpEnabled: boolean
+      readonly projectId: string
+      readonly workspaceName: string
+    },
+    UpdateWorkspaceAgentMcpCapabilityResult
+  >({
+    channel: 'cleancode:update-workspace-agent-mcp-capability',
+    handler: (command) => {
+      if (typeof command.cleancodeMcpEnabled !== 'boolean') {
+        throw createExpectedAppError(
+          'INVALID_IPC_COMMAND',
+          'Invalid IPC command: cleancodeMcpEnabled must be a boolean.'
+        )
+      }
+      return input.updateWorkspaceAgentMcpCapability(command)
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateWorkspaceAgentMcpCapability',
+    scope: 'agent',
+    successLogLevel: 'info'
   })
 
   registerIpcHandler<

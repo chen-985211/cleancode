@@ -1,13 +1,6 @@
 import type { Terminal as XTerm } from '@xterm/xterm'
 import { ShieldAlert } from 'lucide-react'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type MutableRefObject
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type {
   AgentPtyOutputEvent,
@@ -15,6 +8,7 @@ import type {
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import {
   defaultAgentLayoutPosition,
   defaultAgentLayoutSize
@@ -22,6 +16,8 @@ import {
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { defaultAgentXtermDimensions, installAgentXterm } from './agentTerminalXterm'
 import { AgentConsoleActions } from './AgentConsoleActions'
+import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
+import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
@@ -41,6 +37,10 @@ interface AgentConsoleProps {
   readonly currentWorkbench?: WorkbenchSnapshot | null
   readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
+  readonly onMcpCapabilityChange?: (
+    agent: WorkspaceAgentSnapshot,
+    enabled: boolean
+  ) => Promise<UpdateWorkspaceAgentMcpCapabilityResult | undefined>
   readonly onRemove?: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onSelect?: () => void
@@ -51,6 +51,7 @@ export function AgentConsole({
   currentWorkbench = null,
   currentWorkspace = null,
   onGraphUpdated,
+  onMcpCapabilityChange,
   onRemove,
   onRename,
   onSelect
@@ -63,6 +64,8 @@ export function AgentConsole({
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
   const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
+  const [isMcpCapabilityUpdating, setIsMcpCapabilityUpdating] = useState(false)
+  const [mcpCapabilityError, setMcpCapabilityError] = useState<string | null>(null)
   const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
   const currentWorkspaceKey = createWorkspaceKey(
     currentWorkbench,
@@ -346,6 +349,26 @@ export function AgentConsole({
     await window.cleancode?.rejectAgentTool({ approvalId: approval.approvalId })
   }
 
+  async function updateMcpCapability(enabled: boolean): Promise<void> {
+    if (!agent || !onMcpCapabilityChange || isMcpCapabilityUpdating) return
+    setIsMcpCapabilityUpdating(true)
+    setMcpCapabilityError(null)
+    try {
+      const result = await onMcpCapabilityChange(agent, enabled)
+      if (!result) return
+      setPendingApprovals([])
+      if (result.session && currentWorkspaceKey) {
+        sessionBindingRef.current = { session: result.session, workspaceKey: currentWorkspaceKey }
+        sessionRef.current = result.session
+        setSession(result.session)
+      }
+    } catch {
+      setMcpCapabilityError('未能切换 CleanCode MCP，请重试。')
+    } finally {
+      setIsMcpCapabilityUpdating(false)
+    }
+  }
+
   return (
     <div className="agent-console">
       <div
@@ -360,6 +383,16 @@ export function AgentConsole({
           {agent && onRename && onRemove ? (
             <AgentConsoleActions
               agent={agent}
+              capabilityControl={
+                onMcpCapabilityChange ? (
+                  <AgentMcpCapabilityToggle
+                    enabled={agent.cleancodeMcpEnabled}
+                    error={mcpCapabilityError}
+                    onChange={(enabled) => void updateMcpCapability(enabled)}
+                    pending={isMcpCapabilityUpdating}
+                  />
+                ) : undefined
+              }
               onRemove={onRemove}
               onRename={onRename}
               onSelect={onSelect ?? noop}
@@ -398,42 +431,12 @@ export function AgentConsole({
             activeOutput={activeOutput}
             terminalElementRef={terminalElementRef}
             onFallbackInput={writeAgentInput}
+            useFallback={isTestRuntime()}
           />
         ) : (
           <div className="agent-console__empty">未选择工作区</div>
         )}
       </div>
-    </div>
-  )
-}
-
-function AgentTerminalSurface({
-  activeOutput,
-  terminalElementRef,
-  onFallbackInput
-}: {
-  readonly activeOutput: string
-  readonly terminalElementRef: MutableRefObject<HTMLDivElement | null>
-  readonly onFallbackInput: (input: string) => void
-}) {
-  if (isTestRuntime()) {
-    return (
-      <div className="agent-terminal-fallback">
-        <pre aria-label="Codex CLI 终端">{activeOutput}</pre>
-        <textarea
-          aria-label="Codex CLI 输入"
-          onChange={(event) => {
-            onFallbackInput(event.target.value)
-            event.target.value = ''
-          }}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="agent-terminal-frame nodrag nopan nowheel">
-      <div className="agent-terminal-viewport nodrag nopan nowheel" ref={terminalElementRef} />
     </div>
   )
 }
@@ -467,6 +470,7 @@ function createFallbackAgent(
 ): WorkspaceAgentSnapshot {
   return {
     agentId: 'default-agent',
+    cleancodeMcpEnabled: true,
     layout: { position: defaultAgentLayoutPosition, size: defaultAgentLayoutSize },
     name: 'Agent 1',
     projectId: workbench?.project.id ?? 'unselected-project',

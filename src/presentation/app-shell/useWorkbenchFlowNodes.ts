@@ -1,5 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
 import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentConsoleFlowNode'
@@ -32,6 +33,10 @@ interface UseWorkbenchFlowNodesInput {
   readonly terminalStates: Record<string, TerminalViewState>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
   readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
+  readonly onMcpCapabilityChange: (
+    agent: WorkspaceAgentSnapshot,
+    enabled: boolean
+  ) => Promise<UpdateWorkspaceAgentMcpCapabilityResult | undefined>
   readonly onRenameAgent: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onResizeAgent: (
     agent: WorkspaceAgentSnapshot,
@@ -57,6 +62,7 @@ export function useWorkbenchFlowNodes({
   terminalStates,
   workflowNodeStatuses,
   onRemoveAgent,
+  onMcpCapabilityChange,
   onRenameAgent,
   onResizeAgent,
   onSelectAgent
@@ -86,6 +92,7 @@ export function useWorkbenchFlowNodes({
             currentWorkspace: currentWorkspace ?? null,
             isSelected: selectedAgentId === agent.agentId,
             onGraphUpdated: setCurrentGraph,
+            onMcpCapabilityChange,
             onRemove: onRemoveAgent,
             onRename: onRenameAgent,
             onResize: onResizeAgent,
@@ -119,6 +126,7 @@ export function useWorkbenchFlowNodes({
     terminalStates,
     workflowNodeStatuses,
     onRemoveAgent,
+    onMcpCapabilityChange,
     onRenameAgent,
     onResizeAgent,
     onSelectAgent

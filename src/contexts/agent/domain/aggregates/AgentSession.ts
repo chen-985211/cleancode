@@ -16,6 +16,7 @@ export interface AgentConversationBindingSnapshot {
 
 export interface PersistedAgentSessionSnapshot {
   readonly agentId: string
+  readonly cleancodeMcpEnabled: boolean
   readonly conversations: readonly AgentConversationBindingSnapshot[]
   readonly layout: AgentLayoutSnapshot
   readonly name: string
@@ -25,6 +26,7 @@ export interface PersistedAgentSessionSnapshot {
 
 export interface CreateAgentSessionInput {
   readonly agentId: string
+  readonly cleancodeMcpEnabled?: boolean
   readonly layout: AgentLayoutSnapshot
   readonly name: string
   readonly projectId: string
@@ -38,6 +40,7 @@ export class AgentSession {
     readonly workspaceName: string,
     private agentName: string,
     private agentLayout: AgentLayoutSnapshot,
+    private isCleancodeMcpEnabled: boolean,
     private readonly conversations: Map<string, AgentConversationBindingSnapshot>,
     private activeScope: AgentConversationScope | null = null
   ) {}
@@ -49,6 +52,7 @@ export class AgentSession {
       requireValue(input.workspaceName, 'workspaceName'),
       normalizeName(input.name),
       normalizeLayout(input.layout),
+      input.cleancodeMcpEnabled ?? true,
       new Map()
     )
   }
@@ -79,6 +83,7 @@ export class AgentSession {
       requireValue(snapshot.workspaceName, 'workspaceName'),
       normalizeName(snapshot.name),
       normalizeLayout(snapshot.layout),
+      snapshot.cleancodeMcpEnabled,
       new Map(
         snapshot.conversations.map((conversation) => [
           branchKey(conversation.gitBranch),
@@ -129,6 +134,10 @@ export class AgentSession {
     return copyLayout(this.agentLayout)
   }
 
+  get cleancodeMcpEnabled(): boolean {
+    return this.isCleancodeMcpEnabled
+  }
+
   findCodexThreadId(gitBranch: string | null): string | null {
     return this.conversations.get(branchKey(gitBranch))?.codexThreadId ?? null
   }
@@ -141,6 +150,10 @@ export class AgentSession {
     this.agentLayout = normalizeLayout(layout)
   }
 
+  setCleancodeMcpEnabled(enabled: boolean): void {
+    this.isCleancodeMcpEnabled = enabled
+  }
+
   clearCodexThread(gitBranch: string | null): void {
     this.conversations.delete(branchKey(gitBranch))
   }
@@ -148,6 +161,7 @@ export class AgentSession {
   toSnapshot(): PersistedAgentSessionSnapshot {
     return {
       agentId: this.id,
+      cleancodeMcpEnabled: this.isCleancodeMcpEnabled,
       conversations: [...this.conversations.values()],
       layout: copyLayout(this.agentLayout),
       name: this.agentName,

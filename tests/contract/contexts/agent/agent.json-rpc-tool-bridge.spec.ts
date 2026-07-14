@@ -85,6 +85,22 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
     })
     const result = readToolsListResult(response)
 
+    expect(result.tools.find((tool) => tool.name === 'inspect_graph')?.annotations).toEqual({
+      destructiveHint: false,
+      openWorldHint: false,
+      readOnlyHint: true
+    })
+    expect(result.tools.find((tool) => tool.name === 'create_block')?.annotations).toEqual({
+      destructiveHint: false,
+      openWorldHint: false,
+      readOnlyHint: false
+    })
+    expect(result.tools.find((tool) => tool.name === 'delete_block')?.annotations).toEqual({
+      destructiveHint: true,
+      openWorldHint: false,
+      readOnlyHint: false
+    })
+
     expect(result.tools.map((tool) => tool.name)).not.toEqual(
       expect.arrayContaining(['list_project_files', 'read_project_file', 'run_shell_command'])
     )
@@ -159,7 +175,14 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
 function readToolsListResult(
   response: Awaited<ReturnType<CleancodeAgentJsonRpcToolBridge['handle']>>
 ): {
-  readonly tools: readonly { readonly name: string }[]
+  readonly tools: readonly {
+    readonly annotations?: {
+      readonly destructiveHint: boolean
+      readonly openWorldHint: boolean
+      readonly readOnlyHint: boolean
+    }
+    readonly name: string
+  }[]
 } {
   if (!response || !('result' in response) || !isToolsListResult(response.result)) {
     throw new Error('Expected tools/list result.')

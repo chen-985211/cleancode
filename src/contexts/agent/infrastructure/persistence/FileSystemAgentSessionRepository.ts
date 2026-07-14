@@ -18,8 +18,21 @@ interface AgentWorkspaceSnapshot {
 }
 
 interface AgentSessionStore {
-  readonly version: 2
+  readonly version: 3
   readonly workspaces: readonly AgentWorkspaceSnapshot[]
+}
+
+type Version2AgentSessionSnapshot = Omit<PersistedAgentSessionSnapshot, 'cleancodeMcpEnabled'>
+
+interface Version2AgentWorkspaceSnapshot {
+  readonly agents: readonly Version2AgentSessionSnapshot[]
+  readonly projectId: string
+  readonly workspaceName: string
+}
+
+interface Version2AgentSessionStore {
+  readonly version: 2
+  readonly workspaces: readonly Version2AgentWorkspaceSnapshot[]
 }
 
 interface LegacyAgentSessionSnapshot {
@@ -131,7 +144,7 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       .catch(() => undefined)
       .then(async () => {
         const store = await this.readStore()
-        await this.writeStore({ version: 2, workspaces: updateWorkspaces(store.workspaces) })
+        await this.writeStore({ version: 3, workspaces: updateWorkspaces(store.workspaces) })
       })
 
     this.saveQueue = update
@@ -141,10 +154,20 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
   private async readStore(): Promise<AgentSessionStore> {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as
-        Partial<AgentSessionStore> | Partial<LegacyAgentSessionStore>
+        | Partial<AgentSessionStore>
+        | Partial<Version2AgentSessionStore>
+        | Partial<LegacyAgentSessionStore>
+
+      if (parsed.version === 3 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
+        return { version: 3, workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[] }
+      }
 
       if (parsed.version === 2 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        return { version: 2, workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[] }
+        const migratedStore = migrateVersion2Store(
+          parsed.workspaces as readonly Version2AgentWorkspaceSnapshot[]
+        )
+        await this.writeStore(migratedStore)
+        return migratedStore
       }
 
       if (parsed.version === 1 && 'sessions' in parsed && Array.isArray(parsed.sessions)) {
@@ -158,7 +181,7 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       throw new Error('Persisted Agent session store is invalid.')
     } catch (error) {
       if (isMissingFileError(error)) {
-        return { version: 2, workspaces: [] }
+        return { version: 3, workspaces: [] }
       }
 
       throw error
@@ -203,11 +226,26 @@ function migrateLegacyStore(sessions: readonly LegacyAgentSessionSnapshot[]): Ag
   }
 
   return {
-    version: 2,
+    version: 3,
     workspaces: [...workspaces.values()].map((workspace) => ({
       agents: [workspace.agent.toSnapshot()],
       projectId: workspace.projectId,
       workspaceName: workspace.workspaceName
+    }))
+  }
+}
+
+function migrateVersion2Store(
+  workspaces: readonly Version2AgentWorkspaceSnapshot[]
+): AgentSessionStore {
+  return {
+    version: 3,
+    workspaces: workspaces.map((workspace) => ({
+      ...workspace,
+      agents: workspace.agents.map((agent) => ({
+        ...agent,
+        cleancodeMcpEnabled: true
+      }))
     }))
   }
 }

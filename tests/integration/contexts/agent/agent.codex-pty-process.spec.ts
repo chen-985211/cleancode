@@ -50,9 +50,11 @@ describe('Codex agent PTY process adapter', () => {
     let output = ''
     let identifiedThreadId = ''
     const handle = await adapter.start({
-      bearerToken: 'token-1',
+      cleancodeMcp: {
+        bearerToken: 'token-1',
+        serverUrl: 'http://127.0.0.1:43123/mcp'
+      },
       columns: 90,
-      mcpServerUrl: 'http://127.0.0.1:43123/mcp',
       onCodexThreadIdentified: (threadId) => {
         identifiedThreadId = threadId
       },
@@ -78,17 +80,12 @@ describe('Codex agent PTY process adapter', () => {
     expect(output).toContain('::1')
     expect(output).toContain('--no-alt-screen')
     expect(output).toContain('-C')
-    expect(output).toContain('--sandbox')
-    expect(output).toContain('workspace-write')
-    expect(output).toContain('--ask-for-approval')
-    expect(output).toContain('on-request')
-    expect(output).toContain('developer_instructions')
-    expect(output).toContain('cleancode canvas')
-    expect(output).toContain('.vscode/tasks.json')
-    expect(output).toContain('mcp_servers.cleancode.url')
-    expect(output).toContain('mcp_servers.cleancode.bearer_token_env_var')
-    expect(output).toContain('mcp_servers.cleancode.default_tools_approval_mode')
-    expect(output).toContain('approve')
+    expect(output).not.toContain('--sandbox')
+    expect(output).not.toContain('--ask-for-approval')
+    expect(output).not.toContain('developer_instructions')
+    expect(output).toContain('mcp_servers.cleancode={')
+    expect(output).toContain('bearer_token_env_var=')
+    expect(output).not.toContain('default_tools_approval_mode')
     expect(identifiedThreadId).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
   }, 10_000)
 
@@ -96,9 +93,11 @@ describe('Codex agent PTY process adapter', () => {
     let output = ''
 
     await adapter.start({
-      bearerToken: 'token-1',
+      cleancodeMcp: {
+        bearerToken: 'token-1',
+        serverUrl: 'http://127.0.0.1:43123/mcp'
+      },
       columns: 90,
-      mcpServerUrl: 'http://127.0.0.1:43123/mcp',
       onCodexThreadIdentified: () => undefined,
       onExit: () => undefined,
       onOutput: (event) => {
@@ -115,7 +114,53 @@ describe('Codex agent PTY process adapter', () => {
     expect(output).toContain('resume')
     expect(output).toContain('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
   })
+
+  it('inherits Codex permissions and omits every built-in MCP trace when the capability is disabled', async () => {
+    let output = ''
+    const originalNoProxy = process.env.NO_PROXY
+    const originalLowercaseNoProxy = process.env.no_proxy
+    process.env.NO_PROXY = 'proxy.internal'
+    process.env.no_proxy = 'lowercase.internal'
+
+    try {
+      await adapter.start({
+        columns: 90,
+        onCodexThreadIdentified: () => undefined,
+        onExit: () => undefined,
+        onOutput: (event) => {
+          output += event.data
+        },
+        rows: 28,
+        sessionId: 'agent-session-without-mcp',
+        workspaceDirectory: workingDirectory
+      })
+
+      await waitUntil(() => output.includes('"argv"'))
+
+      expect(output).toContain('"noProxy":"proxy.internal"')
+      expect(output).toContain('"lowercaseNoProxy":"lowercase.internal"')
+      expect(output).not.toContain('CLEANCODE_MCP_TOKEN')
+      expect(output).not.toContain('mcp_servers.cleancode')
+      expect(output).not.toContain('--sandbox')
+      expect(output).not.toContain('--ask-for-approval')
+      expect(output).not.toContain('developer_instructions')
+    } finally {
+      restoreEnvironmentVariable('NO_PROXY', originalNoProxy)
+      restoreEnvironmentVariable('no_proxy', originalLowercaseNoProxy)
+    }
+  })
 })
+
+function restoreEnvironmentVariable(
+  name: 'NO_PROXY' | 'no_proxy',
+  value: string | undefined
+): void {
+  if (value === undefined) {
+    Reflect.deleteProperty(process.env, name)
+    return
+  }
+  process.env[name] = value
+}
 
 async function waitUntil(assertion: () => boolean): Promise<void> {
   const startedAt = Date.now()

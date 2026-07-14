@@ -77,8 +77,36 @@ describe('workspace Agents e2e', () => {
       const store = JSON.parse(
         await waitForJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
       ) as { version: number; workspaces: Array<{ agents: unknown[] }> }
-      expect(store.version).toBe(2)
+      expect(store.version).toBe(3)
       expect(store.workspaces[0]?.agents).toHaveLength(1)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'persists one Agent CleanCode MCP switch across a full application restart',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+      await waitForPersistedAgent(page)
+
+      const toggle = page.getByRole('switch', { name: 'CleanCode MCP' })
+      expect(await toggle.getAttribute('aria-checked')).toBe('true')
+      await toggle.click()
+      await waitForAgentMcpCapability(workbench, false)
+      expect(await toggle.getAttribute('aria-checked')).toBe('false')
+
+      await electronApp.close()
+      electronApp = await launchApp(workbench)
+      page = await electronApp.firstWindow()
+      await page.waitForLoadState('domcontentloaded')
+      await waitForAgentCount(page, 1)
+      await waitForPersistedAgent(page)
+
+      expect(
+        await page.getByRole('switch', { name: 'CleanCode MCP' }).getAttribute('aria-checked')
+      ).toBe('false')
     },
     electronScenarioTimeoutMs
   )
@@ -274,6 +302,15 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
   )
 }
 
+async function waitForPersistedAgent(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const agentId = document
+      .querySelector('[data-agent-console-node]')
+      ?.getAttribute('data-agent-console-node')
+    return Boolean(agentId && agentId !== 'default-agent')
+  })
+}
+
 async function waitForAgentSelectionState(
   page: Page,
   state: 'selected' | 'unselected'
@@ -297,6 +334,21 @@ async function readAgentLayout(workbench: E2eWorkbench): Promise<AgentLayout> {
   ) as { workspaces: Array<{ agents: Array<{ layout: AgentLayout }> }> }
 
   return store.workspaces[0]!.agents[0]!.layout
+}
+
+async function waitForAgentMcpCapability(
+  workbench: E2eWorkbench,
+  expected: boolean
+): Promise<void> {
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline) {
+    const store = JSON.parse(
+      await readOnlyJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
+    ) as { workspaces: Array<{ agents: Array<{ cleancodeMcpEnabled: boolean }> }> }
+    if (store.workspaces[0]?.agents[0]?.cleancodeMcpEnabled === expected) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`Timed out waiting for CleanCode MCP capability to become ${expected}.`)
 }
 
 async function waitForAgentLayoutChange(

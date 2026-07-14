@@ -1,17 +1,10 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import type {
-  AgentGraphUpdatedEvent,
-  AgentPtyExitEvent,
-  AgentPtyOutputEvent,
-  AgentSessionSnapshot,
-  AgentToolApprovalRequest
-} from '../dto/AgentSessionProtocol'
+import type { AgentSessionSnapshot, AgentToolApprovalRequest } from '../dto/AgentSessionProtocol'
 import { createUnrestorableAgentSessionSnapshot } from '../dto/createUnrestorableAgentSessionSnapshot'
 import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/AgentMcpServerPort'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { CodexAgentProcessPort } from '../ports/CodexAgentProcessPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
-import type { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
 import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
 import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
 import {
@@ -19,26 +12,15 @@ import {
   createAgentConversationScope,
   createAgentRuntimeSessionId,
   createCanceledAgentToolResult,
+  registerAgentMcpEndpoint,
   toAgentSessionSnapshot,
-  type AgentSessionCallbacks
+  unregisterAgentMcpEndpoint,
+  type AttachAgentSessionCommand,
+  type ManagedAgentSession,
+  type PendingToolApproval
 } from './AgentSessionRuntimeState'
 
-export interface AttachAgentSessionCommand {
-  readonly agentId: string
-  readonly columns?: number
-  readonly gitBranch?: string | null
-  readonly onExit: (event: AgentPtyExitEvent) => void
-  readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
-  readonly onOutput: (event: AgentPtyOutputEvent) => void
-  readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
-  readonly persistenceMode?: 'ephemeral' | 'persistent'
-  readonly projectDirectory: string
-  readonly projectId?: string
-  readonly restartMode?: 'new' | 'retry'
-  readonly rows?: number
-  readonly workspaceDirectory: string
-  readonly workspaceName: string
-}
+export type { AttachAgentSessionCommand } from './AgentSessionRuntimeState'
 
 export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
@@ -60,7 +42,7 @@ export class AgentSessionService {
     const existingSession = this.sessions.get(sessionKey)
 
     if (existingSession && command.restartMode !== 'new' && existingSession.status === 'running') {
-      this.updateCallbacks(existingSession, command)
+      existingSession.callbacks = createAgentSessionCallbacks(command)
       if (command.columns && command.rows && existingSession.status === 'running') {
         this.processPort.resize(existingSession.sessionId, command.columns, command.rows)
       }
@@ -85,9 +67,17 @@ export class AgentSessionService {
     }
 
     let persistedSession: AgentSession | null = null
+    let workspaceAgent: AgentSession | null = null
 
     try {
       persistedSession = shouldPersist ? await this.sessionRepository.find(scope) : null
+      workspaceAgent =
+        persistedSession ??
+        (await this.sessionRepository.findAgent(
+          scope.toSnapshot().projectId,
+          command.workspaceName,
+          command.agentId
+        ))
     } catch {
       const scopeSnapshot = scope.toSnapshot()
       return createUnrestorableAgentSessionSnapshot({
@@ -104,12 +94,11 @@ export class AgentSessionService {
     const session: ManagedAgentSession = {
       agentId: command.agentId,
       callbacks: createAgentSessionCallbacks(command),
+      cleancodeMcpEnabled: workspaceAgent?.cleancodeMcpEnabled ?? true,
       codexThreadId: persistedSession?.boundCodexThreadId ?? null,
       columns: command.columns ?? 88,
       gitBranch: scope.toSnapshot().gitBranch,
       isStopping: false,
-      mcpBearerToken: '',
-      mcpServerUrl: '',
       processId: null,
       shouldPersist,
       projectDirectory: command.projectDirectory,
@@ -123,19 +112,13 @@ export class AgentSessionService {
     }
     this.sessions.set(sessionKey, session)
 
-    const endpoint = await this.mcpServerPort.registerSession({
-      executeTool: (toolCommand) => this.executeMcpTool(toolCommand),
-      projectDirectory: command.projectDirectory,
-      sessionId: session.sessionId,
-      workspaceName: command.workspaceName
-    })
-    session.mcpBearerToken = endpoint.bearerToken
-    session.mcpServerUrl = endpoint.url
+    await this.registerMcpEndpoint(session)
 
     try {
       await this.startManagedProcess(session)
     } catch {
       session.status = persistedSession ? 'restore_failed' : 'failed'
+      unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     }
 
     return toAgentSessionSnapshot(session)
@@ -268,6 +251,44 @@ export class AgentSessionService {
     }
   }
 
+  async reconfigureAgent(command: {
+    readonly agentId: string
+    readonly cleancodeMcpEnabled: boolean
+    readonly projectId: string
+    readonly workspaceName: string
+  }): Promise<AgentSessionSnapshot | null> {
+    const session = [...this.sessions.values()].find(
+      (candidate) =>
+        candidate.agentId === command.agentId &&
+        candidate.projectId === command.projectId &&
+        candidate.workspaceName === command.workspaceName
+    )
+    if (!session) {
+      return null
+    }
+
+    this.cancelSessionApprovals(session.sessionId)
+    session.isStopping = true
+    await this.processPort.stop(session.sessionId)
+    unregisterAgentMcpEndpoint(session, this.mcpServerPort)
+
+    session.cleancodeMcpEnabled = command.cleancodeMcpEnabled
+    session.isStopping = false
+    session.processId = null
+    session.sessionId = createAgentRuntimeSessionId()
+    session.status = 'running'
+    await this.registerMcpEndpoint(session)
+
+    try {
+      await this.startManagedProcess(session)
+    } catch {
+      session.status = session.codexThreadId ? 'restore_failed' : 'failed'
+      unregisterAgentMcpEndpoint(session, this.mcpServerPort)
+    }
+
+    return toAgentSessionSnapshot(session)
+  }
+
   async disposeProject(projectDirectory: string): Promise<void> {
     for (const session of [...this.sessions.values()]) {
       if (session.projectDirectory === projectDirectory) {
@@ -289,10 +310,6 @@ export class AgentSessionService {
     await this.processPort.disposeAll()
     await this.waitForPendingPersistence()
     this.mcpServerPort.dispose()
-  }
-
-  private updateCallbacks(session: ManagedAgentSession, command: AttachAgentSessionCommand): void {
-    session.callbacks = createAgentSessionCallbacks(command)
   }
 
   private persistCodexThread(session: ManagedAgentSession, threadId: string): void {
@@ -319,14 +336,21 @@ export class AgentSessionService {
   }
 
   private async startManagedProcess(session: ManagedAgentSession): Promise<void> {
+    const processSessionId = session.sessionId
     const handle = await this.processPort.start({
-      bearerToken: session.mcpBearerToken,
+      cleancodeMcp: session.mcpEndpoint
+        ? {
+            bearerToken: session.mcpEndpoint.bearerToken,
+            serverUrl: session.mcpEndpoint.url
+          }
+        : undefined,
       columns: session.columns,
-      mcpServerUrl: session.mcpServerUrl,
       onCodexThreadIdentified: (threadId) => {
+        if (session.sessionId !== processSessionId) return
         this.persistCodexThread(session, threadId)
       },
       onExit: (event) => {
+        if (session.sessionId !== processSessionId) return
         session.processId = null
 
         if (session.isStopping) {
@@ -344,6 +368,12 @@ export class AgentSessionService {
     })
 
     session.processId = handle.processId
+  }
+
+  private async registerMcpEndpoint(session: ManagedAgentSession): Promise<void> {
+    await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
+      this.executeMcpTool(toolCommand)
+    )
   }
 
   private async disposeOtherScopeForAgentInDirectory(
@@ -369,7 +399,7 @@ export class AgentSessionService {
     this.cancelSessionApprovals(session.sessionId)
     session.isStopping = true
     await this.processPort.stop(session.sessionId)
-    this.mcpServerPort.unregisterSession(session.sessionId)
+    unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     this.sessions.delete(sessionKey)
   }
 
@@ -466,32 +496,4 @@ export class AgentSessionService {
       )
     }
   }
-}
-
-interface ManagedAgentSession {
-  readonly agentId: string
-  callbacks: AgentSessionCallbacks
-  codexThreadId: string | null
-  columns: number
-  readonly gitBranch: string | null
-  isStopping: boolean
-  mcpBearerToken: string
-  mcpServerUrl: string
-  processId: number | null
-  readonly projectDirectory: string
-  readonly projectId: string
-  rows: number
-  readonly shouldPersist: boolean
-  readonly scope: AgentConversationScope
-  readonly sessionId: string
-  status: AgentSessionSnapshot['status']
-  readonly workspaceDirectory: string
-  readonly workspaceName: string
-}
-
-interface PendingToolApproval {
-  readonly command: ExecuteAgentToolCommand
-  readonly request: AgentToolApprovalRequest
-  readonly resolve: (result: AgentToolExecutionResult) => void
-  readonly sessionId: string
 }

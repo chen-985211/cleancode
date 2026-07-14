@@ -58,7 +58,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY；xt
 
 当前嵌入式 Agent 使用 Codex CLI。cleancode 通过 node-pty 启动独立进程，通过 Codex CLI 的正式 resume 入口恢复 thread，并由进程级 `notify` 向本机随机令牌通道报告当前 thread UUID，不扫描历史目录或修改用户全局配置。
 
-每个运行时 Agent 拥有独立 `sessionId`、PTY、MCP URL、Bearer Token 和审批队列。稳定身份与 thread 绑定见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
+每个运行时 Agent 拥有独立 `sessionId`、PTY 和审批队列；启用 CleanCode MCP 时才注册该会话独立的 MCP URL 与 Bearer Token。开关只控制内建画布 MCP，Codex 子进程的 sandbox 与 approval 继承用户配置。稳定身份、能力开关与 thread 绑定见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
 ## 存储层
 

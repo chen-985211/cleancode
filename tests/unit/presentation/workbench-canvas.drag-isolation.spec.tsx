@@ -197,6 +197,7 @@ function createNodes(): {
   const agentNode = createAgentConsoleFlowNode({
     agent: {
       agentId: 'agent-1',
+      cleancodeMcpEnabled: true,
       name: 'Agent 1',
       projectId: 'project-1',
       workspaceName: 'main',
@@ -209,6 +210,7 @@ function createNodes(): {
     currentWorkspace: null,
     isSelected: true,
     onGraphUpdated: vi.fn(),
+    onMcpCapabilityChange: vi.fn(async () => undefined),
     onRemove: vi.fn(),
     onRename: vi.fn(),
     onResize: vi.fn()

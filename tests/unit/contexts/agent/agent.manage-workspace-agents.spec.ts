@@ -81,6 +81,10 @@ class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
   }): Promise<void> {
     this.disposed.push(command.agentId)
   }
+
+  async reconfigureAgent(): Promise<null> {
+    return null
+  }
 }
 
 class MemoryAgentRepository implements AgentSessionRepository {

@@ -14,6 +14,7 @@ export interface RuntimeApiOverrides {
   readonly createWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly renameWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly updateWorkspaceAgentLayout?: ReturnType<typeof vi.fn>
+  readonly updateWorkspaceAgentMcpCapability?: ReturnType<typeof vi.fn>
   readonly removeWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly writeAgentSession?: ReturnType<typeof vi.fn>
   readonly resizeAgentSession?: ReturnType<typeof vi.fn>
@@ -70,6 +71,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     createWorkspaceAgent: overrides.createWorkspaceAgent ?? vi.fn(),
     renameWorkspaceAgent: overrides.renameWorkspaceAgent ?? vi.fn(),
     updateWorkspaceAgentLayout: overrides.updateWorkspaceAgentLayout ?? vi.fn(),
+    updateWorkspaceAgentMcpCapability: overrides.updateWorkspaceAgentMcpCapability ?? vi.fn(),
     removeWorkspaceAgent: overrides.removeWorkspaceAgent ?? vi.fn(),
     writeAgentSession: overrides.writeAgentSession ?? vi.fn(async () => undefined),
     resizeAgentSession: overrides.resizeAgentSession ?? vi.fn(async () => undefined),

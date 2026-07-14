@@ -1,0 +1,118 @@
+.agent-mcp-capability {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.agent-mcp-capability__switch {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  padding: 0 4px;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.agent-mcp-capability__switch:hover:not(:disabled) {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.agent-mcp-capability__switch:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cc-primary) 62%, transparent);
+  outline-offset: 1px;
+}
+
+.agent-mcp-capability__switch:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.agent-mcp-capability__icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.agent-mcp-capability__label {
+  white-space: nowrap;
+}
+
+.agent-mcp-capability__track {
+  position: relative;
+  width: 25px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 999px;
+  background: var(--cc-surface-subtle);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.agent-mcp-capability__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cc-muted-strong);
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.agent-mcp-capability__switch[aria-checked='true'] .agent-mcp-capability__track {
+  border-color: var(--cc-primary);
+  background: color-mix(in srgb, var(--cc-primary) 24%, var(--cc-surface));
+}
+
+.agent-mcp-capability__switch[aria-checked='true'] .agent-mcp-capability__thumb {
+  background: var(--cc-primary);
+  transform: translateX(11px);
+}
+
+.agent-mcp-capability__error {
+  color: var(--cc-danger);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.agent-mcp-capability[data-cc-tooltip]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+  width: 320px;
+  max-width: min(320px, calc(100vw - 32px));
+  border-color: var(--cc-tooltip-border);
+  background: var(--cc-tooltip);
+  box-shadow: var(--cc-shadow-floating);
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+}
+
+.agent-mcp-capability[data-cc-tooltip]::before {
+  top: calc(100% + 3px);
+  bottom: auto;
+  background: var(--cc-tooltip);
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+.agent-mcp-capability[data-cc-tooltip]:focus-within::after,
+.agent-mcp-capability[data-cc-tooltip]:focus-within::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

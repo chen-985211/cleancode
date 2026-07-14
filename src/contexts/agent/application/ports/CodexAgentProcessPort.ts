@@ -1,9 +1,11 @@
 import type { AgentPtyExitEvent, AgentPtyOutputEvent } from '../dto/AgentSessionProtocol'
 
 export interface StartCodexAgentProcessCommand {
-  readonly bearerToken: string
+  readonly cleancodeMcp?: {
+    readonly bearerToken: string
+    readonly serverUrl: string
+  }
   readonly columns: number
-  readonly mcpServerUrl: string
   readonly onCodexThreadIdentified: (threadId: string) => void
   readonly onExit: (event: Omit<AgentPtyExitEvent, 'agentId'>) => void
   readonly onOutput: (event: Omit<AgentPtyOutputEvent, 'agentId'>) => void

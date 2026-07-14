@@ -99,6 +99,20 @@ export function useWorkspaceAgentActions({
     [updateAgentInWorkspace]
   )
 
+  const updateWorkspaceAgentMcpCapability = useCallback(
+    async (agent: WorkspaceAgentSnapshot, cleancodeMcpEnabled: boolean) => {
+      const result = await window.cleancode?.updateWorkspaceAgentMcpCapability({
+        agentId: agent.agentId,
+        cleancodeMcpEnabled,
+        projectId: agent.projectId,
+        workspaceName: agent.workspaceName
+      })
+      if (result) updateAgentInWorkspace(result.agent)
+      return result
+    },
+    [updateAgentInWorkspace]
+  )
+
   const updateWorkspaceAgentLayout = useCallback(
     async (
       agent: WorkspaceAgentSnapshot,
@@ -155,7 +169,8 @@ export function useWorkspaceAgentActions({
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
-    resizeWorkspaceAgent
+    resizeWorkspaceAgent,
+    updateWorkspaceAgentMcpCapability
   }
 }
 

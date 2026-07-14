@@ -163,6 +163,7 @@ function createAgentNode(
 ): WorkbenchFlowNode {
   const agent = {
     agentId: 'agent-1',
+    cleancodeMcpEnabled: true,
     layout: { position, size },
     name: 'Agent 1',
     projectId: 'project-1',
@@ -178,6 +179,7 @@ function createAgentNode(
       currentWorkbench: null,
       currentWorkspace: null,
       onGraphUpdated: vi.fn(),
+      onMcpCapabilityChange: vi.fn(async () => undefined),
       onRemove: vi.fn(),
       onRename: vi.fn(),
       onResize: vi.fn()

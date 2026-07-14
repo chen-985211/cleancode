@@ -4,18 +4,21 @@ import {
   useRef,
   useState,
   type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode
 } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 
 export function AgentConsoleActions({
   agent,
+  capabilityControl,
   onRemove,
   onRename,
   onSelect
 }: {
   readonly agent: WorkspaceAgentSnapshot
+  readonly capabilityControl?: ReactNode
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onSelect?: () => void
@@ -118,6 +121,7 @@ export function AgentConsoleActions({
           {agent.name}
         </button>
       )}
+      {capabilityControl}
       {mode !== 'rename' ? (
         <span className="agent-console-actions__menu-anchor">
           <button

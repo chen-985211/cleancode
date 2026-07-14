@@ -55,9 +55,29 @@ describe('workspace Agents', () => {
     agent.updateLayout({ position: { x: 620, y: 220 }, size: { width: 520, height: 460 } })
 
     expect(agent.toSnapshot()).toMatchObject({
+      cleancodeMcpEnabled: true,
       conversations: [],
       name: '测试 Agent',
       layout: { position: { x: 620, y: 220 }, size: { width: 520, height: 460 } }
+    })
+  })
+
+  it('can disable the CleanCode canvas MCP capability without changing Agent identity', () => {
+    const agent = AgentSession.create({
+      agentId: 'agent-3',
+      layout: { position: { x: 540, y: 180 }, size: { width: 440, height: 520 } },
+      name: 'Agent 3',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    agent.setCleancodeMcpEnabled(false)
+
+    expect(agent.id).toBe('agent-3')
+    expect(agent.cleancodeMcpEnabled).toBe(false)
+    expect(agent.toSnapshot()).toMatchObject({
+      agentId: 'agent-3',
+      cleancodeMcpEnabled: false
     })
   })
 })

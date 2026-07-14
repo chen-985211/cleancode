@@ -5,14 +5,56 @@ import type {
   AgentSessionSnapshot,
   AgentToolApprovalRequest
 } from '../dto/AgentSessionProtocol'
-import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
+import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
+import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/AgentMcpServerPort'
 import { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
+
+export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
+  readonly agentId: string
+  readonly columns?: number
+  readonly gitBranch?: string | null
+  readonly persistenceMode?: 'ephemeral' | 'persistent'
+  readonly projectDirectory: string
+  readonly projectId?: string
+  readonly restartMode?: 'new' | 'retry'
+  readonly rows?: number
+  readonly workspaceDirectory: string
+  readonly workspaceName: string
+}
 
 export interface AgentSessionCallbacks {
   readonly onExit: (event: AgentPtyExitEvent) => void
   readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly onOutput: (event: AgentPtyOutputEvent) => void
   readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
+}
+
+export interface ManagedAgentSession {
+  readonly agentId: string
+  callbacks: AgentSessionCallbacks
+  cleancodeMcpEnabled: boolean
+  codexThreadId: string | null
+  columns: number
+  readonly gitBranch: string | null
+  isStopping: boolean
+  mcpEndpoint?: { readonly bearerToken: string; readonly url: string }
+  processId: number | null
+  readonly projectDirectory: string
+  readonly projectId: string
+  rows: number
+  readonly shouldPersist: boolean
+  readonly scope: AgentConversationScope
+  sessionId: string
+  status: AgentSessionSnapshot['status']
+  readonly workspaceDirectory: string
+  readonly workspaceName: string
+}
+
+export interface PendingToolApproval {
+  readonly command: ExecuteAgentToolCommand
+  readonly request: AgentToolApprovalRequest
+  readonly resolve: (result: AgentToolExecutionResult) => void
+  readonly sessionId: string
 }
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {
@@ -22,6 +64,35 @@ export function createAgentSessionCallbacks(command: AgentSessionCallbacks): Age
     onOutput: command.onOutput,
     onToolApprovalRequested: command.onToolApprovalRequested
   }
+}
+
+export async function registerAgentMcpEndpoint(
+  session: ManagedAgentSession,
+  mcpServerPort: AgentMcpServerPort,
+  executeTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
+): Promise<void> {
+  if (!session.cleancodeMcpEnabled) {
+    return
+  }
+
+  session.mcpEndpoint = await mcpServerPort.registerSession({
+    executeTool,
+    projectDirectory: session.projectDirectory,
+    sessionId: session.sessionId,
+    workspaceName: session.workspaceName
+  })
+}
+
+export function unregisterAgentMcpEndpoint(
+  session: ManagedAgentSession,
+  mcpServerPort: AgentMcpServerPort
+): void {
+  if (!session.mcpEndpoint) {
+    return
+  }
+
+  mcpServerPort.unregisterSession(session.sessionId)
+  session.mcpEndpoint = undefined
 }
 
 export function toAgentSessionSnapshot(session: {

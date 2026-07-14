@@ -8,6 +8,7 @@ import type {
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from './contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { CodexCliInstallationSnapshot } from './contexts/agent/application/ports/CodexCliPort'
 import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
@@ -91,6 +92,12 @@ declare global {
         readonly projectId: string
         readonly workspaceName: string
       }): Promise<WorkspaceAgentSnapshot>
+      updateWorkspaceAgentMcpCapability(command: {
+        readonly agentId: string
+        readonly cleancodeMcpEnabled: boolean
+        readonly projectId: string
+        readonly workspaceName: string
+      }): Promise<UpdateWorkspaceAgentMcpCapabilityResult>
       removeWorkspaceAgent(command: {
         readonly agentId: string
         readonly projectId: string

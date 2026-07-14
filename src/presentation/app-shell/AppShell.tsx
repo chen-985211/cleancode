@@ -126,7 +126,8 @@ export function AppShell() {
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
-    resizeWorkspaceAgent
+    resizeWorkspaceAgent,
+    updateWorkspaceAgentMcpCapability
   } = useWorkspaceAgentActions({
     currentWorkbench,
     currentWorkspace,
@@ -420,6 +421,7 @@ export function AppShell() {
     terminalStates,
     workflowNodeStatuses: terminalWorkflow.nodeStatuses,
     onRemoveAgent: removeWorkspaceAgent,
+    onMcpCapabilityChange: updateWorkspaceAgentMcpCapability,
     onRenameAgent: renameWorkspaceAgent,
     onResizeAgent: resizeWorkspaceAgent,
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle

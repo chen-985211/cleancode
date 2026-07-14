@@ -56,6 +56,7 @@ export class CleancodeAgentJsonRpcToolBridge {
     if (request.method === 'tools/list') {
       return createResult(request.id, {
         tools: agentToolDefinitions.map((tool) => ({
+          annotations: tool.annotations,
           description: tool.description,
           inputSchema: tool.inputSchema,
           name: tool.name

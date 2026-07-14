@@ -1,5 +1,6 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConsoleFlowNode, WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 
@@ -14,6 +15,10 @@ interface CreateAgentConsoleFlowNodeInput {
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly isSelected: boolean
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void
+  readonly onMcpCapabilityChange: (
+    agent: WorkspaceAgentSnapshot,
+    enabled: boolean
+  ) => Promise<UpdateWorkspaceAgentMcpCapabilityResult | undefined>
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onResize: (
@@ -29,6 +34,7 @@ export function createAgentConsoleFlowNode({
   currentWorkspace,
   isSelected,
   onGraphUpdated,
+  onMcpCapabilityChange,
   onRemove,
   onRename,
   onResize,
@@ -48,6 +54,7 @@ export function createAgentConsoleFlowNode({
       currentWorkbench,
       currentWorkspace,
       onGraphUpdated,
+      onMcpCapabilityChange,
       onRemove,
       onRename,
       onResize,
@@ -74,6 +81,7 @@ export function createLegacyAgentSnapshot(
 ): WorkspaceAgentSnapshot | null {
   return {
     agentId: 'default-agent',
+    cleancodeMcpEnabled: true,
     layout: {
       position: { x: resolveDefaultAgentConsoleX(), y: 120 },
       size: defaultAgentLayoutSize

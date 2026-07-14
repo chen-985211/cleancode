@@ -33,6 +33,7 @@ describe('filesystem Agent session repository', () => {
       createScope('agent-2', 'main'),
       thread('0190d8a2-4f13-7e17-a0c1-64c303571909')
     )
+    secondAgent.setCleancodeMcpEnabled(false)
     await repository.save(firstAgent)
     await repository.save(secondAgent)
 
@@ -46,7 +47,51 @@ describe('filesystem Agent session repository', () => {
     })
     expect(agents?.[0]?.findCodexThreadId('main')).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
     expect(agents?.[1]?.findCodexThreadId('main')).toBe('0190d8a2-4f13-7e17-a0c1-64c303571909')
-    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 2 })
+    expect(agents?.[0]?.cleancodeMcpEnabled).toBe(true)
+    expect(agents?.[1]?.cleancodeMcpEnabled).toBe(false)
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 3 })
+  })
+
+  it('migrates version 2 Agents with the CleanCode canvas MCP enabled by default', async () => {
+    await import('node:fs/promises').then(({ writeFile }) =>
+      writeFile(
+        filePath,
+        JSON.stringify({
+          version: 2,
+          workspaces: [
+            {
+              agents: [
+                {
+                  agentId: 'agent-1',
+                  conversations: [],
+                  layout: {
+                    position: { x: 540, y: 120 },
+                    size: { width: 440, height: 520 }
+                  },
+                  name: 'Agent 1',
+                  projectId: 'project-1',
+                  workspaceName: 'main'
+                }
+              ],
+              projectId: 'project-1',
+              workspaceName: 'main'
+            }
+          ]
+        })
+      )
+    )
+
+    const agents = await repository.findWorkspace('project-1', 'main')
+
+    expect(agents?.[0]?.cleancodeMcpEnabled).toBe(true)
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({
+      version: 3,
+      workspaces: [
+        {
+          agents: [{ agentId: 'agent-1', cleancodeMcpEnabled: true }]
+        }
+      ]
+    })
   })
 
   it('migrates legacy branch bindings into one stable default Agent without losing threads', async () => {
@@ -81,7 +126,8 @@ describe('filesystem Agent session repository', () => {
     expect(agents?.[0]?.findCodexThreadId('feature/login')).toBe(
       '0190d8a2-4f13-7e17-a0c1-64c303571909'
     )
-    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 2 })
+    expect(agents?.[0]?.cleancodeMcpEnabled).toBe(true)
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 3 })
   })
 })
 

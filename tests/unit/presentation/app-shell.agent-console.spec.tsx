@@ -112,11 +112,51 @@ describe('app shell Agent console', () => {
     expect(document.querySelector('[aria-label="移除 Agent 2"]')).not.toBeInTheDocument()
     expect(document.querySelector('[aria-label="Agent 2 更多操作"]')).toBeInTheDocument()
   })
+
+  it('persists the CleanCode MCP switch through the application action hook', async () => {
+    const baseWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const first = createAgent('agent-1', 'Agent 1', baseWorkbench.project.id)
+    const updateWorkspaceAgentMcpCapability = vi.fn(async () => ({
+      agent: { ...first, cleancodeMcpEnabled: false },
+      session: null
+    }))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [{ ...baseWorkbench, agents: [first] }]),
+        updateWorkspaceAgentMcpCapability
+      })
+    })
+
+    render(<AppShell />)
+    const agentConsole = await waitFor(() => {
+      const node = document.querySelector('[data-agent-console-node="agent-1"]')
+      expect(node).toBeInTheDocument()
+      return node as HTMLElement
+    })
+    const toggle = agentConsole.querySelector('[role="switch"]') as HTMLButtonElement
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(updateWorkspaceAgentMcpCapability).toHaveBeenCalledWith({
+        agentId: 'agent-1',
+        cleancodeMcpEnabled: false,
+        projectId: baseWorkbench.project.id,
+        workspaceName: 'main'
+      })
+    )
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-agent-console-node="agent-1"] [role="switch"]')
+      ).toHaveAttribute('aria-checked', 'false')
+    )
+  })
 })
 
 function createAgent(agentId: string, name: string, projectId: string, x = 320) {
   return {
     agentId,
+    cleancodeMcpEnabled: true,
     layout: { position: { x, y: 140 }, size: { width: 440, height: 520 } },
     name,
     projectId,

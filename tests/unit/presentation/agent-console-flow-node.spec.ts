@@ -8,6 +8,7 @@ describe('Agent console flow node', () => {
     const node = createAgentConsoleFlowNode({
       agent: {
         agentId: 'agent-1',
+        cleancodeMcpEnabled: true,
         layout: { position: { x: 320, y: 140 }, size: { width: 520, height: 460 } },
         name: '实现 Agent',
         projectId: workbench.project.id,
@@ -17,6 +18,7 @@ describe('Agent console flow node', () => {
       currentWorkspace,
       isSelected: false,
       onGraphUpdated: vi.fn(),
+      onMcpCapabilityChange: vi.fn(async () => undefined),
       onRemove: vi.fn(async () => undefined),
       onRename: vi.fn(async () => undefined),
       onResize: vi.fn(async () => undefined),

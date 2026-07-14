@@ -246,6 +246,49 @@ describe('agent IPC contract', () => {
     )
   })
 
+  it('updates one Agent CleanCode MCP capability through a dedicated typed channel', async () => {
+    const ipcMain = new FakeIpcMain()
+    const updateWorkspaceAgentMcpCapability = vi.fn(async () => ({
+      agent: { ...createWorkspaceAgentSnapshot('agent-2'), cleancodeMcpEnabled: false },
+      session: null
+    }))
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({ ipcMain, updateWorkspaceAgentMcpCapability })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:update-workspace-agent-mcp-capability', {
+        agentId: 'agent-2',
+        cleancodeMcpEnabled: false,
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { agent: { agentId: 'agent-2', cleancodeMcpEnabled: false }, session: null }
+    })
+    expect(updateWorkspaceAgentMcpCapability).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      cleancodeMcpEnabled: false,
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:update-workspace-agent-mcp-capability', {
+        agentId: 'agent-2',
+        cleancodeMcpEnabled: 'disabled',
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(updateWorkspaceAgentMcpCapability).toHaveBeenCalledOnce()
+  })
+
   it('passes Codex terminal input, resize, disposal, and approval commands through channels', async () => {
     const ipcMain = new FakeIpcMain()
     const writeAgentSession = vi.fn()
@@ -324,6 +367,7 @@ function createAgentIpcHandlersInput(input: {
   readonly resizeAgentSession?: AgentIpcHandlersInput['resizeAgentSession']
   readonly writeAgentSession?: AgentIpcHandlersInput['writeAgentSession']
   readonly updateWorkspaceAgentLayout?: AgentIpcHandlersInput['updateWorkspaceAgentLayout']
+  readonly updateWorkspaceAgentMcpCapability?: AgentIpcHandlersInput['updateWorkspaceAgentMcpCapability']
 }): AgentIpcHandlersInput {
   return {
     approveAgentTool: input.approveAgentTool ?? (() => undefined),
@@ -362,13 +406,17 @@ function createAgentIpcHandlersInput(input: {
     resizeAgentSession: input.resizeAgentSession ?? (() => undefined),
     writeAgentSession: input.writeAgentSession ?? (() => undefined),
     updateWorkspaceAgentLayout:
-      input.updateWorkspaceAgentLayout ?? (async () => createWorkspaceAgentSnapshot('agent-1'))
+      input.updateWorkspaceAgentLayout ?? (async () => createWorkspaceAgentSnapshot('agent-1')),
+    updateWorkspaceAgentMcpCapability:
+      input.updateWorkspaceAgentMcpCapability ??
+      (async () => ({ agent: createWorkspaceAgentSnapshot('agent-1'), session: null }))
   }
 }
 
 function createWorkspaceAgentSnapshot(agentId: string) {
   return {
     agentId,
+    cleancodeMcpEnabled: true,
     layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
     name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
     projectId: 'project-1',

@@ -12,7 +12,6 @@ import type {
   CodexAgentProcessPort,
   StartCodexAgentProcessCommand
 } from '../../application/ports/CodexAgentProcessPort'
-import { codexAgentDeveloperInstructions } from '../../application/dto/AgentToolProtocol'
 import { CodexThreadIdentityReporter } from './CodexThreadIdentityReporter'
 
 const nodeRequire = createRequire(import.meta.url)
@@ -45,7 +44,7 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
       ptyProcess = spawnPtyProcess(this.command, [...this.createArgs(command)], {
         cols: command.columns,
         cwd: command.workspaceDirectory,
-        env: createProcessEnvironment(command.bearerToken, identityReporter),
+        env: createProcessEnvironment(command.cleancodeMcp?.bearerToken, identityReporter),
         name: 'xterm-256color',
         rows: command.rows
       })
@@ -105,22 +104,14 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
       '--no-alt-screen',
       '-C',
       command.workspaceDirectory,
-      '--sandbox',
-      'workspace-write',
-      '--ask-for-approval',
-      'on-request',
+      ...(command.cleancodeMcp
+        ? [
+            '--config',
+            `mcp_servers.cleancode={url=${JSON.stringify(command.cleancodeMcp.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true}`
+          ]
+        : []),
       '--config',
-      `developer_instructions=${toTomlString(codexAgentDeveloperInstructions)}`,
-      '--config',
-      `mcp_servers.cleancode.url="${command.mcpServerUrl}"`,
-      '--config',
-      'mcp_servers.cleancode.bearer_token_env_var="CLEANCODE_MCP_TOKEN"',
-      '--config',
-      'mcp_servers.cleancode.enabled=true',
-      '--config',
-      `notify=${JSON.stringify([process.execPath, '-e', codexNotifyReporterScript])}`,
-      '--config',
-      'mcp_servers.cleancode.default_tools_approval_mode="approve"'
+      `notify=${JSON.stringify([process.execPath, '-e', codexNotifyReporterScript])}`
     ]
 
     return sharedArgs
@@ -137,10 +128,6 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
   }
 }
 
-function toTomlString(value: string): string {
-  return JSON.stringify(value)
-}
-
 interface ManagedCodexAgentProcess {
   readonly exit: Promise<void>
   readonly identityReporter: CodexThreadIdentityReporter
@@ -148,7 +135,7 @@ interface ManagedCodexAgentProcess {
 }
 
 function createProcessEnvironment(
-  bearerToken: string,
+  bearerToken: string | undefined,
   identityReporter: CodexThreadIdentityReporter
 ): Record<string, string> {
   const inheritedEnvironment = Object.fromEntries(
@@ -156,21 +143,31 @@ function createProcessEnvironment(
       return typeof entry[1] === 'string'
     })
   )
-  const noProxy = mergeNoProxyHosts(
-    inheritedEnvironment.NO_PROXY,
-    inheritedEnvironment.no_proxy,
-    localMcpNoProxyHosts
-  )
+  const mcpEnvironment = bearerToken ? createMcpEnvironment(inheritedEnvironment, bearerToken) : {}
 
   return {
     ...inheritedEnvironment,
     CLEANCODE_CODEX_NOTIFY_TOKEN: identityReporter.token,
     CLEANCODE_CODEX_NOTIFY_URL: identityReporter.url,
-    CLEANCODE_MCP_TOKEN: bearerToken,
     ELECTRON_RUN_AS_NODE: '1',
-    NO_PROXY: noProxy,
-    no_proxy: noProxy,
+    ...mcpEnvironment,
     PROMPT_EOL_MARK: ''
+  }
+}
+
+function createMcpEnvironment(
+  inheritedEnvironment: Record<string, string>,
+  bearerToken: string
+): Record<string, string> {
+  const noProxy = mergeNoProxyHosts(
+    inheritedEnvironment.NO_PROXY,
+    inheritedEnvironment.no_proxy,
+    localMcpNoProxyHosts
+  )
+  return {
+    CLEANCODE_MCP_TOKEN: bearerToken,
+    NO_PROXY: noProxy,
+    no_proxy: noProxy
   }
 }
 

@@ -6,13 +6,13 @@
 
 ## 当前上下文
 
-| 上下文     | 状态   | 核心聚合                         | 拥有的事实                                           |
-| ---------- | ------ | -------------------------------- | ---------------------------------------------------- |
-| Project    | 已实现 | `Project`、`ProjectRegistry`     | 项目目录、工作区、Git 绑定、当前工作区、最近项目目录 |
-| BlockGraph | 已实现 | `BlockGraph`                     | 终端积木、组合、布局、执行配置和依赖连接             |
-| Run        | 已实现 | `TerminalSession`、`WorkflowRun` | PTY 会话生命周期、工作流运行计划和节点状态           |
-| Agent      | 已实现 | `AgentSession`                   | Agent 身份、布局、thread 绑定、工具协议、审批和审计  |
-| Plugin     | 规划中 | 尚无                             | 尚未形成当前领域模型、用例或持久化事实               |
+| 上下文     | 状态   | 核心聚合                         | 拥有的事实                                                         |
+| ---------- | ------ | -------------------------------- | ------------------------------------------------------------------ |
+| Project    | 已实现 | `Project`、`ProjectRegistry`     | 项目目录、工作区、Git 绑定、当前工作区、最近项目目录               |
+| BlockGraph | 已实现 | `BlockGraph`                     | 终端积木、组合、布局、执行配置和依赖连接                           |
+| Run        | 已实现 | `TerminalSession`、`WorkflowRun` | PTY 会话生命周期、工作流运行计划和节点状态                         |
+| Agent      | 已实现 | `AgentSession`                   | Agent 身份、布局、原生 MCP 开关、thread 绑定、工具协议、审批和审计 |
+| Plugin     | 规划中 | 尚无                             | 尚未形成当前领域模型、用例或持久化事实                             |
 
 `src/platform` 是最外层 composition root 与 Electron 适配层，不是限界上下文。`src/presentation` 负责跨上下文应用外壳与派生视图，也不拥有领域事实。
 

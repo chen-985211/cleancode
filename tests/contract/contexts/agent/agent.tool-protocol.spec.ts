@@ -1,4 +1,7 @@
-import { agentToolDefinitions } from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
+import {
+  agentToolDefinitions,
+  cleancodeMcpInstructions
+} from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
 
 describe('agent tool protocol', () => {
   it('exposes only first-phase cleancode block graph tools', () => {
@@ -49,5 +52,61 @@ describe('agent tool protocol', () => {
         })
       })
     )
+  })
+
+  it('disambiguates unqualified terminal requests as cleancode canvas work', () => {
+    const priorityInstructions = cleancodeMcpInstructions.slice(0, 512)
+
+    expect(priorityInstructions).toContain('inspect_graph')
+    expect(priorityInstructions).toContain('终端')
+    expect(priorityInstructions).toContain('整理终端')
+    expect(priorityInstructions).toContain('终端布局')
+    expect(priorityInstructions).toContain('终端组合')
+    expect(priorityInstructions).toContain('终端源码')
+    expect(priorityInstructions).toContain('Terminal component')
+    expect(priorityInstructions).toContain('xterm')
+    expect(priorityInstructions).toContain('PTY')
+  })
+
+  it('advertises accurate MCP safety annotations for every canvas tool', () => {
+    expect(
+      Object.fromEntries(agentToolDefinitions.map((tool) => [tool.name, tool.annotations] as const))
+    ).toEqual({
+      create_block: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      create_terminal_group: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      delete_block: {
+        destructiveHint: true,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      delete_terminal_group: {
+        destructiveHint: true,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      inspect_graph: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: true
+      },
+      update_block: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      update_terminal_group: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      }
+    })
   })
 })

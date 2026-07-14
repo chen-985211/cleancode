@@ -87,6 +87,7 @@ function createAgentConsoleNode(): AgentConsoleFlowNode {
     data: {
       agent: {
         agentId: 'agent-1',
+        cleancodeMcpEnabled: true,
         layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
         name: 'Agent 1',
         projectId: 'project-1',
@@ -95,6 +96,7 @@ function createAgentConsoleNode(): AgentConsoleFlowNode {
       currentWorkbench: null,
       currentWorkspace: null,
       onGraphUpdated: vi.fn(),
+      onMcpCapabilityChange: vi.fn(async () => undefined),
       onRemove: vi.fn(async () => undefined),
       onRename: vi.fn(async () => undefined),
       onResize: vi.fn(async () => undefined)

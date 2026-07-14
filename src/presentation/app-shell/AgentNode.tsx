@@ -43,6 +43,7 @@ export const AgentNode = memo(function AgentNode({
         currentWorkbench={data.currentWorkbench}
         currentWorkspace={data.currentWorkspace}
         onGraphUpdated={data.onGraphUpdated}
+        onMcpCapabilityChange={data.onMcpCapabilityChange}
         onRemove={data.onRemove}
         onRename={data.onRename}
         onSelect={data.onSelect}

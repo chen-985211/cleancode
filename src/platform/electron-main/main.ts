@@ -2,7 +2,6 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
@@ -12,6 +11,7 @@ import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use
 import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
 import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
+import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
 import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/NodeCodexCliAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
@@ -67,6 +67,7 @@ import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readi
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
+import { createDisabledAgentSessionSnapshot } from './createDisabledAgentSessionSnapshot'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
@@ -179,6 +180,10 @@ const agentSessionService = new AgentSessionService(
   new CleancodeMcpHttpServer(),
   (command) => executeAgentToolUseCase.execute(command),
   agentSessionRepository
+)
+const updateWorkspaceAgentMcpCapabilityUseCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
+  agentSessionRepository,
+  agentSessionService
 )
 const removeWorkspaceAgentUseCase = new RemoveWorkspaceAgentUseCase(
   agentSessionRepository,
@@ -314,30 +319,10 @@ registerAgentIpcHandlers({
       agentSessionService.write({ input, sessionId })
     }
   },
-  updateWorkspaceAgentLayout: (command) => updateWorkspaceAgentLayoutUseCase.execute(command)
+  updateWorkspaceAgentLayout: (command) => updateWorkspaceAgentLayoutUseCase.execute(command),
+  updateWorkspaceAgentMcpCapability: (command) =>
+    updateWorkspaceAgentMcpCapabilityUseCase.execute(command)
 })
-
-function createDisabledAgentSessionSnapshot(command: {
-  readonly agentId: string
-  readonly gitBranch?: string | null
-  readonly projectDirectory: string
-  readonly projectId: string
-  readonly workspaceDirectory: string
-  readonly workspaceName: string
-}): AgentSessionSnapshot {
-  return {
-    agentId: command.agentId,
-    codexThreadId: null,
-    gitBranch: command.gitBranch ?? null,
-    processId: null,
-    projectDirectory: command.projectDirectory,
-    projectId: command.projectId,
-    sessionId: `test-agent-${command.workspaceName}`,
-    status: 'exited',
-    workspaceDirectory: command.workspaceDirectory,
-    workspaceName: command.workspaceName
-  }
-}
 
 async function selectProjectDirectory(): Promise<string | null> {
   if (process.env.CLEANCODE_TEST_PROJECT_DIRECTORY) {

@@ -103,6 +103,7 @@ function renderAgentNode(
       data={{
         agent: {
           agentId: 'agent-1',
+          cleancodeMcpEnabled: true,
           layout: {
             position: { x: 240, y: 180 },
             size: { width: 720, height: 460 }
@@ -114,6 +115,7 @@ function renderAgentNode(
         currentWorkbench: null,
         currentWorkspace: null,
         onGraphUpdated: vi.fn(),
+        onMcpCapabilityChange: vi.fn(async () => undefined),
         onRemove: vi.fn(async () => undefined),
         onRename: vi.fn(async () => undefined),
         onResize
