@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
-import { appendTerminalOutputTail } from './terminalOutputTail'
 import {
   createTerminalStateKey,
   getBlockIdFromTerminalStateKey,
@@ -11,6 +10,18 @@ import {
   migrateTerminalSessionToWorkspace
 } from './terminalSessionWorkspaceMigration'
 import { updateTerminalBlockStatus, updateTerminalStatus } from './terminalStateUpdates'
+import {
+  findTerminalStateKeyBySession,
+  resolveCurrentTerminalStateKey,
+  selectTerminalStatesForWorkspace
+} from './terminalSessionStateSelectors'
+import {
+  appendTerminalOutput,
+  bufferTerminalStartupOutput,
+  takeTerminalStartupOutput,
+  type TerminalInputBuffer
+} from './terminalSessionOutputBuffer'
+import { applyTerminalWorkflowEventToStates } from './terminalWorkflowSessionEvents'
 import {
   defaultTerminalDimensions,
   terminalOutputBrowserEventName,
@@ -40,6 +51,7 @@ export function useTerminalSessions({
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
+  const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const terminalStates = useMemo(
@@ -126,6 +138,7 @@ export function useTerminalSessions({
 
       inputBuffersRef.current.clear()
       inputWriteQueuesRef.current.clear()
+      terminalStartupOutputsRef.current.clear()
       quickLaunchesRef.current.clear()
     },
     []
@@ -139,6 +152,9 @@ export function useTerminalSessions({
     }
 
     const unsubscribeOutput = api.onTerminalOutput((event) => {
+      if (!findTerminalStateKeyBySession(terminalStatesRef.current, event.sessionId)) {
+        bufferTerminalStartupOutput(terminalStartupOutputsRef.current, event)
+      }
       updateTerminalStates((states) => appendTerminalOutput(states, event))
       window.dispatchEvent(
         new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, { detail: event })
@@ -163,6 +179,31 @@ export function useTerminalSessions({
     }
   }, [clearPendingTerminalInput, updateTerminalStates])
 
+  useEffect(() => {
+    const api = window.cleancode
+
+    if (!api || typeof api.onTerminalWorkflowEvent !== 'function') {
+      return undefined
+    }
+
+    return api.onTerminalWorkflowEvent((event) => {
+      if (event.type === 'terminal-session-started') {
+        clearPendingTerminalInput(
+          createTerminalStateKey(event.session.workspaceName, event.blockId)
+        )
+      }
+      if (event.type === 'terminal-output') {
+        window.dispatchEvent(
+          new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, {
+            detail: event.output
+          })
+        )
+      }
+
+      updateTerminalStates((states) => applyTerminalWorkflowEventToStates(states, event))
+    })
+  }, [clearPendingTerminalInput, updateTerminalStates])
+
   const startTerminal = useCallback(
     async (
       block: TerminalBlockSnapshot,
@@ -184,12 +225,16 @@ export function useTerminalSessions({
       })
 
       if (session) {
+        const startupOutput = takeTerminalStartupOutput(
+          terminalStartupOutputsRef.current,
+          session.id
+        )
         updateTerminalStates((states) => ({
           ...states,
           [terminalStateKey]: {
             sessionId: session.id,
             status: session.status,
-            output: ''
+            output: startupOutput
           }
         }))
       }
@@ -249,43 +294,6 @@ export function useTerminalSessions({
     [focusTerminalBlock, startTerminal, terminateTerminalSession]
   )
 
-  const quickLaunchTerminal = useCallback(
-    async (block: TerminalBlockSnapshot, options: TerminalSessionActionOptions = {}) => {
-      const launchCommand = block.launchCommand.trim()
-
-      if (!launchCommand || !window.cleancode) {
-        return
-      }
-
-      const terminalStateKey = resolveCurrentTerminalStateKey(currentWorkspaceName, block.id)
-
-      if (!terminalStateKey || quickLaunchesRef.current.has(terminalStateKey)) {
-        return
-      }
-
-      quickLaunchesRef.current.add(terminalStateKey)
-
-      try {
-        await terminateTerminalSession(block)
-        const session = await startTerminal(block, defaultTerminalDimensions)
-
-        if (session?.status === 'running') {
-          await window.cleancode.writeTerminal({
-            sessionId: session.id,
-            input: `${launchCommand}\r`
-          })
-        }
-
-        if (shouldFocusTerminalAfterAction(options)) {
-          window.setTimeout(() => focusTerminalBlock(block.id), 80)
-        }
-      } finally {
-        quickLaunchesRef.current.delete(terminalStateKey)
-      }
-    },
-    [currentWorkspaceName, focusTerminalBlock, startTerminal, terminateTerminalSession]
-  )
-
   const writeTerminal = useCallback(
     async (block: TerminalBlockSnapshot, input: string) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(currentWorkspaceName, block.id)
@@ -326,6 +334,46 @@ export function useTerminalSessions({
       }
     },
     [clearPendingTerminalInput, currentWorkspaceName, flushTerminalInput]
+  )
+
+  const quickLaunchTerminal = useCallback(
+    async (block: TerminalBlockSnapshot, options: TerminalSessionActionOptions = {}) => {
+      const launchCommand = block.launchCommand.trim()
+
+      if (!launchCommand || !window.cleancode) {
+        return
+      }
+
+      const terminalStateKey = resolveCurrentTerminalStateKey(currentWorkspaceName, block.id)
+
+      if (!terminalStateKey || quickLaunchesRef.current.has(terminalStateKey)) {
+        return
+      }
+
+      quickLaunchesRef.current.add(terminalStateKey)
+
+      try {
+        await terminateTerminalSession(block)
+        const session = await startTerminal(block, defaultTerminalDimensions)
+
+        if (session?.status === 'running') {
+          await writeTerminal(block, `${launchCommand}\r`)
+        }
+
+        if (shouldFocusTerminalAfterAction(options)) {
+          window.setTimeout(() => focusTerminalBlock(block.id), 80)
+        }
+      } finally {
+        quickLaunchesRef.current.delete(terminalStateKey)
+      }
+    },
+    [
+      currentWorkspaceName,
+      focusTerminalBlock,
+      startTerminal,
+      terminateTerminalSession,
+      writeTerminal
+    ]
   )
 
   const resizeTerminal = useCallback(
@@ -436,58 +484,6 @@ export function useTerminalSessions({
   }
 }
 
-function appendTerminalOutput(
-  states: Record<string, TerminalViewState>,
-  event: TerminalOutputEvent
-): Record<string, TerminalViewState> {
-  return Object.fromEntries(
-    Object.entries(states).map(([blockId, state]) => [
-      blockId,
-      state.sessionId === event.sessionId
-        ? { ...state, output: appendTerminalOutputTail(state.output, event.data) }
-        : state
-    ])
-  )
-}
-
 function shouldFocusTerminalAfterAction(options: TerminalSessionActionOptions): boolean {
   return options.shouldFocus !== false
-}
-
-interface TerminalInputBuffer {
-  readonly sessionId: string
-  readonly input: string
-  readonly timerId: number | null
-}
-
-function resolveCurrentTerminalStateKey(
-  workspaceName: string | null,
-  blockId: string
-): string | null {
-  return workspaceName ? createTerminalStateKey(workspaceName, blockId) : null
-}
-
-function selectTerminalStatesForWorkspace(
-  states: Record<string, TerminalViewState>,
-  workspaceName: string | null
-): Record<string, TerminalViewState> {
-  if (!workspaceName) {
-    return {}
-  }
-
-  return Object.fromEntries(
-    Object.entries(states)
-      .filter(
-        ([terminalStateKey]) =>
-          getWorkspaceNameFromTerminalStateKey(terminalStateKey) === workspaceName
-      )
-      .map(([terminalStateKey, state]) => [getBlockIdFromTerminalStateKey(terminalStateKey), state])
-  )
-}
-
-function findTerminalStateKeyBySession(
-  states: Record<string, TerminalViewState>,
-  sessionId: string
-): string | null {
-  return Object.entries(states).find(([, state]) => state.sessionId === sessionId)?.[0] ?? null
 }

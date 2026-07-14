@@ -13,6 +13,7 @@ export interface StartTerminalSessionCommand {
   readonly workspaceName: string
   readonly workingDirectory: string
   readonly shell?: string
+  readonly launchCommand?: string
   readonly columns?: number
   readonly rows?: number
   readonly onOutput: (event: TerminalOutputEvent) => void
@@ -46,12 +47,15 @@ export class TerminalSessionService {
         sessionId: session.id,
         workingDirectory: command.workingDirectory,
         shell: command.shell,
+        launchCommand: command.launchCommand,
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         onOutput: command.onOutput,
         onExit: (event) => {
           session.markExited({ exitCode: event.exitCode })
-          this.sessionIdsByWorkspaceTerminalBlock.delete(terminalBlockKey)
+          if (this.sessionIdsByWorkspaceTerminalBlock.get(terminalBlockKey) === session.id) {
+            this.sessionIdsByWorkspaceTerminalBlock.delete(terminalBlockKey)
+          }
           command.onExit(event)
         }
       })
@@ -120,9 +124,11 @@ export class TerminalSessionService {
 
     this.terminalProcessPort.stop(sessionId)
     session.markExited({ exitCode: null })
-    this.sessionIdsByWorkspaceTerminalBlock.delete(
-      createTerminalBlockKey(session.workspaceName, session.terminalBlockId)
-    )
+    const terminalBlockKey = createTerminalBlockKey(session.workspaceName, session.terminalBlockId)
+
+    if (this.sessionIdsByWorkspaceTerminalBlock.get(terminalBlockKey) === session.id) {
+      this.sessionIdsByWorkspaceTerminalBlock.delete(terminalBlockKey)
+    }
 
     return session.toSnapshot()
   }

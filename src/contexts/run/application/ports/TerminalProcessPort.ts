@@ -17,6 +17,7 @@ export interface StartTerminalProcessCommand {
   readonly sessionId: string
   readonly workingDirectory: string
   readonly shell?: string
+  readonly launchCommand?: string
   readonly columns: number
   readonly rows: number
   readonly onOutput: (event: TerminalOutputEvent) => void

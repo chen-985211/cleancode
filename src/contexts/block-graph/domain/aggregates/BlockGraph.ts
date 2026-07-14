@@ -1,23 +1,21 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import {
   defaultCanvasViewport,
-  defaultTerminalBlockSize,
-  maximumCanvasZoom,
-  minimumCanvasZoom,
-  minimumTerminalBlockSize,
+  defaultTerminalExecutionConfig,
   type BlockGraphSnapshot,
   type BlockPositionSnapshot,
   type CanvasViewportSnapshot,
+  type ConnectTerminalBlocksInput,
   type CreateDefaultGraphInput,
   type CreateTerminalBlockInput,
   type CreateTerminalGroupInput,
   type ResizeTerminalBlockInput,
   type RestorableBlockGraphSnapshot,
-  type RestorableTerminalBlockSnapshot,
-  type TerminalBlockSizeSnapshot,
   type TerminalBlockSnapshot,
+  type TerminalConnectionSnapshot,
   type TerminalGroupSnapshot,
   type UpdateTerminalBlockMetadataInput,
+  type UpdateTerminalExecutionConfigInput,
   type UpdateTerminalGroupMetadataInput
 } from './BlockGraphTypes'
 import {
@@ -27,25 +25,30 @@ import {
   normalizeTerminalGroupMemberIds,
   normalizeTerminalGroups
 } from '../services/TerminalGroupRules'
+import {
+  normalizeCanvasViewport,
+  normalizeTerminalBlock,
+  normalizeTerminalBlockSize,
+  normalizeTerminalLaunchCommand
+} from '../services/BlockGraphNormalization'
+import {
+  addTerminalConnection,
+  normalizeRestoredTerminalConnections,
+  removeTerminalConnection,
+  validateTerminalExecutionConfig
+} from '../services/TerminalWorkflowRules'
+import {
+  createBlockId,
+  createGraphId,
+  createTerminalConnectionId,
+  createTerminalGroupId
+} from '../services/BlockGraphIdentifiers'
 
-export type {
-  BlockGraphSnapshot,
-  BlockPositionSnapshot,
-  CanvasViewportSnapshot,
-  CreateDefaultGraphInput,
-  CreateTerminalBlockInput,
-  CreateTerminalGroupInput,
-  ResizeTerminalBlockInput,
-  RestorableBlockGraphSnapshot,
-  TerminalBlockSizeSnapshot,
-  TerminalBlockSnapshot,
-  TerminalGroupSnapshot,
-  UpdateTerminalBlockMetadataInput,
-  UpdateTerminalGroupMetadataInput
-} from './BlockGraphTypes'
+export type * from './BlockGraphTypes'
 
 export {
   defaultCanvasViewport,
+  defaultTerminalExecutionConfig,
   defaultTerminalBlockSize,
   maximumCanvasZoom,
   minimumCanvasZoom,
@@ -60,6 +63,7 @@ export class BlockGraph {
     public readonly workspaceName: string,
     private viewportSnapshot: CanvasViewportSnapshot,
     private blockSnapshots: TerminalBlockSnapshot[],
+    private terminalConnectionSnapshots: TerminalConnectionSnapshot[],
     private terminalGroupSnapshots: TerminalGroupSnapshot[]
   ) {}
 
@@ -69,6 +73,7 @@ export class BlockGraph {
       input.projectId,
       input.workspaceName,
       defaultCanvasViewport,
+      [],
       [],
       []
     )
@@ -83,6 +88,7 @@ export class BlockGraph {
       snapshot.workspaceName,
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
       blocks,
+      normalizeRestoredTerminalConnections(snapshot.connections, blocks),
       normalizeTerminalGroups(snapshot.terminalGroups, blocks, createTerminalGroupId)
     )
   }
@@ -93,6 +99,10 @@ export class BlockGraph {
 
   get viewport(): CanvasViewportSnapshot {
     return this.viewportSnapshot
+  }
+
+  get connections(): readonly TerminalConnectionSnapshot[] {
+    return this.terminalConnectionSnapshots
   }
 
   get terminalGroups(): readonly TerminalGroupSnapshot[] {
@@ -106,6 +116,10 @@ export class BlockGraph {
       name: input.name,
       description: input.description,
       launchCommand: '',
+      executionConfig: {
+        ...defaultTerminalExecutionConfig,
+        successExitCodes: [...defaultTerminalExecutionConfig.successExitCodes]
+      },
       position: input.position,
       size: normalizeTerminalBlockSize(input.size)
     }
@@ -179,8 +193,38 @@ export class BlockGraph {
     }
   }
 
+  updateTerminalExecutionConfig(blockId: string, input: UpdateTerminalExecutionConfigInput): void {
+    this.requireTerminalBlock(blockId)
+    const executionConfig = validateTerminalExecutionConfig(input)
+
+    this.blockSnapshots = this.blockSnapshots.map((block) =>
+      block.id === blockId ? { ...block, executionConfig } : block
+    )
+  }
+
+  connectTerminalBlocks(input: ConnectTerminalBlocksInput): TerminalConnectionSnapshot {
+    const result = addTerminalConnection(
+      this.blockSnapshots,
+      this.terminalConnectionSnapshots,
+      input,
+      createTerminalConnectionId
+    )
+    this.terminalConnectionSnapshots = [...result.connections]
+
+    return result.connection
+  }
+
+  disconnectTerminalBlocks(connectionId: string): void {
+    this.terminalConnectionSnapshots = [
+      ...removeTerminalConnection(this.terminalConnectionSnapshots, connectionId)
+    ]
+  }
+
   deleteBlock(blockId: string): void {
     this.blockSnapshots = this.blockSnapshots.filter((block) => block.id !== blockId)
+    this.terminalConnectionSnapshots = this.terminalConnectionSnapshots.filter(
+      (connection) => connection.sourceBlockId !== blockId && connection.targetBlockId !== blockId
+    )
     this.terminalGroupSnapshots = this.terminalGroupSnapshots
       .map((group) => ({
         ...group,
@@ -370,6 +414,7 @@ export class BlockGraph {
       workspaceName: this.workspaceName,
       viewport: this.viewportSnapshot,
       blocks: this.blockSnapshots,
+      connections: this.terminalConnectionSnapshots,
       terminalGroups: this.terminalGroupSnapshots
     }
   }
@@ -427,72 +472,4 @@ export class BlockGraph {
         : group
     )
   }
-}
-
-function createGraphId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `graph-${Date.now()}-${Math.random()}`
-}
-function createBlockId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `block-${Date.now()}-${Math.random()}`
-}
-function createTerminalGroupId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `terminal-group-${Date.now()}-${Math.random()}`
-}
-
-function normalizeCanvasViewport(
-  viewport: Partial<CanvasViewportSnapshot> | undefined,
-  fallback: CanvasViewportSnapshot
-): CanvasViewportSnapshot {
-  return {
-    x: normalizeViewportCoordinate(viewport?.x, fallback.x),
-    y: normalizeViewportCoordinate(viewport?.y, fallback.y),
-    zoom: normalizeCanvasZoom(viewport?.zoom, fallback.zoom)
-  }
-}
-
-function normalizeViewportCoordinate(value: number | undefined, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback
-  }
-  return value
-}
-function normalizeCanvasZoom(value: number | undefined, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback
-  }
-  return Math.min(maximumCanvasZoom, Math.max(minimumCanvasZoom, value))
-}
-function normalizeTerminalBlock(block: RestorableTerminalBlockSnapshot): TerminalBlockSnapshot {
-  return {
-    ...block,
-    launchCommand: normalizeTerminalLaunchCommand(block.launchCommand),
-    size: normalizeTerminalBlockSize(block.size)
-  }
-}
-function normalizeTerminalLaunchCommand(command: string | undefined): string {
-  return command?.trim() ?? ''
-}
-
-function normalizeTerminalBlockSize(
-  size: Partial<TerminalBlockSizeSnapshot> | undefined
-): TerminalBlockSizeSnapshot {
-  return {
-    width: normalizeSizeValue(
-      size?.width,
-      minimumTerminalBlockSize.width,
-      defaultTerminalBlockSize.width
-    ),
-    height: normalizeSizeValue(
-      size?.height,
-      minimumTerminalBlockSize.height,
-      defaultTerminalBlockSize.height
-    )
-  }
-}
-
-function normalizeSizeValue(value: number | undefined, minimum: number, fallback: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallback
-  }
-  return Math.max(minimum, Math.round(value))
 }

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import {
   BlockGraph,
   defaultCanvasViewport,
-  defaultTerminalBlockSize
+  defaultTerminalBlockSize,
+  defaultTerminalExecutionConfig
 } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { getAppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
@@ -78,6 +79,7 @@ describe('block graph filesystem repository', () => {
           name: 'Terminal',
           description: 'Local shell',
           launchCommand: 'pnpm dev',
+          executionConfig: defaultTerminalExecutionConfig,
           position: { x: 240, y: 180 },
           size: defaultTerminalBlockSize
         },
@@ -87,6 +89,7 @@ describe('block graph filesystem repository', () => {
           name: 'Terminal 2',
           description: 'Local shell',
           launchCommand: '',
+          executionConfig: defaultTerminalExecutionConfig,
           position: { x: 760, y: 180 },
           size: defaultTerminalBlockSize
         }
@@ -101,7 +104,8 @@ describe('block graph filesystem repository', () => {
           isCollapsed: false,
           memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
         }
-      ]
+      ],
+      connections: []
     })
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
   })
@@ -143,23 +147,27 @@ describe('block graph filesystem repository', () => {
         {
           ...legacyGraph.blocks[0],
           launchCommand: '',
+          executionConfig: defaultTerminalExecutionConfig,
           size: defaultTerminalBlockSize
         }
       ],
-      terminalGroups: []
+      terminalGroups: [],
+      connections: []
     })
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
     expect(migratedGraph.id).toBe(legacyGraph.id)
     expect(migratedGraph).toEqual(
       expect.objectContaining({
         viewport: defaultCanvasViewport,
-        terminalGroups: []
+        terminalGroups: [],
+        connections: []
       })
     )
     expect(migratedGraph.blocks).toEqual([
       expect.objectContaining({
         name: 'Legacy Terminal',
         launchCommand: '',
+        executionConfig: defaultTerminalExecutionConfig,
         size: defaultTerminalBlockSize
       })
     ])

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
 import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentConsoleFlowNode'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
@@ -29,6 +30,7 @@ interface UseWorkbenchFlowNodesInput {
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
+  readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
   readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRenameAgent: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onResizeAgent: (
@@ -53,6 +55,7 @@ export function useWorkbenchFlowNodes({
   setNodes,
   terminalGroupDropAction,
   terminalStates,
+  workflowNodeStatuses,
   onRemoveAgent,
   onRenameAgent,
   onResizeAgent,
@@ -71,7 +74,8 @@ export function useWorkbenchFlowNodes({
         selectedTerminalGroupId,
         selectedUngroupedTerminalBlockIds,
         terminalGroupDropAction,
-        terminalStates
+        terminalStates,
+        workflowNodeStatuses
       })
       const agents = resolveWorkspaceAgents(currentWorkbench, currentWorkspace ?? null)
       const nextNodes = [
@@ -113,6 +117,7 @@ export function useWorkbenchFlowNodes({
     setNodes,
     terminalGroupDropAction,
     terminalStates,
+    workflowNodeStatuses,
     onRemoveAgent,
     onRenameAgent,
     onResizeAgent,

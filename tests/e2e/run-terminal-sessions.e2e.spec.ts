@@ -49,7 +49,7 @@ describe('run terminal sessions e2e', () => {
 
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-run-terminal-e2e')
-    electronApp = await launchApp(workbench)
+    electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
     page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')
   }, electronLaunchTimeoutMs)
@@ -64,9 +64,8 @@ describe('run terminal sessions e2e', () => {
     async () => {
       await createRunningTerminal(page)
 
-      await writeTerminalCommand(page, 'Terminal 1', 'printf cleancode-e2e-ok\r')
+      await writeTerminalCommand(page, 'Terminal 1', 'printf cleancode-e2e-ok; pwd\r')
       await waitForTerminalOutput(page, 'Terminal 1', 'cleancode-e2e-ok')
-      await writeTerminalCommand(page, 'Terminal 1', 'pwd\r')
       await waitForTerminalOutput(page, 'Terminal 1', workbench.projectDirectory)
 
       const graph = JSON.parse(
@@ -328,6 +327,7 @@ describe('run terminal sessions e2e', () => {
       await createRunningTerminal(page)
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await readTerminalSessionId(page, 'Terminal 2')
+      await waitForTerminalStartupOutput(page, 'Terminal 2')
 
       const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
 
@@ -338,7 +338,7 @@ describe('run terminal sessions e2e', () => {
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'FAKE_AGENT_READY')
       await page.locator('[data-terminal-block-id]').nth(1).locator('.terminal-viewport').click()
-      await page.keyboard.type('printf second-terminal-focus-ok')
+      await page.keyboard.type('printf second-terminal-focus-ok', { delay: 10 })
       await page.keyboard.press('Enter')
 
       await waitForTerminalOutput(page, 'Terminal 2', 'second-terminal-focus-ok')
@@ -398,8 +398,18 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await page.getByText('运行中').waitFor()
   await readTerminalSessionId(page, 'Terminal 1')
+  await waitForTerminalStartupOutput(page, 'Terminal 1')
+  await page.waitForTimeout(1_000)
   await page.waitForFunction(() =>
     document.activeElement?.classList.contains('xterm-helper-textarea')
+  )
+}
+
+async function waitForTerminalStartupOutput(page: Page, terminalName: string): Promise<void> {
+  await page.waitForFunction(
+    (label) =>
+      (document.querySelector(`[aria-label="${label} 文本输出"]`)?.textContent?.length ?? 0) > 0,
+    terminalName
   )
 }
 

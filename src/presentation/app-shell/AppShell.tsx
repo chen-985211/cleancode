@@ -6,7 +6,6 @@ import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'rea
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
-import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { resolveNodeSize } from './resolveNodeSize'
@@ -23,7 +22,10 @@ import { useProjectGitStateSynchronization } from './useProjectGitStateSynchroni
 import { useTerminalWorkspaceSynchronization } from './useTerminalWorkspaceSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
+import { useTerminalWorkflow } from './useTerminalWorkflow'
+import { useCurrentGraphState } from './useCurrentGraphState'
 import { useWorkbenchFlowNodes } from './useWorkbenchFlowNodes'
+import { useWorkbenchGraphIndex } from './useWorkbenchGraphIndex'
 import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import type {
@@ -49,16 +51,8 @@ export function AppShell() {
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
-  const graph = currentWorkbench?.graph ?? null
-  const currentWorkspace = findCurrentWorkspace(currentWorkbench)
-  const terminalBlocksById = useMemo(
-    () => new Map((graph?.blocks ?? []).map((block) => [block.id, block])),
-    [graph]
-  )
-  const terminalGroupsById = useMemo(
-    () => new Map((graph?.terminalGroups ?? []).map((group) => [group.id, group])),
-    [graph]
-  )
+  const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
+    useWorkbenchGraphIndex(currentWorkbench)
   const setSelectedTerminalBlockId = useCallback((value: SetStateAction<string | null>) => {
     if (value === null) {
       setSelectedTerminalGroupId(null)
@@ -149,24 +143,19 @@ export function AppShell() {
     replaceWorkbench,
     runningSessionIds
   })
-  const setCurrentGraph = useCallback((graphSnapshot: WorkbenchSnapshot['graph']): void => {
-    const blockIds = new Set(graphSnapshot.blocks.map((block) => block.id))
-    const groupIds = new Set(graphSnapshot.terminalGroups.map((group) => group.id))
-
-    setSelectedTerminalBlockIds((blockIdsSnapshot) =>
-      blockIdsSnapshot.filter((blockId) => blockIds.has(blockId))
-    )
-    setSelectedTerminalGroupId((groupId) => (groupId && groupIds.has(groupId) ? groupId : null))
-    setHoveredTerminalBlockId((blockId) => (blockId && blockIds.has(blockId) ? blockId : null))
-    setCurrentWorkbench((workbench) =>
-      workbench ? { ...workbench, graph: graphSnapshot } : workbench
-    )
-    setWorkbenches((entries) =>
-      entries.map((entry) =>
-        entry.project.id === graphSnapshot.projectId ? { ...entry, graph: graphSnapshot } : entry
-      )
-    )
-  }, [])
+  const setCurrentGraph = useCurrentGraphState({
+    setCurrentWorkbench,
+    setWorkbenches,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId,
+    setHoveredTerminalBlockId
+  })
+  const terminalWorkflow = useTerminalWorkflow({
+    currentWorkbench,
+    currentWorkspace,
+    setCurrentGraph
+  })
+  const { start: startTerminalWorkflow, updateExecutionConfig } = terminalWorkflow
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
@@ -386,6 +375,8 @@ export function AppShell() {
       onRestart: restartTerminal,
       onDelete: deleteTerminalBlock,
       onUpdateMetadata: updateTerminalBlockMetadata,
+      onUpdateExecutionConfig: updateExecutionConfig,
+      onRunFromHere: (block: TerminalBlockSnapshot) => startTerminalWorkflow(block.id),
       onInput: writeTerminal,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
@@ -406,6 +397,8 @@ export function AppShell() {
       selectTerminalBlock,
       startTerminal,
       terminalGroupActions,
+      startTerminalWorkflow,
+      updateExecutionConfig,
       updateTerminalBlockMetadata,
       writeTerminal
     ]
@@ -425,6 +418,7 @@ export function AppShell() {
     setNodes,
     terminalGroupDropAction,
     terminalStates,
+    workflowNodeStatuses: terminalWorkflow.nodeStatuses,
     onRemoveAgent: removeWorkspaceAgent,
     onRenameAgent: renameWorkspaceAgent,
     onResizeAgent: resizeWorkspaceAgent,
@@ -466,6 +460,7 @@ export function AppShell() {
         nodeTypes={workbenchNodeTypes}
         reactFlowInstanceRef={reactFlowInstanceRef}
         minimapNodeInteraction={minimapNodeInteraction}
+        terminalWorkflow={terminalWorkflow}
         onCreateTerminalBlock={createTerminalBlock}
         onCreateWorkspaceAgent={createWorkspaceAgent}
         onBeginTerminalGroupSelection={beginTerminalGroupSelection}

@@ -1,11 +1,11 @@
 // @vitest-environment node
 
 import { execFile } from 'node:child_process'
-import { access, rm, writeFile } from 'node:fs/promises'
+import { access, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
-import type { ElectronApplication, Locator, Page } from 'playwright'
+import type { ElectronApplication, Page } from 'playwright'
 
 import {
   buildElectronApp,
@@ -50,7 +50,7 @@ describe('git branch workspaces e2e', () => {
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-git-e2e')
     await initializeGitProject(workbench.projectDirectory)
-    electronApp = await launchApp(workbench)
+    electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
     page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')
   }, electronScenarioTimeoutMs)
@@ -83,13 +83,14 @@ describe('git branch workspaces e2e', () => {
       await projectCard.getByRole('button', { name: '创建 Worktree' }).click()
       await projectCard.getByRole('button', { name: /feature\/sidebar.*独立工作区/ }).waitFor()
       await access(join(featureWorktreeDirectory, '.git'))
+      const canonicalFeatureWorktreeDirectory = await realpath(featureWorktreeDirectory)
       await expectCurrentGitBranch(featureWorktreeDirectory, 'feature/sidebar')
 
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('运行中').waitFor()
       await expectTerminalPwd(page, 'Terminal 1', featureWorktreeDirectory)
 
-      await chooseDefaultBranch(projectCard, 'main')
+      await projectCard.locator('.default-branch-selector__select').click()
       await page.getByText('Terminal 1').waitFor({ state: 'detached' })
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('运行中').waitFor()
@@ -115,7 +116,7 @@ describe('git branch workspaces e2e', () => {
         },
         {
           name: 'feature/sidebar',
-          directory: featureWorktreeDirectory,
+          directory: canonicalFeatureWorktreeDirectory,
           gitBranch: 'feature/sidebar',
           isCurrent: false
         }
@@ -141,6 +142,13 @@ async function expectTerminalPwd(
 ): Promise<void> {
   const sessionId = await readTerminalSessionId(page, terminalName)
 
+  await page.waitForFunction(
+    (label) =>
+      (document.querySelector(`[aria-label="${label} 文本输出"]`)?.textContent?.length ?? 0) > 0,
+    terminalName
+  )
+  await page.waitForTimeout(1_000)
+
   await page.evaluate(
     ({ input, targetSessionId }) =>
       window.cleancode?.writeTerminal({ sessionId: targetSessionId, input }),
@@ -165,20 +173,6 @@ async function readTerminalSessionId(page: Page, terminalName: string): Promise<
   )
 
   return sessionIdHandle.jsonValue()
-}
-
-async function chooseDefaultBranch(projectCard: Locator, branchName: string): Promise<void> {
-  await projectCard.getByRole('button', { name: /默认工作区分支/ }).click()
-  const branchDialog = projectCard.getByRole('dialog', { name: '选择默认工作区分支' })
-
-  await branchDialog.waitFor()
-  await branchDialog
-    .getByRole('button', { name: new RegExp(`^${escapeRegExp(branchName)}$`) })
-    .click()
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function expectCurrentGitBranch(directory: string, branchName: string): Promise<void> {

@@ -14,11 +14,14 @@ import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
-  TerminalBlockSizeSnapshot
+  TerminalBlockSizeSnapshot,
+  TerminalExecutionConfigSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type { WorkflowRunSnapshot } from './contexts/run/application/dto/WorkflowRunSnapshot'
+import type { TerminalWorkflowEvent } from './contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import type {
   TerminalExitEvent,
   TerminalOutputEvent,
@@ -126,6 +129,17 @@ declare global {
         readonly name: string
         readonly memberBlockIds: readonly string[]
       }): Promise<BlockGraphSnapshot>
+      connectTerminalBlocks(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly sourceBlockId: string
+        readonly targetBlockId: string
+      }): Promise<BlockGraphSnapshot>
+      disconnectTerminalBlocks(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly connectionId: string
+      }): Promise<BlockGraphSnapshot>
       updateTerminalBlockMetadata(command: {
         readonly projectDirectory: string
         readonly workspaceName: string
@@ -133,6 +147,12 @@ declare global {
         readonly name: string
         readonly description: string
         readonly launchCommand: string
+      }): Promise<BlockGraphSnapshot>
+      updateTerminalExecutionConfig(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly executionConfig: TerminalExecutionConfigSnapshot
       }): Promise<BlockGraphSnapshot>
       updateTerminalGroupMetadata(command: {
         readonly projectDirectory: string
@@ -218,6 +238,23 @@ declare global {
         readonly sessionIds: readonly string[]
       }): Promise<TerminalWorkingDirectorySnapshot[]>
       terminateTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      startTerminalWorkflow(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly workingDirectory: string
+        readonly scope:
+          { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
+        readonly shell?: string
+        readonly columns?: number
+        readonly rows?: number
+      }): Promise<WorkflowRunSnapshot>
+      stopTerminalWorkflow(command: {
+        readonly workspaceName: string
+      }): Promise<WorkflowRunSnapshot | null>
+      getTerminalWorkflow(command: {
+        readonly workspaceName: string
+      }): Promise<WorkflowRunSnapshot | null>
+      onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }

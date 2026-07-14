@@ -305,6 +305,36 @@ describe('app shell terminal launch command', () => {
     )
   })
 
+  it('keeps terminal output emitted before the start request returns', async () => {
+    const workbench = createWorkbenchWithTerminal({ launchCommand: '' })
+    let emitTerminalOutput: ((event: TerminalOutputEvent) => void) | undefined
+    const onTerminalOutput = vi.fn((listener: (event: TerminalOutputEvent) => void) => {
+      emitTerminalOutput = listener
+      return vi.fn()
+    })
+    const startTerminal = vi.fn(async () => {
+      emitTerminalOutput?.({ sessionId: 'session-1', data: 'early-shell-prompt' })
+      return createTerminalSessionSnapshot('session-1')
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        startTerminal,
+        onTerminalOutput
+      })
+    })
+
+    render(<AppShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Terminal 1 重开空终端会话' }))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Terminal 1 文本输出')).toHaveTextContent('early-shell-prompt')
+    )
+  })
+
   it('ignores duplicate quick launch clicks while the replacement session is starting', async () => {
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-once'

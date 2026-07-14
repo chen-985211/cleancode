@@ -11,6 +11,14 @@ const userFacingMessages: Partial<Record<AppErrorCode, string>> = {
   MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES: '默认工作区有未提交更改，无法切换分支。',
   NOT_GIT_REPOSITORY: '当前项目不是 Git 仓库，无法执行分支操作。',
   PROJECT_NOT_FOUND: '项目不存在，请重新添加项目。',
+  TERMINAL_CONNECTION_DUPLICATE: '这条终端依赖已经存在。',
+  TERMINAL_CONNECTION_INVALID: '终端不能连接到自身。',
+  TERMINAL_EXECUTION_CONFIG_INVALID: '终端执行配置无效，请检查退出码、超时和就绪条件。',
+  TERMINAL_SHELL_UNSUPPORTED:
+    '当前 Shell 暂不支持工作流命令，请改用 zsh、bash、sh、fish 或 PowerShell。',
+  TERMINAL_WORKFLOW_COMMAND_MISSING: '流程中的每个终端都需要配置启动命令。',
+  TERMINAL_WORKFLOW_CYCLE: '这条依赖会形成环路，无法连接。',
+  TERMINAL_WORKFLOW_EMPTY: '没有可运行的终端命令。',
   UNEXPECTED_ERROR: '操作失败，请稍后重试。'
 }
 

@@ -12,6 +12,9 @@
   right: 12px;
   z-index: 6;
   display: flex;
+  max-width: calc(100% - 24px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 3px;
   border: 1px solid var(--cc-border);
@@ -21,6 +24,52 @@
   pointer-events: none;
   box-shadow: 0 4px 16px var(--cc-shadow-color);
   backdrop-filter: blur(10px);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background: var(--cc-divider);
+}
+
+.toolbar-workflow-status,
+.toolbar-workflow-error {
+  display: inline-flex;
+  max-width: 180px;
+  height: 30px;
+  box-sizing: border-box;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 650;
+  pointer-events: auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-workflow-status {
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+}
+
+.toolbar-workflow-status--ready,
+.toolbar-workflow-status--succeeded {
+  background: var(--cc-success-soft);
+  color: var(--cc-success-strong);
+}
+
+.toolbar-workflow-status--failed,
+.toolbar-workflow-error {
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.toolbar-workflow-status--stopped {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-muted-strong);
 }
 
 .toolbar-button {
@@ -121,6 +170,35 @@
 
 .react-flow__node.selected {
   z-index: 4 !important;
+}
+
+.terminal-workflow-edge .react-flow__edge-path {
+  stroke: var(--cc-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.terminal-workflow-edge .react-flow__arrowhead polyline {
+  stroke: var(--cc-muted);
+}
+
+.terminal-workflow-edge--active .react-flow__edge-path,
+.terminal-workflow-edge--active .react-flow__arrowhead polyline {
+  stroke: var(--cc-primary);
+}
+
+.terminal-workflow-edge--succeeded .react-flow__edge-path,
+.terminal-workflow-edge--succeeded .react-flow__arrowhead polyline {
+  stroke: var(--cc-success);
+}
+
+.terminal-workflow-edge--failed .react-flow__edge-path,
+.terminal-workflow-edge--failed .react-flow__arrowhead polyline {
+  stroke: var(--cc-danger);
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 2.8;
 }
 
 .terminal-node__header,

@@ -1,6 +1,7 @@
 import type {
   BlockGraphSnapshot,
-  CanvasViewportSnapshot
+  CanvasViewportSnapshot,
+  TerminalExecutionConfigSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -22,6 +23,17 @@ export interface BlockGraphIpcHandlersInput {
     readonly name: string
     readonly memberBlockIds: readonly string[]
   }) => Promise<BlockGraphSnapshot>
+  readonly connectTerminalBlocks: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly disconnectTerminalBlocks: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly connectionId: string
+  }) => Promise<BlockGraphSnapshot>
   readonly moveBlock: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -41,6 +53,12 @@ export interface BlockGraphIpcHandlersInput {
     readonly name: string
     readonly description: string
     readonly launchCommand: string
+  }) => Promise<BlockGraphSnapshot>
+  readonly updateTerminalExecutionConfig: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly blockId: string
+    readonly executionConfig: TerminalExecutionConfigSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
@@ -95,6 +113,41 @@ export interface BlockGraphIpcHandlersInput {
 }
 
 export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput): void {
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly sourceBlockId: string
+      readonly targetBlockId: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:connect-terminal-blocks',
+    handler: (command) => input.connectTerminalBlocks(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'connectTerminalBlocks',
+    scope: 'block-graph',
+    successLogLevel: 'info'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly connectionId: string
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:disconnect-terminal-blocks',
+    handler: (command) => input.disconnectTerminalBlocks(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'disconnectTerminalBlocks',
+    scope: 'block-graph',
+    successLogLevel: 'info'
+  })
+
   registerIpcHandler<
     {
       readonly projectDirectory: string
@@ -182,6 +235,23 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'updateTerminalBlockMetadata',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<
+    {
+      readonly projectDirectory: string
+      readonly workspaceName: string
+      readonly blockId: string
+      readonly executionConfig: TerminalExecutionConfigSnapshot
+    },
+    BlockGraphSnapshot
+  >({
+    channel: 'cleancode:update-terminal-execution-config',
+    handler: (command) => input.updateTerminalExecutionConfig(command),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateTerminalExecutionConfig',
     scope: 'block-graph'
   })
 

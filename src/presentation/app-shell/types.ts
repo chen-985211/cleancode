@@ -10,6 +10,8 @@ import {
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
+import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 
 export interface WorkbenchSnapshot {
   readonly agents?: readonly WorkspaceAgentSnapshot[]
@@ -52,6 +54,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly isNavigationHighlighted: boolean
+  readonly workflowStatus?: WorkflowRunNodeStatus
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onStop: (block: TerminalBlockSnapshot) => void
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
@@ -61,6 +64,11 @@ interface TerminalNodeData extends Record<string, unknown> {
     block: TerminalBlockSnapshot,
     metadata: TerminalBlockMetadataInput
   ) => Promise<void>
+  readonly onUpdateExecutionConfig?: (
+    block: TerminalBlockSnapshot,
+    executionConfig: TerminalExecutionConfigSnapshot
+  ) => Promise<void>
+  readonly onRunFromHere?: (block: TerminalBlockSnapshot) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onResizeBlock: (

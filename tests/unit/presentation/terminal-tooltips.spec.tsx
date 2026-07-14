@@ -241,6 +241,7 @@ describe('terminal tooltips', () => {
       .map((button) => button.getAttribute('aria-label'))
 
     expect(actionNames).toEqual([
+      'Terminal 从此处运行终端流程',
       'Terminal 启动命令',
       'Terminal 停止当前命令',
       'Terminal 重开空终端会话',

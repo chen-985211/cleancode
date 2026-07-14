@@ -5,16 +5,19 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, Edit3, Play, Square, Terminal, X } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Check, Edit3, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { GroupRestartIcon } from './TerminalGroupIcons'
+import { TerminalMetadataForm } from './TerminalMetadataForm'
+import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { TerminalViewport } from './TerminalViewport'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import {
   terminalNodeMinimumSize,
   type TerminalDimensions,
+  type TerminalBlockMetadataInput,
   type TerminalFlowNode,
   type TerminalViewState,
   type WorkbenchNodeLayoutInput
@@ -25,15 +28,11 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const session = data.session
   const isRunning = session.status === 'running'
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
-  const [draftName, setDraftName] = useState(block.name)
-  const [draftDescription, setDraftDescription] = useState(block.description)
-  const [draftLaunchCommand, setDraftLaunchCommand] = useState(block.launchCommand)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
   const [isResizingBlock, setIsResizingBlock] = useState(false)
   const hasRequestedAutoStartRef = useRef(false)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
-  const trimmedDraftName = draftName.trim()
   const terminalStateClassName =
     session.status === 'running'
       ? 'terminal-state terminal-state--running'
@@ -84,20 +83,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   }, [block, data, session.sessionId, session.status])
 
   const startEditingMetadata = useCallback(() => {
-    setDraftName(block.name)
-    setDraftDescription(block.description)
-    setDraftLaunchCommand(block.launchCommand)
     setShouldFocusLaunchCommand(false)
     setIsEditingMetadata(true)
-  }, [block.description, block.launchCommand, block.name])
+  }, [])
 
   const startEditingLaunchCommand = useCallback(() => {
-    setDraftName(block.name)
-    setDraftDescription(block.description)
-    setDraftLaunchCommand(block.launchCommand)
     setShouldFocusLaunchCommand(true)
     setIsEditingMetadata(true)
-  }, [block.description, block.launchCommand, block.name])
+  }, [])
 
   const requestTerminalFocus = useCallback(() => {
     setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)
@@ -132,22 +125,16 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
 
   const saveMetadata = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-
-      if (!trimmedDraftName) {
-        return
-      }
-
-      await data.onUpdateMetadata(block, {
-        name: trimmedDraftName,
-        description: draftDescription.trim(),
-        launchCommand: draftLaunchCommand.trim()
-      })
+    async (
+      metadata: TerminalBlockMetadataInput,
+      executionConfig: TerminalExecutionConfigSnapshot
+    ) => {
+      await data.onUpdateMetadata(block, metadata)
+      await data.onUpdateExecutionConfig?.(block, executionConfig)
       setShouldFocusLaunchCommand(false)
       setIsEditingMetadata(false)
     },
-    [block, data, draftDescription, draftLaunchCommand, trimmedDraftName]
+    [block, data]
   )
 
   return (
@@ -175,29 +162,22 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isSelectedForTerminalGroup={data.isSelected}
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
         sessionStatus={session.status}
+        workflowStatus={data.workflowStatus}
         onSelect={(additive) => data.onSelect?.(additive)}
         onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
         onStartEditing={startEditingMetadata}
         onStop={stopTerminal}
         onQuickLaunch={quickLaunchTerminal}
         onRestart={restartTerminal}
+        onRunFromHere={() => data.onRunFromHere?.(block)}
         onDelete={() => data.onDelete(block)}
       />
       {isEditingMetadata ? (
         <TerminalMetadataForm
-          draftName={draftName}
-          draftDescription={draftDescription}
-          draftLaunchCommand={draftLaunchCommand}
+          block={block}
           shouldFocusLaunchCommand={shouldFocusLaunchCommand}
-          trimmedDraftName={trimmedDraftName}
-          onDraftNameChange={setDraftName}
-          onDraftDescriptionChange={setDraftDescription}
-          onDraftLaunchCommandChange={setDraftLaunchCommand}
           onSave={saveMetadata}
           onCancel={() => {
-            setDraftName(block.name)
-            setDraftDescription(block.description)
-            setDraftLaunchCommand(block.launchCommand)
             setShouldFocusLaunchCommand(false)
             setIsEditingMetadata(false)
           }}
@@ -241,12 +221,14 @@ interface TerminalHeaderProps {
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly sessionStatus: TerminalViewState['status']
+  readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly onSelect: (additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
   readonly onStop: () => void
   readonly onQuickLaunch: () => void
   readonly onRestart: () => void
+  readonly onRunFromHere: () => void
   readonly onDelete: () => void
 }
 
@@ -260,12 +242,14 @@ function TerminalHeader({
   isSelectedForTerminalGroup,
   canSelectForTerminalGroup,
   sessionStatus,
+  workflowStatus,
   onSelect,
   onToggleTerminalGroupCandidate,
   onStartEditing,
   onStop,
   onQuickLaunch,
   onRestart,
+  onRunFromHere,
   onDelete
 }: TerminalHeaderProps) {
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
@@ -313,6 +297,11 @@ function TerminalHeader({
                   ? '已退出'
                   : '未启动'}
           </span>
+          {workflowStatus ? (
+            <span className={`workflow-state workflow-state--${workflowStatus}`}>
+              {workflowStatusLabels[workflowStatus]}
+            </span>
+          ) : null}
         </div>
       </div>
       <div
@@ -320,6 +309,17 @@ function TerminalHeader({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
+        <button
+          className="terminal-node__action terminal-node__action--workflow"
+          type="button"
+          aria-label={`${blockName} 从此处运行终端流程`}
+          title="从此终端开始运行依赖流程"
+          data-cc-tooltip="从此处运行流程"
+          disabled={!canQuickLaunch}
+          onClick={onRunFromHere}
+        >
+          <Waypoints size={15} aria-hidden="true" />
+        </button>
         <button
           className={[
             'terminal-node__action',
@@ -382,98 +382,12 @@ function TerminalHeader({
   )
 }
 
-interface TerminalMetadataFormProps {
-  readonly draftName: string
-  readonly draftDescription: string
-  readonly draftLaunchCommand: string
-  readonly shouldFocusLaunchCommand: boolean
-  readonly trimmedDraftName: string
-  readonly onDraftNameChange: (value: string) => void
-  readonly onDraftDescriptionChange: (value: string) => void
-  readonly onDraftLaunchCommandChange: (value: string) => void
-  readonly onSave: (event: FormEvent<HTMLFormElement>) => void
-  readonly onCancel: () => void
-}
-
-function TerminalMetadataForm({
-  draftName,
-  draftDescription,
-  draftLaunchCommand,
-  shouldFocusLaunchCommand,
-  trimmedDraftName,
-  onDraftNameChange,
-  onDraftDescriptionChange,
-  onDraftLaunchCommandChange,
-  onSave,
-  onCancel
-}: TerminalMetadataFormProps) {
-  const launchCommandInputRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => {
-    if (shouldFocusLaunchCommand) {
-      launchCommandInputRef.current?.focus()
-    }
-  }, [shouldFocusLaunchCommand])
-
-  return (
-    <form
-      className="terminal-metadata-form nodrag"
-      aria-label="编辑终端信息"
-      onSubmit={onSave}
-      onPointerDown={(event) => event.stopPropagation()}
-    >
-      <div className="terminal-metadata-form__fields">
-        <label className="terminal-metadata-field">
-          <span>名称</span>
-          <input
-            aria-label="终端名称"
-            placeholder="例如：Web Server"
-            value={draftName}
-            onChange={(event) => onDraftNameChange(event.currentTarget.value)}
-          />
-        </label>
-        <label className="terminal-metadata-field">
-          <span>描述</span>
-          <input
-            aria-label="终端描述"
-            placeholder="例如：本地开发服务"
-            value={draftDescription}
-            onChange={(event) => onDraftDescriptionChange(event.currentTarget.value)}
-          />
-        </label>
-        <label className="terminal-metadata-field">
-          <span>启动命令</span>
-          <input
-            aria-label="启动命令"
-            ref={launchCommandInputRef}
-            placeholder="例如：pnpm dev"
-            value={draftLaunchCommand}
-            onChange={(event) => onDraftLaunchCommandChange(event.currentTarget.value)}
-          />
-        </label>
-      </div>
-      <div className="terminal-metadata-form__footer">
-        <button
-          className="terminal-node__action terminal-node__action--confirm"
-          type="submit"
-          aria-label="保存终端信息"
-          title="保存终端信息"
-          data-cc-tooltip="保存终端信息"
-          disabled={!trimmedDraftName}
-        >
-          <Check size={15} aria-hidden="true" />
-        </button>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label="取消编辑终端信息"
-          title="取消编辑终端信息"
-          data-cc-tooltip="取消编辑"
-          onClick={onCancel}
-        >
-          <X size={15} aria-hidden="true" />
-        </button>
-      </div>
-    </form>
-  )
-}
+const workflowStatusLabels = {
+  waiting: '等待',
+  running: '执行中',
+  ready: '已就绪',
+  succeeded: '成功',
+  failed: '失败',
+  blocked: '已阻断',
+  stopped: '已停止'
+} as const

@@ -5,11 +5,13 @@ export type {
   RestorableBlockGraphSnapshot,
   TerminalBlockSizeSnapshot,
   TerminalBlockSnapshot,
+  TerminalExecutionConfigSnapshot,
   TerminalGroupSnapshot
 } from '../../domain/aggregates/BlockGraph'
 
 export {
   defaultCanvasViewport,
+  defaultTerminalExecutionConfig,
   defaultTerminalBlockSize,
   maximumCanvasZoom,
   minimumCanvasZoom,

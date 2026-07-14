@@ -19,10 +19,13 @@ import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastruct
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
 import { NodePtyCodexAgentProcessAdapter } from '../../contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
+import { BuildTerminalWorkflowPlanUseCase } from '../../contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
+import { ConnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
+import { DisconnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
@@ -33,6 +36,7 @@ import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/app
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
 import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
+import { UpdateTerminalExecutionConfigUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { ArchiveBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
@@ -55,7 +59,11 @@ import {
 } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
 import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
+import { TerminalWorkflowService } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
+import { BlockGraphTerminalWorkflowPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalWorkflowPlanAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
+import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
@@ -63,6 +71,7 @@ import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
+import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
 import { resolveWindowFrameOptions } from './windowFrameOptions'
 
 interface WorkbenchSnapshot {
@@ -102,6 +111,8 @@ const synchronizeProjectGitStateUseCase = new SynchronizeProjectGitStateUseCase(
 const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const createTerminalGroupUseCase = new CreateTerminalGroupUseCase(graphRepository)
+const connectTerminalBlocksUseCase = new ConnectTerminalBlocksUseCase(graphRepository)
+const disconnectTerminalBlocksUseCase = new DisconnectTerminalBlocksUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
 const moveTerminalGroupUseCase = new MoveTerminalGroupUseCase(graphRepository)
 const addTerminalToGroupUseCase = new AddTerminalToGroupUseCase(graphRepository)
@@ -114,7 +125,24 @@ const setTerminalGroupCollapsedUseCase = new SetTerminalGroupCollapsedUseCase(gr
 const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepository)
 const updateTerminalGroupMetadataUseCase = new UpdateTerminalGroupMetadataUseCase(graphRepository)
 const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCase(graphRepository)
+const updateTerminalExecutionConfigUseCase = new UpdateTerminalExecutionConfigUseCase(
+  graphRepository
+)
 const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
+const terminalWorkflowService = new TerminalWorkflowService(
+  new BlockGraphTerminalWorkflowPlanAdapter(new BuildTerminalWorkflowPlanUseCase(graphRepository)),
+  new TerminalSessionWorkflowRuntimeAdapter(terminalSessionService),
+  new NodeTcpReadinessAdapter(),
+  {
+    publish: (event) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) {
+          window.webContents.send('cleancode:terminal-workflow-event', event)
+        }
+      }
+    }
+  }
+)
 const codexCliAdapter = new NodeCodexCliAdapter()
 const inspectCodexCliUseCase = new InspectCodexCliUseCase(codexCliAdapter)
 const agentAuditRepository = new FileSystemAgentAuditRepository(
@@ -218,8 +246,10 @@ registerBlockGraphIpcHandlers({
   addTerminalToGroup: (command) => addTerminalToGroupUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
+  connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),
   deleteBlock: (command) => deleteBlockUseCase.execute(command),
   dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
+  disconnectTerminalBlocks: (command) => disconnectTerminalBlocksUseCase.execute(command),
   ipcMain,
   logger: consoleLogger,
   moveBlock: (command) => moveBlockUseCase.execute(command),
@@ -230,7 +260,8 @@ registerBlockGraphIpcHandlers({
   setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),
   updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command),
-  updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command)
+  updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),
+  updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command)
 })
 
 registerTerminalIpcHandlers({
@@ -244,6 +275,12 @@ registerTerminalIpcHandlers({
   startTerminal: (command) => terminalSessionService.start(command),
   terminateTerminal: (sessionId) => terminalSessionService.terminate(sessionId),
   writeTerminal: (sessionId, input) => terminalSessionService.write(sessionId, input)
+})
+
+registerTerminalWorkflowIpcHandlers({
+  ipcMain,
+  logger: consoleLogger,
+  workflowService: terminalWorkflowService
 })
 
 registerAgentIpcHandlers({

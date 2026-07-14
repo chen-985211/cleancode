@@ -18,6 +18,10 @@ export interface E2eWorkbench {
   readonly appStateDirectory: string
 }
 
+export interface LaunchAppOptions {
+  readonly environment?: NodeJS.ProcessEnv
+}
+
 export async function buildElectronApp(): Promise<void> {
   await execFileAsync('pnpm', ['exec', 'electron-vite', 'build'], {
     cwd: process.cwd()
@@ -38,7 +42,10 @@ export async function cleanupE2eWorkbench(workbench: E2eWorkbench): Promise<void
   await rm(workbench.appStateDirectory, { recursive: true, force: true })
 }
 
-export function launchApp(workbench: E2eWorkbench): Promise<ElectronApplication> {
+export function launchApp(
+  workbench: E2eWorkbench,
+  options: LaunchAppOptions = {}
+): Promise<ElectronApplication> {
   return electron.launch({
     args: ['.'],
     cwd: process.cwd(),
@@ -50,7 +57,8 @@ export function launchApp(workbench: E2eWorkbench): Promise<ElectronApplication>
       CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(
         workbench.registryDirectory,
         'project-registry.json'
-      )
+      ),
+      ...options.environment
     }
   })
 }

@@ -15,6 +15,7 @@ import type {
   TerminalProcessHandle,
   TerminalProcessPort
 } from '../../application/ports/TerminalProcessPort'
+import { createTerminalShellCommandArguments } from './TerminalShellCommand'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -25,13 +26,18 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     ensureNodePtySpawnHelperIsExecutable()
 
-    const ptyProcess = spawnPtyProcess(command.shell || getDefaultShell(), [], {
-      name: 'xterm-256color',
-      cols: command.columns,
-      rows: command.rows,
-      cwd: command.workingDirectory,
-      env: createProcessEnvironment()
-    })
+    const shell = command.shell || getDefaultShell()
+    const ptyProcess = spawnPtyProcess(
+      shell,
+      [...createTerminalShellCommandArguments(shell, command.launchCommand)],
+      {
+        name: 'xterm-256color',
+        cols: command.columns,
+        rows: command.rows,
+        cwd: command.workingDirectory,
+        env: createProcessEnvironment()
+      }
+    )
 
     this.processes.set(command.sessionId, { process: ptyProcess })
     ptyProcess.onData((data) => command.onOutput({ sessionId: command.sessionId, data }))

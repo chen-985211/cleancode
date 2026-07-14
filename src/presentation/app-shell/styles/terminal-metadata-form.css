@@ -35,7 +35,8 @@
   line-height: 1;
 }
 
-.terminal-metadata-form input {
+.terminal-metadata-form input,
+.terminal-metadata-form select {
   min-width: 0;
   height: 32px;
   box-sizing: border-box;
@@ -58,10 +59,36 @@
   color: var(--cc-disabled);
 }
 
-.terminal-metadata-form input:focus {
+.terminal-metadata-form input:focus,
+.terminal-metadata-form select:focus {
   border-color: var(--cc-primary-border);
   background: var(--cc-surface);
   box-shadow: 0 0 0 3px var(--cc-primary-border);
+}
+
+.terminal-execution-config {
+  border-top: 1px solid var(--cc-divider);
+  padding-top: 9px;
+}
+
+.terminal-execution-config summary {
+  cursor: pointer;
+  color: var(--cc-muted-strong);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.terminal-execution-config__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.terminal-execution-config__error {
+  margin: 8px 0 0;
+  color: var(--cc-danger-strong);
+  font-size: 11px;
 }
 
 .terminal-metadata-form__footer {

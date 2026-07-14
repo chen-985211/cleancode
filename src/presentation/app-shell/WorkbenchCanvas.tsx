@@ -8,8 +8,8 @@ import {
   type ReactFlowInstance,
   type Viewport
 } from '@xyflow/react'
-import { Bot, Box, Check, Terminal, X } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
+import { Box } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
@@ -20,6 +20,8 @@ import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
 import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { useTerminalWorkflow } from './useTerminalWorkflow'
+import { WorkbenchToolbar } from './WorkbenchToolbar'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -32,6 +34,7 @@ interface WorkbenchCanvasProps {
   readonly nodeTypes: NodeTypes
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
+  readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
   readonly onBeginTerminalGroupSelection: () => void
@@ -69,6 +72,7 @@ export function WorkbenchCanvas({
   nodeTypes,
   reactFlowInstanceRef,
   minimapNodeInteraction,
+  terminalWorkflow,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
   onBeginTerminalGroupSelection,
@@ -90,6 +94,7 @@ export function WorkbenchCanvas({
   getMiniMapNodeStrokeColor,
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
+  const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
@@ -182,64 +187,28 @@ export function WorkbenchCanvas({
   return (
     <section className="app-shell__workspace" aria-label="积木画布">
       <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
-        <div className="app-shell__toolbar" aria-label="工作台工具栏">
-          <button
-            className="toolbar-button toolbar-button--primary"
-            type="button"
-            onClick={onCreateTerminalBlock}
-            disabled={!isDesktopRuntime || !currentWorkbench}
-          >
-            <Terminal size={16} aria-hidden="true" />
-            新建终端积木
-          </button>
-          <button
-            className="toolbar-button"
-            type="button"
-            onClick={onCreateWorkspaceAgent}
-            disabled={!isDesktopRuntime || !currentWorkbench}
-          >
-            <Bot size={16} aria-hidden="true" />
-            新建 Agent
-          </button>
-          {isTerminalGroupSelectionMode ? (
-            <>
-              <span className="toolbar-selection-status" role="status">
-                组合编辑
-                <strong>{selectedTerminalGroupCandidateCount}</strong>
-              </span>
-              <button
-                className="toolbar-button toolbar-button--primary"
-                type="button"
-                onClick={onCreateTerminalGroup}
-                disabled={!canCreateTerminalGroup}
-              >
-                <Check size={16} aria-hidden="true" />
-                创建组合
-              </button>
-              <button
-                className="toolbar-button"
-                type="button"
-                onClick={onCancelTerminalGroupSelection}
-              >
-                <X size={16} aria-hidden="true" />
-                完成
-              </button>
-            </>
-          ) : (
-            <button
-              className="toolbar-button"
-              type="button"
-              onClick={beginTerminalGroupSelection}
-              disabled={!isDesktopRuntime || !currentWorkbench || !canBeginTerminalGroupSelection}
-            >
-              <Box size={16} aria-hidden="true" />
-              组合终端
-            </button>
-          )}
-        </div>
+        <WorkbenchToolbar
+          isDesktopRuntime={isDesktopRuntime}
+          hasWorkbench={Boolean(currentWorkbench)}
+          isWorkflowActive={workflow.isActive}
+          workflowStatus={workflow.run?.status ?? null}
+          workflowError={workflow.actionError}
+          isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+          selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
+          canBeginTerminalGroupSelection={canBeginTerminalGroupSelection}
+          canCreateTerminalGroup={canCreateTerminalGroup}
+          onCreateTerminalBlock={onCreateTerminalBlock}
+          onCreateWorkspaceAgent={onCreateWorkspaceAgent}
+          onBeginTerminalGroupSelection={beginTerminalGroupSelection}
+          onCreateTerminalGroup={onCreateTerminalGroup}
+          onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
+          onStopWorkflow={() => void workflow.stop()}
+        />
         <ReactFlow<WorkbenchFlowNode, Edge>
           nodes={nodes}
-          edges={[]}
+          edges={workflow.edges}
+          onConnect={(connection) => void workflow.connect(connection)}
+          onEdgesDelete={(edges) => void workflow.deleteEdges(edges)}
           nodeTypes={nodeTypes}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance
@@ -335,6 +304,20 @@ export function WorkbenchCanvas({
     </section>
   )
 }
+
+const inactiveTerminalWorkflowController = {
+  actionError: null,
+  clearActionError: () => undefined,
+  connect: async () => undefined,
+  deleteEdges: async () => undefined,
+  edges: [],
+  isActive: false,
+  nodeStatuses: {},
+  run: null,
+  start: async () => undefined,
+  stop: async () => undefined,
+  updateExecutionConfig: async () => undefined
+} satisfies ReturnType<typeof useTerminalWorkflow>
 
 interface RestoreCanvasViewportInput {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
