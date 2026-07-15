@@ -17,14 +17,16 @@ docs/
     project/
     run/
   product/                  # 跨上下文的产品与表现层契约
-  engineering/              # 跨上下文的架构与工程治理
+  engineering/              # 跨上下文的架构、协作与技术治理
+  testing/                  # 测试规则、方法和稳定性手册
 ```
 
 目录职责：
 
 - `contexts/<bounded-context>/`：只维护该限界上下文拥有的统一语言、业务规则、状态模型、用例边界和能力说明。
 - `product/`：维护跨上下文的产品信息架构、用户可见契约和未实现路线图。
-- `engineering/`：维护全仓架构、开发协作、测试、技术栈、日志和技术排障规则。
+- `engineering/`：维护全仓架构、开发协作、技术栈、日志和技术排障规则。
+- `testing/`：维护跨上下文的测试组织规则、测试方法和稳定性排障手册。
 - `README.md`：只做导航和归属说明。
 
 新增文档时应先确定事实 owner。不能确定 owner 的内容不得先放入“通用”目录；应先澄清它是业务事实、产品契约还是工程约束。
@@ -51,10 +53,14 @@ docs/
 - [架构文档](engineering/architecture.md)：DDD、Clean Architecture、限界上下文、依赖方向和事实来源的唯一规则来源。
 - [上下文地图](engineering/context-map.md)：当前上下文 owner、聚合和跨上下文端口协作总览。
 - [开发协作规范](engineering/development.md)：任务分级、Spec、Plan、TDD、门禁和汇报规则。
-- [测试规范](engineering/testing.md)：测试金字塔、目录、命名、边界和测试数据规则。
 - [技术栈说明](engineering/tech-stack.md)：框架、运行环境、依赖和工具链选择。
 - [日志与错误规范](engineering/logging.md)：诊断日志、应用错误、IPC 错误传递和日志门禁。
 - [终端渲染排障指南](engineering/terminal-rendering.md)：xterm、PTY、CJK cell、滚动条和 Electron 几何验证经验。
+
+## 测试文档
+
+- [测试规范](testing/testing.md)：测试金字塔、目录、命名、边界和测试数据规则。
+- [E2E 稳定性改造手册](testing/e2e-stability.md)：确定性同步、稳定身份、断言 oracle、场景隔离、清理和失败诊断的通用方法。
 
 ## 阅读路径
 
@@ -70,6 +76,7 @@ docs/
 - 界面和交互：再读 UI 契约。
 - 积木按钮、组合动作和类型边界：再读积木动作模型。
 - xterm、PTY 尺寸和字符裁剪：再读终端渲染排障指南。
+- Electron/PTY E2E 偶发失败、超时或测试基础设施改造：再读 E2E 稳定性改造手册。
 - 日志、错误码和 IPC 错误：再读日志与错误规范。
 
 ## 事实来源与重复规则

@@ -8,7 +8,7 @@
 
 - 限界上下文、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准。
 - Agent 控制台的用户可见语义以[UI 契约](../../product/ui.md)为准。
-- 测试层级和组织以[测试规范](../../engineering/testing.md)为准。
+- 测试层级和组织以[测试规范](../../testing/testing.md)为准。
 - BlockGraph 的积木动作语义以[积木动作模型](../block-graph/block-action-model.md)为准。
 
 代码和自动化测试是当前可执行行为的最终证据。本文只描述已实现能力；未来工具不得在实现和契约测试落地前写入当前工具目录。

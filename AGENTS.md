@@ -8,13 +8,13 @@
 
 ## 必读文档
 
-开发协作 AI 处理本仓库任何任务时，必须在当前回合完整阅读 [开发协作规范](docs/engineering/development.md)、[架构文档](docs/engineering/architecture.md) 和 [测试规范](docs/engineering/testing.md)。
+开发协作 AI 处理本仓库任何任务时，必须在当前回合完整阅读 [开发协作规范](docs/engineering/development.md)、[架构文档](docs/engineering/architecture.md) 和 [测试规范](docs/testing/testing.md)。
 
 其中，[开发协作规范](docs/engineering/development.md) 是开发协作行为、任务分级、开工回执、开发流程、验证要求和最终汇报要求的事实来源。
 
 [架构文档](docs/engineering/architecture.md) 是架构范式、分层规则、依赖方向、领域边界、端口归属、业务事实来源和跨层调用方式的事实来源。
 
-[测试规范](docs/engineering/testing.md) 是测试组织方式、测试类型、测试命名、测试边界和测试数据规则的事实来源。
+[测试规范](docs/testing/testing.md) 是测试组织方式、测试类型、测试命名、测试边界和测试数据规则的事实来源。
 
 完成必读文档阅读后，开发协作 AI 必须按 [开发协作规范](docs/engineering/development.md) 的要求输出开工回执，再进入对应任务动作。
 
@@ -23,7 +23,8 @@
 - [文档中心](docs/README.md)：按限界上下文、产品语义和工程治理组织的文档总索引。
 - [开发协作规范](docs/engineering/development.md)：定义开发协作 AI 的需求分析、Spec、Plan、TDD、验证、提交和汇报规则。
 - [架构文档](docs/engineering/architecture.md)：定义架构范式、分层规则、依赖方向、限界上下文、端口归属和业务事实来源。
-- [测试规范](docs/engineering/testing.md)：定义测试金字塔、测试类型、目录结构、命名、边界、数据和门禁规则。
+- [测试规范](docs/testing/testing.md)：定义测试金字塔、测试类型、目录结构、命名、边界、数据和门禁规则。
+- [E2E 稳定性改造手册](docs/testing/e2e-stability.md)：沉淀确定性同步、稳定身份、断言 oracle、场景隔离、清理和失败诊断方法。
 - [技术栈说明](docs/engineering/tech-stack.md)：区分当前采用技术与候选技术，并说明工具链和使用边界。
 - [上下文地图](docs/engineering/context-map.md)：集中记录当前上下文、聚合和跨上下文端口协作。
 - [日志与错误规范](docs/engineering/logging.md)：定义诊断日志、应用错误、IPC 错误传递和日志门禁规则。
@@ -45,6 +46,8 @@
 如果任务涉及界面、交互、视觉、组件、布局或前端体验，开发协作 AI 必须继续阅读 [UI 契约](docs/product/ui.md)。
 
 如果任务涉及 xterm、PTY 行列同步、终端字符宽度、CJK 或 emoji 渲染、终端滚动条、终端黑边或可见字符裁剪，开发协作 AI 必须继续阅读 [终端渲染排障指南](docs/engineering/terminal-rendering.md)。
+
+如果任务涉及 Electron/PTY E2E 偶发失败、超时、固定等待、会话身份、失败诊断或测试基础设施改造，开发协作 AI 必须继续阅读 [E2E 稳定性改造手册](docs/testing/e2e-stability.md)。
 
 如果任务涉及 UI 规划、未来功能、未实现方向或产品路线图，开发协作 AI 必须继续阅读 [UI 路线图](docs/product/ui-roadmap.md)。路线图不得被当作当前功能清单或验收标准。
 
