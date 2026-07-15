@@ -131,6 +131,20 @@ await expectAuthoritativeResult(currentIdentity)
 
 判断原则是：共享失败是否会让一个场景改变另一个场景的前置状态。答案为“会”时必须隔离。
 
+## 后台与可见运行模式
+
+默认 `pnpm test:e2e` 启动屏幕外非激活的真实 Electron 窗口。启动支撑向应用传入精确的测试标记，应用以远离所有显示器的坐标创建 `BrowserWindow`，允许测试窗口超出屏幕边界，并在 renderer 就绪后再次校正坐标、调用 `showInactive()`。E2E 启动后必须从主进程读取窗口可见性、焦点和边界，验证窗口已经显示、没有获得焦点且不与任何显示器相交；不得只根据创建参数推断窗口管理器接受了屏幕外坐标。
+
+屏幕外模式不是浏览器 headless：窗口对操作系统保持可见，renderer 仍实际加载和绘制，GPU、IPC、PTY、DOM 几何、截图与 Playwright trace 均保持正常。E2E 必须关闭 renderer 后台节流；Linux 仍需要可用的显示服务器。Playwright 的 `page.mouse` 和 `page.keyboard` 向页面派发输入，不移动操作系统鼠标指针，也不要求窗口位于前台。macOS 保持正常应用激活策略和 Dock 图标行为，不通过切换 accessory activation policy 隐藏测试应用。
+
+需要肉眼诊断时，使用 `pnpm test:e2e:visible` 运行同一套测试。只有系统焦点、原生对话框、原生菜单或操作系统级输入本身就是断言对象时，才用该入口定向运行个别用例，例如：
+
+```sh
+pnpm test:e2e:visible tests/e2e/example.e2e.spec.ts -t "target behavior"
+```
+
+系统剪贴板 API 可以在屏幕外窗口下使用，不属于必须前台运行的交互；但它修改的是用户机器的全局状态。剪贴板场景必须先保存原值，并在 `finally` 中恢复，整套 E2E 也必须保持串行。
+
 ## 让清理必然发生
 
 推荐的 teardown 结构是：
@@ -207,6 +221,7 @@ E2E 失败诊断至少要回答：
 - [`e2eGlobalSetup.ts`](../../tests/support/e2eGlobalSetup.ts)：整套 E2E 单次构建。
 - [`fakeTerminalPrograms.ts`](../../tests/fixtures/contexts/run/fakeTerminalPrograms.ts)：可控终端程序和持久副作用 oracle。
 - [`vitest.e2e.config.ts`](../../vitest.e2e.config.ts)：Electron E2E 的独立编排入口。
+- [`vitest.e2e.visible.config.ts`](../../vitest.e2e.visible.config.ts)：复用相同套件的显式可见诊断入口。
 
 ## 提交前检查清单
 

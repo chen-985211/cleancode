@@ -8,14 +8,13 @@ import { promisify } from 'node:util'
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
-  captureE2eFailureDiagnostics,
-  closeElectronApp,
-  cleanupE2eWorkbench,
   createE2eWorkbench,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  teardownE2eScenario,
+  type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { expectTerminalWorkingDirectory } from '../support/e2eTerminal'
@@ -43,34 +42,32 @@ describe('git branch workspaces e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
   let page: Page
+  let resources: E2eScenarioResources
 
   beforeEach(async () => {
+    resources = {}
     workbench = await createE2eWorkbench('cleancode-git-e2e')
+    resources.workbench = workbench
     await initializeGitProject(workbench.projectDirectory)
     electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
+    resources.electronApp = electronApp
     page = await electronApp.firstWindow()
+    resources.page = page
     await page.waitForLoadState('domcontentloaded')
   }, electronScenarioTimeoutMs)
 
   afterEach(async ({ task }) => {
-    try {
-      if (task.result?.state === 'fail') {
-        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
-      }
-    } finally {
-      try {
-        await closeElectronApp(electronApp)
-      } finally {
-        try {
-          await rm(projectWorktreesDirectory(workbench.projectDirectory), {
-            recursive: true,
-            force: true
-          })
-        } finally {
-          await cleanupE2eWorkbench(workbench)
-        }
-      }
-    }
+    await teardownE2eScenario({
+      cleanupWorkbenchArtifacts: async (currentWorkbench) => {
+        await rm(projectWorktreesDirectory(currentWorkbench.projectDirectory), {
+          recursive: true,
+          force: true
+        })
+      },
+      resources,
+      taskFailed: task.result?.state === 'fail',
+      taskName: task.name
+    })
   }, electronScenarioTimeoutMs)
 
   it(

@@ -208,6 +208,10 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 整套 Electron E2E 只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。
 
+`pnpm test:e2e` 默认使用屏幕外非激活的真实 Electron `BrowserWindow` 运行，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。
+
+`pnpm test:e2e:visible` 使用相同构建产物、启动支撑和测试套件，仅显式显示 Electron 窗口用于诊断。只有必须验证系统焦点、原生对话框、原生菜单或操作系统级输入的个别场景，才应通过该入口定向运行；这类场景不得迫使默认套件切回前台。系统剪贴板不要求窗口可见，但测试必须在 `finally` 中恢复原值，且不得与其他剪贴板写入场景并行执行。
+
 E2E 失败时必须保留足以定位异步缺口的诊断产物，至少包括页面截图、Playwright trace、Electron/renderer 日志、当前终端 `sessionId` 和输出尾部。失败产物写入被 Git 忽略的 `test-results/`，不得污染业务目录或持久化 fixture。重试只能用于暴露并统计 flaky，不能替代确定性同步和根因修复；本地统一门禁不得靠静默重试掩盖首次失败。
 
 确定性触发、完成条件、稳定身份、断言 oracle、场景隔离、清理和失败证据的落地方法见 [E2E 稳定性改造手册](e2e-stability.md)。该手册是操作指南，不改变本文件定义的测试规则。

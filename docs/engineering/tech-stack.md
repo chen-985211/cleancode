@@ -73,7 +73,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY；xt
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 串行编排 Playwright，并在 suite 级 global setup 中只构建一次桌面产物；失败诊断保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 串行编排 Playwright，并在 suite 级 global setup 中只构建一次桌面产物；默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试，失败诊断保留在本地 `test-results/`。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：接入 Git pre-commit 钩子。

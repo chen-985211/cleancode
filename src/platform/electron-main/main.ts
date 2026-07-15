@@ -68,6 +68,7 @@ import { createExpectedAppError } from '../../shared-kernel/application/errors/A
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { createDisabledAgentSessionSnapshot } from './createDisabledAgentSessionSnapshot'
+import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
@@ -200,6 +201,9 @@ const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCas
   }
 )
 const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
+const electronWindowPolicy = resolveElectronWindowPolicy({
+  backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
+})
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 
 const createMainWindow = (appIconPath: string | undefined): void => {
@@ -211,14 +215,37 @@ const createMainWindow = (appIconPath: string | undefined): void => {
     title: 'cleancode',
     backgroundColor: '#f7f8fa',
     icon: appIconPath,
+    show: electronWindowPolicy.show,
+    ...(electronWindowPolicy.mode === 'offscreen-inactive'
+      ? {
+          enableLargerThanScreen: electronWindowPolicy.enableLargerThanScreen,
+          ...electronWindowPolicy.position
+        }
+      : {}),
     ...resolveWindowFrameOptions(process.platform),
     webPreferences: {
+      backgroundThrottling: electronWindowPolicy.backgroundThrottling,
       preload: join(__dirname, '../preload/preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
     }
   })
+
+  if (electronWindowPolicy.mode === 'offscreen-inactive') {
+    mainWindow.once('ready-to-show', () => {
+      if (mainWindow.isDestroyed()) {
+        return
+      }
+
+      mainWindow.setPosition(
+        electronWindowPolicy.position.x,
+        electronWindowPolicy.position.y,
+        false
+      )
+      mainWindow.showInactive()
+    })
+  }
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)

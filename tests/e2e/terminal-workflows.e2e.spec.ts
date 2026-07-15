@@ -3,15 +3,14 @@
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
-  captureE2eFailureDiagnostics,
-  closeElectronApp,
-  cleanupE2eWorkbench,
   createE2eWorkbench,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  teardownE2eScenario,
+  type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
@@ -20,26 +19,25 @@ describe('terminal workflows e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
   let page: Page
+  let resources: E2eScenarioResources
 
   beforeEach(async () => {
+    resources = {}
     workbench = await createE2eWorkbench('cleancode-terminal-workflow-e2e')
+    resources.workbench = workbench
     electronApp = await launchApp(workbench)
+    resources.electronApp = electronApp
     page = await electronApp.firstWindow()
+    resources.page = page
     await page.waitForLoadState('domcontentloaded')
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
-    try {
-      if (task.result?.state === 'fail') {
-        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
-      }
-    } finally {
-      try {
-        await closeElectronApp(electronApp)
-      } finally {
-        await cleanupE2eWorkbench(workbench)
-      }
-    }
+    await teardownE2eScenario({
+      resources,
+      taskFailed: task.result?.state === 'fail',
+      taskName: task.name
+    })
   })
 
   it(
