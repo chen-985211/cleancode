@@ -6,6 +6,7 @@ dist-electron/
 out/
 build/
 release/
+test-results/
 .DS_Store
 *.log
 .env

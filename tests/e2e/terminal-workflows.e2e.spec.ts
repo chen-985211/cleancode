@@ -3,10 +3,10 @@
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
-  buildElectronApp,
+  captureE2eFailureDiagnostics,
+  closeElectronApp,
   cleanupE2eWorkbench,
   createE2eWorkbench,
-  electronBuildTimeoutMs,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
@@ -21,10 +21,6 @@ describe('terminal workflows e2e', () => {
   let electronApp: ElectronApplication
   let page: Page
 
-  beforeAll(async () => {
-    await buildElectronApp()
-  }, electronBuildTimeoutMs)
-
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-terminal-workflow-e2e')
     electronApp = await launchApp(workbench)
@@ -32,9 +28,18 @@ describe('terminal workflows e2e', () => {
     await page.waitForLoadState('domcontentloaded')
   }, electronLaunchTimeoutMs)
 
-  afterEach(async () => {
-    await electronApp.close()
-    await cleanupE2eWorkbench(workbench)
+  afterEach(async ({ task }) => {
+    try {
+      if (task.result?.state === 'fail') {
+        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
+      }
+    } finally {
+      try {
+        await closeElectronApp(electronApp)
+      } finally {
+        await cleanupE2eWorkbench(workbench)
+      }
+    }
   })
 
   it(

@@ -27,7 +27,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:contract": "vitest run tests/contract --passWithNoTests",
-    "test:e2e": "vitest run tests/e2e --no-file-parallelism",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts --no-file-parallelism",
     "test:watch": "vitest"
   },
   "dependencies": {

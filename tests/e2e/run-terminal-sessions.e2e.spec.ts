@@ -7,13 +7,15 @@ import type { ElectronApplication, Page } from 'playwright'
 import {
   waitForMouseReports,
   writeFakeAgentScript,
-  writeMouseReporterScript
+  writeMouseReporterScript,
+  writeQuickLaunchFixtureScript,
+  writeTerminalSelectionFixtureScript
 } from '../fixtures/contexts/run/fakeTerminalPrograms'
 import {
-  buildElectronApp,
+  captureE2eFailureDiagnostics,
+  closeElectronApp,
   cleanupE2eWorkbench,
   createE2eWorkbench,
-  electronBuildTimeoutMs,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
@@ -40,26 +42,41 @@ import {
   selectExactXtermText,
   setCanvasZoomFromDefault
 } from '../support/terminalSelectionE2e'
+import {
+  configureAndStartTerminalLaunchCommand,
+  e2eShellReadyMarker,
+  readTerminalSessionId,
+  waitForTerminalOutput,
+  waitForTerminalShellReady,
+  writeTerminalCommand
+} from '../support/e2eTerminal'
 
 describe('run terminal sessions e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
   let page: Page
 
-  beforeAll(async () => {
-    await buildElectronApp()
-  }, electronBuildTimeoutMs)
-
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-run-terminal-e2e')
-    electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
+    electronApp = await launchApp(workbench, {
+      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+    })
     page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')
   }, electronLaunchTimeoutMs)
 
-  afterEach(async () => {
-    await electronApp.close()
-    await cleanupE2eWorkbench(workbench)
+  afterEach(async ({ task }) => {
+    try {
+      if (task.result?.state === 'fail') {
+        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
+      }
+    } finally {
+      try {
+        await closeElectronApp(electronApp)
+      } finally {
+        await cleanupE2eWorkbench(workbench)
+      }
+    }
   })
 
   it(
@@ -103,12 +120,19 @@ describe('run terminal sessions e2e', () => {
       const copiedText = 'cleancode-terminal-selection'
       const outputLine = `left-guard-${copiedText}-right-guard`
       const terminal = page.locator('[data-terminal-block-id] .terminal-viewport')
+      const selectionFixturePath = await writeTerminalSelectionFixtureScript(
+        workbench.projectDirectory,
+        { controlText, outputLine }
+      )
 
-      await writeTerminalCommand(page, 'Terminal 1', `printf 'left-${controlText}-right\\n'\r`)
+      await configureAndStartTerminalLaunchCommand(
+        page,
+        'Terminal 1',
+        `node ${JSON.stringify(selectionFixturePath)}`
+      )
       await waitForTerminalOutput(page, 'Terminal 1', controlText)
       await selectExactXtermText(page, terminal, controlText)
       expect(await readXtermSelection(terminal)).toBe(controlText)
-      await writeTerminalCommand(page, 'Terminal 1', `printf '\\n\\n\\n${outputLine}\\n'\r`)
       await waitForTerminalOutput(page, 'Terminal 1', outputLine)
       const zoom = await setCanvasZoomFromDefault(page, 'out')
 
@@ -147,16 +171,13 @@ describe('run terminal sessions e2e', () => {
       await createRunningTerminal(page)
 
       const launchOutput = 'quick-launch-e2e-once'
-      const launchCommand =
-        'printf "\\x71\\x75\\x69\\x63\\x6b\\x2d\\x6c\\x61\\x75\\x6e\\x63\\x68\\x2d\\x65\\x32\\x65\\x2d\\x6f\\x6e\\x63\\x65"'
+      const { reportPath, scriptPath } = await writeQuickLaunchFixtureScript(
+        workbench.projectDirectory,
+        launchOutput
+      )
+      const launchCommand = `node ${JSON.stringify(scriptPath)} ${JSON.stringify(reportPath)}`
 
-      await page.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
-      const launchCommandInput = page.getByRole('textbox', { name: '启动命令' })
-
-      await launchCommandInput.fill(launchCommand)
-      await launchCommandInput.press('Enter')
-      await waitForQuickLaunchState(page, 'configured')
-      await page.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
+      await configureAndStartTerminalLaunchCommand(page, 'Terminal 1', launchCommand)
       await waitForTerminalOutput(page, 'Terminal 1', launchOutput)
 
       const graph = JSON.parse(
@@ -164,10 +185,9 @@ describe('run terminal sessions e2e', () => {
       ) as {
         blocks: Array<{ launchCommand: string }>
       }
-      const terminalOutput = await page.getByLabel('Terminal 1 文本输出').textContent()
 
       expect(graph.blocks[0]?.launchCommand).toBe(launchCommand)
-      expect(countOccurrences(terminalOutput ?? '', launchOutput)).toBe(1)
+      expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
     },
     electronScenarioTimeoutMs
   )
@@ -339,7 +359,7 @@ describe('run terminal sessions e2e', () => {
       await createRunningTerminal(page)
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await readTerminalSessionId(page, 'Terminal 2')
-      await waitForTerminalStartupOutput(page, 'Terminal 2')
+      await waitForTerminalShellReady(page, 'Terminal 2')
 
       const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
 
@@ -410,71 +430,9 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await page.getByText('运行中').waitFor()
   await readTerminalSessionId(page, 'Terminal 1')
-  await waitForTerminalStartupOutput(page, 'Terminal 1')
-  await page.waitForTimeout(1_000)
+  await waitForTerminalShellReady(page, 'Terminal 1')
   await page.waitForFunction(() =>
     document.activeElement?.classList.contains('xterm-helper-textarea')
-  )
-}
-
-async function waitForTerminalStartupOutput(page: Page, terminalName: string): Promise<void> {
-  await page.waitForFunction(
-    (label) =>
-      (document.querySelector(`[aria-label="${label} 文本输出"]`)?.textContent?.length ?? 0) > 0,
-    terminalName
-  )
-}
-
-async function writeTerminalCommand(
-  page: Page,
-  terminalName: string,
-  input: string
-): Promise<void> {
-  const sessionId = await readTerminalSessionId(page, terminalName)
-
-  await page.evaluate(
-    ({ targetSessionId, input }) =>
-      window.cleancode?.writeTerminal({ sessionId: targetSessionId, input }),
-    { targetSessionId: sessionId, input }
-  )
-}
-
-async function readTerminalSessionId(page: Page, terminalName: string): Promise<string> {
-  const sessionIdHandle = await page.waitForFunction(
-    (label) =>
-      document
-        .querySelector(`[aria-label="${label} 文本输出"]`)
-        ?.getAttribute('data-terminal-session-id') ?? '',
-    terminalName
-  )
-
-  return sessionIdHandle.jsonValue()
-}
-
-async function waitForQuickLaunchState(
-  page: Page,
-  state: 'configured' | 'unconfigured'
-): Promise<void> {
-  await page.waitForFunction(
-    (state) =>
-      document
-        .querySelector('[aria-label="Terminal 1 启动命令"]')
-        ?.getAttribute('data-launch-command-state') === state,
-    state
-  )
-}
-
-async function waitForTerminalOutput(
-  page: Page,
-  terminalName: string,
-  output: string
-): Promise<void> {
-  await page.waitForFunction(
-    ({ terminalName, output }) =>
-      document
-        .querySelector(`[aria-label="${terminalName} 文本输出"]`)
-        ?.textContent?.includes(output) ?? false,
-    { terminalName, output }
   )
 }
 

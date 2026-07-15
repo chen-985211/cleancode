@@ -8,16 +8,17 @@ import { promisify } from 'node:util'
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
-  buildElectronApp,
+  captureE2eFailureDiagnostics,
+  closeElectronApp,
   cleanupE2eWorkbench,
   createE2eWorkbench,
-  electronBuildTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { expectTerminalWorkingDirectory } from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
 const gitLocalEnvironmentVariables = [
@@ -43,10 +44,6 @@ describe('git branch workspaces e2e', () => {
   let electronApp: ElectronApplication
   let page: Page
 
-  beforeAll(async () => {
-    await buildElectronApp()
-  }, electronBuildTimeoutMs)
-
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-git-e2e')
     await initializeGitProject(workbench.projectDirectory)
@@ -55,13 +52,25 @@ describe('git branch workspaces e2e', () => {
     await page.waitForLoadState('domcontentloaded')
   }, electronScenarioTimeoutMs)
 
-  afterEach(async () => {
-    await electronApp.close()
-    await rm(projectWorktreesDirectory(workbench.projectDirectory), {
-      recursive: true,
-      force: true
-    })
-    await cleanupE2eWorkbench(workbench)
+  afterEach(async ({ task }) => {
+    try {
+      if (task.result?.state === 'fail') {
+        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
+      }
+    } finally {
+      try {
+        await closeElectronApp(electronApp)
+      } finally {
+        try {
+          await rm(projectWorktreesDirectory(workbench.projectDirectory), {
+            recursive: true,
+            force: true
+          })
+        } finally {
+          await cleanupE2eWorkbench(workbench)
+        }
+      }
+    }
   }, electronScenarioTimeoutMs)
 
   it(
@@ -88,13 +97,13 @@ describe('git branch workspaces e2e', () => {
 
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('运行中').waitFor()
-      await expectTerminalPwd(page, 'Terminal 1', featureWorktreeDirectory)
+      await expectTerminalWorkingDirectory(page, 'Terminal 1', featureWorktreeDirectory)
 
       await projectCard.locator('.default-branch-selector__select').click()
       await page.getByText('Terminal 1').waitFor({ state: 'detached' })
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('运行中').waitFor()
-      await expectTerminalPwd(page, 'Terminal 1', workbench.projectDirectory)
+      await expectTerminalWorkingDirectory(page, 'Terminal 1', workbench.projectDirectory)
 
       const projectMetadata = JSON.parse(
         await readOnlyJsonFile(workbench.appStateDirectory, 'project.json')
@@ -133,46 +142,6 @@ async function initializeGitProject(directory: string): Promise<void> {
   await writeFile(join(directory, 'README.md'), 'hello\n')
   await execGit(directory, ['add', 'README.md'])
   await execGit(directory, ['commit', '-m', 'initial'])
-}
-
-async function expectTerminalPwd(
-  page: Page,
-  terminalName: string,
-  expectedDirectory: string
-): Promise<void> {
-  const sessionId = await readTerminalSessionId(page, terminalName)
-
-  await page.waitForFunction(
-    (label) =>
-      (document.querySelector(`[aria-label="${label} 文本输出"]`)?.textContent?.length ?? 0) > 0,
-    terminalName
-  )
-  await page.waitForTimeout(1_000)
-
-  await page.evaluate(
-    ({ input, targetSessionId }) =>
-      window.cleancode?.writeTerminal({ sessionId: targetSessionId, input }),
-    { targetSessionId: sessionId, input: 'pwd\r' }
-  )
-  await page.waitForFunction(
-    ({ label, directory }) =>
-      document
-        .querySelector(`[aria-label="${label} 文本输出"]`)
-        ?.textContent?.includes(directory) ?? false,
-    { label: terminalName, directory: expectedDirectory }
-  )
-}
-
-async function readTerminalSessionId(page: Page, terminalName: string): Promise<string> {
-  const sessionIdHandle = await page.waitForFunction(
-    (label) =>
-      document
-        .querySelector(`[aria-label="${label} 文本输出"]`)
-        ?.getAttribute('data-terminal-session-id') ?? '',
-    terminalName
-  )
-
-  return sessionIdHandle.jsonValue()
 }
 
 async function expectCurrentGitBranch(directory: string, branchName: string): Promise<void> {

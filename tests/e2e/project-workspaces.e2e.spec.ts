@@ -5,10 +5,10 @@ import { basename, join } from 'node:path'
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
-  buildElectronApp,
+  captureE2eFailureDiagnostics,
+  closeElectronApp,
   cleanupE2eWorkbench,
   createE2eWorkbench,
-  electronBuildTimeoutMs,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
@@ -23,10 +23,6 @@ describe('project workspaces e2e', () => {
   let electronApp: ElectronApplication
   let page: Page
 
-  beforeAll(async () => {
-    await buildElectronApp()
-  }, electronBuildTimeoutMs)
-
   beforeEach(async () => {
     workbench = await createE2eWorkbench('cleancode-project-workspace-e2e')
     electronApp = await launchApp(workbench)
@@ -34,9 +30,18 @@ describe('project workspaces e2e', () => {
     await page.waitForLoadState('domcontentloaded')
   }, electronLaunchTimeoutMs)
 
-  afterEach(async () => {
-    await electronApp.close()
-    await cleanupE2eWorkbench(workbench)
+  afterEach(async ({ task }) => {
+    try {
+      if (task.result?.state === 'fail') {
+        await captureE2eFailureDiagnostics({ electronApp, page, taskName: task.name, workbench })
+      }
+    } finally {
+      try {
+        await closeElectronApp(electronApp)
+      } finally {
+        await cleanupE2eWorkbench(workbench)
+      }
+    }
   })
 
   it(
@@ -65,7 +70,7 @@ describe('project workspaces e2e', () => {
         expect.objectContaining({ type: 'terminal', name: 'Terminal 1' })
       ])
 
-      await electronApp.close()
+      await closeElectronApp(electronApp)
       electronApp = await launchApp(workbench)
       page = await electronApp.firstWindow()
       await page.waitForLoadState('domcontentloaded')

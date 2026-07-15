@@ -8,6 +8,49 @@ export interface MouseReport {
   readonly row: number
 }
 
+export async function writeTerminalSelectionFixtureScript(
+  projectDirectory: string,
+  input: {
+    readonly controlText: string
+    readonly outputLine: string
+  }
+): Promise<string> {
+  const scriptPath = join(projectDirectory, 'terminal-selection-fixture.mjs')
+  const outputLines = [`left-${input.controlText}-right`, '', '', '', input.outputLine]
+
+  await writeFile(
+    scriptPath,
+    `process.stdout.write(${JSON.stringify(`${outputLines.join('\r\n')}\r\n`)})\n`,
+    'utf8'
+  )
+
+  return scriptPath
+}
+
+export async function writeQuickLaunchFixtureScript(
+  projectDirectory: string,
+  outputMarker: string
+): Promise<{ readonly reportPath: string; readonly scriptPath: string }> {
+  const reportPath = join(projectDirectory, 'quick-launch-report.txt')
+  const scriptPath = join(projectDirectory, 'quick-launch-fixture.mjs')
+
+  await writeFile(
+    scriptPath,
+    `
+import { appendFileSync } from 'node:fs'
+
+const reportPath = process.argv[2]
+const outputMarker = ${JSON.stringify(outputMarker)}
+
+appendFileSync(reportPath, outputMarker + '\\n')
+process.stdout.write(outputMarker)
+`,
+    'utf8'
+  )
+
+  return { reportPath, scriptPath }
+}
+
 export async function writeFakeAgentScript(projectDirectory: string): Promise<string> {
   const scriptPath = join(projectDirectory, 'fake-agent-tui.mjs')
 
