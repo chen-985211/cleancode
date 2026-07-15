@@ -7,6 +7,7 @@ interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
   readonly duration?: number
+  readonly interpolate?: 'smooth' | 'linear'
   readonly setSelectedTerminalBlockId: (blockId: string | null) => void
   readonly setHoveredTerminalBlockId: (blockId: string | null) => void
 }
@@ -15,6 +16,7 @@ export function focusTerminalBlockInCanvas({
   block,
   reactFlowInstance,
   duration = 220,
+  interpolate,
   setSelectedTerminalBlockId,
   setHoveredTerminalBlockId
 }: FocusTerminalBlockInCanvasInput): void {
@@ -36,7 +38,8 @@ export function focusTerminalBlockInCanvas({
     position.y + measuredHeight / 2,
     {
       zoom: nextZoom,
-      duration
+      duration,
+      ...(interpolate ? { interpolate } : {})
     }
   )
   window.setTimeout(() => {

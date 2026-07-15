@@ -8,6 +8,7 @@ import type {
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
+import { readMinimapFocusCanvasSize, resolveMinimapFocusDuration } from './minimapFocusTransition'
 import type { WorkbenchFlowNode } from './types'
 
 interface UseMinimapNodeFocusInput {
@@ -32,7 +33,12 @@ export function useMinimapNodeFocus({
   setSelectedTerminalGroupId
 }: UseMinimapNodeFocusInput) {
   const focusTerminalBlock = useCallback(
-    (blockId: string, duration?: number, fallbackBlock?: TerminalBlockSnapshot) => {
+    (
+      blockId: string,
+      duration?: number,
+      fallbackBlock?: TerminalBlockSnapshot,
+      interpolate?: 'smooth' | 'linear'
+    ) => {
       const block =
         terminalBlocksById.get(blockId) ?? (fallbackBlock?.id === blockId ? fallbackBlock : null)
 
@@ -44,6 +50,7 @@ export function useMinimapNodeFocus({
       focusTerminalBlockInCanvas({
         block,
         duration,
+        interpolate,
         reactFlowInstance: reactFlowInstanceRef.current,
         setHoveredTerminalBlockId,
         setSelectedTerminalBlockId
@@ -84,15 +91,16 @@ export function useMinimapNodeFocus({
       const measuredHeight = node?.measured?.height ?? resolveDimension(node?.style?.height)
       const position = node?.position ?? group.position
       const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
+      const targetCenter = {
+        x: position.x + (measuredWidth ?? group.size.width) / 2,
+        y: position.y + (measuredHeight ?? group.size.height) / 2
+      }
 
-      void reactFlowInstance.setCenter(
-        position.x + (measuredWidth ?? group.size.width) / 2,
-        position.y + (measuredHeight ?? group.size.height) / 2,
-        {
-          zoom: nextZoom,
-          duration: 220
-        }
-      )
+      void reactFlowInstance.setCenter(targetCenter.x, targetCenter.y, {
+        zoom: nextZoom,
+        duration: resolveFocusDuration(reactFlowInstance, targetCenter, nextZoom),
+        interpolate: 'linear'
+      })
     },
     [
       reactFlowInstanceRef,
@@ -127,10 +135,15 @@ export function useMinimapNodeFocus({
         resolveDimension(node.style?.height) ??
         defaultAgentLayoutSize.height
       const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
+      const targetCenter = {
+        x: node.position.x + width / 2,
+        y: node.position.y + height / 2
+      }
 
-      void reactFlowInstance.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      void reactFlowInstance.setCenter(targetCenter.x, targetCenter.y, {
         zoom: nextZoom,
-        duration: 220
+        duration: resolveFocusDuration(reactFlowInstance, targetCenter, nextZoom),
+        interpolate: 'linear'
       })
     },
     [
@@ -150,7 +163,23 @@ export function useMinimapNodeFocus({
       }
 
       if (terminalBlocksById.has(nodeId)) {
-        focusTerminalBlock(nodeId)
+        const block = terminalBlocksById.get(nodeId)
+        const reactFlowInstance = reactFlowInstanceRef.current
+        let duration: number | undefined
+
+        if (block && reactFlowInstance) {
+          const node = reactFlowInstance.getNode(nodeId)
+          const position = node?.position ?? block.position
+          const targetCenter = {
+            x: position.x + (node?.measured?.width ?? block.size.width) / 2,
+            y: position.y + (node?.measured?.height ?? block.size.height) / 2
+          }
+          const nextZoom = Math.max(reactFlowInstance.getZoom(), 0.9)
+
+          duration = resolveFocusDuration(reactFlowInstance, targetCenter, nextZoom)
+        }
+
+        focusTerminalBlock(nodeId, duration, undefined, 'linear')
         return
       }
 
@@ -162,6 +191,7 @@ export function useMinimapNodeFocus({
       focusAgentConsole,
       focusTerminalBlock,
       focusTerminalGroup,
+      reactFlowInstanceRef,
       terminalBlocksById,
       terminalGroupsById
     ]
@@ -171,6 +201,19 @@ export function useMinimapNodeFocus({
     focusTerminalBlock,
     focusWorkbenchNode
   }
+}
+
+function resolveFocusDuration(
+  reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+  targetCenter: { readonly x: number; readonly y: number },
+  targetZoom: number
+): number {
+  return resolveMinimapFocusDuration({
+    currentViewport: reactFlowInstance.getViewport(),
+    canvasSize: readMinimapFocusCanvasSize(),
+    targetCenter,
+    targetZoom
+  })
 }
 
 function resolveDimension(value: unknown): number | null {
