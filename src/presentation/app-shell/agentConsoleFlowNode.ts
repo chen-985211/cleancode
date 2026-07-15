@@ -63,7 +63,7 @@ export function createAgentConsoleFlowNode({
   }
 }
 
-function toAgentFlowNodeId(agentId: string): string {
+export function toAgentFlowNodeId(agentId: string): string {
   return `agent:${agentId}`
 }
 

@@ -64,12 +64,18 @@ describe('workspace Agents e2e', () => {
       )
       expect(await agentTerminal.getAttribute('data-agent-terminal-source-theme')).toBe('light')
 
+      const viewportBeforeCreatingAgent = await readCanvasViewportTransform(page)
       page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 2)
+      await page.waitForFunction((previousViewport) => {
+        const viewport = document.querySelector('.react-flow__viewport')
+
+        return Boolean(viewport && getComputedStyle(viewport).transform !== previousViewport)
+      }, viewportBeforeCreatingAgent)
+      expect(await readCanvasViewportTransform(page)).not.toBe(viewportBeforeCreatingAgent)
       expect(await page.locator('[data-minimap-node-id^="agent:"]').count()).toBe(2)
 
-      await page.getByRole('button', { name: '聚焦 Agent Agent 2' }).click()
       await page.getByRole('button', { name: 'Agent 2 更多操作' }).click()
       await page.getByRole('menuitem', { name: '移除 Agent' }).click()
       await page

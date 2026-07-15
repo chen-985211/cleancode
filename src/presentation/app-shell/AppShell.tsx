@@ -81,7 +81,7 @@ export function AppShell() {
   })
   useInitialWorkbenchLoad({ setCurrentWorkbench, setWorkbenches })
 
-  const { focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
+  const { focusAgentConsole, focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
     terminalBlocksById,
     terminalGroupsById,
     reactFlowInstanceRef,
@@ -132,6 +132,7 @@ export function AppShell() {
     currentWorkbench,
     currentWorkspace,
     layoutCommitQueue,
+    onWorkspaceAgentCreated: focusAgentConsole,
     setCurrentWorkbench,
     setSelectedAgentId,
     setWorkbenches

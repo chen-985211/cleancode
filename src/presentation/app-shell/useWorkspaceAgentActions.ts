@@ -13,6 +13,7 @@ export function useWorkspaceAgentActions({
   currentWorkbench,
   currentWorkspace,
   layoutCommitQueue,
+  onWorkspaceAgentCreated,
   setCurrentWorkbench,
   setSelectedAgentId,
   setWorkbenches
@@ -20,6 +21,7 @@ export function useWorkspaceAgentActions({
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
+  readonly onWorkspaceAgentCreated: (agent: WorkspaceAgentSnapshot) => void
   readonly setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
@@ -60,9 +62,9 @@ export function useWorkspaceAgentActions({
     })
     if (created) {
       setWorkspaceAgents(currentWorkbench.project.id, currentWorkspace.name, [...agents, created])
-      setSelectedAgentId(created.agentId)
+      onWorkspaceAgentCreated(created)
     }
-  }, [currentWorkbench, currentWorkspace, setSelectedAgentId, setWorkspaceAgents])
+  }, [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents])
 
   const updateAgentInWorkspace = useCallback(
     (updated: WorkspaceAgentSnapshot): void => {
