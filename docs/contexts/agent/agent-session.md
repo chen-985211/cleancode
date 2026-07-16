@@ -63,7 +63,7 @@ Project 上下文切换主工作区分支时，通过它拥有的 `WorkspaceAgen
 2. 释放同一 Agent 在同一物理目录中的其他作用域。
 3. 按持久化模式查找 thread 绑定；“新对话”会先清除当前作用域绑定。
 4. 为本次运行生成独立 `sessionId`；仅当该 Agent 已启用 CleanCode MCP 时，注册独立 MCP URL 与 Bearer Token。
-5. 启动 Codex PTY，并在存在 UUID 时使用正式 resume 参数；sandbox 与 approval 继承用户 Codex 配置。
+5. 启动 Codex PTY，并在存在 UUID 时使用正式 resume 参数；已启用的 CleanCode MCP Server 必须成功初始化、单独把全部当前和未来工具默认预批准，并向本次进程注入画布路由 developer instructions；sandbox 与全局 approval policy 继续继承用户 Codex 配置。
 6. 仅在当前子进程明确报告 thread UUID 后，才把它绑定并保存到当前作用域。
 
 运行时状态包括 `running`、`suspended`、`exited`、`failed` 和 `restore_failed`。PTY、进程号、终端输出、当前 turn、MCP URL、Token 和待审批请求都不持久化。
@@ -91,13 +91,13 @@ Project 上下文切换主工作区分支时，通过它拥有的 `WorkspaceAgen
 
 ## 验证矩阵
 
-| 层级        | 证明内容                                                     | 主要测试                                                                                                                                                                                                                           |
-| ----------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit        | 身份、布局、分支绑定与多 Agent 管理                          | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.manage-workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.manage-workspace-agents.spec.ts)         |
-| Unit        | attach/restart、MCP 能力重配、审批隔离、挂起恢复和运行时清理 | [`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts)、[`agent.reconfigure-mcp-capability.spec.ts`](../../../tests/unit/contexts/agent/agent.reconfigure-mcp-capability.spec.ts)     |
-| Integration | JSON 迁移、thread 持久化和 Codex PTY 参数/生命周期           | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts) |
-| Contract    | Electron IPC 的会话和管理契约                                | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)                                                                                                                                                    |
-| E2E         | 工作区中多 Agent 的创建、运行和恢复主路径                    | [`workspace-agents.e2e.spec.ts`](../../../tests/e2e/workspace-agents.e2e.spec.ts)                                                                                                                                                  |
+| 层级        | 证明内容                                                                        | 主要测试                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | 身份、布局、分支绑定与多 Agent 管理                                             | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.manage-workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.manage-workspace-agents.spec.ts)         |
+| Unit        | attach/restart、MCP 能力重配、审批隔离、挂起恢复和运行时清理                    | [`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts)、[`agent.reconfigure-mcp-capability.spec.ts`](../../../tests/unit/contexts/agent/agent.reconfigure-mcp-capability.spec.ts)     |
+| Integration | JSON 迁移、thread 持久化和 Codex PTY 参数/必需 MCP/会话路由/默认预批准/生命周期 | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts) |
+| Contract    | Electron IPC 的会话和管理契约                                                   | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)                                                                                                                                                    |
+| E2E         | 工作区中多 Agent 的创建、运行和恢复主路径                                       | [`workspace-agents.e2e.spec.ts`](../../../tests/e2e/workspace-agents.e2e.spec.ts)                                                                                                                                                  |
 
 ## 维护规则
 

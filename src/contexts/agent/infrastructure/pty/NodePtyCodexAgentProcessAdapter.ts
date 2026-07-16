@@ -7,6 +7,7 @@ import type { IPty } from 'node-pty'
 import { spawn as spawnPtyProcess } from 'node-pty'
 
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { cleancodeMcpDeveloperInstructions } from '../../application/dto/AgentToolProtocol'
 import type {
   CodexAgentProcessHandle,
   CodexAgentProcessPort,
@@ -107,7 +108,9 @@ export class NodePtyCodexAgentProcessAdapter implements CodexAgentProcessPort {
       ...(command.cleancodeMcp
         ? [
             '--config',
-            `mcp_servers.cleancode={url=${JSON.stringify(command.cleancodeMcp.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true}`
+            `mcp_servers.cleancode={url=${JSON.stringify(command.cleancodeMcp.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true,required=true,default_tools_approval_mode="approve"}`,
+            '--config',
+            `developer_instructions=${JSON.stringify(cleancodeMcpDeveloperInstructions)}`
           ]
         : []),
       '--config',

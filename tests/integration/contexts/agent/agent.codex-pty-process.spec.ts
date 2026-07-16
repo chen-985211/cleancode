@@ -82,10 +82,14 @@ describe('Codex agent PTY process adapter', () => {
     expect(output).toContain('-C')
     expect(output).not.toContain('--sandbox')
     expect(output).not.toContain('--ask-for-approval')
-    expect(output).not.toContain('developer_instructions')
+    expect(output).toContain('developer_instructions=')
+    expect(output).toContain('启动项目的终端组合')
+    expect(output).toContain('inspect_graph')
+    expect(output).toContain('create_terminal_group')
     expect(output).toContain('mcp_servers.cleancode={')
     expect(output).toContain('bearer_token_env_var=')
-    expect(output).not.toContain('default_tools_approval_mode')
+    expect(output).toContain('required=true')
+    expect(output).toContain('default_tools_approval_mode=\\"approve\\"')
     expect(identifiedThreadId).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
   }, 10_000)
 
@@ -113,6 +117,8 @@ describe('Codex agent PTY process adapter', () => {
 
     expect(output).toContain('resume')
     expect(output).toContain('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+    expect(output).toContain('developer_instructions=')
+    expect(output).toContain('required=true')
   })
 
   it('inherits Codex permissions and omits every built-in MCP trace when the capability is disabled', async () => {
@@ -141,9 +147,12 @@ describe('Codex agent PTY process adapter', () => {
       expect(output).toContain('"lowercaseNoProxy":"lowercase.internal"')
       expect(output).not.toContain('CLEANCODE_MCP_TOKEN')
       expect(output).not.toContain('mcp_servers.cleancode')
+      expect(output).not.toContain('default_tools_approval_mode')
+      expect(output).not.toContain('required=true')
       expect(output).not.toContain('--sandbox')
       expect(output).not.toContain('--ask-for-approval')
       expect(output).not.toContain('developer_instructions')
+      expect(output).not.toContain('启动项目的终端组合')
     } finally {
       restoreEnvironmentVariable('NO_PROXY', originalNoProxy)
       restoreEnvironmentVariable('no_proxy', originalLowercaseNoProxy)

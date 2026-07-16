@@ -21,6 +21,8 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为画布内 Codex Agent �
 
 - 为每个工作区 Agent 持久化独立能力开关；新建和旧数据迁移默认开启。
 - 为每个已启用能力的运行中 Agent 会话注册独立 MCP 端点和 Bearer Token。
+- 把已启用的 Server 标记为必需，并为该 Codex 进程注入画布路由 developer instructions；MCP 初始化失败时不得静默继续。
+- 在 Codex MCP 层默认预批准该 Server 的所有当前和未来工具，不触发 Codex 原生工具审批。
 - 通过 MCP `initialize`、`tools/list` 和 `tools/call` 暴露工具。
 - 查看积木图，创建、更新、删除终端积木，创建、更新、解散终端组合。
 - 对删除类工具发起 cleancode UI 审批。
@@ -43,6 +45,7 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为画布内 Codex Agent �
 | MCP 端点   | 当前 Agent 会话对应的本机 HTTP JSON-RPC URL                                    |
 | 工具协议   | 工具名称、说明、输入 JSON Schema、安全注解、审批属性和结构化结果组成的外部契约 |
 | 工具桥接层 | 把 MCP JSON-RPC 请求转换为 Agent 应用层工具命令的基础设施入站适配器            |
+| 原生预批准 | Codex 对 CleanCode MCP Server 的全部当前和未来工具默认使用 `approve`           |
 | 工具审批   | cleancode UI 对破坏性工具调用作出的独立批准或拒绝                              |
 | 工具审计   | Agent 上下文记录的工具名称、输入、会话、工作区、审批属性和执行状态             |
 
@@ -86,9 +89,9 @@ Agent 基础设施不得直接修改 BlockGraph 聚合、持久化文件或 Reac
 - 请求只接受 `POST`，且 `Authorization` 必须精确等于 `Bearer <token>`。
 - 非 POST 请求返回 `405`，未知会话返回 `404`，鉴权失败返回 `401`，无效 JSON 或 JSON-RPC 请求返回 `400`。
 
-启用能力时，会话启动顺序固定为：先注册 MCP 端点，再启动 Codex PTY。cleancode 通过单个进程级内联配置表注入完整的 `mcp_servers.cleancode` URL、Bearer Token 环境变量名和启用状态，通过子进程环境变量 `CLEANCODE_MCP_TOKEN` 提供 Token；该过程不修改用户的全局 Codex 配置，也不注入默认工具批准模式。
+启用能力时，会话启动顺序固定为：先注册 MCP 端点，再启动 Codex PTY。cleancode 通过进程级 `--config` 注入完整的 `mcp_servers.cleancode` URL、Bearer Token 环境变量名、`enabled = true`、`required = true` 和 `default_tools_approval_mode = "approve"`，通过子进程环境变量 `CLEANCODE_MCP_TOKEN` 提供 Token；同时注入只服务于本次 CleanCode Agent 进程的画布路由 `developer_instructions`。Server 级默认值使当前和未来新增的 CleanCode MCP 工具都跳过 Codex 原生审批；`required = true` 使 Codex 在 Server 无法初始化时停止启动或恢复，而不是继续一个缺少画布工具的会话。该过程不修改用户的全局 Codex 配置文件，也不得绕过优先级更高的组织受管策略。
 
-关闭能力时，不注册端点，不向 Codex 参数或环境注入 CleanCode MCP 配置、Token 或 MCP 专用 `NO_PROXY` 修改。无论开关状态，cleancode 都不强制覆盖 Codex 的 sandbox、approval 或 developer instructions；这些设置继承用户 Codex 配置。画布工具说明由 MCP `initialize` 响应提供。
+关闭能力时，不注册端点，不向 Codex 参数或环境注入 CleanCode MCP 配置、Token、画布路由 developer instructions 或 MCP 专用 `NO_PROXY` 修改；Codex 的 developer instructions 完整继承正常配置层。开启能力时，进程级 `developer_instructions` 按 Codex 配置优先级覆盖该进程原本的同名值，但不写入用户配置文件；其内容只约束画布意图路由，不改变 sandbox 或全局 approval policy。默认预批准只作用于 `mcp_servers.cleancode`，不得改变 Shell、文件、Git、网络或其他 MCP Server 的权限。画布工具说明同时由进程级指令和 MCP `initialize` 响应提供。
 
 Agent 会话释放时必须注销对应端点并取消未完成审批；应用退出时必须清空会话并关闭 HTTP Server。端点 URL、Token、待审批请求和进行中的 HTTP 调用都是易失运行时状态，不得作为持久化会话绑定。
 
@@ -114,7 +117,7 @@ Agent 会话释放时必须注销对应端点并取消未完成审批；应用�
 
 未知方法返回 JSON-RPC `-32601`；工具名或调用结构无效时返回 `-32602`。工具 Schema 使用 `additionalProperties: false` 描述严格输入，但服务端当前只完成工具调用外形和工具名识别，不能把声明的 Schema 误写成独立的服务端全量校验器。
 
-`initialize.instructions` 同时承担开启 CleanCode MCP 时的画布语义消歧：用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”或同义的终端组织请求时，Agent 应先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布终端积木与终端组合，不应先搜索项目仓库。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，不给原生 Codex 行为注入这层语义。
+进程级 `developer_instructions` 与 `initialize.instructions` 共同承担开启 CleanCode MCP 时的画布语义消歧：用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”“启动项目的终端组合”或同义的终端组织请求时，Agent 必须先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布终端积木与终端组合。Agent 可以在查看画布后读取仓库以确认启动命令，但必须继续通过 `create_block` 和 `create_terminal_group` 创建持久化画布对象，不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成替代品。当前工具目录没有启动终端或组合的工具，因此 Agent 只能声明已经创建，不能声称成员已经启动。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
 
 ## 当前工具目录
 
@@ -132,9 +135,11 @@ Agent 会话释放时必须注销对应端点并取消未完成审批；应用�
 
 Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID 和布局，再执行后续变更。创建终端积木和组合的结果会在可识别时返回新对象 ID，供下一次工具调用继续使用。
 
-所有工具通过 MCP `annotations` 如实声明副作用：`inspect_graph` 的 `readOnlyHint` 为 `true`；创建和更新工具属于非破坏性写入；删除积木和解散组合的 `destructiveHint` 为 `true`；所有当前工具都只操作本地私有工作区，因此 `openWorldHint` 为 `false`。这些注解帮助 Codex 理解工具风险，但不覆盖用户的 Codex approval 配置，也不替代删除工具的 cleancode UI 审批。
+所有工具通过 MCP `annotations` 如实声明副作用：`inspect_graph` 的 `readOnlyHint` 为 `true`；创建和更新工具属于非破坏性写入；删除积木和解散组合的 `destructiveHint` 为 `true`；所有当前工具都只操作本地私有工作区，因此 `openWorldHint` 为 `false`。即使 Server 级默认预批准避免了 Codex 原生审批，这些注解仍必须真实描述工具风险，并且不能替代删除工具的 cleancode UI 审批。
 
 ## 执行、审批与结果
+
+所有当前和未来的 CleanCode MCP 工具都在 Codex MCP 层默认预批准，不由 Codex 原生界面逐次询问。该预批准只决定调用是否需要经过 Codex 提示，不授予绕过 cleancode 应用层、领域规则或工具审批的权限。
 
 非破坏性工具直接进入 `ExecuteAgentToolUseCase`。用例在执行前记录 `started` 审计，完成后记录 `completed`，异常时记录 `failed`；图变更通过 `AgentBlockGraphToolPort` 进入 BlockGraph 应用层。
 
@@ -157,16 +162,17 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 
 ## 状态所有权与持久化
 
-| 状态                                       | 所有权                | 是否持久化                   |
-| ------------------------------------------ | --------------------- | ---------------------------- |
-| 工具目录、instructions、安全注解和审批策略 | Agent 代码契约        | 随版本发布                   |
-| Agent 稳定身份、布局和 Codex thread 绑定   | Agent 聚合与仓储      | 是                           |
-| CleanCode MCP 能力开关                     | Agent 聚合与仓储      | 是                           |
-| 工具调用审计                               | Agent 审计仓储        | 是，当前为 JSONL             |
-| 积木图和终端组合                           | BlockGraph 聚合与仓储 | 是                           |
-| MCP URL、Bearer Token、HTTP Server         | Agent 运行时          | 否                           |
-| 待审批请求                                 | Agent 运行时          | 否                           |
-| MCP 调用中的图快照                         | 应用层返回值          | 否，事实仍在 BlockGraph 仓储 |
+| 状态                                                | 所有权                 | 是否持久化                   |
+| --------------------------------------------------- | ---------------------- | ---------------------------- |
+| 工具目录、会话路由/instructions、安全注解和审批策略 | Agent 代码契约         | 随版本发布                   |
+| Codex MCP Server 默认预批准策略                     | Agent 基础设施代码契约 | 随版本发布，不属于用户状态   |
+| Agent 稳定身份、布局和 Codex thread 绑定            | Agent 聚合与仓储       | 是                           |
+| CleanCode MCP 能力开关                              | Agent 聚合与仓储       | 是                           |
+| 工具调用审计                                        | Agent 审计仓储         | 是，当前为 JSONL             |
+| 积木图和终端组合                                    | BlockGraph 聚合与仓储  | 是                           |
+| MCP URL、Bearer Token、HTTP Server                  | Agent 运行时           | 否                           |
+| 待审批请求                                          | Agent 运行时           | 否                           |
+| MCP 调用中的图快照                                  | 应用层返回值           | 否，事实仍在 BlockGraph 仓储 |
 
 任何新增 MCP 工具都必须先确定业务事实 owner。Agent 可以拥有协议、权限和审计，但不得因为工具从 Agent 发起，就把目标上下文的业务规则搬入 Agent。
 
@@ -176,8 +182,11 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 - 每个 Agent 会话必须拥有独立 URL 和 Token；不得跨会话复用授权。
 - Token 只用于当前子进程环境和 HTTP 鉴权，不得写入持久化会话、审计输入或用户全局配置。
 - 未通过鉴权的请求不得进入 JSON-RPC 桥接层或应用层用例。
+- 启用的 CleanCode MCP 必须标记为 required；初始化失败时不得让 Codex 在没有画布工具的情况下静默继续。
+- CleanCode MCP 的全部当前和未来工具必须在 Codex MCP 层默认预批准；该策略不得扩展到全局 Codex 权限或其他 MCP Server。
+- Codex 组织受管策略的优先级高于进程级默认预批准；cleancode 不得绕过管理员限制。
 - 删除类操作必须经过 cleancode UI 审批；CLI 配置不得绕过该规则。
-- MCP 开关不得覆盖用户 Codex sandbox 或 approval；Codex 自身提示与 cleancode 删除审批是彼此独立的安全层。
+- MCP 开关不得覆盖用户 Codex sandbox 或全局 approval policy；Shell、文件、Git、网络和其他 MCP 的权限继续继承用户配置。
 - 会话结束时必须注销端点并取消待审批调用，防止旧 Agent 继续操作工作区。
 - 工具只能进入应用层用例和稳定端口，不得提供绕过领域规则的通用数据库、文件或进程后门。
 
@@ -196,23 +205,25 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 
 ## 验证矩阵
 
-| 层级                     | 证明内容                                                      | 主要测试                                                                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit / Agent domain      | 哪些工具需要 UI 审批                                          | [`agent.tool-approval-policy.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-policy.spec.ts)                                                                                      |
-| Unit / Agent application | 工具路由、审计、审批等待、拒绝和会话释放                      | [`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts) |
-| Contract / tool protocol | 完整工具目录、画布语义、严格 Schema、安全注解和排除的通用工具 | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                |
-| Contract / JSON-RPC      | 初始化说明、带安全注解的工具列表和调用结果结构                | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)                                                                                  |
-| Contract / HTTP          | 本机端点、Bearer 鉴权和 MCP 主路径                            | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                            |
-| Integration / Codex PTY  | 条件注入 URL/Token、继承权限配置和关闭时环境隔离              | [`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                     |
+| 层级                     | 证明内容                                                                      | 主要测试                                                                                                                                                                                           |
+| ------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit / Agent domain      | 哪些工具需要 UI 审批                                                          | [`agent.tool-approval-policy.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-policy.spec.ts)                                                                                      |
+| Unit / Agent application | 工具路由、审计、审批等待、拒绝和会话释放                                      | [`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts) |
+| Contract / tool protocol | 完整工具目录、画布/启动组合路由、严格 Schema、安全注解和排除的通用工具        | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                |
+| Contract / JSON-RPC      | 初始化说明、带安全注解的工具列表和调用结果结构                                | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)                                                                                  |
+| Contract / HTTP          | 本机端点、Bearer 鉴权和 MCP 主路径                                            | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                            |
+| Integration / Codex PTY  | 条件注入 URL/Token/required/会话路由/默认预批准、继承全局权限和关闭时环境隔离 | [`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                     |
 
 手工验收至少覆盖：
 
-1. MCP 开启时，Agent 对未限定的“整理终端”请求能先查看画布，再创建或整理终端积木和终端组合；明确要求修改终端源码时仍按项目代码处理。
+1. MCP 开启时，Agent 对“帮我建一个启动项目的终端组合”先查看画布，可以再读取仓库确认启动命令，但最终必须创建真实终端积木与终端组合，不得用直接启动 Shell 进程代替，也不得把只创建的对象表述为已经启动；明确要求修改终端源码时仍按项目代码处理。
 2. 未携带或携带错误 Token 的请求不能列出或调用工具。
 3. 删除工具在 UI 批准前不修改画布，拒绝后保持原图。
 4. 工具成功后当前工作面的图快照及时刷新。
 5. 移除 Agent 或退出应用后，旧端点和待审批调用不可继续使用。
 6. 同一工作区的多个 Agent 使用不同会话端点，审批和调用不串线。
+7. 在没有更高优先级组织受管策略覆盖时，任意 CleanCode MCP 工具调用都不触发 Codex 原生审批；删除工具仍只等待 cleancode UI 审批。
+8. MCP Server 无法初始化时，开启该能力的 Codex 会话启动或恢复失败并展示异常，不进入缺少画布工具的可交互状态。
 
 ## 维护规则
 
@@ -228,5 +239,7 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 改变监听范围、Token 传递、会话注销或 Codex 注入方式时，必须同步安全不变量、技术栈和相关契约/集成测试。改变用户可见审批或 Agent 控制台行为时，还必须同步 UI 契约和表现层测试。
 
 改变画布语义说明或工具安全注解时，必须同步 `AgentToolProtocol`、JSON-RPC 映射、工具协议契约测试和本文；安全注解必须描述真实副作用，不得用来替代 Agent 领域审批策略。
+
+未来新增的 CleanCode MCP 工具自动继承 Server 级 `approve`。新增工具前仍必须明确业务事实 owner、真实安全注解、cleancode 内部审批策略和审计行为，不得把 Codex 原生预批准当作业务授权。
 
 未来的连线、运行、日志或自定义积木能力必须先明确所属限界上下文和应用层端口，再通过独立 Spec 实现。它们在代码与契约测试落地前只能作为未来方向，不得写入本文件的当前工具目录，也不得在架构文档中列为已经必须实现的协议事实。

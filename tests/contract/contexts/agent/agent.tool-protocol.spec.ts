@@ -1,5 +1,6 @@
 import {
   agentToolDefinitions,
+  cleancodeMcpDeveloperInstructions,
   cleancodeMcpInstructions
 } from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
 
@@ -66,6 +67,25 @@ describe('agent tool protocol', () => {
     expect(priorityInstructions).toContain('Terminal component')
     expect(priorityInstructions).toContain('xterm')
     expect(priorityInstructions).toContain('PTY')
+  })
+
+  it('requires enabled Codex sessions to complete startup terminal groups through canvas tools', () => {
+    expect(cleancodeMcpDeveloperInstructions).toContain('启动项目的终端组合')
+    expect(cleancodeMcpDeveloperInstructions).toContain('inspect_graph')
+    expect(cleancodeMcpDeveloperInstructions).toContain('create_block')
+    expect(cleancodeMcpDeveloperInstructions).toContain('create_terminal_group')
+    expect(cleancodeMcpDeveloperInstructions).toContain('shell processes')
+    expect(cleancodeMcpDeveloperInstructions).toMatch(/do not claim/i)
+    expect(cleancodeMcpDeveloperInstructions).toContain('source-code implementation')
+  })
+
+  it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {
+    expect(cleancodeMcpInstructions).toContain('pre-approved at the Codex MCP layer')
+    expect(cleancodeMcpInstructions).toContain('global Codex sandbox or approval policy')
+    expect(cleancodeMcpInstructions).toContain('other MCP servers')
+    expect(cleancodeMcpInstructions).toContain(
+      'Deletion tools still require independent CleanCode UI approval'
+    )
   })
 
   it('advertises accurate MCP safety annotations for every canvas tool', () => {

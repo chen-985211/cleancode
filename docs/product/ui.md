@@ -201,9 +201,9 @@ Codex Agent 控制台必须：
 
 每个 Agent 必须拥有稳定身份和独立的 Codex CLI PTY、输入输出、审批、MCP 会话及分支对话绑定。移动、选择、重命名或调整控制台大小不得重启或重复创建 Agent 会话。
 
-CleanCode MCP 开关只控制 cleancode 内建画布 MCP，不得顺带覆盖用户 Codex 的 sandbox 或 approval 配置。切换运行中的 Agent 时必须重启该 Agent 的 PTY、继续原 Codex thread、释放旧 MCP 端点并取消旧待审批请求，不得影响其他 Agent；没有活动 PTY 时只保存期望状态并在下次附加时生效。删除画布对象仍必须经过 cleancode 独立审批，不能因 Codex 自身的批准设置而绕过。
+CleanCode MCP 开关只控制 cleancode 内建画布 MCP。开启时，该 Server 必须成功初始化，其全部当前和未来工具在 Codex MCP 层默认预批准，不显示 Codex 原生工具审批；初始化失败时 Agent 会话必须展示异常，不得在缺少画布工具时静默继续。用户 Codex 的 sandbox、全局 approval policy，以及 Shell、文件、Git、网络和其他 MCP 的权限不得被顺带覆盖。切换运行中的 Agent 时必须重启该 Agent 的 PTY、继续原 Codex thread、释放旧 MCP 端点并取消旧待审批请求，不得影响其他 Agent；没有活动 PTY 时只保存期望状态并在下次附加时生效。删除画布对象仍必须经过 cleancode 独立审批，不能因 Codex 原生预批准而绕过。
 
-CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”“终端布局”或“终端组合”，Agent 必须优先理解为当前画布的终端积木与终端组合并先查看画布；只有明确提到终端源码、Terminal 组件、xterm、PTY 或终端模块实现时，才理解为项目代码。关闭 MCP 时不得向原生 Codex 注入这层画布语义。
+CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”或“启动项目的终端组合”，Agent 必须优先理解为当前画布的终端积木与终端组合并先查看画布；为了确定启动命令可以随后读取仓库，但最终必须通过画布工具创建终端积木和组合，不得用直接启动 Shell 进程或创建项目配置代替。当前 MCP 只能创建带启动命令的画布对象，不能启动终端或组合，Agent 不得把“已创建”表述为“已启动”。只有明确提到终端源码、Terminal 组件、xterm、PTY 或终端模块实现时，才理解为项目代码。关闭 MCP 时不得向原生 Codex 注入这层画布语义。
 
 移除 Agent 属于破坏性操作，必须确认并明确说明：系统会停止该 Agent、取消其未完成审批并删除 cleancode 中的 Agent 定义和对话绑定，但不会回滚项目文件、删除 Git 提交或影响其他 Agent。
 

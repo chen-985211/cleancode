@@ -20,9 +20,15 @@ interface AgentToolAnnotations {
 
 type AgentToolInputSchema = Record<string, unknown>
 
+export const cleancodeMcpDeveloperInstructions = [
+  'CleanCode canvas routing is mandatory while the built-in cleancode MCP server is enabled. Treat unqualified requests about “终端”, “整理终端”, “终端布局”, “终端组合”, and specifically “启动项目的终端组合” as requests to create or modify persisted CleanCode canvas terminal blocks and groups, not as requests to run project processes directly.',
+  'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands. Complete canvas creation with create_block as needed and create_terminal_group. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects.',
+  'The current CleanCode MCP has no tool that starts a canvas terminal or terminal group. Do not claim that a created group or its member terminals were started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.'
+].join('\n')
+
 export const cleancodeMcpInstructions = [
   'CleanCode canvas scope / CleanCode 画布语义：while this MCP server is enabled, unqualified requests such as “终端”, “整理终端”, “终端布局”, “终端组合”, terminal organization, or terminal layout mean CleanCode canvas terminal blocks and groups, not repository code. Call inspect_graph before reading or searching repository files. Only treat explicit source-code terms such as “终端源码”, “Terminal component”, xterm, PTY, or terminal module implementation as project-code work.',
-  'For canvas work, call inspect_graph before changes, create terminal blocks with create_block, then group existing block ids with create_terminal_group. Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. Deletion tools require independent CleanCode UI approval; this MCP does not override Codex sandbox or approval settings.'
+  'For canvas work, call inspect_graph before changes, create terminal blocks with create_block, then group existing block ids with create_terminal_group. Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. CleanCode MCP tools are pre-approved at the Codex MCP layer. This does not change the global Codex sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval.'
 ].join('\n')
 
 const readOnlyToolAnnotations: AgentToolAnnotations = {
