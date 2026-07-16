@@ -5,6 +5,7 @@ import { AgentNode } from '../../../src/presentation/app-shell/AgentNode'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
 
 vi.mock('@xyflow/react', () => ({
+  Handle: ({ className, id }: HandleProps) => <span className={className} data-handleid={id} />,
   NodeResizeControl: ({ onResizeEnd, position, style }: ResizeControlProps) => (
     <span
       data-resize-position={position}
@@ -15,6 +16,7 @@ vi.mock('@xyflow/react', () => ({
       }
     />
   ),
+  Position: { Right: 'right' },
   NodeResizer: ({ handleStyle, isVisible }: NodeResizerProps) => (
     <>
       {isVisible
@@ -30,6 +32,11 @@ vi.mock('@xyflow/react', () => ({
     </>
   )
 }))
+
+interface HandleProps {
+  readonly className?: string
+  readonly id?: string
+}
 
 interface ResizeControlProps {
   readonly onResizeEnd?: (event: never, params: never) => void

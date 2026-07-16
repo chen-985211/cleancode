@@ -6,6 +6,7 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { agentApprovalSourceHandleId, agentApprovalTargetHandleId } from './agentApprovalHandles'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import type { AgentApprovalNodeIntent, AgentToolApprovalViewState } from './agentToolApprovalTypes'
 
@@ -128,8 +129,10 @@ export function createAgentApprovalIntentEdges(
         reconnectable: false,
         selectable: false,
         source: presentation.agentNodeId,
+        sourceHandle: agentApprovalSourceHandleId,
         style: { stroke: 'var(--cc-warning)' },
         target: presentation.visibleTargetNodeId,
+        targetHandle: agentApprovalTargetHandleId,
         type: 'approvalIntent'
       }
     ]

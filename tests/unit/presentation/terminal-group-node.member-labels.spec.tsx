@@ -7,6 +7,13 @@ import type {
   TerminalViewState
 } from '../../../src/presentation/app-shell/types'
 
+vi.mock('@xyflow/react', () => ({
+  Handle: ({ className, id }: { readonly className?: string; readonly id?: string }) => (
+    <span className={className} data-handleid={id} />
+  ),
+  Position: { Left: 'left' }
+}))
+
 describe('terminal group member labels', () => {
   it('hides member labels while the group is expanded', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)

@@ -2,6 +2,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { memo } from 'react'
 
 import { AgentConsole } from './AgentConsole'
+import { agentApprovalSourceHandleId } from './agentApprovalHandles'
 import { minimumAgentConsoleSize } from './agentConsoleFlowNode'
 import type { AgentConsoleFlowNode } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
@@ -34,14 +35,13 @@ export const AgentNode = memo(function AgentNode({
       data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
       data-selection-state={selected ? 'selected' : 'unselected'}
     >
-      {hasActiveApproval ? (
-        <Handle
-          className="agent-approval-intent-handle agent-approval-intent-handle--source"
-          type="source"
-          position={Position.Right}
-          isConnectable={false}
-        />
-      ) : null}
+      <Handle
+        id={agentApprovalSourceHandleId}
+        className="agent-approval-intent-handle agent-approval-intent-handle--source"
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+      />
       <WorkbenchNodeResizer
         minWidth={minimumAgentConsoleSize.width}
         minHeight={minimumAgentConsoleSize.height}

@@ -11,6 +11,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { GroupRestartIcon } from './TerminalGroupIcons'
 import { TerminalMetadataForm } from './TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { agentApprovalTargetHandleId } from './agentApprovalHandles'
 import { TerminalViewport } from './TerminalViewport'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
@@ -153,6 +154,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         className="terminal-node__handle terminal-node__handle--input"
         type="target"
         position={Position.Left}
+      />
+      <Handle
+        id={agentApprovalTargetHandleId}
+        className="agent-approval-intent-handle agent-approval-intent-handle--target"
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
       />
       <TerminalHeader
         blockName={block.name}

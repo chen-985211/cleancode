@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react'
 import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { agentApprovalTargetHandleId } from './agentApprovalHandles'
 import {
   GroupAddIcon,
   GroupCollapseIcon,
@@ -61,18 +62,17 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 
   return (
     <section className={className} data-terminal-group-id={group.id}>
+      <Handle
+        id={agentApprovalTargetHandleId}
+        className="agent-approval-intent-handle agent-approval-intent-handle--target"
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+      />
       {data.approvalIntent ? (
-        <>
-          <Handle
-            className="agent-approval-intent-handle agent-approval-intent-handle--target"
-            type="target"
-            position={Position.Left}
-            isConnectable={false}
-          />
-          <span className="agent-approval-target-chip">
-            {data.approvalIntent === 'dissolve' ? 'AI 想解散' : '包含待删除终端'}
-          </span>
-        </>
+        <span className="agent-approval-target-chip">
+          {data.approvalIntent === 'dissolve' ? 'AI 想解散' : '包含待删除终端'}
+        </span>
       ) : null}
       <div
         data-workbench-node-title="true"

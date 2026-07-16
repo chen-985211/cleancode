@@ -135,6 +135,15 @@ describe('Agent destructive approval canvas', () => {
 
     await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
     expect(approvalListener).toBeTruthy()
+    expect(document.querySelector('.agent-approval-intent-handle--source')).toHaveAttribute(
+      'data-handleid',
+      'agent-approval-source'
+    )
+    expect(document.querySelectorAll('.agent-approval-intent-handle--target')).toHaveLength(3)
+    for (const targetHandle of document.querySelectorAll('.agent-approval-intent-handle--target')) {
+      expect(targetHandle).toHaveAttribute('data-handleid', 'agent-approval-target')
+    }
+
     act(() => {
       approvalListener?.({
         agentId: 'agent-1',

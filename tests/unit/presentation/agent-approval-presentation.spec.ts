@@ -49,7 +49,9 @@ describe('Agent approval presentation', () => {
         id: 'approval:approval-1',
         selectable: false,
         source: 'agent:agent-1',
+        sourceHandle: 'agent-approval-source',
         target: 'group-app',
+        targetHandle: 'agent-approval-target',
         type: 'approvalIntent'
       })
     ])
