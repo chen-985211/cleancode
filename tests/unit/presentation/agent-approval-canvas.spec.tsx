@@ -164,12 +164,12 @@ describe('Agent destructive approval canvas', () => {
       )
     )
     expect(document.querySelector('.agent-tool-approval-card')).toBeInTheDocument()
-    expect(await screen.findByText('删除终端？')).toBeInTheDocument()
+    expect(await screen.findByText('删除终端')).toBeInTheDocument()
     expect(screen.getAllByText('Backend API')).toHaveLength(2)
-    expect(document.querySelector('[data-terminal-block-id="terminal-1"]')).toHaveClass(
-      'terminal-node--approval-target'
-    )
-    fireEvent.click(screen.getByText('删除终端', { selector: 'button' }))
+    const approvalTarget = document.querySelector('[data-terminal-block-id="terminal-1"]')
+    expect(approvalTarget).toHaveClass('terminal-node--approval-target')
+    expect(approvalTarget?.querySelector('.agent-approval-target-chip')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('确认删除', { selector: 'button' }))
     expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-1' })
 
     act(() => {

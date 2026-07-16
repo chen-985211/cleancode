@@ -76,7 +76,7 @@ describe('Agent console CleanCode MCP toggle', () => {
     await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
     expect(container.querySelector('.agent-console__header [role="switch"]')).toBeInTheDocument()
 
-    expect(await screen.findByText('AI 操作审批')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '删除终端' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('switch', { name: 'CleanCode MCP' }))
 

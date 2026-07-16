@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -26,16 +26,19 @@ describe('Agent tool approval card', () => {
       />
     )
 
-    expect(screen.getByRole('heading', { name: '删除终端？' })).toBeInTheDocument()
+    expect(screen.getByText('需要你的确认')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '删除终端' })).toBeInTheDocument()
     expect(screen.getByText('Backend API')).toBeInTheDocument()
     expect(screen.getByText('FastAPI 开发服务器')).toBeInTheDocument()
     expect(screen.getByText('位于组合「启动项目」')).toBeInTheDocument()
+    expect(screen.getByText('ID terminal-api')).toBeInTheDocument()
     expect(screen.getByText(/从画布删除此终端及相关连线/)).toBeInTheDocument()
-    expect(screen.getByText('另有 2 个请求等待处理')).toBeInTheDocument()
+    expect(screen.getByText('1 / 3')).toHaveAccessibleName('当前第 1 个，共 3 个审批请求')
 
-    fireEvent.click(screen.getByRole('button', { name: '在画布中查看 Backend API' }))
+    const target = screen.getByRole('group', { name: '审批目标 Backend API' })
+    fireEvent.click(within(target).getByRole('button', { name: '在画布中查看 Backend API' }))
     fireEvent.click(screen.getByRole('button', { name: '保留终端' }))
-    fireEvent.click(screen.getByRole('button', { name: '删除终端' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }))
     expect(onLocate).toHaveBeenCalledOnce()
     expect(onReject).toHaveBeenCalledOnce()
     expect(onApprove).toHaveBeenCalledOnce()
@@ -55,7 +58,8 @@ describe('Agent tool approval card', () => {
     )
 
     expect(screen.getByText('目标已不在当前画布中')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '删除终端' })).toBeDisabled()
+    expect(screen.getByText('目标不可用')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '确认删除' })).toBeDisabled()
 
     rerender(
       <AgentToolApprovalCard
@@ -73,7 +77,7 @@ describe('Agent tool approval card', () => {
         onReject={vi.fn()}
       />
     )
-    expect(screen.getByRole('button', { name: '删除中…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '正在删除…' })).toBeDisabled()
   })
 
   it('explains that dissolving a group preserves its terminals and connections', () => {
@@ -93,10 +97,11 @@ describe('Agent tool approval card', () => {
       />
     )
 
-    expect(screen.getByRole('heading', { name: '解散组合？' })).toBeInTheDocument()
+    expect(screen.getByText('需要你的确认')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '解散终端组合' })).toBeInTheDocument()
     expect(screen.getByText('2 个终端：Backend API、Admin Web')).toBeInTheDocument()
     expect(screen.getByText('只解散组合，保留其中终端及现有连线。')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '解散组合' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '确认解散' })).toBeInTheDocument()
   })
 })
 

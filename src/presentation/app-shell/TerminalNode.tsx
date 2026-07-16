@@ -141,7 +141,6 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   return (
     <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
-      {data.approvalIntent ? <span className="agent-approval-target-chip">AI 想删除</span> : null}
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}

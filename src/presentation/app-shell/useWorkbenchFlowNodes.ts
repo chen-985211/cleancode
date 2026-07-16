@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
@@ -72,11 +72,24 @@ export function useWorkbenchFlowNodes({
   onSelectAgent
 }: UseWorkbenchFlowNodesInput): void {
   const graphIdUsedForNodesRef = useRef<string | null>(null)
+  const agentToolApprovalsRef = useRef(agentToolApprovals)
+
+  useLayoutEffect(() => {
+    agentToolApprovalsRef.current = agentToolApprovals
+    setNodes((currentNodes) =>
+      projectAgentApprovalsOntoNodes(currentNodes, agentToolApprovals, graph)
+    )
+  }, [agentToolApprovals, graph, setNodes])
 
   useEffect(() => {
+    const currentAgentToolApprovals = agentToolApprovalsRef.current
+
     setNodes((currentNodes) => {
       const terminalNodes = createTerminalFlowNodes({
-        approvalNodeIntents: createAgentApprovalNodeIntents(agentToolApprovals.approvals, graph),
+        approvalNodeIntents: createAgentApprovalNodeIntents(
+          currentAgentToolApprovals.approvals,
+          graph
+        ),
         graph,
         handlers,
         hoveredTerminalBlockId,
@@ -93,7 +106,7 @@ export function useWorkbenchFlowNodes({
         ...agents.map((agent) =>
           createAgentConsoleFlowNode({
             agent,
-            approvalController: agentToolApprovals,
+            approvalController: currentAgentToolApprovals,
             currentWorkbench,
             currentWorkspace: currentWorkspace ?? null,
             isSelected: selectedAgentId === agent.agentId,
@@ -116,7 +129,6 @@ export function useWorkbenchFlowNodes({
         : nextNodes
     })
   }, [
-    agentToolApprovals,
     currentWorkbench,
     currentWorkspace,
     graph,
@@ -138,6 +150,30 @@ export function useWorkbenchFlowNodes({
     onResizeAgent,
     onSelectAgent
   ])
+}
+
+function projectAgentApprovalsOntoNodes(
+  nodes: WorkbenchFlowNode[],
+  approvalController: AgentToolApprovalController,
+  graph: WorkbenchSnapshot['graph'] | null
+): WorkbenchFlowNode[] {
+  const approvalNodeIntents = createAgentApprovalNodeIntents(approvalController.approvals, graph)
+  let didChange = false
+  const nextNodes = nodes.map((node): WorkbenchFlowNode => {
+    if (node.type === 'agentConsole') {
+      if (node.data.approvalController === approvalController) return node
+      didChange = true
+      return { ...node, data: { ...node.data, approvalController } }
+    }
+
+    const approvalIntent = approvalNodeIntents.get(node.id)
+
+    if (node.data.approvalIntent === approvalIntent) return node
+    didChange = true
+    return { ...node, data: { ...node.data, approvalIntent } } as WorkbenchFlowNode
+  })
+
+  return didChange ? nextNodes : nodes
 }
 
 function resolveWorkspaceAgents(

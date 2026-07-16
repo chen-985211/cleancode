@@ -69,10 +69,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         position={Position.Left}
         isConnectable={false}
       />
-      {data.approvalIntent ? (
-        <span className="agent-approval-target-chip">
-          {data.approvalIntent === 'dissolve' ? 'AI 想解散' : '包含待删除终端'}
-        </span>
+      {data.approvalIntent === 'contains-delete' ? (
+        <span className="agent-approval-target-chip">包含待删除终端</span>
       ) : null}
       <div
         data-workbench-node-title="true"

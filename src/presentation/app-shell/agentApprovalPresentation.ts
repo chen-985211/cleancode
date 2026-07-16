@@ -38,7 +38,7 @@ export type AgentApprovalPresentation =
     })
 
 export interface AgentApprovalIntentEdgeData extends Record<string, unknown> {
-  readonly label: 'AI 想删除' | 'AI 想解散'
+  readonly label: '删除' | '解散'
   readonly phase: AgentToolApprovalViewState['phase']
 }
 
@@ -116,7 +116,7 @@ export function createAgentApprovalIntentEdges(
         animated: approval.phase === 'approving',
         className: `agent-approval-intent-edge agent-approval-intent-edge--${approval.phase}`,
         data: {
-          label: presentation.targetKind === 'terminal' ? 'AI 想删除' : 'AI 想解散',
+          label: presentation.targetKind === 'terminal' ? '删除' : '解散',
           phase: approval.phase
         },
         deletable: false,

@@ -24,20 +24,21 @@ export function AgentToolApprovalCard({
   const isApproving = phase === 'approving'
   const isFailed = phase === 'failed'
   const isMissing = presentation.status === 'missing'
-  const heading = isFailed
-    ? isTerminal
-      ? '终端未删除'
-      : '组合未解散'
-    : isTerminal
-      ? '删除终端？'
-      : '解散组合？'
+  const heading = isTerminal ? '删除终端' : '解散终端组合'
+  const statusLabel = isMissing
+    ? '目标不可用'
+    : isFailed
+      ? '操作未完成'
+      : isApproving
+        ? '正在执行'
+        : '需要你的确认'
   const destructiveLabel = isApproving
     ? isTerminal
-      ? '删除中…'
-      : '解散中…'
+      ? '正在删除…'
+      : '正在解散…'
     : isTerminal
-      ? '删除终端'
-      : '解散组合'
+      ? '确认删除'
+      : '确认解散'
 
   return (
     <section
@@ -52,34 +53,38 @@ export function AgentToolApprovalCard({
       aria-label="Agent 工具授权"
     >
       <header className="agent-tool-approval-card__header">
-        <span className="agent-tool-approval-card__eyebrow">
-          <ShieldAlert size={14} aria-hidden="true" />
-          AI 操作审批
+        <span className="agent-tool-approval-card__status-icon" aria-hidden="true">
+          <ShieldAlert size={18} />
         </span>
+        <div className="agent-tool-approval-card__heading">
+          <span className="agent-tool-approval-card__eyebrow">{statusLabel}</span>
+          <h3>{heading}</h3>
+        </div>
         {queueCount > 0 ? (
-          <span className="agent-tool-approval-card__queue">另有 {queueCount} 个请求等待处理</span>
+          <span
+            className="agent-tool-approval-card__queue"
+            aria-label={`当前第 1 个，共 ${queueCount + 1} 个审批请求`}
+          >
+            1 / {queueCount + 1}
+          </span>
         ) : null}
       </header>
 
       <div className="agent-tool-approval-card__body">
-        <div className="agent-tool-approval-card__title-row">
-          <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
-            {isTerminal ? <Terminal size={18} /> : <Box size={18} />}
-          </span>
-          <div>
-            <h3>{heading}</h3>
-            <p>{createLead(presentation)}</p>
-          </div>
-        </div>
-
         {isMissing ? (
           <div className="agent-tool-approval-card__notice" role="status">
             <TriangleAlert size={15} aria-hidden="true" />
-            <span>目标已不在当前画布中</span>
-            <code>{shortenId(presentation.targetId)}</code>
+            <span>
+              目标已不在当前画布中
+              <code title={presentation.targetId}>ID {shortenId(presentation.targetId)}</code>
+            </span>
           </div>
         ) : (
-          <TargetDetails presentation={presentation} />
+          <TargetDetails
+            presentation={presentation}
+            isLocatingDisabled={isApproving}
+            onLocate={onLocate}
+          />
         )}
 
         {isFailed ? (
@@ -88,7 +93,12 @@ export function AgentToolApprovalCard({
             <span>{presentation.approval.errorMessage ?? '操作未完成。AI 可重新发起请求。'}</span>
           </div>
         ) : (
-          <p className="agent-tool-approval-card__impact">{createImpact(presentation)}</p>
+          <p className="agent-tool-approval-card__impact">
+            <span className="agent-tool-approval-card__impact-icon" aria-hidden="true">
+              <TriangleAlert size={14} />
+            </span>
+            <span>{createImpact(presentation)}</span>
+          </p>
         )}
       </div>
 
@@ -99,17 +109,6 @@ export function AgentToolApprovalCard({
           </button>
         ) : (
           <>
-            <button
-              className="agent-tool-approval-card__button agent-tool-approval-card__button--locate"
-              type="button"
-              aria-label={`在画布中查看 ${readTargetName(presentation)}`}
-              disabled={isApproving || isMissing}
-              onClick={onLocate}
-            >
-              <MapPin size={14} aria-hidden="true" />
-              在画布中查看
-            </button>
-            <span className="agent-tool-approval-card__action-spacer" />
             <button
               className="agent-tool-approval-card__button"
               type="button"
@@ -140,50 +139,97 @@ export function AgentToolApprovalCard({
   )
 }
 
-function TargetDetails({ presentation }: { readonly presentation: AgentApprovalPresentation }) {
+interface TargetDetailsProps {
+  readonly isLocatingDisabled: boolean
+  readonly onLocate: () => void
+  readonly presentation: AgentApprovalPresentation
+}
+
+function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDetailsProps) {
   if (presentation.status === 'missing') return null
 
   if (presentation.targetKind === 'terminal') {
     return (
-      <div className="agent-tool-approval-card__target">
-        <div className="agent-tool-approval-card__target-main">
+      <div
+        className="agent-tool-approval-card__target"
+        role="group"
+        aria-label={`审批目标 ${presentation.block.name}`}
+      >
+        <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
+          <Terminal size={18} />
+        </span>
+        <div className="agent-tool-approval-card__target-copy">
+          <span className="agent-tool-approval-card__target-type">目标终端</span>
           <strong>{presentation.block.name}</strong>
-          <code>{shortenId(presentation.block.id)}</code>
-        </div>
-        <span>{presentation.block.description || '未填写终端说明'}</span>
-        {presentation.containingGroup ? (
-          <span className="agent-tool-approval-card__membership">
-            位于组合「{presentation.containingGroup.name}」
+          <span className="agent-tool-approval-card__description">
+            {presentation.block.description || '未填写终端说明'}
           </span>
-        ) : null}
+          <div className="agent-tool-approval-card__target-meta">
+            <code title={presentation.block.id}>ID {shortenId(presentation.block.id)}</code>
+            {presentation.containingGroup ? (
+              <span className="agent-tool-approval-card__membership">
+                位于组合「{presentation.containingGroup.name}」
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <LocateTargetButton
+          disabled={isLocatingDisabled}
+          name={presentation.block.name}
+          onLocate={onLocate}
+        />
       </div>
     )
   }
 
   return (
-    <div className="agent-tool-approval-card__target">
-      <div className="agent-tool-approval-card__target-main">
-        <strong>{presentation.group.name}</strong>
-        <code>{shortenId(presentation.group.id)}</code>
-      </div>
-      <span>
-        {presentation.memberBlocks.length} 个终端：
-        {presentation.memberBlocks.map((block) => block.name).join('、') || '无成员'}
+    <div
+      className="agent-tool-approval-card__target"
+      role="group"
+      aria-label={`审批目标 ${presentation.group.name}`}
+    >
+      <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
+        <Box size={18} />
       </span>
+      <div className="agent-tool-approval-card__target-copy">
+        <span className="agent-tool-approval-card__target-type">目标组合</span>
+        <strong>{presentation.group.name}</strong>
+        <span className="agent-tool-approval-card__description">
+          {presentation.memberBlocks.length} 个终端：
+          {presentation.memberBlocks.map((block) => block.name).join('、') || '无成员'}
+        </span>
+        <div className="agent-tool-approval-card__target-meta">
+          <code title={presentation.group.id}>ID {shortenId(presentation.group.id)}</code>
+        </div>
+      </div>
+      <LocateTargetButton
+        disabled={isLocatingDisabled}
+        name={presentation.group.name}
+        onLocate={onLocate}
+      />
     </div>
   )
 }
 
-function createLead(presentation: AgentApprovalPresentation): string {
-  if (presentation.status === 'missing') {
-    return presentation.targetKind === 'terminal'
-      ? 'AI 请求删除一个无法定位的终端。'
-      : 'AI 请求解散一个无法定位的组合。'
-  }
+interface LocateTargetButtonProps {
+  readonly disabled: boolean
+  readonly name: string
+  readonly onLocate: () => void
+}
 
-  return presentation.targetKind === 'terminal'
-    ? `AI 想从画布删除「${presentation.block.name}」。`
-    : `AI 想解散「${presentation.group.name}」。`
+function LocateTargetButton({ disabled, name, onLocate }: LocateTargetButtonProps) {
+  return (
+    <button
+      className="agent-tool-approval-card__locate"
+      type="button"
+      aria-label={`在画布中查看 ${name}`}
+      disabled={disabled}
+      onClick={onLocate}
+    >
+      <MapPin size={14} aria-hidden="true" />
+      在画布查看
+    </button>
+  )
 }
 
 function createImpact(presentation: AgentApprovalPresentation): string {
@@ -194,11 +240,6 @@ function createImpact(presentation: AgentApprovalPresentation): string {
   return presentation.targetKind === 'terminal'
     ? '从画布删除此终端及相关连线；所在组合可能因成员不足自动解散。'
     : '只解散组合，保留其中终端及现有连线。'
-}
-
-function readTargetName(presentation: AgentApprovalPresentation): string {
-  if (presentation.status === 'missing') return presentation.targetId
-  return presentation.targetKind === 'terminal' ? presentation.block.name : presentation.group.name
 }
 
 function shortenId(id: string): string {

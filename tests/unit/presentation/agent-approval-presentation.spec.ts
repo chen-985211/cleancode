@@ -43,7 +43,7 @@ describe('Agent approval presentation', () => {
     ).toEqual([
       expect.objectContaining({
         className: expect.stringContaining('agent-approval-intent-edge'),
-        data: expect.objectContaining({ label: 'AI 想删除' }),
+        data: expect.objectContaining({ label: '删除' }),
         deletable: false,
         focusable: false,
         id: 'approval:approval-1',

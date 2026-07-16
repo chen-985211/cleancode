@@ -288,6 +288,30 @@ describe('terminal group member labels', () => {
     )
     expect(container.querySelector('[data-workbench-node-selection]')).toBeInTheDocument()
   })
+
+  it('labels only a collapsed group that proxies a terminal approval target', () => {
+    const { rerender } = render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: true,
+          data: { approvalIntent: 'dissolve' }
+        })}
+      />
+    )
+
+    expect(screen.queryByText('AI 想解散')).not.toBeInTheDocument()
+
+    rerender(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: true,
+          data: { approvalIntent: 'contains-delete' }
+        })}
+      />
+    )
+
+    expect(screen.getByText('包含待删除终端')).toBeInTheDocument()
+  })
 })
 
 function createTerminalGroupNodeProps(input: {
