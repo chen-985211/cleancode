@@ -12,6 +12,7 @@ import type { ExecuteAgentToolCommand } from '../../../../src/contexts/agent/app
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
+import type { AgentToolApprovalRequest } from '../../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 
 describe('agent session service', () => {
   it('keeps one background Codex PTY per workspace and reattaches without restarting it', async () => {
@@ -180,18 +181,22 @@ describe('agent session service', () => {
   })
 
   it('waits for UI approval before executing destructive MCP tools', async () => {
-    const approvals: string[] = []
+    const approvals: AgentToolApprovalRequest[] = []
     const executeAgentTool = vi
       .fn<ExecuteAgentTool>()
       .mockResolvedValueOnce({
-        approval: { summary: '删除终端积木 terminal-1', toolName: 'delete_block' },
+        approval: {
+          summary: '删除终端积木 terminal-1',
+          target: { blockId: 'terminal-1', kind: 'terminal_block' },
+          toolName: 'delete_block'
+        },
         status: 'awaiting_approval',
         toolCallId: 'approval-1'
       })
       .mockResolvedValueOnce(completedToolResult('approval-1'))
     const service = createSessionService({ executeAgentTool })
     const session = await attachMainSession(service, {
-      onToolApprovalRequested: (approval) => approvals.push(approval.approvalId)
+      onToolApprovalRequested: (approval) => approvals.push(approval)
     })
 
     const resultPromise = service.executeMcpTool({
@@ -199,9 +204,20 @@ describe('agent session service', () => {
       sessionId: session.sessionId,
       toolName: 'delete_block'
     })
-    await vi.waitFor(() => expect(approvals).toEqual(['approval-1']))
+    await vi.waitFor(() =>
+      expect(approvals).toEqual([
+        expect.objectContaining({
+          approvalId: 'approval-1',
+          target: { blockId: 'terminal-1', kind: 'terminal_block' }
+        })
+      ])
+    )
 
-    service.approveTool({ approvalId: 'approval-1' })
+    const approvalResult = service.approveTool({ approvalId: 'approval-1' })
+    await expect(approvalResult).resolves.toEqual({
+      graph: completedToolResult('approval-1').graph,
+      status: 'completed'
+    })
     await expect(resultPromise).resolves.toEqual(completedToolResult('approval-1'))
     expect(executeAgentTool).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -214,7 +230,11 @@ describe('agent session service', () => {
 
   it('returns a canceled result when a destructive MCP tool is rejected or its session is disposed', async () => {
     const executeAgentTool = vi.fn<ExecuteAgentTool>(async () => ({
-      approval: { summary: '删除组合终端 group-1', toolName: 'delete_terminal_group' },
+      approval: {
+        summary: '删除组合终端 group-1',
+        target: { kind: 'terminal_group', terminalGroupId: 'group-1' },
+        toolName: 'delete_terminal_group'
+      },
       status: 'awaiting_approval',
       toolCallId: 'approval-1'
     }))
@@ -252,7 +272,11 @@ describe('agent session service', () => {
     const executeAgentTool = vi
       .fn<ExecuteAgentTool>()
       .mockResolvedValueOnce({
-        approval: { summary: '删除终端积木 terminal-1', toolName: 'delete_block' },
+        approval: {
+          summary: '删除终端积木 terminal-1',
+          target: { blockId: 'terminal-1', kind: 'terminal_block' },
+          toolName: 'delete_block'
+        },
         status: 'awaiting_approval',
         toolCallId: 'approval-2'
       })
@@ -430,7 +454,9 @@ function agentKey(projectId: string, workspaceName: string, agentId: string): st
   return JSON.stringify([projectId, workspaceName, agentId])
 }
 
-function completedToolResult(toolCallId: string): AgentToolExecutionResult {
+function completedToolResult(
+  toolCallId: string
+): Extract<AgentToolExecutionResult, { readonly status: 'completed' }> {
   return {
     graph: {
       blocks: [],

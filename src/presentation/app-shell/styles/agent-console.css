@@ -209,8 +209,7 @@
 }
 
 .agent-console__title-row,
-.agent-runtime-notice,
-.agent-approval__actions {
+.agent-runtime-notice {
   display: flex;
   align-items: center;
 }
@@ -333,74 +332,6 @@
   font-size: 12px;
 }
 
-.agent-approval {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
-  gap: 7px 8px;
-  margin: 10px 12px 0;
-  border: 1px solid var(--cc-warning-border);
-  border-radius: 9px;
-  background: var(--cc-warning-soft);
-  color: var(--cc-warning);
-  padding: 9px;
-}
-
-.agent-approval__copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.agent-approval__copy strong {
-  color: var(--cc-warning-strong);
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.2;
-}
-
-.agent-approval__copy span {
-  overflow: hidden;
-  color: var(--cc-warning-strong);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agent-approval__actions {
-  grid-column: 2;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.agent-approval button {
-  height: 28px;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
-  background: var(--cc-surface);
-  color: var(--cc-muted-strong);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 650;
-  padding: 0 8px;
-}
-
-.agent-approval button:hover {
-  border-color: var(--cc-muted);
-  background: var(--cc-surface-subtle);
-}
-
-.agent-approval button:first-of-type {
-  border-color: var(--cc-danger);
-  background: var(--cc-danger);
-  color: var(--cc-surface);
-}
-
-.agent-approval button:first-of-type:hover {
-  border-color: var(--cc-danger-strong);
-  background: var(--cc-danger-strong);
-}
-
 .agent-runtime-notice {
   min-width: 0;
   min-height: 26px;
@@ -464,12 +395,5 @@
 @keyframes agent-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@media (max-width: 1120px) {
-  .agent-approval {
-    margin-right: 10px;
-    margin-left: 10px;
   }
 }

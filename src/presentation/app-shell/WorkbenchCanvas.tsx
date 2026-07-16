@@ -8,7 +8,7 @@ import {
   type ReactFlowInstance,
   type Viewport
 } from '@xyflow/react'
-import { useEffect, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
 import { Box } from 'lucide-react'
 
 import {
@@ -22,10 +22,14 @@ import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
+import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
+import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
+import { workbenchEdgeTypes } from './workbenchNodeTypes'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 interface WorkbenchCanvasProps {
+  readonly approvalIntents?: readonly AgentToolApprovalViewState[]
   readonly isDesktopRuntime: boolean
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
@@ -64,6 +68,7 @@ interface WorkbenchCanvasProps {
 }
 
 export function WorkbenchCanvas({
+  approvalIntents = [],
   isDesktopRuntime,
   currentWorkbench,
   currentWorkspace,
@@ -95,6 +100,14 @@ export function WorkbenchCanvas({
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
+  const approvalEdges = useMemo(
+    () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null),
+    [approvalIntents, currentWorkbench?.graph]
+  )
+  const edges = useMemo(
+    () => [...workflow.edges, ...approvalEdges],
+    [approvalEdges, workflow.edges]
+  )
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
@@ -206,9 +219,12 @@ export function WorkbenchCanvas({
         />
         <ReactFlow<WorkbenchFlowNode, Edge>
           nodes={nodes}
-          edges={workflow.edges}
+          edges={edges}
+          edgeTypes={workbenchEdgeTypes}
           onConnect={(connection) => void workflow.connect(connection)}
-          onEdgesDelete={(edges) => void workflow.deleteEdges(edges)}
+          onEdgesDelete={(edges) =>
+            void workflow.deleteEdges(edges.filter((edge) => !edge.id.startsWith('approval:')))
+          }
           nodeTypes={nodeTypes}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance

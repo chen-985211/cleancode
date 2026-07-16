@@ -47,7 +47,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     data.isTerminalGroupSelectionMode && data.isSelected
       ? 'terminal-node--group-candidate-selected'
       : '',
-    data.isNavigationHighlighted ? 'terminal-node--navigation-highlighted' : ''
+    data.isNavigationHighlighted ? 'terminal-node--navigation-highlighted' : '',
+    data.approvalIntent ? 'terminal-node--approval-target' : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -139,6 +140,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   return (
     <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
+      {data.approvalIntent ? <span className="agent-approval-target-chip">AI 想删除</span> : null}
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}

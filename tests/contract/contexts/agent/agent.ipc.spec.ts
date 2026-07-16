@@ -96,6 +96,7 @@ describe('agent IPC contract', () => {
           projectDirectory: command.projectDirectory,
           sessionId: 'agent-session-1',
           summary: '删除终端积木 terminal-1',
+          target: { blockId: 'terminal-1', kind: 'terminal_block' },
           toolName: 'delete_block',
           workspaceName: command.workspaceName
         })
@@ -295,7 +296,7 @@ describe('agent IPC contract', () => {
     const resizeAgentSession = vi.fn()
     const disposeAgentWorkspaceSession = vi.fn()
     const disposeProjectAgentSessions = vi.fn()
-    const approveAgentTool = vi.fn()
+    const approveAgentTool = vi.fn(async () => ({ status: 'not_found' as const }))
     const rejectAgentTool = vi.fn()
 
     registerAgentIpcHandlers(
@@ -336,7 +337,7 @@ describe('agent IPC contract', () => {
     ).resolves.toEqual({ ok: true, value: undefined })
     await expect(
       ipcMain.invoke('cleancode:approve-agent-tool', { approvalId: 'approval-1' })
-    ).resolves.toEqual({ ok: true, value: undefined })
+    ).resolves.toEqual({ ok: true, value: { status: 'not_found' } })
     await expect(
       ipcMain.invoke('cleancode:reject-agent-tool', { approvalId: 'approval-1' })
     ).resolves.toEqual({ ok: true, value: undefined })
@@ -370,7 +371,7 @@ function createAgentIpcHandlersInput(input: {
   readonly updateWorkspaceAgentMcpCapability?: AgentIpcHandlersInput['updateWorkspaceAgentMcpCapability']
 }): AgentIpcHandlersInput {
   return {
-    approveAgentTool: input.approveAgentTool ?? (() => undefined),
+    approveAgentTool: input.approveAgentTool ?? (async () => ({ status: 'not_found' })),
     attachAgentSession:
       input.attachAgentSession ??
       (async (command) => ({

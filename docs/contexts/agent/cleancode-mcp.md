@@ -146,9 +146,10 @@ Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID 和布�
 `delete_block` 和 `delete_terminal_group` 需要独立的 cleancode UI 审批：
 
 1. 首次调用只记录 `awaiting_approval`，不得修改积木图。
-2. Agent 会话向 UI 发出审批请求，并让当前工具调用等待用户决定。
-3. 批准后，以显式 `approved` 状态重新进入工具用例并执行。
-4. 拒绝或会话释放时，调用以 `canceled` 结束，不执行删除。
+2. Agent 会话向 UI 发出包含结构化目标的审批请求：删除终端携带 `blockId`，解散组合携带 `terminalGroupId`；当前工具调用等待用户决定。
+3. UI 由当前图快照解析目标名称、说明、组合归属或成员，并用临时审批意图连线与目标高亮表达作用对象。该连线是表现层易失投影，不进入 BlockGraph 持久化，也不构成终端依赖工作流边。
+4. 批准后，以显式 `approved` 状态重新进入工具用例；批准 IPC 必须等待工具真正执行结束，成功时返回最新图快照并移除审批，异常时返回失败而不能提前显示成功。
+5. 拒绝或会话释放时，调用以 `canceled` 结束，不执行删除。
 
 Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破坏性规则由 `AgentToolApprovalPolicy` 决定，不能依赖某个 CLI 自身的批准设置。
 
@@ -192,34 +193,35 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 
 ## 实现入口
 
-| 层级                        | 入口                                                                                                                                                                                                               |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Agent domain                | [`AgentToolName.ts`](../../../src/contexts/agent/domain/value-objects/AgentToolName.ts)、[`AgentToolApprovalPolicy.ts`](../../../src/contexts/agent/domain/policies/AgentToolApprovalPolicy.ts)                    |
-| Agent application protocol  | [`AgentToolProtocol.ts`](../../../src/contexts/agent/application/dto/AgentToolProtocol.ts)、[`AgentMcpServerPort.ts`](../../../src/contexts/agent/application/ports/AgentMcpServerPort.ts)                         |
-| Agent application execution | [`ExecuteAgentToolUseCase.ts`](../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase.ts)、[`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts) |
-| Cross-context port          | [`AgentBlockGraphToolPort.ts`](../../../src/contexts/agent/application/ports/AgentBlockGraphToolPort.ts)                                                                                                           |
-| HTTP MCP adapter            | [`CleancodeMcpHttpServer.ts`](../../../src/contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer.ts)                                                                                                            |
-| JSON-RPC bridge             | [`CleancodeAgentJsonRpcToolBridge.ts`](../../../src/contexts/agent/infrastructure/rpc/CleancodeAgentJsonRpcToolBridge.ts)                                                                                          |
-| BlockGraph adapter          | [`BlockGraphAgentToolAdapter.ts`](../../../src/contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter.ts)                                                                                            |
-| Codex PTY injection         | [`NodePtyCodexAgentProcessAdapter.ts`](../../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts)                                                                                          |
+| 层级                        | 入口                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Agent domain                | [`AgentToolName.ts`](../../../src/contexts/agent/domain/value-objects/AgentToolName.ts)、[`AgentToolApprovalPolicy.ts`](../../../src/contexts/agent/domain/policies/AgentToolApprovalPolicy.ts)                                                                                                                                            |
+| Agent application protocol  | [`AgentToolProtocol.ts`](../../../src/contexts/agent/application/dto/AgentToolProtocol.ts)、[`AgentMcpServerPort.ts`](../../../src/contexts/agent/application/ports/AgentMcpServerPort.ts)                                                                                                                                                 |
+| Agent application execution | [`ExecuteAgentToolUseCase.ts`](../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase.ts)、[`AgentToolApprovalCoordinator.ts`](../../../src/contexts/agent/application/use-cases/AgentToolApprovalCoordinator.ts)、[`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts) |
+| Cross-context port          | [`AgentBlockGraphToolPort.ts`](../../../src/contexts/agent/application/ports/AgentBlockGraphToolPort.ts)                                                                                                                                                                                                                                   |
+| HTTP MCP adapter            | [`CleancodeMcpHttpServer.ts`](../../../src/contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer.ts)                                                                                                                                                                                                                                    |
+| JSON-RPC bridge             | [`CleancodeAgentJsonRpcToolBridge.ts`](../../../src/contexts/agent/infrastructure/rpc/CleancodeAgentJsonRpcToolBridge.ts)                                                                                                                                                                                                                  |
+| BlockGraph adapter          | [`BlockGraphAgentToolAdapter.ts`](../../../src/contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter.ts)                                                                                                                                                                                                                    |
+| Codex PTY injection         | [`NodePtyCodexAgentProcessAdapter.ts`](../../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts)                                                                                                                                                                                                                  |
 
 ## 验证矩阵
 
-| 层级                     | 证明内容                                                                      | 主要测试                                                                                                                                                                                           |
-| ------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit / Agent domain      | 哪些工具需要 UI 审批                                                          | [`agent.tool-approval-policy.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-policy.spec.ts)                                                                                      |
-| Unit / Agent application | 工具路由、审计、审批等待、拒绝和会话释放                                      | [`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts) |
-| Contract / tool protocol | 完整工具目录、画布/启动组合路由、严格 Schema、安全注解和排除的通用工具        | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                |
-| Contract / JSON-RPC      | 初始化说明、带安全注解的工具列表和调用结果结构                                | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)                                                                                  |
-| Contract / HTTP          | 本机端点、Bearer 鉴权和 MCP 主路径                                            | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                            |
-| Integration / Codex PTY  | 条件注入 URL/Token/required/会话路由/默认预批准、继承全局权限和关闭时环境隔离 | [`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                     |
+| 层级                     | 证明内容                                                                      | 主要测试                                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit / Agent domain      | 哪些工具需要 UI 审批                                                          | [`agent.tool-approval-policy.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-policy.spec.ts)                                                                                                                                                                                                                 |
+| Unit / Agent application | 工具路由、审计、结构化审批目标、批准执行结果、拒绝和会话释放                  | [`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts)                                                                                                                            |
+| Unit / Presentation      | 审批文案、目标解析、意图连线、节点高亮、批准/保留交互和目标缺失状态           | [`agent-approval-presentation.spec.ts`](../../../tests/unit/presentation/agent-approval-presentation.spec.ts)、[`agent-tool-approval-card.spec.tsx`](../../../tests/unit/presentation/agent-tool-approval-card.spec.tsx)、[`agent-approval-canvas.spec.tsx`](../../../tests/unit/presentation/agent-approval-canvas.spec.tsx) |
+| Contract / tool protocol | 完整工具目录、画布/启动组合路由、严格 Schema、安全注解和排除的通用工具        | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                           |
+| Contract / JSON-RPC      | 初始化说明、带安全注解的工具列表和调用结果结构                                | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)                                                                                                                                                                                                             |
+| Contract / HTTP          | 本机端点、Bearer 鉴权和 MCP 主路径                                            | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                                                                                                                                                       |
+| Integration / Codex PTY  | 条件注入 URL/Token/required/会话路由/默认预批准、继承全局权限和关闭时环境隔离 | [`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                                                                                                                                                |
 
 手工验收至少覆盖：
 
 1. MCP 开启时，Agent 对“帮我建一个启动项目的终端组合”先查看画布，可以再读取仓库确认启动命令，但最终必须创建真实终端积木与终端组合，不得用直接启动 Shell 进程代替，也不得把只创建的对象表述为已经启动；明确要求修改终端源码时仍按项目代码处理。
 2. 未携带或携带错误 Token 的请求不能列出或调用工具。
-3. 删除工具在 UI 批准前不修改画布，拒绝后保持原图。
-4. 工具成功后当前工作面的图快照及时刷新。
+3. 删除工具在 UI 批准前不修改画布；审批卡明确显示目标和影响，临时意图连线准确连接 Agent 与目标或折叠组合代理，拒绝后保持原图且连线消失。
+4. 批准期间展示执行中状态，工具成功后当前工作面的图快照及时刷新并移除审批；失败时不得误报成功。
 5. 移除 Agent 或退出应用后，旧端点和待审批调用不可继续使用。
 6. 同一工作区的多个 Agent 使用不同会话端点，审批和调用不串线。
 7. 在没有更高优先级组织受管策略覆盖时，任意 CleanCode MCP 工具调用都不触发 Codex 原生审批；删除工具仍只等待 cleancode UI 审批。

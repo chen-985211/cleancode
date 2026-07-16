@@ -3,6 +3,7 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConsoleFlowNode, WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
+import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 
 export const minimumAgentConsoleSize = {
   width: 420,
@@ -11,6 +12,7 @@ export const minimumAgentConsoleSize = {
 
 interface CreateAgentConsoleFlowNodeInput {
   readonly agent: WorkspaceAgentSnapshot
+  readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly isSelected: boolean
@@ -30,6 +32,7 @@ interface CreateAgentConsoleFlowNodeInput {
 
 export function createAgentConsoleFlowNode({
   agent,
+  approvalController,
   currentWorkbench,
   currentWorkspace,
   isSelected,
@@ -51,6 +54,7 @@ export function createAgentConsoleFlowNode({
     style: agent.layout.size,
     data: {
       agent,
+      approvalController,
       currentWorkbench,
       currentWorkspace,
       onGraphUpdated,

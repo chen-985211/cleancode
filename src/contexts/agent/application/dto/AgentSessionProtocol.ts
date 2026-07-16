@@ -21,12 +21,32 @@ export interface AgentGraphUpdatedEvent {
   readonly workspaceName: string
 }
 
+export type AgentToolApprovalTarget =
+  | {
+      readonly blockId: string
+      readonly kind: 'terminal_block'
+    }
+  | {
+      readonly kind: 'terminal_group'
+      readonly terminalGroupId: string
+    }
+
+export type AgentToolApprovalDecisionResult =
+  | {
+      readonly graph: BlockGraphSnapshot
+      readonly status: 'completed'
+    }
+  | {
+      readonly status: 'canceled' | 'not_found'
+    }
+
 export interface AgentToolApprovalRequest {
   readonly agentId: string
   readonly approvalId: string
   readonly projectDirectory: string
   readonly sessionId: string
   readonly summary: string
+  readonly target: AgentToolApprovalTarget
   readonly toolName: AgentToolName
   readonly workspaceName: string
 }

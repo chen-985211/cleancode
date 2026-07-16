@@ -1,4 +1,4 @@
-import type { NodeProps } from '@xyflow/react'
+import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Check, X } from 'lucide-react'
 import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
 
@@ -29,7 +29,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const className = [
     'terminal-group-node',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
-    data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : ''
+    data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : '',
+    data.approvalIntent ? 'terminal-group-node--approval-target' : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -60,6 +61,19 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 
   return (
     <section className={className} data-terminal-group-id={group.id}>
+      {data.approvalIntent ? (
+        <>
+          <Handle
+            className="agent-approval-intent-handle agent-approval-intent-handle--target"
+            type="target"
+            position={Position.Left}
+            isConnectable={false}
+          />
+          <span className="agent-approval-target-chip">
+            {data.approvalIntent === 'dissolve' ? 'AI 想解散' : '包含待删除终端'}
+          </span>
+        </>
+      ) : null}
       <div
         data-workbench-node-title="true"
         className={[

@@ -3,6 +3,7 @@ import type {
   AgentPtyExitEvent,
   AgentPtyOutputEvent,
   AgentSessionSnapshot,
+  AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
@@ -20,7 +21,7 @@ interface IpcSender {
 }
 
 export interface AgentIpcHandlersInput {
-  readonly approveAgentTool: (approvalId: string) => void
+  readonly approveAgentTool: (approvalId: string) => Promise<AgentToolApprovalDecisionResult>
   readonly attachAgentSession: (command: {
     readonly agentId: string
     readonly columns?: number
@@ -267,7 +268,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     scope: 'agent'
   })
 
-  registerIpcHandler<{ readonly approvalId: string }, void>({
+  registerIpcHandler<{ readonly approvalId: string }, AgentToolApprovalDecisionResult>({
     channel: 'cleancode:approve-agent-tool',
     handler: (command) => input.approveAgentTool(command.approvalId),
     ipcMain: input.ipcMain,

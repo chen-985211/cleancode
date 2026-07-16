@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
+import type { AgentApprovalNodeIntent, AgentToolApprovalController } from './agentToolApprovalTypes'
 
 import {
   type BlockGraphSnapshot,
@@ -49,6 +50,7 @@ export interface WorkbenchNodeLayoutInput {
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 interface TerminalNodeData extends Record<string, unknown> {
+  readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
   readonly isSelected: boolean
@@ -83,6 +85,7 @@ interface TerminalNodeData extends Record<string, unknown> {
 export type TerminalFlowNode = Node<TerminalNodeData, 'terminal'>
 
 interface TerminalGroupNodeData extends Record<string, unknown> {
+  readonly approvalIntent?: AgentApprovalNodeIntent
   readonly group: TerminalGroupSnapshot
   readonly memberBlocks: readonly TerminalBlockSnapshot[]
   readonly memberStates: Record<string, TerminalViewState>
@@ -113,6 +116,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
 interface AgentConsoleNodeData extends Record<string, unknown> {
   readonly agent: WorkspaceAgentSnapshot
+  readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated: (graph: BlockGraphSnapshot) => void

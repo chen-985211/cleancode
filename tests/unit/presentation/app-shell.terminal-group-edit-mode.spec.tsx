@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
@@ -96,9 +96,11 @@ describe('app shell terminal group edit mode', () => {
 
     expect(workerNode).toBeDefined()
 
-    await reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
-      ...workerNode!,
-      position: { x: 420, y: 260 }
+    await act(async () => {
+      await reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
+        ...workerNode!,
+        position: { x: 420, y: 260 }
+      })
     })
 
     await waitFor(() =>
@@ -109,12 +111,14 @@ describe('app shell terminal group edit mode', () => {
         position: { x: 420, y: 260 }
       })
     )
-    expect(runtimeApi.addTerminalToGroup).toHaveBeenCalledWith({
-      projectDirectory: '/tmp/alpha-project',
-      workspaceName: 'main',
-      terminalGroupId: 'development-group',
-      blockId: 'worker-terminal'
-    })
+    await waitFor(() =>
+      expect(runtimeApi.addTerminalToGroup).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'main',
+        terminalGroupId: 'development-group',
+        blockId: 'worker-terminal'
+      })
+    )
   })
 
   it('creates a new group from terminals selected before entering edit mode', async () => {

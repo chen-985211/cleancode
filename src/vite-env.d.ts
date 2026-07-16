@@ -5,6 +5,7 @@ import type {
   AgentPtyExitEvent,
   AgentPtyOutputEvent,
   AgentSessionSnapshot,
+  AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
@@ -117,7 +118,9 @@ declare global {
         readonly workspaceName: string
       }): Promise<void>
       disposeProjectAgentSessions(command: { readonly projectDirectory: string }): Promise<void>
-      approveAgentTool(command: { readonly approvalId: string }): Promise<void>
+      approveAgentTool(command: {
+        readonly approvalId: string
+      }): Promise<AgentToolApprovalDecisionResult>
       rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
       onAgentPtyOutput(listener: (event: AgentPtyOutputEvent) => void): () => void
       onAgentPtyExit(listener: (event: AgentPtyExitEvent) => void): () => void

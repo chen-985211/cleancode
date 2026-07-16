@@ -5,7 +5,7 @@ import type {
   AgentSessionSnapshot,
   AgentToolApprovalRequest
 } from '../dto/AgentSessionProtocol'
-import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
+import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/AgentMcpServerPort'
 import { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
 
@@ -48,13 +48,6 @@ export interface ManagedAgentSession {
   status: AgentSessionSnapshot['status']
   readonly workspaceDirectory: string
   readonly workspaceName: string
-}
-
-export interface PendingToolApproval {
-  readonly command: ExecuteAgentToolCommand
-  readonly request: AgentToolApprovalRequest
-  readonly resolve: (result: AgentToolExecutionResult) => void
-  readonly sessionId: string
 }
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {

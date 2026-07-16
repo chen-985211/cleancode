@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -19,7 +19,29 @@ describe('Agent console CleanCode MCP toggle', () => {
       projectId: workbench.project.id,
       workspaceName: currentWorkspace.name
     }
-    let approvalListener: ((approval: AgentToolApprovalRequest) => void) | undefined
+    const clearForAgent = vi.fn()
+    const approvalController: AgentToolApprovalController = {
+      approvals: [
+        {
+          phase: 'awaiting',
+          request: {
+            agentId: agent.agentId,
+            approvalId: 'approval-1',
+            projectDirectory: workbench.project.directory,
+            sessionId: 'agent-session-1',
+            summary: '删除终端积木 terminal-1',
+            target: { blockId: 'terminal-1', kind: 'terminal_block' },
+            toolName: 'delete_block',
+            workspaceName: currentWorkspace.name
+          }
+        }
+      ],
+      approve: vi.fn(async () => undefined),
+      clearForAgent,
+      dismiss: vi.fn(),
+      locate: vi.fn(),
+      reject: vi.fn(async () => undefined)
+    }
     const onMcpCapabilityChange = vi.fn(async () => ({
       agent: { ...agent, cleancodeMcpEnabled: false },
       session: {
@@ -37,17 +59,13 @@ describe('Agent console CleanCode MCP toggle', () => {
     }))
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        onAgentToolApprovalRequested: vi.fn((listener) => {
-          approvalListener = listener
-          return vi.fn()
-        })
-      })
+      value: createRuntimeApi()
     })
 
     const { container } = render(
       <AgentConsole
         agent={agent}
+        approvalController={approvalController}
         currentWorkbench={workbench}
         currentWorkspace={currentWorkspace}
         onMcpCapabilityChange={onMcpCapabilityChange}
@@ -58,20 +76,11 @@ describe('Agent console CleanCode MCP toggle', () => {
     await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
     expect(container.querySelector('.agent-console__header [role="switch"]')).toBeInTheDocument()
 
-    approvalListener?.({
-      agentId: agent.agentId,
-      approvalId: 'approval-1',
-      projectDirectory: workbench.project.directory,
-      sessionId: 'agent-session-1',
-      summary: '删除终端积木 terminal-1',
-      toolName: 'delete_block',
-      workspaceName: currentWorkspace.name
-    })
-    expect(await screen.findByText('需要授权')).toBeInTheDocument()
+    expect(await screen.findByText('AI 操作审批')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('switch', { name: 'CleanCode MCP' }))
 
     await waitFor(() => expect(onMcpCapabilityChange).toHaveBeenCalledWith(agent, false))
-    await waitFor(() => expect(screen.queryByText('需要授权')).not.toBeInTheDocument())
+    expect(clearForAgent).toHaveBeenCalledWith(agent.agentId)
   })
 })

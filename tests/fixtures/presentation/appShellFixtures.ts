@@ -79,7 +79,8 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
       overrides.disposeAgentWorkspaceSession ?? vi.fn(async () => undefined),
     disposeProjectAgentSessions:
       overrides.disposeProjectAgentSessions ?? vi.fn(async () => undefined),
-    approveAgentTool: overrides.approveAgentTool ?? vi.fn(async () => undefined),
+    approveAgentTool:
+      overrides.approveAgentTool ?? vi.fn(async () => ({ status: 'not_found' as const })),
     rejectAgentTool: overrides.rejectAgentTool ?? vi.fn(async () => undefined),
     onAgentPtyOutput: overrides.onAgentPtyOutput ?? vi.fn(() => vi.fn()),
     onAgentPtyExit: overrides.onAgentPtyExit ?? vi.fn(() => vi.fn()),

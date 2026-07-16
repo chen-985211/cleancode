@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import { installAgentXterm } from '../../../src/presentation/app-shell/agentTerminalXterm'
 import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
@@ -410,68 +409,5 @@ describe('agent console terminal', () => {
       )
     )
     expect(window.cleancode?.disposeAgentWorkspaceSession).not.toHaveBeenCalled()
-  })
-
-  it('shows destructive MCP tool approvals outside the terminal output', async () => {
-    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
-    let approvalListener: ((event: AgentToolApprovalRequest) => void) | null = null
-    const approveAgentTool = vi.fn(async () => undefined)
-    const rejectAgentTool = vi.fn(async () => undefined)
-
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: createRuntimeApi({
-        approveAgentTool,
-        attachAgentSession: vi.fn(async () => ({
-          processId: 1,
-          projectDirectory: '/repo/app',
-          sessionId: 'agent-session-1',
-          status: 'running',
-          workspaceDirectory: '/repo/app',
-          workspaceName: 'main'
-        })),
-        inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-          status: 'installed',
-          version: 'codex-cli 0.143.0'
-        })),
-        listWorkbenches: vi.fn(async () => [workbench]),
-        onAgentToolApprovalRequested: vi.fn((listener) => {
-          approvalListener = listener
-          return vi.fn()
-        }),
-        rejectAgentTool
-      })
-    })
-
-    render(<AppShell />)
-
-    await waitFor(() => expect(approvalListener).toBeTruthy())
-    ;(approvalListener as unknown as (event: AgentToolApprovalRequest) => void)({
-      agentId: 'default-agent',
-      approvalId: 'approval-1',
-      projectDirectory: '/repo/app',
-      sessionId: 'agent-session-1',
-      summary: '删除终端积木 terminal-1',
-      toolName: 'delete_block',
-      workspaceName: 'main'
-    })
-
-    expect(await screen.findByText('需要授权')).toBeInTheDocument()
-    expect(screen.getByText('删除终端积木 terminal-1')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('确认删除'))
-    expect(approveAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-1' })
-
-    ;(approvalListener as unknown as (event: AgentToolApprovalRequest) => void)({
-      agentId: 'default-agent',
-      approvalId: 'approval-2',
-      projectDirectory: '/repo/app',
-      sessionId: 'agent-session-1',
-      summary: '删除组合终端 group-1',
-      toolName: 'delete_terminal_group',
-      workspaceName: 'main'
-    })
-    fireEvent.click(await screen.findByText('拒绝'))
-    expect(rejectAgentTool).toHaveBeenCalledWith({ approvalId: 'approval-2' })
   })
 })

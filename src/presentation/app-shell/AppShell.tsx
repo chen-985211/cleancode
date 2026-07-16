@@ -5,8 +5,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
-import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
+import { createMinimapNodeInteraction, filterMinimapNodes } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { resolveNodeSize } from './resolveNodeSize'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
@@ -28,12 +27,8 @@ import { useWorkbenchFlowNodes } from './useWorkbenchFlowNodes'
 import { useWorkbenchGraphIndex } from './useWorkbenchGraphIndex'
 import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
-import type {
-  TerminalBlockMetadataInput,
-  MinimapFlowNode,
-  WorkbenchFlowNode,
-  WorkbenchSnapshot
-} from './types'
+import { useAgentToolApprovals } from './useAgentToolApprovals'
+import type { TerminalBlockMetadataInput, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { ThemeSettingsRoot } from './ThemeSettingsRoot'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
@@ -151,6 +146,13 @@ export function AppShell() {
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId,
     setHoveredTerminalBlockId
+  })
+  const agentToolApprovals = useAgentToolApprovals({
+    graph,
+    projectDirectory: currentWorkbench?.project.directory ?? null,
+    reactFlowInstanceRef,
+    setCurrentGraph,
+    workspaceName: currentWorkspace?.name ?? null
   })
   const terminalWorkflow = useTerminalWorkflow({
     currentWorkbench,
@@ -281,18 +283,14 @@ export function AppShell() {
     setCurrentGraph
   })
 
-  const minimapNodeInteraction = useMemo<MinimapNodeInteractionContextValue>(
-    () => ({
-      getLabel: (blockId) =>
-        readAgentIdFromFlowNodeId(blockId)
-          ? (currentWorkbench?.agents?.find(
-              (agent) => agent.agentId === readAgentIdFromFlowNodeId(blockId)
-            )?.name ?? 'Agent 1')
-          : (terminalBlocksById.get(blockId)?.name ??
-            terminalGroupsById.get(blockId)?.name ??
-            blockId),
-      setHoveredBlockId: setHoveredTerminalBlockId
-    }),
+  const minimapNodeInteraction = useMemo(
+    () =>
+      createMinimapNodeInteraction({
+        agents: currentWorkbench?.agents,
+        setHoveredBlockId: setHoveredTerminalBlockId,
+        terminalBlocksById,
+        terminalGroupsById
+      }),
     [currentWorkbench?.agents, terminalBlocksById, terminalGroupsById]
   )
 
@@ -406,6 +404,7 @@ export function AppShell() {
     ]
   )
   useWorkbenchFlowNodes({
+    agentToolApprovals,
     currentWorkbench,
     currentWorkspace,
     graph,
@@ -427,16 +426,7 @@ export function AppShell() {
     onResizeAgent: resizeWorkspaceAgent,
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
-  const minimapNodes = useMemo(
-    () =>
-      nodes.filter(
-        (node): node is MinimapFlowNode =>
-          node.type === 'agentConsole' ||
-          node.type === 'terminal' ||
-          (node.type === 'terminalGroup' && node.data.group.isCollapsed)
-      ),
-    [nodes]
-  )
+  const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
 
   return (
     <main className="app-shell" aria-label="cleancode workspace">
@@ -455,6 +445,7 @@ export function AppShell() {
         onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
       />
       <WorkbenchCanvas
+        approvalIntents={agentToolApprovals.approvals}
         isDesktopRuntime={isDesktopRuntime}
         currentWorkbench={currentWorkbench}
         currentWorkspace={currentWorkspace}

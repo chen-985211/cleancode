@@ -1,4 +1,5 @@
 import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import { createUnexpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { AgentAuditRecord } from '../../domain/entities/AgentAuditRecord'
 import { AgentToolApprovalPolicy } from '../../domain/policies/AgentToolApprovalPolicy'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
@@ -15,6 +16,7 @@ import type {
 } from '../dto/AgentToolProtocol'
 import type { AgentAuditRepository } from '../ports/AgentAuditRepository'
 import type { AgentBlockGraphToolPort } from '../ports/AgentBlockGraphToolPort'
+import type { AgentToolApprovalTarget } from '../dto/AgentSessionProtocol'
 
 interface ExecuteAgentToolBaseCommand {
   readonly approved?: boolean
@@ -57,6 +59,7 @@ export type AgentToolExecutionResult =
   | {
       readonly approval: {
         readonly summary: string
+        readonly target: AgentToolApprovalTarget
         readonly toolName: AgentToolName
       }
       readonly status: 'awaiting_approval'
@@ -92,6 +95,7 @@ export class ExecuteAgentToolUseCase {
       return {
         approval: {
           summary: createApprovalSummary(command),
+          target: createApprovalTarget(command),
           toolName: command.toolName
         },
         status: 'awaiting_approval',
@@ -209,6 +213,20 @@ export class ExecuteAgentToolUseCase {
       workspaceName: command.workspaceName
     })
   }
+}
+
+function createApprovalTarget(command: ExecuteAgentToolCommand): AgentToolApprovalTarget {
+  if (command.toolName === 'delete_block') {
+    return { blockId: command.input.blockId, kind: 'terminal_block' }
+  }
+
+  if (command.toolName === 'delete_terminal_group') {
+    return { kind: 'terminal_group', terminalGroupId: command.input.terminalGroupId }
+  }
+
+  throw createUnexpectedAppError('Approval target is not defined for this Agent tool.', {
+    toolName: command.toolName
+  })
 }
 
 function createApprovalSummary(command: ExecuteAgentToolCommand): string {

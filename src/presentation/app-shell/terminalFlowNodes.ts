@@ -4,6 +4,7 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
+import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
 import {
   createIdleTerminalState,
   type TerminalBlockMetadataInput,
@@ -67,6 +68,7 @@ interface TerminalGroupFlowNodeHandlers {
 }
 
 interface CreateTerminalFlowNodesInput {
+  readonly approvalNodeIntents?: ReadonlyMap<string, AgentApprovalNodeIntent>
   readonly graph: WorkbenchSnapshot['graph'] | null
   readonly selectedTerminalBlockId?: string | null
   readonly selectedTerminalBlockIds?: readonly string[]
@@ -81,6 +83,7 @@ interface CreateTerminalFlowNodesInput {
 }
 
 export function createTerminalFlowNodes({
+  approvalNodeIntents = new Map(),
   graph,
   selectedTerminalBlockId,
   selectedTerminalBlockIds,
@@ -106,6 +109,7 @@ export function createTerminalFlowNodes({
   )
   const groupNodes = (graph?.terminalGroups ?? []).map((group) =>
     createTerminalGroupFlowNode({
+      approvalIntent: approvalNodeIntents.get(group.id),
       graph,
       group,
       handlers,
@@ -120,6 +124,7 @@ export function createTerminalFlowNodes({
     .filter((block) => !collapsedGroupMemberIds.has(block.id))
     .map((block) =>
       createTerminalFlowNode({
+        approvalIntent: approvalNodeIntents.get(block.id),
         block,
         canSelectForTerminalGroup: isTerminalGroupSelectionMode || !groupedMemberIds.has(block.id),
         handlers,
@@ -135,6 +140,7 @@ export function createTerminalFlowNodes({
 }
 
 interface CreateTerminalFlowNodeInput {
+  readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers
@@ -146,6 +152,7 @@ interface CreateTerminalFlowNodeInput {
 }
 
 function createTerminalFlowNode({
+  approvalIntent,
   block,
   terminalStates,
   handlers,
@@ -167,6 +174,7 @@ function createTerminalFlowNode({
       height: block.size.height
     },
     data: {
+      approvalIntent,
       block,
       session: terminalStates[block.id] ?? createIdleTerminalState(),
       isSelected,
@@ -181,6 +189,7 @@ function createTerminalFlowNode({
 }
 
 interface CreateTerminalGroupFlowNodeInput {
+  readonly approvalIntent?: AgentApprovalNodeIntent
   readonly group: TerminalGroupSnapshot
   readonly graph: WorkbenchSnapshot['graph'] | null
   readonly selectedBlockIds: ReadonlySet<string>
@@ -192,6 +201,7 @@ interface CreateTerminalGroupFlowNodeInput {
 }
 
 function createTerminalGroupFlowNode({
+  approvalIntent,
   group,
   graph,
   selectedBlockIds,
@@ -220,6 +230,7 @@ function createTerminalGroupFlowNode({
       height: size.height
     },
     data: {
+      approvalIntent,
       group,
       memberBlocks,
       memberStates: Object.fromEntries(

@@ -1,5 +1,9 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import type { AgentSessionSnapshot, AgentToolApprovalRequest } from '../dto/AgentSessionProtocol'
+import type {
+  AgentSessionSnapshot,
+  AgentToolApprovalDecisionResult,
+  AgentToolApprovalRequest
+} from '../dto/AgentSessionProtocol'
 import { createUnrestorableAgentSessionSnapshot } from '../dto/createUnrestorableAgentSessionSnapshot'
 import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/AgentMcpServerPort'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
@@ -7,25 +11,24 @@ import type { CodexAgentProcessPort } from '../ports/CodexAgentProcessPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
 import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
 import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
+import { AgentToolApprovalCoordinator } from './AgentToolApprovalCoordinator'
 import {
   createAgentSessionCallbacks,
   createAgentConversationScope,
   createAgentRuntimeSessionId,
-  createCanceledAgentToolResult,
   registerAgentMcpEndpoint,
   toAgentSessionSnapshot,
   unregisterAgentMcpEndpoint,
   type AttachAgentSessionCommand,
-  type ManagedAgentSession,
-  type PendingToolApproval
+  type ManagedAgentSession
 } from './AgentSessionRuntimeState'
 
 export type { AttachAgentSessionCommand } from './AgentSessionRuntimeState'
 
 export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
-  private readonly pendingApprovals = new Map<string, PendingToolApproval>()
   private readonly pendingPersistence = new Set<Promise<void>>()
+  private readonly approvalCoordinator: AgentToolApprovalCoordinator
 
   constructor(
     private readonly processPort: CodexAgentProcessPort,
@@ -34,7 +37,11 @@ export class AgentSessionService {
       command: ExecuteAgentToolCommand
     ) => Promise<AgentToolExecutionResult>,
     private readonly sessionRepository: AgentSessionRepository
-  ) {}
+  ) {
+    this.approvalCoordinator = new AgentToolApprovalCoordinator(executeAgentTool, (sessionId) =>
+      this.findSessionById(sessionId)
+    )
+  }
 
   async attach(command: AttachAgentSessionCommand): Promise<AgentSessionSnapshot> {
     const scope = createAgentConversationScope(command)
@@ -206,19 +213,19 @@ export class AgentSessionService {
       return firstResult
     }
 
-    return this.waitForApproval(session, toolCommand, firstResult)
+    return this.approvalCoordinator.waitForApproval(session, toolCommand, firstResult)
   }
 
-  approveTool(command: { readonly approvalId: string }): void {
-    this.resolvePendingApproval(command.approvalId, 'approved')
+  approveTool(command: { readonly approvalId: string }): Promise<AgentToolApprovalDecisionResult> {
+    return this.approvalCoordinator.approve(command.approvalId)
   }
 
   rejectTool(command: { readonly approvalId: string }): void {
-    this.resolvePendingApproval(command.approvalId, 'rejected')
+    this.approvalCoordinator.reject(command.approvalId)
   }
 
   listPendingApprovals(): readonly AgentToolApprovalRequest[] {
-    return [...this.pendingApprovals.values()].map((approval) => approval.request)
+    return this.approvalCoordinator.list()
   }
 
   async disposeSession(command: {
@@ -417,83 +424,7 @@ export class AgentSessionService {
     return [...this.sessions.values()].find((candidate) => candidate.sessionId === sessionId)
   }
 
-  private waitForApproval(
-    session: ManagedAgentSession,
-    command: ExecuteAgentToolCommand,
-    result: Extract<AgentToolExecutionResult, { readonly status: 'awaiting_approval' }>
-  ): Promise<AgentToolExecutionResult> {
-    const request: AgentToolApprovalRequest = {
-      agentId: session.agentId,
-      approvalId: result.toolCallId,
-      projectDirectory: session.projectDirectory,
-      sessionId: session.sessionId,
-      summary: result.approval.summary,
-      toolName: result.approval.toolName,
-      workspaceName: session.workspaceName
-    }
-
-    session.callbacks.onToolApprovalRequested(request)
-
-    return new Promise((resolve) => {
-      this.pendingApprovals.set(request.approvalId, {
-        command,
-        request,
-        resolve,
-        sessionId: session.sessionId
-      })
-    })
-  }
-
-  private resolvePendingApproval(approvalId: string, decision: 'approved' | 'rejected'): void {
-    const pendingApproval = this.pendingApprovals.get(approvalId)
-
-    if (!pendingApproval) {
-      return
-    }
-
-    this.pendingApprovals.delete(approvalId)
-
-    if (decision === 'rejected') {
-      pendingApproval.resolve(
-        createCanceledAgentToolResult(approvalId, 'User rejected the tool call.')
-      )
-      return
-    }
-
-    void this.executeAgentTool({ ...pendingApproval.command, approved: true }).then((result) => {
-      const session = this.findSessionById(pendingApproval.sessionId)
-
-      if (!session) {
-        pendingApproval.resolve(
-          createCanceledAgentToolResult(approvalId, 'Agent session was disposed.')
-        )
-        return
-      }
-
-      if (result.status === 'completed') {
-        session.callbacks.onGraphUpdated({
-          agentId: session.agentId,
-          graph: result.graph,
-          projectDirectory: session.projectDirectory,
-          sessionId: session.sessionId,
-          workspaceName: session.workspaceName
-        })
-      }
-
-      pendingApproval.resolve(result)
-    })
-  }
-
   private cancelSessionApprovals(sessionId: string): void {
-    for (const [approvalId, pendingApproval] of this.pendingApprovals.entries()) {
-      if (pendingApproval.sessionId !== sessionId) {
-        continue
-      }
-
-      this.pendingApprovals.delete(approvalId)
-      pendingApproval.resolve(
-        createCanceledAgentToolResult(approvalId, 'Agent session was disposed.')
-      )
-    }
+    this.approvalCoordinator.cancelSession(sessionId)
   }
 }

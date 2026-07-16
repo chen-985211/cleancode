@@ -1,11 +1,9 @@
 import type { Terminal as XTerm } from '@xterm/xterm'
-import { ShieldAlert } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import type {
   AgentPtyOutputEvent,
-  AgentSessionSnapshot,
-  AgentToolApprovalRequest
+  AgentSessionSnapshot
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
@@ -20,6 +18,9 @@ import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
+import { AgentToolApprovalCard } from './AgentToolApprovalCard'
+import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
+import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
 
 interface AgentTerminalMeasurement {
@@ -34,6 +35,7 @@ interface AgentSessionBinding {
 
 interface AgentConsoleProps {
   readonly agent?: WorkspaceAgentSnapshot
+  readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench?: WorkbenchSnapshot | null
   readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
   readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
@@ -48,6 +50,7 @@ interface AgentConsoleProps {
 
 export function AgentConsole({
   agent,
+  approvalController,
   currentWorkbench = null,
   currentWorkspace = null,
   onGraphUpdated,
@@ -63,7 +66,6 @@ export function AgentConsole({
   const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
-  const [pendingApprovals, setPendingApprovals] = useState<AgentToolApprovalRequest[]>([])
   const [isMcpCapabilityUpdating, setIsMcpCapabilityUpdating] = useState(false)
   const [mcpCapabilityError, setMcpCapabilityError] = useState<string | null>(null)
   const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
@@ -171,18 +173,10 @@ export function AgentConsole({
           onGraphUpdated?.(event.graph)
         }
       }) ?? noop
-    const unsubscribeApproval =
-      api.onAgentToolApprovalRequested?.((approval) => {
-        if (!approval.agentId || approval.agentId === activeAgent.agentId) {
-          setPendingApprovals((approvals) => [...approvals, approval])
-        }
-      }) ?? noop
-
     return () => {
       unsubscribeOutput()
       unsubscribeExit()
       unsubscribeGraph()
-      unsubscribeApproval()
     }
   }, [activeAgent.agentId, currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
 
@@ -320,12 +314,14 @@ export function AgentConsole({
     })
   }, [currentWorkspaceKey, writeAgentInput])
 
-  const activeApproval = pendingApprovals.find(
-    (approval) =>
-      (!approval.agentId || approval.agentId === activeAgent.agentId) &&
-      approval.projectDirectory === currentWorkbench?.project.directory &&
-      approval.workspaceName === currentWorkspace?.name
-  )
+  const agentApprovals =
+    approvalController?.approvals.filter(
+      (approval) => approval.request.agentId === activeAgent.agentId
+    ) ?? []
+  const activeApproval = agentApprovals[0]
+  const activeApprovalPresentation = activeApproval
+    ? resolveAgentApprovalPresentation(activeApproval, currentWorkbench?.graph ?? null)
+    : null
   function restartSession(mode: 'new' | 'retry'): void {
     if (!currentWorkspaceKey) {
       return
@@ -335,20 +331,6 @@ export function AgentConsole({
     setAttachAttempt((attempt) => attempt + 1)
   }
 
-  async function approveApproval(approval: AgentToolApprovalRequest): Promise<void> {
-    setPendingApprovals((approvals) =>
-      approvals.filter((candidate) => candidate.approvalId !== approval.approvalId)
-    )
-    await window.cleancode?.approveAgentTool({ approvalId: approval.approvalId })
-  }
-
-  async function rejectApproval(approval: AgentToolApprovalRequest): Promise<void> {
-    setPendingApprovals((approvals) =>
-      approvals.filter((candidate) => candidate.approvalId !== approval.approvalId)
-    )
-    await window.cleancode?.rejectAgentTool({ approvalId: approval.approvalId })
-  }
-
   async function updateMcpCapability(enabled: boolean): Promise<void> {
     if (!agent || !onMcpCapabilityChange || isMcpCapabilityUpdating) return
     setIsMcpCapabilityUpdating(true)
@@ -356,7 +338,7 @@ export function AgentConsole({
     try {
       const result = await onMcpCapabilityChange(agent, enabled)
       if (!result) return
-      setPendingApprovals([])
+      approvalController?.clearForAgent(activeAgent.agentId)
       if (result.session && currentWorkspaceKey) {
         sessionBindingRef.current = { session: result.session, workspaceKey: currentWorkspaceKey }
         sessionRef.current = result.session
@@ -408,22 +390,15 @@ export function AgentConsole({
           onRetryRestore={() => restartSession('retry')}
         />
       </div>
-      {activeApproval ? (
-        <div className="agent-approval" role="group" aria-label="Agent 工具授权">
-          <ShieldAlert size={16} aria-hidden="true" />
-          <div className="agent-approval__copy">
-            <strong>需要授权</strong>
-            <span>{activeApproval.summary}</span>
-          </div>
-          <div className="agent-approval__actions">
-            <button type="button" onClick={() => void approveApproval(activeApproval)}>
-              确认删除
-            </button>
-            <button type="button" onClick={() => void rejectApproval(activeApproval)}>
-              拒绝
-            </button>
-          </div>
-        </div>
+      {activeApproval && activeApprovalPresentation && approvalController ? (
+        <AgentToolApprovalCard
+          presentation={activeApprovalPresentation}
+          queueCount={Math.max(0, agentApprovals.length - 1)}
+          onApprove={() => void approvalController.approve(activeApproval.request)}
+          onDismiss={() => approvalController.dismiss(activeApproval.request)}
+          onLocate={() => approvalController.locate(activeApproval.request)}
+          onReject={() => void approvalController.reject(activeApproval.request)}
+        />
       ) : null}
       <div className="agent-console__terminal-shell" role="region" aria-label="Codex CLI 会话">
         {currentWorkspaceKey ? (

@@ -4,6 +4,7 @@ import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/age
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
 import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentConsoleFlowNode'
+import { createAgentApprovalNodeIntents } from './agentApprovalPresentation'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
 import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
@@ -13,10 +14,12 @@ import type {
   WorkbenchNodeLayoutInput,
   WorkbenchSnapshot
 } from './types'
+import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
 interface UseWorkbenchFlowNodesInput {
+  readonly agentToolApprovals: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly graph: WorkbenchSnapshot['graph'] | null
@@ -46,6 +49,7 @@ interface UseWorkbenchFlowNodesInput {
 }
 
 export function useWorkbenchFlowNodes({
+  agentToolApprovals,
   currentWorkbench,
   currentWorkspace,
   graph,
@@ -72,6 +76,7 @@ export function useWorkbenchFlowNodes({
   useEffect(() => {
     setNodes((currentNodes) => {
       const terminalNodes = createTerminalFlowNodes({
+        approvalNodeIntents: createAgentApprovalNodeIntents(agentToolApprovals.approvals, graph),
         graph,
         handlers,
         hoveredTerminalBlockId,
@@ -88,6 +93,7 @@ export function useWorkbenchFlowNodes({
         ...agents.map((agent) =>
           createAgentConsoleFlowNode({
             agent,
+            approvalController: agentToolApprovals,
             currentWorkbench,
             currentWorkspace: currentWorkspace ?? null,
             isSelected: selectedAgentId === agent.agentId,
@@ -110,6 +116,7 @@ export function useWorkbenchFlowNodes({
         : nextNodes
     })
   }, [
+    agentToolApprovals,
     currentWorkbench,
     currentWorkspace,
     graph,

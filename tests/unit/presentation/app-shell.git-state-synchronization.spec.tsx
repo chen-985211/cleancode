@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 
 import {
   createRuntimeApi,
@@ -21,9 +21,13 @@ describe('app shell git state synchronization', () => {
     const synchronizedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       gitBranch: 'feature/free'
     })
+    let resolveFirstSynchronization!: (workbench: typeof synchronizedWorkbench) => void
+    const firstSynchronization = new Promise<typeof synchronizedWorkbench>((resolve) => {
+      resolveFirstSynchronization = resolve
+    })
     const synchronizeProjectGitState = vi
       .fn()
-      .mockResolvedValueOnce(synchronizedWorkbench)
+      .mockReturnValueOnce(firstSynchronization)
       .mockResolvedValue(null)
     const terminateTerminal = vi.fn()
 
@@ -45,6 +49,7 @@ describe('app shell git state synchronization', () => {
         projectDirectory: '/tmp/alpha-project'
       })
     )
+    act(() => resolveFirstSynchronization(synchronizedWorkbench))
     await waitFor(() => expect(within(projectCard).getByText('feature/free')).toBeInTheDocument())
     expect(terminateTerminal).not.toHaveBeenCalled()
   })

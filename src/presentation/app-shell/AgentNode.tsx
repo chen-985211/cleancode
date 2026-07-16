@@ -1,9 +1,10 @@
-import type { NodeProps } from '@xyflow/react'
+import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { memo } from 'react'
 
 import { AgentConsole } from './AgentConsole'
 import { minimumAgentConsoleSize } from './agentConsoleFlowNode'
 import type { AgentConsoleFlowNode } from './types'
+import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 
@@ -11,8 +12,13 @@ export const AgentNode = memo(function AgentNode({
   data,
   selected
 }: NodeProps<AgentConsoleFlowNode>) {
+  const approvalController = data.approvalController ?? inactiveApprovalController
+  const hasActiveApproval = approvalController.approvals.some(
+    (approval) => approval.request.agentId === data.agent.agentId
+  )
   const className = [
     'agent-console-node',
+    hasActiveApproval ? 'agent-console-node--approval-source' : '',
     'nowheel',
     selected ? 'agent-console-node--selected' : ''
   ]
@@ -25,8 +31,17 @@ export const AgentNode = memo(function AgentNode({
       role="region"
       aria-label={`${data.agent.name} 控制台`}
       data-agent-console-node={data.agent.agentId}
+      data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
       data-selection-state={selected ? 'selected' : 'unselected'}
     >
+      {hasActiveApproval ? (
+        <Handle
+          className="agent-approval-intent-handle agent-approval-intent-handle--source"
+          type="source"
+          position={Position.Right}
+          isConnectable={false}
+        />
+      ) : null}
       <WorkbenchNodeResizer
         minWidth={minimumAgentConsoleSize.width}
         minHeight={minimumAgentConsoleSize.height}
@@ -40,6 +55,7 @@ export const AgentNode = memo(function AgentNode({
       />
       <AgentConsole
         agent={data.agent}
+        approvalController={approvalController}
         currentWorkbench={data.currentWorkbench}
         currentWorkspace={data.currentWorkspace}
         onGraphUpdated={data.onGraphUpdated}
@@ -52,3 +68,12 @@ export const AgentNode = memo(function AgentNode({
     </section>
   )
 })
+
+const inactiveApprovalController: AgentToolApprovalController = {
+  approvals: [],
+  approve: async () => undefined,
+  clearForAgent: () => undefined,
+  dismiss: () => undefined,
+  locate: () => undefined,
+  reject: async () => undefined
+}

@@ -105,6 +105,7 @@ describe('execute agent tool', () => {
     expect(result).toEqual({
       approval: {
         summary: '删除终端积木 terminal-1',
+        target: { blockId: 'terminal-1', kind: 'terminal_block' },
         toolName: 'delete_block'
       },
       status: 'awaiting_approval',
@@ -118,6 +119,29 @@ describe('execute agent tool', () => {
         toolName: 'delete_block'
       })
     ])
+  })
+
+  it('identifies the terminal group targeted by a destructive approval', async () => {
+    const executeTool = new ExecuteAgentToolUseCase(
+      createBlockGraphTools(),
+      new RecordingAgentAuditRepository()
+    )
+
+    const result = await executeTool.execute({
+      input: { terminalGroupId: 'group-1' },
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      toolName: 'delete_terminal_group',
+      workspaceName: 'main'
+    })
+
+    expect(result).toMatchObject({
+      approval: {
+        target: { kind: 'terminal_group', terminalGroupId: 'group-1' },
+        toolName: 'delete_terminal_group'
+      },
+      status: 'awaiting_approval'
+    })
   })
 
   it('executes a destructive terminal group tool after approval', async () => {
