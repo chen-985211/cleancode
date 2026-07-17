@@ -8,8 +8,11 @@
 
 .app-shell__toolbar {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: calc(
+    var(--cc-shell-control-inset) + var(--cc-shell-settings-height) +
+      var(--cc-shell-control-row-gap)
+  );
+  right: var(--cc-shell-control-inset);
   z-index: 6;
   display: flex;
   max-width: calc(100% - 24px);

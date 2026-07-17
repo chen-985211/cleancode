@@ -54,22 +54,23 @@ export function ThemeSettingsRoot() {
 
   return (
     <>
-      <header className="app-titlebar">
-        <strong className="app-titlebar__name">cleancode</strong>
-        <button
-          ref={triggerRef}
-          className="app-titlebar__theme-button"
-          type="button"
-          aria-label="主题设置"
-          title="主题设置"
-          onClick={() => setIsOpen(true)}
-        >
-          <span className="app-titlebar__palette-icon" aria-hidden="true" />
-        </button>
-      </header>
+      <button
+        ref={triggerRef}
+        className="theme-settings-trigger"
+        type="button"
+        aria-label="主题设置"
+        aria-controls="theme-settings-dialog"
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        title="主题设置"
+        onClick={() => setIsOpen(true)}
+      >
+        <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
+      </button>
       {isOpen ? (
         <div className="theme-settings-backdrop" onMouseDown={closeFromBackdrop}>
           <aside
+            id="theme-settings-dialog"
             ref={dialogRef}
             className="theme-settings-drawer"
             role="dialog"
@@ -145,7 +146,9 @@ function trapDialogFocus(event: KeyboardEvent<HTMLElement>, dialog: HTMLElement 
   }
 
   const focusable = Array.from(
-    dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')
+    dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled):not([type="radio"]), input[type="radio"]:checked:not(:disabled)'
+    )
   )
   const first = focusable[0]
   const last = focusable.at(-1)

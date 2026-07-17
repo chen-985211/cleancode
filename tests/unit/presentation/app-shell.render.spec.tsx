@@ -17,10 +17,15 @@ describe('app shell', () => {
   it('does not pretend browser preview data is a real workbench', async () => {
     render(<AppShell />)
     const toolbar = within(screen.getByLabelText('工作台工具栏'))
+    const appSettings = screen.getByRole('group', { name: '应用设置' })
 
     expect(screen.getByRole('main', { name: 'cleancode workspace' })).toBeInTheDocument()
-    expect(screen.getByText('cleancode')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '主题设置' })).toBeInTheDocument()
+    expect(screen.queryByText('cleancode')).not.toBeInTheDocument()
+    const themeSettingsTrigger = screen.getByRole('button', { name: '主题设置' })
+    expect(appSettings).toContainElement(themeSettingsTrigger)
+    expect(themeSettingsTrigger).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(themeSettingsTrigger).toHaveAttribute('aria-expanded', 'false')
+    expect(toolbar.queryByRole('button', { name: '主题设置' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeDisabled()
     expect(toolbar.getAllByRole('button')).toHaveLength(3)

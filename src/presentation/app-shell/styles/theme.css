@@ -1,7 +1,6 @@
 :root,
 :root[data-theme='light'] {
   color-scheme: light;
-  --cc-titlebar-height: 40px;
   --cc-background: #eef1f5;
   --cc-canvas: #f8f9fb;
   --cc-chrome: #f3f5f8;

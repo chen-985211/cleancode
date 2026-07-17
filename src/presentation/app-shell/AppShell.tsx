@@ -424,7 +424,9 @@ export function AppShell() {
 
   return (
     <main className="app-shell" aria-label="cleancode workspace">
-      <ThemeSettingsRoot />
+      <div className="app-shell__settings" role="group" aria-label="应用设置">
+        <ThemeSettingsRoot />
+      </div>
       <ProjectSidebar
         workbenches={workbenches}
         currentWorkbench={currentWorkbench}

@@ -1,31 +1,18 @@
-.app-titlebar {
+.app-shell__settings {
   position: absolute;
   z-index: 50;
-  top: 0;
-  right: 0;
-  left: 0;
+  top: var(--cc-shell-control-inset);
+  right: var(--cc-shell-control-inset);
   display: flex;
-  height: var(--cc-titlebar-height);
+  min-height: var(--cc-shell-settings-height);
+  max-width: calc(100% - 24px);
   align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--cc-divider);
-  background: var(--cc-chrome-translucent);
-  padding: 0 10px 0 78px;
-  color: var(--cc-foreground);
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-app-region: drag;
+  justify-content: flex-end;
+  gap: 4px;
+  -webkit-app-region: no-drag;
 }
 
-.app-titlebar__name {
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 680;
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.app-titlebar__theme-button,
+.theme-settings-trigger,
 .theme-settings-drawer__close {
   display: inline-flex;
   width: 30px;
@@ -43,28 +30,34 @@
   -webkit-app-region: no-drag;
 }
 
-.app-titlebar__theme-button:hover,
+.theme-settings-trigger {
+  flex: 0 0 auto;
+}
+
+.theme-settings-trigger:hover,
+.theme-settings-trigger[aria-expanded='true'],
 .theme-settings-drawer__close:hover {
   border-color: var(--cc-border);
   background: var(--cc-surface-hover);
   color: var(--cc-foreground);
 }
 
-.app-titlebar__palette-icon {
+.theme-settings-trigger__palette-icon {
   width: 18px;
   height: 18px;
   background: var(--cc-muted-strong);
   mask: url('../assets/theme-palette.svg') center / contain no-repeat;
 }
 
-.app-titlebar__theme-button:hover .app-titlebar__palette-icon {
+.theme-settings-trigger:hover .theme-settings-trigger__palette-icon,
+.theme-settings-trigger[aria-expanded='true'] .theme-settings-trigger__palette-icon {
   background: var(--cc-foreground);
 }
 
 .theme-settings-backdrop {
   position: fixed;
   z-index: 100;
-  inset: var(--cc-titlebar-height) 0 0;
+  inset: 0;
   background: var(--cc-backdrop);
   backdrop-filter: blur(2px);
   animation: theme-backdrop-in 160ms ease-out;
@@ -267,10 +260,6 @@
 }
 
 @media (max-width: 640px) {
-  .app-titlebar {
-    padding-left: 74px;
-  }
-
   .theme-settings-drawer {
     width: min(360px, calc(100vw - 12px));
   }

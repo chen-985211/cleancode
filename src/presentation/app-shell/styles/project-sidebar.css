@@ -6,7 +6,18 @@
   flex-direction: column;
   overflow: visible;
   border-right: 1px solid var(--cc-divider);
-  padding: 14px 12px 12px;
+  padding: max(14px, calc(var(--cc-window-controls-height) + 8px)) 12px 12px;
+}
+
+.project-sidebar::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--cc-window-controls-height);
+  content: '';
+  user-select: none;
+  -webkit-app-region: drag;
 }
 
 .project-sidebar__actions {
