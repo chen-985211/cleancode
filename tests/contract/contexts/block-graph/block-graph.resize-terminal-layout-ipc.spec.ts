@@ -27,6 +27,10 @@ class FakeIpcMain implements IpcMainLike {
       IpcInvokeResult<TResult>
     >
   }
+
+  hasHandler(channel: string): boolean {
+    return this.handlers.has(channel)
+  }
 }
 
 const silentLogger: Logger = {
@@ -37,6 +41,17 @@ const silentLogger: Logger = {
 }
 
 describe('block graph terminal resize IPC contract', () => {
+  it('does not expose a full graph snapshot overwrite channel', () => {
+    const ipcMain = new FakeIpcMain()
+
+    registerBlockGraphIpcHandlers({
+      ipcMain,
+      logger: silentLogger
+    } as unknown as BlockGraphIpcHandlersInput)
+
+    expect(ipcMain.hasHandler('cleancode:save-graph')).toBe(false)
+  })
+
   it('passes the complete final terminal rectangle through IPC', async () => {
     const ipcMain = new FakeIpcMain()
     const resizeTerminalBlock = vi.fn(async () => createGraphSnapshot())

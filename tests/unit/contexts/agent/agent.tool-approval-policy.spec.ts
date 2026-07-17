@@ -15,5 +15,6 @@ describe('agent tool approval policy', () => {
     expect(policy.requiresApproval('connect_terminal_blocks')).toBe(false)
     expect(policy.requiresApproval('inspect_terminal_workflow_plan')).toBe(false)
     expect(policy.requiresApproval('inspect_graph')).toBe(false)
+    expect(policy.requiresApproval('arrange_terminal_layout')).toBe(false)
   })
 })

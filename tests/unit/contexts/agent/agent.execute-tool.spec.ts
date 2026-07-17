@@ -1,15 +1,19 @@
-import { ExecuteAgentToolUseCase } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { AgentAuditRepository } from '../../../../src/contexts/agent/application/ports/AgentAuditRepository'
 import type { AgentBlockGraphToolPort } from '../../../../src/contexts/agent/application/ports/AgentBlockGraphToolPort'
-import type { AgentAuditRecord } from '../../../../src/contexts/agent/domain/entities/AgentAuditRecord'
 import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import {
+  RecordingAgentAuditRepository,
+  createAgentSessionRepository,
+  createExecuteTool
+} from './agent.execute-tool-fixtures'
 
 describe('execute agent tool', () => {
   it('executes non-destructive terminal block tools without approval and records an audit entry', async () => {
     const blockGraphTools = createBlockGraphTools()
     vi.mocked(blockGraphTools.createTerminalBlock).mockResolvedValue(fakeGraphWithApiBlock)
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const agentRepository = createAgentSessionRepository()
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository, agentRepository)
 
     const result = await executeTool.execute({
       input: {
@@ -46,6 +50,7 @@ describe('execute agent tool', () => {
         type: 'terminal'
       }
     )
+    expect(agentRepository.findWorkspace).not.toHaveBeenCalled()
     expect(auditRepository.records).toEqual([
       expect.objectContaining({
         id: 'tool-call-create',
@@ -72,7 +77,7 @@ describe('execute agent tool', () => {
     const blockGraphTools = createBlockGraphTools()
     vi.mocked(blockGraphTools.createTerminalGroup).mockResolvedValue(fakeGraphWithTerminalGroup)
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository)
 
     const result = await executeTool.execute({
       input: {
@@ -98,7 +103,7 @@ describe('execute agent tool', () => {
   it('waits for right-panel approval before deleting a terminal block', async () => {
     const blockGraphTools = createBlockGraphTools()
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository)
 
     const result = await executeTool.execute({
       input: { blockId: 'terminal-1' },
@@ -129,7 +134,7 @@ describe('execute agent tool', () => {
   })
 
   it('identifies the terminal group targeted by a destructive approval', async () => {
-    const executeTool = new ExecuteAgentToolUseCase(
+    const executeTool = createExecuteTool(
       createBlockGraphTools(),
       new RecordingAgentAuditRepository()
     )
@@ -155,7 +160,7 @@ describe('execute agent tool', () => {
   it('executes a destructive terminal group tool after approval', async () => {
     const blockGraphTools = createBlockGraphTools()
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository)
 
     const result = await executeTool.execute({
       approved: true,
@@ -206,10 +211,7 @@ describe('execute agent tool', () => {
       nodes: [],
       workspaceName: 'main'
     })
-    const executeTool = new ExecuteAgentToolUseCase(
-      blockGraphTools,
-      new RecordingAgentAuditRepository()
-    )
+    const executeTool = createExecuteTool(blockGraphTools, new RecordingAgentAuditRepository())
 
     await expect(
       executeTool.execute({
@@ -268,10 +270,7 @@ describe('execute agent tool', () => {
 
   it('waits for approval before disconnecting one terminal dependency', async () => {
     const blockGraphTools = createBlockGraphTools()
-    const executeTool = new ExecuteAgentToolUseCase(
-      blockGraphTools,
-      new RecordingAgentAuditRepository()
-    )
+    const executeTool = createExecuteTool(blockGraphTools, new RecordingAgentAuditRepository())
 
     const result = await executeTool.execute({
       input: { connectionId: 'connection-api-test' },
@@ -297,7 +296,7 @@ describe('execute agent tool', () => {
   it('returns a structured failed result and never reaches BlockGraph for invalid tool input', async () => {
     const blockGraphTools = createBlockGraphTools()
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository)
 
     await expect(
       executeTool.execute({
@@ -334,7 +333,7 @@ describe('execute agent tool', () => {
         if (record.status !== 'started') throw new Error('audit storage unavailable')
       })
     }
-    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+    const executeTool = createExecuteTool(blockGraphTools, auditRepository)
 
     await expect(
       executeTool.execute({
@@ -357,7 +356,7 @@ describe('execute agent tool', () => {
 
   it('records cancellation only for a call that is still awaiting approval', async () => {
     const auditRepository = new RecordingAgentAuditRepository()
-    const executeTool = new ExecuteAgentToolUseCase(createBlockGraphTools(), auditRepository)
+    const executeTool = createExecuteTool(createBlockGraphTools(), auditRepository)
     const command = {
       input: { connectionId: 'connection-api-test' },
       projectDirectory: '/tmp/project',
@@ -439,16 +438,14 @@ const fakeGraphWithTerminalGroup: BlockGraphSnapshot = {
   ]
 }
 
-class RecordingAgentAuditRepository implements AgentAuditRepository {
-  readonly records: AgentAuditRecord[] = []
-
-  async append(record: AgentAuditRecord): Promise<void> {
-    this.records.push(record)
-  }
-}
-
 function createBlockGraphTools(): AgentBlockGraphToolPort {
   return {
+    arrangeTerminalLayout: vi.fn(async () => ({
+      arrangedBlockIds: [],
+      arrangedTerminalGroupIds: [],
+      graph: fakeGraph,
+      graphChanged: false
+    })),
     createTerminalBlock: vi.fn(async () => fakeGraph),
     createTerminalGroup: vi.fn(async () => fakeGraph),
     connectTerminalBlocks: vi.fn(async () => ({ connectionId: 'connection-1', graph: fakeGraph })),

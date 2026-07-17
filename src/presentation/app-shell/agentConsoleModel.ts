@@ -1,11 +1,13 @@
-import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type {
+  AgentGraphUpdatedEvent,
+  AgentSessionSnapshot
+} from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import {
   defaultAgentLayoutPosition,
   defaultAgentLayoutSize
 } from '../../contexts/agent/domain/aggregates/AgentSession'
-import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { AgentXtermController } from './agentTerminalXterm'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
@@ -26,7 +28,7 @@ export interface AgentConsoleProps {
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench?: WorkbenchSnapshot | null
   readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
-  readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
+  readonly onGraphUpdated?: (event: AgentGraphUpdatedEvent) => void
   readonly onMcpCapabilityChange?: (
     agent: WorkspaceAgentSnapshot,
     enabled: boolean

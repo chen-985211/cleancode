@@ -106,10 +106,6 @@ export interface BlockGraphIpcHandlersInput {
     readonly workspaceName: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
-  readonly saveGraph: (command: {
-    readonly projectDirectory: string
-    readonly graph: BlockGraphSnapshot
-  }) => Promise<BlockGraphSnapshot>
 }
 
 export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput): void {
@@ -389,20 +385,5 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     operation: 'deleteBlock',
     scope: 'block-graph',
     successLogLevel: 'info'
-  })
-
-  registerIpcHandler<
-    {
-      readonly projectDirectory: string
-      readonly graph: BlockGraphSnapshot
-    },
-    BlockGraphSnapshot
-  >({
-    channel: 'cleancode:save-graph',
-    handler: (command) => input.saveGraph(command),
-    ipcMain: input.ipcMain,
-    logger: input.logger,
-    operation: 'saveGraph',
-    scope: 'block-graph'
   })
 }

@@ -53,7 +53,7 @@ describe('block graph filesystem repository', () => {
       memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
     })
 
-    await repository.saveDefaultGraph(projectDirectory, graph)
+    await repository.initializeDefaultGraph(projectDirectory, graph)
 
     const reopenedRepository = new FileSystemBlockGraphRepository(appStateDirectory)
     const openedGraph = await reopenedRepository.findDefaultGraph(projectDirectory, 'main')
@@ -173,44 +173,221 @@ describe('block graph filesystem repository', () => {
     ])
   })
 
-  it('keeps concurrent saves to the same graph path ordered and parseable', async () => {
-    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
-    const slowGraph = BlockGraph.createDefault({
-      projectId: 'project-1',
-      workspaceName: 'main'
-    })
-    const latestGraph = BlockGraph.createDefault({
-      projectId: 'project-1',
-      workspaceName: 'main'
-    })
-
-    for (let index = 0; index < 1_500; index += 1) {
-      slowGraph.createTerminalBlock({
-        name: `Slow Terminal ${index}`,
-        description: 'Large snapshot',
-        position: { x: index, y: index }
-      })
+  it('migrates a legacy graph during initialization instead of shadowing it with an empty graph', async () => {
+    const legacyGraph = {
+      id: 'legacy-before-initialization',
+      projectId: 'legacy-project',
+      workspaceName: 'main',
+      blocks: []
     }
-    latestGraph.createTerminalBlock({
-      name: 'Latest Terminal',
-      description: 'Last requested snapshot',
-      position: { x: 80, y: 120 }
+    const legacyDirectory = join(projectDirectory, '.cleancode', 'workspaces', 'main')
+    await mkdir(legacyDirectory, { recursive: true })
+    await writeFile(
+      join(legacyDirectory, 'default-graph.json'),
+      `${JSON.stringify(legacyGraph, null, 2)}\n`
+    )
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+
+    const initialized = await repository.initializeDefaultGraph(
+      projectDirectory,
+      BlockGraph.createDefault({ projectId: 'new-project', workspaceName: 'main' })
+    )
+
+    expect(initialized.id).toBe('legacy-before-initialization')
+    expect((await repository.findDefaultGraphSnapshot(projectDirectory, 'main'))?.id).toBe(
+      'legacy-before-initialization'
+    )
+  })
+
+  it('serializes the complete read-modify-write transaction for one workspace', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    await repository.initializeDefaultGraph(projectDirectory, graph)
+
+    const [firstTransaction, secondTransaction] = await Promise.all([
+      repository.transactDefaultGraph(projectDirectory, 'main', (currentGraph) =>
+        currentGraph.createTerminalBlock({
+          id: 'terminal-install',
+          name: 'Install',
+          description: 'Install dependencies',
+          position: { x: 120, y: 160 }
+        })
+      ),
+      repository.transactDefaultGraph(projectDirectory, 'main', (currentGraph) =>
+        currentGraph.createTerminalBlock({
+          id: 'terminal-dev',
+          name: 'Dev',
+          description: 'Start development server',
+          position: { x: 760, y: 160 }
+        })
+      )
+    ])
+
+    const persisted = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
+
+    expect(firstTransaction?.result.id).toBe('terminal-install')
+    expect(secondTransaction?.graph.blocks.map((block) => block.id)).toEqual([
+      'terminal-install',
+      'terminal-dev'
+    ])
+    expect(persisted?.blocks.map((block) => block.id)).toEqual(['terminal-install', 'terminal-dev'])
+  })
+
+  it('initializes a workspace inside the mutation queue before a concurrent transaction', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({
+      id: 'initial-graph',
+      projectId: 'project-1',
+      workspaceName: 'main'
     })
 
-    await Promise.all([
-      repository.saveDefaultGraph(projectDirectory, slowGraph),
-      repository.saveDefaultGraph(projectDirectory, latestGraph)
-    ])
-
-    const graphFile = await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
-    const savedGraph = JSON.parse(graphFile) as { id: string; blocks: Array<{ name: string }> }
-
-    expect(savedGraph.id).toBe(latestGraph.id)
-    expect(savedGraph.blocks).toEqual([
-      expect.objectContaining({
-        name: 'Latest Terminal'
+    const initialization = repository.initializeDefaultGraph(projectDirectory, graph)
+    const mutation = repository.transactDefaultGraph(projectDirectory, 'main', (currentGraph) =>
+      currentGraph.createTerminalBlock({
+        id: 'terminal-after-init',
+        name: 'Terminal',
+        description: '',
+        position: { x: 120, y: 160 }
       })
+    )
+    const [initialized, committed] = await Promise.all([initialization, mutation])
+
+    expect(initialized.blocks).toEqual([])
+    expect(committed?.graph.blocks.map((block) => block.id)).toEqual(['terminal-after-init'])
+    expect(
+      (await repository.findDefaultGraphSnapshot(projectDirectory, 'main'))?.blocks.map(
+        (block) => block.id
+      )
+    ).toEqual(['terminal-after-init'])
+  })
+
+  it('keeps the first initialized graph when initialization is requested twice', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const firstGraph = BlockGraph.createDefault({
+      id: 'first-graph',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    const secondGraph = BlockGraph.createDefault({
+      id: 'second-graph',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    const [first, second] = await Promise.all([
+      repository.initializeDefaultGraph(projectDirectory, firstGraph),
+      repository.initializeDefaultGraph(projectDirectory, secondGraph)
     ])
+
+    expect(first.id).toBe('first-graph')
+    expect(second.id).toBe('first-graph')
+    expect((await repository.findDefaultGraphSnapshot(projectDirectory, 'main'))?.id).toBe(
+      'first-graph'
+    )
+  })
+
+  it('does not persist a failed graph transaction and keeps the workspace queue usable', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graph = BlockGraph.createDefault({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    await repository.initializeDefaultGraph(projectDirectory, graph)
+
+    await expect(
+      repository.transactDefaultGraph(projectDirectory, 'main', (currentGraph) => {
+        currentGraph.createTerminalBlock({
+          id: 'terminal-failed',
+          name: 'Failed',
+          description: 'Must not be committed',
+          position: { x: 120, y: 160 }
+        })
+        throw new Error('Stop this transaction.')
+      })
+    ).rejects.toThrow('Stop this transaction.')
+
+    const recovered = await repository.transactDefaultGraph(
+      projectDirectory,
+      'main',
+      (currentGraph) =>
+        currentGraph.createTerminalBlock({
+          id: 'terminal-recovered',
+          name: 'Recovered',
+          description: 'Committed after failure',
+          position: { x: 120, y: 160 }
+        })
+    )
+
+    expect(recovered?.graph.blocks.map((block) => block.id)).toEqual(['terminal-recovered'])
+    expect(
+      (await repository.findDefaultGraphSnapshot(projectDirectory, 'main'))?.blocks.map(
+        (block) => block.id
+      )
+    ).toEqual(['terminal-recovered'])
+  })
+
+  it('awaits an asynchronous transaction before snapshotting and persisting its changes', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    await repository.initializeDefaultGraph(
+      projectDirectory,
+      BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    )
+
+    const committed = await repository.transactDefaultGraph(
+      projectDirectory,
+      'main',
+      async (currentGraph) => {
+        await Promise.resolve()
+        currentGraph.createTerminalBlock({
+          id: 'terminal-async',
+          name: 'Async',
+          description: '',
+          position: { x: 120, y: 160 }
+        })
+        return 'committed'
+      }
+    )
+
+    expect(committed?.result).toBe('committed')
+    expect(committed?.graph.blocks.map((block) => block.id)).toEqual(['terminal-async'])
+  })
+
+  it('rolls back an asynchronously rejected transaction and keeps its queue usable', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    await repository.initializeDefaultGraph(
+      projectDirectory,
+      BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    )
+
+    await expect(
+      repository.transactDefaultGraph(projectDirectory, 'main', async (currentGraph) => {
+        currentGraph.createTerminalBlock({
+          id: 'terminal-rejected',
+          name: 'Rejected',
+          description: '',
+          position: { x: 120, y: 160 }
+        })
+        await Promise.resolve()
+        throw new Error('Reject this transaction.')
+      })
+    ).rejects.toThrow('Reject this transaction.')
+
+    const recovered = await repository.transactDefaultGraph(
+      projectDirectory,
+      'main',
+      (currentGraph) =>
+        currentGraph.createTerminalBlock({
+          id: 'terminal-recovered-async',
+          name: 'Recovered',
+          description: '',
+          position: { x: 120, y: 160 }
+        })
+    )
+
+    expect(recovered?.graph.blocks.map((block) => block.id)).toEqual(['terminal-recovered-async'])
   })
 
   it('reports corrupted persisted graph snapshots as a stable app error', async () => {
@@ -220,7 +397,7 @@ describe('block graph filesystem repository', () => {
       workspaceName: 'main'
     })
 
-    await repository.saveDefaultGraph(projectDirectory, graph)
+    await repository.initializeDefaultGraph(projectDirectory, graph)
 
     const graphPath = await findOnlyFileNamed(appStateDirectory, 'default-graph.json')
 

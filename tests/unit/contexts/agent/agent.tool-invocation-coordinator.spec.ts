@@ -74,8 +74,10 @@ describe('Agent tool invocation coordinator', () => {
 
 function command(toolCallId: string, sessionId: string, workspaceName: string) {
   return {
+    agentId: 'agent-1',
     input: {},
     projectDirectory: '/repo/app',
+    projectId: 'project-1',
     sessionId,
     toolCallId,
     toolName: 'inspect_graph' as const,

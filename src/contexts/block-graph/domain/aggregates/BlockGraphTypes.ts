@@ -113,6 +113,7 @@ export interface CreateTerminalBlockInput {
   readonly id?: string
   readonly name: string
   readonly description: string
+  readonly launchCommand?: string
   readonly position: BlockPositionSnapshot
   readonly size?: Partial<TerminalBlockSizeSnapshot>
 }

@@ -41,18 +41,27 @@ describe('terminal workflow graph commands', () => {
       readiness: { type: 'tcp', port: 4173 },
       readinessTimeoutMs: 30_000
     })
-    expect(repository.saveCount).toBe(3)
+    expect(repository.transactionCount).toBe(3)
   })
 })
 
 class TrackingRepository implements BlockGraphRepository {
-  saveCount = 0
+  transactionCount = 0
 
   constructor(private graph: BlockGraph) {}
 
-  async saveDefaultGraph(_directory: string, graph: BlockGraph): Promise<void> {
-    this.graph = graph
-    this.saveCount += 1
+  async transactDefaultGraph<TResult>(
+    _directory: string,
+    _workspaceName: string,
+    transaction: (graph: BlockGraph) => TResult | Promise<TResult>
+  ) {
+    const result = await transaction(this.graph)
+    this.transactionCount += 1
+    return { graph: this.graph.toSnapshot(), result }
+  }
+
+  async initializeDefaultGraph(_projectDirectory: string, graph: BlockGraph) {
+    return graph.toSnapshot()
   }
 
   async findDefaultGraph(): Promise<BlockGraph> {

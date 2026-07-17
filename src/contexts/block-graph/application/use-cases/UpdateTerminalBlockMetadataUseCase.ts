@@ -1,6 +1,6 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { BlockGraphSnapshot } from '../dto/BlockGraphSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
+import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface UpdateTerminalBlockMetadataCommand {
   readonly projectDirectory: string
@@ -15,23 +15,17 @@ export class UpdateTerminalBlockMetadataUseCase {
   constructor(private readonly graphRepository: BlockGraphRepository) {}
 
   async execute(command: UpdateTerminalBlockMetadataCommand): Promise<BlockGraphSnapshot> {
-    const graph = await this.graphRepository.findDefaultGraph(
-      command.projectDirectory,
-      command.workspaceName
+    const transaction = await executeDefaultGraphTransaction(
+      this.graphRepository,
+      command,
+      (graph) =>
+        graph.updateTerminalBlockMetadata(command.blockId, {
+          name: command.name,
+          description: command.description,
+          launchCommand: command.launchCommand
+        })
     )
 
-    if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
-    }
-
-    graph.updateTerminalBlockMetadata(command.blockId, {
-      name: command.name,
-      description: command.description,
-      launchCommand: command.launchCommand
-    })
-
-    await this.graphRepository.saveDefaultGraph(command.projectDirectory, graph)
-
-    return graph.toSnapshot()
+    return transaction.graph
   }
 }

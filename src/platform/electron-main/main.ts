@@ -19,6 +19,7 @@ import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastruct
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
 import { NodePtyCodexAgentProcessAdapter } from '../../contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
+import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
 import { BuildTerminalWorkflowPlanUseCase } from '../../contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
 import { ConnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
@@ -31,7 +32,6 @@ import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cas
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
 import { RemoveTerminalFromGroupUseCase } from '../../contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
-import { SaveDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/SaveDefaultGraphUseCase'
 import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
 import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
@@ -90,6 +90,7 @@ const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
   gitWorkspaceAdapter
 )
 const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
+const arrangeTerminalLayoutUseCase = new ArrangeTerminalLayoutUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const createTerminalGroupUseCase = new CreateTerminalGroupUseCase(graphRepository)
 const connectTerminalBlocksUseCase = new ConnectTerminalBlocksUseCase(graphRepository)
@@ -101,7 +102,6 @@ const removeTerminalFromGroupUseCase = new RemoveTerminalFromGroupUseCase(graphR
 const dissolveTerminalGroupUseCase = new DissolveTerminalGroupUseCase(graphRepository)
 const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository)
-const saveDefaultGraphUseCase = new SaveDefaultGraphUseCase(graphRepository)
 const setTerminalGroupCollapsedUseCase = new SetTerminalGroupCollapsedUseCase(graphRepository)
 const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepository)
 const updateTerminalGroupMetadataUseCase = new UpdateTerminalGroupMetadataUseCase(graphRepository)
@@ -140,6 +140,7 @@ const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
   agentSessionRepository
 )
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
+  arrangeTerminalLayout: (command) => arrangeTerminalLayoutUseCase.execute(command),
   buildTerminalWorkflowPlan: (query) => buildTerminalWorkflowPlanUseCase.execute(query),
   connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
@@ -158,7 +159,8 @@ const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
 })
 const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
   agentBlockGraphToolAdapter,
-  agentAuditRepository
+  agentAuditRepository,
+  agentSessionRepository
 )
 const agentSessionService = new AgentSessionService(
   new NodePtyCodexAgentProcessAdapter(),
@@ -282,7 +284,6 @@ registerBlockGraphIpcHandlers({
   moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
   removeTerminalFromGroup: (command) => removeTerminalFromGroupUseCase.execute(command),
   resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
-  saveGraph: (command) => saveDefaultGraphUseCase.execute(command),
   setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),
   updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command),

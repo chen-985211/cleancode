@@ -65,6 +65,31 @@ describe('preserve workbench node transient layout', () => {
     expect(preserveWorkbenchNodeTransientLayout([nextNode], [currentNode])).toEqual([nextNode])
   })
 
+  it('keeps a protected terminal at its transient position while a layout commit is pending', () => {
+    const currentNode = createTerminalNode({
+      position: { x: 640, y: 360 },
+      style: { width: 560, height: 420 },
+      blockPosition: { x: 320, y: 240 },
+      blockSize: { width: 560, height: 420 }
+    })
+    const nextNode = createTerminalNode({
+      position: { x: 120, y: 80 },
+      style: { width: 560, height: 420 },
+      blockPosition: { x: 120, y: 80 },
+      blockSize: { width: 560, height: 420 }
+    })
+
+    expect(
+      preserveWorkbenchNodeTransientLayout([nextNode], [currentNode], new Set(['terminal-1']))
+    ).toEqual([
+      {
+        ...nextNode,
+        position: currentNode.position,
+        style: currentNode.style
+      }
+    ])
+  })
+
   it('uses the next terminal group layout when the persisted group bounds change', () => {
     const currentNode = createTerminalGroupNode({
       position: { x: 288, y: 164 },

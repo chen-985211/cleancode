@@ -47,7 +47,8 @@ function TimingProbe({
     selectedTerminalBlockIds: [],
     selectedTerminalGroupId: null,
     selectedUngroupedTerminalBlockIds: [],
-    setCurrentGraph: () => undefined,
+    protectedLayoutNodeIds: new Set(),
+    onAgentGraphUpdated: () => undefined,
     setNodes: () => {
       phases.push('flow-nodes-projected')
     },

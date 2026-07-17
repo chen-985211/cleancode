@@ -7,7 +7,6 @@ import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'rea
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction, filterMinimapNodes } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { resolveNodeSize } from './resolveNodeSize'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
@@ -34,6 +33,7 @@ import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
+import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 
 export function AppShell() {
   const isDesktopRuntime = Boolean(window.cleancode)
@@ -276,6 +276,17 @@ export function AppShell() {
     nodes,
     setCurrentGraph
   })
+  const { onAgentGraphUpdated, onNodeDragStart, onNodeDragStop, protectedLayoutNodeIds } =
+    useAgentLayoutCoordination({
+      clearTerminalGroupDropPreview,
+      currentProjectId: currentWorkbench?.project.id ?? null,
+      currentWorkspaceName: currentWorkspace?.name ?? null,
+      moveWorkbenchNode,
+      moveWorkspaceAgent,
+      nodes,
+      reactFlowInstanceRef,
+      setCurrentGraph
+    })
 
   const minimapNodeInteraction = useMemo(
     () =>
@@ -409,7 +420,8 @@ export function AppShell() {
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
     selectedUngroupedTerminalBlockIds,
-    setCurrentGraph,
+    protectedLayoutNodeIds,
+    onAgentGraphUpdated,
     setNodes,
     terminalGroupDropAction,
     terminalStates,
@@ -464,16 +476,8 @@ export function AppShell() {
         onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
         onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
         onNodeDrag={previewTerminalGroupDrop}
-        onNodeDragStart={clearTerminalGroupDropPreview}
-        onNodeDragStop={(event, node) => {
-          if (node.type !== 'agentConsole') {
-            moveWorkbenchNode(event, node)
-            return
-          }
-          const width = resolveNodeSize(node.style?.width, node.data.agent.layout.size.width)
-          const height = resolveNodeSize(node.style?.height, node.data.agent.layout.size.height)
-          void moveWorkspaceAgent(node.data.agent, node.position, { width, height })
-        }}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDragStop={(event, node) => void onNodeDragStop(event, node)}
         onViewportChange={updateGraphViewport}
         onMinimapNodeClick={focusWorkbenchNode}
         getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}

@@ -10,3 +10,4 @@ export type AgentToolName =
   | 'connect_terminal_blocks'
   | 'disconnect_terminal_blocks'
   | 'inspect_terminal_workflow_plan'
+  | 'arrange_terminal_layout'

@@ -64,7 +64,8 @@ describe('cleancode HTTP MCP server', () => {
       'update_terminal_execution_config',
       'connect_terminal_blocks',
       'disconnect_terminal_blocks',
-      'inspect_terminal_workflow_plan'
+      'inspect_terminal_workflow_plan',
+      'arrange_terminal_layout'
     ])
 
     await expect(

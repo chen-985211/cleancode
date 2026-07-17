@@ -14,8 +14,9 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
     this.savedGraph = initialGraph
   }
 
-  async saveDefaultGraph(_projectDirectory: string, graph: BlockGraph): Promise<void> {
+  async initializeDefaultGraph(_projectDirectory: string, graph: BlockGraph) {
     this.savedGraph = graph
+    return graph.toSnapshot()
   }
 
   async findDefaultGraph(): Promise<BlockGraph | null> {
@@ -24,6 +25,16 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 
   async findDefaultGraphSnapshot() {
     return this.savedGraph?.toSnapshot() ?? null
+  }
+
+  async transactDefaultGraph<TResult>(
+    _projectDirectory: string,
+    _workspaceName: string,
+    transaction: (graph: BlockGraph) => TResult | Promise<TResult>
+  ) {
+    if (!this.savedGraph) return null
+    const result = await transaction(this.savedGraph)
+    return { graph: this.savedGraph.toSnapshot(), result }
   }
 }
 

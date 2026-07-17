@@ -20,7 +20,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       id: 1,
       jsonrpc: '2.0',
       result: expect.objectContaining({
-        instructions: expect.stringContaining('terminal blocks'),
+        instructions: expect.stringContaining('arrange_terminal_layout'),
         serverInfo: { name: 'cleancode-agent-tools', version: '0.2.0' }
       })
     })
@@ -58,7 +58,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
                 }),
                 type: expect.objectContaining({ const: 'terminal' })
               }),
-              required: ['type', 'name', 'position'],
+              required: ['type', 'name'],
               type: 'object'
             }),
             name: 'create_block'
@@ -100,6 +100,18 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       destructiveHint: true,
       openWorldHint: false,
       readOnlyHint: false
+    })
+    expect(result.tools.find((tool) => tool.name === 'arrange_terminal_layout')).toMatchObject({
+      annotations: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      inputSchema: {
+        additionalProperties: false,
+        required: ['blockIds'],
+        type: 'object'
+      }
     })
 
     expect(result.tools.map((tool) => tool.name)).not.toEqual(

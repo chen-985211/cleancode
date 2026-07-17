@@ -102,16 +102,19 @@ export function useTerminalGroupDragActions({
         return
       }
 
-      const graphSnapshot = await window.cleancode?.moveTerminalGroup({
-        projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
-        terminalGroupId: node.id,
-        position: node.position
-      })
-
-      if (graphSnapshot) {
-        setCurrentGraph(graphSnapshot)
-      }
+      await layoutCommitQueue.enqueue(
+        `terminal-group:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+        () =>
+          window.cleancode?.moveTerminalGroup({
+            projectDirectory: currentWorkbench.project.directory,
+            workspaceName: currentWorkspace.name,
+            terminalGroupId: node.id,
+            position: node.position
+          }) ?? Promise.resolve(undefined),
+        (graphSnapshot) => {
+          if (graphSnapshot) setCurrentGraph(graphSnapshot)
+        }
+      )
 
       setTerminalGroupDropAction({ type: 'none' })
     },

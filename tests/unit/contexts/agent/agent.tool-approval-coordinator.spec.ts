@@ -39,7 +39,9 @@ describe('Agent tool approval coordinator', () => {
     expect(cancel).not.toHaveBeenCalled()
     expect(execute).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        agentId: 'agent-1',
         approved: true,
+        projectId: 'project-1',
         toolCallId: 'tool-call-1',
         toolName: 'disconnect_terminal_blocks'
       })
@@ -70,6 +72,44 @@ describe('Agent tool approval coordinator', () => {
     })
 
     expect(session.callbacks.onGraphUpdated).not.toHaveBeenCalled()
+  })
+
+  it('publishes one layout change event with the tool call id and arranged object ids', async () => {
+    const session = createManagedSession()
+    const execute = vi.fn(async () => completedArrangeResult('layout-operation-1'))
+    const coordinator = new AgentToolApprovalCoordinator(
+      { cancel: vi.fn(), execute },
+      () => session
+    )
+
+    await coordinator.execute(session, {
+      input: { blockIds: ['terminal-api', 'terminal-test'] },
+      sessionId: session.sessionId,
+      toolCallId: 'layout-operation-1',
+      toolName: 'arrange_terminal_layout'
+    })
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: 'agent-1',
+        projectId: 'project-1',
+        toolCallId: 'layout-operation-1'
+      })
+    )
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledOnce()
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledWith({
+      agentId: 'agent-1',
+      change: {
+        blockIds: ['terminal-api', 'terminal-test'],
+        kind: 'terminal_layout_arranged',
+        operationId: 'layout-operation-1',
+        terminalGroupIds: ['terminal-group-dev-test']
+      },
+      graph: fakeGraph,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
   })
 
   it('returns a structured failure to the approval surface and completes the tool call', async () => {
@@ -286,6 +326,20 @@ function completedGraphResult(toolCallId: string, graphChanged: boolean): AgentT
     graph: fakeGraph,
     graphChanged,
     output: { type: 'block_graph' },
+    status: 'completed',
+    toolCallId
+  }
+}
+
+function completedArrangeResult(toolCallId: string): AgentToolExecutionResult {
+  return {
+    graph: fakeGraph,
+    graphChanged: true,
+    output: {
+      arrangedBlockIds: ['terminal-api', 'terminal-test'],
+      arrangedTerminalGroupIds: ['terminal-group-dev-test'],
+      type: 'block_graph'
+    },
     status: 'completed',
     toolCallId
   }

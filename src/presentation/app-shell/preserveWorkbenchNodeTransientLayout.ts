@@ -2,7 +2,8 @@ import type { WorkbenchFlowNode } from './types'
 
 export function preserveWorkbenchNodeTransientLayout(
   nextNodes: WorkbenchFlowNode[],
-  currentNodes: WorkbenchFlowNode[]
+  currentNodes: WorkbenchFlowNode[],
+  protectedNodeIds: ReadonlySet<string> = new Set()
 ): WorkbenchFlowNode[] {
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]))
 
@@ -13,20 +14,27 @@ export function preserveWorkbenchNodeTransientLayout(
       return nextNode
     }
 
-    if (hasPersistedLayoutChanged(currentNode, nextNode)) {
+    if (hasPersistedLayoutChanged(currentNode, nextNode) && !protectedNodeIds.has(nextNode.id)) {
       return nextNode
     }
 
-    return {
-      ...nextNode,
-      position: currentNode.position,
-      style: currentNode.style,
-      ...(currentNode.width === undefined ? {} : { width: currentNode.width }),
-      ...(currentNode.height === undefined ? {} : { height: currentNode.height }),
-      ...(currentNode.measured === undefined ? {} : { measured: currentNode.measured }),
-      ...(currentNode.dragging === undefined ? {} : { dragging: currentNode.dragging })
-    }
+    return preserveTransientGeometry(nextNode, currentNode)
   })
+}
+
+function preserveTransientGeometry(
+  nextNode: WorkbenchFlowNode,
+  currentNode: WorkbenchFlowNode
+): WorkbenchFlowNode {
+  return {
+    ...nextNode,
+    position: currentNode.position,
+    style: currentNode.style,
+    ...(currentNode.width === undefined ? {} : { width: currentNode.width }),
+    ...(currentNode.height === undefined ? {} : { height: currentNode.height }),
+    ...(currentNode.measured === undefined ? {} : { measured: currentNode.measured }),
+    ...(currentNode.dragging === undefined ? {} : { dragging: currentNode.dragging })
+  }
 }
 
 function hasPersistedLayoutChanged(

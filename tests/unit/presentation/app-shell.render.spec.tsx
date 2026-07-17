@@ -83,7 +83,6 @@ describe('app shell', () => {
         moveBlock: vi.fn(),
         moveTerminalGroup: vi.fn(),
         deleteBlock: vi.fn(),
-        saveGraph: vi.fn(),
         startTerminal: vi.fn(),
         writeTerminal: vi.fn(),
         resizeTerminal: vi.fn(),

@@ -26,6 +26,13 @@ import {
   normalizeTerminalGroups
 } from '../services/TerminalGroupRules'
 import {
+  applyTerminalLayoutPlan,
+  createTerminalLayoutPlan,
+  toTerminalLayoutResult,
+  type ArrangeTerminalLayoutInput,
+  type TerminalLayoutResult
+} from '../services/TerminalLayoutPolicy'
+import {
   normalizeCanvasViewport,
   normalizeTerminalBlock,
   normalizeTerminalBlockSize,
@@ -55,6 +62,11 @@ export {
   minimumTerminalBlockSize
 } from './BlockGraphTypes'
 export { defaultTerminalGroupSize } from '../services/TerminalGroupRules'
+export type {
+  ArrangeTerminalLayoutInput,
+  TerminalLayoutRegion,
+  TerminalLayoutResult
+} from '../services/TerminalLayoutPolicy'
 
 export class BlockGraph {
   private constructor(
@@ -115,7 +127,7 @@ export class BlockGraph {
       type: 'terminal',
       name: input.name,
       description: input.description,
-      launchCommand: '',
+      launchCommand: normalizeTerminalLaunchCommand(input.launchCommand ?? ''),
       executionConfig: {
         ...defaultTerminalExecutionConfig,
         successExitCodes: [...defaultTerminalExecutionConfig.successExitCodes]
@@ -134,6 +146,16 @@ export class BlockGraph {
       block.id === blockId ? { ...block, position } : block
     )
     this.normalizeGroupsContainingBlock(blockId)
+  }
+
+  arrangeTerminalLayout(input: ArrangeTerminalLayoutInput): TerminalLayoutResult {
+    const plan = createTerminalLayoutPlan(this.toSnapshot(), input)
+    this.blockSnapshots = applyTerminalLayoutPlan(this.blockSnapshots, plan)
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
+      normalizeTerminalGroupBounds(group, this.blockSnapshots)
+    )
+
+    return toTerminalLayoutResult(plan)
   }
 
   updateViewport(viewport: Partial<CanvasViewportSnapshot>): void {

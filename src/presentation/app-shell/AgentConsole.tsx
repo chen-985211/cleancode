@@ -136,7 +136,7 @@ export function AgentConsole({
           currentProjectDirectory === event.projectDirectory &&
           currentWorkspaceName === event.workspaceName
         ) {
-          onGraphUpdated?.(event.graph)
+          onGraphUpdated?.(event)
         }
       }) ?? noop
     return () => {

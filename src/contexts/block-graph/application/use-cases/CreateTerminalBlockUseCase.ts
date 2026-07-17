@@ -1,36 +1,60 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import type { BlockGraphSnapshot, BlockPositionSnapshot } from '../dto/BlockGraphSnapshot'
+import type {
+  BlockGraphSnapshot,
+  BlockPositionSnapshot,
+  TerminalBlockSizeSnapshot,
+  TerminalLayoutRegion
+} from '../dto/BlockGraphSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
+import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface CreateTerminalBlockCommand {
   readonly projectDirectory: string
   readonly workspaceName: string
   readonly name: string
   readonly description: string
-  readonly position: BlockPositionSnapshot
+  readonly launchCommand?: string
+  readonly position?: BlockPositionSnapshot
+  readonly size?: TerminalBlockSizeSnapshot
+  readonly reservedRegions?: readonly TerminalLayoutRegion[]
+  readonly anchorRegion?: TerminalLayoutRegion
 }
 
 export class CreateTerminalBlockUseCase {
   constructor(private readonly graphRepository: BlockGraphRepository) {}
 
   async execute(command: CreateTerminalBlockCommand): Promise<BlockGraphSnapshot> {
-    const graph = await this.graphRepository.findDefaultGraph(
-      command.projectDirectory,
-      command.workspaceName
+    const transaction = await executeDefaultGraphTransaction(
+      this.graphRepository,
+      command,
+      (graph) => {
+        if (!command.position && !command.anchorRegion) {
+          throw createExpectedAppError(
+            'TERMINAL_LAYOUT_ANCHOR_REQUIRED',
+            'Automatic terminal placement requires an anchor region.'
+          )
+        }
+
+        const block = graph.createTerminalBlock({
+          name: command.name,
+          description: command.description,
+          launchCommand: command.launchCommand,
+          position: command.position ?? { x: 0, y: 0 },
+          size: command.size
+        })
+
+        if (!command.position && command.anchorRegion) {
+          graph.arrangeTerminalLayout({
+            anchorRegion: command.anchorRegion,
+            blockIds: [block.id],
+            reservedRegions: command.reservedRegions ?? []
+          })
+        }
+
+        return block
+      }
     )
 
-    if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
-    }
-
-    graph.createTerminalBlock({
-      name: command.name,
-      description: command.description,
-      position: command.position
-    })
-
-    await this.graphRepository.saveDefaultGraph(command.projectDirectory, graph)
-
-    return graph.toSnapshot()
+    return transaction.graph
   }
 }

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { BlockGraphAgentToolAdapter } from '../../../../src/contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
+import { ArrangeTerminalLayoutUseCase } from '../../../../src/contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
 import { BuildTerminalWorkflowPlanUseCase } from '../../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
 import { ConnectTerminalBlocksUseCase } from '../../../../src/contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
@@ -129,23 +130,78 @@ describe('agent block graph workflow tool adapter', () => {
       (error: unknown) => getAppErrorCode(error) === 'TERMINAL_CONNECTION_NOT_FOUND'
     )
   })
+
+  it('creates and arranges terminals through one atomic BlockGraph callback each', async () => {
+    const anchorRegion = {
+      position: { x: 1_600, y: 160 },
+      size: { height: 460, width: 720 }
+    }
+    const reservedRegions = [
+      {
+        position: { x: 2_900, y: 80 },
+        size: { height: 520, width: 760 }
+      }
+    ]
+    const beforeCreate = await adapter.inspectGraph(context)
+    const createdGraph = await adapter.createTerminalBlock(context, {
+      anchorRegion,
+      description: 'Runs the API server',
+      launchCommand: 'pnpm dev:api',
+      name: 'API Server',
+      reservedRegions,
+      size: { height: 300, width: 460 },
+      type: 'terminal'
+    })
+    const previousIds = new Set(beforeCreate.blocks.map((block) => block.id))
+    const createdBlock = createdGraph.blocks.find((block) => !previousIds.has(block.id))
+
+    expect(createdBlock).toMatchObject({
+      description: 'Runs the API server',
+      launchCommand: 'pnpm dev:api',
+      name: 'API Server',
+      size: { height: 300, width: 460 }
+    })
+    expect(createdBlock && overlaps(createdBlock, anchorRegion)).toBe(false)
+    expect(createdBlock && overlaps(createdBlock, reservedRegions[0])).toBe(false)
+
+    if (!createdBlock) throw new Error('Expected the adapter to create a terminal block.')
+
+    const arranged = await adapter.arrangeTerminalLayout(context, {
+      anchorRegion: {
+        position: { x: 4_200, y: 240 },
+        size: { height: 460, width: 720 }
+      },
+      blockIds: [createdBlock.id],
+      reservedRegions
+    })
+
+    expect(arranged).toMatchObject({
+      arrangedBlockIds: [createdBlock.id],
+      arrangedTerminalGroupIds: [],
+      graphChanged: true
+    })
+  })
 })
 
 function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAgentToolAdapter {
+  const arrange = new ArrangeTerminalLayoutUseCase(repository)
   const connect = new ConnectTerminalBlocksUseCase(repository)
+  const createTerminal = new CreateTerminalBlockUseCase(repository)
   const disconnect = new DisconnectTerminalBlocksUseCase(repository)
+  const getGraph = new GetDefaultGraphUseCase(repository)
   const inspectPlan = new BuildTerminalWorkflowPlanUseCase(repository)
   const updateExecutionConfig = new UpdateTerminalExecutionConfigUseCase(repository)
 
   return new BlockGraphAgentToolAdapter({
+    arrangeTerminalLayout: (command) => arrange.execute(command),
     buildTerminalWorkflowPlan: (query) => inspectPlan.execute(query),
     connectTerminalBlocks: (command) => connect.execute(command),
-    createTerminalBlock: notUsed,
+    createTerminalBlock: (command) => createTerminal.execute(command),
     createTerminalGroup: notUsed,
     deleteBlock: notUsed,
     disconnectTerminalBlocks: (command) => disconnect.execute(command),
     dissolveTerminalGroup: notUsed,
-    getDefaultGraph: notUsed,
+    getDefaultGraph: (query) => getGraph.execute({ ...query, projectId: 'project-1' }),
     moveBlock: notUsed,
     moveTerminalGroup: notUsed,
     resizeTerminalBlock: notUsed,
@@ -154,6 +210,24 @@ function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAg
     updateTerminalExecutionConfig: (command) => updateExecutionConfig.execute(command),
     updateTerminalGroupMetadata: notUsed
   })
+}
+
+function overlaps(
+  first: {
+    readonly position: { readonly x: number; readonly y: number }
+    readonly size: { readonly height: number; readonly width: number }
+  },
+  second: {
+    readonly position: { readonly x: number; readonly y: number }
+    readonly size: { readonly height: number; readonly width: number }
+  }
+): boolean {
+  return !(
+    first.position.x + first.size.width <= second.position.x ||
+    second.position.x + second.size.width <= first.position.x ||
+    first.position.y + first.size.height <= second.position.y ||
+    second.position.y + second.size.height <= first.position.y
+  )
 }
 
 async function createConfiguredTerminals(

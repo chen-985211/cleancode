@@ -1,5 +1,8 @@
 import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
-import { createUnexpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  createExpectedAppError,
+  createUnexpectedAppError
+} from '../../../../shared-kernel/application/errors/AppError'
 import type { AgentAuditRecord } from '../../domain/entities/AgentAuditRecord'
 import { AgentToolApprovalPolicy } from '../../domain/policies/AgentToolApprovalPolicy'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
@@ -14,11 +17,15 @@ import { parseAgentToolInput } from '../dto/AgentToolInputValidation'
 import type { AgentToolApprovalTarget } from '../dto/AgentSessionProtocol'
 import type { AgentAuditRepository } from '../ports/AgentAuditRepository'
 import type { AgentBlockGraphToolPort } from '../ports/AgentBlockGraphToolPort'
+import type { AgentCanvasLayoutRegion } from '../ports/AgentBlockGraphToolPort'
+import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 
 export interface ExecuteAgentToolCommand {
+  readonly agentId: string
   readonly approved?: boolean
   readonly input: unknown
   readonly projectDirectory: string
+  readonly projectId: string
   readonly sessionId: string
   readonly toolCallId: string
   readonly toolName: AgentToolName
@@ -54,7 +61,8 @@ export class ExecuteAgentToolUseCase {
 
   constructor(
     private readonly blockGraphTools: AgentBlockGraphToolPort,
-    private readonly auditRepository: AgentAuditRepository
+    private readonly auditRepository: AgentAuditRepository,
+    private readonly agentSessionRepository: AgentSessionRepository
   ) {}
 
   async execute(command: ExecuteAgentToolCommand): Promise<AgentToolExecutionResult> {
@@ -131,7 +139,7 @@ export class ExecuteAgentToolUseCase {
           false
         )
       case 'create_block':
-        return this.createTerminalBlock(command.toolCallId, context, invocation.input)
+        return this.createTerminalBlock(command, context, invocation.input)
       case 'update_block':
         return completedGraphResult(
           command.toolCallId,
@@ -187,20 +195,69 @@ export class ExecuteAgentToolUseCase {
           status: 'completed',
           toolCallId: command.toolCallId
         }
+      case 'arrange_terminal_layout': {
+        const layout = await this.resolveWorkspaceLayout(command)
+        const result = await this.blockGraphTools.arrangeTerminalLayout(context, {
+          ...invocation.input,
+          ...layout
+        })
+        return completedGraphResult(
+          command.toolCallId,
+          result.graph,
+          {
+            arrangedBlockIds: result.arrangedBlockIds,
+            arrangedTerminalGroupIds: result.arrangedTerminalGroupIds,
+            type: 'block_graph'
+          },
+          result.graphChanged
+        )
+      }
     }
   }
 
   private async createTerminalBlock(
-    toolCallId: string,
+    command: ExecuteAgentToolCommand,
     context: AgentToolContext,
     input: AgentToolInputByName['create_block']
   ): Promise<CompletedGraphToolResult> {
     const beforeGraph = await this.blockGraphTools.inspectGraph(context)
-    const graph = await this.blockGraphTools.createTerminalBlock(context, input)
-    return completedGraphResult(toolCallId, graph, {
+    const graph = await this.blockGraphTools.createTerminalBlock(
+      context,
+      input.position
+        ? input
+        : {
+            ...input,
+            ...(await this.resolveWorkspaceLayout(command))
+          }
+    )
+    return completedGraphResult(command.toolCallId, graph, {
       createdBlockId: findNewTerminalBlockId(beforeGraph, graph),
       type: 'block_graph'
     })
+  }
+
+  private async resolveWorkspaceLayout(command: ExecuteAgentToolCommand): Promise<{
+    readonly anchorRegion: AgentCanvasLayoutRegion
+    readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+  }> {
+    const agents =
+      (await this.agentSessionRepository.findWorkspace(command.projectId, command.workspaceName)) ??
+      []
+    const activeAgent = agents.find((agent) => agent.id === command.agentId)
+
+    if (!activeAgent) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_NOT_FOUND',
+        'The active Agent layout was not found.'
+      )
+    }
+
+    return {
+      anchorRegion: toCanvasLayoutRegion(activeAgent.layout),
+      reservedRegions: agents
+        .filter((agent) => agent.id !== activeAgent.id)
+        .map((agent) => toCanvasLayoutRegion(agent.layout))
+    }
   }
 
   private async createTerminalGroup(
@@ -302,4 +359,11 @@ function findNewTerminalGroupId(
 ): string | undefined {
   const previousTerminalGroupIds = new Set(beforeGraph.terminalGroups.map((group) => group.id))
   return afterGraph.terminalGroups.find((group) => !previousTerminalGroupIds.has(group.id))?.id
+}
+
+function toCanvasLayoutRegion(layout: AgentCanvasLayoutRegion): AgentCanvasLayoutRegion {
+  return {
+    position: { ...layout.position },
+    size: { ...layout.size }
+  }
 }

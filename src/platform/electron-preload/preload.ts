@@ -82,7 +82,6 @@ const cleancodeApi = {
   moveTerminalGroup: (command: unknown) =>
     invokeCleancode('cleancode:move-terminal-group', command),
   deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
-  saveGraph: (command: unknown) => invokeCleancode('cleancode:save-graph', command),
   startTerminal: (command: unknown) => invokeCleancode('cleancode:start-terminal', command),
   writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
   resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),

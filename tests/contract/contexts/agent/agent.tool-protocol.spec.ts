@@ -18,7 +18,8 @@ describe('agent tool protocol', () => {
       'update_terminal_execution_config',
       'connect_terminal_blocks',
       'disconnect_terminal_blocks',
-      'inspect_terminal_workflow_plan'
+      'inspect_terminal_workflow_plan',
+      'arrange_terminal_layout'
     ])
     expect(
       agentToolDefinitions.filter((tool) => tool.requiresApproval).map((tool) => tool.name)
@@ -109,14 +110,55 @@ describe('agent tool protocol', () => {
   it('describes canvas tools with strict schemas for Codex tool planning', () => {
     const createBlock = agentToolDefinitions.find((tool) => tool.name === 'create_block')
     const createGroup = agentToolDefinitions.find((tool) => tool.name === 'create_terminal_group')
+    const arrangeLayout = agentToolDefinitions.find(
+      (tool) => tool.name === 'arrange_terminal_layout'
+    )
 
     expect(createBlock).toEqual(
       expect.objectContaining({
         description: expect.stringContaining('cleancode canvas'),
         inputSchema: expect.objectContaining({
           additionalProperties: false,
-          required: ['type', 'name', 'position']
+          required: ['type', 'name']
         })
+      })
+    )
+    expect(createBlock?.description).toContain('Omit position')
+    expect(createBlock?.description).toContain('exact coordinates')
+    expect(arrangeLayout).toEqual(
+      expect.objectContaining({
+        annotations: {
+          destructiveHint: false,
+          openWorldHint: false,
+          readOnlyHint: false
+        },
+        inputSchema: expect.objectContaining({
+          additionalProperties: false,
+          properties: expect.objectContaining({
+            blockIds: expect.objectContaining({ minItems: 1, type: 'array', uniqueItems: true })
+          }),
+          required: ['blockIds'],
+          type: 'object'
+        }),
+        requiresApproval: false
+      })
+    )
+    expect(arrangeLayout?.outputSchema).toEqual(
+      expect.objectContaining({
+        oneOf: expect.arrayContaining([
+          expect.objectContaining({
+            properties: expect.objectContaining({
+              graphChanged: { type: 'boolean' },
+              output: expect.objectContaining({
+                properties: expect.objectContaining({
+                  arrangedBlockIds: expect.objectContaining({ type: 'array' }),
+                  arrangedTerminalGroupIds: expect.objectContaining({ type: 'array' })
+                }),
+                required: ['type', 'arrangedBlockIds', 'arrangedTerminalGroupIds']
+              })
+            })
+          })
+        ])
       })
     )
     expect(createGroup).toEqual(
@@ -151,6 +193,7 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpDeveloperInstructions).toContain('create_terminal_group')
     expect(cleancodeMcpDeveloperInstructions).toContain('update_terminal_execution_config')
     expect(cleancodeMcpDeveloperInstructions).toContain('connect_terminal_blocks')
+    expect(cleancodeMcpDeveloperInstructions).toContain('arrange_terminal_layout')
     expect(cleancodeMcpDeveloperInstructions).toContain('inspect_terminal_workflow_plan')
     expect(cleancodeMcpDeveloperInstructions).toContain('shell processes')
     expect(cleancodeMcpDeveloperInstructions).toMatch(/do not claim/i)
@@ -208,6 +251,11 @@ describe('agent tool protocol', () => {
         readOnlyHint: true
       },
       connect_terminal_blocks: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      arrange_terminal_layout: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: false

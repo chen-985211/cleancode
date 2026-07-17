@@ -1,5 +1,9 @@
-import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
 import type {
+  BlockGraphSnapshot,
+  BlockPositionSnapshot
+} from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  ArrangeTerminalLayoutAgentToolInput,
   AgentToolContext,
   CreateBlockAgentToolInput,
   CreateTerminalGroupAgentToolInput,
@@ -37,11 +41,37 @@ export interface AgentInspectTerminalWorkflowPlanInput {
   readonly scope: AgentTerminalWorkflowPlanScope
 }
 
+export interface AgentCanvasLayoutRegion {
+  readonly position: BlockPositionSnapshot
+  readonly size: { readonly height: number; readonly width: number }
+}
+
+export interface AgentCreateTerminalBlockInput extends CreateBlockAgentToolInput {
+  readonly anchorRegion?: AgentCanvasLayoutRegion
+  readonly reservedRegions?: readonly AgentCanvasLayoutRegion[]
+}
+
+export interface AgentArrangeTerminalLayoutInput extends ArrangeTerminalLayoutAgentToolInput {
+  readonly anchorRegion: AgentCanvasLayoutRegion
+  readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+}
+
+export interface AgentArrangeTerminalLayoutResult {
+  readonly arrangedBlockIds: readonly string[]
+  readonly arrangedTerminalGroupIds: readonly string[]
+  readonly graph: BlockGraphSnapshot
+  readonly graphChanged: boolean
+}
+
 export interface AgentBlockGraphToolPort {
+  arrangeTerminalLayout(
+    context: AgentToolContext,
+    input: AgentArrangeTerminalLayoutInput
+  ): Promise<AgentArrangeTerminalLayoutResult>
   inspectGraph(context: AgentToolContext): Promise<BlockGraphSnapshot>
   createTerminalBlock(
     context: AgentToolContext,
-    input: CreateBlockAgentToolInput
+    input: AgentCreateTerminalBlockInput
   ): Promise<BlockGraphSnapshot>
   updateTerminalBlock(
     context: AgentToolContext,

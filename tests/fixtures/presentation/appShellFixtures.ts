@@ -101,7 +101,6 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     moveBlock: vi.fn(),
     moveTerminalGroup: vi.fn(),
     deleteBlock: vi.fn(),
-    saveGraph: vi.fn(),
     startTerminal: overrides.startTerminal ?? vi.fn(),
     writeTerminal: overrides.writeTerminal ?? vi.fn(),
     resizeTerminal: vi.fn(),

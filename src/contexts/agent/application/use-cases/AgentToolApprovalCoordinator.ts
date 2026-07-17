@@ -34,8 +34,10 @@ export class AgentToolApprovalCoordinator {
     command: AgentMcpToolCallCommand
   ): Promise<AgentToolExecutionResult> {
     const toolCommand: ExecuteAgentToolCommand = {
+      agentId: session.agentId,
       input: command.input,
       projectDirectory: session.projectDirectory,
+      projectId: session.projectId,
       sessionId: session.sessionId,
       toolCallId: command.toolCallId,
       toolName: command.toolName,
@@ -163,9 +165,20 @@ export class AgentToolApprovalCoordinator {
   private publishGraphUpdate(session: ManagedAgentSession, result: AgentToolExecutionResult): void {
     if (result.status !== 'completed' || !result.graphChanged || !('graph' in result)) return
 
+    const layoutChange =
+      result.output.arrangedBlockIds && result.output.arrangedTerminalGroupIds
+        ? {
+            blockIds: result.output.arrangedBlockIds,
+            kind: 'terminal_layout_arranged' as const,
+            operationId: result.toolCallId,
+            terminalGroupIds: result.output.arrangedTerminalGroupIds
+          }
+        : undefined
+
     try {
       session.callbacks.onGraphUpdated({
         agentId: session.agentId,
+        ...(layoutChange ? { change: layoutChange } : {}),
         graph: result.graph,
         projectDirectory: session.projectDirectory,
         sessionId: session.sessionId,

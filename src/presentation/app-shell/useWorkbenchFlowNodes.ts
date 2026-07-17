@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
@@ -30,7 +31,8 @@ interface UseWorkbenchFlowNodesInput {
   readonly selectedTerminalBlockIds: readonly string[]
   readonly selectedTerminalGroupId: string | null
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
-  readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
+  readonly protectedLayoutNodeIds: ReadonlySet<string>
+  readonly onAgentGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
@@ -60,7 +62,8 @@ export function useWorkbenchFlowNodes({
   selectedTerminalBlockIds,
   selectedTerminalGroupId,
   selectedUngroupedTerminalBlockIds,
-  setCurrentGraph,
+  protectedLayoutNodeIds,
+  onAgentGraphUpdated,
   setNodes,
   terminalGroupDropAction,
   terminalStates,
@@ -110,7 +113,7 @@ export function useWorkbenchFlowNodes({
             currentWorkbench,
             currentWorkspace: currentWorkspace ?? null,
             isSelected: selectedAgentId === agent.agentId,
-            onGraphUpdated: setCurrentGraph,
+            onGraphUpdated: onAgentGraphUpdated,
             onMcpCapabilityChange,
             onRemove: onRemoveAgent,
             onRename: onRenameAgent,
@@ -125,7 +128,7 @@ export function useWorkbenchFlowNodes({
       graphIdUsedForNodesRef.current = graphId
 
       return shouldPreserveTransientLayout
-        ? preserveWorkbenchNodeTransientLayout(nextNodes, currentNodes)
+        ? preserveWorkbenchNodeTransientLayout(nextNodes, currentNodes, protectedLayoutNodeIds)
         : nextNodes
     })
   }, [
@@ -139,7 +142,8 @@ export function useWorkbenchFlowNodes({
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
     selectedUngroupedTerminalBlockIds,
-    setCurrentGraph,
+    protectedLayoutNodeIds,
+    onAgentGraphUpdated,
     setNodes,
     terminalGroupDropAction,
     terminalStates,

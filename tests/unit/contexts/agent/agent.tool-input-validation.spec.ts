@@ -7,13 +7,15 @@ import type { AgentToolName } from '../../../../src/contexts/agent/domain/value-
 describe('agent tool input validation', () => {
   it('accepts inputs described by every CleanCode tool schema', () => {
     const validInputs: { readonly [Name in AgentToolName]: AgentToolInputByName[Name] } = {
+      arrange_terminal_layout: {
+        blockIds: ['terminal-build', 'terminal-test']
+      },
       connect_terminal_blocks: {
         sourceBlockId: 'terminal-build',
         targetBlockId: 'terminal-test'
       },
       create_block: {
         name: 'Build',
-        position: { x: 120, y: 80 },
         type: 'terminal'
       },
       create_terminal_group: {
@@ -48,6 +50,13 @@ describe('agent tool input validation', () => {
       expect(parseAgentToolInput(toolName, validInputs[toolName])).toEqual(validInputs[toolName])
     }
 
+    expect(
+      parseAgentToolInput('create_block', {
+        name: 'Explicit Build',
+        position: { x: 120, y: 80 },
+        type: 'terminal'
+      })
+    ).toMatchObject({ position: { x: 120, y: 80 } })
     expect(
       parseAgentToolInput('update_terminal_execution_config', {
         blockId: 'terminal-api',
@@ -90,6 +99,17 @@ describe('agent tool input validation', () => {
   })
 
   it('rejects missing fields, invalid discriminators, duplicates, and out-of-range values', () => {
+    expectInvalidInput(
+      () => parseAgentToolInput('arrange_terminal_layout', { blockIds: [] }),
+      '$.blockIds'
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('arrange_terminal_layout', {
+          blockIds: ['terminal-build', 'terminal-build']
+        }),
+      '$.blockIds'
+    )
     expectInvalidInput(
       () => parseAgentToolInput('disconnect_terminal_blocks', {}),
       '$.connectionId'

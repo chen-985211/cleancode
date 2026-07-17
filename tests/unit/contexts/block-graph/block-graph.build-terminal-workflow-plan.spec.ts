@@ -89,7 +89,9 @@ describe('build terminal workflow plan', () => {
 class InMemoryRepository implements BlockGraphRepository {
   constructor(private readonly graph: BlockGraph) {}
 
-  async saveDefaultGraph(): Promise<void> {}
+  async initializeDefaultGraph() {
+    return this.graph.toSnapshot()
+  }
 
   async findDefaultGraph(): Promise<BlockGraph> {
     return this.graph
@@ -97,6 +99,15 @@ class InMemoryRepository implements BlockGraphRepository {
 
   async findDefaultGraphSnapshot() {
     return this.graph.toSnapshot()
+  }
+
+  async transactDefaultGraph<TResult>(
+    _projectDirectory: string,
+    _workspaceName: string,
+    transaction: (graph: BlockGraph) => TResult | Promise<TResult>
+  ) {
+    const result = await transaction(this.graph)
+    return { graph: this.graph.toSnapshot(), result }
   }
 }
 

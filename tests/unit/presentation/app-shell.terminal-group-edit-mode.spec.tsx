@@ -313,6 +313,49 @@ describe('app shell terminal group edit mode', () => {
       })
     )
   })
+
+  it('serializes repeated moves of the same terminal group', async () => {
+    const workbench = createWorkbenchWithTerminalGroup()
+    const first = createDeferred<WorkbenchSnapshot['graph']>()
+    const second = createDeferred<WorkbenchSnapshot['graph']>()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.moveTerminalGroup
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
+
+    const groupNode = reactFlowProps.latest?.nodes.find(
+      (node) => node.id === 'development-group' && node.type === 'terminalGroup'
+    )
+
+    expect(groupNode).toBeDefined()
+
+    act(() => {
+      reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
+        ...groupNode!,
+        position: { x: 420, y: 180 }
+      })
+      reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
+        ...groupNode!,
+        position: { x: 760, y: 220 }
+      })
+    })
+
+    expect(runtimeApi.moveTerminalGroup).toHaveBeenCalledOnce()
+
+    first.resolve(workbench.graph)
+    await waitFor(() => expect(runtimeApi.moveTerminalGroup).toHaveBeenCalledTimes(2))
+    second.resolve(workbench.graph)
+  })
 })
 
 interface MockReactFlowProps {
@@ -402,4 +445,16 @@ function createTerminalBlock(id: string, position: { readonly x: number; readonl
     position,
     size: { width: 420, height: 306 }
   }
+}
+
+function createDeferred<T>(): {
+  readonly promise: Promise<T>
+  readonly resolve: (value: T) => void
+} {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((settle) => {
+    resolve = settle
+  })
+
+  return { promise, resolve }
 }

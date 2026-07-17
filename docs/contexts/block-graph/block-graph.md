@@ -64,9 +64,26 @@ BlockGraph 负责连接和配置的结构事实，也负责生成不可变、拓
 6. 解散组合只删除组合，保留所有终端积木。
 7. 折叠只改变组合的已提交显示状态，不改变成员或工作流连接。
 
+## 确定性终端布局
+
+BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力只移动请求中的终端及完整包含它们的终端组合，不移动 Agent，也不把无关画布对象吸收到作用域内：
+
+1. 依赖层级按最长上游路径计算，层级从左到右排列；同层终端先按既有 `y/x/id` 形成顺序。跨层组合把各层顺序收束为全局视觉单元顺序；顺序冲突先按强连通分量与稳定单元 ID 破环，再用临时总序归一化各层真实顺序并求最终拓扑序，使一次排列后的结果再次执行不再漂移。
+2. 布局使用每个终端的真实尺寸和固定 `64` 画布单位间距，不假设所有终端等大；完整组合按派生外框形成视觉单元，与未组合终端及其他目标组合也必须保留该间距，不能只排列成员后让外框互相覆盖。视觉单元按最终全序依次放置；横向相交的后序单元不得回填到被障碍下推的前序单元上方。
+3. 首选原点位于 `anchorRegion` 下方；作用域外终端、作用域外组合、anchor 和 `reservedRegions` 都是不可穿越的矩形障碍。
+4. 一个组合只要有成员进入作用域，就必须包含全部成员；部分组合、空作用域和未知终端会在修改前整体拒绝。
+5. 聚合一次替换全部目标位置，再统一重算组合边界；相同图和相同输入重复执行必须得到相同位置，并以 `graphChanged: false` 表达无变化。
+6. 应用用例在进入写事务前记录目标位置基线。若某个终端在布局提交前已经被用户移动，该终端不再参与本次布局；组合内任一成员被移动时保留整个组合。其余未变化目标仍可继续排列。
+
+`CreateTerminalBlockUseCase` 同样遵守该策略：显式 `position` 原样使用；省略位置时必须提供 anchor，并在创建终端的同一事务中自动落位。启动命令、尺寸、创建和自动落位作为一个提交完成。
+
 ## 恢复与持久化
 
 当前文件系统仓储把工作区默认图保存为 Electron 应用数据目录中的 JSON，并通过临时文件、同步和重命名原子替换。旧版项目内 `.cleancode/workspaces/.../default-graph.json` 会在读取时迁移到当前存储位置。
+
+默认图初始化和所有图变更在同一个工作区级进程内队列中执行完整读取—修改—写入事务。初始化是幂等的：当前图或旧路径图已经存在时返回仓储权威快照，不用空图覆盖；事务回调完成后才生成并持久化快照，异步失败不得落盘，后续事务仍可继续。表现层没有保存任意完整图快照的 IPC 后门。
+
+当前互斥边界位于单个 Electron 主进程内；仓储尚未提供跨多个应用进程的文件锁。所有当前产品写入口必须经同一主进程和应用用例进入该事务边界。
 
 恢复时会规范化旧数据：补全 viewport、尺寸和执行配置；丢弃无效连接、重复连接、环、失效组合成员和重复归组。规范化是兼容输入的边界，不允许表现层自行修补聚合事实。
 
@@ -80,24 +97,26 @@ BlockGraph 负责连接和配置的结构事实，也负责生成不可变、拓
 
 ## 实现入口
 
-| 层级           | 入口                                                                                                                                                                                                             |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Domain         | [`BlockGraph.ts`](../../../src/contexts/block-graph/domain/aggregates/BlockGraph.ts)、[`BlockGraphTypes.ts`](../../../src/contexts/block-graph/domain/aggregates/BlockGraphTypes.ts)                             |
-| Group rules    | [`TerminalGroupRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalGroupRules.ts)                                                                                                               |
-| Workflow rules | [`TerminalWorkflowRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowRules.ts)、[`TerminalWorkflowPlan.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan.ts) |
-| Application    | [`BuildTerminalWorkflowPlanUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase.ts) 及同目录中的图变更用例                                                      |
-| Persistence    | [`FileSystemBlockGraphRepository.ts`](../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository.ts)                                                                             |
-| Platform       | [`blockGraphIpcHandlers.ts`](../../../src/platform/electron-main/blockGraphIpcHandlers.ts)                                                                                                                       |
+| 层级           | 入口                                                                                                                                                                                                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain         | [`BlockGraph.ts`](../../../src/contexts/block-graph/domain/aggregates/BlockGraph.ts)、[`BlockGraphTypes.ts`](../../../src/contexts/block-graph/domain/aggregates/BlockGraphTypes.ts)                                                                                                      |
+| Group rules    | [`TerminalGroupRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalGroupRules.ts)                                                                                                                                                                                        |
+| Layout rules   | [`TerminalLayoutPolicy.ts`](../../../src/contexts/block-graph/domain/services/TerminalLayoutPolicy.ts)                                                                                                                                                                                    |
+| Workflow rules | [`TerminalWorkflowRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowRules.ts)、[`TerminalWorkflowPlan.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan.ts)                                                                          |
+| Application    | [`ArrangeTerminalLayoutUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase.ts)、[`BuildTerminalWorkflowPlanUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase.ts) 及同目录中的图变更用例 |
+| Persistence    | [`FileSystemBlockGraphRepository.ts`](../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository.ts)                                                                                                                                                      |
+| Platform       | [`blockGraphIpcHandlers.ts`](../../../src/platform/electron-main/blockGraphIpcHandlers.ts)                                                                                                                                                                                                |
 
 ## 验证矩阵
 
-| 层级        | 证明内容                        | 主要测试                                                                                                                                                                                                                                                                   |
-| ----------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit        | 默认图、viewport、尺寸与元数据  | [`block-graph.default-graph.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.default-graph.spec.ts)、[`block-graph.resize-terminal-block.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.resize-terminal-block.spec.ts)                       |
-| Unit        | 组合成员、边界、移动和解散      | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)、[`block-graph.terminal-group-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-group-use-cases.spec.ts)             |
-| Unit        | 连接不变量、执行配置和计划      | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.build-terminal-workflow-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.build-terminal-workflow-plan.spec.ts) |
-| Integration | JSON 原子保存、恢复与旧路径迁移 | [`block-graph.filesystem-repository.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.filesystem-repository.spec.ts)                                                                                                                                   |
-| Contract    | Electron IPC 的图布局契约       | [`block-graph.resize-terminal-layout-ipc.spec.ts`](../../../tests/contract/contexts/block-graph/block-graph.resize-terminal-layout-ipc.spec.ts)                                                                                                                            |
+| 层级        | 证明内容                            | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | 默认图、viewport、尺寸与元数据      | [`block-graph.default-graph.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.default-graph.spec.ts)、[`block-graph.resize-terminal-block.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.resize-terminal-block.spec.ts)                                                                                                                                                                                            |
+| Unit        | 组合成员、边界、移动和解散          | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)、[`block-graph.terminal-group-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-group-use-cases.spec.ts)                                                                                                                                                                                  |
+| Unit        | 确定性布局、自动创建和拖动优先      | [`block-graph.arrange-terminal-layout.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.arrange-terminal-layout.spec.ts)、[`block-graph.arrange-terminal-layout-use-case.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.arrange-terminal-layout-use-case.spec.ts)、[`block-graph.create-terminal-block-layout.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.create-terminal-block-layout.spec.ts) |
+| Unit        | 连接不变量、执行配置和计划          | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.build-terminal-workflow-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.build-terminal-workflow-plan.spec.ts)                                                                                                                                                                      |
+| Integration | 初始化、RMW、回滚、恢复与旧路径迁移 | [`block-graph.filesystem-repository.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.filesystem-repository.spec.ts)                                                                                                                                                                                                                                                                                                        |
+| Contract    | Electron IPC 的图布局契约           | [`block-graph.resize-terminal-layout-ipc.spec.ts`](../../../tests/contract/contexts/block-graph/block-graph.resize-terminal-layout-ipc.spec.ts)                                                                                                                                                                                                                                                                                                 |
 
 ## 维护规则
 

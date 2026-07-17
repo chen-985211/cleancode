@@ -83,7 +83,7 @@ export function blockGraphOutputSchema(
 
 export function graphToolResultSchema(input: {
   readonly canceled: boolean
-  readonly graphChanged: boolean
+  readonly graphChanged: boolean | 'dynamic'
   readonly output: AgentToolJsonSchema
 }): AgentToolJsonSchema {
   return {
@@ -91,7 +91,8 @@ export function graphToolResultSchema(input: {
       objectSchema(
         {
           graph: blockGraphSnapshotSchema(),
-          graphChanged: { const: input.graphChanged },
+          graphChanged:
+            input.graphChanged === 'dynamic' ? { type: 'boolean' } : { const: input.graphChanged },
           output: input.output,
           status: { const: 'completed' },
           toolCallId: stringSchema

@@ -225,10 +225,6 @@ declare global {
         readonly workspaceName: string
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
-      saveGraph(command: {
-        readonly projectDirectory: string
-        readonly graph: BlockGraphSnapshot
-      }): Promise<BlockGraphSnapshot>
       startTerminal(command: {
         readonly terminalBlockId: string
         readonly workspaceName: string

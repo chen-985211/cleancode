@@ -1,6 +1,6 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { BlockGraphSnapshot } from '../dto/BlockGraphSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
+import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface SetTerminalGroupCollapsedCommand {
   readonly projectDirectory: string
@@ -13,18 +13,12 @@ export class SetTerminalGroupCollapsedUseCase {
   constructor(private readonly graphRepository: BlockGraphRepository) {}
 
   async execute(command: SetTerminalGroupCollapsedCommand): Promise<BlockGraphSnapshot> {
-    const graph = await this.graphRepository.findDefaultGraph(
-      command.projectDirectory,
-      command.workspaceName
+    const transaction = await executeDefaultGraphTransaction(
+      this.graphRepository,
+      command,
+      (graph) => graph.setTerminalGroupCollapsed(command.terminalGroupId, command.isCollapsed)
     )
 
-    if (!graph) {
-      throw createExpectedAppError('BLOCK_GRAPH_NOT_FOUND', 'Default block graph was not created.')
-    }
-
-    graph.setTerminalGroupCollapsed(command.terminalGroupId, command.isCollapsed)
-    await this.graphRepository.saveDefaultGraph(command.projectDirectory, graph)
-
-    return graph.toSnapshot()
+    return transaction.graph
   }
 }

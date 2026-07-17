@@ -18,6 +18,12 @@ export interface AgentPtyExitEvent {
 
 export interface AgentGraphUpdatedEvent {
   readonly agentId: string
+  readonly change?: {
+    readonly blockIds: readonly string[]
+    readonly kind: 'terminal_layout_arranged'
+    readonly operationId: string
+    readonly terminalGroupIds: readonly string[]
+  }
   readonly graph: BlockGraphSnapshot
   readonly projectDirectory: string
   readonly sessionId: string
