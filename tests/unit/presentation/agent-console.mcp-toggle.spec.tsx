@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
+import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
 import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 import {
@@ -53,6 +54,7 @@ describe('Agent console CleanCode MCP toggle', () => {
         projectId: workbench.project.id,
         sessionId: 'agent-session-restarted',
         status: 'running' as const,
+        terminalSourceTheme: 'light' as const,
         workspaceDirectory: currentWorkspace.directory,
         workspaceName: currentWorkspace.name
       }
@@ -83,4 +85,101 @@ describe('Agent console CleanCode MCP toggle', () => {
     await waitFor(() => expect(onMcpCapabilityChange).toHaveBeenCalledWith(agent, false))
     expect(clearForAgent).toHaveBeenCalledWith(agent.agentId)
   })
+
+  it('does not bind a late MCP restart result to a different workspace', async () => {
+    const mainWorkbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const featureWorkbench = createWorkbenchSnapshot('/repo/app', 'app', {
+      gitBranch: 'feature',
+      workspaceDirectory: '/repo/app-worktrees/feature',
+      workspaceName: 'feature'
+    })
+    const mainWorkspace = mainWorkbench.project.workspaces[0]!
+    const featureWorkspace = featureWorkbench.project.workspaces[0]!
+    const mainAgent = createAgent(mainWorkbench.project.id, 'main')
+    const featureAgent = createAgent(featureWorkbench.project.id, 'feature')
+    const pendingUpdate = createDeferred<UpdateWorkspaceAgentMcpCapabilityResult>()
+    const onMcpCapabilityChange = vi.fn(() => pendingUpdate.promise)
+    const writeAgentSession = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ writeAgentSession })
+    })
+    const actions = {
+      onRemove: vi.fn(async () => undefined),
+      onRename: vi.fn(async () => undefined)
+    }
+    const { rerender } = render(
+      <AgentConsole
+        {...actions}
+        agent={mainAgent}
+        currentWorkbench={mainWorkbench}
+        currentWorkspace={mainWorkspace}
+        onMcpCapabilityChange={onMcpCapabilityChange}
+      />
+    )
+
+    await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('switch', { name: 'CleanCode MCP' }))
+    await waitFor(() => expect(onMcpCapabilityChange).toHaveBeenCalled())
+    rerender(
+      <AgentConsole
+        {...actions}
+        agent={featureAgent}
+        currentWorkbench={featureWorkbench}
+        currentWorkspace={featureWorkspace}
+        onMcpCapabilityChange={onMcpCapabilityChange}
+      />
+    )
+    await waitFor(() =>
+      expect(window.cleancode?.attachAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ workspaceName: 'feature' })
+      )
+    )
+
+    await act(async () => {
+      pendingUpdate.resolve({
+        agent: { ...mainAgent, cleancodeMcpEnabled: false },
+        session: {
+          agentId: mainAgent.agentId,
+          codexThreadId: null,
+          gitBranch: null,
+          processId: 7,
+          projectDirectory: '/repo/app',
+          projectId: mainWorkbench.project.id,
+          sessionId: 'agent-main-restarted',
+          status: 'running',
+          terminalSourceTheme: 'light',
+          workspaceDirectory: '/repo/app',
+          workspaceName: 'main'
+        }
+      })
+    })
+    fireEvent.change(screen.getByLabelText('Codex CLI 输入'), {
+      target: { value: 'feature input' }
+    })
+
+    expect(writeAgentSession).toHaveBeenLastCalledWith({
+      input: 'feature input',
+      sessionId: 'agent-feature'
+    })
+  })
 })
+
+function createAgent(projectId: string, workspaceName: string) {
+  return {
+    agentId: 'agent-1',
+    cleancodeMcpEnabled: true,
+    layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
+    name: 'Agent 1',
+    projectId,
+    workspaceName
+  }
+}
+
+function createDeferred<T>(): { readonly promise: Promise<T>; resolve(value: T): void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve
+  })
+  return { promise, resolve }
+}

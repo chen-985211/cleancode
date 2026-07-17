@@ -40,7 +40,7 @@ export interface ProjectIpcHandlersInput {
   readonly synchronizeProjectGitState: (command: {
     readonly projectDirectory: string
   }) => Promise<ProjectSnapshot | null>
-  readonly forgetProject: (directory: string) => Promise<void>
+  readonly forgetProject: (directory: string) => Promise<unknown>
   readonly rememberProject: (directory: string) => Promise<void>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<WorkbenchSnapshot>
   readonly loadRememberedWorkbenches: () => Promise<WorkbenchSnapshot[]>

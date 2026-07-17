@@ -66,11 +66,16 @@ describe('agent console Codex status', () => {
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
-        attachAgentSession: vi.fn(async () => ({
+        attachAgentSession: vi.fn(async (command) => ({
+          agentId: command.agentId,
+          codexThreadId: null,
+          gitBranch: command.gitBranch ?? null,
           processId: null,
           projectDirectory: '/repo/app',
+          projectId: command.projectId,
           sessionId: 'agent-session-failed',
           status: 'failed',
+          terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: '/repo/app',
           workspaceName: 'main'
         })),
@@ -92,7 +97,8 @@ describe('agent console Codex status', () => {
   it('offers restrained retry and new-conversation actions when restoration fails', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app', { gitBranch: 'feature/login' })
     const currentWorkspace = workbench.project.workspaces[0]!
-    const attachAgentSession = vi.fn(async () => ({
+    const attachAgentSession = vi.fn(async (command) => ({
+      agentId: command.agentId,
       codexThreadId: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33',
       gitBranch: 'feature/login',
       processId: null,
@@ -100,6 +106,7 @@ describe('agent console Codex status', () => {
       projectId: workbench.project.id,
       sessionId: 'agent-session-failed',
       status: 'restore_failed' as const,
+      terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
     }))

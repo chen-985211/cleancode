@@ -1,5 +1,6 @@
 import type { ITheme, Terminal as XTerm } from '@xterm/xterm'
 
+import type { AgentTerminalSourceTheme } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { effectiveThemeChangeEventName } from './themePreference'
 
 const terminalThemeVariables = {
@@ -26,12 +27,25 @@ const terminalThemeVariables = {
 } as const satisfies Partial<Record<keyof ITheme, string>>
 
 export function readTerminalTheme(root: HTMLElement = document.documentElement): ITheme {
+  return readTerminalThemeVariables(root, (variable) => variable)
+}
+
+export function readCanonicalTerminalTheme(theme: AgentTerminalSourceTheme): ITheme {
+  return readTerminalThemeVariables(document.documentElement, (variable) =>
+    variable.replace('--cc-terminal-', `--cc-terminal-${theme}-`)
+  )
+}
+
+function readTerminalThemeVariables(
+  root: HTMLElement,
+  resolveVariable: (variable: string) => string
+): ITheme {
   const styles = getComputedStyle(root)
 
   return Object.fromEntries(
     Object.entries(terminalThemeVariables).map(([key, variable]) => [
       key,
-      styles.getPropertyValue(variable).trim()
+      styles.getPropertyValue(resolveVariable(variable)).trim()
     ])
   ) as ITheme
 }

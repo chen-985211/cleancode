@@ -13,6 +13,7 @@
 - 终端最右侧的中文、全角标点或 emoji 显示一半、消失或提前换行。
 - xterm 可见列数与 CLI 实际换行位置不一致。
 - 调整 Agent 节点大小、画布缩放或切换工作区后，输出布局异常。
+- 切换应用主题并离开再返回工作区后，Agent 的终端背景或 Codex composer 与当前主题不一致。
 - 非 100% 画布缩放下，鼠标选区、链接命中或 TUI 鼠标点击偏离指针位置。
 - 滚动条没有贴住终端最右边，增加“安全区域”后反而更突兀。
 - 终端底部出现不属于内容的黑边或实色条。
@@ -120,6 +121,21 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 
 `space-all` 的目的不是美化普通段落，而是让全角标点在测量和显示时都保持全宽，维护 terminal cell 的确定性。W3C 的 `text-spacing` shorthand 也把 `space-all` 与 `no-autospace` 的组合定义为关闭全部自动文本间距。该行为定义可参阅 [CSS Text Module Level 4](https://www.w3.org/TR/css-text-4/#text-spacing-trim-property)。本次 E2E 直接证明的是组合后的字宽结果，没有分别证明两个 longhand 各自都是必要条件。
 
+## Agent 会话源主题与重挂载
+
+Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色背景、composer 和状态区域。因此，“当前应用想显示的主题”和“仍在运行的 PTY 已经采用的源 palette”是两个不同事实。主题切换只改变前者，不得假定子进程会同步改变后者。
+
+Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域再次附加时，renderer 发送当前有效主题作为新运行时提议，应用层则为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；应用重启或显式新对话产生的新运行时可以采用新的当前主题。
+
+重建 xterm surface 时必须遵守以下顺序：
+
+1. 先解除旧 session 的输入输出绑定；附加期间的新 PTY 输出只进入对应 `sessionId` 的尾部缓冲。
+2. 等待 xterm FIFO 中已经排队的 write 完成；连续 replacement 使用 generation，只允许最新请求提交。
+3. 从集中主题 token 读取 canonical source 的完整 palette，并同时设置 surface 的 source dataset。
+4. reset xterm，原子提交 session 绑定，再读取最新尾部并 replay；之后到达的 live output 排在 replay 后面。
+
+这一顺序避免旧 write 跨过 reset、旧 OSC 查询响应被送往新 session，以及工作区快速往返时迟到的 replacement 覆盖当前 surface。主题差异由 source dataset 上的统一滤镜完成，不重启 PTY，也不把 ANSI 尾部改写为另一套颜色。当前 FIFO、generation 与绑定前退出事件行为由 [`agent-console.terminal-generation.spec.tsx`](../../tests/unit/presentation/agent-console.terminal-generation.spec.tsx) 验证，完整 palette 恢复由 [`agent-console.terminal.spec.tsx`](../../tests/unit/presentation/agent-console.terminal.spec.tsx) 验证；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和先解析实际 OSC 11 背景色响应再绘制的 fake Codex，证明工作区往返期间 session/进程复用、源主题固定、滤镜方向与最终像素明暗。
+
 ## 画布缩放下的鼠标坐标
 
 xterm 6.0.0 的鼠标坐标换算使用 `getBoundingClientRect()` 取得元素左上角，再直接用未缩放的 cell 宽高换算列和行。React Flow 在祖先元素上应用 `translate(...) scale(zoom)` 后，`clientX - rect.left` 与 `clientY - rect.top` 已经是缩放后的屏幕距离，而 cell 尺寸仍是布局坐标。两套单位混用会让选区、链接命中、自动滚动和开启鼠标协议的 TUI 一起偏移；缩放越偏离 100%，误差越明显。
@@ -167,6 +183,7 @@ Agent 控制台当前应维护以下不变量。普通终端可以复用排查�
 8. 行内最后一个可见字形不超过行右边界，终端没有水平溢出。
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
 10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
+11. 同一 Agent PTY 的终端源主题在运行期间保持不变；surface 重建时先恢复 canonical palette，再 reset、绑定和 replay。
 
 ## 排障流程
 
@@ -344,7 +361,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
 - [NodePtyCodexAgentProcessAdapter.ts](../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts) 最终把 attach 行列传给 `node-pty.spawn`，并把 resize 转成 PTY 的 `resize(columns, rows)`。
 
-### Electron E2E：只证明真实浏览器几何
+### Electron E2E：证明真实浏览器几何与终端视觉组合
 
 [workspace-agents.e2e.spec.ts](../../tests/e2e/workspace-agents.e2e.spec.ts) 保留两个低层环境无法可靠证明的回归：
 
@@ -353,6 +370,8 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - 放大画布下 Agent 按可见字形拖选，复制结果精确匹配目标文本，节点和 viewport 不移动。
 
 [run-terminal-sessions.e2e.spec.ts](../../tests/e2e/run-terminal-sessions.e2e.spec.ts) 还覆盖普通终端在默认与缩小画布下的精确选区，以及缩小画布下 SGR mouse 的按下、移动、抬起 cell。这样组合覆盖小于 100%、100% 和大于 100% 三个坐标区间，同时证明普通终端与 Agent 两个 surface。
+
+[agent-terminal-theme-workspaces.e2e.spec.ts](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 使用两个不同源主题的真实常驻 Agent PTY，在浅色与深色应用主题间往返 main/worktree。它断言每个工作区继续使用原 session 和进程、surface 恢复对应源主题、跨主题滤镜方向正确，并以截图中心像素验证用户最终看到的明暗。
 
 这里使用 E2E 的理由不是“改动发生在 UI”，而是 jsdom 不执行 Chromium 的真实 CSS Text 排版，也不能可信测量 WebKit scrollbar pseudo-element。
 

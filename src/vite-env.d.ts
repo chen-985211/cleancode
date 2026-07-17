@@ -5,6 +5,7 @@ import type {
   AgentPtyExitEvent,
   AgentPtyOutputEvent,
   AgentSessionSnapshot,
+  AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
@@ -73,6 +74,7 @@ declare global {
         readonly projectId: string
         readonly restartMode?: 'new' | 'retry'
         readonly rows?: number
+        readonly terminalSourceTheme: AgentTerminalSourceTheme
         readonly workspaceDirectory: string
         readonly workspaceName: string
       }): Promise<AgentSessionSnapshot>

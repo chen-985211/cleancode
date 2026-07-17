@@ -63,8 +63,10 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
         gitBranch: command.gitBranch ?? null,
         processId: 1,
         projectDirectory: command.projectDirectory,
+        projectId: command.projectId,
         sessionId: `agent-${command.workspaceName}`,
         status: 'running',
+        terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })),

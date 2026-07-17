@@ -3,6 +3,7 @@ import type {
   AgentPtyExitEvent,
   AgentPtyOutputEvent,
   AgentSessionSnapshot,
+  AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
@@ -35,6 +36,7 @@ export interface AgentIpcHandlersInput {
     readonly projectId: string
     readonly restartMode?: 'new' | 'retry'
     readonly rows?: number
+    readonly terminalSourceTheme: AgentTerminalSourceTheme
     readonly workspaceDirectory: string
     readonly workspaceName: string
   }) => Promise<AgentSessionSnapshot>
@@ -99,6 +101,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly persistenceMode?: 'ephemeral' | 'persistent'
       readonly restartMode?: 'new' | 'retry'
       readonly rows?: number
+      readonly terminalSourceTheme: AgentTerminalSourceTheme
       readonly workspaceDirectory: string
       readonly workspaceName: string
     },
@@ -106,6 +109,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
   >({
     channel: 'cleancode:attach-agent-session',
     handler: (command, event) => {
+      const terminalSourceTheme = readAgentTerminalSourceTheme(command.terminalSourceTheme)
       const sender = readIpcSender(event)
 
       return input.attachAgentSession({
@@ -123,6 +127,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
         projectId: command.projectId,
         restartMode: command.restartMode,
         rows: command.rows,
+        terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })
@@ -286,6 +291,17 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     operation: 'rejectAgentTool',
     scope: 'agent'
   })
+}
+
+function readAgentTerminalSourceTheme(value: unknown): AgentTerminalSourceTheme {
+  if (value === 'dark' || value === 'light') {
+    return value
+  }
+
+  throw createExpectedAppError(
+    'INVALID_IPC_COMMAND',
+    'Invalid IPC command: terminalSourceTheme must be light or dark.'
+  )
 }
 
 function sendIfAlive(sender: IpcSender, channel: string, event: unknown): void {

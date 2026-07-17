@@ -39,16 +39,8 @@ import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/a
 import { UpdateTerminalExecutionConfigUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
-import { ArchiveBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
-import { CheckoutMainWorkspaceBranchUseCase } from '../../contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
-import { CreateBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
-import { CreateOrOpenProjectUseCase } from '../../contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
-import { ForgetProjectUseCase } from '../../contexts/project/application/use-cases/ForgetProjectUseCase'
 import { ListGitBranchNavigationUseCase } from '../../contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
-import { RememberProjectUseCase } from '../../contexts/project/application/use-cases/RememberProjectUseCase'
-import { SwitchBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
-import { SynchronizeProjectGitStateUseCase } from '../../contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
@@ -67,6 +59,9 @@ import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readi
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
+import { createAgentLifecycle, disposeRuntime } from './agentRuntimeLifecycleAdapter'
+import { createAgentRuntimeScopeValidation } from './agentRuntimeScopeValidationAdapter'
+import { createProjectLifecycleUseCases } from './projectLifecycleUseCases'
 import { createDisabledAgentSessionSnapshot } from './createDisabledAgentSessionSnapshot'
 import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
@@ -85,28 +80,11 @@ interface WorkbenchSnapshot {
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
+let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
 const gitWorkspaceAdapter = new GitCliWorkspaceAdapter()
 const branchWorkspaceDirectoryResolver = new FileSystemBranchWorkspaceDirectoryResolver()
-const createOrOpenProjectUseCase = new CreateOrOpenProjectUseCase(
-  projectRepository,
-  gitWorkspaceAdapter
-)
-const createBranchWorkspaceUseCase = new CreateBranchWorkspaceUseCase(
-  projectRepository,
-  gitWorkspaceAdapter,
-  branchWorkspaceDirectoryResolver
-)
-const archiveBranchWorkspaceUseCase = new ArchiveBranchWorkspaceUseCase(
-  projectRepository,
-  gitWorkspaceAdapter
-)
-const switchBranchWorkspaceUseCase = new SwitchBranchWorkspaceUseCase(projectRepository)
 const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
-  projectRepository,
-  gitWorkspaceAdapter
-)
-const synchronizeProjectGitStateUseCase = new SynchronizeProjectGitStateUseCase(
   projectRepository,
   gitWorkspaceAdapter
 )
@@ -180,8 +158,30 @@ const agentSessionService = new AgentSessionService(
   new NodePtyCodexAgentProcessAdapter(),
   new CleancodeMcpHttpServer(),
   (command) => executeAgentToolUseCase.execute(command),
-  agentSessionRepository
+  agentSessionRepository,
+  createAgentRuntimeScopeValidation(
+    agentSessionRepository,
+    getProjectRegistryRepository(),
+    projectRepository
+  )
 )
+const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
+const {
+  archiveBranchWorkspaceUseCase,
+  checkoutMainWorkspaceBranchUseCase,
+  createBranchWorkspaceUseCase,
+  createOrOpenProjectUseCase,
+  forgetProjectUseCase,
+  rememberProjectUseCase,
+  switchBranchWorkspaceUseCase,
+  synchronizeProjectGitStateUseCase
+} = createProjectLifecycleUseCases({
+  agentLifecycle: workspaceAgentLifecycleAdapter,
+  branchDirectories: branchWorkspaceDirectoryResolver,
+  gitWorkspace: gitWorkspaceAdapter,
+  projectRegistry: getProjectRegistryRepository(),
+  projects: projectRepository
+})
 const updateWorkspaceAgentMcpCapabilityUseCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
   agentSessionRepository,
   agentSessionService
@@ -190,22 +190,10 @@ const removeWorkspaceAgentUseCase = new RemoveWorkspaceAgentUseCase(
   agentSessionRepository,
   agentSessionService
 )
-const checkoutMainWorkspaceBranchUseCase = new CheckoutMainWorkspaceBranchUseCase(
-  projectRepository,
-  gitWorkspaceAdapter,
-  {
-    resume: (workspaceDirectory) =>
-      agentSessionService.resumeWorkspaceDirectory(workspaceDirectory),
-    suspend: (workspaceDirectory) =>
-      agentSessionService.suspendWorkspaceDirectory(workspaceDirectory)
-  }
-)
 const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
 const electronWindowPolicy = resolveElectronWindowPolicy({
   backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
 })
-let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
-
 const createMainWindow = (appIconPath: string | undefined): void => {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -260,9 +248,7 @@ registerProjectIpcHandlers({
   checkoutMainWorkspaceBranch: (command) => checkoutMainWorkspaceBranchUseCase.execute(command),
   createBranchWorkspace: (command) => createBranchWorkspaceUseCase.execute(command),
   createOrOpenProject: (command) => createOrOpenProjectUseCase.execute(command),
-  forgetProject: async (directory) => {
-    await new ForgetProjectUseCase(getProjectRegistryRepository()).execute({ directory })
-  },
+  forgetProject: (directory) => forgetProjectUseCase.execute({ directory }),
   inferProjectName,
   ipcMain,
   loadRememberedWorkbenches,
@@ -325,11 +311,11 @@ registerAgentIpcHandlers({
   disposeAgentWorkspaceSession: (command) =>
     isAgentAutostartDisabledForTest
       ? Promise.resolve()
-      : agentSessionService.disposeSession(command),
+      : disposeRuntime(() => agentSessionService.disposeSession(command)),
   disposeProjectAgentSessions: (projectDirectory) =>
     isAgentAutostartDisabledForTest
       ? Promise.resolve()
-      : agentSessionService.disposeProject(projectDirectory),
+      : disposeRuntime(() => agentSessionService.disposeProject(projectDirectory)),
   inspectCodexCli: () => inspectCodexCliUseCase.execute(),
   ipcMain,
   logger: consoleLogger,
@@ -405,7 +391,7 @@ async function getDefaultGraphForAgent(command: {
 }
 
 async function rememberProject(directory: string): Promise<void> {
-  await new RememberProjectUseCase(getProjectRegistryRepository()).execute({ directory })
+  await rememberProjectUseCase.execute({ directory })
 }
 
 async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {

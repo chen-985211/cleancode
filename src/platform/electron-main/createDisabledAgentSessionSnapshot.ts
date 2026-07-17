@@ -1,10 +1,14 @@
-import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type {
+  AgentSessionSnapshot,
+  AgentTerminalSourceTheme
+} from '../../contexts/agent/application/dto/AgentSessionProtocol'
 
 export function createDisabledAgentSessionSnapshot(command: {
   readonly agentId: string
   readonly gitBranch?: string | null
   readonly projectDirectory: string
   readonly projectId: string
+  readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }): AgentSessionSnapshot {
@@ -17,6 +21,7 @@ export function createDisabledAgentSessionSnapshot(command: {
     projectId: command.projectId,
     sessionId: `test-agent-${command.workspaceName}`,
     status: 'exited',
+    terminalSourceTheme: command.terminalSourceTheme,
     workspaceDirectory: command.workspaceDirectory,
     workspaceName: command.workspaceName
   }

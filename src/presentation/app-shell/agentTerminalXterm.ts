@@ -2,9 +2,9 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
 import type { MutableRefObject } from 'react'
 
-import { readTerminalTheme } from './terminalTheme'
+import type { AgentTerminalSourceTheme } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import { readCanonicalTerminalTheme, readTerminalTheme } from './terminalTheme'
 import { installTerminalSelectionCopy } from './terminalSelectionCopy'
-import type { EffectiveTheme } from './themePreference'
 import type { TerminalDimensions } from './types'
 
 const defaultAgentTerminalDimensions: TerminalDimensions = {
@@ -12,16 +12,31 @@ const defaultAgentTerminalDimensions: TerminalDimensions = {
   rows: 24
 }
 
+export interface AgentXtermController {
+  invalidateSessionReplacement(): void
+  replaceSession(input: {
+    readonly onBind: () => boolean | void
+    readonly replayOutput: string | (() => string)
+    readonly sessionId: string
+    readonly terminalSourceTheme: AgentTerminalSourceTheme
+  }): Promise<void>
+  write(data: string): void
+}
+
 export function installAgentXterm(input: {
   readonly element: HTMLDivElement
   readonly initialOutput: string
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (input: string) => void
-  readonly xtermRef: MutableRefObject<XTerm | null>
+  readonly xtermRef: MutableRefObject<AgentXtermController | null>
 }): () => void {
+  let disposed = false
+  let replacementGeneration = 0
   let pendingFitAnimationFrame: number | null = null
   let lastReportedDimensions: TerminalDimensions | null = null
-  input.element.dataset.agentTerminalSourceTheme = readEffectiveTheme()
+  let lastWriteCompletion = Promise.resolve()
+  const pendingWriteResolvers = new Set<() => void>()
+  input.element.dataset.agentTerminalSourceTheme = readAgentTerminalSourceTheme()
   const terminal = new XTerm({
     convertEol: true,
     cursorBlink: true,
@@ -64,7 +79,59 @@ export function installAgentXterm(input: {
   terminal.loadAddon(fitAddon)
   terminal.open(input.element)
   installTerminalSelectionCopy(terminal)
-  input.xtermRef.current = terminal
+  const controller: AgentXtermController = {
+    invalidateSessionReplacement: () => {
+      replacementGeneration += 1
+    },
+    replaceSession: async (replacement) => {
+      const generation = ++replacementGeneration
+      const writesBeforeReplacement = lastWriteCompletion
+      await writesBeforeReplacement
+
+      if (disposed || generation !== replacementGeneration) {
+        return
+      }
+
+      input.element.dataset.agentTerminalSourceTheme = replacement.terminalSourceTheme
+      terminal.options.theme = readCanonicalTerminalTheme(replacement.terminalSourceTheme)
+      terminal.reset()
+      const replayOutput =
+        typeof replacement.replayOutput === 'function'
+          ? replacement.replayOutput()
+          : replacement.replayOutput
+
+      if (replacement.onBind() === false || disposed || generation !== replacementGeneration) {
+        return
+      }
+
+      if (replayOutput) {
+        controller.write(replayOutput)
+      }
+    },
+    write: (data) => {
+      if (disposed) {
+        return
+      }
+
+      let resolveWrite = (): void => undefined
+      const writeCompletion = new Promise<void>((resolve) => {
+        resolveWrite = () => {
+          pendingWriteResolvers.delete(resolveWrite)
+          resolve()
+        }
+      })
+      pendingWriteResolvers.add(resolveWrite)
+      lastWriteCompletion = writeCompletion
+
+      try {
+        terminal.write(data, resolveWrite)
+      } catch (error) {
+        resolveWrite()
+        throw error
+      }
+    }
+  }
+  input.xtermRef.current = controller
   const resizeSubscription = terminal.onResize(({ cols, rows }) => {
     reportDimensions({ columns: cols, rows })
   })
@@ -72,12 +139,19 @@ export function installAgentXterm(input: {
   reportDimensions()
   const dataSubscription = terminal.onData(input.onInput)
   if (input.initialOutput) {
-    terminal.write(input.initialOutput)
+    controller.write(input.initialOutput)
   }
   const resizeObserver = new ResizeObserver(requestFit)
   resizeObserver.observe(input.element)
 
   return () => {
+    disposed = true
+    replacementGeneration += 1
+    for (const resolveWrite of pendingWriteResolvers) {
+      resolveWrite()
+    }
+    pendingWriteResolvers.clear()
+
     if (pendingFitAnimationFrame !== null) {
       window.cancelAnimationFrame(pendingFitAnimationFrame)
     }
@@ -86,13 +160,15 @@ export function installAgentXterm(input: {
     resizeSubscription.dispose()
     resizeObserver.disconnect()
     terminal.dispose()
-    input.xtermRef.current = null
+    if (input.xtermRef.current === controller) {
+      input.xtermRef.current = null
+    }
     delete input.element.dataset.agentTerminalSourceTheme
   }
 }
 
 export const defaultAgentXtermDimensions = defaultAgentTerminalDimensions
 
-function readEffectiveTheme(): EffectiveTheme {
+export function readAgentTerminalSourceTheme(): AgentTerminalSourceTheme {
   return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
 }

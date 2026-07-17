@@ -1,6 +1,8 @@
 import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
+export type AgentTerminalSourceTheme = 'dark' | 'light'
+
 export interface AgentPtyOutputEvent {
   readonly agentId: string
   readonly data: string
@@ -60,6 +62,7 @@ export interface AgentSessionSnapshot {
   readonly projectId: string
   readonly sessionId: string
   readonly status: 'running' | 'suspended' | 'exited' | 'failed' | 'restore_failed'
+  readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }

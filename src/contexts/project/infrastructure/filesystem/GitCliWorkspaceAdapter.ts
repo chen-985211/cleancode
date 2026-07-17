@@ -84,11 +84,18 @@ export class GitCliWorkspaceAdapter implements GitWorkspacePort {
 
 async function isGitRepository(directory: string): Promise<boolean> {
   try {
-    await runGit(directory, ['rev-parse', '--is-inside-work-tree'])
-    return true
-  } catch {
-    return false
+    const output = await runGit(directory, ['rev-parse', '--is-inside-work-tree'])
+    return output.trim() === 'true'
+  } catch (error) {
+    if (isConfirmedNonRepositoryError(error)) return false
+    throw error
   }
+}
+
+function isConfirmedNonRepositoryError(error: unknown): boolean {
+  const stderr = (error as { readonly stderr?: unknown } | null)?.stderr
+
+  return typeof stderr === 'string' && stderr.includes('fatal: not a git repository')
 }
 
 async function getCurrentBranch(directory: string): Promise<string | null> {
@@ -143,6 +150,9 @@ function createGitProcessEnvironment(): NodeJS.ProcessEnv {
   for (const variableName of GIT_LOCAL_ENVIRONMENT_VARIABLES) {
     delete env[variableName]
   }
+
+  env.LANG = 'C'
+  env.LC_ALL = 'C'
 
   return env
 }

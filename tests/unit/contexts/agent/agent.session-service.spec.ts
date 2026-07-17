@@ -28,6 +28,7 @@ describe('agent session service', () => {
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 32,
+      terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
     })
@@ -40,6 +41,7 @@ describe('agent session service', () => {
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 40,
+      terminalSourceTheme: 'dark',
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
     })
@@ -52,6 +54,7 @@ describe('agent session service', () => {
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 24,
+      terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app-worktrees/feature',
       workspaceName: 'feature'
     })
@@ -86,10 +89,12 @@ describe('agent session service', () => {
     const first = await attachMainSession(service, { agentId: 'agent-1' })
     const second = await attachMainSession(service, { agentId: 'agent-2' })
 
-    await expect(service.suspendWorkspaceDirectory('/repo/app')).resolves.toBe(true)
+    const suspension = await service.suspendWorkspaceDirectory('/repo/app')
+    expect(suspension.wasSuspended).toBe(true)
     expect(processPort.stops).toEqual([first.sessionId, second.sessionId])
 
-    await service.resumeWorkspaceDirectory('/repo/app')
+    await suspension.resume()
+    suspension.release()
     expect(processPort.starts).toHaveLength(4)
   })
 
@@ -98,11 +103,12 @@ describe('agent session service', () => {
     const service = createSessionService({ processPort })
     const session = await attachMainSession(service)
 
-    await service.disposeAgent({
+    const lease = await service.disposeAgent({
       agentId: 'agent-1',
       projectId: 'project-1',
       workspaceName: 'main'
     })
+    lease.release()
     service.resize({ columns: 120, rows: 36, sessionId: session.sessionId })
 
     expect(processPort.resizes).toEqual([])
@@ -123,6 +129,7 @@ describe('agent session service', () => {
       gitBranch: 'main',
       projectDirectory: '/repo/app',
       projectId: 'project-1',
+      terminalSourceTheme: 'light' as const,
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
     }
@@ -132,6 +139,7 @@ describe('agent session service', () => {
       gitBranch: 'feature/login',
       projectDirectory: '/repo/app',
       projectId: 'project-1',
+      terminalSourceTheme: 'light' as const,
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
     }
@@ -259,7 +267,11 @@ describe('agent session service', () => {
       toolName: 'delete_terminal_group'
     })
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
-    await service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
+    const lease = await service.disposeSession({
+      projectDirectory: '/repo/app',
+      workspaceName: 'main'
+    })
+    lease.release()
 
     await expect(disposedResultPromise).resolves.toMatchObject({
       status: 'canceled',
@@ -297,7 +309,11 @@ describe('agent session service', () => {
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
     service.approveTool({ approvalId: 'approval-2' })
     await vi.waitFor(() => expect(executeAgentTool).toHaveBeenCalledTimes(2))
-    await service.disposeSession({ projectDirectory: '/repo/app', workspaceName: 'main' })
+    const lease = await service.disposeSession({
+      projectDirectory: '/repo/app',
+      workspaceName: 'main'
+    })
+    lease.release()
     resolveApprovedExecution(completedToolResult('approval-2'))
 
     await expect(resultPromise).resolves.toMatchObject({
@@ -444,6 +460,7 @@ async function attachMainSession(
     projectDirectory: '/repo/app',
     projectId: 'project-1',
     rows: 24,
+    terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
     workspaceName: 'main',
     ...input

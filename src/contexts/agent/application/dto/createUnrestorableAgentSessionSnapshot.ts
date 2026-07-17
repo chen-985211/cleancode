@@ -1,4 +1,4 @@
-import type { AgentSessionSnapshot } from './AgentSessionProtocol'
+import type { AgentSessionSnapshot, AgentTerminalSourceTheme } from './AgentSessionProtocol'
 
 export function createUnrestorableAgentSessionSnapshot(input: {
   readonly agentId: string
@@ -6,6 +6,7 @@ export function createUnrestorableAgentSessionSnapshot(input: {
   readonly projectDirectory: string
   readonly projectId: string
   readonly sessionId: string
+  readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }): AgentSessionSnapshot {
@@ -18,6 +19,7 @@ export function createUnrestorableAgentSessionSnapshot(input: {
     projectId: input.projectId,
     sessionId: input.sessionId,
     status: 'restore_failed',
+    terminalSourceTheme: input.terminalSourceTheme,
     workspaceDirectory: input.workspaceDirectory,
     workspaceName: input.workspaceName
   }

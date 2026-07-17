@@ -4,6 +4,7 @@ import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { BranchWorkspaceDirectoryPort } from '../ports/BranchWorkspaceDirectoryPort'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateBranchWorkspaceCommand {
   readonly projectDirectory: string
@@ -14,10 +15,19 @@ export class CreateBranchWorkspaceUseCase {
   constructor(
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
-    private readonly branchWorkspaceDirectoryPort: BranchWorkspaceDirectoryPort
+    private readonly branchWorkspaceDirectoryPort: BranchWorkspaceDirectoryPort,
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
   ) {}
 
   async execute(command: CreateBranchWorkspaceCommand): Promise<ProjectSnapshot> {
+    return this.transactionCoordinator.run(command.projectDirectory, () =>
+      this.executeTransaction(command)
+    )
+  }
+
+  private async executeTransaction(
+    command: CreateBranchWorkspaceCommand
+  ): Promise<ProjectSnapshot> {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!projectSnapshot) {

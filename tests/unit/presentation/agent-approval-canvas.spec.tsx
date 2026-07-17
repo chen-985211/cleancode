@@ -109,11 +109,16 @@ describe('Agent destructive approval canvas', () => {
       configurable: true,
       value: createRuntimeApi({
         approveAgentTool,
-        attachAgentSession: vi.fn(async () => ({
+        attachAgentSession: vi.fn(async (command) => ({
+          agentId: command.agentId,
+          codexThreadId: null,
+          gitBranch: command.gitBranch ?? null,
           processId: 1,
           projectDirectory: '/repo/app',
+          projectId: command.projectId,
           sessionId: 'agent-session-1',
           status: 'running',
+          terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: '/repo/app',
           workspaceName: 'main'
         })),

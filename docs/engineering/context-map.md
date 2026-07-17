@@ -22,7 +22,12 @@
 Project application
   -> WorkspaceAgentLifecyclePort
   -> Platform adapter
-  -> AgentSessionService suspend/resume
+  -> AgentSessionService lifecycle leases
+
+Agent application
+  -> AgentRuntimeScopeValidationPort
+  -> Platform adapter
+  -> ValidateProjectWorkspaceScopeUseCase
 
 Run application
   -> TerminalWorkflowPlanPort
@@ -37,18 +42,31 @@ Agent application
 
 端口由需要外部能力的调用方上下文拥有；适配器负责把该稳定契约连接到提供方公开的应用层用例。Platform 只装配对象，不重新定义业务规则。
 
-## Project 到 Agent：物理目录分支切换
+## Project 到 Agent：工作区所有权变更
 
-| 项目             | 说明                                                                          |
-| ---------------- | ----------------------------------------------------------------------------- |
-| 发起方           | Project                                                                       |
-| 调用方拥有的端口 | `WorkspaceAgentLifecyclePort`                                                 |
-| 提供方           | Agent 的 `AgentSessionService`                                                |
-| 触发条件         | 主工作区在同一物理目录 checkout 另一个 Git 分支                               |
-| 契约             | checkout 前挂起目录内全部运行中 Agent；Git 失败时恢复，成功后等待新作用域接管 |
-| 禁止             | Project 直接读取 Agent 聚合、PTY 映射或 thread 仓储                           |
+| 项目             | 说明                                                                                                                                                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Project                                                                                                                                                                                      |
+| 调用方拥有的端口 | `WorkspaceAgentLifecyclePort`                                                                                                                                                                |
+| 提供方           | Agent 的 `AgentSessionService`                                                                                                                                                               |
+| 触发条件         | 主工作区 checkout、worktree 归档或从登记簿移除项目                                                                                                                                           |
+| 契约             | Project 写用例按目录串行，登记簿 RMW 另行全局串行；checkout/归档在 Agent 排空后复查工作树；以 release/resolve/quarantine 结束 lease；仅权威 Git 检查成功后同步并 resolve；失败时恢复旧作用域 |
+| 禁止             | Project 直接读取 Agent 聚合、PTY 映射或 thread 仓储                                                                                                                                          |
 
 详细语义见[项目与分支工作区生命周期](../contexts/project/workspace-lifecycle.md)和 [Agent 与会话生命周期](../contexts/agent/agent-session.md)。
+
+## Agent 到 Project：运行时作用域有效性
+
+| 项目             | 说明                                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| 发起方           | Agent                                                                                         |
+| 调用方拥有的端口 | `AgentRuntimeScopeValidationPort`                                                             |
+| 提供方           | Project 的 `ValidateProjectWorkspaceScopeUseCase`                                             |
+| 触发条件         | 每次附加，以及挂起恢复、MCP 重配等任何 Agent PTY 启动                                         |
+| 契约             | 项目仍被记住，项目 ID、工作区名称/目录和 Git 分支全部匹配；Platform 同时确认 Agent 定义仍存在 |
+| 禁止             | Agent 直接读取 Project/ProjectRegistry 聚合或仓储                                             |
+
+该校验是 lifecycle lease 的提交后防线：即使旧 renderer 命令在 lease resolve 后才抵达，已删除 Agent、已归档工作区、已遗忘项目或旧分支作用域也不能重新启动 PTY。
 
 ## Run 到 BlockGraph：终端工作流计划
 

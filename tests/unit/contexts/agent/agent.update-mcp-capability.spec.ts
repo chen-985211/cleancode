@@ -37,7 +37,9 @@ class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
 
   constructor(private readonly repository: AgentSessionRepository) {}
 
-  async disposeAgent(): Promise<void> {}
+  async disposeAgent() {
+    return { release: () => undefined }
+  }
 
   async reconfigureAgent(
     command: Parameters<WorkspaceAgentRuntimePort['reconfigureAgent']>[0]

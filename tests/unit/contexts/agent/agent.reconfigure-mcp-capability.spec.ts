@@ -7,6 +7,7 @@ import type {
   StartCodexAgentProcessCommand
 } from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
+import type { AgentRuntimeScopeValidationPort } from '../../../../src/contexts/agent/application/ports/AgentRuntimeScopeValidationPort'
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
@@ -76,6 +77,66 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
     expect(reattached.sessionId).toBe(restarted?.sessionId)
     expect(processPort.starts).toHaveLength(2)
   })
+
+  it('does not restart a suspended old-scope session after checkout commits', async () => {
+    const processPort = new RecordingProcessPort()
+    const service = createService(
+      new MemoryAgentRepository(createAgent(true)),
+      processPort,
+      new RecordingMcpServerPort()
+    )
+    const attached = await service.attach(attachCommand())
+    const suspension = await service.suspendWorkspaceDirectory('/repo/app')
+    suspension.resolve()
+
+    await expect(
+      service.reconfigureAgent({
+        agentId: 'agent-1',
+        cleancodeMcpEnabled: false,
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ).resolves.toBeNull()
+
+    expect(processPort.stops).toEqual([attached.sessionId])
+    expect(processPort.starts).toHaveLength(1)
+  })
+
+  it('validates the complete runtime scope before restarting an active session', async () => {
+    let isValid = true
+    const scopeValidation = {
+      isValid: vi.fn(async () => isValid)
+    } satisfies AgentRuntimeScopeValidationPort
+    const processPort = new RecordingProcessPort()
+    const service = createService(
+      new MemoryAgentRepository(createAgent(true)),
+      processPort,
+      new RecordingMcpServerPort(),
+      scopeValidation
+    )
+    await service.attach(attachCommand())
+    isValid = false
+
+    await expect(
+      service.reconfigureAgent({
+        agentId: 'agent-1',
+        cleancodeMcpEnabled: false,
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ).rejects.toMatchObject({ code: 'AGENT_SESSION_NOT_FOUND' })
+
+    expect(scopeValidation.isValid).toHaveBeenLastCalledWith({
+      agentId: 'agent-1',
+      gitBranch: null,
+      projectDirectory: '/repo/app',
+      projectId: 'project-1',
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    })
+    expect(processPort.stops).toEqual([])
+    expect(processPort.starts).toHaveLength(1)
+  })
 })
 
 class RecordingProcessPort implements CodexAgentProcessPort {
@@ -140,7 +201,8 @@ class MemoryAgentRepository implements AgentSessionRepository {
 function createService(
   repository: AgentSessionRepository,
   processPort: CodexAgentProcessPort,
-  mcpServer: AgentMcpServerPort
+  mcpServer: AgentMcpServerPort,
+  scopeValidation?: AgentRuntimeScopeValidationPort
 ): AgentSessionService {
   return new AgentSessionService(
     processPort,
@@ -154,7 +216,8 @@ function createService(
       status: 'awaiting_approval',
       toolCallId: 'approval-1'
     }),
-    repository
+    repository,
+    scopeValidation
   )
 }
 
@@ -190,6 +253,7 @@ function attachCommand() {
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
+    terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
     workspaceName: 'main'
   }

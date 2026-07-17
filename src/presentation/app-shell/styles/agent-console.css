@@ -274,12 +274,8 @@
   background: var(--cc-scrollbar);
 }
 
-.agent-terminal-viewport[data-agent-terminal-source-theme='light'] {
-  background: var(--cc-agent-terminal-source-light-background);
-}
-
-.agent-terminal-viewport[data-agent-terminal-source-theme='dark'] {
-  background: var(--cc-agent-terminal-source-dark-background);
+.agent-terminal-viewport[data-agent-terminal-source-theme] {
+  background: var(--cc-terminal-background);
 }
 
 :root[data-theme='dark'] .agent-terminal-viewport[data-agent-terminal-source-theme='light'],

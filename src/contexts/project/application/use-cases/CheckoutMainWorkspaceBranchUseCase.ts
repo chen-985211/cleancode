@@ -3,7 +3,11 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
-import type { WorkspaceAgentLifecyclePort } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceAgentLifecyclePort,
+  type WorkspaceAgentLifecyclePort
+} from '../ports/WorkspaceAgentLifecyclePort'
+import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CheckoutMainWorkspaceBranchCommand {
   readonly projectDirectory: string
@@ -14,10 +18,19 @@ export class CheckoutMainWorkspaceBranchUseCase {
   constructor(
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
-    private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort
+    private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
   ) {}
 
   async execute(command: CheckoutMainWorkspaceBranchCommand): Promise<ProjectSnapshot> {
+    return this.transactionCoordinator.run(command.projectDirectory, () =>
+      this.executeTransaction(command)
+    )
+  }
+
+  private async executeTransaction(
+    command: CheckoutMainWorkspaceBranchCommand
+  ): Promise<ProjectSnapshot> {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!projectSnapshot) {
@@ -46,50 +59,67 @@ export class CheckoutMainWorkspaceBranchUseCase {
     }
 
     if (!(await this.gitWorkspacePort.isWorkingTreeClean(project.directory))) {
-      throw createExpectedAppError(
-        'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES',
-        'Main workspace has uncommitted changes.'
-      )
+      throw createDirtyMainWorkspaceError()
     }
 
-    const wasAgentSuspended = await this.workspaceAgentLifecyclePort.suspend(project.directory)
+    const agentLease = await this.workspaceAgentLifecyclePort.suspend(project.directory)
+    let checkoutCompleted = false
+    let canReleaseAgentLease = true
+    let resolvesQuarantine = false
 
     try {
+      if (!(await this.gitWorkspacePort.isWorkingTreeClean(project.directory))) {
+        throw createDirtyMainWorkspaceError()
+      }
       await this.gitWorkspacePort.checkoutBranch({
         repositoryDirectory: project.directory,
         branchName
       })
+      checkoutCompleted = true
+
+      const worktrees = inspection.branches
+        .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
+        .map((branch) => ({
+          branchName: branch.name,
+          directory: branch.worktreeDirectory ?? project.directory
+        }))
+      const updatedProject = project
+        .syncGitBranchWorkspaces({
+          mainDirectory: project.directory,
+          mainGitBranch: branchName,
+          worktrees
+        })
+        .switchCurrentWorkspace('main')
+
+      await this.projectRepository.save(updatedProject)
+      resolvesQuarantine = true
+      return updatedProject.toSnapshot()
     } catch (error) {
-      if (wasAgentSuspended) {
-        await this.workspaceAgentLifecyclePort.resume(project.directory)
+      if (checkoutCompleted) {
+        if (inspection.currentBranch) {
+          try {
+            await this.gitWorkspacePort.checkoutBranch({
+              repositoryDirectory: project.directory,
+              branchName: inspection.currentBranch
+            })
+            resolvesQuarantine = true
+          } catch {
+            canReleaseAgentLease = false
+          }
+        } else {
+          canReleaseAgentLease = false
+        }
       }
-
+      if (canReleaseAgentLease && agentLease.wasSuspended) {
+        await agentLease.resume().catch(() => undefined)
+      }
       throw error
+    } finally {
+      if (!canReleaseAgentLease) agentLease.quarantine()
+      else if (resolvesQuarantine) agentLease.resolve()
+      else agentLease.release()
     }
-
-    const worktrees = inspection.branches
-      .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
-      .map((branch) => ({
-        branchName: branch.name,
-        directory: branch.worktreeDirectory ?? project.directory
-      }))
-    const updatedProject = project
-      .syncGitBranchWorkspaces({
-        mainDirectory: project.directory,
-        mainGitBranch: branchName,
-        worktrees
-      })
-      .switchCurrentWorkspace('main')
-
-    await this.projectRepository.save(updatedProject)
-
-    return updatedProject.toSnapshot()
   }
-}
-
-const noopWorkspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = {
-  resume: async () => undefined,
-  suspend: async () => false
 }
 
 function normalizeBranchName(branchName: string): string {
@@ -100,4 +130,11 @@ function normalizeBranchName(branchName: string): string {
   }
 
   return normalizedBranchName
+}
+
+function createDirtyMainWorkspaceError() {
+  return createExpectedAppError(
+    'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES',
+    'Main workspace has uncommitted changes.'
+  )
 }

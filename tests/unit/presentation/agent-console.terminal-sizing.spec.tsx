@@ -10,6 +10,7 @@ import {
 interface FakeAgentTerminal {
   cols: number
   rows: number
+  readonly options: { theme?: Record<string, string> }
   readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
   readonly getSelection: ReturnType<typeof vi.fn>
@@ -45,6 +46,7 @@ vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminal {
     cols = 88
     rows = 24
+    readonly options: { theme?: Record<string, string> }
     resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null = null
 
     readonly attachCustomKeyEventHandler = vi.fn()
@@ -53,7 +55,7 @@ vi.mock('@xterm/xterm', () => ({
     readonly hasSelection = vi.fn(() => false)
     readonly open = vi.fn()
     readonly reset = vi.fn()
-    readonly write = vi.fn()
+    readonly write = vi.fn((_data: string, callback?: () => void) => callback?.())
     readonly loadAddon = vi.fn((addon: FakeFitAddon) => {
       addon.terminal = this
     })
@@ -63,7 +65,8 @@ vi.mock('@xterm/xterm', () => ({
       return { dispose: vi.fn() }
     })
 
-    constructor() {
+    constructor(options: { theme?: Record<string, string> }) {
+      this.options = options
       sizingMockState.terminals.push(this)
     }
   }
@@ -307,6 +310,7 @@ function createAgentSession(sessionId: string, workspaceName: string): AgentSess
     projectId: 'project-app',
     sessionId,
     status: 'running',
+    terminalSourceTheme: 'light',
     workspaceDirectory:
       workspaceName === 'main' ? '/repo/app' : `/repo/app-worktrees/${workspaceName}`,
     workspaceName

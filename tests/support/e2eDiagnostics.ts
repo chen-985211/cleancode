@@ -154,6 +154,16 @@ async function readRendererState(page: Page): Promise<unknown> {
     return await page.evaluate(() => ({
       activeElement:
         document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.className,
+      agentTerminals: Array.from(
+        document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
+      ).map((element) => ({
+        filter: getComputedStyle(element).filter,
+        outputTail: element.querySelector('.xterm-rows')?.textContent?.slice(-4_000) ?? '',
+        processId: element.dataset.agentTerminalProcessId,
+        sessionId: element.dataset.agentTerminalSessionId,
+        sourceTheme: element.dataset.agentTerminalSourceTheme,
+        workspaceName: element.dataset.agentTerminalWorkspaceName
+      })),
       terminalOutputs: Array.from(
         document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
       ).map((element) => ({

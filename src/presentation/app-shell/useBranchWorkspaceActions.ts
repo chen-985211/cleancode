@@ -9,10 +9,6 @@ interface UseBranchWorkspaceActionsInput {
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
-  readonly disposeAgentWorkspaceSession: (command: {
-    readonly projectDirectory: string
-    readonly workspaceName: string
-  }) => Promise<void>
   readonly terminateWorkbenchTerminalSessions: (workbench: WorkbenchSnapshot) => Promise<void>
 }
 
@@ -21,7 +17,6 @@ export function useBranchWorkspaceActions({
   replaceWorkbench,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
-  disposeAgentWorkspaceSession,
   terminateWorkbenchTerminalSessions
 }: UseBranchWorkspaceActionsInput) {
   const [branchWorkspaceActionError, setBranchWorkspaceActionError] = useState<string | null>(null)
@@ -98,11 +93,6 @@ export function useBranchWorkspaceActions({
           await terminateWorkbenchTerminalSessions(currentWorkbench)
         }
 
-        await disposeAgentWorkspaceSession({
-          projectDirectory: workbench.project.directory,
-          workspaceName
-        })
-
         const archivedWorkbench = await window.cleancode?.archiveBranchWorkspace({
           projectDirectory: workbench.project.directory,
           workspaceName
@@ -119,7 +109,6 @@ export function useBranchWorkspaceActions({
     [
       clearCurrentBlockSelection,
       currentWorkbench,
-      disposeAgentWorkspaceSession,
       replaceWorkbench,
       terminateWorkbenchTerminalSessions
     ]

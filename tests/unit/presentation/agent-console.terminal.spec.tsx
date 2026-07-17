@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
+import type { AgentSessionSnapshot } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import { installAgentXterm } from '../../../src/presentation/app-shell/agentTerminalXterm'
-import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
+import {
+  effectiveThemeChangeEventName,
+  themePreferenceStorageKey
+} from '../../../src/presentation/app-shell/themePreference'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -35,6 +39,29 @@ interface FakeAgentFitAddonInstance {
 const agentXtermMockState = vi.hoisted(() => ({
   terminals: [] as FakeAgentTerminalInstance[]
 }))
+
+const canonicalLightTerminalPalette = {
+  background: '#f7f9fc',
+  black: '#253043',
+  blue: '#2864c7',
+  brightBlack: '#697586',
+  brightBlue: '#3f7dde',
+  brightCyan: '#188fa8',
+  brightGreen: '#249865',
+  brightMagenta: '#a565cb',
+  brightRed: '#d24d5d',
+  brightWhite: '#ffffff',
+  brightYellow: '#b77b16',
+  cursor: '#172033',
+  cyan: '#0f758c',
+  foreground: '#243142',
+  green: '#18794e',
+  magenta: '#8c4cb3',
+  red: '#b93847',
+  selectionBackground: '#cbdcf8',
+  white: '#d9e0e9',
+  yellow: '#95630c'
+}
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminalInstance {
@@ -168,6 +195,51 @@ describe('agent console terminal', () => {
     expect(terminal?.options.theme?.background).toBe('#10151d')
   })
 
+  it('restores the canonical session palette before presenting a buffered Agent terminal', async () => {
+    const root = document.documentElement
+    root.dataset.theme = 'dark'
+    window.localStorage.setItem(themePreferenceStorageKey, 'dark')
+    Object.entries(canonicalLightTerminalPalette).forEach(([key, value]) => {
+      root.style.setProperty(toTerminalThemeVariable(key), '#111111')
+      root.style.setProperty(toTerminalThemeVariable(key, 'light'), value)
+    })
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(command, 'agent-session-light', 42, 'light')
+    )
+
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'cleancode desktop renderer'
+    })
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession,
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    try {
+      render(<AppShell />)
+
+      await waitFor(() => expect(attachAgentSession).toHaveBeenCalled())
+      await waitFor(() => expect(agentXtermMockState.terminals.length).toBeGreaterThan(0))
+      const terminalViewport = document.querySelector('.agent-terminal-viewport')
+
+      await waitFor(() => {
+        expect(terminalViewport).toHaveAttribute('data-agent-terminal-source-theme', 'light')
+        expect(agentXtermMockState.terminals.at(-1)?.options.theme).toEqual(
+          canonicalLightTerminalPalette
+        )
+      })
+    } finally {
+      window.localStorage.removeItem(themePreferenceStorageKey)
+      delete root.dataset.theme
+      root.removeAttribute('style')
+    }
+  })
+
   it('copies selected Codex output with the native copy shortcut', () => {
     const writeText = vi.fn(async () => undefined)
     Object.defineProperty(navigator, 'clipboard', {
@@ -202,14 +274,9 @@ describe('agent console terminal', () => {
 
   it('installs xterm after the current workspace appears asynchronously', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
-    const attachAgentSession = vi.fn(async () => ({
-      processId: 42,
-      projectDirectory: '/repo/app',
-      sessionId: 'agent-session-1',
-      status: 'running',
-      workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
-    }))
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(command, 'agent-session-1')
+    )
 
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
@@ -250,14 +317,9 @@ describe('agent console terminal', () => {
       workspaceDirectory: '/repo/app-worktrees/feature',
       workspaceName: 'feature'
     })
-    const attachAgentSession = vi.fn(async () => ({
-      processId: 42,
-      projectDirectory: '/repo/app',
-      sessionId: 'agent-session-1',
-      status: 'running',
-      workspaceDirectory: '/repo/app-worktrees/feature',
-      workspaceName: 'feature'
-    }))
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(command, 'agent-session-1')
+    )
     const writeAgentSession = vi.fn(async () => undefined)
 
     Object.defineProperty(window, 'cleancode', {
@@ -301,14 +363,9 @@ describe('agent console terminal', () => {
 
   it('keeps the current Agent session attached when its canvas node is selected', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
-    const attachAgentSession = vi.fn(async () => ({
-      processId: 42,
-      projectDirectory: '/repo/app',
-      sessionId: 'agent-session-1',
-      status: 'running',
-      workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
-    }))
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(command, 'agent-session-1')
+    )
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -357,24 +414,13 @@ describe('agent console terminal', () => {
       },
       graph: { ...mainWorkbench.graph, workspaceName: 'feature' }
     }
-    const attachAgentSession = vi
-      .fn()
-      .mockResolvedValueOnce({
-        processId: 1,
-        projectDirectory: '/repo/app',
-        sessionId: 'agent-main',
-        status: 'running',
-        workspaceDirectory: '/repo/app',
-        workspaceName: 'main'
-      })
-      .mockResolvedValueOnce({
-        processId: 2,
-        projectDirectory: '/repo/app',
-        sessionId: 'agent-feature',
-        status: 'running',
-        workspaceDirectory: '/repo/app-worktrees/feature',
-        workspaceName: 'feature'
-      })
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(
+        command,
+        command.workspaceName === 'main' ? 'agent-main' : 'agent-feature',
+        command.workspaceName === 'main' ? 1 : 2
+      )
+    )
     const switchBranchWorkspace = vi.fn(async () => featureWorkbench)
 
     Object.defineProperty(window, 'cleancode', {
@@ -411,3 +457,33 @@ describe('agent console terminal', () => {
     expect(window.cleancode?.disposeAgentWorkspaceSession).not.toHaveBeenCalled()
   })
 })
+
+type RendererAttachAgentSessionCommand = Parameters<
+  NonNullable<Window['cleancode']>['attachAgentSession']
+>[0]
+
+function createAgentSessionSnapshot(
+  command: RendererAttachAgentSessionCommand,
+  sessionId: string,
+  processId = 42,
+  terminalSourceTheme: AgentSessionSnapshot['terminalSourceTheme'] = command.terminalSourceTheme
+): AgentSessionSnapshot {
+  return {
+    agentId: command.agentId,
+    codexThreadId: null,
+    gitBranch: command.gitBranch ?? null,
+    processId,
+    projectDirectory: command.projectDirectory,
+    projectId: command.projectId,
+    sessionId,
+    status: 'running',
+    terminalSourceTheme,
+    workspaceDirectory: command.workspaceDirectory,
+    workspaceName: command.workspaceName
+  }
+}
+
+function toTerminalThemeVariable(key: string, sourceTheme?: 'light'): string {
+  const suffix = key === 'selectionBackground' ? 'selection' : key.replace(/[A-Z]/g, '-$&')
+  return `--cc-terminal-${sourceTheme ? `${sourceTheme}-` : ''}${suffix.toLowerCase()}`
+}

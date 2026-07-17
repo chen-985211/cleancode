@@ -163,9 +163,6 @@ export function AppShell() {
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
-    disposeAgentWorkspaceSession: async (command) => {
-      await window.cleancode?.disposeAgentWorkspaceSession(command)
-    },
     replaceWorkbench,
     setHoveredTerminalBlockId,
     setSelectedTerminalBlockId,
@@ -183,9 +180,6 @@ export function AppShell() {
   const removeProject = useCallback(
     async (workbench: WorkbenchSnapshot) => {
       await terminateWorkbenchTerminalSessions(workbench)
-      await window.cleancode?.disposeProjectAgentSessions?.({
-        projectDirectory: workbench.project.directory
-      })
 
       const rememberedWorkbenches = await window.cleancode?.removeProject({
         projectDirectory: workbench.project.directory

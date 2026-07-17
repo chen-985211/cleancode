@@ -1,4 +1,3 @@
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   AgentSessionSnapshot,
   AgentToolApprovalDecisionResult,
@@ -7,28 +6,45 @@ import type {
 import { createUnrestorableAgentSessionSnapshot } from '../dto/createUnrestorableAgentSessionSnapshot'
 import type { AgentMcpServerPort, AgentMcpToolCallCommand } from '../ports/AgentMcpServerPort'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
+import {
+  allowAgentRuntimeScope,
+  type AgentRuntimeScopeValidationPort
+} from '../ports/AgentRuntimeScopeValidationPort'
 import type { CodexAgentProcessPort } from '../ports/CodexAgentProcessPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
 import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
 import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
 import { AgentToolApprovalCoordinator } from './AgentToolApprovalCoordinator'
 import {
+  AgentSessionRuntimeCoordinator,
+  createAgentSessionRuntimeOwner,
+  isOwnedAgentSession,
+  type AgentRuntimeAttachmentLease,
+  type AgentRuntimeSuspensionLease,
+  type AgentSessionRuntimeOwner
+} from './AgentSessionRuntimeCoordinator'
+import {
   createAgentSessionCallbacks,
   createAgentConversationScope,
   createAgentRuntimeSessionId,
+  findOwnedManagedAgentSession,
+  recordAgentSessionStartFailure,
+  recordAgentSessionStopFailure,
   registerAgentMcpEndpoint,
+  requireManagedAgentSession,
   toAgentSessionSnapshot,
   unregisterAgentMcpEndpoint,
+  validateAgentRuntimeScope,
+  validateManagedAgentRuntimeScope,
   type AttachAgentSessionCommand,
   type ManagedAgentSession
 } from './AgentSessionRuntimeState'
-
-export type { AttachAgentSessionCommand } from './AgentSessionRuntimeState'
 
 export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
   private readonly pendingPersistence = new Set<Promise<void>>()
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
+  private readonly runtimeCoordinator = new AgentSessionRuntimeCoordinator()
 
   constructor(
     private readonly processPort: CodexAgentProcessPort,
@@ -36,7 +52,8 @@ export class AgentSessionService {
     private readonly executeAgentTool: (
       command: ExecuteAgentToolCommand
     ) => Promise<AgentToolExecutionResult>,
-    private readonly sessionRepository: AgentSessionRepository
+    private readonly sessionRepository: AgentSessionRepository,
+    private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope
   ) {
     this.approvalCoordinator = new AgentToolApprovalCoordinator(executeAgentTool, (sessionId) =>
       this.findSessionById(sessionId)
@@ -44,7 +61,18 @@ export class AgentSessionService {
   }
 
   async attach(command: AttachAgentSessionCommand): Promise<AgentSessionSnapshot> {
+    const owner = createAgentSessionRuntimeOwner({
+      ...command,
+      projectId: command.projectId ?? command.projectDirectory
+    })
+    return this.runtimeCoordinator.runAttach(owner, () => this.attachUnserialized(command))
+  }
+
+  private async attachUnserialized(
+    command: AttachAgentSessionCommand
+  ): Promise<AgentSessionSnapshot> {
     const scope = createAgentConversationScope(command)
+    const scopeSnapshot = await validateAgentRuntimeScope(command, scope, this.scopeValidation)
     const sessionKey = scope.key
     const existingSession = this.sessions.get(sessionKey)
 
@@ -86,13 +114,13 @@ export class AgentSessionService {
           command.agentId
         ))
     } catch {
-      const scopeSnapshot = scope.toSnapshot()
       return createUnrestorableAgentSessionSnapshot({
         agentId: command.agentId,
         gitBranch: scopeSnapshot.gitBranch,
         projectDirectory: command.projectDirectory,
         projectId: scopeSnapshot.projectId,
         sessionId: createAgentRuntimeSessionId(),
+        terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })
@@ -114,6 +142,7 @@ export class AgentSessionService {
       scope,
       sessionId: createAgentRuntimeSessionId(),
       status: 'running',
+      terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: command.workspaceDirectory,
       workspaceName: command.workspaceName
     }
@@ -151,45 +180,48 @@ export class AgentSessionService {
     this.processPort.resize(command.sessionId, command.columns, command.rows)
   }
 
-  async suspendWorkspaceDirectory(workspaceDirectory: string): Promise<boolean> {
-    const sessions = [...this.sessions.values()].filter(
-      (candidate) =>
-        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'running'
+  async suspendWorkspaceDirectory(
+    workspaceDirectory: string
+  ): Promise<AgentRuntimeSuspensionLease> {
+    const ownsDirectory = (owner: AgentSessionRuntimeOwner): boolean =>
+      owner.workspaceDirectory === workspaceDirectory
+    const attachmentLease = await this.runtimeCoordinator.acquireDirectoryLease(
+      workspaceDirectory,
+      ownsDirectory
     )
 
-    if (sessions.length === 0) {
-      return false
+    try {
+      const results = await this.runtimeCoordinator.runForOwners(ownsDirectory, (owner) =>
+        this.suspendRuntimeOwner(owner)
+      )
+      return {
+        ...attachmentLease,
+        resume: () => this.resumeWorkspaceDirectory(workspaceDirectory),
+        wasSuspended: results.some(Boolean)
+      }
+    } catch (error) {
+      attachmentLease.release()
+      throw error
     }
-
-    for (const session of sessions) {
-      session.isStopping = true
-      session.status = 'suspended'
-    }
-    await Promise.all(sessions.map((session) => this.processPort.stop(session.sessionId)))
-    await this.waitForPendingPersistence()
-    for (const session of sessions) {
-      session.isStopping = false
-      session.processId = null
-    }
-    return true
   }
 
   async resumeWorkspaceDirectory(workspaceDirectory: string): Promise<void> {
-    const sessions = [...this.sessions.values()].filter(
-      (candidate) =>
-        candidate.workspaceDirectory === workspaceDirectory && candidate.status === 'suspended'
-    )
-
-    await Promise.all(
-      sessions.map(async (session) => {
-        session.status = 'running'
-        await this.startManagedProcess(session)
-      })
+    await this.runtimeCoordinator.runForOwners(
+      (owner) => owner.workspaceDirectory === workspaceDirectory,
+      (owner) => this.resumeRuntimeOwner(owner)
     )
   }
 
+  isWorkspaceQuarantined(projectDirectory: string, workspaceName: string): boolean {
+    return this.runtimeCoordinator.isWorkspaceQuarantined(projectDirectory, workspaceName)
+  }
+
+  resolveProjectQuarantines(projectDirectory: string): void {
+    this.runtimeCoordinator.resolveProjectQuarantines(projectDirectory)
+  }
+
   async executeMcpTool(command: AgentMcpToolCallCommand): Promise<AgentToolExecutionResult> {
-    const session = this.requireSessionById(command.sessionId)
+    const session = requireManagedAgentSession(this.sessions.values(), command.sessionId)
     const toolCommand = {
       input: command.input,
       projectDirectory: session.projectDirectory,
@@ -231,31 +263,34 @@ export class AgentSessionService {
   async disposeSession(command: {
     readonly projectDirectory: string
     readonly workspaceName: string
-  }): Promise<void> {
-    for (const [sessionKey, session] of this.sessions.entries()) {
-      if (
-        session.projectDirectory === command.projectDirectory &&
-        session.workspaceName === command.workspaceName
-      ) {
-        await this.disposeManagedSession(sessionKey, session)
-      }
-    }
+  }): Promise<AgentRuntimeAttachmentLease> {
+    const matches = (owner: AgentSessionRuntimeOwner): boolean =>
+      owner.projectDirectory === command.projectDirectory &&
+      owner.workspaceName === command.workspaceName
+    return this.runtimeCoordinator.runWithWorkspaceLease(
+      command.projectDirectory,
+      command.workspaceName,
+      matches,
+      (owner) => this.disposeRuntimeOwner(owner)
+    )
   }
 
   async disposeAgent(command: {
     readonly agentId: string
     readonly projectId: string
     readonly workspaceName: string
-  }): Promise<void> {
-    for (const [sessionKey, session] of this.sessions.entries()) {
-      if (
-        session.agentId === command.agentId &&
-        session.projectId === command.projectId &&
-        session.workspaceName === command.workspaceName
-      ) {
-        await this.disposeManagedSession(sessionKey, session)
-      }
-    }
+  }): Promise<AgentRuntimeAttachmentLease> {
+    const matches = (owner: AgentSessionRuntimeOwner): boolean =>
+      owner.agentId === command.agentId &&
+      owner.projectId === command.projectId &&
+      owner.workspaceName === command.workspaceName
+    return this.runtimeCoordinator.runWithAgentLease(
+      command.projectId,
+      command.workspaceName,
+      command.agentId,
+      matches,
+      (owner) => this.disposeRuntimeOwner(owner)
+    )
   }
 
   async reconfigureAgent(command: {
@@ -264,22 +299,89 @@ export class AgentSessionService {
     readonly projectId: string
     readonly workspaceName: string
   }): Promise<AgentSessionSnapshot | null> {
-    const session = [...this.sessions.values()].find(
-      (candidate) =>
-        candidate.agentId === command.agentId &&
-        candidate.projectId === command.projectId &&
-        candidate.workspaceName === command.workspaceName
+    const results = await this.runtimeCoordinator.runStartForOwners(
+      (owner) =>
+        owner.agentId === command.agentId &&
+        owner.projectId === command.projectId &&
+        owner.workspaceName === command.workspaceName,
+      (owner) => this.reconfigureRuntimeOwner(owner, command.cleancodeMcpEnabled)
     )
-    if (!session) {
-      return null
+    return results.find((result) => result !== null) ?? null
+  }
+
+  async disposeProject(projectDirectory: string): Promise<AgentRuntimeAttachmentLease> {
+    const matches = (owner: AgentSessionRuntimeOwner): boolean =>
+      owner.projectDirectory === projectDirectory
+    return this.runtimeCoordinator.runWithProjectLease(projectDirectory, matches, (owner) =>
+      this.disposeRuntimeOwner(owner)
+    )
+  }
+
+  async disposeAll(): Promise<void> {
+    this.runtimeCoordinator.stop()
+    await this.runtimeCoordinator.waitForIdle()
+    for (const session of [...this.sessions.values()]) {
+      this.cancelSessionApprovals(session.sessionId)
+      session.isStopping = true
     }
 
+    this.sessions.clear()
+    this.runtimeCoordinator.clear()
+    await this.processPort.disposeAll()
+    await this.waitForPendingPersistence()
+    this.mcpServerPort.dispose()
+  }
+
+  private async suspendRuntimeOwner(owner: AgentSessionRuntimeOwner): Promise<boolean> {
+    const session = findOwnedManagedAgentSession(this.sessions.values(), owner)
+    if (!session || session.status !== 'running') return false
+
+    session.isStopping = true
+    session.status = 'suspended'
+    try {
+      await this.processPort.stop(session.sessionId)
+      await this.waitForPendingPersistence()
+      session.isStopping = false
+      session.processId = null
+      return true
+    } catch (error) {
+      recordAgentSessionStopFailure(session, this.mcpServerPort)
+      throw error
+    }
+  }
+
+  private async resumeRuntimeOwner(owner: AgentSessionRuntimeOwner): Promise<void> {
+    const session = findOwnedManagedAgentSession(this.sessions.values(), owner)
+    if (!session || session.status !== 'suspended') return
+
+    session.status = 'running'
+    try {
+      await this.startManagedProcess(session)
+    } catch (error) {
+      recordAgentSessionStartFailure(session, this.mcpServerPort)
+      throw error
+    }
+  }
+
+  private async disposeRuntimeOwner(owner: AgentSessionRuntimeOwner): Promise<void> {
+    const entry = [...this.sessions.entries()].find(([, session]) =>
+      isOwnedAgentSession(owner, session)
+    )
+    if (entry) await this.disposeManagedSession(...entry)
+  }
+
+  private async reconfigureRuntimeOwner(
+    owner: AgentSessionRuntimeOwner,
+    cleancodeMcpEnabled: boolean
+  ): Promise<AgentSessionSnapshot | null> {
+    const session = findOwnedManagedAgentSession(this.sessions.values(), owner)
+    if (!session || session.status !== 'running') return null
+    await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     this.cancelSessionApprovals(session.sessionId)
     session.isStopping = true
     await this.processPort.stop(session.sessionId)
     unregisterAgentMcpEndpoint(session, this.mcpServerPort)
-
-    session.cleancodeMcpEnabled = command.cleancodeMcpEnabled
+    session.cleancodeMcpEnabled = cleancodeMcpEnabled
     session.isStopping = false
     session.processId = null
     session.sessionId = createAgentRuntimeSessionId()
@@ -294,29 +396,6 @@ export class AgentSessionService {
     }
 
     return toAgentSessionSnapshot(session)
-  }
-
-  async disposeProject(projectDirectory: string): Promise<void> {
-    for (const session of [...this.sessions.values()]) {
-      if (session.projectDirectory === projectDirectory) {
-        await this.disposeSession({
-          projectDirectory: session.projectDirectory,
-          workspaceName: session.workspaceName
-        })
-      }
-    }
-  }
-
-  async disposeAll(): Promise<void> {
-    for (const session of [...this.sessions.values()]) {
-      this.cancelSessionApprovals(session.sessionId)
-      session.isStopping = true
-    }
-
-    this.sessions.clear()
-    await this.processPort.disposeAll()
-    await this.waitForPendingPersistence()
-    this.mcpServerPort.dispose()
   }
 
   private persistCodexThread(session: ManagedAgentSession, threadId: string): void {
@@ -343,6 +422,7 @@ export class AgentSessionService {
   }
 
   private async startManagedProcess(session: ManagedAgentSession): Promise<void> {
+    await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     const processSessionId = session.sessionId
     const handle = await this.processPort.start({
       cleancodeMcp: session.mcpEndpoint
@@ -408,16 +488,6 @@ export class AgentSessionService {
     await this.processPort.stop(session.sessionId)
     unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     this.sessions.delete(sessionKey)
-  }
-
-  private requireSessionById(sessionId: string): ManagedAgentSession {
-    const session = this.findSessionById(sessionId)
-
-    if (!session) {
-      throw createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent session was not found.')
-    }
-
-    return session
   }
 
   private findSessionById(sessionId: string): ManagedAgentSession | undefined {

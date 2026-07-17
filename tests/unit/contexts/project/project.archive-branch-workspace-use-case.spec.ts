@@ -7,14 +7,17 @@ import type {
   RemoveBranchWorktreeCommand
 } from '../../../../src/contexts/project/application/ports/GitWorkspacePort'
 import type { ProjectRepository } from '../../../../src/contexts/project/application/ports/ProjectRepository'
+import type { WorkspaceAgentLifecyclePort } from '../../../../src/contexts/project/application/ports/WorkspaceAgentLifecyclePort'
 import type { ProjectSnapshot } from '../../../../src/contexts/project/application/dto/ProjectSnapshot'
 import type { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
 class InMemoryProjectRepository implements ProjectRepository {
   readonly savedProjects: ProjectSnapshot[] = []
+  saveError: Error | null = null
   private readonly projects = new Map<string, ProjectSnapshot>()
 
   async save(project: Project): Promise<void> {
+    if (this.saveError) throw this.saveError
     const snapshot = project.toSnapshot()
 
     this.savedProjects.push(snapshot)
@@ -38,6 +41,7 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
     branches: []
   }
   workingTreeClean = true
+  workingTreeCleanResults: boolean[] = []
   cleanChecks: string[] = []
   removeBranchWorktreeCalls: RemoveBranchWorktreeCommand[] = []
   pruneWorktreesCalls: PruneWorktreesCommand[] = []
@@ -51,7 +55,7 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
   async isWorkingTreeClean(directory: string): Promise<boolean> {
     this.cleanChecks.push(directory)
 
-    return this.workingTreeClean
+    return this.workingTreeCleanResults.shift() ?? this.workingTreeClean
   }
 
   async checkoutBranch(): Promise<void> {}
@@ -69,7 +73,20 @@ describe('archive branch workspace use case', () => {
   it('rejects archiving a dirty worktree without removing it', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()
-    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git)
+    const disposeWorkspace = vi.fn(async () => ({
+      wasQuarantined: false,
+      quarantine: () => undefined,
+      release: () => undefined,
+      resolve: () => undefined
+    }))
+    const noopLifecycle = createNoopLifecycle()
+    const suspend = vi.fn(noopLifecycle.suspend)
+    const lifecycle = {
+      ...noopLifecycle,
+      disposeWorkspace,
+      suspend
+    } satisfies WorkspaceAgentLifecyclePort
+    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle)
     git.workingTreeClean = false
     repository.remember(createProjectWithFeatureWorkspace(true))
 
@@ -84,12 +101,42 @@ describe('archive branch workspace use case', () => {
     expect(git.cleanChecks).toEqual(['/work/worktrees/app/feature/sidebar'])
     expect(git.removeBranchWorktreeCalls).toEqual([])
     expect(repository.savedProjects).toEqual([])
+    expect(disposeWorkspace).not.toHaveBeenCalled()
+    expect(suspend).not.toHaveBeenCalled()
   })
 
   it('archives a clean current worktree and selects main in the saved project', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()
-    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git)
+    const lifecycleCalls: string[] = []
+    const lifecycle = {
+      disposeProject: vi.fn(async () => ({
+        wasQuarantined: false,
+        quarantine: () => undefined,
+        release: () => undefined,
+        resolve: () => undefined
+      })),
+      disposeWorkspace: vi.fn(async (command) => {
+        lifecycleCalls.push(`dispose:${command.workspaceName}`)
+        return {
+          wasQuarantined: false,
+          quarantine: () => lifecycleCalls.push(`quarantine:${command.workspaceName}`),
+          release: () => lifecycleCalls.push(`release:${command.workspaceName}`),
+          resolve: () => lifecycleCalls.push(`resolve:${command.workspaceName}`)
+        }
+      }),
+      isWorkspaceQuarantined: vi.fn(() => false),
+      resolveProjectQuarantines: vi.fn(),
+      suspend: vi.fn(async () => ({
+        wasQuarantined: false,
+        quarantine: () => undefined,
+        release: () => undefined,
+        resolve: () => undefined,
+        resume: async () => undefined,
+        wasSuspended: false
+      }))
+    } satisfies WorkspaceAgentLifecyclePort
+    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle)
     repository.remember(createProjectWithFeatureWorkspace(true))
 
     const project = await archiveBranchWorkspace.execute({
@@ -97,7 +144,10 @@ describe('archive branch workspace use case', () => {
       workspaceName: 'feature/sidebar'
     })
 
-    expect(git.cleanChecks).toEqual(['/work/worktrees/app/feature/sidebar'])
+    expect(git.cleanChecks).toEqual([
+      '/work/worktrees/app/feature/sidebar',
+      '/work/worktrees/app/feature/sidebar'
+    ])
     expect(git.removeBranchWorktreeCalls).toEqual([
       {
         repositoryDirectory: '/work/app',
@@ -114,6 +164,129 @@ describe('archive branch workspace use case', () => {
       }
     ])
     expect(repository.savedProjects.at(-1)).toEqual(project)
+    expect(lifecycleCalls).toEqual(['dispose:feature/sidebar', 'resolve:feature/sidebar'])
+  })
+
+  it('keeps stale workspace attaches blocked if saving fails after worktree removal', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    const lifecycleCalls: string[] = []
+    let isQuarantined = false
+    const lifecycle = {
+      disposeProject: vi.fn(async () => ({
+        wasQuarantined: false,
+        quarantine: () => undefined,
+        release: () => undefined,
+        resolve: () => undefined
+      })),
+      disposeWorkspace: vi.fn(async (command) => {
+        lifecycleCalls.push(`dispose:${command.workspaceName}`)
+        const wasQuarantined = isQuarantined
+        return {
+          wasQuarantined,
+          quarantine: () => {
+            isQuarantined = true
+            lifecycleCalls.push(`quarantine:${command.workspaceName}`)
+          },
+          release: () => lifecycleCalls.push(`release:${command.workspaceName}`),
+          resolve: () => {
+            isQuarantined = false
+            lifecycleCalls.push(`resolve:${command.workspaceName}`)
+          }
+        }
+      }),
+      isWorkspaceQuarantined: vi.fn(() => isQuarantined),
+      resolveProjectQuarantines: vi.fn(),
+      suspend: vi.fn(async () => ({
+        wasQuarantined: false,
+        quarantine: () => undefined,
+        release: () => undefined,
+        resolve: () => undefined,
+        resume: async () => undefined,
+        wasSuspended: false
+      }))
+    } satisfies WorkspaceAgentLifecyclePort
+    repository.remember(createProjectWithFeatureWorkspace(true))
+    repository.saveError = new Error('save failed')
+    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle)
+
+    await expect(
+      archiveBranchWorkspace.execute({
+        projectDirectory: '/work/app',
+        workspaceName: 'feature/sidebar'
+      })
+    ).rejects.toThrow('save failed')
+
+    expect(git.removeBranchWorktreeCalls).toHaveLength(1)
+    expect(lifecycleCalls).toEqual(['dispose:feature/sidebar', 'quarantine:feature/sidebar'])
+
+    repository.saveError = null
+    await archiveBranchWorkspace.execute({
+      projectDirectory: '/work/app',
+      workspaceName: 'feature/sidebar'
+    })
+
+    expect(git.cleanChecks).toHaveLength(2)
+    expect(git.removeBranchWorktreeCalls).toHaveLength(1)
+    expect(lifecycleCalls).toEqual([
+      'dispose:feature/sidebar',
+      'quarantine:feature/sidebar',
+      'dispose:feature/sidebar',
+      'resolve:feature/sidebar'
+    ])
+  })
+
+  it('restores suspended Agents if the worktree becomes dirty while they drain', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    const lifecycleCalls: string[] = []
+    const disposeWorkspace = vi.fn(createNoopLifecycle().disposeWorkspace)
+    const lifecycle = {
+      ...createNoopLifecycle(),
+      disposeWorkspace,
+      suspend: vi.fn(async (directory) => {
+        lifecycleCalls.push(`suspend:${directory}`)
+        return {
+          wasQuarantined: false,
+          quarantine: () => {
+            lifecycleCalls.push(`quarantine:${directory}`)
+          },
+          release: () => {
+            lifecycleCalls.push(`release:${directory}`)
+          },
+          resolve: () => {
+            lifecycleCalls.push(`resolve:${directory}`)
+          },
+          resume: async () => {
+            lifecycleCalls.push(`resume:${directory}`)
+          },
+          wasSuspended: true
+        }
+      })
+    } satisfies WorkspaceAgentLifecyclePort
+    const archiveBranchWorkspace = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle)
+    git.workingTreeCleanResults.push(true, false)
+    repository.remember(createProjectWithFeatureWorkspace(true))
+
+    await expectAppErrorCode(
+      archiveBranchWorkspace.execute({
+        projectDirectory: '/work/app',
+        workspaceName: 'feature/sidebar'
+      }),
+      'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES'
+    )
+
+    expect(git.cleanChecks).toEqual([
+      '/work/worktrees/app/feature/sidebar',
+      '/work/worktrees/app/feature/sidebar'
+    ])
+    expect(disposeWorkspace).not.toHaveBeenCalled()
+    expect(git.removeBranchWorktreeCalls).toEqual([])
+    expect(lifecycleCalls).toEqual([
+      'suspend:/work/worktrees/app/feature/sidebar',
+      'resume:/work/worktrees/app/feature/sidebar',
+      'release:/work/worktrees/app/feature/sidebar'
+    ])
   })
 
   it('rejects archiving the main workspace', async () => {
@@ -159,4 +332,24 @@ function createProjectWithFeatureWorkspace(featureIsCurrent: boolean): ProjectSn
 
 async function expectAppErrorCode(promise: Promise<unknown>, code: AppErrorCode): Promise<void> {
   await expect(promise).rejects.toMatchObject({ code })
+}
+
+function createNoopLifecycle(): WorkspaceAgentLifecyclePort {
+  const lease = {
+    wasQuarantined: false,
+    quarantine: () => undefined,
+    release: () => undefined,
+    resolve: () => undefined
+  }
+  return {
+    disposeProject: async () => lease,
+    disposeWorkspace: async () => lease,
+    isWorkspaceQuarantined: () => false,
+    resolveProjectQuarantines: () => undefined,
+    suspend: async () => ({
+      ...lease,
+      resume: async () => undefined,
+      wasSuspended: false
+    })
+  }
 }

@@ -61,6 +61,7 @@ describe('manage workspace Agents', () => {
     })
 
     expect(runtime.disposed).toEqual([first!.agentId])
+    expect(runtime.released).toEqual([first!.agentId])
     expect(remaining).toEqual([
       expect.objectContaining({
         agentId: 'agent-2',
@@ -69,17 +70,38 @@ describe('manage workspace Agents', () => {
       })
     ])
   })
+
+  it('reads the remaining Agents before deleting so a read failure leaves the definition intact', async () => {
+    const repository = new MemoryAgentRepository()
+    const runtime = new RecordingWorkspaceAgentRuntime()
+    const deleteAgent = vi.spyOn(repository, 'deleteAgent')
+    vi.spyOn(repository, 'findWorkspace').mockRejectedValueOnce(new Error('read failed'))
+    const remove = new RemoveWorkspaceAgentUseCase(repository, runtime)
+
+    await expect(
+      remove.execute({
+        agentId: 'agent-1',
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ).rejects.toThrow('read failed')
+
+    expect(deleteAgent).not.toHaveBeenCalled()
+    expect(runtime.released).toEqual(['agent-1'])
+  })
 })
 
 class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
   readonly disposed: string[] = []
+  readonly released: string[] = []
 
   async disposeAgent(command: {
     readonly agentId: string
     readonly projectId: string
     readonly workspaceName: string
-  }): Promise<void> {
+  }) {
     this.disposed.push(command.agentId)
+    return Promise.resolve({ release: () => this.released.push(command.agentId) })
   }
 
   async reconfigureAgent(): Promise<null> {

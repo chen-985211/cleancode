@@ -3,6 +3,11 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import {
+  noopWorkspaceAgentLifecyclePort,
+  type WorkspaceAgentLifecyclePort
+} from '../ports/WorkspaceAgentLifecyclePort'
+import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface SynchronizeProjectGitStateCommand {
   readonly projectDirectory: string
@@ -11,10 +16,20 @@ export interface SynchronizeProjectGitStateCommand {
 export class SynchronizeProjectGitStateUseCase {
   constructor(
     private readonly projectRepository: ProjectRepository,
-    private readonly gitWorkspacePort: GitWorkspacePort
+    private readonly gitWorkspacePort: GitWorkspacePort,
+    private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
   ) {}
 
   async execute(command: SynchronizeProjectGitStateCommand): Promise<ProjectSnapshot | null> {
+    return this.transactionCoordinator.run(command.projectDirectory, () =>
+      this.executeTransaction(command)
+    )
+  }
+
+  private async executeTransaction(
+    command: SynchronizeProjectGitStateCommand
+  ): Promise<ProjectSnapshot | null> {
     const projectSnapshot = await this.projectRepository.findByDirectory(command.projectDirectory)
 
     if (!projectSnapshot) {
@@ -26,10 +41,12 @@ export class SynchronizeProjectGitStateUseCase {
     const synchronizedSnapshot = synchronizedProject.toSnapshot()
 
     if (areProjectSnapshotsEqual(projectSnapshot, synchronizedSnapshot)) {
+      this.workspaceAgentLifecyclePort.resolveProjectQuarantines(project.directory)
       return null
     }
 
     await this.projectRepository.save(synchronizedProject)
+    this.workspaceAgentLifecyclePort.resolveProjectQuarantines(project.directory)
 
     return synchronizedSnapshot
   }

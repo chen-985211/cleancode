@@ -8,6 +8,7 @@ import type {
   RemoveBranchWorktreeCommand
 } from '../../../../src/contexts/project/application/ports/GitWorkspacePort'
 import type { ProjectRepository } from '../../../../src/contexts/project/application/ports/ProjectRepository'
+import type { WorkspaceAgentLifecyclePort } from '../../../../src/contexts/project/application/ports/WorkspaceAgentLifecyclePort'
 import type { ProjectSnapshot } from '../../../../src/contexts/project/application/dto/ProjectSnapshot'
 import type { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
@@ -38,9 +39,11 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
     localBranches: [],
     branches: []
   }
+  inspectionError: Error | null = null
   readonly checkoutBranchCalls: CheckoutBranchCommand[] = []
 
   async inspectRepository(): Promise<GitRepositoryInspection> {
+    if (this.inspectionError) throw this.inspectionError
     return this.inspection
   }
 
@@ -145,6 +148,33 @@ describe('project git state synchronization use case', () => {
       }
     ])
     expect(repository.savedProjects.at(-1)).toEqual(project)
+  })
+
+  it('does not resolve Agent quarantines when Git inspection fails', async () => {
+    const repository = new InMemoryProjectRepository()
+    const git = new FakeGitWorkspacePort()
+    const resolveProjectQuarantines = vi.fn()
+    const lifecycle = {
+      disposeProject: vi.fn(),
+      disposeWorkspace: vi.fn(),
+      isWorkspaceQuarantined: vi.fn(() => true),
+      resolveProjectQuarantines,
+      suspend: vi.fn()
+    } satisfies WorkspaceAgentLifecyclePort
+    const synchronizeProjectGitState = new SynchronizeProjectGitStateUseCase(
+      repository,
+      git,
+      lifecycle
+    )
+    repository.remember(createProjectSnapshot('main'))
+    git.inspectionError = new Error('git inspection failed')
+
+    await expect(
+      synchronizeProjectGitState.execute({ projectDirectory: '/work/app' })
+    ).rejects.toThrow('git inspection failed')
+
+    expect(repository.savedProjects).toEqual([])
+    expect(resolveProjectQuarantines).not.toHaveBeenCalled()
   })
 
   it('discovers external worktrees and drops stale worktree workspaces', async () => {

@@ -124,6 +124,7 @@ describe('agent IPC contract', () => {
           projectId: command.projectId,
           sessionId: 'agent-session-1',
           status: 'running',
+          terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: command.workspaceDirectory,
           workspaceName: command.workspaceName
         }
@@ -142,6 +143,7 @@ describe('agent IPC contract', () => {
           projectDirectory: '/repo/app',
           projectId: 'project-1',
           rows: 32,
+          terminalSourceTheme: 'light',
           workspaceDirectory: '/repo/app-worktrees/feature',
           workspaceName: 'feature'
         },
@@ -158,6 +160,7 @@ describe('agent IPC contract', () => {
         projectId: 'project-1',
         sessionId: 'agent-session-1',
         status: 'running',
+        terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
         workspaceName: 'feature'
       }
@@ -170,6 +173,7 @@ describe('agent IPC contract', () => {
         projectDirectory: '/repo/app',
         projectId: 'project-1',
         rows: 32,
+        terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
         workspaceName: 'feature'
       })
@@ -187,6 +191,28 @@ describe('agent IPC contract', () => {
       'cleancode:agent-graph-updated',
       expect.objectContaining({ sessionId: 'agent-session-1' })
     )
+  })
+
+  it('rejects an invalid terminal source theme before attaching an Agent session', async () => {
+    const ipcMain = new FakeIpcMain()
+    const attachAgentSession = vi.fn<AgentIpcHandlersInput['attachAgentSession']>()
+
+    registerAgentIpcHandlers(createAgentIpcHandlersInput({ attachAgentSession, ipcMain }))
+
+    await expect(
+      ipcMain.invoke('cleancode:attach-agent-session', {
+        agentId: 'agent-2',
+        projectDirectory: '/repo/app',
+        projectId: 'project-1',
+        terminalSourceTheme: 'sepia',
+        workspaceDirectory: '/repo/app',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(attachAgentSession).not.toHaveBeenCalled()
   })
 
   it('creates, renames, lays out, and removes workspace Agents through dedicated channels', async () => {
@@ -383,6 +409,7 @@ function createAgentIpcHandlersInput(input: {
         projectId: command.projectId,
         sessionId: 'agent-session-1',
         status: 'running' as const,
+        terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
       })),

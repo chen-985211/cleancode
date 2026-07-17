@@ -37,6 +37,14 @@ describe('project git workspace adapter', () => {
     })
   })
 
+  it('propagates an inspection failure instead of reporting a missing directory as non-git', async () => {
+    const adapter = new GitCliWorkspaceAdapter()
+
+    await expect(
+      adapter.inspectRepository(join(projectDirectory, 'missing'))
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   it('inspects local branches and creates an isolated branch worktree', async () => {
     const adapter = new GitCliWorkspaceAdapter()
     const worktreeDirectory = join(appStateDirectory, 'feature-sidebar')

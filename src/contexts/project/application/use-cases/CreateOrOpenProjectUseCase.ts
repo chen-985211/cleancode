@@ -2,6 +2,11 @@ import { Project } from '../../domain/aggregates/Project'
 import type { ProjectSnapshot } from '../dto/ProjectSnapshot'
 import type { GitWorkspacePort } from '../ports/GitWorkspacePort'
 import type { ProjectRepository } from '../ports/ProjectRepository'
+import {
+  noopWorkspaceAgentLifecyclePort,
+  type WorkspaceAgentLifecyclePort
+} from '../ports/WorkspaceAgentLifecyclePort'
+import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateOrOpenProjectCommand {
   readonly directory: string
@@ -11,10 +16,18 @@ export interface CreateOrOpenProjectCommand {
 export class CreateOrOpenProjectUseCase {
   constructor(
     private readonly projectRepository: ProjectRepository,
-    private readonly gitWorkspacePort: GitWorkspacePort
+    private readonly gitWorkspacePort: GitWorkspacePort,
+    private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
   ) {}
 
   async execute(command: CreateOrOpenProjectCommand): Promise<ProjectSnapshot> {
+    return this.transactionCoordinator.run(command.directory, () =>
+      this.executeTransaction(command)
+    )
+  }
+
+  private async executeTransaction(command: CreateOrOpenProjectCommand): Promise<ProjectSnapshot> {
     const existingProject = await this.projectRepository.findByDirectory(command.directory)
     const project = existingProject
       ? Project.fromSnapshot(existingProject)
@@ -25,6 +38,7 @@ export class CreateOrOpenProjectUseCase {
     const synchronizedProject = await this.synchronizeGitBinding(project)
 
     await this.projectRepository.save(synchronizedProject)
+    this.workspaceAgentLifecyclePort.resolveProjectQuarantines(synchronizedProject.directory)
 
     return synchronizedProject.toSnapshot()
   }

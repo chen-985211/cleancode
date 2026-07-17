@@ -1,52 +1,31 @@
-import type { Terminal as XTerm } from '@xterm/xterm'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type {
-  AgentPtyOutputEvent,
-  AgentSessionSnapshot
-} from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
+import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import {
-  defaultAgentLayoutPosition,
-  defaultAgentLayoutSize
-} from '../../contexts/agent/domain/aggregates/AgentSession'
-import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { defaultAgentXtermDimensions, installAgentXterm } from './agentTerminalXterm'
+  defaultAgentXtermDimensions,
+  installAgentXterm,
+  readAgentTerminalSourceTheme,
+  type AgentXtermController
+} from './agentTerminalXterm'
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
-import { appendTerminalOutputTail } from './terminalOutputTail'
-import { CodexCliStatusView, type CodexCliPanelState } from './CodexCliStatusView'
+import { appendTerminalOutputForSession } from './terminalOutputTail'
+import { CodexCliStatusView } from './CodexCliStatusView'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
 import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
-import type { AgentToolApprovalController } from './agentToolApprovalTypes'
-import type { TerminalDimensions, WorkbenchSnapshot } from './types'
-
-interface AgentTerminalMeasurement {
-  readonly dimensions: TerminalDimensions
-  readonly workspaceKey: string
-}
-
-interface AgentSessionBinding {
-  readonly session: AgentSessionSnapshot
-  readonly workspaceKey: string
-}
-
-interface AgentConsoleProps {
-  readonly agent?: WorkspaceAgentSnapshot
-  readonly approvalController?: AgentToolApprovalController
-  readonly currentWorkbench?: WorkbenchSnapshot | null
-  readonly currentWorkspace?: WorkbenchSnapshot['project']['workspaces'][number] | null
-  readonly onGraphUpdated?: (graph: BlockGraphSnapshot) => void
-  readonly onMcpCapabilityChange?: (
-    agent: WorkspaceAgentSnapshot,
-    enabled: boolean
-  ) => Promise<UpdateWorkspaceAgentMcpCapabilityResult | undefined>
-  readonly onRemove?: (agent: WorkspaceAgentSnapshot) => Promise<void>
-  readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
-  readonly onSelect?: () => void
-}
+import {
+  createFallbackAgent,
+  createWorkspaceKey,
+  haveSameDimensions,
+  isTestRuntime,
+  noop,
+  restoreRecordedAgentSessionExit,
+  type AgentConsoleProps,
+  type AgentSessionBinding,
+  type AgentTerminalMeasurement
+} from './agentConsoleModel'
+import { useCodexCliState } from './useCodexCliState'
 
 export function AgentConsole({
   agent,
@@ -60,9 +39,7 @@ export function AgentConsole({
   onSelect
 }: AgentConsoleProps) {
   const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
-  const [codexCliState, setCodexCliState] = useState<CodexCliPanelState>(() =>
-    window.cleancode ? { status: 'checking' } : { status: 'unavailable' }
-  )
+  const codexCliState = useCodexCliState()
   const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
@@ -76,62 +53,42 @@ export function AgentConsole({
   )
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
-  const activeSessionId = session?.sessionId
-  const activeOutputRef = useRef(activeOutput)
   const dimensionsRef = useRef<AgentTerminalMeasurement | null>(null)
+  const exitedSessionIdsRef = useRef(new Set<string>())
+  const isMountedRef = useRef(true)
   const outputBySessionRef = useRef(new Map<string, string>())
   const restartRequestRef = useRef<{
     readonly mode: 'new' | 'retry'
     readonly workspaceKey: string
   } | null>(null)
   const sessionBindingRef = useRef<AgentSessionBinding | null>(null)
-  const sessionRef = useRef<AgentSessionSnapshot | null>(null)
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
-  const xtermRef = useRef<XTerm | null>(null)
+  const workspaceGenerationRef = useRef(0)
+  const xtermRef = useRef<AgentXtermController | null>(null)
   const writeAgentInput = useCallback((input: string) => {
-    const activeSession = sessionRef.current
+    const activeBinding = sessionBindingRef.current
 
-    if (!activeSession) {
+    if (!activeBinding || activeBinding.terminalController !== xtermRef.current) {
       return
     }
 
     void window.cleancode?.writeAgentSession({
       input,
-      sessionId: activeSession.sessionId
+      sessionId: activeBinding.session.sessionId
     })
   }, [])
 
   useLayoutEffect(() => {
-    sessionRef.current = session
-  }, [session])
-
-  useLayoutEffect(() => {
-    activeOutputRef.current = activeOutput
-  }, [activeOutput])
+    workspaceGenerationRef.current += 1
+    return () => {
+      workspaceGenerationRef.current += 1
+    }
+  }, [currentWorkspaceKey])
 
   useEffect(() => {
-    let isCurrent = true
-
-    async function inspectCodexCli(): Promise<void> {
-      const api = window.cleancode
-
-      if (!api?.inspectCodexCli) {
-        setCodexCliState({ status: 'unavailable' })
-        return
-      }
-
-      setCodexCliState({ status: 'checking' })
-      const installation = await api.inspectCodexCli()
-
-      if (isCurrent) {
-        setCodexCliState({ installation, status: 'ready' })
-      }
-    }
-
-    void inspectCodexCli()
-
+    isMountedRef.current = true
     return () => {
-      isCurrent = false
+      isMountedRef.current = false
     }
   }, [])
 
@@ -145,9 +102,13 @@ export function AgentConsole({
     const unsubscribeOutput =
       api.onAgentPtyOutput?.((event) => {
         if (event.agentId && event.agentId !== activeAgent.agentId) return
-        const nextOutput = appendAgentOutput(outputBySessionRef.current, event)
+        const nextOutput = appendTerminalOutputForSession(outputBySessionRef.current, event)
+        const activeBinding = sessionBindingRef.current
 
-        if (event.sessionId === sessionRef.current?.sessionId) {
+        if (
+          event.sessionId === activeBinding?.session.sessionId &&
+          activeBinding.terminalController === xtermRef.current
+        ) {
           setActiveOutput(nextOutput)
           xtermRef.current?.write(event.data)
         }
@@ -155,7 +116,12 @@ export function AgentConsole({
     const unsubscribeExit =
       api.onAgentPtyExit?.((event) => {
         if (event.agentId && event.agentId !== activeAgent.agentId) return
-        if (event.sessionId === sessionRef.current?.sessionId) {
+        exitedSessionIdsRef.current.add(event.sessionId)
+        const activeBinding = sessionBindingRef.current
+        if (
+          event.sessionId === activeBinding?.session.sessionId &&
+          activeBinding.terminalController === xtermRef.current
+        ) {
           setSession((currentSession) =>
             currentSession && currentSession.sessionId === event.sessionId
               ? { ...currentSession, status: 'exited' }
@@ -182,13 +148,13 @@ export function AgentConsole({
 
   useEffect(() => {
     let isCurrent = true
+    let replacementController: AgentXtermController | null = null
 
     async function attachSession(): Promise<void> {
       const api = window.cleancode
 
       if (!api?.attachAgentSession || !currentWorkbench || !currentWorkspace) {
         sessionBindingRef.current = null
-        sessionRef.current = null
         setSession(null)
         setActiveOutput('')
         return
@@ -196,7 +162,6 @@ export function AgentConsole({
 
       if (sessionBindingRef.current?.workspaceKey !== currentWorkspaceKey) {
         sessionBindingRef.current = null
-        sessionRef.current = null
         setSession(null)
         setActiveOutput('')
       }
@@ -227,6 +192,7 @@ export function AgentConsole({
         projectId: currentWorkbench.project.id,
         restartMode,
         rows: measuredDimensions.rows,
+        terminalSourceTheme: readAgentTerminalSourceTheme(),
         workspaceDirectory: currentWorkspace.directory,
         workspaceName: currentWorkspace.name
       })
@@ -238,11 +204,68 @@ export function AgentConsole({
       if (restartMode) {
         restartRequestRef.current = null
       }
-      sessionBindingRef.current = { session: nextSession, workspaceKey: currentWorkspaceKey }
-      sessionRef.current = nextSession
-      setSession(nextSession)
-      const restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
-      setActiveOutput(restoredOutput)
+      const currentBinding = sessionBindingRef.current
+      const commitSession = (
+        restoredOutput: string,
+        terminalController: AgentXtermController | null
+      ): boolean => {
+        if (!isCurrent) return false
+        const committedSession = restoreRecordedAgentSessionExit(
+          nextSession,
+          exitedSessionIdsRef.current
+        )
+        sessionBindingRef.current = {
+          session: committedSession,
+          terminalController,
+          workspaceKey: currentWorkspaceKey
+        }
+        setSession(committedSession)
+        setActiveOutput(restoredOutput)
+        return true
+      }
+
+      if (
+        currentBinding?.workspaceKey === currentWorkspaceKey &&
+        currentBinding.session.sessionId === nextSession.sessionId &&
+        currentBinding.terminalController === xtermRef.current
+      ) {
+        commitSession(
+          outputBySessionRef.current.get(nextSession.sessionId) ?? '',
+          currentBinding.terminalController
+        )
+      } else {
+        const terminalController = xtermRef.current
+        sessionBindingRef.current = null
+
+        if (isTestRuntime() || !terminalController) {
+          commitSession(outputBySessionRef.current.get(nextSession.sessionId) ?? '', null)
+        } else {
+          let restoredOutput = ''
+          replacementController = terminalController
+          await terminalController
+            .replaceSession({
+              onBind: () =>
+                xtermRef.current === terminalController &&
+                commitSession(restoredOutput, terminalController),
+              replayOutput: () => {
+                restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
+                return restoredOutput
+              },
+              sessionId: nextSession.sessionId,
+              terminalSourceTheme: nextSession.terminalSourceTheme
+            })
+            .catch(() => {
+              if (xtermRef.current === terminalController) {
+                commitSession(
+                  outputBySessionRef.current.get(nextSession.sessionId) ?? '',
+                  terminalController
+                )
+              }
+            })
+        }
+      }
+
+      if (!isCurrent) return
 
       const latestMeasurement = dimensionsRef.current
       if (
@@ -256,10 +279,16 @@ export function AgentConsole({
       }
     }
 
-    void attachSession()
+    void attachSession().catch(() => {
+      if (!isCurrent) return
+      sessionBindingRef.current = null
+      setSession(null)
+      setActiveOutput('')
+    })
 
     return () => {
       isCurrent = false
+      replacementController?.invalidateSessionReplacement()
     }
   }, [
     activeAgent.agentId,
@@ -271,29 +300,13 @@ export function AgentConsole({
   ])
 
   useEffect(() => {
-    if (!activeSessionId) {
-      return
-    }
-
-    const restoredOutput = outputBySessionRef.current.get(activeSessionId) ?? ''
-
-    setActiveOutput((currentOutput) =>
-      currentOutput === restoredOutput ? currentOutput : restoredOutput
-    )
-    xtermRef.current?.reset()
-    if (restoredOutput) {
-      xtermRef.current?.write(restoredOutput)
-    }
-  }, [activeSessionId])
-
-  useEffect(() => {
     if (isTestRuntime() || !terminalElementRef.current) {
       return undefined
     }
 
     return installAgentXterm({
       element: terminalElementRef.current,
-      initialOutput: activeOutputRef.current,
+      initialOutput: '',
       onDimensionsChange: (dimensions) => {
         if (!currentWorkspaceKey) return
         dimensionsRef.current = { dimensions, workspaceKey: currentWorkspaceKey }
@@ -302,7 +315,10 @@ export function AgentConsole({
         )
         const activeBinding = sessionBindingRef.current
 
-        if (activeBinding?.workspaceKey === currentWorkspaceKey) {
+        if (
+          activeBinding?.workspaceKey === currentWorkspaceKey &&
+          activeBinding.terminalController === xtermRef.current
+        ) {
           void window.cleancode?.resizeAgentSession({
             ...dimensions,
             sessionId: activeBinding.session.sessionId
@@ -333,21 +349,77 @@ export function AgentConsole({
 
   async function updateMcpCapability(enabled: boolean): Promise<void> {
     if (!agent || !onMcpCapabilityChange || isMcpCapabilityUpdating) return
+    const requestController = xtermRef.current
+    const requestGeneration = workspaceGenerationRef.current
+    const requestWorkspaceKey = currentWorkspaceKey
     setIsMcpCapabilityUpdating(true)
     setMcpCapabilityError(null)
     try {
       const result = await onMcpCapabilityChange(agent, enabled)
       if (!result) return
       approvalController?.clearForAgent(activeAgent.agentId)
-      if (result.session && currentWorkspaceKey) {
-        sessionBindingRef.current = { session: result.session, workspaceKey: currentWorkspaceKey }
-        sessionRef.current = result.session
-        setSession(result.session)
+      if (
+        !isMountedRef.current ||
+        !requestWorkspaceKey ||
+        requestGeneration !== workspaceGenerationRef.current ||
+        requestController !== xtermRef.current
+      ) {
+        return
+      }
+      if (result.session) {
+        const nextSession = result.session
+        let restoredOutput = ''
+        sessionBindingRef.current = null
+
+        if (isTestRuntime() || !requestController) {
+          restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
+          const committedSession = restoreRecordedAgentSessionExit(
+            nextSession,
+            exitedSessionIdsRef.current
+          )
+          sessionBindingRef.current = {
+            session: committedSession,
+            terminalController: null,
+            workspaceKey: requestWorkspaceKey
+          }
+          setSession(committedSession)
+          setActiveOutput(restoredOutput)
+        } else {
+          await requestController.replaceSession({
+            onBind: () => {
+              if (
+                requestGeneration !== workspaceGenerationRef.current ||
+                xtermRef.current !== requestController
+              ) {
+                return false
+              }
+              const committedSession = restoreRecordedAgentSessionExit(
+                nextSession,
+                exitedSessionIdsRef.current
+              )
+              sessionBindingRef.current = {
+                session: committedSession,
+                terminalController: requestController,
+                workspaceKey: requestWorkspaceKey
+              }
+              setSession(committedSession)
+              setActiveOutput(restoredOutput)
+            },
+            replayOutput: () => {
+              restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
+              return restoredOutput
+            },
+            sessionId: nextSession.sessionId,
+            terminalSourceTheme: nextSession.terminalSourceTheme
+          })
+        }
       }
     } catch {
-      setMcpCapabilityError('未能切换 CleanCode MCP，请重试。')
+      if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
+        setMcpCapabilityError('未能切换 CleanCode MCP，请重试。')
+      }
     } finally {
-      setIsMcpCapabilityUpdating(false)
+      if (isMountedRef.current) setIsMcpCapabilityUpdating(false)
     }
   }
 
@@ -406,6 +478,7 @@ export function AgentConsole({
             activeOutput={activeOutput}
             terminalElementRef={terminalElementRef}
             onFallbackInput={writeAgentInput}
+            session={session}
             useFallback={isTestRuntime()}
           />
         ) : (
@@ -414,53 +487,4 @@ export function AgentConsole({
       </div>
     </div>
   )
-}
-
-function appendAgentOutput(
-  outputBySession: Map<string, string>,
-  event: AgentPtyOutputEvent
-): string {
-  const nextOutput = appendTerminalOutputTail(
-    outputBySession.get(event.sessionId) ?? '',
-    event.data
-  )
-
-  outputBySession.set(event.sessionId, nextOutput)
-  return nextOutput
-}
-
-function createWorkspaceKey(
-  workbench: WorkbenchSnapshot | null,
-  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null,
-  agentId: string
-): string | null {
-  return workbench && workspace
-    ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}\0${agentId}`
-    : null
-}
-
-function createFallbackAgent(
-  workbench: WorkbenchSnapshot | null,
-  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
-): WorkspaceAgentSnapshot {
-  return {
-    agentId: 'default-agent',
-    cleancodeMcpEnabled: true,
-    layout: { position: defaultAgentLayoutPosition, size: defaultAgentLayoutSize },
-    name: 'Agent 1',
-    projectId: workbench?.project.id ?? 'unselected-project',
-    workspaceName: workspace?.name ?? 'unselected-workspace'
-  }
-}
-
-function isTestRuntime(): boolean {
-  return typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom')
-}
-
-function noop(): void {
-  return undefined
-}
-
-function haveSameDimensions(left: TerminalDimensions, right: TerminalDimensions): boolean {
-  return left.columns === right.columns && left.rows === right.rows
 }
