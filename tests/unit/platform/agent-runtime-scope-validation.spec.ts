@@ -73,6 +73,7 @@ function createAdapter(input: {
   } satisfies ProjectRepository
   const registry = {
     get: vi.fn(async () => ({
+      currentProjectDirectory: input.projectRemembered === false ? null : command.projectDirectory,
       projectDirectories: input.projectRemembered === false ? [] : [command.projectDirectory]
     })),
     save: vi.fn(async () => undefined)

@@ -128,6 +128,35 @@ describe('app shell', () => {
     expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
   })
 
+  it('restores the workbench marked as the current project', async () => {
+    const alpha = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const beta = {
+      ...createWorkbenchSnapshot('/tmp/beta-project', 'beta-project'),
+      isCurrentProject: true
+    }
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [alpha, beta])
+      })
+    })
+
+    render(<AppShell />)
+
+    const alphaProject = await screen.findByRole('group', { name: '项目 alpha-project' })
+    const betaProject = screen.getByRole('group', { name: '项目 beta-project' })
+    const alphaWorkspace = within(alphaProject).getByRole('button', {
+      name: 'Git 未初始化 默认工作区'
+    })
+    const betaWorkspace = within(betaProject).getByRole('button', {
+      name: 'Git 未初始化 默认工作区'
+    })
+
+    await waitFor(() => expect(betaWorkspace).toHaveAttribute('aria-current', 'page'))
+    expect(alphaWorkspace).not.toHaveAttribute('aria-current')
+  })
+
   it('switches branch workspaces through the desktop runtime API', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [

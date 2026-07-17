@@ -42,6 +42,7 @@ export interface ProjectIpcHandlersInput {
   }) => Promise<ProjectSnapshot | null>
   readonly forgetProject: (directory: string) => Promise<unknown>
   readonly rememberProject: (directory: string) => Promise<void>
+  readonly selectCurrentProject: (directory: string) => Promise<void>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<WorkbenchSnapshot>
   readonly loadRememberedWorkbenches: () => Promise<WorkbenchSnapshot[]>
 }
@@ -89,7 +90,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
         branchName: readStringField(command, 'branchName')
       })
 
-      return input.loadWorkbench(project)
+      return loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
@@ -106,7 +107,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
         workspaceName: readStringField(command, 'workspaceName')
       })
 
-      return input.loadWorkbench(project)
+      return loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
@@ -123,7 +124,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
         workspaceName: readStringField(command, 'workspaceName')
       })
 
-      return input.loadWorkbench(project)
+      return loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
@@ -140,7 +141,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
         branchName: readStringField(command, 'branchName')
       })
 
-      return input.loadWorkbench(project)
+      return loadAndSelectWorkbench(input, project)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
@@ -177,6 +178,17 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     scope: 'project.workspace',
     successLogLevel: 'info'
   })
+}
+
+async function loadAndSelectWorkbench(
+  input: ProjectIpcHandlersInput,
+  project: ProjectSnapshot
+): Promise<WorkbenchSnapshot> {
+  const workbench = await input.loadWorkbench(project)
+
+  await input.selectCurrentProject(project.directory)
+
+  return workbench
 }
 
 function readStringField(command: unknown, fieldName: string): string {

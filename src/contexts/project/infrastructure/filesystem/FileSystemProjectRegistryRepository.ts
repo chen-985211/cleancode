@@ -44,6 +44,8 @@ function parseProjectRegistry(metadata: string): ProjectRegistrySnapshot {
   }
 
   return {
+    currentProjectDirectory:
+      typeof parsed.currentProjectDirectory === 'string' ? parsed.currentProjectDirectory : null,
     projectDirectories: parsed.projectDirectories.filter(
       (directory): directory is string => typeof directory === 'string'
     )

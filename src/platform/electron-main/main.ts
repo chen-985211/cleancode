@@ -70,6 +70,7 @@ import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
 import { resolveWindowFrameOptions } from './windowFrameOptions'
+import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -173,6 +174,7 @@ const {
   createOrOpenProjectUseCase,
   forgetProjectUseCase,
   rememberProjectUseCase,
+  selectCurrentProjectUseCase,
   switchBranchWorkspaceUseCase,
   synchronizeProjectGitStateUseCase
 } = createProjectLifecycleUseCases({
@@ -255,6 +257,7 @@ registerProjectIpcHandlers({
   loadWorkbench,
   logger: consoleLogger,
   rememberProject,
+  selectCurrentProject,
   selectProjectDirectory,
   switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command),
   synchronizeProjectGitState: (command) => synchronizeProjectGitStateUseCase.execute(command)
@@ -394,28 +397,19 @@ async function rememberProject(directory: string): Promise<void> {
   await rememberProjectUseCase.execute({ directory })
 }
 
+async function selectCurrentProject(directory: string | null): Promise<void> {
+  await selectCurrentProjectUseCase.execute({ directory })
+}
+
 async function loadRememberedWorkbenches(): Promise<WorkbenchSnapshot[]> {
-  const registry = await new ListRememberedProjectsUseCase(getProjectRegistryRepository()).execute()
-  const workbenches: WorkbenchSnapshot[] = []
-
-  for (const directory of registry.projectDirectories) {
-    try {
-      const rememberedProject = await projectRepository.findByDirectory(directory)
-
-      if (rememberedProject) {
-        const project = await createOrOpenProjectUseCase.execute({
-          directory: rememberedProject.directory,
-          name: rememberedProject.name
-        })
-
-        workbenches.push(await loadWorkbench(project))
-      }
-    } catch {
-      // A remembered project may have been moved or corrupted outside cleancode.
-    }
-  }
-
-  return workbenches
+  return loadRememberedWorkbenchList({
+    findProject: (directory) => projectRepository.findByDirectory(directory),
+    listRememberedProjects: () =>
+      new ListRememberedProjectsUseCase(getProjectRegistryRepository()).execute(),
+    loadWorkbench,
+    openProject: (command) => createOrOpenProjectUseCase.execute(command),
+    selectCurrentProject
+  })
 }
 
 function getProjectRegistryRepository(): FileSystemProjectRegistryRepository {

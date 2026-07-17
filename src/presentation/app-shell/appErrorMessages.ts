@@ -11,6 +11,7 @@ const userFacingMessages: Partial<Record<AppErrorCode, string>> = {
   MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES: '默认工作区有未提交更改，无法切换分支。',
   NOT_GIT_REPOSITORY: '当前项目不是 Git 仓库，无法执行分支操作。',
   PROJECT_NOT_FOUND: '项目不存在，请重新添加项目。',
+  PROJECT_NOT_REMEMBERED: '项目不在最近项目列表中，请重新添加项目。',
   TERMINAL_CONNECTION_DUPLICATE: '这条终端依赖已经存在。',
   TERMINAL_CONNECTION_INVALID: '终端不能连接到自身。',
   TERMINAL_EXECUTION_CONFIG_INVALID: '终端执行配置无效，请检查退出码、超时和就绪条件。',

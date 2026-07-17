@@ -11,7 +11,7 @@
 Project 上下文当前负责：
 
 - 创建或打开本地项目，并保存项目元数据。
-- 记住、排序和移除最近项目目录。
+- 记住、排序和移除最近项目目录，并持久化当前项目选择。
 - 维护主工作区与 Git worktree 工作区。
 - 创建新分支 worktree、切换当前工作区、归档 worktree。
 - 检查真实 Git 状态，并把分支与 worktree 重新同步到项目模型。
@@ -26,6 +26,7 @@ Project 上下文当前负责：
 | ---------- | ------------------------------------------------------------------ |
 | 项目       | 由稳定 ID、名称、项目根目录和一组分支工作区组成的本地工作对象      |
 | 项目登记簿 | 最近打开项目目录的去重、有序列表                                   |
+| 当前项目   | 当前工作面使用的唯一项目；属于项目登记簿中的一个项目或为空         |
 | 主工作区   | 名为 `main`、物理目录等于项目根目录的固定工作区                    |
 | 分支工作区 | 绑定一个 Git 分支与独立 worktree 目录的工作区                      |
 | 当前工作区 | 当前工作面使用的唯一工作区                                         |
@@ -38,7 +39,7 @@ Project 上下文当前负责：
 Project 上下文有两个聚合根：
 
 - `Project`：拥有项目目录、主工作区、分支工作区、Git 绑定和当前工作区选择。
-- `ProjectRegistry`：拥有最近项目目录列表；它不复制项目业务状态。
+- `ProjectRegistry`：拥有最近项目目录列表和当前项目选择；它不复制项目业务状态。
 
 `Project.create` 总是创建一个名为 `main` 的当前工作区，其目录等于项目目录，初始 Git 绑定为 `null`。打开项目或执行同步后，应用层再根据真实 Git 状态更新绑定与 worktree 列表。
 
@@ -52,6 +53,8 @@ Project 上下文有两个聚合根：
 6. 归档当前 worktree 后，当前工作区回退到主工作区。
 7. 同步时以真实 worktree 为准清理失效工作区；原当前工作区消失时回退到主工作区。
 8. 项目登记簿忽略空目录、去重，并把最近记住的目录放在最前面。
+9. 当前项目必须为空或属于项目登记簿；选择项目不改变登记簿顺序。
+10. 移除当前项目时回退到登记簿中的第一个剩余项目；登记簿为空时当前项目为空。
 
 ## Git 工作流
 
@@ -76,7 +79,7 @@ Project 上下文有两个聚合根：
 
 `CreateOrOpenProject`、创建/选择工作区、主目录 checkout、归档、自动 Git 同步和移除项目必须共享同一个 `ProjectWorkspaceTransactionCoordinator`。协调器从每个用例的首次仓储读取开始按项目目录串行，自动同步不得在 checkout 或归档中间缓存旧快照后再覆盖提交结果。
 
-`ProjectRegistry` 是跨项目目录共享的一份整表快照，其 remember/forget 读改写必须另行共享全局 `ProjectRegistryTransactionCoordinator`。移除项目同时持有该目录的 workspace transaction 与全局 registry transaction；不同目录的并发移除以及 remember/forget 并发都不得用旧登记簿快照覆盖另一项更新。
+`ProjectRegistry` 是跨项目目录共享的一份整表快照，其 remember/forget/select 读改写必须另行共享全局 `ProjectRegistryTransactionCoordinator`。移除项目同时持有该目录的 workspace transaction 与全局 registry transaction；不同目录的并发移除以及 remember/forget/select 并发都不得用旧登记簿快照覆盖另一项更新。
 
 自动 Git 同步和重新打开项目会以真实 Git/worktree 状态保存 Project；只有 Git 适配器权威确认“非仓库”或完整检查成功，才允许保存并通过 `WorkspaceAgentLifecyclePort` resolve 项目 quarantine。Git 命令不可执行、目录不可访问、仓库损坏或安全校验失败必须向上抛出，不能伪装成非 Git 项目并解除隔离。这样 checkout 补偿失败或归档部分完成不会永久阻塞 Agent，同时仍保证恢复前旧作用域不能附加。
 
@@ -86,27 +89,28 @@ Agent 运行时如何按分支隔离，见 [Agent 与会话生命周期](../agen
 
 `Project` 与 `ProjectRegistry` 当前通过文件系统仓储保存为版本化 JSON。Git 仓库、分支和 worktree 的真实状态来自 `GitWorkspacePort`，但只有经过用例同步并保存后的 `Project` 才是 cleancode 已提交项目状态。
 
-项目登记簿只保存项目目录，不拥有项目名称、工作区或 Git 绑定。删除登记项不会删除项目目录、Git 分支或 worktree；删除登记前仍须释放项目内 Agent，并把 attach lease 持有到登记簿保存完成。
+项目登记簿保存项目目录和当前项目目录，不拥有项目名称、工作区或 Git 绑定。应用启动时优先恢复登记簿中的当前项目；旧版登记簿缺少该字段、已选项目无法加载或选择无效时，回退到首个可加载项目并立即修复登记簿；没有可加载项目时清空当前项目。删除登记项不会删除项目目录、Git 分支或 worktree；删除登记前仍须释放项目内 Agent，并把 attach lease 持有到登记簿保存完成。
 
 ## 实现入口
 
-| 层级           | 入口                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Domain         | [`Project.ts`](../../../src/contexts/project/domain/aggregates/Project.ts)、[`ProjectRegistry.ts`](../../../src/contexts/project/domain/aggregates/ProjectRegistry.ts)                                                                                                                                                                                                                               |
-| Application    | [`CreateOrOpenProjectUseCase.ts`](../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase.ts)、[`CreateBranchWorkspaceUseCase.ts`](../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase.ts)、[`ProjectWorkspaceTransactionCoordinator.ts`](../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator.ts)         |
-| Git lifecycle  | [`CheckoutMainWorkspaceBranchUseCase.ts`](../../../src/contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase.ts)、[`ArchiveBranchWorkspaceUseCase.ts`](../../../src/contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase.ts)、[`SynchronizeProjectGitStateUseCase.ts`](../../../src/contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase.ts) |
-| Infrastructure | [`GitCliWorkspaceAdapter.ts`](../../../src/contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter.ts)、[`FileSystemProjectRepository.ts`](../../../src/contexts/project/infrastructure/filesystem/FileSystemProjectRepository.ts)                                                                                                                                                         |
-| Platform       | [`projectIpcHandlers.ts`](../../../src/platform/electron-main/projectIpcHandlers.ts)                                                                                                                                                                                                                                                                                                                 |
+| 层级           | 入口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain         | [`Project.ts`](../../../src/contexts/project/domain/aggregates/Project.ts)、[`ProjectRegistry.ts`](../../../src/contexts/project/domain/aggregates/ProjectRegistry.ts)                                                                                                                                                                                                                                                                                                                                               |
+| Application    | [`CreateOrOpenProjectUseCase.ts`](../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase.ts)、[`SelectCurrentProjectUseCase.ts`](../../../src/contexts/project/application/use-cases/SelectCurrentProjectUseCase.ts)、[`CreateBranchWorkspaceUseCase.ts`](../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase.ts)、[`ProjectWorkspaceTransactionCoordinator.ts`](../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator.ts) |
+| Git lifecycle  | [`CheckoutMainWorkspaceBranchUseCase.ts`](../../../src/contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase.ts)、[`ArchiveBranchWorkspaceUseCase.ts`](../../../src/contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase.ts)、[`SynchronizeProjectGitStateUseCase.ts`](../../../src/contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase.ts)                                                                                                                 |
+| Infrastructure | [`GitCliWorkspaceAdapter.ts`](../../../src/contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter.ts)、[`FileSystemProjectRepository.ts`](../../../src/contexts/project/infrastructure/filesystem/FileSystemProjectRepository.ts)                                                                                                                                                                                                                                                                         |
+| Platform       | [`projectIpcHandlers.ts`](../../../src/platform/electron-main/projectIpcHandlers.ts)、[`loadRememberedWorkbenchList.ts`](../../../src/platform/electron-main/loadRememberedWorkbenchList.ts)                                                                                                                                                                                                                                                                                                                         |
 
 ## 验证矩阵
 
-| 层级        | 证明内容                                                          | 主要测试                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit        | 聚合不变量、创建/归档/切换、Git 同步                              | [`project.branch-workspaces.spec.ts`](../../../tests/unit/contexts/project/project.branch-workspaces.spec.ts)、[`project.git-workspace-use-cases.spec.ts`](../../../tests/unit/contexts/project/project.git-workspace-use-cases.spec.ts)                                                                                                                                                    |
-| Unit / 协作 | checkout/自动同步串行、归档恢复、移除项目与 Agent lifecycle lease | [`project.agent-branch-lifecycle.spec.ts`](../../../tests/unit/contexts/project/project.agent-branch-lifecycle.spec.ts)、[`project.archive-branch-workspace-use-case.spec.ts`](../../../tests/unit/contexts/project/project.archive-branch-workspace-use-case.spec.ts)、[`project.remember-workbenches.spec.ts`](../../../tests/unit/contexts/project/project.remember-workbenches.spec.ts) |
-| Integration | JSON 仓储、登记簿和真实 Git/worktree 适配                         | [`project.filesystem-repository.spec.ts`](../../../tests/integration/contexts/project/project.filesystem-repository.spec.ts)、[`project.git-workspace.spec.ts`](../../../tests/integration/contexts/project/project.git-workspace.spec.ts)                                                                                                                                                  |
-| Contract    | Git 状态同步 IPC 的输入输出                                       | [`project.git-state-synchronization-ipc.spec.ts`](../../../tests/contract/contexts/project/project.git-state-synchronization-ipc.spec.ts)                                                                                                                                                                                                                                                   |
+| 层级        | 证明内容                                                          | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | 聚合不变量、当前项目、创建/归档/切换、Git 同步                    | [`project.remember-workbenches.spec.ts`](../../../tests/unit/contexts/project/project.remember-workbenches.spec.ts)、[`project.branch-workspaces.spec.ts`](../../../tests/unit/contexts/project/project.branch-workspaces.spec.ts)、[`project.git-workspace-use-cases.spec.ts`](../../../tests/unit/contexts/project/project.git-workspace-use-cases.spec.ts)                                                                                                                            |
+| Unit / 协作 | checkout/自动同步串行、归档恢复、移除项目与 Agent lifecycle lease | [`project.agent-branch-lifecycle.spec.ts`](../../../tests/unit/contexts/project/project.agent-branch-lifecycle.spec.ts)、[`project.archive-branch-workspace-use-case.spec.ts`](../../../tests/unit/contexts/project/project.archive-branch-workspace-use-case.spec.ts)、[`project.remember-workbenches.spec.ts`](../../../tests/unit/contexts/project/project.remember-workbenches.spec.ts)                                                                                              |
+| Integration | JSON 仓储、当前项目恢复和真实 Git/worktree 适配                   | [`project.filesystem-registry.spec.ts`](../../../tests/integration/contexts/project/project.filesystem-registry.spec.ts)、[`remembered-workbench-loading.spec.ts`](../../../tests/integration/platform/remembered-workbench-loading.spec.ts)、[`project.filesystem-repository.spec.ts`](../../../tests/integration/contexts/project/project.filesystem-repository.spec.ts)、[`project.git-workspace.spec.ts`](../../../tests/integration/contexts/project/project.git-workspace.spec.ts) |
+| Contract    | Git 状态同步 IPC 的输入输出                                       | [`project.git-state-synchronization-ipc.spec.ts`](../../../tests/contract/contexts/project/project.git-state-synchronization-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                |
+| E2E         | 完整退出并重启后恢复最后选择的项目                                | [`project-workspaces.e2e.spec.ts`](../../../tests/e2e/project-workspaces.e2e.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## 维护规则
 
-改变工作区身份、Git 绑定、归档或当前工作区规则时，必须同步 `Project` 聚合、相关用例、测试和本文。新增合并、变基、删除分支等能力前，必须先明确它们是否改变现有聚合边界与失败恢复策略。
+改变当前项目、工作区身份、Git 绑定、归档或当前工作区规则时，必须同步对应聚合、相关用例、测试和本文。新增合并、变基、删除分支等能力前，必须先明确它们是否改变现有聚合边界与失败恢复策略。

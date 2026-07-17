@@ -6,6 +6,7 @@ import { ListRememberedProjectsUseCase } from '../../../../src/contexts/project/
 import { ProjectRegistryTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
 import { RememberProjectUseCase } from '../../../../src/contexts/project/application/use-cases/RememberProjectUseCase'
+import { SelectCurrentProjectUseCase } from '../../../../src/contexts/project/application/use-cases/SelectCurrentProjectUseCase'
 
 describe('project registry', () => {
   it('remembers project directories without duplicates and keeps the newest project first', async () => {
@@ -18,8 +19,68 @@ describe('project registry', () => {
     await rememberProject.execute({ directory: '/work/alpha' })
 
     expect(await listRememberedProjects.execute()).toEqual({
+      currentProjectDirectory: '/work/alpha',
       projectDirectories: ['/work/alpha', '/work/beta']
     })
+  })
+
+  it('falls back to the first remaining project when the current project is forgotten', () => {
+    const registry = ProjectRegistry.empty()
+      .rememberProject('/work/alpha')
+      .rememberProject('/work/beta')
+      .forgetProject('/work/beta')
+
+    expect(registry.toSnapshot()).toEqual({
+      currentProjectDirectory: '/work/alpha',
+      projectDirectories: ['/work/alpha']
+    })
+  })
+
+  it('restores legacy registry snapshots without inventing a current project', () => {
+    expect(
+      ProjectRegistry.fromSnapshot({ projectDirectories: ['/work/alpha'] }).toSnapshot()
+    ).toEqual({
+      currentProjectDirectory: null,
+      projectDirectories: ['/work/alpha']
+    })
+  })
+
+  it('selects a remembered project without reordering recent projects', async () => {
+    const repository = new InMemoryProjectRegistryRepository()
+    const rememberProject = new RememberProjectUseCase(repository)
+    const selectCurrentProject = new SelectCurrentProjectUseCase(repository)
+
+    await rememberProject.execute({ directory: '/work/alpha' })
+    await rememberProject.execute({ directory: '/work/beta' })
+    await selectCurrentProject.execute({ directory: '/work/alpha' })
+
+    await expect(repository.get()).resolves.toEqual({
+      currentProjectDirectory: '/work/alpha',
+      projectDirectories: ['/work/beta', '/work/alpha']
+    })
+  })
+
+  it('clears the current project when no remembered project is loadable', async () => {
+    const repository = new InMemoryProjectRegistryRepository()
+    const rememberProject = new RememberProjectUseCase(repository)
+    const selectCurrentProject = new SelectCurrentProjectUseCase(repository)
+
+    await rememberProject.execute({ directory: '/work/alpha' })
+    await selectCurrentProject.execute({ directory: null })
+
+    await expect(repository.get()).resolves.toEqual({
+      currentProjectDirectory: null,
+      projectDirectories: ['/work/alpha']
+    })
+  })
+
+  it('rejects selecting a project that is not remembered', async () => {
+    const repository = new InMemoryProjectRegistryRepository()
+    const selectCurrentProject = new SelectCurrentProjectUseCase(repository)
+
+    await expect(
+      selectCurrentProject.execute({ directory: '/work/missing' })
+    ).rejects.toMatchObject({ code: 'PROJECT_NOT_REMEMBERED' })
   })
 
   it('forgets a project directory without removing other remembered projects', async () => {
@@ -62,6 +123,7 @@ describe('project registry', () => {
     await forgetProject.execute({ directory: '/work/beta' })
 
     expect(await listRememberedProjects.execute()).toEqual({
+      currentProjectDirectory: '/work/gamma',
       projectDirectories: ['/work/gamma', '/work/alpha']
     })
     expect(lifecycleCalls).toEqual(['dispose:/work/beta', 'resolve:/work/beta'])
@@ -98,7 +160,10 @@ describe('project registry', () => {
     repository.releaseFirstSave()
     await Promise.all([firstForget, secondForget])
 
-    expect(await repository.get()).toEqual({ projectDirectories: ['/work/gamma'] })
+    expect(await repository.get()).toEqual({
+      currentProjectDirectory: null,
+      projectDirectories: ['/work/gamma']
+    })
   })
 
   it('serializes remember and forget without losing either registry update', async () => {
@@ -123,7 +188,33 @@ describe('project registry', () => {
     await Promise.all([rememberGamma, forgetAlpha])
 
     expect(await repository.get()).toEqual({
+      currentProjectDirectory: '/work/gamma',
       projectDirectories: ['/work/gamma', '/work/beta']
+    })
+  })
+
+  it('serializes current project selection and remember without losing either update', async () => {
+    const repository = new BlockingFirstSaveProjectRegistryRepository(
+      ['/work/alpha', '/work/beta'],
+      '/work/beta'
+    )
+    const registryTransactions = new ProjectRegistryTransactionCoordinator()
+    const selectCurrentProject = new SelectCurrentProjectUseCase(repository, registryTransactions)
+    const rememberProject = new RememberProjectUseCase(repository, registryTransactions)
+
+    const selectAlpha = selectCurrentProject.execute({ directory: '/work/alpha' })
+    await repository.waitForFirstSave()
+    const rememberGamma = rememberProject.execute({ directory: '/work/gamma' })
+    await flushAsyncOperations()
+
+    expect(repository.readCount).toBe(1)
+
+    repository.releaseFirstSave()
+    await Promise.all([selectAlpha, rememberGamma])
+
+    expect(await repository.get()).toEqual({
+      currentProjectDirectory: '/work/gamma',
+      projectDirectories: ['/work/gamma', '/work/alpha', '/work/beta']
     })
   })
 })
@@ -147,8 +238,14 @@ class BlockingFirstSaveProjectRegistryRepository implements ProjectRegistryRepos
   private shouldBlockNextSave = true
   readCount = 0
 
-  constructor(projectDirectories: readonly string[]) {
-    this.registry = ProjectRegistry.fromSnapshot({ projectDirectories })
+  constructor(
+    projectDirectories: readonly string[],
+    currentProjectDirectory: string | null = null
+  ) {
+    this.registry = ProjectRegistry.fromSnapshot({
+      currentProjectDirectory,
+      projectDirectories
+    })
   }
 
   async save(registry: ProjectRegistry): Promise<void> {

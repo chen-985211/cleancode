@@ -61,6 +61,38 @@ class SilentLogger implements Logger {
 }
 
 describe('project git state synchronization IPC contract', () => {
+  it('persists the selected project after switching and loading its workbench', async () => {
+    const ipcMain = new FakeIpcMain()
+    const project = createProjectSnapshot('main')
+    const workbench = createWorkbenchSnapshot(project)
+    const switchBranchWorkspace = vi.fn(async () => project)
+    const loadWorkbench = vi.fn(async () => workbench)
+    const selectCurrentProject = vi.fn(async () => undefined)
+
+    registerProjectIpcHandlers(
+      createProjectIpcHandlersInput({
+        ipcMain,
+        loadWorkbench,
+        selectCurrentProject,
+        switchBranchWorkspace
+      })
+    )
+
+    await expect(
+      ipcMain.invoke<WorkbenchSnapshot>('cleancode:switch-branch-workspace', {
+        projectDirectory: '/work/app',
+        workspaceName: 'main'
+      })
+    ).resolves.toEqual({
+      ok: true,
+      value: workbench
+    })
+    expect(selectCurrentProject).toHaveBeenCalledWith(project.directory)
+    expect(loadWorkbench.mock.invocationCallOrder[0]).toBeLessThan(
+      selectCurrentProject.mock.invocationCallOrder[0]!
+    )
+  })
+
   it('returns a reloaded workbench when project git state changes', async () => {
     const ipcMain = new FakeIpcMain()
     const project = createProjectSnapshot('feature/free')
@@ -116,7 +148,9 @@ describe('project git state synchronization IPC contract', () => {
 function createProjectIpcHandlersInput(input: {
   readonly ipcMain: IpcMainLike
   readonly loadWorkbench: ProjectIpcHandlersInput['loadWorkbench']
-  readonly synchronizeProjectGitState: ProjectIpcHandlersInput['synchronizeProjectGitState']
+  readonly selectCurrentProject?: (directory: string) => Promise<void>
+  readonly switchBranchWorkspace?: ProjectIpcHandlersInput['switchBranchWorkspace']
+  readonly synchronizeProjectGitState?: ProjectIpcHandlersInput['synchronizeProjectGitState']
 }): ProjectIpcHandlersInput {
   return {
     archiveBranchWorkspace: vi.fn(),
@@ -130,9 +164,10 @@ function createProjectIpcHandlersInput(input: {
     loadWorkbench: input.loadWorkbench,
     logger: new SilentLogger(),
     rememberProject: vi.fn(),
+    selectCurrentProject: input.selectCurrentProject ?? vi.fn(),
     selectProjectDirectory: vi.fn(async () => null),
-    switchBranchWorkspace: vi.fn(),
-    synchronizeProjectGitState: input.synchronizeProjectGitState
+    switchBranchWorkspace: input.switchBranchWorkspace ?? vi.fn(),
+    synchronizeProjectGitState: input.synchronizeProjectGitState ?? vi.fn()
   }
 }
 

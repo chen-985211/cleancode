@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -26,10 +26,26 @@ describe('project filesystem registry', () => {
     await repository.save(registry)
 
     expect(JSON.parse(await readFile(registryPath, 'utf8'))).toEqual({
+      currentProjectDirectory: '/work/beta',
       projectDirectories: ['/work/beta', '/work/alpha']
     })
     await expect(repository.get()).resolves.toEqual({
+      currentProjectDirectory: '/work/beta',
       projectDirectories: ['/work/beta', '/work/alpha']
+    })
+  })
+
+  it('reads legacy registry files without a current project selection', async () => {
+    const registryPath = join(registryDirectory, 'project-registry.json')
+    await writeFile(
+      registryPath,
+      `${JSON.stringify({ projectDirectories: ['/work/alpha'] }, null, 2)}\n`
+    )
+    const repository = new FileSystemProjectRegistryRepository(registryPath)
+
+    await expect(repository.get()).resolves.toEqual({
+      currentProjectDirectory: null,
+      projectDirectories: ['/work/alpha']
     })
   })
 })

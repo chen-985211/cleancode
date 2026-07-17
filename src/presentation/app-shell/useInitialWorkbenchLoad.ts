@@ -26,7 +26,13 @@ export function useInitialWorkbenchLoad({
       }
 
       setWorkbenches((entries) => (entries.length > 0 ? entries : rememberedWorkbenches))
-      setCurrentWorkbench((workbench) => workbench ?? rememberedWorkbenches[0] ?? null)
+      setCurrentWorkbench(
+        (workbench) =>
+          workbench ??
+          rememberedWorkbenches.find((entry) => entry.isCurrentProject) ??
+          rememberedWorkbenches[0] ??
+          null
+      )
     })
 
     return () => {
