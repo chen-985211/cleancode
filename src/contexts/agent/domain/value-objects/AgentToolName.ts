@@ -6,3 +6,7 @@ export type AgentToolName =
   | 'create_terminal_group'
   | 'update_terminal_group'
   | 'delete_terminal_group'
+  | 'update_terminal_execution_config'
+  | 'connect_terminal_blocks'
+  | 'disconnect_terminal_blocks'
+  | 'inspect_terminal_workflow_plan'

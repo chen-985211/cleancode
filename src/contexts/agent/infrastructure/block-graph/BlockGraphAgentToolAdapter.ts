@@ -7,7 +7,15 @@ import type {
   BlockPositionSnapshot,
   TerminalBlockSizeSnapshot
 } from '../../../block-graph/application/dto/BlockGraphSnapshot'
-import type { AgentBlockGraphToolPort } from '../../application/ports/AgentBlockGraphToolPort'
+import type {
+  AgentBlockGraphToolPort,
+  AgentConnectTerminalBlocksInput,
+  AgentConnectTerminalBlocksResult,
+  AgentDisconnectTerminalBlocksInput,
+  AgentInspectTerminalWorkflowPlanInput,
+  AgentUpdateTerminalExecutionConfigInput
+} from '../../application/ports/AgentBlockGraphToolPort'
+import type { AgentTerminalWorkflowPlanSnapshot } from '../../application/dto/AgentTerminalWorkflowProtocol'
 import type {
   AgentToolContext,
   CreateBlockAgentToolInput,
@@ -19,6 +27,12 @@ import type {
 } from '../../application/dto/AgentToolProtocol'
 
 export interface BlockGraphAgentToolAdapterInput {
+  readonly buildTerminalWorkflowPlan: (
+    query: AgentToolContext & AgentInspectTerminalWorkflowPlanInput
+  ) => Promise<AgentTerminalWorkflowPlanSnapshot>
+  readonly connectTerminalBlocks: (
+    command: AgentToolContext & AgentConnectTerminalBlocksInput
+  ) => Promise<BlockGraphSnapshot>
   readonly createTerminalBlock: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -42,6 +56,9 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly workspaceName: string
     readonly terminalGroupId: string
   }) => Promise<BlockGraphSnapshot>
+  readonly disconnectTerminalBlocks: (
+    command: AgentToolContext & AgentDisconnectTerminalBlocksInput
+  ) => Promise<BlockGraphSnapshot>
   readonly getDefaultGraph: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -79,6 +96,9 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly description: string
     readonly launchCommand: string
   }) => Promise<BlockGraphSnapshot>
+  readonly updateTerminalExecutionConfig: (
+    command: AgentToolContext & AgentUpdateTerminalExecutionConfigInput
+  ) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -234,6 +254,48 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       ...context,
       terminalGroupId: input.terminalGroupId
     })
+  }
+
+  updateTerminalExecutionConfig(
+    context: AgentToolContext,
+    input: AgentUpdateTerminalExecutionConfigInput
+  ): Promise<BlockGraphSnapshot> {
+    return this.tools.updateTerminalExecutionConfig({ ...context, ...input })
+  }
+
+  async connectTerminalBlocks(
+    context: AgentToolContext,
+    input: AgentConnectTerminalBlocksInput
+  ): Promise<AgentConnectTerminalBlocksResult> {
+    const graph = await this.tools.connectTerminalBlocks({ ...context, ...input })
+    const connection = (graph.connections ?? []).find(
+      (candidate) =>
+        candidate.sourceBlockId === input.sourceBlockId &&
+        candidate.targetBlockId === input.targetBlockId
+    )
+
+    if (!connection) {
+      throw createUnexpectedAppError('Created terminal connection was not returned by the graph.', {
+        sourceBlockId: input.sourceBlockId,
+        targetBlockId: input.targetBlockId
+      })
+    }
+
+    return { connectionId: connection.id, graph }
+  }
+
+  disconnectTerminalBlocks(
+    context: AgentToolContext,
+    input: AgentDisconnectTerminalBlocksInput
+  ): Promise<BlockGraphSnapshot> {
+    return this.tools.disconnectTerminalBlocks({ ...context, ...input })
+  }
+
+  inspectTerminalWorkflowPlan(
+    context: AgentToolContext,
+    input: AgentInspectTerminalWorkflowPlanInput
+  ): Promise<AgentTerminalWorkflowPlanSnapshot> {
+    return this.tools.buildTerminalWorkflowPlan({ ...context, ...input })
   }
 }
 

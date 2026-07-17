@@ -4,6 +4,7 @@ import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/appli
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { AgentToolApprovalCard } from '../../../src/presentation/app-shell/AgentToolApprovalCard'
 import { resolveAgentApprovalPresentation } from '../../../src/presentation/app-shell/agentApprovalPresentation'
+import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 
 describe('Agent tool approval card', () => {
   it('names the terminal, its group, and the real deletion impact', () => {
@@ -103,6 +104,76 @@ describe('Agent tool approval card', () => {
     expect(screen.getByText('只解散组合，保留其中终端及现有连线。')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '确认解散' })).toBeInTheDocument()
   })
+
+  it('names both terminal connection endpoints and the exact disconnection impact', () => {
+    const onApprove = vi.fn()
+    const onLocate = vi.fn()
+    const onReject = vi.fn()
+    const connectionId = '019f6eb0-c44b-7220-b47c-0da440bb95ec'
+    const presentation = resolveAgentApprovalPresentation(createConnectionApproval(connectionId), {
+      ...graph,
+      connections: [
+        {
+          id: connectionId,
+          sourceBlockId: 'terminal-api',
+          targetBlockId: 'terminal-web'
+        }
+      ]
+    })
+
+    render(
+      <AgentToolApprovalCard
+        presentation={presentation}
+        queueCount={0}
+        onApprove={onApprove}
+        onDismiss={vi.fn()}
+        onLocate={onLocate}
+        onReject={onReject}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: '断开终端依赖' })).toBeInTheDocument()
+    expect(screen.getByText('上游终端')).toBeInTheDocument()
+    expect(screen.getByText('Backend API')).toBeInTheDocument()
+    expect(screen.getByText('ID terminal-api')).toBeInTheDocument()
+    expect(screen.getByText('下游终端')).toBeInTheDocument()
+    expect(screen.getByText('Admin Web')).toBeInTheDocument()
+    expect(screen.getByText('ID terminal-web')).toBeInTheDocument()
+    expect(screen.getByText(`连接 ID ${connectionId}`)).toBeInTheDocument()
+    expect(
+      screen.getByText('只断开这条依赖，保留两端终端、启动命令、执行配置和组合。')
+    ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '在画布中查看 Backend API 到 Admin Web' }))
+    fireEvent.click(screen.getByRole('button', { name: '保留依赖' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认断开' }))
+    expect(onLocate).toHaveBeenCalledOnce()
+    expect(onReject).toHaveBeenCalledOnce()
+    expect(onApprove).toHaveBeenCalledOnce()
+  })
+
+  it('keeps connection actions explicit when the dependency no longer exists', () => {
+    const presentation = resolveAgentApprovalPresentation(
+      createConnectionApproval('missing-connection'),
+      graph
+    )
+
+    render(
+      <AgentToolApprovalCard
+        presentation={presentation}
+        queueCount={0}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onLocate={vi.fn()}
+        onReject={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('heading', { name: '断开终端依赖' })).toBeInTheDocument()
+    expect(screen.getByText('ID missing-connection')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '保留依赖' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '确认断开' })).toBeDisabled()
+  })
 })
 
 function createApproval(target: AgentToolApprovalRequest['target']): AgentToolApprovalRequest {
@@ -114,6 +185,19 @@ function createApproval(target: AgentToolApprovalRequest['target']): AgentToolAp
     summary: '删除画布对象',
     target,
     toolName: target.kind === 'terminal_block' ? 'delete_block' : 'delete_terminal_group',
+    workspaceName: 'main'
+  }
+}
+
+function createConnectionApproval(connectionId: string): AgentToolApprovalPresentationRequest {
+  return {
+    agentId: 'agent-1',
+    approvalId: 'approval-connection-1',
+    projectDirectory: '/repo/app',
+    sessionId: 'session-1',
+    summary: `断开终端依赖 ${connectionId}`,
+    target: { connectionId, kind: 'terminal_connection' },
+    toolName: 'disconnect_terminal_blocks',
     workspaceName: 'main'
   }
 }
@@ -141,6 +225,13 @@ const graph: BlockGraphSnapshot = {
   ],
   id: 'graph-1',
   projectId: 'project-1',
+  connections: [
+    {
+      id: 'connection-api-web',
+      sourceBlockId: 'terminal-api',
+      targetBlockId: 'terminal-web'
+    }
+  ],
   terminalGroups: [
     {
       id: 'group-app',

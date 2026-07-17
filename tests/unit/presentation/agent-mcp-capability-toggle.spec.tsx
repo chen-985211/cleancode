@@ -20,8 +20,10 @@ describe('Agent CleanCode MCP capability toggle', () => {
     expect(icon?.querySelectorAll('path')).toHaveLength(3)
     expect(icon?.querySelector('circle')).toBeNull()
     expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('画布'))
+    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('执行配置'))
+    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('依赖工作流'))
     expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('sandbox'))
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('删除'))
+    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('断开依赖'))
 
     fireEvent.click(toggle)
     expect(onChange).toHaveBeenCalledWith(false)

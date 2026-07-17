@@ -216,17 +216,6 @@ export function toAgentSessionSnapshot(session: {
   }
 }
 
-export function createCanceledAgentToolResult(
-  toolCallId: string,
-  reason: string
-): AgentToolExecutionResult {
-  return {
-    output: { reason, type: 'tool_canceled' },
-    status: 'canceled',
-    toolCallId
-  }
-}
-
 export function createAgentConversationScope(command: {
   readonly agentId: string
   readonly gitBranch?: string | null

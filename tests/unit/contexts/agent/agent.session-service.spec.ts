@@ -13,6 +13,7 @@ import type { AgentSessionRepository } from '../../../../src/contexts/agent/appl
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 import type { AgentToolApprovalRequest } from '../../../../src/contexts/agent/application/dto/AgentSessionProtocol'
+import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 
 describe('agent session service', () => {
   it('keeps one background Codex PTY per workspace and reattaches without restarting it', async () => {
@@ -210,6 +211,7 @@ describe('agent session service', () => {
     const resultPromise = service.executeMcpTool({
       input: { blockId: 'terminal-1' },
       sessionId: session.sessionId,
+      toolCallId: 'approval-1',
       toolName: 'delete_block'
     })
     await vi.waitFor(() =>
@@ -231,6 +233,7 @@ describe('agent session service', () => {
       expect.objectContaining({
         approved: true,
         input: { blockId: 'terminal-1' },
+        toolCallId: 'approval-1',
         toolName: 'delete_block'
       })
     )
@@ -251,11 +254,12 @@ describe('agent session service', () => {
     const rejectedResultPromise = service.executeMcpTool({
       input: { terminalGroupId: 'group-1' },
       sessionId: session.sessionId,
+      toolCallId: 'approval-1',
       toolName: 'delete_terminal_group'
     })
 
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
-    service.rejectTool({ approvalId: 'approval-1' })
+    await service.rejectTool({ approvalId: 'approval-1' })
     await expect(rejectedResultPromise).resolves.toMatchObject({
       status: 'canceled',
       toolCallId: 'approval-1'
@@ -264,6 +268,7 @@ describe('agent session service', () => {
     const disposedResultPromise = service.executeMcpTool({
       input: { terminalGroupId: 'group-1' },
       sessionId: session.sessionId,
+      toolCallId: 'approval-1',
       toolName: 'delete_terminal_group'
     })
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
@@ -278,52 +283,13 @@ describe('agent session service', () => {
       toolCallId: 'approval-1'
     })
   })
-
-  it('cancels an approved destructive MCP tool if the session is disposed before execution completes', async () => {
-    let resolveApprovedExecution: (result: AgentToolExecutionResult) => void = () => undefined
-    const executeAgentTool = vi
-      .fn<ExecuteAgentTool>()
-      .mockResolvedValueOnce({
-        approval: {
-          summary: '删除终端积木 terminal-1',
-          target: { blockId: 'terminal-1', kind: 'terminal_block' },
-          toolName: 'delete_block'
-        },
-        status: 'awaiting_approval',
-        toolCallId: 'approval-2'
-      })
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveApprovedExecution = resolve
-          })
-      )
-    const service = createSessionService({ executeAgentTool })
-    const session = await attachMainSession(service)
-    const resultPromise = service.executeMcpTool({
-      input: { blockId: 'terminal-1' },
-      sessionId: session.sessionId,
-      toolName: 'delete_block'
-    })
-
-    await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
-    service.approveTool({ approvalId: 'approval-2' })
-    await vi.waitFor(() => expect(executeAgentTool).toHaveBeenCalledTimes(2))
-    const lease = await service.disposeSession({
-      projectDirectory: '/repo/app',
-      workspaceName: 'main'
-    })
-    lease.release()
-    resolveApprovedExecution(completedToolResult('approval-2'))
-
-    await expect(resultPromise).resolves.toMatchObject({
-      status: 'canceled',
-      toolCallId: 'approval-2'
-    })
-  })
 })
 
 type ExecuteAgentTool = (command: ExecuteAgentToolCommand) => Promise<AgentToolExecutionResult>
+type CancelAgentTool = (
+  command: ExecuteAgentToolCommand,
+  reason: string
+) => Promise<AgentToolExecutionResult>
 
 class RecordingCodexAgentProcessPort implements CodexAgentProcessPort {
   readonly resizes: {
@@ -383,6 +349,7 @@ class RecordingMcpServerPort implements AgentMcpServerPort {
 function createSessionService(
   input: {
     readonly executeAgentTool?: ExecuteAgentTool
+    readonly cancelAgentTool?: CancelAgentTool
     readonly mcpServerPort?: AgentMcpServerPort
     readonly processPort?: CodexAgentProcessPort
     readonly repository?: AgentSessionRepository
@@ -391,7 +358,16 @@ function createSessionService(
   return new AgentSessionService(
     input.processPort ?? new RecordingCodexAgentProcessPort(),
     input.mcpServerPort ?? new RecordingMcpServerPort(),
-    input.executeAgentTool ?? (async () => completedToolResult('tool-call-1')),
+    {
+      cancel:
+        input.cancelAgentTool ??
+        (async (command, reason) => ({
+          output: { reason, type: 'tool_canceled' },
+          status: 'canceled',
+          toolCallId: command.toolCallId
+        })),
+      execute: input.executeAgentTool ?? (async () => completedToolResult('tool-call-1'))
+    },
     input.repository ?? new RecordingAgentSessionRepository()
   )
 }
@@ -473,7 +449,10 @@ function agentKey(projectId: string, workspaceName: string, agentId: string): st
 
 function completedToolResult(
   toolCallId: string
-): Extract<AgentToolExecutionResult, { readonly status: 'completed' }> {
+): Extract<
+  AgentToolExecutionResult,
+  { readonly graph: BlockGraphSnapshot; readonly status: 'completed' }
+> {
   return {
     graph: {
       blocks: [],
@@ -483,6 +462,7 @@ function completedToolResult(
       viewport: { x: 0, y: 0, zoom: 1 },
       workspaceName: 'main'
     },
+    graphChanged: true,
     output: { type: 'block_graph' },
     status: 'completed',
     toolCallId

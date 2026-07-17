@@ -23,6 +23,7 @@ import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './ty
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
 import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
+import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 
@@ -104,10 +105,16 @@ export function WorkbenchCanvas({
     () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null),
     [approvalIntents, currentWorkbench?.graph]
   )
-  const edges = useMemo(
-    () => [...workflow.edges, ...approvalEdges],
-    [approvalEdges, workflow.edges]
+  const workflowEdges = useMemo(
+    () =>
+      projectAgentConnectionApprovalsOntoWorkflowEdges(
+        workflow.edges,
+        approvalIntents,
+        currentWorkbench?.graph ?? null
+      ),
+    [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
+  const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)

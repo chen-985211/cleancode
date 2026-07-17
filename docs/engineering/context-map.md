@@ -87,9 +87,9 @@ Agent application
 | ----------------- | ----------------------------------------------------------- |
 | 发起方            | Agent                                                       |
 | 调用方拥有的端口  | `AgentBlockGraphToolPort`                                   |
-| 提供方            | BlockGraph 的查询和图变更用例                               |
-| Agent 所有权      | 工具协议、会话鉴权、审批、调用状态与审计                    |
-| BlockGraph 所有权 | 图结构、校验、变更和持久化                                  |
+| 提供方            | BlockGraph 的图查询/变更、执行配置、连接和计划构建用例      |
+| Agent 所有权      | 工具协议、会话鉴权、审批、调用状态、同工作区 MCP 串行与审计 |
+| BlockGraph 所有权 | 图结构、执行配置、依赖规则、计划校验、变更和持久化          |
 | 禁止              | MCP/JSON-RPC 适配器直接写图 JSON、调用聚合或修改 React 状态 |
 
 详细语义见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。

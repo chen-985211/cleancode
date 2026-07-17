@@ -1,4 +1,10 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
+import {
+  createServer,
+  type IncomingMessage,
+  type RequestListener,
+  type Server,
+  type ServerResponse
+} from 'node:http'
 import { randomBytes } from 'node:crypto'
 
 import type {
@@ -8,9 +14,18 @@ import type {
 } from '../../application/ports/AgentMcpServerPort'
 import { CleancodeAgentJsonRpcToolBridge } from '../rpc/CleancodeAgentJsonRpcToolBridge'
 
+const maximumMcpRequestBodyBytes = 1_048_576
+
 export class CleancodeMcpHttpServer implements AgentMcpServerPort {
   private readonly sessions = new Map<string, RegisteredHttpMcpSession>()
+  private listeningPromise: Promise<void> | null = null
   private server: Server | null = null
+
+  constructor(
+    private readonly createHttpServer: (requestListener: RequestListener) => Server = (
+      requestListener
+    ) => createServer(requestListener)
+  ) {}
 
   async registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpEndpoint> {
     await this.ensureListening()
@@ -45,18 +60,63 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
     this.server = null
   }
 
-  private async ensureListening(): Promise<void> {
+  private ensureListening(): Promise<void> {
     if (this.server?.listening) {
-      return
+      return Promise.resolve()
     }
 
-    this.server = createServer((request, response) => {
+    if (this.listeningPromise) {
+      return this.listeningPromise
+    }
+
+    const server = this.createHttpServer((request, response) => {
       void this.handleRequest(request, response)
     })
+    this.server = server
 
-    await new Promise<void>((resolve) => {
-      this.server?.listen(0, '127.0.0.1', resolve)
-    })
+    const listeningPromise = this.startListening(server)
+    this.listeningPromise = listeningPromise
+    const clearListeningPromise = (): void => {
+      if (this.listeningPromise === listeningPromise) {
+        this.listeningPromise = null
+      }
+    }
+
+    void listeningPromise.then(clearListeningPromise, clearListeningPromise)
+    return listeningPromise
+  }
+
+  private async startListening(server: Server): Promise<void> {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const stopWaitingForListenError = (): void => {
+          server.off('error', handleListenError)
+        }
+        const handleListenError = (error: Error): void => {
+          stopWaitingForListenError()
+          reject(error)
+        }
+        const handleListening = (): void => {
+          stopWaitingForListenError()
+          resolve()
+        }
+
+        server.once('error', handleListenError)
+
+        try {
+          server.listen(0, '127.0.0.1', handleListening)
+        } catch (error) {
+          stopWaitingForListenError()
+          reject(error)
+        }
+      })
+    } catch (error) {
+      if (this.server === server) {
+        this.server = null
+      }
+
+      throw error
+    }
   }
 
   private async handleRequest(request: IncomingMessage, response: ServerResponse): Promise<void> {
@@ -65,19 +125,19 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
       return
     }
 
-    const session = this.findSession(request.url ?? '')
-
-    if (!session) {
-      writeJson(response, 404, { error: 'MCP session not found.' })
-      return
-    }
-
-    if (!isAuthorized(request, session.bearerToken)) {
-      writeJson(response, 401, { error: 'Unauthorized.' })
-      return
-    }
-
     try {
+      const session = this.findSession(request.url ?? '')
+
+      if (!session) {
+        writeJson(response, 404, { error: 'MCP session not found.' })
+        return
+      }
+
+      if (!isAuthorized(request, session.bearerToken)) {
+        writeJson(response, 401, { error: 'Unauthorized.' })
+        return
+      }
+
       const body = await readJsonBody(request)
 
       if (!isJsonRpcRequest(body)) {
@@ -95,9 +155,12 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
 
       writeJson(response, 200, result)
     } catch (error) {
-      writeJson(response, 400, {
-        error: error instanceof Error ? error.message : 'Invalid MCP request.'
-      })
+      if (error instanceof McpRequestBodyTooLargeError) {
+        writeJson(response, 413, { error: 'MCP request body is too large.' })
+        return
+      }
+
+      writeJson(response, 400, { error: 'Invalid MCP request.' })
     }
   }
 
@@ -135,21 +198,38 @@ function isAuthorized(request: IncomingMessage, bearerToken: string): boolean {
 function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = ''
+    let bodyBytes = 0
+    let isSettled = false
 
     request.setEncoding('utf8')
     request.on('data', (chunk) => {
+      if (isSettled) return
+      bodyBytes += Buffer.byteLength(chunk, 'utf8')
+      if (bodyBytes > maximumMcpRequestBodyBytes) {
+        isSettled = true
+        reject(new McpRequestBodyTooLargeError())
+        return
+      }
       body += chunk
     })
     request.on('end', () => {
+      if (isSettled) return
+      isSettled = true
       try {
         resolve(JSON.parse(body))
       } catch (error) {
         reject(error)
       }
     })
-    request.on('error', reject)
+    request.on('error', (error) => {
+      if (isSettled) return
+      isSettled = true
+      reject(error)
+    })
   })
 }
+
+class McpRequestBodyTooLargeError extends Error {}
 
 function writeJson(response: ServerResponse, statusCode: number, body: unknown): void {
   response.statusCode = statusCode

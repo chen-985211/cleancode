@@ -289,7 +289,7 @@ describe('terminal group member labels', () => {
     expect(container.querySelector('[data-workbench-node-selection]')).toBeInTheDocument()
   })
 
-  it('labels only a collapsed group that proxies a terminal approval target', () => {
+  it('labels a collapsed group that proxies a terminal or connection approval target', () => {
     const { rerender } = render(
       <TerminalGroupNode
         {...createTerminalGroupNodeProps({
@@ -311,6 +311,17 @@ describe('terminal group member labels', () => {
     )
 
     expect(screen.getByText('包含待删除终端')).toBeInTheDocument()
+
+    rerender(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: true,
+          data: { approvalIntent: 'contains-disconnect' }
+        })}
+      />
+    )
+
+    expect(screen.getByText('包含待断开依赖')).toBeInTheDocument()
   })
 })
 

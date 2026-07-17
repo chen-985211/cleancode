@@ -40,4 +40,21 @@ describe('application errors', () => {
   it('falls back to no code for ordinary errors', () => {
     expect(getAppErrorCode(new Error('plain failure'))).toBeNull()
   })
+
+  it('recognizes invalid Agent tool input as a stable expected error', () => {
+    const error = createExpectedAppError(
+      'AGENT_TOOL_INPUT_INVALID',
+      'Agent tool input is invalid.',
+      { path: '$.scope', reason: 'must match exactly one schema' }
+    )
+
+    expect(serializeAppError(error)).toEqual({
+      code: 'AGENT_TOOL_INPUT_INVALID',
+      correlationId: undefined,
+      details: { path: '$.scope', reason: 'must match exactly one schema' },
+      isExpected: true,
+      message: 'Agent tool input is invalid.'
+    })
+    expect(getAppErrorCode(error)).toBe('AGENT_TOOL_INPUT_INVALID')
+  })
 })

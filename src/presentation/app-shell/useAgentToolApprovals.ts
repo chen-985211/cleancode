@@ -10,11 +10,11 @@ import {
   type SetStateAction
 } from 'react'
 
-import type { AgentToolApprovalRequest } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
 import type {
   AgentToolApprovalController,
+  AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
 } from './agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from './types'
@@ -77,7 +77,7 @@ export function useAgentToolApprovals({
   }, [])
 
   const approve = useCallback(
-    async (request: AgentToolApprovalRequest) => {
+    async (request: AgentToolApprovalPresentationRequest) => {
       setApprovalPhase(setApprovals, request.approvalId, 'approving')
 
       try {
@@ -85,6 +85,14 @@ export function useAgentToolApprovals({
           approvalId: request.approvalId
         })
 
+        if (result?.status === 'failed') {
+          setApprovalFailure(
+            setApprovals,
+            request.approvalId,
+            `操作未完成：${result.error.message}`
+          )
+          return
+        }
         if (result?.status === 'completed') setCurrentGraph(result.graph)
         removeApproval(request.approvalId)
       } catch (error) {
@@ -95,7 +103,7 @@ export function useAgentToolApprovals({
   )
 
   const reject = useCallback(
-    async (request: AgentToolApprovalRequest) => {
+    async (request: AgentToolApprovalPresentationRequest) => {
       try {
         await window.cleancode?.rejectAgentTool({ approvalId: request.approvalId })
         removeApproval(request.approvalId)
@@ -107,7 +115,7 @@ export function useAgentToolApprovals({
   )
 
   const dismiss = useCallback(
-    (request: AgentToolApprovalRequest) => removeApproval(request.approvalId),
+    (request: AgentToolApprovalPresentationRequest) => removeApproval(request.approvalId),
     [removeApproval]
   )
 
@@ -116,16 +124,22 @@ export function useAgentToolApprovals({
   }, [])
 
   const locate = useCallback(
-    (request: AgentToolApprovalRequest) => {
+    (request: AgentToolApprovalPresentationRequest) => {
       const instance = reactFlowInstanceRef.current
       const presentation = resolveAgentApprovalPresentation(request, graphRef.current)
 
       if (!instance || presentation.status === 'missing') return
 
-      const focusNodes = [
-        instance.getNode(presentation.agentNodeId),
-        instance.getNode(presentation.visibleTargetNodeId)
-      ].filter((node): node is WorkbenchFlowNode => Boolean(node))
+      const visibleTargetNodeIds =
+        presentation.targetKind === 'connection'
+          ? [presentation.visibleSourceNodeId, presentation.visibleTargetNodeId]
+          : [presentation.visibleTargetNodeId]
+      const focusNodeIds = [presentation.agentNodeId, ...visibleTargetNodeIds].filter(
+        (nodeId, index, nodeIds) => nodeIds.indexOf(nodeId) === index
+      )
+      const focusNodes = focusNodeIds
+        .map((nodeId) => instance.getNode(nodeId))
+        .filter((node): node is WorkbenchFlowNode => Boolean(node))
 
       if (focusNodes.length === 0) return
       void instance.fitView({ duration: 220, nodes: focusNodes, padding: 0.24 })

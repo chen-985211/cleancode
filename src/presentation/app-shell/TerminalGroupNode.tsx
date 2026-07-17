@@ -3,7 +3,11 @@ import { Check, X } from 'lucide-react'
 import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { agentApprovalTargetHandleId } from './agentApprovalHandles'
+import {
+  agentApprovalConnectionSourceHandleId,
+  agentApprovalConnectionTargetHandleId,
+  agentApprovalTargetHandleId
+} from './agentApprovalHandles'
 import {
   GroupAddIcon,
   GroupCollapseIcon,
@@ -63,6 +67,20 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   return (
     <section className={className} data-terminal-group-id={group.id}>
       <Handle
+        id={agentApprovalConnectionSourceHandleId}
+        className="agent-approval-intent-handle agent-approval-connection-handle--source"
+        type="source"
+        position={Position.Right}
+        isConnectable={false}
+      />
+      <Handle
+        id={agentApprovalConnectionTargetHandleId}
+        className="agent-approval-intent-handle agent-approval-connection-handle--target"
+        type="target"
+        position={Position.Left}
+        isConnectable={false}
+      />
+      <Handle
         id={agentApprovalTargetHandleId}
         className="agent-approval-intent-handle agent-approval-intent-handle--target"
         type="target"
@@ -71,6 +89,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       />
       {data.approvalIntent === 'contains-delete' ? (
         <span className="agent-approval-target-chip">包含待删除终端</span>
+      ) : data.approvalIntent === 'contains-disconnect' ? (
+        <span className="agent-approval-target-chip">包含待断开依赖</span>
       ) : null}
       <div
         data-workbench-node-title="true"

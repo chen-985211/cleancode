@@ -426,7 +426,7 @@ function createAgentIpcHandlersInput(input: {
       })),
     ipcMain: input.ipcMain,
     logger: new SilentLogger(),
-    rejectAgentTool: input.rejectAgentTool ?? (() => undefined),
+    rejectAgentTool: input.rejectAgentTool ?? (async () => undefined),
     removeWorkspaceAgent:
       input.removeWorkspaceAgent ?? (async () => [createWorkspaceAgentSnapshot('agent-1')]),
     renameWorkspaceAgent:

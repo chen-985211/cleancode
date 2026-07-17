@@ -4,6 +4,7 @@ import type { AgentToolExecutionResult } from '../use-cases/ExecuteAgentToolUseC
 export interface AgentMcpToolCallCommand {
   readonly input: Record<string, unknown>
   readonly sessionId: string
+  readonly toolCallId: string
   readonly toolName: AgentToolName
 }
 

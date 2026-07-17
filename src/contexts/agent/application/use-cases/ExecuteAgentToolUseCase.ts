@@ -4,78 +4,50 @@ import type { AgentAuditRecord } from '../../domain/entities/AgentAuditRecord'
 import { AgentToolApprovalPolicy } from '../../domain/policies/AgentToolApprovalPolicy'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 import type {
-  AgentToolOutput,
   AgentToolContext,
-  CreateBlockAgentToolInput,
-  CreateTerminalGroupAgentToolInput,
-  DeleteBlockAgentToolInput,
-  DeleteTerminalGroupAgentToolInput,
-  InspectGraphAgentToolInput,
-  UpdateBlockAgentToolInput,
-  UpdateTerminalGroupAgentToolInput
+  AgentToolInputByName,
+  AgentToolOutput,
+  AgentToolStructuredContent
 } from '../dto/AgentToolProtocol'
+import { createAgentToolFailedResult } from '../dto/AgentToolFailure'
+import { parseAgentToolInput } from '../dto/AgentToolInputValidation'
+import type { AgentToolApprovalTarget } from '../dto/AgentSessionProtocol'
 import type { AgentAuditRepository } from '../ports/AgentAuditRepository'
 import type { AgentBlockGraphToolPort } from '../ports/AgentBlockGraphToolPort'
-import type { AgentToolApprovalTarget } from '../dto/AgentSessionProtocol'
 
-interface ExecuteAgentToolBaseCommand {
+export interface ExecuteAgentToolCommand {
   readonly approved?: boolean
+  readonly input: unknown
   readonly projectDirectory: string
   readonly sessionId: string
+  readonly toolCallId: string
+  readonly toolName: AgentToolName
   readonly workspaceName: string
 }
 
-export type ExecuteAgentToolCommand =
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: InspectGraphAgentToolInput
-      readonly toolName: 'inspect_graph'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: CreateBlockAgentToolInput
-      readonly toolName: 'create_block'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: UpdateBlockAgentToolInput
-      readonly toolName: 'update_block'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: DeleteBlockAgentToolInput
-      readonly toolName: 'delete_block'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: CreateTerminalGroupAgentToolInput
-      readonly toolName: 'create_terminal_group'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: UpdateTerminalGroupAgentToolInput
-      readonly toolName: 'update_terminal_group'
-    })
-  | (ExecuteAgentToolBaseCommand & {
-      readonly input: DeleteTerminalGroupAgentToolInput
-      readonly toolName: 'delete_terminal_group'
-    })
+type AwaitingAgentToolApprovalResult = {
+  readonly approval: {
+    readonly summary: string
+    readonly target: AgentToolApprovalTarget
+    readonly toolName: AgentToolName
+  }
+  readonly status: 'awaiting_approval'
+  readonly toolCallId: string
+}
 
-export type AgentToolExecutionResult =
-  | {
-      readonly approval: {
-        readonly summary: string
-        readonly target: AgentToolApprovalTarget
-        readonly toolName: AgentToolName
-      }
-      readonly status: 'awaiting_approval'
-      readonly toolCallId: string
-    }
-  | {
-      readonly output: AgentToolOutput
-      readonly status: 'canceled'
-      readonly toolCallId: string
-    }
-  | {
-      readonly graph: BlockGraphSnapshot
-      readonly output: AgentToolOutput
-      readonly status: 'completed'
-      readonly toolCallId: string
-    }
+export type AgentToolExecutionResult = AwaitingAgentToolApprovalResult | AgentToolStructuredContent
+
+type ParsedAgentToolInvocation = {
+  [Name in AgentToolName]: {
+    readonly input: AgentToolInputByName[Name]
+    readonly toolName: Name
+  }
+}[AgentToolName]
+
+type CompletedGraphToolResult = Extract<
+  AgentToolStructuredContent,
+  { readonly graph: BlockGraphSnapshot; readonly status: 'completed' }
+>
 
 export class ExecuteAgentToolUseCase {
   private readonly approvalPolicy = new AgentToolApprovalPolicy()
@@ -86,124 +58,181 @@ export class ExecuteAgentToolUseCase {
   ) {}
 
   async execute(command: ExecuteAgentToolCommand): Promise<AgentToolExecutionResult> {
-    const toolCallId = createAgentToolCallId()
     const requiresApproval = this.approvalPolicy.requiresApproval(command.toolName)
+    let invocation: ParsedAgentToolInvocation
+
+    try {
+      invocation = parseAgentToolInvocation(command)
+    } catch (error) {
+      return this.fail(command, requiresApproval, error)
+    }
 
     if (requiresApproval && command.approved !== true) {
-      await this.recordAudit(command, toolCallId, requiresApproval, 'awaiting_approval')
-
+      await this.recordAudit(command, requiresApproval, 'awaiting_approval')
       return {
         approval: {
-          summary: createApprovalSummary(command),
-          target: createApprovalTarget(command),
-          toolName: command.toolName
+          summary: createApprovalSummary(invocation),
+          target: createApprovalTarget(invocation),
+          toolName: invocation.toolName
         },
         status: 'awaiting_approval',
-        toolCallId
+        toolCallId: command.toolCallId
       }
     }
 
-    await this.recordAudit(command, toolCallId, requiresApproval, 'started')
+    await this.recordAudit(command, requiresApproval, 'started')
+
+    let result: Extract<AgentToolStructuredContent, { readonly status: 'completed' }>
+    try {
+      result = await this.executeApprovedTool(command, invocation)
+    } catch (error) {
+      return this.fail(command, requiresApproval, error)
+    }
 
     try {
-      const result = await this.executeApprovedTool(command)
-      await this.recordAudit(command, toolCallId, requiresApproval, 'completed')
-      return { ...result, status: 'completed', toolCallId }
-    } catch (error) {
-      await this.recordAudit(command, toolCallId, requiresApproval, 'failed')
-      throw error
+      await this.recordAudit(command, requiresApproval, 'completed')
+    } catch {
+      // The graph commit is authoritative; an audit projection failure must not invite a retry.
+    }
+    return result
+  }
+
+  async cancel(
+    command: ExecuteAgentToolCommand,
+    reason: string
+  ): Promise<AgentToolExecutionResult> {
+    await this.recordAudit(
+      command,
+      this.approvalPolicy.requiresApproval(command.toolName),
+      'canceled'
+    )
+    return {
+      output: { reason, type: 'tool_canceled' },
+      status: 'canceled',
+      toolCallId: command.toolCallId
     }
   }
 
-  private async executeApprovedTool(command: ExecuteAgentToolCommand): Promise<{
-    readonly graph: BlockGraphSnapshot
-    readonly output: AgentToolOutput
-  }> {
+  private async executeApprovedTool(
+    command: ExecuteAgentToolCommand,
+    invocation: ParsedAgentToolInvocation
+  ): Promise<Extract<AgentToolStructuredContent, { readonly status: 'completed' }>> {
     const context: AgentToolContext = {
       projectDirectory: command.projectDirectory,
       workspaceName: command.workspaceName
     }
 
-    switch (command.toolName) {
+    switch (invocation.toolName) {
       case 'inspect_graph':
-        return {
-          graph: await this.blockGraphTools.inspectGraph(context),
-          output: { type: 'block_graph' }
-        }
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.inspectGraph(context),
+          { type: 'block_graph' },
+          false
+        )
       case 'create_block':
-        return this.createTerminalBlock(context, command.input)
+        return this.createTerminalBlock(command.toolCallId, context, invocation.input)
       case 'update_block':
-        return {
-          graph: await this.blockGraphTools.updateTerminalBlock(context, command.input),
-          output: { type: 'block_graph' }
-        }
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.updateTerminalBlock(context, invocation.input),
+          { type: 'block_graph' }
+        )
       case 'delete_block':
-        return {
-          graph: await this.blockGraphTools.deleteTerminalBlock(context, command.input),
-          output: { type: 'block_graph' }
-        }
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.deleteTerminalBlock(context, invocation.input),
+          { type: 'block_graph' }
+        )
       case 'create_terminal_group':
-        return this.createTerminalGroup(context, command.input)
+        return this.createTerminalGroup(command.toolCallId, context, invocation.input)
       case 'update_terminal_group':
-        return {
-          graph: await this.blockGraphTools.updateTerminalGroup(context, command.input),
-          output: { type: 'block_graph' }
-        }
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.updateTerminalGroup(context, invocation.input),
+          { type: 'block_graph' }
+        )
       case 'delete_terminal_group':
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.deleteTerminalGroup(context, invocation.input),
+          { type: 'block_graph' }
+        )
+      case 'update_terminal_execution_config':
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.updateTerminalExecutionConfig(context, invocation.input),
+          { type: 'block_graph' }
+        )
+      case 'connect_terminal_blocks': {
+        const result = await this.blockGraphTools.connectTerminalBlocks(context, invocation.input)
+        return completedGraphResult(command.toolCallId, result.graph, {
+          connectionId: result.connectionId,
+          type: 'block_graph'
+        })
+      }
+      case 'disconnect_terminal_blocks':
+        return completedGraphResult(
+          command.toolCallId,
+          await this.blockGraphTools.disconnectTerminalBlocks(context, invocation.input),
+          { type: 'block_graph' }
+        )
+      case 'inspect_terminal_workflow_plan':
         return {
-          graph: await this.blockGraphTools.deleteTerminalGroup(context, command.input),
-          output: { type: 'block_graph' }
+          graphChanged: false,
+          output: {
+            plan: await this.blockGraphTools.inspectTerminalWorkflowPlan(context, invocation.input),
+            type: 'terminal_workflow_plan'
+          },
+          status: 'completed',
+          toolCallId: command.toolCallId
         }
     }
   }
 
   private async createTerminalBlock(
+    toolCallId: string,
     context: AgentToolContext,
-    input: CreateBlockAgentToolInput
-  ): Promise<{
-    readonly graph: BlockGraphSnapshot
-    readonly output: AgentToolOutput
-  }> {
+    input: AgentToolInputByName['create_block']
+  ): Promise<CompletedGraphToolResult> {
     const beforeGraph = await this.blockGraphTools.inspectGraph(context)
     const graph = await this.blockGraphTools.createTerminalBlock(context, input)
-
-    return {
-      graph,
-      output: {
-        createdBlockId: findNewTerminalBlockId(beforeGraph, graph),
-        type: 'block_graph'
-      }
-    }
+    return completedGraphResult(toolCallId, graph, {
+      createdBlockId: findNewTerminalBlockId(beforeGraph, graph),
+      type: 'block_graph'
+    })
   }
 
   private async createTerminalGroup(
+    toolCallId: string,
     context: AgentToolContext,
-    input: CreateTerminalGroupAgentToolInput
-  ): Promise<{
-    readonly graph: BlockGraphSnapshot
-    readonly output: AgentToolOutput
-  }> {
+    input: AgentToolInputByName['create_terminal_group']
+  ): Promise<CompletedGraphToolResult> {
     const beforeGraph = await this.blockGraphTools.inspectGraph(context)
     const graph = await this.blockGraphTools.createTerminalGroup(context, input)
+    return completedGraphResult(toolCallId, graph, {
+      createdTerminalGroupId: findNewTerminalGroupId(beforeGraph, graph),
+      type: 'block_graph'
+    })
+  }
 
-    return {
-      graph,
-      output: {
-        createdTerminalGroupId: findNewTerminalGroupId(beforeGraph, graph),
-        type: 'block_graph'
-      }
-    }
+  private async fail(
+    command: ExecuteAgentToolCommand,
+    requiresApproval: boolean,
+    error: unknown
+  ): Promise<AgentToolExecutionResult> {
+    await this.recordAudit(command, requiresApproval, 'failed')
+    return createAgentToolFailedResult(command.toolCallId, error)
   }
 
   private async recordAudit(
     command: ExecuteAgentToolCommand,
-    toolCallId: string,
     requiresApproval: boolean,
     status: AgentAuditRecord['status']
   ): Promise<void> {
     await this.auditRepository.append({
       createdAt: new Date().toISOString(),
-      id: toolCallId,
+      id: command.toolCallId,
       input: command.input,
       projectDirectory: command.projectDirectory,
       requiresApproval,
@@ -215,34 +244,48 @@ export class ExecuteAgentToolUseCase {
   }
 }
 
-function createApprovalTarget(command: ExecuteAgentToolCommand): AgentToolApprovalTarget {
-  if (command.toolName === 'delete_block') {
-    return { blockId: command.input.blockId, kind: 'terminal_block' }
-  }
-
-  if (command.toolName === 'delete_terminal_group') {
-    return { kind: 'terminal_group', terminalGroupId: command.input.terminalGroupId }
-  }
-
-  throw createUnexpectedAppError('Approval target is not defined for this Agent tool.', {
+function parseAgentToolInvocation(command: ExecuteAgentToolCommand): ParsedAgentToolInvocation {
+  return {
+    input: parseAgentToolInput(command.toolName, command.input),
     toolName: command.toolName
+  } as ParsedAgentToolInvocation
+}
+
+function createApprovalTarget(invocation: ParsedAgentToolInvocation): AgentToolApprovalTarget {
+  if (invocation.toolName === 'delete_block') {
+    return { blockId: invocation.input.blockId, kind: 'terminal_block' }
+  }
+  if (invocation.toolName === 'delete_terminal_group') {
+    return { kind: 'terminal_group', terminalGroupId: invocation.input.terminalGroupId }
+  }
+  if (invocation.toolName === 'disconnect_terminal_blocks') {
+    return { connectionId: invocation.input.connectionId, kind: 'terminal_connection' }
+  }
+  throw createUnexpectedAppError('Approval target is not defined for this Agent tool.', {
+    toolName: invocation.toolName
   })
 }
 
-function createApprovalSummary(command: ExecuteAgentToolCommand): string {
-  if (command.toolName === 'delete_block') {
-    return `删除终端积木 ${command.input.blockId}`
+function createApprovalSummary(invocation: ParsedAgentToolInvocation): string {
+  if (invocation.toolName === 'delete_block') {
+    return `删除终端积木 ${invocation.input.blockId}`
   }
-
-  if (command.toolName === 'delete_terminal_group') {
-    return `删除组合终端 ${command.input.terminalGroupId}`
+  if (invocation.toolName === 'delete_terminal_group') {
+    return `删除组合终端 ${invocation.input.terminalGroupId}`
   }
-
-  return command.toolName
+  if (invocation.toolName === 'disconnect_terminal_blocks') {
+    return `断开终端依赖 ${invocation.input.connectionId}`
+  }
+  return invocation.toolName
 }
 
-function createAgentToolCallId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `agent-tool-${Date.now()}-${Math.random()}`
+function completedGraphResult(
+  toolCallId: string,
+  graph: BlockGraphSnapshot,
+  output: Extract<AgentToolOutput, { readonly type: 'block_graph' }>,
+  graphChanged = true
+): CompletedGraphToolResult {
+  return { graph, graphChanged, output, status: 'completed', toolCallId }
 }
 
 function findNewTerminalBlockId(
@@ -250,7 +293,6 @@ function findNewTerminalBlockId(
   afterGraph: BlockGraphSnapshot
 ): string | undefined {
   const previousBlockIds = new Set(beforeGraph.blocks.map((block) => block.id))
-
   return afterGraph.blocks.find((block) => !previousBlockIds.has(block.id))?.id
 }
 
@@ -259,6 +301,5 @@ function findNewTerminalGroupId(
   afterGraph: BlockGraphSnapshot
 ): string | undefined {
   const previousTerminalGroupIds = new Set(beforeGraph.terminalGroups.map((group) => group.id))
-
   return afterGraph.terminalGroups.find((group) => !previousTerminalGroupIds.has(group.id))?.id
 }

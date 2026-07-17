@@ -3,9 +3,10 @@ import {
   cleancodeMcpDeveloperInstructions,
   cleancodeMcpInstructions
 } from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
+import type { AgentToolJsonSchema } from '../../../../src/contexts/agent/application/dto/AgentToolJsonSchema'
 
 describe('agent tool protocol', () => {
-  it('exposes only first-phase cleancode block graph tools', () => {
+  it('exposes the complete first-phase cleancode workflow authoring tool catalog', () => {
     expect(agentToolDefinitions.map((tool) => tool.name)).toEqual([
       'inspect_graph',
       'create_block',
@@ -13,11 +14,15 @@ describe('agent tool protocol', () => {
       'delete_block',
       'create_terminal_group',
       'update_terminal_group',
-      'delete_terminal_group'
+      'delete_terminal_group',
+      'update_terminal_execution_config',
+      'connect_terminal_blocks',
+      'disconnect_terminal_blocks',
+      'inspect_terminal_workflow_plan'
     ])
     expect(
       agentToolDefinitions.filter((tool) => tool.requiresApproval).map((tool) => tool.name)
-    ).toEqual(['delete_block', 'delete_terminal_group'])
+    ).toEqual(['delete_block', 'delete_terminal_group', 'disconnect_terminal_blocks'])
     expect(agentToolDefinitions.map((tool) => tool.name)).not.toEqual(
       expect.arrayContaining([
         'list_project_files',
@@ -28,6 +33,76 @@ describe('agent tool protocol', () => {
         'read_terminal_output',
         'stop_terminal'
       ])
+    )
+  })
+
+  it('declares strict discriminated workflow authoring input schemas', () => {
+    const updateExecutionConfig = requireTool('update_terminal_execution_config')
+    const connectTerminals = requireTool('connect_terminal_blocks')
+    const disconnectTerminals = requireTool('disconnect_terminal_blocks')
+    const inspectPlan = requireTool('inspect_terminal_workflow_plan')
+
+    expect(updateExecutionConfig.inputSchema).toMatchObject({
+      additionalProperties: false,
+      required: ['blockId', 'executionConfig'],
+      type: 'object'
+    })
+    expect(readSchemaProperty(updateExecutionConfig.inputSchema, 'executionConfig')).toMatchObject({
+      oneOf: expect.arrayContaining([
+        expect.objectContaining({
+          additionalProperties: false,
+          required: ['mode', 'successExitCodes', 'timeoutMs']
+        }),
+        expect.objectContaining({
+          additionalProperties: false,
+          required: ['mode', 'readiness', 'readinessTimeoutMs']
+        })
+      ])
+    })
+    expect(connectTerminals.inputSchema).toMatchObject({
+      additionalProperties: false,
+      required: ['sourceBlockId', 'targetBlockId']
+    })
+    expect(disconnectTerminals.inputSchema).toMatchObject({
+      additionalProperties: false,
+      required: ['connectionId']
+    })
+    expect(readSchemaProperty(inspectPlan.inputSchema, 'scope')).toMatchObject({
+      oneOf: [
+        expect.objectContaining({ additionalProperties: false, required: ['type'] }),
+        expect.objectContaining({
+          additionalProperties: false,
+          required: ['type', 'blockId']
+        })
+      ]
+    })
+  })
+
+  it('declares an output schema for every structured tool result', () => {
+    for (const tool of agentToolDefinitions) {
+      expect(tool.outputSchema).toMatchObject({
+        type: 'object',
+        oneOf: expect.arrayContaining([
+          expect.objectContaining({
+            additionalProperties: false,
+            required: expect.arrayContaining(['status', 'toolCallId'])
+          }),
+          expect.objectContaining({
+            additionalProperties: false,
+            required: ['status', 'toolCallId', 'error']
+          })
+        ])
+      })
+    }
+
+    expect(requireTool('inspect_graph').outputSchema).toEqual(
+      expect.objectContaining({ oneOf: expect.arrayContaining([completedGraphResultSchema]) })
+    )
+    expect(requireTool('inspect_terminal_workflow_plan').outputSchema).toEqual(
+      expect.objectContaining({ oneOf: expect.arrayContaining([completedPlanResultSchema]) })
+    )
+    expect(requireTool('disconnect_terminal_blocks').outputSchema).toEqual(
+      expect.objectContaining({ oneOf: expect.arrayContaining([canceledResultSchema]) })
     )
   })
 
@@ -74,9 +149,14 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpDeveloperInstructions).toContain('inspect_graph')
     expect(cleancodeMcpDeveloperInstructions).toContain('create_block')
     expect(cleancodeMcpDeveloperInstructions).toContain('create_terminal_group')
+    expect(cleancodeMcpDeveloperInstructions).toContain('update_terminal_execution_config')
+    expect(cleancodeMcpDeveloperInstructions).toContain('connect_terminal_blocks')
+    expect(cleancodeMcpDeveloperInstructions).toContain('inspect_terminal_workflow_plan')
     expect(cleancodeMcpDeveloperInstructions).toContain('shell processes')
     expect(cleancodeMcpDeveloperInstructions).toMatch(/do not claim/i)
+    expect(cleancodeMcpDeveloperInstructions).toContain('cannot start it')
     expect(cleancodeMcpDeveloperInstructions).toContain('source-code implementation')
+    expect(cleancodeMcpInstructions).toContain('not workflow nodes')
   })
 
   it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {
@@ -112,12 +192,32 @@ describe('agent tool protocol', () => {
         openWorldHint: false,
         readOnlyHint: false
       },
+      disconnect_terminal_blocks: {
+        destructiveHint: true,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
       inspect_graph: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: true
       },
+      inspect_terminal_workflow_plan: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: true
+      },
+      connect_terminal_blocks: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
       update_block: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      update_terminal_execution_config: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: false
@@ -130,3 +230,51 @@ describe('agent tool protocol', () => {
     })
   })
 })
+
+const completedGraphResultSchema = expect.objectContaining({
+  properties: expect.objectContaining({
+    graph: expect.objectContaining({ type: 'object' }),
+    graphChanged: expect.objectContaining({ const: expect.any(Boolean) }),
+    output: expect.objectContaining({
+      properties: expect.objectContaining({ type: { const: 'block_graph' } })
+    }),
+    status: { const: 'completed' }
+  }),
+  required: ['status', 'toolCallId', 'graphChanged', 'graph', 'output']
+})
+
+const completedPlanResultSchema = expect.objectContaining({
+  properties: expect.objectContaining({
+    graphChanged: { const: false },
+    output: expect.objectContaining({
+      properties: expect.objectContaining({
+        plan: expect.objectContaining({ type: 'object' }),
+        type: { const: 'terminal_workflow_plan' }
+      })
+    }),
+    status: { const: 'completed' }
+  }),
+  required: ['status', 'toolCallId', 'graphChanged', 'output']
+})
+
+const canceledResultSchema = expect.objectContaining({
+  properties: expect.objectContaining({ status: { const: 'canceled' } }),
+  required: ['status', 'toolCallId', 'output']
+})
+
+function requireTool(name: (typeof agentToolDefinitions)[number]['name']) {
+  const tool = agentToolDefinitions.find((candidate) => candidate.name === name)
+
+  if (!tool) throw new Error(`Expected Agent tool definition: ${name}`)
+  return tool
+}
+
+function readSchemaProperty(schema: AgentToolJsonSchema, propertyName: string): unknown {
+  const properties = schema.properties
+
+  if (!properties || typeof properties !== 'object') {
+    throw new Error(`Expected object schema property: ${propertyName}`)
+  }
+
+  return properties[propertyName]
+}

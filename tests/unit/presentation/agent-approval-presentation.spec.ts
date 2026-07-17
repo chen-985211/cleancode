@@ -2,8 +2,10 @@ import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/appli
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
   createAgentApprovalIntentEdges,
+  createAgentApprovalNodeIntents,
   resolveAgentApprovalPresentation
 } from '../../../src/presentation/app-shell/agentApprovalPresentation'
+import type { AgentToolApprovalPresentationRequest } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 
 describe('Agent approval presentation', () => {
   it('uses a collapsed containing group as the visible proxy for a terminal target', () => {
@@ -69,6 +71,47 @@ describe('Agent approval presentation', () => {
       createAgentApprovalIntentEdges([{ phase: 'awaiting', request: approval }], graph)
     ).toEqual([])
   })
+
+  it('resolves a terminal connection and uses its collapsed group as a visible proxy', () => {
+    const approval = createConnectionApproval('connection-api-web')
+    const viewState = { phase: 'awaiting' as const, request: approval }
+
+    expect(resolveAgentApprovalPresentation(viewState, graph)).toMatchObject({
+      connection: {
+        id: 'connection-api-web',
+        sourceBlockId: 'terminal-api',
+        targetBlockId: 'terminal-web'
+      },
+      sourceBlock: { id: 'terminal-api', name: 'Backend API' },
+      sourceIsGroupProxy: true,
+      status: 'resolved',
+      targetBlock: { id: 'terminal-web', name: 'Admin Web' },
+      targetIsGroupProxy: true,
+      targetKind: 'connection',
+      visibleSourceNodeId: 'group-app',
+      visibleTargetNodeId: 'group-app'
+    })
+    expect(createAgentApprovalNodeIntents([viewState], graph).get('group-app')).toBe(
+      'contains-disconnect'
+    )
+    expect(createAgentApprovalIntentEdges([viewState], graph)).toEqual([
+      expect.objectContaining({
+        data: expect.objectContaining({ label: '断开' }),
+        source: 'agent:agent-1',
+        target: 'group-app'
+      })
+    ])
+  })
+
+  it('treats a missing terminal connection as an unavailable approval target', () => {
+    const approval = createConnectionApproval('missing-connection')
+
+    expect(resolveAgentApprovalPresentation(approval, graph)).toMatchObject({
+      status: 'missing',
+      targetId: 'missing-connection',
+      targetKind: 'connection'
+    })
+  })
 })
 
 function createApproval(target: AgentToolApprovalRequest['target']): AgentToolApprovalRequest {
@@ -80,6 +123,19 @@ function createApproval(target: AgentToolApprovalRequest['target']): AgentToolAp
     summary: '删除画布对象',
     target,
     toolName: target.kind === 'terminal_block' ? 'delete_block' : 'delete_terminal_group',
+    workspaceName: 'main'
+  }
+}
+
+function createConnectionApproval(connectionId: string): AgentToolApprovalPresentationRequest {
+  return {
+    agentId: 'agent-1',
+    approvalId: 'approval-connection-1',
+    projectDirectory: '/repo/app',
+    sessionId: 'session-1',
+    summary: `断开终端依赖 ${connectionId}`,
+    target: { connectionId, kind: 'terminal_connection' },
+    toolName: 'disconnect_terminal_blocks',
     workspaceName: 'main'
   }
 }
@@ -107,6 +163,13 @@ const graph: BlockGraphSnapshot = {
   ],
   id: 'graph-1',
   projectId: 'project-1',
+  connections: [
+    {
+      id: 'connection-api-web',
+      sourceBlockId: 'terminal-api',
+      targetBlockId: 'terminal-web'
+    }
+  ],
   terminalGroups: [
     {
       id: 'group-app',

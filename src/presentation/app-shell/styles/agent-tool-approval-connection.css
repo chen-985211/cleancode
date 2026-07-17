@@ -1,0 +1,58 @@
+.agent-tool-approval-card__connection-endpoints {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.agent-tool-approval-card__connection-endpoint {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.agent-tool-approval-card__connection-endpoint > strong {
+  overflow: hidden;
+  color: var(--cc-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-tool-approval-card__connection-arrow {
+  color: var(--cc-warning-strong);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.agent-tool-approval-card__target--connection .agent-tool-approval-card__target-meta code {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.terminal-workflow-edge--approval-target .react-flow__edge-path,
+.terminal-workflow-edge--approval-target .react-flow__arrowhead polyline {
+  stroke: var(--cc-warning);
+}
+
+.terminal-workflow-edge--approval-target .react-flow__edge-path {
+  stroke-width: 3;
+}
+
+.terminal-workflow-edge--approval-proxy .react-flow__edge-path {
+  stroke-dasharray: 8 7;
+}
+
+.terminal-workflow-edge--approval-failed .react-flow__edge-path,
+.terminal-workflow-edge--approval-failed .react-flow__arrowhead polyline {
+  stroke: var(--cc-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-workflow-edge--approval-proxy.animated path {
+    animation: none;
+  }
+}

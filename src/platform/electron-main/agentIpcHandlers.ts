@@ -53,7 +53,7 @@ export interface AgentIpcHandlersInput {
   readonly inspectCodexCli: () => Promise<CodexCliInstallationSnapshot>
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
-  readonly rejectAgentTool: (approvalId: string) => void
+  readonly rejectAgentTool: (approvalId: string) => Promise<void>
   readonly removeWorkspaceAgent: (command: {
     readonly agentId: string
     readonly projectId: string

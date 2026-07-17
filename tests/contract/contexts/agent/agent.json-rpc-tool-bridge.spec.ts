@@ -1,4 +1,5 @@
 import { CleancodeAgentJsonRpcToolBridge } from '../../../../src/contexts/agent/infrastructure/rpc/CleancodeAgentJsonRpcToolBridge'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('cleancode agent JSON-RPC tool bridge', () => {
   it('returns cleancode workspace instructions during MCP initialization', async () => {
@@ -20,7 +21,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       jsonrpc: '2.0',
       result: expect.objectContaining({
         instructions: expect.stringContaining('terminal blocks'),
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.1.0' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.2.0' }
       })
     })
   })
@@ -107,7 +108,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
   })
 
   it('calls agent tools through the application use case', async () => {
-    const executeMcpTool = vi.fn(async () => ({
+    const executeMcpTool = vi.fn(async (command: { readonly toolCallId: string }) => ({
       graph: {
         blocks: [],
         id: 'graph-1',
@@ -116,11 +117,12 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
         viewport: { x: 0, y: 0, zoom: 1 },
         workspaceName: 'main'
       },
+      graphChanged: true,
       output: {
         type: 'block_graph' as const
       },
       status: 'completed' as const,
-      toolCallId: 'tool-call-1'
+      toolCallId: command.toolCallId
     }))
     const bridge = new CleancodeAgentJsonRpcToolBridge({
       executeMcpTool,
@@ -129,21 +131,21 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       workspaceName: 'main'
     })
 
-    await expect(
-      bridge.handle({
-        id: 'call-1',
-        jsonrpc: '2.0',
-        method: 'tools/call',
-        params: {
-          arguments: {
-            name: 'Frontend',
-            position: { x: 120, y: 80 },
-            type: 'terminal'
-          },
-          name: 'create_block'
-        }
-      })
-    ).resolves.toEqual({
+    const response = await bridge.handle({
+      id: 'call-1',
+      jsonrpc: '2.0',
+      method: 'tools/call',
+      params: {
+        arguments: {
+          name: 'Frontend',
+          position: { x: 120, y: 80 },
+          type: 'terminal'
+        },
+        name: 'create_block'
+      }
+    })
+
+    expect(response).toEqual({
       id: 'call-1',
       jsonrpc: '2.0',
       result: {
@@ -156,21 +158,146 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
         isError: false,
         structuredContent: expect.objectContaining({
           status: 'completed',
-          toolCallId: 'tool-call-1'
+          toolCallId: expect.any(String)
         })
       }
     })
-    expect(executeMcpTool).toHaveBeenCalledWith({
-      input: {
-        name: 'Frontend',
-        position: { x: 120, y: 80 },
-        type: 'terminal'
-      },
+    expect(executeMcpTool).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          name: 'Frontend',
+          position: { x: 120, y: 80 },
+          type: 'terminal'
+        },
+        sessionId: 'agent-session-1',
+        toolCallId: expect.any(String),
+        toolName: 'create_block'
+      })
+    )
+    const command = executeMcpTool.mock.calls[0]?.[0]
+    expect(command?.toolCallId).toBe(readStructuredToolCallId(response))
+  })
+
+  it('rejects an explicit non-object arguments value before application execution', async () => {
+    const executeMcpTool = vi.fn()
+    const bridge = new CleancodeAgentJsonRpcToolBridge({
+      executeMcpTool,
+      projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      toolName: 'create_block'
+      workspaceName: 'main'
+    })
+
+    await expect(
+      bridge.handle({
+        id: 'invalid-call',
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { arguments: null, name: 'inspect_graph' }
+      })
+    ).resolves.toEqual({
+      error: { code: -32602, message: 'Invalid tool call.' },
+      id: 'invalid-call',
+      jsonrpc: '2.0'
+    })
+    expect(executeMcpTool).not.toHaveBeenCalled()
+  })
+
+  it('returns recognized application errors as HTTP-safe MCP tool failures', async () => {
+    const executeMcpTool = vi.fn(async (command: { readonly toolCallId: string }) => {
+      expect(command.toolCallId).toEqual(expect.any(String))
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.', {
+        blockId: 'terminal-missing'
+      })
+    })
+    const bridge = new CleancodeAgentJsonRpcToolBridge({
+      executeMcpTool,
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+
+    const response = await bridge.handle({
+      id: 'failed-call',
+      jsonrpc: '2.0',
+      method: 'tools/call',
+      params: { arguments: { blockId: 'terminal-missing' }, name: 'update_block' }
+    })
+
+    expect(response).toEqual({
+      id: 'failed-call',
+      jsonrpc: '2.0',
+      result: {
+        content: [
+          {
+            text: expect.stringContaining('TERMINAL_BLOCK_NOT_FOUND'),
+            type: 'text'
+          }
+        ],
+        isError: true,
+        structuredContent: {
+          error: {
+            code: 'TERMINAL_BLOCK_NOT_FOUND',
+            details: { blockId: 'terminal-missing' },
+            isExpected: true,
+            message: 'Terminal block was not found.'
+          },
+          status: 'failed',
+          toolCallId: expect.any(String)
+        }
+      }
+    })
+    expect(executeMcpTool.mock.calls[0]?.[0].toolCallId).toBe(readStructuredToolCallId(response))
+  })
+
+  it('sanitizes unexpected execution failures', async () => {
+    const bridge = new CleancodeAgentJsonRpcToolBridge({
+      executeMcpTool: vi.fn(async () => {
+        throw new Error('secret filesystem path')
+      }),
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+
+    const response = await bridge.handle({
+      id: 'unexpected-call',
+      jsonrpc: '2.0',
+      method: 'tools/call',
+      params: { name: 'inspect_graph' }
+    })
+
+    expect(JSON.stringify(response)).not.toContain('secret filesystem path')
+    expect(response).toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: {
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            isExpected: false,
+            message: 'Unexpected application error.'
+          },
+          status: 'failed'
+        }
+      }
     })
   })
 })
+
+function readStructuredToolCallId(
+  response: Awaited<ReturnType<CleancodeAgentJsonRpcToolBridge['handle']>>
+): string {
+  if (
+    !response ||
+    !('result' in response) ||
+    !isRecord(response.result) ||
+    !isRecord(response.result.structuredContent) ||
+    typeof response.result.structuredContent.toolCallId !== 'string'
+  ) {
+    throw new Error('Expected structured MCP tool result.')
+  }
+
+  return response.result.structuredContent.toolCallId
+}
 
 function readToolsListResult(
   response: Awaited<ReturnType<CleancodeAgentJsonRpcToolBridge['handle']>>
@@ -199,4 +326,8 @@ function isToolsListResult(
     value !== null &&
     Array.isArray((value as { readonly tools?: unknown }).tools)
   )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

@@ -109,9 +109,10 @@ const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCas
 const updateTerminalExecutionConfigUseCase = new UpdateTerminalExecutionConfigUseCase(
   graphRepository
 )
+const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
 const terminalWorkflowService = new TerminalWorkflowService(
-  new BlockGraphTerminalWorkflowPlanAdapter(new BuildTerminalWorkflowPlanUseCase(graphRepository)),
+  new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase),
   new TerminalSessionWorkflowRuntimeAdapter(terminalSessionService),
   new NodeTcpReadinessAdapter(),
   {
@@ -139,16 +140,20 @@ const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
   agentSessionRepository
 )
 const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
+  buildTerminalWorkflowPlan: (query) => buildTerminalWorkflowPlanUseCase.execute(query),
+  connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
   deleteBlock: (command) => deleteBlockUseCase.execute(command),
   dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
+  disconnectTerminalBlocks: (command) => disconnectTerminalBlocksUseCase.execute(command),
   getDefaultGraph: getDefaultGraphForAgent,
   moveBlock: (command) => moveBlockUseCase.execute(command),
   moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
   resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
   setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),
+  updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command),
   updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command)
 })
 const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
@@ -158,7 +163,7 @@ const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
 const agentSessionService = new AgentSessionService(
   new NodePtyCodexAgentProcessAdapter(),
   new CleancodeMcpHttpServer(),
-  (command) => executeAgentToolUseCase.execute(command),
+  executeAgentToolUseCase,
   agentSessionRepository,
   createAgentRuntimeScopeValidation(
     agentSessionRepository,

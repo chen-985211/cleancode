@@ -1,6 +1,5 @@
 import { MarkerType, type Edge } from '@xyflow/react'
 
-import type { AgentToolApprovalRequest } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type {
   BlockGraphSnapshot,
   TerminalBlockSnapshot,
@@ -8,18 +7,35 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { agentApprovalSourceHandleId, agentApprovalTargetHandleId } from './agentApprovalHandles'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
-import type { AgentApprovalNodeIntent, AgentToolApprovalViewState } from './agentToolApprovalTypes'
+import type {
+  AgentApprovalNodeIntent,
+  AgentToolApprovalPresentationRequest,
+  AgentToolApprovalViewState
+} from './agentToolApprovalTypes'
 
 interface AgentApprovalPresentationBase {
   readonly agentNodeId: string
   readonly approval: AgentToolApprovalViewState
   readonly targetId: string
-  readonly targetKind: 'group' | 'terminal'
+  readonly targetKind: 'connection' | 'group' | 'terminal'
 }
 
 export type AgentApprovalPresentation =
   | (AgentApprovalPresentationBase & {
       readonly status: 'missing'
+    })
+  | (AgentApprovalPresentationBase & {
+      readonly connection: NonNullable<BlockGraphSnapshot['connections']>[number]
+      readonly sourceBlock: TerminalBlockSnapshot
+      readonly sourceContainingGroup: TerminalGroupSnapshot | null
+      readonly sourceIsGroupProxy: boolean
+      readonly status: 'resolved'
+      readonly targetBlock: TerminalBlockSnapshot
+      readonly targetContainingGroup: TerminalGroupSnapshot | null
+      readonly targetIsGroupProxy: boolean
+      readonly targetKind: 'connection'
+      readonly visibleSourceNodeId: string
+      readonly visibleTargetNodeId: string
     })
   | (AgentApprovalPresentationBase & {
       readonly block: TerminalBlockSnapshot
@@ -38,12 +54,12 @@ export type AgentApprovalPresentation =
     })
 
 export interface AgentApprovalIntentEdgeData extends Record<string, unknown> {
-  readonly label: '删除' | '解散'
+  readonly label: '删除' | '断开' | '解散'
   readonly phase: AgentToolApprovalViewState['phase']
 }
 
 export function resolveAgentApprovalPresentation(
-  approval: AgentToolApprovalViewState | AgentToolApprovalRequest,
+  approval: AgentToolApprovalViewState | AgentToolApprovalPresentationRequest,
   graph: BlockGraphSnapshot | null
 ): AgentApprovalPresentation {
   const viewState = toApprovalViewState(approval)
@@ -81,25 +97,34 @@ export function resolveAgentApprovalPresentation(
     }
   }
 
-  const targetId = request.target.terminalGroupId
-  const group = graph?.terminalGroups.find((candidate) => candidate.id === targetId)
+  if (request.target.kind === 'terminal_group') {
+    const targetId = request.target.terminalGroupId
+    const group = graph?.terminalGroups.find((candidate) => candidate.id === targetId)
 
-  if (!group) {
-    return { agentNodeId, approval: viewState, status: 'missing', targetId, targetKind: 'group' }
+    if (!group) {
+      return { agentNodeId, approval: viewState, status: 'missing', targetId, targetKind: 'group' }
+    }
+
+    const memberIds = new Set(group.memberBlockIds)
+
+    return {
+      agentNodeId,
+      approval: viewState,
+      group,
+      memberBlocks: (graph?.blocks ?? []).filter((block) => memberIds.has(block.id)),
+      status: 'resolved',
+      targetId,
+      targetKind: 'group',
+      visibleTargetNodeId: group.id
+    }
   }
 
-  const memberIds = new Set(group.memberBlockIds)
-
-  return {
+  return resolveTerminalConnectionApproval(
+    viewState,
+    graph,
     agentNodeId,
-    approval: viewState,
-    group,
-    memberBlocks: (graph?.blocks ?? []).filter((block) => memberIds.has(block.id)),
-    status: 'resolved',
-    targetId,
-    targetKind: 'group',
-    visibleTargetNodeId: group.id
-  }
+    request.target.connectionId
+  )
 }
 
 export function createAgentApprovalIntentEdges(
@@ -116,7 +141,7 @@ export function createAgentApprovalIntentEdges(
         animated: approval.phase === 'approving',
         className: `agent-approval-intent-edge agent-approval-intent-edge--${approval.phase}`,
         data: {
-          label: presentation.targetKind === 'terminal' ? '删除' : '解散',
+          label: resolveApprovalIntentLabel(presentation.targetKind),
           phase: approval.phase
         },
         deletable: false,
@@ -149,6 +174,15 @@ export function createAgentApprovalNodeIntents(
     const presentation = resolveAgentApprovalPresentation(approval, graph)
 
     if (presentation.status === 'missing') continue
+    if (presentation.targetKind === 'connection') {
+      if (presentation.sourceIsGroupProxy) {
+        intents.set(presentation.visibleSourceNodeId, 'contains-disconnect')
+      }
+      if (presentation.targetIsGroupProxy) {
+        intents.set(presentation.visibleTargetNodeId, 'contains-disconnect')
+      }
+      continue
+    }
     if (presentation.targetKind === 'group') {
       intents.set(presentation.visibleTargetNodeId, 'dissolve')
       continue
@@ -164,7 +198,67 @@ export function createAgentApprovalNodeIntents(
 }
 
 function toApprovalViewState(
-  approval: AgentToolApprovalViewState | AgentToolApprovalRequest
+  approval: AgentToolApprovalViewState | AgentToolApprovalPresentationRequest
 ): AgentToolApprovalViewState {
   return 'request' in approval ? approval : { phase: 'awaiting', request: approval }
+}
+
+function resolveTerminalConnectionApproval(
+  approval: AgentToolApprovalViewState,
+  graph: BlockGraphSnapshot | null,
+  agentNodeId: string,
+  targetId: string
+): AgentApprovalPresentation {
+  const connection = (graph?.connections ?? []).find((candidate) => candidate.id === targetId)
+  const sourceBlock = graph?.blocks.find((block) => block.id === connection?.sourceBlockId)
+  const targetBlock = graph?.blocks.find((block) => block.id === connection?.targetBlockId)
+
+  if (!connection || !sourceBlock || !targetBlock) {
+    return {
+      agentNodeId,
+      approval,
+      status: 'missing',
+      targetId,
+      targetKind: 'connection'
+    }
+  }
+
+  const sourceContainingGroup = findContainingGroup(graph, sourceBlock.id)
+  const targetContainingGroup = findContainingGroup(graph, targetBlock.id)
+  const sourceIsGroupProxy = sourceContainingGroup?.isCollapsed === true
+  const targetIsGroupProxy = targetContainingGroup?.isCollapsed === true
+
+  return {
+    agentNodeId,
+    approval,
+    connection,
+    sourceBlock,
+    sourceContainingGroup,
+    sourceIsGroupProxy,
+    status: 'resolved',
+    targetBlock,
+    targetContainingGroup,
+    targetId,
+    targetIsGroupProxy,
+    targetKind: 'connection',
+    visibleSourceNodeId:
+      sourceIsGroupProxy && sourceContainingGroup ? sourceContainingGroup.id : sourceBlock.id,
+    visibleTargetNodeId:
+      targetIsGroupProxy && targetContainingGroup ? targetContainingGroup.id : targetBlock.id
+  }
+}
+
+function findContainingGroup(
+  graph: BlockGraphSnapshot | null,
+  blockId: string
+): TerminalGroupSnapshot | null {
+  return graph?.terminalGroups.find((group) => group.memberBlockIds.includes(blockId)) ?? null
+}
+
+function resolveApprovalIntentLabel(
+  targetKind: AgentApprovalPresentation['targetKind']
+): AgentApprovalIntentEdgeData['label'] {
+  if (targetKind === 'terminal') return '删除'
+  if (targetKind === 'connection') return '断开'
+  return '解散'
 }

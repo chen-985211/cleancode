@@ -8,6 +8,6 @@ export interface AgentAuditRecord {
   readonly toolName: AgentToolName
   readonly input: unknown
   readonly requiresApproval: boolean
-  readonly status: 'awaiting_approval' | 'started' | 'completed' | 'failed'
+  readonly status: 'awaiting_approval' | 'started' | 'completed' | 'failed' | 'canceled'
   readonly createdAt: string
 }

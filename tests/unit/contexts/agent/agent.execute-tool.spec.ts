@@ -21,15 +21,17 @@ describe('execute agent tool', () => {
       },
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-create',
       toolName: 'create_block',
       workspaceName: 'main'
     })
 
     expect(result).toEqual({
       graph: fakeGraphWithApiBlock,
+      graphChanged: true,
       output: { createdBlockId: 'terminal-api', type: 'block_graph' },
       status: 'completed',
-      toolCallId: expect.any(String)
+      toolCallId: 'tool-call-create'
     })
     expect(blockGraphTools.createTerminalBlock).toHaveBeenCalledWith(
       {
@@ -46,6 +48,7 @@ describe('execute agent tool', () => {
     )
     expect(auditRepository.records).toEqual([
       expect.objectContaining({
+        id: 'tool-call-create',
         projectDirectory: '/tmp/project',
         requiresApproval: false,
         sessionId: 'agent-session-1',
@@ -54,6 +57,7 @@ describe('execute agent tool', () => {
         workspaceName: 'main'
       }),
       expect.objectContaining({
+        id: 'tool-call-create',
         projectDirectory: '/tmp/project',
         requiresApproval: false,
         sessionId: 'agent-session-1',
@@ -77,15 +81,17 @@ describe('execute agent tool', () => {
       },
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-group-create',
       toolName: 'create_terminal_group',
       workspaceName: 'main'
     })
 
     expect(result).toEqual({
       graph: fakeGraphWithTerminalGroup,
+      graphChanged: true,
       output: { createdTerminalGroupId: 'terminal-group-dev-test', type: 'block_graph' },
       status: 'completed',
-      toolCallId: expect.any(String)
+      toolCallId: 'tool-call-group-create'
     })
   })
 
@@ -98,6 +104,7 @@ describe('execute agent tool', () => {
       input: { blockId: 'terminal-1' },
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-delete',
       toolName: 'delete_block',
       workspaceName: 'main'
     })
@@ -109,7 +116,7 @@ describe('execute agent tool', () => {
         toolName: 'delete_block'
       },
       status: 'awaiting_approval',
-      toolCallId: expect.any(String)
+      toolCallId: 'tool-call-delete'
     })
     expect(blockGraphTools.deleteTerminalBlock).not.toHaveBeenCalled()
     expect(auditRepository.records).toEqual([
@@ -131,6 +138,7 @@ describe('execute agent tool', () => {
       input: { terminalGroupId: 'group-1' },
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-group-delete',
       toolName: 'delete_terminal_group',
       workspaceName: 'main'
     })
@@ -154,15 +162,17 @@ describe('execute agent tool', () => {
       input: { terminalGroupId: 'group-1' },
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-group-delete',
       toolName: 'delete_terminal_group',
       workspaceName: 'main'
     })
 
     expect(result).toEqual({
       graph: fakeGraph,
+      graphChanged: true,
       output: { type: 'block_graph' },
       status: 'completed',
-      toolCallId: expect.any(String)
+      toolCallId: 'tool-call-group-delete'
     })
     expect(blockGraphTools.deleteTerminalGroup).toHaveBeenCalledWith(
       {
@@ -182,6 +192,190 @@ describe('execute agent tool', () => {
         status: 'completed',
         toolName: 'delete_terminal_group'
       })
+    ])
+  })
+
+  it('routes terminal execution config, connection, and workflow plan tools through BlockGraph', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.connectTerminalBlocks).mockResolvedValue({
+      connectionId: 'connection-api-test',
+      graph: fakeGraph
+    })
+    vi.mocked(blockGraphTools.inspectTerminalWorkflowPlan).mockResolvedValue({
+      graphId: 'graph-1',
+      nodes: [],
+      workspaceName: 'main'
+    })
+    const executeTool = new ExecuteAgentToolUseCase(
+      blockGraphTools,
+      new RecordingAgentAuditRepository()
+    )
+
+    await expect(
+      executeTool.execute({
+        input: {
+          blockId: 'terminal-api',
+          executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
+        },
+        projectDirectory: '/tmp/project',
+        sessionId: 'agent-session-1',
+        toolCallId: 'tool-config',
+        toolName: 'update_terminal_execution_config',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      graph: fakeGraph,
+      graphChanged: true,
+      output: { type: 'block_graph' },
+      status: 'completed',
+      toolCallId: 'tool-config'
+    })
+
+    await expect(
+      executeTool.execute({
+        input: { sourceBlockId: 'terminal-api', targetBlockId: 'terminal-test' },
+        projectDirectory: '/tmp/project',
+        sessionId: 'agent-session-1',
+        toolCallId: 'tool-connect',
+        toolName: 'connect_terminal_blocks',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      graphChanged: true,
+      output: { connectionId: 'connection-api-test', type: 'block_graph' },
+      status: 'completed'
+    })
+
+    await expect(
+      executeTool.execute({
+        input: { scope: { type: 'full' } },
+        projectDirectory: '/tmp/project',
+        sessionId: 'agent-session-1',
+        toolCallId: 'tool-plan',
+        toolName: 'inspect_terminal_workflow_plan',
+        workspaceName: 'main'
+      })
+    ).resolves.toEqual({
+      graphChanged: false,
+      output: {
+        plan: { graphId: 'graph-1', nodes: [], workspaceName: 'main' },
+        type: 'terminal_workflow_plan'
+      },
+      status: 'completed',
+      toolCallId: 'tool-plan'
+    })
+  })
+
+  it('waits for approval before disconnecting one terminal dependency', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    const executeTool = new ExecuteAgentToolUseCase(
+      blockGraphTools,
+      new RecordingAgentAuditRepository()
+    )
+
+    const result = await executeTool.execute({
+      input: { connectionId: 'connection-api-test' },
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-disconnect',
+      toolName: 'disconnect_terminal_blocks',
+      workspaceName: 'main'
+    })
+
+    expect(result).toMatchObject({
+      approval: {
+        summary: '断开终端依赖 connection-api-test',
+        target: { connectionId: 'connection-api-test', kind: 'terminal_connection' },
+        toolName: 'disconnect_terminal_blocks'
+      },
+      status: 'awaiting_approval',
+      toolCallId: 'tool-disconnect'
+    })
+    expect(blockGraphTools.disconnectTerminalBlocks).not.toHaveBeenCalled()
+  })
+
+  it('returns a structured failed result and never reaches BlockGraph for invalid tool input', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    const auditRepository = new RecordingAgentAuditRepository()
+    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+
+    await expect(
+      executeTool.execute({
+        input: { sourceBlockId: 'terminal-api', unexpected: true },
+        projectDirectory: '/tmp/project',
+        sessionId: 'agent-session-1',
+        toolCallId: 'tool-invalid',
+        toolName: 'connect_terminal_blocks',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: 'AGENT_TOOL_INPUT_INVALID',
+        isExpected: true
+      },
+      status: 'failed',
+      toolCallId: 'tool-invalid'
+    })
+    expect(blockGraphTools.connectTerminalBlocks).not.toHaveBeenCalled()
+    expect(auditRepository.records).toEqual([
+      expect.objectContaining({
+        id: 'tool-invalid',
+        status: 'failed',
+        toolName: 'connect_terminal_blocks'
+      })
+    ])
+  })
+
+  it('keeps a committed graph result authoritative when completion auditing fails', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.updateTerminalBlock).mockResolvedValue(fakeGraphWithApiBlock)
+    const auditRepository: AgentAuditRepository = {
+      append: vi.fn(async (record) => {
+        if (record.status !== 'started') throw new Error('audit storage unavailable')
+      })
+    }
+    const executeTool = new ExecuteAgentToolUseCase(blockGraphTools, auditRepository)
+
+    await expect(
+      executeTool.execute({
+        input: { blockId: 'terminal-api', name: 'API Server' },
+        projectDirectory: '/tmp/project',
+        sessionId: 'agent-session-1',
+        toolCallId: 'tool-committed-audit-failed',
+        toolName: 'update_block',
+        workspaceName: 'main'
+      })
+    ).resolves.toEqual({
+      graph: fakeGraphWithApiBlock,
+      graphChanged: true,
+      output: { type: 'block_graph' },
+      status: 'completed',
+      toolCallId: 'tool-committed-audit-failed'
+    })
+    expect(blockGraphTools.updateTerminalBlock).toHaveBeenCalledOnce()
+  })
+
+  it('records cancellation only for a call that is still awaiting approval', async () => {
+    const auditRepository = new RecordingAgentAuditRepository()
+    const executeTool = new ExecuteAgentToolUseCase(createBlockGraphTools(), auditRepository)
+    const command = {
+      input: { connectionId: 'connection-api-test' },
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-canceled',
+      toolName: 'disconnect_terminal_blocks' as const,
+      workspaceName: 'main'
+    }
+
+    await executeTool.execute(command)
+    await expect(executeTool.cancel(command, 'User rejected the tool call.')).resolves.toEqual({
+      output: { reason: 'User rejected the tool call.', type: 'tool_canceled' },
+      status: 'canceled',
+      toolCallId: 'tool-canceled'
+    })
+    expect(auditRepository.records.map((record) => [record.id, record.status])).toEqual([
+      ['tool-canceled', 'awaiting_approval'],
+      ['tool-canceled', 'canceled']
     ])
   })
 })
@@ -257,10 +451,18 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
   return {
     createTerminalBlock: vi.fn(async () => fakeGraph),
     createTerminalGroup: vi.fn(async () => fakeGraph),
+    connectTerminalBlocks: vi.fn(async () => ({ connectionId: 'connection-1', graph: fakeGraph })),
     deleteTerminalBlock: vi.fn(async () => fakeGraph),
     deleteTerminalGroup: vi.fn(async () => fakeGraph),
+    disconnectTerminalBlocks: vi.fn(async () => fakeGraph),
     inspectGraph: vi.fn(async () => fakeGraph),
+    inspectTerminalWorkflowPlan: vi.fn(async () => ({
+      graphId: 'graph-1',
+      nodes: [],
+      workspaceName: 'main'
+    })),
     updateTerminalBlock: vi.fn(async () => fakeGraph),
+    updateTerminalExecutionConfig: vi.fn(async () => fakeGraph),
     updateTerminalGroup: vi.fn(async () => fakeGraph)
   }
 }

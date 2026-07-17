@@ -1,5 +1,5 @@
 const capabilityTooltip =
-  '允许此 Agent 通过 CleanCode MCP 查看和修改当前工作区的终端积木与终端组合。切换会重启当前 Agent 并继续原对话，不会更改 Codex 的 sandbox 或 approval 配置。删除画布对象仍需 CleanCode 单独确认。'
+  '允许此 Agent 通过 CleanCode MCP 查看和修改当前工作区的终端积木、组合、执行配置与依赖工作流。切换会重启当前 Agent 并继续原对话，不会更改 Codex 的 sandbox 或 approval 配置。删除画布对象、解散组合或断开依赖仍需 CleanCode 单独确认。'
 
 export function AgentMcpCapabilityToggle({
   enabled,

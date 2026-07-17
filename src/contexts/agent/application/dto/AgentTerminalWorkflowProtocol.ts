@@ -1,0 +1,41 @@
+interface AgentTerminalTaskExecutionConfigSnapshot {
+  readonly mode: 'task'
+  readonly successExitCodes: readonly number[]
+  readonly timeoutMs: number | null
+}
+
+interface AgentTerminalOutputReadinessSnapshot {
+  readonly text: string
+  readonly type: 'output'
+}
+
+interface AgentTerminalTcpReadinessSnapshot {
+  readonly port: number
+  readonly type: 'tcp'
+}
+
+interface AgentTerminalServiceExecutionConfigSnapshot {
+  readonly mode: 'service'
+  readonly readiness: AgentTerminalOutputReadinessSnapshot | AgentTerminalTcpReadinessSnapshot
+  readonly readinessTimeoutMs: number
+}
+
+export type AgentTerminalExecutionConfigSnapshot =
+  AgentTerminalTaskExecutionConfigSnapshot | AgentTerminalServiceExecutionConfigSnapshot
+
+export type AgentTerminalWorkflowPlanScope =
+  { readonly type: 'full' } | { readonly blockId: string; readonly type: 'from-block' }
+
+interface AgentTerminalWorkflowPlanNodeSnapshot {
+  readonly blockId: string
+  readonly dependencyBlockIds: readonly string[]
+  readonly executionConfig: AgentTerminalExecutionConfigSnapshot
+  readonly launchCommand: string
+  readonly name: string
+}
+
+export interface AgentTerminalWorkflowPlanSnapshot {
+  readonly graphId: string
+  readonly nodes: readonly AgentTerminalWorkflowPlanNodeSnapshot[]
+  readonly workspaceName: string
+}

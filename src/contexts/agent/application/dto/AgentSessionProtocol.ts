@@ -1,4 +1,5 @@
 import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import type { AgentToolErrorSnapshot } from './AgentToolProtocol'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
 export type AgentTerminalSourceTheme = 'dark' | 'light'
@@ -32,11 +33,19 @@ export type AgentToolApprovalTarget =
       readonly kind: 'terminal_group'
       readonly terminalGroupId: string
     }
+  | {
+      readonly connectionId: string
+      readonly kind: 'terminal_connection'
+    }
 
 export type AgentToolApprovalDecisionResult =
   | {
       readonly graph: BlockGraphSnapshot
       readonly status: 'completed'
+    }
+  | {
+      readonly error: AgentToolErrorSnapshot
+      readonly status: 'failed'
     }
   | {
       readonly status: 'canceled' | 'not_found'

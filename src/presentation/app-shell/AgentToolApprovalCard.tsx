@@ -1,4 +1,12 @@
-import { Box, LoaderCircle, MapPin, ShieldAlert, Terminal, TriangleAlert } from 'lucide-react'
+import {
+  Box,
+  LoaderCircle,
+  MapPin,
+  ShieldAlert,
+  Terminal,
+  TriangleAlert,
+  Waypoints
+} from 'lucide-react'
 
 import type { AgentApprovalPresentation } from './agentApprovalPresentation'
 
@@ -19,12 +27,11 @@ export function AgentToolApprovalCard({
   presentation,
   queueCount
 }: AgentToolApprovalCardProps) {
-  const isTerminal = presentation.targetKind === 'terminal'
   const phase = presentation.approval.phase
   const isApproving = phase === 'approving'
   const isFailed = phase === 'failed'
   const isMissing = presentation.status === 'missing'
-  const heading = isTerminal ? '删除终端' : '解散终端组合'
+  const actionCopy = createActionCopy(presentation.targetKind, isApproving)
   const statusLabel = isMissing
     ? '目标不可用'
     : isFailed
@@ -32,13 +39,6 @@ export function AgentToolApprovalCard({
       : isApproving
         ? '正在执行'
         : '需要你的确认'
-  const destructiveLabel = isApproving
-    ? isTerminal
-      ? '正在删除…'
-      : '正在解散…'
-    : isTerminal
-      ? '确认删除'
-      : '确认解散'
 
   return (
     <section
@@ -58,7 +58,7 @@ export function AgentToolApprovalCard({
         </span>
         <div className="agent-tool-approval-card__heading">
           <span className="agent-tool-approval-card__eyebrow">{statusLabel}</span>
-          <h3>{heading}</h3>
+          <h3>{actionCopy.heading}</h3>
         </div>
         {queueCount > 0 ? (
           <span
@@ -115,7 +115,7 @@ export function AgentToolApprovalCard({
               disabled={isApproving}
               onClick={onReject}
             >
-              {isTerminal ? '保留终端' : '保留组合'}
+              {actionCopy.retainLabel}
             </button>
             <button
               className="agent-tool-approval-card__button agent-tool-approval-card__button--danger"
@@ -130,7 +130,7 @@ export function AgentToolApprovalCard({
                   aria-hidden="true"
                 />
               ) : null}
-              {destructiveLabel}
+              {actionCopy.destructiveLabel}
             </button>
           </>
         )}
@@ -182,6 +182,50 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
     )
   }
 
+  if (presentation.targetKind === 'connection') {
+    const locateName = `${presentation.sourceBlock.name} 到 ${presentation.targetBlock.name}`
+
+    return (
+      <div
+        className="agent-tool-approval-card__target agent-tool-approval-card__target--connection"
+        role="group"
+        aria-label={`审批目标 ${locateName}`}
+      >
+        <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
+          <Waypoints size={18} />
+        </span>
+        <div className="agent-tool-approval-card__target-copy">
+          <span className="agent-tool-approval-card__target-type">目标依赖</span>
+          <div className="agent-tool-approval-card__connection-endpoints">
+            <ConnectionEndpoint
+              direction="上游终端"
+              id={presentation.sourceBlock.id}
+              name={presentation.sourceBlock.name}
+            />
+            <span className="agent-tool-approval-card__connection-arrow" aria-hidden="true">
+              →
+            </span>
+            <ConnectionEndpoint
+              direction="下游终端"
+              id={presentation.targetBlock.id}
+              name={presentation.targetBlock.name}
+            />
+          </div>
+          <div className="agent-tool-approval-card__target-meta">
+            <code
+              aria-label={`连接 ID ${presentation.connection.id}`}
+              tabIndex={0}
+              title={presentation.connection.id}
+            >
+              连接 ID {presentation.connection.id}
+            </code>
+          </div>
+        </div>
+        <LocateTargetButton disabled={isLocatingDisabled} name={locateName} onLocate={onLocate} />
+      </div>
+    )
+  }
+
   return (
     <div
       className="agent-tool-approval-card__target"
@@ -211,6 +255,22 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
   )
 }
 
+interface ConnectionEndpointProps {
+  readonly direction: '上游终端' | '下游终端'
+  readonly id: string
+  readonly name: string
+}
+
+function ConnectionEndpoint({ direction, id, name }: ConnectionEndpointProps) {
+  return (
+    <span className="agent-tool-approval-card__connection-endpoint">
+      <span className="agent-tool-approval-card__target-type">{direction}</span>
+      <strong>{name}</strong>
+      <code title={id}>ID {shortenId(id)}</code>
+    </span>
+  )
+}
+
 interface LocateTargetButtonProps {
   readonly disabled: boolean
   readonly name: string
@@ -237,9 +297,46 @@ function createImpact(presentation: AgentApprovalPresentation): string {
     return '为避免误操作，请保留目标并让 AI 重新检查画布。'
   }
 
-  return presentation.targetKind === 'terminal'
-    ? '从画布删除此终端及相关连线；所在组合可能因成员不足自动解散。'
-    : '只解散组合，保留其中终端及现有连线。'
+  if (presentation.targetKind === 'terminal') {
+    return '从画布删除此终端及相关连线；所在组合可能因成员不足自动解散。'
+  }
+
+  if (presentation.targetKind === 'connection') {
+    return '只断开这条依赖，保留两端终端、启动命令、执行配置和组合。'
+  }
+
+  return '只解散组合，保留其中终端及现有连线。'
+}
+
+function createActionCopy(
+  targetKind: AgentApprovalPresentation['targetKind'],
+  isApproving: boolean
+): {
+  readonly destructiveLabel: string
+  readonly heading: string
+  readonly retainLabel: string
+} {
+  if (targetKind === 'terminal') {
+    return {
+      destructiveLabel: isApproving ? '正在删除…' : '确认删除',
+      heading: '删除终端',
+      retainLabel: '保留终端'
+    }
+  }
+
+  if (targetKind === 'connection') {
+    return {
+      destructiveLabel: isApproving ? '正在断开…' : '确认断开',
+      heading: '断开终端依赖',
+      retainLabel: '保留依赖'
+    }
+  }
+
+  return {
+    destructiveLabel: isApproving ? '正在解散…' : '确认解散',
+    heading: '解散终端组合',
+    retainLabel: '保留组合'
+  }
 }
 
 function shortenId(id: string): string {

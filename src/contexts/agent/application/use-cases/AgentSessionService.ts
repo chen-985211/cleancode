@@ -13,8 +13,12 @@ import {
 import type { CodexAgentProcessPort } from '../ports/CodexAgentProcessPort'
 import { AgentSession } from '../../domain/aggregates/AgentSession'
 import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
-import type { AgentToolExecutionResult, ExecuteAgentToolCommand } from './ExecuteAgentToolUseCase'
-import { AgentToolApprovalCoordinator } from './AgentToolApprovalCoordinator'
+import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
+import {
+  AgentToolApprovalCoordinator,
+  type AgentToolExecutionOperations
+} from './AgentToolApprovalCoordinator'
+import { AgentToolInvocationCoordinator } from './AgentToolInvocationCoordinator'
 import {
   AgentSessionRuntimeCoordinator,
   createAgentSessionRuntimeOwner,
@@ -44,18 +48,18 @@ export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
   private readonly pendingPersistence = new Set<Promise<void>>()
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
+  private readonly toolInvocations: AgentToolInvocationCoordinator
   private readonly runtimeCoordinator = new AgentSessionRuntimeCoordinator()
 
   constructor(
     private readonly processPort: CodexAgentProcessPort,
     private readonly mcpServerPort: AgentMcpServerPort,
-    private readonly executeAgentTool: (
-      command: ExecuteAgentToolCommand
-    ) => Promise<AgentToolExecutionResult>,
+    toolExecution: AgentToolExecutionOperations,
     private readonly sessionRepository: AgentSessionRepository,
     private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope
   ) {
-    this.approvalCoordinator = new AgentToolApprovalCoordinator(executeAgentTool, (sessionId) =>
+    this.toolInvocations = new AgentToolInvocationCoordinator(toolExecution)
+    this.approvalCoordinator = new AgentToolApprovalCoordinator(this.toolInvocations, (sessionId) =>
       this.findSessionById(sessionId)
     )
   }
@@ -75,35 +79,28 @@ export class AgentSessionService {
     const scopeSnapshot = await validateAgentRuntimeScope(command, scope, this.scopeValidation)
     const sessionKey = scope.key
     const existingSession = this.sessions.get(sessionKey)
-
     if (existingSession && command.restartMode !== 'new' && existingSession.status === 'running') {
       existingSession.callbacks = createAgentSessionCallbacks(command)
+      this.approvalCoordinator.replayWaiting(existingSession)
       if (command.columns && command.rows && existingSession.status === 'running') {
         this.processPort.resize(existingSession.sessionId, command.columns, command.rows)
       }
-
       return toAgentSessionSnapshot(existingSession)
     }
-
     if (existingSession) {
       await this.disposeManagedSession(sessionKey, existingSession)
     }
-
     await this.disposeOtherScopeForAgentInDirectory(
       command.workspaceDirectory,
       command.agentId,
       sessionKey
     )
-
     const shouldPersist = command.persistenceMode !== 'ephemeral'
-
     if (command.restartMode === 'new' && shouldPersist) {
       await this.sessionRepository.delete(scope)
     }
-
     let persistedSession: AgentSession | null = null
     let workspaceAgent: AgentSession | null = null
-
     try {
       persistedSession = shouldPersist ? await this.sessionRepository.find(scope) : null
       workspaceAgent =
@@ -125,7 +122,6 @@ export class AgentSessionService {
         workspaceName: command.workspaceName
       })
     }
-
     const session: ManagedAgentSession = {
       agentId: command.agentId,
       callbacks: createAgentSessionCallbacks(command),
@@ -147,13 +143,12 @@ export class AgentSessionService {
       workspaceName: command.workspaceName
     }
     this.sessions.set(sessionKey, session)
-
-    await this.registerMcpEndpoint(session)
-
     try {
+      await this.registerMcpEndpoint(session)
       await this.startManagedProcess(session)
     } catch {
       session.status = persistedSession ? 'restore_failed' : 'failed'
+      this.toolInvocations.beginSessionClosing(session.sessionId)
       unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     }
 
@@ -170,11 +165,9 @@ export class AgentSessionService {
     readonly sessionId: string
   }): void {
     const session = this.findSessionById(command.sessionId)
-
     if (!session) {
       return
     }
-
     session.columns = command.columns
     session.rows = command.rows
     this.processPort.resize(command.sessionId, command.columns, command.rows)
@@ -189,7 +182,6 @@ export class AgentSessionService {
       workspaceDirectory,
       ownsDirectory
     )
-
     try {
       const results = await this.runtimeCoordinator.runForOwners(ownsDirectory, (owner) =>
         this.suspendRuntimeOwner(owner)
@@ -222,38 +214,17 @@ export class AgentSessionService {
 
   async executeMcpTool(command: AgentMcpToolCallCommand): Promise<AgentToolExecutionResult> {
     const session = requireManagedAgentSession(this.sessions.values(), command.sessionId)
-    const toolCommand = {
-      input: command.input,
-      projectDirectory: session.projectDirectory,
-      sessionId: session.sessionId,
-      toolName: command.toolName,
-      workspaceName: session.workspaceName
-    } as ExecuteAgentToolCommand
-    const firstResult = await this.executeAgentTool(toolCommand)
-
-    if (firstResult.status !== 'awaiting_approval') {
-      if (firstResult.status === 'completed') {
-        session.callbacks.onGraphUpdated({
-          agentId: session.agentId,
-          graph: firstResult.graph,
-          projectDirectory: session.projectDirectory,
-          sessionId: session.sessionId,
-          workspaceName: session.workspaceName
-        })
-      }
-
-      return firstResult
-    }
-
-    return this.approvalCoordinator.waitForApproval(session, toolCommand, firstResult)
+    return this.toolInvocations.runSessionToolCall(session.sessionId, () =>
+      this.approvalCoordinator.execute(session, command)
+    )
   }
 
   approveTool(command: { readonly approvalId: string }): Promise<AgentToolApprovalDecisionResult> {
     return this.approvalCoordinator.approve(command.approvalId)
   }
 
-  rejectTool(command: { readonly approvalId: string }): void {
-    this.approvalCoordinator.reject(command.approvalId)
+  rejectTool(command: { readonly approvalId: string }): Promise<void> {
+    return this.approvalCoordinator.reject(command.approvalId)
   }
 
   listPendingApprovals(): readonly AgentToolApprovalRequest[] {
@@ -320,31 +291,33 @@ export class AgentSessionService {
   async disposeAll(): Promise<void> {
     this.runtimeCoordinator.stop()
     await this.runtimeCoordinator.waitForIdle()
-    for (const session of [...this.sessions.values()]) {
-      this.cancelSessionApprovals(session.sessionId)
-      session.isStopping = true
-    }
-
+    const sessions = [...this.sessions.values()]
+    for (const session of sessions) this.beginSessionToolClosing(session)
+    await Promise.all(sessions.map((session) => this.settleSessionToolCalls(session)))
     this.sessions.clear()
     this.runtimeCoordinator.clear()
     await this.processPort.disposeAll()
     await this.waitForPendingPersistence()
     this.mcpServerPort.dispose()
+    for (const session of sessions) this.toolInvocations.forgetSession(session.sessionId)
   }
 
   private async suspendRuntimeOwner(owner: AgentSessionRuntimeOwner): Promise<boolean> {
     const session = findOwnedManagedAgentSession(this.sessions.values(), owner)
     if (!session || session.status !== 'running') return false
-
     session.isStopping = true
     session.status = 'suspended'
+    this.toolInvocations.beginSessionClosing(session.sessionId)
     try {
+      await this.settleSessionToolCalls(session)
       await this.processPort.stop(session.sessionId)
       await this.waitForPendingPersistence()
+      unregisterAgentMcpEndpoint(session, this.mcpServerPort)
       session.isStopping = false
       session.processId = null
       return true
     } catch (error) {
+      this.toolInvocations.reopenSession(session.sessionId)
       recordAgentSessionStopFailure(session, this.mcpServerPort)
       throw error
     }
@@ -355,9 +328,13 @@ export class AgentSessionService {
     if (!session || session.status !== 'suspended') return
 
     session.status = 'running'
+    session.isStopping = false
+    this.toolInvocations.reopenSession(session.sessionId)
     try {
+      await this.registerMcpEndpoint(session)
       await this.startManagedProcess(session)
     } catch (error) {
+      this.toolInvocations.beginSessionClosing(session.sessionId)
       recordAgentSessionStartFailure(session, this.mcpServerPort)
       throw error
     }
@@ -377,21 +354,30 @@ export class AgentSessionService {
     const session = findOwnedManagedAgentSession(this.sessions.values(), owner)
     if (!session || session.status !== 'running') return null
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
-    this.cancelSessionApprovals(session.sessionId)
+    const replacedSessionId = session.sessionId
     session.isStopping = true
-    await this.processPort.stop(session.sessionId)
+    this.toolInvocations.beginSessionClosing(replacedSessionId)
+    try {
+      await this.settleSessionToolCalls(session)
+      await this.processPort.stop(replacedSessionId)
+    } catch (error) {
+      this.toolInvocations.reopenSession(replacedSessionId)
+      recordAgentSessionStopFailure(session, this.mcpServerPort)
+      throw error
+    }
     unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     session.cleancodeMcpEnabled = cleancodeMcpEnabled
     session.isStopping = false
     session.processId = null
     session.sessionId = createAgentRuntimeSessionId()
     session.status = 'running'
-    await this.registerMcpEndpoint(session)
-
+    this.toolInvocations.forgetSession(replacedSessionId)
     try {
+      await this.registerMcpEndpoint(session)
       await this.startManagedProcess(session)
     } catch {
       session.status = session.codexThreadId ? 'restore_failed' : 'failed'
+      this.toolInvocations.beginSessionClosing(session.sessionId)
       unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     }
 
@@ -445,6 +431,8 @@ export class AgentSessionService {
         }
 
         session.status = 'exited'
+        this.beginSessionToolClosing(session)
+        void this.settleSessionToolCalls(session)
         session.callbacks.onExit({ ...event, agentId: session.agentId })
       },
       onOutput: (event) => session.callbacks.onOutput({ ...event, agentId: session.agentId }),
@@ -458,6 +446,11 @@ export class AgentSessionService {
   }
 
   private async registerMcpEndpoint(session: ManagedAgentSession): Promise<void> {
+    if (!session.cleancodeMcpEnabled) {
+      this.toolInvocations.beginSessionClosing(session.sessionId)
+      return
+    }
+    this.toolInvocations.reopenSession(session.sessionId)
     await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
       this.executeMcpTool(toolCommand)
     )
@@ -483,18 +476,25 @@ export class AgentSessionService {
     sessionKey: string,
     session: ManagedAgentSession
   ): Promise<void> {
-    this.cancelSessionApprovals(session.sessionId)
-    session.isStopping = true
+    this.beginSessionToolClosing(session)
+    await this.settleSessionToolCalls(session)
     await this.processPort.stop(session.sessionId)
-    unregisterAgentMcpEndpoint(session, this.mcpServerPort)
     this.sessions.delete(sessionKey)
+    this.toolInvocations.forgetSession(session.sessionId)
   }
 
   private findSessionById(sessionId: string): ManagedAgentSession | undefined {
     return [...this.sessions.values()].find((candidate) => candidate.sessionId === sessionId)
   }
 
-  private cancelSessionApprovals(sessionId: string): void {
-    this.approvalCoordinator.cancelSession(sessionId)
+  private beginSessionToolClosing(session: ManagedAgentSession): void {
+    session.isStopping = true
+    this.toolInvocations.beginSessionClosing(session.sessionId)
+    unregisterAgentMcpEndpoint(session, this.mcpServerPort)
+  }
+
+  private async settleSessionToolCalls(session: ManagedAgentSession): Promise<void> {
+    await this.approvalCoordinator.cancelSession(session.sessionId)
+    await this.toolInvocations.waitForSession(session.sessionId)
   }
 }

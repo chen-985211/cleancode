@@ -36,6 +36,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
     const approval = service.executeMcpTool({
       input: { blockId: 'terminal-1' },
       sessionId: first.sessionId,
+      toolCallId: 'approval-1',
       toolName: 'delete_block'
     })
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
@@ -207,15 +208,22 @@ function createService(
   return new AgentSessionService(
     processPort,
     mcpServer,
-    async (): Promise<AgentToolExecutionResult> => ({
-      approval: {
-        summary: '删除终端积木 terminal-1',
-        target: { blockId: 'terminal-1', kind: 'terminal_block' },
-        toolName: 'delete_block'
-      },
-      status: 'awaiting_approval',
-      toolCallId: 'approval-1'
-    }),
+    {
+      cancel: async (command, reason): Promise<AgentToolExecutionResult> => ({
+        output: { reason, type: 'tool_canceled' },
+        status: 'canceled',
+        toolCallId: command.toolCallId
+      }),
+      execute: async (): Promise<AgentToolExecutionResult> => ({
+        approval: {
+          summary: '删除终端积木 terminal-1',
+          target: { blockId: 'terminal-1', kind: 'terminal_block' },
+          toolName: 'delete_block'
+        },
+        status: 'awaiting_approval',
+        toolCallId: 'approval-1'
+      })
+    },
     repository,
     scopeValidation
   )

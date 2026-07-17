@@ -335,8 +335,13 @@ function createSessionService(
   return new AgentSessionService(
     processPort,
     new NoopAgentMcpServerPort(),
-    async () => {
-      throw new Error('Agent tools are not used by these tests.')
+    {
+      cancel: async () => {
+        throw new Error('Agent tools are not used by these tests.')
+      },
+      execute: async () => {
+        throw new Error('Agent tools are not used by these tests.')
+      }
     },
     repository
   )
