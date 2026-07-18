@@ -36,6 +36,7 @@
 - [积木动作模型](docs/contexts/block-graph/block-action-model.md)：定义当前终端积木与终端组合动作的功能意图和作用对象。
 - [终端会话生命周期](docs/contexts/run/terminal-session.md)：维护普通终端 PTY 的状态、输入、中断、替换和清理规则。
 - [终端依赖工作流](docs/contexts/run/terminal-workflow.md)：维护终端依赖图的上下文协作、状态模型、任务/服务语义、实现入口和验证矩阵。
+- [本地服务端口治理规划](docs/contexts/run/service-port-management.md)：记录多项目/worktree 本地服务端口冲突、端口策略、运行期租约、实际端点和实现进度；不作为当前能力事实来源。
 - [Agent 与会话生命周期](docs/contexts/agent/agent-session.md)：维护 Agent 身份、布局、分支 thread 绑定与 Codex PTY 生命周期。
 - [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)：维护内建 MCP 的工具目录、协议、会话鉴权、审批、上下文协作、实现入口和验证矩阵。
 
@@ -60,6 +61,8 @@
 如果任务涉及普通终端 PTY、终端输入、Ctrl+C、resize、工作目录、会话替换或清理，开发协作 AI 必须继续阅读[终端会话生命周期](docs/contexts/run/terminal-session.md)。
 
 如果任务涉及终端连线、依赖图、工作流计划、任务/服务模式、服务就绪、流程状态、失败传播或流程停止，开发协作 AI 必须继续阅读 [终端依赖工作流](docs/contexts/run/terminal-workflow.md)。
+
+如果任务涉及本地服务端口冲突、端口分配策略、端口租约、动态端口注入、监听者所有权或实际服务端点，开发协作 AI 必须继续阅读 [本地服务端口治理规划](docs/contexts/run/service-port-management.md)。该文档记录规划和进度，不得被当作当前功能清单。
 
 如果任务涉及 cleancode 原生 MCP、MCP Server、工具名称或 Schema、JSON-RPC 桥接、会话端点、Bearer Token、工具审批、工具审计或 Codex MCP 配置注入，开发协作 AI 必须继续阅读 [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)。
 
