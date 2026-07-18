@@ -47,7 +47,11 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
 
   async checkoutBranch(): Promise<void> {}
 
+  async lockBranchWorktree(): Promise<void> {}
+
   async removeBranchWorktree(): Promise<void> {}
+
+  async unlockBranchWorktree(): Promise<void> {}
 
   async pruneWorktrees(): Promise<void> {}
 }
@@ -76,7 +80,9 @@ describe('create branch workspace errors', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }

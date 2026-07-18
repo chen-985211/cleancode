@@ -153,7 +153,9 @@ export function createWorkbenchSnapshot(
               isCurrent: true,
               isMainWorkspaceBranch: true,
               worktreeDirectory: workspaceDirectory,
-              isSelectableInMainWorkspace: false
+              isSelectableInMainWorkspace: false,
+              isLocked: false,
+              lockReason: null
             }
           ]
         : []),

@@ -91,6 +91,8 @@ describe('project Agent branch lifecycle', () => {
       inspectRepository: vi.fn(async () => ({
         branches: ['main', 'feature/free'].map((name) => ({
           isCurrent: name === currentBranch,
+          isLocked: false,
+          lockReason: null,
           name,
           worktreeDirectory: name === currentBranch ? '/work/app' : null
         })),
@@ -99,8 +101,10 @@ describe('project Agent branch lifecycle', () => {
         localBranches: ['main', 'feature/free']
       })),
       isWorkingTreeClean: vi.fn(async () => true),
+      lockBranchWorktree: vi.fn(),
       pruneWorktrees: vi.fn(),
-      removeBranchWorktree: vi.fn()
+      removeBranchWorktree: vi.fn(),
+      unlockBranchWorktree: vi.fn()
     } satisfies GitWorkspacePort
     const lease = {
       wasQuarantined: false,
@@ -194,16 +198,30 @@ function createFixture(input: {
     createBranchWorktree: vi.fn(),
     inspectRepository: vi.fn(async () => ({
       branches: [
-        { name: 'main', worktreeDirectory: '/work/app', isCurrent: true },
-        { name: 'feature/free', worktreeDirectory: null, isCurrent: false }
+        {
+          name: 'main',
+          worktreeDirectory: '/work/app',
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
+        },
+        {
+          name: 'feature/free',
+          worktreeDirectory: null,
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
+        }
       ],
       currentBranch: 'main',
       isGitRepository: true,
       localBranches: ['main', 'feature/free']
     })),
     isWorkingTreeClean: vi.fn(async () => input.workingTreeCleanResults?.shift() ?? true),
+    lockBranchWorktree: vi.fn(),
     pruneWorktrees: vi.fn(),
-    removeBranchWorktree: vi.fn()
+    removeBranchWorktree: vi.fn(),
+    unlockBranchWorktree: vi.fn()
   } satisfies GitWorkspacePort
   const lifecycleCalls: string[] = []
   const workspaceAgentLifecyclePort = {

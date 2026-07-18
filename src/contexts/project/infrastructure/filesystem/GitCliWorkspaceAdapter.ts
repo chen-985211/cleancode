@@ -7,8 +7,10 @@ import type {
   GitBranchInspection,
   GitRepositoryInspection,
   GitWorkspacePort,
+  LockBranchWorktreeCommand,
   PruneWorktreesCommand,
-  RemoveBranchWorktreeCommand
+  RemoveBranchWorktreeCommand,
+  UnlockBranchWorktreeCommand
 } from '../../application/ports/GitWorkspacePort'
 
 const execFileAsync = promisify(execFile)
@@ -73,8 +75,22 @@ export class GitCliWorkspaceAdapter implements GitWorkspacePort {
     await runGit(command.repositoryDirectory, ['checkout', command.branchName])
   }
 
+  async lockBranchWorktree(command: LockBranchWorktreeCommand): Promise<void> {
+    const reasonArgs = command.reason ? ['--reason', command.reason] : []
+    await runGit(command.repositoryDirectory, [
+      'worktree',
+      'lock',
+      ...reasonArgs,
+      command.worktreeDirectory
+    ])
+  }
+
   async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
     await runGit(command.repositoryDirectory, ['worktree', 'remove', command.worktreeDirectory])
+  }
+
+  async unlockBranchWorktree(command: UnlockBranchWorktreeCommand): Promise<void> {
+    await runGit(command.repositoryDirectory, ['worktree', 'unlock', command.worktreeDirectory])
   }
 
   async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
@@ -109,17 +125,29 @@ async function getLocalBranchInspections(
   directory: string,
   currentBranch: string | null
 ): Promise<GitBranchInspection[]> {
-  const output = await runGit(directory, ['branch', '--format=%(refname:short)%09%(worktreepath)'])
+  const [output, worktreeOutput] = await Promise.all([
+    runGit(directory, ['branch', '--format=%(refname:short)%09%(worktreepath)']),
+    runGit(directory, ['worktree', 'list', '--porcelain', '-z'])
+  ])
+  const worktrees = parseWorktreePorcelain(worktreeOutput)
 
   return output
     .split('\n')
-    .map((line) => parseBranchInspectionLine(line, currentBranch))
+    .map((line) => parseBranchInspectionLine(line, currentBranch, worktrees))
     .filter((branch): branch is GitBranchInspection => Boolean(branch))
+}
+
+interface GitWorktreeInspection {
+  readonly branchName: string | null
+  readonly directory: string
+  readonly isLocked: boolean
+  readonly lockReason: string | null
 }
 
 function parseBranchInspectionLine(
   line: string,
-  currentBranch: string | null
+  currentBranch: string | null,
+  worktrees: readonly GitWorktreeInspection[]
 ): GitBranchInspection | null {
   const [branchName, worktreeDirectory] = line.split('\t')
   const name = branchName?.trim()
@@ -128,11 +156,50 @@ function parseBranchInspectionLine(
     return null
   }
 
+  const directory = worktreeDirectory?.trim() || null
+  const worktree = worktrees.find(
+    (candidate) => candidate.directory === directory || candidate.branchName === name
+  )
+
   return {
     name,
-    worktreeDirectory: worktreeDirectory?.trim() || null,
-    isCurrent: name === currentBranch
+    worktreeDirectory: directory,
+    isCurrent: name === currentBranch,
+    isLocked: worktree?.isLocked ?? false,
+    lockReason: worktree?.lockReason ?? null
   }
+}
+
+function parseWorktreePorcelain(output: string): GitWorktreeInspection[] {
+  const worktrees: GitWorktreeInspection[] = []
+  let directory: string | null = null
+  let branchName: string | null = null
+  let isLocked = false
+  let lockReason: string | null = null
+  const flush = (): void => {
+    if (directory) worktrees.push({ branchName, directory, isLocked, lockReason })
+    directory = null
+    branchName = null
+    isLocked = false
+    lockReason = null
+  }
+
+  for (const field of output.split('\0')) {
+    if (!field) {
+      flush()
+    } else if (field.startsWith('worktree ')) {
+      if (directory) flush()
+      directory = field.slice('worktree '.length)
+    } else if (field.startsWith('branch refs/heads/')) {
+      branchName = field.slice('branch refs/heads/'.length)
+    } else if (field === 'locked' || field.startsWith('locked ')) {
+      isLocked = true
+      lockReason = field === 'locked' ? null : field.slice('locked '.length)
+    }
+  }
+  flush()
+
+  return worktrees
 }
 
 async function runGit(directory: string, args: readonly string[]): Promise<string> {

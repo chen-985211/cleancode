@@ -11,8 +11,8 @@ import {
 import { useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
+import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
 import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspaceForm'
-import { ProjectSidebarConfirmationDialog } from './ProjectSidebarConfirmationDialog'
 import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
 import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
@@ -23,7 +23,11 @@ interface ProjectSidebarProps {
   readonly isDesktopRuntime: boolean
   readonly actionError: string | null
   readonly onAddProject: () => void
-  readonly onArchiveBranchWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
+  readonly onArchiveBranchWorkspace: (
+    workbench: WorkbenchSnapshot,
+    workspaceName: string,
+    lockedWorktreeConfirmation?: { readonly lockReason: string | null }
+  ) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onDismissActionError: () => void
@@ -98,7 +102,11 @@ export function ProjectSidebar({
 interface ProjectCardProps {
   readonly workbench: WorkbenchSnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly onArchiveBranchWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
+  readonly onArchiveBranchWorkspace: (
+    workbench: WorkbenchSnapshot,
+    workspaceName: string,
+    lockedWorktreeConfirmation?: { readonly lockReason: string | null }
+  ) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
@@ -139,6 +147,13 @@ function ProjectCard({
   )
   const archiveWorkspace = archiveWorkspaceName
     ? workbench.project.workspaces.find((workspace) => workspace.name === archiveWorkspaceName)
+    : null
+  const archiveWorkspaceGitBranch = archiveWorkspace
+    ? workbench.gitBranches.find(
+        (branch) =>
+          branch.name === archiveWorkspace.gitBranch &&
+          branch.worktreeDirectory === archiveWorkspace.directory
+      )
     : null
   const closeBranchSelector = (): void => {
     setIsBranchSelectorOpen(false)
@@ -432,40 +447,21 @@ function ProjectCard({
         <ArchiveWorkspaceDialog
           workspaceName={archiveWorkspace.name}
           isCurrentWorkspace={archiveWorkspace.isCurrent && isCurrentProject}
+          isLocked={archiveWorkspaceGitBranch?.isLocked ?? false}
+          lockReason={archiveWorkspaceGitBranch?.lockReason ?? null}
           onCancel={() => setArchiveWorkspaceName(null)}
           onConfirm={() => {
-            onArchiveBranchWorkspace(workbench, archiveWorkspace.name)
+            onArchiveBranchWorkspace(
+              workbench,
+              archiveWorkspace.name,
+              archiveWorkspaceGitBranch?.isLocked
+                ? { lockReason: archiveWorkspaceGitBranch.lockReason }
+                : undefined
+            )
             setArchiveWorkspaceName(null)
           }}
         />
       ) : null}
     </section>
-  )
-}
-
-interface ArchiveWorkspaceDialogProps {
-  readonly workspaceName: string
-  readonly isCurrentWorkspace: boolean
-  readonly onCancel: () => void
-  readonly onConfirm: () => void
-}
-
-function ArchiveWorkspaceDialog({
-  workspaceName,
-  isCurrentWorkspace,
-  onCancel,
-  onConfirm
-}: ArchiveWorkspaceDialogProps) {
-  return (
-    <ProjectSidebarConfirmationDialog
-      ariaLabel={`归档工作区 ${workspaceName}`}
-      confirmLabel="归档工作区"
-      description={`将移除这个 worktree 目录，但保留 Git 分支 ${workspaceName}。之后可以从默认工作区重新创建。`}
-      detail={isCurrentWorkspace ? '当前正在使用该工作区，归档前将自动切回默认工作区。' : undefined}
-      icon={<Archive size={16} aria-hidden="true" />}
-      title={`归档工作区 ${workspaceName}`}
-      onCancel={onCancel}
-      onConfirm={onConfirm}
-    />
   )
 }

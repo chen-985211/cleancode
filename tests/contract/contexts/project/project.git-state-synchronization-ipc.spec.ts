@@ -61,6 +61,59 @@ class SilentLogger implements Logger {
 }
 
 describe('project git state synchronization IPC contract', () => {
+  it('forwards one-time locked worktree confirmation to archive', async () => {
+    const ipcMain = new FakeIpcMain()
+    const project = createProjectSnapshot('main')
+    const workbench = createWorkbenchSnapshot(project)
+    const archiveBranchWorkspace = vi.fn(async () => project)
+
+    registerProjectIpcHandlers(
+      createProjectIpcHandlersInput({
+        ipcMain,
+        archiveBranchWorkspace,
+        loadWorkbench: vi.fn(async () => workbench)
+      })
+    )
+
+    await expect(
+      ipcMain.invoke<WorkbenchSnapshot>('cleancode:archive-branch-workspace', {
+        projectDirectory: '/work/app',
+        workspaceName: 'test-c',
+        lockedWorktreeConfirmation: { lockReason: 'external agent session' }
+      })
+    ).resolves.toMatchObject({ ok: true })
+    expect(archiveBranchWorkspace).toHaveBeenCalledWith({
+      projectDirectory: '/work/app',
+      workspaceName: 'test-c',
+      lockedWorktreeConfirmation: { lockReason: 'external agent session' }
+    })
+  })
+
+  it('rejects a malformed locked worktree confirmation', async () => {
+    const ipcMain = new FakeIpcMain()
+    const archiveBranchWorkspace = vi.fn()
+
+    registerProjectIpcHandlers(
+      createProjectIpcHandlersInput({
+        ipcMain,
+        archiveBranchWorkspace,
+        loadWorkbench: vi.fn()
+      })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:archive-branch-workspace', {
+        projectDirectory: '/work/app',
+        workspaceName: 'test-c',
+        lockedWorktreeConfirmation: { lockReason: 42 }
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(archiveBranchWorkspace).not.toHaveBeenCalled()
+  })
+
   it('persists the selected project after switching and loading its workbench', async () => {
     const ipcMain = new FakeIpcMain()
     const project = createProjectSnapshot('main')
@@ -146,6 +199,7 @@ describe('project git state synchronization IPC contract', () => {
 })
 
 function createProjectIpcHandlersInput(input: {
+  readonly archiveBranchWorkspace?: ProjectIpcHandlersInput['archiveBranchWorkspace']
   readonly ipcMain: IpcMainLike
   readonly loadWorkbench: ProjectIpcHandlersInput['loadWorkbench']
   readonly selectCurrentProject?: (directory: string) => Promise<void>
@@ -153,7 +207,7 @@ function createProjectIpcHandlersInput(input: {
   readonly synchronizeProjectGitState?: ProjectIpcHandlersInput['synchronizeProjectGitState']
 }): ProjectIpcHandlersInput {
   return {
-    archiveBranchWorkspace: vi.fn(),
+    archiveBranchWorkspace: input.archiveBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: vi.fn(),
     createBranchWorkspace: vi.fn(),
     createOrOpenProject: vi.fn(),
@@ -196,7 +250,9 @@ function createWorkbenchSnapshot(project: ProjectSnapshot): WorkbenchSnapshot {
         isCurrent: true,
         isMainWorkspaceBranch: true,
         worktreeDirectory: project.directory,
-        isSelectableInMainWorkspace: false
+        isSelectableInMainWorkspace: false,
+        isLocked: false,
+        lockReason: null
       }
     ],
     graph: {

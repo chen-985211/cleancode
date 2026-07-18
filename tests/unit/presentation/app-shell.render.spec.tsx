@@ -224,21 +224,27 @@ describe('app shell', () => {
           isCurrent: false,
           isMainWorkspaceBranch: false,
           worktreeDirectory: null,
-          isSelectableInMainWorkspace: true
+          isSelectableInMainWorkspace: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/worktree',
           isCurrent: false,
           isMainWorkspaceBranch: false,
           worktreeDirectory: '/tmp/alpha-project-worktrees/feature-worktree',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           isCurrent: true,
           isMainWorkspaceBranch: true,
           worktreeDirectory: '/tmp/alpha-project',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })
@@ -314,14 +320,18 @@ describe('app shell', () => {
           isCurrent: false,
           isMainWorkspaceBranch: true,
           worktreeDirectory: '/tmp/alpha-project',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'test',
           isCurrent: true,
           isMainWorkspaceBranch: false,
           worktreeDirectory: '/tmp/alpha-project-worktrees/test',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })
@@ -393,14 +403,18 @@ describe('app shell', () => {
           isCurrent: true,
           isMainWorkspaceBranch: true,
           worktreeDirectory: '/tmp/alpha-project',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/free',
           isCurrent: false,
           isMainWorkspaceBranch: false,
           worktreeDirectory: null,
-          isSelectableInMainWorkspace: true
+          isSelectableInMainWorkspace: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })
@@ -412,14 +426,18 @@ describe('app shell', () => {
           isCurrent: false,
           isMainWorkspaceBranch: false,
           worktreeDirectory: null,
-          isSelectableInMainWorkspace: true
+          isSelectableInMainWorkspace: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/free',
           isCurrent: true,
           isMainWorkspaceBranch: true,
           worktreeDirectory: '/tmp/alpha-project',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })

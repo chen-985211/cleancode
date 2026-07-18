@@ -25,14 +25,18 @@ describe('app shell worktree archive', () => {
           isCurrent: true,
           isMainWorkspaceBranch: true,
           worktreeDirectory: '/tmp/alpha-project',
-          isSelectableInMainWorkspace: false
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'test',
           isCurrent: false,
           isMainWorkspaceBranch: false,
           worktreeDirectory: null,
-          isSelectableInMainWorkspace: true
+          isSelectableInMainWorkspace: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })
@@ -106,9 +110,42 @@ describe('app shell worktree archive', () => {
 
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })
+
+  it('requires an explicit unlock confirmation for a locked external worktree', async () => {
+    const workbench = createWorkbenchWithTestWorktree(false, 'external agent session')
+    const archiveBranchWorkspace = vi.fn(async () => workbench)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        archiveBranchWorkspace
+      })
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
+    fireEvent.click(within(projectCard).getByRole('menuitem', { name: '归档工作区' }))
+
+    const dialog = await screen.findByRole('dialog', { name: '解除锁并归档工作区 test' })
+    expect(within(dialog).getByText(/external agent session/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/Git 分支 test 会被保留/)).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '解除锁并归档' }))
+
+    await waitFor(() =>
+      expect(archiveBranchWorkspace).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'test',
+        lockedWorktreeConfirmation: { lockReason: 'external agent session' }
+      })
+    )
+  })
 })
 
-function createWorkbenchWithTestWorktree(testIsCurrent: boolean) {
+function createWorkbenchWithTestWorktree(testIsCurrent: boolean, lockReason: string | null = null) {
   return createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
     workspaceName: testIsCurrent ? 'test' : 'main',
     workspaceDirectory: testIsCurrent ? '/tmp/alpha-project-worktrees/test' : '/tmp/alpha-project',
@@ -125,6 +162,26 @@ function createWorkbenchWithTestWorktree(testIsCurrent: boolean) {
         directory: '/tmp/alpha-project-worktrees/test',
         gitBranch: 'test',
         isCurrent: testIsCurrent
+      }
+    ],
+    gitBranches: [
+      {
+        name: 'main',
+        isCurrent: true,
+        isMainWorkspaceBranch: true,
+        worktreeDirectory: '/tmp/alpha-project',
+        isSelectableInMainWorkspace: false,
+        isLocked: false,
+        lockReason: null
+      },
+      {
+        name: 'test',
+        isCurrent: false,
+        isMainWorkspaceBranch: false,
+        worktreeDirectory: '/tmp/alpha-project-worktrees/test',
+        isSelectableInMainWorkspace: false,
+        isLocked: lockReason !== null,
+        lockReason
       }
     ]
   })

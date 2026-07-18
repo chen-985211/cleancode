@@ -60,9 +60,13 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
 
   async checkoutBranch(): Promise<void> {}
 
+  async lockBranchWorktree(): Promise<void> {}
+
   async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
     this.removeBranchWorktreeCalls.push(command)
   }
+
+  async unlockBranchWorktree(): Promise<void> {}
 
   async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
     this.pruneWorktreesCalls.push(command)

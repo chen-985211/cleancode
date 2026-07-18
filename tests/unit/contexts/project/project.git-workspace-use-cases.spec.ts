@@ -1,7 +1,6 @@
 import { CreateBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { CreateOrOpenProjectUseCase } from '../../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
 import { CheckoutMainWorkspaceBranchUseCase } from '../../../../src/contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
-import { ListGitBranchNavigationUseCase } from '../../../../src/contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
 import type { BranchWorkspaceDirectoryPort } from '../../../../src/contexts/project/application/ports/BranchWorkspaceDirectoryPort'
 import type {
   CheckoutBranchCommand,
@@ -69,9 +68,13 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
     this.checkoutBranchCalls.push(command)
   }
 
+  async lockBranchWorktree(): Promise<void> {}
+
   async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
     this.removeBranchWorktreeCalls.push(command)
   }
+
+  async unlockBranchWorktree(): Promise<void> {}
 
   async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
     this.pruneWorktreesCalls.push(command)
@@ -100,12 +103,16 @@ describe('project git workspace use cases', () => {
         {
           name: 'feature/current',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -137,7 +144,9 @@ describe('project git workspace use cases', () => {
         {
           name: 'trunk',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -167,7 +176,9 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -209,7 +220,9 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -242,17 +255,23 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/free',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/worktree',
           worktreeDirectory: '/work/app-feature-worktree',
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -276,50 +295,6 @@ describe('project git workspace use cases', () => {
         isCurrent: false
       }
     ])
-  })
-
-  it('lists branch navigation with worktree branches disabled under main', async () => {
-    const repository = new InMemoryProjectRepository()
-    const git = new FakeGitWorkspacePort()
-    const createOrOpenProject = new CreateOrOpenProjectUseCase(repository, git)
-    const listGitBranchNavigation = new ListGitBranchNavigationUseCase(repository, git)
-    git.inspection = {
-      isGitRepository: true,
-      currentBranch: 'main',
-      localBranches: ['main', 'feature/free', 'feature/worktree'],
-      branches: [
-        {
-          name: 'main',
-          worktreeDirectory: '/work/app',
-          isCurrent: true
-        },
-        {
-          name: 'feature/free',
-          worktreeDirectory: null,
-          isCurrent: false
-        },
-        {
-          name: 'feature/worktree',
-          worktreeDirectory: '/work/app-feature-worktree',
-          isCurrent: false
-        }
-      ]
-    }
-    await createOrOpenProject.execute({
-      directory: '/work/app',
-      name: 'app'
-    })
-
-    const navigation = await listGitBranchNavigation.execute({ projectDirectory: '/work/app' })
-
-    expect(navigation.branches.find((branch) => branch.name === 'feature/free')).toMatchObject({
-      isSelectableInMainWorkspace: true,
-      worktreeDirectory: null
-    })
-    expect(navigation.branches.find((branch) => branch.name === 'feature/worktree')).toMatchObject({
-      isSelectableInMainWorkspace: false,
-      worktreeDirectory: '/work/app-feature-worktree'
-    })
   })
 
   it('rejects checking out a main workspace branch when the main directory is dirty', async () => {
@@ -348,12 +323,16 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/free',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -393,12 +372,16 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/worktree',
           worktreeDirectory: '/work/app-feature-worktree',
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -444,17 +427,23 @@ describe('project git workspace use cases', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/free',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/worktree',
           worktreeDirectory: '/work/app-feature-worktree',
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }

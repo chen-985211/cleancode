@@ -7,6 +7,7 @@ const userFacingMessages: Partial<Record<AppErrorCode, string>> = {
   GIT_BRANCH_ALREADY_EXISTS: 'Git 分支已存在，无法创建同名工作区。',
   GIT_BRANCH_CHECKED_OUT_IN_WORKTREE: '这个分支已经绑定到其他 worktree，无法在默认工作区切换。',
   GIT_BRANCH_NOT_FOUND: 'Git 分支不存在，请刷新分支列表后重试。',
+  GIT_WORKTREE_LOCKED: '工作区已被 Git 锁定，请确认锁信息后重试。',
   MAIN_WORKSPACE_CANNOT_BE_ARCHIVED: '默认工作区不能归档。',
   MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES: '默认工作区有未提交更改，无法切换分支。',
   NOT_GIT_REPOSITORY: '当前项目不是 Git 仓库，无法执行分支操作。',

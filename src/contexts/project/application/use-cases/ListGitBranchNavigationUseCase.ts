@@ -41,7 +41,9 @@ export class ListGitBranchNavigationUseCase {
           isCurrent: isMainWorkspaceBranch,
           isMainWorkspaceBranch,
           worktreeDirectory: branch.worktreeDirectory,
-          isSelectableInMainWorkspace: !isMainWorkspaceBranch && !isCheckedOutInAnotherWorktree
+          isSelectableInMainWorkspace: !isMainWorkspaceBranch && !isCheckedOutInAnotherWorktree,
+          isLocked: branch.isLocked,
+          lockReason: branch.lockReason
         }
       })
     }

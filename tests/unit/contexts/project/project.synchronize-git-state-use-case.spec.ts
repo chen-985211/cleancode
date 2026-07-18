@@ -59,9 +59,13 @@ class FakeGitWorkspacePort implements GitWorkspacePort {
     this.checkoutBranchCalls.push(command)
   }
 
+  async lockBranchWorktree(): Promise<void> {}
+
   async removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void> {
     void command
   }
+
+  async unlockBranchWorktree(): Promise<void> {}
 
   async pruneWorktrees(command: PruneWorktreesCommand): Promise<void> {
     void command
@@ -82,12 +86,16 @@ describe('project git state synchronization use case', () => {
         {
           name: 'feature/free',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -119,7 +127,9 @@ describe('project git state synchronization use case', () => {
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -209,17 +219,23 @@ describe('project git state synchronization use case', () => {
         {
           name: 'feature/sidebar',
           worktreeDirectory: '/work/app-sidebar',
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'feature/stale',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }
@@ -274,12 +290,16 @@ describe('project git state synchronization use case', () => {
         {
           name: 'feature/sidebar',
           worktreeDirectory: null,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           worktreeDirectory: '/work/app',
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     }

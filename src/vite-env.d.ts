@@ -57,6 +57,7 @@ declare global {
       archiveBranchWorkspace(command: {
         readonly projectDirectory: string
         readonly workspaceName: string
+        readonly lockedWorktreeConfirmation?: { readonly lockReason: string | null }
       }): Promise<WorkbenchSnapshot>
       checkoutMainWorkspaceBranch(command: {
         readonly projectDirectory: string

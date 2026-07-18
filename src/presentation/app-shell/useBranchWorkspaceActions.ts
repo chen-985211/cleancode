@@ -78,7 +78,11 @@ export function useBranchWorkspaceActions({
   )
 
   const archiveBranchWorkspace = useCallback(
-    async (workbench: WorkbenchSnapshot, workspaceName: string): Promise<void> => {
+    async (
+      workbench: WorkbenchSnapshot,
+      workspaceName: string,
+      lockedWorktreeConfirmation?: { readonly lockReason: string | null }
+    ): Promise<void> => {
       setBranchWorkspaceActionError(null)
 
       try {
@@ -95,7 +99,8 @@ export function useBranchWorkspaceActions({
 
         const archivedWorkbench = await window.cleancode?.archiveBranchWorkspace({
           projectDirectory: workbench.project.directory,
-          workspaceName
+          workspaceName,
+          ...(lockedWorktreeConfirmation ? { lockedWorktreeConfirmation } : {})
         })
 
         if (archivedWorkbench) {

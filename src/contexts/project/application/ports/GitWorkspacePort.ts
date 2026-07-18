@@ -2,6 +2,8 @@ export interface GitBranchInspection {
   readonly name: string
   readonly worktreeDirectory: string | null
   readonly isCurrent: boolean
+  readonly isLocked: boolean
+  readonly lockReason: string | null
 }
 
 export interface GitRepositoryInspection {
@@ -27,6 +29,17 @@ export interface RemoveBranchWorktreeCommand {
   readonly worktreeDirectory: string
 }
 
+export interface UnlockBranchWorktreeCommand {
+  readonly repositoryDirectory: string
+  readonly worktreeDirectory: string
+}
+
+export interface LockBranchWorktreeCommand {
+  readonly repositoryDirectory: string
+  readonly worktreeDirectory: string
+  readonly reason: string | null
+}
+
 export interface PruneWorktreesCommand {
   readonly repositoryDirectory: string
 }
@@ -36,6 +49,8 @@ export interface GitWorkspacePort {
   createBranchWorktree(command: CreateBranchWorktreeCommand): Promise<void>
   isWorkingTreeClean(directory: string): Promise<boolean>
   checkoutBranch(command: CheckoutBranchCommand): Promise<void>
+  lockBranchWorktree(command: LockBranchWorktreeCommand): Promise<void>
   removeBranchWorktree(command: RemoveBranchWorktreeCommand): Promise<void>
+  unlockBranchWorktree(command: UnlockBranchWorktreeCommand): Promise<void>
   pruneWorktrees(command: PruneWorktreesCommand): Promise<void>
 }

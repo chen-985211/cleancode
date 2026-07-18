@@ -32,6 +32,7 @@ export interface ProjectIpcHandlersInput {
   readonly archiveBranchWorkspace: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
+    readonly lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   }) => Promise<ProjectSnapshot>
   readonly checkoutMainWorkspaceBranch: (command: {
     readonly projectDirectory: string
@@ -119,9 +120,11 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
   registerIpcHandler<unknown, WorkbenchSnapshot>({
     channel: 'cleancode:archive-branch-workspace',
     handler: async (command) => {
+      const lockedWorktreeConfirmation = readLockedWorktreeConfirmation(command)
       const project = await input.archiveBranchWorkspace({
         projectDirectory: readStringField(command, 'projectDirectory'),
-        workspaceName: readStringField(command, 'workspaceName')
+        workspaceName: readStringField(command, 'workspaceName'),
+        ...(lockedWorktreeConfirmation ? { lockedWorktreeConfirmation } : {})
       })
 
       return loadAndSelectWorkbench(input, project)
@@ -200,6 +203,27 @@ function readStringField(command: unknown, fieldName: string): string {
   }
 
   return command[fieldName]
+}
+
+function readLockedWorktreeConfirmation(
+  command: unknown
+): { readonly lockReason: string | null } | undefined {
+  if (!isRecord(command) || command.lockedWorktreeConfirmation === undefined) {
+    return undefined
+  }
+
+  const confirmation = command.lockedWorktreeConfirmation
+  if (
+    !isRecord(confirmation) ||
+    (typeof confirmation.lockReason !== 'string' && confirmation.lockReason !== null)
+  ) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      'Invalid IPC command: lockedWorktreeConfirmation.lockReason must be a string or null.'
+    )
+  }
+
+  return { lockReason: confirmation.lockReason }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -59,7 +59,9 @@ describe('project git workspace adapter', () => {
         {
           name: 'main',
           worktreeDirectory: canonicalProjectDirectory,
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
     })
@@ -86,14 +88,76 @@ describe('project git workspace adapter', () => {
         {
           name: 'feature/sidebar',
           worktreeDirectory: canonicalWorktreeDirectory,
-          isCurrent: false
+          isCurrent: false,
+          isLocked: false,
+          lockReason: null
         },
         {
           name: 'main',
           worktreeDirectory: canonicalProjectDirectory,
-          isCurrent: true
+          isCurrent: true,
+          isLocked: false,
+          lockReason: null
         }
       ]
+    })
+  })
+
+  it('inspects, unlocks, and restores a worktree lock reason', async () => {
+    const adapter = new GitCliWorkspaceAdapter()
+    const worktreeDirectory = join(appStateDirectory, 'feature-sidebar')
+
+    await initializeGitProject(projectDirectory)
+    await adapter.createBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      branchName: 'feature/sidebar',
+      worktreeDirectory
+    })
+    await execFileAsync(
+      'git',
+      ['worktree', 'lock', '--reason', 'external agent session', worktreeDirectory],
+      { cwd: projectDirectory }
+    )
+
+    const lockedInspection = await adapter.inspectRepository(projectDirectory)
+    expect(
+      lockedInspection.branches.find((branch) => branch.name === 'feature/sidebar')
+    ).toMatchObject({
+      name: 'feature/sidebar',
+      isLocked: true,
+      lockReason: 'external agent session'
+    })
+
+    await adapter.unlockBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      worktreeDirectory
+    })
+    const unlockedInspection = await adapter.inspectRepository(projectDirectory)
+    expect(
+      unlockedInspection.branches.find((branch) => branch.name === 'feature/sidebar')
+    ).toMatchObject({
+      name: 'feature/sidebar',
+      isLocked: false,
+      lockReason: null
+    })
+
+    await adapter.lockBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      worktreeDirectory,
+      reason: 'external agent session'
+    })
+    const restoredInspection = await adapter.inspectRepository(projectDirectory)
+    expect(
+      restoredInspection.branches.find((branch) => branch.name === 'feature/sidebar')
+    ).toMatchObject({
+      name: 'feature/sidebar',
+      isLocked: true,
+      lockReason: 'external agent session'
+    })
+
+    await adapter.unlockBranchWorktree({
+      repositoryDirectory: projectDirectory,
+      worktreeDirectory
     })
   })
 
