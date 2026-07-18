@@ -34,8 +34,13 @@ import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommi
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
+import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
 
-export function AppShell() {
+interface AppShellProps {
+  readonly notifications?: AppNotificationController
+}
+
+export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
   const [currentWorkbench, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(null)
@@ -157,9 +162,10 @@ export function AppShell() {
   const terminalWorkflow = useTerminalWorkflow({
     currentWorkbench,
     currentWorkspace,
+    notifications,
     setCurrentGraph
   })
-  const { start: startTerminalWorkflow, updateExecutionConfig } = terminalWorkflow
+  const { start: startWorkflow, stop: stopWorkflow, updateExecutionConfig } = terminalWorkflow
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
@@ -381,7 +387,8 @@ export function AppShell() {
       onDelete: deleteTerminalBlock,
       onUpdateMetadata: updateTerminalBlockMetadata,
       onUpdateExecutionConfig: updateExecutionConfig,
-      onRunFromHere: (block: TerminalBlockSnapshot) => startTerminalWorkflow(block.id),
+      onRunFromHere: (block: TerminalBlockSnapshot) => startWorkflow(block.id),
+      onStopWorkflow: stopWorkflow,
       onInput: writeTerminal,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
@@ -402,7 +409,8 @@ export function AppShell() {
       selectTerminalBlock,
       startTerminal,
       terminalGroupActions,
-      startTerminalWorkflow,
+      startWorkflow,
+      stopWorkflow,
       updateExecutionConfig,
       updateTerminalBlockMetadata,
       writeTerminal
@@ -425,6 +433,8 @@ export function AppShell() {
     setNodes,
     terminalGroupDropAction,
     terminalStates,
+    activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
+    isStoppingWorkflow: terminalWorkflow.isStopping,
     workflowNodeStatuses: terminalWorkflow.nodeStatuses,
     onRemoveAgent: removeWorkspaceAgent,
     onMcpCapabilityChange: updateWorkspaceAgentMcpCapability,

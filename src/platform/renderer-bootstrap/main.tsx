@@ -1,7 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { AppShell } from '../../presentation/app-shell/AppShell'
+import { AppShellRoot } from '../../presentation/app-shell/AppShellRoot'
 import { applyInitialThemePreference } from '../../presentation/app-shell/themePreference'
 import './renderer.css'
 
@@ -15,6 +15,6 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <React.StrictMode>
-    <AppShell />
+    <AppShellRoot />
   </React.StrictMode>
 )

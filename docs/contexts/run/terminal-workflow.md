@@ -23,7 +23,7 @@
 - 从指定终端运行该终端及其全部后代。
 - 按任务退出码或服务就绪条件判断上游是否可以放行下游。
 - 支持并行根节点、汇合等待、失败传播、超时和停止。
-- 在终端节点、连线和工具栏中投影工作流状态。
+- 在终端节点、连线和应用通知中投影工作流状态与活动期控制。
 
 当前不包括：
 
@@ -78,7 +78,7 @@ Run 不得直接读取或修改 `BlockGraph` 聚合。它只能通过 `TerminalW
 - 节点的等待、运行、就绪、成功、失败、阻塞和停止状态。
 - 工作流命令 PTY、计时器、TCP 探测和输出匹配缓冲。
 
-表现层中的节点徽标、连线颜色和工具栏状态都是运行快照的派生投影，不是新的事实来源。应用重启后恢复连接和执行配置，但不恢复上一次活动工作流。
+表现层中的节点徽标、连线颜色和应用通知都是运行快照的派生投影，不是新的事实来源。通知关闭不得改变工作流、节点状态或终端输出，也不得隐式触发停止。应用重启后恢复连接和执行配置，但不恢复上一次活动工作流或通知。
 
 ## 图与计划规则
 
@@ -171,7 +171,7 @@ waiting
 4. 清理任务超时、服务就绪超时和 TCP 探测。
 5. 保留已有终端输出，并将终端交还为空交互式会话。
 
-顶部“停止流程”只在工作流活动期间出现。单个终端的“停止当前命令”与停止整个工作流是两个不同作用范围的动作。
+工作流活动期间，右上角活动通知提供“停止本次运行”，本次计划的根终端也将“从此处运行流程”切换为同名兜底动作；顶部工具栏不展示工作流状态或停止动作。“停止本次运行”精确停止当前工作区的活动 `WorkflowRun`，包括计划中尚未开始以及已经运行或就绪的全部节点，不影响同画布无关的独立终端命令、其他工作区或其他项目。单个终端的“停止当前命令”只中断该终端当前 PTY，两者是不同作用范围的动作。
 
 ## 失败与用户反馈
 
@@ -188,38 +188,42 @@ waiting
 
 上游失败后，下游显示阻塞而不是伪装成未运行。连线和节点可以辅助展示状态，但颜色不得成为唯一信息载体。
 
+工作流开始后，表现层按运行 ID 创建一条可关闭的活动通知，展示起点、精确终端数量和“停止本次运行”，并在运行、服务就绪、成功、失败或已停止之间原地更新。成功和已停止可以短暂显示后自动关闭；失败默认保留，并使用失败终端名称和结构化退出码生成稳定用户文案，不直接展示未经映射的底层异常文本。同一次运行的终态重复更新不得重复通知。用户主动关闭活动通知不得停止运行，后续普通状态不得重新打开它；如果该运行随后失败，必须重新弹出错误通知。连接、配置、启动或停止流程等用户动作失败时同样进入应用通知，不在顶部工具栏中常驻显示错误。关闭通知只移除临时反馈，失败节点、阻塞后代、连线状态和终端输出继续保留。
+
 ## 实现入口
 
-| 层级                   | 入口                                                                                                                                                                                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BlockGraph domain      | [`TerminalWorkflowRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowRules.ts)、[`TerminalWorkflowPlan.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan.ts)                                   |
-| BlockGraph application | [`BuildTerminalWorkflowPlanUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase.ts) 及连接/断开/配置用例                                                                                          |
-| Run domain             | [`WorkflowRun.ts`](../../../src/contexts/run/domain/aggregates/WorkflowRun.ts)                                                                                                                                                                     |
-| Run application        | [`TerminalWorkflowService.ts`](../../../src/contexts/run/application/use-cases/TerminalWorkflowService.ts) 和 `TerminalWorkflow*Port`                                                                                                              |
-| Run infrastructure     | [`TerminalSessionWorkflowRuntimeAdapter.ts`](../../../src/contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter.ts)、[`NodeTcpReadinessAdapter.ts`](../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter.ts) |
-| Platform               | [`terminalWorkflowIpcHandlers.ts`](../../../src/platform/electron-main/terminalWorkflowIpcHandlers.ts) 与 preload                                                                                                                                  |
-| Presentation           | [`useTerminalWorkflow.ts`](../../../src/presentation/app-shell/useTerminalWorkflow.ts)、[`terminalWorkflowEdges.ts`](../../../src/presentation/app-shell/terminalWorkflowEdges.ts)、终端节点与工具栏                                               |
+| 层级                   | 入口                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BlockGraph domain      | [`TerminalWorkflowRules.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowRules.ts)、[`TerminalWorkflowPlan.ts`](../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan.ts)                                                                                                                                                                                                                 |
+| BlockGraph application | [`BuildTerminalWorkflowPlanUseCase.ts`](../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase.ts) 及连接/断开/配置用例                                                                                                                                                                                                                                                                        |
+| Run domain             | [`WorkflowRun.ts`](../../../src/contexts/run/domain/aggregates/WorkflowRun.ts)                                                                                                                                                                                                                                                                                                                                                   |
+| Run application        | [`TerminalWorkflowService.ts`](../../../src/contexts/run/application/use-cases/TerminalWorkflowService.ts) 和 `TerminalWorkflow*Port`                                                                                                                                                                                                                                                                                            |
+| Run infrastructure     | [`TerminalSessionWorkflowRuntimeAdapter.ts`](../../../src/contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter.ts)、[`NodeTcpReadinessAdapter.ts`](../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter.ts)                                                                                                                                                                               |
+| Platform               | [`terminalWorkflowIpcHandlers.ts`](../../../src/platform/electron-main/terminalWorkflowIpcHandlers.ts) 与 preload                                                                                                                                                                                                                                                                                                                |
+| Presentation           | [`useTerminalWorkflow.ts`](../../../src/presentation/app-shell/useTerminalWorkflow.ts)、[`useTerminalWorkflowNotifications.ts`](../../../src/presentation/app-shell/useTerminalWorkflowNotifications.ts)、[`terminalWorkflowNotifications.ts`](../../../src/presentation/app-shell/terminalWorkflowNotifications.ts)、[`terminalWorkflowEdges.ts`](../../../src/presentation/app-shell/terminalWorkflowEdges.ts)、终端节点与通知 |
 
 ## 验证矩阵
 
 低层测试证明规则和状态，高层测试只证明真实跨边界主路径：
 
-| 层级                | 证明内容                                       | 主要测试                                                                                                                                                                                                                                                                   |
-| ------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit / BlockGraph   | 连接不变量、计划范围、拓扑和配置               | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.build-terminal-workflow-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.build-terminal-workflow-plan.spec.ts) |
-| Unit / Run          | 状态迁移、并行、汇合、失败传播、停止和服务就绪 | [`run.workflow-run.spec.ts`](../../../tests/unit/contexts/run/run.workflow-run.spec.ts)、[`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)                                                                 |
-| Unit / Presentation | 表单解析、事件投影、连线和工具栏状态           | [`terminal-metadata-workflow-config.spec.tsx`](../../../tests/unit/presentation/terminal-metadata-workflow-config.spec.tsx)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                                         |
-| Integration         | 真实 PTY、计划适配器和工作流协作               | [`run.terminal-workflow.spec.ts`](../../../tests/integration/contexts/run/run.terminal-workflow.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)                                                                   |
-| Contract            | Electron IPC 输入、输出和事件契约              | [`run.terminal-workflow-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-workflow-ipc.spec.ts)                                                                                                                                                              |
-| E2E                 | 用户连接两个终端并从上游运行到下游成功         | [`terminal-workflows.e2e.spec.ts`](../../../tests/e2e/terminal-workflows.e2e.spec.ts)                                                                                                                                                                                      |
+| 层级                | 证明内容                                         | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit / BlockGraph   | 连接不变量、计划范围、拓扑和配置                 | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.build-terminal-workflow-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.build-terminal-workflow-plan.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Unit / Run          | 状态迁移、并行、汇合、失败传播、停止和服务就绪   | [`run.workflow-run.spec.ts`](../../../tests/unit/contexts/run/run.workflow-run.spec.ts)、[`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Unit / Presentation | 表单解析、事件投影、通知生命周期、停止入口和连线 | [`terminal-metadata-workflow-config.spec.tsx`](../../../tests/unit/presentation/terminal-metadata-workflow-config.spec.tsx)、[`app-notifications.spec.tsx`](../../../tests/unit/presentation/app-notifications.spec.tsx)、[`terminal-workflow-notifications.spec.ts`](../../../tests/unit/presentation/terminal-workflow-notifications.spec.ts)、[`terminal-workflow.notification-publishing.spec.tsx`](../../../tests/unit/presentation/terminal-workflow.notification-publishing.spec.tsx)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)、[`terminal-tooltips.spec.tsx`](../../../tests/unit/presentation/terminal-tooltips.spec.tsx) |
+| Integration         | 真实 PTY、计划适配器和工作流协作                 | [`run.terminal-workflow.spec.ts`](../../../tests/integration/contexts/run/run.terminal-workflow.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Contract            | Electron IPC 输入、输出和事件契约                | [`run.terminal-workflow-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-workflow-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| E2E                 | 用户连接两个终端并从上游运行到下游成功           | [`terminal-workflows.e2e.spec.ts`](../../../tests/e2e/terminal-workflows.e2e.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 手工验收至少覆盖：
 
 1. 上游任务成功后下游才启动。
 2. 上游失败时下游阻塞。
 3. 服务输出或端口就绪后下游启动，而服务保持运行。
-4. 活动期间停止流程后不再启动新节点。
+4. 活动通知和根终端的“停止本次运行”都只停止当前工作区的活动运行，提交期间不可重复触发，停止后不再启动新节点。
 5. 重启应用后连接和执行配置恢复，旧运行状态不恢复。
+6. 活动通知在运行、就绪和终态之间原地更新；关闭活动通知不停止流程，普通更新不重开，后续失败会重新提示。
+7. 工作流失败后右上角只出现一条可关闭通知，关闭后节点、连线和终端输出仍保留失败证据。
 
 ## 维护规则
 

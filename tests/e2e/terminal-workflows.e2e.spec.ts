@@ -58,7 +58,7 @@ describe('terminal workflows e2e', () => {
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()
       await waitForTerminalOutput(page, 'Terminal 1', 'workflow-install-complete')
       await waitForTerminalOutput(page, 'Terminal 2', 'workflow-build-complete')
-      await page.getByText('流程成功').waitFor()
+      await page.getByText('流程运行成功').waitFor()
 
       const graph = JSON.parse(
         await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')

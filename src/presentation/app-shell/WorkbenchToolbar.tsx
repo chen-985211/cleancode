@@ -1,13 +1,8 @@
-import { Bot, Box, Check, Square, Terminal, X } from 'lucide-react'
-
-import type { WorkflowRunStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
+import { Bot, Box, Check, Terminal, X } from 'lucide-react'
 
 interface WorkbenchToolbarProps {
   readonly isDesktopRuntime: boolean
   readonly hasWorkbench: boolean
-  readonly isWorkflowActive: boolean
-  readonly workflowStatus: WorkflowRunStatus | null
-  readonly workflowError: string | null
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalGroupCandidateCount: number
   readonly canBeginTerminalGroupSelection: boolean
@@ -17,7 +12,6 @@ interface WorkbenchToolbarProps {
   readonly onBeginTerminalGroupSelection: () => void
   readonly onCreateTerminalGroup: () => void
   readonly onCancelTerminalGroupSelection: () => void
-  readonly onStopWorkflow: () => void
 }
 
 export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
@@ -42,29 +36,6 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
         新建 Agent
       </button>
       <span className="toolbar-divider" aria-hidden="true" />
-      {props.workflowStatus ? (
-        <span
-          className={`toolbar-workflow-status toolbar-workflow-status--${props.workflowStatus}`}
-        >
-          {workflowStatusLabel[props.workflowStatus]}
-        </span>
-      ) : null}
-      {props.isWorkflowActive ? (
-        <button
-          className="toolbar-button"
-          type="button"
-          onClick={props.onStopWorkflow}
-          title="按逆依赖顺序停止运行中的终端"
-        >
-          <Square size={14} aria-hidden="true" />
-          停止流程
-        </button>
-      ) : null}
-      {props.workflowError ? (
-        <span className="toolbar-workflow-error" role="alert" title={props.workflowError}>
-          {props.workflowError}
-        </span>
-      ) : null}
       {props.isTerminalGroupSelectionMode ? (
         <>
           <span className="toolbar-selection-status" role="status">
@@ -104,12 +75,4 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
       )}
     </div>
   )
-}
-
-const workflowStatusLabel: Record<WorkflowRunStatus, string> = {
-  running: '流程运行中',
-  ready: '服务已就绪',
-  succeeded: '流程成功',
-  failed: '流程失败',
-  stopped: '流程已停止'
 }

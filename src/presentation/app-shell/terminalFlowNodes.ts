@@ -36,6 +36,7 @@ interface TerminalFlowNodeHandlers {
   ) => Promise<void>
   readonly onUpdateExecutionConfig?: TerminalFlowNode['data']['onUpdateExecutionConfig']
   readonly onRunFromHere?: TerminalFlowNode['data']['onRunFromHere']
+  readonly onStopWorkflow?: TerminalFlowNode['data']['onStopWorkflow']
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onResizeBlock: (
@@ -77,6 +78,8 @@ interface CreateTerminalFlowNodesInput {
   readonly isTerminalGroupSelectionMode?: boolean
   readonly terminalGroupDropAction?: TerminalGroupDropAction
   readonly hoveredTerminalBlockId: string | null
+  readonly activeWorkflowRootBlockIds?: readonly string[]
+  readonly isStoppingWorkflow?: boolean
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
@@ -92,10 +95,13 @@ export function createTerminalFlowNodes({
   isTerminalGroupSelectionMode = false,
   terminalGroupDropAction = { type: 'none' },
   hoveredTerminalBlockId,
+  activeWorkflowRootBlockIds = [],
+  isStoppingWorkflow = false,
   terminalStates,
   handlers,
   workflowNodeStatuses = {}
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
+  const activeWorkflowRootIds = new Set(activeWorkflowRootBlockIds)
   const selectedBlockIds = new Set(
     selectedTerminalBlockIds ?? (selectedTerminalBlockId ? [selectedTerminalBlockId] : [])
   )
@@ -129,6 +135,8 @@ export function createTerminalFlowNodes({
         canSelectForTerminalGroup: isTerminalGroupSelectionMode || !groupedMemberIds.has(block.id),
         handlers,
         isNavigationHighlighted: hoveredTerminalBlockId === block.id,
+        isActiveWorkflowRoot: activeWorkflowRootIds.has(block.id),
+        isStoppingWorkflow,
         isSelected: selectedBlockIds.has(block.id),
         isTerminalGroupSelectionMode,
         terminalStates,
@@ -148,6 +156,8 @@ interface CreateTerminalFlowNodeInput {
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly isNavigationHighlighted: boolean
+  readonly isActiveWorkflowRoot: boolean
+  readonly isStoppingWorkflow: boolean
   readonly workflowStatus?: WorkflowRunNodeStatus
 }
 
@@ -160,6 +170,8 @@ function createTerminalFlowNode({
   isTerminalGroupSelectionMode,
   canSelectForTerminalGroup,
   isNavigationHighlighted,
+  isActiveWorkflowRoot,
+  isStoppingWorkflow,
   workflowStatus
 }: CreateTerminalFlowNodeInput): TerminalFlowNode {
   return {
@@ -181,6 +193,8 @@ function createTerminalFlowNode({
       isTerminalGroupSelectionMode,
       canSelectForTerminalGroup,
       isNavigationHighlighted,
+      isActiveWorkflowRoot,
+      isStoppingWorkflow,
       workflowStatus,
       ...handlers,
       onSelect: (additive) => handlers.onSelect?.(block, additive)

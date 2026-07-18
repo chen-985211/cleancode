@@ -356,6 +356,18 @@
   color: var(--cc-primary);
 }
 
+.terminal-node__action--workflow-stop {
+  border-color: var(--cc-danger-border);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.terminal-node__action--workflow-stop:hover:not(:disabled) {
+  border-color: var(--cc-danger);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
 .terminal-frame {
   display: flex;
   min-height: 0;

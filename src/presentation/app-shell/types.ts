@@ -59,6 +59,8 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly isNavigationHighlighted: boolean
+  readonly isActiveWorkflowRoot?: boolean
+  readonly isStoppingWorkflow?: boolean
   readonly workflowStatus?: WorkflowRunNodeStatus
   readonly onStart: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onStop: (block: TerminalBlockSnapshot) => void
@@ -74,6 +76,7 @@ interface TerminalNodeData extends Record<string, unknown> {
     executionConfig: TerminalExecutionConfigSnapshot
   ) => Promise<void>
   readonly onRunFromHere?: (block: TerminalBlockSnapshot) => void
+  readonly onStopWorkflow?: () => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void
   readonly onResizeBlock: (

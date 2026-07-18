@@ -210,9 +210,6 @@ export function WorkbenchCanvas({
         <WorkbenchToolbar
           isDesktopRuntime={isDesktopRuntime}
           hasWorkbench={Boolean(currentWorkbench)}
-          isWorkflowActive={workflow.isActive}
-          workflowStatus={workflow.run?.status ?? null}
-          workflowError={workflow.actionError}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
           selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
           canBeginTerminalGroupSelection={canBeginTerminalGroupSelection}
@@ -222,7 +219,6 @@ export function WorkbenchCanvas({
           onBeginTerminalGroupSelection={beginTerminalGroupSelection}
           onCreateTerminalGroup={onCreateTerminalGroup}
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
-          onStopWorkflow={() => void workflow.stop()}
         />
         <ReactFlow<WorkbenchFlowNode, Edge>
           nodes={nodes}
@@ -329,12 +325,12 @@ export function WorkbenchCanvas({
 }
 
 const inactiveTerminalWorkflowController = {
-  actionError: null,
-  clearActionError: () => undefined,
+  activeRootBlockIds: [],
   connect: async () => undefined,
   deleteEdges: async () => undefined,
   edges: [],
   isActive: false,
+  isStopping: false,
   nodeStatuses: {},
   run: null,
   start: async () => undefined,

@@ -36,6 +36,8 @@ interface UseWorkbenchFlowNodesInput {
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
+  readonly activeWorkflowRootBlockIds?: readonly string[]
+  readonly isStoppingWorkflow?: boolean
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
   readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onMcpCapabilityChange: (
@@ -67,6 +69,8 @@ export function useWorkbenchFlowNodes({
   setNodes,
   terminalGroupDropAction,
   terminalStates,
+  activeWorkflowRootBlockIds,
+  isStoppingWorkflow,
   workflowNodeStatuses,
   onRemoveAgent,
   onMcpCapabilityChange,
@@ -96,6 +100,8 @@ export function useWorkbenchFlowNodes({
         graph,
         handlers,
         hoveredTerminalBlockId,
+        activeWorkflowRootBlockIds,
+        isStoppingWorkflow,
         isTerminalGroupSelectionMode,
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
@@ -137,6 +143,8 @@ export function useWorkbenchFlowNodes({
     graph,
     handlers,
     hoveredTerminalBlockId,
+    activeWorkflowRootBlockIds,
+    isStoppingWorkflow,
     selectedAgentId,
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,

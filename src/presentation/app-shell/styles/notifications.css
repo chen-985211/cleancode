@@ -1,0 +1,211 @@
+.notification-viewport {
+  position: fixed;
+  top: max(
+    calc(
+      var(--cc-shell-control-inset) + var(--cc-shell-settings-height) +
+        var(--cc-shell-control-row-gap) + var(--cc-shell-toolbar-height) +
+        var(--cc-shell-control-row-gap)
+    ),
+    calc(var(--cc-window-controls-height) + 8px)
+  );
+  right: calc(
+    var(--cc-shell-control-inset) + var(--cc-shell-settings-height) +
+      var(--cc-shell-control-row-gap)
+  );
+  z-index: 40;
+  display: flex;
+  width: min(360px, calc(100vw - 80px));
+  max-height: calc(100vh - 24px);
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 1px;
+  pointer-events: none;
+}
+
+.notification-card {
+  --notification-accent: var(--cc-primary);
+  --notification-border: var(--cc-primary-border);
+  --notification-soft: var(--cc-primary-soft);
+
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  border: 1px solid var(--notification-border);
+  border-radius: 11px;
+  background: var(--cc-surface-overlay);
+  padding: 11px;
+  color: var(--cc-foreground);
+  pointer-events: auto;
+  overflow: hidden;
+  box-shadow: var(--cc-shadow-floating);
+  backdrop-filter: blur(12px);
+  animation: notification-enter 180ms ease-out both;
+}
+
+.notification-card--success {
+  --notification-accent: var(--cc-success-strong);
+  --notification-border: var(--cc-success-border);
+  --notification-soft: var(--cc-success-soft);
+}
+
+.notification-card--warning {
+  --notification-accent: var(--cc-warning-strong);
+  --notification-border: var(--cc-warning-border);
+  --notification-soft: var(--cc-warning-soft);
+}
+
+.notification-card--error {
+  --notification-accent: var(--cc-danger-strong);
+  --notification-border: var(--cc-danger-border);
+  --notification-soft: var(--cc-danger-soft);
+}
+
+.notification-card__icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--notification-soft);
+  color: var(--notification-accent);
+}
+
+.notification-card__content {
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.notification-card__title {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.notification-card__message {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--cc-muted-strong);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.notification-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.notification-card__action {
+  min-height: 30px;
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  background: var(--cc-surface-subtle);
+  padding: 0 10px;
+  color: var(--cc-foreground);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.notification-card__action:hover:not(:disabled) {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-hover);
+}
+
+.notification-card__action--danger {
+  border-color: var(--cc-danger-border);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.notification-card__action--danger:hover:not(:disabled) {
+  border-color: var(--cc-danger);
+  background: var(--cc-danger-soft);
+}
+
+.notification-card__action:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.notification-card__action:focus-visible,
+.notification-card__dismiss:focus-visible {
+  outline: 2px solid var(--cc-primary-border);
+  outline-offset: 2px;
+}
+
+.notification-card__spinner {
+  animation: notification-spin 900ms linear infinite;
+}
+
+.notification-card__dismiss {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cc-muted);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.notification-card__dismiss:hover {
+  border-color: var(--cc-border);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+@keyframes notification-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes notification-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .notification-viewport {
+    top: calc(
+      var(--cc-shell-control-inset) + var(--cc-shell-settings-height) +
+        var(--cc-shell-control-row-gap) + var(--cc-shell-toolbar-height) +
+        var(--cc-shell-control-row-gap)
+    );
+    right: var(--cc-shell-control-inset);
+    width: calc(100vw - var(--cc-shell-control-inset) * 2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-card {
+    animation: none;
+  }
+
+  .notification-card__spinner {
+    animation: none;
+  }
+}

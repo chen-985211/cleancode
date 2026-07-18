@@ -1,9 +1,12 @@
-.app-shell {
+:root {
   --cc-window-controls-height: env(titlebar-area-height, 0px);
   --cc-shell-control-inset: 12px;
   --cc-shell-settings-height: 36px;
   --cc-shell-control-row-gap: 8px;
+  --cc-shell-toolbar-height: 40px;
+}
 
+.app-shell {
   position: relative;
   display: grid;
   width: 100%;

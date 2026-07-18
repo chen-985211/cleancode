@@ -5,7 +5,7 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, Edit3, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
+import { Check, CircleStop, Edit3, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { GroupRestartIcon } from './TerminalGroupIcons'
@@ -172,6 +172,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
         sessionStatus={session.status}
         workflowStatus={data.workflowStatus}
+        isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
+        isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
         onSelect={(additive) => data.onSelect?.(additive)}
         onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
         onStartEditing={startEditingMetadata}
@@ -179,6 +181,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         onQuickLaunch={quickLaunchTerminal}
         onRestart={restartTerminal}
         onRunFromHere={() => data.onRunFromHere?.(block)}
+        onStopWorkflow={() => data.onStopWorkflow?.()}
         onDelete={() => data.onDelete(block)}
       />
       {isEditingMetadata ? (
@@ -231,6 +234,8 @@ interface TerminalHeaderProps {
   readonly canSelectForTerminalGroup: boolean
   readonly sessionStatus: TerminalViewState['status']
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
+  readonly isActiveWorkflowRoot: boolean
+  readonly isStoppingWorkflow: boolean
   readonly onSelect: (additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: () => void
   readonly onStartEditing: () => void
@@ -238,6 +243,7 @@ interface TerminalHeaderProps {
   readonly onQuickLaunch: () => void
   readonly onRestart: () => void
   readonly onRunFromHere: () => void
+  readonly onStopWorkflow: () => void
   readonly onDelete: () => void
 }
 
@@ -252,6 +258,8 @@ function TerminalHeader({
   canSelectForTerminalGroup,
   sessionStatus,
   workflowStatus,
+  isActiveWorkflowRoot,
+  isStoppingWorkflow,
   onSelect,
   onToggleTerminalGroupCandidate,
   onStartEditing,
@@ -259,12 +267,18 @@ function TerminalHeader({
   onQuickLaunch,
   onRestart,
   onRunFromHere,
+  onStopWorkflow,
   onDelete
 }: TerminalHeaderProps) {
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
   const launchCommandTooltip = canQuickLaunch ? '启动命令' : '配置启动命令'
   const terminalGroupSelectionLabel = isSelectedForTerminalGroup ? '已选择终端' : '选择终端'
+  const workflowActionLabel = isActiveWorkflowRoot
+    ? isStoppingWorkflow
+      ? '正在停止本次运行…'
+      : '停止本次运行'
+    : '从此处运行流程'
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
@@ -319,15 +333,19 @@ function TerminalHeader({
         onClick={(event) => event.stopPropagation()}
       >
         <button
-          className="terminal-node__action terminal-node__action--workflow"
+          className={`terminal-node__action terminal-node__action--workflow${isActiveWorkflowRoot ? ' terminal-node__action--workflow-stop' : ''}`}
           type="button"
-          aria-label={`${blockName} 从此处运行终端流程`}
-          title="从此终端开始运行依赖流程"
-          data-cc-tooltip="从此处运行流程"
-          disabled={!canQuickLaunch}
-          onClick={onRunFromHere}
+          aria-label={`${blockName} ${isActiveWorkflowRoot ? workflowActionLabel : '从此处运行终端流程'}`}
+          title={isActiveWorkflowRoot ? workflowActionLabel : '从此终端开始运行依赖流程'}
+          data-cc-tooltip={workflowActionLabel}
+          disabled={isActiveWorkflowRoot ? isStoppingWorkflow : !canQuickLaunch}
+          onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
         >
-          <Waypoints size={15} aria-hidden="true" />
+          {isActiveWorkflowRoot ? (
+            <CircleStop size={15} aria-hidden="true" />
+          ) : (
+            <Waypoints size={15} aria-hidden="true" />
+          )}
         </button>
         <button
           className={[

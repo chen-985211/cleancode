@@ -1,5 +1,5 @@
 import type { Connection, Edge } from '@xyflow/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   TerminalBlockSnapshot,
@@ -8,27 +8,36 @@ import type {
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import { createTerminalWorkflowEdges } from './terminalWorkflowEdges'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import type { AppNotificationController, NotifyApp } from './appNotifications'
+import { getWorkflowRunRootBlockIds } from './terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from './types'
+import { useTerminalWorkflowNotifications } from './useTerminalWorkflowNotifications'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 interface UseTerminalWorkflowInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly notifications: AppNotificationController
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
 }
 
 export function useTerminalWorkflow({
   currentWorkbench,
   currentWorkspace,
+  notifications,
   setCurrentGraph
 }: UseTerminalWorkflowInput) {
   const [run, setRun] = useState<WorkflowRunSnapshot | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [isStopping, setIsStopping] = useState(false)
+  const isStoppingRef = useRef(false)
   const workspaceName = currentWorkspace?.name ?? null
+  const { notify } = notifications
 
   useEffect(() => {
     const api = window.cleancode
+    isStoppingRef.current = false
+    setIsStopping(false)
 
     if (
       !api ||
@@ -85,7 +94,7 @@ export function useTerminalWorkflow({
         return
       }
 
-      await performAction(setActionError, async () => {
+      await performAction(notify, async () => {
         const graph = await window.cleancode?.connectTerminalBlocks({
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
@@ -96,14 +105,14 @@ export function useTerminalWorkflow({
         if (graph) setCurrentGraph(graph)
       })
     },
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
   )
 
   const deleteEdges = useCallback(
     async (deletedEdges: Edge[]) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(setActionError, async () => {
+      await performAction(notify, async () => {
         for (const edge of deletedEdges) {
           const graph = await window.cleancode?.disconnectTerminalBlocks({
             projectDirectory: currentWorkbench.project.directory,
@@ -115,14 +124,14 @@ export function useTerminalWorkflow({
         }
       })
     },
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
   )
 
   const updateExecutionConfig = useCallback(
     async (block: TerminalBlockSnapshot, executionConfig: TerminalExecutionConfigSnapshot) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(setActionError, async () => {
+      await performAction(notify, async () => {
         const graph = await window.cleancode?.updateTerminalExecutionConfig({
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
@@ -133,14 +142,14 @@ export function useTerminalWorkflow({
         if (graph) setCurrentGraph(graph)
       })
     },
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
   )
 
   const start = useCallback(
     async (blockId?: string) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(setActionError, async () => {
+      await performAction(notify, async () => {
         const nextRun = await window.cleancode?.startTerminalWorkflow({
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
@@ -151,28 +160,49 @@ export function useTerminalWorkflow({
         if (nextRun) setRun(nextRun)
       })
     },
-    [currentWorkbench, currentWorkspace]
+    [currentWorkbench, currentWorkspace, notify]
   )
 
   const stop = useCallback(async () => {
-    if (!currentWorkspace) return
+    if (!currentWorkspace || isStoppingRef.current) return
 
-    await performAction(setActionError, async () => {
-      setRun(
-        (await window.cleancode?.stopTerminalWorkflow({
-          workspaceName: currentWorkspace.name
-        })) ?? null
-      )
-    })
-  }, [currentWorkspace])
+    isStoppingRef.current = true
+    setIsStopping(true)
+    try {
+      await performAction(notify, async () => {
+        setRun(
+          (await window.cleancode?.stopTerminalWorkflow({
+            workspaceName: currentWorkspace.name
+          })) ?? null
+        )
+      })
+    } finally {
+      isStoppingRef.current = false
+      setIsStopping(false)
+    }
+  }, [currentWorkspace, notify])
+
+  useTerminalWorkflowNotifications({
+    isStopping,
+    notifications,
+    onStop: stop,
+    run,
+    workspaceName
+  })
+
+  const isActive = run?.status === 'running' || run?.status === 'ready'
+  const activeRootBlockIds = useMemo(
+    () => (isActive && run ? getWorkflowRunRootBlockIds(run) : []),
+    [isActive, run]
+  )
 
   return {
-    actionError,
-    clearActionError: () => setActionError(null),
+    activeRootBlockIds,
     connect,
     deleteEdges,
     edges,
-    isActive: run?.status === 'running' || run?.status === 'ready',
+    isActive,
+    isStopping,
     nodeStatuses,
     run,
     start,
@@ -181,17 +211,14 @@ export function useTerminalWorkflow({
   }
 }
 
-async function performAction(
-  setError: (error: string | null) => void,
-  action: () => Promise<void>
-): Promise<void> {
-  setError(null)
-
+async function performAction(notify: NotifyApp, action: () => Promise<void>): Promise<void> {
   try {
     await action()
   } catch (error) {
-    setError(
-      resolveUserFacingErrorMessage(error, error instanceof Error ? error.message : String(error))
-    )
+    notify({
+      kind: 'error',
+      title: '流程操作失败',
+      message: resolveUserFacingErrorMessage(error, '流程操作失败，请稍后重试。')
+    })
   }
 }

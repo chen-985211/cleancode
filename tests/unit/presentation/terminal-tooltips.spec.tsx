@@ -218,6 +218,38 @@ describe('terminal tooltips', () => {
     expect(deleteButton.querySelector('.lucide-trash-2')).toBeNull()
   })
 
+  it('turns the workflow action into a scoped stop action on the active run root', () => {
+    const onStopWorkflow = vi.fn()
+    render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...createTerminalNodeData(),
+          isActiveWorkflowRoot: true,
+          isStoppingWorkflow: false,
+          onStopWorkflow
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const stopWorkflow = screen.getByRole('button', { name: 'Terminal 停止本次运行' })
+
+    expect(stopWorkflow).toHaveAttribute('data-cc-tooltip', '停止本次运行')
+    fireEvent.click(stopWorkflow)
+    expect(onStopWorkflow).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Terminal 停止当前命令' })).toBeInTheDocument()
+  })
+
   it('orders terminal actions like the shared terminal group actions', () => {
     render(
       <TerminalNode

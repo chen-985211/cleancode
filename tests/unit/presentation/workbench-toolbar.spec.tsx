@@ -1,16 +1,12 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 
 import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'
 
 describe('workbench toolbar', () => {
-  it('keeps workflow controls out of the idle toolbar and reveals stop only while active', () => {
-    const onStopWorkflow = vi.fn()
+  it('keeps workflow status and controls out of the toolbar in every run state', () => {
     const props = {
       isDesktopRuntime: true,
       hasWorkbench: true,
-      isWorkflowActive: false,
-      workflowStatus: null,
-      workflowError: null,
       isTerminalGroupSelectionMode: false,
       selectedTerminalGroupCandidateCount: 0,
       canBeginTerminalGroupSelection: true,
@@ -19,8 +15,7 @@ describe('workbench toolbar', () => {
       onCreateWorkspaceAgent: vi.fn(),
       onBeginTerminalGroupSelection: vi.fn(),
       onCreateTerminalGroup: vi.fn(),
-      onCancelTerminalGroupSelection: vi.fn(),
-      onStopWorkflow
+      onCancelTerminalGroupSelection: vi.fn()
     } as const
 
     const { rerender } = render(<WorkbenchToolbar {...props} />)
@@ -29,10 +24,29 @@ describe('workbench toolbar', () => {
     expect(toolbar.queryByRole('button', { name: '运行流程' })).not.toBeInTheDocument()
     expect(toolbar.queryByRole('button', { name: '停止流程' })).not.toBeInTheDocument()
 
-    rerender(<WorkbenchToolbar {...props} isWorkflowActive workflowStatus="running" />)
+    rerender(<WorkbenchToolbar {...props} />)
 
-    fireEvent.click(toolbar.getByRole('button', { name: '停止流程' }))
+    expect(toolbar.queryByText('流程运行中')).not.toBeInTheDocument()
+    expect(toolbar.queryByRole('button', { name: '停止流程' })).not.toBeInTheDocument()
+  })
 
-    expect(onStopWorkflow).toHaveBeenCalledOnce()
+  it('keeps a completed workflow failure out of the toolbar', () => {
+    render(
+      <WorkbenchToolbar
+        isDesktopRuntime
+        hasWorkbench
+        isTerminalGroupSelectionMode={false}
+        selectedTerminalGroupCandidateCount={0}
+        canBeginTerminalGroupSelection
+        canCreateTerminalGroup={false}
+        onCreateTerminalBlock={vi.fn()}
+        onCreateWorkspaceAgent={vi.fn()}
+        onBeginTerminalGroupSelection={vi.fn()}
+        onCreateTerminalGroup={vi.fn()}
+        onCancelTerminalGroupSelection={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText('流程失败')).not.toBeInTheDocument()
   })
 })

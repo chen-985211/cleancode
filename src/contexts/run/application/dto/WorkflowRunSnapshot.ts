@@ -2,6 +2,5 @@ export type {
   WorkflowRunNodeStatus,
   WorkflowRunPlanNodeSnapshot,
   WorkflowRunPlanSnapshot,
-  WorkflowRunSnapshot,
-  WorkflowRunStatus
+  WorkflowRunSnapshot
 } from '../../domain/aggregates/WorkflowRunTypes'

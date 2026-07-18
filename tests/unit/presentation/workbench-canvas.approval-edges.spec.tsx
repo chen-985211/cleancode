@@ -103,12 +103,12 @@ function createWorkflow(
   deleteEdges: (edges: Edge[]) => Promise<void>
 ): ReturnType<typeof useTerminalWorkflow> {
   return {
-    actionError: null,
-    clearActionError: vi.fn(),
+    activeRootBlockIds: [],
     connect: vi.fn(async () => undefined),
     deleteEdges,
     edges: [],
     isActive: false,
+    isStopping: false,
     nodeStatuses: {},
     run: null,
     start: vi.fn(async () => undefined),
