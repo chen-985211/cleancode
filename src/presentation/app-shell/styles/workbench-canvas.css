@@ -18,15 +18,27 @@
   max-width: calc(100% - 24px);
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.app-shell__toolbar-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 3px;
   border: 1px solid var(--cc-border);
   border-radius: 10px;
   background: var(--cc-neutral-overlay);
   padding: 4px;
-  pointer-events: none;
   box-shadow: 0 4px 16px var(--cc-shadow-color);
   backdrop-filter: blur(10px);
+}
+
+.app-shell__toolbar-group--agent {
+  flex: 0 0 auto;
 }
 
 .toolbar-divider {

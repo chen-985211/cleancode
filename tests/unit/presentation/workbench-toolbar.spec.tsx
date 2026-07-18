@@ -3,6 +3,34 @@ import { render, screen, within } from '@testing-library/react'
 import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'
 
 describe('workbench toolbar', () => {
+  it('keeps Agent creation separate at the right edge of the toolbar', () => {
+    render(
+      <WorkbenchToolbar
+        isDesktopRuntime
+        hasWorkbench
+        isTerminalGroupSelectionMode={false}
+        selectedTerminalGroupCandidateCount={0}
+        canBeginTerminalGroupSelection
+        canCreateTerminalGroup={false}
+        onCreateTerminalBlock={vi.fn()}
+        onCreateWorkspaceAgent={vi.fn()}
+        onBeginTerminalGroupSelection={vi.fn()}
+        onCreateTerminalGroup={vi.fn()}
+        onCancelTerminalGroupSelection={vi.fn()}
+      />
+    )
+
+    const toolbar = screen.getByLabelText('工作台工具栏')
+    const terminalTools = within(toolbar).getByRole('group', { name: '终端工具' })
+    const agentTools = within(toolbar).getByRole('group', { name: 'Agent 工具' })
+
+    expect(
+      within(terminalTools).queryByRole('button', { name: '新建 Agent' })
+    ).not.toBeInTheDocument()
+    expect(within(agentTools).getByRole('button', { name: '新建 Agent' })).toBeInTheDocument()
+    expect(toolbar.lastElementChild).toBe(agentTools)
+  })
+
   it('keeps workflow status and controls out of the toolbar in every run state', () => {
     const props = {
       isDesktopRuntime: true,
