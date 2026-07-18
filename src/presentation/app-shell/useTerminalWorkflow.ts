@@ -31,6 +31,8 @@ export function useTerminalWorkflow({
   const [run, setRun] = useState<WorkflowRunSnapshot | null>(null)
   const [isStopping, setIsStopping] = useState(false)
   const isStoppingRef = useRef(false)
+  const graphId = currentWorkbench?.graph.id ?? null
+  const projectDirectory = currentWorkbench?.project.directory ?? null
   const workspaceName = currentWorkspace?.name ?? null
   const { notify } = notifications
 
@@ -41,6 +43,8 @@ export function useTerminalWorkflow({
 
     if (
       !api ||
+      !graphId ||
+      !projectDirectory ||
       !workspaceName ||
       typeof api.onTerminalWorkflowEvent !== 'function' ||
       typeof api.getTerminalWorkflow !== 'function'
@@ -51,12 +55,16 @@ export function useTerminalWorkflow({
 
     let isActive = true
     const unsubscribe = api.onTerminalWorkflowEvent((event) => {
-      if (event.type === 'run-updated' && event.run.workspaceName === workspaceName) {
+      if (
+        event.type === 'run-updated' &&
+        event.run.graphId === graphId &&
+        event.run.workspaceName === workspaceName
+      ) {
         setRun(event.run)
       }
     })
 
-    void api.getTerminalWorkflow({ workspaceName }).then((activeRun) => {
+    void api.getTerminalWorkflow({ projectDirectory, workspaceName }).then((activeRun) => {
       if (isActive) {
         setRun(activeRun)
       }
@@ -66,7 +74,7 @@ export function useTerminalWorkflow({
       isActive = false
       unsubscribe()
     }
-  }, [workspaceName])
+  }, [graphId, projectDirectory, workspaceName])
 
   const nodeStatuses = useMemo(
     () =>
@@ -164,7 +172,7 @@ export function useTerminalWorkflow({
   )
 
   const stop = useCallback(async () => {
-    if (!currentWorkspace || isStoppingRef.current) return
+    if (!currentWorkbench || !currentWorkspace || isStoppingRef.current) return
 
     isStoppingRef.current = true
     setIsStopping(true)
@@ -172,6 +180,7 @@ export function useTerminalWorkflow({
       await performAction(notify, async () => {
         setRun(
           (await window.cleancode?.stopTerminalWorkflow({
+            projectDirectory: currentWorkbench.project.directory,
             workspaceName: currentWorkspace.name
           })) ?? null
         )
@@ -180,12 +189,13 @@ export function useTerminalWorkflow({
       isStoppingRef.current = false
       setIsStopping(false)
     }
-  }, [currentWorkspace, notify])
+  }, [currentWorkbench, currentWorkspace, notify])
 
   useTerminalWorkflowNotifications({
     isStopping,
     notifications,
     onStop: stop,
+    projectDirectory,
     run,
     workspaceName
   })

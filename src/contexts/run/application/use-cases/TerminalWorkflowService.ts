@@ -17,9 +17,12 @@ import type {
   TerminalWorkflowRuntimePort
 } from '../ports/TerminalWorkflowRuntimePort'
 
-export interface StartTerminalWorkflowCommand {
+export interface TerminalWorkflowScopeCommand {
   readonly projectDirectory: string
   readonly workspaceName: string
+}
+
+export interface StartTerminalWorkflowCommand extends TerminalWorkflowScopeCommand {
   readonly workingDirectory: string
   readonly scope: TerminalWorkflowPlanScope
   readonly shell?: string
@@ -39,7 +42,7 @@ interface ActiveWorkflowRun {
 }
 
 export class TerminalWorkflowService {
-  private readonly activeRuns = new Map<string, ActiveWorkflowRun>()
+  private readonly activeRunsByProject = new Map<string, Map<string, ActiveWorkflowRun>>()
 
   constructor(
     private readonly planPort: TerminalWorkflowPlanPort,
@@ -49,8 +52,8 @@ export class TerminalWorkflowService {
   ) {}
 
   async start(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
-    if (this.activeRuns.has(command.workspaceName)) {
-      await this.stop(command.workspaceName)
+    if (this.findActiveRun(command)) {
+      await this.stop(command)
     }
 
     const plan = await this.planPort.buildPlan({
@@ -76,19 +79,19 @@ export class TerminalWorkflowService {
       outputTails: new Map(),
       handoffStarted: new Set()
     }
-    this.activeRuns.set(command.workspaceName, activeRun)
+    this.storeActiveRun(activeRun)
     this.publishRun(activeRun)
     await this.schedule(activeRun)
 
     return activeRun.run.toSnapshot()
   }
 
-  getActiveRun(workspaceName: string): WorkflowRunSnapshot | null {
-    return this.activeRuns.get(workspaceName)?.run.toSnapshot() ?? null
+  getActiveRun(scope: TerminalWorkflowScopeCommand): WorkflowRunSnapshot | null {
+    return this.findActiveRun(scope)?.run.toSnapshot() ?? null
   }
 
-  async stop(workspaceName: string): Promise<WorkflowRunSnapshot | null> {
-    const activeRun = this.activeRuns.get(workspaceName)
+  async stop(scope: TerminalWorkflowScopeCommand): Promise<WorkflowRunSnapshot | null> {
+    const activeRun = this.findActiveRun(scope)
 
     if (!activeRun) {
       return null
@@ -311,7 +314,23 @@ export class TerminalWorkflowService {
   }
 
   private isCurrent(activeRun: ActiveWorkflowRun): boolean {
-    return this.activeRuns.get(activeRun.command.workspaceName) === activeRun
+    return this.findActiveRun(activeRun.command) === activeRun
+  }
+
+  private findActiveRun(scope: TerminalWorkflowScopeCommand): ActiveWorkflowRun | undefined {
+    return this.activeRunsByProject.get(scope.projectDirectory)?.get(scope.workspaceName)
+  }
+
+  private storeActiveRun(activeRun: ActiveWorkflowRun): void {
+    const { projectDirectory, workspaceName } = activeRun.command
+    let projectRuns = this.activeRunsByProject.get(projectDirectory)
+
+    if (!projectRuns) {
+      projectRuns = new Map()
+      this.activeRunsByProject.set(projectDirectory, projectRuns)
+    }
+
+    projectRuns.set(workspaceName, activeRun)
   }
 }
 

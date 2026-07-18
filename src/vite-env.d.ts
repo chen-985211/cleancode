@@ -258,9 +258,11 @@ declare global {
         readonly rows?: number
       }): Promise<WorkflowRunSnapshot>
       stopTerminalWorkflow(command: {
+        readonly projectDirectory: string
         readonly workspaceName: string
       }): Promise<WorkflowRunSnapshot | null>
       getTerminalWorkflow(command: {
+        readonly projectDirectory: string
         readonly workspaceName: string
       }): Promise<WorkflowRunSnapshot | null>
       onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void

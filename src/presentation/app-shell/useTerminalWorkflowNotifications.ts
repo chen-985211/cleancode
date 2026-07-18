@@ -8,12 +8,15 @@ interface UseTerminalWorkflowNotificationsInput {
   readonly isStopping: boolean
   readonly notifications: AppNotificationController
   readonly onStop: () => Promise<void> | void
+  readonly projectDirectory: string | null
   readonly run: WorkflowRunSnapshot | null
   readonly workspaceName: string | null
 }
 
 interface PublishedWorkflowNotification {
+  hiddenByScopeChange: boolean
   notificationId: string
+  runId: string
   terminalStatusPublished: boolean
 }
 
@@ -21,29 +24,36 @@ export function useTerminalWorkflowNotifications({
   isStopping,
   notifications,
   onStop,
+  projectDirectory,
   run,
   workspaceName
 }: UseTerminalWorkflowNotificationsInput): void {
-  const publishedByRunId = useRef(new Map<string, PublishedWorkflowNotification>())
+  const publishedByScope = useRef(new Map<string, PublishedWorkflowNotification>())
   const { dismiss, notify, update } = notifications
+  const scopeKey = createWorkflowScopeKey(projectDirectory, workspaceName)
 
   useEffect(
     () => () => {
-      for (const published of publishedByRunId.current.values()) {
-        dismiss(published.notificationId)
+      if (!scopeKey) {
+        return
       }
-      publishedByRunId.current.clear()
+
+      const published = publishedByScope.current.get(scopeKey)
+      if (published) {
+        dismiss(published.notificationId)
+        published.hiddenByScopeChange = true
+      }
     },
-    [dismiss, workspaceName]
+    [dismiss, scopeKey]
   )
 
   useEffect(() => {
-    if (!run || !workspaceName || run.workspaceName !== workspaceName) {
+    if (!run || !scopeKey || !workspaceName || run.workspaceName !== workspaceName) {
       return
     }
 
-    const existing = publishedByRunId.current.get(run.id)
-    if (existing?.terminalStatusPublished) {
+    const existing = publishedByScope.current.get(scopeKey)
+    if (existing?.runId === run.id && existing.terminalStatusPublished) {
       return
     }
 
@@ -51,9 +61,11 @@ export function useTerminalWorkflowNotifications({
     const isTerminalStatus =
       run.status === 'failed' || run.status === 'succeeded' || run.status === 'stopped'
 
-    if (!existing) {
-      publishedByRunId.current.set(run.id, {
+    if (!existing || existing.runId !== run.id) {
+      publishedByScope.current.set(scopeKey, {
+        hiddenByScopeChange: false,
         notificationId: notify(notification),
+        runId: run.id,
         terminalStatusPublished: isTerminalStatus
       })
       return
@@ -62,8 +74,21 @@ export function useTerminalWorkflowNotifications({
     const isVisible = update(existing.notificationId, notification)
     existing.terminalStatusPublished = isTerminalStatus
 
-    if (!isVisible && run.status === 'failed') {
+    if (
+      !isVisible &&
+      (run.status === 'failed' || (!isTerminalStatus && existing.hiddenByScopeChange))
+    ) {
       existing.notificationId = notify(notification)
     }
-  }, [isStopping, notify, onStop, run, update, workspaceName])
+    existing.hiddenByScopeChange = false
+  }, [isStopping, notify, onStop, run, scopeKey, update, workspaceName])
+}
+
+function createWorkflowScopeKey(
+  projectDirectory: string | null,
+  workspaceName: string | null
+): string | null {
+  return projectDirectory && workspaceName
+    ? JSON.stringify([projectDirectory, workspaceName])
+    : null
 }

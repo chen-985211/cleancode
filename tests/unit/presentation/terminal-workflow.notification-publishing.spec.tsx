@@ -95,6 +95,157 @@ describe('terminal workflow notification publishing', () => {
     )
   })
 
+  it('does not republish the same terminal outcome after switching away and back', async () => {
+    const notifications = createNotificationController()
+    const mainWorkbench = createWorkbenchSnapshot('/project', 'Project')
+    const featureWorkbench = createWorkbenchSnapshot('/project', 'Project', {
+      workspaceDirectory: '/project-feature',
+      workspaceName: 'feature'
+    })
+    const get = vi.fn(async (command: { readonly workspaceName: string }) =>
+      command.workspaceName === 'main' ? failedRun('run-1', 1) : null
+    )
+    window.cleancode = createWorkflowRuntime({ get })
+
+    const { rerender } = renderHook(
+      ({ workbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench: workbench,
+          currentWorkspace: workbench.project.workspaces[0],
+          notifications,
+          setCurrentGraph: vi.fn()
+        }),
+      { initialProps: { workbench: mainWorkbench } }
+    )
+
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledTimes(1))
+
+    rerender({ workbench: featureWorkbench })
+    await waitFor(() =>
+      expect(get).toHaveBeenCalledWith({
+        projectDirectory: '/project',
+        workspaceName: 'feature'
+      })
+    )
+
+    rerender({ workbench: mainWorkbench })
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(3))
+
+    expect(notifications.notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the activity notification when returning to an active workflow', async () => {
+    const notifications = createNotificationController({ updateResult: false })
+    const mainWorkbench = createWorkbenchSnapshot('/project', 'Project')
+    const featureWorkbench = createWorkbenchSnapshot('/project', 'Project', {
+      workspaceDirectory: '/project-feature',
+      workspaceName: 'feature'
+    })
+    const get = vi.fn(async (command: { readonly workspaceName: string }) =>
+      command.workspaceName === 'main' ? workflowRun('run-1', 'running') : null
+    )
+    window.cleancode = createWorkflowRuntime({ get })
+
+    const { rerender } = renderHook(
+      ({ workbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench: workbench,
+          currentWorkspace: workbench.project.workspaces[0],
+          notifications,
+          setCurrentGraph: vi.fn()
+        }),
+      { initialProps: { workbench: mainWorkbench } }
+    )
+
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledTimes(1))
+    rerender({ workbench: featureWorkbench })
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2))
+    rerender({ workbench: mainWorkbench })
+
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledTimes(2))
+    expect(notifications.notify).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isActivity: true, title: '流程运行中' })
+    )
+  })
+
+  it('reloads workflow state when switching between projects with the same workspace name', async () => {
+    let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
+    const notifications = createNotificationController()
+    const firstWorkbench = createWorkbenchSnapshot('/first-project', 'First')
+    const secondWorkbench = createWorkbenchSnapshot('/second-project', 'Second')
+    const get = vi.fn(async () => null)
+    window.cleancode = createWorkflowRuntime({
+      get,
+      onEvent: (listener) => {
+        publishEvent = listener
+      }
+    })
+
+    const { rerender } = renderHook(
+      ({ workbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench: workbench,
+          currentWorkspace: workbench.project.workspaces[0],
+          notifications,
+          setCurrentGraph: vi.fn()
+        }),
+      { initialProps: { workbench: firstWorkbench } }
+    )
+
+    await waitFor(() =>
+      expect(get).toHaveBeenCalledWith({
+        projectDirectory: '/first-project',
+        workspaceName: 'main'
+      })
+    )
+
+    rerender({ workbench: secondWorkbench })
+
+    await waitFor(() =>
+      expect(get).toHaveBeenCalledWith({
+        projectDirectory: '/second-project',
+        workspaceName: 'main'
+      })
+    )
+
+    act(() =>
+      publishEvent?.({
+        type: 'run-updated',
+        run: { ...failedRun('first-run', 1), graphId: 'graph-First' }
+      })
+    )
+    expect(notifications.notify).not.toHaveBeenCalled()
+  })
+
+  it('does not reopen a manually dismissed activity for ordinary status updates', async () => {
+    let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
+    const notifications = createNotificationController({ updateResult: false })
+    const workbench = createWorkbenchSnapshot('/project', 'Project')
+    window.cleancode = createWorkflowRuntime({
+      onEvent: (listener) => {
+        publishEvent = listener
+      }
+    })
+
+    renderHook(() =>
+      useTerminalWorkflow({
+        currentWorkbench: workbench,
+        currentWorkspace: workbench.project.workspaces[0],
+        notifications,
+        setCurrentGraph: vi.fn()
+      })
+    )
+
+    await waitFor(() => expect(publishEvent).toBeTypeOf('function'))
+    act(() => publishEvent?.({ type: 'run-updated', run: workflowRun('run-1', 'running') }))
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledTimes(1))
+
+    act(() => publishEvent?.({ type: 'run-updated', run: workflowRun('run-1', 'ready') }))
+    await waitFor(() => expect(notifications.update).toHaveBeenCalledOnce())
+
+    expect(notifications.notify).toHaveBeenCalledTimes(1)
+  })
+
   it('publishes mapped workflow action errors', async () => {
     const notifications = createNotificationController()
     const workbench = createWorkbenchSnapshot('/project', 'Project')
@@ -161,6 +312,7 @@ describe('terminal workflow notification publishing', () => {
 })
 
 interface CreateWorkflowRuntimeOptions {
+  readonly get?: ReturnType<typeof vi.fn>
   readonly onEvent?: (listener: (event: TerminalWorkflowEvent) => void) => void
   readonly start?: ReturnType<typeof vi.fn>
   readonly stop?: ReturnType<typeof vi.fn>
@@ -171,7 +323,7 @@ function createWorkflowRuntime(
 ): NonNullable<Window['cleancode']> {
   return {
     appName: 'cleancode',
-    getTerminalWorkflow: vi.fn(async () => null),
+    getTerminalWorkflow: options.get ?? vi.fn(async () => null),
     onTerminalWorkflowEvent: vi.fn((listener) => {
       options.onEvent?.(listener)
       return vi.fn()

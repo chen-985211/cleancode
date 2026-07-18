@@ -25,7 +25,7 @@ describe('terminal workflow IPC contract', () => {
     expect(start).toHaveBeenCalledWith(command)
   })
 
-  it('passes workspace-scoped stop commands', async () => {
+  it('passes project-workspace-scoped stop commands', async () => {
     const ipcMain = new FakeIpcMain()
     const stop = vi.fn(async () => createRun())
     registerTerminalWorkflowIpcHandlers({
@@ -34,9 +34,25 @@ describe('terminal workflow IPC contract', () => {
       workflowService: { start: vi.fn(), stop, getActiveRun: vi.fn() }
     })
 
-    await ipcMain.invoke('cleancode:stop-terminal-workflow', { workspaceName: 'main' })
+    const command = { projectDirectory: '/project', workspaceName: 'main' }
+    await ipcMain.invoke('cleancode:stop-terminal-workflow', command)
 
-    expect(stop).toHaveBeenCalledWith('main')
+    expect(stop).toHaveBeenCalledWith(command)
+  })
+
+  it('passes project-workspace-scoped workflow queries', async () => {
+    const ipcMain = new FakeIpcMain()
+    const getActiveRun = vi.fn(() => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start: vi.fn(), stop: vi.fn(), getActiveRun }
+    })
+    const command = { projectDirectory: '/project', workspaceName: 'main' }
+
+    await ipcMain.invoke('cleancode:get-terminal-workflow', command)
+
+    expect(getActiveRun).toHaveBeenCalledWith(command)
   })
 })
 

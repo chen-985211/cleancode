@@ -32,7 +32,9 @@ describe('terminal workflow service', () => {
     )
     runtime.exit('build', 0)
 
-    await vi.waitFor(() => expect(service.getActiveRun('main')?.status).toBe('succeeded'))
+    await vi.waitFor(() =>
+      expect(service.getActiveRun(createWorkflowScope())?.status).toBe('succeeded')
+    )
     expect(runtime.interactiveStarts).toEqual(['install-a', 'install-b', 'build'])
   })
 
@@ -47,7 +49,7 @@ describe('terminal workflow service', () => {
     await vi.waitFor(() =>
       expect(runtime.commandStarts.map((start) => start.blockId)).toContain('browser')
     )
-    expect(service.getActiveRun('main')?.nodes[0]?.status).toBe('ready')
+    expect(service.getActiveRun(createWorkflowScope())?.nodes[0]?.status).toBe('ready')
   })
 
   it('fails timed-out tasks, blocks descendants, and lets independent branches finish', async () => {
@@ -59,7 +61,7 @@ describe('terminal workflow service', () => {
     await vi.advanceTimersByTimeAsync(1_000)
 
     expect(runtime.stops).toEqual(['slow-session'])
-    expect(service.getActiveRun('main')).toMatchObject({
+    expect(service.getActiveRun(createWorkflowScope())).toMatchObject({
       nodes: [
         { blockId: 'slow', status: 'failed' },
         { blockId: 'after-slow', status: 'blocked' },
@@ -69,8 +71,34 @@ describe('terminal workflow service', () => {
 
     runtime.exit('independent', 0)
     await vi.runAllTimersAsync()
-    expect(service.getActiveRun('main')?.status).toBe('failed')
+    expect(service.getActiveRun(createWorkflowScope())?.status).toBe('failed')
     vi.useRealTimers()
+  })
+
+  it('keeps workflows with the same workspace name isolated by project', async () => {
+    const runtime = new FakeRuntime()
+    const service = new TerminalWorkflowService(
+      new ProjectScopedPlanPort(),
+      runtime,
+      new FakeTcpReadiness(),
+      new RecordingPublisher()
+    )
+
+    await service.start(createStartCommand('/first-project'))
+    await service.start(createStartCommand('/second-project'))
+
+    expect(runtime.stops).toEqual([])
+    expect(service.getActiveRun(createWorkflowScope('/first-project'))?.graphId).toBe(
+      'graph-first-project'
+    )
+    expect(service.getActiveRun(createWorkflowScope('/second-project'))?.graphId).toBe(
+      'graph-second-project'
+    )
+
+    await service.stop(createWorkflowScope('/first-project'))
+
+    expect(runtime.stops).toEqual(['first-project-task-session'])
+    expect(service.getActiveRun(createWorkflowScope('/second-project'))?.status).toBe('running')
   })
 })
 
@@ -112,6 +140,19 @@ class FakePlanPort implements TerminalWorkflowPlanPort {
   }
 }
 
+class ProjectScopedPlanPort implements TerminalWorkflowPlanPort {
+  async buildPlan(command: {
+    readonly projectDirectory: string
+  }): Promise<WorkflowRunPlanSnapshot> {
+    const projectName = command.projectDirectory.slice(1)
+    return {
+      graphId: `graph-${projectName}`,
+      workspaceName: 'main',
+      nodes: [task(`${projectName}-task`)]
+    }
+  }
+}
+
 class FakeTcpReadiness implements TcpReadinessPort {
   async waitUntilReady(): Promise<void> {}
 }
@@ -136,13 +177,17 @@ function createService(
   )
 }
 
-function createStartCommand() {
+function createStartCommand(projectDirectory = '/project') {
   return {
-    projectDirectory: '/project',
+    projectDirectory,
     workspaceName: 'main',
-    workingDirectory: '/project',
+    workingDirectory: projectDirectory,
     scope: { type: 'full' as const }
   }
+}
+
+function createWorkflowScope(projectDirectory = '/project') {
+  return { projectDirectory, workspaceName: 'main' }
 }
 
 function createTaskPlan(): WorkflowRunPlanSnapshot {

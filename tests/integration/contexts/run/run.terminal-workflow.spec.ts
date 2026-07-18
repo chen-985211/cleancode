@@ -35,7 +35,11 @@ describe('terminal workflow with real PTYs', () => {
         scope: { type: 'full' }
       })
 
-      await waitUntil(() => workflow.getActiveRun('main')?.status === 'succeeded')
+      await waitUntil(
+        () =>
+          workflow.getActiveRun({ projectDirectory: workingDirectory, workspaceName: 'main' })
+            ?.status === 'succeeded'
+      )
 
       expect(readOutput(events.events)).toContain('install-complete')
       expect(readOutput(events.events)).toContain('build-complete')

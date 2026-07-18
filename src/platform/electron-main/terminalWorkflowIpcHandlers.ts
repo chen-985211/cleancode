@@ -1,7 +1,8 @@
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type {
   StartTerminalWorkflowCommand,
-  TerminalWorkflowService
+  TerminalWorkflowService,
+  TerminalWorkflowScopeCommand
 } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -24,9 +25,9 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<{ readonly workspaceName: string }, WorkflowRunSnapshot | null>({
+  registerIpcHandler<TerminalWorkflowScopeCommand, WorkflowRunSnapshot | null>({
     channel: 'cleancode:stop-terminal-workflow',
-    handler: (command) => input.workflowService.stop(command.workspaceName),
+    handler: (command) => input.workflowService.stop(command),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'stopTerminalWorkflow',
@@ -34,9 +35,9 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<{ readonly workspaceName: string }, WorkflowRunSnapshot | null>({
+  registerIpcHandler<TerminalWorkflowScopeCommand, WorkflowRunSnapshot | null>({
     channel: 'cleancode:get-terminal-workflow',
-    handler: (command) => input.workflowService.getActiveRun(command.workspaceName),
+    handler: (command) => input.workflowService.getActiveRun(command),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'getTerminalWorkflow',
