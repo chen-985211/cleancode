@@ -1,5 +1,6 @@
 import { vi } from 'vitest'
 
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 import { TerminalWorkflowService } from '../../../../src/contexts/run/application/use-cases/TerminalWorkflowService'
 import type { TerminalWorkflowPlanPort } from '../../../../src/contexts/run/application/ports/TerminalWorkflowPlanPort'
 import type {
@@ -13,6 +14,8 @@ import type {
 } from '../../../../src/contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import type { TerminalSessionSnapshot } from '../../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import type { WorkflowRunPlanSnapshot } from '../../../../src/contexts/run/application/dto/WorkflowRunSnapshot'
+import type { ManagedServiceLauncher } from '../../../../src/contexts/run/application/services/ManagedServiceLauncher'
+import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
 
 describe('terminal workflow service', () => {
   it('starts roots in parallel, schedules fan-in once, and hands completed tasks to interactive shells', async () => {
@@ -100,6 +103,159 @@ describe('terminal workflow service', () => {
     expect(runtime.stops).toEqual(['first-project-task-session'])
     expect(service.getActiveRun(createWorkflowScope('/second-project'))?.status).toBe('running')
   })
+
+  it('uses the shared managed launcher for port services and publishes the actual endpoint', async () => {
+    const runtime = new FakeRuntime()
+    const publisher = new RecordingPublisher()
+    const managed = new FakeManagedServiceLauncher()
+    const service = new TerminalWorkflowService(
+      new FakePlanPort(createManagedServicePlan()),
+      runtime,
+      new FakeTcpReadiness(),
+      publisher,
+      managed as unknown as ManagedServiceLauncher
+    )
+
+    await service.start(createStartCommand())
+
+    expect(managed.launches).toHaveLength(1)
+    expect(managed.launches[0]).toMatchObject({
+      projectId: 'project-project',
+      blockId: 'api',
+      portIntent: { policy: { type: 'preferred', port: 3_000 } }
+    })
+    expect(runtime.commandStarts.map((start) => start.blockId)).toContain('browser')
+    expect(publisher.events).toContainEqual(
+      expect.objectContaining({
+        type: 'service-endpoint-updated',
+        endpoint: expect.objectContaining({ port: 41_001 })
+      })
+    )
+    const serviceEvents = publisher.events.filter(
+      (event) =>
+        (event.type === 'terminal-session-started' && event.blockId === 'api') ||
+        event.type === 'service-endpoint-updated'
+    )
+    expect(serviceEvents).toEqual([
+      expect.objectContaining({ type: 'terminal-session-started', endpoint: null }),
+      expect.objectContaining({
+        type: 'service-endpoint-updated',
+        endpoint: expect.objectContaining({ port: 41_001 })
+      })
+    ])
+    expect(service.getActiveRun(createWorkflowScope())?.nodes[0]).toMatchObject({
+      status: 'ready',
+      endpoint: { port: 41_001 },
+      error: null
+    })
+  })
+
+  it('publishes a raw structured port conflict event for workflow launch failures', async () => {
+    const publisher = new RecordingPublisher()
+    const managed = new FakeManagedServiceLauncher(
+      createExpectedAppError('SERVICE_PORT_FIXED_CONFLICT', 'Port 3000 is occupied.', {
+        port: 3_000,
+        attemptedProjectId: 'project-project',
+        attemptedBlockId: 'api',
+        attemptedSessionId: 'session-attempt',
+        attemptedRunId: 'run-attempt',
+        attemptedGeneration: 1
+      })
+    )
+    const service = new TerminalWorkflowService(
+      new FakePlanPort(createManagedServicePlan()),
+      new FakeRuntime(),
+      new FakeTcpReadiness(),
+      publisher,
+      managed as unknown as ManagedServiceLauncher
+    )
+
+    await service.start(createStartCommand())
+
+    expect(publisher.events).toContainEqual({
+      type: 'service-port-conflict',
+      failure: {
+        code: 'SERVICE_PORT_FIXED_CONFLICT',
+        message: 'Port 3000 is occupied.',
+        details: expect.objectContaining({
+          port: 3_000,
+          attemptedBlockId: 'api',
+          attemptedRunId: 'run-attempt'
+        })
+      }
+    })
+  })
+
+  it('hard-disposes the whole workflow without handoff or late timeout scheduling', async () => {
+    vi.useFakeTimers()
+    const runtime = new FakeRuntime()
+    const publisher = new RecordingPublisher()
+    const lifecycle = new RunLifecycleService()
+    const service = new TerminalWorkflowService(
+      new FakePlanPort(createTimeoutPlan()),
+      runtime,
+      new FakeTcpReadiness(),
+      publisher,
+      undefined,
+      lifecycle
+    )
+
+    await service.start(createStartCommand())
+    const lease = await lifecycle.hardDisposeWorkspace({
+      projectDirectory: '/project',
+      workspaceName: 'main'
+    })
+
+    expect(runtime.stops).toEqual(expect.arrayContaining(['slow-session', 'independent-session']))
+    expect(runtime.interactiveStarts).toEqual([])
+    expect(service.getActiveRun(createWorkflowScope())).toBeNull()
+    const eventCount = publisher.events.length
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    runtime.exit('slow', 1)
+    await Promise.resolve()
+    expect(runtime.commandStarts.map((start) => start.blockId)).not.toContain('after-slow')
+    expect(runtime.interactiveStarts).toEqual([])
+    expect(publisher.events).toHaveLength(eventCount)
+    lease.release()
+    vi.useRealTimers()
+  })
+
+  it('waits for an in-flight node start to be stopped before hard dispose completes', async () => {
+    let releaseStart: () => void = () => undefined
+    const startGate = new Promise<void>((resolve) => {
+      releaseStart = resolve
+    })
+    const runtime = new FakeRuntime(startGate)
+    const lifecycle = new RunLifecycleService()
+    const service = new TerminalWorkflowService(
+      new FakePlanPort(plan([task('api')])),
+      runtime,
+      new FakeTcpReadiness(),
+      new RecordingPublisher(),
+      undefined,
+      lifecycle
+    )
+    const starting = service.start(createStartCommand())
+    await vi.waitFor(() => expect(runtime.commandStarts).toHaveLength(1))
+
+    let disposed = false
+    const disposing = lifecycle
+      .hardDisposeWorkspace({ projectDirectory: '/project', workspaceName: 'main' })
+      .then((lease) => {
+        disposed = true
+        return lease
+      })
+    await Promise.resolve()
+    expect(disposed).toBe(false)
+
+    releaseStart()
+    const lease = await disposing
+    await Promise.allSettled([starting])
+    expect(runtime.stops).toEqual(['api-session'])
+    expect(service.getActiveRun(createWorkflowScope())).toBeNull()
+    lease.release()
+  })
 })
 
 class FakeRuntime implements TerminalWorkflowRuntimePort {
@@ -108,9 +264,12 @@ class FakeRuntime implements TerminalWorkflowRuntimePort {
   readonly stops: string[] = []
   private readonly commands = new Map<string, StartWorkflowRuntimeCommand>()
 
+  constructor(private readonly commandStartGate?: Promise<void>) {}
+
   async startCommand(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot> {
     this.commandStarts.push(command)
     this.commands.set(command.blockId, command)
+    await this.commandStartGate
     return session(`${command.blockId}-session`, command.blockId)
   }
 
@@ -119,16 +278,26 @@ class FakeRuntime implements TerminalWorkflowRuntimePort {
     return session(`${command.blockId}-interactive`, command.blockId)
   }
 
-  stop(sessionId: string): void {
+  async stop(sessionId: string): Promise<void> {
     this.stops.push(sessionId)
   }
 
   output(blockId: string, data: string): void {
-    this.commands.get(blockId)?.onOutput({ sessionId: `${blockId}-session`, data })
+    const runtimeSession = session(`${blockId}-session`, blockId)
+    this.commands.get(blockId)?.onOutput({
+      scope: runtimeSession,
+      sessionId: runtimeSession.id,
+      data
+    })
   }
 
   exit(blockId: string, exitCode: number): void {
-    this.commands.get(blockId)?.onExit({ sessionId: `${blockId}-session`, exitCode })
+    const runtimeSession = session(`${blockId}-session`, blockId)
+    this.commands.get(blockId)?.onExit({
+      scope: runtimeSession,
+      sessionId: runtimeSession.id,
+      exitCode
+    })
   }
 }
 
@@ -155,6 +324,7 @@ class ProjectScopedPlanPort implements TerminalWorkflowPlanPort {
 
 class FakeTcpReadiness implements TcpReadinessPort {
   async waitUntilReady(): Promise<void> {}
+  async waitUntilClosed(): Promise<void> {}
 }
 
 class RecordingPublisher implements TerminalWorkflowEventPublisherPort {
@@ -179,11 +349,33 @@ function createService(
 
 function createStartCommand(projectDirectory = '/project') {
   return {
+    projectId: `project-${projectDirectory.slice(1)}`,
     projectDirectory,
     workspaceName: 'main',
+    workspaceDirectory: projectDirectory,
+    gitBranch: 'main',
     workingDirectory: projectDirectory,
     scope: { type: 'full' as const }
   }
+}
+
+function createManagedServicePlan(): WorkflowRunPlanSnapshot {
+  return plan([
+    {
+      ...task('api'),
+      executionConfig: {
+        mode: 'service',
+        readiness: { type: 'tcp' },
+        readinessTimeoutMs: 30_000,
+        port: {
+          protocol: 'http',
+          policy: { type: 'preferred', port: 3_000 },
+          binding: { type: 'environment', variableName: 'PORT' }
+        }
+      }
+    },
+    task('browser', ['api'])
+  ])
 }
 
 function createWorkflowScope(projectDirectory = '/project') {
@@ -232,6 +424,14 @@ function task(blockId: string, dependencyBlockIds: readonly string[] = []) {
 
 function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
   return {
+    projectId: 'project-project',
+    projectDirectory: '/project',
+    workspaceDirectory: '/project',
+    gitBranch: 'main',
+    blockId: terminalBlockId,
+    sessionId: id,
+    runId: 'run-1',
+    generation: 1,
     id,
     terminalBlockId,
     workspaceName: 'main',
@@ -241,5 +441,54 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
     inputHistory: [],
     exitCode: null,
     failureReason: null
+  }
+}
+
+class FakeManagedServiceLauncher {
+  readonly launches: Array<Record<string, unknown>> = []
+
+  constructor(private readonly launchError?: Error) {}
+
+  async launch(command: Record<string, unknown>) {
+    this.launches.push(command)
+    if (this.launchError) throw this.launchError
+    const started = command.onSessionStarted as (session: TerminalSessionSnapshot) => void
+    const confirmed = command.onEndpointConfirmed as (
+      session: TerminalSessionSnapshot,
+      actualEndpoint: ReturnType<typeof endpoint>
+    ) => void
+    const terminalSession = session('api-managed', 'api')
+    started(terminalSession)
+    confirmed(terminalSession, endpoint())
+    return {
+      scope: terminalSession,
+      session: terminalSession,
+      endpoint: endpoint(),
+      lease: {
+        id: 'lease-1',
+        owner: terminalSession,
+        endpoint: endpoint(),
+        state: 'bound',
+        quarantineReason: null
+      }
+    }
+  }
+
+  getActive(): null {
+    return null
+  }
+
+  async stop(): Promise<void> {}
+}
+
+function endpoint() {
+  return {
+    protocol: 'http' as const,
+    host: '127.0.0.1' as const,
+    port: 41_001,
+    requestedPort: 3_000,
+    fallback: true,
+    displayAddress: 'http://127.0.0.1:41001',
+    openable: true
   }
 }

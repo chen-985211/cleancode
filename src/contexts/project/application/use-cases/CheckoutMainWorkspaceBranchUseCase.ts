@@ -7,6 +7,11 @@ import {
   noopWorkspaceAgentLifecyclePort,
   type WorkspaceAgentLifecyclePort
 } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceRunLifecyclePort,
+  type WorkspaceRunLifecyclePort,
+  type WorkspaceRunStartGateLease
+} from '../ports/WorkspaceRunLifecyclePort'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CheckoutMainWorkspaceBranchCommand {
@@ -19,7 +24,8 @@ export class CheckoutMainWorkspaceBranchUseCase {
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
     private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
-    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator(),
+    private readonly workspaceRunLifecyclePort: WorkspaceRunLifecyclePort = noopWorkspaceRunLifecyclePort
   ) {}
 
   async execute(command: CheckoutMainWorkspaceBranchCommand): Promise<ProjectSnapshot> {
@@ -63,14 +69,20 @@ export class CheckoutMainWorkspaceBranchUseCase {
     }
 
     const agentLease = await this.workspaceAgentLifecyclePort.suspend(project.directory)
+    let runLease: WorkspaceRunStartGateLease | null = null
     let checkoutCompleted = false
     let canReleaseAgentLease = true
+    let canReleaseRunLease = true
     let resolvesQuarantine = false
 
     try {
       if (!(await this.gitWorkspacePort.isWorkingTreeClean(project.directory))) {
         throw createDirtyMainWorkspaceError()
       }
+      runLease = await this.workspaceRunLifecyclePort.disposeWorkspace({
+        projectDirectory: project.directory,
+        workspaceName: 'main'
+      })
       await this.gitWorkspacePort.checkoutBranch({
         repositoryDirectory: project.directory,
         branchName
@@ -105,9 +117,11 @@ export class CheckoutMainWorkspaceBranchUseCase {
             resolvesQuarantine = true
           } catch {
             canReleaseAgentLease = false
+            canReleaseRunLease = false
           }
         } else {
           canReleaseAgentLease = false
+          canReleaseRunLease = false
         }
       }
       if (canReleaseAgentLease && agentLease.wasSuspended) {
@@ -118,6 +132,11 @@ export class CheckoutMainWorkspaceBranchUseCase {
       if (!canReleaseAgentLease) agentLease.quarantine()
       else if (resolvesQuarantine) agentLease.resolve()
       else agentLease.release()
+      if (runLease) {
+        if (!canReleaseRunLease) runLease.quarantine()
+        else if (resolvesQuarantine) runLease.resolve()
+        else runLease.release()
+      }
     }
   }
 }

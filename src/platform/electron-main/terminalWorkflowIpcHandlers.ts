@@ -4,6 +4,7 @@ import type {
   TerminalWorkflowService,
   TerminalWorkflowScopeCommand
 } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
+import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -14,10 +15,18 @@ export interface TerminalWorkflowIpcHandlersInput {
   readonly workflowService: Pick<TerminalWorkflowService, 'getActiveRun' | 'start' | 'stop'>
 }
 
+type StartTerminalWorkflowIpcCommand = Omit<StartTerminalWorkflowCommand, 'workingDirectory'>
+
 export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHandlersInput): void {
-  registerIpcHandler<StartTerminalWorkflowCommand, WorkflowRunSnapshot>({
+  registerIpcHandler<StartTerminalWorkflowIpcCommand, WorkflowRunSnapshot>({
     channel: 'cleancode:start-terminal-workflow',
-    handler: (command) => input.workflowService.start(command),
+    handler: (command) => {
+      const startCommand = readStartWorkflowCommand(command)
+      return input.workflowService.start({
+        ...startCommand,
+        workingDirectory: startCommand.workspaceDirectory
+      })
+    },
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'startTerminalWorkflow',
@@ -43,4 +52,42 @@ export function registerTerminalWorkflowIpcHandlers(input: TerminalWorkflowIpcHa
     operation: 'getTerminalWorkflow',
     scope: 'run.terminal-workflow'
   })
+}
+
+function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCommand {
+  if (
+    !isRecord(command) ||
+    !isNonEmptyString(command.projectId) ||
+    !isNonEmptyString(command.projectDirectory) ||
+    !isNonEmptyString(command.workspaceName) ||
+    !isNonEmptyString(command.workspaceDirectory) ||
+    !(command.gitBranch === null || typeof command.gitBranch === 'string') ||
+    !isWorkflowScope(command.scope) ||
+    !(command.shell === undefined || typeof command.shell === 'string') ||
+    !isOptionalPositiveInteger(command.columns) ||
+    !isOptionalPositiveInteger(command.rows)
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal workflow command.')
+  }
+
+  return command as unknown as StartTerminalWorkflowIpcCommand
+}
+
+function isWorkflowScope(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.type === 'full' || (value.type === 'from-block' && isNonEmptyString(value.blockId)))
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isOptionalPositiveInteger(value: unknown): boolean {
+  return value === undefined || (Number.isInteger(value) && Number(value) > 0)
 }

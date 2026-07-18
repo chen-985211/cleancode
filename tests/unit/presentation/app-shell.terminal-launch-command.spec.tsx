@@ -6,6 +6,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { createDeferred } from '../../fixtures/deferred'
 import type { TerminalOutputEvent } from '../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
@@ -82,7 +83,7 @@ describe('app shell terminal launch command', () => {
 
   it('configures a missing launch command from the quick launch button', async () => {
     const workbench = createWorkbenchWithTerminal({ launchCommand: '' })
-    const updateTerminalBlockMetadata = vi.fn(async (command) => ({
+    const updateTerminalDefinition = vi.fn(async (command) => ({
       ...workbench.graph,
       blocks: [
         {
@@ -98,11 +99,12 @@ describe('app shell terminal launch command', () => {
       configurable: true,
       value: createRuntimeApi({
         listWorkbenches: vi.fn(async () => [workbench]),
-        updateTerminalBlockMetadata,
         startTerminal: vi.fn(),
         writeTerminal: vi.fn()
-      })
+      }) satisfies object
     })
+
+    Object.assign(window.cleancode!, { updateTerminalDefinition })
 
     render(<AppShell />)
 
@@ -127,13 +129,14 @@ describe('app shell terminal launch command', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存终端信息' }))
 
     await waitFor(() =>
-      expect(updateTerminalBlockMetadata).toHaveBeenCalledWith({
+      expect(updateTerminalDefinition).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
         workspaceName: 'main',
         blockId: 'terminal-1',
         name: 'Terminal 1',
         description: '本地终端',
-        launchCommand: 'pnpm dev'
+        launchCommand: 'pnpm dev',
+        executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
       })
     )
     expect(window.cleancode?.startTerminal).not.toHaveBeenCalled()
@@ -144,18 +147,31 @@ describe('app shell terminal launch command', () => {
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-ok'
     })
-    const startTerminal = vi.fn().mockResolvedValueOnce(createTerminalSessionSnapshot('session-1'))
-    const writeTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-written'))
+    const launchTerminal = vi.fn(async () => ({
+      session: createTerminalSessionSnapshot('session-1'),
+      endpoint: {
+        protocol: 'http' as const,
+        host: '127.0.0.1' as const,
+        port: 4317,
+        requestedPort: 3000,
+        fallback: true,
+        displayAddress: 'http://127.0.0.1:4317',
+        openable: true
+      }
+    }))
+    const writeTerminal = vi.fn()
     const terminateTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-1'))
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      startTerminal: vi.fn(),
+      writeTerminal,
+      terminateTerminal
+    })
+    Object.assign(runtimeApi, { launchTerminal })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench]),
-        startTerminal,
-        writeTerminal,
-        terminateTerminal
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
@@ -169,19 +185,19 @@ describe('app shell terminal launch command', () => {
     fireEvent.click(quickLaunchButton)
 
     await waitFor(() =>
-      expect(writeTerminal).toHaveBeenCalledWith({
-        sessionId: 'session-1',
-        input: 'printf quick-launch-ok\r'
-      })
-    )
-    expect(writeTerminal).toHaveBeenCalledTimes(1)
-    expect(startTerminal).toHaveBeenCalledWith(
-      expect.objectContaining({
+      expect(launchTerminal).toHaveBeenCalledWith({
+        projectId: 'project-alpha-project',
+        projectDirectory: '/tmp/alpha-project',
         terminalBlockId: 'terminal-1',
         workspaceName: 'main',
-        workingDirectory: '/tmp/alpha-project'
+        workspaceDirectory: '/tmp/alpha-project',
+        gitBranch: null,
+        columns: 80,
+        rows: 24
       })
     )
+    expect(writeTerminal).not.toHaveBeenCalled()
+    expect(await screen.findByLabelText('实际服务地址')).toHaveTextContent('http://127.0.0.1:4317')
   })
 
   it('clears the previous visible output when quick launching a replacement session', async () => {
@@ -189,27 +205,30 @@ describe('app shell terminal launch command', () => {
       launchCommand: 'printf quick-launch-fresh'
     })
     let emitTerminalOutput: ((event: TerminalOutputEvent) => void) | undefined
-    const startTerminal = vi
+    const launchTerminal = vi
       .fn()
-      .mockResolvedValueOnce(createTerminalSessionSnapshot('session-1'))
-      .mockResolvedValueOnce(createTerminalSessionSnapshot('session-2'))
-    const writeTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-written'))
+      .mockResolvedValueOnce({
+        session: createTerminalSessionSnapshot('session-1'),
+        endpoint: null
+      })
+      .mockResolvedValueOnce({
+        session: createTerminalSessionSnapshot('session-2', 2),
+        endpoint: null
+      })
     const terminateTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-1'))
     const onTerminalOutput = vi.fn((listener: (event: TerminalOutputEvent) => void) => {
       emitTerminalOutput = listener
       return vi.fn()
     })
 
-    Object.defineProperty(window, 'cleancode', {
-      configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench]),
-        startTerminal,
-        writeTerminal,
-        terminateTerminal,
-        onTerminalOutput
-      })
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      startTerminal: vi.fn(),
+      terminateTerminal,
+      onTerminalOutput
     })
+    Object.assign(runtimeApi, { launchTerminal })
+    Object.defineProperty(window, 'cleancode', { configurable: true, value: runtimeApi })
 
     render(<AppShell />)
 
@@ -219,18 +238,14 @@ describe('app shell terminal launch command', () => {
 
     fireEvent.click(quickLaunchButton)
 
-    await waitFor(() =>
-      expect(writeTerminal).toHaveBeenCalledWith({
-        sessionId: 'session-1',
-        input: 'printf quick-launch-fresh\r'
-      })
-    )
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
 
     expect(emitTerminalOutput).toEqual(expect.any(Function))
 
     act(() => {
       emitTerminalOutput?.({
         sessionId: 'session-1',
+        scope: createTerminalRunScope('session-1'),
         data: 'stale-output'
       })
     })
@@ -241,12 +256,7 @@ describe('app shell terminal launch command', () => {
 
     fireEvent.click(quickLaunchButton)
 
-    await waitFor(() =>
-      expect(writeTerminal).toHaveBeenLastCalledWith({
-        sessionId: 'session-2',
-        input: 'printf quick-launch-fresh\r'
-      })
-    )
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(2))
     await waitFor(() =>
       expect(screen.getByLabelText('Terminal 1 文本输出')).not.toHaveTextContent('stale-output')
     )
@@ -260,7 +270,7 @@ describe('app shell terminal launch command', () => {
     const startTerminal = vi
       .fn()
       .mockResolvedValueOnce(createTerminalSessionSnapshot('session-1'))
-      .mockResolvedValueOnce(createTerminalSessionSnapshot('session-2'))
+      .mockResolvedValueOnce(createTerminalSessionSnapshot('session-2', 2))
     const terminateTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-1'))
     const onTerminalOutput = vi.fn((listener: (event: TerminalOutputEvent) => void) => {
       emitTerminalOutput = listener
@@ -287,6 +297,7 @@ describe('app shell terminal launch command', () => {
     act(() => {
       emitTerminalOutput?.({
         sessionId: 'session-1',
+        scope: createTerminalRunScope('session-1'),
         data: 'restart-stale-output'
       })
     })
@@ -313,7 +324,11 @@ describe('app shell terminal launch command', () => {
       return vi.fn()
     })
     const startTerminal = vi.fn(async () => {
-      emitTerminalOutput?.({ sessionId: 'session-1', data: 'early-shell-prompt' })
+      emitTerminalOutput?.({
+        sessionId: 'session-1',
+        scope: createTerminalRunScope('session-1'),
+        data: 'early-shell-prompt'
+      })
       return createTerminalSessionSnapshot('session-1')
     })
 
@@ -339,19 +354,24 @@ describe('app shell terminal launch command', () => {
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-once'
     })
-    const replacementSession = createDeferred<TerminalSessionSnapshot>()
-    const startTerminal = vi.fn(() => replacementSession.promise)
-    const writeTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-written'))
+    const replacementSession = createDeferred<{
+      readonly session: TerminalSessionSnapshot
+      readonly endpoint: null
+    }>()
+    const launchTerminal = vi.fn(() => replacementSession.promise)
+    const writeTerminal = vi.fn()
     const terminateTerminal = vi.fn(async () => createTerminalSessionSnapshot('session-old'))
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      startTerminal: vi.fn(),
+      writeTerminal,
+      terminateTerminal
+    })
+    Object.assign(runtimeApi, { launchTerminal })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench]),
-        startTerminal,
-        writeTerminal,
-        terminateTerminal
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
@@ -363,17 +383,15 @@ describe('app shell terminal launch command', () => {
     fireEvent.click(quickLaunchButton)
     fireEvent.click(quickLaunchButton)
 
-    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
 
-    replacementSession.resolve(createTerminalSessionSnapshot('session-1'))
+    replacementSession.resolve({
+      session: createTerminalSessionSnapshot('session-1'),
+      endpoint: null
+    })
 
-    await waitFor(() =>
-      expect(writeTerminal).toHaveBeenCalledWith({
-        sessionId: 'session-1',
-        input: 'printf quick-launch-once\r'
-      })
-    )
-    expect(writeTerminal).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
+    expect(writeTerminal).not.toHaveBeenCalled()
   })
 })
 
@@ -450,9 +468,10 @@ function createWorkbenchWithTerminal(input: { readonly launchCommand: string }):
   }
 }
 
-function createTerminalSessionSnapshot(sessionId: string): TerminalSessionSnapshot {
+function createTerminalSessionSnapshot(sessionId: string, generation = 1): TerminalSessionSnapshot {
   return {
     id: sessionId,
+    ...createTerminalRunScope(sessionId, generation),
     terminalBlockId: 'terminal-1',
     workspaceName: 'main',
     workingDirectory: '/tmp/alpha-project',
@@ -464,11 +483,16 @@ function createTerminalSessionSnapshot(sessionId: string): TerminalSessionSnapsh
   }
 }
 
-function createDeferred<T>() {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-
-  return { promise, resolve }
+function createTerminalRunScope(sessionId: string, generation = 1) {
+  return {
+    projectId: 'project-alpha-project',
+    projectDirectory: '/tmp/alpha-project',
+    workspaceName: 'main',
+    workspaceDirectory: '/tmp/alpha-project',
+    gitBranch: null,
+    blockId: 'terminal-1',
+    sessionId,
+    runId: `${sessionId}-run`,
+    generation
+  } as const
 }

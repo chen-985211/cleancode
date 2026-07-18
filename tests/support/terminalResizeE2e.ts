@@ -1,6 +1,7 @@
 import type { Page } from 'playwright'
 
-import { readOnlyJsonFile, type E2eWorkbench } from './e2eWorkbench'
+import { readE2eBlockGraph } from './e2eBlockGraph'
+import type { E2eWorkbench } from './e2eWorkbench'
 
 export async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
   const box = await locator.boundingBox()
@@ -55,17 +56,13 @@ export async function startTerminalBlockResizeFromTopLeft(page: Page): Promise<{
 }
 
 export async function readTerminalBlockPosition(workbench: E2eWorkbench) {
-  const graph = JSON.parse(
-    await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-  ) as { blocks: Array<{ position: { x: number; y: number } }> }
+  const graph = await readE2eBlockGraph(workbench)
 
   return graph.blocks[0]!.position
 }
 
 export async function readTerminalBlockSize(workbench: E2eWorkbench) {
-  const graph = JSON.parse(
-    await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-  ) as { blocks: Array<{ size: { width: number; height: number } }> }
+  const graph = await readE2eBlockGraph(workbench)
 
   return graph.blocks[0]!.size
 }

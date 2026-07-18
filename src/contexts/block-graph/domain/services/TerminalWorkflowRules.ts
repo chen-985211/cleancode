@@ -4,7 +4,11 @@ import {
   type ConnectTerminalBlocksInput,
   type TerminalBlockSnapshot,
   type TerminalConnectionSnapshot,
-  type TerminalExecutionConfigSnapshot
+  type TerminalExecutionConfigSnapshot,
+  type TerminalServicePortBindingSnapshot,
+  type TerminalServicePortIntentSnapshot,
+  type TerminalServicePortPolicySnapshot,
+  type TerminalServiceReadinessSnapshot
 } from '../aggregates/BlockGraphTypes'
 
 export interface AddTerminalConnectionResult {
@@ -97,6 +101,8 @@ export function validateTerminalExecutionConfig(
     throwInvalidExecutionConfig()
   }
 
+  let readiness: TerminalServiceReadinessSnapshot
+
   if (config.readiness.type === 'output') {
     const text = config.readiness.text.trim()
 
@@ -104,22 +110,83 @@ export function validateTerminalExecutionConfig(
       throwInvalidExecutionConfig()
     }
 
-    return {
-      mode: 'service',
-      readiness: { type: 'output', text },
-      readinessTimeoutMs: config.readinessTimeoutMs
-    }
-  }
-
-  if (!isPositiveInteger(config.readiness.port) || config.readiness.port > 65_535) {
+    readiness = { type: 'output', text }
+  } else if (config.readiness.type === 'tcp') {
+    readiness = { type: 'tcp' }
+  } else {
     throwInvalidExecutionConfig()
   }
 
+  const port = config.port ? validateTerminalServicePortIntent(config.port) : undefined
+
+  if (readiness.type === 'tcp' && !port) throwInvalidExecutionConfig()
+
   return {
     mode: 'service',
-    readiness: { type: 'tcp', port: config.readiness.port },
+    ...(port ? { port } : {}),
+    readiness,
     readinessTimeoutMs: config.readinessTimeoutMs
   }
+}
+
+function validateTerminalServicePortIntent(
+  port: TerminalServicePortIntentSnapshot
+): TerminalServicePortIntentSnapshot {
+  if (!['http', 'https', 'tcp'].includes(port.protocol)) throwInvalidExecutionConfig()
+
+  const policy = validateTerminalServicePortPolicy(port.policy)
+  const binding = validateTerminalServicePortBinding(port.binding)
+
+  if (binding.type === 'none' && policy.type !== 'fixed') throwInvalidExecutionConfig()
+
+  return { binding, policy, protocol: port.protocol }
+}
+
+function validateTerminalServicePortPolicy(
+  policy: TerminalServicePortPolicySnapshot
+): TerminalServicePortPolicySnapshot {
+  if (policy.type === 'auto') return { type: 'auto' }
+
+  if (
+    !['fixed', 'preferred'].includes(policy.type) ||
+    !isPositiveInteger(policy.port) ||
+    policy.port > 65_535
+  ) {
+    throwInvalidExecutionConfig()
+  }
+
+  return { port: policy.port, type: policy.type }
+}
+
+function validateTerminalServicePortBinding(
+  binding: TerminalServicePortBindingSnapshot
+): TerminalServicePortBindingSnapshot {
+  if (binding.type === 'none') return { type: 'none' }
+
+  if (binding.type === 'environment') {
+    const normalizedName = binding.variableName.toUpperCase()
+    if (
+      !/^[A-Za-z_][A-Za-z0-9_]*$/.test(binding.variableName) ||
+      normalizedName.startsWith('CLEANCODE_') ||
+      normalizedName === 'PROMPT_EOL_MARK'
+    ) {
+      throwInvalidExecutionConfig()
+    }
+
+    return { type: 'environment', variableName: binding.variableName }
+  }
+
+  if (binding.type !== 'argument') throwInvalidExecutionConfig()
+
+  const template = binding.template.trim()
+  const placeholders = template.match(/\{port\}/g) ?? []
+  const remainingTemplate = template.replace('{port}', '')
+
+  if (placeholders.length !== 1 || !/^[A-Za-z0-9_./:=\- ]*$/.test(remainingTemplate)) {
+    throwInvalidExecutionConfig()
+  }
+
+  return { template, type: 'argument' }
 }
 
 export function normalizeRestoredTerminalExecutionConfig(
@@ -129,11 +196,7 @@ export function normalizeRestoredTerminalExecutionConfig(
     return defaultTerminalExecutionConfig
   }
 
-  try {
-    return validateTerminalExecutionConfig(config)
-  } catch {
-    return defaultTerminalExecutionConfig
-  }
+  return validateTerminalExecutionConfig(config)
 }
 
 export function normalizeRestoredTerminalConnections(

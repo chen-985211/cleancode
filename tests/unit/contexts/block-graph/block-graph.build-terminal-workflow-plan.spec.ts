@@ -46,6 +46,43 @@ describe('build terminal workflow plan', () => {
     ])
   })
 
+  it('copies and deeply freezes the service port intent in the immutable plan', async () => {
+    const graph = createBuildGraph()
+    graph.updateTerminalExecutionConfig('build', {
+      mode: 'service',
+      port: {
+        binding: { type: 'environment', variableName: 'PORT' },
+        policy: { port: 5_173, type: 'preferred' },
+        protocol: 'http'
+      },
+      readiness: { type: 'tcp' },
+      readinessTimeoutMs: 30_000
+    })
+    const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+
+    const plan = await buildPlan.execute({
+      projectDirectory: '/project',
+      workspaceName: 'main',
+      scope: { type: 'from-block', blockId: 'build' }
+    })
+    const config = plan.nodes[0]?.executionConfig
+
+    expect(config).toEqual({
+      mode: 'service',
+      port: {
+        binding: { type: 'environment', variableName: 'PORT' },
+        policy: { port: 5_173, type: 'preferred' },
+        protocol: 'http'
+      },
+      readiness: { type: 'tcp' },
+      readinessTimeoutMs: 30_000
+    })
+    expect(config && Object.isFrozen(config)).toBe(true)
+    expect(config?.mode === 'service' && Object.isFrozen(config.port)).toBe(true)
+    expect(config?.mode === 'service' && Object.isFrozen(config.port?.policy)).toBe(true)
+    expect(config?.mode === 'service' && Object.isFrozen(config.port?.binding)).toBe(true)
+  })
+
   it('ignores unconfigured isolated terminals in a full plan', async () => {
     const graph = createBuildGraph()
     graph.createTerminalBlock({

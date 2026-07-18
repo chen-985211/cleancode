@@ -1,9 +1,13 @@
+import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+
 export interface TerminalOutputEvent {
+  readonly scope: TerminalRunScope
   readonly sessionId: string
   readonly data: string
 }
 
 export interface TerminalExitEvent {
+  readonly scope: TerminalRunScope
   readonly sessionId: string
   readonly exitCode: number | null
 }
@@ -14,10 +18,11 @@ export interface TerminalWorkingDirectorySnapshot {
 }
 
 export interface StartTerminalProcessCommand {
-  readonly sessionId: string
+  readonly scope: TerminalRunScope
   readonly workingDirectory: string
   readonly shell?: string
   readonly launchCommand?: string
+  readonly environment?: Readonly<Record<string, string>>
   readonly columns: number
   readonly rows: number
   readonly onOutput: (event: TerminalOutputEvent) => void
@@ -33,6 +38,6 @@ export interface TerminalProcessPort {
   write(sessionId: string, input: string): void
   resize(sessionId: string, columns: number, rows: number): void
   readWorkingDirectory(sessionId: string): Promise<string | null>
-  stop(sessionId: string): void
-  disposeAll(): void
+  stop(sessionId: string): Promise<void>
+  disposeAll(): Promise<void>
 }

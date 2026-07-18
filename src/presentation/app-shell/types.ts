@@ -12,9 +12,22 @@ import {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
+import type {
+  ManagedTerminalServiceOwner,
+  TerminalRunIdentity,
+  TerminalServiceEndpoint,
+  TerminalServicePortConflict
+} from '../../contexts/run/application/dto/TerminalRunEvent'
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+
+export type {
+  ManagedTerminalServiceOwner,
+  TerminalRunIdentity,
+  TerminalServiceEndpoint,
+  TerminalServicePortConflict
+} from '../../contexts/run/application/dto/TerminalRunEvent'
 
 export interface WorkbenchSnapshot {
   readonly agents?: readonly WorkspaceAgentSnapshot[]
@@ -28,6 +41,9 @@ export interface TerminalViewState {
   readonly sessionId: string | null
   readonly status: TerminalSessionStatus
   readonly output: string
+  readonly runIdentity?: TerminalRunIdentity | null
+  readonly actualEndpoint?: TerminalServiceEndpoint | null
+  readonly portConflict?: TerminalServicePortConflict | null
 }
 
 export interface TerminalDimensions {
@@ -39,6 +55,10 @@ export interface TerminalBlockMetadataInput {
   readonly name: string
   readonly description: string
   readonly launchCommand: string
+}
+
+export interface TerminalDefinitionInput extends TerminalBlockMetadataInput {
+  readonly executionConfig: TerminalExecutionConfigSnapshot
 }
 
 export interface TerminalGroupMetadataInput {
@@ -67,14 +87,16 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
-  readonly onUpdateMetadata: (
+  readonly onUpdateDefinition: (
     block: TerminalBlockSnapshot,
-    metadata: TerminalBlockMetadataInput
+    definition: TerminalDefinitionInput
   ) => Promise<void>
-  readonly onUpdateExecutionConfig?: (
-    block: TerminalBlockSnapshot,
-    executionConfig: TerminalExecutionConfigSnapshot
-  ) => Promise<void>
+  readonly onCopyServiceEndpoint?: (endpoint: TerminalServiceEndpoint) => Promise<void> | void
+  readonly onOpenServiceEndpoint?: (identity: TerminalRunIdentity) => Promise<void> | void
+  readonly onLocateManagedServiceOwner?: (
+    owner: ManagedTerminalServiceOwner
+  ) => Promise<void> | void
+  readonly onDismissPortConflict?: (identity: TerminalRunIdentity) => void
   readonly onRunFromHere?: (block: TerminalBlockSnapshot) => void
   readonly onStopWorkflow?: () => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
@@ -155,6 +177,9 @@ export function createIdleTerminalState(): TerminalViewState {
   return {
     sessionId: null,
     status: 'idle',
-    output: ''
+    output: '',
+    runIdentity: null,
+    actualEndpoint: null,
+    portConflict: null
   }
 }

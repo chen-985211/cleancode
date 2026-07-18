@@ -8,11 +8,11 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
-  readOnlyJsonFile,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
@@ -371,9 +371,7 @@ async function waitForGraph(
 }
 
 async function readGraph(workbench: E2eWorkbench): Promise<TerminalGroupGraphRecord> {
-  return JSON.parse(
-    await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-  ) as TerminalGroupGraphRecord
+  return readE2eBlockGraph(workbench)
 }
 
 async function readRequiredBoundingBox(locator: Locator) {

@@ -226,7 +226,7 @@ function createHandlers() {
     onQuickLaunch: vi.fn(),
     onRestart: vi.fn(),
     onDelete: vi.fn(),
-    onUpdateMetadata: vi.fn(),
+    onUpdateDefinition: vi.fn(),
     onInput: vi.fn(),
     onResize: vi.fn(),
     onResizeBlock: vi.fn(async () => undefined),

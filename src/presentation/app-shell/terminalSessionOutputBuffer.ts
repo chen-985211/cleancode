@@ -1,4 +1,5 @@
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
+import type { TerminalRunScope } from '../../contexts/run/domain/value-objects/TerminalRunScope'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { terminalOutputBrowserEventName, type TerminalViewState } from './types'
 
@@ -15,7 +16,9 @@ export function appendTerminalOutput(
   return Object.fromEntries(
     Object.entries(states).map(([blockId, state]) => [
       blockId,
-      state.sessionId === event.sessionId
+      state.sessionId === event.sessionId &&
+      state.runIdentity?.runId === event.scope.runId &&
+      state.runIdentity.generation === event.scope.generation
         ? { ...state, output: appendTerminalOutputTail(state.output, event.data) }
         : state
     ])
@@ -32,15 +35,18 @@ export function bufferTerminalStartupOutput(
   )
 }
 
-export function takeTerminalStartupOutput(outputs: Map<string, string>, sessionId: string): string {
-  const output = outputs.get(sessionId) ?? ''
+export function takeTerminalStartupOutput(
+  outputs: Map<string, string>,
+  scope: TerminalRunScope
+): string {
+  const output = outputs.get(scope.sessionId) ?? ''
 
-  outputs.delete(sessionId)
+  outputs.delete(scope.sessionId)
   if (output) {
     window.setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, {
-          detail: { sessionId, data: output }
+          detail: { sessionId: scope.sessionId, data: output, scope }
         })
       )
     }, 0)

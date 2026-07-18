@@ -7,6 +7,15 @@ import {
   noopWorkspaceAgentLifecyclePort,
   type WorkspaceAgentLifecyclePort
 } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceRunLifecyclePort,
+  type WorkspaceRunLifecyclePort
+} from '../ports/WorkspaceRunLifecyclePort'
+import {
+  areProjectSnapshotsEqual,
+  saveSynchronizedProject,
+  synchronizeProjectGitBinding
+} from '../services/ProjectGitStateSynchronization'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface SynchronizeProjectGitStateCommand {
@@ -18,7 +27,8 @@ export class SynchronizeProjectGitStateUseCase {
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
     private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
-    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator(),
+    private readonly workspaceRunLifecyclePort: WorkspaceRunLifecyclePort = noopWorkspaceRunLifecyclePort
   ) {}
 
   async execute(command: SynchronizeProjectGitStateCommand): Promise<ProjectSnapshot | null> {
@@ -37,64 +47,27 @@ export class SynchronizeProjectGitStateUseCase {
     }
 
     const project = Project.fromSnapshot(projectSnapshot)
-    const synchronizedProject = await this.synchronizeGitBinding(project)
+    const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
+    const synchronizedProject = synchronizeProjectGitBinding(project, inspection)
     const synchronizedSnapshot = synchronizedProject.toSnapshot()
 
     if (areProjectSnapshotsEqual(projectSnapshot, synchronizedSnapshot)) {
       this.workspaceAgentLifecyclePort.resolveProjectQuarantines(project.directory)
+      this.workspaceRunLifecyclePort.resolveProjectQuarantines(project.directory)
       return null
     }
 
-    await this.projectRepository.save(synchronizedProject)
-    this.workspaceAgentLifecyclePort.resolveProjectQuarantines(project.directory)
+    await saveSynchronizedProject({
+      afterCommit: () => {
+        this.workspaceAgentLifecyclePort.resolveProjectQuarantines(project.directory)
+        this.workspaceRunLifecyclePort.resolveProjectQuarantines(project.directory)
+      },
+      currentSnapshot: projectSnapshot,
+      project: synchronizedProject,
+      projectRepository: this.projectRepository,
+      workspaceRunLifecyclePort: this.workspaceRunLifecyclePort
+    })
 
     return synchronizedSnapshot
   }
-
-  private async synchronizeGitBinding(project: Project): Promise<Project> {
-    const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
-
-    if (!inspection.isGitRepository) {
-      return project.syncGitBranchWorkspaces({
-        mainDirectory: project.directory,
-        mainGitBranch: null,
-        worktrees: []
-      })
-    }
-
-    const mainGitBranch =
-      inspection.branches.find((branch) => branch.isCurrent)?.name ?? inspection.currentBranch
-    const worktrees = inspection.branches
-      .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
-      .map((branch) => ({
-        branchName: branch.name,
-        directory: branch.worktreeDirectory ?? project.directory
-      }))
-
-    return project.syncGitBranchWorkspaces({
-      mainDirectory: project.directory,
-      mainGitBranch,
-      worktrees
-    })
-  }
-}
-
-function areProjectSnapshotsEqual(left: ProjectSnapshot, right: ProjectSnapshot): boolean {
-  return (
-    left.id === right.id &&
-    left.name === right.name &&
-    left.directory === right.directory &&
-    left.workspaces.length === right.workspaces.length &&
-    left.workspaces.every((workspace, index) => {
-      const rightWorkspace = right.workspaces[index]
-
-      return (
-        rightWorkspace !== undefined &&
-        workspace.name === rightWorkspace.name &&
-        workspace.directory === rightWorkspace.directory &&
-        workspace.gitBranch === rightWorkspace.gitBranch &&
-        workspace.isCurrent === rightWorkspace.isCurrent
-      )
-    })
-  )
 }

@@ -19,6 +19,8 @@ import { createTerminalShellCommandArguments } from './TerminalShellCommand'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
+const TERMINATION_GRACE_MS = 500
+const TERMINATION_FORCE_MS = 1_500
 
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
@@ -35,15 +37,34 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         cols: command.columns,
         rows: command.rows,
         cwd: command.workingDirectory,
-        env: createProcessEnvironment()
+        env: createProcessEnvironment(command.environment)
       }
     )
 
-    this.processes.set(command.sessionId, { process: ptyProcess })
-    ptyProcess.onData((data) => command.onOutput({ sessionId: command.sessionId, data }))
+    let resolveExit: () => void = () => undefined
+    const exited = new Promise<void>((resolve) => {
+      resolveExit = resolve
+    })
+    const managedProcess: ManagedTerminalProcess = {
+      process: ptyProcess,
+      scope: command.scope,
+      exited,
+      stopPromise: null
+    }
+    this.processes.set(command.scope.sessionId, managedProcess)
+    ptyProcess.onData((data) =>
+      command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data })
+    )
     ptyProcess.onExit((event) => {
-      this.processes.delete(command.sessionId)
-      command.onExit({ sessionId: command.sessionId, exitCode: event.exitCode })
+      if (this.processes.get(command.scope.sessionId) === managedProcess) {
+        this.processes.delete(command.scope.sessionId)
+      }
+      resolveExit()
+      command.onExit({
+        scope: command.scope,
+        sessionId: command.scope.sessionId,
+        exitCode: event.exitCode
+      })
     })
 
     return {
@@ -73,20 +94,28 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     return readProcessWorkingDirectory(terminalProcess.process.pid)
   }
 
-  stop(sessionId: string): void {
-    const ptyProcess = this.processes.get(sessionId)
+  async stop(sessionId: string): Promise<void> {
+    const managedProcess = this.processes.get(sessionId)
 
-    if (!ptyProcess) {
+    if (!managedProcess) {
       return
     }
 
-    ptyProcess.process.kill()
-    this.processes.delete(sessionId)
+    managedProcess.stopPromise ??= stopManagedProcess(managedProcess)
+    await managedProcess.stopPromise
   }
 
-  disposeAll(): void {
-    for (const sessionId of this.processes.keys()) {
-      this.stop(sessionId)
+  async disposeAll(): Promise<void> {
+    const results = await Promise.allSettled(
+      [...this.processes.keys()].map((sessionId) => this.stop(sessionId))
+    )
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    )
+
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) {
+      throw new AggregateError(failures, 'Multiple terminal processes failed to stop.')
     }
   }
 
@@ -103,23 +132,148 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
 interface ManagedTerminalProcess {
   readonly process: IPty
+  readonly scope: StartTerminalProcessCommand['scope']
+  readonly exited: Promise<void>
+  stopPromise: Promise<void> | null
 }
 
 function getDefaultShell(): string {
   return platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/sh'
 }
 
-function createProcessEnvironment(): Record<string, string> {
+function createProcessEnvironment(
+  environment: Readonly<Record<string, string>> | undefined
+): Record<string, string> {
   const inheritedEnvironment = Object.fromEntries(
     Object.entries(process.env).filter((entry): entry is [string, string] => {
       return typeof entry[1] === 'string'
     })
   )
 
-  return {
-    ...inheritedEnvironment,
-    PROMPT_EOL_MARK: ''
+  for (const [name, value] of Object.entries(environment ?? {})) {
+    if (platform() === 'win32') {
+      const inheritedName = Object.keys(inheritedEnvironment).find(
+        (candidate) => candidate.toLowerCase() === name.toLowerCase()
+      )
+      if (inheritedName) {
+        delete inheritedEnvironment[inheritedName]
+      }
+    }
+    inheritedEnvironment[name] = value
   }
+
+  inheritedEnvironment.PROMPT_EOL_MARK = ''
+  return inheritedEnvironment
+}
+
+async function stopManagedProcess(managedProcess: ManagedTerminalProcess): Promise<void> {
+  if (platform() === 'win32') {
+    managedProcess.process.kill()
+    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
+    return
+  }
+
+  const processGroupId = await readProcessGroupId(managedProcess.process.pid)
+
+  if (!processGroupId) {
+    managedProcess.process.kill('SIGTERM')
+    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
+    return
+  }
+
+  signalProcessGroup(processGroupId, 'SIGTERM')
+  if (await waitForProcessGroupExit(processGroupId, TERMINATION_GRACE_MS)) {
+    await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
+    return
+  }
+
+  signalProcessGroup(processGroupId, 'SIGKILL')
+  const groupExited = await waitForProcessGroupExit(processGroupId, TERMINATION_FORCE_MS)
+
+  if (!groupExited) {
+    throw new Error(`Terminal process group ${processGroupId} did not exit.`)
+  }
+
+  await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
+}
+
+async function readProcessGroupId(processId: number): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync('/bin/ps', ['-o', 'pgid=', '-p', String(processId)], {
+      timeout: 1_000
+    })
+    const processGroupId = Number.parseInt(stdout.trim(), 10)
+    return Number.isSafeInteger(processGroupId) && processGroupId > 1 ? processGroupId : null
+  } catch {
+    return null
+  }
+}
+
+function signalProcessGroup(processGroupId: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-processGroupId, signal)
+  } catch (error) {
+    if (!isNoSuchProcessError(error)) {
+      throw error
+    }
+  }
+}
+
+async function waitForProcessGroupExit(
+  processGroupId: number,
+  timeoutMs: number
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+
+  while (isProcessGroupAlive(processGroupId)) {
+    if (Date.now() >= deadline) {
+      return false
+    }
+    await delay(25)
+  }
+
+  return true
+}
+
+function isProcessGroupAlive(processGroupId: number): boolean {
+  try {
+    process.kill(-processGroupId, 0)
+    return true
+  } catch (error) {
+    return !isNoSuchProcessError(error)
+  }
+}
+
+async function waitForPromise(promise: Promise<void>, timeoutMs: number): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error('Terminal process did not report its exit.')),
+          timeoutMs
+        )
+      })
+    ])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
+function delay(durationMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, durationMs))
+}
+
+function isNoSuchProcessError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { readonly code?: unknown }).code === 'ESRCH'
+  )
 }
 
 async function readProcessWorkingDirectory(processId: number): Promise<string | null> {

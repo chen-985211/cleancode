@@ -4,6 +4,7 @@ const terminalStateKeySeparator = '\0'
 
 export interface TerminalSessionWorkspaceMigration {
   readonly sessionId: string
+  readonly targetProjectId: string
   readonly targetBlockId?: string
   readonly targetWorkspaceName: string
 }
@@ -27,7 +28,11 @@ export function migrateTerminalSessionToWorkspace(
 
   const [sourceKey, sourceState] = sourceEntry
   const blockId = migration.targetBlockId ?? getBlockIdFromTerminalStateKey(sourceKey)
-  const targetKey = createTerminalStateKey(migration.targetWorkspaceName, blockId)
+  const targetKey = createTerminalStateKey(
+    migration.targetProjectId,
+    migration.targetWorkspaceName,
+    blockId
+  )
 
   if (sourceKey === targetKey) {
     return { states, migrated: false }
@@ -40,14 +45,29 @@ export function migrateTerminalSessionToWorkspace(
   return { states: nextStates, migrated: true }
 }
 
-export function createTerminalStateKey(workspaceName: string, blockId: string): string {
-  return `${workspaceName}${terminalStateKeySeparator}${blockId}`
+export function createTerminalStateKey(
+  projectId: string,
+  workspaceName: string,
+  blockId: string
+): string {
+  return [projectId, workspaceName, blockId].join(terminalStateKeySeparator)
+}
+
+export function getProjectIdFromTerminalStateKey(terminalStateKey: string): string {
+  return splitTerminalStateKey(terminalStateKey)[0]
 }
 
 export function getWorkspaceNameFromTerminalStateKey(terminalStateKey: string): string {
-  return terminalStateKey.slice(0, terminalStateKey.indexOf(terminalStateKeySeparator))
+  return splitTerminalStateKey(terminalStateKey)[1]
 }
 
 export function getBlockIdFromTerminalStateKey(terminalStateKey: string): string {
-  return terminalStateKey.slice(terminalStateKey.indexOf(terminalStateKeySeparator) + 1)
+  return splitTerminalStateKey(terminalStateKey)[2]
+}
+
+function splitTerminalStateKey(terminalStateKey: string): [string, string, string] {
+  const [projectId = '', workspaceName = '', ...blockIdParts] =
+    terminalStateKey.split(terminalStateKeySeparator)
+
+  return [projectId, workspaceName, blockIdParts.join(terminalStateKeySeparator)]
 }

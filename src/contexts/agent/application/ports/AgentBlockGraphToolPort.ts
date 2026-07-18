@@ -1,7 +1,7 @@
 import type {
-  BlockGraphSnapshot,
-  BlockPositionSnapshot
-} from '../../../block-graph/application/dto/BlockGraphSnapshot'
+  AgentBlockGraphSnapshot,
+  AgentBlockPositionSnapshot
+} from '../dto/AgentBlockGraphProtocol'
 import type {
   ArrangeTerminalLayoutAgentToolInput,
   AgentToolContext,
@@ -30,7 +30,7 @@ export interface AgentConnectTerminalBlocksInput {
 
 export interface AgentConnectTerminalBlocksResult {
   readonly connectionId: string
-  readonly graph: BlockGraphSnapshot
+  readonly graph: AgentBlockGraphSnapshot
 }
 
 export interface AgentDisconnectTerminalBlocksInput {
@@ -42,7 +42,7 @@ export interface AgentInspectTerminalWorkflowPlanInput {
 }
 
 export interface AgentCanvasLayoutRegion {
-  readonly position: BlockPositionSnapshot
+  readonly position: AgentBlockPositionSnapshot
   readonly size: { readonly height: number; readonly width: number }
 }
 
@@ -59,7 +59,7 @@ export interface AgentArrangeTerminalLayoutInput extends ArrangeTerminalLayoutAg
 export interface AgentArrangeTerminalLayoutResult {
   readonly arrangedBlockIds: readonly string[]
   readonly arrangedTerminalGroupIds: readonly string[]
-  readonly graph: BlockGraphSnapshot
+  readonly graph: AgentBlockGraphSnapshot
   readonly graphChanged: boolean
 }
 
@@ -68,35 +68,35 @@ export interface AgentBlockGraphToolPort {
     context: AgentToolContext,
     input: AgentArrangeTerminalLayoutInput
   ): Promise<AgentArrangeTerminalLayoutResult>
-  inspectGraph(context: AgentToolContext): Promise<BlockGraphSnapshot>
+  inspectGraph(context: AgentToolContext): Promise<AgentBlockGraphSnapshot>
   createTerminalBlock(
     context: AgentToolContext,
     input: AgentCreateTerminalBlockInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   updateTerminalBlock(
     context: AgentToolContext,
     input: UpdateBlockAgentToolInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   deleteTerminalBlock(
     context: AgentToolContext,
     input: DeleteBlockAgentToolInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   createTerminalGroup(
     context: AgentToolContext,
     input: CreateTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   updateTerminalGroup(
     context: AgentToolContext,
     input: UpdateTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   deleteTerminalGroup(
     context: AgentToolContext,
     input: DeleteTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   updateTerminalExecutionConfig(
     context: AgentToolContext,
     input: AgentUpdateTerminalExecutionConfigInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   connectTerminalBlocks(
     context: AgentToolContext,
     input: AgentConnectTerminalBlocksInput
@@ -104,7 +104,7 @@ export interface AgentBlockGraphToolPort {
   disconnectTerminalBlocks(
     context: AgentToolContext,
     input: AgentDisconnectTerminalBlocksInput
-  ): Promise<BlockGraphSnapshot>
+  ): Promise<AgentBlockGraphSnapshot>
   inspectTerminalWorkflowPlan(
     context: AgentToolContext,
     input: AgentInspectTerminalWorkflowPlanInput

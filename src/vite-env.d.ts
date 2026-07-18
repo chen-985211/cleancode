@@ -23,6 +23,10 @@ import type {
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type {
+  TerminalRunEvent,
+  TerminalServiceEndpoint
+} from './contexts/run/application/dto/TerminalRunEvent'
 import type { WorkflowRunSnapshot } from './contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalWorkflowEvent } from './contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import type {
@@ -168,6 +172,15 @@ declare global {
         readonly blockId: string
         readonly executionConfig: TerminalExecutionConfigSnapshot
       }): Promise<BlockGraphSnapshot>
+      updateTerminalDefinition(command: {
+        readonly projectDirectory: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly name: string
+        readonly description: string
+        readonly launchCommand: string
+        readonly executionConfig: TerminalExecutionConfigSnapshot
+      }): Promise<BlockGraphSnapshot>
       updateTerminalGroupMetadata(command: {
         readonly projectDirectory: string
         readonly workspaceName: string
@@ -227,13 +240,35 @@ declare global {
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
       startTerminal(command: {
+        readonly projectId: string
+        readonly projectDirectory: string
         readonly terminalBlockId: string
         readonly workspaceName: string
-        readonly workingDirectory: string
+        readonly workspaceDirectory: string
+        readonly gitBranch: string | null
         readonly shell?: string
         readonly columns?: number
         readonly rows?: number
       }): Promise<TerminalSessionSnapshot>
+      launchTerminal(command: {
+        readonly projectId: string
+        readonly projectDirectory: string
+        readonly terminalBlockId: string
+        readonly workspaceName: string
+        readonly workspaceDirectory: string
+        readonly gitBranch: string | null
+        readonly shell?: string
+        readonly columns?: number
+        readonly rows?: number
+      }): Promise<{
+        readonly session: TerminalSessionSnapshot
+        readonly endpoint: TerminalServiceEndpoint | null
+      }>
+      openTerminalServiceEndpoint(command: {
+        readonly runId: string
+        readonly sessionId: string
+        readonly generation: number
+      }): Promise<void>
       writeTerminal(command: {
         readonly sessionId: string
         readonly input: string
@@ -249,9 +284,11 @@ declare global {
       }): Promise<TerminalWorkingDirectorySnapshot[]>
       terminateTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
       startTerminalWorkflow(command: {
+        readonly projectId: string
         readonly projectDirectory: string
         readonly workspaceName: string
-        readonly workingDirectory: string
+        readonly workspaceDirectory: string
+        readonly gitBranch: string | null
         readonly scope:
           { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
         readonly shell?: string
@@ -267,6 +304,7 @@ declare global {
         readonly workspaceName: string
       }): Promise<WorkflowRunSnapshot | null>
       onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void
+      onTerminalRunEvent(listener: (event: TerminalRunEvent) => void): () => void
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }

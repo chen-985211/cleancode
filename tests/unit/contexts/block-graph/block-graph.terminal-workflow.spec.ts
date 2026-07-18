@@ -146,7 +146,12 @@ describe('terminal workflow configuration in a block graph', () => {
     })
     graph.updateTerminalExecutionConfig('test', {
       mode: 'service',
-      readiness: { type: 'tcp', port: 4173 },
+      port: {
+        binding: { type: 'none' },
+        policy: { port: 4173, type: 'fixed' },
+        protocol: 'tcp'
+      },
+      readiness: { type: 'tcp' },
       readinessTimeoutMs: 45_000
     })
 
@@ -163,7 +168,12 @@ describe('terminal workflow configuration in a block graph', () => {
       },
       {
         mode: 'service',
-        readiness: { type: 'tcp', port: 4173 },
+        port: {
+          binding: { type: 'none' },
+          policy: { port: 4173, type: 'fixed' },
+          protocol: 'tcp'
+        },
+        readiness: { type: 'tcp' },
         readinessTimeoutMs: 45_000
       }
     ])
@@ -183,7 +193,12 @@ describe('terminal workflow configuration in a block graph', () => {
       },
       {
         mode: 'service',
-        readiness: { type: 'tcp', port: 70_000 },
+        port: {
+          binding: { type: 'none' },
+          policy: { port: 70_000, type: 'fixed' },
+          protocol: 'tcp'
+        },
+        readiness: { type: 'tcp' },
         readinessTimeoutMs: 30_000
       }
     ] as const

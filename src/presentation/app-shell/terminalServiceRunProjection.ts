@@ -1,0 +1,106 @@
+import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
+import type { TerminalRunEvent } from '../../contexts/run/application/dto/TerminalRunEvent'
+import { createIdleTerminalState, type TerminalRunIdentity, type TerminalViewState } from './types'
+
+export type TerminalServiceRunEvent = TerminalRunEvent
+
+export function applyTerminalServiceRunEvent(
+  states: Record<string, TerminalViewState>,
+  event: TerminalServiceRunEvent
+): Record<string, TerminalViewState> {
+  const key = createTerminalStateKey(
+    event.scope.projectId,
+    event.scope.workspaceName,
+    event.scope.blockId
+  )
+  const existing = states[key]
+  if (!existing && event.type !== 'service-run-started' && event.type !== 'service-port-conflict') {
+    return states
+  }
+  const current = existing ?? createIdleTerminalState()
+
+  if (event.type === 'service-run-started') {
+    if (current.runIdentity && current.runIdentity.generation >= event.scope.generation) {
+      return states
+    }
+
+    return {
+      ...states,
+      [key]: {
+        ...current,
+        sessionId: event.scope.sessionId,
+        status: 'running',
+        runIdentity: event.scope,
+        actualEndpoint: null,
+        portConflict: null
+      }
+    }
+  }
+
+  if (event.type === 'service-port-conflict') {
+    if (
+      current.runIdentity &&
+      (current.runIdentity.generation > event.scope.generation ||
+        (current.runIdentity.generation === event.scope.generation &&
+          !isSameRun(current.runIdentity, event.scope)))
+    ) {
+      return states
+    }
+
+    return {
+      ...states,
+      [key]: {
+        ...current,
+        sessionId: event.scope.sessionId,
+        status: 'failed',
+        runIdentity: event.scope,
+        actualEndpoint: null,
+        portConflict: event.conflict
+      }
+    }
+  }
+
+  if (!isSameRun(current.runIdentity, event.scope)) return states
+
+  if (event.type === 'service-endpoint-updated') {
+    return {
+      ...states,
+      [key]: { ...current, actualEndpoint: event.endpoint, portConflict: null }
+    }
+  }
+
+  return {
+    ...states,
+    [key]: {
+      ...current,
+      actualEndpoint: null,
+      portConflict: null
+    }
+  }
+}
+
+export function dismissTerminalPortConflict(
+  states: Record<string, TerminalViewState>,
+  identity: TerminalRunIdentity
+): Record<string, TerminalViewState> {
+  const key = createTerminalStateKey(identity.projectId, identity.workspaceName, identity.blockId)
+  const current = states[key]
+
+  if (!current || !isSameRun(current.runIdentity, identity) || !current.portConflict) {
+    return states
+  }
+
+  return { ...states, [key]: { ...current, portConflict: null } }
+}
+
+function isSameRun(
+  current: TerminalRunIdentity | null | undefined,
+  event: TerminalRunIdentity
+): boolean {
+  return Boolean(
+    current &&
+    current.runId === event.runId &&
+    current.sessionId === event.sessionId &&
+    current.generation === event.generation
+  )
+}

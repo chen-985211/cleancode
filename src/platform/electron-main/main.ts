@@ -28,6 +28,7 @@ import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-c
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
+import { GetTerminalLaunchPlanUseCase } from '../../contexts/block-graph/application/use-cases/GetTerminalLaunchPlanUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
 import { RemoveTerminalFromGroupUseCase } from '../../contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
@@ -37,6 +38,7 @@ import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/applicati
 import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import { UpdateTerminalExecutionConfigUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
+import { UpdateTerminalDefinitionUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalDefinitionUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { ListGitBranchNavigationUseCase } from '../../contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
@@ -50,27 +52,27 @@ import {
   inferProjectName
 } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRepository'
 import { GitCliWorkspaceAdapter } from '../../contexts/project/infrastructure/filesystem/GitCliWorkspaceAdapter'
-import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
-import { TerminalWorkflowService } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
+import { BlockGraphTerminalLaunchPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalLaunchPlanAdapter'
 import { BlockGraphTerminalWorkflowPlanAdapter } from '../../contexts/run/infrastructure/block-graph/BlockGraphTerminalWorkflowPlanAdapter'
-import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
-import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
-import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { createAgentLifecycle, disposeRuntime } from './agentRuntimeLifecycleAdapter'
 import { createAgentRuntimeScopeValidation } from './agentRuntimeScopeValidationAdapter'
 import { createProjectLifecycleUseCases } from './projectLifecycleUseCases'
+import { createRunRuntimeScopeValidation } from './runRuntimeScopeValidationAdapter'
+import { createRunRuntime } from './runRuntimeComposition'
 import { createDisabledAgentSessionSnapshot } from './createDisabledAgentSessionSnapshot'
+import { createMainWindow } from './createMainWindow'
 import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
-import { resolveWindowFrameOptions } from './windowFrameOptions'
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
+import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
+import { disposeApplicationRuntime } from './applicationRuntimeShutdown'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -83,6 +85,10 @@ const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
+const resolveManagedServiceOwner = createManagedServiceOwnerResolver(
+  projectRepository,
+  graphRepository
+)
 const gitWorkspaceAdapter = new GitCliWorkspaceAdapter()
 const branchWorkspaceDirectoryResolver = new FileSystemBranchWorkspaceDirectoryResolver()
 const listGitBranchNavigationUseCase = new ListGitBranchNavigationUseCase(
@@ -101,7 +107,6 @@ const addTerminalToGroupUseCase = new AddTerminalToGroupUseCase(graphRepository)
 const removeTerminalFromGroupUseCase = new RemoveTerminalFromGroupUseCase(graphRepository)
 const dissolveTerminalGroupUseCase = new DissolveTerminalGroupUseCase(graphRepository)
 const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
-const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository)
 const setTerminalGroupCollapsedUseCase = new SetTerminalGroupCollapsedUseCase(graphRepository)
 const updateGraphViewportUseCase = new UpdateGraphViewportUseCase(graphRepository)
 const updateTerminalGroupMetadataUseCase = new UpdateTerminalGroupMetadataUseCase(graphRepository)
@@ -109,22 +114,27 @@ const updateTerminalBlockMetadataUseCase = new UpdateTerminalBlockMetadataUseCas
 const updateTerminalExecutionConfigUseCase = new UpdateTerminalExecutionConfigUseCase(
   graphRepository
 )
+const updateTerminalDefinitionUseCase = new UpdateTerminalDefinitionUseCase(graphRepository)
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
-const terminalSessionService = new TerminalSessionService(new NodePtyTerminalProcessAdapter())
-const terminalWorkflowService = new TerminalWorkflowService(
-  new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase),
-  new TerminalSessionWorkflowRuntimeAdapter(terminalSessionService),
-  new NodeTcpReadinessAdapter(),
-  {
-    publish: (event) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) {
-          window.webContents.send('cleancode:terminal-workflow-event', event)
-        }
-      }
-    }
-  }
-)
+const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
+const {
+  launchTerminal,
+  lifecycle: runLifecycleService,
+  openTerminalServiceEndpoint,
+  sessions: terminalSessionService,
+  terminalRuns,
+  workflow: terminalWorkflowService,
+  workspaceRuns
+} = createRunRuntime({
+  launchPlans: new BlockGraphTerminalLaunchPlanAdapter(getTerminalLaunchPlanUseCase),
+  resolveManagedServiceOwner,
+  scopeValidation: createRunRuntimeScopeValidation(
+    getProjectRegistryRepository(),
+    projectRepository
+  ),
+  workflowPlans: new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase)
+})
+const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
 const codexCliAdapter = new NodeCodexCliAdapter()
 const inspectCodexCliUseCase = new InspectCodexCliUseCase(codexCliAdapter)
 const agentAuditRepository = new FileSystemAgentAuditRepository(
@@ -186,6 +196,7 @@ const {
   synchronizeProjectGitStateUseCase
 } = createProjectLifecycleUseCases({
   agentLifecycle: workspaceAgentLifecycleAdapter,
+  runLifecycle: workspaceRuns,
   branchDirectories: branchWorkspaceDirectoryResolver,
   gitWorkspace: gitWorkspaceAdapter,
   projectRegistry: getProjectRegistryRepository(),
@@ -203,55 +214,6 @@ const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT
 const electronWindowPolicy = resolveElectronWindowPolicy({
   backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
 })
-const createMainWindow = (appIconPath: string | undefined): void => {
-  const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 960,
-    minHeight: 640,
-    title: 'cleancode',
-    backgroundColor: '#f7f8fa',
-    icon: appIconPath,
-    show: electronWindowPolicy.show,
-    ...(electronWindowPolicy.mode === 'offscreen-inactive'
-      ? {
-          enableLargerThanScreen: electronWindowPolicy.enableLargerThanScreen,
-          ...electronWindowPolicy.position
-        }
-      : {}),
-    ...resolveWindowFrameOptions(process.platform),
-    webPreferences: {
-      backgroundThrottling: electronWindowPolicy.backgroundThrottling,
-      preload: join(__dirname, '../preload/preload.mjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
-  })
-
-  if (electronWindowPolicy.mode === 'offscreen-inactive') {
-    mainWindow.once('ready-to-show', () => {
-      if (mainWindow.isDestroyed()) {
-        return
-      }
-
-      mainWindow.setPosition(
-        electronWindowPolicy.position.x,
-        electronWindowPolicy.position.y,
-        false
-      )
-      mainWindow.showInactive()
-    })
-  }
-
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-    return
-  }
-
-  void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-}
-
 registerProjectIpcHandlers({
   archiveBranchWorkspace: (command) => archiveBranchWorkspaceUseCase.execute(command),
   checkoutMainWorkspaceBranch: (command) => checkoutMainWorkspaceBranchUseCase.execute(command),
@@ -288,15 +250,19 @@ registerBlockGraphIpcHandlers({
   updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),
   updateTerminalGroupMetadata: (command) => updateTerminalGroupMetadataUseCase.execute(command),
   updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),
+  updateTerminalDefinition: (command) => updateTerminalDefinitionUseCase.execute(command),
   updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command)
 })
 
 registerTerminalIpcHandlers({
   interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
   ipcMain,
+  launchTerminal: (command) => launchTerminal.execute(command),
   listTerminalWorkingDirectories: (sessionIds) =>
     terminalSessionService.listWorkingDirectories(sessionIds),
   logger: consoleLogger,
+  openTerminalServiceEndpoint: (command) => openTerminalServiceEndpoint.execute(command),
+  resolveManagedServiceOwner,
   resizeTerminal: (sessionId, columns, rows) =>
     terminalSessionService.resize(sessionId, columns, rows),
   startTerminal: (command) => terminalSessionService.start(command),
@@ -449,11 +415,11 @@ app.whenReady().then(() => {
     app.dock?.setIcon(appIconPath)
   }
 
-  createMainWindow(appIconPath)
+  createMainWindow({ appIconPath, policy: electronWindowPolicy })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow(appIconPath)
+      createMainWindow({ appIconPath, policy: electronWindowPolicy })
     }
   })
 })
@@ -478,8 +444,12 @@ app.on('before-quit', (event) => {
   }
 
   isPreparingToQuit = true
-  terminalSessionService.stopAll()
-  void agentSessionService.disposeAll().finally(() => {
+  void disposeApplicationRuntime({
+    disposeAgentSessions: () => agentSessionService.disposeAll(),
+    disposeRunLifecycle: () => runLifecycleService.hardDisposeAll(),
+    disposeTerminalSessions: () => terminalSessionService.stopAll(),
+    logger: consoleLogger
+  }).finally(() => {
     isReadyToQuit = true
     app.quit()
   })

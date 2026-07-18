@@ -13,8 +13,8 @@ export class TerminalSessionWorkflowRuntimeAdapter implements TerminalWorkflowRu
     return this.startSession(command, undefined)
   }
 
-  stop(sessionId: string): void {
-    this.terminalSessions.terminate(sessionId)
+  async stop(sessionId: string): Promise<void> {
+    await this.terminalSessions.terminate(sessionId)
   }
 
   private async startSession(
@@ -22,9 +22,14 @@ export class TerminalSessionWorkflowRuntimeAdapter implements TerminalWorkflowRu
     launchCommand: string | undefined
   ) {
     const session = await this.terminalSessions.start({
+      projectId: command.projectId,
+      projectDirectory: command.projectDirectory,
       terminalBlockId: command.blockId,
       workspaceName: command.workspaceName,
+      workspaceDirectory: command.workspaceDirectory,
+      gitBranch: command.gitBranch,
       workingDirectory: command.workingDirectory,
+      runId: command.runId,
       launchCommand,
       shell: command.shell,
       columns: command.columns,

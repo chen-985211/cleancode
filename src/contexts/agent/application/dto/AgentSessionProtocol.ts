@@ -1,4 +1,4 @@
-import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import type { AgentBlockGraphSnapshot } from './AgentBlockGraphProtocol'
 import type { AgentToolErrorSnapshot } from './AgentToolProtocol'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
@@ -24,7 +24,7 @@ export interface AgentGraphUpdatedEvent {
     readonly operationId: string
     readonly terminalGroupIds: readonly string[]
   }
-  readonly graph: BlockGraphSnapshot
+  readonly graph: AgentBlockGraphSnapshot
   readonly projectDirectory: string
   readonly sessionId: string
   readonly workspaceName: string
@@ -46,7 +46,7 @@ export type AgentToolApprovalTarget =
 
 export type AgentToolApprovalDecisionResult =
   | {
-      readonly graph: BlockGraphSnapshot
+      readonly graph: AgentBlockGraphSnapshot
       readonly status: 'completed'
     }
   | {

@@ -147,6 +147,7 @@ describe('app shell worktree directory synchronization', () => {
       )
     ])
     const createTerminalBlock = vi.fn(async () => createdGraph)
+    const updateTerminalDefinition = vi.fn(async () => createdGraph)
     const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
 
     Object.defineProperty(window, 'cleancode', {
@@ -159,6 +160,7 @@ describe('app shell worktree directory synchronization', () => {
         switchBranchWorkspace
       })
     })
+    Object.assign(window.cleancode!, { updateTerminalDefinition })
 
     render(<AppShell />)
 
@@ -171,6 +173,17 @@ describe('app shell worktree directory synchronization', () => {
         name: 'Terminal 1',
         description: '本地终端',
         position: { x: 160, y: 220 }
+      })
+    )
+    await waitFor(() =>
+      expect(updateTerminalDefinition).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'feature/sidebar',
+        blockId: 'terminal-worktree',
+        name: 'Terminal 1',
+        description: '本地终端',
+        launchCommand: '',
+        executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
       })
     )
     await screen.findByText('/tmp/alpha-project-worktrees/feature-sidebar')
@@ -344,8 +357,19 @@ function createTerminalSessionSnapshot(
   workspaceName: string,
   workingDirectory: string
 ): TerminalSessionSnapshot {
+  const workspaceDirectory =
+    workspaceName === 'main' ? '/tmp/alpha-project' : '/tmp/alpha-project-worktrees/feature-sidebar'
+
   return {
     id: sessionId,
+    projectId: 'project-alpha-project',
+    projectDirectory: '/tmp/alpha-project',
+    workspaceDirectory,
+    gitBranch: workspaceName === 'main' ? 'main' : 'feature/sidebar',
+    blockId: 'terminal-1',
+    sessionId,
+    runId: `${sessionId}-run`,
+    generation: 1,
     terminalBlockId: 'terminal-1',
     workspaceName,
     workingDirectory,

@@ -11,6 +11,10 @@ import {
   type WorkspaceAgentAttachmentLease,
   type WorkspaceAgentLifecyclePort
 } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceRunLifecyclePort,
+  type WorkspaceRunLifecyclePort
+} from '../ports/WorkspaceRunLifecyclePort'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface ArchiveBranchWorkspaceCommand {
@@ -32,7 +36,8 @@ export class ArchiveBranchWorkspaceUseCase {
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
     private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
-    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator(),
+    private readonly workspaceRunLifecyclePort: WorkspaceRunLifecyclePort = noopWorkspaceRunLifecyclePort
   ) {}
 
   async execute(command: ArchiveBranchWorkspaceCommand): Promise<ProjectSnapshot> {
@@ -59,10 +64,10 @@ export class ArchiveBranchWorkspaceUseCase {
     }
 
     const archivedProject = project.archiveBranchWorkspace(workspaceName)
-    const isRecoveringQuarantine = this.workspaceAgentLifecyclePort.isWorkspaceQuarantined({
-      projectDirectory: project.directory,
-      workspaceName
-    })
+    const workspaceScope = { projectDirectory: project.directory, workspaceName }
+    const isRecoveringQuarantine =
+      this.workspaceAgentLifecyclePort.isWorkspaceQuarantined(workspaceScope) ||
+      this.workspaceRunLifecyclePort.isWorkspaceQuarantined(workspaceScope)
     if (
       !isRecoveringQuarantine &&
       !(await this.gitWorkspacePort.isWorkingTreeClean(workspace.directory))
@@ -89,7 +94,14 @@ export class ArchiveBranchWorkspaceUseCase {
           command.lockedWorktreeConfirmation
         )
     const { agentLease, worktreeLock } = preparation
-    let worktreeRemoved = agentLease.wasQuarantined
+    let runLease
+    try {
+      runLease = await this.workspaceRunLifecyclePort.disposeWorkspace(workspaceScope)
+    } catch (error) {
+      agentLease.release()
+      throw error
+    }
+    let worktreeRemoved = agentLease.wasQuarantined || runLease.wasQuarantined
     let transactionCommitted = false
     try {
       if (!agentLease.wasQuarantined) {
@@ -103,9 +115,16 @@ export class ArchiveBranchWorkspaceUseCase {
       transactionCommitted = true
       return archivedProject.toSnapshot()
     } finally {
-      if (transactionCommitted) agentLease.resolve()
-      else if (worktreeRemoved) agentLease.quarantine()
-      else agentLease.release()
+      if (transactionCommitted) {
+        agentLease.resolve()
+        runLease.resolve()
+      } else if (worktreeRemoved) {
+        agentLease.quarantine()
+        runLease.quarantine()
+      } else {
+        agentLease.release()
+        runLease.release()
+      }
     }
   }
 

@@ -76,6 +76,63 @@ describe('block graph terminal resize IPC contract', () => {
     expect(result).toEqual({ ok: true, value: createGraphSnapshot() })
     expect(resizeTerminalBlock).toHaveBeenCalledWith(command)
   })
+
+  it('passes one complete terminal definition through the atomic update channel', async () => {
+    const ipcMain = new FakeIpcMain()
+    const updateTerminalDefinition = vi.fn(async () => createGraphSnapshot())
+    registerBlockGraphIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      updateTerminalDefinition
+    } as unknown as BlockGraphIpcHandlersInput)
+    const command = {
+      projectDirectory: '/repo/app',
+      workspaceName: 'main',
+      blockId: 'terminal-1',
+      name: 'Web',
+      description: 'Development server',
+      launchCommand: 'pnpm dev',
+      executionConfig: {
+        mode: 'service' as const,
+        readiness: { type: 'tcp' as const },
+        readinessTimeoutMs: 30_000,
+        port: {
+          protocol: 'http' as const,
+          policy: { type: 'preferred' as const, port: 5173 },
+          binding: { type: 'environment' as const, variableName: 'PORT' }
+        }
+      }
+    }
+
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:update-terminal-definition', command)
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+    expect(updateTerminalDefinition).toHaveBeenCalledTimes(1)
+    expect(updateTerminalDefinition).toHaveBeenCalledWith(command)
+  })
+
+  it('rejects malformed terminal definitions before invoking the use case', async () => {
+    const ipcMain = new FakeIpcMain()
+    const updateTerminalDefinition = vi.fn(async () => createGraphSnapshot())
+    registerBlockGraphIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      updateTerminalDefinition
+    } as unknown as BlockGraphIpcHandlersInput)
+
+    const result = await ipcMain.invoke('cleancode:update-terminal-definition', {
+      projectDirectory: '/repo/app',
+      workspaceName: 'main',
+      blockId: 'terminal-1',
+      name: 'Web'
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND' }
+    })
+    expect(updateTerminalDefinition).not.toHaveBeenCalled()
+  })
 })
 
 function createGraphSnapshot(): BlockGraphSnapshot {

@@ -10,7 +10,7 @@
 | ---------- | ------ | -------------------------------- | ------------------------------------------------------------------ |
 | Project    | 已实现 | `Project`、`ProjectRegistry`     | 项目目录、工作区、Git 绑定、当前工作区、最近项目目录               |
 | BlockGraph | 已实现 | `BlockGraph`                     | 终端积木、组合、布局、执行配置和依赖连接                           |
-| Run        | 已实现 | `TerminalSession`、`WorkflowRun` | PTY 会话生命周期、工作流运行计划和节点状态                         |
+| Run        | 已实现 | `TerminalSession`、`WorkflowRun` | PTY 会话、精确运行身份、服务端口租约、实际端点、工作流和节点状态   |
 | Agent      | 已实现 | `AgentSession`                   | Agent 身份、布局、原生 MCP 开关、thread 绑定、工具协议、审批和审计 |
 | Plugin     | 规划中 | 尚无                             | 尚未形成当前领域模型、用例或持久化事实                             |
 
@@ -24,15 +24,30 @@ Project application
   -> Platform adapter
   -> AgentSessionService lifecycle leases
 
+Project application
+  -> WorkspaceRunLifecyclePort
+  -> Platform adapter
+  -> RunLifecycleService lifecycle leases
+
+BlockGraph application
+  -> TerminalRunLifecyclePort
+  -> Platform adapter
+  -> RunLifecycleService lifecycle leases
+
 Agent application
   -> AgentRuntimeScopeValidationPort
   -> Platform adapter
   -> ValidateProjectWorkspaceScopeUseCase
 
 Run application
-  -> TerminalWorkflowPlanPort
-  -> BlockGraphTerminalWorkflowPlanAdapter
-  -> BuildTerminalWorkflowPlanUseCase
+  -> RunRuntimeScopeValidationPort
+  -> Platform adapter
+  -> ValidateProjectWorkspaceScopeUseCase
+
+Run application
+  -> TerminalLaunchPlanPort / TerminalWorkflowPlanPort
+  -> BlockGraph adapters
+  -> GetTerminalLaunchPlanUseCase / BuildTerminalWorkflowPlanUseCase
 
 Agent application
   -> AgentBlockGraphToolPort
@@ -55,6 +70,30 @@ Agent application
 
 详细语义见[项目与分支工作区生命周期](../contexts/project/workspace-lifecycle.md)和 [Agent 与会话生命周期](../contexts/agent/agent-session.md)。
 
+## Project 到 Run：工作区运行资源变更
+
+| 项目             | 说明                                                                                                                                                                                                                                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Project                                                                                                                                                                                                                                                                                                               |
+| 调用方拥有的端口 | `WorkspaceRunLifecyclePort`                                                                                                                                                                                                                                                                                           |
+| 提供方           | Run 的 `RunLifecycleService`                                                                                                                                                                                                                                                                                          |
+| 触发条件         | 主工作区 checkout、worktree 归档、移除项目，以及权威 Git 同步发现工作区已消失、目录或分支绑定变化                                                                                                                                                                                                                     |
+| 契约             | 先阻止匹配作用域的新启动，再等待在途启动并硬清理 PTY、探测器和端口租约；一次 Git 同步涉及多个工作区时通过 `disposeWorkspaces` 共用一个项目级 lease，同时按 workspace key 独立保留 quarantine；Project 持有 release/resolve/quarantine lease 直至外部状态与持久化提交收束；后续权威同步或重新打开项目可解除 quarantine |
+| 禁止             | Project 直接读取 Run 会话表、进程、租约或实际端点                                                                                                                                                                                                                                                                     |
+
+应用退出由 Platform 触发 Run 的全局硬清理，不经过 Project 聚合；这只是 composition root 的资源释放，不产生新的项目事实。
+
+## BlockGraph 到 Run：终端删除清理
+
+| 项目             | 说明                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | BlockGraph                                                                                                                                |
+| 调用方拥有的端口 | `TerminalRunLifecyclePort`                                                                                                                |
+| 提供方           | Run 的 `RunLifecycleService`                                                                                                              |
+| 触发条件         | 删除一个终端积木                                                                                                                          |
+| 契约             | 图校验通过后，删除提交前阻止并硬清理该项目/工作区/终端作用域；保存成功 resolve，清理已确认但保存失败 release，清理结果不确定时 quarantine |
+| 禁止             | BlockGraph 直接停止 PTY、释放端口租约或读取 Run 内部状态                                                                                  |
+
 ## Agent 到 Project：运行时作用域有效性
 
 | 项目             | 说明                                                                                          |
@@ -68,18 +107,31 @@ Agent application
 
 该校验是 lifecycle lease 的提交后防线：即使旧 renderer 命令在 lease resolve 后才抵达，已删除 Agent、已归档工作区、已遗忘项目或旧分支作用域也不能重新启动 PTY。
 
-## Run 到 BlockGraph：终端工作流计划
+## Run 到 Project：终端运行作用域有效性
 
-| 项目             | 说明                                                     |
-| ---------------- | -------------------------------------------------------- |
-| 发起方           | Run                                                      |
-| 调用方拥有的端口 | `TerminalWorkflowPlanPort`                               |
-| 提供方           | BlockGraph 的 `BuildTerminalWorkflowPlanUseCase`         |
-| 返回             | 启动时不可变、拓扑有序的计划 DTO                         |
-| 后续所有权       | Run 的 `WorkflowRun` 独立维护运行状态，不反写 BlockGraph |
-| 禁止             | Run 直接读取 BlockGraph 仓储、聚合或表现层图对象         |
+| 项目             | 说明                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| 发起方           | Run                                                                                               |
+| 调用方拥有的端口 | `RunRuntimeScopeValidationPort`                                                                   |
+| 提供方           | Project 的 `ValidateProjectWorkspaceScopeUseCase`                                                 |
+| 触发条件         | 每次普通终端、直接启动命令和工作流节点 PTY 启动                                                   |
+| 契约             | 项目仍被记住，项目 ID、项目目录、工作区名称/目录和 Git 分支全部匹配；失败统一为 `RUN_SCOPE_STALE` |
+| 禁止             | Run 直接读取 Project/ProjectRegistry 聚合或仓储                                                   |
 
-详细语义见[积木图模型](../contexts/block-graph/block-graph.md)和[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+该校验与 `RunLifecycleService` 启动闸门共同防止迟到的 renderer 命令在 checkout、归档、删除终端或移除项目后复活旧作用域。
+
+## Run 到 BlockGraph：终端启动与工作流计划
+
+| 项目             | 说明                                                                             |
+| ---------------- | -------------------------------------------------------------------------------- |
+| 发起方           | Run                                                                              |
+| 调用方拥有的端口 | `TerminalLaunchPlanPort`、`TerminalWorkflowPlanPort`                             |
+| 提供方           | BlockGraph 的 `GetTerminalLaunchPlanUseCase`、`BuildTerminalWorkflowPlanUseCase` |
+| 返回             | 单终端启动或工作流启动时不可变的命令、执行配置与拓扑计划 DTO                     |
+| 后续所有权       | Run 的 `WorkflowRun` 独立维护运行状态，不反写 BlockGraph                         |
+| 禁止             | Run 直接读取 BlockGraph 仓储、聚合或表现层图对象                                 |
+
+端口策略和注入方式随计划从 BlockGraph 进入 Run；实际端口、租约、监听者检查和运行事件只由 Run 拥有。详细语义见[积木图模型](../contexts/block-graph/block-graph.md)、[终端依赖工作流](../contexts/run/terminal-workflow.md)和[本地服务端口治理](../contexts/run/service-port-management.md)。
 
 ## Agent 到 BlockGraph：原生 MCP 工具
 

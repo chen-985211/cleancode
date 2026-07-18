@@ -3,8 +3,7 @@ import { TerminalSession } from '../../../../src/contexts/run/domain/aggregates/
 describe('terminal session', () => {
   it('starts for a terminal block inside a branch workspace', () => {
     const session = TerminalSession.create({
-      terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      scope: runScope(),
       workingDirectory: '/tmp/cleancode-demo'
     })
 
@@ -18,8 +17,7 @@ describe('terminal session', () => {
 
   it('accepts input only while running', () => {
     const session = TerminalSession.create({
-      terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      scope: runScope(),
       workingDirectory: '/tmp/cleancode-demo'
     })
 
@@ -32,4 +30,31 @@ describe('terminal session', () => {
     expect(session.status).toBe('exited')
     expect(session.inputHistory).toEqual(['pnpm test\n'])
   })
+
+  it('blocks input while an asynchronous stop is in progress', () => {
+    const session = TerminalSession.create({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo'
+    })
+    session.markRunning({ processId: 1234 })
+
+    session.markStopping()
+
+    expect(session.status).toBe('stopping')
+    expect(() => session.recordInput('late input')).toThrow('Terminal session is not running.')
+  })
 })
+
+function runScope() {
+  return {
+    projectId: 'project-1',
+    projectDirectory: '/tmp/cleancode-demo',
+    workspaceName: 'main',
+    workspaceDirectory: '/tmp/cleancode-demo',
+    gitBranch: 'main',
+    blockId: 'block-1',
+    sessionId: 'session-1',
+    runId: 'run-1',
+    generation: 1
+  }
+}

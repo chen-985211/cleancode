@@ -1,59 +1,54 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { WorkflowRun } from '../../domain/aggregates/WorkflowRun'
 import type {
+  WorkflowRunFailureSnapshot,
   WorkflowRunPlanNodeSnapshot,
-  WorkflowRunPlanSnapshot,
   WorkflowRunSnapshot
 } from '../dto/WorkflowRunSnapshot'
+import type {
+  StartTerminalWorkflowCommand,
+  TerminalWorkflowScopeCommand
+} from '../dto/TerminalWorkflowCommand'
 import type { TerminalExitEvent, TerminalOutputEvent } from '../ports/TerminalProcessPort'
 import type { TcpReadinessPort } from '../ports/TcpReadinessPort'
 import type { TerminalWorkflowEventPublisherPort } from '../ports/TerminalWorkflowEventPublisherPort'
-import type {
-  TerminalWorkflowPlanPort,
-  TerminalWorkflowPlanScope
-} from '../ports/TerminalWorkflowPlanPort'
+import type { TerminalWorkflowPlanPort } from '../ports/TerminalWorkflowPlanPort'
 import type {
   StartWorkflowRuntimeCommand,
   TerminalWorkflowRuntimePort
 } from '../ports/TerminalWorkflowRuntimePort'
+import type { ManagedServiceLauncher } from '../services/ManagedServiceLauncher'
+import {
+  ActiveWorkflowRunRegistry,
+  beginWorkflowHardDispose,
+  createWorkflowRunOwners,
+  trackWorkflowRun,
+  type ActiveWorkflowRun
+} from '../services/TerminalWorkflowRuntimeState'
+import { isServicePortConflictFailure, toWorkflowFailure } from '../services/WorkflowFailure'
+import type { RunLifecycleService } from './RunLifecycleService'
 
-export interface TerminalWorkflowScopeCommand {
-  readonly projectDirectory: string
-  readonly workspaceName: string
-}
-
-export interface StartTerminalWorkflowCommand extends TerminalWorkflowScopeCommand {
-  readonly workingDirectory: string
-  readonly scope: TerminalWorkflowPlanScope
-  readonly shell?: string
-  readonly columns?: number
-  readonly rows?: number
-}
-
-interface ActiveWorkflowRun {
-  readonly run: WorkflowRun
-  readonly plan: WorkflowRunPlanSnapshot
-  readonly command: StartTerminalWorkflowCommand
-  readonly sessionIds: Map<string, string>
-  readonly timeoutIds: Map<string, ReturnType<typeof setTimeout>>
-  readonly readinessControllers: Map<string, AbortController>
-  readonly outputTails: Map<string, string>
-  readonly handoffStarted: Set<string>
-}
+export type {
+  StartTerminalWorkflowCommand,
+  TerminalWorkflowScopeCommand
+} from '../dto/TerminalWorkflowCommand'
 
 export class TerminalWorkflowService {
-  private readonly activeRunsByProject = new Map<string, Map<string, ActiveWorkflowRun>>()
+  private readonly activeRuns = new ActiveWorkflowRunRegistry()
 
   constructor(
     private readonly planPort: TerminalWorkflowPlanPort,
     private readonly runtimePort: TerminalWorkflowRuntimePort,
-    private readonly tcpReadinessPort: TcpReadinessPort,
-    private readonly eventPublisher: TerminalWorkflowEventPublisherPort
+    _tcpReadinessPort: TcpReadinessPort,
+    private readonly eventPublisher: TerminalWorkflowEventPublisherPort,
+    private readonly managedServices?: ManagedServiceLauncher,
+    private readonly lifecycle?: RunLifecycleService
   ) {}
 
   async start(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
-    if (this.findActiveRun(command)) {
-      await this.stop(command)
+    const existing = this.findActiveRun(command)
+    if (existing) {
+      await beginWorkflowHardDispose(existing, () => this.performHardDispose(existing))
     }
 
     const plan = await this.planPort.buildPlan({
@@ -70,17 +65,37 @@ export class TerminalWorkflowService {
     }
 
     const activeRun: ActiveWorkflowRun = {
-      run: WorkflowRun.create(plan),
+      run: WorkflowRun.create(plan, {
+        projectId: command.projectId,
+        projectDirectory: command.projectDirectory,
+        workspaceName: command.workspaceName,
+        workspaceDirectory: command.workspaceDirectory,
+        gitBranch: command.gitBranch
+      }),
       plan,
       command,
       sessionIds: new Map(),
       timeoutIds: new Map(),
       readinessControllers: new Map(),
       outputTails: new Map(),
-      handoffStarted: new Set()
+      handoffStarted: new Set(),
+      pendingNodeStarts: new Set(),
+      lifecycleUnregisters: [],
+      hardDisposing: false,
+      hardDisposePromise: null
     }
-    this.storeActiveRun(activeRun)
-    this.publishRun(activeRun)
+    const register = async (): Promise<void> => {
+      this.activeRuns.store(activeRun)
+      trackWorkflowRun(this.lifecycle, activeRun, () =>
+        beginWorkflowHardDispose(activeRun, () => this.performHardDispose(activeRun))
+      )
+      this.publishRun(activeRun)
+    }
+    if (this.lifecycle) {
+      await this.lifecycle.runStartMany(createWorkflowRunOwners(activeRun), register)
+    } else {
+      await register()
+    }
     await this.schedule(activeRun)
 
     return activeRun.run.toSnapshot()
@@ -103,8 +118,9 @@ export class TerminalWorkflowService {
       const sessionId = activeRun.sessionIds.get(blockId)
 
       if (sessionId) {
-        this.runtimePort.stop(sessionId)
+        await this.stopSession(sessionId)
       }
+      activeRun.run.clearActualEndpoint(blockId)
       await this.handoffToInteractive(activeRun, blockId)
     }
 
@@ -126,7 +142,18 @@ export class TerminalWorkflowService {
     }
 
     this.publishRun(activeRun)
-    await Promise.all(runnableNodes.map((node) => this.startNode(activeRun, node)))
+    await Promise.all(runnableNodes.map((node) => this.trackNodeStart(activeRun, node)))
+  }
+
+  private trackNodeStart(
+    activeRun: ActiveWorkflowRun,
+    node: WorkflowRunPlanNodeSnapshot
+  ): Promise<void> {
+    const starting = this.startNode(activeRun, node).finally(() => {
+      activeRun.pendingNodeStarts.delete(starting)
+    })
+    activeRun.pendingNodeStarts.add(starting)
+    return starting
   }
 
   private async startNode(
@@ -134,22 +161,109 @@ export class TerminalWorkflowService {
     node: WorkflowRunPlanNodeSnapshot
   ): Promise<void> {
     try {
+      if (node.executionConfig.mode === 'service' && node.executionConfig.port) {
+        await this.startManagedServiceNode(activeRun, node)
+        return
+      }
       const session = await this.runtimePort.startCommand(
         this.createRuntimeCommand(activeRun, node.blockId, node.launchCommand)
       )
+      if (!this.isCurrent(activeRun)) {
+        await this.runtimePort.stop(session.id)
+        return
+      }
       activeRun.sessionIds.set(node.blockId, session.id)
       this.eventPublisher.publish({
         type: 'terminal-session-started',
         blockId: node.blockId,
         session,
-        clearOutput: true
+        clearOutput: true,
+        endpoint: null
       })
       this.armNodeGuards(activeRun, node)
     } catch (error) {
-      activeRun.run.markFailed(node.blockId, getErrorMessage(error))
+      if (!this.isCurrent(activeRun)) return
+      const failure = toWorkflowFailure(error)
+      if (isServicePortConflictFailure(failure)) {
+        this.eventPublisher.publish({ type: 'service-port-conflict', failure })
+      }
+      activeRun.run.markFailed(node.blockId, failure)
       this.publishRun(activeRun)
       await this.schedule(activeRun)
     }
+  }
+
+  private async startManagedServiceNode(
+    activeRun: ActiveWorkflowRun,
+    node: WorkflowRunPlanNodeSnapshot
+  ): Promise<void> {
+    if (
+      !this.managedServices ||
+      node.executionConfig.mode !== 'service' ||
+      !node.executionConfig.port
+    ) {
+      throw createExpectedAppError(
+        'SERVICE_PORT_MANAGEMENT_UNSUPPORTED',
+        'Managed local service launching is unavailable.'
+      )
+    }
+
+    const controller = new AbortController()
+    activeRun.readinessControllers.set(node.blockId, controller)
+    const managedRun = await this.managedServices.launch({
+      projectId: activeRun.command.projectId,
+      projectDirectory: activeRun.command.projectDirectory,
+      workspaceName: activeRun.command.workspaceName,
+      workspaceDirectory: activeRun.command.workspaceDirectory,
+      gitBranch: activeRun.command.gitBranch,
+      blockId: node.blockId,
+      workingDirectory: activeRun.command.workingDirectory,
+      launchCommand: node.launchCommand,
+      shell: activeRun.command.shell,
+      columns: activeRun.command.columns,
+      rows: activeRun.command.rows,
+      runId: activeRun.run.id,
+      portIntent: node.executionConfig.port,
+      readiness: node.executionConfig.readiness,
+      readinessTimeoutMs: node.executionConfig.readinessTimeoutMs,
+      signal: controller.signal,
+      onOutput: (event) => this.handleOutput(activeRun, node.blockId, event),
+      onExit: (event) => void this.handleExit(activeRun, node.blockId, event),
+      onSessionStarted: (session) => {
+        if (!this.isCurrent(activeRun)) return
+        activeRun.sessionIds.set(node.blockId, session.id)
+        this.eventPublisher.publish({
+          type: 'terminal-session-started',
+          blockId: node.blockId,
+          session,
+          clearOutput: true,
+          endpoint: null
+        })
+        this.publishRun(activeRun)
+      },
+      onEndpointConfirmed: (session, endpoint) => {
+        if (!this.isCurrent(activeRun)) return
+        activeRun.run.recordActualEndpoint(node.blockId, endpoint)
+        this.eventPublisher.publish({ type: 'service-endpoint-updated', scope: session, endpoint })
+        this.publishRun(activeRun)
+      },
+      onCleanupFailed: (error) => {
+        if (!this.isCurrent(activeRun)) return
+        activeRun.run.recordCleanupFailure(node.blockId, toWorkflowFailure(error))
+        this.publishRun(activeRun)
+      }
+    })
+
+    if (!this.isCurrent(activeRun)) {
+      await this.managedServices.stop(managedRun.session.id)
+      return
+    }
+    activeRun.sessionIds.set(node.blockId, managedRun.session.id)
+    activeRun.run.recordActualEndpoint(node.blockId, managedRun.endpoint)
+    activeRun.run.markServiceReady(node.blockId)
+    activeRun.readinessControllers.delete(node.blockId)
+    this.publishRun(activeRun)
+    await this.schedule(activeRun)
   }
 
   private createRuntimeCommand(
@@ -159,8 +273,13 @@ export class TerminalWorkflowService {
   ): StartWorkflowRuntimeCommand {
     return {
       blockId,
+      projectId: activeRun.command.projectId,
+      projectDirectory: activeRun.command.projectDirectory,
       workspaceName: activeRun.command.workspaceName,
+      workspaceDirectory: activeRun.command.workspaceDirectory,
+      gitBranch: activeRun.command.gitBranch,
       workingDirectory: activeRun.command.workingDirectory,
+      runId: activeRun.run.id,
       launchCommand,
       shell: activeRun.command.shell,
       columns: activeRun.command.columns,
@@ -183,17 +302,15 @@ export class TerminalWorkflowService {
       )
     }
 
-    if (node.executionConfig.mode === 'service' && node.executionConfig.readiness.type === 'tcp') {
-      const controller = new AbortController()
-      activeRun.readinessControllers.set(node.blockId, controller)
-      void this.tcpReadinessPort
-        .waitUntilReady({ port: node.executionConfig.readiness.port, signal: controller.signal })
-        .then(() => this.markServiceReady(activeRun, node.blockId))
-        .catch((error: unknown) => {
-          if (!controller.signal.aborted) {
-            void this.failNode(activeRun, node.blockId, getErrorMessage(error))
-          }
-        })
+    if (
+      node.executionConfig.mode === 'service' &&
+      !node.executionConfig.port &&
+      node.executionConfig.readiness.type === 'tcp'
+    ) {
+      void this.failNode(activeRun, node.blockId, {
+        code: 'SERVICE_PORT_MANAGEMENT_UNSUPPORTED',
+        message: 'TCP service readiness requires a managed port intent.'
+      })
     }
   }
 
@@ -211,6 +328,7 @@ export class TerminalWorkflowService {
 
     if (
       node?.executionConfig.mode !== 'service' ||
+      Boolean(node.executionConfig.port) ||
       node.executionConfig.readiness.type !== 'output'
     ) {
       return
@@ -256,24 +374,27 @@ export class TerminalWorkflowService {
   }
 
   private async handleTimeout(activeRun: ActiveWorkflowRun, blockId: string): Promise<void> {
-    await this.failNode(activeRun, blockId, 'Terminal command timed out.')
+    await this.failNode(activeRun, blockId, {
+      code: 'COMMAND_TIMED_OUT',
+      message: 'Terminal command timed out.'
+    })
   }
 
   private async failNode(
     activeRun: ActiveWorkflowRun,
     blockId: string,
-    reason: string
+    failure: WorkflowRunFailureSnapshot
   ): Promise<void> {
     if (!this.isCurrent(activeRun)) {
       return
     }
 
     this.clearNodeGuards(activeRun, blockId)
-    activeRun.run.markFailed(blockId, reason)
+    activeRun.run.markFailed(blockId, failure)
     const sessionId = activeRun.sessionIds.get(blockId)
 
     if (sessionId) {
-      this.runtimePort.stop(sessionId)
+      await this.stopSession(sessionId)
     }
     this.publishRun(activeRun)
     await this.handoffToInteractive(activeRun, blockId)
@@ -281,7 +402,7 @@ export class TerminalWorkflowService {
   }
 
   private async handoffToInteractive(activeRun: ActiveWorkflowRun, blockId: string): Promise<void> {
-    if (activeRun.handoffStarted.has(blockId)) {
+    if (!this.isCurrent(activeRun) || activeRun.handoffStarted.has(blockId)) {
       return
     }
 
@@ -289,12 +410,17 @@ export class TerminalWorkflowService {
     const session = await this.runtimePort.startInteractive(
       this.createRuntimeCommand(activeRun, blockId, '')
     )
+    if (!this.isCurrent(activeRun)) {
+      await this.runtimePort.stop(session.id)
+      return
+    }
     activeRun.sessionIds.set(blockId, session.id)
     this.eventPublisher.publish({
       type: 'terminal-session-started',
       blockId,
       session,
-      clearOutput: false
+      clearOutput: false,
+      endpoint: null
     })
   }
 
@@ -314,26 +440,51 @@ export class TerminalWorkflowService {
   }
 
   private isCurrent(activeRun: ActiveWorkflowRun): boolean {
-    return this.findActiveRun(activeRun.command) === activeRun
+    return !activeRun.hardDisposing && this.findActiveRun(activeRun.command) === activeRun
+  }
+
+  private async performHardDispose(activeRun: ActiveWorkflowRun): Promise<void> {
+    for (const node of activeRun.plan.nodes) this.clearNodeGuards(activeRun, node.blockId)
+    await Promise.allSettled([...activeRun.pendingNodeStarts])
+    for (const node of activeRun.plan.nodes) this.clearNodeGuards(activeRun, node.blockId)
+
+    for (const blockId of activeRun.run.getStoppableBlockIds()) {
+      activeRun.run.markStopped(blockId)
+      activeRun.run.clearActualEndpoint(blockId)
+    }
+    const stopResults = await Promise.allSettled(
+      [...new Set(activeRun.sessionIds.values())].map((sessionId) => this.stopSession(sessionId))
+    )
+    const failedStop = stopResults.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (failedStop) {
+      this.publishRun(activeRun)
+      throw failedStop.reason
+    }
+
+    activeRun.outputTails.clear()
+    this.activeRuns.remove(activeRun)
+    for (const unregister of activeRun.lifecycleUnregisters.splice(0)) unregister()
+    this.publishRun(activeRun)
+  }
+
+  private async stopSession(sessionId: string): Promise<void> {
+    const managedServices = this.managedServices
+    const managed = managedServices?.getActive(sessionId)
+    if (managedServices && managed) {
+      await managedServices.stop(sessionId)
+      this.eventPublisher.publish({
+        type: 'service-endpoint-updated',
+        scope: managed.scope,
+        endpoint: null
+      })
+      return
+    }
+    await this.runtimePort.stop(sessionId)
   }
 
   private findActiveRun(scope: TerminalWorkflowScopeCommand): ActiveWorkflowRun | undefined {
-    return this.activeRunsByProject.get(scope.projectDirectory)?.get(scope.workspaceName)
+    return this.activeRuns.find(scope)
   }
-
-  private storeActiveRun(activeRun: ActiveWorkflowRun): void {
-    const { projectDirectory, workspaceName } = activeRun.command
-    let projectRuns = this.activeRunsByProject.get(projectDirectory)
-
-    if (!projectRuns) {
-      projectRuns = new Map()
-      this.activeRunsByProject.set(projectDirectory, projectRuns)
-    }
-
-    projectRuns.set(workspaceName, activeRun)
-  }
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

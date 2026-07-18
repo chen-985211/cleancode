@@ -4,12 +4,13 @@ import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 
 import type { BlockGraphRepository } from '../../application/ports/BlockGraphRepository'
-import type {
-  BlockGraphSnapshot,
-  RestorableBlockGraphSnapshot
-} from '../../application/dto/BlockGraphSnapshot'
+import type { BlockGraphSnapshot } from '../../application/dto/BlockGraphSnapshot'
 import { BlockGraph } from '../../domain/aggregates/BlockGraph'
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  parseBlockGraphStore,
+  serializeBlockGraphStore,
+  type ParsedBlockGraphStore
+} from './BlockGraphStore'
 
 const graphFileName = 'default-graph.json'
 const graphMutationQueues = new Map<string, Promise<unknown>>()
@@ -52,16 +53,21 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
     )
 
     return enqueueGraphMutation(graphPath, async () => {
-      const existing = await readGraphSnapshot(graphPath)
+      const existing = await readGraphStore(graphPath)
 
-      if (existing) return normalizeGraphSnapshot(existing)
+      if (existing) {
+        if (existing.requiresMigration) {
+          await writeFileAtomically(graphPath, serializeBlockGraphStore(existing.graph))
+        }
+        return existing.graph
+      }
 
-      const legacy = await readGraphSnapshot(
+      const legacy = await readGraphStore(
         getLegacyDefaultGraphPath(projectDirectory, candidate.workspaceName)
       )
-      const initialized = legacy ? BlockGraph.fromSnapshot(legacy).toSnapshot() : candidate
+      const initialized = legacy?.graph ?? candidate
 
-      await writeFileAtomically(graphPath, serializeGraphSnapshot(initialized))
+      await writeFileAtomically(graphPath, serializeBlockGraphStore(initialized))
       return initialized
     })
   }
@@ -75,18 +81,18 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
 
     return enqueueGraphMutation(graphPath, async () => {
       const snapshot =
-        (await readGraphSnapshot(graphPath)) ??
-        (await readGraphSnapshot(getLegacyDefaultGraphPath(projectDirectory, workspaceName)))
+        (await readGraphStore(graphPath)) ??
+        (await readGraphStore(getLegacyDefaultGraphPath(projectDirectory, workspaceName)))
 
       if (!snapshot) {
         return null
       }
 
-      const graph = BlockGraph.fromSnapshot(snapshot)
+      const graph = BlockGraph.fromSnapshot(snapshot.graph)
       const result = await transaction(graph)
       const graphSnapshot = graph.toSnapshot()
 
-      await writeFileAtomically(graphPath, serializeGraphSnapshot(graphSnapshot))
+      await writeFileAtomically(graphPath, serializeBlockGraphStore(graphSnapshot))
 
       return { graph: graphSnapshot, result }
     })
@@ -106,20 +112,23 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
     workspaceName: string
   ): Promise<BlockGraphSnapshot | null> {
     const graphPath = getDefaultGraphPath(this.storageDirectory, projectDirectory, workspaceName)
-    const graph = await readGraphSnapshot(graphPath)
+    const graph = await readGraphStore(graphPath)
 
-    if (graph) {
-      return normalizeGraphSnapshot(graph)
+    if (graph && !graph.requiresMigration) {
+      return graph.graph
     }
 
     return enqueueGraphMutation(graphPath, async () => {
-      const currentGraph = await readGraphSnapshot(graphPath)
+      const currentGraph = await readGraphStore(graphPath)
 
       if (currentGraph) {
-        return normalizeGraphSnapshot(currentGraph)
+        if (currentGraph.requiresMigration) {
+          await writeFileAtomically(graphPath, serializeBlockGraphStore(currentGraph.graph))
+        }
+        return currentGraph.graph
       }
 
-      const legacyGraph = await readGraphSnapshot(
+      const legacyGraph = await readGraphStore(
         getLegacyDefaultGraphPath(projectDirectory, workspaceName)
       )
 
@@ -127,29 +136,21 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
         return null
       }
 
-      const migratedGraph = BlockGraph.fromSnapshot(legacyGraph).toSnapshot()
+      const migratedGraph = legacyGraph.graph
 
-      await writeFileAtomically(graphPath, serializeGraphSnapshot(migratedGraph))
+      await writeFileAtomically(graphPath, serializeBlockGraphStore(migratedGraph))
 
       return migratedGraph
     })
   }
 }
 
-async function readGraphSnapshot(graphPath: string): Promise<RestorableBlockGraphSnapshot | null> {
+async function readGraphStore(graphPath: string): Promise<ParsedBlockGraphStore | null> {
   try {
-    return JSON.parse(await readFile(graphPath, 'utf8')) as RestorableBlockGraphSnapshot
+    return parseBlockGraphStore(await readFile(graphPath, 'utf8'), graphPath)
   } catch (error) {
     if (isMissingFileError(error)) {
       return null
-    }
-
-    if (error instanceof SyntaxError) {
-      throw createExpectedAppError(
-        'BLOCK_GRAPH_SNAPSHOT_CORRUPTED',
-        'Persisted block graph snapshot is corrupted.',
-        { path: graphPath }
-      )
     }
 
     throw error
@@ -173,10 +174,6 @@ async function enqueueGraphMutation<TResult>(
       graphMutationQueues.delete(queueKey)
     }
   }
-}
-
-function serializeGraphSnapshot(snapshot: BlockGraphSnapshot): string {
-  return `${JSON.stringify(snapshot, null, 2)}\n`
 }
 
 async function writeFileAtomically(filePath: string, contents: string): Promise<void> {
@@ -235,8 +232,4 @@ function isUnsupportedDirectorySyncError(error: unknown): boolean {
   return ['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM'].includes(
     (error as NodeJS.ErrnoException).code ?? ''
   )
-}
-
-function normalizeGraphSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraphSnapshot {
-  return BlockGraph.fromSnapshot(snapshot).toSnapshot()
 }

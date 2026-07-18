@@ -1,4 +1,4 @@
-import type { BlockGraphSnapshot } from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import type { AgentBlockGraphSnapshot } from '../dto/AgentBlockGraphProtocol'
 import {
   createExpectedAppError,
   createUnexpectedAppError
@@ -53,7 +53,7 @@ type ParsedAgentToolInvocation = {
 
 type CompletedGraphToolResult = Extract<
   AgentToolStructuredContent,
-  { readonly graph: BlockGraphSnapshot; readonly status: 'completed' }
+  { readonly graph: AgentBlockGraphSnapshot; readonly status: 'completed' }
 >
 
 export class ExecuteAgentToolUseCase {
@@ -338,7 +338,7 @@ function createApprovalSummary(invocation: ParsedAgentToolInvocation): string {
 
 function completedGraphResult(
   toolCallId: string,
-  graph: BlockGraphSnapshot,
+  graph: AgentBlockGraphSnapshot,
   output: Extract<AgentToolOutput, { readonly type: 'block_graph' }>,
   graphChanged = true
 ): CompletedGraphToolResult {
@@ -346,16 +346,16 @@ function completedGraphResult(
 }
 
 function findNewTerminalBlockId(
-  beforeGraph: BlockGraphSnapshot,
-  afterGraph: BlockGraphSnapshot
+  beforeGraph: AgentBlockGraphSnapshot,
+  afterGraph: AgentBlockGraphSnapshot
 ): string | undefined {
   const previousBlockIds = new Set(beforeGraph.blocks.map((block) => block.id))
   return afterGraph.blocks.find((block) => !previousBlockIds.has(block.id))?.id
 }
 
 function findNewTerminalGroupId(
-  beforeGraph: BlockGraphSnapshot,
-  afterGraph: BlockGraphSnapshot
+  beforeGraph: AgentBlockGraphSnapshot,
+  afterGraph: AgentBlockGraphSnapshot
 ): string | undefined {
   const previousTerminalGroupIds = new Set(beforeGraph.terminalGroups.map((group) => group.id))
   return afterGraph.terminalGroups.find((group) => !previousTerminalGroupIds.has(group.id))?.id

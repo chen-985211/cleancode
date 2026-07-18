@@ -1,4 +1,5 @@
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalExitEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalViewState } from './types'
 
 export function updateTerminalBlockStatus(
@@ -13,13 +14,17 @@ export function updateTerminalBlockStatus(
 
 export function updateTerminalStatus(
   states: Record<string, TerminalViewState>,
-  sessionId: string,
+  event: TerminalExitEvent,
   status: TerminalSessionStatus
 ): Record<string, TerminalViewState> {
   return Object.fromEntries(
     Object.entries(states).map(([blockId, state]) => [
       blockId,
-      state.sessionId === sessionId ? { ...state, status } : state
+      state.sessionId === event.sessionId &&
+      state.runIdentity?.runId === event.scope.runId &&
+      state.runIdentity.generation === event.scope.generation
+        ? { ...state, status }
+        : state
     ])
   )
 }

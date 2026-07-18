@@ -10,6 +10,7 @@ export interface AgentToolJsonSchema {
   readonly minLength?: number
   readonly minimum?: number
   readonly oneOf?: readonly AgentToolJsonSchema[]
+  readonly pattern?: string
   readonly properties?: Readonly<Record<string, AgentToolJsonSchema>>
   readonly required?: readonly string[]
   readonly type?: 'array' | 'boolean' | 'integer' | 'null' | 'number' | 'object' | 'string'
@@ -64,6 +65,9 @@ export function findAgentToolJsonSchemaIssue(
   if (schema.type === 'string' && typeof value === 'string') {
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       return { path, reason: `Expected at least ${schema.minLength} characters.` }
+    }
+    if (schema.pattern !== undefined && !new RegExp(schema.pattern).test(value)) {
+      return { path, reason: `Expected a string matching ${schema.pattern}.` }
     }
   }
 

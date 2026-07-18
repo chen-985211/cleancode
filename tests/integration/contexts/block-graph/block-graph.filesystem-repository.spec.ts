@@ -63,10 +63,10 @@ describe('block graph filesystem repository', () => {
     )
     const graphMetadata = JSON.parse(
       await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
-    ) as { id: string }
+    ) as { graph: { id: string }; version: number }
 
     expect(await pathExists(join(projectDirectory, '.cleancode'))).toBe(false)
-    expect(graphMetadata.id).toBe(graph.id)
+    expect(graphMetadata).toMatchObject({ graph: { id: graph.id }, version: 1 })
     expect(openedGraph?.toSnapshot()).toEqual({
       id: graph.id,
       projectId: 'project-1',
@@ -128,17 +128,22 @@ describe('block graph filesystem repository', () => {
     await mkdir(join(projectDirectory, '.cleancode', 'workspaces', 'main'), {
       recursive: true
     })
-    await writeFile(
-      join(projectDirectory, '.cleancode', 'workspaces', 'main', 'default-graph.json'),
-      `${JSON.stringify(legacyGraph, null, 2)}\n`
+    const legacyGraphPath = join(
+      projectDirectory,
+      '.cleancode',
+      'workspaces',
+      'main',
+      'default-graph.json'
     )
+    const legacyGraphContents = `${JSON.stringify(legacyGraph, null, 2)}\n`
+    await writeFile(legacyGraphPath, legacyGraphContents)
 
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const openedGraph = await repository.findDefaultGraph(projectDirectory, 'main')
     const openedSnapshot = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
     const migratedGraph = JSON.parse(
       await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
-    ) as { id: string; blocks: Array<{ name: string }> }
+    ) as { graph: { id: string; blocks: Array<{ name: string }> }; version: number }
 
     expect(openedGraph?.toSnapshot()).toEqual({
       ...legacyGraph,
@@ -155,15 +160,17 @@ describe('block graph filesystem repository', () => {
       connections: []
     })
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
-    expect(migratedGraph.id).toBe(legacyGraph.id)
-    expect(migratedGraph).toEqual(
+    await expect(readFile(legacyGraphPath, 'utf8')).resolves.toBe(legacyGraphContents)
+    expect(migratedGraph.version).toBe(1)
+    expect(migratedGraph.graph.id).toBe(legacyGraph.id)
+    expect(migratedGraph.graph).toEqual(
       expect.objectContaining({
         viewport: defaultCanvasViewport,
         terminalGroups: [],
         connections: []
       })
     )
-    expect(migratedGraph.blocks).toEqual([
+    expect(migratedGraph.graph.blocks).toEqual([
       expect.objectContaining({
         name: 'Legacy Terminal',
         launchCommand: '',

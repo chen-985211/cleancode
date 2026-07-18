@@ -7,7 +7,7 @@ import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
 import {
   createIdleTerminalState,
-  type TerminalBlockMetadataInput,
+  type TerminalDefinitionInput,
   type TerminalDimensions,
   type TerminalFlowNode,
   type TerminalGroupDropFeedback,
@@ -30,11 +30,14 @@ interface TerminalFlowNodeHandlers {
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
-  readonly onUpdateMetadata: (
+  readonly onUpdateDefinition: (
     block: TerminalBlockSnapshot,
-    metadata: TerminalBlockMetadataInput
+    definition: TerminalDefinitionInput
   ) => Promise<void>
-  readonly onUpdateExecutionConfig?: TerminalFlowNode['data']['onUpdateExecutionConfig']
+  readonly onCopyServiceEndpoint?: TerminalFlowNode['data']['onCopyServiceEndpoint']
+  readonly onOpenServiceEndpoint?: TerminalFlowNode['data']['onOpenServiceEndpoint']
+  readonly onLocateManagedServiceOwner?: TerminalFlowNode['data']['onLocateManagedServiceOwner']
+  readonly onDismissPortConflict?: TerminalFlowNode['data']['onDismissPortConflict']
   readonly onRunFromHere?: TerminalFlowNode['data']['onRunFromHere']
   readonly onStopWorkflow?: TerminalFlowNode['data']['onStopWorkflow']
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void

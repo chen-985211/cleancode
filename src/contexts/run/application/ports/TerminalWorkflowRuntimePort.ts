@@ -2,9 +2,14 @@ import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type { TerminalExitEvent, TerminalOutputEvent } from './TerminalProcessPort'
 
 export interface StartWorkflowRuntimeCommand {
+  readonly projectId: string
+  readonly projectDirectory: string
   readonly blockId: string
   readonly workspaceName: string
+  readonly workspaceDirectory: string
+  readonly gitBranch: string | null
   readonly workingDirectory: string
+  readonly runId: string
   readonly launchCommand: string
   readonly shell?: string
   readonly columns?: number
@@ -16,5 +21,5 @@ export interface StartWorkflowRuntimeCommand {
 export interface TerminalWorkflowRuntimePort {
   startCommand(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot>
   startInteractive(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot>
-  stop(sessionId: string): void
+  stop(sessionId: string): Promise<void>
 }

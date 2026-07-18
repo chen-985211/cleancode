@@ -56,10 +56,31 @@ describe('agent tool protocol', () => {
         }),
         expect.objectContaining({
           additionalProperties: false,
-          required: ['mode', 'readiness', 'readinessTimeoutMs']
+          required: ['mode', 'port', 'readiness', 'readinessTimeoutMs']
         })
       ])
     })
+    const executionConfigSchema = readSchemaProperty(
+      updateExecutionConfig.inputSchema,
+      'executionConfig'
+    ) as AgentToolJsonSchema
+    const serviceWithPort = executionConfigSchema.oneOf?.find(
+      (variant) => variant.required?.includes('port') && variant.required.includes('readiness')
+    )
+    const portIntentSchema = serviceWithPort
+      ? (readSchemaProperty(serviceWithPort, 'port') as AgentToolJsonSchema)
+      : undefined
+
+    expect(executionConfigSchema.oneOf).toHaveLength(4)
+    expect(portIntentSchema?.oneOf).toHaveLength(3)
+    expect(portIntentSchema?.oneOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          additionalProperties: false,
+          required: ['protocol', 'policy', 'binding']
+        })
+      ])
+    )
     expect(connectTerminals.inputSchema).toMatchObject({
       additionalProperties: false,
       required: ['sourceBlockId', 'targetBlockId']

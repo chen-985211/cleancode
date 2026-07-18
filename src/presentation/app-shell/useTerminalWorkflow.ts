@@ -159,9 +159,11 @@ export function useTerminalWorkflow({
 
       await performAction(notify, async () => {
         const nextRun = await window.cleancode?.startTerminalWorkflow({
+          projectId: currentWorkbench.project.id,
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
-          workingDirectory: currentWorkspace.directory,
+          workspaceDirectory: currentWorkspace.directory,
+          gitBranch: currentWorkspace.gitBranch,
           scope: blockId ? { type: 'from-block', blockId } : { type: 'full' }
         })
 

@@ -28,8 +28,11 @@ describe('terminal workflow with real PTYs', () => {
 
     try {
       await workflow.start({
+        projectId: 'project-integration',
         projectDirectory: workingDirectory,
         workspaceName: 'main',
+        workspaceDirectory: workingDirectory,
+        gitBranch: 'main',
         workingDirectory,
         shell: '/bin/sh',
         scope: { type: 'full' }
@@ -49,7 +52,7 @@ describe('terminal workflow with real PTYs', () => {
         )
       ).toEqual(['install', 'build'])
     } finally {
-      sessions.stopAll()
+      await sessions.stopAll()
       await rm(workingDirectory, { recursive: true, force: true })
     }
   }, 10_000)

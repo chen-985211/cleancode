@@ -62,7 +62,12 @@ describe('agent tool input validation', () => {
         blockId: 'terminal-api',
         executionConfig: {
           mode: 'service',
-          readiness: { port: 4_173, type: 'tcp' },
+          port: {
+            binding: { type: 'environment', variableName: 'PORT' },
+            policy: { port: 4_173, type: 'preferred' },
+            protocol: 'http'
+          },
+          readiness: { type: 'tcp' },
           readinessTimeoutMs: 30_000
         }
       })
@@ -72,6 +77,21 @@ describe('agent tool input validation', () => {
         scope: { blockId: 'terminal-build', type: 'from-block' }
       })
     ).toEqual({ scope: { blockId: 'terminal-build', type: 'from-block' } })
+    expect(
+      parseAgentToolInput('update_terminal_execution_config', {
+        blockId: 'terminal-fixed',
+        executionConfig: {
+          mode: 'service',
+          port: {
+            binding: { type: 'none' },
+            policy: { port: 4_173, type: 'fixed' },
+            protocol: 'tcp'
+          },
+          readiness: { type: 'tcp' },
+          readinessTimeoutMs: 30_000
+        }
+      })
+    ).toMatchObject({ executionConfig: { port: { policy: { type: 'fixed' } } } })
   })
 
   it('rejects undeclared properties at the top level and in nested objects', () => {
@@ -90,7 +110,12 @@ describe('agent tool input validation', () => {
           blockId: 'terminal-api',
           executionConfig: {
             mode: 'service',
-            readiness: { host: 'example.com', port: 4_173, type: 'tcp' },
+            port: {
+              binding: { type: 'none' },
+              policy: { port: 4_173, type: 'fixed' },
+              protocol: 'tcp'
+            },
+            readiness: { host: 'example.com', type: 'tcp' },
             readinessTimeoutMs: 30_000
           }
         }),
@@ -139,11 +164,72 @@ describe('agent tool input validation', () => {
           blockId: 'terminal-api',
           executionConfig: {
             mode: 'service',
-            readiness: { port: 65_536, type: 'tcp' },
+            port: {
+              binding: { type: 'none' },
+              policy: { port: 65_536, type: 'fixed' },
+              protocol: 'tcp'
+            },
+            readiness: { type: 'tcp' },
             readinessTimeoutMs: 30_000
           }
         }),
-      '$.executionConfig.readiness.port'
+      expect.stringContaining('$.executionConfig.port')
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('update_terminal_execution_config', {
+          blockId: 'terminal-legacy',
+          executionConfig: {
+            mode: 'service',
+            readiness: { port: 4_173, type: 'tcp' },
+            readinessTimeoutMs: 30_000
+          }
+        }),
+      expect.stringContaining('$.executionConfig')
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('update_terminal_execution_config', {
+          blockId: 'terminal-unbound',
+          executionConfig: {
+            mode: 'service',
+            readiness: { type: 'tcp' },
+            readinessTimeoutMs: 30_000
+          }
+        }),
+      expect.stringContaining('$.executionConfig')
+    )
+  })
+
+  it.each([
+    {
+      binding: { type: 'none' },
+      policy: { type: 'auto' },
+      protocol: 'http'
+    },
+    {
+      binding: { type: 'environment', variableName: '9PORT' },
+      policy: { type: 'auto' },
+      protocol: 'http'
+    },
+    {
+      binding: { template: '--port {port}; echo unsafe', type: 'argument' },
+      policy: { type: 'auto' },
+      protocol: 'http'
+    }
+  ] as const)('rejects an unsafe or incompatible Agent port intent', (port) => {
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('update_terminal_execution_config', {
+          blockId: 'terminal-api',
+          executionConfig: {
+            mode: 'service',
+            port,
+            readiness: { type: 'tcp' },
+            readinessTimeoutMs: 30_000
+          }
+        }),
+      expect.stringContaining('$.executionConfig.port')
     )
   })
 
@@ -160,7 +246,7 @@ describe('agent tool input validation', () => {
   })
 })
 
-function expectInvalidInput(action: () => unknown, expectedPath: string): void {
+function expectInvalidInput(action: () => unknown, expectedPath: unknown): void {
   try {
     action()
   } catch (error) {

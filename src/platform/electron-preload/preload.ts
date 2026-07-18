@@ -64,6 +64,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:update-terminal-block-metadata', command),
   updateTerminalExecutionConfig: (command: unknown) =>
     invokeCleancode('cleancode:update-terminal-execution-config', command),
+  updateTerminalDefinition: (command: unknown) =>
+    invokeCleancode('cleancode:update-terminal-definition', command),
   updateTerminalGroupMetadata: (command: unknown) =>
     invokeCleancode('cleancode:update-terminal-group-metadata', command),
   setTerminalGroupCollapsed: (command: unknown) =>
@@ -83,6 +85,9 @@ const cleancodeApi = {
     invokeCleancode('cleancode:move-terminal-group', command),
   deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
   startTerminal: (command: unknown) => invokeCleancode('cleancode:start-terminal', command),
+  launchTerminal: (command: unknown) => invokeCleancode('cleancode:launch-terminal', command),
+  openTerminalServiceEndpoint: (command: unknown) =>
+    invokeCleancode('cleancode:open-terminal-service-endpoint', command),
   writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
   resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),
   interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
@@ -97,6 +102,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:get-terminal-workflow', command),
   onTerminalWorkflowEvent: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:terminal-workflow-event', listener),
+  onTerminalRunEvent: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:terminal-run-event', listener),
   onTerminalOutput: (listener: (event: unknown) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, outputEvent: unknown) => {
       listener(outputEvent)

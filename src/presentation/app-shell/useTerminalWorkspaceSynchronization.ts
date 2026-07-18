@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react'
 
-import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import {
+  defaultTerminalExecutionConfig,
+  type TerminalBlockSnapshot
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { getTerminalDefinitionRuntimeApi } from './terminalDefinitionRuntime'
 import { findWorkspaceByDirectory } from './workspaceDirectoryMatching'
 import type { WorkbenchSnapshot } from './types'
 
@@ -212,13 +216,18 @@ async function ensureTerminalBlockForMigratedSession({
     position: sourceBlock.position,
     size: sourceBlock.size
   })
-  const updatedGraph = await api?.updateTerminalBlockMetadata({
+  const definitionApi = getTerminalDefinitionRuntimeApi()
+  if (typeof definitionApi?.updateTerminalDefinition !== 'function') {
+    throw new Error('Terminal definition updates are unavailable.')
+  }
+  const updatedGraph = await definitionApi.updateTerminalDefinition({
     projectDirectory,
     workspaceName,
     blockId: createdBlock.id,
     name: sourceBlock.name,
     description: sourceBlock.description,
-    launchCommand: sourceBlock.launchCommand
+    launchCommand: sourceBlock.launchCommand,
+    executionConfig: sourceBlock.executionConfig ?? defaultTerminalExecutionConfig
   })
 
   return {

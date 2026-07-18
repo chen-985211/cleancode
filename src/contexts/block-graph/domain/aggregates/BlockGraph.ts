@@ -15,6 +15,7 @@ import {
   type TerminalConnectionSnapshot,
   type TerminalGroupSnapshot,
   type UpdateTerminalBlockMetadataInput,
+  type UpdateTerminalDefinitionInput,
   type UpdateTerminalExecutionConfigInput,
   type UpdateTerminalGroupMetadataInput
 } from './BlockGraphTypes'
@@ -38,6 +39,10 @@ import {
   normalizeTerminalBlockSize,
   normalizeTerminalLaunchCommand
 } from '../services/BlockGraphNormalization'
+import {
+  normalizeTerminalBlockMetadata,
+  normalizeTerminalDefinition
+} from '../services/TerminalDefinitionRules'
 import {
   addTerminalConnection,
   normalizeRestoredTerminalConnections,
@@ -184,35 +189,11 @@ export class BlockGraph {
   }
 
   updateTerminalBlockMetadata(blockId: string, input: UpdateTerminalBlockMetadataInput): void {
-    const name = input.name.trim()
-
-    if (!name) {
-      throw createExpectedAppError(
-        'TERMINAL_BLOCK_NAME_EMPTY',
-        'Terminal block name cannot be empty.'
-      )
-    }
-
-    let hasUpdatedBlock = false
-
+    this.requireTerminalBlock(blockId)
+    const metadata = normalizeTerminalBlockMetadata(input)
     this.blockSnapshots = this.blockSnapshots.map((block) => {
-      if (block.id !== blockId) {
-        return block
-      }
-
-      hasUpdatedBlock = true
-
-      return {
-        ...block,
-        name,
-        description: input.description.trim(),
-        launchCommand: normalizeTerminalLaunchCommand(input.launchCommand)
-      }
+      return block.id === blockId ? { ...block, ...metadata } : block
     })
-
-    if (!hasUpdatedBlock) {
-      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
-    }
   }
 
   updateTerminalExecutionConfig(blockId: string, input: UpdateTerminalExecutionConfigInput): void {
@@ -221,6 +202,15 @@ export class BlockGraph {
 
     this.blockSnapshots = this.blockSnapshots.map((block) =>
       block.id === blockId ? { ...block, executionConfig } : block
+    )
+  }
+
+  updateTerminalDefinition(blockId: string, input: UpdateTerminalDefinitionInput): void {
+    this.requireTerminalBlock(blockId)
+    const definition = normalizeTerminalDefinition(input)
+
+    this.blockSnapshots = this.blockSnapshots.map((block) =>
+      block.id === blockId ? { ...block, ...definition } : block
     )
   }
 
@@ -243,6 +233,7 @@ export class BlockGraph {
   }
 
   deleteBlock(blockId: string): void {
+    this.requireTerminalBlock(blockId)
     this.blockSnapshots = this.blockSnapshots.filter((block) => block.id !== blockId)
     this.terminalConnectionSnapshots = this.terminalConnectionSnapshots.filter(
       (connection) => connection.sourceBlockId !== blockId && connection.targetBlockId !== blockId
@@ -254,6 +245,10 @@ export class BlockGraph {
       }))
       .filter(hasEnoughTerminalGroupMembers)
       .map((group) => normalizeTerminalGroupBounds(group, this.blockSnapshots))
+  }
+
+  ensureTerminalBlockExists(blockId: string): void {
+    this.requireTerminalBlock(blockId)
   }
 
   createTerminalGroup(input: CreateTerminalGroupInput): TerminalGroupSnapshot {

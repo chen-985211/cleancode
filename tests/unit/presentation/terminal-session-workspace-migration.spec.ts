@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createTerminalStateKey,
+  getProjectIdFromTerminalStateKey,
   migrateTerminalSessionToWorkspace
 } from '../../../src/presentation/app-shell/terminalSessionWorkspaceMigration'
 import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
@@ -21,11 +22,12 @@ describe('terminal session workspace migration', () => {
 
     const result = migrateTerminalSessionToWorkspace(
       {
-        [createTerminalStateKey('main', 'terminal-1')]: runningState,
-        [createTerminalStateKey('main', 'terminal-2')]: idleState
+        [createTerminalStateKey('project-alpha', 'main', 'terminal-1')]: runningState,
+        [createTerminalStateKey('project-alpha', 'main', 'terminal-2')]: idleState
       },
       {
         sessionId: 'session-main',
+        targetProjectId: 'project-alpha',
         targetWorkspaceName: 'feature/sidebar'
       }
     )
@@ -33,8 +35,8 @@ describe('terminal session workspace migration', () => {
     expect(result).toEqual({
       migrated: true,
       states: {
-        [createTerminalStateKey('main', 'terminal-2')]: idleState,
-        [createTerminalStateKey('feature/sidebar', 'terminal-1')]: runningState
+        [createTerminalStateKey('project-alpha', 'main', 'terminal-2')]: idleState,
+        [createTerminalStateKey('project-alpha', 'feature/sidebar', 'terminal-1')]: runningState
       }
     })
   })
@@ -46,11 +48,12 @@ describe('terminal session workspace migration', () => {
       output: ''
     }
     const states = {
-      [createTerminalStateKey('feature/sidebar', 'terminal-1')]: runningState
+      [createTerminalStateKey('project-alpha', 'feature/sidebar', 'terminal-1')]: runningState
     }
 
     const result = migrateTerminalSessionToWorkspace(states, {
       sessionId: 'session-feature',
+      targetProjectId: 'project-alpha',
       targetWorkspaceName: 'feature/sidebar'
     })
 
@@ -66,10 +69,11 @@ describe('terminal session workspace migration', () => {
 
     const result = migrateTerminalSessionToWorkspace(
       {
-        [createTerminalStateKey('main', 'terminal-1')]: runningState
+        [createTerminalStateKey('project-alpha', 'main', 'terminal-1')]: runningState
       },
       {
         sessionId: 'session-main',
+        targetProjectId: 'project-alpha',
         targetBlockId: 'terminal-worktree',
         targetWorkspaceName: 'feature/sidebar'
       }
@@ -78,8 +82,18 @@ describe('terminal session workspace migration', () => {
     expect(result).toEqual({
       migrated: true,
       states: {
-        [createTerminalStateKey('feature/sidebar', 'terminal-worktree')]: runningState
+        [createTerminalStateKey('project-alpha', 'feature/sidebar', 'terminal-worktree')]:
+          runningState
       }
     })
+  })
+
+  it('keeps identical workspace and block identities isolated by project', () => {
+    const alphaKey = createTerminalStateKey('project-alpha', 'main', 'terminal-1')
+    const betaKey = createTerminalStateKey('project-beta', 'main', 'terminal-1')
+
+    expect(alphaKey).not.toBe(betaKey)
+    expect(getProjectIdFromTerminalStateKey(alphaKey)).toBe('project-alpha')
+    expect(getProjectIdFromTerminalStateKey(betaKey)).toBe('project-beta')
   })
 })

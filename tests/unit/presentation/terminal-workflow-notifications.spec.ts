@@ -100,7 +100,11 @@ function workflowRun(
   return {
     id,
     graphId: 'graph-1',
+    projectId: 'project-1',
+    projectDirectory: '/project',
     workspaceName: 'main',
+    workspaceDirectory: '/project',
+    gitBranch: null,
     status,
     nodes
   }
@@ -116,6 +120,8 @@ function workflowNode(
     blockId,
     dependencyBlockIds,
     executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null },
+    endpoint: null,
+    error: null,
     exitCode: status === 'succeeded' ? 0 : null,
     failureReason: null,
     launchCommand: 'echo ready',
@@ -133,6 +139,8 @@ function failedNode(
     blockId,
     dependencyBlockIds: [],
     executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null },
+    endpoint: null,
+    error: { code: 'COMMAND_FAILED', message: 'raw infrastructure failure' },
     exitCode,
     failureReason: 'raw infrastructure failure',
     launchCommand: 'false',

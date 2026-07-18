@@ -6,6 +6,14 @@ import {
   noopWorkspaceAgentLifecyclePort,
   type WorkspaceAgentLifecyclePort
 } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceRunLifecyclePort,
+  type WorkspaceRunLifecyclePort
+} from '../ports/WorkspaceRunLifecyclePort'
+import {
+  saveSynchronizedProject,
+  synchronizeProjectGitBinding
+} from '../services/ProjectGitStateSynchronization'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
 export interface CreateOrOpenProjectCommand {
@@ -18,7 +26,8 @@ export class CreateOrOpenProjectUseCase {
     private readonly projectRepository: ProjectRepository,
     private readonly gitWorkspacePort: GitWorkspacePort,
     private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
-    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator()
+    private readonly transactionCoordinator = new ProjectWorkspaceTransactionCoordinator(),
+    private readonly workspaceRunLifecyclePort: WorkspaceRunLifecyclePort = noopWorkspaceRunLifecyclePort
   ) {}
 
   async execute(command: CreateOrOpenProjectCommand): Promise<ProjectSnapshot> {
@@ -35,38 +44,20 @@ export class CreateOrOpenProjectUseCase {
           directory: command.directory,
           name: command.name
         })
-    const synchronizedProject = await this.synchronizeGitBinding(project)
+    const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
+    const synchronizedProject = synchronizeProjectGitBinding(project, inspection)
 
-    await this.projectRepository.save(synchronizedProject)
-    this.workspaceAgentLifecyclePort.resolveProjectQuarantines(synchronizedProject.directory)
+    await saveSynchronizedProject({
+      afterCommit: () => {
+        this.workspaceAgentLifecyclePort.resolveProjectQuarantines(synchronizedProject.directory)
+        this.workspaceRunLifecyclePort.resolveProjectQuarantines(synchronizedProject.directory)
+      },
+      currentSnapshot: existingProject,
+      project: synchronizedProject,
+      projectRepository: this.projectRepository,
+      workspaceRunLifecyclePort: this.workspaceRunLifecyclePort
+    })
 
     return synchronizedProject.toSnapshot()
-  }
-
-  private async synchronizeGitBinding(project: Project): Promise<Project> {
-    const inspection = await this.gitWorkspacePort.inspectRepository(project.directory)
-
-    if (!inspection.isGitRepository) {
-      return project.syncGitBranchWorkspaces({
-        mainDirectory: project.directory,
-        mainGitBranch: null,
-        worktrees: []
-      })
-    }
-
-    const mainGitBranch =
-      inspection.branches.find((branch) => branch.isCurrent)?.name ?? inspection.currentBranch
-    const worktrees = inspection.branches
-      .filter((branch) => branch.worktreeDirectory && !branch.isCurrent)
-      .map((branch) => ({
-        branchName: branch.name,
-        directory: branch.worktreeDirectory ?? project.directory
-      }))
-
-    return project.syncGitBranchWorkspaces({
-      mainDirectory: project.directory,
-      mainGitBranch,
-      worktrees
-    })
   }
 }

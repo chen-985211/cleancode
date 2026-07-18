@@ -421,6 +421,7 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
 const terminalStatusLabels: Record<TerminalViewState['status'], string> = {
   idle: '未启动',
   running: '运行中',
+  stopping: '正在停止',
   exited: '已退出',
   failed: '失败'
 }

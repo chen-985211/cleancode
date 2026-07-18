@@ -17,12 +17,12 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
-  readOnlyJsonFile,
   teardownE2eScenario,
   waitForTextFile,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import {
   readRequiredBoundingBox,
   readTerminalBlockPosition,
@@ -98,11 +98,7 @@ describe('run terminal sessions e2e', () => {
         workbench.projectDirectory
       )
 
-      const graph = JSON.parse(
-        await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-      ) as {
-        blocks: Array<{ type: string }>
-      }
+      const graph = await readE2eBlockGraph(workbench)
 
       expect(graph.blocks).toHaveLength(1)
       expect(graph.blocks[0]?.type).toBe('terminal')
@@ -178,11 +174,7 @@ describe('run terminal sessions e2e', () => {
       await configureAndStartTerminalLaunchCommand(page, 'Terminal 1', launchCommand)
       await waitForTerminalOutput(page, 'Terminal 1', launchOutput)
 
-      const graph = JSON.parse(
-        await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-      ) as {
-        blocks: Array<{ launchCommand: string }>
-      }
+      const graph = await readE2eBlockGraph(workbench)
 
       expect(graph.blocks[0]?.launchCommand).toBe(launchCommand)
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)

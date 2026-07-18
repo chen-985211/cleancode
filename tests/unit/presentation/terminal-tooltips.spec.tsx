@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { CSSProperties } from 'react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
@@ -281,6 +281,43 @@ describe('terminal tooltips', () => {
       'Terminal 删除终端'
     ])
   })
+
+  it('submits metadata and execution configuration through one definition update', async () => {
+    const onUpdateDefinition = vi.fn(async () => undefined)
+    render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{ ...createTerminalNodeData(), onUpdateDefinition }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Terminal 编辑终端信息' }))
+    fireEvent.change(screen.getByLabelText('启动命令'), { target: { value: ' pnpm dev ' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存终端信息' }))
+
+    await waitFor(() =>
+      expect(onUpdateDefinition).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'terminal-1' }),
+        {
+          name: 'Terminal',
+          description: 'Local shell',
+          launchCommand: 'pnpm dev',
+          executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
+        }
+      )
+    )
+    expect(onUpdateDefinition).toHaveBeenCalledTimes(1)
+  })
 })
 
 function createTerminalNodeData(): TerminalFlowNode['data'] {
@@ -306,7 +343,7 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
     onQuickLaunch: vi.fn(),
     onRestart: vi.fn(),
     onDelete: vi.fn(),
-    onUpdateMetadata: vi.fn(),
+    onUpdateDefinition: vi.fn(),
     onInput: vi.fn(),
     onResize: vi.fn(),
     onResizeBlock: vi.fn(),

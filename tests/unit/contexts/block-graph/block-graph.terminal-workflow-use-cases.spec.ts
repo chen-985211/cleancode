@@ -25,7 +25,12 @@ describe('terminal workflow graph commands', () => {
       blockId: 'build',
       executionConfig: {
         mode: 'service',
-        readiness: { type: 'tcp', port: 4173 },
+        port: {
+          binding: { type: 'none' },
+          policy: { port: 4173, type: 'fixed' },
+          protocol: 'tcp'
+        },
+        readiness: { type: 'tcp' },
         readinessTimeoutMs: 30_000
       }
     })
@@ -38,7 +43,12 @@ describe('terminal workflow graph commands', () => {
     expect(disconnected.connections).toEqual([])
     expect(disconnected.blocks[1]?.executionConfig).toEqual({
       mode: 'service',
-      readiness: { type: 'tcp', port: 4173 },
+      port: {
+        binding: { type: 'none' },
+        policy: { port: 4173, type: 'fixed' },
+        protocol: 'tcp'
+      },
+      readiness: { type: 'tcp' },
       readinessTimeoutMs: 30_000
     })
     expect(repository.transactionCount).toBe(3)

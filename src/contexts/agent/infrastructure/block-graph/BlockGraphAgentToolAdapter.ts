@@ -5,8 +5,14 @@ import {
 import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
-  TerminalBlockSizeSnapshot
+  TerminalBlockSizeSnapshot,
+  TerminalExecutionConfigSnapshot
 } from '../../../block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  TerminalWorkflowPlanScope,
+  TerminalWorkflowPlanSnapshot
+} from '../../../block-graph/application/dto/TerminalWorkflowPlanSnapshot'
+import type { AgentBlockGraphSnapshot } from '../../application/dto/AgentBlockGraphProtocol'
 import type {
   AgentArrangeTerminalLayoutInput,
   AgentArrangeTerminalLayoutResult,
@@ -18,7 +24,10 @@ import type {
   AgentInspectTerminalWorkflowPlanInput,
   AgentUpdateTerminalExecutionConfigInput
 } from '../../application/ports/AgentBlockGraphToolPort'
-import type { AgentTerminalWorkflowPlanSnapshot } from '../../application/dto/AgentTerminalWorkflowProtocol'
+import type {
+  AgentTerminalExecutionConfigSnapshot,
+  AgentTerminalWorkflowPlanSnapshot
+} from '../../application/dto/AgentTerminalWorkflowProtocol'
 import type {
   AgentToolContext,
   CreateTerminalGroupAgentToolInput,
@@ -31,10 +40,15 @@ import type {
 export interface BlockGraphAgentToolAdapterInput {
   readonly arrangeTerminalLayout: (
     command: AgentToolContext & AgentArrangeTerminalLayoutInput
-  ) => Promise<AgentArrangeTerminalLayoutResult>
+  ) => Promise<{
+    readonly arrangedBlockIds: readonly string[]
+    readonly arrangedTerminalGroupIds: readonly string[]
+    readonly graph: BlockGraphSnapshot
+    readonly graphChanged: boolean
+  }>
   readonly buildTerminalWorkflowPlan: (
-    query: AgentToolContext & AgentInspectTerminalWorkflowPlanInput
-  ) => Promise<AgentTerminalWorkflowPlanSnapshot>
+    query: AgentToolContext & { readonly scope: TerminalWorkflowPlanScope }
+  ) => Promise<TerminalWorkflowPlanSnapshot>
   readonly connectTerminalBlocks: (
     command: AgentToolContext & AgentConnectTerminalBlocksInput
   ) => Promise<BlockGraphSnapshot>
@@ -105,9 +119,12 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly description: string
     readonly launchCommand: string
   }) => Promise<BlockGraphSnapshot>
-  readonly updateTerminalExecutionConfig: (
-    command: AgentToolContext & AgentUpdateTerminalExecutionConfigInput
-  ) => Promise<BlockGraphSnapshot>
+  readonly updateTerminalExecutionConfig: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly blockId: string
+    readonly executionConfig: TerminalExecutionConfigSnapshot
+  }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -119,38 +136,41 @@ export interface BlockGraphAgentToolAdapterInput {
 export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
   constructor(private readonly tools: BlockGraphAgentToolAdapterInput) {}
 
-  arrangeTerminalLayout(
+  async arrangeTerminalLayout(
     context: AgentToolContext,
     input: AgentArrangeTerminalLayoutInput
   ): Promise<AgentArrangeTerminalLayoutResult> {
-    return this.tools.arrangeTerminalLayout({ ...context, ...input })
+    const result = await this.tools.arrangeTerminalLayout({ ...context, ...input })
+    return { ...result, graph: toAgentBlockGraphSnapshot(result.graph) }
   }
 
-  inspectGraph(context: AgentToolContext): Promise<BlockGraphSnapshot> {
-    return this.tools.getDefaultGraph(context)
+  async inspectGraph(context: AgentToolContext): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(await this.tools.getDefaultGraph(context))
   }
 
-  createTerminalBlock(
+  async createTerminalBlock(
     context: AgentToolContext,
     input: AgentCreateTerminalBlockInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.createTerminalBlock({
-      ...context,
-      ...(input.anchorRegion ? { anchorRegion: input.anchorRegion } : {}),
-      description: input.description ?? '',
-      ...(input.launchCommand !== undefined ? { launchCommand: input.launchCommand } : {}),
-      name: input.name,
-      ...(input.position ? { position: input.position } : {}),
-      ...(input.reservedRegions ? { reservedRegions: input.reservedRegions } : {}),
-      ...(input.size ? { size: input.size } : {})
-    })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.createTerminalBlock({
+        ...context,
+        ...(input.anchorRegion ? { anchorRegion: input.anchorRegion } : {}),
+        description: input.description ?? '',
+        ...(input.launchCommand !== undefined ? { launchCommand: input.launchCommand } : {}),
+        name: input.name,
+        ...(input.position ? { position: input.position } : {}),
+        ...(input.reservedRegions ? { reservedRegions: input.reservedRegions } : {}),
+        ...(input.size ? { size: input.size } : {})
+      })
+    )
   }
 
   async updateTerminalBlock(
     context: AgentToolContext,
     input: UpdateBlockAgentToolInput
-  ): Promise<BlockGraphSnapshot> {
-    let graph = await this.inspectGraph(context)
+  ): Promise<AgentBlockGraphSnapshot> {
+    let graph = await this.tools.getDefaultGraph(context)
     const block = graph.blocks.find((candidateBlock) => candidateBlock.id === input.blockId)
 
     if (!block) {
@@ -189,32 +209,36 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       })
     }
 
-    return graph
+    return toAgentBlockGraphSnapshot(graph)
   }
 
-  deleteTerminalBlock(
+  async deleteTerminalBlock(
     context: AgentToolContext,
     input: DeleteBlockAgentToolInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.deleteBlock({ ...context, blockId: input.blockId })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.deleteBlock({ ...context, blockId: input.blockId })
+    )
   }
 
-  createTerminalGroup(
+  async createTerminalGroup(
     context: AgentToolContext,
     input: CreateTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.createTerminalGroup({
-      ...context,
-      memberBlockIds: input.memberBlockIds,
-      name: input.name
-    })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.createTerminalGroup({
+        ...context,
+        memberBlockIds: input.memberBlockIds,
+        name: input.name
+      })
+    )
   }
 
   async updateTerminalGroup(
     context: AgentToolContext,
     input: UpdateTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot> {
-    let graph = await this.inspectGraph(context)
+  ): Promise<AgentBlockGraphSnapshot> {
+    let graph = await this.tools.getDefaultGraph(context)
 
     if (input.name !== undefined) {
       graph = await this.tools.updateTerminalGroupMetadata({
@@ -240,24 +264,32 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       })
     }
 
-    return graph
+    return toAgentBlockGraphSnapshot(graph)
   }
 
-  deleteTerminalGroup(
+  async deleteTerminalGroup(
     context: AgentToolContext,
     input: DeleteTerminalGroupAgentToolInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.dissolveTerminalGroup({
-      ...context,
-      terminalGroupId: input.terminalGroupId
-    })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.dissolveTerminalGroup({
+        ...context,
+        terminalGroupId: input.terminalGroupId
+      })
+    )
   }
 
-  updateTerminalExecutionConfig(
+  async updateTerminalExecutionConfig(
     context: AgentToolContext,
     input: AgentUpdateTerminalExecutionConfigInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.updateTerminalExecutionConfig({ ...context, ...input })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.updateTerminalExecutionConfig({
+        ...context,
+        blockId: input.blockId,
+        executionConfig: toBlockGraphTerminalExecutionConfig(input.executionConfig)
+      })
+    )
   }
 
   async connectTerminalBlocks(
@@ -278,21 +310,31 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       })
     }
 
-    return { connectionId: connection.id, graph }
+    return { connectionId: connection.id, graph: toAgentBlockGraphSnapshot(graph) }
   }
 
-  disconnectTerminalBlocks(
+  async disconnectTerminalBlocks(
     context: AgentToolContext,
     input: AgentDisconnectTerminalBlocksInput
-  ): Promise<BlockGraphSnapshot> {
-    return this.tools.disconnectTerminalBlocks({ ...context, ...input })
+  ): Promise<AgentBlockGraphSnapshot> {
+    return toAgentBlockGraphSnapshot(
+      await this.tools.disconnectTerminalBlocks({ ...context, ...input })
+    )
   }
 
-  inspectTerminalWorkflowPlan(
+  async inspectTerminalWorkflowPlan(
     context: AgentToolContext,
     input: AgentInspectTerminalWorkflowPlanInput
   ): Promise<AgentTerminalWorkflowPlanSnapshot> {
-    return this.tools.buildTerminalWorkflowPlan({ ...context, ...input })
+    return toAgentTerminalWorkflowPlan(
+      await this.tools.buildTerminalWorkflowPlan({
+        ...context,
+        scope:
+          input.scope.type === 'full'
+            ? { type: 'full' }
+            : { blockId: input.scope.blockId, type: 'from-block' }
+      })
+    )
   }
 }
 
@@ -307,4 +349,102 @@ function requireTerminalBlock(
   }
 
   return block
+}
+
+function toAgentBlockGraphSnapshot(graph: BlockGraphSnapshot): AgentBlockGraphSnapshot {
+  return {
+    blocks: graph.blocks.map((block) => ({
+      description: block.description,
+      ...(block.executionConfig
+        ? { executionConfig: toAgentTerminalExecutionConfig(block.executionConfig) }
+        : {}),
+      id: block.id,
+      launchCommand: block.launchCommand,
+      name: block.name,
+      position: { ...block.position },
+      size: { ...block.size },
+      type: 'terminal'
+    })),
+    connections: (graph.connections ?? []).map((connection) => ({ ...connection })),
+    id: graph.id,
+    projectId: graph.projectId,
+    terminalGroups: graph.terminalGroups.map((group) => ({
+      ...group,
+      memberBlockIds: [...group.memberBlockIds],
+      position: { ...group.position },
+      size: { ...group.size }
+    })),
+    viewport: { ...graph.viewport },
+    workspaceName: graph.workspaceName
+  }
+}
+
+function toAgentTerminalWorkflowPlan(
+  plan: TerminalWorkflowPlanSnapshot
+): AgentTerminalWorkflowPlanSnapshot {
+  return {
+    graphId: plan.graphId,
+    nodes: plan.nodes.map((node) => ({
+      blockId: node.blockId,
+      dependencyBlockIds: [...node.dependencyBlockIds],
+      executionConfig: toAgentTerminalExecutionConfig(node.executionConfig),
+      launchCommand: node.launchCommand,
+      name: node.name
+    })),
+    workspaceName: plan.workspaceName
+  }
+}
+
+function toAgentTerminalExecutionConfig(
+  config: TerminalExecutionConfigSnapshot
+): AgentTerminalExecutionConfigSnapshot {
+  if (config.mode === 'task') {
+    return {
+      mode: 'task',
+      successExitCodes: [...config.successExitCodes],
+      timeoutMs: config.timeoutMs
+    }
+  }
+
+  return {
+    mode: 'service',
+    ...(config.port
+      ? {
+          port: {
+            binding: { ...config.port.binding },
+            policy: { ...config.port.policy },
+            protocol: config.port.protocol
+          }
+        }
+      : {}),
+    readiness: { ...config.readiness },
+    readinessTimeoutMs: config.readinessTimeoutMs
+  }
+}
+
+function toBlockGraphTerminalExecutionConfig(
+  config: AgentTerminalExecutionConfigSnapshot
+): TerminalExecutionConfigSnapshot {
+  if (config.mode === 'task') {
+    return {
+      mode: 'task',
+      successExitCodes: [...config.successExitCodes],
+      timeoutMs: config.timeoutMs
+    }
+  }
+
+  return {
+    mode: 'service',
+    ...(config.port
+      ? {
+          port: {
+            binding: { ...config.port.binding },
+            policy: { ...config.port.policy },
+            protocol: config.port.protocol
+          }
+        }
+      : {}),
+    readiness: { ...config.readiness },
+    readinessTimeoutMs: config.readinessTimeoutMs
+  }
 }

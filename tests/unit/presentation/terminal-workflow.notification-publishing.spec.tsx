@@ -353,13 +353,19 @@ function workflowRun(id: string, status: WorkflowRunSnapshot['status']): Workflo
   return {
     id,
     graphId: 'graph-Project',
+    projectId: 'project-Project',
+    projectDirectory: '/tmp/Project',
     workspaceName: 'main',
+    workspaceDirectory: '/tmp/Project',
+    gitBranch: null,
     status,
     nodes: [
       {
         blockId: 'dev',
         dependencyBlockIds: [],
         executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null },
+        endpoint: null,
+        error: null,
         exitCode: status === 'succeeded' ? 0 : null,
         failureReason: null,
         launchCommand: 'pnpm dev',
@@ -374,13 +380,22 @@ function failedRun(id: string, exitCode: number): WorkflowRunSnapshot {
   return {
     id,
     graphId: 'graph-Project',
+    projectId: 'project-Project',
+    projectDirectory: '/tmp/Project',
     workspaceName: 'main',
+    workspaceDirectory: '/tmp/Project',
+    gitBranch: null,
     status: 'failed',
     nodes: [
       {
         blockId: 'dev',
         dependencyBlockIds: [],
         executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null },
+        endpoint: null,
+        error: {
+          code: 'COMMAND_FAILED',
+          message: `Command exited with code ${exitCode}.`
+        },
         exitCode,
         failureReason: `Command exited with code ${exitCode}.`,
         launchCommand: 'pnpm dev',

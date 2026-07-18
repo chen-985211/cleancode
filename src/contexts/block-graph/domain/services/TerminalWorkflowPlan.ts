@@ -16,10 +16,41 @@ interface TerminalWorkflowPlanNodeSnapshot {
   readonly dependencyBlockIds: readonly string[]
 }
 
+export type TerminalLaunchPlanSnapshot = Pick<
+  TerminalWorkflowPlanNodeSnapshot,
+  'blockId' | 'launchCommand' | 'executionConfig'
+>
+
 export interface TerminalWorkflowPlanSnapshot {
   readonly graphId: string
   readonly workspaceName: string
   readonly nodes: readonly TerminalWorkflowPlanNodeSnapshot[]
+}
+
+export function buildTerminalLaunchPlan(
+  graph: BlockGraphSnapshot,
+  blockId: string
+): TerminalLaunchPlanSnapshot {
+  const block = graph.blocks.find((candidate) => candidate.id === blockId)
+
+  if (!block) {
+    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+  }
+  if (!block.launchCommand) {
+    throw createExpectedAppError(
+      'TERMINAL_WORKFLOW_COMMAND_MISSING',
+      'The selected terminal must have a launch command.',
+      { blockId }
+    )
+  }
+
+  return Object.freeze({
+    blockId,
+    launchCommand: block.launchCommand,
+    executionConfig: freezeTerminalExecutionConfig(
+      block.executionConfig ?? defaultTerminalExecutionConfig
+    )
+  })
 }
 
 export function buildTerminalWorkflowPlan(
@@ -62,7 +93,7 @@ export function buildTerminalWorkflowPlan(
       blockId,
       name: block.name,
       launchCommand: block.launchCommand,
-      executionConfig: freezeExecutionConfig(
+      executionConfig: freezeTerminalExecutionConfig(
         block.executionConfig ?? defaultTerminalExecutionConfig
       ),
       dependencyBlockIds: Object.freeze(
@@ -162,7 +193,7 @@ function topologicallyOrderBlocks(
   return ordered
 }
 
-function freezeExecutionConfig(
+function freezeTerminalExecutionConfig(
   config: TerminalExecutionConfigSnapshot
 ): TerminalExecutionConfigSnapshot {
   if (config.mode === 'task') {
@@ -172,5 +203,17 @@ function freezeExecutionConfig(
     })
   }
 
-  return Object.freeze({ ...config, readiness: Object.freeze({ ...config.readiness }) })
+  return Object.freeze({
+    ...config,
+    ...(config.port
+      ? {
+          port: Object.freeze({
+            ...config.port,
+            binding: Object.freeze({ ...config.port.binding }),
+            policy: Object.freeze({ ...config.port.policy })
+          })
+        }
+      : {}),
+    readiness: Object.freeze({ ...config.readiness })
+  })
 }

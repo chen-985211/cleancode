@@ -20,6 +20,7 @@ import { useProjectGitStateSynchronization } from './useProjectGitStateSynchroni
 import { useTerminalWorkspaceSynchronization } from './useTerminalWorkspaceSynchronization'
 import { useTerminalMinimapAppearance } from './useTerminalMinimapAppearance'
 import { useTerminalSessions } from './useTerminalSessions'
+import { useTerminalServiceActions } from './useTerminalServiceActions'
 import { useTerminalWorkflow } from './useTerminalWorkflow'
 import { useCurrentGraphState } from './useCurrentGraphState'
 import { useWorkbenchFlowNodes } from './useWorkbenchFlowNodes'
@@ -27,7 +28,7 @@ import { useWorkbenchGraphIndex } from './useWorkbenchGraphIndex'
 import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
-import type { TerminalBlockMetadataInput, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { ThemeSettingsRoot } from './ThemeSettingsRoot'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
@@ -36,11 +37,9 @@ import { putWorkbenchFirst, resolveCurrentWorkbenchAfterRemoval } from './workbe
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
 
-interface AppShellProps {
-  readonly notifications?: AppNotificationController
-}
-
-export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
+export function AppShell({
+  notifications = ignoreAppNotifications
+}: { readonly notifications?: AppNotificationController } = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
   const [currentWorkbench, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(null)
@@ -92,6 +91,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     setSelectedTerminalGroupId
   })
   const {
+    dismissPortConflict,
     findTerminalBlockIdForSession,
     interruptTerminal,
     moveTerminalSessionToWorkspace,
@@ -104,7 +104,12 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     terminateTerminalSession,
     terminateWorkbenchTerminalSessions,
     writeTerminal
-  } = useTerminalSessions({ currentWorkspace, focusTerminalBlock })
+  } = useTerminalSessions({
+    currentProject: currentWorkbench?.project,
+    currentWorkspace,
+    focusTerminalBlock,
+    notify: notifications.notify
+  })
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -165,7 +170,20 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     notifications,
     setCurrentGraph
   })
-  const { start: startWorkflow, stop: stopWorkflow, updateExecutionConfig } = terminalWorkflow
+  const { start: startWorkflow, stop: stopWorkflow } = terminalWorkflow
+  const {
+    copyServiceEndpoint,
+    locateManagedServiceOwner,
+    openServiceEndpoint,
+    updateTerminalDefinition
+  } = useTerminalServiceActions({
+    currentWorkbench,
+    currentWorkspace,
+    focusTerminalBlock,
+    rememberWorkbench,
+    setCurrentGraph,
+    workbenches
+  })
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
@@ -191,9 +209,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
         projectDirectory: workbench.project.directory
       })
 
-      if (!rememberedWorkbenches) {
-        return
-      }
+      if (!rememberedWorkbenches) return
 
       setSelectedTerminalBlockIds([])
       setSelectedTerminalGroupId(null)
@@ -326,27 +342,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     [currentWorkbench, currentWorkspace, setCurrentGraph, terminateTerminalSession]
   )
 
-  const updateTerminalBlockMetadata = useCallback(
-    async (block: TerminalBlockSnapshot, metadata: TerminalBlockMetadataInput) => {
-      if (!currentWorkbench || !currentWorkspace) {
-        return
-      }
-
-      const graphSnapshot = await window.cleancode?.updateTerminalBlockMetadata({
-        projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
-        blockId: block.id,
-        name: metadata.name,
-        description: metadata.description,
-        launchCommand: metadata.launchCommand
-      })
-
-      if (graphSnapshot) {
-        setCurrentGraph(graphSnapshot)
-      }
-    },
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
-  )
   const resizeTerminalBlock = useTerminalBlockResizeAction({
     currentWorkbench,
     currentWorkspace,
@@ -385,8 +380,11 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
       onQuickLaunch: quickLaunchTerminal,
       onRestart: restartTerminal,
       onDelete: deleteTerminalBlock,
-      onUpdateMetadata: updateTerminalBlockMetadata,
-      onUpdateExecutionConfig: updateExecutionConfig,
+      onUpdateDefinition: updateTerminalDefinition,
+      onCopyServiceEndpoint: copyServiceEndpoint,
+      onOpenServiceEndpoint: openServiceEndpoint,
+      onLocateManagedServiceOwner: locateManagedServiceOwner,
+      onDismissPortConflict: dismissPortConflict,
       onRunFromHere: (block: TerminalBlockSnapshot) => startWorkflow(block.id),
       onStopWorkflow: stopWorkflow,
       onInput: writeTerminal,
@@ -400,19 +398,22 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     }),
     [
       deleteTerminalBlock,
+      copyServiceEndpoint,
+      dismissPortConflict,
       interruptTerminal,
       quickLaunchTerminal,
       resizeTerminal,
       resizeTerminalBlock,
       restartTerminal,
+      locateManagedServiceOwner,
+      openServiceEndpoint,
       selectTerminalFromTitle,
       selectTerminalBlock,
       startTerminal,
       terminalGroupActions,
       startWorkflow,
       stopWorkflow,
-      updateExecutionConfig,
-      updateTerminalBlockMetadata,
+      updateTerminalDefinition,
       writeTerminal
     ]
   )

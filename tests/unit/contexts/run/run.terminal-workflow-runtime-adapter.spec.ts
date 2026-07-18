@@ -10,8 +10,13 @@ describe('terminal session workflow runtime adapter', () => {
     const processes = new RecordingProcessPort()
     const runtime = new TerminalSessionWorkflowRuntimeAdapter(new TerminalSessionService(processes))
     const common = {
+      projectId: 'project-1',
+      projectDirectory: '/project',
       blockId: 'install',
       workspaceName: 'main',
+      workspaceDirectory: '/project',
+      gitBranch: 'main',
+      runId: 'workflow-run-1',
       workingDirectory: '/project',
       launchCommand: 'pnpm install',
       onOutput: () => undefined,
@@ -44,8 +49,8 @@ class RecordingProcessPort implements TerminalProcessPort {
   async readWorkingDirectory(): Promise<null> {
     return null
   }
-  stop(sessionId: string): void {
+  async stop(sessionId: string): Promise<void> {
     this.stops.push(sessionId)
   }
-  disposeAll(): void {}
+  async disposeAll(): Promise<void> {}
 }

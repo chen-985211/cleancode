@@ -54,6 +54,8 @@ export function getTerminalStatusColor(status: TerminalSessionStatus): string {
       return 'var(--cc-success)'
     case 'failed':
       return 'var(--cc-danger)'
+    case 'stopping':
+      return 'var(--cc-warning)'
     case 'exited':
       return 'var(--cc-muted)'
     case 'idle':

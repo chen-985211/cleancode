@@ -13,16 +13,42 @@ describe('terminal workflow IPC contract', () => {
       workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
     })
     const command = {
+      projectId: 'project-1',
       projectDirectory: '/project',
       workspaceName: 'main',
-      workingDirectory: '/project',
+      workspaceDirectory: '/project',
+      gitBranch: 'main',
       scope: { type: 'full' as const }
     }
 
     await expect(
       ipcMain.invoke<WorkflowRunSnapshot>('cleancode:start-terminal-workflow', command)
     ).resolves.toEqual({ ok: true, value: createRun() })
-    expect(start).toHaveBeenCalledWith(command)
+    expect(start).toHaveBeenCalledWith({ ...command, workingDirectory: command.workspaceDirectory })
+  })
+
+  it('rejects malformed workflow identities before invoking the service', async () => {
+    const ipcMain = new FakeIpcMain()
+    const start = vi.fn(async () => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:start-terminal-workflow', {
+        projectDirectory: '/project',
+        workspaceName: 'main',
+        workspaceDirectory: '/project',
+        gitBranch: 'main',
+        scope: { type: 'full' }
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(start).not.toHaveBeenCalled()
   })
 
   it('passes project-workspace-scoped stop commands', async () => {
@@ -87,7 +113,11 @@ function createRun(): WorkflowRunSnapshot {
   return {
     id: 'run-1',
     graphId: 'graph-1',
+    projectId: 'project-1',
+    projectDirectory: '/project',
     workspaceName: 'main',
+    workspaceDirectory: '/project',
+    gitBranch: 'main',
     status: 'running',
     nodes: []
   }

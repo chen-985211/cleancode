@@ -8,11 +8,11 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
-  readOnlyJsonFile,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
 
 describe('terminal workflows e2e', () => {
@@ -60,9 +60,7 @@ describe('terminal workflows e2e', () => {
       await waitForTerminalOutput(page, 'Terminal 2', 'workflow-build-complete')
       await page.getByText('流程运行成功').waitFor()
 
-      const graph = JSON.parse(
-        await readOnlyJsonFile(workbench.appStateDirectory, 'default-graph.json')
-      ) as { connections: Array<{ sourceBlockId: string; targetBlockId: string }> }
+      const graph = await readE2eBlockGraph(workbench)
 
       expect(graph.connections).toHaveLength(1)
     },

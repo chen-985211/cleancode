@@ -15,7 +15,7 @@ interface OffscreenElectronWindowPolicy {
   readonly show: false
 }
 
-type ElectronWindowPolicy = NormalElectronWindowPolicy | OffscreenElectronWindowPolicy
+export type ElectronWindowPolicy = NormalElectronWindowPolicy | OffscreenElectronWindowPolicy
 
 const electronE2eOffscreenCoordinate = -50_000
 

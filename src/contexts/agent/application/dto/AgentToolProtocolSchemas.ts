@@ -34,30 +34,117 @@ export function terminalExecutionConfigSchema(): AgentToolJsonSchema {
       objectSchema(
         {
           mode: { const: 'service' },
-          readiness: {
-            oneOf: [
-              objectSchema(
-                {
-                  text: { minLength: 1, type: 'string' },
-                  type: { const: 'output' }
-                },
-                ['type', 'text']
-              ),
-              objectSchema(
-                {
-                  port: { maximum: 65_535, minimum: 1, type: 'integer' },
-                  type: { const: 'tcp' }
-                },
-                ['type', 'port']
-              )
-            ]
-          },
+          readiness: outputReadinessSchema(),
           readinessTimeoutMs: positiveIntegerSchema
         },
         ['mode', 'readiness', 'readinessTimeoutMs']
+      ),
+      serviceExecutionConfigWithPortSchema(outputReadinessSchema()),
+      serviceExecutionConfigWithPortSchema(objectSchema({ type: { const: 'tcp' } }, ['type']))
+    ]
+  }
+}
+
+function serviceExecutionConfigWithPortSchema(readiness: AgentToolJsonSchema): AgentToolJsonSchema {
+  return objectSchema(
+    {
+      mode: { const: 'service' },
+      port: terminalServicePortIntentSchema(),
+      readiness,
+      readinessTimeoutMs: positiveIntegerSchema
+    },
+    ['mode', 'port', 'readiness', 'readinessTimeoutMs']
+  )
+}
+
+function outputReadinessSchema(): AgentToolJsonSchema {
+  return objectSchema(
+    {
+      text: { minLength: 1, type: 'string' },
+      type: { const: 'output' }
+    },
+    ['type', 'text']
+  )
+}
+
+function terminalServicePortIntentSchema(): AgentToolJsonSchema {
+  return {
+    oneOf: [
+      objectSchema(
+        {
+          binding: {
+            oneOf: [
+              nonePortBindingSchema(),
+              environmentPortBindingSchema(),
+              argumentPortBindingSchema()
+            ]
+          },
+          policy: objectSchema(
+            {
+              port: { maximum: 65_535, minimum: 1, type: 'integer' },
+              type: { const: 'fixed' }
+            },
+            ['type', 'port']
+          ),
+          protocol: serviceProtocolSchema()
+        },
+        ['protocol', 'policy', 'binding']
+      ),
+      objectSchema(
+        {
+          binding: { oneOf: [environmentPortBindingSchema(), argumentPortBindingSchema()] },
+          policy: objectSchema(
+            {
+              port: { maximum: 65_535, minimum: 1, type: 'integer' },
+              type: { const: 'preferred' }
+            },
+            ['type', 'port']
+          ),
+          protocol: serviceProtocolSchema()
+        },
+        ['protocol', 'policy', 'binding']
+      ),
+      objectSchema(
+        {
+          binding: { oneOf: [environmentPortBindingSchema(), argumentPortBindingSchema()] },
+          policy: objectSchema({ type: { const: 'auto' } }, ['type']),
+          protocol: serviceProtocolSchema()
+        },
+        ['protocol', 'policy', 'binding']
       )
     ]
   }
+}
+
+function serviceProtocolSchema(): AgentToolJsonSchema {
+  return { oneOf: [{ const: 'http' }, { const: 'https' }, { const: 'tcp' }] }
+}
+
+function nonePortBindingSchema(): AgentToolJsonSchema {
+  return objectSchema({ type: { const: 'none' } }, ['type'])
+}
+
+function environmentPortBindingSchema(): AgentToolJsonSchema {
+  return objectSchema(
+    {
+      type: { const: 'environment' },
+      variableName: { pattern: '^[A-Za-z_][A-Za-z0-9_]*$', type: 'string' }
+    },
+    ['type', 'variableName']
+  )
+}
+
+function argumentPortBindingSchema(): AgentToolJsonSchema {
+  return objectSchema(
+    {
+      template: {
+        pattern: '^[A-Za-z0-9_./:=\\- ]*\\{port\\}[A-Za-z0-9_./:=\\- ]*$',
+        type: 'string'
+      },
+      type: { const: 'argument' }
+    },
+    ['type', 'template']
+  )
 }
 
 export function terminalWorkflowPlanScopeSchema(): AgentToolJsonSchema {

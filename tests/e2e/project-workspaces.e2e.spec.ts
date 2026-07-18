@@ -23,6 +23,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { waitForE2eBlockGraph } from '../support/e2eBlockGraph'
 
 describe('project workspaces e2e', () => {
   let workbench: E2eWorkbench
@@ -62,11 +63,7 @@ describe('project workspaces e2e', () => {
       const projectMetadata = JSON.parse(
         await waitForJsonFile(workbench.appStateDirectory, 'project.json')
       ) as { name: string; workspaces: Array<{ name: string }> }
-      const graph = JSON.parse(
-        await waitForJsonFile(workbench.appStateDirectory, 'default-graph.json')
-      ) as {
-        blocks: Array<{ type: string; name: string }>
-      }
+      const graph = await waitForE2eBlockGraph(workbench)
 
       expect(await pathExists(join(workbench.projectDirectory, '.cleancode'))).toBe(false)
       expect(projectMetadata.name).toBe(basename(workbench.projectDirectory))

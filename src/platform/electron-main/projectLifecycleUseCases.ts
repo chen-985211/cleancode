@@ -3,6 +3,7 @@ import type { GitWorkspacePort } from '../../contexts/project/application/ports/
 import type { ProjectRegistryRepository } from '../../contexts/project/application/ports/ProjectRegistryRepository'
 import type { ProjectRepository } from '../../contexts/project/application/ports/ProjectRepository'
 import type { WorkspaceAgentLifecyclePort } from '../../contexts/project/application/ports/WorkspaceAgentLifecyclePort'
+import type { WorkspaceRunLifecyclePort } from '../../contexts/project/application/ports/WorkspaceRunLifecyclePort'
 import { ArchiveBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/ArchiveBranchWorkspaceUseCase'
 import { CheckoutMainWorkspaceBranchUseCase } from '../../contexts/project/application/use-cases/CheckoutMainWorkspaceBranchUseCase'
 import { CreateBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
@@ -17,6 +18,7 @@ import { SynchronizeProjectGitStateUseCase } from '../../contexts/project/applic
 
 export function createProjectLifecycleUseCases(input: {
   readonly agentLifecycle: WorkspaceAgentLifecyclePort
+  readonly runLifecycle: WorkspaceRunLifecyclePort
   readonly branchDirectories: BranchWorkspaceDirectoryPort
   readonly gitWorkspace: GitWorkspacePort
   readonly projectRegistry: ProjectRegistryRepository
@@ -29,13 +31,15 @@ export function createProjectLifecycleUseCases(input: {
       input.projects,
       input.gitWorkspace,
       input.agentLifecycle,
-      workspaceTransactions
+      workspaceTransactions,
+      input.runLifecycle
     ),
     checkoutMainWorkspaceBranchUseCase: new CheckoutMainWorkspaceBranchUseCase(
       input.projects,
       input.gitWorkspace,
       input.agentLifecycle,
-      workspaceTransactions
+      workspaceTransactions,
+      input.runLifecycle
     ),
     createBranchWorkspaceUseCase: new CreateBranchWorkspaceUseCase(
       input.projects,
@@ -47,13 +51,15 @@ export function createProjectLifecycleUseCases(input: {
       input.projects,
       input.gitWorkspace,
       input.agentLifecycle,
-      workspaceTransactions
+      workspaceTransactions,
+      input.runLifecycle
     ),
     forgetProjectUseCase: new ForgetProjectUseCase(
       input.projectRegistry,
       input.agentLifecycle,
       workspaceTransactions,
-      registryTransactions
+      registryTransactions,
+      input.runLifecycle
     ),
     rememberProjectUseCase: new RememberProjectUseCase(input.projectRegistry, registryTransactions),
     selectCurrentProjectUseCase: new SelectCurrentProjectUseCase(
@@ -68,7 +74,8 @@ export function createProjectLifecycleUseCases(input: {
       input.projects,
       input.gitWorkspace,
       input.agentLifecycle,
-      workspaceTransactions
+      workspaceTransactions,
+      input.runLifecycle
     )
   }
 }

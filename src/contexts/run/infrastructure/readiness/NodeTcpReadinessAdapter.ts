@@ -20,6 +20,17 @@ export class NodeTcpReadinessAdapter implements TcpReadinessPort {
   }
 
   async waitUntilReady(command: WaitForTcpReadinessCommand): Promise<void> {
+    return this.waitForState(command, true)
+  }
+
+  async waitUntilClosed(command: WaitForTcpReadinessCommand): Promise<void> {
+    return this.waitForState(command, false)
+  }
+
+  private async waitForState(
+    command: WaitForTcpReadinessCommand,
+    expectedReachable: boolean
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       let socket: Socket | null = null
       let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -35,7 +46,7 @@ export class NodeTcpReadinessAdapter implements TcpReadinessPort {
       }
       const handleAbort = (): void => {
         cleanup()
-        reject(new Error('TCP readiness check was cancelled.'))
+        reject(command.signal.reason ?? new Error('TCP readiness check was cancelled.'))
       }
       const retry = (): void => {
         socket?.destroy()
@@ -46,14 +57,30 @@ export class NodeTcpReadinessAdapter implements TcpReadinessPort {
         }
       }
       const tryConnect = (): void => {
-        socket = connect({ host: '127.0.0.1', port: command.port })
+        socket = connect({ host: command.host, port: command.port })
         socket.setTimeout(this.connectionTimeoutMs)
         socket.once('connect', () => {
-          cleanup()
-          resolve()
+          if (expectedReachable) {
+            cleanup()
+            resolve()
+          } else {
+            retry()
+          }
         })
-        socket.once('error', retry)
-        socket.once('timeout', retry)
+        socket.once('error', () => {
+          if (expectedReachable) retry()
+          else {
+            cleanup()
+            resolve()
+          }
+        })
+        socket.once('timeout', () => {
+          if (expectedReachable) retry()
+          else {
+            cleanup()
+            resolve()
+          }
+        })
       }
 
       command.signal.addEventListener('abort', handleAbort, { once: true })

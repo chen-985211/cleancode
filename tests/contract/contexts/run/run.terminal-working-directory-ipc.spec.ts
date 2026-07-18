@@ -92,8 +92,10 @@ function createTerminalIpcHandlersInput(input: {
   return {
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
+    launchTerminal: vi.fn(),
     listTerminalWorkingDirectories: input.listTerminalWorkingDirectories,
     logger: new SilentLogger(),
+    openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: vi.fn(),
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),

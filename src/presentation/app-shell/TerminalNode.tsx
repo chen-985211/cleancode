@@ -12,6 +12,7 @@ import { GroupRestartIcon } from './TerminalGroupIcons'
 import { TerminalMetadataForm } from './TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
+import { TerminalServiceRuntimeBar } from './TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
@@ -131,8 +132,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       metadata: TerminalBlockMetadataInput,
       executionConfig: TerminalExecutionConfigSnapshot
     ) => {
-      await data.onUpdateMetadata(block, metadata)
-      await data.onUpdateExecutionConfig?.(block, executionConfig)
+      await data.onUpdateDefinition(block, { ...metadata, executionConfig })
       setShouldFocusLaunchCommand(false)
       setIsEditingMetadata(false)
     },
@@ -195,6 +195,25 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           }}
         />
       ) : null}
+      <TerminalServiceRuntimeBar
+        identity={session.runIdentity ?? null}
+        endpoint={session.actualEndpoint ?? null}
+        conflict={session.portConflict ?? null}
+        onCopyEndpoint={async (endpoint) => {
+          if (data.onCopyServiceEndpoint) {
+            await data.onCopyServiceEndpoint(endpoint)
+            return
+          }
+
+          await window.navigator.clipboard?.writeText(endpoint.displayAddress)
+        }}
+        onOpenEndpoint={(identity) => data.onOpenServiceEndpoint?.(identity)}
+        onLocateOwner={(owner) => data.onLocateManagedServiceOwner?.(owner)}
+        onEditPortConfiguration={startEditingMetadata}
+        onDismissConflict={() => {
+          if (session.runIdentity) data.onDismissPortConflict?.(session.runIdentity)
+        }}
+      />
       <div className="terminal-frame">
         <TerminalViewport
           key={session.sessionId ?? 'idle'}
@@ -314,11 +333,13 @@ function TerminalHeader({
           <span className={terminalStateClassName}>
             {isRunning
               ? '运行中'
-              : sessionStatus === 'failed'
-                ? '失败'
-                : sessionStatus === 'exited'
-                  ? '已退出'
-                  : '未启动'}
+              : sessionStatus === 'stopping'
+                ? '正在停止'
+                : sessionStatus === 'failed'
+                  ? '失败'
+                  : sessionStatus === 'exited'
+                    ? '已退出'
+                    : '未启动'}
           </span>
           {workflowStatus ? (
             <span className={`workflow-state workflow-state--${workflowStatus}`}>

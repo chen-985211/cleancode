@@ -39,14 +39,24 @@ describe('agent block graph workflow tool adapter', () => {
       blockId: terminalIds.build,
       executionConfig: {
         mode: 'service',
-        readiness: { port: 4173, type: 'tcp' },
+        port: {
+          binding: { type: 'environment', variableName: 'PORT' },
+          policy: { port: 4173, type: 'preferred' },
+          protocol: 'http'
+        },
+        readiness: { type: 'tcp' },
         readinessTimeoutMs: 30_000
       }
     })
 
     expect(findBlock(configured, terminalIds.build).executionConfig).toEqual({
       mode: 'service',
-      readiness: { port: 4173, type: 'tcp' },
+      port: {
+        binding: { type: 'environment', variableName: 'PORT' },
+        policy: { port: 4173, type: 'preferred' },
+        protocol: 'http'
+      },
+      readiness: { type: 'tcp' },
       readinessTimeoutMs: 30_000
     })
 

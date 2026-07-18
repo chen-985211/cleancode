@@ -1,11 +1,11 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import type { TerminalRunScope } from '../value-objects/TerminalRunScope'
 
-export type TerminalSessionStatus = 'idle' | 'running' | 'exited' | 'failed'
+export type TerminalSessionStatus = 'idle' | 'running' | 'stopping' | 'exited' | 'failed'
 
-export interface TerminalSessionSnapshot {
+export interface TerminalSessionSnapshot extends TerminalRunScope {
   readonly id: string
   readonly terminalBlockId: string
-  readonly workspaceName: string
   readonly workingDirectory: string
   readonly processId: number | null
   readonly status: TerminalSessionStatus
@@ -15,9 +15,7 @@ export interface TerminalSessionSnapshot {
 }
 
 export interface CreateTerminalSessionInput {
-  readonly id?: string
-  readonly terminalBlockId: string
-  readonly workspaceName: string
+  readonly scope: TerminalRunScope
   readonly workingDirectory: string
 }
 
@@ -29,19 +27,24 @@ export class TerminalSession {
   private failureReasonValue: string | null = null
 
   private constructor(
-    public readonly id: string,
-    public readonly terminalBlockId: string,
-    public readonly workspaceName: string,
+    public readonly scope: TerminalRunScope,
     public readonly workingDirectory: string
   ) {}
 
   static create(input: CreateTerminalSessionInput): TerminalSession {
-    return new TerminalSession(
-      input.id ?? createSessionId(),
-      input.terminalBlockId,
-      input.workspaceName,
-      input.workingDirectory
-    )
+    return new TerminalSession(input.scope, input.workingDirectory)
+  }
+
+  get id(): string {
+    return this.scope.sessionId
+  }
+
+  get terminalBlockId(): string {
+    return this.scope.blockId
+  }
+
+  get workspaceName(): string {
+    return this.scope.workspaceName
   }
 
   get processId(): number | null {
@@ -74,6 +77,12 @@ export class TerminalSession {
     this.recordedInput.push(input)
   }
 
+  markStopping(): void {
+    if (this.statusValue === 'running') {
+      this.statusValue = 'stopping'
+    }
+  }
+
   markExited(input: { readonly exitCode: number | null }): void {
     this.statusValue = 'exited'
     this.exitCodeValue = input.exitCode
@@ -86,6 +95,7 @@ export class TerminalSession {
 
   toSnapshot(): TerminalSessionSnapshot {
     return {
+      ...this.scope,
       id: this.id,
       terminalBlockId: this.terminalBlockId,
       workspaceName: this.workspaceName,
@@ -97,8 +107,4 @@ export class TerminalSession {
       failureReason: this.failureReasonValue
     }
   }
-}
-
-function createSessionId(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `terminal-session-${Date.now()}-${Math.random()}`
 }

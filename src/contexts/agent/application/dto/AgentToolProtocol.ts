@@ -1,8 +1,8 @@
 import type {
-  BlockGraphSnapshot,
-  BlockPositionSnapshot,
-  TerminalBlockSizeSnapshot
-} from '../../../block-graph/application/dto/BlockGraphSnapshot'
+  AgentBlockGraphSnapshot,
+  AgentBlockPositionSnapshot,
+  AgentTerminalBlockSizeSnapshot
+} from './AgentBlockGraphProtocol'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 import type {
   AgentTerminalExecutionConfigSnapshot,
@@ -266,8 +266,8 @@ export interface CreateBlockAgentToolInput {
   readonly description?: string
   readonly launchCommand?: string
   readonly name: string
-  readonly position?: BlockPositionSnapshot
-  readonly size?: TerminalBlockSizeSnapshot
+  readonly position?: AgentBlockPositionSnapshot
+  readonly size?: AgentTerminalBlockSizeSnapshot
   readonly type: 'terminal'
 }
 
@@ -276,8 +276,8 @@ export interface UpdateBlockAgentToolInput {
   readonly description?: string
   readonly launchCommand?: string
   readonly name?: string
-  readonly position?: BlockPositionSnapshot
-  readonly size?: TerminalBlockSizeSnapshot
+  readonly position?: AgentBlockPositionSnapshot
+  readonly size?: AgentTerminalBlockSizeSnapshot
 }
 
 export interface DeleteBlockAgentToolInput {
@@ -292,7 +292,7 @@ export interface CreateTerminalGroupAgentToolInput {
 export interface UpdateTerminalGroupAgentToolInput {
   readonly isCollapsed?: boolean
   readonly name?: string
-  readonly position?: BlockPositionSnapshot
+  readonly position?: AgentBlockPositionSnapshot
   readonly terminalGroupId: string
 }
 
@@ -359,7 +359,7 @@ type AgentToolCompletedOutput = Exclude<AgentToolOutput, { readonly type: 'tool_
 
 export type AgentToolStructuredContent =
   | {
-      readonly graph: BlockGraphSnapshot
+      readonly graph: AgentBlockGraphSnapshot
       readonly graphChanged: boolean
       readonly output: Extract<AgentToolCompletedOutput, { readonly type: 'block_graph' }>
       readonly status: 'completed'

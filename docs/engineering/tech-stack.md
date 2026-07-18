@@ -54,6 +54,10 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY；xt
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
+受管本地服务使用 Node.js `net.Server` 在 `127.0.0.1` 上预留固定、首选或操作系统动态端口，并在启动 PTY 前通过显式环境变量或安全命令参数后缀注入实际端口。预留句柄不能移交给任意项目进程，因此释放预留到目标进程监听之间仍存在竞争；Run 使用有限分配/激活重试和监听所有权校验收束该窗口，不引入新的第三方依赖。
+
+当前监听所有权验证只在 macOS 上使用系统 `/usr/sbin/lsof` 和 `/bin/ps`，通过两次监听 PID 快照、受管根进程存活检查和进程祖先关系证明监听者属于本次 PTY。Linux 和 Windows 保留 Run 应用端口边界，但当前适配器不能证明所有权时按 `unknown` 失败关闭，不把 TCP 可连接误判为服务就绪。进程清理在 POSIX 上等待异步 PTY/进程组退出；不持久化 PID，也不根据重启后的陈旧 PID 自动终止进程。
+
 ## Agent 集成
 
 当前嵌入式 Agent 使用 Codex CLI。cleancode 通过 node-pty 启动独立进程，通过 Codex CLI 的正式 resume 入口恢复 thread，并由进程级 `notify` 向本机随机令牌通道报告当前 thread UUID，不扫描历史目录或修改用户全局配置。

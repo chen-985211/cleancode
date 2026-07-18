@@ -1,5 +1,10 @@
 import type { BlockGraphSnapshot } from '../dto/BlockGraphSnapshot'
 import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
+import {
+  noopTerminalRunLifecyclePort,
+  type TerminalRunLifecycleLease,
+  type TerminalRunLifecyclePort
+} from '../ports/TerminalRunLifecyclePort'
 import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface DeleteBlockCommand {
@@ -9,15 +14,42 @@ export interface DeleteBlockCommand {
 }
 
 export class DeleteBlockUseCase {
-  constructor(private readonly graphRepository: BlockGraphRepository) {}
+  constructor(
+    private readonly graphRepository: BlockGraphRepository,
+    private readonly terminalRunLifecycle: TerminalRunLifecyclePort = noopTerminalRunLifecyclePort
+  ) {}
 
   async execute(command: DeleteBlockCommand): Promise<BlockGraphSnapshot> {
-    const transaction = await executeDefaultGraphTransaction(
-      this.graphRepository,
-      command,
-      (graph) => graph.deleteBlock(command.blockId)
-    )
+    const leaseState: { current: TerminalRunLifecycleLease | null } = { current: null }
+    let disposalConfirmed = false
+    let transactionCommitted = false
 
-    return transaction.graph
+    try {
+      const transaction = await executeDefaultGraphTransaction(
+        this.graphRepository,
+        command,
+        async (graph) => {
+          graph.ensureTerminalBlockExists(command.blockId)
+          leaseState.current = await this.terminalRunLifecycle.acquireTerminalDeletion({
+            blockId: command.blockId,
+            projectDirectory: command.projectDirectory,
+            projectId: graph.projectId,
+            workspaceName: command.workspaceName
+          })
+          await leaseState.current.hardDispose()
+          disposalConfirmed = true
+          graph.deleteBlock(command.blockId)
+        }
+      )
+
+      transactionCommitted = true
+      return transaction.graph
+    } finally {
+      if (leaseState.current) {
+        if (transactionCommitted) leaseState.current.resolve()
+        else if (disposalConfirmed) leaseState.current.release()
+        else leaseState.current.quarantine()
+      }
+    }
   }
 }

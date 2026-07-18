@@ -5,6 +5,10 @@ import {
   noopWorkspaceAgentLifecyclePort,
   type WorkspaceAgentLifecyclePort
 } from '../ports/WorkspaceAgentLifecyclePort'
+import {
+  noopWorkspaceRunLifecyclePort,
+  type WorkspaceRunLifecyclePort
+} from '../ports/WorkspaceRunLifecyclePort'
 import { ProjectRegistryTransactionCoordinator } from './ProjectRegistryTransactionCoordinator'
 import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransactionCoordinator'
 
@@ -17,7 +21,8 @@ export class ForgetProjectUseCase {
     private readonly projectRegistryRepository: ProjectRegistryRepository,
     private readonly workspaceAgentLifecyclePort: WorkspaceAgentLifecyclePort = noopWorkspaceAgentLifecyclePort,
     private readonly workspaceTransactionCoordinator = new ProjectWorkspaceTransactionCoordinator(),
-    private readonly registryTransactionCoordinator = new ProjectRegistryTransactionCoordinator()
+    private readonly registryTransactionCoordinator = new ProjectRegistryTransactionCoordinator(),
+    private readonly workspaceRunLifecyclePort: WorkspaceRunLifecyclePort = noopWorkspaceRunLifecyclePort
   ) {}
 
   async execute(command: ForgetProjectCommand): Promise<ProjectRegistrySnapshot> {
@@ -30,6 +35,13 @@ export class ForgetProjectUseCase {
     command: ForgetProjectCommand
   ): Promise<ProjectRegistrySnapshot> {
     const agentLease = await this.workspaceAgentLifecyclePort.disposeProject(command.directory)
+    let runLease
+    try {
+      runLease = await this.workspaceRunLifecyclePort.disposeProject(command.directory)
+    } catch (error) {
+      agentLease.release()
+      throw error
+    }
     let transactionCommitted = false
     try {
       const registry = await this.registryTransactionCoordinator.run(() =>
@@ -39,8 +51,13 @@ export class ForgetProjectUseCase {
 
       return registry
     } finally {
-      if (transactionCommitted) agentLease.resolve()
-      else agentLease.release()
+      if (transactionCommitted) {
+        agentLease.resolve()
+        runLease.resolve()
+      } else {
+        agentLease.release()
+        runLease.release()
+      }
     }
   }
 

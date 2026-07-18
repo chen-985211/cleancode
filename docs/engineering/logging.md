@@ -62,7 +62,7 @@
 
 - `timestamp`：日志发生时间。
 - `level`：`debug`、`info`、`warn` 或 `error`。
-- `scope`：日志来源，例如 `project.git`、`project.workspace`、`block-graph`、`run.terminal`。
+- `scope`：日志来源，例如 `project.git`、`project.workspace`、`block-graph`、`run.terminal`、`run.service-port`。
 - `operation`：应用动作，例如 `createBranchWorkspace`。
 - `outcome`：`success` 或 `failure`。
 - `durationMs`：操作耗时。
@@ -100,6 +100,14 @@
 - `MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES`
 - `TERMINAL_SESSION_NOT_FOUND`
 - `BLOCK_GRAPH_NOT_FOUND`
+- `RUN_SCOPE_STALE`
+- `RUN_START_BLOCKED`
+- `SERVICE_PORT_FIXED_CONFLICT`
+- `SERVICE_PORT_ALLOCATION_EXHAUSTED`
+- `SERVICE_LISTENER_OWNERSHIP_MISMATCH`
+- `SERVICE_LISTENER_OWNERSHIP_UNVERIFIED`
+- `SERVICE_PORT_CLEANUP_FAILED`
+- `SERVICE_ENDPOINT_NOT_OPENABLE`
 - `UNEXPECTED_ERROR`
 
 新增业务错误时必须先登记错误码，再在用例、聚合或平台边界使用。
@@ -147,6 +155,8 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 - 大段文件内容。
 
 路径可以作为本地诊断信息记录，但不得把路径当成业务事实来源。
+
+本地服务端口诊断可以记录稳定运行身份、候选/实际端口、租约状态、所有权分类、有限重试次数和结构化失败原因；不得记录完整环境变量、Bearer Token、项目命令输出或把操作系统 PID 直接提升为用户可见业务身份。当前冲突界面不展示外部 PID，也不提供终止未知进程的动作。
 
 ## 工程门禁
 

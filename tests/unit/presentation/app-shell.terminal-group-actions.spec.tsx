@@ -82,35 +82,35 @@ describe('app shell terminal group actions', () => {
     const startTerminal = vi.fn(async (command) =>
       createTerminalSessionSnapshot(command.terminalBlockId)
     )
-    const writeTerminal = vi.fn(async () => createTerminalSessionSnapshot('written-terminal'))
+    const launchTerminal = vi.fn(async () => ({
+      session: createTerminalSessionSnapshot('backend-terminal'),
+      endpoint: null
+    }))
+    const writeTerminal = vi.fn()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      startTerminal,
+      writeTerminal
+    })
+    Object.assign(runtimeApi, { launchTerminal })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench]),
-        startTerminal,
-        writeTerminal
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
 
     fireEvent.click(await screen.findByRole('button', { name: '启动项目 启动组合命令' }))
 
-    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(2))
-    expect(startTerminal).toHaveBeenCalledWith(
-      expect.objectContaining({ terminalBlockId: 'backend-terminal' })
-    )
+    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
     expect(startTerminal).toHaveBeenCalledWith(
       expect.objectContaining({ terminalBlockId: 'frontend-terminal' })
     )
-    await waitFor(() =>
-      expect(writeTerminal).toHaveBeenCalledWith({
-        sessionId: 'backend-terminal-session',
-        input: 'pnpm dev:api\r'
-      })
+    expect(launchTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({ terminalBlockId: 'backend-terminal' })
     )
-    expect(writeTerminal).toHaveBeenCalledTimes(1)
+    expect(writeTerminal).not.toHaveBeenCalled()
   })
 
   it('restarts group members without centering member terminals', async () => {
@@ -234,8 +234,18 @@ function createWorkbenchWithTerminalGroup(): WorkbenchSnapshot {
 }
 
 function createTerminalSessionSnapshot(terminalBlockId: string): TerminalSessionSnapshot {
+  const sessionId = `${terminalBlockId}-session`
+
   return {
-    id: `${terminalBlockId}-session`,
+    id: sessionId,
+    projectId: 'project-alpha-project',
+    projectDirectory: '/tmp/alpha-project',
+    workspaceDirectory: '/tmp/alpha-project',
+    gitBranch: null,
+    blockId: terminalBlockId,
+    sessionId,
+    runId: `${sessionId}-run`,
+    generation: 1,
     terminalBlockId,
     workspaceName: 'main',
     workingDirectory: '/tmp/alpha-project',

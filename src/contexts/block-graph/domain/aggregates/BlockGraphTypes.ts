@@ -32,16 +32,32 @@ interface TerminalOutputReadinessSnapshot {
 
 interface TerminalTcpReadinessSnapshot {
   readonly type: 'tcp'
-  readonly port: number
 }
 
-type TerminalServiceReadinessSnapshot =
+export type TerminalServiceReadinessSnapshot =
   TerminalOutputReadinessSnapshot | TerminalTcpReadinessSnapshot
+
+export type TerminalServicePortPolicySnapshot =
+  | { readonly type: 'fixed'; readonly port: number }
+  | { readonly type: 'preferred'; readonly port: number }
+  | { readonly type: 'auto' }
+
+export type TerminalServicePortBindingSnapshot =
+  | { readonly type: 'none' }
+  | { readonly type: 'environment'; readonly variableName: string }
+  | { readonly type: 'argument'; readonly template: string }
+
+export interface TerminalServicePortIntentSnapshot {
+  readonly protocol: 'http' | 'https' | 'tcp'
+  readonly policy: TerminalServicePortPolicySnapshot
+  readonly binding: TerminalServicePortBindingSnapshot
+}
 
 interface TerminalServiceExecutionConfigSnapshot {
   readonly mode: 'service'
   readonly readiness: TerminalServiceReadinessSnapshot
   readonly readinessTimeoutMs: number
+  readonly port?: TerminalServicePortIntentSnapshot
 }
 
 export type TerminalExecutionConfigSnapshot =
@@ -122,6 +138,10 @@ export interface UpdateTerminalBlockMetadataInput {
   readonly name: string
   readonly description: string
   readonly launchCommand: string
+}
+
+export interface UpdateTerminalDefinitionInput extends UpdateTerminalBlockMetadataInput {
+  readonly executionConfig: TerminalExecutionConfigSnapshot
 }
 
 export interface ConnectTerminalBlocksInput {

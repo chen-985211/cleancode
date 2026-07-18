@@ -3,9 +3,20 @@ import type {
   CanvasViewportSnapshot,
   TerminalExecutionConfigSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
+
+interface TerminalDefinitionIpcCommand {
+  readonly projectDirectory: string
+  readonly workspaceName: string
+  readonly blockId: string
+  readonly name: string
+  readonly description: string
+  readonly launchCommand: string
+  readonly executionConfig: TerminalExecutionConfigSnapshot
+}
 
 export interface BlockGraphIpcHandlersInput {
   readonly ipcMain: IpcMainLike
@@ -58,6 +69,15 @@ export interface BlockGraphIpcHandlersInput {
     readonly projectDirectory: string
     readonly workspaceName: string
     readonly blockId: string
+    readonly executionConfig: TerminalExecutionConfigSnapshot
+  }) => Promise<BlockGraphSnapshot>
+  readonly updateTerminalDefinition: (command: {
+    readonly projectDirectory: string
+    readonly workspaceName: string
+    readonly blockId: string
+    readonly name: string
+    readonly description: string
+    readonly launchCommand: string
     readonly executionConfig: TerminalExecutionConfigSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
@@ -251,6 +271,15 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     scope: 'block-graph'
   })
 
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:update-terminal-definition',
+    handler: (command) => input.updateTerminalDefinition(readTerminalDefinitionCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateTerminalDefinition',
+    scope: 'block-graph'
+  })
+
   registerIpcHandler<
     {
       readonly projectDirectory: string
@@ -386,4 +415,28 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     scope: 'block-graph',
     successLogLevel: 'info'
   })
+}
+
+function readTerminalDefinitionCommand(command: unknown): TerminalDefinitionIpcCommand {
+  if (
+    !isRecord(command) ||
+    typeof command.projectDirectory !== 'string' ||
+    typeof command.workspaceName !== 'string' ||
+    typeof command.blockId !== 'string' ||
+    typeof command.name !== 'string' ||
+    typeof command.description !== 'string' ||
+    typeof command.launchCommand !== 'string' ||
+    !isRecord(command.executionConfig)
+  ) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      'Invalid IPC command: complete terminal definition is required.'
+    )
+  }
+
+  return command as unknown as TerminalDefinitionIpcCommand
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

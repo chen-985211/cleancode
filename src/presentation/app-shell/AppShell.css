@@ -13,6 +13,7 @@
 @import './styles/terminal-group-node.css';
 @import './styles/terminal-group-toolbar.css';
 @import './styles/terminal-node.css';
+@import './styles/terminal-service-runtime.css';
 @import './styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';
 @import './styles/agent-tool-approval.css';
