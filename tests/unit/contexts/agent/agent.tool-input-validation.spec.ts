@@ -94,6 +94,53 @@ describe('agent tool input validation', () => {
     ).toMatchObject({ executionConfig: { port: { policy: { type: 'fixed' } } } })
   })
 
+  it.each([
+    {
+      binding: { type: 'environment', variableName: 'PORT' },
+      policy: { port: 4_173, type: 'preferred' }
+    },
+    {
+      binding: { template: '--port {port}', type: 'argument' },
+      policy: { port: 4_173, type: 'preferred' }
+    },
+    {
+      binding: { type: 'environment', variableName: 'PORT' },
+      policy: { type: 'auto' }
+    },
+    {
+      binding: { template: '--port {port}', type: 'argument' },
+      policy: { type: 'auto' }
+    }
+  ] as const)(
+    'round-trips a managed dynamic port using $policy.type with $binding.type injection',
+    ({ binding, policy }) => {
+      const input = {
+        blockId: 'terminal-api',
+        executionConfig: {
+          mode: 'service',
+          port: { binding, policy, protocol: 'http' },
+          readiness: { type: 'tcp' },
+          readinessTimeoutMs: 30_000
+        }
+      } as const
+
+      expect(parseAgentToolInput('update_terminal_execution_config', input)).toEqual(input)
+    }
+  )
+
+  it('keeps an output-readiness service without a managed port backward compatible', () => {
+    const input = {
+      blockId: 'terminal-worker',
+      executionConfig: {
+        mode: 'service',
+        readiness: { text: 'worker ready', type: 'output' },
+        readinessTimeoutMs: 30_000
+      }
+    } as const
+
+    expect(parseAgentToolInput('update_terminal_execution_config', input)).toEqual(input)
+  })
+
   it('rejects undeclared properties at the top level and in nested objects', () => {
     expectInvalidInput(
       () =>

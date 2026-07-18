@@ -4,6 +4,7 @@ export interface AgentToolJsonSchema {
   readonly additionalProperties?: boolean | AgentToolJsonSchema
   readonly const?: AgentToolJsonPrimitive
   readonly description?: string
+  readonly examples?: readonly unknown[]
   readonly items?: AgentToolJsonSchema
   readonly maximum?: number
   readonly minItems?: number

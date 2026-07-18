@@ -17,6 +17,8 @@ export function terminalBlockSizeSchema(): AgentToolJsonSchema {
 
 export function terminalExecutionConfigSchema(): AgentToolJsonSchema {
   return {
+    description:
+      'Complete task or service execution configuration. Local HTTP, HTTPS, or TCP development services should declare a managed port whenever their existing launch path can receive the runtime port.',
     oneOf: [
       objectSchema(
         {
@@ -69,82 +71,139 @@ function outputReadinessSchema(): AgentToolJsonSchema {
 
 function terminalServicePortIntentSchema(): AgentToolJsonSchema {
   return {
+    description:
+      'Managed port intent for parallel projects and worktrees. Prefer preferred(port) with a verified binding when the service has a conventional port; use auto when no conventional port matters; reserve fixed(port) for an explicitly immutable port.',
+    examples: [
+      {
+        binding: { template: '--port {port}', type: 'argument' },
+        policy: { port: 8_000, type: 'preferred' },
+        protocol: 'http'
+      },
+      {
+        binding: { type: 'environment', variableName: 'PORT' },
+        policy: { type: 'auto' },
+        protocol: 'http'
+      }
+    ],
     oneOf: [
-      objectSchema(
+      describedObjectSchema(
         {
-          binding: {
-            oneOf: [
-              nonePortBindingSchema(),
-              environmentPortBindingSchema(),
-              argumentPortBindingSchema()
-            ]
-          },
+          binding: dynamicPortBindingSchema(),
           policy: objectSchema(
             {
-              port: { maximum: 65_535, minimum: 1, type: 'integer' },
-              type: { const: 'fixed' }
-            },
-            ['type', 'port']
-          ),
-          protocol: serviceProtocolSchema()
-        },
-        ['protocol', 'policy', 'binding']
-      ),
-      objectSchema(
-        {
-          binding: { oneOf: [environmentPortBindingSchema(), argumentPortBindingSchema()] },
-          policy: objectSchema(
-            {
-              port: { maximum: 65_535, minimum: 1, type: 'integer' },
+              port: {
+                description: 'Conventional port to try before falling back.',
+                maximum: 65_535,
+                minimum: 1,
+                type: 'integer'
+              },
               type: { const: 'preferred' }
             },
             ['type', 'port']
           ),
           protocol: serviceProtocolSchema()
         },
-        ['protocol', 'policy', 'binding']
+        ['protocol', 'policy', 'binding'],
+        'The recommended default for a local development service with a conventional port: try that port, then fall back when parallel projects or worktrees already use it. The actual port must be injected.'
       ),
-      objectSchema(
+      describedObjectSchema(
         {
-          binding: { oneOf: [environmentPortBindingSchema(), argumentPortBindingSchema()] },
+          binding: dynamicPortBindingSchema(),
           policy: objectSchema({ type: { const: 'auto' } }, ['type']),
           protocol: serviceProtocolSchema()
         },
-        ['protocol', 'policy', 'binding']
+        ['protocol', 'policy', 'binding'],
+        'Use when the project has no meaningful conventional port and any available port is acceptable. The actual port must be injected.'
+      ),
+      describedObjectSchema(
+        {
+          binding: {
+            description:
+              'Choose a verified injection when useful, or none only when the existing command or project configuration already binds the exact fixed port.',
+            oneOf: [
+              environmentPortBindingSchema(),
+              argumentPortBindingSchema(),
+              nonePortBindingSchema()
+            ]
+          },
+          policy: objectSchema(
+            {
+              port: {
+                description: 'Exact required port. No fallback occurs.',
+                maximum: 65_535,
+                minimum: 1,
+                type: 'integer'
+              },
+              type: { const: 'fixed' }
+            },
+            ['type', 'port']
+          ),
+          protocol: serviceProtocolSchema()
+        },
+        ['protocol', 'policy', 'binding'],
+        'Use only when the user or project contract explicitly requires the exact port. A conflict fails instead of falling back, so this is not the default for parallel worktrees.'
       )
     ]
   }
 }
 
 function serviceProtocolSchema(): AgentToolJsonSchema {
-  return { oneOf: [{ const: 'http' }, { const: 'https' }, { const: 'tcp' }] }
+  return {
+    description:
+      'Protocol used to form the actual service endpoint; HTTP and HTTPS endpoints can be opened, while TCP endpoints can only be copied.',
+    oneOf: [{ const: 'http' }, { const: 'https' }, { const: 'tcp' }]
+  }
 }
 
 function nonePortBindingSchema(): AgentToolJsonSchema {
-  return objectSchema({ type: { const: 'none' } }, ['type'])
+  return describedObjectSchema(
+    { type: { const: 'none' } },
+    ['type'],
+    'This binding does not inject a port. Use it only with fixed when the existing launch command or project configuration already binds that exact port.'
+  )
 }
 
 function environmentPortBindingSchema(): AgentToolJsonSchema {
-  return objectSchema(
+  return describedObjectSchema(
     {
       type: { const: 'environment' },
       variableName: { pattern: '^[A-Za-z_][A-Za-z0-9_]*$', type: 'string' }
     },
-    ['type', 'variableName']
+    ['type', 'variableName'],
+    'Inject the actual allocated port through an environment variable that the existing project launch path already reads. Do not invent an unsupported variable.'
   )
 }
 
 function argumentPortBindingSchema(): AgentToolJsonSchema {
-  return objectSchema(
+  return describedObjectSchema(
     {
       template: {
+        description:
+          'Safe suffix appended to the launch command, with exactly one {port} placeholder replaced by the actual allocated port. Example: --port {port}.',
         pattern: '^[A-Za-z0-9_./:=\\- ]*\\{port\\}[A-Za-z0-9_./:=\\- ]*$',
         type: 'string'
       },
       type: { const: 'argument' }
     },
-    ['type', 'template']
+    ['type', 'template'],
+    'Append a safe argument suffix containing {port}. Use it only when the existing CLI or task wrapper accepts that argument.'
   )
+}
+
+function dynamicPortBindingSchema(): AgentToolJsonSchema {
+  return {
+    description:
+      'Dynamic policies require one verified way to pass the actual allocated port to the existing service launch path.',
+    oneOf: [environmentPortBindingSchema(), argumentPortBindingSchema()]
+  }
+}
+
+function describedObjectSchema(
+  properties: Readonly<Record<string, AgentToolJsonSchema>>,
+  required: readonly string[],
+  description: string
+): AgentToolJsonSchema {
+  return { ...objectSchema(properties, required), description }
 }
 
 export function terminalWorkflowPlanScopeSchema(): AgentToolJsonSchema {

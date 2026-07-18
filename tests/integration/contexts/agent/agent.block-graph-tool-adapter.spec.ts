@@ -59,6 +59,30 @@ describe('agent block graph workflow tool adapter', () => {
       readiness: { type: 'tcp' },
       readinessTimeoutMs: 30_000
     })
+    const automaticallyConfigured = await adapter.updateTerminalExecutionConfig(context, {
+      blockId: terminalIds.install,
+      executionConfig: {
+        mode: 'service',
+        port: {
+          binding: { template: '--port {port}', type: 'argument' },
+          policy: { type: 'auto' },
+          protocol: 'http'
+        },
+        readiness: { type: 'tcp' },
+        readinessTimeoutMs: 30_000
+      }
+    })
+
+    expect(findBlock(automaticallyConfigured, terminalIds.install).executionConfig).toEqual({
+      mode: 'service',
+      port: {
+        binding: { template: '--port {port}', type: 'argument' },
+        policy: { type: 'auto' },
+        protocol: 'http'
+      },
+      readiness: { type: 'tcp' },
+      readinessTimeoutMs: 30_000
+    })
 
     const unrelatedConnection = await adapter.connectTerminalBlocks(context, {
       sourceBlockId: terminalIds.build,
@@ -86,6 +110,17 @@ describe('agent block graph workflow tool adapter', () => {
       context.workspaceName
     )
 
+    if (!persisted) throw new Error('Expected the configured graph to be persisted.')
+    expect(findBlock(persisted, terminalIds.install).executionConfig).toEqual({
+      mode: 'service',
+      port: {
+        binding: { template: '--port {port}', type: 'argument' },
+        policy: { type: 'auto' },
+        protocol: 'http'
+      },
+      readiness: { type: 'tcp' },
+      readinessTimeoutMs: 30_000
+    })
     expect(disconnected.connections).toEqual([
       expect.objectContaining({ id: unrelatedConnection.connectionId })
     ])

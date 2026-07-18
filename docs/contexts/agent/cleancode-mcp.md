@@ -101,13 +101,15 @@ Agent 会话释放时先同步关闭新工具调用准入并注销对应端点�
 
 切换运行中 Agent 的能力时，先保存期望状态，再取消旧审批、停止旧 PTY、注销旧端点并生成新 `sessionId`，随后使用原 Codex thread 重启。关闭后只移除未来调用能力；原 thread 中已经存在的 MCP 交互记录仍属于 Codex 对话历史。没有活动 PTY 时只持久化开关，待下次附加时生效。
 
+进程级 `developer_instructions` 和 MCP 工具元数据分别在 Codex PTY 启动与 MCP 初始化时读取。应用升级这些协议内容后，已经运行的旧 Agent 不会在原进程内热替换指令；必须重新附加、切换一次 MCP 能力或重启 Agent PTY 才能获得新版本。持久化 Codex thread 可以继续恢复，不要求丢弃对话历史。
+
 ## MCP 协议面
 
 当前初始化结果声明：
 
 - MCP `protocolVersion`：`2025-06-18`。
 - Server 名称：`cleancode-agent-tools`。
-- Server 版本：`0.3.0`。
+- Server 版本：`0.3.1`。
 - Capability：`tools`，且 `listChanged` 为 `false`。
 
 当前只处理以下方法：
@@ -136,7 +138,7 @@ Agent 会话释放时先同步关闭新工具调用准入并注销对应端点�
 | `create_terminal_group`            | 用至少两个现有终端积木创建视觉组合            | `name`、`memberBlockIds`         | 无                                                         | 否      |
 | `update_terminal_group`            | 更新组合名称、位置或折叠状态                  | `terminalGroupId`                | `name`、`position`、`isCollapsed`                          | 否      |
 | `delete_terminal_group`            | 解散组合并保留成员终端                        | `terminalGroupId`                | 无                                                         | 是      |
-| `update_terminal_execution_config` | 替换终端的 task/service 执行配置              | `blockId`、`executionConfig`     | 无                                                         | 否      |
+| `update_terminal_execution_config` | 替换 task/service 配置并声明服务端口意图      | `blockId`、`executionConfig`     | 无                                                         | 否      |
 | `connect_terminal_blocks`          | 建立 source 上游到 target 下游的依赖          | `sourceBlockId`、`targetBlockId` | 无                                                         | 否      |
 | `disconnect_terminal_blocks`       | 按 `connectionId` 断开一条依赖并保留终端      | `connectionId`                   | 无                                                         | 是      |
 | `inspect_terminal_workflow_plan`   | 构建并校验拓扑计划，不启动任何进程            | `scope`                          | 无                                                         | 否      |
@@ -144,11 +146,13 @@ Agent 会话释放时先同步关闭新工具调用准入并注销对应端点�
 
 `executionConfig` 必须是完整 task 或 service 联合结构。`0.3.0` 在保持 12 个工具名称不变的前提下扩展 service Schema：输出就绪服务可以不声明端口；TCP 就绪以及任何受管服务必须声明 `port`，其中策略为 `fixed(port)`、`preferred(port)` 或 `auto`，协议为 `http`、`https` 或 `tcp`，注入为固定策略可用的 `none`、环境变量或恰好包含一个 `{port}` 的安全参数模板。动态策略不能搭配 `none`。这些字段只是 BlockGraph 持久化意图；工具仍不能分配端口、启动 PTY 或返回实际端点。
 
+`0.3.1` 不改变上述输入形状，而是把并行端口决策变成 Agent 可发现的协议事实。Developer Instructions、MCP 初始化说明、工具描述和嵌套 JSON Schema 统一要求：本地 HTTP/HTTPS/TCP 开发服务存在惯用端口时，默认使用 `preferred(port)` 与已经验证的注入；没有惯用端口时使用 `auto` 与已经验证的注入；只有用户或项目契约明确要求端口不可变化时才使用 `fixed`。环境变量注入只允许选择项目现有启动路径已经读取的变量，参数注入只允许选择现有 CLI 或任务包装器已经接受的安全 `{port}` 后缀；Agent 不得猜测 `PORT`、仅因日志出现 `8000` 就选择 `fixed + none`，也不得为支持动态端口擅自修改源码或项目配置。Schema 把推荐的 `preferred` 和 `auto` 分支放在 `fixed` 前，并提供可由同一 Schema 校验的结构化示例。
+
 工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点。
 
 `create_block` 显式提供 `position` 时原样采用；省略时，应用层从当前受管 Agent 的持久化布局注入 anchor，并把同工作区其他 Agent 注入为 reserved regions，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
 
-Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置和依赖，再执行后续变更。创建终端积木、组合和连接的结果会在可识别时分别返回新对象 ID；完成工作流创作后，应先对精确相关终端调用 `arrange_terminal_layout`，再调用 `inspect_terminal_workflow_plan`，利用 BlockGraph 的既有规则统一验证缺失命令、作用范围和拓扑顺序。
+Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置和依赖，再执行后续变更。创建终端积木、组合和连接的结果会在可识别时分别返回新对象 ID；完成工作流创作后，应先对精确相关终端调用 `arrange_terminal_layout`，再调用 `inspect_terminal_workflow_plan`，利用 BlockGraph 的既有规则统一验证缺失命令、服务端口意图、作用范围和拓扑顺序。Agent 的最终说明应报告持久化的策略与注入方式，不能把请求端口误报为本次运行的实际端点。
 
 所有工具通过 MCP `annotations` 如实声明副作用：`inspect_graph` 和 `inspect_terminal_workflow_plan` 的 `readOnlyHint` 为 `true`；创建、更新和连接属于非破坏性写入；删除积木、解散组合和断开依赖的 `destructiveHint` 为 `true`；所有当前工具的 `openWorldHint` 都为 `false`。即使 Server 级默认预批准避免了 Codex 原生审批，这些注解仍必须真实描述工具风险，并且不能替代 cleancode UI 审批。
 
@@ -234,7 +238,7 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 | Unit / Agent application | 输入校验、12 工具路由、身份注入、动态变更、稳定调用 ID、审计、审批收束、工作区串行和会话关闭排空     | [`agent.tool-input-validation.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-input-validation.spec.ts)、[`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.execute-layout-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-layout-tool.spec.ts)、[`agent.tool-approval-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-coordinator.spec.ts)、[`agent.tool-invocation-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-invocation-coordinator.spec.ts)、[`agent.session-tool-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-tool-lifecycle.spec.ts) |
 | Unit / Presentation      | 审批投影、布局事件、整组拖动保护、真实几何投影等待和单次聚焦                                         | [`agent-approval-presentation.spec.ts`](../../../tests/unit/presentation/agent-approval-presentation.spec.ts)、[`use-agent-layout-coordination.spec.tsx`](../../../tests/unit/presentation/use-agent-layout-coordination.spec.tsx)、[`workbench-layout-focus.spec.tsx`](../../../tests/unit/presentation/workbench-layout-focus.spec.tsx)、[`agent-layout-projection-timing.spec.tsx`](../../../tests/unit/presentation/agent-layout-projection-timing.spec.tsx)、[`preserve-workbench-node-transient-layout.spec.ts`](../../../tests/unit/presentation/preserve-workbench-node-transient-layout.spec.ts)                                                                                            |
 | Contract / tool protocol | 12 个工具、共源严格输入/输出 Schema、安全注解和排除的通用工具                                        | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Contract / JSON-RPC      | `0.3.0` 初始化、工具列表、稳定调用 ID、结构化/净化错误                                               | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Contract / JSON-RPC      | `0.3.1` 初始化、自描述端口策略、工具列表、稳定调用 ID、结构化/净化错误                               | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Contract / HTTP          | 本机端点、Bearer 鉴权、1 MiB 请求体上限、监听失败/并发初始化、净化请求错误和业务错误的 HTTP 200 通道 | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Integration / BlockGraph | 四个工作流工具复用真实 BlockGraph 用例、持久化与领域错误透传                                         | [`agent.block-graph-tool-adapter.spec.ts`](../../../tests/integration/contexts/agent/agent.block-graph-tool-adapter.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Integration / Codex PTY  | 条件注入 URL/Token/required/会话路由/默认预批准、继承全局权限和关闭时环境隔离                        | [`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -250,6 +254,7 @@ Codex MCP 配置中的默认工具批准模式不替代这层产品审批。破�
 7. 在没有更高优先级组织受管策略覆盖时，任意 CleanCode MCP 工具调用都不触发 Codex 原生审批；破坏性工具仍只等待 cleancode UI 审批。
 8. MCP Server 无法初始化时，开启该能力的 Codex 会话启动或恢复失败并展示异常，不进入缺少画布工具的可交互状态。
 9. Agent 完成终端工作流后只排列精确相关终端；布局位于发起 Agent 附近并避开其他 Agent/无关对象，用户同时拖动的终端或组合不被迟到布局覆盖，实际变化最多触发一次画布聚焦。
+10. 为两个可能并行运行的项目或 worktree 搭建本地服务工作流时，Agent 对已有惯用端口默认写入 `preferred` 与经仓库确认的环境变量或参数注入；没有惯用端口时使用 `auto`；只有明确不可变端口约束时才写入 `fixed`，并在最终说明中报告策略和注入方式而不是声称已经获得实际端点。
 
 ## 第二阶段候选：运行态 MCP（尚未实现）
 

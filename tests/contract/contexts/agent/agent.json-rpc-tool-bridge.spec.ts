@@ -20,8 +20,8 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       id: 1,
       jsonrpc: '2.0',
       result: expect.objectContaining({
-        instructions: expect.stringContaining('arrange_terminal_layout'),
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.3.0' }
+        instructions: expect.stringMatching(/arrange_terminal_layout[\s\S]*preferred/),
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.3.1' }
       })
     })
   })

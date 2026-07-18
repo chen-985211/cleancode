@@ -3,7 +3,10 @@ import {
   cleancodeMcpDeveloperInstructions,
   cleancodeMcpInstructions
 } from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
-import type { AgentToolJsonSchema } from '../../../../src/contexts/agent/application/dto/AgentToolJsonSchema'
+import {
+  findAgentToolJsonSchemaIssue,
+  type AgentToolJsonSchema
+} from '../../../../src/contexts/agent/application/dto/AgentToolJsonSchema'
 
 describe('agent tool protocol', () => {
   it('exposes the complete first-phase cleancode workflow authoring tool catalog', () => {
@@ -98,6 +101,81 @@ describe('agent tool protocol', () => {
         })
       ]
     })
+  })
+
+  it('teaches agents how to choose and inject managed service ports for parallel worktrees', () => {
+    const updateExecutionConfig = requireTool('update_terminal_execution_config')
+    const executionConfigSchema = readSchemaProperty(
+      updateExecutionConfig.inputSchema,
+      'executionConfig'
+    ) as AgentToolJsonSchema
+    const serviceWithPort = executionConfigSchema.oneOf?.find(
+      (variant) => variant.required?.includes('port') && variant.required.includes('readiness')
+    )
+    const portIntentSchema = serviceWithPort
+      ? (readSchemaProperty(serviceWithPort, 'port') as AgentToolJsonSchema)
+      : undefined
+    const policyOrder = portIntentSchema?.oneOf?.map(readPortPolicyType)
+    const preferredPolicy = portIntentSchema?.oneOf?.find(
+      (variant) => readPortPolicyType(variant) === 'preferred'
+    )
+    const fixedPolicy = portIntentSchema?.oneOf?.find(
+      (variant) => readPortPolicyType(variant) === 'fixed'
+    )
+    const preferredBindings = preferredPolicy
+      ? (readSchemaProperty(preferredPolicy, 'binding') as AgentToolJsonSchema)
+      : undefined
+    const fixedBindings = fixedPolicy
+      ? (readSchemaProperty(fixedPolicy, 'binding') as AgentToolJsonSchema)
+      : undefined
+    const examples = portIntentSchema?.examples ?? []
+
+    expect(updateExecutionConfig.description).toContain('preferred')
+    expect(updateExecutionConfig.description).toContain('fixed')
+    expect(portIntentSchema).toMatchObject({
+      description: expect.stringContaining('parallel')
+    })
+    expect(examples.map(readPortExampleDiscriminators)).toEqual(
+      expect.arrayContaining([
+        ['preferred', 'argument'],
+        ['auto', 'environment']
+      ])
+    )
+    for (const example of examples) {
+      expect(
+        findAgentToolJsonSchemaIssue(portIntentSchema as AgentToolJsonSchema, example)
+      ).toBeNull()
+    }
+    expect(policyOrder).toEqual(['preferred', 'auto', 'fixed'])
+    for (const policyVariant of portIntentSchema?.oneOf ?? []) {
+      expect(policyVariant.description).toEqual(expect.stringMatching(/\S/))
+      const bindings = readSchemaProperty(policyVariant, 'binding') as AgentToolJsonSchema
+      for (const bindingVariant of bindings.oneOf ?? []) {
+        expect(bindingVariant.description).toEqual(expect.stringMatching(/\S/))
+      }
+    }
+    expect(preferredPolicy?.description).toContain('recommended default')
+    expect(fixedPolicy?.description).toContain('conflict')
+    expect(
+      preferredBindings?.oneOf?.find((binding) => readBindingType(binding) === 'environment')
+        ?.description
+    ).toContain('already reads')
+    expect(
+      preferredBindings?.oneOf?.find((binding) => readBindingType(binding) === 'argument')
+        ?.description
+    ).toContain('{port}')
+    expect(
+      fixedBindings?.oneOf?.find((binding) => readBindingType(binding) === 'none')?.description
+    ).toContain('does not inject')
+
+    for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
+      expect(instructions).toContain('preferred')
+      expect(instructions).toContain('auto')
+      expect(instructions).toContain('fixed')
+      expect(instructions).toContain('{port}')
+      expect(instructions).toContain('worktree')
+      expect(instructions).toContain('actual allocated port')
+    }
   })
 
   it('declares an output schema for every structured tool result', () => {
@@ -346,4 +424,23 @@ function readSchemaProperty(schema: AgentToolJsonSchema, propertyName: string): 
   }
 
   return properties[propertyName]
+}
+
+function readPortPolicyType(schema: AgentToolJsonSchema): unknown {
+  const policy = readSchemaProperty(schema, 'policy') as AgentToolJsonSchema
+  const type = readSchemaProperty(policy, 'type') as AgentToolJsonSchema
+  return type.const
+}
+
+function readBindingType(schema: AgentToolJsonSchema): unknown {
+  return (readSchemaProperty(schema, 'type') as AgentToolJsonSchema).const
+}
+
+function readPortExampleDiscriminators(example: unknown): readonly unknown[] {
+  if (!isRecord(example) || !isRecord(example.policy) || !isRecord(example.binding)) return []
+  return [example.policy.type, example.binding.type]
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
 }

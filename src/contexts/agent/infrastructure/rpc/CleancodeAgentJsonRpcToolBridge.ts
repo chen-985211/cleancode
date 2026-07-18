@@ -45,7 +45,7 @@ export class CleancodeAgentJsonRpcToolBridge {
         capabilities: { tools: { listChanged: false } },
         instructions: cleancodeMcpInstructions,
         protocolVersion: '2025-06-18',
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.3.0' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.3.1' }
       })
     }
 
