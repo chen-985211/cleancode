@@ -56,7 +56,7 @@ describe('application settings', () => {
     expect(terminalRecorder).toHaveAttribute('aria-pressed', 'true')
     expect(terminalRecorder).toHaveTextContent('请按下新的快捷键')
 
-    fireEvent.keyDown(terminalRecorder, { key: 'a', metaKey: true })
+    fireEvent.keyDown(terminalRecorder, { key: 'a', metaKey: true, shiftKey: true })
 
     expect(screen.getByRole('alert')).toHaveTextContent('该快捷键已分配给“新建 Agent”')
     expect(terminalRecorder).toHaveTextContent('请按下新的快捷键')
@@ -80,7 +80,7 @@ describe('application settings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '恢复“新建 Agent”的默认快捷键' }))
     expect(agentRecorder).toHaveTextContent('⌘')
-    expect(agentRecorder).not.toHaveTextContent('⇧')
+    expect(agentRecorder).toHaveTextContent('⇧')
     expect(agentRecorder).toHaveTextContent('A')
 
     const terminalRecorder = screen.getByRole('button', { name: '修改“新建终端积木”快捷键' })

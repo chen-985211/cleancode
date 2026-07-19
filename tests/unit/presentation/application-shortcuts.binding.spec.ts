@@ -18,6 +18,7 @@ describe('application shortcut bindings', () => {
     )
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.createAgent, 'mac')).toEqual([
       '⌘',
+      '⇧',
       'A'
     ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.groupTerminals, 'mac')).toEqual(
@@ -26,6 +27,11 @@ describe('application shortcut bindings', () => {
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'other')
     ).toEqual(['Ctrl', 'T'])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.createAgent, 'other')).toEqual([
+      'Ctrl',
+      'Shift',
+      'A'
+    ])
     expect(
       new Set(
         Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))

@@ -8,36 +8,40 @@ import {
 
 describe('application shortcut dispatch', () => {
   it.each([
-    ['openSettings', ','],
-    ['createTerminal', 't'],
-    ['createAgent', 'a'],
-    ['groupTerminals', 'g']
-  ] as const)('dispatches the %s default shortcut and cancels the native event', (command, key) => {
-    const actions = createActions()
-    render(<ShortcutHarness actions={actions} />)
+    ['openSettings', ',', false],
+    ['createTerminal', 't', false],
+    ['createAgent', 'a', true],
+    ['groupTerminals', 'g', false]
+  ] as const)(
+    'dispatches the %s default shortcut and cancels the native event',
+    (command, key, shiftKey) => {
+      const actions = createActions()
+      render(<ShortcutHarness actions={actions} />)
 
-    const event = new KeyboardEvent('keydown', {
-      bubbles: true,
-      cancelable: true,
-      key,
-      metaKey: true
-    })
-    document.dispatchEvent(event)
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key,
+        metaKey: true,
+        shiftKey
+      })
+      document.dispatchEvent(event)
 
-    expect(event.defaultPrevented).toBe(true)
-    expect(actions[command].run).toHaveBeenCalledTimes(1)
-    for (const [otherCommand, action] of Object.entries(actions)) {
-      if (otherCommand !== command) {
-        expect(action.run).not.toHaveBeenCalled()
+      expect(event.defaultPrevented).toBe(true)
+      expect(actions[command].run).toHaveBeenCalledTimes(1)
+      for (const [otherCommand, action] of Object.entries(actions)) {
+        if (otherCommand !== command) {
+          expect(action.run).not.toHaveBeenCalled()
+        }
       }
     }
-  })
+  )
 
   it('ignores keyboard auto-repeat', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
 
-    fireEvent.keyDown(document, { key: 'a', metaKey: true, repeat: true })
+    fireEvent.keyDown(document, { key: 'a', metaKey: true, repeat: true, shiftKey: true })
 
     expect(actions.createAgent.run).not.toHaveBeenCalled()
   })
@@ -51,6 +55,15 @@ describe('application shortcut dispatch', () => {
 
     expect(actions.groupTerminals.run).not.toHaveBeenCalled()
     expect(actions.createTerminal.run).not.toHaveBeenCalled()
+  })
+
+  it('does not create an Agent without the Shift modifier', () => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(document, { key: 'a', metaKey: true })
+
+    expect(actions.createAgent.run).not.toHaveBeenCalled()
   })
 
   it.each([
