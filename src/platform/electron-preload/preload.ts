@@ -5,9 +5,13 @@ import {
   isSerializedAppError
 } from '../../shared-kernel/application/errors/AppError'
 import type { IpcInvokeResult } from '../ipc/registerIpcHandler'
+import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChannels'
 
 const cleancodeApi = {
   appName: 'cleancode',
+  getWindowFullScreenState: () => invokeCleancode<boolean>(windowFullScreenStateChannels.get),
+  onWindowFullScreenStateChange: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent(windowFullScreenStateChannels.changed, listener),
   listWorkbenches: () => invokeCleancode('cleancode:list-workbenches'),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),

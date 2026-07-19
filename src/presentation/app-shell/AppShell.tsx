@@ -2,6 +2,7 @@ import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import { PanelLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -47,6 +48,7 @@ import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
 import { useApplicationShortcuts, type ApplicationShortcutActions } from './useApplicationShortcuts'
+import { useWindowFullScreenState } from './useWindowFullScreenState'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -61,11 +63,21 @@ export function AppShell({
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const [isApplicationSettingsOpen, setIsApplicationSettingsOpen] = useState(false)
+  const [isProjectSidebarCollapsed, setIsProjectSidebarCollapsed] = useState(false)
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
+  const isWindowFullScreen = useWindowFullScreenState()
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
+  const projectSidebarToggleRef = useRef<HTMLButtonElement | null>(null)
+  const toggleProjectSidebar = useCallback((): void => {
+    if (!isProjectSidebarCollapsed && document.activeElement?.closest('#project-sidebar')) {
+      projectSidebarToggleRef.current?.focus()
+    }
+
+    setIsProjectSidebarCollapsed((collapsed) => !collapsed)
+  }, [isProjectSidebarCollapsed])
   useEffect(
     () => () => agentTerminalEvents.surfaceRegistry.disposeAll(),
     [agentTerminalEvents.surfaceRegistry]
@@ -464,6 +476,10 @@ export function AppShell({
         enabled: !isApplicationSettingsOpen,
         run: () => setIsApplicationSettingsOpen(true)
       },
+      toggleSidebar: {
+        enabled: true,
+        run: toggleProjectSidebar
+      },
       createTerminal: {
         enabled: isDesktopRuntime && Boolean(currentWorkbench),
         run: createTerminalBlock
@@ -484,7 +500,8 @@ export function AppShell({
       currentWorkbench,
       isApplicationSettingsOpen,
       isDesktopRuntime,
-      isTerminalGroupSelectionMode
+      isTerminalGroupSelectionMode,
+      toggleProjectSidebar
     ]
   )
   useApplicationShortcuts({
@@ -492,12 +509,21 @@ export function AppShell({
     bindings,
     platform: shortcutPlatform
   })
-
   return (
     <CodexCliStateProvider>
       <AgentTerminalEventProvider store={agentTerminalEvents}>
         <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-          <main className="app-shell" aria-label={t('app.workspace')}>
+          <main
+            className={[
+              'app-shell',
+              shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
+              isWindowFullScreen ? 'app-shell--window-full-screen' : '',
+              isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            aria-label={t('app.workspace')}
+          >
             <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
               <LanguageSettingsRoot />
               <ThemeSettingsRoot />
@@ -511,19 +537,40 @@ export function AppShell({
                 onResetAll={resetAllBindings}
               />
             </div>
-            <ProjectSidebar
-              workbenches={workbenches}
-              currentWorkbench={currentWorkbench}
-              isDesktopRuntime={isDesktopRuntime}
-              actionError={branchWorkspaceActions.branchWorkspaceActionError}
-              onAddProject={addProject}
-              onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
-              onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
-              onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-              onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
-              onRemoveProject={removeProject}
-              onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
-            />
+            <div className="project-sidebar-column">
+              <nav
+                className="app-shell__titlebar-navigation"
+                aria-label={t('app.windowNavigation')}
+              >
+                <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
+                <button
+                  ref={projectSidebarToggleRef}
+                  className="project-sidebar-toggle"
+                  type="button"
+                  aria-controls="project-sidebar"
+                  aria-expanded={!isProjectSidebarCollapsed}
+                  aria-label={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+                  title={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+                  onClick={toggleProjectSidebar}
+                >
+                  <PanelLeft size={16} aria-hidden="true" />
+                </button>
+              </nav>
+              <ProjectSidebar
+                workbenches={workbenches}
+                currentWorkbench={currentWorkbench}
+                isCollapsed={isProjectSidebarCollapsed}
+                isDesktopRuntime={isDesktopRuntime}
+                actionError={branchWorkspaceActions.branchWorkspaceActionError}
+                onAddProject={addProject}
+                onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+                onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+                onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
+                onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
+                onRemoveProject={removeProject}
+                onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
+              />
+            </div>
             <WorkbenchCanvas
               approvalIntents={agentToolApprovals.approvals}
               isDesktopRuntime={isDesktopRuntime}

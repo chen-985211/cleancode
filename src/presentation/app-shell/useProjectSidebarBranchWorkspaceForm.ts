@@ -18,6 +18,10 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     setBranchName('')
     setIsOpen(false)
   }
+  const close = (): void => {
+    setBranchName('')
+    setIsOpen(false)
+  }
   const toggle = (): void => {
     if (isOpen) {
       setBranchName('')
@@ -50,5 +54,5 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     return () => document.removeEventListener('pointerdown', cancelWhenClickingOutside)
   }, [isOpen])
 
-  return { branchName, formRef, isOpen, setBranchName, submit, toggle, triggerRef }
+  return { branchName, close, formRef, isOpen, setBranchName, submit, toggle, triggerRef }
 }

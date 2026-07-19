@@ -9,6 +9,7 @@ import {
 describe('application shortcut dispatch', () => {
   it.each([
     ['openSettings', ',', false],
+    ['toggleSidebar', 'b', false],
     ['createTerminal', 't', false],
     ['createAgent', 'a', true],
     ['groupTerminals', 'g', false]
@@ -124,6 +125,7 @@ function createActions(
 ): ApplicationShortcutActions {
   return {
     openSettings: { enabled: enabled.openSettings ?? true, run: vi.fn() },
+    toggleSidebar: { enabled: enabled.toggleSidebar ?? true, run: vi.fn() },
     createTerminal: { enabled: enabled.createTerminal ?? true, run: vi.fn() },
     createAgent: { enabled: enabled.createAgent ?? true, run: vi.fn() },
     groupTerminals: { enabled: enabled.groupTerminals ?? true, run: vi.fn() }

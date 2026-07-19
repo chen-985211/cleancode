@@ -13,6 +13,10 @@ describe('application shortcut bindings', () => {
       '⌘',
       ','
     ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.toggleSidebar, 'mac')).toEqual([
+      '⌘',
+      'B'
+    ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'mac')).toEqual(
       ['⌘', 'T']
     )
@@ -27,6 +31,9 @@ describe('application shortcut bindings', () => {
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'other')
     ).toEqual(['Ctrl', 'T'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.toggleSidebar, 'other')
+    ).toEqual(['Ctrl', 'B'])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.createAgent, 'other')).toEqual([
       'Ctrl',
       'Shift',
@@ -36,7 +43,7 @@ describe('application shortcut bindings', () => {
       new Set(
         Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))
       ).size
-    ).toBe(4)
+    ).toBe(5)
   })
 
   it('normalizes primary-modifier combinations and rejects unsafe single keys', () => {

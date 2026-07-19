@@ -1,23 +1,102 @@
-.project-sidebar {
+.project-sidebar-column {
   position: relative;
   z-index: 10;
   display: flex;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   flex-direction: column;
   overflow: visible;
-  border-right: 1px solid var(--cc-divider);
-  padding: max(14px, calc(var(--cc-window-controls-height) + 8px)) 12px 12px;
 }
 
-.project-sidebar::before {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: var(--cc-window-controls-height);
-  content: '';
+.project-sidebar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: visible;
+  padding: 12px;
+  opacity: 1;
+  transition:
+    opacity 120ms ease,
+    padding 180ms ease;
+}
+
+.app-shell--sidebar-collapsed .project-sidebar {
+  overflow: hidden;
+  visibility: hidden;
+  padding-right: 0;
+  padding-left: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-shell__titlebar-navigation {
+  z-index: 11;
+  display: flex;
+  width: 100%;
+  height: var(--cc-titlebar-height);
+  min-height: var(--cc-titlebar-height);
+  flex: 0 0 var(--cc-titlebar-height);
+  align-items: center;
+  overflow: hidden;
+  background: transparent;
   user-select: none;
   -webkit-app-region: drag;
+}
+
+.app-shell--sidebar-collapsed .project-sidebar-column {
+  width: 0;
+}
+
+.app-shell--sidebar-collapsed .app-shell__titlebar-navigation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+}
+
+.app-shell__titlebar-traffic-light-pad {
+  width: 12px;
+  height: 100%;
+  flex: 0 0 12px;
+}
+
+.app-shell--mac .app-shell__titlebar-traffic-light-pad {
+  width: 80px;
+  flex-basis: 80px;
+}
+
+.app-shell--window-full-screen .app-shell__titlebar-traffic-light-pad {
+  width: 0;
+  flex-basis: 0;
+}
+
+.project-sidebar-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 4px 8px;
+  color: var(--cc-muted);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.project-sidebar-toggle:hover {
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-foreground);
+}
+
+.app-shell--sidebar-collapsed .canvas-minimap-panel {
+  margin-top: calc(var(--cc-titlebar-height) + 12px);
 }
 
 .project-sidebar__actions {
@@ -107,6 +186,10 @@
   transition:
     background 140ms ease,
     color 140ms ease;
+}
+
+.project-card__name {
+  flex: 1 1 auto;
 }
 
 .project-card__select:hover {

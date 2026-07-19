@@ -1,10 +1,11 @@
 import { resolveWindowFrameOptions } from '../../../src/platform/electron-main/windowFrameOptions'
 
 describe('platform window frame', () => {
-  it('exposes the macOS window-controls safe area to the full-size renderer', () => {
+  it('uses native inset chrome without a titlebar overlay on macOS', () => {
     expect(resolveWindowFrameOptions('darwin')).toEqual({
+      acceptFirstMouse: true,
       titleBarStyle: 'hiddenInset',
-      titleBarOverlay: true
+      trafficLightPosition: { x: 16, y: 12 }
     })
   })
 

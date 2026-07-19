@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveWindowFrameOptions } from './windowFrameOptions'
+import { bindWindowFullScreenState } from './windowFullScreenState'
 
 export function createMainWindow(input: {
   readonly appIconPath: string | undefined
@@ -32,6 +33,7 @@ export function createMainWindow(input: {
       sandbox: false
     }
   })
+  bindWindowFullScreenState(mainWindow)
 
   if (input.policy.mode === 'offscreen-inactive') {
     const { position } = input.policy

@@ -47,6 +47,8 @@ declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      getWindowFullScreenState(): Promise<boolean>
+      onWindowFullScreenStateChange(listener: (isFullScreen: boolean) => void): () => void
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>

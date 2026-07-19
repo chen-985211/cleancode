@@ -32,6 +32,7 @@ describe('application settings', () => {
     expect(screen.getByRole('navigation', { name: '设置导航' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '修改“切换侧边栏”快捷键' })).toHaveTextContent('⌘B')
     expect(screen.getByRole('button', { name: '返回工作区' })).toHaveFocus()
 
     fireEvent.keyDown(document, { key: 'Escape' })

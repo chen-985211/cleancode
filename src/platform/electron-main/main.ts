@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -73,6 +73,7 @@ import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandle
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { disposeApplicationRuntime } from './applicationRuntimeShutdown'
+import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -213,6 +214,11 @@ const removeWorkspaceAgentUseCase = new RemoveWorkspaceAgentUseCase(
 const isAgentAutostartDisabledForTest = process.env.CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART === '1'
 const electronWindowPolicy = resolveElectronWindowPolicy({
   backgroundE2eMarker: process.env.CLEANCODE_TEST_BACKGROUND_E2E
+})
+registerWindowFullScreenStateIpc({
+  ipcMain,
+  logger: consoleLogger,
+  resolveWindow: (event) => BrowserWindow.fromWebContents((event as IpcMainInvokeEvent).sender)
 })
 registerProjectIpcHandlers({
   archiveBranchWorkspace: (command) => archiveBranchWorkspaceUseCase.execute(command),

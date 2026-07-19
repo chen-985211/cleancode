@@ -2,6 +2,7 @@ import type { MessageCatalog } from './zh-CN'
 
 export const enMessages = {
   'app.settings': 'Application settings',
+  'app.windowNavigation': 'Window navigation',
   'app.workspace': 'cleancode workspace',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
@@ -33,6 +34,7 @@ export const enMessages = {
   'settings.shortcuts.clear': 'Clear the “{action}” shortcut',
   'settings.shortcuts.reset': 'Restore the default “{action}” shortcut',
   'settings.shortcuts.command.openSettings': 'Open settings',
+  'settings.shortcuts.command.toggleSidebar': 'Toggle sidebar',
   'settings.shortcuts.command.createTerminal': 'New terminal block',
   'settings.shortcuts.command.createAgent': 'New Agent',
   'settings.shortcuts.command.groupTerminals': 'Group terminals',
@@ -72,12 +74,16 @@ export const enMessages = {
   'toolbar.agentTools': 'Agent tools',
   'toolbar.newAgent': 'New Agent',
   'sidebar.label': 'Projects and branch workspaces',
+  'sidebar.expand': 'Show sidebar',
+  'sidebar.collapse': 'Hide sidebar',
   'sidebar.addProject': 'Add project',
   'sidebar.previewWarning':
     'Browser preview does not connect to the local file system or terminals. Use the desktop app for live features.',
   'sidebar.closeAlert': 'Dismiss message',
   'sidebar.projects': 'Projects',
   'sidebar.projectGroup': 'Project {projectName}',
+  'sidebar.expandProject': 'Expand project {projectName}',
+  'sidebar.collapseProject': 'Collapse project {projectName}',
   'sidebar.newBranchWorkspace': 'New branch workspace',
   'sidebar.removeProject': 'Remove project',
   'sidebar.removeProjectFromList': 'Remove project from the list',

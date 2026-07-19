@@ -37,6 +37,7 @@ interface ApplicationSettingsRootProps {
 
 const commandMessageKeys: Readonly<Record<ApplicationShortcutCommand, MessageKey>> = {
   openSettings: 'settings.shortcuts.command.openSettings',
+  toggleSidebar: 'settings.shortcuts.command.toggleSidebar',
   createTerminal: 'settings.shortcuts.command.createTerminal',
   createAgent: 'settings.shortcuts.command.createAgent',
   groupTerminals: 'settings.shortcuts.command.groupTerminals'

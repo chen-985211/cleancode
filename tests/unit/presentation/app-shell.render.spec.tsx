@@ -148,6 +148,63 @@ describe('app shell', () => {
     expect(workspace.inert).toBe(true)
   })
 
+  it('collapses the project sidebar without remounting the canvas workspace', () => {
+    render(<AppShell />)
+    const workspace = screen.getByLabelText('积木画布')
+    const sidebar = screen.getByLabelText('项目与分支工作区')
+    const titlebarNavigation = screen.getByRole('navigation', { name: '窗口导航' })
+    const collapseSidebar = within(titlebarNavigation).getByRole('button', {
+      name: '收起侧边栏'
+    })
+    const sidebarColumn = sidebar.closest('.project-sidebar-column')
+
+    expect(sidebarColumn).not.toBeNull()
+    expect(titlebarNavigation.parentElement).toBe(sidebarColumn)
+    expect(sidebar.previousElementSibling).toBe(titlebarNavigation)
+    expect(
+      titlebarNavigation.querySelector('.app-shell__titlebar-traffic-light-pad')
+    ).toBeInTheDocument()
+    expect(collapseSidebar).toHaveAttribute('aria-expanded', 'true')
+    expect(collapseSidebar.querySelector('.lucide-panel-left')).toBeInTheDocument()
+    expect(sidebar).not.toHaveAttribute('aria-hidden')
+
+    fireEvent.click(collapseSidebar)
+
+    expect(screen.getByLabelText('积木画布')).toBe(workspace)
+    expect(sidebar).toHaveAttribute('aria-hidden', 'true')
+    const expandSidebar = within(titlebarNavigation).getByRole('button', {
+      name: '展开侧边栏'
+    })
+    expect(titlebarNavigation.parentElement).toBe(sidebarColumn)
+    expect(expandSidebar).toHaveAttribute('aria-expanded', 'false')
+    expect(expandSidebar.querySelector('.lucide-panel-left')).toBeInTheDocument()
+
+    fireEvent.click(expandSidebar)
+
+    expect(screen.getByLabelText('积木画布')).toBe(workspace)
+    expect(sidebar).not.toHaveAttribute('aria-hidden')
+  })
+
+  it('routes Command/Ctrl+B through the sidebar toggle action', () => {
+    render(<AppShell />)
+
+    fireEvent.keyDown(document, { key: 'b', metaKey: true })
+    fireEvent.keyDown(document, { ctrlKey: true, key: 'b' })
+
+    expect(screen.getByRole('button', { name: '展开侧边栏' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+
+    fireEvent.keyDown(document, { key: 'b', metaKey: true })
+    fireEvent.keyDown(document, { ctrlKey: true, key: 'b' })
+
+    expect(screen.getByRole('button', { name: '收起侧边栏' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
+  })
+
   it('routes the terminal shortcut through the existing workbench action', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const createTerminalBlock = vi.fn()

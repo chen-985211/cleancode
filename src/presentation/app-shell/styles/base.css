@@ -1,4 +1,5 @@
 :root {
+  --cc-titlebar-height: 36px;
   --cc-window-controls-height: env(titlebar-area-height, 0px);
   --cc-shell-control-inset: 12px;
   --cc-shell-settings-height: 36px;
@@ -7,16 +8,22 @@
 }
 
 .app-shell {
+  --cc-sidebar-width: clamp(220px, 17vw, 252px);
   position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
   height: 100%;
   min-height: 0;
-  grid-template-columns: clamp(220px, 17vw, 252px) minmax(440px, 1fr);
+  grid-template-columns: var(--cc-sidebar-width) minmax(440px, 1fr);
   overflow: hidden;
   background: var(--cc-background);
   color: var(--cc-foreground);
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell--sidebar-collapsed {
+  --cc-sidebar-width: 0px;
 }
 
 button {
@@ -101,7 +108,7 @@ textarea:focus-visible {
 
 .project-sidebar {
   min-width: 0;
-  background: var(--cc-chrome);
+  background: transparent;
 }
 
 .truncate {
@@ -113,7 +120,12 @@ textarea:focus-visible {
 
 @media (max-width: 1120px) {
   .app-shell {
-    grid-template-columns: 220px minmax(400px, 1fr);
+    --cc-sidebar-width: 220px;
+    grid-template-columns: var(--cc-sidebar-width) minmax(400px, 1fr);
+  }
+
+  .app-shell--sidebar-collapsed {
+    --cc-sidebar-width: 0px;
   }
 
   .sidebar-action {

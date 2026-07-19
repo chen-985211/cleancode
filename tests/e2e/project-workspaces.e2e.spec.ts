@@ -51,6 +51,95 @@ describe('project workspaces e2e', () => {
   })
 
   it(
+    'keeps the titlebar sidebar control aligned and interactive across fullscreen and collapse states',
+    async () => {
+      await expectDesktopRuntime(page)
+      const titlebarNavigation = page.getByRole('navigation', { name: '窗口导航' })
+      const sidebar = page.locator('#project-sidebar')
+      const collapseSidebar = titlebarNavigation.getByRole('button', { name: '收起侧边栏' })
+
+      await expect
+        .poll(() => readSidebarTitlebarGeometry(page))
+        .toMatchObject({
+          button: { height: 24, width: 32, x: 80, y: 6 },
+          buttonOwnsHitTarget: true,
+          navigationBoundary: {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            borderRightWidth: '0px',
+            boxShadow: 'none'
+          },
+          navigation: { height: 36, x: 0, y: 0 },
+          sidebar: {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            borderRightWidth: '0px',
+            y: 36
+          }
+        })
+
+      await collapseSidebar.click()
+
+      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBe('true')
+      const expandSidebar = titlebarNavigation.getByRole('button', { name: '展开侧边栏' })
+      await expandSidebar.waitFor()
+      await expect
+        .poll(() => readSidebarTitlebarGeometry(page))
+        .toMatchObject({
+          button: { height: 24, width: 32, x: 80, y: 6 },
+          buttonOwnsHitTarget: true,
+          navigationBoundary: {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            borderRightWidth: '0px',
+            boxShadow: 'none'
+          },
+          navigation: { height: 36, width: 112, x: 0, y: 0 },
+          sidebar: {
+            backgroundColor: 'rgba(0, 0, 0, 0)',
+            borderRightWidth: '0px'
+          }
+        })
+      await expandSidebar.click()
+
+      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBeNull()
+      await titlebarNavigation.getByRole('button', { name: '收起侧边栏' }).waitFor()
+
+      await electronApp.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.emit('enter-full-screen')
+      })
+      await expect
+        .poll(() => readSidebarTitlebarGeometry(page))
+        .toMatchObject({
+          button: { height: 24, width: 32, x: 0, y: 6 },
+          buttonOwnsHitTarget: true,
+          navigation: { height: 36, x: 0, y: 0 }
+        })
+
+      await titlebarNavigation.getByRole('button', { name: '收起侧边栏' }).click()
+      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBe('true')
+      await expect
+        .poll(() => readSidebarTitlebarGeometry(page))
+        .toMatchObject({
+          button: { height: 24, width: 32, x: 0, y: 6 },
+          buttonOwnsHitTarget: true,
+          navigation: { height: 36, width: 32, x: 0, y: 0 }
+        })
+      await titlebarNavigation.getByRole('button', { name: '展开侧边栏' }).click()
+      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBeNull()
+
+      await electronApp.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.emit('leave-full-screen')
+      })
+      await expect
+        .poll(() => readSidebarTitlebarGeometry(page))
+        .toMatchObject({
+          button: { height: 24, width: 32, x: 80, y: 6 },
+          buttonOwnsHitTarget: true,
+          navigation: { height: 36, x: 0, y: 0 }
+        })
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'creates and restores a local project workspace graph without fake runtime data',
     async () => {
       await expectDesktopRuntime(page)
@@ -137,7 +226,7 @@ describe('project workspaces e2e', () => {
       })
 
       await expect.poll(() => alphaWorkspace.getAttribute('aria-current')).toBe('page')
-      await betaProject.getByRole('button', { name: betaProjectName, exact: true }).click()
+      await betaWorkspace.click()
       await expect.poll(() => betaWorkspace.getAttribute('aria-current')).toBe('page')
       await expect
         .poll(async () => (await registryRepository.get()).currentProjectDirectory)
@@ -161,6 +250,79 @@ describe('project workspaces e2e', () => {
     electronScenarioTimeoutMs
   )
 })
+
+async function readSidebarTitlebarGeometry(page: Page): Promise<{
+  readonly button: {
+    readonly height: number
+    readonly width: number
+    readonly x: number
+    readonly y: number
+  }
+  readonly buttonOwnsHitTarget: boolean
+  readonly navigation: {
+    readonly height: number
+    readonly width: number
+    readonly x: number
+    readonly y: number
+  }
+  readonly navigationBoundary: {
+    readonly backgroundColor: string
+    readonly borderRightWidth: string
+    readonly boxShadow: string
+  }
+  readonly sidebar: {
+    readonly backgroundColor: string
+    readonly borderRightWidth: string
+    readonly y: number
+  }
+}> {
+  return page.evaluate(() => {
+    const navigation = document.querySelector<HTMLElement>('.app-shell__titlebar-navigation')
+    const button = navigation?.querySelector<HTMLElement>('.project-sidebar-toggle')
+    const sidebar = document.querySelector<HTMLElement>('#project-sidebar')
+
+    if (!navigation || !button || !sidebar) {
+      throw new Error('Sidebar titlebar geometry is unavailable.')
+    }
+
+    const buttonRect = button.getBoundingClientRect()
+    const navigationRect = navigation.getBoundingClientRect()
+    const sidebarRect = sidebar.getBoundingClientRect()
+    const navigationStyle = getComputedStyle(navigation)
+    const sidebarStyle = getComputedStyle(sidebar)
+    const hitTarget = document.elementFromPoint(
+      buttonRect.left + buttonRect.width / 2,
+      buttonRect.top + buttonRect.height / 2
+    )
+    const round = (value: number): number => Math.round(value)
+
+    return {
+      button: {
+        height: round(buttonRect.height),
+        width: round(buttonRect.width),
+        x: round(buttonRect.x),
+        y: round(buttonRect.y)
+      },
+      buttonOwnsHitTarget: hitTarget === button || Boolean(hitTarget && button.contains(hitTarget)),
+      navigation: {
+        height: round(navigationRect.height),
+        width: round(navigationRect.width),
+        x: round(navigationRect.x),
+        y: round(navigationRect.y)
+      },
+      navigationBoundary: {
+        backgroundColor: navigationStyle.backgroundColor,
+        borderRightWidth: navigationStyle.borderRightWidth,
+        boxShadow: navigationStyle.boxShadow
+      },
+      sidebar: {
+        backgroundColor: sidebarStyle.backgroundColor,
+        borderRightWidth: sidebarStyle.borderRightWidth,
+        y: round(sidebarRect.y)
+      }
+    }
+  })
+}
 
 async function expectNoBrowserPreviewData(page: Page): Promise<void> {
   expect(await page.getByRole('button', { name: '打开项目' }).count()).toBe(0)
