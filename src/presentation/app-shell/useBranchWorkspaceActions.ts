@@ -3,8 +3,10 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from 'react
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
 import type { WorkbenchSnapshot } from './types'
+import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
 
 interface UseBranchWorkspaceActionsInput {
+  readonly agentTerminalSurfaceRegistry: AgentTerminalSurfaceRegistry
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
@@ -17,6 +19,7 @@ interface UseBranchWorkspaceActionsInput {
 }
 
 export function useBranchWorkspaceActions({
+  agentTerminalSurfaceRegistry,
   currentWorkbench,
   replaceWorkbench,
   setHoveredTerminalBlockId,
@@ -109,6 +112,7 @@ export function useBranchWorkspaceActions({
         })
 
         if (archivedWorkbench) {
+          agentTerminalSurfaceRegistry.releaseWorkspace(workbench.project.id, workspaceName)
           forgetWorkspaceTerminalStates(workbench.project.id, workspaceName)
           clearCurrentBlockSelection()
           replaceWorkbench(archivedWorkbench)
@@ -120,6 +124,7 @@ export function useBranchWorkspaceActions({
     [
       clearCurrentBlockSelection,
       currentWorkbench,
+      agentTerminalSurfaceRegistry,
       replaceWorkbench,
       terminateWorkspaceTerminalSessions,
       forgetWorkspaceTerminalStates
@@ -134,12 +139,18 @@ export function useBranchWorkspaceActions({
       })
 
       if (checkedOutWorkbench) {
+        agentTerminalSurfaceRegistry.releaseWorkspace(workbench.project.id, 'main')
         forgetWorkspaceTerminalStates(workbench.project.id, 'main')
         clearCurrentBlockSelection()
         replaceWorkbench(checkedOutWorkbench)
       }
     },
-    [clearCurrentBlockSelection, forgetWorkspaceTerminalStates, replaceWorkbench]
+    [
+      agentTerminalSurfaceRegistry,
+      clearCurrentBlockSelection,
+      forgetWorkspaceTerminalStates,
+      replaceWorkbench
+    ]
   )
 
   return {

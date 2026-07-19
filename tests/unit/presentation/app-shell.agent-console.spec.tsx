@@ -16,10 +16,15 @@ describe('app shell Agent console', () => {
         createAgent('agent-2', '审查 Agent', baseWorkbench.project.id, 680)
       ]
     }
+    const inspectCodexCli = vi.fn(async () => ({
+      status: 'installed' as const,
+      version: 'codex-cli 0.144.6'
+    }))
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
+        inspectCodexCli,
         listWorkbenches: vi.fn(async () => [workbench])
       })
     })
@@ -42,6 +47,7 @@ describe('app shell Agent console', () => {
       within(canvas).queryByRole('complementary', { name: 'Agent 面板' })
     ).not.toBeInTheDocument()
     expect(agentConsole).not.toHaveAttribute('data-terminal-block-id')
+    expect(inspectCodexCli).toHaveBeenCalledTimes(1)
   })
 
   it('renames an Agent by double-clicking its title', async () => {

@@ -62,7 +62,6 @@ describe('agent IPC contract', () => {
     registerAgentIpcHandlers(
       createAgentIpcHandlersInput({
         inspectCodexCli: async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         }),
@@ -73,9 +72,32 @@ describe('agent IPC contract', () => {
     await expect(ipcMain.invoke('cleancode:inspect-codex-cli')).resolves.toEqual({
       ok: true,
       value: {
-        installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
         status: 'installed',
         version: 'codex-cli 0.143.0'
+      }
+    })
+  })
+
+  it('keeps a temporary Codex CLI inspection failure distinct from a missing executable', async () => {
+    const ipcMain = new FakeIpcMain()
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({
+        inspectCodexCli: async () => ({
+          reason: 'timed_out',
+          status: 'temporarily_unavailable',
+          version: null
+        }),
+        ipcMain
+      })
+    )
+
+    await expect(ipcMain.invoke('cleancode:inspect-codex-cli')).resolves.toEqual({
+      ok: true,
+      value: {
+        reason: 'timed_out',
+        status: 'temporarily_unavailable',
+        version: null
       }
     })
   })
@@ -421,6 +443,7 @@ function createAgentIpcHandlersInput(input: {
       input.inspectCodexCli ??
       (async () => ({
         installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+        reason: 'not_found' as const,
         status: 'missing' as const,
         version: null
       })),

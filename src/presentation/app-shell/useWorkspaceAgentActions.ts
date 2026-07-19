@@ -6,10 +6,12 @@ import { resolveNewAgentConsolePosition } from './agentConsolePlacement'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
+import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 export function useWorkspaceAgentActions({
+  agentTerminalSurfaceRegistry,
   currentWorkbench,
   currentWorkspace,
   layoutCommitQueue,
@@ -18,6 +20,7 @@ export function useWorkspaceAgentActions({
   setSelectedAgentId,
   setWorkbenches
 }: {
+  readonly agentTerminalSurfaceRegistry: AgentTerminalSurfaceRegistry
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
@@ -161,9 +164,12 @@ export function useWorkspaceAgentActions({
         projectId: agent.projectId,
         workspaceName: agent.workspaceName
       })
-      if (remaining) setWorkspaceAgents(agent.projectId, agent.workspaceName, remaining)
+      if (remaining) {
+        agentTerminalSurfaceRegistry.release(agent)
+        setWorkspaceAgents(agent.projectId, agent.workspaceName, remaining)
+      }
     },
-    [setWorkspaceAgents]
+    [agentTerminalSurfaceRegistry, setWorkspaceAgents]
   )
 
   return {

@@ -123,7 +123,6 @@ describe('Agent destructive approval canvas', () => {
           workspaceName: 'main'
         })),
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         })),

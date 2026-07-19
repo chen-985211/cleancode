@@ -9,6 +9,7 @@ import {
   defaultAgentLayoutSize
 } from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { AgentXtermController } from './agentTerminalXterm'
+import type { AgentTerminalSurfaceOwner } from './agentTerminalSurfaceRegistry'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
 
@@ -46,6 +47,14 @@ export function createWorkspaceKey(
   return workbench && workspace
     ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}\0${agentId}`
     : null
+}
+
+export function createAgentTerminalOwner(
+  agentId: string,
+  projectId: string,
+  workspaceName: string
+): AgentTerminalSurfaceOwner {
+  return { agentId, projectId, workspaceName }
 }
 
 export function createFallbackAgent(

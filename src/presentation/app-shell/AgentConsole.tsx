@@ -3,19 +3,19 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import {
   defaultAgentXtermDimensions,
-  installAgentXterm,
   readAgentTerminalSourceTheme,
-  type AgentXtermController
+  type AgentXtermController,
+  type AgentXtermSurface
 } from './agentTerminalXterm'
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
-import { appendTerminalOutputForSession } from './terminalOutputTail'
 import { CodexCliStatusView } from './CodexCliStatusView'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
 import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
 import {
   createFallbackAgent,
+  createAgentTerminalOwner,
   createWorkspaceKey,
   haveSameDimensions,
   isTestRuntime,
@@ -26,6 +26,8 @@ import {
   type AgentTerminalMeasurement
 } from './agentConsoleModel'
 import { useCodexCliState } from './useCodexCliState'
+import { useAgentTerminalEvents } from './useAgentTerminalEvents'
+import { useAgentTerminalSurface } from './useAgentTerminalSurface'
 
 export function AgentConsole({
   agent,
@@ -39,7 +41,8 @@ export function AgentConsole({
   onSelect
 }: AgentConsoleProps) {
   const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
-  const codexCliState = useCodexCliState()
+  const codexCliController = useCodexCliState()
+  const agentTerminalEvents = useAgentTerminalEvents()
   const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
   const [activeOutput, setActiveOutput] = useState('')
   const [attachAttempt, setAttachAttempt] = useState(0)
@@ -54,9 +57,7 @@ export function AgentConsole({
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const dimensionsRef = useRef<AgentTerminalMeasurement | null>(null)
-  const exitedSessionIdsRef = useRef(new Set<string>())
   const isMountedRef = useRef(true)
-  const outputBySessionRef = useRef(new Map<string, string>())
   const restartRequestRef = useRef<{
     readonly mode: 'new' | 'retry'
     readonly workspaceKey: string
@@ -64,19 +65,29 @@ export function AgentConsole({
   const sessionBindingRef = useRef<AgentSessionBinding | null>(null)
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
   const workspaceGenerationRef = useRef(0)
-  const xtermRef = useRef<AgentXtermController | null>(null)
+  const xtermRef = useRef<AgentXtermSurface | null>(null)
   const writeAgentInput = useCallback((input: string) => {
     const activeBinding = sessionBindingRef.current
 
-    if (!activeBinding || activeBinding.terminalController !== xtermRef.current) {
-      return
-    }
+    if (!activeBinding || activeBinding.terminalController !== xtermRef.current) return
 
     void window.cleancode?.writeAgentSession({
       input,
       sessionId: activeBinding.session.sessionId
     })
   }, [])
+  useAgentTerminalSurface({
+    agentId: activeAgent.agentId,
+    dimensionsRef,
+    events: agentTerminalEvents,
+    projectId: currentWorkbench?.project.id ?? null,
+    sessionBindingRef,
+    setMeasuredTerminalKey,
+    terminalElementRef,
+    workspaceKey: currentWorkspaceKey,
+    workspaceName: currentWorkspaceName,
+    xtermRef
+  })
 
   useLayoutEffect(() => {
     workspaceGenerationRef.current += 1
@@ -99,36 +110,31 @@ export function AgentConsole({
       return undefined
     }
 
-    const unsubscribeOutput =
-      api.onAgentPtyOutput?.((event) => {
-        if (event.agentId && event.agentId !== activeAgent.agentId) return
-        const nextOutput = appendTerminalOutputForSession(outputBySessionRef.current, event)
-        const activeBinding = sessionBindingRef.current
+    const unsubscribeOutput = agentTerminalEvents.subscribeOutput((event, nextOutput) => {
+      if (event.agentId && event.agentId !== activeAgent.agentId) return
+      const activeBinding = sessionBindingRef.current
 
-        if (
-          event.sessionId === activeBinding?.session.sessionId &&
-          activeBinding.terminalController === xtermRef.current
-        ) {
-          setActiveOutput(nextOutput)
-          xtermRef.current?.write(event.data)
-        }
-      }) ?? noop
-    const unsubscribeExit =
-      api.onAgentPtyExit?.((event) => {
-        if (event.agentId && event.agentId !== activeAgent.agentId) return
-        exitedSessionIdsRef.current.add(event.sessionId)
-        const activeBinding = sessionBindingRef.current
-        if (
-          event.sessionId === activeBinding?.session.sessionId &&
-          activeBinding.terminalController === xtermRef.current
-        ) {
-          setSession((currentSession) =>
-            currentSession && currentSession.sessionId === event.sessionId
-              ? { ...currentSession, status: 'exited' }
-              : currentSession
-          )
-        }
-      }) ?? noop
+      if (
+        event.sessionId === activeBinding?.session.sessionId &&
+        activeBinding.terminalController === xtermRef.current
+      ) {
+        setActiveOutput(nextOutput)
+      }
+    })
+    const unsubscribeExit = agentTerminalEvents.subscribeExit((event) => {
+      if (event.agentId && event.agentId !== activeAgent.agentId) return
+      const activeBinding = sessionBindingRef.current
+      if (
+        event.sessionId === activeBinding?.session.sessionId &&
+        activeBinding.terminalController === xtermRef.current
+      ) {
+        setSession((currentSession) =>
+          currentSession && currentSession.sessionId === event.sessionId
+            ? { ...currentSession, status: 'exited' }
+            : currentSession
+        )
+      }
+    })
     const unsubscribeGraph =
       api.onAgentGraphUpdated?.((event) => {
         if (
@@ -144,7 +150,13 @@ export function AgentConsole({
       unsubscribeExit()
       unsubscribeGraph()
     }
-  }, [activeAgent.agentId, currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
+  }, [
+    activeAgent.agentId,
+    agentTerminalEvents,
+    currentProjectDirectory,
+    currentWorkspaceName,
+    onGraphUpdated
+  ])
 
   useEffect(() => {
     let isCurrent = true
@@ -205,6 +217,11 @@ export function AgentConsole({
         restartRequestRef.current = null
       }
       const currentBinding = sessionBindingRef.current
+      const terminalOwner = createAgentTerminalOwner(
+        activeAgent.agentId,
+        currentWorkbench.project.id,
+        currentWorkspace.name
+      )
       const commitSession = (
         restoredOutput: string,
         terminalController: AgentXtermController | null
@@ -212,7 +229,7 @@ export function AgentConsole({
         if (!isCurrent) return false
         const committedSession = restoreRecordedAgentSessionExit(
           nextSession,
-          exitedSessionIdsRef.current
+          agentTerminalEvents.exitedSessionIds
         )
         sessionBindingRef.current = {
           session: committedSession,
@@ -225,41 +242,56 @@ export function AgentConsole({
       }
 
       if (
-        currentBinding?.workspaceKey === currentWorkspaceKey &&
-        currentBinding.session.sessionId === nextSession.sessionId &&
-        currentBinding.terminalController === xtermRef.current
+        (currentBinding?.workspaceKey === currentWorkspaceKey &&
+          currentBinding.session.sessionId === nextSession.sessionId &&
+          currentBinding.terminalController === xtermRef.current) ||
+        (xtermRef.current &&
+          agentTerminalEvents.surfaceRegistry.isBound(
+            terminalOwner,
+            nextSession.sessionId,
+            xtermRef.current
+          ))
       ) {
-        commitSession(
-          outputBySessionRef.current.get(nextSession.sessionId) ?? '',
-          currentBinding.terminalController
-        )
+        commitSession(agentTerminalEvents.readOutput(nextSession.sessionId), xtermRef.current)
       } else {
         const terminalController = xtermRef.current
         sessionBindingRef.current = null
 
         if (isTestRuntime() || !terminalController) {
-          commitSession(outputBySessionRef.current.get(nextSession.sessionId) ?? '', null)
+          commitSession(agentTerminalEvents.readOutput(nextSession.sessionId), null)
         } else {
-          let restoredOutput = ''
+          let startupOutput = ''
           replacementController = terminalController
           await terminalController
             .replaceSession({
-              onBind: () =>
-                xtermRef.current === terminalController &&
-                commitSession(restoredOutput, terminalController),
-              replayOutput: () => {
-                restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
-                return restoredOutput
+              onBind: () => {
+                if (xtermRef.current !== terminalController) return false
+                startupOutput = agentTerminalEvents.surfaceRegistry.bind(
+                  terminalOwner,
+                  nextSession.sessionId,
+                  terminalController
+                )
+                return commitSession(
+                  agentTerminalEvents.readOutput(nextSession.sessionId),
+                  terminalController
+                )
               },
+              replayOutput: () => startupOutput,
               sessionId: nextSession.sessionId,
               terminalSourceTheme: nextSession.terminalSourceTheme
             })
             .catch(() => {
               if (xtermRef.current === terminalController) {
-                commitSession(
-                  outputBySessionRef.current.get(nextSession.sessionId) ?? '',
+                const pendingOutput = agentTerminalEvents.surfaceRegistry.bind(
+                  terminalOwner,
+                  nextSession.sessionId,
                   terminalController
                 )
+                commitSession(
+                  agentTerminalEvents.readOutput(nextSession.sessionId),
+                  terminalController
+                )
+                if (pendingOutput) terminalController.write(pendingOutput)
               }
             })
         }
@@ -292,43 +324,13 @@ export function AgentConsole({
     }
   }, [
     activeAgent.agentId,
+    agentTerminalEvents,
     attachAttempt,
     currentWorkbench,
     currentWorkspace,
     currentWorkspaceKey,
     measuredTerminalKey
   ])
-
-  useEffect(() => {
-    if (isTestRuntime() || !terminalElementRef.current) {
-      return undefined
-    }
-
-    return installAgentXterm({
-      element: terminalElementRef.current,
-      initialOutput: '',
-      onDimensionsChange: (dimensions) => {
-        if (!currentWorkspaceKey) return
-        dimensionsRef.current = { dimensions, workspaceKey: currentWorkspaceKey }
-        setMeasuredTerminalKey((currentKey) =>
-          currentKey === currentWorkspaceKey ? currentKey : currentWorkspaceKey
-        )
-        const activeBinding = sessionBindingRef.current
-
-        if (
-          activeBinding?.workspaceKey === currentWorkspaceKey &&
-          activeBinding.terminalController === xtermRef.current
-        ) {
-          void window.cleancode?.resizeAgentSession({
-            ...dimensions,
-            sessionId: activeBinding.session.sessionId
-          })
-        }
-      },
-      onInput: writeAgentInput,
-      xtermRef
-    })
-  }, [currentWorkspaceKey, writeAgentInput])
 
   const agentApprovals =
     approvalController?.approvals.filter(
@@ -339,9 +341,7 @@ export function AgentConsole({
     ? resolveAgentApprovalPresentation(activeApproval, currentWorkbench?.graph ?? null)
     : null
   function restartSession(mode: 'new' | 'retry'): void {
-    if (!currentWorkspaceKey) {
-      return
-    }
+    if (!currentWorkspaceKey) return
 
     restartRequestRef.current = { mode, workspaceKey: currentWorkspaceKey }
     setAttachAttempt((attempt) => attempt + 1)
@@ -368,14 +368,19 @@ export function AgentConsole({
       }
       if (result.session) {
         const nextSession = result.session
-        let restoredOutput = ''
+        const terminalOwner = createAgentTerminalOwner(
+          activeAgent.agentId,
+          nextSession.projectId,
+          nextSession.workspaceName
+        )
+        let startupOutput = ''
         sessionBindingRef.current = null
 
         if (isTestRuntime() || !requestController) {
-          restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
+          const restoredOutput = agentTerminalEvents.readOutput(nextSession.sessionId)
           const committedSession = restoreRecordedAgentSessionExit(
             nextSession,
-            exitedSessionIdsRef.current
+            agentTerminalEvents.exitedSessionIds
           )
           sessionBindingRef.current = {
             session: committedSession,
@@ -393,9 +398,14 @@ export function AgentConsole({
               ) {
                 return false
               }
+              startupOutput = agentTerminalEvents.surfaceRegistry.bind(
+                terminalOwner,
+                nextSession.sessionId,
+                requestController
+              )
               const committedSession = restoreRecordedAgentSessionExit(
                 nextSession,
-                exitedSessionIdsRef.current
+                agentTerminalEvents.exitedSessionIds
               )
               sessionBindingRef.current = {
                 session: committedSession,
@@ -403,12 +413,9 @@ export function AgentConsole({
                 workspaceKey: requestWorkspaceKey
               }
               setSession(committedSession)
-              setActiveOutput(restoredOutput)
+              setActiveOutput(agentTerminalEvents.readOutput(nextSession.sessionId))
             },
-            replayOutput: () => {
-              restoredOutput = outputBySessionRef.current.get(nextSession.sessionId) ?? ''
-              return restoredOutput
-            },
+            replayOutput: () => startupOutput,
             sessionId: nextSession.sessionId,
             terminalSourceTheme: nextSession.terminalSourceTheme
           })
@@ -456,9 +463,10 @@ export function AgentConsole({
           )}
         </div>
         <CodexCliStatusView
-          state={codexCliState}
+          state={codexCliController.state}
           sessionStatus={session?.status ?? null}
           onNewConversation={() => restartSession('new')}
+          onRetryInspection={codexCliController.retry}
           onRetryRestore={() => restartSession('retry')}
         />
       </div>

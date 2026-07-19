@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+
+const installCommand = 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'
 
 describe('agent console Codex status', () => {
   beforeEach(() => {
@@ -22,7 +24,6 @@ describe('agent console Codex status', () => {
       configurable: true,
       value: createRuntimeApi({
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         }))
@@ -38,25 +39,139 @@ describe('agent console Codex status', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('shows a quick install command when Codex CLI is missing', async () => {
+  it('trusts a running Codex session over a stale missing-CLI inspection', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
-        inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-          status: 'missing',
-          version: null
-        }))
+        inspectCodexCli: vi.fn(async () => createMissingSnapshot())
       })
     })
 
-    render(<AgentConsole />)
+    render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
-    expect(await screen.findByText('未检测到 Codex CLI')).toBeInTheDocument()
-    expect(screen.queryByText('未安装')).not.toBeInTheDocument()
-    expect(
-      screen.getByText('curl -fsSL https://chatgpt.com/codex/install.sh | sh')
-    ).toBeInTheDocument()
+    await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
+    await waitFor(() => expect(window.cleancode?.inspectCodexCli).toHaveBeenCalled())
+    expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
+  })
+
+  it('retries the first missing result before showing any warning', async () => {
+    vi.useFakeTimers()
+    const inspectCodexCli = vi
+      .fn()
+      .mockResolvedValueOnce(createMissingSnapshot())
+      .mockResolvedValueOnce({ status: 'installed', version: 'codex-cli 0.144.6' })
+
+    try {
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({ inspectCodexCli })
+      })
+
+      render(<AgentConsole />)
+      await flushMicrotasks()
+
+      expect(inspectCodexCli).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
+
+      await advanceTimers(600)
+
+      expect(inspectCodexCli).toHaveBeenCalledTimes(2)
+      expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('delays the checking notice so fast inspections remain quiet', async () => {
+    vi.useFakeTimers()
+    const pendingInspection = new Promise<never>(() => undefined)
+
+    try {
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({ inspectCodexCli: vi.fn(() => pendingInspection) })
+      })
+
+      render(<AgentConsole />)
+
+      expect(screen.queryByText('正在检查 Codex CLI')).not.toBeInTheDocument()
+      await advanceTimers(399)
+      expect(screen.queryByText('正在检查 Codex CLI')).not.toBeInTheDocument()
+      await advanceTimers(1)
+      expect(screen.getByText('正在检查 Codex CLI')).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reveals install guidance only after a missing executable is confirmed twice', async () => {
+    vi.useFakeTimers()
+    const writeText = vi.fn(async () => undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    })
+    const inspectCodexCli = vi.fn(async () => createMissingSnapshot())
+
+    try {
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({ inspectCodexCli })
+      })
+
+      render(<AgentConsole />)
+      await flushMicrotasks()
+      await advanceTimers(600)
+
+      expect(screen.getByText('未检测到 Codex CLI')).toBeInTheDocument()
+      expect(screen.queryByText(installCommand)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '重新检查 Codex CLI' })).toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('安装帮助'))
+      expect(screen.getByText(installCommand)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: '复制安装命令' }))
+      await flushMicrotasks()
+      expect(writeText).toHaveBeenCalledWith(installCommand)
+      expect(screen.getByText('已复制')).toBeInTheDocument()
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps temporary inspection failures neutral and lets the user retry', async () => {
+    vi.useFakeTimers()
+    const inspectCodexCli = vi
+      .fn()
+      .mockResolvedValueOnce(createUnavailableSnapshot('timed_out'))
+      .mockResolvedValueOnce(createUnavailableSnapshot('timed_out'))
+      .mockResolvedValueOnce({ status: 'installed', version: 'codex-cli 0.144.6' })
+
+    try {
+      Object.defineProperty(window, 'cleancode', {
+        configurable: true,
+        value: createRuntimeApi({ inspectCodexCli })
+      })
+
+      render(<AgentConsole />)
+      await flushMicrotasks()
+      await advanceTimers(600)
+
+      expect(screen.getByText('暂时无法检查 Codex CLI')).toBeInTheDocument()
+      expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: '重新检查 Codex CLI' }))
+      await flushMicrotasks()
+
+      expect(inspectCodexCli).toHaveBeenCalledTimes(3)
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('surfaces a failed session as the single actionable status', async () => {
@@ -79,19 +194,14 @@ describe('agent console Codex status', () => {
           workspaceDirectory: '/repo/app',
           workspaceName: 'main'
         })),
-        inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-          status: 'installed',
-          version: 'codex-cli 0.143.0'
-        }))
+        inspectCodexCli: vi.fn(async () => createMissingSnapshot())
       })
     })
 
     render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
     expect(await screen.findByText('Codex 会话启动失败')).toBeInTheDocument()
-    expect(screen.queryByText('已安装')).not.toBeInTheDocument()
-    expect(screen.queryByText('已连接')).not.toBeInTheDocument()
+    expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
   })
 
   it('offers restrained retry and new-conversation actions when restoration fails', async () => {
@@ -115,11 +225,7 @@ describe('agent console Codex status', () => {
       configurable: true,
       value: createRuntimeApi({
         attachAgentSession,
-        inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-          status: 'installed',
-          version: 'codex-cli 0.143.0'
-        }))
+        inspectCodexCli: vi.fn(async () => createMissingSnapshot())
       })
     })
 
@@ -154,3 +260,32 @@ describe('agent console Codex status', () => {
     expect(screen.queryByText('未安装')).not.toBeInTheDocument()
   })
 })
+
+function createMissingSnapshot() {
+  return {
+    installCommand,
+    reason: 'not_found' as const,
+    status: 'missing' as const,
+    version: null
+  }
+}
+
+function createUnavailableSnapshot(reason: 'timed_out') {
+  return {
+    reason,
+    status: 'temporarily_unavailable' as const,
+    version: null
+  }
+}
+
+async function advanceTimers(milliseconds: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(milliseconds)
+  })
+}
+
+async function flushMicrotasks(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve()
+  })
+}

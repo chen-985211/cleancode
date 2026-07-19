@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { AgentSessionSnapshot } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
@@ -14,6 +14,7 @@ import {
 
 interface FakeAgentTerminalInstance {
   cols: number
+  element: HTMLElement | null
   rows: number
   options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
   selection: string
@@ -25,6 +26,7 @@ interface FakeAgentTerminalInstance {
   readonly onData: ReturnType<typeof vi.fn>
   readonly onResize: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
+  readonly refresh: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
   customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
@@ -66,6 +68,7 @@ const canonicalLightTerminalPalette = {
 vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminalInstance {
     cols = 88
+    element: HTMLElement | null = null
     rows = 24
     options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
     selection = ''
@@ -77,7 +80,11 @@ vi.mock('@xterm/xterm', () => ({
     readonly dispose = vi.fn()
     readonly getSelection = vi.fn(() => this.selection)
     readonly hasSelection = vi.fn(() => this.selection.length > 0)
-    readonly open = vi.fn()
+    readonly open = vi.fn((host: HTMLElement) => {
+      this.element = document.createElement('div')
+      host.append(this.element)
+    })
+    readonly refresh = vi.fn()
     readonly reset = vi.fn()
     readonly loadAddon = vi.fn((addon: FakeAgentFitAddonInstance) => {
       addon.terminal = this
@@ -287,7 +294,6 @@ describe('agent console terminal', () => {
       value: createRuntimeApi({
         attachAgentSession,
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         })),
@@ -327,7 +333,6 @@ describe('agent console terminal', () => {
       value: createRuntimeApi({
         attachAgentSession,
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         })),
@@ -428,7 +433,6 @@ describe('agent console terminal', () => {
       value: createRuntimeApi({
         attachAgentSession,
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
           status: 'installed',
           version: 'codex-cli 0.143.0'
         })),
@@ -456,7 +460,137 @@ describe('agent console terminal', () => {
     )
     expect(window.cleancode?.disposeAgentWorkspaceSession).not.toHaveBeenCalled()
   })
+
+  it('preserves the live Agent terminal surface and parser while switching workspaces', async () => {
+    const mainWorkbench = createWorkbenchSnapshot('/repo/app', 'app', {
+      gitBranches: [
+        {
+          name: 'main',
+          isCurrent: true,
+          isMainWorkspaceBranch: true,
+          worktreeDirectory: '/repo/app',
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
+        },
+        {
+          name: 'feature',
+          isCurrent: false,
+          isMainWorkspaceBranch: false,
+          worktreeDirectory: '/repo/app-worktrees/feature',
+          isSelectableInMainWorkspace: false,
+          isLocked: false,
+          lockReason: null
+        }
+      ],
+      workspaces: [
+        { directory: '/repo/app', gitBranch: 'main', isCurrent: true, name: 'main' },
+        {
+          directory: '/repo/app-worktrees/feature',
+          gitBranch: 'feature',
+          isCurrent: false,
+          name: 'feature'
+        }
+      ]
+    })
+    const toCurrentWorkspace = (workspaceName: 'feature' | 'main') => ({
+      ...mainWorkbench,
+      graph: { ...mainWorkbench.graph, workspaceName },
+      project: {
+        ...mainWorkbench.project,
+        workspaces: mainWorkbench.project.workspaces.map((workspace) => ({
+          ...workspace,
+          isCurrent: workspace.name === workspaceName
+        }))
+      }
+    })
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot(
+        command,
+        command.workspaceName === 'main' ? 'agent-main' : 'agent-feature'
+      )
+    )
+    let outputListener: (event: {
+      readonly agentId: string
+      readonly data: string
+      readonly sessionId: string
+    }) => void = () => undefined
+
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'cleancode desktop renderer'
+    })
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession,
+        inspectCodexCli: vi.fn(async () => ({
+          status: 'installed',
+          version: 'codex-cli 0.143.0'
+        })),
+        listWorkbenches: vi.fn(async () => [mainWorkbench]),
+        onAgentPtyOutput: vi.fn((listener) => {
+          outputListener = listener
+          return vi.fn()
+        }),
+        switchBranchWorkspace: vi.fn(async ({ workspaceName }) => toCurrentWorkspace(workspaceName))
+      })
+    })
+
+    render(<AppShell />)
+
+    await waitFor(() =>
+      expect(attachAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceName: 'main' })
+      )
+    )
+    const mainCommand = attachAgentSession.mock.calls[0]![0]
+    act(() => {
+      outputListener({
+        agentId: mainCommand.agentId,
+        data: 'MAIN_READY',
+        sessionId: 'agent-main'
+      })
+    })
+    await waitFor(() =>
+      expect(agentXtermMockState.terminals.at(-1)?.write).toHaveBeenCalledWith(
+        'MAIN_READY',
+        expect.any(Function)
+      )
+    )
+    const mainTerminal = agentXtermMockState.terminals[0]!
+    const mainResetCount = mainTerminal.reset.mock.calls.length
+
+    fireEvent.click(await screen.findByRole('button', { name: 'feature 独立工作区' }))
+    await waitFor(() =>
+      expect(attachAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ workspaceName: 'feature' })
+      )
+    )
+    const backgroundOutput =
+      'x'.repeat(terminalOutputTailBoundary + 1) + '\u001b[2;1HBACKGROUND_MAIN_READY'
+
+    act(() => {
+      outputListener({
+        agentId: mainCommand.agentId,
+        data: backgroundOutput,
+        sessionId: 'agent-main'
+      })
+    })
+
+    await waitFor(() =>
+      expect(mainTerminal.write).toHaveBeenCalledWith(backgroundOutput, expect.any(Function))
+    )
+    fireEvent.click(await screen.findByRole('button', { name: '切换到默认工作区 main' }))
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(3))
+
+    expect(agentXtermMockState.terminals).toHaveLength(2)
+    expect(mainTerminal.dispose).not.toHaveBeenCalled()
+    expect(mainTerminal.reset).toHaveBeenCalledTimes(mainResetCount)
+  })
 })
+
+const terminalOutputTailBoundary = 8_192
 
 type RendererAttachAgentSessionCommand = Parameters<
   NonNullable<Window['cleancode']>['attachAgentSession']

@@ -26,13 +26,12 @@ export class NodeCodexCliAdapter implements CodexCliPort {
 
       return version
         ? {
-            installCommand: codexCliInstallCommand,
             status: 'installed',
             version
           }
-        : createMissingCodexCliSnapshot()
-    } catch {
-      return createMissingCodexCliSnapshot()
+        : createUnavailableCodexCliSnapshot('invalid_output')
+    } catch (error) {
+      return classifyCodexCliInspectionError(error)
     }
   }
 }
@@ -46,9 +45,48 @@ function normalizeCodexCliVersionOutput(output: string): string | null {
 function createMissingCodexCliSnapshot(): CodexCliInstallationSnapshot {
   return {
     installCommand: codexCliInstallCommand,
+    reason: 'not_found',
     status: 'missing',
     version: null
   }
+}
+
+function createUnavailableCodexCliSnapshot(
+  reason: Extract<
+    CodexCliInstallationSnapshot,
+    { readonly status: 'temporarily_unavailable' }
+  >['reason']
+): CodexCliInstallationSnapshot {
+  return {
+    reason,
+    status: 'temporarily_unavailable',
+    version: null
+  }
+}
+
+function classifyCodexCliInspectionError(error: unknown): CodexCliInstallationSnapshot {
+  const commandError = readCommandError(error)
+
+  if (commandError?.code === 'ENOENT') {
+    return createMissingCodexCliSnapshot()
+  }
+
+  if (commandError?.killed === true || commandError?.code === 'ETIMEDOUT') {
+    return createUnavailableCodexCliSnapshot('timed_out')
+  }
+
+  if (commandError?.code === 'EACCES' || commandError?.code === 'EPERM') {
+    return createUnavailableCodexCliSnapshot('permission_denied')
+  }
+
+  return createUnavailableCodexCliSnapshot('command_failed')
+}
+
+function readCommandError(error: unknown): {
+  readonly code?: string | number | null
+  readonly killed?: boolean
+} | null {
+  return typeof error === 'object' && error !== null ? error : null
 }
 
 function runCodexCliCommand(

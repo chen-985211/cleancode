@@ -23,6 +23,7 @@ interface ExpectedAgentTerminalSessionController {
 
 interface ControllableTerminalInstance {
   cols: number
+  element: HTMLElement | null
   rows: number
   readonly events: string[]
   readonly options: { theme?: Record<string, string> }
@@ -34,6 +35,7 @@ interface ControllableTerminalInstance {
   readonly onData: ReturnType<typeof vi.fn>
   readonly onResize: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
+  readonly refresh: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
   completeNextWrite(): void
@@ -51,6 +53,7 @@ const terminalGenerationMockState = vi.hoisted(() => ({
 vi.mock('@xterm/xterm', () => ({
   Terminal: class ControllableTerminal implements ControllableTerminalInstance {
     cols = 88
+    element: HTMLElement | null = null
     rows = 24
     readonly events: string[] = []
     readonly options: { theme?: Record<string, string> }
@@ -63,7 +66,10 @@ vi.mock('@xterm/xterm', () => ({
     readonly hasSelection = vi.fn(() => false)
     readonly open = vi.fn((element: HTMLDivElement) => {
       this.openedElement = element
+      this.element = document.createElement('div')
+      element.append(this.element)
     })
+    readonly refresh = vi.fn()
     readonly reset = vi.fn(() =>
       this.events.push(`reset:${this.openedElement?.dataset.agentTerminalSourceTheme}`)
     )
@@ -196,7 +202,6 @@ describe('Agent terminal session generation', () => {
       value: createRuntimeApi({
         attachAgentSession,
         inspectCodexCli: vi.fn(async () => ({
-          installCommand: '',
           status: 'installed',
           version: 'codex-cli test'
         })),

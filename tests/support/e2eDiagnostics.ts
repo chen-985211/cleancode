@@ -158,6 +158,7 @@ async function readRendererState(page: Page): Promise<unknown> {
         document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
       ).map((element) => ({
         filter: getComputedStyle(element).filter,
+        bufferedOutputLength: Number(element.dataset.agentTerminalOutputLength ?? 0),
         outputTail: element.querySelector('.xterm-rows')?.textContent?.slice(-4_000) ?? '',
         processId: element.dataset.agentTerminalProcessId,
         sessionId: element.dataset.agentTerminalSessionId,

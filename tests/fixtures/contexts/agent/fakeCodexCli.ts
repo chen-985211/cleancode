@@ -101,6 +101,7 @@ function draw() {
     process.pid +
     CSI +
     '0m'
+  output += (CSI + '2;1H').repeat(1_600)
   process.stdout.write(output)
   report('draw')
 }

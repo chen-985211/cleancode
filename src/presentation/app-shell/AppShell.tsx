@@ -2,7 +2,7 @@ import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction, filterMinimapNodes } from './minimapInteraction'
@@ -38,6 +38,9 @@ import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
+import { CodexCliStateProvider } from './CodexCliStateProvider'
+import { AgentTerminalEventProvider } from './AgentTerminalEventProvider'
+import { createAgentTerminalEventStore } from './agentTerminalEventState'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -51,7 +54,12 @@ export function AppShell({
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
+  const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
+  useEffect(
+    () => () => agentTerminalEvents.surfaceRegistry.disposeAll(),
+    [agentTerminalEvents.surfaceRegistry]
+  )
   const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
     useWorkbenchGraphIndex(currentWorkbench)
   const currentTerminalBlockIds = useMemo(() => graph?.blocks.map((block) => block.id), [graph])
@@ -141,6 +149,7 @@ export function AppShell({
     resizeWorkspaceAgent,
     updateWorkspaceAgentMcpCapability
   } = useWorkspaceAgentActions({
+    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     currentWorkbench,
     currentWorkspace,
     layoutCommitQueue,
@@ -193,6 +202,7 @@ export function AppShell({
   })
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
+    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     currentWorkbench,
     replaceWorkbench,
     setHoveredTerminalBlockId,
@@ -202,6 +212,7 @@ export function AppShell({
   })
 
   const { addProject, removeProject } = useProjectActions({
+    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     rememberWorkbench,
     setCurrentWorkbench,
     setHoveredTerminalBlockId,
@@ -435,57 +446,61 @@ export function AppShell({
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
 
   return (
-    <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-      <main className="app-shell" aria-label="cleancode workspace">
-        <div className="app-shell__settings" role="group" aria-label="应用设置">
-          <ThemeSettingsRoot />
-        </div>
-        <ProjectSidebar
-          workbenches={workbenches}
-          currentWorkbench={currentWorkbench}
-          isDesktopRuntime={isDesktopRuntime}
-          actionError={branchWorkspaceActions.branchWorkspaceActionError}
-          onAddProject={addProject}
-          onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
-          onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
-          onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-          onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
-          onRemoveProject={removeProject}
-          onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
-        />
-        <WorkbenchCanvas
-          approvalIntents={agentToolApprovals.approvals}
-          isDesktopRuntime={isDesktopRuntime}
-          currentWorkbench={currentWorkbench}
-          currentWorkspace={currentWorkspace}
-          nodes={nodes}
-          minimapNodes={minimapNodes}
-          nodeTypes={workbenchNodeTypes}
-          reactFlowInstanceRef={reactFlowInstanceRef}
-          minimapNodeInteraction={minimapNodeInteraction}
-          terminalWorkflow={terminalWorkflow}
-          onCreateTerminalBlock={createTerminalBlock}
-          onCreateWorkspaceAgent={createWorkspaceAgent}
-          onBeginTerminalGroupSelection={beginTerminalGroupSelection}
-          onCreateTerminalGroup={createTerminalGroup}
-          onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
-          isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
-          selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
-          canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
-          canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
-          onNodesChange={workbenchNodeSelection.onNodesChange}
-          onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
-          onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
-          onNodeDrag={previewTerminalGroupDrop}
-          onNodeDragStart={onNodeDragStart}
-          onNodeDragStop={(event, node) => void onNodeDragStop(event, node)}
-          onViewportChange={updateGraphViewport}
-          onMinimapNodeClick={focusWorkbenchNode}
-          getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
-          getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
-          getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
-        />
-      </main>
-    </TerminalSurfaceRegistryProvider>
+    <CodexCliStateProvider>
+      <AgentTerminalEventProvider store={agentTerminalEvents}>
+        <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
+          <main className="app-shell" aria-label="cleancode workspace">
+            <div className="app-shell__settings" role="group" aria-label="应用设置">
+              <ThemeSettingsRoot />
+            </div>
+            <ProjectSidebar
+              workbenches={workbenches}
+              currentWorkbench={currentWorkbench}
+              isDesktopRuntime={isDesktopRuntime}
+              actionError={branchWorkspaceActions.branchWorkspaceActionError}
+              onAddProject={addProject}
+              onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+              onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+              onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
+              onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
+              onRemoveProject={removeProject}
+              onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
+            />
+            <WorkbenchCanvas
+              approvalIntents={agentToolApprovals.approvals}
+              isDesktopRuntime={isDesktopRuntime}
+              currentWorkbench={currentWorkbench}
+              currentWorkspace={currentWorkspace}
+              nodes={nodes}
+              minimapNodes={minimapNodes}
+              nodeTypes={workbenchNodeTypes}
+              reactFlowInstanceRef={reactFlowInstanceRef}
+              minimapNodeInteraction={minimapNodeInteraction}
+              terminalWorkflow={terminalWorkflow}
+              onCreateTerminalBlock={createTerminalBlock}
+              onCreateWorkspaceAgent={createWorkspaceAgent}
+              onBeginTerminalGroupSelection={beginTerminalGroupSelection}
+              onCreateTerminalGroup={createTerminalGroup}
+              onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
+              isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+              selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
+              canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
+              canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
+              onNodesChange={workbenchNodeSelection.onNodesChange}
+              onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
+              onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
+              onNodeDrag={previewTerminalGroupDrop}
+              onNodeDragStart={onNodeDragStart}
+              onNodeDragStop={(event, node) => void onNodeDragStop(event, node)}
+              onViewportChange={updateGraphViewport}
+              onMinimapNodeClick={focusWorkbenchNode}
+              getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
+              getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
+              getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
+            />
+          </main>
+        </TerminalSurfaceRegistryProvider>
+      </AgentTerminalEventProvider>
+    </CodexCliStateProvider>
   )
 }

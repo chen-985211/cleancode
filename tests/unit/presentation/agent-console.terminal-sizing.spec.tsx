@@ -9,6 +9,7 @@ import {
 
 interface FakeAgentTerminal {
   cols: number
+  element: HTMLElement | null
   rows: number
   readonly options: { theme?: Record<string, string> }
   readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
@@ -19,6 +20,7 @@ interface FakeAgentTerminal {
   readonly onData: ReturnType<typeof vi.fn>
   readonly onResize: ReturnType<typeof vi.fn>
   readonly open: ReturnType<typeof vi.fn>
+  readonly refresh: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly write: ReturnType<typeof vi.fn>
   resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null
@@ -45,6 +47,7 @@ const sizingMockState = vi.hoisted(() => ({
 vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal implements FakeAgentTerminal {
     cols = 88
+    element: HTMLElement | null = null
     rows = 24
     readonly options: { theme?: Record<string, string> }
     resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null = null
@@ -53,7 +56,11 @@ vi.mock('@xterm/xterm', () => ({
     readonly dispose = vi.fn()
     readonly getSelection = vi.fn(() => '')
     readonly hasSelection = vi.fn(() => false)
-    readonly open = vi.fn()
+    readonly open = vi.fn((host: HTMLElement) => {
+      this.element = document.createElement('div')
+      host.append(this.element)
+    })
+    readonly refresh = vi.fn()
     readonly reset = vi.fn()
     readonly write = vi.fn((_data: string, callback?: () => void) => callback?.())
     readonly loadAddon = vi.fn((addon: FakeFitAddon) => {

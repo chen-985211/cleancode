@@ -331,6 +331,7 @@
 .agent-runtime-notice {
   min-width: 0;
   min-height: 26px;
+  flex-wrap: wrap;
   gap: 7px;
   border-radius: 7px;
   background: var(--cc-surface-subtle);
@@ -350,20 +351,6 @@
   flex: 0 0 auto;
 }
 
-.agent-runtime-notice code {
-  overflow: hidden;
-  min-width: 0;
-  margin-left: auto;
-  color: currentcolor;
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-  font-size: 9px;
-  opacity: 0.8;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .agent-runtime-notice--checking svg {
   animation: agent-spin 900ms linear infinite;
 }
@@ -375,8 +362,11 @@
 }
 
 .agent-runtime-notice__actions button {
+  display: inline-flex;
+  align-items: center;
   height: 22px;
-  border: 1px solid var(--cc-warning-border);
+  gap: 3px;
+  border: 1px solid var(--cc-border);
   border-radius: 5px;
   background: transparent;
   color: inherit;
@@ -385,6 +375,58 @@
 }
 
 .agent-runtime-notice__actions button:hover {
+  background: var(--cc-surface-hover);
+}
+
+.agent-runtime-notice[data-tone='warning'] .agent-runtime-notice__actions button {
+  border-color: var(--cc-warning-border);
+}
+
+.agent-runtime-notice__actions button:focus-visible,
+.agent-runtime-notice__install-help button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
+}
+
+.agent-runtime-notice__install-help {
+  display: flex;
+  min-width: 0;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: 5px;
+  padding-left: 21px;
+}
+
+.agent-runtime-notice__install-help code {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  color: currentcolor;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  font-size: 9px;
+  opacity: 0.82;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-runtime-notice__install-help button {
+  display: inline-flex;
+  min-width: 51px;
+  height: 22px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.agent-runtime-notice__install-help button:hover {
   background: var(--cc-warning-border);
 }
 

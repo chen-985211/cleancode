@@ -127,14 +127,18 @@ Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色
 
 Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域再次附加时，renderer 发送当前有效主题作为新运行时提议，应用层则为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；应用重启或显式新对话产生的新运行时可以采用新的当前主题。
 
-重建 xterm surface 时必须遵守以下顺序：
+工作区导航不得重建 Agent 的 xterm surface。Presentation 使用 `projectId + workspaceName + agentId` 持有独立 surface registry：离开工作区时只 detach xterm 根 DOM，保留 terminal、parser、屏幕缓冲和 scrollback；隐藏期间到达的 PTY 输出仍按 `sessionId` 直接写入该 surface；返回时把同一 DOM 挂到新 host 并重新 fit、refresh，不 reset，也不 replay 输出尾部。
 
-1. 先解除旧 session 的输入输出绑定；附加期间的新 PTY 输出只进入对应 `sessionId` 的尾部缓冲。
-2. 等待 xterm FIFO 中已经排队的 write 完成；连续 replacement 使用 generation，只允许最新请求提交。
-3. 从集中主题 token 读取 canonical source 的完整 palette，并同时设置 surface 的 source dataset。
-4. reset xterm，原子提交 session 绑定，再读取最新尾部并 replay；之后到达的 live output 排在 replay 后面。
+8192 字符尾部只用于无障碍文本、诊断和非 xterm 回退，不是 TUI 屏幕恢复来源。任意字符截断都可能落在 CSI、OSC 或 UTF-8 序列中，把 `2m`、`H` 等控制序列残片显示为普通文本。首次绑定尚未完成的短暂竞态必须保存完整 PTY 事件块，绑定后按原顺序写入；不得先裁剪再交给 parser。
 
-这一顺序避免旧 write 跨过 reset、旧 OSC 查询响应被送往新 session，以及工作区快速往返时迟到的 replacement 覆盖当前 surface。主题差异由 source dataset 上的统一滤镜完成，不重启 PTY，也不把 ANSI 尾部改写为另一套颜色。当前 FIFO、generation 与绑定前退出事件行为由 [`agent-console.terminal-generation.spec.tsx`](../../tests/unit/presentation/agent-console.terminal-generation.spec.tsx) 验证，完整 palette 恢复由 [`agent-console.terminal.spec.tsx`](../../tests/unit/presentation/agent-console.terminal.spec.tsx) 验证；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和先解析实际 OSC 11 背景色响应再绘制的 fake Codex，证明工作区往返期间 session/进程复用、源主题固定、滤镜方向与最终像素明暗。
+只有真实 session replacement 才重置已有 surface，并必须遵守以下顺序：
+
+1. 等待 xterm FIFO 中已经排队的 write 完成；连续 replacement 使用 generation，只允许最新请求提交。
+2. 从集中主题 token 读取 canonical source 的完整 palette，并同时设置 surface 的 source dataset。
+3. reset xterm，原子提交新 `sessionId` 绑定，再读取绑定前的完整启动输出；之后到达的 live output 直接进入新绑定。
+4. Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放对应 surface；普通工作区导航不得释放。
+
+这一顺序避免旧 write 跨过 reset、旧 OSC 查询响应被送往新 session，以及工作区快速往返时迟到的 replacement 覆盖当前 surface。主题差异由 source dataset 上的统一滤镜完成，不重启 PTY，也不改写原始 ANSI 输出。[`agent-terminal-surface-registry.spec.ts`](../../tests/unit/presentation/agent-terminal-surface-registry.spec.ts) 证明隐藏期间完整输出路由、绑定前完整事件块和生命周期清理；[`agent-console.terminal.spec.tsx`](../../tests/unit/presentation/agent-console.terminal.spec.tsx) 证明工作区往返复用同一 xterm 且不 reset；[`agent-console.terminal-generation.spec.tsx`](../../tests/unit/presentation/agent-console.terminal-generation.spec.tsx) 验证 FIFO 与 generation；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和超过 8192 字符的 ANSI 输出，证明工作区往返期间 surface/session/进程复用、源主题固定、无控制序列残片以及最终像素明暗。
 
 ## 普通终端的 worktree 重挂载
 
@@ -146,7 +150,7 @@ Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域�
 2. 首次附加创建一个 xterm surface，配置 `scrollback: 1000`；worktree 切走时只把 xterm 根 DOM 从旧 host detach，不 dispose terminal，切回时把同一 DOM 重新挂到新 host 并重新 fit、refresh。
 3. 当前与隐藏工作区的终端输出都按完整运行身份直接写入对应 surface；8192 字符尾部仍保留为启动竞态、无障碍文本和非 xterm 回退，不作为滚动历史的事实来源，也不得在重挂载时重复 replay 到已有 surface。
 4. session replacement、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放失效 surface。普通 worktree 导航本身不得触发清理。
-5. Agent console 有独立的 PTY、主题和 generation 协议，不进入普通终端 registry。
+5. Agent console 使用独立但同样保留 parser 状态的 surface registry，并继续遵守自己的 PTY、主题和 generation 协议，不进入普通终端 registry。
 
 重挂载完成后的 `fit` 可能立即产生 resize。Presentation 必须先保留完整运行身份，并在重新进入工作区时批量向 Run 查询缓存 session 的权威快照；主进程对已退出 session 的 resize 幂等返回该快照，renderer 随即收敛为 `exited`。退出事件先于启动响应时也必须先建立终态投影，避免迟到的启动 Promise 把旧 PTY 重新标成运行中。
 
@@ -201,7 +205,7 @@ Agent 控制台当前应维护以下不变量。普通终端可以复用排查�
 8. 行内最后一个可见字形不超过行右边界，终端没有水平溢出。
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
 10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
-11. 同一 Agent PTY 的终端源主题在运行期间保持不变；surface 重建时先恢复 canonical palette，再 reset、绑定和 replay。
+11. 同一 Agent PTY 的终端源主题在运行期间保持不变；工作区往返复用同一 surface，真实 session replacement 才恢复 canonical palette、reset 并重新绑定。
 
 ## 排障流程
 

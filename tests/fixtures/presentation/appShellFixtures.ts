@@ -52,6 +52,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
       overrides.inspectCodexCli ??
       vi.fn(async () => ({
         installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+        reason: 'not_found' as const,
         status: 'missing',
         version: null
       })),

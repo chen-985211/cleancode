@@ -35,6 +35,7 @@ export function AgentTerminalSurface({
       <div
         className="agent-terminal-viewport nodrag nopan nowheel"
         data-agent-terminal-agent-id={session?.agentId}
+        data-agent-terminal-output-length={activeOutput.length}
         data-agent-terminal-process-id={session?.processId ?? undefined}
         data-agent-terminal-session-id={session?.sessionId}
         data-agent-terminal-workspace-name={session?.workspaceName}

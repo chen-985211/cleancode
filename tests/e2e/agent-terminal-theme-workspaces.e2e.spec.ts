@@ -189,6 +189,8 @@ async function waitForAgentTerminal(
   const viewport = page.locator(
     `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceName}"]`
   )
+  const visibleOutput = await viewport.locator('.xterm-rows').textContent()
+  expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
   const attributes = await viewport.evaluate((element) => ({
     processId: element.getAttribute('data-agent-terminal-process-id'),
     sessionId: element.getAttribute('data-agent-terminal-session-id'),

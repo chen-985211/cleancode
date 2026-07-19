@@ -1,5 +1,5 @@
 import { FitAddon } from '@xterm/addon-fit'
-import { Terminal as XTerm } from '@xterm/xterm'
+import { Terminal as XTerm, type IDisposable } from '@xterm/xterm'
 import type { MutableRefObject } from 'react'
 
 import type { AgentTerminalSourceTheme } from '../../contexts/agent/application/dto/AgentSessionProtocol'
@@ -23,21 +23,24 @@ export interface AgentXtermController {
   write(data: string): void
 }
 
-export function installAgentXterm(input: {
+interface AgentXtermAttachment {
   readonly element: HTMLDivElement
-  readonly initialOutput: string
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (input: string) => void
-  readonly xtermRef: MutableRefObject<AgentXtermController | null>
-}): () => void {
-  let disposed = false
-  let replacementGeneration = 0
-  let pendingFitAnimationFrame: number | null = null
-  let lastReportedDimensions: TerminalDimensions | null = null
-  let lastWriteCompletion = Promise.resolve()
-  const pendingWriteResolvers = new Set<() => void>()
-  input.element.dataset.agentTerminalSourceTheme = readAgentTerminalSourceTheme()
-  const terminal = new XTerm({
+}
+
+export interface AgentXtermSurface extends AgentXtermController {
+  attach(attachment: AgentXtermAttachment): void
+  detach(element: HTMLDivElement): void
+  dispose(): void
+}
+
+export function createAgentXtermSurface(): AgentXtermSurface {
+  return new XtermAgentSurface()
+}
+
+class XtermAgentSurface implements AgentXtermSurface {
+  private readonly terminal = new XTerm({
     convertEol: true,
     cursorBlink: true,
     fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
@@ -48,122 +51,193 @@ export function installAgentXterm(input: {
     rows: defaultAgentTerminalDimensions.rows,
     theme: readTerminalTheme()
   })
-  const fitAddon = new FitAddon()
-  const reportDimensions = (
-    dimensions: TerminalDimensions = { columns: terminal.cols, rows: terminal.rows }
-  ): void => {
+  private readonly fitAddon = new FitAddon()
+  private readonly pendingWriteResolvers = new Set<() => void>()
+  private dataSubscription: IDisposable | null = null
+  private resizeSubscription: IDisposable | null = null
+  private resizeObserver: ResizeObserver | null = null
+  private element: HTMLDivElement | null = null
+  private isDisposed = false
+  private isOpened = false
+  private lastReportedDimensions: TerminalDimensions | null = null
+  private lastWriteCompletion = Promise.resolve()
+  private onDimensionsChange: (dimensions: TerminalDimensions) => void = () => undefined
+  private onInput: (input: string) => void = () => undefined
+  private pendingFitAnimationFrame: number | null = null
+  private replacementGeneration = 0
+  private terminalSourceTheme = readAgentTerminalSourceTheme()
+
+  constructor() {
+    this.terminal.loadAddon(this.fitAddon)
+  }
+
+  attach(attachment: AgentXtermAttachment): void {
+    if (this.isDisposed) return
+    if (this.element && this.element !== attachment.element) {
+      this.detach(this.element)
+    }
+
+    this.element = attachment.element
+    this.onDimensionsChange = attachment.onDimensionsChange
+    this.onInput = attachment.onInput
+    this.lastReportedDimensions = null
+    attachment.element.dataset.agentTerminalSourceTheme = this.terminalSourceTheme
+
+    if (!this.isOpened) {
+      this.terminal.open(attachment.element)
+      installTerminalSelectionCopy(this.terminal)
+      this.dataSubscription = this.terminal.onData((input) => this.onInput(input))
+      this.resizeSubscription = this.terminal.onResize(({ cols, rows }) => {
+        this.reportDimensions({ columns: cols, rows })
+      })
+      this.isOpened = true
+    } else if (
+      this.terminal.element &&
+      this.terminal.element.parentElement !== attachment.element
+    ) {
+      attachment.element.append(this.terminal.element)
+    }
+
+    this.fitAddon.fit()
+    this.reportDimensions()
+    if (this.terminal.rows > 0 && this.isOpened) {
+      this.terminal.refresh(0, this.terminal.rows - 1)
+    }
+    this.resizeObserver = new ResizeObserver(this.requestFit)
+    this.resizeObserver.observe(attachment.element)
+  }
+
+  detach(element: HTMLDivElement): void {
+    if (this.element !== element) return
+
+    if (this.pendingFitAnimationFrame !== null) {
+      window.cancelAnimationFrame(this.pendingFitAnimationFrame)
+      this.pendingFitAnimationFrame = null
+    }
+    this.resizeObserver?.disconnect()
+    this.resizeObserver = null
+    this.terminal.element?.remove()
+    delete element.dataset.agentTerminalSourceTheme
+    this.element = null
+  }
+
+  dispose(): void {
+    if (this.isDisposed) return
+    if (this.element) this.detach(this.element)
+
+    this.isDisposed = true
+    this.replacementGeneration += 1
+    for (const resolveWrite of this.pendingWriteResolvers) resolveWrite()
+    this.pendingWriteResolvers.clear()
+    this.dataSubscription?.dispose()
+    this.resizeSubscription?.dispose()
+    this.terminal.dispose()
+  }
+
+  invalidateSessionReplacement(): void {
+    this.replacementGeneration += 1
+  }
+
+  async replaceSession(replacement: {
+    readonly onBind: () => boolean | void
+    readonly replayOutput: string | (() => string)
+    readonly sessionId: string
+    readonly terminalSourceTheme: AgentTerminalSourceTheme
+  }): Promise<void> {
+    const generation = ++this.replacementGeneration
+    const writesBeforeReplacement = this.lastWriteCompletion
+    await writesBeforeReplacement
+
+    if (this.isDisposed || generation !== this.replacementGeneration) return
+
+    this.terminalSourceTheme = replacement.terminalSourceTheme
+    if (this.element) {
+      this.element.dataset.agentTerminalSourceTheme = replacement.terminalSourceTheme
+    }
+    this.terminal.options.theme = readCanonicalTerminalTheme(replacement.terminalSourceTheme)
+    this.terminal.reset()
+
     if (
-      dimensions.columns <= 0 ||
-      dimensions.rows <= 0 ||
-      (lastReportedDimensions?.columns === dimensions.columns &&
-        lastReportedDimensions.rows === dimensions.rows)
+      replacement.onBind() === false ||
+      this.isDisposed ||
+      generation !== this.replacementGeneration
     ) {
       return
     }
 
-    lastReportedDimensions = dimensions
-    input.onDimensionsChange(dimensions)
+    const replayOutput =
+      typeof replacement.replayOutput === 'function'
+        ? replacement.replayOutput()
+        : replacement.replayOutput
+    if (replayOutput) this.write(replayOutput)
   }
-  const requestFit = (): void => {
-    if (pendingFitAnimationFrame !== null) {
-      return
-    }
 
-    pendingFitAnimationFrame = window.requestAnimationFrame(() => {
-      pendingFitAnimationFrame = null
-      fitAddon.fit()
-      reportDimensions()
+  write(data: string): void {
+    if (this.isDisposed) return
+
+    let resolveWrite = (): void => undefined
+    const writeCompletion = new Promise<void>((resolve) => {
+      resolveWrite = () => {
+        this.pendingWriteResolvers.delete(resolveWrite)
+        resolve()
+      }
+    })
+    this.pendingWriteResolvers.add(resolveWrite)
+    this.lastWriteCompletion = writeCompletion
+
+    try {
+      this.terminal.write(data, resolveWrite)
+    } catch (error) {
+      resolveWrite()
+      throw error
+    }
+  }
+
+  private readonly requestFit = (): void => {
+    if (!this.element || this.pendingFitAnimationFrame !== null) return
+
+    this.pendingFitAnimationFrame = window.requestAnimationFrame(() => {
+      this.pendingFitAnimationFrame = null
+      this.fitAddon.fit()
+      this.reportDimensions()
     })
   }
 
-  terminal.loadAddon(fitAddon)
-  terminal.open(input.element)
-  installTerminalSelectionCopy(terminal)
-  const controller: AgentXtermController = {
-    invalidateSessionReplacement: () => {
-      replacementGeneration += 1
-    },
-    replaceSession: async (replacement) => {
-      const generation = ++replacementGeneration
-      const writesBeforeReplacement = lastWriteCompletion
-      await writesBeforeReplacement
-
-      if (disposed || generation !== replacementGeneration) {
-        return
-      }
-
-      input.element.dataset.agentTerminalSourceTheme = replacement.terminalSourceTheme
-      terminal.options.theme = readCanonicalTerminalTheme(replacement.terminalSourceTheme)
-      terminal.reset()
-      const replayOutput =
-        typeof replacement.replayOutput === 'function'
-          ? replacement.replayOutput()
-          : replacement.replayOutput
-
-      if (replacement.onBind() === false || disposed || generation !== replacementGeneration) {
-        return
-      }
-
-      if (replayOutput) {
-        controller.write(replayOutput)
-      }
-    },
-    write: (data) => {
-      if (disposed) {
-        return
-      }
-
-      let resolveWrite = (): void => undefined
-      const writeCompletion = new Promise<void>((resolve) => {
-        resolveWrite = () => {
-          pendingWriteResolvers.delete(resolveWrite)
-          resolve()
-        }
-      })
-      pendingWriteResolvers.add(resolveWrite)
-      lastWriteCompletion = writeCompletion
-
-      try {
-        terminal.write(data, resolveWrite)
-      } catch (error) {
-        resolveWrite()
-        throw error
-      }
+  private reportDimensions(
+    dimensions: TerminalDimensions = {
+      columns: this.terminal.cols,
+      rows: this.terminal.rows
     }
+  ): void {
+    if (
+      dimensions.columns <= 0 ||
+      dimensions.rows <= 0 ||
+      (this.lastReportedDimensions?.columns === dimensions.columns &&
+        this.lastReportedDimensions.rows === dimensions.rows)
+    ) {
+      return
+    }
+
+    this.lastReportedDimensions = dimensions
+    this.onDimensionsChange(dimensions)
   }
-  input.xtermRef.current = controller
-  const resizeSubscription = terminal.onResize(({ cols, rows }) => {
-    reportDimensions({ columns: cols, rows })
-  })
-  fitAddon.fit()
-  reportDimensions()
-  const dataSubscription = terminal.onData(input.onInput)
-  if (input.initialOutput) {
-    controller.write(input.initialOutput)
-  }
-  const resizeObserver = new ResizeObserver(requestFit)
-  resizeObserver.observe(input.element)
+}
+
+export function installAgentXterm(input: {
+  readonly element: HTMLDivElement
+  readonly initialOutput: string
+  readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
+  readonly onInput: (input: string) => void
+  readonly xtermRef: MutableRefObject<AgentXtermController | null>
+}): () => void {
+  const surface = createAgentXtermSurface()
+  input.xtermRef.current = surface
+  surface.attach(input)
+  if (input.initialOutput) surface.write(input.initialOutput)
 
   return () => {
-    disposed = true
-    replacementGeneration += 1
-    for (const resolveWrite of pendingWriteResolvers) {
-      resolveWrite()
-    }
-    pendingWriteResolvers.clear()
-
-    if (pendingFitAnimationFrame !== null) {
-      window.cancelAnimationFrame(pendingFitAnimationFrame)
-    }
-
-    dataSubscription.dispose()
-    resizeSubscription.dispose()
-    resizeObserver.disconnect()
-    terminal.dispose()
-    if (input.xtermRef.current === controller) {
-      input.xtermRef.current = null
-    }
-    delete input.element.dataset.agentTerminalSourceTheme
+    surface.dispose()
+    if (input.xtermRef.current === surface) input.xtermRef.current = null
   }
 }
 
