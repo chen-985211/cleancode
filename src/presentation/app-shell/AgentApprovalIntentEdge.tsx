@@ -8,6 +8,7 @@ import {
 import { memo } from 'react'
 
 import type { AgentApprovalIntentEdgeData } from './agentApprovalPresentation'
+import { useI18n } from './i18n/useI18n'
 
 type ApprovalIntentEdge = Edge<AgentApprovalIntentEdgeData, 'approvalIntent'>
 
@@ -21,6 +22,7 @@ export const AgentApprovalIntentEdge = memo(function AgentApprovalIntentEdge({
   targetX,
   targetY
 }: EdgeProps<ApprovalIntentEdge>) {
+  const { t } = useI18n()
   const [path, labelX, labelY] = getBezierPath({
     sourcePosition,
     sourceX,
@@ -38,7 +40,7 @@ export const AgentApprovalIntentEdge = memo(function AgentApprovalIntentEdge({
           className="agent-approval-intent-edge__label nodrag nopan"
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
-          {data?.label ?? 'AI 操作目标'}
+          {data?.label ?? t('agentApproval.intentTarget')}
         </span>
       </EdgeLabelRenderer>
     </>

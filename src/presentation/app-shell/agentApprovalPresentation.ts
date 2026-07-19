@@ -12,6 +12,7 @@ import type {
   AgentToolApprovalPresentationRequest,
   AgentToolApprovalViewState
 } from './agentToolApprovalTypes'
+import { translate, type Translate } from './i18n/messages'
 
 interface AgentApprovalPresentationBase {
   readonly agentNodeId: string
@@ -54,7 +55,7 @@ export type AgentApprovalPresentation =
     })
 
 export interface AgentApprovalIntentEdgeData extends Record<string, unknown> {
-  readonly label: '删除' | '断开' | '解散'
+  readonly label: string
   readonly phase: AgentToolApprovalViewState['phase']
 }
 
@@ -129,7 +130,8 @@ export function resolveAgentApprovalPresentation(
 
 export function createAgentApprovalIntentEdges(
   approvals: readonly AgentToolApprovalViewState[],
-  graph: BlockGraphSnapshot | null
+  graph: BlockGraphSnapshot | null,
+  t: Translate = defaultTranslate
 ): Edge<AgentApprovalIntentEdgeData>[] {
   return approvals.flatMap((approval) => {
     const presentation = resolveAgentApprovalPresentation(approval, graph)
@@ -141,7 +143,7 @@ export function createAgentApprovalIntentEdges(
         animated: approval.phase === 'approving',
         className: `agent-approval-intent-edge agent-approval-intent-edge--${approval.phase}`,
         data: {
-          label: resolveApprovalIntentLabel(presentation.targetKind),
+          label: resolveApprovalIntentLabel(presentation.targetKind, t),
           phase: approval.phase
         },
         deletable: false,
@@ -256,9 +258,12 @@ function findContainingGroup(
 }
 
 function resolveApprovalIntentLabel(
-  targetKind: AgentApprovalPresentation['targetKind']
+  targetKind: AgentApprovalPresentation['targetKind'],
+  t: Translate
 ): AgentApprovalIntentEdgeData['label'] {
-  if (targetKind === 'terminal') return '删除'
-  if (targetKind === 'connection') return '断开'
-  return '解散'
+  if (targetKind === 'terminal') return t('approval.edgeDelete')
+  if (targetKind === 'connection') return t('approval.edgeDisconnect')
+  return t('approval.edgeDissolve')
 }
+
+const defaultTranslate: Translate = (key, variables) => translate('zh-CN', key, variables)

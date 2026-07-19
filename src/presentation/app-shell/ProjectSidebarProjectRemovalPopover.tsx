@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
+import { useI18n } from './i18n/useI18n'
 
 interface ProjectSidebarProjectRemovalPopoverProps {
   readonly projectName: string
@@ -13,6 +14,7 @@ export function ProjectSidebarProjectRemovalPopover({
   onCancel,
   onConfirm
 }: ProjectSidebarProjectRemovalPopoverProps) {
+  const { t } = useI18n()
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -39,16 +41,16 @@ export function ProjectSidebarProjectRemovalPopover({
       className="project-removal-popover"
       ref={rootRef}
       role="dialog"
-      aria-label={`移除项目 ${projectName}`}
+      aria-label={t('projectRemoval.dialog', { projectName })}
     >
-      <strong>移除项目？</strong>
-      <p>停止会话并从列表移除，本地文件保留。</p>
+      <strong>{t('projectRemoval.title')}</strong>
+      <p>{t('projectRemoval.description')}</p>
       <div className="project-removal-popover__actions">
         <button type="button" autoFocus onClick={onCancel}>
-          取消
+          {t('common.cancel')}
         </button>
         <button className="project-removal-popover__confirm" type="button" onClick={onConfirm}>
-          移除
+          {t('common.remove')}
         </button>
       </div>
     </div>

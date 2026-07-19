@@ -9,6 +9,7 @@ import {
 } from './minimapInteraction'
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
 import type { MinimapFlowNode } from './types'
+import { useI18n } from './i18n/useI18n'
 
 interface CanvasSize {
   readonly width: number
@@ -79,6 +80,7 @@ export function CanvasMinimap({
   getMiniMapNodeStrokeColor,
   getMiniMapNodeClassName
 }: CanvasMinimapProps) {
+  const { t } = useI18n()
   const isPanningViewportRef = useRef(false)
   const lastViewportCenterRef = useRef<MinimapViewportCenter | null>(null)
   const frames = nodes.map(toMinimapFrame)
@@ -149,7 +151,7 @@ export function CanvasMinimap({
                 onPointerUp={finishViewportPan}
                 onPointerCancel={finishViewportPan}
               >
-                <title id="canvas-minimap-title">积木导航小地图</title>
+                <title id="canvas-minimap-title">{t('minimap.title')}</title>
                 <rect
                   className="canvas-minimap__hit-area"
                   x={viewBox.x}
@@ -170,7 +172,13 @@ export function CanvasMinimap({
                     key={frame.node.id}
                     id={frame.node.id}
                     variant={resolveMinimapNodeVariant(frame.node)}
-                    kindLabel={resolveMinimapNodeKindLabel(frame.node)}
+                    kindLabel={
+                      frame.node.type === 'agentConsole'
+                        ? 'Agent'
+                        : frame.node.type === 'terminalGroup'
+                          ? t('minimap.terminalGroup')
+                          : t('minimap.terminal')
+                    }
                     x={frame.x}
                     y={frame.y}
                     width={frame.width}
@@ -192,11 +200,11 @@ export function CanvasMinimap({
           </div>
         </div>
       ) : null}
-      <div className="canvas-minimap__controls" role="group" aria-label="小地图控制">
+      <div className="canvas-minimap__controls" role="group" aria-label={t('minimap.controls')}>
         <div className="canvas-minimap__control-group canvas-minimap__control-group--top">
           <MinimapControlButton
-            label={isCollapsed ? '展开小地图' : '收起小地图'}
-            title={isCollapsed ? '展开小地图' : '收起小地图'}
+            label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
+            title={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
             onClick={onToggleCollapsed}
           >
             {isCollapsed ? (
@@ -209,16 +217,28 @@ export function CanvasMinimap({
         {!isCollapsed ? (
           <>
             <div className="canvas-minimap__control-group canvas-minimap__control-group--zoom">
-              <MinimapControlButton label="小地图放大" title="放大画布" onClick={onZoomIn}>
+              <MinimapControlButton
+                label={t('minimap.zoomInLabel')}
+                title={t('minimap.zoomInTitle')}
+                onClick={onZoomIn}
+              >
                 <Plus size={14} aria-hidden="true" />
               </MinimapControlButton>
-              <output aria-label="画布缩放比例">{Math.round(viewportZoom * 100)}%</output>
-              <MinimapControlButton label="小地图缩小" title="缩小画布" onClick={onZoomOut}>
+              <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
+              <MinimapControlButton
+                label={t('minimap.zoomOutLabel')}
+                title={t('minimap.zoomOutTitle')}
+                onClick={onZoomOut}
+              >
                 <Minus size={14} aria-hidden="true" />
               </MinimapControlButton>
             </div>
             <div className="canvas-minimap__control-group canvas-minimap__control-group--bottom">
-              <MinimapControlButton label="小地图适应" title="适应画布" onClick={onFitCanvas}>
+              <MinimapControlButton
+                label={t('minimap.fitLabel')}
+                title={t('minimap.fitTitle')}
+                onClick={onFitCanvas}
+              >
                 <Scan size={14} aria-hidden="true" />
               </MinimapControlButton>
             </div>
@@ -352,14 +372,6 @@ function resolveMinimapNodeVariant(
   node: MinimapFlowNode
 ): 'agentConsole' | 'terminal' | 'terminalGroup' {
   return node.type
-}
-
-function resolveMinimapNodeKindLabel(node: MinimapFlowNode): string {
-  if (node.type === 'agentConsole') {
-    return 'Agent'
-  }
-
-  return node.type === 'terminalGroup' ? '终端组合' : '终端'
 }
 
 function resolveSvgPoint(

@@ -2,16 +2,10 @@ import { Check, X } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { ThemePreference } from './themePreference'
+import { useI18n } from './i18n/useI18n'
 import { useThemePreference } from './useThemePreference'
 
-const themeOptions: ReadonlyArray<{
-  readonly label: string
-  readonly preference: ThemePreference
-}> = [
-  { preference: 'system', label: '系统' },
-  { preference: 'light', label: '浅色' },
-  { preference: 'dark', label: '深色' }
-]
+const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
 
 export function ThemeSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
@@ -19,6 +13,7 @@ export function ThemeSettingsRoot() {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLElement | null>(null)
   const { preference, selectPreference } = useThemePreference()
+  const { t } = useI18n()
   const closeSettings = (): void => {
     setIsOpen(false)
     triggerRef.current?.focus()
@@ -58,11 +53,11 @@ export function ThemeSettingsRoot() {
         ref={triggerRef}
         className="theme-settings-trigger"
         type="button"
-        aria-label="主题设置"
+        aria-label={t('theme.settings')}
         aria-controls="theme-settings-dialog"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        title="主题设置"
+        title={t('theme.settings')}
         onClick={() => setIsOpen(true)}
       >
         <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
@@ -80,34 +75,34 @@ export function ThemeSettingsRoot() {
           >
             <div className="theme-settings-drawer__header">
               <div>
-                <h2 id="theme-settings-title">主题设置</h2>
-                <p>选择 cleancode 的界面外观。</p>
+                <h2 id="theme-settings-title">{t('theme.settings')}</h2>
+                <p>{t('theme.description')}</p>
               </div>
               <button
                 ref={closeButtonRef}
                 className="theme-settings-drawer__close"
                 type="button"
-                aria-label="关闭主题设置"
-                title="关闭主题设置"
+                aria-label={t('theme.close')}
+                title={t('theme.close')}
                 onClick={closeSettings}
               >
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
             <fieldset className="theme-settings-options">
-              <legend>主题</legend>
+              <legend>{t('theme.section')}</legend>
               <div className="theme-settings-options__grid">
-                {themeOptions.map((option) => (
-                  <label className="theme-option" key={option.preference}>
+                {themePreferences.map((option) => (
+                  <label className="theme-option" key={option}>
                     <input
                       type="radio"
                       name="theme-preference"
-                      value={option.preference}
-                      checked={preference === option.preference}
-                      onChange={() => selectPreference(option.preference)}
+                      value={option}
+                      checked={preference === option}
+                      onChange={() => selectPreference(option)}
                     />
                     <span
-                      className={`theme-option__preview theme-option__preview--${option.preference}`}
+                      className={`theme-option__preview theme-option__preview--${option}`}
                       aria-hidden="true"
                     >
                       <span className="theme-option__preview-sidebar" />
@@ -116,13 +111,13 @@ export function ThemeSettingsRoot() {
                         <span />
                         <span />
                       </span>
-                      {preference === option.preference ? (
+                      {preference === option ? (
                         <span className="theme-option__check">
                           <Check size={13} aria-hidden="true" />
                         </span>
                       ) : null}
                     </span>
-                    <span className="theme-option__label">{option.label}</span>
+                    <span className="theme-option__label">{themeLabel(option)}</span>
                   </label>
                 ))}
               </div>
@@ -137,6 +132,12 @@ export function ThemeSettingsRoot() {
     if (event.target === event.currentTarget) {
       closeSettings()
     }
+  }
+
+  function themeLabel(option: ThemePreference): string {
+    if (option === 'system') return t('theme.system')
+    if (option === 'light') return t('theme.light')
+    return t('theme.dark')
   }
 }
 

@@ -1,6 +1,7 @@
 import { Check, GitBranch, Plus, Search } from 'lucide-react'
 
 import type { WorkbenchSnapshot } from './types'
+import { useI18n } from './i18n/useI18n'
 
 type GitBranchNavigationItem = WorkbenchSnapshot['gitBranches'][number]
 
@@ -17,6 +18,7 @@ export function BranchSelectorPopover({
   onSearchQueryChange,
   onChooseBranch
 }: BranchSelectorPopoverProps) {
+  const { t } = useI18n()
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const visibleBranches = normalizedQuery
     ? branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery))
@@ -24,9 +26,9 @@ export function BranchSelectorPopover({
   const orderedVisibleBranches = orderBranchSelectorItems(visibleBranches)
 
   return (
-    <div className="branch-selector-popover" role="dialog" aria-label="选择默认工作区分支">
+    <div className="branch-selector-popover" role="dialog" aria-label={t('branchSelector.dialog')}>
       <label className="sr-only" htmlFor="branch-selector-search">
-        搜索分支
+        {t('branchSelector.search')}
       </label>
       <div className="branch-selector-search">
         <Search size={15} aria-hidden="true" />
@@ -34,10 +36,10 @@ export function BranchSelectorPopover({
           id="branch-selector-search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
-          placeholder="搜索分支"
+          placeholder={t('branchSelector.search')}
         />
       </div>
-      <div className="branch-selector-label">分支</div>
+      <div className="branch-selector-label">{t('branchSelector.branches')}</div>
       <div className="branch-selector-options">
         {orderedVisibleBranches.map((branch) => {
           const isWorktreeBranch = Boolean(
@@ -61,7 +63,9 @@ export function BranchSelectorPopover({
               <span className="branch-selector-option__content">
                 <span className="truncate">{branch.name}</span>
                 {isWorktreeBranch ? (
-                  <span className="branch-selector-option__meta">独立工作区</span>
+                  <span className="branch-selector-option__meta">
+                    {t('branchSelector.worktree')}
+                  </span>
                 ) : null}
               </span>
               {branch.isMainWorkspaceBranch ? <Check size={17} aria-hidden="true" /> : null}
@@ -70,13 +74,13 @@ export function BranchSelectorPopover({
         })}
         {visibleBranches.length === 0 ? (
           <div className="branch-selector-empty" role="status">
-            没有匹配的分支
+            {t('branchSelector.empty')}
           </div>
         ) : null}
       </div>
       <button className="branch-selector-create" type="button" disabled>
         <Plus size={16} aria-hidden="true" />
-        创建并检出新分支...
+        {t('branchSelector.create')}
       </button>
     </div>
   )

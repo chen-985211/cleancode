@@ -1,4 +1,5 @@
 import { Bot, Box, Check, Terminal, X } from 'lucide-react'
+import { useI18n } from './i18n/useI18n'
 
 interface WorkbenchToolbarProps {
   readonly isDesktopRuntime: boolean
@@ -15,9 +16,14 @@ interface WorkbenchToolbarProps {
 }
 
 export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
+  const { t } = useI18n()
   return (
-    <div className="app-shell__toolbar" role="toolbar" aria-label="工作台工具栏">
-      <div className="app-shell__toolbar-group" role="group" aria-label="终端工具">
+    <div className="app-shell__toolbar" role="toolbar" aria-label={t('toolbar.label')}>
+      <div
+        className="app-shell__toolbar-group"
+        role="group"
+        aria-label={t('toolbar.terminalTools')}
+      >
         <button
           className="toolbar-button toolbar-button--primary"
           type="button"
@@ -25,13 +31,13 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
           disabled={!props.isDesktopRuntime || !props.hasWorkbench}
         >
           <Terminal size={16} aria-hidden="true" />
-          新建终端积木
+          {t('toolbar.newTerminal')}
         </button>
         <span className="toolbar-divider" aria-hidden="true" />
         {props.isTerminalGroupSelectionMode ? (
           <>
             <span className="toolbar-selection-status" role="status">
-              组合编辑
+              {t('toolbar.groupEditing')}
               <strong>{props.selectedTerminalGroupCandidateCount}</strong>
             </span>
             <button
@@ -41,7 +47,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
               disabled={!props.canCreateTerminalGroup}
             >
               <Check size={16} aria-hidden="true" />
-              创建组合
+              {t('toolbar.createGroup')}
             </button>
             <button
               className="toolbar-button"
@@ -49,7 +55,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
               onClick={props.onCancelTerminalGroupSelection}
             >
               <X size={16} aria-hidden="true" />
-              完成
+              {t('toolbar.finish')}
             </button>
           </>
         ) : (
@@ -64,14 +70,14 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
             }
           >
             <Box size={16} aria-hidden="true" />
-            组合终端
+            {t('toolbar.groupTerminals')}
           </button>
         )}
       </div>
       <div
         className="app-shell__toolbar-group app-shell__toolbar-group--agent"
         role="group"
-        aria-label="Agent 工具"
+        aria-label={t('toolbar.agentTools')}
       >
         <button
           className="toolbar-button"
@@ -80,7 +86,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
           disabled={!props.isDesktopRuntime || !props.hasWorkbench}
         >
           <Bot size={16} aria-hidden="true" />
-          新建 Agent
+          {t('toolbar.newAgent')}
         </button>
       </div>
     </div>

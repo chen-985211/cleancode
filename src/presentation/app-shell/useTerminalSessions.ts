@@ -21,6 +21,7 @@ import { useTerminalSessionRetention } from './useTerminalSessionRetention'
 import type { NotifyApp } from './appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import { useI18n } from './i18n/useI18n'
 import {
   applyTerminalSessionSnapshot,
   applyTerminalSessionStatusSnapshot,
@@ -56,6 +57,7 @@ export function useTerminalSessions({
   focusTerminalBlock,
   notify
 }: UseTerminalSessionsInput) {
+  const { t } = useI18n()
   const [terminalStatesByKey, setTerminalStatesByKey] = useState<Record<string, TerminalViewState>>(
     {}
   )
@@ -428,7 +430,7 @@ export function useTerminalSessions({
           window.setTimeout(() => focusTerminalBlock(block.id), 80)
         }
       } catch (error) {
-        notifyTerminalLaunchFailure(notify, error)
+        notifyTerminalLaunchFailure(notify, error, t)
       } finally {
         quickLaunchesRef.current.delete(terminalStateKey)
       }
@@ -441,6 +443,7 @@ export function useTerminalSessions({
       currentWorkspace,
       focusTerminalBlock,
       notify,
+      t,
       terminateTerminalSession
     ]
   )

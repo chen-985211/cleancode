@@ -24,6 +24,7 @@ import {
   type TerminalViewState,
   type WorkbenchNodeLayoutInput
 } from './types'
+import { useI18n } from './i18n/useI18n'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -290,15 +291,20 @@ function TerminalHeader({
   onStopWorkflow,
   onDelete
 }: TerminalHeaderProps) {
+  const { t } = useI18n()
   const canQuickLaunch = blockLaunchCommand.trim().length > 0
   const launchCommandState = canQuickLaunch ? 'configured' : 'unconfigured'
-  const launchCommandTooltip = canQuickLaunch ? '启动命令' : '配置启动命令'
-  const terminalGroupSelectionLabel = isSelectedForTerminalGroup ? '已选择终端' : '选择终端'
+  const launchCommandTooltip = canQuickLaunch
+    ? t('terminal.action.launch')
+    : t('terminal.action.configureLaunch')
+  const terminalGroupSelectionLabel = isSelectedForTerminalGroup
+    ? t('terminal.action.selected')
+    : t('terminal.action.select')
   const workflowActionLabel = isActiveWorkflowRoot
     ? isStoppingWorkflow
-      ? '正在停止本次运行…'
-      : '停止本次运行'
-    : '从此处运行流程'
+      ? t('terminal.action.stoppingWorkflow')
+      : t('terminal.action.stopWorkflow')
+    : t('terminal.action.runWorkflow')
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
@@ -314,7 +320,10 @@ function TerminalHeader({
             .join(' ')}
           type="button"
           aria-pressed={isSelectedForTerminalGroup}
-          aria-label={`${blockName} ${terminalGroupSelectionLabel}`}
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: terminalGroupSelectionLabel
+          })}
           title={terminalGroupSelectionLabel}
           data-cc-tooltip={terminalGroupSelectionLabel}
           disabled={!canSelectForTerminalGroup}
@@ -333,18 +342,18 @@ function TerminalHeader({
           <span className="terminal-node__description">{blockDescription}</span>
           <span className={terminalStateClassName}>
             {isRunning
-              ? '运行中'
+              ? t('terminal.status.running')
               : sessionStatus === 'stopping'
-                ? '正在停止'
+                ? t('terminal.status.stopping')
                 : sessionStatus === 'failed'
-                  ? '失败'
+                  ? t('terminal.status.failed')
                   : sessionStatus === 'exited'
-                    ? '已退出'
-                    : '未启动'}
+                    ? t('terminal.status.exited')
+                    : t('terminal.status.idle')}
           </span>
           {workflowStatus ? (
             <span className={`workflow-state workflow-state--${workflowStatus}`}>
-              {workflowStatusLabels[workflowStatus]}
+              {t(`workflow.status.${workflowStatus}`)}
             </span>
           ) : null}
         </div>
@@ -357,8 +366,13 @@ function TerminalHeader({
         <button
           className={`terminal-node__action terminal-node__action--workflow${isActiveWorkflowRoot ? ' terminal-node__action--workflow-stop' : ''}`}
           type="button"
-          aria-label={`${blockName} ${isActiveWorkflowRoot ? workflowActionLabel : '从此处运行终端流程'}`}
-          title={isActiveWorkflowRoot ? workflowActionLabel : '从此终端开始运行依赖流程'}
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: isActiveWorkflowRoot
+              ? workflowActionLabel
+              : t('terminal.action.runTerminalWorkflow')
+          })}
+          title={isActiveWorkflowRoot ? workflowActionLabel : t('terminal.action.runDependencies')}
           data-cc-tooltip={workflowActionLabel}
           disabled={isActiveWorkflowRoot ? isStoppingWorkflow : !canQuickLaunch}
           onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
@@ -376,7 +390,10 @@ function TerminalHeader({
             `terminal-node__action--launch-${launchCommandState}`
           ].join(' ')}
           type="button"
-          aria-label={`${blockName} 启动命令`}
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: t('terminal.action.launch')
+          })}
           title={launchCommandTooltip}
           data-cc-tooltip={launchCommandTooltip}
           data-launch-command-state={launchCommandState}
@@ -387,9 +404,12 @@ function TerminalHeader({
         <button
           className="terminal-node__action"
           type="button"
-          aria-label={`${blockName} 停止当前命令`}
-          title="停止当前命令 (Ctrl+C)"
-          data-cc-tooltip="停止当前命令"
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: t('terminal.action.stopCommand')
+          })}
+          title={t('terminal.action.stopCommandShortcut')}
+          data-cc-tooltip={t('terminal.action.stopCommand')}
           disabled={!isRunning}
           onClick={onStop}
         >
@@ -398,9 +418,12 @@ function TerminalHeader({
         <button
           className="terminal-node__action"
           type="button"
-          aria-label={`${blockName} 重开空终端会话`}
-          title="重开空终端会话，不执行启动命令"
-          data-cc-tooltip="重开空终端会话，不执行启动命令"
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: t('terminal.action.restartEmpty')
+          })}
+          title={t('terminal.action.restartEmptyDescription')}
+          data-cc-tooltip={t('terminal.action.restartEmptyDescription')}
           onClick={onRestart}
         >
           <GroupRestartIcon size={16} />
@@ -409,9 +432,12 @@ function TerminalHeader({
         <button
           className="terminal-node__action"
           type="button"
-          aria-label={`${blockName} 编辑终端信息`}
-          title="编辑终端信息"
-          data-cc-tooltip="编辑终端信息"
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: t('terminal.action.edit')
+          })}
+          title={t('terminal.action.edit')}
+          data-cc-tooltip={t('terminal.action.edit')}
           onClick={onStartEditing}
         >
           <Edit3 size={15} aria-hidden="true" />
@@ -419,9 +445,12 @@ function TerminalHeader({
         <button
           className="terminal-node__action terminal-node__action--danger"
           type="button"
-          aria-label={`${blockName} 删除终端`}
-          title="删除终端"
-          data-cc-tooltip="删除终端"
+          aria-label={t('terminal.namedAction', {
+            blockName,
+            action: t('terminal.action.delete')
+          })}
+          title={t('terminal.action.delete')}
+          data-cc-tooltip={t('terminal.action.delete')}
           onClick={onDelete}
         >
           <X size={15} aria-hidden="true" />
@@ -430,13 +459,3 @@ function TerminalHeader({
     </div>
   )
 }
-
-const workflowStatusLabels = {
-  waiting: '等待',
-  running: '执行中',
-  ready: '已就绪',
-  succeeded: '成功',
-  failed: '失败',
-  blocked: '已阻断',
-  stopped: '已停止'
-} as const

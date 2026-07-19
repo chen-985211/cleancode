@@ -1,6 +1,7 @@
 import { useContext, type KeyboardEvent, type MouseEvent, type SyntheticEvent } from 'react'
 
 import { MinimapNodeInteractionContext } from './minimapInteraction'
+import { useI18n } from './i18n/useI18n'
 
 interface MinimapWorkbenchNodeProps {
   readonly id: string
@@ -35,6 +36,7 @@ export function MinimapWorkbenchNode({
   selected,
   onClick
 }: MinimapWorkbenchNodeProps) {
+  const { t } = useI18n()
   const { getLabel, setHoveredBlockId } = useContext(MinimapNodeInteractionContext)
   const label = getLabel(id)
   const accessibleKindLabel = variant === 'agentConsole' ? ` ${kindLabel}` : kindLabel
@@ -77,7 +79,7 @@ export function MinimapWorkbenchNode({
       className={nodeClassName}
       role="button"
       tabIndex={0}
-      aria-label={`聚焦${accessibleKindLabel} ${label}`}
+      aria-label={t('minimap.focusNode', { kind: accessibleKindLabel, label })}
       data-minimap-node-id={id}
       onClick={activate}
       onKeyDown={activateFromKeyboard}

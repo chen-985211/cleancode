@@ -9,6 +9,7 @@ import {
 } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { useI18n } from './i18n/useI18n'
 
 export function AgentConsoleActions({
   agent,
@@ -23,6 +24,7 @@ export function AgentConsoleActions({
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onSelect?: () => void
 }) {
+  const { t } = useI18n()
   const [mode, setMode] = useState<'closed' | 'menu' | 'remove' | 'rename'>('closed')
   const [name, setName] = useState(agent.name)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -91,7 +93,7 @@ export function AgentConsoleActions({
           onSubmit={(event) => void submitRename(event)}
         >
           <input
-            aria-label="Agent 名称"
+            aria-label={t('agent.name')}
             autoFocus
             value={name}
             onBlur={cancelRename}
@@ -104,8 +106,8 @@ export function AgentConsoleActions({
         <button
           className="agent-console-actions__title"
           type="button"
-          aria-label={`${agent.name}，双击重命名`}
-          title="双击重命名"
+          aria-label={t('agent.renameHint', { agentName: agent.name })}
+          title={t('agent.renameTitle')}
           onClick={(event) => {
             event.stopPropagation()
             onSelect?.()
@@ -128,10 +130,10 @@ export function AgentConsoleActions({
             className="agent-console-actions__more nodrag"
             ref={menuTriggerRef}
             type="button"
-            aria-label={`${agent.name} 更多操作`}
+            aria-label={t('agent.moreActions', { agentName: agent.name })}
             aria-expanded={mode === 'menu'}
             aria-haspopup="menu"
-            title="更多操作"
+            title={t('sidebar.more')}
             disabled={isSubmitting}
             onClick={(event) => {
               event.stopPropagation()
@@ -144,11 +146,11 @@ export function AgentConsoleActions({
             <div
               className="agent-console-actions__menu nodrag"
               role="menu"
-              aria-label={`${agent.name} 操作`}
+              aria-label={t('agent.actions', { agentName: agent.name })}
             >
               <button type="button" role="menuitem" onClick={startRename}>
                 <Pencil size={14} aria-hidden="true" />
-                重命名 Agent
+                {t('agent.rename')}
               </button>
               <button
                 className="agent-console-actions__menu-item--danger"
@@ -157,7 +159,7 @@ export function AgentConsoleActions({
                 onClick={() => setMode('remove')}
               >
                 <Trash2 size={14} aria-hidden="true" />
-                移除 Agent
+                {t('agent.remove')}
               </button>
             </div>
           ) : null}
@@ -167,17 +169,14 @@ export function AgentConsoleActions({
         <div
           className="agent-console-actions__confirm nodrag"
           role="dialog"
-          aria-label="移除 Agent"
+          aria-label={t('agent.remove')}
         >
-          <span>
-            停止并移除此 Agent，取消未完成审批并删除其对话绑定。不会回滚项目文件、删除 Git
-            提交或影响其他 Agent。
-          </span>
+          <span>{t('agent.removeDescription')}</span>
           <button type="button" onClick={() => setMode('closed')}>
-            取消
+            {t('common.cancel')}
           </button>
           <button type="button" onClick={() => void removeAgent()} disabled={isSubmitting}>
-            移除
+            {t('common.remove')}
           </button>
         </div>
       ) : null}

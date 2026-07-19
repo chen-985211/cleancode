@@ -7,6 +7,7 @@ import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
+import { useI18n } from './i18n/useI18n'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -29,6 +30,7 @@ export function useWorkspaceAgentActions({
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
 }) {
+  const { t } = useI18n()
   const setWorkspaceAgents = useCallback(
     (projectId: string, workspaceName: string, agents: readonly WorkspaceAgentSnapshot[]): void => {
       const update = (workbench: WorkbenchSnapshot): WorkbenchSnapshot =>
@@ -48,10 +50,7 @@ export function useWorkspaceAgentActions({
   const createWorkspaceAgent = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace) return
     const agents = currentWorkbench.agents ?? []
-    if (
-      agents.length > 0 &&
-      !window.confirm('多个 Agent 将共享当前工作区目录，可能同时修改相同文件。继续创建吗？')
-    ) {
+    if (agents.length > 0 && !window.confirm(t('agent.multipleWarning'))) {
       return
     }
     const position = resolveNewAgentConsolePosition(agents.map((agent) => agent.layout))
@@ -67,7 +66,7 @@ export function useWorkspaceAgentActions({
       setWorkspaceAgents(currentWorkbench.project.id, currentWorkspace.name, [...agents, created])
       onWorkspaceAgentCreated(created)
     }
-  }, [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents])
+  }, [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents, t])
 
   const updateAgentInWorkspace = useCallback(
     (updated: WorkspaceAgentSnapshot): void => {

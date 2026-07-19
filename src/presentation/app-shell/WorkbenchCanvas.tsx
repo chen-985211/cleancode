@@ -26,6 +26,7 @@ import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
+import { useI18n } from './i18n/useI18n'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -100,10 +101,11 @@ export function WorkbenchCanvas({
   getMiniMapNodeStrokeColor,
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
+  const { t } = useI18n()
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const approvalEdges = useMemo(
-    () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null),
-    [approvalIntents, currentWorkbench?.graph]
+    () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null, t),
+    [approvalIntents, currentWorkbench?.graph, t]
   )
   const workflowEdges = useMemo(
     () =>
@@ -205,7 +207,7 @@ export function WorkbenchCanvas({
   }, [currentWorkbench, reactFlowInstanceRef])
 
   return (
-    <section className="app-shell__workspace" aria-label="积木画布">
+    <section className="app-shell__workspace" aria-label={t('canvas.label')}>
       <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
         <WorkbenchToolbar
           isDesktopRuntime={isDesktopRuntime}
@@ -417,14 +419,11 @@ function resolveCanvasDimension(value: number, fallback: number): number {
 }
 
 function CanvasEmptyState({ isDesktopRuntime }: { readonly isDesktopRuntime: boolean }) {
+  const { t } = useI18n()
   return (
     <div className="canvas-empty">
       <Box size={24} aria-hidden="true" />
-      <span>
-        {isDesktopRuntime
-          ? '选择或添加项目后进入 main 工作区'
-          : '当前是浏览器预览模式，真实项目和终端功能请在 Electron 桌面应用中使用'}
-      </span>
+      <span>{isDesktopRuntime ? t('canvas.emptyDesktop') : t('canvas.emptyPreview')}</span>
     </div>
   )
 }
@@ -440,11 +439,16 @@ function CanvasStatusbar({
   currentWorkbench,
   currentWorkspace
 }: CanvasStatusbarProps) {
+  const { t } = useI18n()
   return (
     <footer className="app-shell__statusbar">
       <span className="status-dot status-dot--running" />
       <span>
-        {!isDesktopRuntime ? '浏览器预览模式' : currentWorkbench ? '已连接本地运行时' : '等待项目'}
+        {!isDesktopRuntime
+          ? t('canvas.statusPreview')
+          : currentWorkbench
+            ? t('canvas.statusConnected')
+            : t('canvas.statusWaiting')}
       </span>
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
     </footer>

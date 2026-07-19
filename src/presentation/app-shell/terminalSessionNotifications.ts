@@ -1,10 +1,17 @@
 import type { NotifyApp } from './appNotifications'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { translate, type Translate } from './i18n/messages'
 
-export function notifyTerminalLaunchFailure(notify: NotifyApp, error: unknown): void {
+export function notifyTerminalLaunchFailure(
+  notify: NotifyApp,
+  error: unknown,
+  t: Translate = defaultTranslate
+): void {
   notify({
     kind: 'error',
-    title: '启动命令失败',
-    message: resolveUserFacingErrorMessage(error, '启动命令失败，请检查终端输出后重试。')
+    title: t('terminalLaunch.failedTitle'),
+    message: resolveUserFacingErrorMessage(error, 'terminalLaunch.failed', t)
   })
 }
+
+const defaultTranslate: Translate = (key, variables) => translate('zh-CN', key, variables)

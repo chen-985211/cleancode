@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { AppNotificationController } from './appNotifications'
 import { createWorkflowRunNotification } from './terminalWorkflowNotifications'
+import { useI18n } from './i18n/useI18n'
 
 interface UseTerminalWorkflowNotificationsInput {
   readonly isStopping: boolean
@@ -28,6 +29,7 @@ export function useTerminalWorkflowNotifications({
   run,
   workspaceName
 }: UseTerminalWorkflowNotificationsInput): void {
+  const { t } = useI18n()
   const publishedByScope = useRef(new Map<string, PublishedWorkflowNotification>())
   const { dismiss, notify, update } = notifications
   const scopeKey = createWorkflowScopeKey(projectDirectory, workspaceName)
@@ -57,7 +59,7 @@ export function useTerminalWorkflowNotifications({
       return
     }
 
-    const notification = createWorkflowRunNotification(run, { isStopping, onStop })
+    const notification = createWorkflowRunNotification(run, { isStopping, onStop }, t)
     const isTerminalStatus =
       run.status === 'failed' || run.status === 'succeeded' || run.status === 'stopped'
 
@@ -81,7 +83,7 @@ export function useTerminalWorkflowNotifications({
       existing.notificationId = notify(notification)
     }
     existing.hiddenByScopeChange = false
-  }, [isStopping, notify, onStop, run, scopeKey, update, workspaceName])
+  }, [isStopping, notify, onStop, run, scopeKey, t, update, workspaceName])
 }
 
 function createWorkflowScopeKey(

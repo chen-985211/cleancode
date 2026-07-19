@@ -18,6 +18,8 @@ import type {
   AgentToolApprovalViewState
 } from './agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from './types'
+import { useI18n } from './i18n/useI18n'
+import type { Translate } from './i18n/messages'
 
 interface UseAgentToolApprovalsInput {
   readonly graph: BlockGraphSnapshot | null
@@ -34,6 +36,7 @@ export function useAgentToolApprovals({
   setCurrentGraph,
   workspaceName
 }: UseAgentToolApprovalsInput): AgentToolApprovalController {
+  const { t } = useI18n()
   const [approvals, setApprovals] = useState<AgentToolApprovalViewState[]>([])
   const scopeRef = useRef({ projectDirectory, workspaceName })
   const graphRef = useRef(graph)
@@ -89,17 +92,17 @@ export function useAgentToolApprovals({
           setApprovalFailure(
             setApprovals,
             request.approvalId,
-            `操作未完成：${result.error.message}`
+            t('approval.failedWithMessage', { message: result.error.message })
           )
           return
         }
         if (result?.status === 'completed') setCurrentGraph(result.graph)
         removeApproval(request.approvalId)
       } catch (error) {
-        setApprovalFailure(setApprovals, request.approvalId, readApprovalError(error))
+        setApprovalFailure(setApprovals, request.approvalId, readApprovalError(error, t))
       }
     },
-    [removeApproval, setCurrentGraph]
+    [removeApproval, setCurrentGraph, t]
   )
 
   const reject = useCallback(
@@ -108,10 +111,10 @@ export function useAgentToolApprovals({
         await window.cleancode?.rejectAgentTool({ approvalId: request.approvalId })
         removeApproval(request.approvalId)
       } catch (error) {
-        setApprovalFailure(setApprovals, request.approvalId, readApprovalError(error))
+        setApprovalFailure(setApprovals, request.approvalId, readApprovalError(error, t))
       }
     },
-    [removeApproval]
+    [removeApproval, t]
   )
 
   const dismiss = useCallback(
@@ -179,8 +182,8 @@ function setApprovalFailure(
   )
 }
 
-function readApprovalError(error: unknown): string {
+function readApprovalError(error: unknown, t: Translate): string {
   return error instanceof Error && error.message
-    ? `操作未完成：${error.message}`
-    : '操作未完成。AI 可重新发起请求。'
+    ? t('approval.failedWithMessage', { message: error.message })
+    : t('approval.failedFallback')
 }

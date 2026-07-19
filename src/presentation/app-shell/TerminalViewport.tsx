@@ -6,6 +6,7 @@ import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
 import { createTerminalSurfaceKey, type TerminalSurface } from './terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
 import type { TerminalDimensions, TerminalViewState } from './types'
+import { useI18n } from './i18n/useI18n'
 
 interface TerminalViewportProps {
   readonly block: TerminalBlockSnapshot
@@ -24,6 +25,7 @@ export function TerminalViewport({
   onDimensionsChange,
   onInput
 }: TerminalViewportProps) {
+  const { t } = useI18n()
   const surfaceRegistry = useTerminalSurfaceRegistry()
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
   const outputTailElementRef = useRef<HTMLPreElement | null>(null)
@@ -119,7 +121,7 @@ export function TerminalViewport({
       <pre
         className="terminal-fallback"
         ref={outputTailElementRef}
-        aria-label={`${block.name} 文本输出`}
+        aria-label={t('terminal.output', { blockName: block.name })}
         data-terminal-session-id={session.sessionId ?? ''}
       />
     )
@@ -139,7 +141,7 @@ export function TerminalViewport({
       <pre
         className="terminal-output-tail"
         ref={outputTailElementRef}
-        aria-label={`${block.name} 文本输出`}
+        aria-label={t('terminal.output', { blockName: block.name })}
         data-terminal-output-tail="true"
         data-terminal-session-id={session.sessionId ?? ''}
       />

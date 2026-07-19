@@ -1,5 +1,6 @@
 import { Folders } from 'lucide-react'
 import type { FormEvent, RefObject } from 'react'
+import { useI18n } from './i18n/useI18n'
 
 interface ProjectSidebarBranchWorkspaceFormProps {
   readonly branchName: string
@@ -16,20 +17,21 @@ export function ProjectSidebarBranchWorkspaceForm({
   onBranchNameChange,
   onSubmit
 }: ProjectSidebarBranchWorkspaceFormProps) {
+  const { t } = useI18n()
   return (
     <form className="branch-workspace-form" ref={formRef} onSubmit={onSubmit}>
       <label className="sr-only" htmlFor={`${projectId}-branch-name`}>
-        分支名称
+        {t('branchWorkspace.branchName')}
       </label>
       <input
         id={`${projectId}-branch-name`}
         value={branchName}
         onChange={(event) => onBranchNameChange(event.target.value)}
-        placeholder="新分支名称"
+        placeholder={t('branchWorkspace.newBranchPlaceholder')}
       />
       <button type="submit">
         <Folders size={13} aria-hidden="true" />
-        <span>创建 Worktree</span>
+        <span>{t('branchWorkspace.createWorktree')}</span>
       </button>
     </form>
   )

@@ -75,6 +75,8 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
+国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
+
 `pnpm test` 必须按测试金字塔从低层到高层串行执行：
 
 ```txt

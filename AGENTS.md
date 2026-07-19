@@ -24,6 +24,7 @@
 - [开发协作规范](docs/engineering/development.md)：定义开发协作 AI 的需求分析、Spec、Plan、TDD、验证、提交和汇报规则。
 - [架构文档](docs/engineering/architecture.md)：定义架构范式、分层规则、依赖方向、限界上下文、端口归属和业务事实来源。
 - [测试规范](docs/testing/testing.md)：定义测试金字塔、测试类型、目录结构、命名、边界、数据和门禁规则。
+- [国际化规范](docs/i18n/README.md)：定义 locale catalog、文案归属、Message key、不可翻译边界和 AI 静态门禁规则。
 - [E2E 稳定性改造手册](docs/testing/e2e-stability.md)：沉淀确定性同步、稳定身份、断言 oracle、场景隔离、清理和失败诊断方法。
 - [技术栈说明](docs/engineering/tech-stack.md)：区分当前采用技术与候选技术，并说明工具链和使用边界。
 - [上下文地图](docs/engineering/context-map.md)：集中记录当前上下文、聚合和跨上下文端口协作。
@@ -44,7 +45,9 @@
 
 如果任务涉及技术选型、运行环境、工具链、依赖、构建配置或框架使用，开发协作 AI 必须继续阅读 [技术栈说明](docs/engineering/tech-stack.md)。
 
-如果任务涉及界面、交互、视觉、组件、布局或前端体验，开发协作 AI 必须继续阅读 [UI 契约](docs/product/ui.md)。
+如果任务涉及界面、交互、视觉、组件、布局或前端体验，开发协作 AI 必须继续阅读 [UI 契约](docs/product/ui.md) 和 [国际化规范](docs/i18n/README.md)。
+
+如果任务涉及用户可见文案、可访问名称、表单提示、通知、错误映射、语言偏好、locale catalog、Message key 或 i18n 门禁，开发协作 AI 必须继续阅读 [国际化规范](docs/i18n/README.md)。
 
 如果任务涉及 xterm、PTY 行列同步、终端字符宽度、CJK 或 emoji 渲染、终端滚动条、终端黑边或可见字符裁剪，开发协作 AI 必须继续阅读 [终端渲染排障指南](docs/engineering/terminal-rendering.md)。
 

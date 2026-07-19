@@ -9,6 +9,8 @@ import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/Wor
 import { createTerminalWorkflowEdges } from './terminalWorkflowEdges'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import type { AppNotificationController, NotifyApp } from './appNotifications'
+import { useI18n } from './i18n/useI18n'
+import type { Translate } from './i18n/messages'
 import { getWorkflowRunRootBlockIds } from './terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from './types'
 import { useTerminalWorkflowNotifications } from './useTerminalWorkflowNotifications'
@@ -28,6 +30,7 @@ export function useTerminalWorkflow({
   notifications,
   setCurrentGraph
 }: UseTerminalWorkflowInput) {
+  const { t } = useI18n()
   const [run, setRun] = useState<WorkflowRunSnapshot | null>(null)
   const [isStopping, setIsStopping] = useState(false)
   const isStoppingRef = useRef(false)
@@ -102,7 +105,7 @@ export function useTerminalWorkflow({
         return
       }
 
-      await performAction(notify, async () => {
+      await performAction(notify, t, async () => {
         const graph = await window.cleancode?.connectTerminalBlocks({
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
@@ -113,14 +116,14 @@ export function useTerminalWorkflow({
         if (graph) setCurrentGraph(graph)
       })
     },
-    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph, t]
   )
 
   const deleteEdges = useCallback(
     async (deletedEdges: Edge[]) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(notify, async () => {
+      await performAction(notify, t, async () => {
         for (const edge of deletedEdges) {
           const graph = await window.cleancode?.disconnectTerminalBlocks({
             projectDirectory: currentWorkbench.project.directory,
@@ -132,14 +135,14 @@ export function useTerminalWorkflow({
         }
       })
     },
-    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph, t]
   )
 
   const updateExecutionConfig = useCallback(
     async (block: TerminalBlockSnapshot, executionConfig: TerminalExecutionConfigSnapshot) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(notify, async () => {
+      await performAction(notify, t, async () => {
         const graph = await window.cleancode?.updateTerminalExecutionConfig({
           projectDirectory: currentWorkbench.project.directory,
           workspaceName: currentWorkspace.name,
@@ -150,14 +153,14 @@ export function useTerminalWorkflow({
         if (graph) setCurrentGraph(graph)
       })
     },
-    [currentWorkbench, currentWorkspace, notify, setCurrentGraph]
+    [currentWorkbench, currentWorkspace, notify, setCurrentGraph, t]
   )
 
   const start = useCallback(
     async (blockId?: string) => {
       if (!currentWorkbench || !currentWorkspace) return
 
-      await performAction(notify, async () => {
+      await performAction(notify, t, async () => {
         const nextRun = await window.cleancode?.startTerminalWorkflow({
           projectId: currentWorkbench.project.id,
           projectDirectory: currentWorkbench.project.directory,
@@ -170,7 +173,7 @@ export function useTerminalWorkflow({
         if (nextRun) setRun(nextRun)
       })
     },
-    [currentWorkbench, currentWorkspace, notify]
+    [currentWorkbench, currentWorkspace, notify, t]
   )
 
   const stop = useCallback(async () => {
@@ -179,7 +182,7 @@ export function useTerminalWorkflow({
     isStoppingRef.current = true
     setIsStopping(true)
     try {
-      await performAction(notify, async () => {
+      await performAction(notify, t, async () => {
         setRun(
           (await window.cleancode?.stopTerminalWorkflow({
             projectDirectory: currentWorkbench.project.directory,
@@ -191,7 +194,7 @@ export function useTerminalWorkflow({
       isStoppingRef.current = false
       setIsStopping(false)
     }
-  }, [currentWorkbench, currentWorkspace, notify])
+  }, [currentWorkbench, currentWorkspace, notify, t])
 
   useTerminalWorkflowNotifications({
     isStopping,
@@ -223,14 +226,18 @@ export function useTerminalWorkflow({
   }
 }
 
-async function performAction(notify: NotifyApp, action: () => Promise<void>): Promise<void> {
+async function performAction(
+  notify: NotifyApp,
+  t: Translate,
+  action: () => Promise<void>
+): Promise<void> {
   try {
     await action()
   } catch (error) {
     notify({
       kind: 'error',
-      title: '流程操作失败',
-      message: resolveUserFacingErrorMessage(error, '流程操作失败，请稍后重试。')
+      title: t('workflow.operationFailedTitle'),
+      message: resolveUserFacingErrorMessage(error, 'workflow.operationFailed', t)
     })
   }
 }

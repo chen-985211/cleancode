@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useI18n } from './i18n/useI18n'
 
 interface ProjectSidebarConfirmationDialogProps {
   readonly ariaLabel: string
@@ -21,6 +22,7 @@ export function ProjectSidebarConfirmationDialog({
   onCancel,
   onConfirm
 }: ProjectSidebarConfirmationDialogProps) {
+  const { t } = useI18n()
   return (
     <div className="project-sidebar-confirmation-dialog__backdrop">
       <div
@@ -37,7 +39,7 @@ export function ProjectSidebarConfirmationDialog({
         {detail ? <p>{detail}</p> : null}
         <div className="project-sidebar-confirmation-dialog__actions">
           <button type="button" autoFocus onClick={onCancel}>
-            取消
+            {t('common.cancel')}
           </button>
           <button
             className="project-sidebar-confirmation-dialog__confirm"

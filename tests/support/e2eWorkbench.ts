@@ -89,7 +89,7 @@ export async function launchApp(
 ): Promise<ElectronApplication> {
   const runElectronInBackground = process.env.CLEANCODE_E2E_VISIBLE !== '1'
   const electronApplication = await electron.launch({
-    args: ['.'],
+    args: ['.', '--lang=zh-CN'],
     cwd: process.cwd(),
     env: {
       ...process.env,

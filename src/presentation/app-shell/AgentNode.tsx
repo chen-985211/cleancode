@@ -8,11 +8,13 @@ import type { AgentConsoleFlowNode } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
+import { useI18n } from './i18n/useI18n'
 
 export const AgentNode = memo(function AgentNode({
   data,
   selected
 }: NodeProps<AgentConsoleFlowNode>) {
+  const { t } = useI18n()
   const approvalController = data.approvalController ?? inactiveApprovalController
   const hasActiveApproval = approvalController.approvals.some(
     (approval) => approval.request.agentId === data.agent.agentId
@@ -30,7 +32,7 @@ export const AgentNode = memo(function AgentNode({
     <section
       className={className}
       role="region"
-      aria-label={`${data.agent.name} 控制台`}
+      aria-label={t('agent.consoleRegion', { agentName: data.agent.name })}
       data-agent-console-node={data.agent.agentId}
       data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
       data-selection-state={selected ? 'selected' : 'unselected'}

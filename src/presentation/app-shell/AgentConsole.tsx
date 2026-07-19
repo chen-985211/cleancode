@@ -28,6 +28,7 @@ import {
 import { useCodexCliState } from './useCodexCliState'
 import { useAgentTerminalEvents } from './useAgentTerminalEvents'
 import { useAgentTerminalSurface } from './useAgentTerminalSurface'
+import { useI18n } from './i18n/useI18n'
 
 export function AgentConsole({
   agent,
@@ -40,6 +41,7 @@ export function AgentConsole({
   onRename,
   onSelect
 }: AgentConsoleProps) {
+  const { t } = useI18n()
   const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
   const codexCliController = useCodexCliState()
   const agentTerminalEvents = useAgentTerminalEvents()
@@ -423,7 +425,7 @@ export function AgentConsole({
       }
     } catch {
       if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
-        setMcpCapabilityError('未能切换 CleanCode MCP，请重试。')
+        setMcpCapabilityError(t('agent.mcpUpdateFailed'))
       }
     } finally {
       if (isMountedRef.current) setIsMcpCapabilityUpdating(false)
@@ -480,7 +482,11 @@ export function AgentConsole({
           onReject={() => void approvalController.reject(activeApproval.request)}
         />
       ) : null}
-      <div className="agent-console__terminal-shell" role="region" aria-label="Codex CLI 会话">
+      <div
+        className="agent-console__terminal-shell"
+        role="region"
+        aria-label={t('agent.cliSession')}
+      >
         {currentWorkspaceKey ? (
           <AgentTerminalSurface
             activeOutput={activeOutput}
@@ -490,7 +496,7 @@ export function AgentConsole({
             useFallback={isTestRuntime()}
           />
         ) : (
-          <div className="agent-console__empty">未选择工作区</div>
+          <div className="agent-console__empty">{t('agent.noWorkspace')}</div>
         )}
       </div>
     </div>

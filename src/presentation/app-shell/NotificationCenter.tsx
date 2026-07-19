@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from '
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 
 import type { AppNotification, AppNotificationKind } from './appNotifications'
+import { useI18n } from './i18n/useI18n'
 
 interface NotificationCenterProps {
   readonly notifications: readonly AppNotification[]
@@ -9,12 +10,13 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ notifications, onDismiss }: NotificationCenterProps) {
+  const { t } = useI18n()
   if (notifications.length === 0) {
     return null
   }
 
   return (
-    <div className="notification-viewport" aria-label="通知">
+    <div className="notification-viewport" aria-label={t('notifications.label')}>
       {notifications.map((notification) => (
         <NotificationCard key={notification.id} notification={notification} onDismiss={onDismiss} />
       ))}
@@ -28,6 +30,7 @@ interface NotificationCardProps {
 }
 
 function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
+  const { t } = useI18n()
   const [isActionPending, setIsActionPending] = useState(false)
   const isMounted = useRef(true)
 
@@ -105,8 +108,8 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
       <button
         className="notification-card__dismiss"
         type="button"
-        aria-label={`关闭“${notification.title}”通知`}
-        title="关闭通知"
+        aria-label={t('notifications.dismiss', { title: notification.title })}
+        title={t('notifications.dismissTitle')}
         onClick={() => onDismiss(notification.id)}
       >
         <X size={15} aria-hidden="true" />

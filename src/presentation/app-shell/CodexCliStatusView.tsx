@@ -4,6 +4,7 @@ import { Check, CircleAlert, Copy, Download, Loader2, MonitorOff, RefreshCw } fr
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { CodexCliInstallationSnapshot } from '../../contexts/agent/application/ports/CodexCliPort'
 import type { CodexCliPanelState } from './useCodexCliState'
+import { useI18n } from './i18n/useI18n'
 
 export function CodexCliStatusView({
   onNewConversation,
@@ -18,17 +19,18 @@ export function CodexCliStatusView({
   readonly state: CodexCliPanelState
   readonly sessionStatus: AgentSessionSnapshot['status'] | null
 }) {
+  const { t } = useI18n()
   if (sessionStatus === 'running' || sessionStatus === 'suspended') return null
 
   if (sessionStatus === 'restore_failed') {
     return (
-      <RuntimeNotice label="无法恢复上次对话" tone="warning">
+      <RuntimeNotice label={t('codex.restoreFailed')} tone="warning">
         <span className="agent-runtime-notice__actions">
           <button type="button" onClick={onRetryRestore}>
-            重试
+            {t('codex.retry')}
           </button>
           <button type="button" onClick={onNewConversation}>
-            新对话
+            {t('codex.newConversation')}
           </button>
         </span>
       </RuntimeNotice>
@@ -36,7 +38,7 @@ export function CodexCliStatusView({
   }
 
   if (sessionStatus === 'exited') {
-    return <RuntimeNotice label="Codex 会话已结束" tone="neutral" />
+    return <RuntimeNotice label={t('codex.sessionEnded')} tone="neutral" />
   }
 
   if (sessionStatus === 'failed') {
@@ -44,28 +46,28 @@ export function CodexCliStatusView({
       return (
         <MissingCliNotice
           installation={state.installation}
-          label="Codex 会话启动失败，未检测到 CLI"
+          label={t('codex.startFailedMissing')}
           onRetry={onRetryInspection}
         />
       )
     }
 
-    return <RuntimeNotice label="Codex 会话启动失败" tone="warning" />
+    return <RuntimeNotice label={t('codex.startFailed')} tone="warning" />
   }
 
   if (state.status === 'unavailable') {
-    return <RuntimeNotice label="桌面运行时未连接" tone="neutral" icon="offline" />
+    return <RuntimeNotice label={t('codex.runtimeUnavailable')} tone="neutral" icon="offline" />
   }
 
   if (state.status === 'checking') {
     return state.visible ? (
-      <RuntimeNotice label="正在检查 Codex CLI" tone="neutral" icon="checking" />
+      <RuntimeNotice label={t('codex.checking')} tone="neutral" icon="checking" />
     ) : null
   }
 
   if (state.installation.status === 'temporarily_unavailable') {
     return (
-      <RuntimeNotice label="暂时无法检查 Codex CLI" tone="neutral">
+      <RuntimeNotice label={t('codex.checkUnavailable')} tone="neutral">
         <span className="agent-runtime-notice__actions">
           <RetryInspectionButton onRetry={onRetryInspection} />
         </span>
@@ -82,13 +84,14 @@ export function CodexCliStatusView({
 
 function MissingCliNotice({
   installation,
-  label = '未检测到 Codex CLI',
+  label,
   onRetry
 }: {
   readonly installation: Extract<CodexCliInstallationSnapshot, { readonly status: 'missing' }>
   readonly label?: string
   readonly onRetry: () => void
 }) {
+  const { t } = useI18n()
   const [isHelpVisible, setIsHelpVisible] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
 
@@ -105,7 +108,7 @@ function MissingCliNotice({
   return (
     <div className="agent-runtime-notice" role="status" data-tone="warning">
       <Download size={14} aria-hidden="true" />
-      <span>{label}</span>
+      <span>{label ?? t('codex.missing')}</span>
       <span className="agent-runtime-notice__actions">
         <RetryInspectionButton onRetry={onRetry} />
         <button
@@ -113,19 +116,23 @@ function MissingCliNotice({
           aria-expanded={isHelpVisible}
           onClick={() => setIsHelpVisible((visible) => !visible)}
         >
-          安装帮助
+          {t('codex.installHelp')}
         </button>
       </span>
       {isHelpVisible ? (
         <span className="agent-runtime-notice__install-help">
           <code>{installation.installCommand}</code>
-          <button type="button" aria-label="复制安装命令" onClick={() => void copyInstallCommand()}>
+          <button
+            type="button"
+            aria-label={t('codex.copyInstallCommand')}
+            onClick={() => void copyInstallCommand()}
+          >
             {isCopied ? (
               <Check size={12} aria-hidden="true" />
             ) : (
               <Copy size={12} aria-hidden="true" />
             )}
-            <span>{isCopied ? '已复制' : '复制'}</span>
+            <span>{isCopied ? t('codex.copied') : t('codex.copy')}</span>
           </button>
         </span>
       ) : null}
@@ -134,10 +141,11 @@ function MissingCliNotice({
 }
 
 function RetryInspectionButton({ onRetry }: { readonly onRetry: () => void }) {
+  const { t } = useI18n()
   return (
-    <button type="button" aria-label="重新检查 Codex CLI" onClick={onRetry}>
+    <button type="button" aria-label={t('codex.recheck')} onClick={onRetry}>
       <RefreshCw size={12} aria-hidden="true" />
-      <span>重新检查</span>
+      <span>{t('codex.recheckShort')}</span>
     </button>
   )
 }

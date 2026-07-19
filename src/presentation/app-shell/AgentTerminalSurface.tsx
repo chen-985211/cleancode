@@ -1,6 +1,7 @@
 import type { MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import { useI18n } from './i18n/useI18n'
 
 export function AgentTerminalSurface({
   activeOutput,
@@ -15,12 +16,13 @@ export function AgentTerminalSurface({
   readonly session: AgentSessionSnapshot | null
   readonly useFallback: boolean
 }) {
+  const { t } = useI18n()
   if (useFallback) {
     return (
       <div className="agent-terminal-fallback">
-        <pre aria-label="Codex CLI 终端">{activeOutput}</pre>
+        <pre aria-label={t('agent.cliTerminal')}>{activeOutput}</pre>
         <textarea
-          aria-label="Codex CLI 输入"
+          aria-label={t('agent.cliInput')}
           onChange={(event) => {
             onFallbackInput(event.target.value)
             event.target.value = ''

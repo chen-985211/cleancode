@@ -85,6 +85,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY；xt
 - `check:max-lines`：限制代码文件行数。
 - `check:logging`：检查日志、错误码和 IPC 错误边界。
 - `check:theme`：检查集中主题与语义颜色 token。
+- `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
 本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖上述自定义检查、格式、Lint、类型检查、全部测试、依赖方向和未使用代码检查。

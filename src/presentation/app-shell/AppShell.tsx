@@ -31,6 +31,8 @@ import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { ThemeSettingsRoot } from './ThemeSettingsRoot'
+import { LanguageSettingsRoot } from './LanguageSettingsRoot'
+import { useI18n } from './i18n/useI18n'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
@@ -46,6 +48,7 @@ export function AppShell({
   notifications = ignoreAppNotifications
 }: { readonly notifications?: AppNotificationController } = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
+  const { t } = useI18n()
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
   const [currentWorkbench, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(null)
   const [nodes, setNodes] = useState<WorkbenchFlowNode[]>([])
@@ -231,8 +234,8 @@ export function AppShell({
     const graphSnapshot = await window.cleancode?.createTerminalBlock({
       projectDirectory: currentWorkbench.project.directory,
       workspaceName: currentWorkspace.name,
-      name: `Terminal ${currentWorkbench.graph.blocks.length + 1}`,
-      description: '本地终端',
+      name: t('terminal.defaultName', { index: currentWorkbench.graph.blocks.length + 1 }),
+      description: t('terminal.defaultDescription'),
       position: resolveNewTerminalBlockPosition(currentWorkbench.graph.blocks)
     })
 
@@ -244,7 +247,7 @@ export function AppShell({
         focusTerminalBlock(createdBlock.id, 220, createdBlock)
       }
     }
-  }, [currentWorkbench, currentWorkspace, focusTerminalBlock, setCurrentGraph])
+  }, [currentWorkbench, currentWorkspace, focusTerminalBlock, setCurrentGraph, t])
 
   const createTerminalGroup = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
@@ -255,7 +258,10 @@ export function AppShell({
     const graphSnapshot = await window.cleancode?.createTerminalGroup({
       projectDirectory: currentWorkbench.project.directory,
       workspaceName: currentWorkspace.name,
-      name: currentWorkbench.graph.terminalGroups.length === 0 ? '启动项目' : '终端组合',
+      name:
+        currentWorkbench.graph.terminalGroups.length === 0
+          ? t('group.defaultFirstName')
+          : t('group.defaultName'),
       memberBlockIds: selectedUngroupedTerminalBlockIds
     })
 
@@ -271,7 +277,8 @@ export function AppShell({
     currentWorkspace,
     completeTerminalGroupSelection,
     selectedUngroupedTerminalBlockIds,
-    setCurrentGraph
+    setCurrentGraph,
+    t
   ])
 
   const workbenchNodeSelection = useWorkbenchNodeSelection({
@@ -449,8 +456,9 @@ export function AppShell({
     <CodexCliStateProvider>
       <AgentTerminalEventProvider store={agentTerminalEvents}>
         <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-          <main className="app-shell" aria-label="cleancode workspace">
-            <div className="app-shell__settings" role="group" aria-label="应用设置">
+          <main className="app-shell" aria-label={t('app.workspace')}>
+            <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
+              <LanguageSettingsRoot />
               <ThemeSettingsRoot />
             </div>
             <ProjectSidebar

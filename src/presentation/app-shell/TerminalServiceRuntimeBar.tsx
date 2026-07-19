@@ -6,6 +6,8 @@ import type {
   TerminalServiceEndpoint,
   TerminalServicePortConflict
 } from './types'
+import { useI18n } from './i18n/useI18n'
+import type { Translate } from './i18n/messages'
 
 interface TerminalServiceRuntimeBarProps {
   readonly identity: TerminalRunIdentity | null
@@ -68,6 +70,7 @@ function EndpointRow({
 > & {
   readonly endpoint: TerminalServiceEndpoint
 }) {
+  const { t } = useI18n()
   const canOpen =
     Boolean(identity) &&
     portState === 'bound' &&
@@ -76,37 +79,40 @@ function EndpointRow({
 
   return (
     <div className="terminal-service-runtime__endpoint">
-      <span className="terminal-service-runtime__label">服务</span>
+      <span className="terminal-service-runtime__label">{t('service.label')}</span>
       <code
         className="terminal-service-runtime__address"
-        aria-label="实际服务地址"
+        aria-label={t('service.actualAddress')}
         title={endpoint.displayAddress}
       >
         {endpoint.displayAddress}
       </code>
       {endpoint.fallback && endpoint.requestedPort !== null ? (
         <span className="terminal-service-runtime__fallback">
-          首选 {endpoint.requestedPort} 已占用，已改用 {endpoint.port}
+          {t('service.fallback', {
+            requestedPort: endpoint.requestedPort,
+            port: endpoint.port
+          })}
         </span>
       ) : null}
       {portState === 'releasing' ? (
-        <span className="terminal-service-runtime__fallback">正在停止并释放端口</span>
+        <span className="terminal-service-runtime__fallback">{t('service.releasing')}</span>
       ) : null}
       {portState === 'quarantined' ? (
-        <span className="terminal-service-runtime__fallback">端口清理未确认，已隔离</span>
+        <span className="terminal-service-runtime__fallback">{t('service.quarantined')}</span>
       ) : null}
       <div className="terminal-service-runtime__actions">
         <RuntimeIconButton
-          label="复制实际服务地址"
-          tooltip="复制实际服务地址"
+          label={t('service.copyAddress')}
+          tooltip={t('service.copyAddress')}
           onClick={() => void onCopyEndpoint(endpoint)}
         >
           <Copy size={13} aria-hidden="true" />
         </RuntimeIconButton>
         {canOpen && identity ? (
           <RuntimeIconButton
-            label="打开实际服务地址"
-            tooltip="打开实际服务地址"
+            label={t('service.openAddress')}
+            tooltip={t('service.openAddress')}
             onClick={() => void onOpenEndpoint(identity)}
           >
             <ExternalLink size={13} aria-hidden="true" />
@@ -127,29 +133,34 @@ function ConflictRow({
   TerminalServiceRuntimeBarProps,
   'conflict' | 'onOpenEndpoint' | 'onLocateOwner' | 'onEditPortConfiguration' | 'onDismissConflict'
 > & { readonly conflict: TerminalServicePortConflict }) {
+  const { t } = useI18n()
   const owner = conflict.ownership === 'managed' ? conflict.managedOwner : null
   const canOpenOwner = owner && conflict.managedLeaseState === 'bound'
 
   return (
-    <div className="terminal-service-runtime__conflict" role="status" aria-label="端口冲突">
+    <div
+      className="terminal-service-runtime__conflict"
+      role="status"
+      aria-label={t('service.portConflict')}
+    >
       <TriangleAlert size={14} aria-hidden="true" />
       <span className="terminal-service-runtime__conflict-message">
-        {createConflictMessage(conflict, owner)}
+        {createConflictMessage(conflict, owner, t)}
       </span>
       <div className="terminal-service-runtime__actions">
         {owner ? (
           <>
             <RuntimeIconButton
-              label="定位占用服务"
-              tooltip="定位占用服务"
+              label={t('service.locateOwner')}
+              tooltip={t('service.locateOwner')}
               onClick={() => void onLocateOwner(owner)}
             >
               <LocateFixed size={13} aria-hidden="true" />
             </RuntimeIconButton>
             {canOpenOwner ? (
               <RuntimeIconButton
-                label="打开占用服务"
-                tooltip="打开占用服务"
+                label={t('service.openOwner')}
+                tooltip={t('service.openOwner')}
                 onClick={() => void onOpenEndpoint(owner.identity)}
               >
                 <ExternalLink size={13} aria-hidden="true" />
@@ -158,13 +169,17 @@ function ConflictRow({
           </>
         ) : null}
         <RuntimeIconButton
-          label="编辑端口配置"
-          tooltip="编辑端口配置"
+          label={t('service.editPort')}
+          tooltip={t('service.editPort')}
           onClick={onEditPortConfiguration}
         >
           <Pencil size={13} aria-hidden="true" />
         </RuntimeIconButton>
-        <RuntimeIconButton label="取消端口冲突提示" tooltip="关闭提示" onClick={onDismissConflict}>
+        <RuntimeIconButton
+          label={t('service.dismissConflict')}
+          tooltip={t('service.dismiss')}
+          onClick={onDismissConflict}
+        >
           <X size={13} aria-hidden="true" />
         </RuntimeIconButton>
       </div>
@@ -174,32 +189,43 @@ function ConflictRow({
 
 function createConflictMessage(
   conflict: TerminalServicePortConflict,
-  owner: ManagedTerminalServiceOwner | null
+  owner: ManagedTerminalServiceOwner | null,
+  t: Translate
 ): string {
   if (owner) {
     if (conflict.managedLeaseState === 'releasing') {
-      return `端口 ${conflict.port} 的服务正在停止并清理`
+      return t('service.conflictReleasing', { port: conflict.port })
     }
     if (conflict.managedLeaseState === 'quarantined') {
-      return `端口 ${conflict.port} 的上次清理未确认，当前已隔离`
+      return t('service.conflictQuarantined', { port: conflict.port })
     }
     if (conflict.managedLeaseState === 'reserved' || conflict.managedLeaseState === 'activating') {
-      return `端口 ${conflict.port} 正由 ${owner.projectName} / ${owner.workspaceName} / ${owner.terminalName} 启动`
+      return t('service.conflictStarting', {
+        port: conflict.port,
+        projectName: owner.projectName,
+        workspaceName: owner.workspaceName,
+        terminalName: owner.terminalName
+      })
     }
-    return `端口 ${conflict.port} 正由 ${owner.projectName} / ${owner.workspaceName} / ${owner.terminalName} 使用`
+    return t('service.conflictManaged', {
+      port: conflict.port,
+      projectName: owner.projectName,
+      workspaceName: owner.workspaceName,
+      terminalName: owner.terminalName
+    })
   }
 
   if (conflict.code === 'SERVICE_PORT_ALLOCATION_EXHAUSTED') {
-    return '未能分配可用端口，请修改端口配置后重试'
+    return t('service.conflictExhausted')
   }
 
   if (conflict.ownership === 'managed') {
-    return `端口 ${conflict.port} 正由另一个 cleancode 服务使用`
+    return t('service.conflictOtherManaged', { port: conflict.port })
   }
 
   return conflict.ownership === 'external'
-    ? `端口 ${conflict.port} 已被外部服务占用`
-    : `无法确认端口 ${conflict.port} 的监听者归属`
+    ? t('service.conflictExternal', { port: conflict.port })
+    : t('service.conflictUnknown', { port: conflict.port })
 }
 
 function RuntimeIconButton({

@@ -327,6 +327,7 @@ Electron 启动、IPC、依赖装配和配置必须放在 `platform` 内。
 - 限界上下文拥有的统一语言、业务规则、状态模型和能力说明放入 `docs/contexts/<bounded-context>/`。
 - 跨上下文的产品信息架构、用户可见契约和路线图放入 `docs/product/`。
 - 全仓架构、开发协作、技术栈、日志和排障规则放入 `docs/engineering/`。
+- 国际化实现、文案归属、Message key 和 AI i18n 约束放入 `docs/i18n/`。
 - 测试组织规则、测试方法和稳定性排障手册放入 `docs/testing/`。
 - `docs` 根目录除 `README.md` 外不得新增主题文档。
 
@@ -396,6 +397,8 @@ Large Change 或运行时风险变更必须显式检查以下事项，并在最�
 仅修改 Markdown 文档，且没有同时修改生产代码、测试代码、构建配置、工具配置或依赖时，不要求运行 `pnpm pre-commit`。纯文档改动必须运行 `pnpm check:docs`、对改动文档执行 Prettier 格式检查，并执行 `git diff --check`；如果同一工作区已有尚未通过完整门禁的非文档改动，仍须按前述规则完成 `pnpm pre-commit`。
 
 生产 UI 的颜色必须来自集中主题定义和语义 token。`pnpm check:theme` 必须检查生产界面的 CSS、SVG、TypeScript 和 TSX，禁止在集中主题定义之外新增颜色字面量。检查器规则、允许范围和可执行事实来源以 `scripts/check-theme.mjs` 为准。
+
+第一方 UI 文案必须由 locale catalog 持有，开发协作 AI 不得在表现层硬编码中英文用户可见文本。文案归属、不可翻译边界和 AI 修改流程以 [国际化规范](../i18n/README.md) 为准；`pnpm check:i18n` 的可执行事实来源是 `scripts/check-i18n.mjs`。
 
 开发协作 AI 不得绕过失败的质量门禁。若门禁失败，必须先修复失败原因，再重新运行门禁。
 

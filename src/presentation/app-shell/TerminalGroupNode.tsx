@@ -22,10 +22,12 @@ import {
 } from './TerminalGroupIcons'
 import type { TerminalGroupFlowNode, TerminalViewState } from './types'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
+import { useI18n } from './i18n/useI18n'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
 }: NodeProps<TerminalGroupFlowNode>) {
+  const { t } = useI18n()
   const group = data.group
   const [isEditingName, setIsEditingName] = useState(false)
   const [draftName, setDraftName] = useState(group.name)
@@ -88,9 +90,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         isConnectable={false}
       />
       {data.approvalIntent === 'contains-delete' ? (
-        <span className="agent-approval-target-chip">包含待删除终端</span>
+        <span className="agent-approval-target-chip">{t('group.containsDelete')}</span>
       ) : data.approvalIntent === 'contains-disconnect' ? (
-        <span className="agent-approval-target-chip">包含待断开依赖</span>
+        <span className="agent-approval-target-chip">{t('group.containsDisconnect')}</span>
       ) : null}
       <div
         data-workbench-node-title="true"
@@ -110,7 +112,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
               onPointerDown={(event) => event.stopPropagation()}
             >
               <input
-                aria-label="组合名称"
+                aria-label={t('group.name')}
                 value={draftName}
                 onChange={(event) => setDraftName(event.target.value)}
               />
@@ -122,7 +124,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
               </strong>
               {data.dropFeedback ? (
                 <span className="terminal-group-node__drop-hint">
-                  {getDropFeedbackLabel(data.dropFeedback)}
+                  {getDropFeedbackLabel(data.dropFeedback, t)}
                 </span>
               ) : null}
             </>
@@ -183,6 +185,7 @@ interface GroupActionToolbarProps {
 
 function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolbarProps) {
   const group = data.group
+  const { t } = useI18n()
 
   return (
     <div
@@ -200,8 +203,11 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
         data-control-group="runtime"
       >
         <IconButton
-          label={`${group.name} 启动组合命令`}
-          title="启动组合命令"
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.start')
+          })}
+          title={t('group.action.start')}
           tone="primary"
           surface="raised"
           onClick={() => data.onStartGroup(group)}
@@ -209,16 +215,22 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
           <GroupStartIcon />
         </IconButton>
         <IconButton
-          label={`${group.name} 停止全部当前命令`}
-          title="停止全部当前命令"
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.stop')
+          })}
+          title={t('group.action.stop')}
           surface="raised"
           onClick={() => data.onStopGroup(group)}
         >
           <GroupStopIcon />
         </IconButton>
         <IconButton
-          label={`${group.name} 重开组合终端会话`}
-          title="重开组合终端会话，不执行启动命令"
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.restart')
+          })}
+          title={t('group.action.restartDescription')}
           surface="raised"
           onClick={() => data.onRestartGroup(group)}
         >
@@ -236,8 +248,11 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
         data-control-group="structure"
       >
         <IconButton
-          label={`${group.name} 编辑组合名称`}
-          title="编辑组合名称"
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.edit')
+          })}
+          title={t('group.action.edit')}
           surface="raised"
           onClick={onEdit}
         >
@@ -246,16 +261,22 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
         {isInline ? <DisclosureButton data={data} /> : null}
         <div className="terminal-group-node__membership-actions" data-control-group="membership">
           <IconButton
-            label={`${group.name} 添加选中终端`}
-            title="添加选中终端"
+            label={t('group.namedAction', {
+              groupName: group.name,
+              action: t('group.action.addSelected')
+            })}
+            title={t('group.action.addSelected')}
             disabled={data.selectedUngroupedTerminalBlockIds.length === 0}
             onClick={() => void data.onAddSelectedTerminalsToGroup(group)}
           >
             <GroupAddIcon />
           </IconButton>
           <IconButton
-            label={`${group.name} 移出选中终端`}
-            title="移出选中终端"
+            label={t('group.namedAction', {
+              groupName: group.name,
+              action: t('group.action.removeSelected')
+            })}
+            title={t('group.action.removeSelected')}
             disabled={data.selectedMemberBlockIds.length === 0}
             onClick={() => void data.onRemoveSelectedTerminalsFromGroup(group)}
           >
@@ -274,8 +295,11 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
         data-control-group="danger"
       >
         <IconButton
-          label={`${group.name} 解散组合`}
-          title="解散组合，保留成员终端"
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.dissolve')
+          })}
+          title={t('group.action.dissolveDescription')}
           tone="danger"
           surface="raised"
           onClick={() => void data.onDissolveGroup(group)}
@@ -293,16 +317,20 @@ interface DisclosureButtonProps {
 
 function DisclosureButton({ data }: DisclosureButtonProps) {
   const group = data.group
-  const action = group.isCollapsed ? '展开' : '折叠'
+  const { t } = useI18n()
+  const action = group.isCollapsed ? t('group.action.expand') : t('group.action.collapse')
+  const groupAction = group.isCollapsed
+    ? t('group.action.expandGroup')
+    : t('group.action.collapseGroup')
 
   return (
     <button
       className="terminal-group-node__disclosure nodrag"
       type="button"
-      aria-label={`${group.name} ${action}组合`}
+      aria-label={t('group.namedAction', { groupName: group.name, action: groupAction })}
       aria-expanded={!group.isCollapsed}
-      title={`${action}组合`}
-      data-cc-tooltip={`${action}组合`}
+      title={groupAction}
+      data-cc-tooltip={groupAction}
       onPointerDown={(event) => event.stopPropagation()}
       onClick={() => void data.onToggleGroupCollapsed(group, !group.isCollapsed)}
     >
@@ -319,6 +347,7 @@ interface EditActionsProps {
 }
 
 function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
+  const { t } = useI18n()
   return (
     <div
       className="terminal-group-node__edit-actions nodrag"
@@ -328,9 +357,9 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
         className="terminal-group-node__action terminal-group-node__action--primary"
         type="submit"
         form={formId}
-        aria-label="保存组合名称"
-        title="保存组合名称"
-        data-cc-tooltip="保存组合名称"
+        aria-label={t('group.action.saveName')}
+        title={t('group.action.saveName')}
+        data-cc-tooltip={t('group.action.saveName')}
         disabled={!canSave}
       >
         <Check size={15} aria-hidden="true" />
@@ -338,9 +367,9 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
       <button
         className="terminal-group-node__action"
         type="button"
-        aria-label="取消编辑组合名称"
-        title="取消"
-        data-cc-tooltip="取消"
+        aria-label={t('group.action.cancelEditName')}
+        title={t('common.cancel')}
+        data-cc-tooltip={t('common.cancel')}
         onClick={onCancel}
       >
         <X size={15} aria-hidden="true" />
@@ -394,6 +423,7 @@ interface MemberRowProps {
 
 function MemberRow({ block, state, onRemove }: MemberRowProps) {
   const status = state?.status ?? 'idle'
+  const { t } = useI18n()
 
   return (
     <div className={`terminal-group-node__member terminal-group-node__member--${status}`}>
@@ -402,13 +432,16 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
         {block.name}
       </span>
       <span className="terminal-group-node__member-status-label">
-        {terminalStatusLabels[status]}
+        {t(`terminal.status.${status}`)}
       </span>
       <button
         className="terminal-group-node__member-remove nodrag"
         type="button"
-        aria-label={`${block.name} 移出组合`}
-        data-cc-tooltip="移出组合"
+        aria-label={t('group.memberNamedAction', {
+          blockName: block.name,
+          action: t('group.action.removeMember')
+        })}
+        data-cc-tooltip={t('group.action.removeMember')}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={onRemove}
       >
@@ -418,24 +451,17 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
   )
 }
 
-const terminalStatusLabels: Record<TerminalViewState['status'], string> = {
-  idle: '未启动',
-  running: '运行中',
-  stopping: '正在停止',
-  exited: '已退出',
-  failed: '失败'
-}
-
 function getDropFeedbackLabel(
-  feedback: NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>
+  feedback: NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>,
+  t: ReturnType<typeof useI18n>['t']
 ) {
   if (feedback === 'join') {
-    return '松开加入组合'
+    return t('group.dropJoin')
   }
 
   if (feedback === 'leave') {
-    return '松开移出组合'
+    return t('group.dropLeave')
   }
 
-  return '松开后解散组合'
+  return t('group.dropDissolve')
 }

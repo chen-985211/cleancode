@@ -16,6 +16,7 @@ import { ProjectSidebarBranchWorkspaceForm } from './ProjectSidebarBranchWorkspa
 import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemovalPopover'
 import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
+import { useI18n } from './i18n/useI18n'
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
@@ -48,8 +49,9 @@ export function ProjectSidebar({
   onRemoveProject,
   onSelectWorkspace
 }: ProjectSidebarProps) {
+  const { t } = useI18n()
   return (
-    <aside className="project-sidebar" aria-label="项目与分支工作区">
+    <aside className="project-sidebar" aria-label={t('sidebar.label')}>
       <div className="project-sidebar__actions">
         <button
           className="sidebar-action"
@@ -58,12 +60,12 @@ export function ProjectSidebar({
           disabled={!isDesktopRuntime}
         >
           <Plus size={17} aria-hidden="true" />
-          添加项目
+          {t('sidebar.addProject')}
         </button>
       </div>
       {!isDesktopRuntime ? (
         <div className="runtime-warning" role="status">
-          浏览器预览不连接本地文件系统和终端。请用桌面应用运行真实功能。
+          {t('sidebar.previewWarning')}
         </div>
       ) : null}
       {actionError ? (
@@ -72,15 +74,15 @@ export function ProjectSidebar({
           <button
             className="project-sidebar-alert__close"
             type="button"
-            aria-label="关闭提示"
-            title="关闭提示"
+            aria-label={t('sidebar.closeAlert')}
+            title={t('sidebar.closeAlert')}
             onClick={onDismissActionError}
           >
             <X size={13} aria-hidden="true" />
           </button>
         </div>
       ) : null}
-      <div className="project-sidebar__label">项目</div>
+      <div className="project-sidebar__label">{t('sidebar.projects')}</div>
       <div className="project-list">
         {workbenches.map((workbench) => (
           <ProjectCard
@@ -122,6 +124,7 @@ function ProjectCard({
   onRemoveProject,
   onSelectWorkspace
 }: ProjectCardProps) {
+  const { t } = useI18n()
   const isCurrentProject = currentWorkbench?.project.id === workbench.project.id
   const currentProjectWorkspace = workbench.project.workspaces.find(
     (workspace) => workspace.isCurrent
@@ -213,7 +216,11 @@ function ProjectCard({
   }, [openWorkspaceMenuName])
 
   return (
-    <section className="project-card" role="group" aria-label={`项目 ${workbench.project.name}`}>
+    <section
+      className="project-card"
+      role="group"
+      aria-label={t('sidebar.projectGroup', { projectName: workbench.project.name })}
+    >
       <div className="project-card__header">
         <button
           className="project-card__select"
@@ -227,8 +234,8 @@ function ProjectCard({
         <button
           className="project-card__branch icon-button"
           type="button"
-          aria-label="新建分支工作区"
-          title="新建分支工作区"
+          aria-label={t('sidebar.newBranchWorkspace')}
+          title={t('sidebar.newBranchWorkspace')}
           ref={triggerRef}
           onClick={toggleBranchWorkspaceForm}
         >
@@ -237,8 +244,8 @@ function ProjectCard({
         <button
           className="project-card__remove icon-button"
           type="button"
-          aria-label="移除项目"
-          title="从列表移除项目"
+          aria-label={t('sidebar.removeProject')}
+          title={t('sidebar.removeProjectFromList')}
           ref={removeProjectButtonRef}
           onClick={() => setIsRemoveProjectDialogOpen((isOpen) => !isOpen)}
         >
@@ -253,15 +260,17 @@ function ProjectCard({
           const isGitUninitialized =
             isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
           const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
-          const workspaceDisplayName = isGitUninitialized ? 'Git 未初始化' : workspace.name
+          const workspaceDisplayName = isGitUninitialized
+            ? t('sidebar.gitUninitialized')
+            : workspace.name
           const shouldShowDefaultWorkspaceBadge =
             isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
           const shouldShowGitBranchBadge =
             Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.name
           const workspaceButtonLabel = [
             workspaceDisplayName,
-            shouldShowDefaultWorkspaceBadge ? '默认工作区' : null,
-            isWorktreeWorkspace ? '独立工作区' : null,
+            shouldShowDefaultWorkspaceBadge ? t('sidebar.defaultWorkspace') : null,
+            isWorktreeWorkspace ? t('sidebar.separateWorkspace') : null,
             shouldShowGitBranchBadge ? workspace.gitBranch : null
           ]
             .filter(Boolean)
@@ -289,7 +298,9 @@ function ProjectCard({
                     }
                   >
                     <button
-                      aria-label={`切换到默认工作区 ${boundBranchName}`}
+                      aria-label={t('sidebar.switchDefaultWorkspace', {
+                        branchName: boundBranchName
+                      })}
                       aria-current={isActiveWorkspace ? 'page' : undefined}
                       className="default-branch-selector__select"
                       type="button"
@@ -301,16 +312,20 @@ function ProjectCard({
                       </span>
                       <span className="workspace-row__name truncate">{boundBranchName}</span>
                       {shouldShowDefaultWorkspaceBadge ? (
-                        <span className="badge badge--default-workspace">默认工作区</span>
+                        <span className="badge badge--default-workspace">
+                          {t('sidebar.defaultWorkspace')}
+                        </span>
                       ) : null}
                     </button>
                     <button
-                      aria-label={`选择默认工作区分支 ${boundBranchName}`}
+                      aria-label={t('sidebar.chooseDefaultBranch', {
+                        branchName: boundBranchName
+                      })}
                       aria-expanded={isBranchSelectorOpen}
                       aria-haspopup="dialog"
                       className="default-branch-selector__toggle"
                       type="button"
-                      title="选择默认工作区分支"
+                      title={t('sidebar.chooseDefaultBranchTitle')}
                       onClick={toggleBranchSelector}
                     >
                       <ChevronDown size={14} aria-hidden="true" />
@@ -363,13 +378,15 @@ function ProjectCard({
                       shouldShowGitBranchBadge ? (
                         <span className="workspace-row__metadata">
                           {shouldShowDefaultWorkspaceBadge ? (
-                            <span className="badge badge--default-workspace">默认工作区</span>
+                            <span className="badge badge--default-workspace">
+                              {t('sidebar.defaultWorkspace')}
+                            </span>
                           ) : null}
                           {isWorktreeWorkspace ? (
                             <span
                               className="workspace-row__kind"
                               aria-hidden="true"
-                              title="独立工作区"
+                              title={t('sidebar.separateWorkspace')}
                             >
                               <Folders size={12} />
                             </span>
@@ -384,10 +401,12 @@ function ProjectCard({
                       <button
                         className="workspace-row__menu-button"
                         type="button"
-                        aria-label={`打开 ${workspace.name} 工作区菜单`}
+                        aria-label={t('sidebar.openWorkspaceMenu', {
+                          workspaceName: workspace.name
+                        })}
                         aria-haspopup="menu"
                         aria-expanded={openWorkspaceMenuName === workspace.name}
-                        title="更多"
+                        title={t('sidebar.more')}
                         onClick={() =>
                           setOpenWorkspaceMenuName((menuName) =>
                             menuName === workspace.name ? null : workspace.name
@@ -410,7 +429,7 @@ function ProjectCard({
                         }}
                       >
                         <Archive size={14} aria-hidden="true" />
-                        归档工作区
+                        {t('sidebar.archiveWorkspace')}
                       </button>
                     </div>
                   ) : null}

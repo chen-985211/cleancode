@@ -1,4 +1,5 @@
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { translate, type Translate } from './i18n/messages'
 
 type TerminalServicePortPolicy = NonNullable<
   Extract<TerminalExecutionConfigSnapshot, { mode: 'service' }>['port']
@@ -54,16 +55,20 @@ export function createExecutionConfigDraft(
 }
 
 export function validateExecutionConfigDraft(
-  draft: ExecutionConfigDraft
+  draft: ExecutionConfigDraft,
+  t: Translate = defaultTranslate
 ): ExecutionConfigDraftValidation {
   if (draft.mode === 'task') {
-    return validateTaskExecutionConfig(draft)
+    return validateTaskExecutionConfig(draft, t)
   }
 
-  return validateServiceExecutionConfig(draft)
+  return validateServiceExecutionConfig(draft, t)
 }
 
-function validateTaskExecutionConfig(draft: ExecutionConfigDraft): ExecutionConfigDraftValidation {
+function validateTaskExecutionConfig(
+  draft: ExecutionConfigDraft,
+  t: Translate
+): ExecutionConfigDraftValidation {
   const successExitCodes = draft.successExitCodes.split(',').map((value) => Number(value.trim()))
   const timeoutMs = draft.taskTimeoutSeconds.trim()
     ? parsePositiveSeconds(draft.taskTimeoutSeconds)
@@ -73,11 +78,11 @@ function validateTaskExecutionConfig(draft: ExecutionConfigDraft): ExecutionConf
     successExitCodes.length === 0 ||
     successExitCodes.some((code) => !Number.isInteger(code) || code < 0 || code > 255)
   ) {
-    return invalid('成功退出码必须是 0 到 255 之间的整数。')
+    return invalid(t('terminalValidation.exitCodes'))
   }
 
   if (draft.taskTimeoutSeconds.trim() && timeoutMs === null) {
-    return invalid('任务超时必须是大于 0 的秒数。')
+    return invalid(t('terminalValidation.taskTimeout'))
   }
 
   return valid({
@@ -88,12 +93,13 @@ function validateTaskExecutionConfig(draft: ExecutionConfigDraft): ExecutionConf
 }
 
 function validateServiceExecutionConfig(
-  draft: ExecutionConfigDraft
+  draft: ExecutionConfigDraft,
+  t: Translate
 ): ExecutionConfigDraftValidation {
   const readinessTimeoutMs = parsePositiveSeconds(draft.readinessTimeoutSeconds)
 
   if (readinessTimeoutMs === null) {
-    return invalid('服务就绪超时必须是大于 0 的秒数。')
+    return invalid(t('terminalValidation.readinessTimeout'))
   }
 
   const readiness =
@@ -104,30 +110,30 @@ function validateServiceExecutionConfig(
       : ({ type: 'tcp' } as const)
 
   if (!readiness) {
-    return invalid('请填写服务就绪文本。')
+    return invalid(t('terminalValidation.readinessText'))
   }
 
   if (draft.portPolicy === 'unmanaged') {
     return readiness.type === 'tcp'
-      ? invalid('TCP 就绪需要先配置端口策略。')
+      ? invalid(t('terminalValidation.tcpNeedsPort'))
       : valid({ mode: 'service', readiness, readinessTimeoutMs })
   }
 
   const policy = parsePortPolicy(draft)
   if (!policy) {
-    return invalid('服务端口必须是 1 到 65535 之间的整数。')
+    return invalid(t('terminalValidation.portRange'))
   }
 
   if (draft.portBinding === 'none' && policy.type !== 'fixed') {
-    return invalid('不注入端口只适用于固定端口策略。')
+    return invalid(t('terminalValidation.noBindingFixedOnly'))
   }
 
   const binding = parsePortBinding(draft)
   if (!binding) {
     return invalid(
       draft.portBinding === 'environment'
-        ? '请填写有效的环境变量名称。'
-        : '参数后缀必须只包含安全参数，并且恰好包含一个 {port}。'
+        ? t('terminalValidation.environmentVariable')
+        : t('terminalValidation.argumentTemplate')
     )
   }
 
@@ -181,3 +187,5 @@ function valid(config: TerminalExecutionConfigSnapshot): ExecutionConfigDraftVal
 function invalid(error: string): ExecutionConfigDraftValidation {
   return { config: null, error }
 }
+
+const defaultTranslate: Translate = (key, variables) => translate('zh-CN', key, variables)

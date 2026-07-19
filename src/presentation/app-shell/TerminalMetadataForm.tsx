@@ -12,6 +12,7 @@ import {
   type ExecutionConfigDraft
 } from './terminalExecutionConfigDraft'
 import type { TerminalBlockMetadataInput } from './types'
+import { useI18n } from './i18n/useI18n'
 
 interface TerminalMetadataFormProps {
   readonly block: TerminalBlockSnapshot
@@ -29,6 +30,7 @@ export function TerminalMetadataForm({
   onSave,
   onCancel
 }: TerminalMetadataFormProps) {
+  const { t } = useI18n()
   const [name, setName] = useState(block.name)
   const [description, setDescription] = useState(block.description)
   const [launchCommand, setLaunchCommand] = useState(block.launchCommand)
@@ -39,8 +41,8 @@ export function TerminalMetadataForm({
   const [saveError, setSaveError] = useState<string | null>(null)
   const launchCommandInputRef = useRef<HTMLInputElement | null>(null)
   const executionValidation = useMemo(
-    () => validateExecutionConfigDraft(executionDraft),
-    [executionDraft]
+    () => validateExecutionConfigDraft(executionDraft, t),
+    [executionDraft, t]
   )
   const canSave = Boolean(name.trim()) && executionValidation.config !== null && !isSaving
 
@@ -70,7 +72,7 @@ export function TerminalMetadataForm({
         executionValidation.config
       )
     } catch {
-      setSaveError('保存失败，请重试。')
+      setSaveError(t('terminalForm.saveFailed'))
     } finally {
       setIsSaving(false)
     }
@@ -79,7 +81,7 @@ export function TerminalMetadataForm({
   return (
     <form
       className="terminal-metadata-form nodrag"
-      aria-label="编辑终端信息"
+      aria-label={t('terminalForm.edit')}
       aria-busy={isSaving}
       onSubmit={(event) => void save(event)}
       onPointerDown={(event) => event.stopPropagation()}
@@ -87,10 +89,10 @@ export function TerminalMetadataForm({
       <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>
         <div className="terminal-metadata-form__body">
           <div className="terminal-metadata-form__fields">
-            <MetadataField label="名称">
+            <MetadataField label={t('terminalForm.name')}>
               <input
-                aria-label="终端名称"
-                placeholder="例如：Web Server"
+                aria-label={t('terminalForm.terminalName')}
+                placeholder={t('terminalForm.namePlaceholder')}
                 value={name}
                 onChange={(event) => {
                   setSaveError(null)
@@ -98,10 +100,10 @@ export function TerminalMetadataForm({
                 }}
               />
             </MetadataField>
-            <MetadataField label="描述">
+            <MetadataField label={t('terminalForm.description')}>
               <input
-                aria-label="终端描述"
-                placeholder="例如：本地开发服务"
+                aria-label={t('terminalForm.terminalDescription')}
+                placeholder={t('terminalForm.descriptionPlaceholder')}
                 value={description}
                 onChange={(event) => {
                   setSaveError(null)
@@ -109,11 +111,11 @@ export function TerminalMetadataForm({
                 }}
               />
             </MetadataField>
-            <MetadataField label="启动命令">
+            <MetadataField label={t('terminalForm.launchCommand')}>
               <input
-                aria-label="启动命令"
+                aria-label={t('terminalForm.launchCommand')}
                 ref={launchCommandInputRef}
-                placeholder="例如：pnpm dev"
+                placeholder={t('terminalForm.launchPlaceholder')}
                 value={launchCommand}
                 onChange={(event) => {
                   setSaveError(null)
@@ -123,11 +125,11 @@ export function TerminalMetadataForm({
             </MetadataField>
           </div>
           <details className="terminal-execution-config" open={executionDraft.mode === 'service'}>
-            <summary>工作流高级配置</summary>
+            <summary>{t('terminalForm.advanced')}</summary>
             <div className="terminal-execution-config__grid">
-              <MetadataField label="运行模式">
+              <MetadataField label={t('terminalForm.runMode')}>
                 <select
-                  aria-label="运行模式"
+                  aria-label={t('terminalForm.runMode')}
                   value={executionDraft.mode}
                   onChange={(event) =>
                     updateExecutionDraft({
@@ -136,8 +138,8 @@ export function TerminalMetadataForm({
                     })
                   }
                 >
-                  <option value="task">任务（按退出码完成）</option>
-                  <option value="service">服务（就绪后放行）</option>
+                  <option value="task">{t('terminalForm.taskMode')}</option>
+                  <option value="service">{t('terminalForm.serviceMode')}</option>
                 </select>
               </MetadataField>
               {executionDraft.mode === 'task' ? (
@@ -162,10 +164,10 @@ export function TerminalMetadataForm({
           <button
             className="terminal-node__action terminal-node__action--confirm"
             type="submit"
-            aria-label="保存终端信息"
+            aria-label={t('terminalForm.save')}
             aria-busy={isSaving}
-            title="保存终端信息"
-            data-cc-tooltip={isSaving ? '正在保存终端信息' : '保存终端信息'}
+            title={t('terminalForm.save')}
+            data-cc-tooltip={isSaving ? t('terminalForm.saving') : t('terminalForm.save')}
             disabled={!canSave}
           >
             <Check size={15} aria-hidden="true" />
@@ -173,9 +175,9 @@ export function TerminalMetadataForm({
           <button
             className="terminal-node__action"
             type="button"
-            aria-label="取消编辑终端信息"
-            title="取消编辑终端信息"
-            data-cc-tooltip="取消编辑"
+            aria-label={t('terminalForm.cancel')}
+            title={t('terminalForm.cancel')}
+            data-cc-tooltip={t('terminalForm.cancelShort')}
             onClick={onCancel}
           >
             <X size={15} aria-hidden="true" />
@@ -193,21 +195,22 @@ function TaskExecutionFields({
   readonly draft: ExecutionConfigDraft
   readonly onChange: (draft: ExecutionConfigDraft) => void
 }) {
+  const { t } = useI18n()
   return (
     <>
-      <MetadataField label="成功退出码">
+      <MetadataField label={t('terminalForm.successExitCodes')}>
         <input
-          aria-label="成功退出码"
-          placeholder="0 或 0,2"
+          aria-label={t('terminalForm.successExitCodes')}
+          placeholder={t('terminalForm.exitCodesPlaceholder')}
           value={draft.successExitCodes}
           onChange={(event) => onChange({ ...draft, successExitCodes: event.currentTarget.value })}
         />
       </MetadataField>
-      <MetadataField label="任务超时（秒，可空）">
+      <MetadataField label={t('terminalForm.taskTimeoutLabel')}>
         <input
-          aria-label="任务超时"
+          aria-label={t('terminalForm.taskTimeout')}
           inputMode="numeric"
-          placeholder="不限时"
+          placeholder={t('terminalForm.noTimeout')}
           value={draft.taskTimeoutSeconds}
           onChange={(event) =>
             onChange({ ...draft, taskTimeoutSeconds: event.currentTarget.value })
@@ -225,11 +228,12 @@ function ServiceExecutionFields({
   readonly draft: ExecutionConfigDraft
   readonly onChange: (draft: ExecutionConfigDraft) => void
 }) {
+  const { t } = useI18n()
   return (
     <>
-      <MetadataField label="就绪方式">
+      <MetadataField label={t('terminalForm.readinessMethod')}>
         <select
-          aria-label="服务就绪方式"
+          aria-label={t('terminalForm.serviceReadinessMethod')}
           value={draft.readinessType}
           onChange={(event) =>
             onChange({
@@ -238,23 +242,23 @@ function ServiceExecutionFields({
             })
           }
         >
-          <option value="output">输出包含文本</option>
-          <option value="tcp">本机 TCP 监听</option>
+          <option value="output">{t('terminalForm.outputReadiness')}</option>
+          <option value="tcp">{t('terminalForm.tcpReadiness')}</option>
         </select>
       </MetadataField>
       {draft.readinessType === 'output' ? (
-        <MetadataField label="就绪文本（字面匹配）">
+        <MetadataField label={t('terminalForm.readinessTextLabel')}>
           <input
-            aria-label="服务就绪文本"
-            placeholder="例如：server ready"
+            aria-label={t('terminalForm.readinessText')}
+            placeholder={t('terminalForm.readinessTextPlaceholder')}
             value={draft.readinessText}
             onChange={(event) => onChange({ ...draft, readinessText: event.currentTarget.value })}
           />
         </MetadataField>
       ) : null}
-      <MetadataField label="就绪超时（秒）">
+      <MetadataField label={t('terminalForm.readinessTimeoutLabel')}>
         <input
-          aria-label="服务就绪超时"
+          aria-label={t('terminalForm.readinessTimeout')}
           inputMode="numeric"
           value={draft.readinessTimeoutSeconds}
           onChange={(event) =>
@@ -274,13 +278,14 @@ function PortIntentFields({
   readonly draft: ExecutionConfigDraft
   readonly onChange: (draft: ExecutionConfigDraft) => void
 }) {
+  const { t } = useI18n()
   const hasPortIntent = draft.portPolicy !== 'unmanaged'
 
   return (
     <div className="terminal-port-intent-fields">
-      <MetadataField label="端口策略">
+      <MetadataField label={t('terminalForm.portPolicy')}>
         <select
-          aria-label="端口策略"
+          aria-label={t('terminalForm.portPolicy')}
           value={draft.portPolicy}
           onChange={(event) => {
             const portPolicy = event.currentTarget.value as ExecutionConfigDraft['portPolicy']
@@ -294,17 +299,17 @@ function PortIntentFields({
             })
           }}
         >
-          <option value="unmanaged">不管理端口</option>
-          <option value="fixed">固定端口</option>
-          <option value="preferred">首选端口，可自动回退</option>
-          <option value="auto">自动分配端口</option>
+          <option value="unmanaged">{t('terminalForm.portUnmanaged')}</option>
+          <option value="fixed">{t('terminalForm.portFixed')}</option>
+          <option value="preferred">{t('terminalForm.portPreferred')}</option>
+          <option value="auto">{t('terminalForm.portAuto')}</option>
         </select>
       </MetadataField>
       {hasPortIntent ? (
         <>
-          <MetadataField label="访问协议">
+          <MetadataField label={t('terminalForm.protocol')}>
             <select
-              aria-label="访问协议"
+              aria-label={t('terminalForm.protocol')}
               value={draft.portProtocol}
               onChange={(event) =>
                 onChange({
@@ -319,19 +324,19 @@ function PortIntentFields({
             </select>
           </MetadataField>
           {draft.portPolicy === 'fixed' || draft.portPolicy === 'preferred' ? (
-            <MetadataField label="服务端口">
+            <MetadataField label={t('terminalForm.servicePort')}>
               <input
-                aria-label="服务端口"
+                aria-label={t('terminalForm.servicePort')}
                 inputMode="numeric"
-                placeholder="例如：5173"
+                placeholder={t('terminalForm.portPlaceholder')}
                 value={draft.portNumber}
                 onChange={(event) => onChange({ ...draft, portNumber: event.currentTarget.value })}
               />
             </MetadataField>
           ) : null}
-          <MetadataField label="端口注入方式">
+          <MetadataField label={t('terminalForm.portBinding')}>
             <select
-              aria-label="端口注入方式"
+              aria-label={t('terminalForm.portBinding')}
               value={draft.portBinding}
               onChange={(event) =>
                 onChange({
@@ -340,20 +345,22 @@ function PortIntentFields({
                 })
               }
             >
-              {draft.portPolicy === 'fixed' ? <option value="none">不注入</option> : null}
-              <option value="environment">环境变量（推荐）</option>
-              <option value="argument">命令参数后缀</option>
+              {draft.portPolicy === 'fixed' ? (
+                <option value="none">{t('terminalForm.noBinding')}</option>
+              ) : null}
+              <option value="environment">{t('terminalForm.environmentBinding')}</option>
+              <option value="argument">{t('terminalForm.argumentBinding')}</option>
             </select>
           </MetadataField>
           {draft.portBinding === 'environment' ? (
             <>
-              <MetadataField label="环境变量名称">
+              <MetadataField label={t('terminalForm.environmentVariable')}>
                 <input
-                  aria-label="环境变量名称"
+                  aria-label={t('terminalForm.environmentVariable')}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="例如：APP_PORT"
+                  placeholder={t('terminalForm.environmentPlaceholder')}
                   value={draft.environmentVariable}
                   onChange={(event) =>
                     onChange({ ...draft, environmentVariable: event.currentTarget.value })
@@ -361,19 +368,19 @@ function PortIntentFields({
                 />
               </MetadataField>
               <p className="terminal-port-intent-fields__hint">
-                推荐使用环境变量注入；请填写项目实际读取的变量名。
+                {t('terminalForm.environmentHint')}
               </p>
             </>
           ) : null}
           {draft.portBinding === 'argument' ? (
             <>
-              <MetadataField label="端口参数后缀">
+              <MetadataField label={t('terminalForm.argumentSuffix')}>
                 <input
-                  aria-label="端口参数后缀"
+                  aria-label={t('terminalForm.argumentSuffix')}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="例如：--port {port}"
+                  placeholder={t('terminalForm.argumentPlaceholder')}
                   value={draft.argumentTemplate}
                   onChange={(event) =>
                     onChange({ ...draft, argumentTemplate: event.currentTarget.value })
@@ -381,7 +388,7 @@ function PortIntentFields({
                 />
               </MetadataField>
               <p className="terminal-port-intent-fields__hint">
-                参数会追加到启动命令，仅支持安全参数字符和一个 {'{port}'} 占位符。
+                {t('terminalForm.argumentHint', { port: '{port}' })}
               </p>
             </>
           ) : null}

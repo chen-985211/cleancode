@@ -1,6 +1,7 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
 
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { useI18n } from './i18n/useI18n'
 import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
 import type { WorkbenchSnapshot } from './types'
 import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
@@ -27,6 +28,7 @@ export function useBranchWorkspaceActions({
   terminateWorkspaceTerminalSessions,
   forgetWorkspaceTerminalStates
 }: UseBranchWorkspaceActionsInput) {
+  const { t } = useI18n()
   const [branchWorkspaceActionError, setBranchWorkspaceActionError] = useState<string | null>(null)
   const clearCurrentBlockSelection = useCallback(() => {
     setSelectedTerminalBlockId(null)
@@ -79,10 +81,12 @@ export function useBranchWorkspaceActions({
         clearCurrentBlockSelection()
         replaceWorkbench(createdWorkbench)
       } catch (error) {
-        setBranchWorkspaceActionError(resolveUserFacingErrorMessage(error, '工作区操作失败。'))
+        setBranchWorkspaceActionError(
+          resolveUserFacingErrorMessage(error, 'workspace.operationFailed', t)
+        )
       }
     },
-    [clearCurrentBlockSelection, replaceWorkbench]
+    [clearCurrentBlockSelection, replaceWorkbench, t]
   )
 
   const archiveBranchWorkspace = useCallback(
@@ -118,7 +122,9 @@ export function useBranchWorkspaceActions({
           replaceWorkbench(archivedWorkbench)
         }
       } catch (error) {
-        setBranchWorkspaceActionError(resolveUserFacingErrorMessage(error, '工作区操作失败。'))
+        setBranchWorkspaceActionError(
+          resolveUserFacingErrorMessage(error, 'workspace.operationFailed', t)
+        )
       }
     },
     [
@@ -126,6 +132,7 @@ export function useBranchWorkspaceActions({
       currentWorkbench,
       agentTerminalSurfaceRegistry,
       replaceWorkbench,
+      t,
       terminateWorkspaceTerminalSessions,
       forgetWorkspaceTerminalStates
     ]
