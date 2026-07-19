@@ -27,6 +27,12 @@ export interface LaunchTerminalCommand {
     session: TerminalSessionSnapshot,
     endpoint: ActualServiceEndpoint
   ) => void
+  readonly onPortStateChanged?: (
+    session: TerminalSessionSnapshot,
+    endpoint: ActualServiceEndpoint,
+    state: 'releasing' | 'released' | 'quarantined'
+  ) => void
+  readonly onRunEnded?: (event: TerminalExitEvent) => void
   readonly onCleanupFailed?: (error: unknown) => void
 }
 
@@ -71,6 +77,7 @@ export class LaunchTerminalCommandUseCase {
         onExit: command.onExit,
         onSessionStarted: (session) => command.onSessionStarted(session, null),
         onEndpointConfirmed: command.onEndpointConfirmed,
+        onPortStateChanged: command.onPortStateChanged,
         onCleanupFailed: command.onCleanupFailed
       })
       return { session: run.session, endpoint: run.endpoint }
@@ -89,7 +96,10 @@ export class LaunchTerminalCommandUseCase {
       columns: command.columns,
       rows: command.rows,
       onOutput: command.onOutput,
-      onExit: command.onExit
+      onExit: (event) => {
+        command.onExit(event)
+        command.onRunEnded?.(event)
+      }
     })
     command.onSessionStarted(session, null)
     return { session, endpoint: null }

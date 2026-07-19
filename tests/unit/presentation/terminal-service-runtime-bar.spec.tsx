@@ -24,6 +24,7 @@ describe('terminal service runtime bar', () => {
       <TerminalServiceRuntimeBar
         identity={identity}
         endpoint={endpoint}
+        portState="bound"
         conflict={null}
         onCopyEndpoint={onCopyEndpoint}
         onOpenEndpoint={onOpenEndpoint}
@@ -54,6 +55,7 @@ describe('terminal service runtime bar', () => {
           displayAddress: 'tcp://127.0.0.1:5432',
           openable: false
         }}
+        portState="bound"
         conflict={null}
         onCopyEndpoint={vi.fn()}
         onOpenEndpoint={vi.fn()}
@@ -88,6 +90,7 @@ describe('terminal service runtime bar', () => {
       <TerminalServiceRuntimeBar
         identity={createIdentity()}
         endpoint={null}
+        portState={null}
         conflict={createConflict({ ownership: 'managed', managedOwner: owner })}
         onCopyEndpoint={vi.fn()}
         onOpenEndpoint={onOpenEndpoint}
@@ -119,6 +122,7 @@ describe('terminal service runtime bar', () => {
         <TerminalServiceRuntimeBar
           identity={createIdentity()}
           endpoint={null}
+          portState={null}
           conflict={createConflict({ ownership })}
           onCopyEndpoint={vi.fn()}
           onOpenEndpoint={vi.fn()}
@@ -145,6 +149,7 @@ describe('terminal service runtime bar', () => {
       <TerminalServiceRuntimeBar
         identity={createIdentity()}
         endpoint={null}
+        portState={null}
         conflict={createConflict({ ownership: 'managed' })}
         onCopyEndpoint={vi.fn()}
         onOpenEndpoint={vi.fn()}
@@ -158,6 +163,57 @@ describe('terminal service runtime bar', () => {
       '端口 5173 正由另一个 cleancode 服务使用'
     )
     expect(screen.queryByRole('button', { name: '定位占用服务' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '打开占用服务' })).not.toBeInTheDocument()
+  })
+
+  it('shows cleanup in progress and does not offer opening a releasing endpoint', () => {
+    render(
+      <TerminalServiceRuntimeBar
+        identity={createIdentity()}
+        endpoint={createEndpoint()}
+        portState="releasing"
+        conflict={null}
+        onCopyEndpoint={vi.fn()}
+        onOpenEndpoint={vi.fn()}
+        onLocateOwner={vi.fn()}
+        onEditPortConfiguration={vi.fn()}
+        onDismissConflict={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('正在停止并释放端口')).toBeVisible()
+    expect(screen.queryByRole('button', { name: '打开实际服务地址' })).not.toBeInTheDocument()
+  })
+
+  it('distinguishes a releasing managed conflict from an active owner', () => {
+    const owner: ManagedTerminalServiceOwner = {
+      identity: createIdentity(),
+      projectName: 'Storefront',
+      workspaceName: 'main',
+      terminalName: 'API'
+    }
+    render(
+      <TerminalServiceRuntimeBar
+        identity={createIdentity()}
+        endpoint={null}
+        portState={null}
+        conflict={createConflict({
+          ownership: 'managed',
+          managedOwner: owner,
+          managedLeaseState: 'releasing'
+        })}
+        onCopyEndpoint={vi.fn()}
+        onOpenEndpoint={vi.fn()}
+        onLocateOwner={vi.fn()}
+        onEditPortConfiguration={vi.fn()}
+        onDismissConflict={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('status', { name: '端口冲突' })).toHaveTextContent(
+      '端口 5173 的服务正在停止并清理'
+    )
+    expect(screen.getByRole('button', { name: '定位占用服务' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: '打开占用服务' })).not.toBeInTheDocument()
   })
 })
@@ -189,13 +245,14 @@ function createEndpoint(input: Partial<TerminalServiceEndpoint> = {}): TerminalS
 function createConflict(
   input: Pick<TerminalServicePortConflict, 'ownership'> & Partial<TerminalServicePortConflict>
 ): TerminalServicePortConflict {
-  const { ownership, ...rest } = input
+  const { ownership, managedLeaseState = 'bound', ...rest } = input
 
   return {
     code: 'SERVICE_PORT_FIXED_CONFLICT',
     port: 5173,
     ownership,
     managedOwner: null,
+    managedLeaseState,
     ...rest
   }
 }

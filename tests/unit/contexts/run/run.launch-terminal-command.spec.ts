@@ -15,6 +15,7 @@ describe('launch terminal command', () => {
     )
     const startedEndpoints: Array<number | null> = []
     const confirmedEndpoints: number[] = []
+    const portStates: string[] = []
 
     const result = await useCase.execute({
       projectId: 'project-1',
@@ -28,7 +29,8 @@ describe('launch terminal command', () => {
       onOutput: () => undefined,
       onExit: () => undefined,
       onSessionStarted: (_session, endpoint) => startedEndpoints.push(endpoint?.port ?? null),
-      onEndpointConfirmed: (_session, endpoint) => confirmedEndpoints.push(endpoint.port)
+      onEndpointConfirmed: (_session, endpoint) => confirmedEndpoints.push(endpoint.port),
+      onPortStateChanged: (_session, _endpoint, state) => portStates.push(state)
     })
 
     expect(plans.queries).toEqual([
@@ -49,6 +51,54 @@ describe('launch terminal command', () => {
     expect(result.endpoint).toMatchObject({ port: 41_001 })
     expect(startedEndpoints).toEqual([null])
     expect(confirmedEndpoints).toEqual([41_001])
+    expect(portStates).toEqual(['releasing', 'released'])
+  })
+
+  it('reports a non-managed command as ended only after forwarding its process exit', async () => {
+    const exitOrder: string[] = []
+    const session = createSession()
+    const plans: TerminalLaunchPlanPort = {
+      getPlan: async () => ({
+        blockId: 'api',
+        launchCommand: 'pnpm test',
+        executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: null }
+      })
+    }
+    const sessions = {
+      start: async (command: Record<string, unknown>) => {
+        const event = { scope: session, sessionId: session.id, exitCode: 0 }
+        ;(
+          command.onExit as (exitEvent: {
+            readonly scope: typeof session
+            readonly sessionId: string
+            readonly exitCode: number
+          }) => void
+        )(event)
+        return session
+      }
+    } as unknown as TerminalSessionService
+    const useCase = new LaunchTerminalCommandUseCase(
+      plans,
+      sessions,
+      new RecordingManagedLauncher() as unknown as ManagedServiceLauncher
+    )
+
+    await useCase.execute({
+      projectId: 'project-1',
+      projectDirectory: '/project',
+      workspaceName: 'main',
+      workspaceDirectory: '/project',
+      gitBranch: 'main',
+      blockId: 'api',
+      workingDirectory: '/project',
+      signal: new AbortController().signal,
+      onOutput: () => undefined,
+      onExit: () => exitOrder.push('process-exit'),
+      onRunEnded: () => exitOrder.push('run-ended'),
+      onSessionStarted: () => undefined
+    })
+
+    expect(exitOrder).toEqual(['process-exit', 'run-ended'])
   })
 })
 
@@ -105,6 +155,13 @@ class RecordingManagedLauncher {
     ) => void
     onSessionStarted(session)
     onEndpointConfirmed(session, endpoint())
+    const onPortStateChanged = command.onPortStateChanged as (
+      startedSession: typeof session,
+      actualEndpoint: ReturnType<typeof endpoint>,
+      state: 'releasing' | 'released'
+    ) => void
+    onPortStateChanged(session, endpoint(), 'releasing')
+    onPortStateChanged(session, endpoint(), 'released')
     return {
       scope: session,
       session,
@@ -117,6 +174,28 @@ class RecordingManagedLauncher {
         quarantineReason: null
       }
     }
+  }
+}
+
+function createSession() {
+  return {
+    projectId: 'project-1',
+    projectDirectory: '/project',
+    workspaceName: 'main',
+    workspaceDirectory: '/project',
+    gitBranch: 'main',
+    blockId: 'api',
+    sessionId: 'session-1',
+    runId: 'run-1',
+    generation: 1,
+    id: 'session-1',
+    terminalBlockId: 'api',
+    workingDirectory: '/project',
+    processId: 1,
+    status: 'running' as const,
+    inputHistory: [],
+    exitCode: null,
+    failureReason: null
   }
 }
 

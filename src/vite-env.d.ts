@@ -277,12 +277,17 @@ declare global {
         readonly sessionId: string
         readonly columns: number
         readonly rows: number
-      }): Promise<void>
+      }): Promise<TerminalSessionSnapshot>
       interruptTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      listTerminalSessions(command: {
+        readonly sessionIds: readonly string[]
+      }): Promise<TerminalSessionSnapshot[]>
       listTerminalWorkingDirectories(command: {
         readonly sessionIds: readonly string[]
       }): Promise<TerminalWorkingDirectorySnapshot[]>
-      terminateTerminal(command: { readonly sessionId: string }): Promise<TerminalSessionSnapshot>
+      terminateTerminal(command: {
+        readonly sessionId: string
+      }): Promise<TerminalSessionSnapshot | null>
       startTerminalWorkflow(command: {
         readonly projectId: string
         readonly projectDirectory: string

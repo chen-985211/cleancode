@@ -37,6 +37,36 @@ describe('service port lease registry', () => {
       'Service port already has an active lease.'
     )
   })
+
+  it('lets a contender await the exact releasing lease settlement', async () => {
+    const registry = new ServicePortLeaseRegistry()
+    const lease = registry.reserve(runScope('run-1'), endpoint(41_000))
+    lease.markActivating()
+    lease.markBound()
+    lease.markReleasing()
+
+    const settled = registry.waitForSettlement({ port: 41_000, leaseId: lease.id })
+    lease.release()
+
+    await expect(settled).resolves.toMatchObject({
+      id: lease.id,
+      state: 'released',
+      endpoint: { port: 41_000 }
+    })
+  })
+
+  it('recovers only the exact quarantined lease selected by the caller', () => {
+    const registry = new ServicePortLeaseRegistry()
+    const lease = registry.reserve(runScope('run-1'), endpoint(41_000))
+    lease.markReleasing()
+    lease.quarantine('Listener closure was not confirmed.')
+
+    expect(registry.recoverQuarantined({ port: 41_000, leaseId: 'stale-lease' })).toBe(false)
+    expect(registry.findActiveByPort(41_000)?.state).toBe('quarantined')
+    expect(registry.recoverQuarantined({ port: 41_000, leaseId: lease.id })).toBe(true)
+    expect(registry.findActiveByPort(41_000)).toBeNull()
+    expect(lease.toSnapshot().state).toBe('released')
+  })
 })
 
 function runScope(runId: string) {

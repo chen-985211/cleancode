@@ -54,6 +54,19 @@ describe('managed terminal service IPC contract', () => {
     })
   })
 
+  it('reports an already absent terminal session as an idempotent termination success', async () => {
+    const ipcMain = new FakeIpcMain()
+    const terminateTerminal = vi.fn(async () => null)
+    registerTerminalIpcHandlers(
+      createInput({ ipcMain, terminateTerminal }) as unknown as TerminalIpcHandlersInput
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:terminate-terminal', { sessionId: 'missing-session' })
+    ).resolves.toEqual({ ok: true, value: null })
+    expect(terminateTerminal).toHaveBeenCalledWith('missing-session')
+  })
+
   it('launches only from an exact Project workspace identity and forwards terminal events', async () => {
     const ipcMain = new FakeIpcMain()
     const launchTerminal = vi.fn(async (command: Record<string, unknown>) => {
@@ -72,6 +85,16 @@ describe('managed terminal service IPC contract', () => {
         sessionId: 'session-2',
         exitCode: 0
       })
+      ;(command.onPortStateChanged as (session: unknown, endpoint: unknown, state: string) => void)(
+        session,
+        launchResult.endpoint,
+        'releasing'
+      )
+      ;(command.onPortStateChanged as (session: unknown, endpoint: unknown, state: string) => void)(
+        session,
+        launchResult.endpoint,
+        'released'
+      )
       return launchResult
     })
     const senderEvent = createSenderEvent()
@@ -92,9 +115,13 @@ describe('managed terminal service IPC contract', () => {
       workingDirectory: launchCommand.workspaceDirectory,
       columns: launchCommand.columns,
       rows: launchCommand.rows,
+      shell: undefined,
       signal: expect.any(AbortSignal),
+      onCleanupFailed: expect.any(Function),
       onExit: expect.any(Function),
       onOutput: expect.any(Function),
+      onPortStateChanged: expect.any(Function),
+      onRunEnded: expect.any(Function),
       onSessionStarted: expect.any(Function),
       onEndpointConfirmed: expect.any(Function)
     })
@@ -118,8 +145,14 @@ describe('managed terminal service IPC contract', () => {
       exitCode: 0
     })
     expect(senderEvent.sender.send).toHaveBeenNthCalledWith(5, 'cleancode:terminal-run-event', {
-      type: 'service-run-ended',
-      scope: runIdentity
+      type: 'service-port-state-changed',
+      scope: runIdentity,
+      state: 'releasing'
+    })
+    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(6, 'cleancode:terminal-run-event', {
+      type: 'service-port-state-changed',
+      scope: runIdentity,
+      state: 'released'
     })
   })
 
@@ -177,7 +210,8 @@ describe('managed terminal service IPC contract', () => {
           managedBlockId: managedOwner.identity.blockId,
           managedSessionId: managedOwner.identity.sessionId,
           managedRunId: managedOwner.identity.runId,
-          managedGeneration: managedOwner.identity.generation
+          managedGeneration: managedOwner.identity.generation,
+          managedLeaseState: 'bound'
         }
       )
     })
@@ -207,7 +241,8 @@ describe('managed terminal service IPC contract', () => {
         code: 'SERVICE_PORT_FIXED_CONFLICT',
         port: 3_000,
         ownership: 'managed',
-        managedOwner
+        managedOwner,
+        managedLeaseState: 'bound'
       }
     })
   })
@@ -271,18 +306,20 @@ function createInput(input: {
     readonly generation: number
   }) => Promise<void>
   readonly resolveManagedServiceOwner?: (owner: Record<string, unknown>) => Promise<unknown>
+  readonly terminateTerminal?: (sessionId: string) => Promise<typeof session | null>
 }) {
   return {
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: input.launchTerminal ?? vi.fn(),
+    listTerminalSessions: vi.fn(() => []),
     listTerminalWorkingDirectories: vi.fn(async () => []),
     logger: new SilentLogger(),
     openTerminalServiceEndpoint: input.openTerminalServiceEndpoint ?? vi.fn(),
     resolveManagedServiceOwner: input.resolveManagedServiceOwner,
     resizeTerminal: vi.fn(),
     startTerminal: input.startTerminal ?? vi.fn(),
-    terminateTerminal: vi.fn(),
+    terminateTerminal: input.terminateTerminal ?? vi.fn(),
     writeTerminal: vi.fn()
   }
 }

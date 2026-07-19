@@ -163,6 +163,70 @@ describe('local port allocator', () => {
       }
     })
   })
+
+  it('waits for an exact releasing lease before reusing a fixed port', async () => {
+    const registry = new ServicePortLeaseRegistry()
+    const previous = registry.reserve(runScope('previous'), createEndpoint(3_000))
+    previous.markActivating()
+    previous.markBound()
+    previous.markReleasing()
+    const reservations = new FakeReservationPort([reservation(3_000)])
+    const allocator = new LocalPortAllocator(reservations, registry)
+
+    const allocating = allocator.allocate({
+      scope: runScope('replacement'),
+      intent: intent({ type: 'fixed', port: 3_000 })
+    })
+    await Promise.resolve()
+    expect(reservations.requestedPorts).toEqual([])
+
+    previous.release()
+    await expect(allocating).resolves.toMatchObject({ endpoint: { port: 3_000 } })
+    expect(reservations.requestedPorts).toEqual([3_000])
+  })
+
+  it('recovers a quarantined fixed lease only after the exact old run is inactive and OS reservation succeeds', async () => {
+    const registry = new ServicePortLeaseRegistry()
+    const previous = registry.reserve(runScope('previous'), createEndpoint(3_000))
+    previous.markReleasing()
+    previous.quarantine('Listener closure was not confirmed.')
+    const reservations = new FakeReservationPort([reservation(3_000)])
+    const allocator = new LocalPortAllocator(reservations, registry, {
+      isRunInactive: (scope) => scope.runId === 'previous'
+    })
+
+    const allocation = await allocator.allocate({
+      scope: runScope('replacement'),
+      intent: intent({ type: 'fixed', port: 3_000 })
+    })
+
+    expect(allocation.endpoint.port).toBe(3_000)
+    expect(allocation.lease.owner.runId).toBe('replacement')
+    expect(previous.toSnapshot().state).toBe('released')
+    expect(reservations.requestedPorts).toEqual([3_000])
+  })
+
+  it('keeps a quarantined lease unavailable when the old run is not authoritatively inactive', async () => {
+    const registry = new ServicePortLeaseRegistry()
+    const previous = registry.reserve(runScope('previous'), createEndpoint(3_000))
+    previous.markReleasing()
+    previous.quarantine('Listener closure was not confirmed.')
+    const reservations = new FakeReservationPort([reservation(3_000)])
+    const allocator = new LocalPortAllocator(reservations, registry, {
+      isRunInactive: () => false
+    })
+
+    await expect(
+      allocator.allocate({
+        scope: runScope('replacement'),
+        intent: intent({ type: 'fixed', port: 3_000 })
+      })
+    ).rejects.toMatchObject({
+      code: 'SERVICE_PORT_FIXED_CONFLICT',
+      details: { managedLeaseState: 'quarantined', managedRunId: 'previous' }
+    })
+    expect(reservations.requestedPorts).toEqual([])
+  })
 })
 
 class FakeReservationPort implements LocalPortReservationPort {

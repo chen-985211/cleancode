@@ -45,7 +45,8 @@ export async function projectTerminalPortConflict(
             failure.code === 'SERVICE_PORT_ALLOCATION_EXHAUSTED'
           ? 'unknown'
           : 'external',
-      managedOwner
+      managedOwner,
+      managedLeaseState: readLeaseState(failure.details)
     }
   }
 }
@@ -100,4 +101,18 @@ function readString(details: AppErrorDetails | undefined, key: string): string |
 function readNumber(details: AppErrorDetails | undefined, key: string): number | null {
   const value = details?.[key]
   return typeof value === 'number' && Number.isSafeInteger(value) ? value : null
+}
+
+function readLeaseState(
+  details: AppErrorDetails | undefined
+): TerminalServicePortConflict['managedLeaseState'] {
+  const value = details?.managedLeaseState
+  return value === 'reserved' ||
+    value === 'activating' ||
+    value === 'bound' ||
+    value === 'releasing' ||
+    value === 'released' ||
+    value === 'quarantined'
+    ? value
+    : null
 }

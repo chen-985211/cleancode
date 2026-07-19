@@ -8,6 +8,31 @@ export interface MouseReport {
   readonly row: number
 }
 
+export const terminalWorkspaceRetentionFixtureFileName = 'terminal-workspace-retention-fixture.mjs'
+export const terminalWorkspaceRetentionEarlyMarker = '__TERMINAL_SCROLLBACK_EARLY_MARKER__'
+export const terminalWorkspaceRetentionLateMarker = '__TERMINAL_SCROLLBACK_LATE_MARKER__'
+export const terminalWorkspaceRetentionInvisiblePadding = '\u001b[0m'.repeat(2_200)
+
+export async function writeTerminalWorkspaceRetentionFixtureScript(
+  projectDirectory: string
+): Promise<string> {
+  const scriptPath = join(projectDirectory, terminalWorkspaceRetentionFixtureFileName)
+  const fillerLines = Array.from(
+    { length: 24 },
+    (_, index) => `scrollback-${String(index).padStart(3, '0')}-${'x'.repeat(64)}`
+  )
+  const output = [
+    terminalWorkspaceRetentionEarlyMarker,
+    terminalWorkspaceRetentionInvisiblePadding,
+    ...fillerLines,
+    terminalWorkspaceRetentionLateMarker
+  ].join('\r\n')
+
+  await writeFile(scriptPath, `process.stdout.write(${JSON.stringify(`${output}\r\n`)})\n`, 'utf8')
+
+  return scriptPath
+}
+
 export async function writeTerminalSelectionFixtureScript(
   projectDirectory: string,
   input: {

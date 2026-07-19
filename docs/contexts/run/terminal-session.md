@@ -49,6 +49,8 @@ idle -> running -> stopping -> exited
 - 每次启动在取得 PTY 前通过 `RunRuntimeScopeValidationPort` 校验 Project 的权威项目/工作区/分支身份，并受 `RunLifecycleService` 启动闸门保护。
 - 应用退出或统一清理时先关闭新启动准入，再等待在途启动并终止全部 PTY，把运行中会话标记为退出。
 
+Renderer 重新进入工作区时，可以按本地仍标记为运行中的 session ID 批量查询这些保留快照，并只按完整运行身份收敛状态。退出事件先于启动响应抵达时，表现层先用事件中的项目、工作区、终端和运行身份建立 `exited` 投影；同一运行迟到的 `running` 启动响应不得把它降级。已经保留但不再运行的 session 收到迟到 `write`、Ctrl+C 或 resize 时，应用层不再访问 PTY，而是幂等返回当前权威快照；这些交互动作指向未知 session 时仍返回 `TERMINAL_SESSION_NOT_FOUND`。终止动作表达“确保该 session 不再存在”，因此未知 session 视为已经完成并返回空结果，不能阻断随后启动新会话。
+
 会话的 `workingDirectory` 来自 Project 工作区 DTO；Run 不自行读取或切换 Project 聚合，而是通过调用方拥有的校验端口验证该 DTO 仍然权威。
 
 ## PTY 端口语义
@@ -56,8 +58,8 @@ idle -> running -> stopping -> exited
 Run 应用层只依赖 `TerminalProcessPort`：
 
 - `start`：以工作目录、shell、可选启动命令和行列启动 PTY，返回真实进程 ID。
-- `write`：向已存在的 PTY 写入原始输入。
-- `resize`：同步 PTY 行列。
+- `write`：只向仍运行的 PTY 写入原始输入；已退出快照返回当前状态而不写入进程。
+- `resize`：只同步仍运行的 PTY 行列，并返回当前会话快照供调用方对账。
 - `readWorkingDirectory`：在 macOS 通过 `lsof`、Linux 通过 `/proc/<pid>/cwd` 尽力读取；不支持或进程消失时返回 `null`。
 - `stop` / `disposeAll`：异步终止一个或全部受管 PTY，并等待适配器确认退出。
 
@@ -66,6 +68,8 @@ Run 应用层只依赖 `TerminalProcessPort`：
 ## 启动命令与受管服务
 
 空终端由 `TerminalSessionService` 直接建立，不执行 BlockGraph 启动命令。用户执行启动命令时，`LaunchTerminalCommandUseCase` 通过 `TerminalLaunchPlanPort` 读取不可变计划：普通任务和未声明端口的输出就绪服务进入常规会话；声明端口意图的服务进入共享 `ManagedServiceLauncher`，由其分配端口、注入命令、验证监听者并发布实际端点。
+
+受管服务在端口分配或命令注入等 PTY 启动准备阶段失败时，本次 session 必须保留为 `failed` 权威快照并释放当前槽位，不能在已经发布精确冲突 identity 后删除 session。这样工作区切换后的状态对账和下一次“启动命令”终止旧运行都不会指向悬空 identity；下一次启动仍使用递增 generation。
 
 直接启动、终端组合逐成员启动和依赖工作流中的服务节点必须复用同一个受管启动器。完整端口策略、租约和所有权语义见[本地服务端口治理](service-port-management.md)。
 

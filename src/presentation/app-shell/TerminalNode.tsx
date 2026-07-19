@@ -198,6 +198,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       <TerminalServiceRuntimeBar
         identity={session.runIdentity ?? null}
         endpoint={session.actualEndpoint ?? null}
+        portState={session.servicePortState ?? null}
         conflict={session.portConflict ?? null}
         onCopyEndpoint={async (endpoint) => {
           if (data.onCopyServiceEndpoint) {

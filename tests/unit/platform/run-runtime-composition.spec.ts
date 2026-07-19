@@ -72,7 +72,8 @@ describe('Run runtime composition', () => {
         code: 'SERVICE_PORT_FIXED_CONFLICT',
         port: 3_000,
         ownership: 'managed',
-        managedOwner
+        managedOwner,
+        managedLeaseState: 'bound'
       }
     })
     expect(send).not.toHaveBeenCalledWith('cleancode:terminal-workflow-event', expect.anything())
@@ -147,7 +148,8 @@ const managedConflictEvent: TerminalWorkflowEvent = {
       managedBlockId: 'api',
       managedSessionId: 'owner-session',
       managedRunId: 'owner-run',
-      managedGeneration: 3
+      managedGeneration: 3,
+      managedLeaseState: 'bound'
     }
   }
 }

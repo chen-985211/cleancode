@@ -39,12 +39,13 @@ export function applyTerminalWorkflowEventToStates(
           generation: event.session.generation
         },
         actualEndpoint: event.endpoint,
-        portConflict: null
+        portConflict: null,
+        servicePortState: event.endpoint ? 'bound' : null
       }
     }
   }
 
-  if (event.type === 'service-endpoint-updated') {
+  if (event.type === 'service-endpoint-updated' || event.type === 'service-port-state-changed') {
     return applyTerminalServiceRunEvent(states, event)
   }
 

@@ -1,7 +1,7 @@
 import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalRunScope } from '../../contexts/run/domain/value-objects/TerminalRunScope'
 import { appendTerminalOutputTail } from './terminalOutputTail'
-import { terminalOutputBrowserEventName, type TerminalViewState } from './types'
+import type { TerminalViewState } from './types'
 
 export interface TerminalInputBuffer {
   readonly sessionId: string
@@ -42,15 +42,5 @@ export function takeTerminalStartupOutput(
   const output = outputs.get(scope.sessionId) ?? ''
 
   outputs.delete(scope.sessionId)
-  if (output) {
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, {
-          detail: { sessionId: scope.sessionId, data: output, scope }
-        })
-      )
-    }, 0)
-  }
-
   return output
 }

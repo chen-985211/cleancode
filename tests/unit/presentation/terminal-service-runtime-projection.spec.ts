@@ -91,7 +91,8 @@ describe('terminal service run projection', () => {
         code: 'SERVICE_PORT_FIXED_CONFLICT',
         port: 3000,
         ownership: 'external',
-        managedOwner: null
+        managedOwner: null,
+        managedLeaseState: null
       }
     }
 
@@ -143,6 +144,39 @@ describe('terminal service run projection', () => {
       portConflict: null
     })
     expect(applyTerminalServiceRunEvent(ended, startedEvent(1))).toBe(ended)
+  })
+
+  it('keeps the endpoint visible but non-active while releasing and clears it only after release', () => {
+    const key = createTerminalStateKey('project-alpha', 'main', 'api')
+    const endpoint = {
+      protocol: 'http' as const,
+      host: '127.0.0.1' as const,
+      port: 3000,
+      requestedPort: 3000,
+      fallback: false,
+      displayAddress: 'http://127.0.0.1:3000',
+      openable: true
+    }
+    const running = applyTerminalServiceRunEvent(
+      applyTerminalServiceRunEvent({ [key]: createState('session-2') }, startedEvent(2)),
+      { type: 'service-endpoint-updated', scope: startedEvent(2).scope, endpoint }
+    )
+    const releasing = applyTerminalServiceRunEvent(running, {
+      type: 'service-port-state-changed',
+      scope: startedEvent(2).scope,
+      state: 'releasing'
+    })
+    const released = applyTerminalServiceRunEvent(releasing, {
+      type: 'service-port-state-changed',
+      scope: startedEvent(2).scope,
+      state: 'released'
+    })
+
+    expect(releasing[key]).toMatchObject({
+      actualEndpoint: endpoint,
+      servicePortState: 'releasing'
+    })
+    expect(released[key]).toMatchObject({ actualEndpoint: null, servicePortState: null })
   })
 })
 

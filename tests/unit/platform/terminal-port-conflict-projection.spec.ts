@@ -18,7 +18,8 @@ describe('terminal port conflict projection', () => {
             managedBlockId: 'api',
             managedSessionId: 'owner-session',
             managedRunId: 'owner-run',
-            managedGeneration: 3
+            managedGeneration: 3,
+            managedLeaseState: 'releasing'
           }
         },
         async () => {
@@ -32,7 +33,8 @@ describe('terminal port conflict projection', () => {
       conflict: {
         port: 3_000,
         ownership: 'managed',
-        managedOwner: null
+        managedOwner: null,
+        managedLeaseState: 'releasing'
       }
     })
     expect(onResolutionError).toHaveBeenCalledWith(resolutionError)

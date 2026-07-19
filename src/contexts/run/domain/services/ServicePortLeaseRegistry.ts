@@ -21,7 +21,7 @@ export class ServicePortLease {
     public readonly id: string,
     public readonly owner: TerminalRunScope,
     public readonly endpoint: ActualServiceEndpoint,
-    private readonly onReleased: () => void
+    private readonly onSettled: (snapshot: ServicePortLeaseSnapshot) => void
   ) {}
 
   markActivating(): void {
@@ -45,7 +45,7 @@ export class ServicePortLease {
 
   release(): void {
     this.transition('releasing', 'released')
-    this.onReleased()
+    this.onSettled(this.toSnapshot())
   }
 
   quarantine(reason: string): void {
@@ -54,6 +54,13 @@ export class ServicePortLease {
     }
     this.stateValue = 'quarantined'
     this.quarantineReasonValue = reason
+    this.onSettled(this.toSnapshot())
+  }
+
+  recoverQuarantined(): void {
+    this.transition('quarantined', 'released')
+    this.quarantineReasonValue = null
+    this.onSettled(this.toSnapshot())
   }
 
   toSnapshot(): ServicePortLeaseSnapshot {
@@ -76,6 +83,10 @@ export class ServicePortLease {
 
 export class ServicePortLeaseRegistry {
   private readonly activeLeasesByPort = new Map<number, ServicePortLease>()
+  private readonly settlementWaiters = new Map<
+    string,
+    Set<(snapshot: ServicePortLeaseSnapshot) => void>
+  >()
 
   reserve(owner: TerminalRunScope, endpoint: ActualServiceEndpoint): ServicePortLease {
     if (this.activeLeasesByPort.has(endpoint.port)) {
@@ -86,10 +97,11 @@ export class ServicePortLeaseRegistry {
       )
     }
 
-    const lease = new ServicePortLease(createLeaseId(), owner, endpoint, () => {
-      if (this.activeLeasesByPort.get(endpoint.port) === lease) {
+    const lease = new ServicePortLease(createLeaseId(), owner, endpoint, (snapshot) => {
+      if (snapshot.state === 'released' && this.activeLeasesByPort.get(endpoint.port) === lease) {
         this.activeLeasesByPort.delete(endpoint.port)
       }
+      this.notifySettlement(snapshot)
     })
     this.activeLeasesByPort.set(endpoint.port, lease)
     return lease
@@ -97,6 +109,40 @@ export class ServicePortLeaseRegistry {
 
   findActiveByPort(port: number): ServicePortLeaseSnapshot | null {
     return this.activeLeasesByPort.get(port)?.toSnapshot() ?? null
+  }
+
+  waitForSettlement(command: {
+    readonly port: number
+    readonly leaseId: string
+  }): Promise<ServicePortLeaseSnapshot | null> {
+    const lease = this.activeLeasesByPort.get(command.port)
+    if (!lease || lease.id !== command.leaseId) return Promise.resolve(null)
+    const snapshot = lease.toSnapshot()
+    if (snapshot.state === 'quarantined' || snapshot.state === 'released') {
+      return Promise.resolve(snapshot)
+    }
+
+    return new Promise((resolve) => {
+      const waiters = this.settlementWaiters.get(command.leaseId) ?? new Set()
+      waiters.add(resolve)
+      this.settlementWaiters.set(command.leaseId, waiters)
+    })
+  }
+
+  recoverQuarantined(command: { readonly port: number; readonly leaseId: string }): boolean {
+    const lease = this.activeLeasesByPort.get(command.port)
+    if (!lease || lease.id !== command.leaseId || lease.toSnapshot().state !== 'quarantined') {
+      return false
+    }
+    lease.recoverQuarantined()
+    return true
+  }
+
+  private notifySettlement(snapshot: ServicePortLeaseSnapshot): void {
+    const waiters = this.settlementWaiters.get(snapshot.id)
+    if (!waiters) return
+    this.settlementWaiters.delete(snapshot.id)
+    for (const resolve of waiters) resolve(snapshot)
   }
 }
 

@@ -2,8 +2,9 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
+import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
 import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
-import { terminalOutputBrowserEventName } from '../../../src/presentation/app-shell/types'
+import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
 
 interface FakeTerminalInstance {
   cols: number
@@ -19,6 +20,8 @@ interface FakeTerminalInstance {
   readonly open: ReturnType<typeof vi.fn>
   readonly onData: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
+  readonly refresh: ReturnType<typeof vi.fn>
+  element: HTMLElement | undefined
   textarea: HTMLTextAreaElement | null
   customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
 }
@@ -45,6 +48,7 @@ vi.mock('@xterm/xterm', () => ({
     rows = 24
     options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
     selection = ''
+    element: HTMLElement | undefined
     textarea: HTMLTextAreaElement | null = null
 
     readonly attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
@@ -65,16 +69,20 @@ vi.mock('@xterm/xterm', () => ({
     })
 
     readonly open = vi.fn((element: HTMLElement) => {
+      const terminalElement = document.createElement('div')
       const textarea = document.createElement('textarea')
 
       textarea.className = 'xterm-helper-textarea'
       textarea.focus = vi.fn()
-      element.append(textarea)
+      terminalElement.append(textarea)
+      element.append(terminalElement)
+      this.element = terminalElement
       this.textarea = textarea
     })
 
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
     readonly dispose = vi.fn()
+    readonly refresh = vi.fn()
 
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
 
@@ -111,6 +119,8 @@ vi.mock('@xterm/addon-fit', () => ({
   }
 }))
 
+let terminalSurfaceRegistry: TerminalSurfaceRegistry
+
 describe('terminal viewport interaction', () => {
   let animationFrameCallbacks: FrameRequestCallback[] = []
   let resizeObserverCallbacks: ResizeObserverCallback[] = []
@@ -124,6 +134,7 @@ describe('terminal viewport interaction', () => {
     })
     animationFrameCallbacks = []
     resizeObserverCallbacks = []
+    terminalSurfaceRegistry = new TerminalSurfaceRegistry()
     xtermMockState.fitAddons = []
     xtermMockState.fitSizes = []
     xtermMockState.terminals = []
@@ -165,13 +176,7 @@ describe('terminal viewport interaction', () => {
     terminal.focus.mockClear()
     helperTextareaFocus.mockClear()
 
-    act(() => {
-      window.dispatchEvent(
-        new CustomEvent(terminalOutputBrowserEventName, {
-          detail: { sessionId: 'terminal-session-1', data: 'agent output\n' }
-        })
-      )
-    })
+    act(() => terminalSurfaceRegistry.write(createOutputEvent('agent output\n')))
 
     expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
     expect(terminal.focus).not.toHaveBeenCalled()
@@ -223,6 +228,20 @@ describe('terminal viewport interaction', () => {
 
     expect(terminal.options.theme?.background).toBe('#f6f8fb')
     expect(xtermMockState.terminals).toHaveLength(1)
+  })
+
+  it('reattaches the same terminal surface after its workspace becomes visible again', async () => {
+    const firstWorkspace = renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+
+    firstWorkspace.unmount()
+
+    expect(terminal.dispose).not.toHaveBeenCalled()
+
+    renderTerminalViewport()
+
+    await waitFor(() => expect(xtermMockState.terminals).toHaveLength(1))
+    expect(terminal.open).toHaveBeenCalledTimes(1)
   })
 
   it('coalesces resize observer bursts before reporting terminal dimensions', async () => {
@@ -319,14 +338,16 @@ function renderTerminalViewport({
   }) => void
 } = {}) {
   return render(
-    <TerminalViewport
-      block={createTerminalBlock()}
-      session={{ sessionId: 'terminal-session-1', status: 'running', output: '' }}
-      focusRequestId={0}
-      isResizeSuspended={isResizeSuspended}
-      onDimensionsChange={onDimensionsChange}
-      onInput={vi.fn()}
-    />
+    <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
+      <TerminalViewport
+        block={createTerminalBlock()}
+        session={createRunningTerminalState()}
+        focusRequestId={0}
+        isResizeSuspended={isResizeSuspended}
+        onDimensionsChange={onDimensionsChange}
+        onInput={vi.fn()}
+      />
+    </TerminalSurfaceRegistryProvider>
   )
 }
 
@@ -344,15 +365,51 @@ function rerenderTerminalViewport(
   } = {}
 ) {
   rerender(
-    <TerminalViewport
-      block={createTerminalBlock()}
-      session={{ sessionId: 'terminal-session-1', status: 'running', output: '' }}
-      focusRequestId={0}
-      isResizeSuspended={isResizeSuspended}
-      onDimensionsChange={onDimensionsChange}
-      onInput={vi.fn()}
-    />
+    <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
+      <TerminalViewport
+        block={createTerminalBlock()}
+        session={createRunningTerminalState()}
+        focusRequestId={0}
+        isResizeSuspended={isResizeSuspended}
+        onDimensionsChange={onDimensionsChange}
+        onInput={vi.fn()}
+      />
+    </TerminalSurfaceRegistryProvider>
   )
+}
+
+function createRunningTerminalState() {
+  return {
+    sessionId: 'terminal-session-1',
+    status: 'running' as const,
+    output: '',
+    runIdentity: {
+      projectId: 'project-alpha',
+      workspaceName: 'feature/sidebar',
+      blockId: 'terminal-1',
+      sessionId: 'terminal-session-1',
+      runId: 'run-1',
+      generation: 1
+    }
+  }
+}
+
+function createOutputEvent(data: string) {
+  return {
+    sessionId: 'terminal-session-1',
+    data,
+    scope: {
+      projectId: 'project-alpha',
+      projectDirectory: '/tmp/project-alpha',
+      workspaceName: 'feature/sidebar',
+      workspaceDirectory: '/tmp/project-alpha-worktrees/feature-sidebar',
+      gitBranch: 'feature/sidebar',
+      blockId: 'terminal-1',
+      sessionId: 'terminal-session-1',
+      runId: 'run-1',
+      generation: 1
+    }
+  }
 }
 
 async function waitForInstalledTerminal(): Promise<FakeTerminalInstance> {

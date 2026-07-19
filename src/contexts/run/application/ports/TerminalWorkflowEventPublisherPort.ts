@@ -25,6 +25,11 @@ export type TerminalWorkflowEvent =
       readonly endpoint: ActualServiceEndpoint | null
     }
   | {
+      readonly type: 'service-port-state-changed'
+      readonly scope: TerminalRunScope
+      readonly state: 'releasing' | 'released' | 'quarantined'
+    }
+  | {
       readonly type: 'service-port-conflict'
       readonly failure: WorkflowRunFailureSnapshot
     }

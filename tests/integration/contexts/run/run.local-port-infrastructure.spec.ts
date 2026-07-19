@@ -1,6 +1,8 @@
 import { createServer, type Server } from 'node:net'
 import { spawn } from 'node:child_process'
 
+import { LocalPortAllocator } from '../../../../src/contexts/run/application/services/LocalPortAllocator'
+import { ServicePortLeaseRegistry } from '../../../../src/contexts/run/domain/services/ServicePortLeaseRegistry'
 import { NodeLocalPortReservationAdapter } from '../../../../src/contexts/run/infrastructure/network/NodeLocalPortReservationAdapter'
 import { NodeTcpListenerInspectionAdapter } from '../../../../src/contexts/run/infrastructure/network/NodeTcpListenerInspectionAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
@@ -54,6 +56,59 @@ describe('local port infrastructure', () => {
       if (server.listening) {
         await new Promise<void>((resolve) => closeServer(() => resolve()))
       }
+    }
+  })
+
+  it('recovers a quarantined lease only while a real replacement reservation proves the port is free', async () => {
+    const reservations = new NodeLocalPortReservationAdapter()
+    const probe = await reservations.tryReserve({ host: '127.0.0.1' })
+    if (!probe) throw new Error('Expected a free loopback port.')
+    const port = probe.port
+    await probe.release()
+    const registry = new ServicePortLeaseRegistry()
+    const oldLease = registry.reserve(runScope('old-run'), endpoint(port))
+    oldLease.markReleasing()
+    oldLease.quarantine('Previous listener closure was not confirmed.')
+    const allocator = new LocalPortAllocator(reservations, registry, {
+      isRunInactive: () => true
+    })
+
+    const allocation = await allocator.allocate({
+      scope: runScope('replacement-run'),
+      intent: fixedPortIntent(port)
+    })
+
+    expect(oldLease.toSnapshot().state).toBe('released')
+    expect(allocation.endpoint.port).toBe(port)
+    expect(allocation.lease.owner.runId).toBe('run-replacement-run')
+    await allocation.reservation.release()
+    allocation.lease.markReleasing()
+    allocation.lease.release()
+  })
+
+  it('keeps a quarantined lease isolated when an external listener still owns the port', async () => {
+    const server = createServer()
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP address.')
+    const registry = new ServicePortLeaseRegistry()
+    const oldLease = registry.reserve(runScope('old-run'), endpoint(address.port))
+    oldLease.markReleasing()
+    oldLease.quarantine('Previous listener closure was not confirmed.')
+    const allocator = new LocalPortAllocator(new NodeLocalPortReservationAdapter(), registry, {
+      isRunInactive: () => true
+    })
+
+    try {
+      await expect(
+        allocator.allocate({
+          scope: runScope('replacement-run'),
+          intent: fixedPortIntent(address.port)
+        })
+      ).rejects.toMatchObject({ code: 'SERVICE_PORT_FIXED_CONFLICT' })
+      expect(registry.findActiveByPort(address.port)?.state).toBe('quarantined')
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   })
 
@@ -242,6 +297,26 @@ function runScope(sessionId: string) {
     sessionId,
     runId: `run-${sessionId}`,
     generation: 1
+  }
+}
+
+function endpoint(port: number) {
+  return {
+    protocol: 'http' as const,
+    host: '127.0.0.1' as const,
+    port,
+    requestedPort: port,
+    fallback: false,
+    displayAddress: `http://127.0.0.1:${port}`,
+    openable: true
+  }
+}
+
+function fixedPortIntent(port: number) {
+  return {
+    protocol: 'http' as const,
+    policy: { type: 'fixed' as const, port },
+    binding: { type: 'none' as const }
   }
 }
 

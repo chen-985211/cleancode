@@ -1,4 +1,5 @@
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
+import type { ServicePortLeaseState } from '../../domain/services/ServicePortLeaseRegistry'
 
 export interface TerminalRunIdentity {
   readonly projectId: string
@@ -27,6 +28,7 @@ export interface TerminalServicePortConflict {
   readonly port: number
   readonly ownership: 'managed' | 'external' | 'unknown'
   readonly managedOwner: ManagedTerminalServiceOwner | null
+  readonly managedLeaseState: ServicePortLeaseState | null
 }
 
 export type TerminalRunEvent =
@@ -40,5 +42,10 @@ export type TerminalRunEvent =
       readonly type: 'service-port-conflict'
       readonly scope: TerminalRunIdentity
       readonly conflict: TerminalServicePortConflict
+    }
+  | {
+      readonly type: 'service-port-state-changed'
+      readonly scope: TerminalRunIdentity
+      readonly state: 'releasing' | 'released' | 'quarantined'
     }
   | { readonly type: 'service-run-ended'; readonly scope: TerminalRunIdentity }

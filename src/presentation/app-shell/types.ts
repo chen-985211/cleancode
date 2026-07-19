@@ -44,6 +44,7 @@ export interface TerminalViewState {
   readonly runIdentity?: TerminalRunIdentity | null
   readonly actualEndpoint?: TerminalServiceEndpoint | null
   readonly portConflict?: TerminalServicePortConflict | null
+  readonly servicePortState?: 'bound' | 'releasing' | 'quarantined' | null
 }
 
 export interface TerminalDimensions {
@@ -171,8 +172,6 @@ export const defaultTerminalDimensions: TerminalDimensions = {
 
 export const terminalNodeMinimumSize = minimumTerminalBlockSize
 
-export const terminalOutputBrowserEventName = 'cleancode-terminal-output'
-
 export function createIdleTerminalState(): TerminalViewState {
   return {
     sessionId: null,
@@ -180,6 +179,7 @@ export function createIdleTerminalState(): TerminalViewState {
     output: '',
     runIdentity: null,
     actualEndpoint: null,
-    portConflict: null
+    portConflict: null,
+    servicePortState: null
   }
 }

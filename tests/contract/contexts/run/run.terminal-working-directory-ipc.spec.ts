@@ -83,22 +83,111 @@ describe('terminal working directory IPC contract', () => {
     })
     expect(listTerminalWorkingDirectories).toHaveBeenCalledWith(['session-1'])
   })
+
+  it('returns retained session snapshots for renderer reconciliation', async () => {
+    const ipcMain = new FakeIpcMain()
+    const listTerminalSessions = vi.fn(() => [sessionSnapshot('session-1', 'exited')])
+
+    registerTerminalIpcHandlers(
+      createTerminalIpcHandlersInput({
+        ipcMain,
+        listTerminalSessions,
+        listTerminalWorkingDirectories: vi.fn(async () => [])
+      })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:list-terminal-sessions', { sessionIds: ['session-1', 'missing'] })
+    ).resolves.toEqual({
+      ok: true,
+      value: [sessionSnapshot('session-1', 'exited')]
+    })
+    expect(listTerminalSessions).toHaveBeenCalledWith(['session-1', 'missing'])
+  })
+
+  it('returns the authoritative session snapshot after resize', async () => {
+    const ipcMain = new FakeIpcMain()
+    const resizeTerminal = vi.fn(() => sessionSnapshot('session-1', 'exited'))
+
+    registerTerminalIpcHandlers(
+      createTerminalIpcHandlersInput({
+        ipcMain,
+        listTerminalSessions: vi.fn(() => []),
+        listTerminalWorkingDirectories: vi.fn(async () => []),
+        resizeTerminal
+      })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:resize-terminal', {
+        sessionId: 'session-1',
+        columns: 120,
+        rows: 40
+      })
+    ).resolves.toEqual({ ok: true, value: sessionSnapshot('session-1', 'exited') })
+    expect(resizeTerminal).toHaveBeenCalledWith('session-1', 120, 40)
+  })
+
+  it('rejects malformed session reconciliation requests at the IPC boundary', async () => {
+    const ipcMain = new FakeIpcMain()
+    const listTerminalSessions = vi.fn(() => [])
+    registerTerminalIpcHandlers(
+      createTerminalIpcHandlersInput({
+        ipcMain,
+        listTerminalSessions,
+        listTerminalWorkingDirectories: vi.fn(async () => [])
+      })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:list-terminal-sessions', { sessionIds: ['valid', ''] })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(listTerminalSessions).not.toHaveBeenCalled()
+  })
 })
 
 function createTerminalIpcHandlersInput(input: {
   readonly ipcMain: IpcMainLike
+  readonly listTerminalSessions?: TerminalIpcHandlersInput['listTerminalSessions']
   readonly listTerminalWorkingDirectories: TerminalIpcHandlersInput['listTerminalWorkingDirectories']
+  readonly resizeTerminal?: TerminalIpcHandlersInput['resizeTerminal']
 }): TerminalIpcHandlersInput {
   return {
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: vi.fn(),
+    listTerminalSessions: input.listTerminalSessions ?? vi.fn(() => []),
     listTerminalWorkingDirectories: input.listTerminalWorkingDirectories,
     logger: new SilentLogger(),
     openTerminalServiceEndpoint: vi.fn(),
-    resizeTerminal: vi.fn(),
+    resizeTerminal: input.resizeTerminal ?? vi.fn(),
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),
     writeTerminal: vi.fn()
+  }
+}
+
+function sessionSnapshot(sessionId: string, status: 'running' | 'exited') {
+  return {
+    id: sessionId,
+    sessionId,
+    runId: 'run-1',
+    generation: 1,
+    projectId: 'project-1',
+    projectDirectory: '/work/app',
+    workspaceName: 'main',
+    workspaceDirectory: '/work/app',
+    gitBranch: 'main',
+    blockId: 'block-1',
+    terminalBlockId: 'block-1',
+    workingDirectory: '/work/app',
+    processId: status === 'running' ? 101 : null,
+    status,
+    inputHistory: [],
+    exitCode: status === 'exited' ? 0 : null,
+    failureReason: null
   }
 }

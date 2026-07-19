@@ -8,16 +8,31 @@ import { promisify } from 'node:util'
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
+  terminalWorkspaceRetentionEarlyMarker,
+  terminalWorkspaceRetentionFixtureFileName,
+  terminalWorkspaceRetentionInvisiblePadding,
+  terminalWorkspaceRetentionLateMarker,
+  writeTerminalWorkspaceRetentionFixtureScript
+} from '../fixtures/contexts/run/fakeTerminalPrograms'
+import {
   createE2eWorkbench,
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
   teardownE2eScenario,
+  waitForTextFile,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { expectTerminalWorkingDirectory } from '../support/e2eTerminal'
+import {
+  e2eShellReadyMarker,
+  expectTerminalWorkingDirectory,
+  readTerminalSessionId,
+  waitForTerminalOutput,
+  waitForTerminalShellReady,
+  writeTerminalCommand
+} from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
 const gitLocalEnvironmentVariables = [
@@ -49,7 +64,9 @@ describe('git branch workspaces e2e', () => {
     workbench = await createE2eWorkbench('cleancode-git-e2e')
     resources.workbench = workbench
     await initializeGitProject(workbench.projectDirectory)
-    electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
+    electronApp = await launchApp(workbench, {
+      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+    })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
     resources.page = page
@@ -130,6 +147,72 @@ describe('git branch workspaces e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'keeps bounded terminal scrollback and background output across worktree switches',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+
+      const projectCard = page.getByRole('group', {
+        name: `项目 ${basename(workbench.projectDirectory)}`
+      })
+      const branchName = 'feature/terminal-retention'
+      const featureWorktreeDirectory = branchWorktreeDirectory(
+        workbench.projectDirectory,
+        branchName
+      )
+
+      await projectCard.getByRole('button', { name: '新建分支工作区' }).click()
+      await projectCard.getByLabel('分支名称').fill(branchName)
+      await projectCard.getByRole('button', { name: '创建 Worktree' }).click()
+      const featureWorkspace = projectCard.getByRole('button', {
+        name: /feature\/terminal-retention.*独立工作区/
+      })
+      await featureWorkspace.waitFor()
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await waitForTerminalShellReady(page, 'Terminal 1')
+
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        `node ${terminalWorkspaceRetentionFixtureFileName}\r`
+      )
+      await waitForTerminalOutput(page, 'Terminal 1', terminalWorkspaceRetentionLateMarker)
+      const sessionId = await readTerminalSessionId(page, 'Terminal 1')
+      await waitForVisibleXtermText(page, sessionId, terminalWorkspaceRetentionLateMarker)
+      const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
+      await markTerminalSurface(page, sessionId, terminalSurfaceToken)
+
+      const boundedOutputTail = await readTerminalOutputTail(page, sessionId)
+      expect(terminalWorkspaceRetentionInvisiblePadding.length).toBeGreaterThan(8192)
+      expect(boundedOutputTail.length).toBeLessThanOrEqual(8192)
+      expect(boundedOutputTail).toContain(terminalWorkspaceRetentionLateMarker)
+
+      await projectCard.locator('.default-branch-selector__select').click()
+      await waitForTerminalSessionDetached(page, sessionId)
+
+      const hiddenOutputMarker = '__TERMINAL_HIDDEN_WORKSPACE_OUTPUT__'
+      const hiddenOutputReport = join(featureWorktreeDirectory, 'hidden-output-report.txt')
+      await page.evaluate(
+        ({ hiddenOutputMarker, sessionId }) =>
+          window.cleancode?.writeTerminal({
+            sessionId,
+            input: `printf '${hiddenOutputMarker}\\n'; printf done > hidden-output-report.txt\r`
+          }),
+        { hiddenOutputMarker, sessionId }
+      )
+      expect(await waitForTextFile(hiddenOutputReport)).toBe('done')
+
+      await featureWorkspace.click()
+      await waitForTerminalSurface(page, sessionId, terminalSurfaceToken)
+      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+      await waitForVisibleXtermText(page, sessionId, hiddenOutputMarker)
+      await scrollTerminalToTop(page, sessionId)
+      await waitForVisibleXtermText(page, sessionId, terminalWorkspaceRetentionEarlyMarker)
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function initializeGitProject(directory: string): Promise<void> {
@@ -137,8 +220,108 @@ async function initializeGitProject(directory: string): Promise<void> {
   await execGit(directory, ['config', 'user.email', 'test@example.com'])
   await execGit(directory, ['config', 'user.name', 'Test User'])
   await writeFile(join(directory, 'README.md'), 'hello\n')
-  await execGit(directory, ['add', 'README.md'])
+  await writeTerminalWorkspaceRetentionFixtureScript(directory)
+  await execGit(directory, ['add', 'README.md', terminalWorkspaceRetentionFixtureFileName])
   await execGit(directory, ['commit', '-m', 'initial'])
+}
+
+async function readTerminalOutputTail(page: Page, sessionId: string): Promise<string> {
+  return page.evaluate(
+    (targetSessionId) =>
+      document.querySelector<HTMLElement>(
+        `[data-terminal-output-tail][data-terminal-session-id="${targetSessionId}"]`
+      )?.textContent ?? '',
+    sessionId
+  )
+}
+
+async function waitForTerminalSessionDetached(page: Page, sessionId: string): Promise<void> {
+  await page
+    .locator(`[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`)
+    .waitFor({ state: 'detached' })
+}
+
+async function markTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {
+  await page.evaluate(
+    ({ sessionId, token }) => {
+      const outputTail = document.querySelector<HTMLElement>(
+        `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+      )
+      const surface = outputTail
+        ?.closest('.terminal-output-shell')
+        ?.querySelector<HTMLElement>('.xterm')
+
+      if (!surface) {
+        throw new Error('The terminal surface is not attached to the current session.')
+      }
+
+      surface.dataset.workspaceRetentionToken = token
+    },
+    { sessionId, token }
+  )
+}
+
+async function waitForTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {
+  await page.waitForFunction(
+    ({ sessionId, token }) => {
+      const outputTail = document.querySelector<HTMLElement>(
+        `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+      )
+
+      return (
+        outputTail?.closest('.terminal-output-shell')?.querySelector<HTMLElement>('.xterm')?.dataset
+          .workspaceRetentionToken === token
+      )
+    },
+    { sessionId, token }
+  )
+}
+
+async function scrollTerminalToTop(page: Page, sessionId: string): Promise<void> {
+  const didFocusTerminal = await page.evaluate((targetSessionId) => {
+    const outputTail = document.querySelector<HTMLElement>(
+      `[data-terminal-output-tail][data-terminal-session-id="${targetSessionId}"]`
+    )
+    const terminalViewport = outputTail
+      ?.closest('.terminal-output-shell')
+      ?.querySelector<HTMLElement>('.terminal-viewport')
+
+    if (!terminalViewport) {
+      return false
+    }
+
+    terminalViewport.focus()
+    return true
+  }, sessionId)
+
+  if (!didFocusTerminal) {
+    throw new Error('The terminal viewport is not attached to the current session.')
+  }
+  for (let pageIndex = 0; pageIndex < 10; pageIndex += 1) {
+    await page.keyboard.press('Shift+PageUp')
+  }
+}
+
+async function waitForVisibleXtermText(
+  page: Page,
+  sessionId: string,
+  expectedText: string
+): Promise<void> {
+  await page.waitForFunction(
+    ({ expectedText, sessionId }) => {
+      const outputTail = document.querySelector<HTMLElement>(
+        `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+      )
+
+      return (
+        outputTail
+          ?.closest('.terminal-output-shell')
+          ?.querySelector<HTMLElement>('.xterm-rows')
+          ?.textContent?.includes(expectedText) ?? false
+      )
+    },
+    { expectedText, sessionId }
+  )
 }
 
 async function expectCurrentGitBranch(directory: string, branchName: string): Promise<void> {

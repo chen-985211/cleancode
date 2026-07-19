@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { extname, join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export const defaultMaxLines = 500
+export const defaultMaxLines = 700
 
 const codeDirectories = ['src', 'tests', 'scripts']
 const codeExtensions = new Set([

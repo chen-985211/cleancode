@@ -185,9 +185,11 @@ describe('managed service launcher', () => {
       reservations: [41_001],
       inspections: [{ ownership: 'owned', listenerProcessId: 201 }]
     })
+    const cleanupStates: string[] = []
     const run = await fixture.launcher.launch({
       ...launchCommand(),
-      portIntent: preferredPort()
+      portIntent: preferredPort(),
+      onPortStateChanged: (_session, _endpoint, state) => cleanupStates.push(state)
     })
 
     await fixture.launcher.stop(run.session.id)
@@ -197,6 +199,7 @@ describe('managed service launcher', () => {
       expect.objectContaining({ host: '127.0.0.1', port: 41_001 })
     ])
     expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
+    expect(cleanupStates).toEqual(['releasing', 'released'])
   })
 
   it('quarantines the lease when the managed listener does not close after process exit', async () => {
@@ -205,15 +208,39 @@ describe('managed service launcher', () => {
       inspections: [{ ownership: 'owned', listenerProcessId: 201 }],
       closeFailure: true
     })
+    const cleanupStates: string[] = []
     const run = await fixture.launcher.launch({
       ...launchCommand(),
-      portIntent: preferredPort()
+      portIntent: preferredPort(),
+      onPortStateChanged: (_session, _endpoint, state) => cleanupStates.push(state)
     })
 
     await expect(fixture.launcher.stop(run.session.id)).rejects.toMatchObject({
       code: 'SERVICE_PORT_CLEANUP_FAILED'
     })
     expect(fixture.registry.findActiveByPort(41_001)?.state).toBe('quarantined')
+    expect(cleanupStates).toEqual(['releasing', 'quarantined'])
+  })
+
+  it('does not let cleanup-state publication failure block listener release', async () => {
+    const fixture = createFixture({
+      reservations: [41_001],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }]
+    })
+    const publicationFailures: unknown[] = []
+    const run = await fixture.launcher.launch({
+      ...launchCommand(),
+      portIntent: preferredPort(),
+      onPortStateChanged: () => {
+        throw new Error('renderer unavailable')
+      },
+      onCleanupFailed: (error) => publicationFailures.push(error)
+    })
+
+    await fixture.launcher.stop(run.session.id)
+
+    expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
+    expect(publicationFailures).toHaveLength(2)
   })
 
   it('reports a structured cleanup failure after a bound service exits naturally', async () => {

@@ -12,6 +12,10 @@ import { RunLifecycleService } from '../../contexts/run/application/use-cases/Ru
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
 import { TerminalWorkflowService } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
 import { ServicePortLeaseRegistry } from '../../contexts/run/domain/services/ServicePortLeaseRegistry'
+import {
+  createTerminalRunSlotKey,
+  isSameTerminalRun
+} from '../../contexts/run/domain/value-objects/TerminalRunScope'
 import { NodeLocalPortReservationAdapter } from '../../contexts/run/infrastructure/network/NodeLocalPortReservationAdapter'
 import { NodeTcpListenerInspectionAdapter } from '../../contexts/run/infrastructure/network/NodeTcpListenerInspectionAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
@@ -36,7 +40,17 @@ export function createRunRuntime(input: {
   )
   const readiness = new NodeTcpReadinessAdapter()
   const leases = new ServicePortLeaseRegistry()
-  const allocator = new LocalPortAllocator(new NodeLocalPortReservationAdapter(), leases)
+  const allocator = new LocalPortAllocator(new NodeLocalPortReservationAdapter(), leases, {
+    isRunInactive: (scope) => {
+      const session = sessions.getSession(scope.sessionId)
+      return Boolean(
+        session &&
+        createTerminalRunSlotKey(session) === createTerminalRunSlotKey(scope) &&
+        isSameTerminalRun(session, scope) &&
+        (session.status === 'exited' || session.status === 'failed')
+      )
+    }
+  })
   const managedServices = new ManagedServiceLauncher(
     sessions,
     allocator,

@@ -91,6 +91,8 @@ const cleancodeApi = {
   writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
   resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),
   interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
+  listTerminalSessions: (command: unknown) =>
+    invokeCleancode('cleancode:list-terminal-sessions', command),
   listTerminalWorkingDirectories: (command: unknown) =>
     invokeCleancode('cleancode:list-terminal-working-directories', command),
   terminateTerminal: (command: unknown) => invokeCleancode('cleancode:terminate-terminal', command),

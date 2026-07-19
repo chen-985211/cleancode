@@ -41,10 +41,59 @@ describe('terminal session service', () => {
     })
     const terminatedSession = await service.terminate(session.id)
 
-    expect(terminatedSession.status).toBe('exited')
-    expect(terminatedSession.exitCode).toBeNull()
+    expect(terminatedSession?.status).toBe('exited')
+    expect(terminatedSession?.exitCode).toBeNull()
     expect(terminalProcessPort.stoppedSessionIds).toEqual([session.id])
     expect(terminalProcessPort.writes).toEqual([])
+  })
+
+  it('treats terminating an absent terminal session as already completed', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+
+    await expect(service.terminate('missing-session')).resolves.toBeNull()
+    expect(terminalProcessPort.stoppedSessionIds).toEqual([])
+  })
+
+  it('retains a failed snapshot when managed launch preparation rejects', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+    const preparationFailure = new Error('fixed service port is unavailable')
+    let failedSessionId = ''
+
+    await expect(
+      service.start({
+        ...runOwner('/work/app', 'project-app'),
+        terminalBlockId: 'block-1',
+        prepareLaunch: async (scope) => {
+          failedSessionId = scope.sessionId
+          throw preparationFailure
+        },
+        onOutput: () => undefined,
+        onExit: () => undefined
+      })
+    ).rejects.toBe(preparationFailure)
+
+    expect(service.getSession(failedSessionId)).toMatchObject({
+      id: failedSessionId,
+      status: 'failed',
+      processId: null,
+      failureReason: preparationFailure.message
+    })
+    await expect(service.terminate(failedSessionId)).resolves.toMatchObject({
+      id: failedSessionId,
+      status: 'failed'
+    })
+
+    const replacement = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    expect(replacement.generation).toBe(2)
+    expect(terminalProcessPort.starts).toHaveLength(1)
   })
 
   it('reports a failed terminal instead of pretending a process is running', async () => {
@@ -105,6 +154,39 @@ describe('terminal session service', () => {
     await service.terminate(session.id)
 
     await expect(service.listWorkingDirectories([session.id])).resolves.toEqual([])
+  })
+
+  it('returns authoritative snapshots without forwarding stale actions after a session exits', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const service = new TerminalSessionService(terminalProcessPort)
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    await service.terminate(session.id)
+
+    expect(service.write(session.id, 'stale input').status).toBe('exited')
+    expect(service.interrupt(session.id).status).toBe('exited')
+    expect(service.resize(session.id, 120, 40).status).toBe('exited')
+    expect(terminalProcessPort.writes).toEqual([])
+    expect(terminalProcessPort.resizes).toEqual([])
+  })
+
+  it('lists retained session snapshots for renderer reconciliation', async () => {
+    const service = new TerminalSessionService(new RecordingTerminalProcessPort())
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    await service.terminate(session.id)
+
+    expect(service.listSessions([session.id, 'missing-session'])).toEqual([
+      expect.objectContaining({ id: session.id, status: 'exited' })
+    ])
   })
 
   it('keeps terminal sessions in different workspaces independent', async () => {
@@ -310,6 +392,11 @@ describe('terminal session service', () => {
 
 class RecordingTerminalProcessPort implements TerminalProcessPort {
   readonly writes: Array<{ readonly sessionId: string; readonly input: string }> = []
+  readonly resizes: Array<{
+    readonly sessionId: string
+    readonly columns: number
+    readonly rows: number
+  }> = []
   readonly stoppedSessionIds: string[] = []
   readonly workingDirectories = new Map<string, string>()
   readonly starts: Parameters<TerminalProcessPort['start']>[0][] = []
@@ -328,8 +415,8 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
     this.writes.push({ sessionId, input })
   }
 
-  resize(): void {
-    return undefined
+  resize(sessionId: string, columns: number, rows: number): void {
+    this.resizes.push({ sessionId, columns, rows })
   }
 
   async stop(sessionId: string): Promise<void> {

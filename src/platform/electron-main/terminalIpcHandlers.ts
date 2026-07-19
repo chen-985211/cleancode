@@ -60,6 +60,13 @@ export interface TerminalIpcHandlersInput {
       session: TerminalSessionSnapshot,
       endpoint: TerminalServiceEndpoint
     ) => void
+    readonly onPortStateChanged?: (
+      session: TerminalSessionSnapshot,
+      endpoint: TerminalServiceEndpoint,
+      state: 'releasing' | 'released' | 'quarantined'
+    ) => void
+    readonly onRunEnded?: (event: TerminalExitEvent) => void
+    readonly onCleanupFailed?: (error: unknown) => void
   }) => Promise<{
     readonly session: TerminalSessionSnapshot
     readonly endpoint: TerminalServiceEndpoint | null
@@ -70,13 +77,18 @@ export interface TerminalIpcHandlersInput {
     readonly generation: number
   }) => Promise<void>
   readonly resolveManagedServiceOwner?: ManagedServiceOwnerResolver
-  readonly resizeTerminal: (sessionId: string, columns: number, rows: number) => void
+  readonly resizeTerminal: (
+    sessionId: string,
+    columns: number,
+    rows: number
+  ) => TerminalSessionSnapshot
   readonly writeTerminal: (sessionId: string, input: string) => TerminalSessionSnapshot
   readonly interruptTerminal: (sessionId: string) => TerminalSessionSnapshot
+  readonly listTerminalSessions: (sessionIds: readonly string[]) => TerminalSessionSnapshot[]
   readonly listTerminalWorkingDirectories: (
     sessionIds: readonly string[]
   ) => Promise<TerminalWorkingDirectorySnapshot[]>
-  readonly terminateTerminal: (sessionId: string) => Promise<TerminalSessionSnapshot>
+  readonly terminateTerminal: (sessionId: string) => Promise<TerminalSessionSnapshot | null>
 }
 
 interface StartTerminalIpcCommand {
@@ -145,6 +157,8 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
             sendRendererEvent(sender, 'cleancode:terminal-output', outputEvent),
           onExit: (exitEvent) => {
             sendRendererEvent(sender, 'cleancode:terminal-exit', exitEvent)
+          },
+          onRunEnded: (exitEvent) => {
             sendRendererEvent(sender, 'cleancode:terminal-run-event', {
               type: 'service-run-ended',
               scope: toRunIdentity(exitEvent.scope)
@@ -162,6 +176,23 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
               scope: toRunIdentity(session),
               endpoint
             } satisfies TerminalRunEvent)
+          },
+          onPortStateChanged: (session, _endpoint, state) => {
+            sendRendererEvent(sender, 'cleancode:terminal-run-event', {
+              type: 'service-port-state-changed',
+              scope: toRunIdentity(session),
+              state
+            } satisfies TerminalRunEvent)
+          },
+          onCleanupFailed: (error) => {
+            input.logger.warn({
+              scope: 'run.service-port',
+              operation: 'cleanupManagedTerminalService',
+              outcome: 'failure',
+              error: isAppError(error)
+                ? { code: error.code, isExpected: error.isExpected, message: error.message }
+                : { message: error instanceof Error ? error.message : String(error) }
+            })
           }
         })
       } catch (error) {
@@ -190,12 +221,10 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
 
   registerIpcHandler<
     { readonly sessionId: string; readonly columns: number; readonly rows: number },
-    void
+    TerminalSessionSnapshot
   >({
     channel: 'cleancode:resize-terminal',
-    handler: (command) => {
-      input.resizeTerminal(command.sessionId, command.columns, command.rows)
-    },
+    handler: (command) => input.resizeTerminal(command.sessionId, command.columns, command.rows),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'resizeTerminal',
@@ -223,19 +252,28 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     scope: 'run.terminal'
   })
 
+  registerIpcHandler<{ readonly sessionIds: readonly string[] }, TerminalSessionSnapshot[]>({
+    channel: 'cleancode:list-terminal-sessions',
+    handler: (command) => input.listTerminalSessions(readSessionIds(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listTerminalSessions',
+    scope: 'run.terminal'
+  })
+
   registerIpcHandler<
     { readonly sessionIds: readonly string[] },
     TerminalWorkingDirectorySnapshot[]
   >({
     channel: 'cleancode:list-terminal-working-directories',
-    handler: (command) => input.listTerminalWorkingDirectories(command.sessionIds),
+    handler: (command) => input.listTerminalWorkingDirectories(readSessionIds(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'listTerminalWorkingDirectories',
     scope: 'run.terminal'
   })
 
-  registerIpcHandler<{ readonly sessionId: string }, TerminalSessionSnapshot>({
+  registerIpcHandler<{ readonly sessionId: string }, TerminalSessionSnapshot | null>({
     channel: 'cleancode:terminate-terminal',
     handler: (command) => input.terminateTerminal(command.sessionId),
     ipcMain: input.ipcMain,
@@ -355,4 +393,16 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isOptionalPositiveInteger(value: unknown): boolean {
   return value === undefined || (Number.isInteger(value) && Number(value) > 0)
+}
+
+function readSessionIds(command: unknown): readonly string[] {
+  if (
+    !isRecord(command) ||
+    !Array.isArray(command.sessionIds) ||
+    command.sessionIds.length > 1_000 ||
+    !command.sessionIds.every(isNonEmptyString)
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal session query.')
+  }
+  return command.sessionIds
 }

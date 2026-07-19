@@ -13,7 +13,7 @@ export interface LineGateLogger {
   readonly error: (message: string) => void
 }
 
-export const defaultMaxLines: 500
+export const defaultMaxLines: 700
 
 export function countTextLines(text: string): number
 

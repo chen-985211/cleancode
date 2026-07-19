@@ -56,6 +56,11 @@ export interface LaunchManagedServiceCommand {
     session: TerminalSessionSnapshot,
     endpoint: ActualServiceEndpoint
   ) => void
+  readonly onPortStateChanged?: (
+    session: TerminalSessionSnapshot,
+    endpoint: ActualServiceEndpoint,
+    state: 'releasing' | 'released' | 'quarantined'
+  ) => void
   readonly onCleanupFailed?: (error: unknown) => void
 }
 
@@ -74,6 +79,7 @@ interface ActiveManagedService {
   unregisterManagedTerminator: () => void
   stopPromise: Promise<void> | null
   readonly reportCleanupFailure: (error: unknown) => void
+  readonly reportPortState: (state: 'releasing' | 'released' | 'quarantined') => void
 }
 
 export class ManagedServiceLauncher {
@@ -229,7 +235,11 @@ export class ManagedServiceLauncher {
         runId,
         trackLifecycle: false,
         prepareLaunch: async (scope) => {
-          const allocation = await this.allocator.allocate({ scope, intent })
+          const allocation = await this.allocator.allocate({
+            scope,
+            intent,
+            signal: command.signal
+          })
           attemptState.allocation = allocation
           const bound = applyServicePortBinding({
             launchCommand: command.launchCommand,
@@ -279,7 +289,9 @@ export class ManagedServiceLauncher {
             unregisterLifecycle: () => undefined,
             unregisterManagedTerminator: () => undefined,
             stopPromise: null,
-            reportCleanupFailure: (error) => command.onCleanupFailed?.(error)
+            reportCleanupFailure: (error) => command.onCleanupFailed?.(error),
+            reportPortState: (state) =>
+              command.onPortStateChanged?.(startedSession, allocation.endpoint, state)
           }
           this.activeServices.set(startedSession.id, activeService)
           activeService.unregisterManagedTerminator = this.sessions.registerManagedTerminator(
@@ -372,6 +384,7 @@ export class ManagedServiceLauncher {
   private async stopAndRelease(service: ActiveManagedService): Promise<void> {
     service.readinessController.abort()
     markReleasing(service.allocation.lease)
+    this.reportPortState(service, 'releasing')
 
     try {
       await this.sessions.terminateProcess(service.session.id)
@@ -385,9 +398,11 @@ export class ManagedServiceLauncher {
         this.cleanupTimeoutMs
       )
       service.allocation.lease.release()
+      this.reportPortState(service, 'released')
       this.removeActive(service)
     } catch (error) {
       quarantineIfReleasing(service.allocation.lease, getErrorMessage(error))
+      this.reportPortState(service, 'quarantined')
       this.removeActive(service)
       throw createExpectedAppError(
         'SERVICE_PORT_CLEANUP_FAILED',
@@ -400,11 +415,14 @@ export class ManagedServiceLauncher {
   private async releaseMismatchedAttempt(service: ActiveManagedService): Promise<void> {
     service.readinessController.abort()
     markReleasing(service.allocation.lease)
+    this.reportPortState(service, 'releasing')
     try {
       await this.sessions.terminateProcess(service.session.id)
       service.allocation.lease.release()
+      this.reportPortState(service, 'released')
     } catch (error) {
       quarantineIfReleasing(service.allocation.lease, getErrorMessage(error))
+      this.reportPortState(service, 'quarantined')
       throw error
     } finally {
       this.removeActive(service)
@@ -414,6 +432,7 @@ export class ManagedServiceLauncher {
   private async quarantineUnverified(service: ActiveManagedService): Promise<void> {
     service.readinessController.abort()
     markReleasing(service.allocation.lease)
+    this.reportPortState(service, 'releasing')
     try {
       await this.sessions.terminateProcess(service.session.id)
     } finally {
@@ -421,6 +440,7 @@ export class ManagedServiceLauncher {
         service.allocation.lease,
         'Listener ownership could not be verified during cleanup.'
       )
+      this.reportPortState(service, 'quarantined')
       this.removeActive(service)
     }
   }
@@ -431,6 +451,17 @@ export class ManagedServiceLauncher {
     }
     service.unregisterManagedTerminator()
     service.unregisterLifecycle()
+  }
+
+  private reportPortState(
+    service: ActiveManagedService,
+    state: 'releasing' | 'released' | 'quarantined'
+  ): void {
+    try {
+      service.reportPortState(state)
+    } catch (error) {
+      service.reportCleanupFailure(error)
+    }
   }
 }
 

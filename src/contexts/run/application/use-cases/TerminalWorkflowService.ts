@@ -247,6 +247,13 @@ export class TerminalWorkflowService {
         this.eventPublisher.publish({ type: 'service-endpoint-updated', scope: session, endpoint })
         this.publishRun(activeRun)
       },
+      onPortStateChanged: (session, _endpoint, state) => {
+        this.eventPublisher.publish({
+          type: 'service-port-state-changed',
+          scope: session,
+          state
+        })
+      },
       onCleanupFailed: (error) => {
         if (!this.isCurrent(activeRun)) return
         activeRun.run.recordCleanupFailure(node.blockId, toWorkflowFailure(error))

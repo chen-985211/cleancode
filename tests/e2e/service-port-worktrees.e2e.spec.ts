@@ -120,6 +120,64 @@ describe('service port management across worktrees e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it.runIf(process.platform === 'darwin')(
+    'reuses a fixed port after the stopped worktree run settles while switching workspaces',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+
+      const fixedPort = await findAvailableLoopbackPort()
+      const projectCard = page.getByRole('group', {
+        name: `项目 ${basename(workbench.projectDirectory)}`
+      })
+      const mainTerminal = await createHttpServiceTerminal(page, fixedPort, 'fixed', false)
+
+      await createBranchWorkspace(projectCard, 'feature/service-stop')
+      await mainTerminal.waitFor({ state: 'detached' })
+      const branchTerminal = await createHttpServiceTerminal(page, fixedPort, 'fixed', true)
+      await expectActualServiceAddress(branchTerminal, `http://127.0.0.1:${fixedPort}`)
+
+      const mainWorkspace = projectCard.getByRole('button', {
+        name: '切换到默认工作区 main'
+      })
+      await mainWorkspace.click()
+      await expect
+        .poll(() => mainWorkspace.getAttribute('aria-current'), { interval: 50, timeout: 10_000 })
+        .toBe('page')
+      await branchTerminal.waitFor({ state: 'detached' })
+
+      await launchConfiguredTerminal(page, mainTerminal)
+      await page.getByText('启动命令失败', { exact: true }).waitFor()
+      await page.getByRole('button', { name: '关闭“启动命令失败”通知' }).click()
+
+      const branchWorkspace = projectCard.getByRole('button', {
+        name: /feature\/service-stop.*独立工作区/
+      })
+      await branchWorkspace.click()
+      await expect
+        .poll(() => branchWorkspace.getAttribute('aria-current'), {
+          interval: 50,
+          timeout: 10_000
+        })
+        .toBe('page')
+      await mainTerminal.waitFor({ state: 'detached' })
+
+      await branchTerminal.getByRole('button', { name: 'Terminal 1 停止当前命令' }).click()
+      await branchTerminal.getByText('已退出', { exact: true }).waitFor()
+
+      await mainWorkspace.click()
+      await expect
+        .poll(() => mainWorkspace.getAttribute('aria-current'), { interval: 50, timeout: 10_000 })
+        .toBe('page')
+      await branchTerminal.waitFor({ state: 'detached' })
+
+      await launchConfiguredTerminal(page, mainTerminal)
+      await expectActualServiceAddress(mainTerminal, `http://127.0.0.1:${fixedPort}`)
+      expect(await page.getByText('启动命令失败', { exact: true }).count()).toBe(0)
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function createBranchWorkspace(projectCard: Locator, branchName: string): Promise<void> {
@@ -139,6 +197,15 @@ async function createPreferredHttpServiceTerminal(
   page: Page,
   preferredPort: number
 ): Promise<Locator> {
+  return createHttpServiceTerminal(page, preferredPort, 'preferred', true)
+}
+
+async function createHttpServiceTerminal(
+  page: Page,
+  port: number,
+  policy: 'fixed' | 'preferred',
+  shouldStart: boolean
+): Promise<Locator> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   const currentTerminal = terminalBlock(page)
   await currentTerminal.waitFor()
@@ -149,21 +216,26 @@ async function createPreferredHttpServiceTerminal(
   }
 
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
-  const previousSessionId = await readTerminalSessionId(page, 'Terminal 1')
-
   await terminal.getByRole('button', { name: 'Terminal 1 编辑终端信息' }).click()
   await terminal.getByRole('textbox', { name: '启动命令' }).fill('node service-fixture.mjs')
   await terminal.getByText('工作流高级配置', { exact: true }).click()
   await terminal.getByLabel('运行模式').selectOption('service')
   await terminal.getByLabel('服务就绪方式').selectOption('tcp')
-  await terminal.getByLabel('端口策略').selectOption('preferred')
+  await terminal.getByLabel('端口策略').selectOption(policy)
   await terminal.getByLabel('访问协议').selectOption('http')
-  await terminal.getByRole('textbox', { name: '服务端口' }).fill(String(preferredPort))
+  await terminal.getByRole('textbox', { name: '服务端口' }).fill(String(port))
   await terminal.getByLabel('端口注入方式').selectOption('environment')
   await terminal.getByRole('textbox', { name: '环境变量名称' }).fill('PORT')
   await terminal.getByRole('button', { name: '保存终端信息' }).click()
   await terminal.getByRole('form', { name: '编辑终端信息' }).waitFor({ state: 'detached' })
 
+  if (shouldStart) await launchConfiguredTerminal(page, terminal)
+
+  return terminal
+}
+
+async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {
+  const previousSessionId = await readTerminalSessionId(page, 'Terminal 1')
   await terminal.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
   await page.waitForFunction(
     ({ previousSessionId }) => {
@@ -175,8 +247,6 @@ async function createPreferredHttpServiceTerminal(
     },
     { previousSessionId }
   )
-
-  return terminal
 }
 
 function terminalBlock(page: Page): Locator {

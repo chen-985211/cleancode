@@ -71,6 +71,13 @@ export class TerminalSessionService {
     return this.sessions.get(sessionId)?.toSnapshot() ?? null
   }
 
+  listSessions(sessionIds: readonly string[]): TerminalSessionSnapshot[] {
+    return sessionIds.flatMap((sessionId) => {
+      const session = this.sessions.get(sessionId)
+      return session ? [session.toSnapshot()] : []
+    })
+  }
+
   private async startInSlot(
     command: StartTerminalSessionCommand,
     owner: TerminalRunOwner,
@@ -119,7 +126,7 @@ export class TerminalSessionService {
         launchCommand = prepared.launchCommand
         environment = prepared.environment
       } catch (error) {
-        this.sessions.delete(session.id)
+        session.markFailed({ reason: getErrorMessage(error) })
         if (this.sessionIdsBySlot.get(slotKey) === session.id) {
           this.sessionIdsBySlot.delete(slotKey)
         }
@@ -182,6 +189,7 @@ export class TerminalSessionService {
 
   write(sessionId: string, input: string): TerminalSessionSnapshot {
     const session = this.requireSession(sessionId)
+    if (session.status !== 'running') return session.toSnapshot()
 
     session.recordInput(input)
     this.terminalProcessPort.write(sessionId, input)
@@ -190,16 +198,19 @@ export class TerminalSessionService {
   }
 
   interrupt(sessionId: string): TerminalSessionSnapshot {
-    const session = this.requireRunningSession(sessionId)
+    const session = this.requireSession(sessionId)
+    if (session.status !== 'running') return session.toSnapshot()
 
     this.terminalProcessPort.write(sessionId, '\x03')
 
     return session.toSnapshot()
   }
 
-  resize(sessionId: string, columns: number, rows: number): void {
-    this.requireRunningSession(sessionId)
+  resize(sessionId: string, columns: number, rows: number): TerminalSessionSnapshot {
+    const session = this.requireSession(sessionId)
+    if (session.status !== 'running') return session.toSnapshot()
     this.terminalProcessPort.resize(sessionId, columns, rows)
+    return session.toSnapshot()
   }
 
   async listWorkingDirectories(
@@ -226,10 +237,11 @@ export class TerminalSessionService {
     return workingDirectories
   }
 
-  terminate(sessionId: string): Promise<TerminalSessionSnapshot> {
+  terminate(sessionId: string): Promise<TerminalSessionSnapshot | null> {
+    if (!this.sessions.has(sessionId)) return Promise.resolve(null)
     const managedTerminator = this.managedTerminators.get(sessionId)
     if (!managedTerminator) return this.terminateProcess(sessionId)
-    return managedTerminator().then(() => this.requireSession(sessionId).toSnapshot())
+    return managedTerminator().then(() => this.sessions.get(sessionId)?.toSnapshot() ?? null)
   }
 
   terminateProcess(sessionId: string): Promise<TerminalSessionSnapshot> {
@@ -283,19 +295,6 @@ export class TerminalSessionService {
 
     if (!session) {
       throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
-    }
-
-    return session
-  }
-
-  private requireRunningSession(sessionId: string): TerminalSession {
-    const session = this.requireSession(sessionId)
-
-    if (session.status !== 'running') {
-      throw createExpectedAppError(
-        'TERMINAL_SESSION_NOT_RUNNING',
-        'Terminal session is not running.'
-      )
     }
 
     return session

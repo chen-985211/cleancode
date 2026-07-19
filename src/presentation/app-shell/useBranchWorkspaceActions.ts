@@ -9,7 +9,11 @@ interface UseBranchWorkspaceActionsInput {
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
-  readonly terminateWorkbenchTerminalSessions: (workbench: WorkbenchSnapshot) => Promise<void>
+  readonly terminateWorkspaceTerminalSessions: (
+    workbench: WorkbenchSnapshot,
+    workspaceName: string
+  ) => Promise<void>
+  readonly forgetWorkspaceTerminalStates: (projectId: string, workspaceName: string) => void
 }
 
 export function useBranchWorkspaceActions({
@@ -17,7 +21,8 @@ export function useBranchWorkspaceActions({
   replaceWorkbench,
   setHoveredTerminalBlockId,
   setSelectedTerminalBlockId,
-  terminateWorkbenchTerminalSessions
+  terminateWorkspaceTerminalSessions,
+  forgetWorkspaceTerminalStates
 }: UseBranchWorkspaceActionsInput) {
   const [branchWorkspaceActionError, setBranchWorkspaceActionError] = useState<string | null>(null)
   const clearCurrentBlockSelection = useCallback(() => {
@@ -94,7 +99,7 @@ export function useBranchWorkspaceActions({
           Boolean(selectedWorkspace?.isCurrent)
 
         if (shouldTerminateCurrentWorkspace && currentWorkbench) {
-          await terminateWorkbenchTerminalSessions(currentWorkbench)
+          await terminateWorkspaceTerminalSessions(currentWorkbench, workspaceName)
         }
 
         const archivedWorkbench = await window.cleancode?.archiveBranchWorkspace({
@@ -104,6 +109,7 @@ export function useBranchWorkspaceActions({
         })
 
         if (archivedWorkbench) {
+          forgetWorkspaceTerminalStates(workbench.project.id, workspaceName)
           clearCurrentBlockSelection()
           replaceWorkbench(archivedWorkbench)
         }
@@ -115,7 +121,8 @@ export function useBranchWorkspaceActions({
       clearCurrentBlockSelection,
       currentWorkbench,
       replaceWorkbench,
-      terminateWorkbenchTerminalSessions
+      terminateWorkspaceTerminalSessions,
+      forgetWorkspaceTerminalStates
     ]
   )
 
@@ -127,11 +134,12 @@ export function useBranchWorkspaceActions({
       })
 
       if (checkedOutWorkbench) {
+        forgetWorkspaceTerminalStates(workbench.project.id, 'main')
         clearCurrentBlockSelection()
         replaceWorkbench(checkedOutWorkbench)
       }
     },
-    [clearCurrentBlockSelection, replaceWorkbench]
+    [clearCurrentBlockSelection, forgetWorkspaceTerminalStates, replaceWorkbench]
   )
 
   return {

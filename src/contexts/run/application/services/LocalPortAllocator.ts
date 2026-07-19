@@ -1,7 +1,8 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
   ServicePortLease,
-  ServicePortLeaseRegistry
+  ServicePortLeaseRegistry,
+  ServicePortLeaseSnapshot
 } from '../../domain/services/ServicePortLeaseRegistry'
 import {
   createActualServiceEndpoint,
@@ -23,18 +24,27 @@ export interface LocalPortAllocation {
 
 export class LocalPortAllocator {
   private readonly maxAttempts: number
+  private readonly releaseWaitTimeoutMs: number
+  private readonly isRunInactive: (scope: TerminalRunScope) => boolean
 
   constructor(
     private readonly reservations: LocalPortReservationPort,
     private readonly leases: ServicePortLeaseRegistry,
-    options: { readonly maxAttempts?: number } = {}
+    options: {
+      readonly maxAttempts?: number
+      readonly releaseWaitTimeoutMs?: number
+      readonly isRunInactive?: (scope: TerminalRunScope) => boolean
+    } = {}
   ) {
     this.maxAttempts = options.maxAttempts ?? 3
+    this.releaseWaitTimeoutMs = options.releaseWaitTimeoutMs ?? 2_500
+    this.isRunInactive = options.isRunInactive ?? (() => false)
   }
 
   async allocate(command: {
     readonly scope: TerminalRunScope
     readonly intent: ServicePortIntent
+    readonly signal?: AbortSignal
   }): Promise<LocalPortAllocation> {
     const requestedPort = 'port' in command.intent.policy ? command.intent.policy.port : null
     let lastAttemptedPort = requestedPort ?? 0
@@ -49,16 +59,26 @@ export class LocalPortAllocator {
       const activeLease = port === undefined ? null : this.leases.findActiveByPort(port)
 
       if (activeLease) {
-        if (command.intent.policy.type === 'fixed') {
-          fixedConflict(command.intent.policy.port, command.scope, activeLease.owner)
+        if (activeLease.state === 'releasing') {
+          const settled = await this.waitForSettlement(activeLease, command.signal)
+          if (settled || !this.isExactActiveLease(activeLease)) attempt -= 1
+          else if (command.intent.policy.type === 'fixed') {
+            fixedConflict(command.intent.policy.port, command.scope, activeLease)
+          }
+          continue
         }
-        continue
+        if (activeLease.state !== 'quarantined' || !this.isRunInactive(activeLease.owner)) {
+          if (command.intent.policy.type === 'fixed') {
+            fixedConflict(command.intent.policy.port, command.scope, activeLease)
+          }
+          continue
+        }
       }
 
       const reservation = await this.reservations.tryReserve({ host: '127.0.0.1', port })
       if (!reservation) {
         if (command.intent.policy.type === 'fixed') {
-          fixedConflict(port as number, command.scope, null)
+          fixedConflict(port as number, command.scope, activeLease)
         }
         continue
       }
@@ -66,20 +86,32 @@ export class LocalPortAllocator {
 
       const conflictingLease = this.leases.findActiveByPort(reservation.port)
       if (conflictingLease) {
+        if (
+          conflictingLease.state === 'quarantined' &&
+          this.isRunInactive(conflictingLease.owner) &&
+          this.leases.recoverQuarantined({
+            port: reservation.port,
+            leaseId: conflictingLease.id
+          })
+        ) {
+          return this.createAllocation(command, requestedPort, reservation)
+        }
         await reservation.release()
+        if (conflictingLease.state === 'releasing') {
+          const settled = await this.waitForSettlement(conflictingLease, command.signal)
+          if (settled || !this.isExactActiveLease(conflictingLease)) attempt -= 1
+          else if (command.intent.policy.type === 'fixed') {
+            fixedConflict(reservation.port, command.scope, conflictingLease)
+          }
+          continue
+        }
         if (command.intent.policy.type === 'fixed') {
-          fixedConflict(reservation.port, command.scope, conflictingLease.owner)
+          fixedConflict(reservation.port, command.scope, conflictingLease)
         }
         continue
       }
 
-      const endpoint = createActualServiceEndpoint({
-        protocol: command.intent.protocol,
-        port: reservation.port,
-        requestedPort
-      })
-      const lease = this.leases.reserve(command.scope, endpoint)
-      return { endpoint, lease, reservation }
+      return this.createAllocation(command, requestedPort, reservation)
     }
 
     throw createExpectedAppError(
@@ -91,13 +123,55 @@ export class LocalPortAllocator {
       }
     )
   }
+
+  private createAllocation(
+    command: { readonly scope: TerminalRunScope; readonly intent: ServicePortIntent },
+    requestedPort: number | null,
+    reservation: LocalPortReservation
+  ): LocalPortAllocation {
+    const endpoint = createActualServiceEndpoint({
+      protocol: command.intent.protocol,
+      port: reservation.port,
+      requestedPort
+    })
+    const lease = this.leases.reserve(command.scope, endpoint)
+    return { endpoint, lease, reservation }
+  }
+
+  private async waitForSettlement(
+    lease: ServicePortLeaseSnapshot,
+    signal?: AbortSignal
+  ): Promise<ServicePortLeaseSnapshot | null> {
+    if (signal?.aborted) throw signal.reason
+    const waiting = this.leases.waitForSettlement({ port: lease.endpoint.port, leaseId: lease.id })
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    let abortListener: (() => void) | undefined
+    const interrupted = new Promise<null>((resolve, reject) => {
+      timeoutId = setTimeout(resolve, this.releaseWaitTimeoutMs, null)
+      if (signal) {
+        abortListener = () => reject(signal.reason)
+        signal.addEventListener('abort', abortListener, { once: true })
+      }
+    })
+    try {
+      return await Promise.race([waiting, interrupted])
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (signal && abortListener) signal.removeEventListener('abort', abortListener)
+    }
+  }
+
+  private isExactActiveLease(lease: ServicePortLeaseSnapshot): boolean {
+    return this.leases.findActiveByPort(lease.endpoint.port)?.id === lease.id
+  }
 }
 
 function fixedConflict(
   port: number,
   attemptedOwner: TerminalRunScope,
-  managedOwner: TerminalRunScope | null
+  managedLease: ServicePortLeaseSnapshot | null
 ): never {
+  const managedOwner = managedLease?.owner ?? null
   throw createExpectedAppError(
     'SERVICE_PORT_FIXED_CONFLICT',
     'The fixed local service port is already occupied.',
@@ -112,6 +186,7 @@ function fixedConflict(
       attemptedSessionId: attemptedOwner.sessionId,
       attemptedRunId: attemptedOwner.runId,
       attemptedGeneration: attemptedOwner.generation,
+      managedLeaseState: managedLease?.state ?? null,
       managedProjectId: managedOwner?.projectId ?? null,
       managedProjectDirectory: managedOwner?.projectDirectory ?? null,
       managedWorkspaceName: managedOwner?.workspaceName ?? null,

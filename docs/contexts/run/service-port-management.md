@@ -112,6 +112,8 @@ projectId + projectDirectory
 
 直接启动由 `LaunchTerminalCommandUseCase` 进入；组合启动逐成员调用该用例；工作流服务节点由 `TerminalWorkflowService` 进入。三条路径最终复用 `ManagedServiceLauncher`，普通任务和无端口的输出就绪服务继续使用常规 PTY 路径。
 
+端口分配冲突发生在 PTY 启动准备阶段时，Run 仍保留带有本次精确 identity 的 `failed` session 快照，同时释放槽位供下一 generation 使用。冲突事件、renderer 对账和后续终止因此引用同一个可查询事实；不能发布冲突 identity 后再删除对应 session。终止一个已经不存在的旧 session 是幂等完成，但已存在的受管 session 仍必须等待监听关闭并完成租约释放或隔离。
+
 ## 分配、租约与竞争
 
 Run 通过 `LocalPortReservationPort` 在回环地址创建临时 TCP Server：
@@ -123,6 +125,8 @@ Run 通过 `LocalPortReservationPort` 在回环地址创建临时 TCP Server：
 5. 服务满足就绪和所有权校验后，租约进入 `bound`，实际端点才对外确认。
 
 临时 TCP Server 无法把监听句柄通用地移交给任意项目进程，因此“释放预留—目标进程监听”仍有竞争窗口。Run 不把预检查当成无竞争保证，而是使用有限分配与激活重试。重试耗尽返回结构化失败，不无限循环。
+
+同一固定或首选端口的旧租约已经进入 `releasing` 时，新启动会按精确 lease identity 有界等待其进入 `released` 或 `quarantined`，不会把清理窗口误报为普通活动冲突。`quarantined` 不会仅凭进程退出记录自动释放；只有旧精确 session 已由 Run 权威快照确认 `exited/failed`，并且 Run 在旧租约仍存在时重新取得该端口的真实操作系统 reservation，才允许原子移除旧隔离并建立新租约。reservation 失败表示仍有监听者，隔离继续保留；系统不自动终止外部进程。
 
 ## 监听所有权与就绪
 
@@ -157,7 +161,8 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 当前已经交付轻量、所有权感知的冲突反馈：
 
 - 首选端口回退成功：终端常驻地址条显示实际地址，并说明首选端口与实际端口。
-- 当前应用内活动租约占用固定端口：结构化错误携带受管项目、工作区、终端和运行身份；界面展示用户可读 owner，并可定位或打开已有服务。
+- 当前应用内活动租约占用固定端口：结构化错误携带受管项目、工作区、终端、租约状态和运行身份；界面展示用户可读 owner 并可定位，只有已绑定服务可以打开。
+- 受管冲突同时携带 `reserved/activating/bound/releasing/quarantined` 状态；只有 `bound` owner 可以打开，释放中和隔离状态只提供准确说明与安全定位。
 - 操作系统端口已占用但没有当前受管租约：按外部占用处理，只提供编辑配置和关闭提示。
 - 监听所有权不匹配或无法确认：分别显示外部或未知归属，不自动终止占用者。
 - 分配耗尽和清理失败使用稳定错误码，不把 raw 异常或终端输出作为用户判断依据。
@@ -166,7 +171,7 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 
 ## 停止与跨上下文生命周期
 
-停止受管服务时，Run 依次取消就绪等待、把租约标记为释放中、终止 PTY/进程组、等待实际监听关闭，再释放租约。监听未在清理时限内关闭时，租约进入 `quarantined` 并返回 `SERVICE_PORT_CLEANUP_FAILED`，不能把仍占用的端口重新分配。
+停止受管服务时，Run 依次取消就绪等待、把租约标记为释放中、终止 PTY/进程组、等待实际监听关闭，再释放租约。进程退出事件只证明 PTY 已结束，不代表端口已经释放；Run 继续发布精确运行身份的 `releasing`，并在监听关闭后发布 `released`，或在清理无法确认时发布 `quarantined`。监听未在清理时限内关闭时返回 `SERVICE_PORT_CLEANUP_FAILED`，不能把仍占用的端口重新分配。
 
 以下外部生命周期通过调用方拥有的端口进入同一个 `RunLifecycleService`：
 
@@ -226,7 +231,7 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 | Integration         | 版本迁移、真实端口预留/监听、PTY 注入和计划适配             | [`block-graph.store-versioning.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.store-versioning.spec.ts)、[`run.local-port-infrastructure.spec.ts`](../../../tests/integration/contexts/run/run.local-port-infrastructure.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`run.terminal-launch-plan-adapter.spec.ts`](../../../tests/integration/contexts/run/run.terminal-launch-plan-adapter.spec.ts)                                                                          |
 | Contract            | 原子终端定义、Run IPC/事件和 MCP `0.3.1` 自描述 Schema      | [`block-graph.resize-terminal-layout-ipc.spec.ts`](../../../tests/contract/contexts/block-graph/block-graph.resize-terminal-layout-ipc.spec.ts)、[`run.service-port-ipc.spec.ts`](../../../tests/contract/contexts/run/run.service-port-ipc.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                         |
 
-关键 E2E 只覆盖一个低层测试不能单独证明的跨上下文用户目标：两个 worktree 使用同一首选端口时，都能从界面成功启动并看到不同的实际端点。测试必须使用确定性本地服务、精确运行 identity/endpoint 事件作为完成条件，不能使用固定等待；策略边界、所有权失败和清理分支继续由低层测试证明。
+关键 E2E 覆盖低层测试不能单独证明的跨上下文用户目标：两个 worktree 使用同一首选端口时都能从界面成功启动并看到不同实际端点；默认工作区因另一 worktree 占用固定端口而直接“启动命令”失败后，可以切换过去停止服务，再返回默认工作区用同一“启动命令”入口成功重试。测试必须使用确定性本地服务、精确运行 identity/endpoint 事件作为完成条件，不能使用固定等待；策略边界、所有权失败和清理分支继续由低层测试证明。
 
 ## 交付进度
 

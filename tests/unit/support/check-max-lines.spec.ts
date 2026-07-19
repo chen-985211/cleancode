@@ -7,10 +7,15 @@ import { describe, expect, it } from 'vitest'
 import {
   collectLineViolations,
   countTextLines,
+  defaultMaxLines,
   isCodeFile
 } from '../../../scripts/check-max-lines.mjs'
 
 describe('max lines quality gate', () => {
+  it('uses 700 lines as the default limit', () => {
+    expect(defaultMaxLines).toBe(700)
+  })
+
   it('counts text lines without treating a trailing newline as another line', () => {
     expect(countTextLines('')).toBe(0)
     expect(countTextLines('one')).toBe(1)

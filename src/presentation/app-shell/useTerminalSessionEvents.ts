@@ -1,6 +1,5 @@
 import { useEffect, type SetStateAction } from 'react'
 
-import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { appendTerminalOutput, bufferTerminalStartupOutput } from './terminalSessionOutputBuffer'
 import { findTerminalStateKeyBySession } from './terminalSessionStateSelectors'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
@@ -8,13 +7,15 @@ import {
   applyTerminalServiceRunEvent,
   type TerminalServiceRunEvent
 } from './terminalServiceRunProjection'
-import { updateTerminalStatus } from './terminalStateUpdates'
+import { applyTerminalExitEvent } from './terminalSessionRuntime'
 import { applyTerminalWorkflowEventToStates } from './terminalWorkflowSessionEvents'
-import { terminalOutputBrowserEventName, type TerminalViewState } from './types'
+import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import type { TerminalViewState } from './types'
 
 interface UseTerminalSessionEventsInput {
   readonly clearPendingTerminalInput: (terminalStateKey: string) => void
   readonly terminalStartupOutputsRef: { readonly current: Map<string, string> }
+  readonly terminalSurfaceRegistry: TerminalSurfaceRegistry
   readonly terminalStatesRef: { readonly current: Record<string, TerminalViewState> }
   readonly updateTerminalStates: (
     stateAction: SetStateAction<Record<string, TerminalViewState>>
@@ -24,6 +25,7 @@ interface UseTerminalSessionEventsInput {
 export function useTerminalSessionEvents({
   clearPendingTerminalInput,
   terminalStartupOutputsRef,
+  terminalSurfaceRegistry,
   terminalStatesRef,
   updateTerminalStates
 }: UseTerminalSessionEventsInput): void {
@@ -37,7 +39,7 @@ export function useTerminalSessionEvents({
         bufferTerminalStartupOutput(terminalStartupOutputsRef.current, event)
       }
       updateTerminalStates((states) => appendTerminalOutput(states, event))
-      publishTerminalOutput(event)
+      terminalSurfaceRegistry.write(event)
     })
     const unsubscribeExit = api.onTerminalExit((event) => {
       const exitedTerminalStateKey = findTerminalStateKeyBySession(
@@ -46,7 +48,7 @@ export function useTerminalSessionEvents({
       )
 
       if (exitedTerminalStateKey) clearPendingTerminalInput(exitedTerminalStateKey)
-      updateTerminalStates((states) => updateTerminalStatus(states, event, 'exited'))
+      updateTerminalStates((states) => applyTerminalExitEvent(states, event))
     })
 
     return () => {
@@ -56,6 +58,7 @@ export function useTerminalSessionEvents({
   }, [
     clearPendingTerminalInput,
     terminalStartupOutputsRef,
+    terminalSurfaceRegistry,
     terminalStatesRef,
     updateTerminalStates
   ])
@@ -76,7 +79,7 @@ export function useTerminalSessionEvents({
     if (!api || typeof api.onTerminalWorkflowEvent !== 'function') return undefined
 
     return api.onTerminalWorkflowEvent((event) => {
-      if (event.type === 'terminal-output') publishTerminalOutput(event.output)
+      if (event.type === 'terminal-output') terminalSurfaceRegistry.write(event.output)
 
       let acceptedSessionKey: string | null = null
       updateTerminalStates((states) => {
@@ -94,13 +97,7 @@ export function useTerminalSessionEvents({
       })
       if (acceptedSessionKey) clearPendingTerminalInput(acceptedSessionKey)
     })
-  }, [clearPendingTerminalInput, updateTerminalStates])
-}
-
-function publishTerminalOutput(event: TerminalOutputEvent): void {
-  window.dispatchEvent(
-    new CustomEvent<TerminalOutputEvent>(terminalOutputBrowserEventName, { detail: event })
-  )
+  }, [clearPendingTerminalInput, terminalSurfaceRegistry, updateTerminalStates])
 }
 
 interface TerminalRunEventRuntimeApi {

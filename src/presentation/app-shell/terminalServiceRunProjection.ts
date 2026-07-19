@@ -32,7 +32,8 @@ export function applyTerminalServiceRunEvent(
         status: 'running',
         runIdentity: event.scope,
         actualEndpoint: null,
-        portConflict: null
+        portConflict: null,
+        servicePortState: null
       }
     }
   }
@@ -55,7 +56,8 @@ export function applyTerminalServiceRunEvent(
         status: 'failed',
         runIdentity: event.scope,
         actualEndpoint: null,
-        portConflict: event.conflict
+        portConflict: event.conflict,
+        servicePortState: null
       }
     }
   }
@@ -65,7 +67,23 @@ export function applyTerminalServiceRunEvent(
   if (event.type === 'service-endpoint-updated') {
     return {
       ...states,
-      [key]: { ...current, actualEndpoint: event.endpoint, portConflict: null }
+      [key]: {
+        ...current,
+        actualEndpoint: event.endpoint,
+        portConflict: null,
+        servicePortState: event.endpoint ? 'bound' : null
+      }
+    }
+  }
+
+  if (event.type === 'service-port-state-changed') {
+    return {
+      ...states,
+      [key]: {
+        ...current,
+        actualEndpoint: event.state === 'released' ? null : current.actualEndpoint,
+        servicePortState: event.state === 'released' ? null : event.state
+      }
     }
   }
 
@@ -74,7 +92,8 @@ export function applyTerminalServiceRunEvent(
     [key]: {
       ...current,
       actualEndpoint: null,
-      portConflict: null
+      portConflict: null,
+      servicePortState: null
     }
   }
 }

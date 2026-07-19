@@ -258,6 +258,7 @@ registerTerminalIpcHandlers({
   interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
   ipcMain,
   launchTerminal: (command) => launchTerminal.execute(command),
+  listTerminalSessions: (sessionIds) => terminalSessionService.listSessions(sessionIds),
   listTerminalWorkingDirectories: (sessionIds) =>
     terminalSessionService.listWorkingDirectories(sessionIds),
   logger: consoleLogger,

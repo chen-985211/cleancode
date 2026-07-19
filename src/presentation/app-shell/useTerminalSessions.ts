@@ -6,7 +6,6 @@ import {
   createTerminalStateKey,
   getBlockIdFromTerminalStateKey,
   getProjectIdFromTerminalStateKey,
-  getWorkspaceNameFromTerminalStateKey,
   migrateTerminalSessionToWorkspace
 } from './terminalSessionWorkspaceMigration'
 import { updateTerminalBlockStatus } from './terminalStateUpdates'
@@ -18,11 +17,15 @@ import {
 import { takeTerminalStartupOutput, type TerminalInputBuffer } from './terminalSessionOutputBuffer'
 import { dismissTerminalPortConflict } from './terminalServiceRunProjection'
 import { useTerminalSessionEvents } from './useTerminalSessionEvents'
+import { useTerminalSessionRetention } from './useTerminalSessionRetention'
 import type { NotifyApp } from './appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
+import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import {
   applyTerminalSessionSnapshot,
+  applyTerminalSessionStatusSnapshot,
   launchTerminalRuntimeSession,
+  reconcileTerminalSessionSnapshots,
   startTerminalRuntimeSession
 } from './terminalSessionRuntime'
 import {
@@ -37,6 +40,7 @@ type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 interface UseTerminalSessionsInput {
   readonly currentProject: WorkbenchSnapshot['project'] | undefined
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly currentTerminalBlockIds: readonly string[] | undefined
   readonly focusTerminalBlock: (blockId: string) => void
   readonly notify: NotifyApp
 }
@@ -48,6 +52,7 @@ export interface TerminalSessionActionOptions {
 export function useTerminalSessions({
   currentProject,
   currentWorkspace,
+  currentTerminalBlockIds,
   focusTerminalBlock,
   notify
 }: UseTerminalSessionsInput) {
@@ -55,6 +60,7 @@ export function useTerminalSessions({
     {}
   )
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
+  const [terminalSurfaceRegistry] = useState(() => new TerminalSurfaceRegistry())
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
@@ -79,6 +85,14 @@ export function useTerminalSessions({
     terminalStatesRef.current = terminalStatesByKey
   }, [terminalStatesByKey])
 
+  useEffect(() => {
+    terminalSurfaceRegistry.retain(
+      Object.values(terminalStatesByKey)
+        .map((state) => state.runIdentity)
+        .filter((identity): identity is NonNullable<typeof identity> => Boolean(identity))
+    )
+  }, [terminalStatesByKey, terminalSurfaceRegistry])
+
   const updateTerminalStates = useCallback(
     (stateAction: SetStateAction<Record<string, TerminalViewState>>) => {
       const nextStates =
@@ -90,6 +104,44 @@ export function useTerminalSessions({
     []
   )
 
+  const reconcileTerminalActionSnapshot = useCallback(
+    (terminalStateKey: string, session: TerminalSessionSnapshot) => {
+      updateTerminalStates((states) =>
+        applyTerminalSessionStatusSnapshot(states, terminalStateKey, session)
+      )
+    },
+    [updateTerminalStates]
+  )
+
+  useEffect(() => {
+    const api = window.cleancode
+    if (!api?.listTerminalSessions || !currentProjectId || !currentWorkspaceName) return undefined
+
+    const requestedRuns = Object.values(terminalStatesRef.current).flatMap((state) =>
+      state.status === 'running' &&
+      state.runIdentity?.projectId === currentProjectId &&
+      state.runIdentity.workspaceName === currentWorkspaceName
+        ? [state.runIdentity]
+        : []
+    )
+    if (requestedRuns.length === 0) return undefined
+
+    let isCurrentRequest = true
+    void api
+      .listTerminalSessions({ sessionIds: requestedRuns.map((run) => run.sessionId) })
+      .then((sessions) => {
+        if (!isCurrentRequest) return
+        updateTerminalStates((states) =>
+          reconcileTerminalSessionSnapshots(states, requestedRuns, sessions)
+        )
+      })
+      .catch(() => undefined)
+
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [currentProjectId, currentWorkspaceName, updateTerminalStates])
+
   const clearPendingTerminalInput = useCallback((terminalStateKey: string) => {
     const buffer = inputBuffersRef.current.get(terminalStateKey)
 
@@ -100,41 +152,54 @@ export function useTerminalSessions({
     inputBuffersRef.current.delete(terminalStateKey)
   }, [])
 
-  const flushTerminalInput = useCallback((terminalStateKey: string) => {
-    const buffer = inputBuffersRef.current.get(terminalStateKey)
+  const terminalSessionRetention = useTerminalSessionRetention({
+    clearPendingTerminalInput,
+    currentProject,
+    currentTerminalBlockIds,
+    currentWorkspaceName,
+    terminalStatesRef,
+    updateTerminalStates
+  })
 
-    if (!buffer || buffer.input.length === 0) {
-      return
-    }
+  const flushTerminalInput = useCallback(
+    (terminalStateKey: string) => {
+      const buffer = inputBuffersRef.current.get(terminalStateKey)
 
-    inputBuffersRef.current.delete(terminalStateKey)
-    const queuedWrite = inputWriteQueuesRef.current.get(terminalStateKey) ?? Promise.resolve()
-    const nextWrite = queuedWrite
-      .catch(() => undefined)
-      .then(async () => {
-        const terminalState = terminalStatesRef.current[terminalStateKey]
-
-        if (
-          terminalState?.sessionId !== buffer.sessionId ||
-          terminalState.status !== 'running' ||
-          !window.cleancode
-        ) {
-          return
-        }
-
-        await window.cleancode.writeTerminal({
-          sessionId: buffer.sessionId,
-          input: buffer.input
-        })
-      })
-
-    inputWriteQueuesRef.current.set(terminalStateKey, nextWrite)
-    void nextWrite.finally(() => {
-      if (inputWriteQueuesRef.current.get(terminalStateKey) === nextWrite) {
-        inputWriteQueuesRef.current.delete(terminalStateKey)
+      if (!buffer || buffer.input.length === 0) {
+        return
       }
-    })
-  }, [])
+
+      inputBuffersRef.current.delete(terminalStateKey)
+      const queuedWrite = inputWriteQueuesRef.current.get(terminalStateKey) ?? Promise.resolve()
+      const nextWrite = queuedWrite
+        .catch(() => undefined)
+        .then(async () => {
+          const terminalState = terminalStatesRef.current[terminalStateKey]
+
+          if (
+            terminalState?.sessionId !== buffer.sessionId ||
+            terminalState.status !== 'running' ||
+            !window.cleancode
+          ) {
+            return
+          }
+
+          const session = await window.cleancode.writeTerminal({
+            sessionId: buffer.sessionId,
+            input: buffer.input
+          })
+          reconcileTerminalActionSnapshot(terminalStateKey, session)
+        })
+
+      inputWriteQueuesRef.current.set(terminalStateKey, nextWrite)
+      void nextWrite.finally(() => {
+        if (inputWriteQueuesRef.current.get(terminalStateKey) === nextWrite) {
+          inputWriteQueuesRef.current.delete(terminalStateKey)
+        }
+      })
+    },
+    [reconcileTerminalActionSnapshot]
+  )
 
   useEffect(
     () => () => {
@@ -148,13 +213,15 @@ export function useTerminalSessions({
       inputWriteQueuesRef.current.clear()
       terminalStartupOutputsRef.current.clear()
       quickLaunchesRef.current.clear()
+      terminalSurfaceRegistry.disposeAll()
     },
-    []
+    [terminalSurfaceRegistry]
   )
 
   useTerminalSessionEvents({
     clearPendingTerminalInput,
     terminalStartupOutputsRef,
+    terminalSurfaceRegistry,
     terminalStatesRef,
     updateTerminalStates
   })
@@ -223,10 +290,18 @@ export function useTerminalSessions({
 
       if (terminalStateKey && terminalState?.sessionId && terminalState.status === 'running') {
         clearPendingTerminalInput(terminalStateKey)
-        await window.cleancode?.interruptTerminal({ sessionId: terminalState.sessionId })
+        const session = await window.cleancode?.interruptTerminal({
+          sessionId: terminalState.sessionId
+        })
+        if (session) reconcileTerminalActionSnapshot(terminalStateKey, session)
       }
     },
-    [clearPendingTerminalInput, currentProjectId, currentWorkspaceName]
+    [
+      clearPendingTerminalInput,
+      currentProjectId,
+      currentWorkspaceName,
+      reconcileTerminalActionSnapshot
+    ]
   )
 
   const terminateTerminalSession = useCallback(
@@ -382,46 +457,17 @@ export function useTerminalSessions({
         : undefined
 
       if (terminalState?.sessionId && terminalState.status === 'running') {
-        await window.cleancode?.resizeTerminal({
+        const session = await window.cleancode?.resizeTerminal({
           sessionId: terminalState.sessionId,
           columns: dimensions.columns,
           rows: dimensions.rows
         })
+        if (session && terminalStateKey) {
+          reconcileTerminalActionSnapshot(terminalStateKey, session)
+        }
       }
     },
-    [currentProjectId, currentWorkspaceName]
-  )
-
-  const terminateWorkbenchTerminalSessions = useCallback(
-    async (workbench: WorkbenchSnapshot) => {
-      const workspaceNames = new Set(
-        workbench.project.workspaces.map((workspace) => workspace.name)
-      )
-      const terminalStateKeys = Object.keys(terminalStatesRef.current).filter(
-        (terminalStateKey) =>
-          getProjectIdFromTerminalStateKey(terminalStateKey) === workbench.project.id &&
-          workspaceNames.has(getWorkspaceNameFromTerminalStateKey(terminalStateKey))
-      )
-      const sessionIds = terminalStateKeys
-        .map((terminalStateKey) => terminalStatesRef.current[terminalStateKey]?.sessionId)
-        .filter((sessionId): sessionId is string => Boolean(sessionId))
-
-      updateTerminalStates((states) => {
-        const nextStates = { ...states }
-
-        for (const terminalStateKey of terminalStateKeys) {
-          clearPendingTerminalInput(terminalStateKey)
-          delete nextStates[terminalStateKey]
-        }
-
-        return nextStates
-      })
-
-      await Promise.all(
-        sessionIds.map((sessionId) => window.cleancode?.terminateTerminal({ sessionId }))
-      )
-    },
-    [clearPendingTerminalInput, updateTerminalStates]
+    [currentProjectId, currentWorkspaceName, reconcileTerminalActionSnapshot]
   )
 
   const findTerminalBlockIdForSession = useCallback((sessionId: string): string | null => {
@@ -486,9 +532,10 @@ export function useTerminalSessions({
     setTerminalStates: updateTerminalStates,
     startTerminal,
     terminalStates,
+    terminalSurfaceRegistry,
     terminalStatesRef,
     terminateTerminalSession,
-    terminateWorkbenchTerminalSessions,
+    ...terminalSessionRetention,
     writeTerminal
   }
 }

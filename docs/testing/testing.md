@@ -206,6 +206,8 @@ E2E 测试只能覆盖关键路径，不得替代上下文内的 unit、integrat
 
 Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitForTimeout` 代替进程、协议或界面状态就绪。终端场景必须按当前 `sessionId` 等待精确输出 marker；只验证终端渲染或选区时应使用可控本地程序产生固定输出，不得额外依赖交互式 shell 的启动时机。验证 PTY 工作目录时应查询 Run 上下文公开的工作目录能力，不得通过输入 `pwd` 后解析界面回显间接推断。
 
+普通终端跨 worktree 保留场景由 `git-branch-workspaces.e2e.spec.ts` 使用超过 8192 字符的本地 fixture 覆盖：断言返回后仍是原 `sessionId` 和原 xterm DOM surface、隐藏期间输出可见，并通过 `Shift+PageUp` 读取早于文本尾部的滚动历史。该场景必须留在真实 Electron E2E，因为 jsdom 不能证明 xterm buffer、DOM reparent、node-pty 与 IPC 输出的组合行为；精确身份路由和生命周期清理分支仍由 unit 测试覆盖。
+
 整套 Electron E2E 只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。
 
 `pnpm test:e2e` 默认使用屏幕外非激活的真实 Electron `BrowserWindow` 运行，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。

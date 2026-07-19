@@ -136,6 +136,24 @@ Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域�
 
 这一顺序避免旧 write 跨过 reset、旧 OSC 查询响应被送往新 session，以及工作区快速往返时迟到的 replacement 覆盖当前 surface。主题差异由 source dataset 上的统一滤镜完成，不重启 PTY，也不把 ANSI 尾部改写为另一套颜色。当前 FIFO、generation 与绑定前退出事件行为由 [`agent-console.terminal-generation.spec.tsx`](../../tests/unit/presentation/agent-console.terminal-generation.spec.tsx) 验证，完整 palette 恢复由 [`agent-console.terminal.spec.tsx`](../../tests/unit/presentation/agent-console.terminal.spec.tsx) 验证；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和先解析实际 OSC 11 背景色响应再绘制的 fake Codex，证明工作区往返期间 session/进程复用、源主题固定、滤镜方向与最终像素明暗。
 
+## 普通终端的 worktree 重挂载
+
+普通终端的 PTY 由 Run 上下文按工作区持有，React 画布只负责当前工作区的可见投影。工作区切换会卸载当前 `TerminalViewport`；如果组件卸载同时调用 `xterm.dispose()`，PTY 虽然仍然运行，xterm 的 parser 状态、滚动缓冲和 DOM surface 却会消失。返回工作区时只用表现层的 8192 字符输出尾部创建新 xterm，就会表现为较早内容“丢失”，并且无法完整恢复 ANSI 状态。
+
+普通终端必须使用表现层 surface registry 保持以下不变量：
+
+1. registry key 使用完整的 `projectId + workspaceName + blockId + sessionId + runId + generation`，不得只按 block 或 session 的局部身份路由。
+2. 首次附加创建一个 xterm surface，配置 `scrollback: 1000`；worktree 切走时只把 xterm 根 DOM 从旧 host detach，不 dispose terminal，切回时把同一 DOM 重新挂到新 host 并重新 fit、refresh。
+3. 当前与隐藏工作区的终端输出都按完整运行身份直接写入对应 surface；8192 字符尾部仍保留为启动竞态、无障碍文本和非 xterm 回退，不作为滚动历史的事实来源，也不得在重挂载时重复 replay 到已有 surface。
+4. session replacement、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放失效 surface。普通 worktree 导航本身不得触发清理。
+5. Agent console 有独立的 PTY、主题和 generation 协议，不进入普通终端 registry。
+
+重挂载完成后的 `fit` 可能立即产生 resize。Presentation 必须先保留完整运行身份，并在重新进入工作区时批量向 Run 查询缓存 session 的权威快照；主进程对已退出 session 的 resize 幂等返回该快照，renderer 随即收敛为 `exited`。退出事件先于启动响应时也必须先建立终态投影，避免迟到的启动 Promise 把旧 PTY 重新标成运行中。
+
+xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model 承担；`.xterm-viewport` 不再是可用 `scrollTop` 判断历史是否存在的原生滚动容器。自动化验证优先使用 xterm 支持的 `Shift+PageUp` 用户交互和可见行结果，不得用旧 DOM 元素的 `scrollHeight` 作为 buffer oracle。
+
+[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确身份路由、detach/reattach 与有界清理；[`terminal-session-state-retention.cleans-surfaces.spec.ts`](../../tests/unit/presentation/terminal-session-state-retention.cleans-surfaces.spec.ts) 证明工作区和积木生命周期投影清理；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty 和超过 8192 字符的确定性输出，证明同一 surface 在 worktree 往返后保留、隐藏期间输出可见且早期 scrollback 仍可访问。
+
 ## 画布缩放下的鼠标坐标
 
 xterm 6.0.0 的鼠标坐标换算使用 `getBoundingClientRect()` 取得元素左上角，再直接用未缩放的 cell 宽高换算列和行。React Flow 在祖先元素上应用 `translate(...) scale(zoom)` 后，`clientX - rect.left` 与 `clientY - rect.top` 已经是缩放后的屏幕距离，而 cell 尺寸仍是布局坐标。两套单位混用会让选区、链接命中、自动滚动和开启鼠标协议的 TUI 一起偏移；缩放越偏离 100%，误差越明显。
