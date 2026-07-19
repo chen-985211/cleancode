@@ -23,12 +23,17 @@ describe('app shell', () => {
     expect(screen.queryByText('cleancode')).not.toBeInTheDocument()
     const languageSettingsTrigger = screen.getByRole('button', { name: '语言' })
     const themeSettingsTrigger = screen.getByRole('button', { name: '主题设置' })
+    const applicationSettingsTrigger = screen.getByRole('button', { name: '设置' })
     expect(appSettings).toContainElement(languageSettingsTrigger)
     expect(appSettings).toContainElement(themeSettingsTrigger)
+    expect(appSettings).toContainElement(applicationSettingsTrigger)
     expect(languageSettingsTrigger.parentElement?.nextElementSibling).toBe(themeSettingsTrigger)
+    expect(themeSettingsTrigger.nextElementSibling).toBe(applicationSettingsTrigger)
     expect(languageSettingsTrigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(themeSettingsTrigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(themeSettingsTrigger).toHaveAttribute('aria-expanded', 'false')
+    expect(applicationSettingsTrigger).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(applicationSettingsTrigger).toHaveAttribute('aria-expanded', 'false')
     expect(toolbar.queryByRole('button', { name: '主题设置' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeDisabled()
@@ -129,6 +134,45 @@ describe('app shell', () => {
     expect(toolbar.getByText('组合编辑')).toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '创建组合' })).toBeDisabled()
     expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
+  })
+
+  it('opens the full application settings surface from the default shortcut', () => {
+    render(<AppShell />)
+    const workspace = screen.getByLabelText('积木画布')
+
+    fireEvent.keyDown(document, { key: ',', metaKey: true })
+    fireEvent.keyDown(document, { ctrlKey: true, key: ',' })
+
+    expect(screen.getByRole('dialog', { name: '设置' })).toBeInTheDocument()
+    expect(workspace).toBeInTheDocument()
+    expect(workspace.inert).toBe(true)
+  })
+
+  it('routes the terminal shortcut through the existing workbench action', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const createTerminalBlock = vi.fn()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        createTerminalBlock,
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+    await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.keyDown(document, { key: 't', metaKey: true, shiftKey: true })
+    fireEvent.keyDown(document, { ctrlKey: true, key: 't', shiftKey: true })
+
+    expect(createTerminalBlock).toHaveBeenCalledTimes(1)
+    expect(createTerminalBlock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Terminal 1',
+        projectDirectory: '/tmp/alpha-project',
+        workspaceName: 'main'
+      })
+    )
   })
 
   it('restores the workbench marked as the current project', async () => {

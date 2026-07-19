@@ -43,6 +43,10 @@ import { ignoreAppNotifications, type AppNotificationController } from './appNot
 import { CodexCliStateProvider } from './CodexCliStateProvider'
 import { AgentTerminalEventProvider } from './AgentTerminalEventProvider'
 import { createAgentTerminalEventStore } from './agentTerminalEventState'
+import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
+import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
+import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
+import { useApplicationShortcuts, type ApplicationShortcutActions } from './useApplicationShortcuts'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -56,6 +60,9 @@ export function AppShell({
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
+  const [isApplicationSettingsOpen, setIsApplicationSettingsOpen] = useState(false)
+  const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
+  const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -451,6 +458,40 @@ export function AppShell({
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
+  const applicationShortcutActions = useMemo<ApplicationShortcutActions>(
+    () => ({
+      openSettings: {
+        enabled: !isApplicationSettingsOpen,
+        run: () => setIsApplicationSettingsOpen(true)
+      },
+      createTerminal: {
+        enabled: isDesktopRuntime && Boolean(currentWorkbench),
+        run: createTerminalBlock
+      },
+      createAgent: {
+        enabled: isDesktopRuntime && Boolean(currentWorkbench),
+        run: createWorkspaceAgent
+      },
+      groupTerminals: {
+        enabled: isDesktopRuntime && Boolean(currentWorkbench) && !isTerminalGroupSelectionMode,
+        run: beginTerminalGroupSelection
+      }
+    }),
+    [
+      beginTerminalGroupSelection,
+      createTerminalBlock,
+      createWorkspaceAgent,
+      currentWorkbench,
+      isApplicationSettingsOpen,
+      isDesktopRuntime,
+      isTerminalGroupSelectionMode
+    ]
+  )
+  useApplicationShortcuts({
+    actions: applicationShortcutActions,
+    bindings,
+    platform: shortcutPlatform
+  })
 
   return (
     <CodexCliStateProvider>
@@ -460,6 +501,15 @@ export function AppShell({
             <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
               <LanguageSettingsRoot />
               <ThemeSettingsRoot />
+              <ApplicationSettingsRoot
+                bindings={bindings}
+                isOpen={isApplicationSettingsOpen}
+                platform={shortcutPlatform}
+                onBindingChange={changeBinding}
+                onClose={() => setIsApplicationSettingsOpen(false)}
+                onOpen={() => setIsApplicationSettingsOpen(true)}
+                onResetAll={resetAllBindings}
+              />
             </div>
             <ProjectSidebar
               workbenches={workbenches}
