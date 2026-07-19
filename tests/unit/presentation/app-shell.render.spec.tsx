@@ -162,8 +162,8 @@ describe('app shell', () => {
     render(<AppShell />)
     await screen.findByRole('group', { name: '项目 alpha-project' })
 
-    fireEvent.keyDown(document, { key: 't', metaKey: true, shiftKey: true })
-    fireEvent.keyDown(document, { ctrlKey: true, key: 't', shiftKey: true })
+    fireEvent.keyDown(document, { key: 't', metaKey: true })
+    fireEvent.keyDown(document, { ctrlKey: true, key: 't' })
 
     expect(createTerminalBlock).toHaveBeenCalledTimes(1)
     expect(createTerminalBlock).toHaveBeenCalledWith(

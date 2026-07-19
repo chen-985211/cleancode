@@ -7,27 +7,38 @@ import {
 } from '../../../src/presentation/app-shell/useApplicationShortcuts'
 
 describe('application shortcut dispatch', () => {
-  it('dispatches enabled actions once and cancels the native event', () => {
+  it.each([
+    ['openSettings', ','],
+    ['createTerminal', 't'],
+    ['createAgent', 'a'],
+    ['groupTerminals', 'g']
+  ] as const)('dispatches the %s default shortcut and cancels the native event', (command, key) => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
 
     const event = new KeyboardEvent('keydown', {
       bubbles: true,
       cancelable: true,
-      key: 't',
-      metaKey: true,
-      shiftKey: true
+      key,
+      metaKey: true
     })
     document.dispatchEvent(event)
-    fireEvent.keyDown(document, {
-      key: 'a',
-      metaKey: true,
-      repeat: true,
-      shiftKey: true
-    })
 
     expect(event.defaultPrevented).toBe(true)
-    expect(actions.createTerminal.run).toHaveBeenCalledTimes(1)
+    expect(actions[command].run).toHaveBeenCalledTimes(1)
+    for (const [otherCommand, action] of Object.entries(actions)) {
+      if (otherCommand !== command) {
+        expect(action.run).not.toHaveBeenCalled()
+      }
+    }
+  })
+
+  it('ignores keyboard auto-repeat', () => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(document, { key: 'a', metaKey: true, repeat: true })
+
     expect(actions.createAgent.run).not.toHaveBeenCalled()
   })
 
@@ -35,8 +46,8 @@ describe('application shortcut dispatch', () => {
     const actions = createActions({ groupTerminals: false })
     render(<ShortcutHarness actions={actions} />)
 
-    fireEvent.keyDown(document, { key: 'g', metaKey: true, shiftKey: true })
-    fireEvent.keyDown(document, { altKey: true, key: 't', metaKey: true, shiftKey: true })
+    fireEvent.keyDown(document, { key: 'g', metaKey: true })
+    fireEvent.keyDown(document, { key: 't', metaKey: true, shiftKey: true })
 
     expect(actions.groupTerminals.run).not.toHaveBeenCalled()
     expect(actions.createTerminal.run).not.toHaveBeenCalled()
@@ -52,8 +63,7 @@ describe('application shortcut dispatch', () => {
 
     fireEvent.keyDown(screen.getByLabelText(label), {
       key: 't',
-      metaKey: true,
-      shiftKey: true
+      metaKey: true
     })
 
     expect(actions.createTerminal.run).not.toHaveBeenCalled()
@@ -63,7 +73,7 @@ describe('application shortcut dispatch', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} showDialog />)
 
-    fireEvent.keyDown(document, { key: 't', metaKey: true, shiftKey: true })
+    fireEvent.keyDown(document, { key: 't', metaKey: true })
     fireEvent.keyDown(document, { key: ',', metaKey: true })
 
     expect(actions.createTerminal.run).not.toHaveBeenCalled()

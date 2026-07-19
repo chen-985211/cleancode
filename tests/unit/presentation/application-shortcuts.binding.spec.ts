@@ -8,17 +8,29 @@ import {
 } from '../../../src/presentation/app-shell/applicationShortcuts'
 
 describe('application shortcut bindings', () => {
-  it('provides stable defaults with platform-native labels', () => {
+  it('provides unique defaults with platform-native labels', () => {
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.openSettings, 'mac')).toEqual([
       '⌘',
       ','
     ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'mac')).toEqual(
-      ['⌘', '⇧', 'T']
+      ['⌘', 'T']
+    )
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.createAgent, 'mac')).toEqual([
+      '⌘',
+      'A'
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.groupTerminals, 'mac')).toEqual(
+      ['⌘', 'G']
     )
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'other')
-    ).toEqual(['Ctrl', 'Shift', 'T'])
+    ).toEqual(['Ctrl', 'T'])
+    expect(
+      new Set(
+        Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))
+      ).size
+    ).toBe(4)
   })
 
   it('normalizes primary-modifier combinations and rejects unsafe single keys', () => {
@@ -45,21 +57,28 @@ describe('application shortcut bindings', () => {
 
     expect(
       matchesShortcutEvent(
-        new KeyboardEvent('keydown', { key: 't', metaKey: true, shiftKey: true }),
+        new KeyboardEvent('keydown', { key: 't', metaKey: true }),
         binding,
         'mac'
       )
     ).toBe(true)
     expect(
       matchesShortcutEvent(
-        new KeyboardEvent('keydown', { altKey: true, key: 't', metaKey: true, shiftKey: true }),
+        new KeyboardEvent('keydown', { key: 't', metaKey: true, shiftKey: true }),
         binding,
         'mac'
       )
     ).toBe(false)
     expect(
       matchesShortcutEvent(
-        new KeyboardEvent('keydown', { ctrlKey: true, key: 't', shiftKey: true }),
+        new KeyboardEvent('keydown', { altKey: true, key: 't', metaKey: true }),
+        binding,
+        'mac'
+      )
+    ).toBe(false)
+    expect(
+      matchesShortcutEvent(
+        new KeyboardEvent('keydown', { ctrlKey: true, key: 't' }),
         binding,
         'mac'
       )

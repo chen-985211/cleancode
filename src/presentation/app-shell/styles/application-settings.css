@@ -11,7 +11,10 @@
   transition:
     border-color 150ms ease,
     background 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
   -webkit-app-region: no-drag;
 }
 
@@ -24,8 +27,7 @@
 
 .application-settings-trigger:hover,
 .application-settings-trigger[aria-expanded='true'],
-.application-settings-back:hover,
-.shortcut-row-action:hover:not(:disabled) {
+.application-settings-back:hover {
   border-color: var(--cc-border);
   background: var(--cc-surface-hover);
   color: var(--cc-foreground);
@@ -50,41 +52,53 @@
   position: relative;
   z-index: 1;
   display: flex;
-  min-height: max(76px, calc(var(--cc-window-controls-height) + 34px));
+  min-height: max(64px, calc(var(--cc-window-controls-height) + 34px));
   align-items: center;
-  gap: 16px;
-  border-bottom: 1px solid var(--cc-divider);
-  background: var(--cc-chrome);
-  padding: max(12px, calc(var(--cc-window-controls-height) - 18px)) 28px 12px;
+  gap: 14px;
+  background: var(--cc-canvas);
+  padding: max(12px, calc(var(--cc-window-controls-height) - 18px)) 24px 12px;
   user-select: none;
   -webkit-app-region: drag;
 }
 
 .application-settings-surface--mac .application-settings-header {
-  min-height: max(114px, calc(var(--cc-window-controls-height) + 82px));
-  gap: 24px;
-  padding: max(50px, calc(var(--cc-window-controls-height) + 20px)) 28px 18px 30px;
+  min-height: max(84px, calc(var(--cc-window-controls-height) + 54px));
+  padding: max(34px, calc(var(--cc-window-controls-height) + 6px)) 24px 12px;
 }
 
 .application-settings-back {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
-  border-color: var(--cc-border);
-  border-radius: 12px;
-  background: var(--cc-surface);
+  border-color: transparent;
+  border-radius: 10px;
+  background: var(--cc-surface-translucent);
   box-shadow: var(--cc-shadow-xs);
 }
 
+.application-settings-back:hover {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-raised);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.application-settings-back:active {
+  box-shadow: var(--cc-shadow-xs);
+  transform: translateY(0);
+}
+
 .application-settings-back svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .application-settings-header h1 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 680;
   letter-spacing: -0.01em;
 }
 
@@ -92,18 +106,18 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: clamp(200px, 16vw, 220px) minmax(0, 1fr);
 }
 
 .application-settings-navigation {
   min-width: 0;
   overflow: auto;
-  border-right: 1px solid var(--cc-divider);
-  background: var(--cc-chrome);
-  padding: 20px 14px;
+  background: var(--cc-canvas);
+  padding: 16px 12px;
 }
 
 .application-settings-navigation button {
+  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -119,6 +133,11 @@
   font-size: 13px;
   font-weight: 580;
   text-align: left;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .application-settings-navigation button:hover {
@@ -127,20 +146,32 @@
 }
 
 .application-settings-navigation button[aria-current='page'] {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
+  border-color: transparent;
+  background: var(--cc-primary-wash);
   color: var(--cc-primary);
+}
+
+.application-settings-navigation button[aria-current='page']::before {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--cc-primary);
+  content: '';
 }
 
 .application-settings-content {
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  padding: clamp(38px, 5vh, 52px) clamp(32px, 4vw, 56px) 64px;
+  background: var(--cc-canvas);
+  padding: clamp(32px, 4vh, 44px) clamp(32px, 4vw, 52px) 56px;
 }
 
 .shortcut-settings-pane {
-  width: min(100%, 1024px);
+  width: min(100%, 980px);
 }
 
 .shortcut-settings-pane__header {
@@ -158,7 +189,7 @@
 }
 
 .shortcut-settings-pane__header h2 {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.2;
@@ -181,28 +212,50 @@
   border: 1px solid var(--cc-border);
   border-radius: 8px;
   background: var(--cc-surface);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-xs);
   padding: 0 11px;
   color: var(--cc-muted-strong);
   font: inherit;
   font-size: 12px;
   font-weight: 620;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .shortcut-settings-reset-all:hover {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-sm);
+  transform: translateY(-1px);
+}
+
+.shortcut-settings-reset-all:active {
+  box-shadow: var(--cc-shadow-xs);
+  transform: translateY(0);
 }
 
 .shortcut-settings-list {
+  isolation: isolate;
   overflow: hidden;
   border: 1px solid var(--cc-border);
   border-radius: 12px;
   background: var(--cc-surface);
-  box-shadow: var(--cc-shadow-xs);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-sm);
 }
 
 .shortcut-settings-row {
+  position: relative;
   display: grid;
   min-height: 70px;
   grid-template-columns: minmax(180px, 1fr) auto;
@@ -213,10 +266,16 @@
   column-gap: 24px;
   border-bottom: 1px solid var(--cc-divider);
   padding: 14px 18px;
+  transition: background 150ms ease;
 }
 
 .shortcut-settings-row:last-child {
   border-bottom: 0;
+}
+
+.shortcut-settings-row:hover,
+.shortcut-settings-row:focus-within {
+  background: var(--cc-primary-wash);
 }
 
 .shortcut-settings-row__label {
@@ -231,34 +290,46 @@
   min-width: 0;
   grid-area: controls;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .shortcut-recorder {
   display: inline-flex;
-  min-width: 134px;
+  min-width: 118px;
   min-height: 36px;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid var(--cc-border);
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--cc-surface-subtle);
+  background: transparent;
   padding: 4px 7px;
   color: var(--cc-foreground);
   font: inherit;
-  box-shadow: var(--cc-shadow-xs);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
-.shortcut-recorder:hover,
-.shortcut-recorder[aria-pressed='true'] {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
+.shortcut-recorder:hover {
+  border-color: var(--cc-border);
+  background: var(--cc-surface-subtle);
+  box-shadow: var(--cc-shadow-xs);
 }
 
 .shortcut-recorder[aria-pressed='true'] {
   justify-content: center;
-  box-shadow: 0 0 0 3px var(--cc-primary-ring);
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-soft);
+  box-shadow:
+    0 0 0 3px var(--cc-primary-ring),
+    var(--cc-shadow-xs);
+}
+
+.shortcut-recorder:active:not([aria-pressed='true']) {
+  transform: translateY(1px);
 }
 
 .shortcut-recorder kbd {
@@ -268,15 +339,18 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 5px;
-  background: var(--cc-surface-subtle);
+  border-radius: 6px;
+  background: var(--cc-surface-raised);
   padding: 0 6px;
   color: var(--cc-muted-strong);
   font-family: inherit;
   font-size: 11px;
   font-weight: 680;
   line-height: 1;
-  box-shadow: 0 1px 0 var(--cc-border-strong);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    0 1px 0 var(--cc-border-strong),
+    var(--cc-shadow-xs);
 }
 
 .shortcut-recorder__prompt,
@@ -295,10 +369,44 @@
   height: 32px;
   flex: 0 0 auto;
   border-radius: 8px;
+  opacity: 0.48;
 }
 
 .shortcut-recorder + .shortcut-row-action {
   margin-left: 4px;
+}
+
+.shortcut-settings-row:hover .shortcut-row-action:not(:disabled),
+.shortcut-settings-row:focus-within .shortcut-row-action:not(:disabled),
+.shortcut-row-action:focus-visible {
+  opacity: 1;
+}
+
+.shortcut-row-action:hover:not(:disabled) {
+  border-color: var(--cc-border);
+  background: var(--cc-surface-raised);
+  color: var(--cc-foreground);
+  box-shadow: var(--cc-shadow-xs);
+}
+
+.shortcut-recorder + .shortcut-row-action:hover:not(:disabled) {
+  border-color: var(--cc-danger-border);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+}
+
+.shortcut-row-action:last-child:hover:not(:disabled) {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+}
+
+.shortcut-row-action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.shortcut-row-action:disabled {
+  opacity: 0.22;
 }
 
 .shortcut-settings-row__error,
@@ -343,7 +451,6 @@
   .application-settings-navigation {
     overflow: auto hidden;
     border-right: 0;
-    border-bottom: 1px solid var(--cc-divider);
     padding: 8px 12px;
   }
 
@@ -387,5 +494,12 @@
 @media (prefers-reduced-motion: reduce) {
   .application-settings-surface {
     animation: none;
+  }
+
+  .application-settings-back,
+  .shortcut-settings-reset-all,
+  .shortcut-recorder,
+  .shortcut-row-action {
+    transition: none;
   }
 }

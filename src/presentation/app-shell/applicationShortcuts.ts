@@ -22,9 +22,9 @@ export type ApplicationShortcutBindings = Readonly<
 
 export const defaultApplicationShortcutBindings = {
   openSettings: { alt: false, key: ',', primary: true, shift: false },
-  createTerminal: { alt: false, key: 'T', primary: true, shift: true },
-  createAgent: { alt: false, key: 'A', primary: true, shift: true },
-  groupTerminals: { alt: false, key: 'G', primary: true, shift: true }
+  createTerminal: { alt: false, key: 'T', primary: true, shift: false },
+  createAgent: { alt: false, key: 'A', primary: true, shift: false },
+  groupTerminals: { alt: false, key: 'G', primary: true, shift: false }
 } as const satisfies ApplicationShortcutBindings
 
 const unsupportedBindingKeys = new Set([
