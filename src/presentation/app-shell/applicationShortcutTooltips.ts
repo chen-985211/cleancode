@@ -14,7 +14,10 @@ export const applicationShortcutCommandMessageKeys: Readonly<
   toggleSidebar: 'settings.shortcuts.command.toggleSidebar',
   createTerminal: 'settings.shortcuts.command.createTerminal',
   createAgent: 'settings.shortcuts.command.createAgent',
-  groupTerminals: 'settings.shortcuts.command.groupTerminals'
+  groupTerminals: 'settings.shortcuts.command.groupTerminals',
+  zoomCanvasIn: 'settings.shortcuts.command.zoomCanvasIn',
+  zoomCanvasOut: 'settings.shortcuts.command.zoomCanvasOut',
+  fitCanvas: 'settings.shortcuts.command.fitCanvas'
 }
 
 export type ApplicationShortcutTooltipLabels = Readonly<Record<ApplicationShortcutCommand, string>>

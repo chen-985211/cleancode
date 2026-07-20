@@ -43,7 +43,10 @@ describe('workbench canvas Agent approval edges', () => {
           toggleSidebar: '切换侧边栏 (⌘B)',
           createTerminal: '新建终端积木 (⌘T)',
           createAgent: '新建 Agent (⌘⇧A)',
-          groupTerminals: '组合终端 (⌘G)'
+          groupTerminals: '组合终端 (⌘G)',
+          zoomCanvasIn: '放大画布 (⌘=)',
+          zoomCanvasOut: '缩小画布 (⌘-)',
+          fitCanvas: '适应画布 (⌘0)'
         }}
         approvalIntents={[approval]}
         canBeginTerminalGroupSelection={false}
@@ -64,6 +67,9 @@ describe('workbench canvas Agent approval edges', () => {
         onCreateTerminalBlock={vi.fn()}
         onCreateTerminalGroup={vi.fn()}
         onCreateWorkspaceAgent={vi.fn()}
+        onZoomCanvasIn={vi.fn()}
+        onZoomCanvasOut={vi.fn()}
+        onFitCanvas={vi.fn()}
         onMinimapNodeClick={vi.fn()}
         onNodeClick={vi.fn()}
         onNodeDrag={vi.fn()}

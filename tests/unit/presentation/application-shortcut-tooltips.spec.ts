@@ -23,7 +23,10 @@ describe('application shortcut tooltips', () => {
       toggleSidebar: '切换侧边栏 (⌘B)',
       createTerminal: '新建终端积木 (⌘T)',
       createAgent: '新建 Agent (⌘⇧A)',
-      groupTerminals: '组合终端 (⌘G)'
+      groupTerminals: '组合终端 (⌘G)',
+      zoomCanvasIn: '放大画布 (⌘=)',
+      zoomCanvasOut: '缩小画布 (⌘-)',
+      fitCanvas: '适应画布 (⌘0)'
     })
     expect(otherLabels.createAgent).toBe('New Agent (Ctrl+Shift+A)')
     expect(otherLabels.createTerminal).toBe('New terminal block (Ctrl+T)')

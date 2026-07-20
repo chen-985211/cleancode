@@ -43,6 +43,9 @@ interface WorkbenchCanvasProps {
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly shortcutTooltips: ApplicationShortcutTooltipLabels
+  readonly onZoomCanvasIn: () => void
+  readonly onZoomCanvasOut: () => void
+  readonly onFitCanvas: () => void
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
   readonly onBeginTerminalGroupSelection: () => void
@@ -83,6 +86,9 @@ export function WorkbenchCanvas({
   minimapNodeInteraction,
   terminalWorkflow,
   shortcutTooltips,
+  onZoomCanvasIn,
+  onZoomCanvasOut,
+  onFitCanvas,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
   onBeginTerminalGroupSelection,
@@ -303,13 +309,12 @@ export function WorkbenchCanvas({
               canvasViewport={canvasViewport}
               canvasSize={canvasSize}
               viewportZoom={viewportZoom}
+              shortcutTooltips={shortcutTooltips}
               minimapNodeInteraction={minimapNodeInteraction}
               onToggleCollapsed={() => setIsMinimapCollapsed((collapsed) => !collapsed)}
-              onZoomOut={() => void reactFlowInstanceRef.current?.zoomOut({ duration: 160 })}
-              onZoomIn={() => void reactFlowInstanceRef.current?.zoomIn({ duration: 160 })}
-              onFitCanvas={() =>
-                void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
-              }
+              onZoomOut={onZoomCanvasOut}
+              onZoomIn={onZoomCanvasIn}
+              onFitCanvas={onFitCanvas}
               onMinimapNodeClick={onMinimapNodeClick}
               onViewportCenterPreview={(center) => moveCanvasViewportToMinimapCenter(center, false)}
               onViewportCenterCommit={(center) => moveCanvasViewportToMinimapCenter(center, true)}

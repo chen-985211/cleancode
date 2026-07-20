@@ -17,11 +17,19 @@ const legacyApplicationShortcutCommands = [
   'groupTerminals'
 ] as const
 
+const v2ApplicationShortcutCommands = [
+  'openSettings',
+  'toggleSidebar',
+  'createTerminal',
+  'createAgent',
+  'groupTerminals'
+] as const
+
 type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding | null>>
 
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 2
+  readonly version: 3
 }
 
 function hasCompleteBindingCatalog(
@@ -73,6 +81,33 @@ function defaultBindings(): ApplicationShortcutBindings {
   return cloneBindings(defaultApplicationShortcutBindings)
 }
 
+function extendLegacyBindings(
+  bindings: ShortcutBindingCatalog,
+  preservedCommands: readonly string[]
+): ApplicationShortcutBindings {
+  const migrated: Record<string, ApplicationShortcutBinding | null> = {}
+
+  for (const command of preservedCommands) {
+    migrated[command] = bindings[command] ?? null
+  }
+
+  for (const command of applicationShortcutCommands) {
+    if (Object.hasOwn(migrated, command)) {
+      continue
+    }
+
+    const defaultBinding = defaultApplicationShortcutBindings[command]
+    const conflictsWithPreservedBinding =
+      defaultBinding !== null &&
+      Object.values(migrated).some(
+        (binding) => binding !== null && applicationShortcutBindingsEqual(binding, defaultBinding)
+      )
+    migrated[command] = conflictsWithPreservedBinding ? null : defaultBinding
+  }
+
+  return cloneBindings(migrated)
+}
+
 export function readApplicationShortcutBindings(
   storage: Pick<Storage, 'getItem'> = window.localStorage
 ): ApplicationShortcutBindings {
@@ -87,7 +122,7 @@ export function readApplicationShortcutBindings(
       readonly version?: unknown
     }
     if (
-      preference.version === 2 &&
+      preference.version === 3 &&
       hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
     ) {
@@ -95,11 +130,19 @@ export function readApplicationShortcutBindings(
     }
 
     if (
+      preference.version === 2 &&
+      hasCompleteBindingCatalog(preference.bindings, v2ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v2ApplicationShortcutCommands)
+    ) {
+      return extendLegacyBindings(preference.bindings, v2ApplicationShortcutCommands)
+    }
+
+    if (
       preference.version === 1 &&
       hasCompleteBindingCatalog(preference.bindings, legacyApplicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, legacyApplicationShortcutCommands)
     ) {
-      const migratedBindings: ApplicationShortcutBindings = {
+      const migratedBindings = {
         openSettings: preference.bindings.openSettings,
         toggleSidebar: defaultApplicationShortcutBindings.toggleSidebar,
         createTerminal: preference.bindings.createTerminal,
@@ -107,8 +150,8 @@ export function readApplicationShortcutBindings(
         groupTerminals: preference.bindings.groupTerminals
       }
 
-      if (!hasShortcutConflict(migratedBindings, applicationShortcutCommands)) {
-        return cloneBindings(migratedBindings)
+      if (!hasShortcutConflict(migratedBindings, v2ApplicationShortcutCommands)) {
+        return extendLegacyBindings(migratedBindings, v2ApplicationShortcutCommands)
       }
     }
 
@@ -124,7 +167,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 2
+    version: 3
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

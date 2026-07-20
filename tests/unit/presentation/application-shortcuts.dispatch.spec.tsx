@@ -12,7 +12,10 @@ describe('application shortcut dispatch', () => {
     ['toggleSidebar', 'b', false],
     ['createTerminal', 't', false],
     ['createAgent', 'a', true],
-    ['groupTerminals', 'g', false]
+    ['groupTerminals', 'g', false],
+    ['zoomCanvasIn', '=', false],
+    ['zoomCanvasOut', '-', false],
+    ['fitCanvas', '0', false]
   ] as const)(
     'dispatches the %s default shortcut and cancels the native event',
     (command, key, shiftKey) => {
@@ -128,6 +131,9 @@ function createActions(
     toggleSidebar: { enabled: enabled.toggleSidebar ?? true, run: vi.fn() },
     createTerminal: { enabled: enabled.createTerminal ?? true, run: vi.fn() },
     createAgent: { enabled: enabled.createAgent ?? true, run: vi.fn() },
-    groupTerminals: { enabled: enabled.groupTerminals ?? true, run: vi.fn() }
+    groupTerminals: { enabled: enabled.groupTerminals ?? true, run: vi.fn() },
+    zoomCanvasIn: { enabled: enabled.zoomCanvasIn ?? true, run: vi.fn() },
+    zoomCanvasOut: { enabled: enabled.zoomCanvasOut ?? true, run: vi.fn() },
+    fitCanvas: { enabled: enabled.fitCanvas ?? true, run: vi.fn() }
   }
 }

@@ -11,7 +11,9 @@ import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/type
 
 const reactFlowSpies = vi.hoisted(() => ({
   fitView: vi.fn(async () => undefined),
-  setCenter: vi.fn(async () => undefined)
+  setCenter: vi.fn(async () => undefined),
+  zoomIn: vi.fn(async () => undefined),
+  zoomOut: vi.fn(async () => undefined)
 }))
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -47,6 +49,9 @@ describe('app shell create terminal focus', () => {
   beforeEach(() => {
     reactFlowSpies.fitView.mockClear()
     reactFlowSpies.setCenter.mockClear()
+    reactFlowSpies.zoomIn.mockClear()
+    reactFlowSpies.zoomOut.mockClear()
+    window.localStorage.clear()
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: undefined
@@ -118,6 +123,38 @@ describe('app shell create terminal focus', () => {
       })
     )
   })
+
+  it('dispatches canvas shortcuts to the current React Flow instance', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+
+    await screen.findByTestId('mock-react-flow')
+    await waitFor(() => expect(screen.getByRole('button', { name: '新建终端积木' })).toBeEnabled())
+
+    reactFlowSpies.fitView.mockClear()
+    const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+      ? { metaKey: true }
+      : { ctrlKey: true }
+
+    fireEvent.keyDown(document, { key: '=', ...primaryModifier })
+    fireEvent.keyDown(document, { key: '-', ...primaryModifier })
+    fireEvent.keyDown(document, { key: '0', ...primaryModifier })
+
+    expect(reactFlowSpies.zoomIn).toHaveBeenCalledWith({ duration: 160 })
+    expect(reactFlowSpies.zoomOut).toHaveBeenCalledWith({ duration: 160 })
+    expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
+      padding: 0.22,
+      duration: 180
+    })
+  })
 })
 
 interface MockReactFlowProps {
@@ -131,8 +168,8 @@ interface MockReactFlowInstance {
   readonly getZoom: () => number
   readonly setCenter: typeof reactFlowSpies.setCenter
   readonly setViewport: () => Promise<void>
-  readonly zoomOut: () => Promise<void>
-  readonly zoomIn: () => Promise<void>
+  readonly zoomOut: typeof reactFlowSpies.zoomOut
+  readonly zoomIn: typeof reactFlowSpies.zoomIn
   readonly fitView: typeof reactFlowSpies.fitView
 }
 
@@ -143,8 +180,8 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     getZoom: () => 1,
     setCenter: reactFlowSpies.setCenter,
     setViewport: async () => undefined,
-    zoomOut: async () => undefined,
-    zoomIn: async () => undefined,
+    zoomOut: reactFlowSpies.zoomOut,
+    zoomIn: reactFlowSpies.zoomIn,
     fitView: reactFlowSpies.fitView
   }
 }

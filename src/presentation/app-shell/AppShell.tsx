@@ -73,6 +73,15 @@ export function AppShell({
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
+  const zoomCanvasIn = useCallback((): void => {
+    void reactFlowInstanceRef.current?.zoomIn({ duration: 160 })
+  }, [])
+  const zoomCanvasOut = useCallback((): void => {
+    void reactFlowInstanceRef.current?.zoomOut({ duration: 160 })
+  }, [])
+  const fitCanvas = useCallback((): void => {
+    void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
+  }, [])
   const projectSidebarToggleRef = useRef<HTMLButtonElement | null>(null)
   const toggleProjectSidebar = useCallback((): void => {
     if (!isProjectSidebarCollapsed && document.activeElement?.closest('#project-sidebar')) {
@@ -501,6 +510,18 @@ export function AppShell({
       groupTerminals: {
         enabled: isDesktopRuntime && Boolean(currentWorkbench) && !isTerminalGroupSelectionMode,
         run: beginTerminalGroupSelection
+      },
+      zoomCanvasIn: {
+        enabled: Boolean(currentWorkbench),
+        run: zoomCanvasIn
+      },
+      zoomCanvasOut: {
+        enabled: Boolean(currentWorkbench),
+        run: zoomCanvasOut
+      },
+      fitCanvas: {
+        enabled: Boolean(currentWorkbench),
+        run: fitCanvas
       }
     }),
     [
@@ -508,10 +529,13 @@ export function AppShell({
       createTerminalBlock,
       createWorkspaceAgent,
       currentWorkbench,
+      fitCanvas,
       isApplicationSettingsOpen,
       isDesktopRuntime,
       isTerminalGroupSelectionMode,
-      toggleProjectSidebar
+      toggleProjectSidebar,
+      zoomCanvasIn,
+      zoomCanvasOut
     ]
   )
   useApplicationShortcuts({
@@ -603,6 +627,9 @@ export function AppShell({
               minimapNodeInteraction={minimapNodeInteraction}
               terminalWorkflow={terminalWorkflow}
               shortcutTooltips={shortcutTooltips}
+              onZoomCanvasIn={zoomCanvasIn}
+              onZoomCanvasOut={zoomCanvasOut}
+              onFitCanvas={fitCanvas}
               onCreateTerminalBlock={createTerminalBlock}
               onCreateWorkspaceAgent={createWorkspaceAgent}
               onBeginTerminalGroupSelection={beginTerminalGroupSelection}

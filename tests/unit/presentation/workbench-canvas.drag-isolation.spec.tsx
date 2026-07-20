@@ -140,7 +140,10 @@ function renderCanvas(
         toggleSidebar: '切换侧边栏 (⌘B)',
         createTerminal: '新建终端积木 (⌘T)',
         createAgent: '新建 Agent (⌘⇧A)',
-        groupTerminals: '组合终端 (⌘G)'
+        groupTerminals: '组合终端 (⌘G)',
+        zoomCanvasIn: '放大画布 (⌘=)',
+        zoomCanvasOut: '缩小画布 (⌘-)',
+        fitCanvas: '适应画布 (⌘0)'
       }}
       isDesktopRuntime={true}
       currentWorkbench={null}
@@ -152,6 +155,9 @@ function renderCanvas(
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
       onCreateTerminalBlock={vi.fn()}
       onCreateWorkspaceAgent={vi.fn()}
+      onZoomCanvasIn={vi.fn()}
+      onZoomCanvasOut={vi.fn()}
+      onFitCanvas={vi.fn()}
       onBeginTerminalGroupSelection={vi.fn()}
       onCreateTerminalGroup={vi.fn()}
       onCancelTerminalGroupSelection={vi.fn()}

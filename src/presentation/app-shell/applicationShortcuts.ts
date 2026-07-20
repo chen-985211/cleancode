@@ -3,7 +3,10 @@ export const applicationShortcutCommands = [
   'toggleSidebar',
   'createTerminal',
   'createAgent',
-  'groupTerminals'
+  'groupTerminals',
+  'zoomCanvasIn',
+  'zoomCanvasOut',
+  'fitCanvas'
 ] as const
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
@@ -26,7 +29,10 @@ export const defaultApplicationShortcutBindings = {
   toggleSidebar: { alt: false, key: 'B', primary: true, shift: false },
   createTerminal: { alt: false, key: 'T', primary: true, shift: false },
   createAgent: { alt: false, key: 'A', primary: true, shift: true },
-  groupTerminals: { alt: false, key: 'G', primary: true, shift: false }
+  groupTerminals: { alt: false, key: 'G', primary: true, shift: false },
+  zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
+  zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
+  fitCanvas: { alt: false, key: '0', primary: true, shift: false }
 } as const satisfies ApplicationShortcutBindings
 
 const unsupportedBindingKeys = new Set([

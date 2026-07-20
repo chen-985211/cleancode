@@ -28,6 +28,18 @@ describe('application shortcut bindings', () => {
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.groupTerminals, 'mac')).toEqual(
       ['⌘', 'G']
     )
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.zoomCanvasIn, 'mac')).toEqual([
+      '⌘',
+      '='
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.zoomCanvasOut, 'mac')).toEqual([
+      '⌘',
+      '-'
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.fitCanvas, 'mac')).toEqual([
+      '⌘',
+      '0'
+    ])
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'other')
     ).toEqual(['Ctrl', 'T'])
@@ -43,7 +55,7 @@ describe('application shortcut bindings', () => {
       new Set(
         Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))
       ).size
-    ).toBe(5)
+    ).toBe(8)
   })
 
   it('normalizes primary-modifier combinations and rejects unsafe single keys', () => {

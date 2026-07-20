@@ -30,6 +30,7 @@ describe('canvas minimap', () => {
         canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
         viewportZoom={1.51}
+        shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={minimapNodeInteraction}
         onToggleCollapsed={onToggleCollapsed}
         onZoomOut={onZoomOut}
@@ -196,6 +197,16 @@ describe('canvas minimap', () => {
     expect(screen.queryByLabelText('画布缩放比例')).not.toBeInTheDocument()
   })
 
+  it('shows the configured canvas shortcuts in control tooltips', async () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} />)
+
+    fireEvent.pointerMove(screen.getByRole('button', { name: '小地图放大' }), {
+      pointerType: 'mouse'
+    })
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('放大画布 (⌘=)')
+  })
+
   it('keeps collapsed terminal groups visible as minimap nodes', () => {
     const onMinimapNodeClick = vi.fn()
     const minimapNodeInteraction = createMinimapNodeInteraction()
@@ -207,6 +218,7 @@ describe('canvas minimap', () => {
         canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
         viewportZoom={1}
+        shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={minimapNodeInteraction}
         onToggleCollapsed={vi.fn()}
         onZoomOut={vi.fn()}
@@ -246,6 +258,7 @@ describe('canvas minimap', () => {
         canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
         viewportZoom={1}
+        shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={createMinimapNodeInteraction()}
         onToggleCollapsed={vi.fn()}
         onZoomOut={vi.fn()}
@@ -278,6 +291,7 @@ describe('canvas minimap', () => {
         canvasViewport={{ x: -120, y: 48, zoom: 1.25 }}
         canvasSize={{ width: 960, height: 640 }}
         viewportZoom={1.25}
+        shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={createMinimapNodeInteraction()}
         onToggleCollapsed={vi.fn()}
         onZoomOut={vi.fn()}
@@ -314,6 +328,7 @@ function createCanvasMinimapProps() {
     canvasViewport: { x: 0, y: 0, zoom: 1 },
     canvasSize: { width: 960, height: 640 },
     viewportZoom: 1,
+    shortcutTooltips: canvasShortcutTooltips,
     minimapNodeInteraction: createMinimapNodeInteraction(),
     onToggleCollapsed: vi.fn(),
     onZoomOut: vi.fn(),
@@ -327,6 +342,12 @@ function createCanvasMinimapProps() {
     getMiniMapNodeClassName: () => 'canvas-minimap__node'
   } satisfies Parameters<typeof CanvasMinimap>[0]
 }
+
+const canvasShortcutTooltips = {
+  fitCanvas: '适应画布 (⌘0)',
+  zoomCanvasIn: '放大画布 (⌘=)',
+  zoomCanvasOut: '缩小画布 (⌘-)'
+} as const
 
 function createMinimapNodeInteraction(): MinimapNodeInteractionContextValue {
   return {

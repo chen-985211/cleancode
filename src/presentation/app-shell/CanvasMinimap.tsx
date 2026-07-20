@@ -9,6 +9,7 @@ import {
 } from './minimapInteraction'
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
 import type { MinimapFlowNode } from './types'
+import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 
@@ -28,6 +29,10 @@ interface CanvasMinimapProps {
   readonly canvasViewport: CanvasViewportSnapshot
   readonly canvasSize: CanvasSize
   readonly viewportZoom: number
+  readonly shortcutTooltips: Pick<
+    ApplicationShortcutTooltipLabels,
+    'fitCanvas' | 'zoomCanvasIn' | 'zoomCanvasOut'
+  >
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly onToggleCollapsed: () => void
   readonly onZoomOut: () => void
@@ -69,6 +74,7 @@ export function CanvasMinimap({
   canvasViewport,
   canvasSize,
   viewportZoom,
+  shortcutTooltips,
   minimapNodeInteraction,
   onToggleCollapsed,
   onZoomOut,
@@ -220,7 +226,7 @@ export function CanvasMinimap({
             <div className="canvas-minimap__control-group canvas-minimap__control-group--zoom">
               <MinimapControlButton
                 label={t('minimap.zoomInLabel')}
-                tooltip={t('minimap.zoomInTitle')}
+                tooltip={shortcutTooltips.zoomCanvasIn}
                 onClick={onZoomIn}
               >
                 <Plus size={14} aria-hidden="true" />
@@ -228,7 +234,7 @@ export function CanvasMinimap({
               <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
               <MinimapControlButton
                 label={t('minimap.zoomOutLabel')}
-                tooltip={t('minimap.zoomOutTitle')}
+                tooltip={shortcutTooltips.zoomCanvasOut}
                 onClick={onZoomOut}
               >
                 <Minus size={14} aria-hidden="true" />
@@ -237,7 +243,7 @@ export function CanvasMinimap({
             <div className="canvas-minimap__control-group canvas-minimap__control-group--bottom">
               <MinimapControlButton
                 label={t('minimap.fitLabel')}
-                tooltip={t('minimap.fitTitle')}
+                tooltip={shortcutTooltips.fitCanvas}
                 onClick={onFitCanvas}
               >
                 <Scan size={14} aria-hidden="true" />
