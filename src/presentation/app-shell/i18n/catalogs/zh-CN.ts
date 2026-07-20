@@ -90,6 +90,7 @@ export const zhCNMessages = {
   'sidebar.openWorkspaceMenu': '打开 {workspaceName} 工作区菜单',
   'sidebar.more': '更多',
   'sidebar.archiveWorkspace': '归档工作区',
+  'sidebar.reorderFailed': '项目排序失败，请重试。',
   'canvas.label': '积木画布',
   'canvas.emptyDesktop': '选择或添加项目后进入 main 工作区',
   'canvas.emptyPreview': '当前是浏览器预览模式，真实项目和终端功能请在 Electron 桌面应用中使用',

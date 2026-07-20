@@ -17,12 +17,14 @@ import { ProjectSidebarProjectRemovalPopover } from './ProjectSidebarProjectRemo
 import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 import { useI18n } from './i18n/useI18n'
+import { useProjectSidebarReorder } from './useProjectSidebarReorder'
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isCollapsed?: boolean
   readonly isDesktopRuntime: boolean
+  readonly isReorderPending?: boolean
   readonly actionError: string | null
   readonly onAddProject: () => void
   readonly onArchiveBranchWorkspace: (
@@ -34,6 +36,10 @@ interface ProjectSidebarProps {
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onDismissActionError: () => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
+  readonly onReorderProject: (
+    workbench: WorkbenchSnapshot,
+    beforeProjectDirectory: string | null
+  ) => void
   readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
 }
 
@@ -42,6 +48,7 @@ export function ProjectSidebar({
   currentWorkbench,
   isCollapsed = false,
   isDesktopRuntime,
+  isReorderPending = false,
   actionError,
   onAddProject,
   onArchiveBranchWorkspace,
@@ -49,9 +56,18 @@ export function ProjectSidebar({
   onCreateBranchWorkspace,
   onDismissActionError,
   onRemoveProject,
+  onReorderProject,
   onSelectWorkspace
 }: ProjectSidebarProps) {
   const { t } = useI18n()
+  const projectListRef = useRef<HTMLDivElement>(null)
+  const canReorderProjects = isDesktopRuntime && !isReorderPending && workbenches.length > 1
+  const projectReorder = useProjectSidebarReorder({
+    canReorder: canReorderProjects,
+    getProjectList: () => projectListRef.current,
+    onReorderProject,
+    workbenches
+  })
   return (
     <aside
       id="project-sidebar"
@@ -91,7 +107,23 @@ export function ProjectSidebar({
         </div>
       ) : null}
       <div className="project-sidebar__label">{t('sidebar.projects')}</div>
-      <div className="project-list">
+      <div
+        className={
+          projectReorder.draggingProjectId ? 'project-list project-list--dragging' : 'project-list'
+        }
+        ref={projectListRef}
+      >
+        {projectReorder.dropIndicatorY !== null ? (
+          <div
+            className="project-list__drop-indicator"
+            role="presentation"
+            style={{ top: projectReorder.dropIndicatorY }}
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : null}
         {workbenches.map((workbench) => (
           <ProjectCard
             key={workbench.project.id}
@@ -101,6 +133,9 @@ export function ProjectSidebar({
             onCheckoutMainBranch={onCheckoutMainBranch}
             onCreateBranchWorkspace={onCreateBranchWorkspace}
             onRemoveProject={onRemoveProject}
+            isDragging={projectReorder.draggingProjectId === workbench.project.id}
+            canReorder={canReorderProjects}
+            onProjectPointerDown={projectReorder.onProjectPointerDown}
             onSelectWorkspace={onSelectWorkspace}
           />
         ))}
@@ -120,6 +155,12 @@ interface ProjectCardProps {
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
+  readonly isDragging: boolean
+  readonly canReorder: boolean
+  readonly onProjectPointerDown: (
+    event: React.PointerEvent<HTMLElement>,
+    workbench: WorkbenchSnapshot
+  ) => void
   readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
 }
 
@@ -130,6 +171,9 @@ function ProjectCard({
   onCheckoutMainBranch,
   onCreateBranchWorkspace,
   onRemoveProject,
+  isDragging,
+  canReorder,
+  onProjectPointerDown,
   onSelectWorkspace
 }: ProjectCardProps) {
   const { t } = useI18n()
@@ -234,13 +278,18 @@ function ProjectCard({
 
   return (
     <section
-      className="project-card"
+      className={isDragging ? 'project-card project-card--dragging' : 'project-card'}
+      data-project-card-id={workbench.project.id}
       role="group"
       aria-label={t('sidebar.projectGroup', { projectName: workbench.project.name })}
     >
       <div className="project-card__header">
         <button
-          className="project-card__select"
+          className={
+            canReorder
+              ? 'project-card__select project-card__select--draggable'
+              : 'project-card__select'
+          }
           type="button"
           aria-controls={workspaceListId}
           aria-expanded={isExpanded}
@@ -249,6 +298,7 @@ function ProjectCard({
             projectName: workbench.project.name
           })}
           onClick={toggleProjectExpanded}
+          onPointerDown={(event) => onProjectPointerDown(event, workbench)}
         >
           <span className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'} />
           <span className="project-card__name truncate">{workbench.project.name}</span>
@@ -274,207 +324,221 @@ function ProjectCard({
           <Trash2 size={14} aria-hidden="true" />
         </button>
       </div>
-      {isExpanded ? (
-        <div id={workspaceListId} className="workspace-list">
-          {workbench.project.workspaces.map((workspace) => {
-            const isActiveWorkspace = workspace.isCurrent && isCurrentProject
-            const boundBranchName = workspace.gitBranch ?? workspace.name
-            const isDefaultWorkspace = workspace.name === 'main'
-            const isGitUninitialized =
-              isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
-            const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
-            const workspaceDisplayName = isGitUninitialized
-              ? t('sidebar.gitUninitialized')
-              : workspace.name
-            const shouldShowDefaultWorkspaceBadge =
-              isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
-            const shouldShowGitBranchBadge =
-              Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.name
-            const workspaceButtonLabel = [
-              workspaceDisplayName,
-              shouldShowDefaultWorkspaceBadge ? t('sidebar.defaultWorkspace') : null,
-              isWorktreeWorkspace ? t('sidebar.separateWorkspace') : null,
-              shouldShowGitBranchBadge ? workspace.gitBranch : null
-            ]
-              .filter(Boolean)
-              .join(' ')
+      <div
+        className={
+          isExpanded
+            ? 'project-card__disclosure'
+            : 'project-card__disclosure project-card__disclosure--collapsed'
+        }
+        aria-hidden={!isExpanded}
+        inert={!isExpanded ? true : undefined}
+      >
+        <div className="project-card__disclosure-content">
+          <div id={workspaceListId} className="workspace-list">
+            {workbench.project.workspaces.map((workspace) => {
+              const isActiveWorkspace = workspace.isCurrent && isCurrentProject
+              const boundBranchName = workspace.gitBranch ?? workspace.name
+              const isDefaultWorkspace = workspace.name === 'main'
+              const isGitUninitialized =
+                isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
+              const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
+              const workspaceDisplayName = isGitUninitialized
+                ? t('sidebar.gitUninitialized')
+                : workspace.name
+              const shouldShowDefaultWorkspaceBadge =
+                isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
+              const shouldShowGitBranchBadge =
+                Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.name
+              const workspaceButtonLabel = [
+                workspaceDisplayName,
+                shouldShowDefaultWorkspaceBadge ? t('sidebar.defaultWorkspace') : null,
+                isWorktreeWorkspace ? t('sidebar.separateWorkspace') : null,
+                shouldShowGitBranchBadge ? workspace.gitBranch : null
+              ]
+                .filter(Boolean)
+                .join(' ')
 
-            return (
-              <div
-                className="workspace-group"
-                key={workspace.name}
-                ref={
-                  workspace.name === 'main'
-                    ? branchSelectorRootRef
-                    : openWorkspaceMenuName === workspace.name
-                      ? workspaceMenuRootRef
-                      : undefined
-                }
-              >
-                {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
-                  <>
-                    <div
-                      className={
-                        isActiveWorkspace
-                          ? 'workspace-row workspace-row--active default-branch-selector'
-                          : 'workspace-row default-branch-selector'
-                      }
-                    >
-                      <button
-                        aria-label={t('sidebar.switchDefaultWorkspace', {
-                          branchName: boundBranchName
-                        })}
-                        aria-current={isActiveWorkspace ? 'page' : undefined}
-                        className="default-branch-selector__select"
-                        type="button"
-                        title={boundBranchName}
-                        onClick={() => onSelectWorkspace(workbench, 'main')}
+              return (
+                <div
+                  className="workspace-group"
+                  key={workspace.name}
+                  ref={
+                    workspace.name === 'main'
+                      ? branchSelectorRootRef
+                      : openWorkspaceMenuName === workspace.name
+                        ? workspaceMenuRootRef
+                        : undefined
+                  }
+                >
+                  {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
+                    <>
+                      <div
+                        className={
+                          isActiveWorkspace
+                            ? 'workspace-row workspace-row--active default-branch-selector'
+                            : 'workspace-row default-branch-selector'
+                        }
                       >
-                        <span className="workspace-row__branch-icon" aria-hidden="true">
-                          <GitBranch size={14} />
-                        </span>
-                        <span className="workspace-row__name truncate">{boundBranchName}</span>
-                        {shouldShowDefaultWorkspaceBadge ? (
-                          <span className="badge badge--default-workspace">
-                            {t('sidebar.defaultWorkspace')}
-                          </span>
-                        ) : null}
-                      </button>
-                      <button
-                        aria-label={t('sidebar.chooseDefaultBranch', {
-                          branchName: boundBranchName
-                        })}
-                        aria-expanded={isBranchSelectorOpen}
-                        aria-haspopup="dialog"
-                        className="default-branch-selector__toggle"
-                        type="button"
-                        title={t('sidebar.chooseDefaultBranchTitle')}
-                        onClick={toggleBranchSelector}
-                      >
-                        <ChevronDown size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                    {isBranchSelectorOpen ? (
-                      <BranchSelectorPopover
-                        branches={workbench.gitBranches}
-                        searchQuery={branchSearchQuery}
-                        onSearchQueryChange={setBranchSearchQuery}
-                        onChooseBranch={(branch) => {
-                          closeBranchSelector()
-
-                          if (branch.isMainWorkspaceBranch) {
-                            onSelectWorkspace(workbench, 'main')
-                            return
-                          }
-
-                          if (branch.isSelectableInMainWorkspace) {
-                            onCheckoutMainBranch(workbench, branch.name)
-                          }
-                        }}
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={[
-                        isActiveWorkspace ? 'workspace-row workspace-row--active' : 'workspace-row',
-                        isWorktreeWorkspace ? 'workspace-row--with-actions' : null
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <button
-                        aria-label={workspaceButtonLabel}
-                        aria-current={isActiveWorkspace ? 'page' : undefined}
-                        className="workspace-row__select"
-                        type="button"
-                        title={workspaceDisplayName}
-                        onClick={() => onSelectWorkspace(workbench, workspace.name)}
-                      >
-                        <span className="workspace-row__branch-icon" aria-hidden="true">
-                          <GitBranch size={14} />
-                        </span>
-                        <span className="workspace-row__name truncate">{workspaceDisplayName}</span>
-                        {shouldShowDefaultWorkspaceBadge ||
-                        isWorktreeWorkspace ||
-                        shouldShowGitBranchBadge ? (
-                          <span className="workspace-row__metadata">
-                            {shouldShowDefaultWorkspaceBadge ? (
-                              <span className="badge badge--default-workspace">
-                                {t('sidebar.defaultWorkspace')}
-                              </span>
-                            ) : null}
-                            {isWorktreeWorkspace ? (
-                              <span
-                                className="workspace-row__kind"
-                                aria-hidden="true"
-                                title={t('sidebar.separateWorkspace')}
-                              >
-                                <Folders size={12} />
-                              </span>
-                            ) : null}
-                            {shouldShowGitBranchBadge ? (
-                              <span className="badge badge--git">{workspace.gitBranch}</span>
-                            ) : null}
-                          </span>
-                        ) : null}
-                      </button>
-                      {isWorktreeWorkspace ? (
                         <button
-                          className="workspace-row__menu-button"
-                          type="button"
-                          aria-label={t('sidebar.openWorkspaceMenu', {
-                            workspaceName: workspace.name
+                          aria-label={t('sidebar.switchDefaultWorkspace', {
+                            branchName: boundBranchName
                           })}
-                          aria-haspopup="menu"
-                          aria-expanded={openWorkspaceMenuName === workspace.name}
-                          title={t('sidebar.more')}
-                          onClick={() =>
-                            setOpenWorkspaceMenuName((menuName) =>
-                              menuName === workspace.name ? null : workspace.name
-                            )
-                          }
-                        >
-                          <MoreHorizontal size={15} aria-hidden="true" />
-                        </button>
-                      ) : null}
-                    </div>
-                    {openWorkspaceMenuName === workspace.name ? (
-                      <div className="workspace-row-menu" role="menu">
-                        <button
-                          className="workspace-row-menu__item workspace-row-menu__item--danger"
+                          aria-current={isActiveWorkspace ? 'page' : undefined}
+                          className="default-branch-selector__select"
                           type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setArchiveWorkspaceName(workspace.name)
-                            setOpenWorkspaceMenuName(null)
-                          }}
+                          title={boundBranchName}
+                          onClick={() => onSelectWorkspace(workbench, 'main')}
                         >
-                          <Archive size={14} aria-hidden="true" />
-                          {t('sidebar.archiveWorkspace')}
+                          <span className="workspace-row__branch-icon" aria-hidden="true">
+                            <GitBranch size={14} />
+                          </span>
+                          <span className="workspace-row__name truncate">{boundBranchName}</span>
+                          {shouldShowDefaultWorkspaceBadge ? (
+                            <span className="badge badge--default-workspace">
+                              {t('sidebar.defaultWorkspace')}
+                            </span>
+                          ) : null}
+                        </button>
+                        <button
+                          aria-label={t('sidebar.chooseDefaultBranch', {
+                            branchName: boundBranchName
+                          })}
+                          aria-expanded={isBranchSelectorOpen}
+                          aria-haspopup="dialog"
+                          className="default-branch-selector__toggle"
+                          type="button"
+                          title={t('sidebar.chooseDefaultBranchTitle')}
+                          onClick={toggleBranchSelector}
+                        >
+                          <ChevronDown size={14} aria-hidden="true" />
                         </button>
                       </div>
-                    ) : null}
-                  </>
-                )}
-                {workspace.name !== 'main' && workspace.gitBranch ? (
-                  <span className="workspace-git-branch sr-only">{workspace.gitBranch}</span>
-                ) : null}
-              </div>
-            )
-          })}
-          {isBranchWorkspaceFormOpen ? (
-            <ProjectSidebarBranchWorkspaceForm
-              branchName={branchName}
-              formRef={formRef}
-              projectId={workbench.project.id}
-              onBranchNameChange={setBranchName}
-              onSubmit={submitBranchWorkspace}
-            />
-          ) : null}
+                      {isBranchSelectorOpen ? (
+                        <BranchSelectorPopover
+                          branches={workbench.gitBranches}
+                          searchQuery={branchSearchQuery}
+                          onSearchQueryChange={setBranchSearchQuery}
+                          onChooseBranch={(branch) => {
+                            closeBranchSelector()
+
+                            if (branch.isMainWorkspaceBranch) {
+                              onSelectWorkspace(workbench, 'main')
+                              return
+                            }
+
+                            if (branch.isSelectableInMainWorkspace) {
+                              onCheckoutMainBranch(workbench, branch.name)
+                            }
+                          }}
+                        />
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className={[
+                          isActiveWorkspace
+                            ? 'workspace-row workspace-row--active'
+                            : 'workspace-row',
+                          isWorktreeWorkspace ? 'workspace-row--with-actions' : null
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      >
+                        <button
+                          aria-label={workspaceButtonLabel}
+                          aria-current={isActiveWorkspace ? 'page' : undefined}
+                          className="workspace-row__select"
+                          type="button"
+                          title={workspaceDisplayName}
+                          onClick={() => onSelectWorkspace(workbench, workspace.name)}
+                        >
+                          <span className="workspace-row__branch-icon" aria-hidden="true">
+                            <GitBranch size={14} />
+                          </span>
+                          <span className="workspace-row__name truncate">
+                            {workspaceDisplayName}
+                          </span>
+                          {shouldShowDefaultWorkspaceBadge ||
+                          isWorktreeWorkspace ||
+                          shouldShowGitBranchBadge ? (
+                            <span className="workspace-row__metadata">
+                              {shouldShowDefaultWorkspaceBadge ? (
+                                <span className="badge badge--default-workspace">
+                                  {t('sidebar.defaultWorkspace')}
+                                </span>
+                              ) : null}
+                              {isWorktreeWorkspace ? (
+                                <span
+                                  className="workspace-row__kind"
+                                  aria-hidden="true"
+                                  title={t('sidebar.separateWorkspace')}
+                                >
+                                  <Folders size={12} />
+                                </span>
+                              ) : null}
+                              {shouldShowGitBranchBadge ? (
+                                <span className="badge badge--git">{workspace.gitBranch}</span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </button>
+                        {isWorktreeWorkspace ? (
+                          <button
+                            className="workspace-row__menu-button"
+                            type="button"
+                            aria-label={t('sidebar.openWorkspaceMenu', {
+                              workspaceName: workspace.name
+                            })}
+                            aria-haspopup="menu"
+                            aria-expanded={openWorkspaceMenuName === workspace.name}
+                            title={t('sidebar.more')}
+                            onClick={() =>
+                              setOpenWorkspaceMenuName((menuName) =>
+                                menuName === workspace.name ? null : workspace.name
+                              )
+                            }
+                          >
+                            <MoreHorizontal size={15} aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                      {openWorkspaceMenuName === workspace.name ? (
+                        <div className="workspace-row-menu" role="menu">
+                          <button
+                            className="workspace-row-menu__item workspace-row-menu__item--danger"
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setArchiveWorkspaceName(workspace.name)
+                              setOpenWorkspaceMenuName(null)
+                            }}
+                          >
+                            <Archive size={14} aria-hidden="true" />
+                            {t('sidebar.archiveWorkspace')}
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  {workspace.name !== 'main' && workspace.gitBranch ? (
+                    <span className="workspace-git-branch sr-only">{workspace.gitBranch}</span>
+                  ) : null}
+                </div>
+              )
+            })}
+            {isBranchWorkspaceFormOpen ? (
+              <ProjectSidebarBranchWorkspaceForm
+                branchName={branchName}
+                formRef={formRef}
+                projectId={workbench.project.id}
+                onBranchNameChange={setBranchName}
+                onSubmit={submitBranchWorkspace}
+              />
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
       {isRemoveProjectDialogOpen ? (
         <ProjectSidebarProjectRemovalPopover
           projectName={workbench.project.name}

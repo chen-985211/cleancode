@@ -192,6 +192,7 @@ const {
   createOrOpenProjectUseCase,
   forgetProjectUseCase,
   rememberProjectUseCase,
+  reorderProjectsUseCase,
   selectCurrentProjectUseCase,
   switchBranchWorkspaceUseCase,
   synchronizeProjectGitStateUseCase
@@ -232,6 +233,7 @@ registerProjectIpcHandlers({
   loadWorkbench,
   logger: consoleLogger,
   rememberProject,
+  reorderProjects: (command) => reorderProjectsUseCase.execute(command),
   selectCurrentProject,
   selectProjectDirectory,
   switchBranchWorkspace: (command) => switchBranchWorkspaceUseCase.execute(command),

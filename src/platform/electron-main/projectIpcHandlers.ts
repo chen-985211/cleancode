@@ -43,6 +43,10 @@ export interface ProjectIpcHandlersInput {
   }) => Promise<ProjectSnapshot | null>
   readonly forgetProject: (directory: string) => Promise<unknown>
   readonly rememberProject: (directory: string) => Promise<void>
+  readonly reorderProjects: (command: {
+    readonly projectDirectory: string
+    readonly beforeProjectDirectory: string | null
+  }) => Promise<unknown>
   readonly selectCurrentProject: (directory: string) => Promise<void>
   readonly loadWorkbench: (project: ProjectSnapshot) => Promise<WorkbenchSnapshot>
   readonly loadRememberedWorkbenches: () => Promise<WorkbenchSnapshot[]>
@@ -181,6 +185,22 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     scope: 'project.workspace',
     successLogLevel: 'info'
   })
+
+  registerIpcHandler<unknown, WorkbenchSnapshot[]>({
+    channel: 'cleancode:reorder-project',
+    handler: async (command) => {
+      await input.reorderProjects({
+        projectDirectory: readStringField(command, 'projectDirectory'),
+        beforeProjectDirectory: readNullableStringField(command, 'beforeProjectDirectory')
+      })
+
+      return input.loadRememberedWorkbenches()
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'reorderProject',
+    scope: 'project.workspace'
+  })
 }
 
 async function loadAndSelectWorkbench(
@@ -199,6 +219,20 @@ function readStringField(command: unknown, fieldName: string): string {
     throw createExpectedAppError(
       'INVALID_IPC_COMMAND',
       `Invalid IPC command: ${fieldName} is required.`
+    )
+  }
+
+  return command[fieldName]
+}
+
+function readNullableStringField(command: unknown, fieldName: string): string | null {
+  if (
+    !isRecord(command) ||
+    (typeof command[fieldName] !== 'string' && command[fieldName] !== null)
+  ) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      `Invalid IPC command: ${fieldName} must be a string or null.`
     )
   }
 

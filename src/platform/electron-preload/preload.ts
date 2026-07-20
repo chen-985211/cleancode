@@ -15,6 +15,7 @@ const cleancodeApi = {
   listWorkbenches: () => invokeCleancode('cleancode:list-workbenches'),
   addProject: () => invokeCleancode('cleancode:add-project'),
   removeProject: (command: unknown) => invokeCleancode('cleancode:remove-project', command),
+  reorderProject: (command: unknown) => invokeCleancode('cleancode:reorder-project', command),
   createBranchWorkspace: (command: unknown) =>
     invokeCleancode('cleancode:create-branch-workspace', command),
   switchBranchWorkspace: (command: unknown) =>

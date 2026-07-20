@@ -4,6 +4,7 @@ export interface RuntimeApiOverrides {
   readonly listWorkbenches?: ReturnType<typeof vi.fn>
   readonly addProject?: ReturnType<typeof vi.fn>
   readonly removeProject?: ReturnType<typeof vi.fn>
+  readonly reorderProject?: ReturnType<typeof vi.fn>
   readonly archiveBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly createBranchWorkspace?: ReturnType<typeof vi.fn>
   readonly switchBranchWorkspace?: ReturnType<typeof vi.fn>
@@ -43,6 +44,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     listWorkbenches: overrides.listWorkbenches ?? vi.fn(async () => []),
     addProject: overrides.addProject ?? vi.fn(),
     removeProject: overrides.removeProject ?? vi.fn(),
+    reorderProject: overrides.reorderProject ?? vi.fn(),
     archiveBranchWorkspace: overrides.archiveBranchWorkspace ?? vi.fn(),
     createBranchWorkspace: overrides.createBranchWorkspace ?? vi.fn(),
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),

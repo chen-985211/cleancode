@@ -60,6 +60,50 @@ export class ProjectRegistry {
     return new ProjectRegistry(this.projectDirectories, normalizedDirectory)
   }
 
+  moveProjectBefore(directory: string, beforeDirectory: string | null): ProjectRegistry {
+    const normalizedDirectory = directory.trim()
+
+    if (!this.projectDirectories.includes(normalizedDirectory)) {
+      throw createExpectedAppError(
+        'PROJECT_NOT_REMEMBERED',
+        'Cannot reorder an unremembered project.'
+      )
+    }
+
+    const normalizedBeforeDirectory = beforeDirectory?.trim() ?? null
+
+    if (
+      normalizedBeforeDirectory !== null &&
+      !this.projectDirectories.includes(normalizedBeforeDirectory)
+    ) {
+      throw createExpectedAppError(
+        'PROJECT_NOT_REMEMBERED',
+        'Cannot reorder before an unremembered project.'
+      )
+    }
+
+    if (normalizedDirectory === normalizedBeforeDirectory) {
+      return this
+    }
+
+    const remainingDirectories = this.projectDirectories.filter(
+      (entry) => entry !== normalizedDirectory
+    )
+    const insertIndex =
+      normalizedBeforeDirectory === null
+        ? remainingDirectories.length
+        : remainingDirectories.indexOf(normalizedBeforeDirectory)
+    const projectDirectories = [...remainingDirectories]
+
+    projectDirectories.splice(insertIndex, 0, normalizedDirectory)
+
+    if (projectDirectories.every((entry, index) => entry === this.projectDirectories[index])) {
+      return this
+    }
+
+    return new ProjectRegistry(projectDirectories, this.currentProjectDirectory)
+  }
+
   forgetProject(directory: string): ProjectRegistry {
     const normalizedDirectory = directory.trim()
 

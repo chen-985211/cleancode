@@ -218,6 +218,7 @@ function createProjectIpcHandlersInput(input: {
     loadWorkbench: input.loadWorkbench,
     logger: new SilentLogger(),
     rememberProject: vi.fn(),
+    reorderProjects: vi.fn(),
     selectCurrentProject: input.selectCurrentProject ?? vi.fn(),
     selectProjectDirectory: vi.fn(async () => null),
     switchBranchWorkspace: input.switchBranchWorkspace ?? vi.fn(),

@@ -12,6 +12,7 @@ import { ForgetProjectUseCase } from '../../contexts/project/application/use-cas
 import { ProjectRegistryTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectRegistryTransactionCoordinator'
 import { ProjectWorkspaceTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
 import { RememberProjectUseCase } from '../../contexts/project/application/use-cases/RememberProjectUseCase'
+import { ReorderProjectsUseCase } from '../../contexts/project/application/use-cases/ReorderProjectsUseCase'
 import { SelectCurrentProjectUseCase } from '../../contexts/project/application/use-cases/SelectCurrentProjectUseCase'
 import { SwitchBranchWorkspaceUseCase } from '../../contexts/project/application/use-cases/SwitchBranchWorkspaceUseCase'
 import { SynchronizeProjectGitStateUseCase } from '../../contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
@@ -62,6 +63,7 @@ export function createProjectLifecycleUseCases(input: {
       input.runLifecycle
     ),
     rememberProjectUseCase: new RememberProjectUseCase(input.projectRegistry, registryTransactions),
+    reorderProjectsUseCase: new ReorderProjectsUseCase(input.projectRegistry, registryTransactions),
     selectCurrentProjectUseCase: new SelectCurrentProjectUseCase(
       input.projectRegistry,
       registryTransactions

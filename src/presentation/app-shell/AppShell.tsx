@@ -233,7 +233,14 @@ export function AppShell({
     forgetWorkspaceTerminalStates
   })
 
-  const { addProject, removeProject } = useProjectActions({
+  const {
+    addProject,
+    dismissProjectActionError,
+    isReorderingProject,
+    projectActionError,
+    removeProject,
+    reorderProject
+  } = useProjectActions({
     agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     rememberWorkbench,
     setCurrentWorkbench,
@@ -561,13 +568,20 @@ export function AppShell({
                 currentWorkbench={currentWorkbench}
                 isCollapsed={isProjectSidebarCollapsed}
                 isDesktopRuntime={isDesktopRuntime}
-                actionError={branchWorkspaceActions.branchWorkspaceActionError}
+                actionError={
+                  projectActionError ?? branchWorkspaceActions.branchWorkspaceActionError
+                }
+                isReorderPending={isReorderingProject}
                 onAddProject={addProject}
                 onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
                 onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
                 onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-                onDismissActionError={branchWorkspaceActions.dismissBranchWorkspaceActionError}
+                onDismissActionError={() => {
+                  dismissProjectActionError()
+                  branchWorkspaceActions.dismissBranchWorkspaceActionError()
+                }}
                 onRemoveProject={removeProject}
+                onReorderProject={reorderProject}
                 onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
               />
             </div>

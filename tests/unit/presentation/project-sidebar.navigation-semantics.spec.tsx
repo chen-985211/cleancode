@@ -19,6 +19,7 @@ describe('project sidebar navigation semantics', () => {
         onCreateBranchWorkspace={vi.fn()}
         onDismissActionError={vi.fn()}
         onRemoveProject={vi.fn()}
+        onReorderProject={vi.fn()}
         onSelectWorkspace={vi.fn()}
       />
     )
@@ -51,6 +52,7 @@ describe('project sidebar navigation semantics', () => {
         onCreateBranchWorkspace={vi.fn()}
         onDismissActionError={vi.fn()}
         onRemoveProject={vi.fn()}
+        onReorderProject={vi.fn()}
         onSelectWorkspace={vi.fn()}
       />
     )
@@ -85,6 +87,7 @@ describe('project sidebar navigation semantics', () => {
         onCreateBranchWorkspace={vi.fn()}
         onDismissActionError={vi.fn()}
         onRemoveProject={vi.fn()}
+        onReorderProject={vi.fn()}
         onSelectWorkspace={onSelectWorkspace}
       />
     )
@@ -101,9 +104,14 @@ describe('project sidebar navigation semantics', () => {
     expect(onSelectWorkspace).not.toHaveBeenCalled()
     expect(collapseProject).toHaveAttribute('aria-expanded', 'false')
     expect(collapseProject).toHaveAttribute('title', '展开项目 alpha-project')
-    expect(
-      screen.queryByRole('button', { name: 'Git 未初始化 默认工作区' })
-    ).not.toBeInTheDocument()
+    const collapsedWorkspaceList = document.getElementById(
+      `project-${workbench.project.id}-workspaces`
+    )
+    const collapsedDisclosure = collapsedWorkspaceList?.closest('.project-card__disclosure')
+    expect(collapsedWorkspaceList).toBeInTheDocument()
+    expect(collapsedDisclosure).toHaveAttribute('aria-hidden', 'true')
+    expect(collapsedDisclosure).toHaveAttribute('inert')
+    expect(screen.queryByRole('button', { name: 'Git 未初始化 默认工作区' })).toBeNull()
 
     fireEvent.click(collapseProject)
 
@@ -128,6 +136,7 @@ describe('project sidebar navigation semantics', () => {
         onCreateBranchWorkspace={vi.fn()}
         onDismissActionError={vi.fn()}
         onRemoveProject={vi.fn()}
+        onReorderProject={vi.fn()}
         onSelectWorkspace={vi.fn()}
       />
     )
@@ -145,4 +154,100 @@ describe('project sidebar navigation semantics', () => {
       })
     ).toBeVisible()
   })
+
+  it('reorders a project only after the pointer crosses the drag threshold', () => {
+    const alpha = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const beta = createWorkbenchSnapshot('/tmp/beta-project', 'beta-project')
+    const gamma = createWorkbenchSnapshot('/tmp/gamma-project', 'gamma-project')
+    const onReorderProject = vi.fn()
+
+    render(
+      <ProjectSidebar
+        workbenches={[alpha, beta, gamma]}
+        currentWorkbench={alpha}
+        isDesktopRuntime
+        actionError={null}
+        onAddProject={vi.fn()}
+        onArchiveBranchWorkspace={vi.fn()}
+        onCheckoutMainBranch={vi.fn()}
+        onCreateBranchWorkspace={vi.fn()}
+        onDismissActionError={vi.fn()}
+        onRemoveProject={vi.fn()}
+        onReorderProject={onReorderProject}
+        onSelectWorkspace={vi.fn()}
+      />
+    )
+
+    const projectList = document.querySelector<HTMLElement>('.project-list')!
+    const projectCards = [...document.querySelectorAll<HTMLElement>('.project-card')]
+    mockRect(projectList, { top: 100, bottom: 400 })
+    mockRect(projectCards[0]!, { top: 100, bottom: 180 })
+    mockRect(projectCards[1]!, { top: 190, bottom: 270 })
+    mockRect(projectCards[2]!, { top: 280, bottom: 360 })
+
+    const gammaTitle = screen.getByRole('button', { name: 'gamma-project' })
+    fireEvent.pointerDown(gammaTitle, { button: 0, pointerId: 1, clientX: 20, clientY: 300 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 22, clientY: 302 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 22, clientY: 302 })
+
+    expect(onReorderProject).not.toHaveBeenCalled()
+
+    fireEvent.pointerDown(gammaTitle, { button: 0, pointerId: 2, clientX: 20, clientY: 300 })
+    fireEvent.pointerMove(window, { pointerId: 2, clientX: 20, clientY: 101 })
+    fireEvent.pointerUp(window, { pointerId: 2, clientX: 20, clientY: 101 })
+
+    expect(onReorderProject).toHaveBeenCalledWith(gamma, '/tmp/alpha-project')
+    expect(gammaTitle).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('cancels an armed project reorder with Escape', () => {
+    const alpha = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const beta = createWorkbenchSnapshot('/tmp/beta-project', 'beta-project')
+    const onReorderProject = vi.fn()
+
+    render(
+      <ProjectSidebar
+        workbenches={[alpha, beta]}
+        currentWorkbench={alpha}
+        isDesktopRuntime
+        actionError={null}
+        onAddProject={vi.fn()}
+        onArchiveBranchWorkspace={vi.fn()}
+        onCheckoutMainBranch={vi.fn()}
+        onCreateBranchWorkspace={vi.fn()}
+        onDismissActionError={vi.fn()}
+        onRemoveProject={vi.fn()}
+        onReorderProject={onReorderProject}
+        onSelectWorkspace={vi.fn()}
+      />
+    )
+
+    const projectList = document.querySelector<HTMLElement>('.project-list')!
+    const projectCards = [...document.querySelectorAll<HTMLElement>('.project-card')]
+    mockRect(projectList, { top: 100, bottom: 300 })
+    mockRect(projectCards[0]!, { top: 100, bottom: 180 })
+    mockRect(projectCards[1]!, { top: 190, bottom: 270 })
+
+    const betaTitle = screen.getByRole('button', { name: 'beta-project' })
+    fireEvent.pointerDown(betaTitle, { button: 0, pointerId: 2, clientX: 20, clientY: 210 })
+    fireEvent.pointerMove(window, { pointerId: 2, clientX: 20, clientY: 101 })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.pointerUp(window, { pointerId: 2, clientX: 20, clientY: 101 })
+
+    expect(onReorderProject).not.toHaveBeenCalled()
+  })
 })
+
+function mockRect(element: HTMLElement, input: { readonly top: number; readonly bottom: number }) {
+  element.getBoundingClientRect = vi.fn(() => ({
+    bottom: input.bottom,
+    height: input.bottom - input.top,
+    left: 0,
+    right: 240,
+    top: input.top,
+    width: 240,
+    x: 0,
+    y: input.top,
+    toJSON: () => ({})
+  }))
+}

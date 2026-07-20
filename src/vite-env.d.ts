@@ -52,6 +52,10 @@ declare global {
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
       addProject(): Promise<WorkbenchSnapshot | null>
       removeProject(command: { readonly projectDirectory: string }): Promise<WorkbenchSnapshot[]>
+      reorderProject(command: {
+        readonly projectDirectory: string
+        readonly beforeProjectDirectory: string | null
+      }): Promise<WorkbenchSnapshot[]>
       createBranchWorkspace(command: {
         readonly projectDirectory: string
         readonly branchName: string

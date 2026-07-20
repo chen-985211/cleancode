@@ -96,6 +96,7 @@ export const enMessages = {
   'sidebar.openWorkspaceMenu': 'Open the {workspaceName} workspace menu',
   'sidebar.more': 'More',
   'sidebar.archiveWorkspace': 'Archive workspace',
+  'sidebar.reorderFailed': 'Could not reorder projects. Try again.',
   'canvas.label': 'Block canvas',
   'canvas.emptyDesktop': 'Choose or add a project to enter the main workspace',
   'canvas.emptyPreview':

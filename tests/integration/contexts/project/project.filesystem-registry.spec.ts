@@ -48,4 +48,20 @@ describe('project filesystem registry', () => {
       projectDirectories: ['/work/alpha']
     })
   })
+
+  it('restores a manually reordered project list without changing the current project', async () => {
+    const registryPath = join(registryDirectory, 'project-registry.json')
+    const repository = new FileSystemProjectRegistryRepository(registryPath)
+    const registry = ProjectRegistry.fromSnapshot({
+      currentProjectDirectory: '/work/beta',
+      projectDirectories: ['/work/alpha', '/work/beta', '/work/gamma']
+    }).moveProjectBefore('/work/gamma', '/work/alpha')
+
+    await repository.save(registry)
+
+    await expect(new FileSystemProjectRegistryRepository(registryPath).get()).resolves.toEqual({
+      currentProjectDirectory: '/work/beta',
+      projectDirectories: ['/work/gamma', '/work/alpha', '/work/beta']
+    })
+  })
 })

@@ -138,6 +138,7 @@
 }
 
 .project-list {
+  position: relative;
   min-height: 0;
   flex: 1 1 auto;
   margin-top: 6px;
@@ -145,9 +146,55 @@
   overflow: visible;
 }
 
+.project-list--dragging {
+  cursor: grabbing;
+}
+
+.project-list__drop-indicator {
+  position: absolute;
+  right: 3px;
+  left: 3px;
+  z-index: 6;
+  display: flex;
+  height: 10px;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.project-list__drop-indicator span:first-child,
+.project-list__drop-indicator span:last-child {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--cc-primary);
+  box-shadow: 0 0 0 2px var(--cc-chrome);
+}
+
+.project-list__drop-indicator span:nth-child(2) {
+  height: 2px;
+  flex: 1 1 auto;
+  border-radius: 999px;
+  background: var(--cc-primary);
+  box-shadow: 0 0 0 2px var(--cc-chrome);
+}
+
 .project-card {
   position: relative;
   overflow: visible;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.project-card--dragging {
+  z-index: 5;
+  border-radius: 8px;
+  background: var(--cc-primary-soft);
+  box-shadow: 0 0 0 1px var(--cc-primary-border);
+  transform: scale(1.01);
 }
 
 .project-card + .project-card {
@@ -186,6 +233,14 @@
   transition:
     background 140ms ease,
     color 140ms ease;
+}
+
+.project-card__select--draggable {
+  cursor: grab;
+}
+
+.project-card--dragging .project-card__select {
+  cursor: grabbing;
 }
 
 .project-card__name {
@@ -254,10 +309,56 @@
   background: var(--cc-success);
 }
 
+.project-card__disclosure {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 160ms ease;
+}
+
+.project-card__disclosure--collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.project-card__disclosure-content {
+  min-height: 0;
+}
+
+.project-card__disclosure--collapsed .project-card__disclosure-content {
+  overflow: hidden;
+}
+
 .workspace-list {
+  min-height: 0;
   margin-left: 9px;
   border-left: 1px solid var(--cc-border);
   padding: 2px 0 0 9px;
+  transform: translateY(0);
+  transition: transform 180ms ease;
+}
+
+.project-card__disclosure--collapsed .workspace-list {
+  transform: translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-card,
+  .project-card__disclosure,
+  .workspace-list {
+    transition: none;
+  }
+
+  .project-card--dragging {
+    transform: none;
+  }
+
+  .project-card__disclosure--collapsed .workspace-list {
+    transform: none;
+  }
 }
 
 .workspace-group {

@@ -1,5 +1,7 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 
+import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import { resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
 import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
@@ -25,6 +27,10 @@ export function useProjectActions({
   setWorkbenches,
   terminateWorkbenchTerminalSessions
 }: UseProjectActionsInput) {
+  const { t } = useI18n()
+  const [projectActionError, setProjectActionError] = useState<string | null>(null)
+  const [isReorderingProject, setIsReorderingProject] = useState(false)
+  const isReorderingProjectRef = useRef(false)
   const addProject = useCallback(async () => {
     const workbench = await window.cleancode?.addProject()
 
@@ -63,5 +69,54 @@ export function useProjectActions({
     ]
   )
 
-  return { addProject, removeProject }
+  const reorderProject = useCallback(
+    async (workbench: WorkbenchSnapshot, beforeProjectDirectory: string | null): Promise<void> => {
+      if (isReorderingProjectRef.current) {
+        return
+      }
+
+      isReorderingProjectRef.current = true
+      setIsReorderingProject(true)
+      setProjectActionError(null)
+
+      try {
+        const reorderedWorkbenches = await window.cleancode?.reorderProject({
+          projectDirectory: workbench.project.directory,
+          beforeProjectDirectory
+        })
+
+        if (!reorderedWorkbenches) {
+          return
+        }
+
+        setWorkbenches(reorderedWorkbenches)
+        setCurrentWorkbench((current) =>
+          current
+            ? (reorderedWorkbenches.find(
+                (entry) => entry.project.directory === current.project.directory
+              ) ?? current)
+            : null
+        )
+      } catch (error) {
+        setProjectActionError(resolveUserFacingErrorMessage(error, 'sidebar.reorderFailed', t))
+      } finally {
+        isReorderingProjectRef.current = false
+        setIsReorderingProject(false)
+      }
+    },
+    [setCurrentWorkbench, setWorkbenches, t]
+  )
+
+  const dismissProjectActionError = useCallback(() => {
+    setProjectActionError(null)
+  }, [])
+
+  return {
+    addProject,
+    dismissProjectActionError,
+    isReorderingProject,
+    projectActionError,
+    removeProject,
+    reorderProject
+  }
 }
