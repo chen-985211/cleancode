@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 
 import {
+  allowsApplicationShortcutRepeat,
   applicationShortcutCommands,
   matchesShortcutEvent,
   type ApplicationShortcutBindings,
@@ -32,7 +33,6 @@ export function useApplicationShortcuts({
     const dispatchShortcut = (event: KeyboardEvent): void => {
       if (
         event.defaultPrevented ||
-        event.repeat ||
         isProtectedShortcutTarget(event.target) ||
         document.querySelector('[role="dialog"][aria-modal="true"]') !== null
       ) {
@@ -42,7 +42,11 @@ export function useApplicationShortcuts({
       const command = applicationShortcutCommands.find((candidate) =>
         matchesShortcutEvent(event, bindings[candidate], platform)
       )
-      if (command === undefined || !actions[command].enabled) {
+      if (
+        command === undefined ||
+        !actions[command].enabled ||
+        (event.repeat && !allowsApplicationShortcutRepeat(command))
+      ) {
         return
       }
 

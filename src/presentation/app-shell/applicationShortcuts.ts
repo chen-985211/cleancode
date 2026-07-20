@@ -20,6 +20,17 @@ export const applicationShortcutCommands = [
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
 
+const repeatableApplicationShortcutCommands: readonly ApplicationShortcutCommand[] = [
+  'panCanvasLeft',
+  'panCanvasRight',
+  'panCanvasUp',
+  'panCanvasDown'
+]
+
+export function allowsApplicationShortcutRepeat(command: ApplicationShortcutCommand): boolean {
+  return repeatableApplicationShortcutCommands.includes(command)
+}
+
 export type ShortcutPlatform = 'mac' | 'other'
 
 export interface ApplicationShortcutBinding {

@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
-import { defaultApplicationShortcutBindings } from '../../../src/presentation/app-shell/applicationShortcuts'
+import {
+  defaultApplicationShortcutBindings,
+  type ApplicationShortcutBindings
+} from '../../../src/presentation/app-shell/applicationShortcuts'
 import {
   useApplicationShortcuts,
   type ApplicationShortcutActions
@@ -50,13 +53,53 @@ describe('application shortcut dispatch', () => {
     }
   )
 
-  it('ignores keyboard auto-repeat', () => {
+  it.each([
+    ['panCanvasLeft', 'ArrowLeft'],
+    ['panCanvasRight', 'ArrowRight'],
+    ['panCanvasUp', 'ArrowUp'],
+    ['panCanvasDown', 'ArrowDown']
+  ] as const)('dispatches keyboard auto-repeat for %s', (command, key) => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(document, { key, metaKey: true, repeat: true })
+
+    expect(actions[command].run).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores keyboard auto-repeat for non-pan actions', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
 
     fireEvent.keyDown(document, { key: 'a', metaKey: true, repeat: true, shiftKey: true })
 
     expect(actions.createAgent.run).not.toHaveBeenCalled()
+  })
+
+  it('dispatches keyboard auto-repeat through a customized pan binding', () => {
+    const actions = createActions()
+    const bindings: ApplicationShortcutBindings = {
+      ...defaultApplicationShortcutBindings,
+      panCanvasLeft: { alt: false, key: 'H', primary: true, shift: false }
+    }
+    render(<ShortcutHarness actions={actions} bindings={bindings} />)
+
+    fireEvent.keyDown(document, { key: 'h', metaKey: true, repeat: true })
+
+    expect(actions.panCanvasLeft.run).toHaveBeenCalledTimes(1)
+  })
+
+  it('protects xterm from repeated pan shortcuts', () => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(screen.getByLabelText('快捷键测试终端'), {
+      key: 'ArrowLeft',
+      metaKey: true,
+      repeat: true
+    })
+
+    expect(actions.panCanvasLeft.run).not.toHaveBeenCalled()
   })
 
   it('does not dispatch disabled actions or partial modifier matches', () => {
@@ -109,14 +152,16 @@ describe('application shortcut dispatch', () => {
 
 function ShortcutHarness({
   actions,
+  bindings = defaultApplicationShortcutBindings,
   showDialog = false
 }: {
   readonly actions: ApplicationShortcutActions
+  readonly bindings?: ApplicationShortcutBindings
   readonly showDialog?: boolean
 }) {
   useApplicationShortcuts({
     actions,
-    bindings: defaultApplicationShortcutBindings,
+    bindings,
     platform: 'mac'
   })
 
