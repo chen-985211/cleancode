@@ -7,7 +7,7 @@
 本文不重新定义全仓规则：
 
 - 限界上下文、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准。
-- Agent 控制台的用户可见语义以[UI 契约](../../product/ui.md)为准。
+- Agent 控制台的用户可见语义以[UI 契约](../../product/ui-contract.md)为准。
 - 测试层级和组织以[测试规范](../../testing/testing.md)为准。
 - BlockGraph 的积木动作语义以[积木动作模型](../block-graph/block-action-model.md)为准。
 

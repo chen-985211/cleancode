@@ -4,7 +4,7 @@
 
 本文是当前已实现本地服务端口治理能力的统一维护入口，描述多个项目、多个 worktree 和多个终端服务并行运行时的端口意图、运行身份、租约、实际端点、监听所有权、生命周期与用户反馈。
 
-全仓边界以[架构文档](../../engineering/architecture.md)为准；持久化服务意图以[积木图模型](../block-graph/block-graph.md)为准；普通 PTY 和工作流语义分别见[终端会话生命周期](terminal-session.md)与[终端依赖工作流](terminal-workflow.md)；稳定交互以 [UI 契约](../../product/ui.md)为准。
+全仓边界以[架构文档](../../engineering/architecture.md)为准；持久化服务意图以[积木图模型](../block-graph/block-graph.md)为准；普通 PTY 和工作流语义分别见[终端会话生命周期](terminal-session.md)与[终端依赖工作流](terminal-workflow.md)；稳定交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 代码和自动化测试是可执行事实的最终证据。本文的“后续候选”不是当前能力。
 
@@ -269,6 +269,6 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 - 改变策略、协议、注入或迁移时，同步 BlockGraph 模型、仓储、MCP Schema、测试和[积木图模型](../block-graph/block-graph.md)。
 - 改变运行身份、租约、实际端点、所有权或清理时，同步 Run 模型、端口、测试、[终端会话生命周期](terminal-session.md)和[终端依赖工作流](terminal-workflow.md)。
 - 改变 Project/BlockGraph 到 Run 协作时，同步[架构文档](../../engineering/architecture.md)、[上下文地图](../../engineering/context-map.md)和调用方 lifecycle 测试。
-- 改变稳定交互时，同步 [UI 契约](../../product/ui.md)和表现层测试；未来能力只进入 [UI 路线图](../../product/ui-roadmap.md)。
+- 改变稳定交互时，同步 [UI 契约](../../product/ui-contract.md)和表现层测试；未来能力只进入 [UI 路线图](../../product/ui-roadmap.md)。
 - 改变 Node、node-pty、系统进程检查或平台范围时，同步[技术栈说明](../../engineering/tech-stack.md)和真实集成测试。
 - 每次更新本文后运行 `pnpm check:docs`。

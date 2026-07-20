@@ -4,7 +4,7 @@
 
 本文是当前已实现普通终端 PTY 会话的统一维护入口。终端依赖图、任务/服务调度与 `WorkflowRun` 由[终端依赖工作流](terminal-workflow.md)单独维护。
 
-全仓边界以[架构文档](../../engineering/architecture.md)为准；终端界面的稳定交互以 [UI 契约](../../product/ui.md)为准。
+全仓边界以[架构文档](../../engineering/architecture.md)为准；终端界面的稳定交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 能力状态与范围
 

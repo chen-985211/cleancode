@@ -2,7 +2,7 @@
 
 ## 文档地位
 
-本文是 cleancode 国际化实现、文案归属和 AI 协作约束的唯一事实来源。语言入口、偏好恢复和切换行为等长期产品语义以 [UI 契约](../product/ui.md) 为准；测试层级和组织方式以 [测试规范](../testing/testing.md) 为准；通用开发流程以 [开发协作规范](../engineering/development.md) 为准。
+本文是 cleancode 国际化实现、文案归属和 AI 协作约束的唯一事实来源。语言入口、偏好恢复和切换结果属于 [UI 契约](../product/ui-contract.md)；本文只维护这些行为所需的 locale 与文案实现规则。
 
 当前国际化实现位于 `src/presentation/app-shell/i18n/`。第一方 UI 文案只允许由 locale catalog 持有，组件和其他表现层模块不得建立第二套文案事实来源。
 

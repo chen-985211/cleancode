@@ -4,7 +4,7 @@
 
 本文是当前已实现 Agent 身份、对话绑定和运行时会话的统一维护入口。原生工具协议、MCP 鉴权和工具目录由 [cleancode 原生 MCP](cleancode-mcp.md)单独维护。
 
-全仓边界与事实来源以[架构文档](../../engineering/architecture.md)为准；Agent 控制台的用户可见语义以 [UI 契约](../../product/ui.md)为准。
+全仓边界与事实来源以[架构文档](../../engineering/architecture.md)为准；Agent 控制台的用户可见语义以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 两类会话必须区分
 

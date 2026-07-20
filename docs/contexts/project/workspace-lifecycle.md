@@ -4,7 +4,7 @@
 
 本文是当前已实现 Project 上下文的统一维护入口，描述项目登记、分支工作区、Git 绑定、生命周期规则、跨上下文协作和验证入口。
 
-全仓分层、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准；用户可见交互以 [UI 契约](../../product/ui.md)为准。
+全仓分层、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准；用户可见交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 能力状态与范围
 

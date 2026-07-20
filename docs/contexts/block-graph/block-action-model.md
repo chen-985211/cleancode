@@ -4,7 +4,7 @@
 
 本文维护当前已实现终端积木与终端组合动作的功能意图、作用对象和语义边界。未来积木类型、通用动作描述器和混合组合只记录在 [UI 路线图](../../product/ui-roadmap.md)，不是本文的当前事实。
 
-积木结构规则以[积木图模型](block-graph.md)为准；终端工作流运行语义以[终端依赖工作流](../run/terminal-workflow.md)为准；稳定用户交互以 [UI 契约](../../product/ui.md)为准。
+积木结构规则以[积木图模型](block-graph.md)为准；终端工作流运行语义以[终端依赖工作流](../run/terminal-workflow.md)为准；稳定用户交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 动作定义
 

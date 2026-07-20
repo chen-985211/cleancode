@@ -7,7 +7,7 @@
 本文不重新定义全仓架构和 UI 总则：
 
 - 限界上下文、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准。
-- 用户可见的稳定交互以[UI 契约](../../product/ui.md)为准。
+- 用户可见的稳定交互以[UI 契约](../../product/ui-contract.md)为准。
 - 积木动作的功能意图和作用对象以[积木动作模型](../block-graph/block-action-model.md)为准。
 - 测试层级和组织以[测试规范](../../testing/testing.md)为准。
 

@@ -2,85 +2,54 @@
 
 ## 定位
 
-本文件是 cleancode 仓库的 AI 阅读入口，只定义开发协作 AI 进入本仓库后必须阅读哪些文档，以及在什么情况下继续阅读任务相关文档。
+本文是 cleancode 仓库的 AI 阅读入口，只负责把当前任务路由到必要文档。
 
-本文不展开具体开发规则、架构规则、测试规则或任务规则。文档内容以被引用文档自身为准。
+完整文档目录由 [文档中心](docs/README.md) 维护。本文不复制开发、架构、测试或产品规则，也不要求 AI 在每个回合重复读取固定文档集合。
 
-## 必读文档
+## 阅读原则
 
-开发协作 AI 处理本仓库任何任务时，必须在当前回合完整阅读 [开发协作规范](docs/engineering/development.md)、[架构文档](docs/engineering/architecture.md) 和 [测试规范](docs/testing/testing.md)。
+1. 先理解用户目标并检查直接目标文件，再判断需要哪些规则。
+2. 只读取会影响本次判断、修改或验证的文档和章节，不做预防性全库阅读。
+3. 文档中的普通链接只表示导航、出处或事实移交，不自动产生继续阅读义务。
+4. 只有当前任务同时命中链接目标的阅读条件，或当前文档不足以解决事实冲突时，才继续读取链接目标。
+5. 同一连续任务中，已经读取且内容未变化的文档不重复读取；任务变化后重新按触发条件判断。
+6. 修改规则文档时，读取目标文档及本次实际改变的规则 owner；不得因为目标文档包含链接就递归读取所有被引用文档。
 
-其中，[开发协作规范](docs/engineering/development.md) 是开发协作行为、任务分级、开工回执、开发流程、验证要求和最终汇报要求的事实来源。
+默认读取相关章节即可。只有任务会改变整份文档的职责、存在跨章节冲突，或无法通过局部内容确定规则时，才完整阅读该文档。
 
-[架构文档](docs/engineering/architecture.md) 是架构范式、分层规则、依赖方向、领域边界、端口归属、业务事实来源和跨层调用方式的事实来源。
+## 开工要求
 
-[测试规范](docs/testing/testing.md) 是测试组织方式、测试类型、测试命名、测试边界和测试数据规则的事实来源。
+只读分析、解释、审查和状态查询不要求读取开发协作规范，也不要求开工回执。
 
-完成必读文档阅读后，开发协作 AI 必须按 [开发协作规范](docs/engineering/development.md) 的要求输出开工回执，再进入对应任务动作。
+任务会修改项目文件、配置、依赖、Git 状态或其他项目状态时，必须先读取 [开发协作规范](docs/engineering/development.md) 中与任务分级、执行流程、验证和输出相关的章节，并按其要求输出开工回执。架构文档和测试规范不因此自动成为必读文档。
 
-## 文档目录
+需要修改文件但尚未完成当前任务所需阅读时，不得开始修改、运行测试或创建提交。
 
-- [文档中心](docs/README.md)：按限界上下文、产品语义和工程治理组织的文档总索引。
-- [开发协作规范](docs/engineering/development.md)：定义开发协作 AI 的需求分析、Spec、Plan、TDD、验证、提交和汇报规则。
-- [架构文档](docs/engineering/architecture.md)：定义架构范式、分层规则、依赖方向、限界上下文、端口归属和业务事实来源。
-- [测试规范](docs/testing/testing.md)：定义测试金字塔、测试类型、目录结构、命名、边界、数据和门禁规则。
-- [国际化规范](docs/i18n/README.md)：定义 locale catalog、文案归属、Message key、不可翻译边界和 AI 静态门禁规则。
-- [E2E 稳定性改造手册](docs/testing/e2e-stability.md)：沉淀确定性同步、稳定身份、断言 oracle、场景隔离、清理和失败诊断方法。
-- [技术栈说明](docs/engineering/tech-stack.md)：区分当前采用技术与候选技术，并说明工具链和使用边界。
-- [上下文地图](docs/engineering/context-map.md)：集中记录当前上下文、聚合和跨上下文端口协作。
-- [日志与错误规范](docs/engineering/logging.md)：定义诊断日志、应用错误、IPC 错误传递和日志门禁规则。
-- [终端渲染排障指南](docs/engineering/terminal-rendering.md)：沉淀 xterm、PTY 行列同步、滚动条几何、CJK cell 度量和 Electron 视觉验证经验。
-- [UI 契约](docs/product/ui.md)：定义长期有效的工作台信息架构、对象语义、交互不变量、状态反馈和视觉原则。
-- [UI 路线图](docs/product/ui-roadmap.md)：记录尚未确认、尚未实现或等待实现对齐的 UI 方向；不作为当前功能或验收事实来源。
-- [项目与分支工作区生命周期](docs/contexts/project/workspace-lifecycle.md)：维护项目、登记簿、Git 分支/worktree 和 Agent 挂起协作规则。
-- [积木图模型](docs/contexts/block-graph/block-graph.md)：维护终端积木、组合、连接、布局和恢复规则。
-- [积木动作模型](docs/contexts/block-graph/block-action-model.md)：定义当前终端积木与终端组合动作的功能意图和作用对象。
-- [终端会话生命周期](docs/contexts/run/terminal-session.md)：维护普通终端 PTY 的状态、输入、中断、替换和清理规则。
-- [终端依赖工作流](docs/contexts/run/terminal-workflow.md)：维护终端依赖图的上下文协作、状态模型、任务/服务语义、实现入口和验证矩阵。
-- [本地服务端口治理](docs/contexts/run/service-port-management.md)：维护多项目/worktree 本地服务端口策略、运行期租约、实际端点、平台限制和后续候选。
-- [Agent 与会话生命周期](docs/contexts/agent/agent-session.md)：维护 Agent 身份、布局、分支 thread 绑定与 Codex PTY 生命周期。
-- [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)：维护内建 MCP 的工具目录、协议、会话鉴权、审批、上下文协作、实现入口和验证矩阵。
+## 按任务路由
 
-## 按任务阅读
+多个条件同时命中时读取对应文档的并集，不额外扩展为固定套餐。
 
-如果任务涉及技术选型、运行环境、工具链、依赖、构建配置或框架使用，开发协作 AI 必须继续阅读 [技术栈说明](docs/engineering/tech-stack.md)。
-
-如果任务涉及界面、交互、视觉、组件、布局或前端体验，开发协作 AI 必须继续阅读 [UI 契约](docs/product/ui.md) 和 [国际化规范](docs/i18n/README.md)。
-
-如果任务涉及用户可见文案、可访问名称、表单提示、通知、错误映射、语言偏好、locale catalog、Message key 或 i18n 门禁，开发协作 AI 必须继续阅读 [国际化规范](docs/i18n/README.md)。
-
-如果任务涉及 xterm、PTY 行列同步、终端字符宽度、CJK 或 emoji 渲染、终端滚动条、终端黑边或可见字符裁剪，开发协作 AI 必须继续阅读 [终端渲染排障指南](docs/engineering/terminal-rendering.md)。
-
-如果任务涉及 Electron/PTY E2E 偶发失败、超时、固定等待、会话身份、失败诊断或测试基础设施改造，开发协作 AI 必须继续阅读 [E2E 稳定性改造手册](docs/testing/e2e-stability.md)。
-
-如果任务涉及 UI 规划、未来功能、未实现方向或产品路线图，开发协作 AI 必须继续阅读 [UI 路线图](docs/product/ui-roadmap.md)。路线图不得被当作当前功能清单或验收标准。
-
-如果任务涉及积木按钮、批量操作、组合动作、动作作用对象或新增积木类型，开发协作 AI 必须继续阅读 [积木动作模型](docs/contexts/block-graph/block-action-model.md)。
-
-如果任务涉及项目、最近项目、Git 分支、worktree、主工作区 checkout、工作区同步或归档，开发协作 AI 必须继续阅读[项目与分支工作区生命周期](docs/contexts/project/workspace-lifecycle.md)。
-
-如果任务涉及终端积木、终端组合、画布 viewport、图持久化、连线校验或图恢复，开发协作 AI 必须继续阅读[积木图模型](docs/contexts/block-graph/block-graph.md)。
-
-如果任务涉及普通终端 PTY、终端输入、Ctrl+C、resize、工作目录、会话替换或清理，开发协作 AI 必须继续阅读[终端会话生命周期](docs/contexts/run/terminal-session.md)。
-
-如果任务涉及终端连线、依赖图、工作流计划、任务/服务模式、服务就绪、流程状态、失败传播或流程停止，开发协作 AI 必须继续阅读 [终端依赖工作流](docs/contexts/run/terminal-workflow.md)。
-
-如果任务涉及本地服务端口冲突、端口分配策略、端口租约、动态端口注入、监听者所有权或实际服务端点，开发协作 AI 必须继续阅读 [本地服务端口治理](docs/contexts/run/service-port-management.md)。该文档是当前已实现能力、边界、平台限制和后续候选的事实维护入口；其中明确标记的后续候选不得被当作当前能力。
-
-如果任务涉及 cleancode 原生 MCP、MCP Server、工具名称或 Schema、JSON-RPC 桥接、会话端点、Bearer Token、工具审批、工具审计或 Codex MCP 配置注入，开发协作 AI 必须继续阅读 [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)。
-
-如果任务涉及 Agent 身份、多个 Agent、布局、Codex thread 绑定、分支对话恢复、Agent PTY、挂起恢复或删除生命周期，开发协作 AI 必须继续阅读 [Agent 与会话生命周期](docs/contexts/agent/agent-session.md)。
-
-如果任务涉及新增或修改跨限界上下文协作、调用方端口、上下文适配器或 Platform composition root，开发协作 AI 必须继续阅读[上下文地图](docs/engineering/context-map.md)。
-
-如果任务涉及日志、错误处理、异常传递、IPC 错误返回、诊断输出、日志级别或日志门禁，开发协作 AI 必须继续阅读 [日志与错误规范](docs/engineering/logging.md)。
-
-如果任务涉及修改文档规则本身，开发协作 AI 必须继续阅读被修改文档及其直接引用的相关文档。
-
-## 行动边界
-
-未完成本文件要求的当前回合阅读前，开发协作 AI 不得修改文件、实现代码、运行测试、创建提交，或声称已理解项目规则。
+| 任务条件                                                                | 需要读取                                                                                                                                      |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 修改业务行为、状态、不变量或生命周期                                    | 对应限界上下文文档；状态 owner 或边界不清楚时再读[架构文档](docs/engineering/architecture.md)                                                 |
+| 修改分层、依赖方向、端口、跨上下文协作或 composition root               | [架构文档](docs/engineering/architecture.md)；涉及当前协作关系时再读[上下文地图](docs/engineering/context-map.md)                             |
+| 新增或修改测试、选择测试层级、调整测试目录或测试基础设施                | [测试规范](docs/testing/testing.md)；Electron/PTY E2E 稳定性问题再读 [E2E 稳定性改造手册](docs/testing/e2e-stability.md)                      |
+| 修改依赖、构建、运行环境、框架或工具链                                  | [技术栈说明](docs/engineering/tech-stack.md)                                                                                                  |
+| 修改稳定的用户可见行为、信息架构、对象作用域或状态含义                  | [UI 契约](docs/product/ui-contract.md)                                                                                                        |
+| 修改视觉、组件选择、布局、状态呈现、动效或可访问性交互                  | [UI Style Guide](docs/product/ui-style-guide.md)；只有同时改变产品语义时才读 UI 契约                                                          |
+| 修改用户可见文案、可访问名称、locale、Message key 或 i18n 门禁          | [国际化规范](docs/i18n/README.md)                                                                                                             |
+| 讨论尚未确认或尚未实现的 UI 方向                                        | [UI 路线图](docs/product/ui-roadmap.md)                                                                                                       |
+| 修改项目、Git 分支、worktree、checkout、同步或归档                      | [项目与分支工作区生命周期](docs/contexts/project/workspace-lifecycle.md)                                                                      |
+| 修改终端积木、终端组合、viewport、连线、图持久化或图恢复                | [积木图模型](docs/contexts/block-graph/block-graph.md)；涉及动作作用对象时再读[积木动作模型](docs/contexts/block-graph/block-action-model.md) |
+| 修改普通终端 PTY、输入、中断、resize、工作目录、会话替换或清理          | [终端会话生命周期](docs/contexts/run/terminal-session.md)                                                                                     |
+| 修改终端依赖、工作流计划、任务/服务、就绪、状态传播或停止               | [终端依赖工作流](docs/contexts/run/terminal-workflow.md)                                                                                      |
+| 修改本地服务端口策略、租约、注入、监听所有权或实际端点                  | [本地服务端口治理](docs/contexts/run/service-port-management.md)                                                                              |
+| 修改 Agent 身份、布局、thread 绑定、Agent PTY 或挂起恢复                | [Agent 与会话生命周期](docs/contexts/agent/agent-session.md)                                                                                  |
+| 修改 cleancode 原生 MCP、工具 Schema、鉴权、审批、审计或 Codex MCP 注入 | [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)                                                                                    |
+| 修改日志、错误传递、诊断输出或日志门禁                                  | [日志与错误规范](docs/engineering/logging.md)                                                                                                 |
+| 修改 xterm 渲染、PTY 行列、CJK/emoji cell、滚动条或可见裁剪             | [终端渲染排障指南](docs/engineering/terminal-rendering.md)                                                                                    |
+| 新增、移动、重命名或删除文档                                            | [文档中心](docs/README.md)；只改文档内容时直接读取目标文档                                                                                    |
 
 ## 阻塞处理
 
-如果必读文档或当前任务所需的按任务阅读文档无法读取，开发协作 AI 必须停止开发动作，并向用户说明阻塞原因。
+如果当前任务按上述条件必需的文档无法读取，必须停止会受该规则影响的动作并说明原因。未命中的文档不可读不构成阻塞。
