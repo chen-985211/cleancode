@@ -43,8 +43,7 @@
   --cc-danger-border: rgb(194 65 79 / 25%);
   --cc-ring: rgb(47 103 216 / 34%);
   --cc-backdrop: rgb(15 23 42 / 38%);
-  --cc-tooltip: rgb(15 23 42 / 94%);
-  --cc-tooltip-border: rgb(15 23 42 / 18%);
+  --cc-tooltip: #0a0a0a;
   --cc-tooltip-foreground: #f8fafc;
   --cc-scrollbar: rgb(100 116 139 / 55%);
   --cc-neutral-overlay: rgb(255 255 255 / 90%);
@@ -107,9 +106,8 @@
   --cc-danger-border: rgb(238 113 128 / 38%);
   --cc-ring: rgb(117 160 245 / 42%);
   --cc-backdrop: rgb(0 0 0 / 56%);
-  --cc-tooltip: rgb(5 8 12 / 96%);
-  --cc-tooltip-border: rgb(255 255 255 / 14%);
-  --cc-tooltip-foreground: #f8fafc;
+  --cc-tooltip: #edf1f7;
+  --cc-tooltip-foreground: #101318;
   --cc-scrollbar: rgb(148 163 184 / 48%);
   --cc-neutral-overlay: rgb(255 255 255 / 7%);
   --cc-shadow-color: rgb(0 0 0 / 34%);

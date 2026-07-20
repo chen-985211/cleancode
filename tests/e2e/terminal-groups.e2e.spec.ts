@@ -117,59 +117,6 @@ describe('terminal groups e2e', () => {
   )
 
   it(
-    'keeps the member remove tooltip above the collapsed group toolbar',
-    async () => {
-      await createTwoTerminalBlocks(page, workbench)
-
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
-      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
-      await page.getByRole('button', { name: '创建组合' }).click()
-      await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
-      await page.getByRole('button', { name: 'Terminal 1 移出组合' }).waitFor()
-
-      expect((await page.locator('.terminal-group-node__title').innerText()).trim()).toBe(
-        '启动项目'
-      )
-
-      const removeButton = page.getByRole('button', { name: 'Terminal 1 移出组合' })
-
-      expect(await removeButton.getAttribute('title')).toBeNull()
-      await removeButton.hover()
-      await page.waitForFunction(() => {
-        const button = document.querySelector('.terminal-group-node__member-remove')
-
-        return button ? getComputedStyle(button, '::after').opacity === '1' : false
-      })
-
-      const tooltipLayers = await page.evaluate(() => {
-        const memberList = document.querySelector('.terminal-group-node__members')
-        const toolbar = document.querySelector('.terminal-group-node__toolbar')
-        const button = document.querySelector('.terminal-group-node__member-remove')
-
-        if (!memberList || !toolbar || !button) {
-          return null
-        }
-
-        const tooltip = getComputedStyle(button, '::after')
-
-        return {
-          memberList: Number(getComputedStyle(memberList).zIndex),
-          toolbar: Number(getComputedStyle(toolbar).zIndex),
-          tooltipLeft: Number.parseFloat(tooltip.left),
-          tooltipRight: tooltip.right
-        }
-      })
-
-      expect(tooltipLayers).not.toBeNull()
-      expect(tooltipLayers!.memberList).toBeGreaterThan(tooltipLayers!.toolbar)
-      expect(tooltipLayers!.tooltipLeft).toBeLessThan(0)
-      expect(tooltipLayers!.tooltipRight).toBe('0px')
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
     'removes a member terminal by dropping it outside in group edit mode',
     async () => {
       await createTerminalBlocks(page, workbench, 3)

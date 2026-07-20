@@ -8,6 +8,7 @@ import type {
 } from './types'
 import { useI18n } from './i18n/useI18n'
 import type { Translate } from './i18n/messages'
+import { TooltipLabel } from './Tooltip'
 
 interface TerminalServiceRuntimeBarProps {
   readonly identity: TerminalRunIdentity | null
@@ -80,13 +81,11 @@ function EndpointRow({
   return (
     <div className="terminal-service-runtime__endpoint">
       <span className="terminal-service-runtime__label">{t('service.label')}</span>
-      <code
-        className="terminal-service-runtime__address"
-        aria-label={t('service.actualAddress')}
-        title={endpoint.displayAddress}
-      >
-        {endpoint.displayAddress}
-      </code>
+      <TooltipLabel content={endpoint.displayAddress}>
+        <code className="terminal-service-runtime__address" aria-label={t('service.actualAddress')}>
+          {endpoint.displayAddress}
+        </code>
+      </TooltipLabel>
       {endpoint.fallback && endpoint.requestedPort !== null ? (
         <span className="terminal-service-runtime__fallback">
           {t('service.fallback', {
@@ -240,15 +239,15 @@ function RuntimeIconButton({
   readonly children: React.ReactNode
 }) {
   return (
-    <button
-      className="terminal-service-runtime__action"
-      type="button"
-      aria-label={label}
-      title={tooltip}
-      data-cc-tooltip={tooltip}
-      onClick={onClick}
-    >
-      {children}
-    </button>
+    <TooltipLabel content={tooltip}>
+      <button
+        className="terminal-service-runtime__action"
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    </TooltipLabel>
   )
 }

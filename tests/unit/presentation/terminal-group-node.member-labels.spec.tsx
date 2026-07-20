@@ -175,13 +175,15 @@ describe('terminal group member labels', () => {
     expect(onDissolveGroup).toHaveBeenCalledWith(expectedGroup)
   })
 
-  it('explains that dissolving a group preserves its member terminals', () => {
+  it('explains that dissolving a group preserves its member terminals', async () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
     const dissolveButton = screen.getByRole('button', { name: '启动项目 解散组合' })
 
-    expect(dissolveButton).toHaveAttribute('title', '解散组合，保留成员终端')
-    expect(dissolveButton).toHaveAttribute('data-cc-tooltip', '解散组合，保留成员终端')
+    expect(dissolveButton).not.toHaveAttribute('title')
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(dissolveButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('解散组合，保留成员终端')
   })
 
   it('keeps the group header compact while editing the group name', () => {
@@ -208,13 +210,16 @@ describe('terminal group member labels', () => {
     expect(screen.getByRole('button', { name: 'Frontend 移出组合' })).toBeInTheDocument()
   })
 
-  it('uses only the custom tooltip for a member remove action', () => {
+  it('uses only the shared tooltip for a member remove action', async () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
     const removeButton = screen.getByRole('button', { name: 'Backend 移出组合' })
 
     expect(removeButton).not.toHaveAttribute('title')
-    expect(removeButton).toHaveAttribute('data-cc-tooltip', '移出组合')
+    expect(removeButton).not.toHaveAttribute('data-cc-tooltip')
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(removeButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('移出组合')
   })
 
   it('shows each member terminal status while the group is collapsed', () => {

@@ -9,6 +9,7 @@ import {
 } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
 
 export function AgentConsoleActions({
@@ -103,45 +104,47 @@ export function AgentConsoleActions({
           />
         </form>
       ) : (
-        <button
-          className="agent-console-actions__title"
-          type="button"
-          aria-label={t('agent.renameHint', { agentName: agent.name })}
-          title={t('agent.renameTitle')}
-          onClick={(event) => {
-            event.stopPropagation()
-            onSelect?.()
-          }}
-          onDoubleClick={(event) => {
-            event.stopPropagation()
-            startRename()
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'F2') startRename()
-          }}
-        >
-          {agent.name}
-        </button>
+        <TooltipLabel content={t('agent.renameTitle')}>
+          <button
+            className="agent-console-actions__title"
+            type="button"
+            aria-label={t('agent.renameHint', { agentName: agent.name })}
+            onClick={(event) => {
+              event.stopPropagation()
+              onSelect?.()
+            }}
+            onDoubleClick={(event) => {
+              event.stopPropagation()
+              startRename()
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'F2') startRename()
+            }}
+          >
+            {agent.name}
+          </button>
+        </TooltipLabel>
       )}
       {capabilityControl}
       {mode !== 'rename' ? (
         <span className="agent-console-actions__menu-anchor">
-          <button
-            className="agent-console-actions__more nodrag"
-            ref={menuTriggerRef}
-            type="button"
-            aria-label={t('agent.moreActions', { agentName: agent.name })}
-            aria-expanded={mode === 'menu'}
-            aria-haspopup="menu"
-            title={t('sidebar.more')}
-            disabled={isSubmitting}
-            onClick={(event) => {
-              event.stopPropagation()
-              setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
-            }}
-          >
-            <MoreHorizontal size={15} aria-hidden="true" />
-          </button>
+          <TooltipLabel content={t('sidebar.more')}>
+            <button
+              className="agent-console-actions__more nodrag"
+              ref={menuTriggerRef}
+              type="button"
+              aria-label={t('agent.moreActions', { agentName: agent.name })}
+              aria-expanded={mode === 'menu'}
+              aria-haspopup="menu"
+              disabled={isSubmitting}
+              onClick={(event) => {
+                event.stopPropagation()
+                setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
+              }}
+            >
+              <MoreHorizontal size={15} aria-hidden="true" />
+            </button>
+          </TooltipLabel>
           {mode === 'menu' ? (
             <div
               className="agent-console-actions__menu nodrag"

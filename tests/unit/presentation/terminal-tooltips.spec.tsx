@@ -185,7 +185,7 @@ describe('terminal tooltips', () => {
     })
   })
 
-  it('labels terminal icon actions with tooltip text', () => {
+  it('labels terminal icon actions with tooltip text', async () => {
     render(
       <TerminalNode
         id="terminal-1"
@@ -203,11 +203,11 @@ describe('terminal tooltips', () => {
       />
     )
 
-    expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
-    expectTooltip('Terminal 启动命令', '配置启动命令')
-    expectTooltip('Terminal 停止当前命令', '停止当前命令')
-    expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
-    expectTooltip('Terminal 删除终端', '删除终端')
+    await expectTooltip('Terminal 编辑终端信息', '编辑终端信息')
+    await expectTooltip('Terminal 启动命令', '配置启动命令')
+    await expectTooltip('Terminal 停止当前命令', '停止当前命令')
+    await expectTooltip('Terminal 重开空终端会话', '重开空终端会话，不执行启动命令')
+    await expectTooltip('Terminal 删除终端', '删除终端')
 
     const restartButton = screen.getByRole('button', { name: 'Terminal 重开空终端会话' })
     expect(restartButton.querySelector('[data-icon="group-restart"]')).not.toBeNull()
@@ -218,7 +218,7 @@ describe('terminal tooltips', () => {
     expect(deleteButton.querySelector('.lucide-trash-2')).toBeNull()
   })
 
-  it('turns the workflow action into a scoped stop action on the active run root', () => {
+  it('turns the workflow action into a scoped stop action on the active run root', async () => {
     const onStopWorkflow = vi.fn()
     render(
       <TerminalNode
@@ -244,7 +244,9 @@ describe('terminal tooltips', () => {
 
     const stopWorkflow = screen.getByRole('button', { name: 'Terminal 停止本次运行' })
 
-    expect(stopWorkflow).toHaveAttribute('data-cc-tooltip', '停止本次运行')
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(stopWorkflow)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('停止本次运行')
     fireEvent.click(stopWorkflow)
     expect(onStopWorkflow).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: 'Terminal 停止当前命令' })).toBeInTheDocument()
@@ -352,9 +354,14 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
   }
 }
 
-function expectTooltip(accessibleName: string, tooltip: string): void {
-  expect(screen.getByRole('button', { name: accessibleName })).toHaveAttribute(
-    'data-cc-tooltip',
-    tooltip
-  )
+async function expectTooltip(accessibleName: string, tooltip: string): Promise<void> {
+  const button = screen.getByRole('button', { name: accessibleName })
+  expect(button).not.toHaveAttribute('title')
+  expect(button).not.toHaveAttribute('data-cc-tooltip')
+
+  fireEvent.keyDown(document, { key: 'Tab' })
+  fireEvent.focus(button)
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(tooltip)
+  fireEvent.blur(button)
+  await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
 }

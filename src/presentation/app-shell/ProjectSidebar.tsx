@@ -18,6 +18,7 @@ import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
+import { TooltipLabel } from './Tooltip'
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
@@ -95,15 +96,16 @@ export function ProjectSidebar({
       {actionError ? (
         <div className="project-sidebar-alert" role="alert">
           <span>{actionError}</span>
-          <button
-            className="project-sidebar-alert__close"
-            type="button"
-            aria-label={t('sidebar.closeAlert')}
-            title={t('sidebar.closeAlert')}
-            onClick={onDismissActionError}
-          >
-            <X size={13} aria-hidden="true" />
-          </button>
+          <TooltipLabel content={t('sidebar.closeAlert')}>
+            <button
+              className="project-sidebar-alert__close"
+              type="button"
+              aria-label={t('sidebar.closeAlert')}
+              onClick={onDismissActionError}
+            >
+              <X size={13} aria-hidden="true" />
+            </button>
+          </TooltipLabel>
         </div>
       ) : null}
       <div className="project-sidebar__label">{t('sidebar.projects')}</div>
@@ -284,45 +286,52 @@ function ProjectCard({
       aria-label={t('sidebar.projectGroup', { projectName: workbench.project.name })}
     >
       <div className="project-card__header">
-        <button
-          className={
-            canReorder
-              ? 'project-card__select project-card__select--draggable'
-              : 'project-card__select'
-          }
-          type="button"
-          aria-controls={workspaceListId}
-          aria-expanded={isExpanded}
-          aria-label={workbench.project.name}
-          title={t(isExpanded ? 'sidebar.collapseProject' : 'sidebar.expandProject', {
+        <TooltipLabel
+          content={t(isExpanded ? 'sidebar.collapseProject' : 'sidebar.expandProject', {
             projectName: workbench.project.name
           })}
-          onClick={toggleProjectExpanded}
-          onPointerDown={(event) => onProjectPointerDown(event, workbench)}
         >
-          <span className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'} />
-          <span className="project-card__name truncate">{workbench.project.name}</span>
-        </button>
-        <button
-          className="project-card__branch icon-button"
-          type="button"
-          aria-label={t('sidebar.newBranchWorkspace')}
-          title={t('sidebar.newBranchWorkspace')}
-          ref={triggerRef}
-          onClick={toggleBranchWorkspaceForm}
-        >
-          <Plus size={14} aria-hidden="true" />
-        </button>
-        <button
-          className="project-card__remove icon-button"
-          type="button"
-          aria-label={t('sidebar.removeProject')}
-          title={t('sidebar.removeProjectFromList')}
-          ref={removeProjectButtonRef}
-          onClick={() => setIsRemoveProjectDialogOpen((isOpen) => !isOpen)}
-        >
-          <Trash2 size={14} aria-hidden="true" />
-        </button>
+          <button
+            className={
+              canReorder
+                ? 'project-card__select project-card__select--draggable'
+                : 'project-card__select'
+            }
+            type="button"
+            aria-controls={workspaceListId}
+            aria-expanded={isExpanded}
+            aria-label={workbench.project.name}
+            onClick={toggleProjectExpanded}
+            onPointerDown={(event) => onProjectPointerDown(event, workbench)}
+          >
+            <span
+              className={isCurrentProject ? 'project-dot project-dot--active' : 'project-dot'}
+            />
+            <span className="project-card__name truncate">{workbench.project.name}</span>
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={t('sidebar.newBranchWorkspace')}>
+          <button
+            className="project-card__branch icon-button"
+            type="button"
+            aria-label={t('sidebar.newBranchWorkspace')}
+            ref={triggerRef}
+            onClick={toggleBranchWorkspaceForm}
+          >
+            <Plus size={14} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={t('sidebar.removeProjectFromList')}>
+          <button
+            className="project-card__remove icon-button"
+            type="button"
+            aria-label={t('sidebar.removeProject')}
+            ref={removeProjectButtonRef}
+            onClick={() => setIsRemoveProjectDialogOpen((isOpen) => !isOpen)}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
       </div>
       <div
         className={
@@ -379,39 +388,41 @@ function ProjectCard({
                             : 'workspace-row default-branch-selector'
                         }
                       >
-                        <button
-                          aria-label={t('sidebar.switchDefaultWorkspace', {
-                            branchName: boundBranchName
-                          })}
-                          aria-current={isActiveWorkspace ? 'page' : undefined}
-                          className="default-branch-selector__select"
-                          type="button"
-                          title={boundBranchName}
-                          onClick={() => onSelectWorkspace(workbench, 'main')}
-                        >
-                          <span className="workspace-row__branch-icon" aria-hidden="true">
-                            <GitBranch size={14} />
-                          </span>
-                          <span className="workspace-row__name truncate">{boundBranchName}</span>
-                          {shouldShowDefaultWorkspaceBadge ? (
-                            <span className="badge badge--default-workspace">
-                              {t('sidebar.defaultWorkspace')}
+                        <TooltipLabel content={boundBranchName}>
+                          <button
+                            aria-label={t('sidebar.switchDefaultWorkspace', {
+                              branchName: boundBranchName
+                            })}
+                            aria-current={isActiveWorkspace ? 'page' : undefined}
+                            className="default-branch-selector__select"
+                            type="button"
+                            onClick={() => onSelectWorkspace(workbench, 'main')}
+                          >
+                            <span className="workspace-row__branch-icon" aria-hidden="true">
+                              <GitBranch size={14} />
                             </span>
-                          ) : null}
-                        </button>
-                        <button
-                          aria-label={t('sidebar.chooseDefaultBranch', {
-                            branchName: boundBranchName
-                          })}
-                          aria-expanded={isBranchSelectorOpen}
-                          aria-haspopup="dialog"
-                          className="default-branch-selector__toggle"
-                          type="button"
-                          title={t('sidebar.chooseDefaultBranchTitle')}
-                          onClick={toggleBranchSelector}
-                        >
-                          <ChevronDown size={14} aria-hidden="true" />
-                        </button>
+                            <span className="workspace-row__name truncate">{boundBranchName}</span>
+                            {shouldShowDefaultWorkspaceBadge ? (
+                              <span className="badge badge--default-workspace">
+                                {t('sidebar.defaultWorkspace')}
+                              </span>
+                            ) : null}
+                          </button>
+                        </TooltipLabel>
+                        <TooltipLabel content={t('sidebar.chooseDefaultBranchTitle')}>
+                          <button
+                            aria-label={t('sidebar.chooseDefaultBranch', {
+                              branchName: boundBranchName
+                            })}
+                            aria-expanded={isBranchSelectorOpen}
+                            aria-haspopup="dialog"
+                            className="default-branch-selector__toggle"
+                            type="button"
+                            onClick={toggleBranchSelector}
+                          >
+                            <ChevronDown size={14} aria-hidden="true" />
+                          </button>
+                        </TooltipLabel>
                       </div>
                       {isBranchSelectorOpen ? (
                         <BranchSelectorPopover
@@ -445,62 +456,60 @@ function ProjectCard({
                           .filter(Boolean)
                           .join(' ')}
                       >
-                        <button
-                          aria-label={workspaceButtonLabel}
-                          aria-current={isActiveWorkspace ? 'page' : undefined}
-                          className="workspace-row__select"
-                          type="button"
-                          title={workspaceDisplayName}
-                          onClick={() => onSelectWorkspace(workbench, workspace.name)}
-                        >
-                          <span className="workspace-row__branch-icon" aria-hidden="true">
-                            <GitBranch size={14} />
-                          </span>
-                          <span className="workspace-row__name truncate">
-                            {workspaceDisplayName}
-                          </span>
-                          {shouldShowDefaultWorkspaceBadge ||
-                          isWorktreeWorkspace ||
-                          shouldShowGitBranchBadge ? (
-                            <span className="workspace-row__metadata">
-                              {shouldShowDefaultWorkspaceBadge ? (
-                                <span className="badge badge--default-workspace">
-                                  {t('sidebar.defaultWorkspace')}
-                                </span>
-                              ) : null}
-                              {isWorktreeWorkspace ? (
-                                <span
-                                  className="workspace-row__kind"
-                                  aria-hidden="true"
-                                  title={t('sidebar.separateWorkspace')}
-                                >
-                                  <Folders size={12} />
-                                </span>
-                              ) : null}
-                              {shouldShowGitBranchBadge ? (
-                                <span className="badge badge--git">{workspace.gitBranch}</span>
-                              ) : null}
-                            </span>
-                          ) : null}
-                        </button>
-                        {isWorktreeWorkspace ? (
+                        <TooltipLabel content={workspaceButtonLabel}>
                           <button
-                            className="workspace-row__menu-button"
+                            aria-label={workspaceButtonLabel}
+                            aria-current={isActiveWorkspace ? 'page' : undefined}
+                            className="workspace-row__select"
                             type="button"
-                            aria-label={t('sidebar.openWorkspaceMenu', {
-                              workspaceName: workspace.name
-                            })}
-                            aria-haspopup="menu"
-                            aria-expanded={openWorkspaceMenuName === workspace.name}
-                            title={t('sidebar.more')}
-                            onClick={() =>
-                              setOpenWorkspaceMenuName((menuName) =>
-                                menuName === workspace.name ? null : workspace.name
-                              )
-                            }
+                            onClick={() => onSelectWorkspace(workbench, workspace.name)}
                           >
-                            <MoreHorizontal size={15} aria-hidden="true" />
+                            <span className="workspace-row__branch-icon" aria-hidden="true">
+                              <GitBranch size={14} />
+                            </span>
+                            <span className="workspace-row__name truncate">
+                              {workspaceDisplayName}
+                            </span>
+                            {shouldShowDefaultWorkspaceBadge ||
+                            isWorktreeWorkspace ||
+                            shouldShowGitBranchBadge ? (
+                              <span className="workspace-row__metadata">
+                                {shouldShowDefaultWorkspaceBadge ? (
+                                  <span className="badge badge--default-workspace">
+                                    {t('sidebar.defaultWorkspace')}
+                                  </span>
+                                ) : null}
+                                {isWorktreeWorkspace ? (
+                                  <span className="workspace-row__kind" aria-hidden="true">
+                                    <Folders size={12} />
+                                  </span>
+                                ) : null}
+                                {shouldShowGitBranchBadge ? (
+                                  <span className="badge badge--git">{workspace.gitBranch}</span>
+                                ) : null}
+                              </span>
+                            ) : null}
                           </button>
+                        </TooltipLabel>
+                        {isWorktreeWorkspace ? (
+                          <TooltipLabel content={t('sidebar.more')}>
+                            <button
+                              className="workspace-row__menu-button"
+                              type="button"
+                              aria-label={t('sidebar.openWorkspaceMenu', {
+                                workspaceName: workspace.name
+                              })}
+                              aria-haspopup="menu"
+                              aria-expanded={openWorkspaceMenuName === workspace.name}
+                              onClick={() =>
+                                setOpenWorkspaceMenuName((menuName) =>
+                                  menuName === workspace.name ? null : workspace.name
+                                )
+                              }
+                            >
+                              <MoreHorizontal size={15} aria-hidden="true" />
+                            </button>
+                          </TooltipLabel>
                         ) : null}
                       </div>
                       {openWorkspaceMenuName === workspace.name ? (

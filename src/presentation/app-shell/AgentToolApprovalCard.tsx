@@ -10,6 +10,7 @@ import {
 
 import type { AgentApprovalPresentation } from './agentApprovalPresentation'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 import type { Translate } from './i18n/messages'
 
 interface AgentToolApprovalCardProps {
@@ -79,9 +80,9 @@ export function AgentToolApprovalCard({
             <TriangleAlert size={15} aria-hidden="true" />
             <span>
               {t('approval.targetMissing')}
-              <code title={presentation.targetId}>
-                {t('approval.targetId', { id: shortenId(presentation.targetId) })}
-              </code>
+              <TooltipLabel content={presentation.targetId}>
+                <code>{t('approval.targetId', { id: shortenId(presentation.targetId) })}</code>
+              </TooltipLabel>
             </span>
           </div>
         ) : (
@@ -173,9 +174,9 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
             {presentation.block.description || t('approval.noDescription')}
           </span>
           <div className="agent-tool-approval-card__target-meta">
-            <code title={presentation.block.id}>
-              {t('approval.targetId', { id: shortenId(presentation.block.id) })}
-            </code>
+            <TooltipLabel content={presentation.block.id}>
+              <code>{t('approval.targetId', { id: shortenId(presentation.block.id) })}</code>
+            </TooltipLabel>
             {presentation.containingGroup ? (
               <span className="agent-tool-approval-card__membership">
                 {t('approval.inGroup', { groupName: presentation.containingGroup.name })}
@@ -227,15 +228,16 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
             />
           </div>
           <div className="agent-tool-approval-card__target-meta">
-            <code
-              aria-label={t('approval.connectionId', {
-                connectionId: presentation.connection.id
-              })}
-              tabIndex={0}
-              title={presentation.connection.id}
-            >
-              {t('approval.connectionId', { connectionId: presentation.connection.id })}
-            </code>
+            <TooltipLabel content={presentation.connection.id}>
+              <code
+                aria-label={t('approval.connectionId', {
+                  connectionId: presentation.connection.id
+                })}
+                tabIndex={0}
+              >
+                {t('approval.connectionId', { connectionId: presentation.connection.id })}
+              </code>
+            </TooltipLabel>
           </div>
         </div>
         <LocateTargetButton disabled={isLocatingDisabled} name={locateName} onLocate={onLocate} />
@@ -265,9 +267,9 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
           })}
         </span>
         <div className="agent-tool-approval-card__target-meta">
-          <code title={presentation.group.id}>
-            {t('approval.targetId', { id: shortenId(presentation.group.id) })}
-          </code>
+          <TooltipLabel content={presentation.group.id}>
+            <code>{t('approval.targetId', { id: shortenId(presentation.group.id) })}</code>
+          </TooltipLabel>
         </div>
       </div>
       <LocateTargetButton
@@ -295,7 +297,9 @@ function ConnectionEndpoint({ direction, id, name }: ConnectionEndpointProps) {
           : t('approval.downstreamTerminal')}
       </span>
       <strong>{name}</strong>
-      <code title={id}>{t('approval.targetId', { id: shortenId(id) })}</code>
+      <TooltipLabel content={id}>
+        <code>{t('approval.targetId', { id: shortenId(id) })}</code>
+      </TooltipLabel>
     </span>
   )
 }

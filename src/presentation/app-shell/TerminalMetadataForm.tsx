@@ -13,6 +13,7 @@ import {
 } from './terminalExecutionConfigDraft'
 import type { TerminalBlockMetadataInput } from './types'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 interface TerminalMetadataFormProps {
   readonly block: TerminalBlockSnapshot
@@ -161,27 +162,27 @@ export function TerminalMetadataForm({
           ) : null}
         </div>
         <div className="terminal-metadata-form__footer">
-          <button
-            className="terminal-node__action terminal-node__action--confirm"
-            type="submit"
-            aria-label={t('terminalForm.save')}
-            aria-busy={isSaving}
-            title={t('terminalForm.save')}
-            data-cc-tooltip={isSaving ? t('terminalForm.saving') : t('terminalForm.save')}
-            disabled={!canSave}
-          >
-            <Check size={15} aria-hidden="true" />
-          </button>
-          <button
-            className="terminal-node__action"
-            type="button"
-            aria-label={t('terminalForm.cancel')}
-            title={t('terminalForm.cancel')}
-            data-cc-tooltip={t('terminalForm.cancelShort')}
-            onClick={onCancel}
-          >
-            <X size={15} aria-hidden="true" />
-          </button>
+          <TooltipLabel content={isSaving ? t('terminalForm.saving') : t('terminalForm.save')}>
+            <button
+              className="terminal-node__action terminal-node__action--confirm"
+              type="submit"
+              aria-label={t('terminalForm.save')}
+              aria-busy={isSaving}
+              disabled={!canSave}
+            >
+              <Check size={15} aria-hidden="true" />
+            </button>
+          </TooltipLabel>
+          <TooltipLabel content={t('terminalForm.cancelShort')}>
+            <button
+              className="terminal-node__action"
+              type="button"
+              aria-label={t('terminalForm.cancel')}
+              onClick={onCancel}
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </TooltipLabel>
         </div>
       </fieldset>
     </form>

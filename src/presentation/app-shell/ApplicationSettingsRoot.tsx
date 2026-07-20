@@ -21,6 +21,7 @@ import {
 } from './applicationShortcuts'
 import type { MessageKey } from './i18n/messages'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 interface ApplicationSettingsRootProps {
   readonly bindings: ApplicationShortcutBindings
@@ -95,19 +96,20 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        className="application-settings-trigger"
-        type="button"
-        aria-controls="application-settings-dialog"
-        aria-expanded={props.isOpen}
-        aria-haspopup="dialog"
-        aria-label={t('settings.open')}
-        title={t('settings.open')}
-        onClick={props.onOpen}
-      >
-        <Settings size={17} aria-hidden="true" />
-      </button>
+      <TooltipLabel content={t('settings.open')} side="bottom">
+        <button
+          ref={triggerRef}
+          className="application-settings-trigger"
+          type="button"
+          aria-controls="application-settings-dialog"
+          aria-expanded={props.isOpen}
+          aria-haspopup="dialog"
+          aria-label={t('settings.open')}
+          onClick={props.onOpen}
+        >
+          <Settings size={17} aria-hidden="true" />
+        </button>
+      </TooltipLabel>
       {props.isOpen ? (
         <section
           id="application-settings-dialog"
@@ -119,16 +121,17 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
           onKeyDown={(event) => trapSettingsFocus(event, dialogRef.current)}
         >
           <header className="application-settings-header">
-            <button
-              ref={backButtonRef}
-              className="application-settings-back"
-              type="button"
-              aria-label={t('settings.back')}
-              title={t('settings.back')}
-              onClick={closeSettings}
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-            </button>
+            <TooltipLabel content={t('settings.back')} side="right">
+              <button
+                ref={backButtonRef}
+                className="application-settings-back"
+                type="button"
+                aria-label={t('settings.back')}
+                onClick={closeSettings}
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </button>
+            </TooltipLabel>
             <h1 id="application-settings-title">{t('settings.title')}</h1>
           </header>
           <div className="application-settings-layout">
@@ -196,40 +199,42 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                               ))
                             )}
                           </button>
-                          <button
-                            className="shortcut-row-action"
-                            type="button"
-                            aria-label={t('settings.shortcuts.clear', { action })}
-                            title={t('settings.shortcuts.clear', { action })}
-                            disabled={binding === null}
-                            onClick={() => {
-                              props.onBindingChange(command, null)
-                              setRecordingCommand(null)
-                              setCaptureError(undefined)
-                            }}
-                          >
-                            <X size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            className="shortcut-row-action"
-                            type="button"
-                            aria-label={t('settings.shortcuts.reset', { action })}
-                            title={t('settings.shortcuts.reset', { action })}
-                            disabled={applicationShortcutBindingsEqual(
-                              binding,
-                              defaultApplicationShortcutBindings[command]
-                            )}
-                            onClick={() => {
-                              props.onBindingChange(
-                                command,
+                          <TooltipLabel content={t('settings.shortcuts.clear', { action })}>
+                            <button
+                              className="shortcut-row-action"
+                              type="button"
+                              aria-label={t('settings.shortcuts.clear', { action })}
+                              disabled={binding === null}
+                              onClick={() => {
+                                props.onBindingChange(command, null)
+                                setRecordingCommand(null)
+                                setCaptureError(undefined)
+                              }}
+                            >
+                              <X size={15} aria-hidden="true" />
+                            </button>
+                          </TooltipLabel>
+                          <TooltipLabel content={t('settings.shortcuts.reset', { action })}>
+                            <button
+                              className="shortcut-row-action"
+                              type="button"
+                              aria-label={t('settings.shortcuts.reset', { action })}
+                              disabled={applicationShortcutBindingsEqual(
+                                binding,
                                 defaultApplicationShortcutBindings[command]
-                              )
-                              setRecordingCommand(null)
-                              setCaptureError(undefined)
-                            }}
-                          >
-                            <RotateCcw size={15} aria-hidden="true" />
-                          </button>
+                              )}
+                              onClick={() => {
+                                props.onBindingChange(
+                                  command,
+                                  defaultApplicationShortcutBindings[command]
+                                )
+                                setRecordingCommand(null)
+                                setCaptureError(undefined)
+                              }}
+                            >
+                              <RotateCcw size={15} aria-hidden="true" />
+                            </button>
+                          </TooltipLabel>
                         </div>
                         {error ? (
                           <p id={errorId} className="shortcut-settings-row__error" role="alert">

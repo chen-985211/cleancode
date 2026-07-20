@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { ProjectSidebar } from '../../../src/presentation/app-shell/ProjectSidebar'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
@@ -34,7 +34,7 @@ describe('project sidebar navigation semantics', () => {
     expect(screen.queryByRole('button', { name: /选择默认工作区分支/ })).not.toBeInTheDocument()
   })
 
-  it('identifies the current workspace and preserves complete navigation labels', () => {
+  it('identifies the current workspace and preserves complete navigation labels', async () => {
     const projectName = 'a-project-name-that-does-not-fit-in-the-sidebar'
     const workbench = createWorkbenchSnapshot('/tmp/long-project', projectName, {
       gitBranch: 'main'
@@ -57,21 +57,21 @@ describe('project sidebar navigation semantics', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: projectName })).toHaveAttribute(
-      'title',
-      `收起项目 ${projectName}`
-    )
-    expect(screen.getByRole('button', { name: '切换到默认工作区 main' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
-    expect(screen.getByRole('button', { name: '切换到默认工作区 main' })).toHaveAttribute(
-      'title',
-      'main'
-    )
+    const projectButton = screen.getByRole('button', { name: projectName })
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(projectButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(`收起项目 ${projectName}`)
+    fireEvent.blur(projectButton)
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+
+    const workspaceButton = screen.getByRole('button', { name: '切换到默认工作区 main' })
+    expect(workspaceButton).toHaveAttribute('aria-current', 'page')
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(workspaceButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('main')
   })
 
-  it('collapses a project without selecting or changing its current workspace', () => {
+  it('collapses a project without selecting or changing its current workspace', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const onSelectWorkspace = vi.fn()
 
@@ -103,7 +103,9 @@ describe('project sidebar navigation semantics', () => {
 
     expect(onSelectWorkspace).not.toHaveBeenCalled()
     expect(collapseProject).toHaveAttribute('aria-expanded', 'false')
-    expect(collapseProject).toHaveAttribute('title', '展开项目 alpha-project')
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(collapseProject)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('展开项目 alpha-project')
     const collapsedWorkspaceList = document.getElementById(
       `project-${workbench.project.id}-workspaces`
     )

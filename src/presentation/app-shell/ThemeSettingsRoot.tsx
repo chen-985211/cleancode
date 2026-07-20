@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from
 
 import type { ThemePreference } from './themePreference'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
@@ -49,19 +50,20 @@ export function ThemeSettingsRoot() {
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        className="theme-settings-trigger"
-        type="button"
-        aria-label={t('theme.settings')}
-        aria-controls="theme-settings-dialog"
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
-        title={t('theme.settings')}
-        onClick={() => setIsOpen(true)}
-      >
-        <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
-      </button>
+      <TooltipLabel content={t('theme.settings')} side="bottom">
+        <button
+          ref={triggerRef}
+          className="theme-settings-trigger"
+          type="button"
+          aria-label={t('theme.settings')}
+          aria-controls="theme-settings-dialog"
+          aria-expanded={isOpen}
+          aria-haspopup="dialog"
+          onClick={() => setIsOpen(true)}
+        >
+          <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
+        </button>
+      </TooltipLabel>
       {isOpen ? (
         <div className="theme-settings-backdrop" onMouseDown={closeFromBackdrop}>
           <aside
@@ -78,16 +80,17 @@ export function ThemeSettingsRoot() {
                 <h2 id="theme-settings-title">{t('theme.settings')}</h2>
                 <p>{t('theme.description')}</p>
               </div>
-              <button
-                ref={closeButtonRef}
-                className="theme-settings-drawer__close"
-                type="button"
-                aria-label={t('theme.close')}
-                title={t('theme.close')}
-                onClick={closeSettings}
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
+              <TooltipLabel content={t('theme.close')} side="left">
+                <button
+                  ref={closeButtonRef}
+                  className="theme-settings-drawer__close"
+                  type="button"
+                  aria-label={t('theme.close')}
+                  onClick={closeSettings}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </TooltipLabel>
             </div>
             <fieldset className="theme-settings-options">
               <legend>{t('theme.section')}</legend>

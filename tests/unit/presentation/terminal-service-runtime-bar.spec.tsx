@@ -9,7 +9,7 @@ import type {
 } from '../../../src/presentation/app-shell/types'
 
 describe('terminal service runtime bar', () => {
-  it('shows the authoritative address, copies it, opens HTTP, and explains fallback', () => {
+  it('shows the authoritative address, copies it, opens HTTP, and explains fallback', async () => {
     const onCopyEndpoint = vi.fn()
     const onOpenEndpoint = vi.fn()
     const identity = createIdentity()
@@ -35,7 +35,10 @@ describe('terminal service runtime bar', () => {
     )
 
     expect(screen.getByLabelText('实际服务地址')).toHaveTextContent('http://127.0.0.1:5174')
-    expect(screen.getByLabelText('实际服务地址')).toHaveAttribute('title', 'http://127.0.0.1:5174')
+    const address = screen.getByLabelText('实际服务地址')
+    expect(address).not.toHaveAttribute('title')
+    fireEvent.pointerMove(address)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('http://127.0.0.1:5174')
     expect(screen.getByText('首选 5173 已占用，已改用 5174')).toBeVisible()
 
     fireEvent.click(screen.getByRole('button', { name: '复制实际服务地址' }))

@@ -2,6 +2,7 @@ import { Check, Languages } from 'lucide-react'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 import { supportedLocales, type Locale } from './i18n/locale'
 
 export function LanguageSettingsRoot() {
@@ -34,19 +35,20 @@ export function LanguageSettingsRoot() {
 
   return (
     <div ref={rootRef} className="language-settings">
-      <button
-        ref={triggerRef}
-        className="language-settings-trigger"
-        type="button"
-        aria-label={t('language.settings')}
-        aria-controls="language-settings-menu"
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
-        title={t('language.settings')}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <Languages size={18} strokeWidth={1.9} aria-hidden="true" />
-      </button>
+      <TooltipLabel content={t('language.settings')} side="bottom">
+        <button
+          ref={triggerRef}
+          className="language-settings-trigger"
+          type="button"
+          aria-label={t('language.settings')}
+          aria-controls="language-settings-menu"
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          <Languages size={18} strokeWidth={1.9} aria-hidden="true" />
+        </button>
+      </TooltipLabel>
       {isOpen ? (
         <div
           id="language-settings-menu"

@@ -90,29 +90,3 @@
   font-size: 10px;
   white-space: nowrap;
 }
-
-.agent-mcp-capability[data-cc-tooltip]::after {
-  top: calc(100% + 8px);
-  bottom: auto;
-  width: 320px;
-  max-width: min(320px, calc(100vw - 32px));
-  border-color: var(--cc-tooltip-border);
-  background: var(--cc-tooltip);
-  box-shadow: var(--cc-shadow-floating);
-  line-height: 1.45;
-  text-align: left;
-  white-space: normal;
-}
-
-.agent-mcp-capability[data-cc-tooltip]::before {
-  top: calc(100% + 3px);
-  bottom: auto;
-  background: var(--cc-tooltip);
-  clip-path: polygon(50% 0, 0 100%, 100% 100%);
-}
-
-.agent-mcp-capability[data-cc-tooltip]:focus-within::after,
-.agent-mcp-capability[data-cc-tooltip]:focus-within::before {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}

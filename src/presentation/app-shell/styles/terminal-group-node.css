@@ -315,25 +315,6 @@
   outline-offset: 2px;
 }
 
-.terminal-group-node__member-remove[data-cc-tooltip]::after {
-  right: 0;
-  left: auto;
-  transform: translateY(2px);
-}
-
-.terminal-group-node__member-remove[data-cc-tooltip]::before {
-  right: 6px;
-  left: auto;
-  transform: translateY(2px);
-}
-
-.terminal-group-node__member-remove[data-cc-tooltip]:hover::after,
-.terminal-group-node__member-remove[data-cc-tooltip]:hover::before,
-.terminal-group-node__member-remove[data-cc-tooltip]:focus-visible::after,
-.terminal-group-node__member-remove[data-cc-tooltip]:focus-visible::before {
-  transform: translateY(0);
-}
-
 .terminal-group-name-form {
   display: flex;
   width: 100%;

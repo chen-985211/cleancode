@@ -22,6 +22,7 @@ describe('application settings', () => {
     )
 
     const trigger = screen.getByRole('button', { name: '设置' })
+    fireEvent.pointerDown(trigger, { pointerType: 'mouse' })
     fireEvent.click(trigger)
 
     const dialog = screen.getByRole('dialog', { name: '设置' })
@@ -34,6 +35,7 @@ describe('application settings', () => {
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '修改“切换侧边栏”快捷键' })).toHaveTextContent('⌘B')
     expect(screen.getByRole('button', { name: '返回工作区' })).toHaveFocus()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
 
     fireEvent.keyDown(document, { key: 'Escape' })
 

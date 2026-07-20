@@ -71,6 +71,7 @@ export const zhCNMessages = {
   'sidebar.label': '项目与分支工作区',
   'sidebar.expand': '展开侧边栏',
   'sidebar.collapse': '收起侧边栏',
+  'sidebar.toggleTooltip': '切换侧边栏 ({shortcut})',
   'sidebar.addProject': '添加项目',
   'sidebar.previewWarning': '浏览器预览不连接本地文件系统和终端。请用桌面应用运行真实功能。',
   'sidebar.closeAlert': '关闭提示',

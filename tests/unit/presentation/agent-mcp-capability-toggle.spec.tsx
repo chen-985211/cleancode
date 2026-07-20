@@ -3,14 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { AgentMcpCapabilityToggle } from '../../../src/presentation/app-shell/AgentMcpCapabilityToggle'
 
 describe('Agent CleanCode MCP capability toggle', () => {
-  it('shows the named MCP capability as an accessible switch with complete scope guidance', () => {
+  it('shows the named MCP capability as an accessible switch with complete scope guidance', async () => {
     const onChange = vi.fn()
     const { container } = render(
       <AgentMcpCapabilityToggle enabled onChange={onChange} pending={false} />
     )
 
     const toggle = screen.getByRole('switch', { name: 'CleanCode MCP' })
-    const tooltip = toggle.closest('[data-cc-tooltip]')
     const icon = container.querySelector('.agent-mcp-capability__icon')
 
     expect(toggle).toHaveAttribute('aria-checked', 'true')
@@ -19,11 +18,14 @@ describe('Agent CleanCode MCP capability toggle', () => {
     expect(icon).toHaveAttribute('stroke', 'currentColor')
     expect(icon?.querySelectorAll('path')).toHaveLength(3)
     expect(icon?.querySelector('circle')).toBeNull()
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('画布'))
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('执行配置'))
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('依赖工作流'))
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('sandbox'))
-    expect(tooltip).toHaveAttribute('data-cc-tooltip', expect.stringContaining('断开依赖'))
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(toggle)
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent('画布')
+    expect(tooltip).toHaveTextContent('执行配置')
+    expect(tooltip).toHaveTextContent('依赖工作流')
+    expect(tooltip).toHaveTextContent('sandbox')
+    expect(tooltip).toHaveTextContent('断开依赖')
 
     fireEvent.click(toggle)
     expect(onChange).toHaveBeenCalledWith(false)

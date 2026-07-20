@@ -76,6 +76,7 @@ export const enMessages = {
   'sidebar.label': 'Projects and branch workspaces',
   'sidebar.expand': 'Show sidebar',
   'sidebar.collapse': 'Hide sidebar',
+  'sidebar.toggleTooltip': 'Toggle sidebar ({shortcut})',
   'sidebar.addProject': 'Add project',
   'sidebar.previewWarning':
     'Browser preview does not connect to the local file system or terminals. Use the desktop app for live features.',

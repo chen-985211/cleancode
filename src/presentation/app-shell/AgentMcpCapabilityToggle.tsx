@@ -1,4 +1,5 @@
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 export function AgentMcpCapabilityToggle({
   enabled,
@@ -14,29 +15,28 @@ export function AgentMcpCapabilityToggle({
   const { t } = useI18n()
   const capabilityTooltip = t('agent.mcpTooltip')
   return (
-    <span
-      className="agent-mcp-capability nodrag"
-      data-cc-tooltip={error ? `${error} ${capabilityTooltip}` : capabilityTooltip}
-    >
-      <button
-        className="agent-mcp-capability__switch nodrag"
-        type="button"
-        role="switch"
-        aria-busy={pending}
-        aria-checked={enabled}
-        aria-label={t('agent.mcpName')}
-        disabled={pending}
-        onClick={(event) => {
-          event.stopPropagation()
-          onChange(!enabled)
-        }}
-      >
-        <McpGlyph />
-        <span className="agent-mcp-capability__label">{t('agent.mcpName')}</span>
-        <span className="agent-mcp-capability__track" aria-hidden="true">
-          <span className="agent-mcp-capability__thumb" />
-        </span>
-      </button>
+    <span className="agent-mcp-capability nodrag">
+      <TooltipLabel content={capabilityTooltip} side="bottom">
+        <button
+          className="agent-mcp-capability__switch nodrag"
+          type="button"
+          role="switch"
+          aria-busy={pending}
+          aria-checked={enabled}
+          aria-label={t('agent.mcpName')}
+          disabled={pending}
+          onClick={(event) => {
+            event.stopPropagation()
+            onChange(!enabled)
+          }}
+        >
+          <McpGlyph />
+          <span className="agent-mcp-capability__label">{t('agent.mcpName')}</span>
+          <span className="agent-mcp-capability__track" aria-hidden="true">
+            <span className="agent-mcp-capability__thumb" />
+          </span>
+        </button>
+      </TooltipLabel>
       {error ? (
         <span className="agent-mcp-capability__error" role="alert">
           {t('agent.mcpToggleFailed')}

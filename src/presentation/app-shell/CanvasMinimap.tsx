@@ -10,6 +10,7 @@ import {
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
 import type { MinimapFlowNode } from './types'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 interface CanvasSize {
   readonly width: number
@@ -204,7 +205,7 @@ export function CanvasMinimap({
         <div className="canvas-minimap__control-group canvas-minimap__control-group--top">
           <MinimapControlButton
             label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
-            title={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
+            tooltip={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
             onClick={onToggleCollapsed}
           >
             {isCollapsed ? (
@@ -219,7 +220,7 @@ export function CanvasMinimap({
             <div className="canvas-minimap__control-group canvas-minimap__control-group--zoom">
               <MinimapControlButton
                 label={t('minimap.zoomInLabel')}
-                title={t('minimap.zoomInTitle')}
+                tooltip={t('minimap.zoomInTitle')}
                 onClick={onZoomIn}
               >
                 <Plus size={14} aria-hidden="true" />
@@ -227,7 +228,7 @@ export function CanvasMinimap({
               <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
               <MinimapControlButton
                 label={t('minimap.zoomOutLabel')}
-                title={t('minimap.zoomOutTitle')}
+                tooltip={t('minimap.zoomOutTitle')}
                 onClick={onZoomOut}
               >
                 <Minus size={14} aria-hidden="true" />
@@ -236,7 +237,7 @@ export function CanvasMinimap({
             <div className="canvas-minimap__control-group canvas-minimap__control-group--bottom">
               <MinimapControlButton
                 label={t('minimap.fitLabel')}
-                title={t('minimap.fitTitle')}
+                tooltip={t('minimap.fitTitle')}
                 onClick={onFitCanvas}
               >
                 <Scan size={14} aria-hidden="true" />
@@ -251,22 +252,23 @@ export function CanvasMinimap({
 
 interface MinimapControlButtonProps {
   readonly label: string
-  readonly title: string
+  readonly tooltip: string
   readonly onClick: () => void
   readonly children: ReactNode
 }
 
-function MinimapControlButton({ label, title, onClick, children }: MinimapControlButtonProps) {
+function MinimapControlButton({ label, tooltip, onClick, children }: MinimapControlButtonProps) {
   return (
-    <button
-      className="icon-button icon-button--small"
-      type="button"
-      aria-label={label}
-      title={title}
-      onClick={onClick}
-    >
-      {children}
-    </button>
+    <TooltipLabel content={tooltip}>
+      <button
+        className="icon-button icon-button--small"
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    </TooltipLabel>
   )
 }
 

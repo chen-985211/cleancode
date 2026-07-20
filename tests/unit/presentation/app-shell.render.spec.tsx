@@ -185,6 +185,18 @@ describe('app shell', () => {
     expect(sidebar).not.toHaveAttribute('aria-hidden')
   })
 
+  it('shows the sidebar shortcut in an Orca-style bottom tooltip', async () => {
+    render(<AppShell />)
+    const titlebarNavigation = screen.getByRole('navigation', { name: '窗口导航' })
+    const toggle = within(titlebarNavigation).getByRole('button', { name: '收起侧边栏' })
+
+    fireEvent.pointerMove(toggle, { pointerType: 'mouse' })
+
+    const tooltip = await screen.findByRole('tooltip')
+    expect(tooltip).toHaveTextContent(/切换侧边栏 \((?:⌘B|Ctrl\+B)\)/)
+    expect(document.querySelector('.cc-tooltip-content')).toHaveAttribute('data-side', 'bottom')
+  })
+
   it('routes Command/Ctrl+B through the sidebar toggle action', () => {
     render(<AppShell />)
 
@@ -375,9 +387,12 @@ describe('app shell', () => {
     })
 
     expect(worktreeWorkspaceButton).toBeEnabled()
-    const worktreeIndicator = within(worktreeWorkspaceButton).getByTitle('独立工作区')
+    expect(worktreeWorkspaceButton).toHaveAccessibleName('feature/worktree 独立工作区')
+    const worktreeIndicator =
+      worktreeWorkspaceButton.querySelector<HTMLElement>('.workspace-row__kind')!
 
     expect(worktreeIndicator).toBeInTheDocument()
+    expect(worktreeIndicator).toHaveAttribute('aria-hidden', 'true')
     expect(worktreeIndicator.querySelector('.lucide-folders')).toBeInTheDocument()
     expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 

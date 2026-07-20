@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ComponentType } from 'react'
 
 import type { AppNotification, AppNotificationKind } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 interface NotificationCenterProps {
   readonly notifications: readonly AppNotification[]
@@ -105,15 +106,16 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
           </div>
         ) : null}
       </div>
-      <button
-        className="notification-card__dismiss"
-        type="button"
-        aria-label={t('notifications.dismiss', { title: notification.title })}
-        title={t('notifications.dismissTitle')}
-        onClick={() => onDismiss(notification.id)}
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
+      <TooltipLabel content={t('notifications.dismissTitle')}>
+        <button
+          className="notification-card__dismiss"
+          type="button"
+          aria-label={t('notifications.dismiss', { title: notification.title })}
+          onClick={() => onDismiss(notification.id)}
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      </TooltipLabel>
     </section>
   )
 }

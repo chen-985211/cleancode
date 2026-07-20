@@ -14,6 +14,7 @@ import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
 import { TerminalServiceRuntimeBar } from './TerminalServiceRuntimeBar'
 import { TerminalViewport } from './TerminalViewport'
+import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import {
@@ -311,30 +312,30 @@ function TerminalHeader({
         <Terminal size={19} aria-hidden="true" />
       </span>
       {isTerminalGroupSelectionMode ? (
-        <button
-          className={[
-            'terminal-node__group-select nodrag',
-            isSelectedForTerminalGroup ? 'terminal-node__group-select--selected' : ''
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          type="button"
-          aria-pressed={isSelectedForTerminalGroup}
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: terminalGroupSelectionLabel
-          })}
-          title={terminalGroupSelectionLabel}
-          data-cc-tooltip={terminalGroupSelectionLabel}
-          disabled={!canSelectForTerminalGroup}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation()
-            onToggleTerminalGroupCandidate()
-          }}
-        >
-          {isSelectedForTerminalGroup ? <Check size={16} aria-hidden="true" /> : null}
-        </button>
+        <TooltipLabel content={terminalGroupSelectionLabel}>
+          <button
+            className={[
+              'terminal-node__group-select nodrag',
+              isSelectedForTerminalGroup ? 'terminal-node__group-select--selected' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            type="button"
+            aria-pressed={isSelectedForTerminalGroup}
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: terminalGroupSelectionLabel
+            })}
+            disabled={!canSelectForTerminalGroup}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleTerminalGroupCandidate()
+            }}
+          >
+            {isSelectedForTerminalGroup ? <Check size={16} aria-hidden="true" /> : null}
+          </button>
+        </TooltipLabel>
       ) : null}
       <div className="terminal-node__title">
         <strong>{blockName}</strong>
@@ -363,98 +364,98 @@ function TerminalHeader({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <button
-          className={`terminal-node__action terminal-node__action--workflow${isActiveWorkflowRoot ? ' terminal-node__action--workflow-stop' : ''}`}
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: isActiveWorkflowRoot
-              ? workflowActionLabel
-              : t('terminal.action.runTerminalWorkflow')
-          })}
-          title={isActiveWorkflowRoot ? workflowActionLabel : t('terminal.action.runDependencies')}
-          data-cc-tooltip={workflowActionLabel}
-          disabled={isActiveWorkflowRoot ? isStoppingWorkflow : !canQuickLaunch}
-          onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
-        >
-          {isActiveWorkflowRoot ? (
-            <CircleStop size={15} aria-hidden="true" />
-          ) : (
-            <Waypoints size={15} aria-hidden="true" />
-          )}
-        </button>
-        <button
-          className={[
-            'terminal-node__action',
-            'terminal-node__action--launch',
-            `terminal-node__action--launch-${launchCommandState}`
-          ].join(' ')}
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: t('terminal.action.launch')
-          })}
-          title={launchCommandTooltip}
-          data-cc-tooltip={launchCommandTooltip}
-          data-launch-command-state={launchCommandState}
-          onClick={onQuickLaunch}
-        >
-          <Play size={15} aria-hidden="true" />
-        </button>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: t('terminal.action.stopCommand')
-          })}
-          title={t('terminal.action.stopCommandShortcut')}
-          data-cc-tooltip={t('terminal.action.stopCommand')}
-          disabled={!isRunning}
-          onClick={onStop}
-        >
-          <Square size={14} aria-hidden="true" />
-        </button>
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: t('terminal.action.restartEmpty')
-          })}
-          title={t('terminal.action.restartEmptyDescription')}
-          data-cc-tooltip={t('terminal.action.restartEmptyDescription')}
-          onClick={onRestart}
-        >
-          <GroupRestartIcon size={16} />
-        </button>
+        <TooltipLabel content={workflowActionLabel}>
+          <button
+            className={`terminal-node__action terminal-node__action--workflow${isActiveWorkflowRoot ? ' terminal-node__action--workflow-stop' : ''}`}
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: isActiveWorkflowRoot
+                ? workflowActionLabel
+                : t('terminal.action.runTerminalWorkflow')
+            })}
+            disabled={isActiveWorkflowRoot ? isStoppingWorkflow : !canQuickLaunch}
+            onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
+          >
+            {isActiveWorkflowRoot ? (
+              <CircleStop size={15} aria-hidden="true" />
+            ) : (
+              <Waypoints size={15} aria-hidden="true" />
+            )}
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={launchCommandTooltip}>
+          <button
+            className={[
+              'terminal-node__action',
+              'terminal-node__action--launch',
+              `terminal-node__action--launch-${launchCommandState}`
+            ].join(' ')}
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: t('terminal.action.launch')
+            })}
+            data-launch-command-state={launchCommandState}
+            onClick={onQuickLaunch}
+          >
+            <Play size={15} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={t('terminal.action.stopCommand')}>
+          <button
+            className="terminal-node__action"
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: t('terminal.action.stopCommand')
+            })}
+            disabled={!isRunning}
+            onClick={onStop}
+          >
+            <Square size={14} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={t('terminal.action.restartEmptyDescription')}>
+          <button
+            className="terminal-node__action"
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: t('terminal.action.restartEmpty')
+            })}
+            onClick={onRestart}
+          >
+            <GroupRestartIcon size={16} />
+          </button>
+        </TooltipLabel>
         <span className="terminal-node__action-divider" aria-hidden="true" />
-        <button
-          className="terminal-node__action"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: t('terminal.action.edit')
-          })}
-          title={t('terminal.action.edit')}
-          data-cc-tooltip={t('terminal.action.edit')}
-          onClick={onStartEditing}
-        >
-          <Edit3 size={15} aria-hidden="true" />
-        </button>
-        <button
-          className="terminal-node__action terminal-node__action--danger"
-          type="button"
-          aria-label={t('terminal.namedAction', {
-            blockName,
-            action: t('terminal.action.delete')
-          })}
-          title={t('terminal.action.delete')}
-          data-cc-tooltip={t('terminal.action.delete')}
-          onClick={onDelete}
-        >
-          <X size={15} aria-hidden="true" />
-        </button>
+        <TooltipLabel content={t('terminal.action.edit')}>
+          <button
+            className="terminal-node__action"
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: t('terminal.action.edit')
+            })}
+            onClick={onStartEditing}
+          >
+            <Edit3 size={15} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={t('terminal.action.delete')}>
+          <button
+            className="terminal-node__action terminal-node__action--danger"
+            type="button"
+            aria-label={t('terminal.namedAction', {
+              blockName,
+              action: t('terminal.action.delete')
+            })}
+            onClick={onDelete}
+          >
+            <X size={15} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
       </div>
     </div>
   )

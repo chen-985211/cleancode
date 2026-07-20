@@ -32,6 +32,7 @@ import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { ThemeSettingsRoot } from './ThemeSettingsRoot'
+import { TooltipLabel } from './Tooltip'
 import { LanguageSettingsRoot } from './LanguageSettingsRoot'
 import { useI18n } from './i18n/useI18n'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
@@ -45,7 +46,11 @@ import { CodexCliStateProvider } from './CodexCliStateProvider'
 import { AgentTerminalEventProvider } from './AgentTerminalEventProvider'
 import { createAgentTerminalEventStore } from './agentTerminalEventState'
 import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
-import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
+import {
+  formatShortcutBinding,
+  resolveShortcutPlatform,
+  type ShortcutPlatform
+} from './applicationShortcuts'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
 import { useApplicationShortcuts, type ApplicationShortcutActions } from './useApplicationShortcuts'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
@@ -67,6 +72,13 @@ export function AppShell({
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
+  const sidebarToggleShortcut = formatShortcutBinding(
+    bindings.toggleSidebar,
+    shortcutPlatform
+  ).join(shortcutPlatform === 'mac' ? '' : '+')
+  const sidebarToggleTooltip = sidebarToggleShortcut
+    ? t('sidebar.toggleTooltip', { shortcut: sidebarToggleShortcut })
+    : t('settings.shortcuts.command.toggleSidebar')
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -550,18 +562,21 @@ export function AppShell({
                 aria-label={t('app.windowNavigation')}
               >
                 <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
-                <button
-                  ref={projectSidebarToggleRef}
-                  className="project-sidebar-toggle"
-                  type="button"
-                  aria-controls="project-sidebar"
-                  aria-expanded={!isProjectSidebarCollapsed}
-                  aria-label={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-                  title={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-                  onClick={toggleProjectSidebar}
-                >
-                  <PanelLeft size={16} aria-hidden="true" />
-                </button>
+                <TooltipLabel content={sidebarToggleTooltip} side="bottom">
+                  <button
+                    ref={projectSidebarToggleRef}
+                    className="project-sidebar-toggle"
+                    type="button"
+                    aria-controls="project-sidebar"
+                    aria-expanded={!isProjectSidebarCollapsed}
+                    aria-label={t(
+                      isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse'
+                    )}
+                    onClick={toggleProjectSidebar}
+                  >
+                    <PanelLeft size={16} aria-hidden="true" />
+                  </button>
+                </TooltipLabel>
               </nav>
               <ProjectSidebar
                 workbenches={workbenches}
