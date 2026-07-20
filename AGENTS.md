@@ -47,7 +47,7 @@
 | 修改 Agent 身份、布局、thread 绑定、Agent PTY 或挂起恢复                | [Agent 与会话生命周期](docs/contexts/agent/agent-session.md)                                                                                  |
 | 修改 cleancode 原生 MCP、工具 Schema、鉴权、审批、审计或 Codex MCP 注入 | [cleancode 原生 MCP](docs/contexts/agent/cleancode-mcp.md)                                                                                    |
 | 修改日志、错误传递、诊断输出或日志门禁                                  | [日志与错误规范](docs/engineering/logging.md)                                                                                                 |
-| 修改 xterm 渲染、PTY 行列、CJK/emoji cell、滚动条或可见裁剪             | [终端渲染排障指南](docs/engineering/terminal-rendering.md)                                                                                    |
+| 修改 xterm 渲染、PTY 行列、CJK/emoji cell、滚动条或可见裁剪             | [终端渲染排障指南](docs/terminal/rendering.md)                                                                                                |
 | 新增、移动、重命名或删除文档                                            | [文档中心](docs/README.md)；只改文档内容时直接读取目标文档                                                                                    |
 
 ## 阻塞处理

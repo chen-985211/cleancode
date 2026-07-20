@@ -18,6 +18,7 @@ docs/
     run/
   product/                  # 跨上下文的产品与表现层契约
   engineering/              # 跨上下文的架构、协作与技术治理
+  terminal/                 # 跨层终端运行时、渲染、恢复与专项路线
   i18n/                     # 国际化实现、文案归属与 AI 约束
   testing/                  # 测试规则、方法和稳定性手册
 ```
@@ -27,11 +28,12 @@ docs/
 - `contexts/<bounded-context>/`：只维护该限界上下文拥有的统一语言、业务规则、状态模型、用例边界和能力说明。
 - `product/`：维护跨上下文的产品信息架构、用户可见契约和未实现路线图。
 - `engineering/`：维护全仓架构、开发协作、技术栈、日志和技术排障规则。
+- `terminal/`：维护跨越 Run、Platform、Presentation 和测试层级的普通终端专项资料，不取代各限界上下文的事实 owner。
 - `i18n/`：维护 locale catalog、文案归属、Message key、不可翻译边界和 AI 静态门禁规则。
 - `testing/`：维护跨上下文的测试组织规则、测试方法和稳定性排障手册。
 - `README.md`：只做导航和归属说明。
 
-新增文档时应先确定事实 owner。不能确定 owner 的内容不得先放入“通用”目录；应先澄清它是业务事实、产品契约还是工程约束。
+新增文档时应先确定事实 owner。不能确定 owner 的内容不得先放入“通用”目录；应先澄清它是业务事实、产品契约、终端专项还是工程约束。普通终端运行时、渲染、恢复和性能等跨层主题进入 `terminal/`，不得因为涉及技术实现就笼统放入 `engineering/`；属于单一限界上下文的终端事实仍保留在对应 `contexts/` 目录。
 
 ## 限界上下文文档
 
@@ -58,7 +60,12 @@ docs/
 - [开发协作规范](engineering/development.md)：任务分级、Spec、Plan、TDD、门禁和汇报规则。
 - [技术栈说明](engineering/tech-stack.md)：框架、运行环境、依赖和工具链选择。
 - [日志与错误规范](engineering/logging.md)：诊断日志、应用错误、IPC 错误传递和日志门禁。
-- [终端渲染排障指南](engineering/terminal-rendering.md)：xterm、PTY、CJK cell、滚动条和 Electron 几何验证经验。
+
+## 终端文档
+
+- [终端文档入口](terminal/README.md)：终端专项文档的定位、边界与放置规则。
+- [终端渲染排障指南](terminal/rendering.md)：xterm、PTY、CJK cell、滚动条和 Electron 几何验证经验。
+- [普通终端运行时演进路线图](terminal/runtime-roadmap.md)：普通终端权威模型、交互质量、跨应用恢复和多运行环境的分阶段实施方向。
 
 ## 国际化文档
 

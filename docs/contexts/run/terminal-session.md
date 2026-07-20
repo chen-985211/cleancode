@@ -63,7 +63,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 - `readWorkingDirectory`：在 macOS 通过 `lsof`、Linux 通过 `/proc/<pid>/cwd` 尽力读取；不支持或进程消失时返回 `null`。
 - `stop` / `disposeAll`：异步终止一个或全部受管 PTY，并等待适配器确认退出。
 
-基础设施默认使用系统 shell；启动命令通过 shell 参数执行，不以解析 shell 提示符判断完成。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，避免只关闭 shell 而遗留仍占用端口的子进程；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../engineering/terminal-rendering.md)。
+基础设施默认使用系统 shell；启动命令通过 shell 参数执行，不以解析 shell 提示符判断完成。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，避免只关闭 shell 而遗留仍占用端口的子进程；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
 
 ## 启动命令与受管服务
 

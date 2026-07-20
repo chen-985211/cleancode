@@ -2,7 +2,7 @@
 
 ## 文档地位
 
-本文提供跨场景可复用的 E2E 设计、排障和改造方法，不重新定义测试层级、目录、门禁或强制规则。测试规则以[测试规范](testing.md)为唯一事实来源，Electron、Vitest 和 Playwright 的当前采用方式以[技术栈说明](../engineering/tech-stack.md)为准，xterm、PTY 网格和终端几何问题继续使用[终端渲染排障指南](../engineering/terminal-rendering.md)。
+本文提供跨场景可复用的 E2E 设计、排障和改造方法，不重新定义测试层级、目录、门禁或强制规则。测试规则以[测试规范](testing.md)为唯一事实来源，Electron、Vitest 和 Playwright 的当前采用方式以[技术栈说明](../engineering/tech-stack.md)为准，xterm、PTY 网格和终端几何问题继续使用[终端渲染排障指南](../terminal/rendering.md)。
 
 本文回答“如何把一个偶发通过的 E2E 改成确定性测试”。具体业务断言仍由所属限界上下文的领域规则、用例、端口和产品契约决定。
 
