@@ -22,7 +22,8 @@ interface UseAppShellShortcutActionsInput {
   readonly isSettingsOpen: boolean
   readonly navigateWorkspace: (direction: WorkspaceNavigationDirection) => void | Promise<void>
   readonly openSettings: ShortcutRun
-  readonly panCanvas: (direction: CanvasPanDirection) => void
+  readonly startPanCanvas: (direction: CanvasPanDirection) => void
+  readonly stopPanCanvas: (direction: CanvasPanDirection) => void
   readonly toggleMinimap: ShortcutRun
   readonly toggleSidebar: ShortcutRun
   readonly zoomCanvasIn: ShortcutRun
@@ -43,7 +44,8 @@ export function useAppShellShortcutActions({
   isSettingsOpen,
   navigateWorkspace,
   openSettings,
-  panCanvas,
+  startPanCanvas,
+  stopPanCanvas,
   toggleMinimap,
   toggleSidebar,
   zoomCanvasIn,
@@ -72,10 +74,26 @@ export function useAppShellShortcutActions({
         enabled: isDesktopRuntime && hasWorkbench && !isGroupSelectionMode,
         run: groupTerminals
       },
-      panCanvasLeft: { enabled: hasWorkbench, run: () => panCanvas('left') },
-      panCanvasRight: { enabled: hasWorkbench, run: () => panCanvas('right') },
-      panCanvasUp: { enabled: hasWorkbench, run: () => panCanvas('up') },
-      panCanvasDown: { enabled: hasWorkbench, run: () => panCanvas('down') },
+      panCanvasLeft: {
+        enabled: hasWorkbench,
+        run: () => startPanCanvas('left'),
+        stop: () => stopPanCanvas('left')
+      },
+      panCanvasRight: {
+        enabled: hasWorkbench,
+        run: () => startPanCanvas('right'),
+        stop: () => stopPanCanvas('right')
+      },
+      panCanvasUp: {
+        enabled: hasWorkbench,
+        run: () => startPanCanvas('up'),
+        stop: () => stopPanCanvas('up')
+      },
+      panCanvasDown: {
+        enabled: hasWorkbench,
+        run: () => startPanCanvas('down'),
+        stop: () => stopPanCanvas('down')
+      },
       zoomCanvasIn: { enabled: hasWorkbench, run: zoomCanvasIn },
       zoomCanvasOut: { enabled: hasWorkbench, run: zoomCanvasOut },
       fitCanvas: { enabled: hasWorkbench, run: fitCanvas },
@@ -95,7 +113,8 @@ export function useAppShellShortcutActions({
       isSettingsOpen,
       navigateWorkspace,
       openSettings,
-      panCanvas,
+      startPanCanvas,
+      stopPanCanvas,
       toggleMinimap,
       toggleSidebar,
       zoomCanvasIn,

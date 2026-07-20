@@ -177,16 +177,17 @@ describe('app shell create terminal focus', () => {
       : { ctrlKey: true }
     reactFlowSpies.setViewport.mockClear()
 
-    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
-    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
-    fireEvent.keyDown(document, { key: 'ArrowUp', ...primaryModifier })
-    fireEvent.keyDown(document, { key: 'ArrowDown', ...primaryModifier })
+    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+      fireEvent.keyDown(document, { key, ...primaryModifier })
+      fireEvent.keyDown(document, { key, repeat: true, ...primaryModifier })
+      fireEvent.keyUp(document, { key, ...primaryModifier })
+    }
 
     expect(reactFlowSpies.setViewport.mock.calls).toEqual([
-      [{ x: 160, y: 0, zoom: 1 }, { duration: 160 }],
-      [{ x: -160, y: 0, zoom: 1 }, { duration: 160 }],
-      [{ x: 0, y: 160, zoom: 1 }, { duration: 160 }],
-      [{ x: 0, y: -160, zoom: 1 }, { duration: 160 }]
+      [{ x: 11.52, y: 0, zoom: 1 }],
+      [{ x: -11.52, y: 0, zoom: 1 }],
+      [{ x: 0, y: 11.52, zoom: 1 }],
+      [{ x: 0, y: -11.52, zoom: 1 }]
     ])
 
     fireEvent.keyDown(document, { key: 'm', shiftKey: true, ...primaryModifier })

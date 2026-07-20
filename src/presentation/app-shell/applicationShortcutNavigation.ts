@@ -5,23 +5,23 @@ import type { WorkbenchSnapshot } from './types'
 export type CanvasPanDirection = 'down' | 'left' | 'right' | 'up'
 export type WorkspaceNavigationDirection = 'next' | 'previous'
 
-export function resolvePannedCanvasViewport(
+export function resolveContinuousCanvasPanViewport(
   viewport: Viewport,
-  direction: CanvasPanDirection,
-  distance: number
+  directions: readonly CanvasPanDirection[],
+  pixelsPerSecond: number,
+  elapsedMs: number
 ): Viewport {
-  const offsets: Readonly<Record<CanvasPanDirection, { readonly x: number; readonly y: number }>> =
-    {
-      down: { x: 0, y: -distance },
-      left: { x: distance, y: 0 },
-      right: { x: -distance, y: 0 },
-      up: { x: 0, y: distance }
-    }
-  const offset = offsets[direction]
+  const horizontal = Number(directions.includes('left')) - Number(directions.includes('right'))
+  const vertical = Number(directions.includes('up')) - Number(directions.includes('down'))
+  const magnitude = Math.hypot(horizontal, vertical)
+  if (magnitude === 0) {
+    return viewport
+  }
 
+  const distance = (pixelsPerSecond * elapsedMs) / 1_000
   return {
-    x: viewport.x + offset.x,
-    y: viewport.y + offset.y,
+    x: viewport.x + (horizontal / magnitude) * distance,
+    y: viewport.y + (vertical / magnitude) * distance,
     zoom: viewport.zoom
   }
 }

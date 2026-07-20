@@ -20,15 +20,15 @@ export const applicationShortcutCommands = [
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
 
-const repeatableApplicationShortcutCommands: readonly ApplicationShortcutCommand[] = [
+const continuousApplicationShortcutCommands: readonly ApplicationShortcutCommand[] = [
   'panCanvasLeft',
   'panCanvasRight',
   'panCanvasUp',
   'panCanvasDown'
 ]
 
-export function allowsApplicationShortcutRepeat(command: ApplicationShortcutCommand): boolean {
-  return repeatableApplicationShortcutCommands.includes(command)
+export function isContinuousApplicationShortcut(command: ApplicationShortcutCommand): boolean {
+  return continuousApplicationShortcutCommands.includes(command)
 }
 
 export type ShortcutPlatform = 'mac' | 'other'
@@ -238,4 +238,11 @@ export function matchesShortcutEvent(
     event.shiftKey === binding.shift &&
     normalizeKey(event.key) === binding.key
   )
+}
+
+export function matchesShortcutBindingKey(
+  event: KeyboardEvent,
+  binding: ApplicationShortcutBinding | null
+): boolean {
+  return binding !== null && normalizeKey(event.key) === binding.key
 }
