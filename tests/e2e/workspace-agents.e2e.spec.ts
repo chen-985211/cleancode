@@ -214,6 +214,7 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await waitForPersistedAgent(page)
 
       const agent = page.locator('[data-agent-console-node]').first()
       await waitForAgentSelectionState(page, 'unselected')
@@ -254,6 +255,86 @@ describe('workspace Agents e2e', () => {
 
       await agent.locator('.agent-console__header').click()
       await waitForAgentSelectionState(page, 'selected')
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'selects an Agent by spatial shortcut without stealing the same shortcut from xterm',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+      page.once('dialog', (dialog) => dialog.accept())
+      await page.getByRole('button', { name: '新建 Agent' }).click()
+      await waitForAgentCount(page, 2)
+      await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
+      await waitForAllAgentsUnselected(page)
+
+      const agents = page.locator('[data-agent-console-node]')
+      const target = await agents.evaluateAll((elements) => {
+        const canvas = document.querySelector('.react-flow')
+        if (!canvas) throw new Error('Canvas is unavailable.')
+
+        const canvasBounds = canvas.getBoundingClientRect()
+        const candidates = elements.map((element, index) => {
+          const bounds = element.getBoundingClientRect()
+          const horizontalDelta =
+            bounds.x + bounds.width / 2 - (canvasBounds.x + canvasBounds.width / 2)
+          const verticalDelta =
+            bounds.y + bounds.height / 2 - (canvasBounds.y + canvasBounds.height / 2)
+
+          if (Math.abs(horizontalDelta) >= Math.abs(verticalDelta)) {
+            return {
+              distance: Math.abs(horizontalDelta),
+              index,
+              key: horizontalDelta >= 0 ? 'ArrowRight' : 'ArrowLeft'
+            }
+          }
+          return {
+            distance: Math.abs(verticalDelta),
+            index,
+            key: verticalDelta >= 0 ? 'ArrowDown' : 'ArrowUp'
+          }
+        })
+
+        return candidates.sort((left, right) => right.distance - left.distance)[0]!
+      })
+      const primaryModifier = process.platform === 'darwin' ? 'Meta' : 'Control'
+
+      await page.keyboard.press(`${primaryModifier}+${target.key}`)
+      await page.waitForFunction(() =>
+        Array.from(document.querySelectorAll('[data-agent-console-node]')).some(
+          (agent) => agent.getAttribute('data-selection-state') === 'selected'
+        )
+      )
+      const selectedAgent = page.locator('[data-selection-state="selected"]').first()
+      const selectedAgentId = await selectedAgent.getAttribute('data-agent-console-node')
+      if (!selectedAgentId) throw new Error('Selected Agent id is unavailable.')
+      const centerOffset = await selectedAgent.evaluate((element) => {
+        const canvas = document.querySelector('.react-flow')
+        if (!canvas) throw new Error('Canvas is unavailable.')
+
+        const agentBounds = element.getBoundingClientRect()
+        const canvasBounds = canvas.getBoundingClientRect()
+        return {
+          x: agentBounds.x + agentBounds.width / 2 - (canvasBounds.x + canvasBounds.width / 2),
+          y: agentBounds.y + agentBounds.height / 2 - (canvasBounds.y + canvasBounds.height / 2)
+        }
+      })
+
+      expect(Math.abs(centerOffset.x)).toBeLessThanOrEqual(2)
+      expect(Math.abs(centerOffset.y)).toBeLessThanOrEqual(2)
+
+      await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
+      await waitForAllAgentsUnselected(page)
+      await page
+        .locator(`[data-agent-console-node="${selectedAgentId}"] .xterm-helper-textarea`)
+        .focus()
+      await page.keyboard.press(`${primaryModifier}+${target.key}`)
+      await page.waitForTimeout(100)
+
+      await waitForAllAgentsUnselected(page)
     },
     electronScenarioTimeoutMs
   )
@@ -334,6 +415,14 @@ async function waitForAgentSelectionState(
       document.querySelector('[data-agent-console-node]')?.getAttribute('data-selection-state') ===
       expectedState,
     state
+  )
+}
+
+async function waitForAllAgentsUnselected(page: Page): Promise<void> {
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll('[data-agent-console-node]')).every(
+      (agent) => agent.getAttribute('data-selection-state') === 'unselected'
+    )
   )
 }
 

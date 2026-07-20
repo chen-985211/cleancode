@@ -36,11 +36,31 @@ const v3ApplicationShortcutCommands = [
   'fitCanvas'
 ] as const
 
+const v4ApplicationShortcutCommands = [
+  'openSettings',
+  'toggleSidebar',
+  'addProject',
+  'createBranchWorkspace',
+  'previousWorkspace',
+  'nextWorkspace',
+  'createTerminal',
+  'createAgent',
+  'groupTerminals',
+  'panCanvasLeft',
+  'panCanvasRight',
+  'panCanvasUp',
+  'panCanvasDown',
+  'zoomCanvasIn',
+  'zoomCanvasOut',
+  'fitCanvas',
+  'toggleMinimap'
+] as const
+
 type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding | null>>
 
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 4
+  readonly version: 5
 }
 
 function hasCompleteBindingCatalog(
@@ -133,11 +153,25 @@ export function readApplicationShortcutBindings(
       readonly version?: unknown
     }
     if (
-      preference.version === 4 &&
+      preference.version === 5 &&
       hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
     ) {
       return cloneBindings(preference.bindings)
+    }
+
+    if (
+      preference.version === 4 &&
+      hasCompleteBindingCatalog(preference.bindings, v4ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v4ApplicationShortcutCommands)
+    ) {
+      return cloneBindings({
+        ...preference.bindings,
+        selectCanvasNodeLeft: preference.bindings.panCanvasLeft,
+        selectCanvasNodeRight: preference.bindings.panCanvasRight,
+        selectCanvasNodeUp: preference.bindings.panCanvasUp,
+        selectCanvasNodeDown: preference.bindings.panCanvasDown
+      })
     }
 
     if (
@@ -186,7 +220,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 4
+    version: 5
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

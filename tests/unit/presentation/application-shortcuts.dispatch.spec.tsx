@@ -23,10 +23,10 @@ describe('application shortcut dispatch', () => {
     ['zoomCanvasIn', '=', false],
     ['zoomCanvasOut', '-', false],
     ['fitCanvas', '0', false],
-    ['panCanvasLeft', 'ArrowLeft', false],
-    ['panCanvasRight', 'ArrowRight', false],
-    ['panCanvasUp', 'ArrowUp', false],
-    ['panCanvasDown', 'ArrowDown', false],
+    ['selectCanvasNodeLeft', 'ArrowLeft', false],
+    ['selectCanvasNodeRight', 'ArrowRight', false],
+    ['selectCanvasNodeUp', 'ArrowUp', false],
+    ['selectCanvasNodeDown', 'ArrowDown', false],
     ['toggleMinimap', 'm', true]
   ] as const)(
     'dispatches the %s default shortcut and cancels the native event',
@@ -54,12 +54,12 @@ describe('application shortcut dispatch', () => {
   )
 
   it.each([
-    ['panCanvasLeft', 'ArrowLeft'],
-    ['panCanvasRight', 'ArrowRight'],
-    ['panCanvasUp', 'ArrowUp'],
-    ['panCanvasDown', 'ArrowDown']
-  ] as const)('keeps %s in one active gesture until keyup', (command, key) => {
-    const actions = createActionsWithPanStops()
+    ['selectCanvasNodeLeft', 'ArrowLeft'],
+    ['selectCanvasNodeRight', 'ArrowRight'],
+    ['selectCanvasNodeUp', 'ArrowUp'],
+    ['selectCanvasNodeDown', 'ArrowDown']
+  ] as const)('dispatches %s once and ignores keyboard auto-repeat', (command, key) => {
+    const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
 
     fireEvent.keyDown(document, { key, metaKey: true })
@@ -67,7 +67,6 @@ describe('application shortcut dispatch', () => {
     fireEvent.keyUp(document, { key, metaKey: true })
 
     expect(actions[command].run).toHaveBeenCalledTimes(1)
-    expect(actions[command].stop).toHaveBeenCalledTimes(1)
   })
 
   it('ignores keyboard auto-repeat for non-pan actions', () => {
@@ -79,11 +78,11 @@ describe('application shortcut dispatch', () => {
     expect(actions.createAgent.run).not.toHaveBeenCalled()
   })
 
-  it('dispatches keyboard auto-repeat through a customized pan binding', () => {
-    const actions = createActionsWithPanStops()
+  it('ignores keyboard auto-repeat through a customized directional selection binding', () => {
+    const actions = createActions()
     const bindings: ApplicationShortcutBindings = {
       ...defaultApplicationShortcutBindings,
-      panCanvasLeft: { alt: false, key: 'H', primary: true, shift: false }
+      selectCanvasNodeLeft: { alt: false, key: 'H', primary: true, shift: false }
     }
     render(<ShortcutHarness actions={actions} bindings={bindings} />)
 
@@ -91,68 +90,10 @@ describe('application shortcut dispatch', () => {
     fireEvent.keyDown(document, { key: 'h', metaKey: true, repeat: true })
     fireEvent.keyUp(document, { key: 'h', metaKey: true })
 
-    expect(actions.panCanvasLeft.run).toHaveBeenCalledTimes(1)
-    expect(actions.panCanvasLeft.stop).toHaveBeenCalledTimes(1)
+    expect(actions.selectCanvasNodeLeft.run).toHaveBeenCalledTimes(1)
   })
 
-  it('stops an active pan when the primary modifier is released', () => {
-    const actions = createActionsWithPanStops()
-    render(<ShortcutHarness actions={actions} />)
-
-    fireEvent.keyDown(document, { key: 'ArrowLeft', metaKey: true })
-    fireEvent.keyUp(document, { key: 'Meta' })
-
-    expect(actions.panCanvasLeft.stop).toHaveBeenCalledTimes(1)
-  })
-
-  it('stops active pans when the window loses focus or the shortcut hook unmounts', () => {
-    const blurActions = createActionsWithPanStops()
-    const { unmount } = render(<ShortcutHarness actions={blurActions} />)
-
-    fireEvent.keyDown(document, { key: 'ArrowLeft', metaKey: true })
-    fireEvent.blur(window)
-
-    expect(blurActions.panCanvasLeft.stop).toHaveBeenCalledTimes(1)
-    unmount()
-
-    const unmountActions = createActionsWithPanStops()
-    const mounted = render(<ShortcutHarness actions={unmountActions} />)
-    fireEvent.keyDown(document, { key: 'ArrowRight', metaKey: true })
-
-    mounted.unmount()
-
-    expect(unmountActions.panCanvasRight.stop).toHaveBeenCalledTimes(1)
-  })
-
-  it('stops active pans when the page becomes hidden', () => {
-    const actions = createActionsWithPanStops()
-    render(<ShortcutHarness actions={actions} />)
-    fireEvent.keyDown(document, { key: 'ArrowUp', metaKey: true })
-
-    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
-    try {
-      document.dispatchEvent(new Event('visibilitychange'))
-      expect(actions.panCanvasUp.stop).toHaveBeenCalledTimes(1)
-    } finally {
-      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
-    }
-  })
-
-  it('keeps an active pan alive when the action catalog rerenders', () => {
-    const actions = createActionsWithPanStops()
-    const view = render(<ShortcutHarness actions={actions} />)
-    fireEvent.keyDown(document, { key: 'ArrowLeft', metaKey: true })
-
-    view.rerender(<ShortcutHarness actions={{ ...actions }} />)
-
-    expect(actions.panCanvasLeft.stop).not.toHaveBeenCalled()
-    fireEvent.keyDown(document, { key: 'ArrowLeft', metaKey: true, repeat: true })
-    fireEvent.keyUp(document, { key: 'ArrowLeft', metaKey: true })
-    expect(actions.panCanvasLeft.run).toHaveBeenCalledTimes(1)
-    expect(actions.panCanvasLeft.stop).toHaveBeenCalledTimes(1)
-  })
-
-  it('protects xterm from repeated pan shortcuts', () => {
+  it('protects xterm from directional selection shortcuts', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
 
@@ -162,7 +103,7 @@ describe('application shortcut dispatch', () => {
       repeat: true
     })
 
-    expect(actions.panCanvasLeft.run).not.toHaveBeenCalled()
+    expect(actions.selectCanvasNodeLeft.run).not.toHaveBeenCalled()
   })
 
   it('does not dispatch disabled actions or partial modifier matches', () => {
@@ -259,32 +200,10 @@ function createActions(
     zoomCanvasIn: { enabled: enabled.zoomCanvasIn ?? true, run: vi.fn() },
     zoomCanvasOut: { enabled: enabled.zoomCanvasOut ?? true, run: vi.fn() },
     fitCanvas: { enabled: enabled.fitCanvas ?? true, run: vi.fn() },
-    panCanvasLeft: { enabled: enabled.panCanvasLeft ?? true, run: vi.fn() },
-    panCanvasRight: { enabled: enabled.panCanvasRight ?? true, run: vi.fn() },
-    panCanvasUp: { enabled: enabled.panCanvasUp ?? true, run: vi.fn() },
-    panCanvasDown: { enabled: enabled.panCanvasDown ?? true, run: vi.fn() },
+    selectCanvasNodeLeft: { enabled: enabled.selectCanvasNodeLeft ?? true, run: vi.fn() },
+    selectCanvasNodeRight: { enabled: enabled.selectCanvasNodeRight ?? true, run: vi.fn() },
+    selectCanvasNodeUp: { enabled: enabled.selectCanvasNodeUp ?? true, run: vi.fn() },
+    selectCanvasNodeDown: { enabled: enabled.selectCanvasNodeDown ?? true, run: vi.fn() },
     toggleMinimap: { enabled: enabled.toggleMinimap ?? true, run: vi.fn() }
   }
-}
-
-type ActionWithStop = ApplicationShortcutActions['panCanvasLeft'] & {
-  readonly stop: ReturnType<typeof vi.fn>
-}
-
-type ActionsWithPanStops = ApplicationShortcutActions & {
-  readonly panCanvasLeft: ActionWithStop
-  readonly panCanvasRight: ActionWithStop
-  readonly panCanvasUp: ActionWithStop
-  readonly panCanvasDown: ActionWithStop
-}
-
-function createActionsWithPanStops(): ActionsWithPanStops {
-  const actions = createActions()
-  return {
-    ...actions,
-    panCanvasLeft: { ...actions.panCanvasLeft, stop: vi.fn() },
-    panCanvasRight: { ...actions.panCanvasRight, stop: vi.fn() },
-    panCanvasUp: { ...actions.panCanvasUp, stop: vi.fn() },
-    panCanvasDown: { ...actions.panCanvasDown, stop: vi.fn() }
-  } as ActionsWithPanStops
 }

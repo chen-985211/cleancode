@@ -54,6 +54,29 @@ describe('workbench node selection', () => {
     expect(input.setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
     expect(input.selectTerminalBlock).toHaveBeenCalledWith('backend-terminal', true)
   })
+
+  it.each([
+    ['terminal', 'backend-terminal'],
+    ['terminalGroup', 'development-group'],
+    ['agentConsole', 'agent:reviewer']
+  ] as const)(
+    'selects a %s from a directional shortcut through the existing selection owners',
+    (type, id) => {
+      const { input, result } = renderSelectionHook()
+
+      act(() => {
+        result.current.selectWorkbenchNodeFromShortcut({ id, type } as WorkbenchFlowNode)
+      })
+
+      if (type === 'terminal') {
+        expect(input.selectTerminalBlock).toHaveBeenCalledWith(id, false)
+      } else if (type === 'terminalGroup') {
+        expect(input.selectTerminalGroup).toHaveBeenCalledWith(id)
+      } else {
+        expect(input.setSelectedAgentId).toHaveBeenCalledWith('reviewer')
+      }
+    }
+  )
 })
 
 function renderSelectionHook() {

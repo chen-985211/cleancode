@@ -55,21 +55,18 @@ describe('application shortcut bindings', () => {
       '⌘',
       '0'
     ])
-    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasLeft, 'mac')).toEqual([
-      '⌘',
-      '←'
-    ])
-    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasRight, 'mac')).toEqual(
-      ['⌘', '→']
-    )
-    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasUp, 'mac')).toEqual([
-      '⌘',
-      '↑'
-    ])
-    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasDown, 'mac')).toEqual([
-      '⌘',
-      '↓'
-    ])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeLeft, 'mac')
+    ).toEqual(['⌘', '←'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeRight, 'mac')
+    ).toEqual(['⌘', '→'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeUp, 'mac')
+    ).toEqual(['⌘', '↑'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeDown, 'mac')
+    ).toEqual(['⌘', '↓'])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.toggleMinimap, 'mac')).toEqual([
       '⌘',
       '⇧',

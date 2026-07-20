@@ -1,38 +1,69 @@
 import {
   resolveAdjacentWorkspaceTarget,
-  resolveContinuousCanvasPanViewport
+  resolveDirectionalWorkbenchNode
 } from '../../../src/presentation/app-shell/applicationShortcutNavigation'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('application shortcut navigation', () => {
-  it('moves at the same speed for different frame intervals without changing zoom', () => {
-    const viewport = { x: 12, y: -8, zoom: 1.5 }
+  it.each([
+    ['left', 'left'],
+    ['right', 'right'],
+    ['up', 'up'],
+    ['down', 'down']
+  ] as const)('selects the closest aligned node to the %s', (direction, expectedId) => {
+    const nodes = [
+      createNode('selected', 'terminal', 400, 300),
+      createNode('left', 'terminalGroup', 100, 300),
+      createNode('right', 'agentConsole', 700, 300),
+      createNode('up', 'terminal', 400, 0),
+      createNode('down', 'terminalGroup', 400, 600),
+      createNode('closer-diagonal', 'agentConsole', 560, 130)
+    ]
 
-    const oneFrame = resolveContinuousCanvasPanViewport(viewport, ['left'], 600, 16)
-    const twoFrames = resolveContinuousCanvasPanViewport(
-      resolveContinuousCanvasPanViewport(viewport, ['left'], 600, 8),
-      ['left'],
-      600,
-      8
-    )
-
-    expect(oneFrame).toEqual({ x: 21.6, y: -8, zoom: 1.5 })
-    expect(twoFrames).toEqual(oneFrame)
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'selected',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        direction
+      )?.id
+    ).toBe(expectedId)
   })
 
-  it('normalizes diagonal movement and cancels opposite directions', () => {
-    const diagonal = resolveContinuousCanvasPanViewport(
-      { x: 0, y: 0, zoom: 1 },
-      ['left', 'up'],
-      600,
-      100
-    )
+  it('uses the viewport center when nothing is selected', () => {
+    const nodes = [
+      createNode('left', 'terminal', 100, 250),
+      createNode('right', 'agentConsole', 600, 250)
+    ]
 
-    expect(diagonal.x).toBeCloseTo(60 / Math.sqrt(2))
-    expect(diagonal.y).toBeCloseTo(60 / Math.sqrt(2))
     expect(
-      resolveContinuousCanvasPanViewport({ x: 0, y: 0, zoom: 1 }, ['left', 'right', 'up'], 600, 100)
-    ).toEqual({ x: 0, y: 60, zoom: 1 })
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        null,
+        { x: -240, y: -160, zoom: 2 },
+        { width: 960, height: 640 },
+        'right'
+      )?.id
+    ).toBe('right')
+  })
+
+  it('does not wrap or return the current node when there is no directional candidate', () => {
+    const nodes = [
+      createNode('selected', 'terminal', 400, 300),
+      createNode('left', 'terminal', 0, 300)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'selected',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'right'
+      )
+    ).toBeNull()
   })
 
   it('cycles through every project workspace in sidebar order', () => {
@@ -92,3 +123,17 @@ describe('application shortcut navigation', () => {
     expect(resolveAdjacentWorkspaceTarget([], null, 'next')).toBeNull()
   })
 })
+
+function createNode(
+  id: string,
+  type: WorkbenchFlowNode['type'],
+  x: number,
+  y: number
+): WorkbenchFlowNode {
+  return {
+    id,
+    type,
+    position: { x, y },
+    style: { width: 120, height: 80 }
+  } as WorkbenchFlowNode
+}

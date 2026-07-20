@@ -31,10 +31,10 @@ describe('application shortcut tooltips', () => {
       zoomCanvasIn: '放大画布 (⌘=)',
       zoomCanvasOut: '缩小画布 (⌘-)',
       fitCanvas: '适应画布 (⌘0)',
-      panCanvasLeft: '画布向左 (⌘←)',
-      panCanvasRight: '画布向右 (⌘→)',
-      panCanvasUp: '画布向上 (⌘↑)',
-      panCanvasDown: '画布向下 (⌘↓)',
+      selectCanvasNodeLeft: '选择左侧节点 (⌘←)',
+      selectCanvasNodeRight: '选择右侧节点 (⌘→)',
+      selectCanvasNodeUp: '选择上方节点 (⌘↑)',
+      selectCanvasNodeDown: '选择下方节点 (⌘↓)',
       toggleMinimap: '收起或展开小地图 (⌘⇧M)'
     })
     expect(otherLabels.createAgent).toBe('New Agent (Ctrl+Shift+A)')

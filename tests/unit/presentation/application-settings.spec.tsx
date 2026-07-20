@@ -43,7 +43,7 @@ describe('application settings', () => {
     ).toHaveTextContent('⌘⇧↓')
     const canvasShortcuts = screen.getByRole('group', { name: '画布' })
     expect(
-      within(canvasShortcuts).getByRole('button', { name: '修改“画布向左”快捷键' })
+      within(canvasShortcuts).getByRole('button', { name: '修改“选择左侧节点”快捷键' })
     ).toHaveTextContent('⌘←')
     expect(screen.getByRole('button', { name: '返回工作区' })).toHaveFocus()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()

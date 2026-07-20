@@ -8,10 +8,10 @@ export const applicationShortcutCommands = [
   'createTerminal',
   'createAgent',
   'groupTerminals',
-  'panCanvasLeft',
-  'panCanvasRight',
-  'panCanvasUp',
-  'panCanvasDown',
+  'selectCanvasNodeLeft',
+  'selectCanvasNodeRight',
+  'selectCanvasNodeUp',
+  'selectCanvasNodeDown',
   'zoomCanvasIn',
   'zoomCanvasOut',
   'fitCanvas',
@@ -19,17 +19,6 @@ export const applicationShortcutCommands = [
 ] as const
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
-
-const continuousApplicationShortcutCommands: readonly ApplicationShortcutCommand[] = [
-  'panCanvasLeft',
-  'panCanvasRight',
-  'panCanvasUp',
-  'panCanvasDown'
-]
-
-export function isContinuousApplicationShortcut(command: ApplicationShortcutCommand): boolean {
-  return continuousApplicationShortcutCommands.includes(command)
-}
 
 export type ShortcutPlatform = 'mac' | 'other'
 
@@ -54,10 +43,10 @@ export const defaultApplicationShortcutBindings = {
   createTerminal: { alt: false, key: 'T', primary: true, shift: false },
   createAgent: { alt: false, key: 'A', primary: true, shift: true },
   groupTerminals: { alt: false, key: 'G', primary: true, shift: false },
-  panCanvasLeft: { alt: false, key: 'ArrowLeft', primary: true, shift: false },
-  panCanvasRight: { alt: false, key: 'ArrowRight', primary: true, shift: false },
-  panCanvasUp: { alt: false, key: 'ArrowUp', primary: true, shift: false },
-  panCanvasDown: { alt: false, key: 'ArrowDown', primary: true, shift: false },
+  selectCanvasNodeLeft: { alt: false, key: 'ArrowLeft', primary: true, shift: false },
+  selectCanvasNodeRight: { alt: false, key: 'ArrowRight', primary: true, shift: false },
+  selectCanvasNodeUp: { alt: false, key: 'ArrowUp', primary: true, shift: false },
+  selectCanvasNodeDown: { alt: false, key: 'ArrowDown', primary: true, shift: false },
   zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
   zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
   fitCanvas: { alt: false, key: '0', primary: true, shift: false },
@@ -82,10 +71,10 @@ export const applicationShortcutGroups = [
       'createTerminal',
       'createAgent',
       'groupTerminals',
-      'panCanvasLeft',
-      'panCanvasRight',
-      'panCanvasUp',
-      'panCanvasDown',
+      'selectCanvasNodeLeft',
+      'selectCanvasNodeRight',
+      'selectCanvasNodeUp',
+      'selectCanvasNodeDown',
       'zoomCanvasIn',
       'zoomCanvasOut',
       'fitCanvas',
@@ -238,11 +227,4 @@ export function matchesShortcutEvent(
     event.shiftKey === binding.shift &&
     normalizeKey(event.key) === binding.key
   )
-}
-
-export function matchesShortcutBindingKey(
-  event: KeyboardEvent,
-  binding: ApplicationShortcutBinding | null
-): boolean {
-  return binding !== null && normalizeKey(event.key) === binding.key
 }

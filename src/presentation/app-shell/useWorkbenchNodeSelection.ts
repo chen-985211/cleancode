@@ -70,6 +70,27 @@ export function useWorkbenchNodeSelection({
     [selectTerminalBlock, setSelectedAgentId, setSelectedTerminalGroupId]
   )
 
+  const selectWorkbenchNodeFromShortcut = useCallback(
+    (node: WorkbenchFlowNode) => {
+      if (node.type === 'terminal') {
+        selectTerminalFromTitle(node.id, false)
+        return
+      }
+
+      if (node.type === 'terminalGroup') {
+        setSelectedAgentId(null)
+        selectTerminalGroup(node.id)
+        return
+      }
+
+      const agentId = readAgentIdFromFlowNodeId(node.id)
+      if (agentId) {
+        selectAgentFromTitle(agentId)
+      }
+    },
+    [selectAgentFromTitle, selectTerminalFromTitle, selectTerminalGroup, setSelectedAgentId]
+  )
+
   const clearWorkbenchSelection = useCallback(() => {
     setSelectedAgentId(null)
     setSelectedTerminalBlockIds([])
@@ -81,6 +102,7 @@ export function useWorkbenchNodeSelection({
     onNodesChange,
     selectAgentFromTitle,
     selectTerminalFromTitle,
+    selectWorkbenchNodeFromShortcut,
     selectWorkbenchNode
   }
 }

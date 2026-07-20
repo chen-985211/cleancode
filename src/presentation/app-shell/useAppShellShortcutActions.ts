@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 
 import type {
-  CanvasPanDirection,
+  CanvasNavigationDirection,
   WorkspaceNavigationDirection
 } from './applicationShortcutNavigation'
 import type { ApplicationShortcutActions } from './useApplicationShortcuts'
@@ -22,8 +22,7 @@ interface UseAppShellShortcutActionsInput {
   readonly isSettingsOpen: boolean
   readonly navigateWorkspace: (direction: WorkspaceNavigationDirection) => void | Promise<void>
   readonly openSettings: ShortcutRun
-  readonly startPanCanvas: (direction: CanvasPanDirection) => void
-  readonly stopPanCanvas: (direction: CanvasPanDirection) => void
+  readonly selectCanvasNode: (direction: CanvasNavigationDirection) => void
   readonly toggleMinimap: ShortcutRun
   readonly toggleSidebar: ShortcutRun
   readonly zoomCanvasIn: ShortcutRun
@@ -44,8 +43,7 @@ export function useAppShellShortcutActions({
   isSettingsOpen,
   navigateWorkspace,
   openSettings,
-  startPanCanvas,
-  stopPanCanvas,
+  selectCanvasNode,
   toggleMinimap,
   toggleSidebar,
   zoomCanvasIn,
@@ -74,25 +72,21 @@ export function useAppShellShortcutActions({
         enabled: isDesktopRuntime && hasWorkbench && !isGroupSelectionMode,
         run: groupTerminals
       },
-      panCanvasLeft: {
+      selectCanvasNodeLeft: {
         enabled: hasWorkbench,
-        run: () => startPanCanvas('left'),
-        stop: () => stopPanCanvas('left')
+        run: () => selectCanvasNode('left')
       },
-      panCanvasRight: {
+      selectCanvasNodeRight: {
         enabled: hasWorkbench,
-        run: () => startPanCanvas('right'),
-        stop: () => stopPanCanvas('right')
+        run: () => selectCanvasNode('right')
       },
-      panCanvasUp: {
+      selectCanvasNodeUp: {
         enabled: hasWorkbench,
-        run: () => startPanCanvas('up'),
-        stop: () => stopPanCanvas('up')
+        run: () => selectCanvasNode('up')
       },
-      panCanvasDown: {
+      selectCanvasNodeDown: {
         enabled: hasWorkbench,
-        run: () => startPanCanvas('down'),
-        stop: () => stopPanCanvas('down')
+        run: () => selectCanvasNode('down')
       },
       zoomCanvasIn: { enabled: hasWorkbench, run: zoomCanvasIn },
       zoomCanvasOut: { enabled: hasWorkbench, run: zoomCanvasOut },
@@ -113,8 +107,7 @@ export function useAppShellShortcutActions({
       isSettingsOpen,
       navigateWorkspace,
       openSettings,
-      startPanCanvas,
-      stopPanCanvas,
+      selectCanvasNode,
       toggleMinimap,
       toggleSidebar,
       zoomCanvasIn,

@@ -53,6 +53,7 @@ import { useApplicationShortcuts } from './useApplicationShortcuts'
 import { useApplicationShortcutNavigation } from './useApplicationShortcutNavigation'
 import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
+import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -75,6 +76,7 @@ export function AppShell({
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
+  const canvasSizeRef = useRef({ width: 0, height: 0 })
   const zoomCanvasIn = useCallback((): void => {
     void reactFlowInstanceRef.current?.zoomIn({ duration: 160 })
   }, [])
@@ -266,14 +268,6 @@ export function AppShell({
     setWorkbenches,
     terminateWorkbenchTerminalSessions
   })
-  const shortcutNavigation = useApplicationShortcutNavigation({
-    currentWorkbench,
-    onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
-    reactFlowInstanceRef,
-    revealProjectSidebar,
-    workbenches
-  })
-
   const createTerminalBlock = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace) {
       return
@@ -338,6 +332,20 @@ export function AppShell({
     setSelectedAgentId,
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
+  })
+  const selectedWorkbenchNodeId = selectedAgentId
+    ? toAgentFlowNodeId(selectedAgentId)
+    : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
+  const shortcutNavigation = useApplicationShortcutNavigation({
+    canvasSizeRef,
+    currentWorkbench,
+    nodes,
+    onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
+    reactFlowInstanceRef,
+    revealProjectSidebar,
+    selectedNodeId: selectedWorkbenchNodeId,
+    selectWorkbenchNode: workbenchNodeSelection.selectWorkbenchNodeFromShortcut,
+    workbenches
   })
   const { selectTerminalFromTitle } = workbenchNodeSelection
   const {
@@ -516,8 +524,7 @@ export function AppShell({
     isSettingsOpen: isApplicationSettingsOpen,
     navigateWorkspace: shortcutNavigation.navigateWorkspace,
     openSettings: openApplicationSettings,
-    startPanCanvas: shortcutNavigation.startPanCanvas,
-    stopPanCanvas: shortcutNavigation.stopPanCanvas,
+    selectCanvasNode: shortcutNavigation.selectCanvasNode,
     toggleMinimap: shortcutNavigation.toggleMinimap,
     toggleSidebar: toggleProjectSidebar,
     zoomCanvasIn,
@@ -610,6 +617,7 @@ export function AppShell({
               nodes={nodes}
               minimapNodes={minimapNodes}
               nodeTypes={workbenchNodeTypes}
+              canvasSizeRef={canvasSizeRef}
               reactFlowInstanceRef={reactFlowInstanceRef}
               minimapNodeInteraction={minimapNodeInteraction}
               terminalWorkflow={terminalWorkflow}

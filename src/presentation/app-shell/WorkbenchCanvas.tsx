@@ -39,6 +39,7 @@ interface WorkbenchCanvasProps {
   readonly nodes: WorkbenchFlowNode[]
   readonly minimapNodes: MinimapFlowNode[]
   readonly nodeTypes: NodeTypes
+  readonly canvasSizeRef?: MutableRefObject<{ width: number; height: number }>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
@@ -84,6 +85,7 @@ export function WorkbenchCanvas({
   nodes,
   minimapNodes,
   nodeTypes,
+  canvasSizeRef,
   reactFlowInstanceRef,
   minimapNodeInteraction,
   terminalWorkflow,
@@ -177,10 +179,14 @@ export function WorkbenchCanvas({
     }
 
     const updateCanvasSize = (): void => {
-      setCanvasSize({
+      const nextCanvasSize = {
         width: canvasSurface.clientWidth,
         height: canvasSurface.clientHeight
-      })
+      }
+      setCanvasSize(nextCanvasSize)
+      if (canvasSizeRef) {
+        canvasSizeRef.current = nextCanvasSize
+      }
     }
 
     updateCanvasSize()
@@ -194,7 +200,7 @@ export function WorkbenchCanvas({
     resizeObserver.observe(canvasSurface)
 
     return () => resizeObserver.disconnect()
-  }, [])
+  }, [canvasSizeRef])
 
   useEffect(() => {
     const instance = reactFlowInstanceRef.current

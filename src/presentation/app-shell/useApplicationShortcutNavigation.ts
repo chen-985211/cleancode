@@ -1,35 +1,41 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useRef, useState, type MutableRefObject } from 'react'
 
 import {
   resolveAdjacentWorkspaceTarget,
-  resolveContinuousCanvasPanViewport,
-  type CanvasPanDirection,
+  resolveDirectionalWorkbenchNode,
+  resolveWorkbenchNodeCenter,
+  type CanvasNavigationDirection,
+  type CanvasSize,
   type WorkspaceNavigationDirection
 } from './applicationShortcutNavigation'
 import type { ProjectSidebarIntent } from './ProjectSidebar'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
-const canvasPanPixelsPerSecond = 720
-const canvasPanInitialElapsedMs = 16
-const canvasPanMaximumFrameElapsedMs = 32
-
 interface UseApplicationShortcutNavigationInput {
+  readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly nodes: readonly WorkbenchFlowNode[]
   readonly onSelectWorkspace: (
     workbench: WorkbenchSnapshot,
     workspaceName: string
   ) => void | Promise<void>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly revealProjectSidebar: () => void
+  readonly selectedNodeId: string | null
+  readonly selectWorkbenchNode: (node: WorkbenchFlowNode) => void
   readonly workbenches: readonly WorkbenchSnapshot[]
 }
 
 export function useApplicationShortcutNavigation({
+  canvasSizeRef,
   currentWorkbench,
+  nodes,
   onSelectWorkspace,
   reactFlowInstanceRef,
   revealProjectSidebar,
+  selectedNodeId,
+  selectWorkbenchNode,
   workbenches
 }: UseApplicationShortcutNavigationInput) {
   const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
@@ -38,9 +44,12 @@ export function useApplicationShortcutNavigation({
   )
   const intentIdRef = useRef(0)
   const isWorkspaceTransitionPendingRef = useRef(false)
-  const activePanDirectionsRef = useRef(new Set<CanvasPanDirection>())
-  const panAnimationFrameRef = useRef<number | null>(null)
-  const previousPanFrameTimeRef = useRef<number | null>(null)
+  const nodesRef = useRef(nodes)
+  const selectedNodeIdRef = useRef(selectedNodeId)
+  const selectWorkbenchNodeRef = useRef(selectWorkbenchNode)
+  nodesRef.current = nodes
+  selectedNodeIdRef.current = selectedNodeId
+  selectWorkbenchNodeRef.current = selectWorkbenchNode
 
   const revealProject = useCallback(
     (projectId: string, type: ProjectSidebarIntent['type']): void => {
@@ -51,86 +60,30 @@ export function useApplicationShortcutNavigation({
     [revealProjectSidebar]
   )
 
-  const applyPan = useCallback(
-    (elapsedMs: number): void => {
+  const selectCanvasNode = useCallback(
+    (direction: CanvasNavigationDirection): void => {
       const instance = reactFlowInstanceRef.current
       if (!instance) {
         return
       }
 
-      void instance.setViewport(
-        resolveContinuousCanvasPanViewport(
-          instance.getViewport(),
-          [...activePanDirectionsRef.current],
-          canvasPanPixelsPerSecond,
-          elapsedMs
-        )
+      const viewport = instance.getViewport()
+      const target = resolveDirectionalWorkbenchNode(
+        nodesRef.current,
+        selectedNodeIdRef.current,
+        viewport,
+        canvasSizeRef.current,
+        direction
       )
-    },
-    [reactFlowInstanceRef]
-  )
-
-  const advancePanFrame = useCallback(
-    function advancePanFrame(timestamp: number): void {
-      if (activePanDirectionsRef.current.size === 0 || !reactFlowInstanceRef.current) {
-        panAnimationFrameRef.current = null
-        previousPanFrameTimeRef.current = null
+      if (!target) {
         return
       }
 
-      const previousTimestamp = previousPanFrameTimeRef.current ?? timestamp
-      const elapsedMs = Math.min(
-        Math.max(timestamp - previousTimestamp, 0),
-        canvasPanMaximumFrameElapsedMs
-      )
-      previousPanFrameTimeRef.current = timestamp
-      if (elapsedMs > 0) {
-        applyPan(elapsedMs)
-      }
-      panAnimationFrameRef.current = window.requestAnimationFrame(advancePanFrame)
+      selectWorkbenchNodeRef.current(target)
+      const center = resolveWorkbenchNodeCenter(target)
+      void instance.setCenter(center.x, center.y, { duration: 0, zoom: viewport.zoom })
     },
-    [applyPan, reactFlowInstanceRef]
-  )
-
-  const startPanCanvas = useCallback(
-    (direction: CanvasPanDirection): void => {
-      if (!reactFlowInstanceRef.current || activePanDirectionsRef.current.has(direction)) {
-        return
-      }
-
-      activePanDirectionsRef.current.add(direction)
-      if (panAnimationFrameRef.current !== null) {
-        return
-      }
-
-      applyPan(canvasPanInitialElapsedMs)
-      previousPanFrameTimeRef.current = performance.now()
-      panAnimationFrameRef.current = window.requestAnimationFrame(advancePanFrame)
-    },
-    [advancePanFrame, applyPan, reactFlowInstanceRef]
-  )
-
-  const stopPanCanvas = useCallback((direction: CanvasPanDirection): void => {
-    activePanDirectionsRef.current.delete(direction)
-    if (activePanDirectionsRef.current.size > 0) {
-      return
-    }
-
-    if (panAnimationFrameRef.current !== null) {
-      window.cancelAnimationFrame(panAnimationFrameRef.current)
-    }
-    panAnimationFrameRef.current = null
-    previousPanFrameTimeRef.current = null
-  }, [])
-
-  useEffect(
-    () => () => {
-      activePanDirectionsRef.current.clear()
-      if (panAnimationFrameRef.current !== null) {
-        window.cancelAnimationFrame(panAnimationFrameRef.current)
-      }
-    },
-    []
+    [canvasSizeRef, reactFlowInstanceRef]
   )
 
   const navigateWorkspace = useCallback(
@@ -170,8 +123,7 @@ export function useApplicationShortcutNavigation({
     navigateWorkspace,
     projectSidebarIntent,
     requestBranchWorkspaceCreation,
-    startPanCanvas,
-    stopPanCanvas,
+    selectCanvasNode,
     toggleMinimap
   }
 }

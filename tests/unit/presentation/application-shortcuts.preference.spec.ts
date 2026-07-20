@@ -130,12 +130,39 @@ describe('application shortcut preference', () => {
     })
   })
 
-  it('writes the complete catalog with preference schema v4', () => {
+  it('migrates the v4 direction bindings to directional node selection', () => {
+    const nonDirectionalBindings = Object.fromEntries(
+      Object.entries(defaultApplicationShortcutBindings).filter(
+        ([command]) => !command.startsWith('selectCanvasNode')
+      )
+    )
+    const v4Bindings = {
+      ...nonDirectionalBindings,
+      panCanvasLeft: { alt: true, key: 'H', primary: false, shift: false },
+      panCanvasRight: null,
+      panCanvasUp: { alt: false, key: 'K', primary: true, shift: false },
+      panCanvasDown: { alt: false, key: 'J', primary: true, shift: false }
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v4Bindings, version: 4 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...nonDirectionalBindings,
+      selectCanvasNodeLeft: v4Bindings.panCanvasLeft,
+      selectCanvasNodeRight: null,
+      selectCanvasNodeUp: v4Bindings.panCanvasUp,
+      selectCanvasNodeDown: v4Bindings.panCanvasDown
+    })
+  })
+
+  it('writes the complete catalog with preference schema v5', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 4
+      version: 5
     })
   })
 

@@ -8,103 +8,81 @@ import type {
 } from '../../../src/presentation/app-shell/types'
 
 describe('application shortcut navigation hook', () => {
-  afterEach(() => vi.restoreAllMocks())
-
-  it('runs one animation frame loop for every active pan direction and cancels it when stopped', () => {
-    let viewport = { x: 0, y: 0, zoom: 1 }
-    let nextFrameId = 0
-    const pendingFrames = new Map<number, FrameRequestCallback>()
-    const requestAnimationFrame = vi
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation((callback) => {
-        nextFrameId += 1
-        pendingFrames.set(nextFrameId, callback)
-        return nextFrameId
-      })
-    const cancelAnimationFrame = vi
-      .spyOn(window, 'cancelAnimationFrame')
-      .mockImplementation((frameId) => {
-        pendingFrames.delete(frameId)
-      })
-    vi.spyOn(performance, 'now').mockReturnValue(100)
-    const setViewport = vi.fn(async (nextViewport: typeof viewport) => {
-      viewport = nextViewport
-      return true
+  it('immediately centers a selected target even when it is already visible', () => {
+    const selected = createNode('selected', 100, 100)
+    const target = createNode('target', 400, 100)
+    const selectWorkbenchNode = vi.fn()
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      nodes: [selected, target],
+      selectedNodeId: selected.id,
+      selectWorkbenchNode,
+      setCenter
     })
-    const reactFlowInstanceRef = {
-      current: {
-        getViewport: () => viewport,
-        setViewport
-      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-    }
-    const hook = renderHook(() =>
-      useApplicationShortcutNavigation({
-        currentWorkbench: null,
-        onSelectWorkspace:
-          vi.fn<(workbench: WorkbenchSnapshot, workspaceName: string) => Promise<void>>(),
-        reactFlowInstanceRef,
-        revealProjectSidebar: vi.fn(),
-        workbenches: []
-      })
-    )
 
-    act(() => hook.result.current.startPanCanvas('left'))
+    act(() => hook.result.current.selectCanvasNode('right'))
 
-    expect(setViewport).toHaveBeenLastCalledWith({ x: 11.52, y: 0, zoom: 1 })
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
-
-    act(() => hook.result.current.startPanCanvas('up'))
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
-
-    const firstFrame = pendingFrames.get(1)
-    expect(firstFrame).toBeDefined()
-    pendingFrames.delete(1)
-    act(() => firstFrame?.(116))
-
-    expect(setViewport).toHaveBeenLastCalledWith({
-      x: 11.52 + 11.52 / Math.sqrt(2),
-      y: 11.52 / Math.sqrt(2),
-      zoom: 1
-    })
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(2)
-
-    act(() => hook.result.current.stopPanCanvas('left'))
-    expect(cancelAnimationFrame).not.toHaveBeenCalled()
-
-    act(() => hook.result.current.stopPanCanvas('up'))
-    expect(cancelAnimationFrame).toHaveBeenCalledWith(2)
-    expect(pendingFrames.size).toBe(0)
-
-    hook.unmount()
+    expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
+    expect(setCenter).toHaveBeenCalledWith(460, 140, { duration: 0, zoom: 1 })
   })
 
-  it('cancels a pending pan frame when the hook unmounts', () => {
-    const requestAnimationFrame = vi
-      .spyOn(window, 'requestAnimationFrame')
-      .mockImplementation(() => 42)
-    const cancelAnimationFrame = vi
-      .spyOn(window, 'cancelAnimationFrame')
-      .mockImplementation(() => undefined)
-    const reactFlowInstanceRef = {
-      current: {
-        getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
-        setViewport: vi.fn(async () => true)
-      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-    }
-    const hook = renderHook(() =>
-      useApplicationShortcutNavigation({
-        currentWorkbench: null,
-        onSelectWorkspace: vi.fn(),
-        reactFlowInstanceRef,
-        revealProjectSidebar: vi.fn(),
-        workbenches: []
-      })
-    )
+  it('immediately centers a selected target when it is outside the viewport', () => {
+    const target = createNode('offscreen', 1_200, 700)
+    const selectWorkbenchNode = vi.fn()
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      nodes: [target],
+      selectedNodeId: null,
+      selectWorkbenchNode,
+      setCenter
+    })
 
-    act(() => hook.result.current.startPanCanvas('right'))
-    hook.unmount()
+    act(() => hook.result.current.selectCanvasNode('right'))
 
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
-    expect(cancelAnimationFrame).toHaveBeenCalledWith(42)
+    expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
+    expect(setCenter).toHaveBeenCalledWith(1_260, 740, { duration: 0, zoom: 1 })
   })
 })
+
+function renderNavigationHook({
+  nodes,
+  selectedNodeId,
+  selectWorkbenchNode,
+  setCenter
+}: {
+  readonly nodes: WorkbenchFlowNode[]
+  readonly selectedNodeId: string | null
+  readonly selectWorkbenchNode: (node: WorkbenchFlowNode) => void
+  readonly setCenter: ReturnType<typeof vi.fn>
+}) {
+  const reactFlowInstanceRef = {
+    current: {
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setCenter
+    } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+  }
+
+  return renderHook(() =>
+    useApplicationShortcutNavigation({
+      canvasSizeRef: { current: { width: 960, height: 640 } },
+      currentWorkbench: null,
+      nodes,
+      onSelectWorkspace:
+        vi.fn<(workbench: WorkbenchSnapshot, workspaceName: string) => Promise<void>>(),
+      reactFlowInstanceRef,
+      revealProjectSidebar: vi.fn(),
+      selectedNodeId,
+      selectWorkbenchNode,
+      workbenches: []
+    })
+  )
+}
+
+function createNode(id: string, x: number, y: number): WorkbenchFlowNode {
+  return {
+    id,
+    type: 'terminal',
+    position: { x, y },
+    style: { width: 120, height: 80 }
+  } as WorkbenchFlowNode
+}

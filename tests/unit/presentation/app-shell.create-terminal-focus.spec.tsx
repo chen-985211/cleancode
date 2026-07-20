@@ -7,7 +7,10 @@ import {
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
-import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type {
+  WorkbenchFlowNode,
+  WorkbenchSnapshot
+} from '../../../src/presentation/app-shell/types'
 
 const reactFlowSpies = vi.hoisted(() => ({
   fitView: vi.fn(async () => undefined),
@@ -29,7 +32,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
-    ReactFlow: ({ children, onInit }: MockReactFlowProps) => {
+    ReactFlow: ({ children, nodes = [], onInit }: MockReactFlowProps) => {
       const hasInitializedRef = React.useRef(false)
 
       React.useEffect(() => {
@@ -41,7 +44,18 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         onInit?.(createMockReactFlowInstance())
       }, [onInit])
 
-      return React.createElement('div', { 'data-testid': 'mock-react-flow' }, children)
+      return React.createElement(
+        'div',
+        { 'data-testid': 'mock-react-flow' },
+        children,
+        nodes.map((node) =>
+          React.createElement('div', {
+            key: node.id,
+            'data-selected': String(Boolean(node.selected)),
+            'data-testid': `mock-node-${node.id}`
+          })
+        )
+      )
     }
   }
 })
@@ -158,13 +172,27 @@ describe('app shell create terminal focus', () => {
     })
   })
 
-  it('pans the canvas in four directions and toggles the minimap from shortcuts', async () => {
+  it('selects canvas nodes by direction without animated panning and toggles the minimap', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench])
+        listWorkbenches: vi.fn(async () => [
+          {
+            ...workbench,
+            graph: {
+              ...workbench.graph,
+              blocks: [
+                createTerminalBlockSnapshot({ id: 'left-terminal', position: { x: 100, y: 240 } }),
+                createTerminalBlockSnapshot({
+                  id: 'right-terminal',
+                  position: { x: 700, y: 240 }
+                })
+              ]
+            }
+          }
+        ])
       })
     })
 
@@ -172,23 +200,36 @@ describe('app shell create terminal focus', () => {
 
     await screen.findByTestId('mock-react-flow')
     await waitFor(() => expect(screen.getByRole('button', { name: '收起小地图' })).toBeEnabled())
+    await screen.findByTestId('mock-node-right-terminal')
     const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
       ? { metaKey: true }
       : { ctrlKey: true }
     reactFlowSpies.setViewport.mockClear()
+    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
 
-    for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
-      fireEvent.keyDown(document, { key, ...primaryModifier })
-      fireEvent.keyDown(document, { key, repeat: true, ...primaryModifier })
-      fireEvent.keyUp(document, { key, ...primaryModifier })
-    }
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-node-agent:default-agent')).toHaveAttribute(
+        'data-selected',
+        'true'
+      )
+    )
 
-    expect(reactFlowSpies.setViewport.mock.calls).toEqual([
-      [{ x: 11.52, y: 0, zoom: 1 }],
-      [{ x: -11.52, y: 0, zoom: 1 }],
-      [{ x: 0, y: 11.52, zoom: 1 }],
-      [{ x: 0, y: -11.52, zoom: 1 }]
-    ])
+    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-node-right-terminal')).toHaveAttribute(
+        'data-selected',
+        'true'
+      )
+    )
+    expect(reactFlowSpies.setViewport).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-node-left-terminal')).toHaveAttribute('data-selected', 'true')
+    )
 
     fireEvent.keyDown(document, { key: 'm', shiftKey: true, ...primaryModifier })
 
@@ -198,6 +239,7 @@ describe('app shell create terminal focus', () => {
 
 interface MockReactFlowProps {
   readonly children?: ReactNode
+  readonly nodes?: readonly WorkbenchFlowNode[]
   readonly onInit?: (instance: MockReactFlowInstance) => void
 }
 
