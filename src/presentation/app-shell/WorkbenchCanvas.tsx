@@ -22,6 +22,7 @@ import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
+import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
@@ -41,6 +42,7 @@ interface WorkbenchCanvasProps {
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
+  readonly shortcutTooltips: ApplicationShortcutTooltipLabels
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
   readonly onBeginTerminalGroupSelection: () => void
@@ -80,6 +82,7 @@ export function WorkbenchCanvas({
   reactFlowInstanceRef,
   minimapNodeInteraction,
   terminalWorkflow,
+  shortcutTooltips,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
   onBeginTerminalGroupSelection,
@@ -210,6 +213,7 @@ export function WorkbenchCanvas({
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
       <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
         <WorkbenchToolbar
+          shortcutTooltips={shortcutTooltips}
           isDesktopRuntime={isDesktopRuntime}
           hasWorkbench={Boolean(currentWorkbench)}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}

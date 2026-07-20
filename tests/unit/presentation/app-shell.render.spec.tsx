@@ -5,9 +5,15 @@ import {
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { shortcutBindingsStorageKey } from '../../../src/presentation/app-shell/applicationShortcutPreference'
 
 describe('app shell', () => {
   beforeEach(() => {
+    window.localStorage.removeItem(shortcutBindingsStorageKey)
+    Object.defineProperty(window.navigator, 'platform', {
+      configurable: true,
+      value: 'MacIntel'
+    })
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: undefined
@@ -195,6 +201,27 @@ describe('app shell', () => {
     const tooltip = await screen.findByRole('tooltip')
     expect(tooltip).toHaveTextContent(/切换侧边栏 \((?:⌘B|Ctrl\+B)\)/)
     expect(document.querySelector('.cc-tooltip-content')).toHaveAttribute('data-side', 'bottom')
+  })
+
+  it('updates a toolbar tooltip immediately after editing its shortcut', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    })
+    render(<AppShell />)
+    await screen.findByRole('group', { name: '项目 alpha-project' })
+
+    fireEvent.click(screen.getByRole('button', { name: '设置' }))
+    const recorder = screen.getByRole('button', { name: '修改“新建终端积木”快捷键' })
+    fireEvent.click(recorder)
+    fireEvent.keyDown(recorder, { altKey: true, key: 'k', metaKey: true })
+    fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+
+    const createTerminal = screen.getByRole('button', { name: '新建终端积木' })
+    fireEvent.pointerMove(createTerminal, { pointerType: 'mouse' })
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('新建终端积木 (⌘⌥K)')
   })
 
   it('routes Command/Ctrl+B through the sidebar toggle action', () => {

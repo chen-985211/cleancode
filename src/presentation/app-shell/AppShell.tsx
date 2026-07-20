@@ -46,11 +46,8 @@ import { CodexCliStateProvider } from './CodexCliStateProvider'
 import { AgentTerminalEventProvider } from './AgentTerminalEventProvider'
 import { createAgentTerminalEventStore } from './agentTerminalEventState'
 import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
-import {
-  formatShortcutBinding,
-  resolveShortcutPlatform,
-  type ShortcutPlatform
-} from './applicationShortcuts'
+import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
+import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
 import { useApplicationShortcuts, type ApplicationShortcutActions } from './useApplicationShortcuts'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
@@ -72,13 +69,7 @@ export function AppShell({
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
-  const sidebarToggleShortcut = formatShortcutBinding(
-    bindings.toggleSidebar,
-    shortcutPlatform
-  ).join(shortcutPlatform === 'mac' ? '' : '+')
-  const sidebarToggleTooltip = sidebarToggleShortcut
-    ? t('sidebar.toggleTooltip', { shortcut: sidebarToggleShortcut })
-    : t('settings.shortcuts.command.toggleSidebar')
+  const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -562,7 +553,7 @@ export function AppShell({
                 aria-label={t('app.windowNavigation')}
               >
                 <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
-                <TooltipLabel content={sidebarToggleTooltip} side="bottom">
+                <TooltipLabel content={shortcutTooltips.toggleSidebar} side="bottom">
                   <button
                     ref={projectSidebarToggleRef}
                     className="project-sidebar-toggle"
@@ -611,6 +602,7 @@ export function AppShell({
               reactFlowInstanceRef={reactFlowInstanceRef}
               minimapNodeInteraction={minimapNodeInteraction}
               terminalWorkflow={terminalWorkflow}
+              shortcutTooltips={shortcutTooltips}
               onCreateTerminalBlock={createTerminalBlock}
               onCreateWorkspaceAgent={createWorkspaceAgent}
               onBeginTerminalGroupSelection={beginTerminalGroupSelection}

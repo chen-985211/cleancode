@@ -135,6 +135,13 @@ function renderCanvas(
 ): void {
   render(
     <WorkbenchCanvas
+      shortcutTooltips={{
+        openSettings: '打开设置 (⌘,)',
+        toggleSidebar: '切换侧边栏 (⌘B)',
+        createTerminal: '新建终端积木 (⌘T)',
+        createAgent: '新建 Agent (⌘⇧A)',
+        groupTerminals: '组合终端 (⌘G)'
+      }}
       isDesktopRuntime={true}
       currentWorkbench={null}
       currentWorkspace={undefined}

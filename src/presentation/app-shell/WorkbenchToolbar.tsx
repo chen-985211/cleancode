@@ -1,5 +1,7 @@
 import { Bot, Box, Check, Terminal, X } from 'lucide-react'
+import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
 
 interface WorkbenchToolbarProps {
   readonly isDesktopRuntime: boolean
@@ -8,6 +10,10 @@ interface WorkbenchToolbarProps {
   readonly selectedTerminalGroupCandidateCount: number
   readonly canBeginTerminalGroupSelection: boolean
   readonly canCreateTerminalGroup: boolean
+  readonly shortcutTooltips: Pick<
+    ApplicationShortcutTooltipLabels,
+    'createAgent' | 'createTerminal' | 'groupTerminals'
+  >
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
   readonly onBeginTerminalGroupSelection: () => void
@@ -24,15 +30,17 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
         role="group"
         aria-label={t('toolbar.terminalTools')}
       >
-        <button
-          className="toolbar-button toolbar-button--primary"
-          type="button"
-          onClick={props.onCreateTerminalBlock}
-          disabled={!props.isDesktopRuntime || !props.hasWorkbench}
-        >
-          <Terminal size={16} aria-hidden="true" />
-          {t('toolbar.newTerminal')}
-        </button>
+        <TooltipLabel content={props.shortcutTooltips.createTerminal} side="bottom">
+          <button
+            className="toolbar-button toolbar-button--primary"
+            type="button"
+            onClick={props.onCreateTerminalBlock}
+            disabled={!props.isDesktopRuntime || !props.hasWorkbench}
+          >
+            <Terminal size={16} aria-hidden="true" />
+            {t('toolbar.newTerminal')}
+          </button>
+        </TooltipLabel>
         <span className="toolbar-divider" aria-hidden="true" />
         {props.isTerminalGroupSelectionMode ? (
           <>
@@ -59,19 +67,21 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
             </button>
           </>
         ) : (
-          <button
-            className="toolbar-button"
-            type="button"
-            onClick={props.onBeginTerminalGroupSelection}
-            disabled={
-              !props.isDesktopRuntime ||
-              !props.hasWorkbench ||
-              !props.canBeginTerminalGroupSelection
-            }
-          >
-            <Box size={16} aria-hidden="true" />
-            {t('toolbar.groupTerminals')}
-          </button>
+          <TooltipLabel content={props.shortcutTooltips.groupTerminals} side="bottom">
+            <button
+              className="toolbar-button"
+              type="button"
+              onClick={props.onBeginTerminalGroupSelection}
+              disabled={
+                !props.isDesktopRuntime ||
+                !props.hasWorkbench ||
+                !props.canBeginTerminalGroupSelection
+              }
+            >
+              <Box size={16} aria-hidden="true" />
+              {t('toolbar.groupTerminals')}
+            </button>
+          </TooltipLabel>
         )}
       </div>
       <div
@@ -79,15 +89,17 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
         role="group"
         aria-label={t('toolbar.agentTools')}
       >
-        <button
-          className="toolbar-button"
-          type="button"
-          onClick={props.onCreateWorkspaceAgent}
-          disabled={!props.isDesktopRuntime || !props.hasWorkbench}
-        >
-          <Bot size={16} aria-hidden="true" />
-          {t('toolbar.newAgent')}
-        </button>
+        <TooltipLabel content={props.shortcutTooltips.createAgent} side="bottom">
+          <button
+            className="toolbar-button"
+            type="button"
+            onClick={props.onCreateWorkspaceAgent}
+            disabled={!props.isDesktopRuntime || !props.hasWorkbench}
+          >
+            <Bot size={16} aria-hidden="true" />
+            {t('toolbar.newAgent')}
+          </button>
+        </TooltipLabel>
       </div>
     </div>
   )

@@ -19,7 +19,10 @@ import {
   type ApplicationShortcutCommand,
   type ShortcutPlatform
 } from './applicationShortcuts'
-import type { MessageKey } from './i18n/messages'
+import {
+  applicationShortcutCommandMessageKeys,
+  createApplicationShortcutTooltipLabels
+} from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 
@@ -36,16 +39,9 @@ interface ApplicationSettingsRootProps {
   readonly onResetAll: () => void
 }
 
-const commandMessageKeys: Readonly<Record<ApplicationShortcutCommand, MessageKey>> = {
-  openSettings: 'settings.shortcuts.command.openSettings',
-  toggleSidebar: 'settings.shortcuts.command.toggleSidebar',
-  createTerminal: 'settings.shortcuts.command.createTerminal',
-  createAgent: 'settings.shortcuts.command.createAgent',
-  groupTerminals: 'settings.shortcuts.command.groupTerminals'
-}
-
 export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const { t } = useI18n()
+  const shortcutTooltips = createApplicationShortcutTooltipLabels(props.bindings, props.platform, t)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const backButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLElement | null>(null)
@@ -96,7 +92,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
 
   return (
     <>
-      <TooltipLabel content={t('settings.open')} side="bottom">
+      <TooltipLabel content={shortcutTooltips.openSettings} side="bottom">
         <button
           ref={triggerRef}
           className="application-settings-trigger"
@@ -163,7 +159,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 </header>
                 <div className="shortcut-settings-list">
                   {applicationShortcutCommands.map((command) => {
-                    const action = t(commandMessageKeys[command])
+                    const action = t(applicationShortcutCommandMessageKeys[command])
                     const binding = props.bindings[command]
                     const isRecording = recordingCommand === command
                     const error =
@@ -289,7 +285,9 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     if (conflict !== null) {
       setCaptureError({
         command,
-        message: t('settings.shortcuts.conflict', { action: t(commandMessageKeys[conflict]) })
+        message: t('settings.shortcuts.conflict', {
+          action: t(applicationShortcutCommandMessageKeys[conflict])
+        })
       })
       return
     }

@@ -99,6 +99,11 @@ describe('language settings', () => {
           selectedTerminalGroupCandidateCount={0}
           canBeginTerminalGroupSelection
           canCreateTerminalGroup={false}
+          shortcutTooltips={{
+            createAgent: 'New Agent (Ctrl+Shift+A)',
+            createTerminal: 'New terminal block (Ctrl+T)',
+            groupTerminals: 'Group terminals (Ctrl+G)'
+          }}
           onCreateTerminalBlock={vi.fn()}
           onCreateWorkspaceAgent={vi.fn()}
           onBeginTerminalGroupSelection={vi.fn()}

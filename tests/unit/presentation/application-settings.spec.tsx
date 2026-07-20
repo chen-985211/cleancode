@@ -95,6 +95,20 @@ describe('application settings', () => {
     fireEvent.click(screen.getByRole('button', { name: '全部恢复默认' }))
     expect(screen.getByRole('button', { name: '修改“新建终端积木”快捷键' })).toHaveTextContent('⌘T')
   })
+
+  it('updates the settings trigger tooltip when its shortcut binding changes', async () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    const recorder = screen.getByRole('button', { name: '修改“打开设置”快捷键' })
+    fireEvent.click(recorder)
+    fireEvent.keyDown(recorder, { altKey: true, key: 'o', metaKey: true })
+    fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+
+    const trigger = screen.getByRole('button', { name: '设置' })
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' })
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('打开设置 (⌘⌥O)')
+  })
 })
 
 function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {

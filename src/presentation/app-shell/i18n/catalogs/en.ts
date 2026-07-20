@@ -33,6 +33,7 @@ export const enMessages = {
   'settings.shortcuts.edit': 'Change the “{action}” shortcut',
   'settings.shortcuts.clear': 'Clear the “{action}” shortcut',
   'settings.shortcuts.reset': 'Restore the default “{action}” shortcut',
+  'settings.shortcuts.tooltip': '{action} ({shortcut})',
   'settings.shortcuts.command.openSettings': 'Open settings',
   'settings.shortcuts.command.toggleSidebar': 'Toggle sidebar',
   'settings.shortcuts.command.createTerminal': 'New terminal block',
@@ -76,7 +77,6 @@ export const enMessages = {
   'sidebar.label': 'Projects and branch workspaces',
   'sidebar.expand': 'Show sidebar',
   'sidebar.collapse': 'Hide sidebar',
-  'sidebar.toggleTooltip': 'Toggle sidebar ({shortcut})',
   'sidebar.addProject': 'Add project',
   'sidebar.previewWarning':
     'Browser preview does not connect to the local file system or terminals. Use the desktop app for live features.',
