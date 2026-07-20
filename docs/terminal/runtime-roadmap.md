@@ -38,7 +38,10 @@
 - `TerminalSession` 使用明确状态迁移管理一次 PTY 会话。
 - 每次启动产生精确 `sessionId + runId + generation`，旧运行的迟到事件不能覆盖当前运行。
 - 同一项目、目录、工作区和终端槽位的启动与清理按 owner 串行。
-- 工作区切换时可复用同一 xterm surface，保留当前应用进程内的解析状态和滚动历史。
+- 每个可恢复运行在主进程维护独立的权威终端模型、单调输出 sequence 和有界 snapshot。
+- 工作区切换会销毁旧 renderer xterm；返回时创建新视图，并按 snapshot marker 接续定向 live output。
+- 隐藏普通终端停止逐字节 renderer 投递，由主进程模型继续解析输出并响应 terminal query。
+- 模型使用 PTY pause/resume 建立背压与 query 响应权交接；renderer 恢复队列和重试均有界。
 - 启动命令、停止当前命令、重开空终端和停止工作流具有不同作用对象和语义。
 - 依赖工作流支持并行根、汇合等待、失败传播、任务/服务模式、就绪和反向停止。
 - 受管服务具备端口策略、注入、所有权验证、释放等待和隔离语义。
@@ -46,10 +49,8 @@
 当前限制：
 
 - PTY、输出、输入历史和终端屏幕状态只存在于当前应用进程。
-- renderer 中的 xterm surface 同时承担可见视图和主要屏幕状态保存职责。
-- 隐藏终端仍保留完整 xterm 实例并持续处理输出，资源占用随终端数量增长。
-- renderer 重建后没有独立于旧 xterm 的权威屏幕快照。
-- 输出事件没有用于快照与实时数据对账的单调序号。
+- 权威终端模型仍只存在于当前主进程，应用完整退出后不会保留 PTY 或屏幕状态。
+- 当前 headless 模型适配器仍需随终端依赖升级重新验证序列化和协议兼容性。
 - 终端搜索、文件与 URL 链接、复杂输入、长文本粘贴和渲染降级能力仍然基础。
 - 普通终端没有跨应用存活、磁盘 checkpoint、远程 provider 或外部控制协议。
 
@@ -108,7 +109,7 @@ flowchart LR
 
 | 阶段 | 名称                   | 核心结果                                       | 主要用户收益                       | 状态     |
 | ---- | ---------------------- | ---------------------------------------------- | ---------------------------------- | -------- |
-| 1    | 权威模型与可丢弃视图   | 终端状态脱离单个 renderer xterm                | 隐藏、切换和视图重建更加可靠       | 尚未开始 |
+| 1    | 权威模型与可丢弃视图   | 终端状态脱离单个 renderer xterm                | 隐藏、切换和视图重建更加可靠       | 已完成   |
 | 2    | 日常交互与渲染质量     | 完整的检索、链接、输入和渲染降级能力           | 每天使用更快、更顺、更少误操作     | 尚未开始 |
 | 3    | 跨应用存活与故障恢复   | 持久运行 provider、warm attach 和 cold restore | 退出或故障后仍能找回符合策略的终端 | 尚未开始 |
 | 4    | 多运行环境与可编程控制 | 本地和远程 provider、CLI/受控工具协议          | 同一套终端体验覆盖更多运行环境     | 尚未开始 |
@@ -215,6 +216,18 @@ flowchart LR
 - 当前行为文档已经更新为新的事实来源，不再把 xterm surface 描述为恢复权威。
 - 未完成的兼容路径具有明确 kill switch 或回退策略。
 - 未发现无界缓冲、重复 query 响应、旧 generation 污染或资源泄漏。
+
+### 第一阶段完成证据
+
+第一阶段于 2026-07-20 完成：
+
+- `TerminalSessionService` 保持 PTY 生命周期 owner，并在有效输出进入应用消费者前只写入 `TerminalModelPort` 一次。
+- 主进程 headless 模型维护 1000 行滚动历史、ANSI 屏幕、alternate buffer、模式、标题、工作目录、sequence、snapshot、transcript 和恢复耗时指标。
+- 模型待解析输出以 1 MiB / 256 KiB 高低水位控制 PTY pause/resume；renderer 恢复队列上限为 1 MiB，sequence 缺口和溢出进入有界重新 attach。
+- attach/detach 通过暂停 PTY、flush 模型和确认后销毁旧 xterm 交接 terminal query 响应权；真实 Electron 测试证明可见与隐藏状态都只产生一次查询响应。
+- renderer 每次挂载创建新 xterm，snapshot 按原始尺寸恢复后接续 marker 之后的 live output；隐藏普通终端不再接收逐字节输出。
+- replace、显式 terminate 和应用清理释放模型；natural exit 只在当前进程内保留最新 generation 的有界最终模型，后续 replacement 会撤销恢复资格。
+- Unit、Integration、Contract 和 E2E 分别覆盖身份与生命周期、真实 headless ANSI/模式/背压、IPC 恢复契约，以及真实视图销毁重建、隐藏输出和早期 scrollback。
 
 ## 第二阶段：日常交互与渲染质量
 

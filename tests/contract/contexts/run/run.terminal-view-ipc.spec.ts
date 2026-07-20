@@ -1,0 +1,204 @@
+import type { TerminalSnapshot } from '../../../../src/contexts/run/application/dto/TerminalModelSnapshot'
+import type { TerminalViewOutputEvent } from '../../../../src/contexts/run/application/ports/TerminalModelPort'
+import {
+  registerTerminalIpcHandlers,
+  type TerminalIpcHandlersInput
+} from '../../../../src/platform/electron-main/terminalIpcHandlers'
+import type { IpcInvokeResult, IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandler'
+import type { Logger } from '../../../../src/platform/logging/Logger'
+
+describe('terminal view IPC contract', () => {
+  it('attaches an exact view identity, returns its snapshot and targets live output', async () => {
+    const ipcMain = new FakeIpcMain()
+    const sender = new FakeSender()
+    let emitOutput: ((event: TerminalViewOutputEvent) => void) | undefined
+    const attachTerminalView = vi.fn(async (command) => {
+      emitOutput = command.onOutput
+      return snapshot()
+    })
+    registerTerminalIpcHandlers(createInput({ ipcMain, attachTerminalView }))
+
+    await expect(
+      ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), sender)
+    ).resolves.toEqual({ ok: true, value: snapshot() })
+
+    const output = viewOutputEvent()
+    emitOutput?.(output)
+
+    expect(attachTerminalView).toHaveBeenCalledWith({
+      ...viewCommand(),
+      onOutput: expect.any(Function)
+    })
+    expect(sender.send).toHaveBeenCalledWith('cleancode:terminal-view-output', output)
+  })
+
+  it('detaches explicitly and also cleans up an attached view when its renderer is destroyed', async () => {
+    const ipcMain = new FakeIpcMain()
+    const sender = new FakeSender()
+    const detachTerminalView = vi.fn(async () => undefined)
+    registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView }))
+
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), sender)
+    sender.destroy()
+
+    await vi.waitFor(() => expect(detachTerminalView).toHaveBeenCalledWith(viewCommand()))
+
+    const explicitSender = new FakeSender()
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand('view-2'), explicitSender)
+    await expect(
+      ipcMain.invoke('cleancode:detach-terminal-view', viewCommand('view-2'), explicitSender)
+    ).resolves.toEqual({ ok: true, value: undefined })
+
+    expect(detachTerminalView).toHaveBeenCalledWith(viewCommand('view-2'))
+    expect(explicitSender.listenerCount).toBe(0)
+  })
+
+  it('rejects incomplete restore identities at the IPC boundary', async () => {
+    const ipcMain = new FakeIpcMain()
+    const attachTerminalView = vi.fn()
+    registerTerminalIpcHandlers(createInput({ ipcMain, attachTerminalView }))
+
+    await expect(
+      ipcMain.invoke(
+        'cleancode:attach-terminal-view',
+        { ...viewCommand(), generation: 0 },
+        new FakeSender()
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(attachTerminalView).not.toHaveBeenCalled()
+  })
+})
+
+class FakeIpcMain implements IpcMainLike {
+  private readonly handlers = new Map<
+    string,
+    (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
+  >()
+
+  handle(
+    channel: string,
+    listener: (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
+  ): void {
+    this.handlers.set(channel, listener)
+  }
+
+  invoke<TResult>(
+    channel: string,
+    command: unknown,
+    sender: FakeSender
+  ): Promise<IpcInvokeResult<TResult>> {
+    const handler = this.handlers.get(channel)
+    if (!handler) throw new Error(`No handler registered for ${channel}`)
+    return handler({ sender }, command) as Promise<IpcInvokeResult<TResult>>
+  }
+}
+
+class FakeSender {
+  readonly send = vi.fn()
+  private readonly destroyedListeners = new Set<() => void>()
+
+  get listenerCount(): number {
+    return this.destroyedListeners.size
+  }
+
+  isDestroyed(): boolean {
+    return false
+  }
+
+  once(_event: 'destroyed', listener: () => void): void {
+    this.destroyedListeners.add(listener)
+  }
+
+  removeListener(_event: 'destroyed', listener: () => void): void {
+    this.destroyedListeners.delete(listener)
+  }
+
+  destroy(): void {
+    const listeners = [...this.destroyedListeners]
+    this.destroyedListeners.clear()
+    for (const listener of listeners) listener()
+  }
+}
+
+function createInput(input: {
+  readonly ipcMain: IpcMainLike
+  readonly attachTerminalView?: TerminalIpcHandlersInput['attachTerminalView']
+  readonly detachTerminalView?: TerminalIpcHandlersInput['detachTerminalView']
+}): TerminalIpcHandlersInput {
+  return {
+    attachTerminalView: input.attachTerminalView ?? vi.fn(async () => snapshot()),
+    detachTerminalView: input.detachTerminalView ?? vi.fn(async () => undefined),
+    interruptTerminal: vi.fn(),
+    ipcMain: input.ipcMain,
+    launchTerminal: vi.fn(),
+    listTerminalSessions: vi.fn(() => []),
+    listTerminalWorkingDirectories: vi.fn(async () => []),
+    logger: new SilentLogger(),
+    openTerminalServiceEndpoint: vi.fn(),
+    resizeTerminal: vi.fn(),
+    startTerminal: vi.fn(),
+    terminateTerminal: vi.fn(),
+    writeTerminal: vi.fn()
+  }
+}
+
+function viewCommand(viewId = 'view-1') {
+  return {
+    projectId: 'project-1',
+    workspaceName: 'main',
+    blockId: 'block-1',
+    sessionId: 'session-1',
+    runId: 'run-1',
+    generation: 1,
+    viewId
+  }
+}
+
+function snapshot(): TerminalSnapshot {
+  return {
+    identity: {
+      ...viewCommand(),
+      projectDirectory: '/work/app',
+      workspaceDirectory: '/work/app',
+      gitBranch: 'main'
+    },
+    sequence: 2,
+    restoreMarker: { viewId: 'view-1', sequence: 2 },
+    content: 'restored',
+    transcript: 'restored',
+    dimensions: { columns: 80, rows: 24 },
+    title: '',
+    workingDirectory: '/work/app',
+    modes: {
+      applicationCursorKeysMode: false,
+      applicationKeypadMode: false,
+      bracketedPasteMode: false,
+      insertMode: false,
+      mouseTrackingMode: 'none',
+      originMode: false,
+      reverseWraparoundMode: false,
+      sendFocusMode: false,
+      synchronizedOutputMode: false,
+      wraparoundMode: true
+    }
+  }
+}
+
+function viewOutputEvent(): TerminalViewOutputEvent {
+  return {
+    viewId: 'view-1',
+    scope: snapshot().identity,
+    sessionId: 'session-1',
+    output: { sequence: 3, data: 'live' }
+  }
+}
+
+class SilentLogger implements Logger {
+  debug(): void {}
+  info(): void {}
+  warn(): void {}
+  error(): void {}
+}

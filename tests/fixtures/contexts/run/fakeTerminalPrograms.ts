@@ -12,6 +12,7 @@ export const terminalWorkspaceRetentionFixtureFileName = 'terminal-workspace-ret
 export const terminalWorkspaceRetentionEarlyMarker = '__TERMINAL_SCROLLBACK_EARLY_MARKER__'
 export const terminalWorkspaceRetentionLateMarker = '__TERMINAL_SCROLLBACK_LATE_MARKER__'
 export const terminalWorkspaceRetentionInvisiblePadding = '\u001b[0m'.repeat(2_200)
+export const terminalQueryFixtureFileName = 'terminal-query-fixture.mjs'
 
 export async function writeTerminalWorkspaceRetentionFixtureScript(
   projectDirectory: string
@@ -30,6 +31,34 @@ export async function writeTerminalWorkspaceRetentionFixtureScript(
 
   await writeFile(scriptPath, `process.stdout.write(${JSON.stringify(`${output}\r\n`)})\n`, 'utf8')
 
+  return scriptPath
+}
+
+export async function writeTerminalQueryFixtureScript(projectDirectory: string): Promise<string> {
+  const scriptPath = join(projectDirectory, terminalQueryFixtureFileName)
+  await writeFile(
+    scriptPath,
+    `
+import { writeFileSync } from 'node:fs'
+
+const reportPath = process.argv[2]
+let input = ''
+
+process.stdin.setRawMode?.(true)
+process.stdin.resume()
+process.stdin.on('data', (data) => {
+  input += data.toString('utf8')
+})
+process.stdout.write('\u001b[6n')
+
+setTimeout(() => {
+  const responses = input.match(/\\u001b\\[\\d+;\\d+R/g) ?? []
+  writeFileSync(reportPath, JSON.stringify({ count: responses.length, responses }))
+  process.exit(0)
+}, 300)
+`,
+    'utf8'
+  )
   return scriptPath
 }
 

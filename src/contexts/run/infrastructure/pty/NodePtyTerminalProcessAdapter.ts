@@ -84,6 +84,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     terminalProcess.process.resize(columns, rows)
   }
 
+  pauseOutput(sessionId: string): void {
+    this.requireProcess(sessionId).process.pause()
+  }
+
+  resumeOutput(sessionId: string): void {
+    this.requireProcess(sessionId).process.resume()
+  }
+
   async readWorkingDirectory(sessionId: string): Promise<string | null> {
     const terminalProcess = this.processes.get(sessionId)
 

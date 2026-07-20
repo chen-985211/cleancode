@@ -8,23 +8,23 @@
 
 ## 当前技术栈
 
-| 责任           | 当前采用技术                                 |
-| -------------- | -------------------------------------------- |
-| 包管理         | pnpm                                         |
-| 桌面壳         | Electron                                     |
-| 前端框架       | React                                        |
-| 类型系统       | TypeScript                                   |
-| 构建与开发     | electron-vite、Vite                          |
-| 积木画布       | React Flow（`@xyflow/react`）                |
-| 终端渲染       | xterm.js、`@xterm/addon-fit`                 |
-| 伪终端         | node-pty                                     |
-| 本地运行时     | Node.js                                      |
-| 状态管理       | React 本地状态与 hooks；当前没有集中式状态库 |
-| 进程通信       | Electron IPC 与主进程事件                    |
-| 持久化         | Node.js 文件系统、版本化 JSON 与 JSONL       |
-| Agent CLI      | Codex CLI + node-pty                         |
-| Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                  |
-| 测试           | Vitest、Testing Library、Playwright          |
+| 责任           | 当前采用技术                                                              |
+| -------------- | ------------------------------------------------------------------------- |
+| 包管理         | pnpm                                                                      |
+| 桌面壳         | Electron                                                                  |
+| 前端框架       | React                                                                     |
+| 类型系统       | TypeScript                                                                |
+| 构建与开发     | electron-vite、Vite                                                       |
+| 积木画布       | React Flow（`@xyflow/react`）                                             |
+| 终端渲染与模型 | xterm.js、`@xterm/addon-fit`、`@xterm/headless`、`@xterm/addon-serialize` |
+| 伪终端         | node-pty                                                                  |
+| 本地运行时     | Node.js                                                                   |
+| 状态管理       | React 本地状态与 hooks；当前没有集中式状态库                              |
+| 进程通信       | Electron IPC 与主进程事件                                                 |
+| 持久化         | Node.js 文件系统、版本化 JSON 与 JSONL                                    |
+| Agent CLI      | Codex CLI + node-pty                                                      |
+| Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                                               |
+| 测试           | Vitest、Testing Library、Playwright                                       |
 
 当前没有 Monaco Editor、SQLite、Drizzle ORM、Zustand、WebSocket、electron-builder 或 Electron Forge 依赖，也没有基于这些技术的现有产品能力。
 
@@ -50,7 +50,7 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY；xterm.js 只负责渲染与输入。普通会话见[终端会话生命周期](../contexts/run/terminal-session.md)，任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。renderer 中的 xterm.js 负责渲染与输入；普通终端另外在主进程使用 `@xterm/headless` 和 `@xterm/addon-serialize` 维护进程内权威屏幕模型与恢复 snapshot，具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 

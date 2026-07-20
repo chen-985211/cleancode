@@ -1,50 +1,71 @@
-import type { TerminalOutputEvent } from '../../../src/contexts/run/application/ports/TerminalProcessPort'
+import type { TerminalViewOutputEvent } from '../../../src/contexts/run/application/ports/TerminalModelPort'
 import type { Mock } from 'vitest'
 import {
   TerminalSurfaceRegistry,
   type TerminalSurface
 } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
 
-describe('terminal surface registry workspace retention', () => {
-  it('keeps one surface alive while detached and routes background output by exact run identity', () => {
+describe('terminal surface registry disposable views', () => {
+  it('creates a fresh disposable surface whenever the same run becomes visible again', () => {
     const surfaces: FakeTerminalSurface[] = []
-    const registry = new TerminalSurfaceRegistry(() => {
-      const surface = createFakeSurface()
-
-      surfaces.push(surface)
-      return surface
-    })
+    let nextViewId = 0
+    const registry = new TerminalSurfaceRegistry(
+      () => {
+        const surface = createFakeSurface()
+        surfaces.push(surface)
+        return surface
+      },
+      () => `view-${++nextViewId}`
+    )
     const identity = createIdentity()
-    const firstSurface = registry.acquire(identity)
+    const first = registry.create(identity)
 
-    firstSurface.detach(document.createElement('div'))
-    registry.write(createOutputEvent(identity, 'background output\n'))
-    const reattachedSurface = registry.acquire(identity)
+    registry.release(first.viewId)
+    const second = registry.create(identity)
 
-    expect(reattachedSurface).toBe(firstSurface)
-    expect(surfaces).toHaveLength(1)
-    expect(firstSurface.write).toHaveBeenCalledWith('background output\n')
-    expect(firstSurface.dispose).not.toHaveBeenCalled()
+    expect(second.surface).not.toBe(first.surface)
+    expect(surfaces).toHaveLength(2)
+    expect(first.surface.dispose).toHaveBeenCalledTimes(1)
+    expect(registry.getDiagnostics()).toEqual({ surfaceCount: 1, pendingOutputBytes: 0 })
   })
 
-  it('ignores stale generations and disposes surfaces that no longer have a current session', () => {
-    const registry = new TerminalSurfaceRegistry(createFakeSurface)
+  it('routes sequenced output only to the exact live view lease', () => {
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => 'view-current')
     const identity = createIdentity()
-    const surface = registry.acquire(identity)
+    const lease = registry.create(identity)
 
+    registry.write(createOutputEvent(identity, 'view-stale', 1, 'stale'))
+    registry.write(createOutputEvent(identity, lease.viewId, 2, 'live'))
     registry.write(
-      createOutputEvent({ ...identity, runId: 'stale-run', generation: 0 }, 'stale output\n')
+      createOutputEvent(
+        { ...identity, generation: identity.generation + 1 },
+        lease.viewId,
+        3,
+        'old'
+      )
     )
-    registry.retain([{ ...identity, runId: 'replacement-run', generation: 2 }])
 
-    expect(surface.write).not.toHaveBeenCalled()
-    expect(surface.dispose).toHaveBeenCalledTimes(1)
+    expect(lease.surface.write).toHaveBeenCalledTimes(1)
+    expect(lease.surface.write).toHaveBeenCalledWith({ sequence: 2, data: 'live' })
+  })
+
+  it('disposes every remaining view during renderer shutdown', () => {
+    let nextViewId = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++nextViewId}`)
+    const first = registry.create(createIdentity())
+    const second = registry.create({ ...createIdentity(), sessionId: 'session-2', runId: 'run-2' })
+
+    registry.disposeAll()
+
+    expect(first.surface.dispose).toHaveBeenCalledTimes(1)
+    expect(second.surface.dispose).toHaveBeenCalledTimes(1)
   })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
   readonly detach: Mock<TerminalSurface['detach']>
   readonly dispose: Mock<TerminalSurface['dispose']>
+  readonly restore: Mock<TerminalSurface['restore']>
   readonly write: Mock<TerminalSurface['write']>
 }
 
@@ -54,6 +75,8 @@ function createFakeSurface(): FakeTerminalSurface {
     detach: vi.fn<TerminalSurface['detach']>(),
     dispose: vi.fn<TerminalSurface['dispose']>(),
     focus: vi.fn<TerminalSurface['focus']>(),
+    getDiagnostics: vi.fn<TerminalSurface['getDiagnostics']>(() => ({ pendingOutputBytes: 0 })),
+    restore: vi.fn<TerminalSurface['restore']>(),
     setResizeSuspended: vi.fn<TerminalSurface['setResizeSuspended']>(),
     write: vi.fn<TerminalSurface['write']>()
   }
@@ -72,11 +95,14 @@ function createIdentity() {
 
 function createOutputEvent(
   identity: ReturnType<typeof createIdentity>,
+  viewId: string,
+  sequence: number,
   data: string
-): TerminalOutputEvent {
+): TerminalViewOutputEvent {
   return {
+    viewId,
     sessionId: identity.sessionId,
-    data,
+    output: { sequence, data },
     scope: {
       ...identity,
       projectDirectory: '/tmp/project-alpha',

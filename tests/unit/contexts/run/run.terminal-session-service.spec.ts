@@ -419,6 +419,10 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
     this.resizes.push({ sessionId, columns, rows })
   }
 
+  pauseOutput(): void {}
+
+  resumeOutput(): void {}
+
   async stop(sessionId: string): Promise<void> {
     this.stoppedSessionIds.push(sessionId)
     if (this.deferStops) {
@@ -452,6 +456,10 @@ class FailingTerminalProcessPort implements TerminalProcessPort {
   resize(): void {
     throw new Error('Terminal process was not started.')
   }
+
+  pauseOutput(): void {}
+
+  resumeOutput(): void {}
 
   async stop(): Promise<void> {
     return undefined

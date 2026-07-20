@@ -39,8 +39,20 @@ export function useTerminalSessionEvents({
         bufferTerminalStartupOutput(terminalStartupOutputsRef.current, event)
       }
       updateTerminalStates((states) => appendTerminalOutput(states, event))
-      terminalSurfaceRegistry.write(event)
     })
+    const unsubscribeViewOutput =
+      typeof api.onTerminalViewOutput === 'function'
+        ? api.onTerminalViewOutput((event) => {
+            const outputEvent = {
+              scope: event.scope,
+              sessionId: event.sessionId,
+              sequence: event.output.sequence,
+              data: event.output.data
+            }
+            updateTerminalStates((states) => appendTerminalOutput(states, outputEvent))
+            terminalSurfaceRegistry.write(event)
+          })
+        : () => undefined
     const unsubscribeExit = api.onTerminalExit((event) => {
       const exitedTerminalStateKey = findTerminalStateKeyBySession(
         terminalStatesRef.current,
@@ -53,6 +65,7 @@ export function useTerminalSessionEvents({
 
     return () => {
       unsubscribeOutput()
+      unsubscribeViewOutput()
       unsubscribeExit()
     }
   }, [
@@ -79,8 +92,6 @@ export function useTerminalSessionEvents({
     if (!api || typeof api.onTerminalWorkflowEvent !== 'function') return undefined
 
     return api.onTerminalWorkflowEvent((event) => {
-      if (event.type === 'terminal-output') terminalSurfaceRegistry.write(event.output)
-
       let acceptedSessionKey: string | null = null
       updateTerminalStates((states) => {
         const nextStates = applyTerminalWorkflowEventToStates(states, event)

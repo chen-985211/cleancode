@@ -21,6 +21,7 @@ import { NodeTcpListenerInspectionAdapter } from '../../contexts/run/infrastruct
 import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
 import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
+import { HeadlessTerminalModelAdapter } from '../../contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { createRunLifecycleAdapters } from './runLifecycleAdapters'
 import type { ManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
@@ -36,7 +37,8 @@ export function createRunRuntime(input: {
   const sessions = new TerminalSessionService(
     new NodePtyTerminalProcessAdapter(),
     input.scopeValidation,
-    lifecycle
+    lifecycle,
+    new HeadlessTerminalModelAdapter()
   )
   const readiness = new NodeTcpReadinessAdapter()
   const leases = new ServicePortLeaseRegistry()
@@ -94,6 +96,7 @@ function publishWorkflowEvent(
   event: TerminalWorkflowEvent,
   resolveManagedServiceOwner: ManagedServiceOwnerResolver
 ): void {
+  if (event.type === 'terminal-output') return
   if (event.type !== 'service-port-conflict') {
     broadcastRendererEvent('cleancode:terminal-workflow-event', event)
     return

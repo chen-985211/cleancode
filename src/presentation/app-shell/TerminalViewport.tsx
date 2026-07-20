@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type FocusEvent } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
 import { createTerminalSurfaceKey, type TerminalSurface } from './terminalSurfaceRegistry'
@@ -83,27 +84,60 @@ export function TerminalViewport({
 
     const element = terminalElementRef.current
     const runIdentity = runIdentityRef.current
-    const isPersistent = Boolean(runIdentity && surfaceRegistry)
-    const surface =
+    const lease =
       runIdentity && surfaceRegistry
-        ? surfaceRegistry.acquire(runIdentity, () =>
-            createTerminalXtermSurface(outputTailRef.current)
-          )
-        : createTerminalXtermSurface(outputTailRef.current)
+        ? surfaceRegistry.create(runIdentity, createTerminalXtermSurface)
+        : null
+    const surface = lease?.surface ?? createTerminalXtermSurface()
+    const api = window.cleancode
+    let isReleased = false
+    let restoreTail = Promise.resolve()
 
     surfaceRef.current = surface
     surface.attach({
       element,
       isResizeSuspended: isResizeSuspendedRef.current,
       onDimensionsChange: (dimensions) => onDimensionsChangeRef.current(dimensions),
-      onInput: (input) => onInputRef.current(blockRef.current, input)
+      onInput: (input) => onInputRef.current(blockRef.current, input),
+      onRestoreRequired: () => requestRestore(0)
     })
 
+    const requestRestore = (attempt: number): void => {
+      restoreTail = restoreTail
+        .catch(() => undefined)
+        .then(async () => {
+          if (isReleased) return
+          const snapshot =
+            runIdentity && lease && api?.attachTerminalView
+              ? await api.attachTerminalView({ ...runIdentity, viewId: lease.viewId })
+              : createFallbackSnapshot(runIdentity, outputTailRef.current)
+          if (isReleased) return
+          if (lease && api?.attachTerminalView && snapshot.restoreMarker.viewId !== lease.viewId) {
+            return
+          }
+          const result = await surface.restore(snapshot)
+          if (isReleased) return
+          outputTailRef.current = appendTerminalOutputTail('', snapshot.transcript)
+          if (outputTailElementRef.current) {
+            outputTailElementRef.current.textContent = outputTailRef.current
+          }
+          if (result === 'retry' && attempt < 1) requestRestore(attempt + 1)
+        })
+      void restoreTail.catch(() => undefined)
+    }
+
+    requestRestore(0)
+
     return () => {
+      isReleased = true
       surface.detach(element)
-      if (!isPersistent) {
-        surface.dispose()
-      }
+      if (runIdentity && lease && api?.detachTerminalView) {
+        void api
+          .detachTerminalView({ ...runIdentity, viewId: lease.viewId })
+          .catch(() => undefined)
+          .finally(() => surfaceRegistry?.release(lease.viewId))
+      } else if (lease) surfaceRegistry?.release(lease.viewId)
+      else surface.dispose()
       if (surfaceRef.current === surface) {
         surfaceRef.current = null
       }
@@ -151,4 +185,49 @@ export function TerminalViewport({
 
 function isTestRuntime(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom')
+}
+
+function createFallbackSnapshot(
+  identity: NonNullable<TerminalViewState['runIdentity']> | null,
+  output: string
+): TerminalSnapshot {
+  return {
+    identity: identity
+      ? {
+          ...identity,
+          projectDirectory: '',
+          workspaceDirectory: '',
+          gitBranch: null
+        }
+      : ({
+          projectId: '',
+          projectDirectory: '',
+          workspaceName: '',
+          workspaceDirectory: '',
+          gitBranch: null,
+          blockId: '',
+          sessionId: '',
+          runId: '',
+          generation: 0
+        } satisfies TerminalSnapshot['identity']),
+    sequence: 0,
+    restoreMarker: { viewId: '', sequence: 0 },
+    content: output,
+    transcript: output,
+    dimensions: { columns: 80, rows: 24 },
+    title: '',
+    workingDirectory: '',
+    modes: {
+      applicationCursorKeysMode: false,
+      applicationKeypadMode: false,
+      bracketedPasteMode: false,
+      insertMode: false,
+      mouseTrackingMode: 'none',
+      originMode: false,
+      reverseWraparoundMode: false,
+      sendFocusMode: false,
+      synchronizedOutputMode: false,
+      wraparoundMode: true
+    }
+  }
 }

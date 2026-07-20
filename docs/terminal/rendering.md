@@ -142,21 +142,26 @@ Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域�
 
 ## 普通终端的 worktree 重挂载
 
-普通终端的 PTY 由 Run 上下文按工作区持有，React 画布只负责当前工作区的可见投影。工作区切换会卸载当前 `TerminalViewport`；如果组件卸载同时调用 `xterm.dispose()`，PTY 虽然仍然运行，xterm 的 parser 状态、滚动缓冲和 DOM surface 却会消失。返回工作区时只用表现层的 8192 字符输出尾部创建新 xterm，就会表现为较早内容“丢失”，并且无法完整恢复 ANSI 状态。
+普通终端的 PTY 和权威屏幕模型由 Run 上下文按完整运行身份持有，React 画布只负责当前工作区的可见投影。工作区切换可以卸载 `TerminalViewport` 并最终销毁 renderer xterm；隐藏期间的 ANSI 解析、滚动历史、终端模式和输出序号继续由主进程模型维护。
 
-普通终端必须使用表现层 surface registry 保持以下不变量：
+普通终端必须保持以下恢复顺序：
 
-1. registry key 使用完整的 `projectId + workspaceName + blockId + sessionId + runId + generation`，不得只按 block 或 session 的局部身份路由。
-2. 首次附加创建一个 xterm surface，配置 `scrollback: 1000`；worktree 切走时只把 xterm 根 DOM 从旧 host detach，不 dispose terminal，切回时把同一 DOM 重新挂到新 host 并重新 fit、refresh。
-3. 当前与隐藏工作区的终端输出都按完整运行身份直接写入对应 surface；8192 字符尾部仍保留为启动竞态、无障碍文本和非 xterm 回退，不作为滚动历史的事实来源，也不得在重挂载时重复 replay 到已有 surface。
-4. session replacement、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放失效 surface。普通 worktree 导航本身不得触发清理。
-5. Agent console 使用独立但同样保留 parser 状态的 surface registry，并继续遵守自己的 PTY、主题和 generation 协议，不进入普通终端 registry。
+1. 每次可见挂载创建新的 xterm 和唯一 `viewId`，并在请求 snapshot 前注册 surface，使较早到达的 live output 可以进入临时队列。
+2. 主进程 attach 先暂停 PTY 输出、排空模型写入并生成带 `RestoreMarker` 的 snapshot，再把 terminal query 响应权交给当前视图并恢复 PTY 输出。
+3. renderer 先按 snapshot 原始行列 reset 和 replay，再丢弃不大于 snapshot sequence 的事件，只接续严格连续的后续输出，最后按当前可见容器重新 fit。
+4. 恢复队列上限为 1 MiB；sequence 缺口或溢出触发新的 attach，恢复重试有界，不能继续无界累计。
+5. worktree 切走时先从 DOM detach，但在主进程确认响应权已经交回隐藏模型前暂不 dispose xterm；确认后释放 surface。该动作不终止 PTY，也不撤销自然退出模型的进程内恢复资格。
+6. session replacement、显式终止、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放对应 PTY、模型、视图租约和缓冲。
 
-重挂载完成后的 `fit` 可能立即产生 resize。Presentation 必须先保留完整运行身份，并在重新进入工作区时批量向 Run 查询缓存 session 的权威快照；主进程对已退出 session 的 resize 幂等返回该快照，renderer 随即收敛为 `exited`。退出事件先于启动响应时也必须先建立终态投影，避免迟到的启动 Promise 把旧 PTY 重新标成运行中。
+隐藏普通终端不再持续接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见视图取得定向租约后才接收带 sequence 的低延迟事件。隐藏时模型响应 terminal query，可见时 renderer xterm 响应；attach/detach 使用 PTY pause、模型 flush 和确认后销毁，保证同一查询不会由两端重复响应。
+
+8192 字符尾部仍用于无障碍文本、诊断和非 xterm 回退，不是屏幕恢复来源。新 snapshot 额外提供由模型 buffer 导出的有界 transcript，表现层可以用它更新无障碍投影；不得把裁剪后的文本重新送入 xterm parser。
+
+重挂载完成后的 `fit` 可能立即产生 resize。Presentation 必须保留完整运行身份；主进程对已退出 session 的 resize 幂等返回该快照，renderer 随即收敛为 `exited`。退出事件先于启动响应时也必须先建立终态投影，避免迟到的启动 Promise 把旧 PTY 重新标成运行中。
 
 xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model 承担；`.xterm-viewport` 不再是可用 `scrollTop` 判断历史是否存在的原生滚动容器。自动化验证优先使用 xterm 支持的 `Shift+PageUp` 用户交互和可见行结果，不得用旧 DOM 元素的 `scrollHeight` 作为 buffer oracle。
 
-[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确身份路由、detach/reattach 与有界清理；[`terminal-session-state-retention.cleans-surfaces.spec.ts`](../../tests/unit/presentation/terminal-session-state-retention.cleans-surfaces.spec.ts) 证明工作区和积木生命周期投影清理；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty 和超过 8192 字符的确定性输出，证明同一 surface 在 worktree 往返后保留、隐藏期间输出可见且早期 scrollback 仍可访问。
+[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`terminal-viewport.interaction.spec.tsx`](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
 
 ## 画布缩放下的鼠标坐标
 

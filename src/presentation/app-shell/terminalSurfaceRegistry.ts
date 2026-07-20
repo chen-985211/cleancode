@@ -1,5 +1,9 @@
+import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
 import type { TerminalRunIdentity } from '../../contexts/run/application/dto/TerminalRunEvent'
-import type { TerminalOutputEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
+import type {
+  SequencedTerminalOutput,
+  TerminalViewOutputEvent
+} from '../../contexts/run/application/ports/TerminalModelPort'
 import type { TerminalDimensions } from './types'
 
 export interface TerminalSurfaceAttachment {
@@ -7,6 +11,17 @@ export interface TerminalSurfaceAttachment {
   readonly isResizeSuspended: boolean
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (input: string) => void
+  readonly onRestoreRequired: () => void
+}
+
+export type TerminalRestoreResult = 'ready' | 'retry'
+
+interface TerminalSurfaceDiagnostics {
+  readonly pendingOutputBytes: number
+}
+
+export interface TerminalSurfaceRegistryDiagnostics extends TerminalSurfaceDiagnostics {
+  readonly surfaceCount: number
 }
 
 export interface TerminalSurface {
@@ -14,63 +29,74 @@ export interface TerminalSurface {
   detach(element: HTMLDivElement): void
   dispose(): void
   focus(): void
+  getDiagnostics(): TerminalSurfaceDiagnostics
+  restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult>
   setResizeSuspended(isResizeSuspended: boolean): void
-  write(output: string): void
+  write(output: SequencedTerminalOutput): void
+}
+
+export interface TerminalSurfaceLease {
+  readonly viewId: string
+  readonly surface: TerminalSurface
 }
 
 type TerminalSurfaceFactory = () => TerminalSurface
+type TerminalViewIdFactory = () => string
 
 export class TerminalSurfaceRegistry {
-  private readonly surfaces = new Map<string, TerminalSurface>()
+  private readonly views = new Map<
+    string,
+    { readonly identityKey: string; readonly surface: TerminalSurface }
+  >()
 
-  constructor(private readonly defaultFactory?: TerminalSurfaceFactory) {}
+  constructor(
+    private readonly defaultFactory?: TerminalSurfaceFactory,
+    private readonly createViewId: TerminalViewIdFactory = createDefaultViewId
+  ) {}
 
-  acquire(
+  create(
     identity: TerminalRunIdentity,
     factory: TerminalSurfaceFactory | undefined = this.defaultFactory
-  ): TerminalSurface {
-    const key = createTerminalSurfaceKey(identity)
-    const current = this.surfaces.get(key)
+  ): TerminalSurfaceLease {
+    if (!factory) throw new Error('A terminal surface factory is required for a terminal view.')
 
-    if (current) {
-      return current
-    }
-    if (!factory) {
-      throw new Error('A terminal surface factory is required for a new run identity.')
-    }
-
+    const viewId = this.createUniqueViewId()
     const surface = factory()
-    this.surfaces.set(key, surface)
-    return surface
+    this.views.set(viewId, { identityKey: createTerminalSurfaceKey(identity), surface })
+    return { viewId, surface }
   }
 
-  write(event: TerminalOutputEvent): void {
-    if (event.sessionId !== event.scope.sessionId) {
-      return
-    }
-
-    this.surfaces.get(createTerminalSurfaceKey(event.scope))?.write(event.data)
+  write(event: TerminalViewOutputEvent): void {
+    if (event.sessionId !== event.scope.sessionId) return
+    const view = this.views.get(event.viewId)
+    if (!view || view.identityKey !== createTerminalSurfaceKey(event.scope)) return
+    view.surface.write(event.output)
   }
 
-  retain(identities: readonly TerminalRunIdentity[]): void {
-    const retainedKeys = new Set(identities.map(createTerminalSurfaceKey))
-
-    for (const [key, surface] of this.surfaces) {
-      if (retainedKeys.has(key)) {
-        continue
-      }
-
-      surface.dispose()
-      this.surfaces.delete(key)
-    }
+  release(viewId: string): void {
+    const view = this.views.get(viewId)
+    if (!view) return
+    this.views.delete(viewId)
+    view.surface.dispose()
   }
 
   disposeAll(): void {
-    for (const surface of this.surfaces.values()) {
-      surface.dispose()
-    }
+    for (const view of this.views.values()) view.surface.dispose()
+    this.views.clear()
+  }
 
-    this.surfaces.clear()
+  getDiagnostics(): TerminalSurfaceRegistryDiagnostics {
+    let pendingOutputBytes = 0
+    for (const view of this.views.values()) {
+      pendingOutputBytes += view.surface.getDiagnostics().pendingOutputBytes
+    }
+    return { surfaceCount: this.views.size, pendingOutputBytes }
+  }
+
+  private createUniqueViewId(): string {
+    let viewId = this.createViewId()
+    while (this.views.has(viewId)) viewId = this.createViewId()
+    return viewId
   }
 }
 
@@ -88,4 +114,8 @@ export function createTerminalSurfaceKey(
     identity.runId,
     identity.generation
   ].join('\0')
+}
+
+function createDefaultViewId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `terminal-view-${Date.now()}-${Math.random()}`
 }

@@ -403,6 +403,8 @@ class RecordingProcessPort implements TerminalProcessPort {
   }
   write(): void {}
   resize(): void {}
+  pauseOutput(): void {}
+  resumeOutput(): void {}
   async readWorkingDirectory(): Promise<null> {
     return null
   }

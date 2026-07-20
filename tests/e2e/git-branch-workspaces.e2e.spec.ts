@@ -12,6 +12,8 @@ import {
   terminalWorkspaceRetentionFixtureFileName,
   terminalWorkspaceRetentionInvisiblePadding,
   terminalWorkspaceRetentionLateMarker,
+  terminalQueryFixtureFileName,
+  writeTerminalQueryFixtureScript,
   writeTerminalWorkspaceRetentionFixtureScript
 } from '../fixtures/contexts/run/fakeTerminalPrograms'
 import {
@@ -181,6 +183,13 @@ describe('git branch workspaces e2e', () => {
       await waitForTerminalOutput(page, 'Terminal 1', terminalWorkspaceRetentionLateMarker)
       const sessionId = await readTerminalSessionId(page, 'Terminal 1')
       await waitForVisibleXtermText(page, sessionId, terminalWorkspaceRetentionLateMarker)
+      const visibleQueryReport = join(featureWorktreeDirectory, 'visible-query-report.json')
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        `node ${terminalQueryFixtureFileName} ${visibleQueryReport}\r`
+      )
+      expect(JSON.parse(await waitForTextFile(visibleQueryReport))).toMatchObject({ count: 1 })
       const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
       await markTerminalSurface(page, sessionId, terminalSurfaceToken)
 
@@ -203,9 +212,19 @@ describe('git branch workspaces e2e', () => {
         { hiddenOutputMarker, sessionId }
       )
       expect(await waitForTextFile(hiddenOutputReport)).toBe('done')
+      const hiddenQueryReport = join(featureWorktreeDirectory, 'hidden-query-report.json')
+      await page.evaluate(
+        ({ hiddenQueryReport, queryFixtureFileName, sessionId }) =>
+          window.cleancode?.writeTerminal({
+            sessionId,
+            input: `node ${queryFixtureFileName} ${hiddenQueryReport}\r`
+          }),
+        { hiddenQueryReport, queryFixtureFileName: terminalQueryFixtureFileName, sessionId }
+      )
+      expect(JSON.parse(await waitForTextFile(hiddenQueryReport))).toMatchObject({ count: 1 })
 
       await featureWorkspace.click()
-      await waitForTerminalSurface(page, sessionId, terminalSurfaceToken)
+      await waitForRecreatedTerminalSurface(page, sessionId, terminalSurfaceToken)
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForVisibleXtermText(page, sessionId, hiddenOutputMarker)
       await scrollTerminalToTop(page, sessionId)
@@ -221,7 +240,13 @@ async function initializeGitProject(directory: string): Promise<void> {
   await execGit(directory, ['config', 'user.name', 'Test User'])
   await writeFile(join(directory, 'README.md'), 'hello\n')
   await writeTerminalWorkspaceRetentionFixtureScript(directory)
-  await execGit(directory, ['add', 'README.md', terminalWorkspaceRetentionFixtureFileName])
+  await writeTerminalQueryFixtureScript(directory)
+  await execGit(directory, [
+    'add',
+    'README.md',
+    terminalWorkspaceRetentionFixtureFileName,
+    terminalQueryFixtureFileName
+  ])
   await execGit(directory, ['commit', '-m', 'initial'])
 }
 
@@ -261,19 +286,23 @@ async function markTerminalSurface(page: Page, sessionId: string, token: string)
   )
 }
 
-async function waitForTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {
+async function waitForRecreatedTerminalSurface(
+  page: Page,
+  sessionId: string,
+  previousToken: string
+): Promise<void> {
   await page.waitForFunction(
-    ({ sessionId, token }) => {
+    ({ previousToken, sessionId }) => {
       const outputTail = document.querySelector<HTMLElement>(
         `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
       )
+      const surface = outputTail
+        ?.closest('.terminal-output-shell')
+        ?.querySelector<HTMLElement>('.xterm')
 
-      return (
-        outputTail?.closest('.terminal-output-shell')?.querySelector<HTMLElement>('.xterm')?.dataset
-          .workspaceRetentionToken === token
-      )
+      return Boolean(surface && surface.dataset.workspaceRetentionToken !== previousToken)
     },
-    { sessionId, token }
+    { previousToken, sessionId }
   )
 }
 

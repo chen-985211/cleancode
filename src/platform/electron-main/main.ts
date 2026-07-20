@@ -263,6 +263,8 @@ registerBlockGraphIpcHandlers({
 })
 
 registerTerminalIpcHandlers({
+  attachTerminalView: (command) => terminalSessionService.attachView(command),
+  detachTerminalView: (command) => terminalSessionService.detachView(command),
   interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
   ipcMain,
   launchTerminal: (command) => launchTerminal.execute(command),

@@ -55,7 +55,7 @@ describe('terminal workflow session events', () => {
       {
         type: 'terminal-output',
         blockId: 'install',
-        output: { sessionId: 'command', data: 'done', scope: runScope('command') }
+        output: { sessionId: 'command', sequence: 1, data: 'done', scope: runScope('command') }
       }
     )
 

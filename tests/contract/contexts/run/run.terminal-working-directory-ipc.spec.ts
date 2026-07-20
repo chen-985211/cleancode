@@ -156,6 +156,8 @@ function createTerminalIpcHandlersInput(input: {
   readonly resizeTerminal?: TerminalIpcHandlersInput['resizeTerminal']
 }): TerminalIpcHandlersInput {
   return {
+    attachTerminalView: vi.fn(),
+    detachTerminalView: vi.fn(),
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: vi.fn(),

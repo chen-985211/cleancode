@@ -21,6 +21,8 @@ interface FakeTerminalInstance {
   readonly onData: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
   readonly refresh: ReturnType<typeof vi.fn>
+  readonly reset: ReturnType<typeof vi.fn>
+  readonly resize: ReturnType<typeof vi.fn>
   element: HTMLElement | undefined
   textarea: HTMLTextAreaElement | null
   customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
@@ -83,6 +85,11 @@ vi.mock('@xterm/xterm', () => ({
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
     readonly dispose = vi.fn()
     readonly refresh = vi.fn()
+    readonly reset = vi.fn()
+    readonly resize = vi.fn((columns: number, rows: number) => {
+      this.cols = columns
+      this.rows = rows
+    })
 
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
 
@@ -120,6 +127,8 @@ vi.mock('@xterm/addon-fit', () => ({
 }))
 
 let terminalSurfaceRegistry: TerminalSurfaceRegistry
+let attachTerminalView: ReturnType<typeof vi.fn>
+let detachTerminalView: ReturnType<typeof vi.fn>
 
 describe('terminal viewport interaction', () => {
   let animationFrameCallbacks: FrameRequestCallback[] = []
@@ -135,6 +144,12 @@ describe('terminal viewport interaction', () => {
     animationFrameCallbacks = []
     resizeObserverCallbacks = []
     terminalSurfaceRegistry = new TerminalSurfaceRegistry()
+    attachTerminalView = vi.fn(async (command) => createSnapshot(command, 0, ''))
+    detachTerminalView = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: { attachTerminalView, detachTerminalView }
+    })
     xtermMockState.fitAddons = []
     xtermMockState.fitSizes = []
     xtermMockState.terminals = []
@@ -156,6 +171,7 @@ describe('terminal viewport interaction', () => {
       value: originalUserAgent
     })
     vi.restoreAllMocks()
+    Reflect.deleteProperty(window, 'cleancode')
   })
 
   it('does not refocus the terminal when background output arrives', async () => {
@@ -176,7 +192,8 @@ describe('terminal viewport interaction', () => {
     terminal.focus.mockClear()
     helperTextareaFocus.mockClear()
 
-    act(() => terminalSurfaceRegistry.write(createOutputEvent('agent output\n')))
+    const viewId = await waitForAttachedViewId()
+    act(() => terminalSurfaceRegistry.write(createOutputEvent(viewId, 1, 'agent output\n')))
 
     expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
     expect(terminal.focus).not.toHaveBeenCalled()
@@ -230,18 +247,106 @@ describe('terminal viewport interaction', () => {
     expect(xtermMockState.terminals).toHaveLength(1)
   })
 
-  it('reattaches the same terminal surface after its workspace becomes visible again', async () => {
+  it('disposes the detached xterm after main acknowledges detach and creates a fresh view', async () => {
     const firstWorkspace = renderTerminalViewport()
     const terminal = await waitForInstalledTerminal()
+    await waitForAttachedViewId()
 
     firstWorkspace.unmount()
 
-    expect(terminal.dispose).not.toHaveBeenCalled()
+    await waitFor(() => expect(terminal.dispose).toHaveBeenCalledTimes(1))
+    expect(detachTerminalView).toHaveBeenCalledTimes(1)
 
     renderTerminalViewport()
 
-    await waitFor(() => expect(xtermMockState.terminals).toHaveLength(1))
-    expect(terminal.open).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(xtermMockState.terminals).toHaveLength(2))
+    expect(xtermMockState.terminals[1]).not.toBe(terminal)
+    expect(xtermMockState.terminals[1]?.open).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a detached xterm alive until query ownership handoff is acknowledged', async () => {
+    let finishDetach: () => void = () => undefined
+    detachTerminalView.mockImplementation(
+      () => new Promise<void>((resolve) => (finishDetach = resolve))
+    )
+    const workspace = renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+    await waitForAttachedViewId()
+
+    workspace.unmount()
+
+    expect(terminal.dispose).not.toHaveBeenCalled()
+    finishDetach()
+    await waitFor(() => expect(terminal.dispose).toHaveBeenCalledTimes(1))
+  })
+
+  it('replays a snapshot before applying later sequenced output', async () => {
+    attachTerminalView.mockImplementation(async (command) =>
+      createSnapshot(command, 2, '\u001b[31mrestored')
+    )
+    renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+    const viewId = await waitForAttachedViewId()
+
+    act(() => terminalSurfaceRegistry.write(createOutputEvent(viewId, 3, '\r\nlive')))
+
+    await waitFor(() => {
+      expect(terminal.write.mock.calls.map((call) => call[0])).toEqual([
+        '\u001b[31mrestored',
+        '\r\nlive'
+      ])
+    })
+  })
+
+  it('requests a fresh snapshot when live output has a sequence gap', async () => {
+    attachTerminalView
+      .mockImplementationOnce(async (command) => createSnapshot(command, 0, 'first'))
+      .mockImplementationOnce(async (command) => createSnapshot(command, 2, 'gap-recovered'))
+    renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+    const viewId = await waitForAttachedViewId()
+    await waitFor(() => expect(terminal.reset).toHaveBeenCalledTimes(1))
+
+    act(() => terminalSurfaceRegistry.write(createOutputEvent(viewId, 2, 'missing-one')))
+
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(terminal.write.mock.calls.map((call) => call[0])).toContain('gap-recovered')
+    )
+  })
+
+  it('bounds output buffered while a snapshot is in flight and recovers from overflow', async () => {
+    let resolveFirstSnapshot: (snapshot: ReturnType<typeof createSnapshot>) => void = () =>
+      undefined
+    attachTerminalView.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstSnapshot = resolve
+        })
+    )
+    attachTerminalView.mockImplementation(async (command) =>
+      createSnapshot(command, 2, 'overflow-recovered')
+    )
+    renderTerminalViewport()
+    const terminal = await waitForInstalledTerminal()
+    const viewId = await waitForAttachedViewId()
+
+    act(() => {
+      terminalSurfaceRegistry.write(createOutputEvent(viewId, 1, 'x'.repeat(600 * 1024)))
+      terminalSurfaceRegistry.write(createOutputEvent(viewId, 2, 'y'.repeat(600 * 1024)))
+    })
+
+    expect(terminalSurfaceRegistry.getDiagnostics().pendingOutputBytes).toBeLessThanOrEqual(
+      1024 * 1024
+    )
+    const firstAttachCommand = attachTerminalView.mock.calls[0]?.[0]
+    expect(firstAttachCommand).toBeDefined()
+    resolveFirstSnapshot(createSnapshot(firstAttachCommand, 0, 'first-boundary'))
+
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(terminal.write.mock.calls.map((call) => call[0])).toContain('overflow-recovered')
+    )
   })
 
   it('coalesces resize observer bursts before reporting terminal dimensions', async () => {
@@ -394,10 +499,11 @@ function createRunningTerminalState() {
   }
 }
 
-function createOutputEvent(data: string) {
+function createOutputEvent(viewId: string, sequence: number, data: string) {
   return {
+    viewId,
     sessionId: 'terminal-session-1',
-    data,
+    output: { sequence, data },
     scope: {
       projectId: 'project-alpha',
       projectDirectory: '/tmp/project-alpha',
@@ -408,6 +514,52 @@ function createOutputEvent(data: string) {
       sessionId: 'terminal-session-1',
       runId: 'run-1',
       generation: 1
+    }
+  }
+}
+
+async function waitForAttachedViewId(): Promise<string> {
+  await waitFor(() => expect(attachTerminalView).toHaveBeenCalled())
+  return attachTerminalView.mock.calls.at(-1)?.[0].viewId as string
+}
+
+function createSnapshot(
+  command: ReturnType<typeof createRunningTerminalState>['runIdentity'] & {
+    readonly viewId?: string
+  },
+  sequence: number,
+  content: string
+) {
+  return {
+    identity: {
+      projectId: command.projectId,
+      projectDirectory: '/tmp/project-alpha',
+      workspaceName: command.workspaceName,
+      workspaceDirectory: '/tmp/project-alpha-worktrees/feature-sidebar',
+      gitBranch: 'feature/sidebar',
+      blockId: command.blockId,
+      sessionId: command.sessionId,
+      runId: command.runId,
+      generation: command.generation
+    },
+    sequence,
+    restoreMarker: { viewId: command.viewId ?? '', sequence },
+    content,
+    transcript: content,
+    dimensions: { columns: 80, rows: 24 },
+    title: '',
+    workingDirectory: '/tmp/project-alpha-worktrees/feature-sidebar',
+    modes: {
+      applicationCursorKeysMode: false,
+      applicationKeypadMode: false,
+      bracketedPasteMode: false,
+      insertMode: false,
+      mouseTrackingMode: 'none' as const,
+      originMode: false,
+      reverseWraparoundMode: false,
+      sendFocusMode: false,
+      synchronizedOutputMode: false,
+      wraparoundMode: true
     }
   }
 }

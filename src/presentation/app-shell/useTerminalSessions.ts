@@ -87,14 +87,6 @@ export function useTerminalSessions({
     terminalStatesRef.current = terminalStatesByKey
   }, [terminalStatesByKey])
 
-  useEffect(() => {
-    terminalSurfaceRegistry.retain(
-      Object.values(terminalStatesByKey)
-        .map((state) => state.runIdentity)
-        .filter((identity): identity is NonNullable<typeof identity> => Boolean(identity))
-    )
-  }, [terminalStatesByKey, terminalSurfaceRegistry])
-
   const updateTerminalStates = useCallback(
     (stateAction: SetStateAction<Record<string, TerminalViewState>>) => {
       const nextStates =

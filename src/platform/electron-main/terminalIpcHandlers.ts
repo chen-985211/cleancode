@@ -1,4 +1,5 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
 import type {
   TerminalRunEvent,
   TerminalRunIdentity,
@@ -9,6 +10,11 @@ import type {
   TerminalOutputEvent,
   TerminalWorkingDirectorySnapshot
 } from '../../contexts/run/application/ports/TerminalProcessPort'
+import type { TerminalViewOutputEvent } from '../../contexts/run/application/ports/TerminalModelPort'
+import type {
+  AttachTerminalViewCommand,
+  TerminalViewIdentityCommand
+} from '../../contexts/run/application/use-cases/TerminalSessionService'
 import { createExpectedAppError, isAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -19,6 +25,11 @@ import { projectTerminalPortConflict } from './terminalPortConflictProjection'
 interface IpcSender {
   isDestroyed(): boolean
   send(channel: string, event: unknown): void
+}
+
+interface TerminalViewIpcSender extends IpcSender {
+  once(event: 'destroyed', listener: () => void): void
+  removeListener(event: 'destroyed', listener: () => void): void
 }
 
 export interface TerminalIpcHandlersInput {
@@ -89,6 +100,8 @@ export interface TerminalIpcHandlersInput {
     sessionIds: readonly string[]
   ) => Promise<TerminalWorkingDirectorySnapshot[]>
   readonly terminateTerminal: (sessionId: string) => Promise<TerminalSessionSnapshot | null>
+  readonly attachTerminalView: (command: AttachTerminalViewCommand) => Promise<TerminalSnapshot>
+  readonly detachTerminalView: (command: TerminalViewIdentityCommand) => Promise<void>
 }
 
 interface StartTerminalIpcCommand {
@@ -104,6 +117,11 @@ interface StartTerminalIpcCommand {
 }
 
 export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): void {
+  const viewCleanupListeners = new Map<
+    string,
+    { readonly sender: TerminalViewIpcSender; readonly listener: () => void }
+  >()
+
   registerIpcHandler<StartTerminalIpcCommand, TerminalSessionSnapshot>({
     channel: 'cleancode:start-terminal',
     handler: (command, event) => {
@@ -113,11 +131,7 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
       return input.startTerminal({
         ...startCommand,
         workingDirectory: startCommand.workspaceDirectory,
-        onOutput: (outputEvent) => {
-          if (!sender.isDestroyed()) {
-            sender.send('cleancode:terminal-output', outputEvent)
-          }
-        },
+        onOutput: () => undefined,
         onExit: (exitEvent) => {
           if (!sender.isDestroyed()) {
             sender.send('cleancode:terminal-exit', exitEvent)
@@ -153,8 +167,7 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
           columns: launchCommand.columns,
           rows: launchCommand.rows,
           signal: new AbortController().signal,
-          onOutput: (outputEvent) =>
-            sendRendererEvent(sender, 'cleancode:terminal-output', outputEvent),
+          onOutput: () => undefined,
           onExit: (exitEvent) => {
             sendRendererEvent(sender, 'cleancode:terminal-exit', exitEvent)
           },
@@ -281,6 +294,59 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     operation: 'terminateTerminal',
     scope: 'run.terminal'
   })
+
+  registerIpcHandler<TerminalViewIdentityCommand, TerminalSnapshot>({
+    channel: 'cleancode:attach-terminal-view',
+    handler: async (command, event) => {
+      const viewCommand = readTerminalViewCommand(command)
+      const sender = readTerminalViewIpcSender(event)
+      unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
+      const cleanupListener = () => {
+        viewCleanupListeners.delete(viewCommand.viewId)
+        void input.detachTerminalView(viewCommand).catch((error) => {
+          input.logger.warn({
+            scope: 'run.terminal-view',
+            operation: 'detachDestroyedTerminalView',
+            outcome: 'failure',
+            error: { message: error instanceof Error ? error.message : String(error) }
+          })
+        })
+      }
+      sender.once('destroyed', cleanupListener)
+      viewCleanupListeners.set(viewCommand.viewId, { sender, listener: cleanupListener })
+
+      try {
+        return await input.attachTerminalView({
+          ...viewCommand,
+          onOutput: (outputEvent: TerminalViewOutputEvent) =>
+            sendRendererEvent(sender, 'cleancode:terminal-view-output', outputEvent)
+        })
+      } catch (error) {
+        unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
+        throw error
+      }
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'attachTerminalView',
+    scope: 'run.terminal-view'
+  })
+
+  registerIpcHandler<TerminalViewIdentityCommand, void>({
+    channel: 'cleancode:detach-terminal-view',
+    handler: async (command) => {
+      const viewCommand = readTerminalViewCommand(command)
+      try {
+        await input.detachTerminalView(viewCommand)
+      } finally {
+        unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
+      }
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'detachTerminalView',
+    scope: 'run.terminal-view'
+  })
 }
 
 function sendRendererEvent(sender: IpcSender, channel: string, event: unknown): void {
@@ -364,8 +430,44 @@ function readIpcSender(event: unknown): IpcSender {
   return sender as unknown as IpcSender
 }
 
+function readTerminalViewIpcSender(event: unknown): TerminalViewIpcSender {
+  const sender = readIpcSender(event)
+  const candidate = sender as IpcSender & Partial<TerminalViewIpcSender>
+  if (typeof candidate.once !== 'function' || typeof candidate.removeListener !== 'function') {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view IPC sender.')
+  }
+  return candidate as TerminalViewIpcSender
+}
+
+function unregisterViewCleanup(
+  listeners: Map<string, { readonly sender: TerminalViewIpcSender; readonly listener: () => void }>,
+  viewId: string
+): void {
+  const cleanup = listeners.get(viewId)
+  if (!cleanup) return
+  cleanup.sender.removeListener('destroyed', cleanup.listener)
+  listeners.delete(viewId)
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand {
+  if (
+    !isRecord(command) ||
+    !isNonEmptyString(command.projectId) ||
+    !isNonEmptyString(command.workspaceName) ||
+    !isNonEmptyString(command.blockId) ||
+    !isNonEmptyString(command.sessionId) ||
+    !isNonEmptyString(command.runId) ||
+    !Number.isSafeInteger(command.generation) ||
+    Number(command.generation) < 1 ||
+    !isNonEmptyString(command.viewId)
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view identity.')
+  }
+  return command as unknown as TerminalViewIdentityCommand
 }
 
 function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {

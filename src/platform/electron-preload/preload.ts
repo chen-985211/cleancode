@@ -101,6 +101,10 @@ const cleancodeApi = {
   listTerminalWorkingDirectories: (command: unknown) =>
     invokeCleancode('cleancode:list-terminal-working-directories', command),
   terminateTerminal: (command: unknown) => invokeCleancode('cleancode:terminate-terminal', command),
+  attachTerminalView: (command: unknown) =>
+    invokeCleancode('cleancode:attach-terminal-view', command),
+  detachTerminalView: (command: unknown) =>
+    invokeCleancode('cleancode:detach-terminal-view', command),
   startTerminalWorkflow: (command: unknown) =>
     invokeCleancode('cleancode:start-terminal-workflow', command),
   stopTerminalWorkflow: (command: unknown) =>
@@ -120,6 +124,8 @@ const cleancodeApi = {
 
     return () => ipcRenderer.removeListener('cleancode:terminal-output', subscription)
   },
+  onTerminalViewOutput: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:terminal-view-output', listener),
   onTerminalExit: (listener: (event: unknown) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, exitEvent: unknown) => {
       listener(exitEvent)

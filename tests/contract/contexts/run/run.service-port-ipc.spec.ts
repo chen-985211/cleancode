@@ -134,22 +134,21 @@ describe('managed terminal service IPC contract', () => {
       scope: runIdentity,
       endpoint: launchResult.endpoint
     })
-    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(3, 'cleancode:terminal-output', {
-      scope: session,
-      sessionId: 'session-2',
-      data: 'ready'
-    })
-    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(4, 'cleancode:terminal-exit', {
+    expect(senderEvent.sender.send).not.toHaveBeenCalledWith(
+      'cleancode:terminal-output',
+      expect.anything()
+    )
+    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(3, 'cleancode:terminal-exit', {
       scope: session,
       sessionId: 'session-2',
       exitCode: 0
     })
-    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(5, 'cleancode:terminal-run-event', {
+    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(4, 'cleancode:terminal-run-event', {
       type: 'service-port-state-changed',
       scope: runIdentity,
       state: 'releasing'
     })
-    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(6, 'cleancode:terminal-run-event', {
+    expect(senderEvent.sender.send).toHaveBeenNthCalledWith(5, 'cleancode:terminal-run-event', {
       type: 'service-port-state-changed',
       scope: runIdentity,
       state: 'released'
@@ -309,6 +308,8 @@ function createInput(input: {
   readonly terminateTerminal?: (sessionId: string) => Promise<typeof session | null>
 }) {
   return {
+    attachTerminalView: vi.fn(),
+    detachTerminalView: vi.fn(),
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: input.launchTerminal ?? vi.fn(),

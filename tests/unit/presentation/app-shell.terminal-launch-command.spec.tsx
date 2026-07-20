@@ -246,6 +246,7 @@ describe('app shell terminal launch command', () => {
       emitTerminalOutput?.({
         sessionId: 'session-1',
         scope: createTerminalRunScope('session-1'),
+        sequence: 1,
         data: 'stale-output'
       })
     })
@@ -298,6 +299,7 @@ describe('app shell terminal launch command', () => {
       emitTerminalOutput?.({
         sessionId: 'session-1',
         scope: createTerminalRunScope('session-1'),
+        sequence: 1,
         data: 'restart-stale-output'
       })
     })
@@ -327,6 +329,7 @@ describe('app shell terminal launch command', () => {
       emitTerminalOutput?.({
         sessionId: 'session-1',
         scope: createTerminalRunScope('session-1'),
+        sequence: 1,
         data: 'early-shell-prompt'
       })
       return createTerminalSessionSnapshot('session-1')

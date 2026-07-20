@@ -287,6 +287,7 @@ class FakeRuntime implements TerminalWorkflowRuntimePort {
     this.commands.get(blockId)?.onOutput({
       scope: runtimeSession,
       sessionId: runtimeSession.id,
+      sequence: 1,
       data
     })
   }

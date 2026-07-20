@@ -23,6 +23,8 @@ import type {
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalSnapshot } from './contexts/run/application/dto/TerminalModelSnapshot'
+import type { TerminalViewOutputEvent } from './contexts/run/application/ports/TerminalModelPort'
 import type {
   TerminalRunEvent,
   TerminalServiceEndpoint
@@ -294,6 +296,24 @@ declare global {
       terminateTerminal(command: {
         readonly sessionId: string
       }): Promise<TerminalSessionSnapshot | null>
+      attachTerminalView(command: {
+        readonly projectId: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly sessionId: string
+        readonly runId: string
+        readonly generation: number
+        readonly viewId: string
+      }): Promise<TerminalSnapshot>
+      detachTerminalView(command: {
+        readonly projectId: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly sessionId: string
+        readonly runId: string
+        readonly generation: number
+        readonly viewId: string
+      }): Promise<void>
       startTerminalWorkflow(command: {
         readonly projectId: string
         readonly projectDirectory: string
@@ -317,6 +337,7 @@ declare global {
       onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void
       onTerminalRunEvent(listener: (event: TerminalRunEvent) => void): () => void
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
+      onTerminalViewOutput(listener: (event: TerminalViewOutputEvent) => void): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }
   }
