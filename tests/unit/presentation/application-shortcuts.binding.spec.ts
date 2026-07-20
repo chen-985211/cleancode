@@ -17,6 +17,21 @@ describe('application shortcut bindings', () => {
       '⌘',
       'B'
     ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.addProject, 'mac')).toEqual([
+      '⌘',
+      'O'
+    ])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.createBranchWorkspace, 'mac')
+    ).toEqual(['⌘', 'N'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.previousWorkspace, 'mac')
+    ).toEqual(['⌘', '⇧', '↑'])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.nextWorkspace, 'mac')).toEqual([
+      '⌘',
+      '⇧',
+      '↓'
+    ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'mac')).toEqual(
       ['⌘', 'T']
     )
@@ -40,6 +55,26 @@ describe('application shortcut bindings', () => {
       '⌘',
       '0'
     ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasLeft, 'mac')).toEqual([
+      '⌘',
+      '←'
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasRight, 'mac')).toEqual(
+      ['⌘', '→']
+    )
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasUp, 'mac')).toEqual([
+      '⌘',
+      '↑'
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.panCanvasDown, 'mac')).toEqual([
+      '⌘',
+      '↓'
+    ])
+    expect(formatShortcutBinding(defaultApplicationShortcutBindings.toggleMinimap, 'mac')).toEqual([
+      '⌘',
+      '⇧',
+      'M'
+    ])
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.createTerminal, 'other')
     ).toEqual(['Ctrl', 'T'])
@@ -55,7 +90,7 @@ describe('application shortcut bindings', () => {
       new Set(
         Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))
       ).size
-    ).toBe(8)
+    ).toBe(17)
   })
 
   it('normalizes primary-modifier combinations and rejects unsafe single keys', () => {

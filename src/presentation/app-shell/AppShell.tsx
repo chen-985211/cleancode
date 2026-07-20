@@ -49,7 +49,9 @@ import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
-import { useApplicationShortcuts, type ApplicationShortcutActions } from './useApplicationShortcuts'
+import { useApplicationShortcuts } from './useApplicationShortcuts'
+import { useApplicationShortcutNavigation } from './useApplicationShortcutNavigation'
+import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 
 export function AppShell({
@@ -90,6 +92,8 @@ export function AppShell({
 
     setIsProjectSidebarCollapsed((collapsed) => !collapsed)
   }, [isProjectSidebarCollapsed])
+  const revealProjectSidebar = useCallback((): void => setIsProjectSidebarCollapsed(false), [])
+  const openApplicationSettings = useCallback((): void => setIsApplicationSettingsOpen(true), [])
   useEffect(
     () => () => agentTerminalEvents.surfaceRegistry.disposeAll(),
     [agentTerminalEvents.surfaceRegistry]
@@ -261,6 +265,13 @@ export function AppShell({
     setSelectedTerminalGroupId,
     setWorkbenches,
     terminateWorkbenchTerminalSessions
+  })
+  const shortcutNavigation = useApplicationShortcutNavigation({
+    currentWorkbench,
+    onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
+    reactFlowInstanceRef,
+    revealProjectSidebar,
+    workbenches
   })
 
   const createTerminalBlock = useCallback(async () => {
@@ -489,55 +500,28 @@ export function AppShell({
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
-  const applicationShortcutActions = useMemo<ApplicationShortcutActions>(
-    () => ({
-      openSettings: {
-        enabled: !isApplicationSettingsOpen,
-        run: () => setIsApplicationSettingsOpen(true)
-      },
-      toggleSidebar: {
-        enabled: true,
-        run: toggleProjectSidebar
-      },
-      createTerminal: {
-        enabled: isDesktopRuntime && Boolean(currentWorkbench),
-        run: createTerminalBlock
-      },
-      createAgent: {
-        enabled: isDesktopRuntime && Boolean(currentWorkbench),
-        run: createWorkspaceAgent
-      },
-      groupTerminals: {
-        enabled: isDesktopRuntime && Boolean(currentWorkbench) && !isTerminalGroupSelectionMode,
-        run: beginTerminalGroupSelection
-      },
-      zoomCanvasIn: {
-        enabled: Boolean(currentWorkbench),
-        run: zoomCanvasIn
-      },
-      zoomCanvasOut: {
-        enabled: Boolean(currentWorkbench),
-        run: zoomCanvasOut
-      },
-      fitCanvas: {
-        enabled: Boolean(currentWorkbench),
-        run: fitCanvas
-      }
-    }),
-    [
-      beginTerminalGroupSelection,
-      createTerminalBlock,
-      createWorkspaceAgent,
-      currentWorkbench,
-      fitCanvas,
-      isApplicationSettingsOpen,
-      isDesktopRuntime,
-      isTerminalGroupSelectionMode,
-      toggleProjectSidebar,
-      zoomCanvasIn,
-      zoomCanvasOut
-    ]
-  )
+  const hasMultipleWorkspaces =
+    workbenches.reduce((count, workbench) => count + workbench.project.workspaces.length, 0) > 1
+  const applicationShortcutActions = useAppShellShortcutActions({
+    addProject,
+    createAgent: createWorkspaceAgent,
+    createBranchWorkspace: shortcutNavigation.requestBranchWorkspaceCreation,
+    createTerminal: createTerminalBlock,
+    fitCanvas,
+    groupTerminals: beginTerminalGroupSelection,
+    hasMultipleWorkspaces,
+    hasWorkbench: Boolean(currentWorkbench),
+    isDesktopRuntime,
+    isGroupSelectionMode: isTerminalGroupSelectionMode,
+    isSettingsOpen: isApplicationSettingsOpen,
+    navigateWorkspace: shortcutNavigation.navigateWorkspace,
+    openSettings: openApplicationSettings,
+    panCanvas: shortcutNavigation.panCanvas,
+    toggleMinimap: shortcutNavigation.toggleMinimap,
+    toggleSidebar: toggleProjectSidebar,
+    zoomCanvasIn,
+    zoomCanvasOut
+  })
   useApplicationShortcuts({
     actions: applicationShortcutActions,
     bindings,
@@ -598,6 +582,8 @@ export function AppShell({
                 currentWorkbench={currentWorkbench}
                 isCollapsed={isProjectSidebarCollapsed}
                 isDesktopRuntime={isDesktopRuntime}
+                intent={shortcutNavigation.projectSidebarIntent}
+                shortcutTooltips={shortcutTooltips}
                 actionError={
                   projectActionError ?? branchWorkspaceActions.branchWorkspaceActionError
                 }
@@ -627,6 +613,8 @@ export function AppShell({
               minimapNodeInteraction={minimapNodeInteraction}
               terminalWorkflow={terminalWorkflow}
               shortcutTooltips={shortcutTooltips}
+              isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
+              onToggleMinimap={shortcutNavigation.toggleMinimap}
               onZoomCanvasIn={zoomCanvasIn}
               onZoomCanvasOut={zoomCanvasOut}
               onFitCanvas={fitCanvas}

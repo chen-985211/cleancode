@@ -41,12 +41,21 @@ describe('workbench canvas Agent approval edges', () => {
         shortcutTooltips={{
           openSettings: '打开设置 (⌘,)',
           toggleSidebar: '切换侧边栏 (⌘B)',
+          addProject: '添加项目 (⌘O)',
+          createBranchWorkspace: '新建分支工作区 (⌘N)',
+          previousWorkspace: '上一个工作区 (⌘⇧↑)',
+          nextWorkspace: '下一个工作区 (⌘⇧↓)',
           createTerminal: '新建终端积木 (⌘T)',
           createAgent: '新建 Agent (⌘⇧A)',
           groupTerminals: '组合终端 (⌘G)',
+          panCanvasLeft: '画布向左 (⌘←)',
+          panCanvasRight: '画布向右 (⌘→)',
+          panCanvasUp: '画布向上 (⌘↑)',
+          panCanvasDown: '画布向下 (⌘↓)',
           zoomCanvasIn: '放大画布 (⌘=)',
           zoomCanvasOut: '缩小画布 (⌘-)',
-          fitCanvas: '适应画布 (⌘0)'
+          fitCanvas: '适应画布 (⌘0)',
+          toggleMinimap: '收起或展开小地图 (⌘⇧M)'
         }}
         approvalIntents={[approval]}
         canBeginTerminalGroupSelection={false}
@@ -57,6 +66,7 @@ describe('workbench canvas Agent approval edges', () => {
         getMiniMapNodeColor={() => '#fff'}
         getMiniMapNodeStrokeColor={() => '#000'}
         isDesktopRuntime={true}
+        isMinimapCollapsed={false}
         isTerminalGroupSelectionMode={false}
         minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
         minimapNodes={[]}
@@ -71,6 +81,7 @@ describe('workbench canvas Agent approval edges', () => {
         onZoomCanvasOut={vi.fn()}
         onFitCanvas={vi.fn()}
         onMinimapNodeClick={vi.fn()}
+        onToggleMinimap={vi.fn()}
         onNodeClick={vi.fn()}
         onNodeDrag={vi.fn()}
         onNodeDragStart={vi.fn()}

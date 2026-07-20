@@ -19,6 +19,13 @@ import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchW
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
 import { TooltipLabel } from './Tooltip'
+import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
+
+export interface ProjectSidebarIntent {
+  readonly id: number
+  readonly projectId: string
+  readonly type: 'createBranchWorkspace' | 'revealProject'
+}
 
 interface ProjectSidebarProps {
   readonly workbenches: readonly WorkbenchSnapshot[]
@@ -26,6 +33,11 @@ interface ProjectSidebarProps {
   readonly isCollapsed?: boolean
   readonly isDesktopRuntime: boolean
   readonly isReorderPending?: boolean
+  readonly intent?: ProjectSidebarIntent | null
+  readonly shortcutTooltips?: Pick<
+    ApplicationShortcutTooltipLabels,
+    'addProject' | 'createBranchWorkspace'
+  >
   readonly actionError: string | null
   readonly onAddProject: () => void
   readonly onArchiveBranchWorkspace: (
@@ -50,6 +62,8 @@ export function ProjectSidebar({
   isCollapsed = false,
   isDesktopRuntime,
   isReorderPending = false,
+  intent = null,
+  shortcutTooltips,
   actionError,
   onAddProject,
   onArchiveBranchWorkspace,
@@ -61,6 +75,9 @@ export function ProjectSidebar({
   onSelectWorkspace
 }: ProjectSidebarProps) {
   const { t } = useI18n()
+  const addProjectTooltip = shortcutTooltips?.addProject ?? t('sidebar.addProject')
+  const createBranchWorkspaceTooltip =
+    shortcutTooltips?.createBranchWorkspace ?? t('sidebar.newBranchWorkspace')
   const projectListRef = useRef<HTMLDivElement>(null)
   const canReorderProjects = isDesktopRuntime && !isReorderPending && workbenches.length > 1
   const projectReorder = useProjectSidebarReorder({
@@ -78,15 +95,17 @@ export function ProjectSidebar({
       inert={isCollapsed}
     >
       <div className="project-sidebar__actions">
-        <button
-          className="sidebar-action"
-          type="button"
-          onClick={onAddProject}
-          disabled={!isDesktopRuntime}
-        >
-          <Plus size={17} aria-hidden="true" />
-          {t('sidebar.addProject')}
-        </button>
+        <TooltipLabel content={addProjectTooltip}>
+          <button
+            className="sidebar-action"
+            type="button"
+            onClick={onAddProject}
+            disabled={!isDesktopRuntime}
+          >
+            <Plus size={17} aria-hidden="true" />
+            {t('sidebar.addProject')}
+          </button>
+        </TooltipLabel>
       </div>
       {!isDesktopRuntime ? (
         <div className="runtime-warning" role="status">
@@ -137,6 +156,8 @@ export function ProjectSidebar({
             onRemoveProject={onRemoveProject}
             isDragging={projectReorder.draggingProjectId === workbench.project.id}
             canReorder={canReorderProjects}
+            intent={intent?.projectId === workbench.project.id ? intent : null}
+            createBranchWorkspaceTooltip={createBranchWorkspaceTooltip}
             onProjectPointerDown={projectReorder.onProjectPointerDown}
             onSelectWorkspace={onSelectWorkspace}
           />
@@ -159,6 +180,8 @@ interface ProjectCardProps {
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
   readonly isDragging: boolean
   readonly canReorder: boolean
+  readonly intent: ProjectSidebarIntent | null
+  readonly createBranchWorkspaceTooltip: string
   readonly onProjectPointerDown: (
     event: React.PointerEvent<HTMLElement>,
     workbench: WorkbenchSnapshot
@@ -175,6 +198,8 @@ function ProjectCard({
   onRemoveProject,
   isDragging,
   canReorder,
+  intent,
+  createBranchWorkspaceTooltip,
   onProjectPointerDown,
   onSelectWorkspace
 }: ProjectCardProps) {
@@ -186,6 +211,7 @@ function ProjectCard({
   const [openWorkspaceMenuName, setOpenWorkspaceMenuName] = useState<string | null>(null)
   const [archiveWorkspaceName, setArchiveWorkspaceName] = useState<string | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
+  const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
   const removeProjectButtonRef = useRef<HTMLButtonElement>(null)
   const workspaceMenuRootRef = useRef<HTMLDivElement>(null)
@@ -194,6 +220,7 @@ function ProjectCard({
     close: closeBranchWorkspaceForm,
     formRef,
     isOpen: isBranchWorkspaceFormOpen,
+    open: openBranchWorkspaceForm,
     setBranchName,
     submit: submitBranchWorkspace,
     toggle: toggleBranchWorkspaceForm,
@@ -201,6 +228,17 @@ function ProjectCard({
   } = useProjectSidebarBranchWorkspaceForm((newBranchName) =>
     onCreateBranchWorkspace(workbench, newBranchName)
   )
+  if (intent && intent.id !== handledIntentId) {
+    setHandledIntentId(intent.id)
+    setIsExpanded(true)
+    setIsBranchSelectorOpen(false)
+    setBranchSearchQuery('')
+    setOpenWorkspaceMenuName(null)
+    setIsRemoveProjectDialogOpen(false)
+    if (intent.type === 'createBranchWorkspace') {
+      openBranchWorkspaceForm()
+    }
+  }
   const archiveWorkspace = archiveWorkspaceName
     ? workbench.project.workspaces.find((workspace) => workspace.name === archiveWorkspaceName)
     : null
@@ -310,7 +348,11 @@ function ProjectCard({
             <span className="project-card__name truncate">{workbench.project.name}</span>
           </button>
         </TooltipLabel>
-        <TooltipLabel content={t('sidebar.newBranchWorkspace')}>
+        <TooltipLabel
+          content={
+            isCurrentProject ? createBranchWorkspaceTooltip : t('sidebar.newBranchWorkspace')
+          }
+        >
           <button
             className="project-card__branch icon-button"
             type="button"

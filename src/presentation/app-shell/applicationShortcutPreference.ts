@@ -25,11 +25,22 @@ const v2ApplicationShortcutCommands = [
   'groupTerminals'
 ] as const
 
+const v3ApplicationShortcutCommands = [
+  'openSettings',
+  'toggleSidebar',
+  'createTerminal',
+  'createAgent',
+  'groupTerminals',
+  'zoomCanvasIn',
+  'zoomCanvasOut',
+  'fitCanvas'
+] as const
+
 type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding | null>>
 
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 3
+  readonly version: 4
 }
 
 function hasCompleteBindingCatalog(
@@ -122,11 +133,19 @@ export function readApplicationShortcutBindings(
       readonly version?: unknown
     }
     if (
-      preference.version === 3 &&
+      preference.version === 4 &&
       hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
     ) {
       return cloneBindings(preference.bindings)
+    }
+
+    if (
+      preference.version === 3 &&
+      hasCompleteBindingCatalog(preference.bindings, v3ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v3ApplicationShortcutCommands)
+    ) {
+      return extendLegacyBindings(preference.bindings, v3ApplicationShortcutCommands)
     }
 
     if (
@@ -167,7 +186,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 3
+    version: 4
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

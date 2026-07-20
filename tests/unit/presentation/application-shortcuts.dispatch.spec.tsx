@@ -10,12 +10,21 @@ describe('application shortcut dispatch', () => {
   it.each([
     ['openSettings', ',', false],
     ['toggleSidebar', 'b', false],
+    ['addProject', 'o', false],
+    ['createBranchWorkspace', 'n', false],
+    ['previousWorkspace', 'ArrowUp', true],
+    ['nextWorkspace', 'ArrowDown', true],
     ['createTerminal', 't', false],
     ['createAgent', 'a', true],
     ['groupTerminals', 'g', false],
     ['zoomCanvasIn', '=', false],
     ['zoomCanvasOut', '-', false],
-    ['fitCanvas', '0', false]
+    ['fitCanvas', '0', false],
+    ['panCanvasLeft', 'ArrowLeft', false],
+    ['panCanvasRight', 'ArrowRight', false],
+    ['panCanvasUp', 'ArrowUp', false],
+    ['panCanvasDown', 'ArrowDown', false],
+    ['toggleMinimap', 'm', true]
   ] as const)(
     'dispatches the %s default shortcut and cancels the native event',
     (command, key, shiftKey) => {
@@ -129,11 +138,23 @@ function createActions(
   return {
     openSettings: { enabled: enabled.openSettings ?? true, run: vi.fn() },
     toggleSidebar: { enabled: enabled.toggleSidebar ?? true, run: vi.fn() },
+    addProject: { enabled: enabled.addProject ?? true, run: vi.fn() },
+    createBranchWorkspace: {
+      enabled: enabled.createBranchWorkspace ?? true,
+      run: vi.fn()
+    },
+    previousWorkspace: { enabled: enabled.previousWorkspace ?? true, run: vi.fn() },
+    nextWorkspace: { enabled: enabled.nextWorkspace ?? true, run: vi.fn() },
     createTerminal: { enabled: enabled.createTerminal ?? true, run: vi.fn() },
     createAgent: { enabled: enabled.createAgent ?? true, run: vi.fn() },
     groupTerminals: { enabled: enabled.groupTerminals ?? true, run: vi.fn() },
     zoomCanvasIn: { enabled: enabled.zoomCanvasIn ?? true, run: vi.fn() },
     zoomCanvasOut: { enabled: enabled.zoomCanvasOut ?? true, run: vi.fn() },
-    fitCanvas: { enabled: enabled.fitCanvas ?? true, run: vi.fn() }
+    fitCanvas: { enabled: enabled.fitCanvas ?? true, run: vi.fn() },
+    panCanvasLeft: { enabled: enabled.panCanvasLeft ?? true, run: vi.fn() },
+    panCanvasRight: { enabled: enabled.panCanvasRight ?? true, run: vi.fn() },
+    panCanvasUp: { enabled: enabled.panCanvasUp ?? true, run: vi.fn() },
+    panCanvasDown: { enabled: enabled.panCanvasDown ?? true, run: vi.fn() },
+    toggleMinimap: { enabled: enabled.toggleMinimap ?? true, run: vi.fn() }
   }
 }

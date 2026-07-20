@@ -1,12 +1,21 @@
 export const applicationShortcutCommands = [
   'openSettings',
   'toggleSidebar',
+  'addProject',
+  'createBranchWorkspace',
+  'previousWorkspace',
+  'nextWorkspace',
   'createTerminal',
   'createAgent',
   'groupTerminals',
+  'panCanvasLeft',
+  'panCanvasRight',
+  'panCanvasUp',
+  'panCanvasDown',
   'zoomCanvasIn',
   'zoomCanvasOut',
-  'fitCanvas'
+  'fitCanvas',
+  'toggleMinimap'
 ] as const
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
@@ -27,13 +36,55 @@ export type ApplicationShortcutBindings = Readonly<
 export const defaultApplicationShortcutBindings = {
   openSettings: { alt: false, key: ',', primary: true, shift: false },
   toggleSidebar: { alt: false, key: 'B', primary: true, shift: false },
+  addProject: { alt: false, key: 'O', primary: true, shift: false },
+  createBranchWorkspace: { alt: false, key: 'N', primary: true, shift: false },
+  previousWorkspace: { alt: false, key: 'ArrowUp', primary: true, shift: true },
+  nextWorkspace: { alt: false, key: 'ArrowDown', primary: true, shift: true },
   createTerminal: { alt: false, key: 'T', primary: true, shift: false },
   createAgent: { alt: false, key: 'A', primary: true, shift: true },
   groupTerminals: { alt: false, key: 'G', primary: true, shift: false },
+  panCanvasLeft: { alt: false, key: 'ArrowLeft', primary: true, shift: false },
+  panCanvasRight: { alt: false, key: 'ArrowRight', primary: true, shift: false },
+  panCanvasUp: { alt: false, key: 'ArrowUp', primary: true, shift: false },
+  panCanvasDown: { alt: false, key: 'ArrowDown', primary: true, shift: false },
   zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
   zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
-  fitCanvas: { alt: false, key: '0', primary: true, shift: false }
+  fitCanvas: { alt: false, key: '0', primary: true, shift: false },
+  toggleMinimap: { alt: false, key: 'M', primary: true, shift: true }
 } as const satisfies ApplicationShortcutBindings
+
+export const applicationShortcutGroups = [
+  { id: 'application', commands: ['openSettings'] },
+  {
+    id: 'workspace',
+    commands: [
+      'toggleSidebar',
+      'addProject',
+      'createBranchWorkspace',
+      'previousWorkspace',
+      'nextWorkspace'
+    ]
+  },
+  {
+    id: 'canvas',
+    commands: [
+      'createTerminal',
+      'createAgent',
+      'groupTerminals',
+      'panCanvasLeft',
+      'panCanvasRight',
+      'panCanvasUp',
+      'panCanvasDown',
+      'zoomCanvasIn',
+      'zoomCanvasOut',
+      'fitCanvas',
+      'toggleMinimap'
+    ]
+  }
+] as const satisfies readonly {
+  readonly id: 'application' | 'workspace' | 'canvas'
+  readonly commands: readonly ApplicationShortcutCommand[]
+}[]
 
 const unsupportedBindingKeys = new Set([
   'Alt',
@@ -117,8 +168,15 @@ export function formatShortcutBinding(
   if (binding.shift) {
     labels.push(platform === 'mac' ? '⇧' : 'Shift')
   }
-  labels.push(binding.key)
+  labels.push(shortcutKeyLabels[binding.key] ?? binding.key)
   return labels
+}
+
+const shortcutKeyLabels: Readonly<Record<string, string>> = {
+  ArrowDown: '↓',
+  ArrowLeft: '←',
+  ArrowRight: '→',
+  ArrowUp: '↑'
 }
 
 export function applicationShortcutBindingsEqual(

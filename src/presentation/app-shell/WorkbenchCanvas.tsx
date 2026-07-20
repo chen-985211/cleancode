@@ -43,6 +43,8 @@ interface WorkbenchCanvasProps {
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly shortcutTooltips: ApplicationShortcutTooltipLabels
+  readonly isMinimapCollapsed: boolean
+  readonly onToggleMinimap: () => void
   readonly onZoomCanvasIn: () => void
   readonly onZoomCanvasOut: () => void
   readonly onFitCanvas: () => void
@@ -86,6 +88,8 @@ export function WorkbenchCanvas({
   minimapNodeInteraction,
   terminalWorkflow,
   shortcutTooltips,
+  isMinimapCollapsed,
+  onToggleMinimap,
   onZoomCanvasIn,
   onZoomCanvasOut,
   onFitCanvas,
@@ -126,7 +130,6 @@ export function WorkbenchCanvas({
     [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
-  const [isMinimapCollapsed, setIsMinimapCollapsed] = useState(false)
   const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
@@ -311,7 +314,7 @@ export function WorkbenchCanvas({
               viewportZoom={viewportZoom}
               shortcutTooltips={shortcutTooltips}
               minimapNodeInteraction={minimapNodeInteraction}
-              onToggleCollapsed={() => setIsMinimapCollapsed((collapsed) => !collapsed)}
+              onToggleCollapsed={onToggleMinimap}
               onZoomOut={onZoomCanvasOut}
               onZoomIn={onZoomCanvasIn}
               onFitCanvas={onFitCanvas}

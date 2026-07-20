@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: string) => void) {
   const [isOpen, setIsOpen] = useState(false)
@@ -22,6 +22,9 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     setBranchName('')
     setIsOpen(false)
   }
+  const open = useCallback((): void => {
+    setIsOpen(true)
+  }, [])
   const toggle = (): void => {
     if (isOpen) {
       setBranchName('')
@@ -34,6 +37,8 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     if (!isOpen) {
       return undefined
     }
+
+    formRef.current?.querySelector<HTMLInputElement>('input')?.focus()
 
     const cancelWhenClickingOutside = (event: PointerEvent): void => {
       const target = event.target
@@ -54,5 +59,5 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     return () => document.removeEventListener('pointerdown', cancelWhenClickingOutside)
   }, [isOpen])
 
-  return { branchName, close, formRef, isOpen, setBranchName, submit, toggle, triggerRef }
+  return { branchName, close, formRef, isOpen, open, setBranchName, submit, toggle, triggerRef }
 }

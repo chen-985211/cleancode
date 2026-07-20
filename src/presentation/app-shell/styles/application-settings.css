@@ -254,6 +254,23 @@
     var(--cc-shadow-sm);
 }
 
+.shortcut-settings-group + .shortcut-settings-group {
+  border-top: 1px solid var(--cc-border);
+}
+
+.shortcut-settings-group__title {
+  margin: 0;
+  border-bottom: 1px solid var(--cc-divider);
+  background: var(--cc-surface-subtle);
+  padding: 8px 18px;
+  color: var(--cc-muted);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
 .shortcut-settings-row {
   position: relative;
   display: grid;

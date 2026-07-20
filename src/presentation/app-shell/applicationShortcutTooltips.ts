@@ -12,12 +12,21 @@ export const applicationShortcutCommandMessageKeys: Readonly<
 > = {
   openSettings: 'settings.shortcuts.command.openSettings',
   toggleSidebar: 'settings.shortcuts.command.toggleSidebar',
+  addProject: 'settings.shortcuts.command.addProject',
+  createBranchWorkspace: 'settings.shortcuts.command.createBranchWorkspace',
+  previousWorkspace: 'settings.shortcuts.command.previousWorkspace',
+  nextWorkspace: 'settings.shortcuts.command.nextWorkspace',
   createTerminal: 'settings.shortcuts.command.createTerminal',
   createAgent: 'settings.shortcuts.command.createAgent',
   groupTerminals: 'settings.shortcuts.command.groupTerminals',
+  panCanvasLeft: 'settings.shortcuts.command.panCanvasLeft',
+  panCanvasRight: 'settings.shortcuts.command.panCanvasRight',
+  panCanvasUp: 'settings.shortcuts.command.panCanvasUp',
+  panCanvasDown: 'settings.shortcuts.command.panCanvasDown',
   zoomCanvasIn: 'settings.shortcuts.command.zoomCanvasIn',
   zoomCanvasOut: 'settings.shortcuts.command.zoomCanvasOut',
-  fitCanvas: 'settings.shortcuts.command.fitCanvas'
+  fitCanvas: 'settings.shortcuts.command.fitCanvas',
+  toggleMinimap: 'settings.shortcuts.command.toggleMinimap'
 }
 
 export type ApplicationShortcutTooltipLabels = Readonly<Record<ApplicationShortcutCommand, string>>

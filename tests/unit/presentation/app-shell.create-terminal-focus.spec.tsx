@@ -12,6 +12,7 @@ import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/type
 const reactFlowSpies = vi.hoisted(() => ({
   fitView: vi.fn(async () => undefined),
   setCenter: vi.fn(async () => undefined),
+  setViewport: vi.fn(async () => undefined),
   zoomIn: vi.fn(async () => undefined),
   zoomOut: vi.fn(async () => undefined)
 }))
@@ -49,6 +50,7 @@ describe('app shell create terminal focus', () => {
   beforeEach(() => {
     reactFlowSpies.fitView.mockClear()
     reactFlowSpies.setCenter.mockClear()
+    reactFlowSpies.setViewport.mockClear()
     reactFlowSpies.zoomIn.mockClear()
     reactFlowSpies.zoomOut.mockClear()
     window.localStorage.clear()
@@ -155,6 +157,42 @@ describe('app shell create terminal focus', () => {
       duration: 180
     })
   })
+
+  it('pans the canvas in four directions and toggles the minimap from shortcuts', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+
+    render(<AppShell />)
+
+    await screen.findByTestId('mock-react-flow')
+    await waitFor(() => expect(screen.getByRole('button', { name: '收起小地图' })).toBeEnabled())
+    const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
+      ? { metaKey: true }
+      : { ctrlKey: true }
+    reactFlowSpies.setViewport.mockClear()
+
+    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowUp', ...primaryModifier })
+    fireEvent.keyDown(document, { key: 'ArrowDown', ...primaryModifier })
+
+    expect(reactFlowSpies.setViewport.mock.calls).toEqual([
+      [{ x: 160, y: 0, zoom: 1 }, { duration: 160 }],
+      [{ x: -160, y: 0, zoom: 1 }, { duration: 160 }],
+      [{ x: 0, y: 160, zoom: 1 }, { duration: 160 }],
+      [{ x: 0, y: -160, zoom: 1 }, { duration: 160 }]
+    ])
+
+    fireEvent.keyDown(document, { key: 'm', shiftKey: true, ...primaryModifier })
+
+    expect(screen.getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
+  })
 })
 
 interface MockReactFlowProps {
@@ -167,7 +205,7 @@ interface MockReactFlowInstance {
   readonly getViewport: () => WorkbenchSnapshot['graph']['viewport']
   readonly getZoom: () => number
   readonly setCenter: typeof reactFlowSpies.setCenter
-  readonly setViewport: () => Promise<void>
+  readonly setViewport: typeof reactFlowSpies.setViewport
   readonly zoomOut: typeof reactFlowSpies.zoomOut
   readonly zoomIn: typeof reactFlowSpies.zoomIn
   readonly fitView: typeof reactFlowSpies.fitView
@@ -179,7 +217,7 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getZoom: () => 1,
     setCenter: reactFlowSpies.setCenter,
-    setViewport: async () => undefined,
+    setViewport: reactFlowSpies.setViewport,
     zoomOut: reactFlowSpies.zoomOut,
     zoomIn: reactFlowSpies.zoomIn,
     fitView: reactFlowSpies.fitView

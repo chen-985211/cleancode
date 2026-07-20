@@ -34,6 +34,17 @@ describe('application settings', () => {
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '修改“切换侧边栏”快捷键' })).toHaveTextContent('⌘B')
+    const projectShortcuts = screen.getByRole('group', { name: '项目与工作区' })
+    expect(
+      within(projectShortcuts).getByRole('button', { name: '修改“添加项目”快捷键' })
+    ).toHaveTextContent('⌘O')
+    expect(
+      within(projectShortcuts).getByRole('button', { name: '修改“下一个工作区”快捷键' })
+    ).toHaveTextContent('⌘⇧↓')
+    const canvasShortcuts = screen.getByRole('group', { name: '画布' })
+    expect(
+      within(canvasShortcuts).getByRole('button', { name: '修改“画布向左”快捷键' })
+    ).toHaveTextContent('⌘←')
     expect(screen.getByRole('button', { name: '返回工作区' })).toHaveFocus()
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
 

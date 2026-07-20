@@ -31,7 +31,7 @@ interface CanvasMinimapProps {
   readonly viewportZoom: number
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
-    'fitCanvas' | 'zoomCanvasIn' | 'zoomCanvasOut'
+    'fitCanvas' | 'toggleMinimap' | 'zoomCanvasIn' | 'zoomCanvasOut'
   >
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly onToggleCollapsed: () => void
@@ -211,7 +211,7 @@ export function CanvasMinimap({
         <div className="canvas-minimap__control-group canvas-minimap__control-group--top">
           <MinimapControlButton
             label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
-            tooltip={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
+            tooltip={shortcutTooltips.toggleMinimap}
             onClick={onToggleCollapsed}
           >
             {isCollapsed ? (

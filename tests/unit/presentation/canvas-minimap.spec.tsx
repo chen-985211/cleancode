@@ -207,6 +207,25 @@ describe('canvas minimap', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('放大画布 (⌘=)')
   })
 
+  it('shows the configured minimap toggle shortcut in both states', async () => {
+    const props = createCanvasMinimapProps()
+    const { rerender } = render(<CanvasMinimap {...props} />)
+
+    fireEvent.pointerMove(screen.getByRole('button', { name: '收起小地图' }), {
+      pointerType: 'mouse'
+    })
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('收起或展开小地图 (⌘⇧M)')
+
+    fireEvent.pointerLeave(screen.getByRole('button', { name: '收起小地图' }), {
+      pointerType: 'mouse'
+    })
+    rerender(<CanvasMinimap {...props} isCollapsed />)
+    fireEvent.pointerMove(screen.getByRole('button', { name: '展开小地图' }), {
+      pointerType: 'mouse'
+    })
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('收起或展开小地图 (⌘⇧M)')
+  })
+
   it('keeps collapsed terminal groups visible as minimap nodes', () => {
     const onMinimapNodeClick = vi.fn()
     const minimapNodeInteraction = createMinimapNodeInteraction()
@@ -345,6 +364,7 @@ function createCanvasMinimapProps() {
 
 const canvasShortcutTooltips = {
   fitCanvas: '适应画布 (⌘0)',
+  toggleMinimap: '收起或展开小地图 (⌘⇧M)',
   zoomCanvasIn: '放大画布 (⌘=)',
   zoomCanvasOut: '缩小画布 (⌘-)'
 } as const

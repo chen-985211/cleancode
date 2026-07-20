@@ -16,6 +16,7 @@ describe('Agent minimap navigation', () => {
         viewportZoom={1}
         shortcutTooltips={{
           fitCanvas: '适应画布 (⌘0)',
+          toggleMinimap: '收起或展开小地图 (⌘⇧M)',
           zoomCanvasIn: '放大画布 (⌘=)',
           zoomCanvasOut: '缩小画布 (⌘-)'
         }}

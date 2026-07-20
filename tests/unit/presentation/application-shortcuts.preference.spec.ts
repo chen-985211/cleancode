@@ -40,11 +40,9 @@ describe('application shortcut preference', () => {
     )
 
     expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
       ...legacyBindings,
-      toggleSidebar: defaultApplicationShortcutBindings.toggleSidebar,
-      zoomCanvasIn: defaultApplicationShortcutBindings.zoomCanvasIn,
-      zoomCanvasOut: defaultApplicationShortcutBindings.zoomCanvasOut,
-      fitCanvas: defaultApplicationShortcutBindings.fitCanvas
+      toggleSidebar: defaultApplicationShortcutBindings.toggleSidebar
     })
   })
 
@@ -62,10 +60,53 @@ describe('application shortcut preference', () => {
     )
 
     expect(readApplicationShortcutBindings()).toEqual({
-      ...v2Bindings,
+      ...defaultApplicationShortcutBindings,
+      ...v2Bindings
+    })
+  })
+
+  it('migrates the complete v3 catalog and preserves customized or cleared bindings', () => {
+    const v3Bindings = {
+      openSettings: defaultApplicationShortcutBindings.openSettings,
+      toggleSidebar: { alt: true, key: 'B', primary: true, shift: false },
+      createTerminal: null,
+      createAgent: defaultApplicationShortcutBindings.createAgent,
+      groupTerminals: defaultApplicationShortcutBindings.groupTerminals,
       zoomCanvasIn: defaultApplicationShortcutBindings.zoomCanvasIn,
       zoomCanvasOut: defaultApplicationShortcutBindings.zoomCanvasOut,
       fitCanvas: defaultApplicationShortcutBindings.fitCanvas
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v3Bindings, version: 3 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
+      ...v3Bindings
+    })
+  })
+
+  it('keeps a v3 custom binding and leaves a conflicting new default unassigned', () => {
+    const v3Bindings = {
+      openSettings: defaultApplicationShortcutBindings.openSettings,
+      toggleSidebar: defaultApplicationShortcutBindings.toggleSidebar,
+      createTerminal: { alt: false, key: 'O', primary: true, shift: false },
+      createAgent: defaultApplicationShortcutBindings.createAgent,
+      groupTerminals: defaultApplicationShortcutBindings.groupTerminals,
+      zoomCanvasIn: defaultApplicationShortcutBindings.zoomCanvasIn,
+      zoomCanvasOut: defaultApplicationShortcutBindings.zoomCanvasOut,
+      fitCanvas: defaultApplicationShortcutBindings.fitCanvas
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v3Bindings, version: 3 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
+      ...v3Bindings,
+      addProject: null
     })
   })
 
@@ -83,19 +124,18 @@ describe('application shortcut preference', () => {
     )
 
     expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
       ...v2Bindings,
-      zoomCanvasIn: null,
-      zoomCanvasOut: defaultApplicationShortcutBindings.zoomCanvasOut,
-      fitCanvas: defaultApplicationShortcutBindings.fitCanvas
+      zoomCanvasIn: null
     })
   })
 
-  it('writes the complete catalog with preference schema v3', () => {
+  it('writes the complete catalog with preference schema v4', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 3
+      version: 4
     })
   })
 
@@ -118,7 +158,7 @@ describe('application shortcut preference', () => {
 
   it.each([
     'not-json',
-    JSON.stringify({ version: 3, bindings: {} }),
+    JSON.stringify({ version: 4, bindings: {} }),
     JSON.stringify({
       version: 1,
       bindings: {
