@@ -226,6 +226,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           isResizeSuspended={isResizingBlock}
           onDimensionsChange={handleDimensionsChange}
           onInput={data.onInput}
+          onPaste={data.onPaste}
         />
       </div>
       <Handle

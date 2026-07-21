@@ -29,6 +29,8 @@ export interface TerminalModeSnapshot {
 export interface TerminalSnapshot {
   readonly identity: TerminalModelIdentity
   readonly sequence: OutputSequence
+  readonly scrollbackRows: number
+  readonly unicodeVersion: '11'
   readonly restoreMarker: RestoreMarker
   readonly content: string
   readonly transcript: string

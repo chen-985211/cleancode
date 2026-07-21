@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 
 import type { SerializeAddon as SerializeAddonInstance } from '@xterm/addon-serialize'
+import type { Unicode11Addon as Unicode11AddonInstance } from '@xterm/addon-unicode11'
 import type {
   ITerminalInitOnlyOptions,
   ITerminalOptions,
@@ -19,6 +20,10 @@ import type {
   TerminalModelPort,
   TerminalViewOutputEvent
 } from '../../application/ports/TerminalModelPort'
+import {
+  defaultTerminalScrollbackRows,
+  type TerminalScrollbackRows
+} from '../../application/dto/TerminalRuntimeSettings'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
@@ -32,20 +37,23 @@ const { Terminal: HeadlessTerminal } = nodeRequire('@xterm/headless') as {
 const { SerializeAddon } = nodeRequire('@xterm/addon-serialize') as {
   readonly SerializeAddon: new () => SerializeAddonInstance
 }
+const { Unicode11Addon } = nodeRequire('@xterm/addon-unicode11') as {
+  readonly Unicode11Addon: new () => Unicode11AddonInstance
+}
 
-const terminalScrollbackRows = 1000
 const pendingOutputHighWatermarkBytes = 1024 * 1024
 const pendingOutputLowWatermarkBytes = 256 * 1024
 
 export class HeadlessTerminalModelAdapter implements TerminalModelPort {
   private readonly models = new Map<string, ManagedTerminalModel>()
   private lastRestoreDurationMs = 0
+  private scrollbackRows: TerminalScrollbackRows = defaultTerminalScrollbackRows
 
   create(command: CreateTerminalModelCommand): void {
     const key = createModelKey(command.identity)
     this.models.get(key)?.dispose()
     this.models.delete(key)
-    this.models.set(key, new ManagedTerminalModel(command))
+    this.models.set(key, new ManagedTerminalModel(command, this.scrollbackRows))
   }
 
   acceptOutput(identity: TerminalRunScope, data: string): SequencedTerminalOutput {
@@ -67,8 +75,17 @@ export class HeadlessTerminalModelAdapter implements TerminalModelPort {
     return this.requireModel(identity).flush()
   }
 
+  readWorkingDirectory(identity: TerminalRunScope): string {
+    return this.requireModel(identity).currentWorkingDirectory
+  }
+
   resize(identity: TerminalRunScope, columns: number, rows: number): void {
     this.requireModel(identity).resize(columns, rows)
+  }
+
+  setScrollbackRows(rows: TerminalScrollbackRows): void {
+    this.scrollbackRows = rows
+    for (const model of this.models.values()) model.setScrollbackRows(rows)
   }
 
   updateWorkingDirectory(identity: TerminalRunScope, workingDirectory: string): void {
@@ -136,7 +153,7 @@ class ManagedTerminalModel {
   private disposed = false
   pendingOutputBytes = 0
 
-  constructor(command: CreateTerminalModelCommand) {
+  constructor(command: CreateTerminalModelCommand, scrollbackRows: TerminalScrollbackRows) {
     this.identity = command.identity
     this.workingDirectory = command.workingDirectory
     this.onQueryResponse = command.onQueryResponse
@@ -147,12 +164,17 @@ class ManagedTerminalModel {
       convertEol: true,
       disableStdin: false,
       rows: command.rows,
-      scrollback: terminalScrollbackRows
+      scrollback: scrollbackRows
     })
     this.serializeAddon = new SerializeAddon()
+    const unicodeAddon = new Unicode11Addon()
     this.terminal.loadAddon(
       this.serializeAddon as unknown as Parameters<HeadlessTerminalInstance['loadAddon']>[0]
     )
+    this.terminal.loadAddon(
+      unicodeAddon as unknown as Parameters<HeadlessTerminalInstance['loadAddon']>[0]
+    )
+    this.terminal.unicode.activeVersion = '11'
     this.terminal.onData((response) => this.onQueryResponse(response))
     this.terminal.onTitleChange((title) => {
       this.title = title
@@ -165,6 +187,11 @@ class ManagedTerminalModel {
 
   get hasAttachedView(): boolean {
     return this.activeView !== null
+  }
+
+  get currentWorkingDirectory(): string {
+    this.assertActive()
+    return this.workingDirectory
   }
 
   acceptOutput(data: string): SequencedTerminalOutput {
@@ -236,6 +263,11 @@ class ManagedTerminalModel {
     this.terminal.resize(columns, rows)
   }
 
+  setScrollbackRows(rows: TerminalScrollbackRows): void {
+    this.assertActive()
+    this.terminal.options.scrollback = rows
+  }
+
   updateWorkingDirectory(workingDirectory: string): void {
     this.assertActive()
     this.workingDirectory = workingDirectory
@@ -255,8 +287,12 @@ class ManagedTerminalModel {
     return {
       identity: this.identity,
       sequence: this.parsedSequence,
+      scrollbackRows: this.terminal.options.scrollback ?? defaultTerminalScrollbackRows,
+      unicodeVersion: '11',
       restoreMarker: { viewId, sequence: this.parsedSequence },
-      content: this.serializeAddon.serialize({ scrollback: terminalScrollbackRows }),
+      content: this.serializeAddon.serialize({
+        scrollback: this.terminal.options.scrollback ?? defaultTerminalScrollbackRows
+      }),
       transcript: readTranscript(this.terminal),
       dimensions: { columns: this.terminal.cols, rows: this.terminal.rows },
       title: this.title,

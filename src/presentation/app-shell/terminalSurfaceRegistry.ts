@@ -5,32 +5,51 @@ import type {
   TerminalViewOutputEvent
 } from '../../contexts/run/application/ports/TerminalModelPort'
 import type { TerminalDimensions } from './types'
+import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
+import type { TerminalRendererState } from './terminalRendererController'
 
 export interface TerminalSurfaceAttachment {
   readonly element: HTMLDivElement
   readonly isResizeSuspended: boolean
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (input: string) => void
+  readonly onOpenLink: (target: string) => void
+  readonly onOpenSearch: () => void
   readonly onRestoreRequired: () => void
+  readonly onSearchResultsChange: (results: TerminalSearchResults) => void
 }
+
+export interface TerminalSearchResults {
+  readonly resultIndex: number
+  readonly resultCount: number
+}
+
+export type TerminalSearchDirection = 'incremental' | 'next' | 'previous'
 
 export type TerminalRestoreResult = 'ready' | 'retry'
 
 interface TerminalSurfaceDiagnostics {
   readonly pendingOutputBytes: number
+  readonly rendererState: TerminalRendererState
 }
 
 export interface TerminalSurfaceRegistryDiagnostics extends TerminalSurfaceDiagnostics {
   readonly surfaceCount: number
+  readonly domSurfaceCount: number
+  readonly webglSurfaceCount: number
 }
 
 export interface TerminalSurface {
   attach(attachment: TerminalSurfaceAttachment): void
   detach(element: HTMLDivElement): void
   dispose(): void
+  clearSearch(): void
+  find(query: string, direction: TerminalSearchDirection): void
   focus(): void
   getDiagnostics(): TerminalSurfaceDiagnostics
+  isBracketedPasteMode(): boolean
   restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult>
+  setScrollbackRows(rows: TerminalScrollbackRows): void
   setResizeSuspended(isResizeSuspended: boolean): void
   write(output: SequencedTerminalOutput): void
 }
@@ -85,12 +104,27 @@ export class TerminalSurfaceRegistry {
     this.views.clear()
   }
 
+  setScrollbackRows(rows: TerminalScrollbackRows): void {
+    for (const view of this.views.values()) view.surface.setScrollbackRows(rows)
+  }
+
   getDiagnostics(): TerminalSurfaceRegistryDiagnostics {
     let pendingOutputBytes = 0
+    let domSurfaceCount = 0
+    let webglSurfaceCount = 0
     for (const view of this.views.values()) {
-      pendingOutputBytes += view.surface.getDiagnostics().pendingOutputBytes
+      const diagnostics = view.surface.getDiagnostics()
+      pendingOutputBytes += diagnostics.pendingOutputBytes
+      if (diagnostics.rendererState === 'webgl') webglSurfaceCount += 1
+      else domSurfaceCount += 1
     }
-    return { surfaceCount: this.views.size, pendingOutputBytes }
+    return {
+      surfaceCount: this.views.size,
+      pendingOutputBytes,
+      rendererState: webglSurfaceCount > 0 ? 'webgl' : 'dom',
+      domSurfaceCount,
+      webglSurfaceCount
+    }
   }
 
   private createUniqueViewId(): string {

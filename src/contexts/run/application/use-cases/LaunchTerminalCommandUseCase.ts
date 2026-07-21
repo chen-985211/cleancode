@@ -92,6 +92,7 @@ export class LaunchTerminalCommandUseCase {
       terminalBlockId: command.blockId,
       workingDirectory: command.workingDirectory,
       launchCommand: plan.launchCommand,
+      launchMode: 'interactive',
       shell: command.shell,
       columns: command.columns,
       rows: command.rows,

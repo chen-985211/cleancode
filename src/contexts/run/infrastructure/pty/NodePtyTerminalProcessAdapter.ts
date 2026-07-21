@@ -15,7 +15,7 @@ import type {
   TerminalProcessHandle,
   TerminalProcessPort
 } from '../../application/ports/TerminalProcessPort'
-import { createTerminalShellCommandArguments } from './TerminalShellCommand'
+import { createTerminalProcessLaunch } from './TerminalShellCommand'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -29,17 +29,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     ensureNodePtySpawnHelperIsExecutable()
 
     const shell = command.shell || getDefaultShell()
-    const ptyProcess = spawnPtyProcess(
-      shell,
-      [...createTerminalShellCommandArguments(shell, command.launchCommand)],
-      {
-        name: 'xterm-256color',
-        cols: command.columns,
-        rows: command.rows,
-        cwd: command.workingDirectory,
-        env: createProcessEnvironment(command.environment)
-      }
-    )
+    const launch = createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
+    const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
+      name: 'xterm-256color',
+      cols: command.columns,
+      rows: command.rows,
+      cwd: command.workingDirectory,
+      env: createProcessEnvironment(command.environment)
+    })
 
     let resolveExit: () => void = () => undefined
     const exited = new Promise<void>((resolve) => {

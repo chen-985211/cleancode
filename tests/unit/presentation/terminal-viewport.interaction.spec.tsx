@@ -7,9 +7,16 @@ import { effectiveThemeChangeEventName } from '../../../src/presentation/app-she
 import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
 
 interface FakeTerminalInstance {
+  buffer: {
+    active: {
+      getLine(index: number): FakeBufferLine | undefined
+    }
+  }
   cols: number
   rows: number
   options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+  modes: { bracketedPasteMode: boolean }
+  unicode: { activeVersion: string }
   selection: string
   readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
   readonly focus: ReturnType<typeof vi.fn>
@@ -21,16 +28,35 @@ interface FakeTerminalInstance {
   readonly onData: ReturnType<typeof vi.fn>
   readonly dispose: ReturnType<typeof vi.fn>
   readonly refresh: ReturnType<typeof vi.fn>
+  readonly registerLinkProvider: ReturnType<typeof vi.fn>
   readonly reset: ReturnType<typeof vi.fn>
   readonly resize: ReturnType<typeof vi.fn>
   element: HTMLElement | undefined
   textarea: HTMLTextAreaElement | null
   customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
+  linkProvider: { provideLinks(line: number, callback: (links: unknown[]) => void): void } | null
+}
+
+interface FakeBufferLine {
+  readonly length: number
+  getCell(index: number): { getChars(): string; getWidth(): number } | undefined
+  translateToString(trimRight?: boolean): string
 }
 
 interface FakeFitAddonInstance {
   terminal?: FakeTerminalInstance
   readonly fit: ReturnType<typeof vi.fn>
+}
+
+interface FakeSearchAddonInstance {
+  readonly clearDecorations: ReturnType<typeof vi.fn>
+  readonly findNext: ReturnType<typeof vi.fn>
+  readonly findPrevious: ReturnType<typeof vi.fn>
+  emitResults(resultIndex: number, resultCount: number): void
+}
+
+interface FakeWebLinksAddonInstance {
+  activate(event: MouseEvent, target: string): void
 }
 
 interface TerminalSize {
@@ -41,7 +67,9 @@ interface TerminalSize {
 const xtermMockState = vi.hoisted(() => ({
   fitAddons: [] as FakeFitAddonInstance[],
   fitSizes: [] as TerminalSize[],
-  terminals: [] as FakeTerminalInstance[]
+  searchAddons: [] as FakeSearchAddonInstance[],
+  terminals: [] as FakeTerminalInstance[],
+  webLinksAddons: [] as FakeWebLinksAddonInstance[]
 }))
 
 vi.mock('@xterm/xterm', () => ({
@@ -49,6 +77,9 @@ vi.mock('@xterm/xterm', () => ({
     cols = 80
     rows = 24
     options: { macOptionClickForcesSelection?: boolean; theme?: Record<string, string> }
+    modes = { bracketedPasteMode: false }
+    unicode = { activeVersion: '6' }
+    buffer = { active: { getLine: vi.fn<(_: number) => FakeBufferLine | undefined>() } }
     selection = ''
     element: HTMLElement | undefined
     textarea: HTMLTextAreaElement | null = null
@@ -66,9 +97,12 @@ vi.mock('@xterm/xterm', () => ({
       callback?.()
     })
 
-    readonly loadAddon = vi.fn((addon: FakeFitAddonInstance) => {
-      addon.terminal = this
-    })
+    readonly loadAddon = vi.fn(
+      (addon: FakeFitAddonInstance & { activate?(terminal: FakeTerminalInstance): void }) => {
+        addon.terminal = this
+        addon.activate?.(this)
+      }
+    )
 
     readonly open = vi.fn((element: HTMLElement) => {
       const terminalElement = document.createElement('div')
@@ -85,6 +119,12 @@ vi.mock('@xterm/xterm', () => ({
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
     readonly dispose = vi.fn()
     readonly refresh = vi.fn()
+    readonly registerLinkProvider = vi.fn(
+      (provider: { provideLinks(line: number, callback: (links: unknown[]) => void): void }) => {
+        this.linkProvider = provider
+        return { dispose: vi.fn() }
+      }
+    )
     readonly reset = vi.fn()
     readonly resize = vi.fn((columns: number, rows: number) => {
       this.cols = columns
@@ -92,6 +132,9 @@ vi.mock('@xterm/xterm', () => ({
     })
 
     customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null = null
+    linkProvider: {
+      provideLinks(line: number, callback: (links: unknown[]) => void): void
+    } | null = null
 
     constructor(options: {
       macOptionClickForcesSelection?: boolean
@@ -126,9 +169,51 @@ vi.mock('@xterm/addon-fit', () => ({
   }
 }))
 
+vi.mock('@xterm/addon-search', () => ({
+  SearchAddon: class FakeSearchAddon implements FakeSearchAddonInstance {
+    private listener: (result: { resultIndex: number; resultCount: number }) => void = () =>
+      undefined
+
+    readonly clearDecorations = vi.fn()
+    readonly findNext = vi.fn()
+    readonly findPrevious = vi.fn()
+    readonly onDidChangeResults = vi.fn(
+      (listener: (result: { resultIndex: number; resultCount: number }) => void) => {
+        this.listener = listener
+        return { dispose: vi.fn() }
+      }
+    )
+
+    constructor() {
+      xtermMockState.searchAddons.push(this)
+    }
+
+    emitResults(resultIndex: number, resultCount: number): void {
+      this.listener({ resultIndex, resultCount })
+    }
+  }
+}))
+
+vi.mock('@xterm/addon-unicode11', () => ({
+  Unicode11Addon: class FakeUnicode11Addon {}
+}))
+
+vi.mock('@xterm/addon-web-links', () => ({
+  WebLinksAddon: class FakeWebLinksAddon implements FakeWebLinksAddonInstance {
+    constructor(private readonly handler: (event: MouseEvent, target: string) => void) {
+      xtermMockState.webLinksAddons.push(this)
+    }
+
+    activate(event: MouseEvent, target: string): void {
+      this.handler(event, target)
+    }
+  }
+}))
+
 let terminalSurfaceRegistry: TerminalSurfaceRegistry
 let attachTerminalView: ReturnType<typeof vi.fn>
 let detachTerminalView: ReturnType<typeof vi.fn>
+let openTerminalLink: ReturnType<typeof vi.fn>
 
 describe('terminal viewport interaction', () => {
   let animationFrameCallbacks: FrameRequestCallback[] = []
@@ -146,13 +231,21 @@ describe('terminal viewport interaction', () => {
     terminalSurfaceRegistry = new TerminalSurfaceRegistry()
     attachTerminalView = vi.fn(async (command) => createSnapshot(command, 0, ''))
     detachTerminalView = vi.fn(async () => undefined)
+    openTerminalLink = vi.fn(async () => ({ kind: 'external', target: 'https://example.com/' }))
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: { attachTerminalView, detachTerminalView }
+      value: {
+        attachTerminalView,
+        detachTerminalView,
+        getPathForFile: vi.fn(() => ''),
+        openTerminalLink
+      }
     })
     xtermMockState.fitAddons = []
     xtermMockState.fitSizes = []
+    xtermMockState.searchAddons = []
     xtermMockState.terminals = []
+    xtermMockState.webLinksAddons = []
     globalThis.ResizeObserver = class ManualResizeObserver {
       constructor(callback: ResizeObserverCallback) {
         resizeObserverCallbacks.push(callback)
@@ -434,13 +527,15 @@ describe('terminal viewport interaction', () => {
 
 function renderTerminalViewport({
   isResizeSuspended = false,
-  onDimensionsChange = vi.fn()
+  onDimensionsChange = vi.fn(),
+  onPaste = vi.fn(async () => undefined)
 }: {
   readonly isResizeSuspended?: boolean
   readonly onDimensionsChange?: (dimensions: {
     readonly columns: number
     readonly rows: number
   }) => void
+  readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
 } = {}) {
   return render(
     <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
@@ -451,6 +546,7 @@ function renderTerminalViewport({
         isResizeSuspended={isResizeSuspended}
         onDimensionsChange={onDimensionsChange}
         onInput={vi.fn()}
+        onPaste={onPaste}
       />
     </TerminalSurfaceRegistryProvider>
   )

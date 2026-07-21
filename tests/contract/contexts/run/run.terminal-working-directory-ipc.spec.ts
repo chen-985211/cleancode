@@ -164,10 +164,12 @@ function createTerminalIpcHandlersInput(input: {
     listTerminalSessions: input.listTerminalSessions ?? vi.fn(() => []),
     listTerminalWorkingDirectories: input.listTerminalWorkingDirectories,
     logger: new SilentLogger(),
+    openTerminalLink: vi.fn(),
     openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: input.resizeTerminal ?? vi.fn(),
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),
+    updateTerminalScrollback: vi.fn(),
     writeTerminal: vi.fn()
   }
 }

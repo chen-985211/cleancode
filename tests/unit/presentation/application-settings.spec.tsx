@@ -120,6 +120,17 @@ describe('application settings', () => {
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('打开设置 (⌘⌥O)')
   })
+
+  it('changes the shared terminal scrollback budget from the terminal settings pane', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '终端' }))
+
+    expect(screen.getByRole('heading', { name: '终端' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
+    fireEvent.click(screen.getByRole('radio', { name: '5,000 行' }))
+    expect(screen.getByRole('radio', { name: '5,000 行' })).toBeChecked()
+  })
 })
 
 function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {
@@ -127,6 +138,7 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
   const [bindings, setBindings] = useState<ApplicationShortcutBindings>(
     defaultApplicationShortcutBindings
   )
+  const [terminalScrollbackRows, setTerminalScrollbackRows] = useState<1000 | 5000 | 10000>(1000)
 
   const changeBinding = (
     command: ApplicationShortcutCommand,
@@ -144,6 +156,8 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
       onClose={() => setIsOpen(false)}
       onOpen={() => setIsOpen(true)}
       onResetAll={() => setBindings(defaultApplicationShortcutBindings)}
+      terminalScrollbackRows={terminalScrollbackRows}
+      onTerminalScrollbackChange={setTerminalScrollbackRows}
     />
   )
 }

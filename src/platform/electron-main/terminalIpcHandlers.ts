@@ -1,5 +1,13 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type {
+  OpenTerminalLinkCommand,
+  TerminalLinkOpenResult
+} from '../../contexts/run/application/dto/TerminalLink'
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
+import {
+  isTerminalScrollbackRows,
+  type TerminalScrollbackRows
+} from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import type {
   TerminalRunEvent,
   TerminalRunIdentity,
@@ -87,6 +95,7 @@ export interface TerminalIpcHandlersInput {
     readonly sessionId: string
     readonly generation: number
   }) => Promise<void>
+  readonly openTerminalLink: (command: OpenTerminalLinkCommand) => Promise<TerminalLinkOpenResult>
   readonly resolveManagedServiceOwner?: ManagedServiceOwnerResolver
   readonly resizeTerminal: (
     sessionId: string,
@@ -100,6 +109,7 @@ export interface TerminalIpcHandlersInput {
     sessionIds: readonly string[]
   ) => Promise<TerminalWorkingDirectorySnapshot[]>
   readonly terminateTerminal: (sessionId: string) => Promise<TerminalSessionSnapshot | null>
+  readonly updateTerminalScrollback: (rows: TerminalScrollbackRows) => void
   readonly attachTerminalView: (command: AttachTerminalViewCommand) => Promise<TerminalSnapshot>
   readonly detachTerminalView: (command: TerminalViewIdentityCommand) => Promise<void>
 }
@@ -220,6 +230,15 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     successLogLevel: 'info'
   })
 
+  registerIpcHandler<OpenTerminalLinkCommand, TerminalLinkOpenResult>({
+    channel: 'cleancode:open-terminal-link',
+    handler: (command) => input.openTerminalLink(readTerminalLinkCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'openTerminalLink',
+    scope: 'run.terminal-link'
+  })
+
   registerIpcHandler<
     { readonly runId: string; readonly sessionId: string; readonly generation: number },
     void
@@ -330,6 +349,20 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     logger: input.logger,
     operation: 'attachTerminalView',
     scope: 'run.terminal-view'
+  })
+
+  registerIpcHandler<{ readonly scrollbackRows: TerminalScrollbackRows }, void>({
+    channel: 'cleancode:update-terminal-scrollback',
+    handler: (command) => {
+      if (!isRecord(command) || !isTerminalScrollbackRows(command.scrollbackRows)) {
+        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal scrollback budget.')
+      }
+      input.updateTerminalScrollback(command.scrollbackRows)
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateTerminalScrollback',
+    scope: 'run.terminal-model'
   })
 
   registerIpcHandler<TerminalViewIdentityCommand, void>({
@@ -468,6 +501,19 @@ function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand 
     throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view identity.')
   }
   return command as unknown as TerminalViewIdentityCommand
+}
+
+function readTerminalLinkCommand(command: unknown): OpenTerminalLinkCommand {
+  const identity = readTerminalViewCommand(command)
+  if (
+    !isRecord(command) ||
+    typeof command.rawTarget !== 'string' ||
+    command.rawTarget.trim().length === 0 ||
+    command.rawTarget.length > 4_096
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal link target.')
+  }
+  return { ...identity, rawTarget: command.rawTarget }
 }
 
 function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {

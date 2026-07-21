@@ -116,6 +116,12 @@
   padding: 16px 12px;
 }
 
+.application-settings-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .application-settings-navigation button {
   position: relative;
   display: flex;
@@ -172,6 +178,82 @@
 
 .shortcut-settings-pane {
   width: min(100%, 980px);
+}
+
+.terminal-settings-pane {
+  width: min(100%, 760px);
+}
+
+.terminal-settings-pane__header h2,
+.terminal-settings-pane__header p,
+.terminal-settings-group p {
+  margin: 0;
+}
+
+.terminal-settings-pane__header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.terminal-settings-pane__header p,
+.terminal-settings-group p {
+  margin-top: 8px;
+  color: var(--cc-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.terminal-settings-group {
+  margin: 24px 0 0;
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow-sm);
+  padding: 18px;
+}
+
+.terminal-settings-group legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.terminal-settings-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.terminal-settings-options label {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 9px;
+  background: var(--cc-surface-subtle);
+  padding: 0 12px;
+  color: var(--cc-muted-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.terminal-settings-options label:has(input:checked) {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-wash);
+  color: var(--cc-primary);
+}
+
+.terminal-settings-options label:has(input:focus-visible) {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
+}
+
+.terminal-settings-options input {
+  accent-color: var(--cc-primary);
 }
 
 .shortcut-settings-pane__header {

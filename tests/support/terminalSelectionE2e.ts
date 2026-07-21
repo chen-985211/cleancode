@@ -45,6 +45,7 @@ export async function selectExactXtermText(
   terminal: Locator,
   targetText: string
 ): Promise<void> {
+  await ensureTerminalDomRenderer(terminal)
   const selection = await terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.findLast((candidate) => candidate.textContent?.includes(target))
@@ -116,6 +117,7 @@ export async function readXtermAsciiCellCenter(
   terminal: Locator,
   input: { readonly column: number; readonly rowMarker: string }
 ): Promise<{ readonly row: number; readonly x: number; readonly y: number }> {
+  await ensureTerminalDomRenderer(terminal)
   return terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.find((candidate) => candidate.textContent?.includes(target.rowMarker))
@@ -160,6 +162,36 @@ export async function readXtermAsciiCellCenter(
       y: rowBounds.top + rowBounds.height / 2
     }
   }, input)
+}
+
+export async function ensureTerminalDomRenderer(terminal: Locator): Promise<void> {
+  await terminal.evaluate(async (element) => {
+    const terminalElement = element as HTMLElement
+    const readRenderer = (): string | undefined => terminalElement.dataset.terminalRenderer
+    if (readRenderer() !== 'webgl') return
+
+    for (const canvas of terminalElement.querySelectorAll('canvas')) {
+      canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
+    }
+    if (readRenderer() === 'dom') return
+
+    await new Promise<void>((resolve, reject) => {
+      const observer = new MutationObserver(() => {
+        if (readRenderer() !== 'dom') return
+        observer.disconnect()
+        clearTimeout(timeout)
+        resolve()
+      })
+      const timeout = setTimeout(() => {
+        observer.disconnect()
+        reject(new Error('Terminal did not fall back to the DOM renderer.'))
+      }, 5_000)
+      observer.observe(terminalElement, {
+        attributeFilter: ['data-terminal-renderer'],
+        attributes: true
+      })
+    })
+  })
 }
 
 export async function readXtermSelection(terminal: Locator): Promise<string> {

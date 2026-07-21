@@ -52,6 +52,8 @@ describe('terminal session model lifecycle', () => {
     })
     service.resize(session.id, 120, 36)
     await service.detachView({ ...identity, viewId: 'view-1' })
+    processes.emitExit(session.id, 0)
+    const linkContext = await service.getTerminalLinkContext({ ...identity, viewId: 'view-1' })
 
     expect(processes.writes).toContainEqual({ sessionId: session.id, input: '\u001b[1;1R' })
     expect(processes.flowControl).toEqual([
@@ -65,6 +67,10 @@ describe('terminal session model lifecycle', () => {
       }
     ])
     expect(snapshot.sequence).toBe(0)
+    expect(linkContext).toEqual({
+      workingDirectory: '/work/app/src',
+      workspaceDirectory: '/work/app'
+    })
     expect(models.resizes).toEqual([
       { identity: expect.objectContaining({ sessionId: session.id }), columns: 120, rows: 36 }
     ])
@@ -210,9 +216,18 @@ class RecordingModelPort implements TerminalModelPort {
 
   async flush(): Promise<void> {}
 
+  readWorkingDirectory(identity: TerminalRunScope): string {
+    const latest = [...this.workingDirectories]
+      .reverse()
+      .find(({ identity: candidate }) => candidate.sessionId === identity.sessionId)
+    return latest?.workingDirectory ?? '/work/app'
+  }
+
   resize(identity: TerminalRunScope, columns: number, rows: number): void {
     this.resizes.push({ identity, columns, rows })
   }
+
+  setScrollbackRows(): void {}
 
   updateWorkingDirectory(identity: TerminalRunScope, workingDirectory: string): void {
     this.workingDirectories.push({ identity, workingDirectory })
@@ -266,6 +281,8 @@ function createSnapshot(identity: TerminalRunScope, sequence: number): TerminalS
   return {
     identity,
     sequence,
+    scrollbackRows: 1000,
+    unicodeVersion: '11',
     restoreMarker: { viewId: 'view-1', sequence },
     content: '',
     transcript: '',

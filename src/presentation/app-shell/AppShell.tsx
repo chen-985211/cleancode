@@ -53,6 +53,7 @@ import { useApplicationShortcuts } from './useApplicationShortcuts'
 import { useApplicationShortcutNavigation } from './useApplicationShortcutNavigation'
 import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
+import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 
 export function AppShell({
@@ -157,7 +158,8 @@ export function AppShell({
     terminateTerminalSession,
     terminateWorkbenchTerminalSessions,
     terminateWorkspaceTerminalSessions,
-    writeTerminal
+    writeTerminal,
+    writeTerminalImmediately
   } = useTerminalSessions({
     currentProject: currentWorkbench?.project,
     currentWorkspace,
@@ -165,6 +167,8 @@ export function AppShell({
     focusTerminalBlock,
     notify: notifications.notify
   })
+  const { changeTerminalScrollback, terminalScrollbackRows } =
+    useTerminalRuntimePreference(terminalSurfaceRegistry)
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -452,6 +456,7 @@ export function AppShell({
       onRunFromHere: (block: TerminalBlockSnapshot) => startWorkflow(block.id),
       onStopWorkflow: stopWorkflow,
       onInput: writeTerminal,
+      onPaste: writeTerminalImmediately,
       onResize: resizeTerminal,
       onResizeBlock: resizeTerminalBlock,
       onSelect: (block: TerminalBlockSnapshot, additive: boolean) =>
@@ -478,7 +483,8 @@ export function AppShell({
       startWorkflow,
       stopWorkflow,
       updateTerminalDefinition,
-      writeTerminal
+      writeTerminal,
+      writeTerminalImmediately
     ]
   )
   useWorkbenchFlowNodes({
@@ -561,6 +567,8 @@ export function AppShell({
                 onClose={() => setIsApplicationSettingsOpen(false)}
                 onOpen={() => setIsApplicationSettingsOpen(true)}
                 onResetAll={resetAllBindings}
+                terminalScrollbackRows={terminalScrollbackRows}
+                onTerminalScrollbackChange={changeTerminalScrollback}
               />
             </div>
             <div className="project-sidebar-column">

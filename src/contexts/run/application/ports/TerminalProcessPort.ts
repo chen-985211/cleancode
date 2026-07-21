@@ -1,5 +1,7 @@
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 
+export type TerminalLaunchMode = 'command' | 'interactive'
+
 interface TerminalProcessOutputEvent {
   readonly scope: TerminalRunScope
   readonly sessionId: string
@@ -26,6 +28,7 @@ export interface StartTerminalProcessCommand {
   readonly workingDirectory: string
   readonly shell?: string
   readonly launchCommand?: string
+  readonly launchMode?: TerminalLaunchMode
   readonly environment?: Readonly<Record<string, string>>
   readonly columns: number
   readonly rows: number

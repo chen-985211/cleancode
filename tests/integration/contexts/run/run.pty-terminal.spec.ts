@@ -149,6 +149,75 @@ describe('pty terminal process adapter', () => {
     expect(output).toContain(workingDirectory)
   }, 10_000)
 
+  it('keeps an interactive launch session writable after Ctrl+C', async () => {
+    let output = ''
+    let didExit = false
+
+    await adapter.start({
+      scope: runScope('interactive-launch-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      launchCommand: 'printf "interactive-launch-ready\\n"; while :; do sleep 1; done',
+      launchMode: 'interactive',
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => {
+        didExit = true
+      }
+    })
+
+    await waitUntil(() => output.includes('interactive-launch-ready'))
+    adapter.write('interactive-launch-session', '\x03')
+    adapter.write('interactive-launch-session', 'printf "after-interrupt\\n"\r')
+
+    await waitUntil(() => output.split('after-interrupt').length >= 3)
+
+    adapter.write(
+      'interactive-launch-session',
+      'sh -c "printf \\"second-command-ready\\\\n\\"; while :; do sleep 1; done"\r'
+    )
+    await waitUntil(() => output.split('second-command-ready').length >= 3)
+    adapter.write('interactive-launch-session', '\x03')
+    adapter.write('interactive-launch-session', 'printf "after-second-interrupt\\n"\r')
+
+    await waitUntil(() => output.split('after-second-interrupt').length >= 3)
+
+    expect(didExit).toBe(false)
+    expect(output).toContain('after-second-interrupt')
+  }, 10_000)
+
+  it('keeps an interactive launch session writable after the launch command exits', async () => {
+    let output = ''
+    let didExit = false
+
+    await adapter.start({
+      scope: runScope('completed-interactive-launch-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      launchCommand: 'printf "interactive-launch-complete\\n"; exit 7',
+      launchMode: 'interactive',
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => {
+        didExit = true
+      }
+    })
+
+    await waitUntil(() => output.includes('interactive-launch-complete'))
+    adapter.write('completed-interactive-launch-session', 'printf "after-completion\\n"\r')
+
+    await waitUntil(() => output.split('after-completion').length >= 3)
+
+    expect(didExit).toBe(false)
+    expect(output).toContain('after-completion')
+  }, 10_000)
+
   it('runs a command directly and reports its real exit code', async () => {
     let output = ''
     let resolveExit: (exitCode: number | null) => void = () => undefined

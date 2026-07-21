@@ -30,6 +30,19 @@ export function readTerminalTheme(root: HTMLElement = document.documentElement):
   return readTerminalThemeVariables(root, (variable) => variable)
 }
 
+export function readTerminalSearchTheme(root: HTMLElement = document.documentElement): {
+  readonly active: string
+  readonly border: string
+  readonly match: string
+} {
+  const styles = getComputedStyle(root)
+  return {
+    active: styles.getPropertyValue('--cc-terminal-search-active').trim(),
+    border: styles.getPropertyValue('--cc-terminal-search-border').trim(),
+    match: styles.getPropertyValue('--cc-terminal-search-match').trim()
+  }
+}
+
 export function readCanonicalTerminalTheme(theme: AgentTerminalSourceTheme): ITheme {
   return readTerminalThemeVariables(document.documentElement, (variable) =>
     variable.replace('--cc-terminal-', `--cc-terminal-${theme}-`)

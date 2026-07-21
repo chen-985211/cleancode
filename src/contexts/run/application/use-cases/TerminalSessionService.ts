@@ -11,9 +11,13 @@ import type {
   TerminalModelDiagnosticsSnapshot,
   TerminalSnapshot
 } from '../dto/TerminalModelSnapshot'
+import type { TerminalScrollbackRows } from '../dto/TerminalRuntimeSettings'
+import type { TerminalLinkIdentity } from '../dto/TerminalLink'
+import type { TerminalLinkContext } from '../ports/TerminalLinkPorts'
 import type { TerminalModelPort, TerminalViewOutputEvent } from '../ports/TerminalModelPort'
 import type {
   TerminalExitEvent,
+  TerminalLaunchMode,
   TerminalOutputEvent,
   TerminalProcessPort,
   TerminalWorkingDirectorySnapshot
@@ -49,6 +53,7 @@ export interface StartTerminalSessionCommand {
   readonly runId?: string
   readonly shell?: string
   readonly launchCommand?: string
+  readonly launchMode?: TerminalLaunchMode
   readonly environment?: Readonly<Record<string, string>>
   readonly prepareLaunch?: (scope: TerminalRunScope) => Promise<{
     readonly launchCommand: string | undefined
@@ -185,6 +190,7 @@ export class TerminalSessionService {
         workingDirectory: command.workingDirectory,
         shell: command.shell,
         launchCommand,
+        launchMode: command.launchMode,
         environment,
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
@@ -286,6 +292,33 @@ export class TerminalSessionService {
     await this.requireTerminalModelPort().detachView(session.scope, command.viewId)
   }
 
+  async getTerminalLinkContext(command: TerminalLinkIdentity): Promise<TerminalLinkContext> {
+    const session = this.requireRestorableSession(command)
+    try {
+      await this.scopeValidation.validate({
+        projectId: session.scope.projectId,
+        projectDirectory: session.scope.projectDirectory,
+        workspaceName: session.scope.workspaceName,
+        workspaceDirectory: session.scope.workspaceDirectory,
+        gitBranch: session.scope.gitBranch
+      })
+    } catch {
+      throw createExpectedAppError(
+        'RUN_SCOPE_STALE',
+        'Project no longer owns the requested terminal runtime scope.'
+      )
+    }
+
+    let workingDirectory =
+      this.terminalModelPort?.readWorkingDirectory(session.scope) ?? session.workingDirectory
+    if (session.status === 'running') {
+      workingDirectory =
+        (await this.terminalProcessPort.readWorkingDirectory(session.id)) ?? workingDirectory
+      this.terminalModelPort?.updateWorkingDirectory(session.scope, workingDirectory)
+    }
+    return { workingDirectory, workspaceDirectory: session.scope.workspaceDirectory }
+  }
+
   getTerminalModelDiagnostics(): TerminalModelDiagnosticsSnapshot {
     return (
       this.terminalModelPort?.getDiagnostics() ?? {
@@ -295,6 +328,10 @@ export class TerminalSessionService {
         lastRestoreDurationMs: 0
       }
     )
+  }
+
+  updateTerminalScrollback(rows: TerminalScrollbackRows): void {
+    this.terminalModelPort?.setScrollbackRows(rows)
   }
 
   async listWorkingDirectories(
@@ -426,7 +463,7 @@ export class TerminalSessionService {
     return session.status === 'running' && this.isCurrentGeneration(slotKey, session)
   }
 
-  private requireRestorableSession(command: TerminalViewIdentityCommand): TerminalSession {
+  private requireRestorableSession(command: TerminalLinkIdentity): TerminalSession {
     const session = this.requireSession(command.sessionId)
     const slotKey = createTerminalRunSlotKey(session.scope)
     const currentSessionId = this.sessionIdsBySlot.get(slotKey)

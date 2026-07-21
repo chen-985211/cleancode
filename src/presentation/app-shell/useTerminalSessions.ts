@@ -155,33 +155,21 @@ export function useTerminalSessions({
     updateTerminalStates
   })
 
-  const flushTerminalInput = useCallback(
-    (terminalStateKey: string) => {
-      const buffer = inputBuffersRef.current.get(terminalStateKey)
-
-      if (!buffer || buffer.input.length === 0) {
-        return
-      }
-
-      inputBuffersRef.current.delete(terminalStateKey)
+  const enqueueTerminalInputWrite = useCallback(
+    (terminalStateKey: string, sessionId: string, input: string): Promise<void> => {
       const queuedWrite = inputWriteQueuesRef.current.get(terminalStateKey) ?? Promise.resolve()
       const nextWrite = queuedWrite
         .catch(() => undefined)
         .then(async () => {
           const terminalState = terminalStatesRef.current[terminalStateKey]
-
           if (
-            terminalState?.sessionId !== buffer.sessionId ||
+            terminalState?.sessionId !== sessionId ||
             terminalState.status !== 'running' ||
             !window.cleancode
           ) {
             return
           }
-
-          const session = await window.cleancode.writeTerminal({
-            sessionId: buffer.sessionId,
-            input: buffer.input
-          })
+          const session = await window.cleancode.writeTerminal({ sessionId, input })
           reconcileTerminalActionSnapshot(terminalStateKey, session)
         })
 
@@ -191,8 +179,23 @@ export function useTerminalSessions({
           inputWriteQueuesRef.current.delete(terminalStateKey)
         }
       })
+      return nextWrite
     },
     [reconcileTerminalActionSnapshot]
+  )
+
+  const flushTerminalInput = useCallback(
+    (terminalStateKey: string) => {
+      const buffer = inputBuffersRef.current.get(terminalStateKey)
+
+      if (!buffer || buffer.input.length === 0) {
+        return
+      }
+
+      inputBuffersRef.current.delete(terminalStateKey)
+      void enqueueTerminalInputWrite(terminalStateKey, buffer.sessionId, buffer.input)
+    },
+    [enqueueTerminalInputWrite]
   )
 
   useEffect(
@@ -383,6 +386,31 @@ export function useTerminalSessions({
     [clearPendingTerminalInput, currentProjectId, currentWorkspaceName, flushTerminalInput]
   )
 
+  const writeTerminalImmediately = useCallback(
+    async (block: TerminalBlockSnapshot, input: string): Promise<void> => {
+      const terminalStateKey = resolveCurrentTerminalStateKey(
+        currentProjectId,
+        currentWorkspaceName,
+        block.id
+      )
+      const terminalState = terminalStateKey
+        ? terminalStatesRef.current[terminalStateKey]
+        : undefined
+      if (!terminalStateKey || !terminalState?.sessionId || terminalState.status !== 'running') {
+        return
+      }
+
+      const buffer = inputBuffersRef.current.get(terminalStateKey)
+      if (buffer?.timerId != null) window.clearTimeout(buffer.timerId)
+      inputBuffersRef.current.delete(terminalStateKey)
+      if (buffer?.sessionId === terminalState.sessionId && buffer.input) {
+        void enqueueTerminalInputWrite(terminalStateKey, terminalState.sessionId, buffer.input)
+      }
+      await enqueueTerminalInputWrite(terminalStateKey, terminalState.sessionId, input)
+    },
+    [currentProjectId, currentWorkspaceName, enqueueTerminalInputWrite]
+  )
+
   const quickLaunchTerminal = useCallback(
     async (block: TerminalBlockSnapshot, options: TerminalSessionActionOptions = {}) => {
       if (!block.launchCommand.trim() || !currentProject || !currentWorkspace) {
@@ -531,7 +559,8 @@ export function useTerminalSessions({
     terminalStatesRef,
     terminateTerminalSession,
     ...terminalSessionRetention,
-    writeTerminal
+    writeTerminal,
+    writeTerminalImmediately
   }
 }
 

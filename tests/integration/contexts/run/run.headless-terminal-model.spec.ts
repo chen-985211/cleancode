@@ -34,6 +34,7 @@ describe('headless terminal model', () => {
     })
 
     expect(snapshot.sequence).toBe(2)
+    expect(snapshot.unicodeVersion).toBe('11')
     expect(snapshot.restoreMarker).toEqual({ viewId: 'view-1', sequence: 2 })
     expect(snapshot.content).toContain('normal')
     expect(snapshot.content).toContain('\u001b[?1049h')
@@ -137,6 +138,43 @@ describe('headless terminal model', () => {
 
     expect(flowControl).toEqual([true, false])
     expect(adapter.getDiagnostics().pendingOutputBytes).toBe(0)
+  })
+
+  it('applies one scrollback budget to current and future models', async () => {
+    const adapter = new HeadlessTerminalModelAdapter()
+    const firstIdentity = createIdentity()
+    adapter.create({
+      identity: firstIdentity,
+      columns: 20,
+      rows: 2,
+      workingDirectory: '/work/app',
+      onQueryResponse: () => undefined,
+      onFlowControlChange: () => undefined
+    })
+    adapter.setScrollbackRows(5000)
+
+    const firstSnapshot = await adapter.attachView({
+      identity: firstIdentity,
+      viewId: 'view-first',
+      onOutput: () => undefined
+    })
+    const secondIdentity = { ...firstIdentity, sessionId: 'session-2', runId: 'run-2' }
+    adapter.create({
+      identity: secondIdentity,
+      columns: 20,
+      rows: 2,
+      workingDirectory: '/work/app',
+      onQueryResponse: () => undefined,
+      onFlowControlChange: () => undefined
+    })
+    const secondSnapshot = await adapter.attachView({
+      identity: secondIdentity,
+      viewId: 'view-second',
+      onOutput: () => undefined
+    })
+
+    expect(firstSnapshot.scrollbackRows).toBe(5000)
+    expect(secondSnapshot.scrollbackRows).toBe(5000)
   })
 })
 

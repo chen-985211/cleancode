@@ -122,6 +122,7 @@ const {
   launchTerminal,
   lifecycle: runLifecycleService,
   openTerminalServiceEndpoint,
+  openTerminalLink,
   sessions: terminalSessionService,
   terminalRuns,
   workflow: terminalWorkflowService,
@@ -273,11 +274,13 @@ registerTerminalIpcHandlers({
     terminalSessionService.listWorkingDirectories(sessionIds),
   logger: consoleLogger,
   openTerminalServiceEndpoint: (command) => openTerminalServiceEndpoint.execute(command),
+  openTerminalLink: (command) => openTerminalLink.execute(command),
   resolveManagedServiceOwner,
   resizeTerminal: (sessionId, columns, rows) =>
     terminalSessionService.resize(sessionId, columns, rows),
   startTerminal: (command) => terminalSessionService.start(command),
   terminateTerminal: (sessionId) => terminalSessionService.terminate(sessionId),
+  updateTerminalScrollback: (rows) => terminalSessionService.updateTerminalScrollback(rows),
   writeTerminal: (sessionId, input) => terminalSessionService.write(sessionId, input)
 })
 

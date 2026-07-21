@@ -1,4 +1,7 @@
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon, type ISearchOptions } from '@xterm/addon-search'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal as XTerm, type IDisposable } from '@xterm/xterm'
 
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
@@ -6,11 +9,20 @@ import type { SequencedTerminalOutput } from '../../contexts/run/application/por
 import { installTerminalSelectionCopy } from './terminalSelectionCopy'
 import type {
   TerminalRestoreResult,
+  TerminalSearchDirection,
+  TerminalSearchResults,
   TerminalSurface,
   TerminalSurfaceAttachment
 } from './terminalSurfaceRegistry'
-import { readTerminalTheme, synchronizeTerminalTheme } from './terminalTheme'
+import {
+  readTerminalSearchTheme,
+  readTerminalTheme,
+  synchronizeTerminalTheme
+} from './terminalTheme'
 import type { TerminalDimensions } from './types'
+import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
+import { TerminalRendererController } from './terminalRendererController'
+import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
@@ -21,6 +33,7 @@ export function createTerminalXtermSurface(): TerminalSurface {
 
 class XtermTerminalSurface implements TerminalSurface {
   private readonly terminal = new XTerm({
+    allowProposedApi: true,
     convertEol: true,
     cursorBlink: true,
     fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
@@ -33,11 +46,23 @@ class XtermTerminalSurface implements TerminalSurface {
     theme: readTerminalTheme()
   })
   private readonly fitAddon = new FitAddon()
+  private readonly searchAddon = new SearchAddon({ highlightLimit: 1000 })
+  private readonly unicodeAddon = new Unicode11Addon()
+  private readonly webLinksAddon = new WebLinksAddon((event, target) => {
+    if (hasOpenModifier(event)) this.onOpenLink(target)
+  })
+  private readonly rendererController = new TerminalRendererController({
+    onStateChange: (state) => {
+      if (this.element) this.element.dataset.terminalRenderer = state
+    }
+  })
   private readonly pendingOutputs: SequencedTerminalOutput[] = []
   private readonly idleResolvers = new Set<() => void>()
   private element: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private dataSubscription: IDisposable | null = null
+  private searchSubscription: IDisposable | null = null
+  private fileLinkProviderSubscription: IDisposable | null = null
   private stopSynchronizingTheme: (() => void) | null = null
   private pendingFitAnimationFrame: number | null = null
   private lastReportedDimensions: TerminalDimensions | null = null
@@ -54,10 +79,21 @@ class XtermTerminalSurface implements TerminalSurface {
   private pendingOutputBytes = 0
   private onDimensionsChange: (dimensions: TerminalDimensions) => void = () => undefined
   private onInput: (input: string) => void = () => undefined
+  private onOpenLink: (target: string) => void = () => undefined
+  private onOpenSearch: () => void = () => undefined
   private onRestoreRequired: () => void = () => undefined
+  private onSearchResultsChange: (results: TerminalSearchResults) => void = () => undefined
+  private searchQuery = ''
 
   constructor() {
     this.terminal.loadAddon(this.fitAddon)
+    this.terminal.loadAddon(this.searchAddon)
+    this.terminal.loadAddon(this.unicodeAddon)
+    this.terminal.loadAddon(this.webLinksAddon)
+    this.terminal.unicode.activeVersion = '11'
+    this.fileLinkProviderSubscription = this.terminal.registerLinkProvider(
+      createTerminalFileLinkProvider(this.terminal, (target) => this.onOpenLink(target))
+    )
   }
 
   attach(attachment: TerminalSurfaceAttachment): void {
@@ -65,16 +101,32 @@ class XtermTerminalSurface implements TerminalSurface {
     if (this.element && this.element !== attachment.element) this.detach(this.element)
 
     this.element = attachment.element
+    this.element.dataset.terminalRenderer = this.rendererController.state
     this.onDimensionsChange = attachment.onDimensionsChange
     this.onInput = attachment.onInput
+    this.onOpenLink = attachment.onOpenLink
+    this.onOpenSearch = attachment.onOpenSearch
     this.onRestoreRequired = attachment.onRestoreRequired
+    this.onSearchResultsChange = attachment.onSearchResultsChange
     this.isResizeSuspended = attachment.isResizeSuspended
     attachment.element.addEventListener('pointerdown', this.focus, true)
 
     if (!this.isOpened) {
       this.terminal.open(attachment.element)
-      installTerminalSelectionCopy(this.terminal)
+      const terminal = this.terminal
+      void this.rendererController.activate({
+        get rows() {
+          return terminal.rows
+        },
+        loadAddon: (addon) =>
+          terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
+        refresh: (start, end) => terminal.refresh(start, end)
+      })
+      installTerminalSelectionCopy(this.terminal, { onOpenSearch: () => this.onOpenSearch() })
       this.dataSubscription = this.terminal.onData((input) => this.onInput(input))
+      this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>
+        this.onSearchResultsChange(results)
+      )
       this.stopSynchronizingTheme = synchronizeTerminalTheme(this.terminal)
       this.isOpened = true
     }
@@ -101,8 +153,36 @@ class XtermTerminalSurface implements TerminalSurface {
     if (this.element) this.terminal.focus()
   }
 
+  clearSearch(): void {
+    this.searchQuery = ''
+    this.searchAddon.clearDecorations()
+    this.onSearchResultsChange({ resultCount: 0, resultIndex: 0 })
+  }
+
+  find(query: string, direction: TerminalSearchDirection): void {
+    if (!query) {
+      this.clearSearch()
+      return
+    }
+    this.searchQuery = query
+
+    const options: ISearchOptions = {
+      decorations: readSearchDecorations(),
+      incremental: direction === 'incremental'
+    }
+    if (direction === 'previous') this.searchAddon.findPrevious(query, options)
+    else this.searchAddon.findNext(query, options)
+  }
+
   getDiagnostics() {
-    return { pendingOutputBytes: this.pendingOutputBytes }
+    return {
+      pendingOutputBytes: this.pendingOutputBytes,
+      rendererState: this.rendererController.state
+    }
+  }
+
+  isBracketedPasteMode(): boolean {
+    return this.terminal.modes.bracketedPasteMode
   }
 
   async restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult> {
@@ -113,6 +193,7 @@ class XtermTerminalSurface implements TerminalSurface {
 
     this.terminal.reset()
     this.terminal.resize(snapshot.dimensions.columns, snapshot.dimensions.rows)
+    this.terminal.options.scrollback = snapshot.scrollbackRows
     await this.writeToTerminal(snapshot.content)
     this.expectedSequence = snapshot.sequence
     while (this.pendingOutputs[0]?.sequence <= snapshot.sequence) this.pendingOutputs.shift()
@@ -128,6 +209,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.isRestoring = false
     this.drainPendingOutputs()
     this.fitAndReportDimensions()
+    if (this.searchQuery) this.find(this.searchQuery, 'incremental')
     return 'ready'
   }
 
@@ -138,6 +220,10 @@ class XtermTerminalSurface implements TerminalSurface {
       this.hasDeferredResizeFit = false
       this.requestFitAndReportDimensions()
     }
+  }
+
+  setScrollbackRows(rows: TerminalScrollbackRows): void {
+    if (!this.isDisposed) this.terminal.options.scrollback = rows
   }
 
   write(output: SequencedTerminalOutput): void {
@@ -176,7 +262,10 @@ class XtermTerminalSurface implements TerminalSurface {
     this.pendingOutputBytes = 0
     this.resolveIdleWaiters()
     this.dataSubscription?.dispose()
+    this.searchSubscription?.dispose()
+    this.fileLinkProviderSubscription?.dispose()
     this.stopSynchronizingTheme?.()
+    this.rendererController.dispose()
     this.terminal.dispose()
   }
 
@@ -275,4 +364,17 @@ function hasContiguousSequence(
   snapshotSequence: number
 ): boolean {
   return outputs.every((output, index) => output.sequence === snapshotSequence + index + 1)
+}
+
+function readSearchDecorations(): NonNullable<ISearchOptions['decorations']> {
+  const theme = readTerminalSearchTheme()
+
+  return {
+    activeMatchBackground: theme.active,
+    activeMatchBorder: theme.border,
+    activeMatchColorOverviewRuler: theme.active,
+    matchBackground: theme.match,
+    matchBorder: theme.match,
+    matchOverviewRuler: theme.match
+  }
 }

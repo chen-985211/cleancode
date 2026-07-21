@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 import {
   createClientAppError,
@@ -9,6 +9,7 @@ import { windowFullScreenStateChannels } from '../ipc/windowFullScreenStateChann
 
 const cleancodeApi = {
   appName: 'cleancode',
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   getWindowFullScreenState: () => invokeCleancode<boolean>(windowFullScreenStateChannels.get),
   onWindowFullScreenStateChange: (listener: (event: unknown) => void) =>
     subscribeRendererEvent(windowFullScreenStateChannels.changed, listener),
@@ -93,6 +94,7 @@ const cleancodeApi = {
   launchTerminal: (command: unknown) => invokeCleancode('cleancode:launch-terminal', command),
   openTerminalServiceEndpoint: (command: unknown) =>
     invokeCleancode('cleancode:open-terminal-service-endpoint', command),
+  openTerminalLink: (command: unknown) => invokeCleancode('cleancode:open-terminal-link', command),
   writeTerminal: (command: unknown) => invokeCleancode('cleancode:write-terminal', command),
   resizeTerminal: (command: unknown) => invokeCleancode('cleancode:resize-terminal', command),
   interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
@@ -105,6 +107,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:attach-terminal-view', command),
   detachTerminalView: (command: unknown) =>
     invokeCleancode('cleancode:detach-terminal-view', command),
+  updateTerminalScrollback: (command: unknown) =>
+    invokeCleancode('cleancode:update-terminal-scrollback', command),
   startTerminalWorkflow: (command: unknown) =>
     invokeCleancode('cleancode:start-terminal-workflow', command),
   stopTerminalWorkflow: (command: unknown) =>

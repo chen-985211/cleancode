@@ -7,6 +7,7 @@ import type { TerminalWorkflowPlanPort } from '../../contexts/run/application/po
 import { LocalPortAllocator } from '../../contexts/run/application/services/LocalPortAllocator'
 import { ManagedServiceLauncher } from '../../contexts/run/application/services/ManagedServiceLauncher'
 import { LaunchTerminalCommandUseCase } from '../../contexts/run/application/use-cases/LaunchTerminalCommandUseCase'
+import { OpenTerminalLinkUseCase } from '../../contexts/run/application/use-cases/OpenTerminalLinkUseCase'
 import { OpenTerminalServiceEndpointUseCase } from '../../contexts/run/application/use-cases/OpenTerminalServiceEndpointUseCase'
 import { RunLifecycleService } from '../../contexts/run/application/use-cases/RunLifecycleService'
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
@@ -22,6 +23,7 @@ import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure
 import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
 import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
 import { HeadlessTerminalModelAdapter } from '../../contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
+import { NodeTerminalLinkFileSystemAdapter } from '../../contexts/run/infrastructure/filesystem/NodeTerminalLinkFileSystemAdapter'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { createRunLifecycleAdapters } from './runLifecycleAdapters'
 import type { ManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
@@ -70,6 +72,17 @@ export function createRunRuntime(input: {
       await shell.openExternal(address)
     }
   })
+  const openTerminalLink = new OpenTerminalLinkUseCase(
+    sessions,
+    new NodeTerminalLinkFileSystemAdapter(),
+    {
+      openExternal: async (address) => shell.openExternal(address),
+      openLocal: async ({ path }) => {
+        const error = await shell.openPath(path)
+        if (error) throw new Error(error)
+      }
+    }
+  )
   const workflow = new TerminalWorkflowService(
     input.workflowPlans,
     new TerminalSessionWorkflowRuntimeAdapter(sessions),
@@ -87,6 +100,7 @@ export function createRunRuntime(input: {
     lifecycle,
     managedServices,
     openTerminalServiceEndpoint,
+    openTerminalLink,
     sessions,
     workflow
   }

@@ -3,6 +3,7 @@ import type {
   TerminalModelDiagnosticsSnapshot,
   TerminalSnapshot
 } from '../dto/TerminalModelSnapshot'
+import type { TerminalScrollbackRows } from '../dto/TerminalRuntimeSettings'
 
 export interface SequencedTerminalOutput {
   readonly sequence: number
@@ -37,7 +38,9 @@ export interface TerminalModelPort {
   attachView(command: AttachTerminalViewCommand): Promise<TerminalSnapshot>
   detachView(identity: TerminalModelIdentity, viewId: string): Promise<void>
   flush(identity: TerminalModelIdentity): Promise<void>
+  readWorkingDirectory(identity: TerminalModelIdentity): string
   resize(identity: TerminalModelIdentity, columns: number, rows: number): void
+  setScrollbackRows(rows: TerminalScrollbackRows): void
   updateWorkingDirectory(identity: TerminalModelIdentity, workingDirectory: string): void
   retire(identity: TerminalModelIdentity): void
   disposeAll(): void

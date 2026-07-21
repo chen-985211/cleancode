@@ -35,6 +35,7 @@ import {
   waitForTerminalShellReady,
   writeTerminalCommand
 } from '../support/e2eTerminal'
+import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 const execFileAsync = promisify(execFile)
 const gitLocalEnvironmentVariables = [
@@ -336,6 +337,14 @@ async function waitForVisibleXtermText(
   sessionId: string,
   expectedText: string
 ): Promise<void> {
+  const outputTail = page.locator(
+    `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+  )
+  const terminal = page
+    .locator('.terminal-output-shell')
+    .filter({ has: outputTail })
+    .locator('.terminal-viewport')
+  await ensureTerminalDomRenderer(terminal)
   await page.waitForFunction(
     ({ expectedText, sessionId }) => {
       const outputTail = document.querySelector<HTMLElement>(

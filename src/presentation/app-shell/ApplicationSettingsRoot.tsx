@@ -1,4 +1,4 @@
-import { ArrowLeft, Keyboard, RotateCcw, Settings, X } from 'lucide-react'
+import { ArrowLeft, Keyboard, RotateCcw, Settings, SquareTerminal, X } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -25,6 +25,8 @@ import {
 } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
+import { TerminalSettingsPane } from './TerminalSettingsPane'
 
 interface ApplicationSettingsRootProps {
   readonly bindings: ApplicationShortcutBindings
@@ -37,6 +39,8 @@ interface ApplicationSettingsRootProps {
   readonly onClose: () => void
   readonly onOpen: () => void
   readonly onResetAll: () => void
+  readonly terminalScrollbackRows: TerminalScrollbackRows
+  readonly onTerminalScrollbackChange: (rows: TerminalScrollbackRows) => void
 }
 
 export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
@@ -47,6 +51,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const dialogRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(props.onClose)
   const [recordingCommand, setRecordingCommand] = useState<ApplicationShortcutCommand | null>(null)
+  const [activePane, setActivePane] = useState<'shortcuts' | 'terminal'>('shortcuts')
   const [captureError, setCaptureError] = useState<
     { readonly command: ApplicationShortcutCommand; readonly message: string } | undefined
   >()
@@ -132,137 +137,156 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
           </header>
           <div className="application-settings-layout">
             <nav className="application-settings-navigation" aria-label={t('settings.navigation')}>
-              <button type="button" aria-current="page">
+              <button
+                type="button"
+                aria-current={activePane === 'shortcuts' ? 'page' : undefined}
+                onClick={() => setActivePane('shortcuts')}
+              >
                 <Keyboard size={17} aria-hidden="true" />
                 <span>{t('settings.shortcuts.title')}</span>
               </button>
+              <button
+                type="button"
+                aria-current={activePane === 'terminal' ? 'page' : undefined}
+                onClick={() => setActivePane('terminal')}
+              >
+                <SquareTerminal size={17} aria-hidden="true" />
+                <span>{t('settings.terminal.title')}</span>
+              </button>
             </nav>
             <main className="application-settings-content">
-              <div className="shortcut-settings-pane">
-                <header className="shortcut-settings-pane__header">
-                  <div>
-                    <h2>{t('settings.shortcuts.title')}</h2>
-                    <p>{t('settings.shortcuts.description')}</p>
-                  </div>
-                  <button
-                    className="shortcut-settings-reset-all"
-                    type="button"
-                    onClick={() => {
-                      setRecordingCommand(null)
-                      setCaptureError(undefined)
-                      props.onResetAll()
-                    }}
-                  >
-                    <RotateCcw size={14} aria-hidden="true" />
-                    {t('settings.shortcuts.resetAll')}
-                  </button>
-                </header>
-                <div className="shortcut-settings-list">
-                  {applicationShortcutGroups.map((group) => {
-                    const groupLabel = t(applicationShortcutGroupMessageKeys[group.id])
-                    return (
-                      <section
-                        className="shortcut-settings-group"
-                        role="group"
-                        aria-label={groupLabel}
-                        key={group.id}
-                      >
-                        <h3 className="shortcut-settings-group__title">{groupLabel}</h3>
-                        {group.commands.map((command) => {
-                          const action = t(applicationShortcutCommandMessageKeys[command])
-                          const binding = props.bindings[command]
-                          const isRecording = recordingCommand === command
-                          const error =
-                            captureError?.command === command ? captureError.message : undefined
-                          const errorId = `application-shortcut-${command}-error`
-                          return (
-                            <div className="shortcut-settings-row" key={command}>
-                              <div className="shortcut-settings-row__label">{action}</div>
-                              <div className="shortcut-settings-row__controls">
-                                <button
-                                  className="shortcut-recorder"
-                                  type="button"
-                                  aria-describedby={error ? errorId : undefined}
-                                  aria-label={t('settings.shortcuts.edit', { action })}
-                                  aria-pressed={isRecording}
-                                  onClick={() => {
-                                    setRecordingCommand(command)
-                                    setCaptureError(undefined)
-                                  }}
-                                  onKeyDown={(event) => captureShortcut(event, command)}
-                                >
-                                  {isRecording ? (
-                                    <span className="shortcut-recorder__prompt">
-                                      {t('settings.shortcuts.recording')}
-                                    </span>
-                                  ) : binding === null ? (
-                                    <span className="shortcut-recorder__empty">
-                                      {t('settings.shortcuts.unassigned')}
-                                    </span>
-                                  ) : (
-                                    formatShortcutBinding(binding, props.platform).map((label) => (
-                                      <kbd key={label}>{label}</kbd>
-                                    ))
-                                  )}
-                                </button>
-                                <TooltipLabel content={t('settings.shortcuts.clear', { action })}>
+              {activePane === 'terminal' ? (
+                <TerminalSettingsPane
+                  scrollbackRows={props.terminalScrollbackRows}
+                  onScrollbackChange={props.onTerminalScrollbackChange}
+                />
+              ) : (
+                <div className="shortcut-settings-pane">
+                  <header className="shortcut-settings-pane__header">
+                    <div>
+                      <h2>{t('settings.shortcuts.title')}</h2>
+                      <p>{t('settings.shortcuts.description')}</p>
+                    </div>
+                    <button
+                      className="shortcut-settings-reset-all"
+                      type="button"
+                      onClick={() => {
+                        setRecordingCommand(null)
+                        setCaptureError(undefined)
+                        props.onResetAll()
+                      }}
+                    >
+                      <RotateCcw size={14} aria-hidden="true" />
+                      {t('settings.shortcuts.resetAll')}
+                    </button>
+                  </header>
+                  <div className="shortcut-settings-list">
+                    {applicationShortcutGroups.map((group) => {
+                      const groupLabel = t(applicationShortcutGroupMessageKeys[group.id])
+                      return (
+                        <section
+                          className="shortcut-settings-group"
+                          role="group"
+                          aria-label={groupLabel}
+                          key={group.id}
+                        >
+                          <h3 className="shortcut-settings-group__title">{groupLabel}</h3>
+                          {group.commands.map((command) => {
+                            const action = t(applicationShortcutCommandMessageKeys[command])
+                            const binding = props.bindings[command]
+                            const isRecording = recordingCommand === command
+                            const error =
+                              captureError?.command === command ? captureError.message : undefined
+                            const errorId = `application-shortcut-${command}-error`
+                            return (
+                              <div className="shortcut-settings-row" key={command}>
+                                <div className="shortcut-settings-row__label">{action}</div>
+                                <div className="shortcut-settings-row__controls">
                                   <button
-                                    className="shortcut-row-action"
+                                    className="shortcut-recorder"
                                     type="button"
-                                    aria-label={t('settings.shortcuts.clear', { action })}
-                                    disabled={binding === null}
+                                    aria-describedby={error ? errorId : undefined}
+                                    aria-label={t('settings.shortcuts.edit', { action })}
+                                    aria-pressed={isRecording}
                                     onClick={() => {
-                                      props.onBindingChange(command, null)
-                                      setRecordingCommand(null)
+                                      setRecordingCommand(command)
                                       setCaptureError(undefined)
                                     }}
+                                    onKeyDown={(event) => captureShortcut(event, command)}
                                   >
-                                    <X size={15} aria-hidden="true" />
-                                  </button>
-                                </TooltipLabel>
-                                <TooltipLabel content={t('settings.shortcuts.reset', { action })}>
-                                  <button
-                                    className="shortcut-row-action"
-                                    type="button"
-                                    aria-label={t('settings.shortcuts.reset', { action })}
-                                    disabled={applicationShortcutBindingsEqual(
-                                      binding,
-                                      defaultApplicationShortcutBindings[command]
-                                    )}
-                                    onClick={() => {
-                                      props.onBindingChange(
-                                        command,
-                                        defaultApplicationShortcutBindings[command]
+                                    {isRecording ? (
+                                      <span className="shortcut-recorder__prompt">
+                                        {t('settings.shortcuts.recording')}
+                                      </span>
+                                    ) : binding === null ? (
+                                      <span className="shortcut-recorder__empty">
+                                        {t('settings.shortcuts.unassigned')}
+                                      </span>
+                                    ) : (
+                                      formatShortcutBinding(binding, props.platform).map(
+                                        (label) => <kbd key={label}>{label}</kbd>
                                       )
-                                      setRecordingCommand(null)
-                                      setCaptureError(undefined)
-                                    }}
-                                  >
-                                    <RotateCcw size={15} aria-hidden="true" />
+                                    )}
                                   </button>
-                                </TooltipLabel>
+                                  <TooltipLabel content={t('settings.shortcuts.clear', { action })}>
+                                    <button
+                                      className="shortcut-row-action"
+                                      type="button"
+                                      aria-label={t('settings.shortcuts.clear', { action })}
+                                      disabled={binding === null}
+                                      onClick={() => {
+                                        props.onBindingChange(command, null)
+                                        setRecordingCommand(null)
+                                        setCaptureError(undefined)
+                                      }}
+                                    >
+                                      <X size={15} aria-hidden="true" />
+                                    </button>
+                                  </TooltipLabel>
+                                  <TooltipLabel content={t('settings.shortcuts.reset', { action })}>
+                                    <button
+                                      className="shortcut-row-action"
+                                      type="button"
+                                      aria-label={t('settings.shortcuts.reset', { action })}
+                                      disabled={applicationShortcutBindingsEqual(
+                                        binding,
+                                        defaultApplicationShortcutBindings[command]
+                                      )}
+                                      onClick={() => {
+                                        props.onBindingChange(
+                                          command,
+                                          defaultApplicationShortcutBindings[command]
+                                        )
+                                        setRecordingCommand(null)
+                                        setCaptureError(undefined)
+                                      }}
+                                    >
+                                      <RotateCcw size={15} aria-hidden="true" />
+                                    </button>
+                                  </TooltipLabel>
+                                </div>
+                                {error ? (
+                                  <p
+                                    id={errorId}
+                                    className="shortcut-settings-row__error"
+                                    role="alert"
+                                  >
+                                    {error}
+                                  </p>
+                                ) : isRecording ? (
+                                  <p className="shortcut-settings-row__hint">
+                                    {t('settings.shortcuts.captureHint')}
+                                  </p>
+                                ) : null}
                               </div>
-                              {error ? (
-                                <p
-                                  id={errorId}
-                                  className="shortcut-settings-row__error"
-                                  role="alert"
-                                >
-                                  {error}
-                                </p>
-                              ) : isRecording ? (
-                                <p className="shortcut-settings-row__hint">
-                                  {t('settings.shortcuts.captureHint')}
-                                </p>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </section>
-                    )
-                  })}
+                            )
+                          })}
+                        </section>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </main>
           </div>
         </section>

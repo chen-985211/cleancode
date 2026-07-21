@@ -163,6 +163,21 @@ xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model �
 
 [`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`terminal-viewport.interaction.spec.tsx`](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
 
+## 普通终端的 Unicode 与 renderer 降级
+
+普通终端的主进程 headless 模型和 renderer xterm 都加载 Unicode 11 addon，并把 active version 固定为 `11`。xterm 的 Unicode API 属于 proposed API，因此两端构造终端时都必须显式启用 `allowProposedApi`；只在一端加载 addon 会让隐藏解析、snapshot 恢复和可见字宽采用不同规则。
+
+可见 surface 在 `open` 之后异步尝试加载 WebGL addon，内置 DOM renderer 始终是可用基线：
+
+1. addon 加载失败时直接保持 DOM renderer，不中断 attach、输入或恢复。
+2. WebGL context loss 时立即 dispose addon、把 renderer 状态切回 `dom`，并 refresh 当前行区间。
+3. 降级不得 reset xterm、重新 attach view、替换 session、重放 snapshot 或清空搜索和粘贴状态。
+4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，registry 诊断同时统计两类 surface，便于测试和故障定位。
+
+终端搜索是 xterm buffer 上的局部投影。snapshot restore 会 reset 可见终端，因此 restore 完成后必须用当前查询重新建立匹配；关闭搜索则清除 decorations 并恢复终端焦点。粘贴进度、确认和链接反馈是 React 局部覆盖层，不得改变 xterm 网格或拦截无关终端输入。
+
+验证 renderer 改动时至少覆盖中文、emoji、组合字符、搜索命中、context loss 后的可见输出，以及降级后的 PTY 粘贴。真实 GPU/context 和 xterm 输入链路由 [`terminal-daily-interactions.e2e.spec.ts`](../../tests/e2e/terminal-daily-interactions.e2e.spec.ts) 证明；渲染选择与释放分支由 [`terminal-renderer-controller.spec.ts`](../../tests/unit/presentation/terminal-renderer-controller.spec.ts) 覆盖。
+
 ## 画布缩放下的鼠标坐标
 
 xterm 6.0.0 的鼠标坐标换算使用 `getBoundingClientRect()` 取得元素左上角，再直接用未缩放的 cell 宽高换算列和行。React Flow 在祖先元素上应用 `translate(...) scale(zoom)` 后，`clientX - rect.left` 与 `clientY - rect.top` 已经是缩放后的屏幕距离，而 cell 尺寸仍是布局坐标。两套单位混用会让选区、链接命中、自动滚动和开启鼠标协议的 TUI 一起偏移；缩放越偏离 100%，误差越明显。

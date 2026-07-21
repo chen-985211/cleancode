@@ -70,6 +70,69 @@ describe('terminal view IPC contract', () => {
     })
     expect(attachTerminalView).not.toHaveBeenCalled()
   })
+
+  it('accepts only a supported terminal scrollback budget', async () => {
+    const ipcMain = new FakeIpcMain()
+    const updateTerminalScrollback = vi.fn()
+    registerTerminalIpcHandlers(createInput({ ipcMain, updateTerminalScrollback }))
+
+    await expect(
+      ipcMain.invoke(
+        'cleancode:update-terminal-scrollback',
+        { scrollbackRows: 5000 },
+        new FakeSender()
+      )
+    ).resolves.toEqual({ ok: true, value: undefined })
+    await expect(
+      ipcMain.invoke(
+        'cleancode:update-terminal-scrollback',
+        { scrollbackRows: 5001 },
+        new FakeSender()
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+
+    expect(updateTerminalScrollback).toHaveBeenCalledTimes(1)
+    expect(updateTerminalScrollback).toHaveBeenCalledWith(5000)
+  })
+
+  it('forwards a bounded link target with the exact terminal view identity', async () => {
+    const ipcMain = new FakeIpcMain()
+    const openTerminalLink = vi.fn(async () => ({
+      kind: 'external' as const,
+      target: 'https://example.com/'
+    }))
+    registerTerminalIpcHandlers(createInput({ ipcMain, openTerminalLink }))
+
+    await expect(
+      ipcMain.invoke(
+        'cleancode:open-terminal-link',
+        { ...viewCommand(), rawTarget: 'https://example.com/' },
+        new FakeSender()
+      )
+    ).resolves.toEqual({
+      ok: true,
+      value: { kind: 'external', target: 'https://example.com/' }
+    })
+    await expect(
+      ipcMain.invoke(
+        'cleancode:open-terminal-link',
+        { ...viewCommand(), rawTarget: 'x'.repeat(4_097) },
+        new FakeSender()
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+
+    expect(openTerminalLink).toHaveBeenCalledTimes(1)
+    expect(openTerminalLink).toHaveBeenCalledWith({
+      ...viewCommand(),
+      rawTarget: 'https://example.com/'
+    })
+  })
 })
 
 class FakeIpcMain implements IpcMainLike {
@@ -127,6 +190,8 @@ function createInput(input: {
   readonly ipcMain: IpcMainLike
   readonly attachTerminalView?: TerminalIpcHandlersInput['attachTerminalView']
   readonly detachTerminalView?: TerminalIpcHandlersInput['detachTerminalView']
+  readonly openTerminalLink?: TerminalIpcHandlersInput['openTerminalLink']
+  readonly updateTerminalScrollback?: TerminalIpcHandlersInput['updateTerminalScrollback']
 }): TerminalIpcHandlersInput {
   return {
     attachTerminalView: input.attachTerminalView ?? vi.fn(async () => snapshot()),
@@ -137,10 +202,12 @@ function createInput(input: {
     listTerminalSessions: vi.fn(() => []),
     listTerminalWorkingDirectories: vi.fn(async () => []),
     logger: new SilentLogger(),
+    openTerminalLink: input.openTerminalLink ?? vi.fn(),
     openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: vi.fn(),
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),
+    updateTerminalScrollback: input.updateTerminalScrollback ?? vi.fn(),
     writeTerminal: vi.fn()
   }
 }
@@ -166,6 +233,8 @@ function snapshot(): TerminalSnapshot {
       gitBranch: 'main'
     },
     sequence: 2,
+    scrollbackRows: 1000,
+    unicodeVersion: '11',
     restoreMarker: { viewId: 'view-1', sequence: 2 },
     content: 'restored',
     transcript: 'restored',

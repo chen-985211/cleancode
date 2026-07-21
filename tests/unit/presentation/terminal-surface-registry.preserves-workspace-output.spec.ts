@@ -26,7 +26,13 @@ describe('terminal surface registry disposable views', () => {
     expect(second.surface).not.toBe(first.surface)
     expect(surfaces).toHaveLength(2)
     expect(first.surface.dispose).toHaveBeenCalledTimes(1)
-    expect(registry.getDiagnostics()).toEqual({ surfaceCount: 1, pendingOutputBytes: 0 })
+    expect(registry.getDiagnostics()).toEqual({
+      surfaceCount: 1,
+      pendingOutputBytes: 0,
+      rendererState: 'dom',
+      domSurfaceCount: 1,
+      webglSurfaceCount: 0
+    })
   })
 
   it('routes sequenced output only to the exact live view lease', () => {
@@ -60,6 +66,18 @@ describe('terminal surface registry disposable views', () => {
     expect(first.surface.dispose).toHaveBeenCalledTimes(1)
     expect(second.surface.dispose).toHaveBeenCalledTimes(1)
   })
+
+  it('applies a changed scrollback budget to every live disposable view', () => {
+    let nextViewId = 0
+    const registry = new TerminalSurfaceRegistry(createFakeSurface, () => `view-${++nextViewId}`)
+    const first = registry.create(createIdentity())
+    const second = registry.create({ ...createIdentity(), sessionId: 'session-2', runId: 'run-2' })
+
+    registry.setScrollbackRows(5000)
+
+    expect(first.surface.setScrollbackRows).toHaveBeenCalledWith(5000)
+    expect(second.surface.setScrollbackRows).toHaveBeenCalledWith(5000)
+  })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
@@ -72,11 +90,18 @@ interface FakeTerminalSurface extends TerminalSurface {
 function createFakeSurface(): FakeTerminalSurface {
   return {
     attach: vi.fn<TerminalSurface['attach']>(),
+    clearSearch: vi.fn<TerminalSurface['clearSearch']>(),
     detach: vi.fn<TerminalSurface['detach']>(),
     dispose: vi.fn<TerminalSurface['dispose']>(),
+    find: vi.fn<TerminalSurface['find']>(),
     focus: vi.fn<TerminalSurface['focus']>(),
-    getDiagnostics: vi.fn<TerminalSurface['getDiagnostics']>(() => ({ pendingOutputBytes: 0 })),
+    getDiagnostics: vi.fn<TerminalSurface['getDiagnostics']>(() => ({
+      pendingOutputBytes: 0,
+      rendererState: 'dom'
+    })),
+    isBracketedPasteMode: vi.fn<TerminalSurface['isBracketedPasteMode']>(() => false),
     restore: vi.fn<TerminalSurface['restore']>(),
+    setScrollbackRows: vi.fn<TerminalSurface['setScrollbackRows']>(),
     setResizeSuspended: vi.fn<TerminalSurface['setResizeSuspended']>(),
     write: vi.fn<TerminalSurface['write']>()
   }

@@ -56,6 +56,7 @@ describe('launch terminal command', () => {
 
   it('reports a non-managed command as ended only after forwarding its process exit', async () => {
     const exitOrder: string[] = []
+    let startCommand: Record<string, unknown> | null = null
     const session = createSession()
     const plans: TerminalLaunchPlanPort = {
       getPlan: async () => ({
@@ -66,6 +67,7 @@ describe('launch terminal command', () => {
     }
     const sessions = {
       start: async (command: Record<string, unknown>) => {
+        startCommand = command
         const event = { scope: session, sessionId: session.id, exitCode: 0 }
         ;(
           command.onExit as (exitEvent: {
@@ -99,6 +101,7 @@ describe('launch terminal command', () => {
     })
 
     expect(exitOrder).toEqual(['process-exit', 'run-ended'])
+    expect(startCommand).toMatchObject({ launchMode: 'interactive' })
   })
 })
 

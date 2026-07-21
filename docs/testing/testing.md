@@ -210,6 +210,8 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 普通终端跨 worktree 保留场景由 `git-branch-workspaces.e2e.spec.ts` 使用超过 8192 字符的本地 fixture 覆盖：断言返回后仍是原 `sessionId` 和原 xterm DOM surface、隐藏期间输出可见，并通过 `Shift+PageUp` 读取早于文本尾部的滚动历史。该场景必须留在真实 Electron E2E，因为 jsdom 不能证明 xterm buffer、DOM reparent、node-pty 与 IPC 输出的组合行为；精确身份路由和生命周期清理分支仍由 unit 测试覆盖。
 
+普通终端日常交互主路径由 `terminal-daily-interactions.e2e.spec.ts` 在同一真实 session 中覆盖 Unicode 输出、搜索结果、WebGL context loss 后的 DOM fallback，以及降级后的剪贴板输入到 PTY。该场景必须使用真实 Electron，因为 unit 测试无法证明 GPU context、真实 xterm buffer、ClipboardEvent、IPC 和 node-pty 的连续组合；搜索分支、链接授权、粘贴分片和 renderer controller 清理仍放在 unit、integration 与 contract 层。
+
 整套 Electron E2E 只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。
 
 `pnpm test:e2e` 默认使用屏幕外非激活的真实 Electron `BrowserWindow` 运行，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。

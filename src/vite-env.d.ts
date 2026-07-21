@@ -49,6 +49,7 @@ declare global {
   interface Window {
     cleancode?: {
       appName: 'cleancode'
+      getPathForFile(file: File): string
       getWindowFullScreenState(): Promise<boolean>
       onWindowFullScreenStateChange(listener: (isFullScreen: boolean) => void): () => void
       listWorkbenches(): Promise<WorkbenchSnapshot[]>
@@ -277,6 +278,24 @@ declare global {
         readonly sessionId: string
         readonly generation: number
       }): Promise<void>
+      openTerminalLink(command: {
+        readonly projectId: string
+        readonly workspaceName: string
+        readonly blockId: string
+        readonly sessionId: string
+        readonly runId: string
+        readonly generation: number
+        readonly viewId: string
+        readonly rawTarget: string
+      }): Promise<
+        | { readonly kind: 'external'; readonly target: string }
+        | {
+            readonly kind: 'local'
+            readonly target: string
+            readonly line?: number
+            readonly column?: number
+          }
+      >
       writeTerminal(command: {
         readonly sessionId: string
         readonly input: string
@@ -313,6 +332,9 @@ declare global {
         readonly runId: string
         readonly generation: number
         readonly viewId: string
+      }): Promise<void>
+      updateTerminalScrollback(command: {
+        readonly scrollbackRows: 1000 | 5000 | 10000
       }): Promise<void>
       startTerminalWorkflow(command: {
         readonly projectId: string
