@@ -22,6 +22,10 @@ import type { NotifyApp } from './appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import {
+  inheritTerminalRetention,
+  shouldInheritTerminalRetention
+} from './terminalRetentionInheritance'
 import { useI18n } from './i18n/useI18n'
 import {
   applyTerminalSessionSnapshot,
@@ -538,6 +542,10 @@ export function useTerminalSessions({
         return
       }
 
+      const shouldInheritRetention = shouldInheritTerminalRetention(
+        terminalStatesRef.current[terminalStateKey]
+      )
+
       quickLaunchesRef.current.add(terminalStateKey)
 
       try {
@@ -554,7 +562,18 @@ export function useTerminalSessions({
         })
 
         if (result) {
-          bindTerminalSession(terminalStateKey, result.session, result.endpoint)
+          const session = await inheritTerminalRetention(
+            result.session,
+            shouldInheritRetention,
+            (error) =>
+              notify({
+                kind: 'error',
+                title: t('terminal.retention.failedTitle'),
+                message: resolveUserFacingErrorMessage(error, 'terminal.retention.failed', t)
+              })
+          )
+
+          bindTerminalSession(terminalStateKey, session, result.endpoint)
         }
 
         if (shouldFocusTerminalAfterAction(options)) {

@@ -226,7 +226,8 @@ export const enMessages = {
   'terminal.action.delete': 'Delete terminal',
   'terminal.retention.enable': 'Keep this session running after the app exits',
   'terminal.retention.disable': 'Stop keeping this session after the app exits',
-  'terminal.retention.workflowUnavailable': 'Workflow sessions always stop with the app',
+  'terminal.retention.workflowUnavailable':
+    'Workflow sessions stop when the app exits and cannot be kept across app restarts.',
   'terminal.recovery.fresh': 'Fresh',
   'terminal.recovery.warm': 'Restored',
   'terminal.recovery.historical': 'History',

@@ -10,6 +10,7 @@ import { createDeferred } from '../../fixtures/deferred'
 import type { TerminalOutputEvent } from '../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalSessionSnapshot } from '../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import type { AppNotificationController } from '../../../src/presentation/app-shell/appNotifications'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -167,7 +168,7 @@ describe('app shell terminal launch command', () => {
       writeTerminal,
       terminateTerminal
     })
-    Object.assign(runtimeApi, { launchTerminal })
+    Object.assign(runtimeApi, { launchTerminal, setTerminalRetention: vi.fn() })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -196,8 +197,128 @@ describe('app shell terminal launch command', () => {
         rows: 24
       })
     )
+    expect(window.cleancode?.setTerminalRetention).not.toHaveBeenCalled()
     expect(writeTerminal).not.toHaveBeenCalled()
     expect(await screen.findByLabelText('实际服务地址')).toHaveTextContent('http://127.0.0.1:4317')
+  })
+
+  it('inherits retention when quick launching from a retained ordinary session', async () => {
+    const workbench = createWorkbenchWithTerminal({ launchCommand: 'printf retained-launch' })
+    const launchTerminal = vi
+      .fn()
+      .mockResolvedValueOnce({
+        session: {
+          ...createTerminalSessionSnapshot('session-old'),
+          kind: 'interactive' as const
+        },
+        endpoint: null
+      })
+      .mockResolvedValueOnce({
+        session: createTerminalSessionSnapshot('session-new', 2),
+        endpoint: null
+      })
+    const setTerminalRetention = vi.fn(async ({ sessionId, retentionPolicy }) => ({
+      ...createTerminalSessionSnapshot(sessionId, sessionId === 'session-new' ? 2 : 1),
+      kind: sessionId === 'session-old' ? ('interactive' as const) : ('direct' as const),
+      retentionPolicy
+    }))
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      terminateTerminal: vi.fn(async () => createTerminalSessionSnapshot('session-old'))
+    })
+    Object.assign(runtimeApi, { launchTerminal, setTerminalRetention })
+    Object.defineProperty(window, 'cleancode', { configurable: true, value: runtimeApi })
+
+    render(<AppShell />)
+
+    const quickLaunchButton = await screen.findByRole('button', {
+      name: 'Terminal 1 启动命令'
+    })
+    fireEvent.click(quickLaunchButton)
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Terminal 1 应用退出后继续运行此会话'
+      })
+    )
+    await waitFor(() =>
+      expect(setTerminalRetention).toHaveBeenCalledWith({
+        sessionId: 'session-old',
+        retentionPolicy: 'keep-after-application-exit'
+      })
+    )
+
+    fireEvent.click(quickLaunchButton)
+
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(setTerminalRetention).toHaveBeenLastCalledWith({
+        sessionId: 'session-new',
+        retentionPolicy: 'keep-after-application-exit'
+      })
+    )
+    expect(setTerminalRetention).toHaveBeenCalledTimes(2)
+    expect(
+      screen.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' })
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('keeps a new quick launch running when inherited retention cannot be checkpointed', async () => {
+    const workbench = createWorkbenchWithTerminal({ launchCommand: 'printf retained-launch' })
+    const launchTerminal = vi
+      .fn()
+      .mockResolvedValueOnce({
+        session: createTerminalSessionSnapshot('session-old'),
+        endpoint: null
+      })
+      .mockResolvedValueOnce({
+        session: createTerminalSessionSnapshot('session-new', 2),
+        endpoint: null
+      })
+    const setTerminalRetention = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ...createTerminalSessionSnapshot('session-old'),
+        retentionPolicy: 'keep-after-application-exit' as const
+      })
+      .mockRejectedValueOnce(new Error('checkpoint failed'))
+    const notifications = createNotificationController()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench]),
+      terminateTerminal: vi.fn(async () => createTerminalSessionSnapshot('session-old'))
+    })
+    Object.assign(runtimeApi, { launchTerminal, setTerminalRetention })
+    Object.defineProperty(window, 'cleancode', { configurable: true, value: runtimeApi })
+
+    render(<AppShell notifications={notifications} />)
+
+    const quickLaunchButton = await screen.findByRole('button', {
+      name: 'Terminal 1 启动命令'
+    })
+    fireEvent.click(quickLaunchButton)
+    await waitFor(() => expect(launchTerminal).toHaveBeenCalledTimes(1))
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Terminal 1 应用退出后继续运行此会话'
+      })
+    )
+    await waitFor(() => expect(setTerminalRetention).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(quickLaunchButton)
+
+    await waitFor(() => expect(setTerminalRetention).toHaveBeenCalledTimes(2))
+    expect(notifications.notify).toHaveBeenCalledWith({
+      kind: 'error',
+      title: '无法更新会话保留设置',
+      message: '会话保留设置未能更新。'
+    })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
+    )
+    expect(
+      screen.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' })
+    ).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('clears the previous visible output when quick launching a replacement session', async () => {
@@ -501,4 +622,12 @@ function createTerminalRunScope(sessionId: string, generation = 1) {
     runId: `${sessionId}-run`,
     generation
   } as const
+}
+
+function createNotificationController(): AppNotificationController {
+  return {
+    dismiss: vi.fn(),
+    notify: vi.fn(() => 'notification-1'),
+    update: vi.fn(() => true)
+  }
 }

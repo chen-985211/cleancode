@@ -43,7 +43,7 @@ idle -> running -> stopping -> exited
 
 `recordInput` 只允许在 `running` 状态执行。Ctrl+C 只是向当前 PTY 写入 `\x03`，不会把会话伪装成已退出；关闭会话才终止进程并标记 `exited`。普通直接启动命令运行在保留会话的交互式 shell 启动包装层中，命令自然结束或被 Ctrl+C 中断后必须回到可输入的 shell；依赖工作流有限任务和受管端口服务仍使用随命令退出的 PTY，以保留退出码调度与端口清理语义。
 
-会话还记录 `kind`、退出保留策略和恢复类型。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行会话明确切换为 `keep-after-application-exit`；replacement 创建新会话时重新回到默认策略。`workflow` 永远不能启用退出保留。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
+会话还记录 `kind`、退出保留策略和恢复类型。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 永远不能启用退出保留。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
 ## 会话身份与隔离
 

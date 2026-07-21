@@ -212,7 +212,7 @@ export const zhCNMessages = {
   'terminal.action.delete': '删除终端',
   'terminal.retention.enable': '应用退出后继续运行此会话',
   'terminal.retention.disable': '应用退出后不再保留此会话',
-  'terminal.retention.workflowUnavailable': '工作流会话始终随应用停止',
+  'terminal.retention.workflowUnavailable': '工作流会话会随应用退出停止，不能跨应用保留',
   'terminal.recovery.fresh': '新会话',
   'terminal.recovery.warm': '已恢复',
   'terminal.recovery.historical': '历史',

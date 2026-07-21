@@ -397,7 +397,7 @@ flowchart LR
 
 - Electron main 通过带协议版本、随机认证 token、Provider instance、单 controller 和启动锁的本机长度帧协议连接独立终端 Provider；Provider 拥有普通交互/直接启动 PTY、headless 模型和权威输出 sequence，renderer 或 main 退出不等于 Provider shutdown。
 - Provider 启动锁采用带唯一 owner 和取得时间的短期租约：空白/损坏写入经过有界宽限后可恢复，死亡或超期 owner 可回收，所有权校验阻止旧租约误删后继锁；同一应用内并发终端共享单次连接，退出等待在途连接收敛，断连设置在重连后回放。
-- 会话级退出保留默认关闭，只允许当前 `interactive/direct` 运行会话明确启用；新 generation 恢复默认。首次 checkpoint 失败时回滚，运行中持久化失效时自动撤销保留并同步 UI；`workflow` 不可保留且不会被恢复为活动工作流。
+- 会话级退出保留默认关闭，只允许当前 `interactive/direct` 运行会话明确启用；从已保留普通会话执行“启动命令”时，新 `direct` generation 在自身 checkpoint 成功后继承保留，重开空会话、新建终端、工作流和其他 replacement 仍恢复默认。首次 checkpoint 失败时回滚，运行中持久化失效时自动撤销保留并同步 UI；`workflow` 不可保留且不会被恢复为活动工作流，运行期间的禁用图钉通过鼠标与键盘 tooltip 解释这一限制。
 - warm attach 通过认证 Provider 和完整 `TerminalRunScope` 恢复同一个 live session、模型 snapshot 与后续输出；Provider 丢失时只从 schema v1 checkpoint 和连续输出记录恢复 normal-buffer 历史、cwd、尺寸与模式，不声明进程仍存活，也不让 alternate screen 覆盖可读历史。
 - checkpoint 使用同步临时文件、原子重命名和目录同步；单 checkpoint 12 MiB、单输出日志 4 MiB、冷历史 64 个、总量 512 MiB、保留 7 天，容量清理只淘汰冷历史。损坏/未知版本按 session 隔离，live 会话不因清理预算被终止。
 - retained 受管直接启动服务在应用重开后必须重新证明同一 live session、根进程与监听祖先所有权，才重建端口租约和实际端点；cold history 不恢复端点。

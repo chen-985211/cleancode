@@ -330,12 +330,12 @@ function TerminalHeader({
       : t('terminal.action.stopWorkflow')
     : t('terminal.action.runWorkflow')
   const isRetained = retentionPolicy === 'keep-after-application-exit'
-  const retentionActionLabel =
-    sessionKind === 'workflow'
-      ? t('terminal.retention.workflowUnavailable')
-      : isRetained
-        ? t('terminal.retention.disable')
-        : t('terminal.retention.enable')
+  const isWorkflowRetentionUnavailable = sessionKind === 'workflow'
+  const retentionActionLabel = isWorkflowRetentionUnavailable
+    ? t('terminal.retention.workflowUnavailable')
+    : isRetained
+      ? t('terminal.retention.disable')
+      : t('terminal.retention.enable')
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
@@ -455,8 +455,9 @@ function TerminalHeader({
             type="button"
             aria-label={t('terminal.namedAction', { blockName, action: retentionActionLabel })}
             aria-pressed={isRetained}
-            disabled={!isRunning || sessionKind === 'workflow'}
-            onClick={onToggleRetention}
+            aria-disabled={isWorkflowRetentionUnavailable || undefined}
+            disabled={!isRunning}
+            onClick={isWorkflowRetentionUnavailable ? undefined : onToggleRetention}
           >
             <Pin size={14} fill={isRetained ? 'currentColor' : 'none'} aria-hidden="true" />
           </button>

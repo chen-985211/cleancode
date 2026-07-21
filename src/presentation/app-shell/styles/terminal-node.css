@@ -211,14 +211,14 @@
   shape-rendering: geometricPrecision;
 }
 
-.terminal-node__action:hover:not(:disabled) {
+.terminal-node__action:hover:not(:disabled):not([aria-disabled='true']) {
   border-color: var(--cc-border-strong);
   background: var(--terminal-soft-control-hover);
   color: var(--cc-foreground);
   box-shadow: var(--cc-shadow-xs);
 }
 
-.terminal-node__action:active:not(:disabled) {
+.terminal-node__action:active:not(:disabled):not([aria-disabled='true']) {
   background: var(--cc-border);
   box-shadow: none;
 }
@@ -228,10 +228,12 @@
   outline-offset: 2px;
 }
 
-.terminal-node__action:disabled {
+.terminal-node__action:disabled,
+.terminal-node__action[aria-disabled='true'] {
   border-color: var(--cc-border);
   background: var(--cc-surface-subtle);
   color: var(--cc-disabled);
+  cursor: not-allowed;
   opacity: 1;
 }
 

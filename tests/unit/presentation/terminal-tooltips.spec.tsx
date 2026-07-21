@@ -252,6 +252,55 @@ describe('terminal tooltips', () => {
     expect(screen.getByRole('button', { name: 'Terminal 停止当前命令' })).toBeInTheDocument()
   })
 
+  it('explains the workflow retention restriction to pointer and keyboard users', async () => {
+    const onToggleRetention = vi.fn()
+    render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...createTerminalNodeData(),
+          session: {
+            sessionId: 'workflow-session',
+            status: 'running',
+            output: '',
+            sessionKind: 'workflow',
+            retentionPolicy: 'terminate-on-application-exit'
+          },
+          onToggleRetention
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const explanation = '工作流会话会随应用退出停止，不能跨应用保留'
+    const retentionButton = screen.getByRole('button', {
+      name: `Terminal ${explanation}`
+    })
+    expect(retentionButton).toHaveAttribute('aria-disabled', 'true')
+    expect(retentionButton).not.toBeDisabled()
+
+    fireEvent.pointerMove(retentionButton)
+    fireEvent.pointerEnter(retentionButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(explanation)
+    fireEvent.pointerLeave(retentionButton)
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+
+    fireEvent.keyDown(document, { key: 'Tab' })
+    fireEvent.focus(retentionButton)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(explanation)
+    fireEvent.click(retentionButton)
+    expect(onToggleRetention).not.toHaveBeenCalled()
+  })
+
   it('orders terminal actions like the shared terminal group actions', () => {
     render(
       <TerminalNode

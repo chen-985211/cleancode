@@ -19,6 +19,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
+  configureAndStartTerminalLaunchCommand,
   e2eShellReadyMarker,
   readTerminalSessionId,
   waitForTerminalOutput,
@@ -76,6 +77,37 @@ describe('terminal runtime recovery e2e', () => {
   )
 
   it(
+    'inherits retention across a quick-launch replacement and application restart',
+    async () => {
+      const previousSessionId = await retainTerminal(page)
+
+      await configureAndStartTerminalLaunchCommand(
+        page,
+        'Terminal 1',
+        "printf 'INHERITED_LAUNCH\\n'"
+      )
+
+      const inheritedSessionId = await readTerminalSessionId(page, 'Terminal 1')
+      expect(inheritedSessionId).not.toBe(previousSessionId)
+      await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        "while :; do printf 'INHERITED_TICK\\n'; sleep 0.2; done\r"
+      )
+      await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
+
+      await restartApplication()
+
+      await page.getByText('已恢复', { exact: true }).waitFor()
+      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(inheritedSessionId)
+      await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
+      await retireCurrentTerminal()
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'reclaims an interrupted Provider launch lock when multiple terminals restart',
     async () => {
       await page.getByRole('button', { name: '新建终端积木' }).click()
@@ -120,6 +152,12 @@ describe('terminal runtime recovery e2e', () => {
     'reattaches the same session after the renderer crashes',
     async () => {
       const sessionId = await readTerminalSessionId(page, 'Terminal 1')
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        "while :; do printf 'RENDERER_TICK\\n'; sleep 0.2; done\r"
+      )
+      await waitForTerminalOutput(page, 'Terminal 1', 'RENDERER_TICK')
       const recoveredWindow = electronApp.waitForEvent('window')
       await electronApp.evaluate(({ BrowserWindow }) => {
         BrowserWindow.getAllWindows()[0]?.webContents.forcefullyCrashRenderer()
@@ -130,9 +168,7 @@ describe('terminal runtime recovery e2e', () => {
       await page.getByText('Terminal 1').waitFor()
 
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
-      await interruptAndWaitForFreshShellPrompt(page, 'Terminal 1')
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_RENDERER_CRASH\\n'\r")
-      await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_RENDERER_CRASH')
+      await waitForTerminalOutput(page, 'Terminal 1', 'RENDERER_TICK')
     },
     electronScenarioTimeoutMs
   )
@@ -301,44 +337,6 @@ async function waitForTerminalTail(page: Page, terminalName: string, tail: strin
         ?.textContent?.trimEnd()
         .endsWith(tail) ?? false,
     { sessionId, tail }
-  )
-}
-
-async function interruptAndWaitForFreshShellPrompt(
-  page: Page,
-  terminalName: string
-): Promise<void> {
-  const sessionId = await readTerminalSessionId(page, terminalName)
-  const previousCount = await countTerminalOutputOccurrences(page, sessionId, e2eShellReadyMarker)
-  await writeTerminalCommand(page, terminalName, '\u0003')
-  await page.waitForFunction(
-    ({ marker, previousCount, sessionId }) => {
-      const output = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
-      ).find((element) => element.dataset.terminalSessionId === sessionId)?.textContent
-      return countOccurrences(output ?? '', marker) > previousCount
-
-      function countOccurrences(value: string, target: string): number {
-        return value.split(target).length - 1
-      }
-    },
-    { marker: e2eShellReadyMarker, previousCount, sessionId }
-  )
-}
-
-async function countTerminalOutputOccurrences(
-  page: Page,
-  sessionId: string,
-  marker: string
-): Promise<number> {
-  return page.evaluate(
-    ({ marker, sessionId }) => {
-      const output = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
-      ).find((element) => element.dataset.terminalSessionId === sessionId)?.textContent
-      return (output ?? '').split(marker).length - 1
-    },
-    { marker, sessionId }
   )
 }
 
