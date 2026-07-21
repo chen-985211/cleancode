@@ -193,6 +193,7 @@ describe('app shell terminal launch command', () => {
         workspaceName: 'main',
         workspaceDirectory: '/tmp/alpha-project',
         gitBranch: null,
+        terminalSourceTheme: 'light',
         columns: 80,
         rows: 24
       })
@@ -604,6 +605,7 @@ function createTerminalSessionSnapshot(sessionId: string, generation = 1): Termi
     kind: 'direct',
     retentionPolicy: 'terminate-on-application-exit',
     recoveryKind: 'fresh',
+    terminalSourceTheme: 'dark',
     inputHistory: [],
     exitCode: null,
     failureReason: null

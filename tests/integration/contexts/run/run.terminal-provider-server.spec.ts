@@ -87,7 +87,8 @@ describe('terminal provider server', () => {
         processId: 4242,
         status: 'running',
         retentionPolicy: 'keep-after-application-exit',
-        recoveryKind: 'warm'
+        recoveryKind: 'warm',
+        terminalSourceTheme: 'light'
       })
     ])
     const snapshot = await reattached.request<TerminalSnapshot>('attachView', {
@@ -95,6 +96,7 @@ describe('terminal provider server', () => {
       viewId: 'view-restored'
     })
     expect(snapshot.transcript).toContain('provider output')
+    expect(snapshot.terminalSourceTheme).toBe('light')
 
     await reattached.request('stopProcess', { sessionId: 'session-1' })
     await reattached.request('retireModel', { identity: identity() })
@@ -423,7 +425,8 @@ async function createAndStart(
       identity: identity(),
       columns: 80,
       rows: 24,
-      workingDirectory: '/work/app'
+      workingDirectory: '/work/app',
+      terminalSourceTheme: 'light'
     }
   })
   await client.request('startProcess', {
@@ -432,6 +435,7 @@ async function createAndStart(
       workingDirectory: '/work/app',
       columns: 80,
       rows: 24,
+      terminalSourceTheme: 'light',
       sessionKind
     }
   })

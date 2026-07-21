@@ -18,6 +18,7 @@ describe('terminal workflow IPC contract', () => {
       workspaceName: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
+      terminalSourceTheme: 'dark' as const,
       scope: { type: 'full' as const }
     }
 
@@ -42,6 +43,32 @@ describe('terminal workflow IPC contract', () => {
         workspaceName: 'main',
         workspaceDirectory: '/project',
         gitBranch: 'main',
+        scope: { type: 'full' }
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid workflow terminal source theme', async () => {
+    const ipcMain = new FakeIpcMain()
+    const start = vi.fn(async () => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:start-terminal-workflow', {
+        projectId: 'project-1',
+        projectDirectory: '/project',
+        workspaceName: 'main',
+        workspaceDirectory: '/project',
+        gitBranch: 'main',
+        terminalSourceTheme: 'sepia',
         scope: { type: 'full' }
       })
     ).resolves.toMatchObject({

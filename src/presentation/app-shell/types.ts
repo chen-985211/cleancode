@@ -24,6 +24,7 @@ import type {
   TerminalSessionKind,
   TerminalSessionStatus
 } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 
@@ -49,6 +50,7 @@ export interface TerminalViewState {
   readonly sessionKind?: TerminalSessionKind | null
   readonly retentionPolicy?: TerminalRetentionPolicy
   readonly recoveryKind?: TerminalRecoveryKind
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly isRecoveryPending?: boolean
   readonly runIdentity?: TerminalRunIdentity | null
   readonly actualEndpoint?: TerminalServiceEndpoint | null

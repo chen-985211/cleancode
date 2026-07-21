@@ -165,6 +165,7 @@ function warmSession(): TerminalSessionSnapshot {
     kind: 'interactive',
     retentionPolicy: 'keep-after-application-exit',
     recoveryKind: 'warm',
+    terminalSourceTheme: 'dark',
     inputHistory: [],
     exitCode: null,
     failureReason: null

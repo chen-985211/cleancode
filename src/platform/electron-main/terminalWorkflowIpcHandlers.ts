@@ -8,6 +8,7 @@ import { createExpectedAppError } from '../../shared-kernel/application/errors/A
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
+import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 
 export interface TerminalWorkflowIpcHandlersInput {
   readonly ipcMain: IpcMainLike
@@ -62,6 +63,7 @@ function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCom
     !isNonEmptyString(command.workspaceName) ||
     !isNonEmptyString(command.workspaceDirectory) ||
     !(command.gitBranch === null || typeof command.gitBranch === 'string') ||
+    !isTerminalSourceTheme(command.terminalSourceTheme) ||
     !isWorkflowScope(command.scope) ||
     !(command.shell === undefined || typeof command.shell === 'string') ||
     !isOptionalPositiveInteger(command.columns) ||
@@ -71,6 +73,10 @@ function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCom
   }
 
   return command as unknown as StartTerminalWorkflowIpcCommand
+}
+
+function isTerminalSourceTheme(value: unknown): value is TerminalSourceTheme {
+  return value === 'dark' || value === 'light'
 }
 
 function isWorkflowScope(value: unknown): boolean {

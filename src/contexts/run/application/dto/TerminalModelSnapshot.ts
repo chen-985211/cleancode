@@ -1,4 +1,5 @@
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 type OutputSequence = number
 export type TerminalModelIdentity = TerminalRunScope
@@ -38,6 +39,7 @@ export interface TerminalSnapshot {
   readonly title: string
   readonly workingDirectory: string
   readonly modes: TerminalModeSnapshot
+  readonly terminalSourceTheme: TerminalSourceTheme
 }
 
 export interface TerminalModelCheckpoint {

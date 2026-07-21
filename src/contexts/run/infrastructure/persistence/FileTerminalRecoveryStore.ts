@@ -21,7 +21,7 @@ import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface TerminalRecoveryRecord {
-  readonly schemaVersion: 1
+  readonly schemaVersion: 2
   readonly providerInstanceId: string
   readonly updatedAt: string
   readonly session: TerminalSessionSnapshot
@@ -276,11 +276,12 @@ async function readCheckpoint(
 > {
   try {
     const value: unknown = JSON.parse(await readFile(path, 'utf8'))
-    if (isRecord(value) && value.schemaVersion !== 1) {
+    if (isTerminalRecoveryRecord(value)) return { record: value }
+    if (isLegacyTerminalRecoveryRecord(value)) return { record: migrateLegacyRecord(value) }
+    if (isRecord(value) && value.schemaVersion !== 1 && value.schemaVersion !== 2) {
       return { reason: 'unsupported-version' }
     }
-    if (!isTerminalRecoveryRecord(value)) return { reason: 'corrupted' }
-    return { record: value }
+    return { reason: 'corrupted' }
   } catch {
     return { reason: 'corrupted' }
   }
@@ -317,7 +318,27 @@ async function readOutputLog(
 }
 
 function isTerminalRecoveryRecord(value: unknown): value is TerminalRecoveryRecord {
+  if (!isRecord(value) || value.schemaVersion !== 2) return false
+  return isTerminalRecoveryRecordContents(value, true)
+}
+
+interface LegacyTerminalRecoveryRecord extends Omit<
+  TerminalRecoveryRecord,
+  'schemaVersion' | 'session'
+> {
+  readonly schemaVersion: 1
+  readonly session: Omit<TerminalSessionSnapshot, 'terminalSourceTheme'>
+}
+
+function isLegacyTerminalRecoveryRecord(value: unknown): value is LegacyTerminalRecoveryRecord {
   if (!isRecord(value) || value.schemaVersion !== 1) return false
+  return isTerminalRecoveryRecordContents(value, false)
+}
+
+function isTerminalRecoveryRecordContents(
+  value: Record<string, unknown>,
+  requiresTerminalSourceTheme: boolean
+): boolean {
   if (
     typeof value.providerInstanceId !== 'string' ||
     typeof value.updatedAt !== 'string' ||
@@ -330,7 +351,7 @@ function isTerminalRecoveryRecord(value: unknown): value is TerminalRecoveryReco
     isTerminalRunScope(value.session) &&
     isTerminalRunScope(value.model.identity) &&
     isSameTerminalRun(value.session as unknown as TerminalRunScope, value.model.identity) &&
-    isTerminalSessionRecord(value.session) &&
+    isTerminalSessionRecord(value.session, requiresTerminalSourceTheme) &&
     value.model.schemaVersion === 1 &&
     Number.isInteger(value.model.sequence) &&
     (value.model.sequence as number) >= 0 &&
@@ -347,7 +368,21 @@ function isTerminalRecoveryRecord(value: unknown): value is TerminalRecoveryReco
   )
 }
 
-function isTerminalSessionRecord(value: Record<string, unknown>): boolean {
+function migrateLegacyRecord(record: LegacyTerminalRecoveryRecord): TerminalRecoveryRecord {
+  return {
+    ...record,
+    schemaVersion: 2,
+    session: {
+      ...record.session,
+      terminalSourceTheme: 'dark'
+    }
+  }
+}
+
+function isTerminalSessionRecord(
+  value: Record<string, unknown>,
+  requiresTerminalSourceTheme: boolean
+): boolean {
   return (
     value.id === value.sessionId &&
     value.terminalBlockId === value.blockId &&
@@ -362,6 +397,9 @@ function isTerminalSessionRecord(value: Record<string, unknown>): boolean {
       value.retentionPolicy as string
     ) &&
     ['fresh', 'warm', 'historical', 'ended'].includes(value.recoveryKind as string) &&
+    (requiresTerminalSourceTheme
+      ? value.terminalSourceTheme === 'dark' || value.terminalSourceTheme === 'light'
+      : value.terminalSourceTheme === undefined) &&
     Array.isArray(value.inputHistory) &&
     value.inputHistory.every((entry) => typeof entry === 'string') &&
     (value.exitCode === null || typeof value.exitCode === 'number') &&

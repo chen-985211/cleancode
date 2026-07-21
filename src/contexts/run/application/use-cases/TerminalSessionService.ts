@@ -13,7 +13,7 @@ import type {
 import type { TerminalScrollbackRows } from '../dto/TerminalRuntimeSettings'
 import type { TerminalLinkIdentity } from '../dto/TerminalLink'
 import type { TerminalLinkContext } from '../ports/TerminalLinkPorts'
-import type { TerminalModelPort, TerminalViewOutputEvent } from '../ports/TerminalModelPort'
+import type { TerminalModelPort } from '../ports/TerminalModelPort'
 import type {
   TerminalExitEvent,
   TerminalOutputEvent,
@@ -31,7 +31,11 @@ import type {
 } from '../ports/TerminalRuntimeProviderPort'
 import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSession'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
-import type { StartTerminalSessionCommand } from './TerminalSessionCommands'
+import type {
+  AttachTerminalViewCommand,
+  StartTerminalSessionCommand,
+  TerminalViewIdentityCommand
+} from './TerminalSessionCommands'
 import {
   createTerminalSessionId,
   createTerminalSessionOwner,
@@ -39,19 +43,10 @@ import {
   throwTerminalSessionCleanupFailures
 } from './TerminalSessionServiceSupport'
 
-export interface TerminalViewIdentityCommand {
-  readonly projectId: string
-  readonly workspaceName: string
-  readonly blockId: string
-  readonly sessionId: string
-  readonly runId: string
-  readonly generation: number
-  readonly viewId: string
-}
-
-export interface AttachTerminalViewCommand extends TerminalViewIdentityCommand {
-  readonly onOutput: (event: TerminalViewOutputEvent) => void
-}
+export type {
+  AttachTerminalViewCommand,
+  TerminalViewIdentityCommand
+} from './TerminalSessionCommands'
 
 export class TerminalSessionService {
   private readonly sessions = new Map<string, TerminalSession>()
@@ -134,6 +129,7 @@ export class TerminalSessionService {
         kind: snapshot.kind,
         retentionPolicy: snapshot.retentionPolicy,
         recoveryKind: snapshot.recoveryKind,
+        terminalSourceTheme: snapshot.terminalSourceTheme,
         processId: snapshot.processId,
         inputHistory: snapshot.inputHistory,
         exitCode: snapshot.exitCode,
@@ -285,7 +281,8 @@ export class TerminalSessionService {
         generation
       }),
       workingDirectory: command.workingDirectory,
-      kind: command.sessionKind
+      kind: command.sessionKind,
+      terminalSourceTheme: command.terminalSourceTheme
     })
     this.sessions.set(session.id, session)
     this.sessionIdsBySlot.set(slotKey, session.id)
@@ -318,6 +315,7 @@ export class TerminalSessionService {
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         workingDirectory: command.workingDirectory,
+        terminalSourceTheme: session.terminalSourceTheme,
         onQueryResponse: (response) => {
           if (this.isCurrentRunningSession(slotKey, session)) {
             this.terminalProcessPort.write(session.id, response)
@@ -332,6 +330,7 @@ export class TerminalSessionService {
       processHandle = await this.terminalProcessPort.start({
         scope: session.scope,
         workingDirectory: command.workingDirectory,
+        terminalSourceTheme: session.terminalSourceTheme,
         shell: command.shell,
         launchCommand,
         launchMode: command.launchMode,

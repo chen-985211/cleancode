@@ -130,6 +130,7 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited', genera
     kind: 'interactive' as const,
     retentionPolicy: 'terminate-on-application-exit' as const,
     recoveryKind: status === 'running' ? ('fresh' as const) : ('ended' as const),
+    terminalSourceTheme: 'dark' as const,
     inputHistory: [],
     exitCode: status === 'exited' ? 0 : null,
     failureReason: null

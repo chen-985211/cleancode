@@ -5,6 +5,7 @@ import type {
   TerminalSnapshot
 } from '../dto/TerminalModelSnapshot'
 import type { TerminalScrollbackRows } from '../dto/TerminalRuntimeSettings'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 export interface SequencedTerminalOutput {
   readonly sequence: number
@@ -23,6 +24,7 @@ export interface CreateTerminalModelCommand {
   readonly columns: number
   readonly rows: number
   readonly workingDirectory: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly onQueryResponse: (response: string) => void
   readonly onFlowControlChange: (isPaused: boolean) => void
 }
@@ -35,6 +37,7 @@ export interface AttachTerminalViewCommand {
 
 export interface RestoreTerminalModelCommand {
   readonly checkpoint: TerminalModelCheckpoint
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly onQueryResponse: (response: string) => void
   readonly onFlowControlChange: (isPaused: boolean) => void
 }

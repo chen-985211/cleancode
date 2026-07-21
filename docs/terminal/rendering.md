@@ -144,6 +144,8 @@ Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域�
 
 普通终端的 PTY 和权威屏幕模型由 Run 上下文按完整运行身份持有，React 画布只负责当前工作区的可见投影。工作区切换可以卸载 `TerminalViewport` 并最终销毁 renderer xterm；隐藏期间的 ANSI 解析、滚动历史、终端模式和输出序号继续由主进程模型维护。
 
+普通终端内手动启动的 Codex CLI 与 Agent 一样会通过 OSC 10/11 查询默认颜色并缓存主题判断，但普通终端还存在 renderer 未挂载的隐藏阶段。每个 terminal generation 因此固定创建时的 `terminalSourceTheme`：headless 模型隐藏时按 canonical palette 回答查询，可见 xterm 接管后使用同一 palette；attach/detach 交接保证两者不会同时响应。应用主题变化只通过 source dataset 的统一视觉转换投影，不修改运行中 CLI 已识别的 palette。新 generation 可以采用新的当前主题，恢复的同一 generation 必须沿用 checkpoint record 中的原主题。
+
 普通终端必须保持以下恢复顺序：
 
 1. 每次可见挂载创建新的 xterm 和唯一 `viewId`，并在请求 snapshot 前注册 surface，使较早到达的 live output 可以进入临时队列。

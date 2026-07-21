@@ -128,7 +128,8 @@ export class PersistentTerminalProviderClient
         identity: command.identity,
         columns: command.columns,
         rows: command.rows,
-        workingDirectory: command.workingDirectory
+        workingDirectory: command.workingDirectory,
+        terminalSourceTheme: command.terminalSourceTheme
       }
     })
     this.pendingModelCreates.set(command.identity.sessionId, request)
@@ -162,6 +163,7 @@ export class PersistentTerminalProviderClient
         command: {
           scope: command.scope,
           workingDirectory: command.workingDirectory,
+          terminalSourceTheme: command.terminalSourceTheme,
           shell: command.shell,
           launchCommand: command.launchCommand,
           launchMode: command.launchMode,

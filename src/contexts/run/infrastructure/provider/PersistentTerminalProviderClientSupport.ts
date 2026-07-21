@@ -10,7 +10,7 @@ import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
 
 export interface TerminalProviderMetadata {
   readonly schemaVersion: 1
-  readonly protocolVersion: 1 | 2
+  readonly protocolVersion: 1 | 2 | 3
   readonly instanceId: string
   readonly authToken: string
   readonly endpoint: string

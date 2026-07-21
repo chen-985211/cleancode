@@ -6,6 +6,7 @@ import { Terminal as XTerm, type IDisposable } from '@xterm/xterm'
 
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
 import type { SequencedTerminalOutput } from '../../contexts/run/application/ports/TerminalModelPort'
+import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 import { installTerminalSelectionCopy } from './terminalSelectionCopy'
 import type {
   TerminalRestoreResult,
@@ -15,9 +16,9 @@ import type {
   TerminalSurfaceAttachment
 } from './terminalSurfaceRegistry'
 import {
-  readTerminalSearchTheme,
-  readTerminalTheme,
-  synchronizeTerminalTheme
+  readCanonicalTerminalSearchTheme,
+  readCanonicalTerminalTheme,
+  readTerminalSourceTheme
 } from './terminalTheme'
 import type { TerminalDimensions } from './types'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
@@ -27,24 +28,14 @@ import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileL
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
 
-export function createTerminalXtermSurface(): TerminalSurface {
-  return new XtermTerminalSurface()
+export function createTerminalXtermSurface(
+  terminalSourceTheme: TerminalSourceTheme = readTerminalSourceTheme()
+): TerminalSurface {
+  return new XtermTerminalSurface(terminalSourceTheme)
 }
 
 class XtermTerminalSurface implements TerminalSurface {
-  private readonly terminal = new XTerm({
-    allowProposedApi: true,
-    convertEol: true,
-    cursorBlink: true,
-    fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
-    fontSize: 12,
-    fontWeight: 500,
-    lineHeight: 1.32,
-    macOptionClickForcesSelection: true,
-    rows: 9,
-    scrollback: terminalSurfaceScrollbackRows,
-    theme: readTerminalTheme()
-  })
+  private readonly terminal: XTerm
   private readonly fitAddon = new FitAddon()
   private readonly searchAddon = new SearchAddon({ highlightLimit: 1000 })
   private readonly unicodeAddon = new Unicode11Addon()
@@ -63,7 +54,6 @@ class XtermTerminalSurface implements TerminalSurface {
   private dataSubscription: IDisposable | null = null
   private searchSubscription: IDisposable | null = null
   private fileLinkProviderSubscription: IDisposable | null = null
-  private stopSynchronizingTheme: (() => void) | null = null
   private pendingFitAnimationFrame: number | null = null
   private lastReportedDimensions: TerminalDimensions | null = null
   private isResizeSuspended = false
@@ -85,7 +75,20 @@ class XtermTerminalSurface implements TerminalSurface {
   private onSearchResultsChange: (results: TerminalSearchResults) => void = () => undefined
   private searchQuery = ''
 
-  constructor() {
+  constructor(private readonly terminalSourceTheme: TerminalSourceTheme) {
+    this.terminal = new XTerm({
+      allowProposedApi: true,
+      convertEol: true,
+      cursorBlink: true,
+      fontFamily: 'SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace',
+      fontSize: 12,
+      fontWeight: 500,
+      lineHeight: 1.32,
+      macOptionClickForcesSelection: true,
+      rows: 9,
+      scrollback: terminalSurfaceScrollbackRows,
+      theme: readCanonicalTerminalTheme(terminalSourceTheme)
+    })
     this.terminal.loadAddon(this.fitAddon)
     this.terminal.loadAddon(this.searchAddon)
     this.terminal.loadAddon(this.unicodeAddon)
@@ -102,6 +105,7 @@ class XtermTerminalSurface implements TerminalSurface {
 
     this.element = attachment.element
     this.element.dataset.terminalRenderer = this.rendererController.state
+    this.element.dataset.terminalSourceTheme = this.terminalSourceTheme
     this.onDimensionsChange = attachment.onDimensionsChange
     this.onInput = attachment.onInput
     this.onOpenLink = attachment.onOpenLink
@@ -127,7 +131,6 @@ class XtermTerminalSurface implements TerminalSurface {
       this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>
         this.onSearchResultsChange(results)
       )
-      this.stopSynchronizingTheme = synchronizeTerminalTheme(this.terminal)
       this.isOpened = true
     }
 
@@ -167,7 +170,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.searchQuery = query
 
     const options: ISearchOptions = {
-      decorations: readSearchDecorations(),
+      decorations: readSearchDecorations(this.terminalSourceTheme),
       incremental: direction === 'incremental'
     }
     if (direction === 'previous') this.searchAddon.findPrevious(query, options)
@@ -264,7 +267,6 @@ class XtermTerminalSurface implements TerminalSurface {
     this.dataSubscription?.dispose()
     this.searchSubscription?.dispose()
     this.fileLinkProviderSubscription?.dispose()
-    this.stopSynchronizingTheme?.()
     this.rendererController.dispose()
     this.terminal.dispose()
   }
@@ -366,8 +368,10 @@ function hasContiguousSequence(
   return outputs.every((output, index) => output.sequence === snapshotSequence + index + 1)
 }
 
-function readSearchDecorations(): NonNullable<ISearchOptions['decorations']> {
-  const theme = readTerminalSearchTheme()
+function readSearchDecorations(
+  terminalSourceTheme: TerminalSourceTheme
+): NonNullable<ISearchOptions['decorations']> {
+  const theme = readCanonicalTerminalSearchTheme(terminalSourceTheme)
 
   return {
     activeMatchBackground: theme.active,

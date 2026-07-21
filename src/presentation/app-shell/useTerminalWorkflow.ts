@@ -14,6 +14,7 @@ import type { Translate } from './i18n/messages'
 import { getWorkflowRunRootBlockIds } from './terminalWorkflowNotifications'
 import type { WorkbenchSnapshot } from './types'
 import { useTerminalWorkflowNotifications } from './useTerminalWorkflowNotifications'
+import { readTerminalSourceTheme } from './terminalTheme'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -167,6 +168,7 @@ export function useTerminalWorkflow({
           workspaceName: currentWorkspace.name,
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
+          terminalSourceTheme: readTerminalSourceTheme(),
           scope: blockId ? { type: 'from-block', blockId } : { type: 'full' }
         })
 

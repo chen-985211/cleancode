@@ -118,6 +118,7 @@ function session(id: string, generation = 1) {
     kind: 'workflow' as const,
     retentionPolicy: 'terminate-on-application-exit' as const,
     recoveryKind: 'fresh' as const,
+    terminalSourceTheme: 'dark' as const,
     inputHistory: [],
     exitCode: null,
     failureReason: null

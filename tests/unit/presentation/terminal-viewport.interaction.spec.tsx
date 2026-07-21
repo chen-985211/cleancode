@@ -55,14 +55,9 @@ interface FakeSearchAddonInstance {
   emitResults(resultIndex: number, resultCount: number): void
 }
 
-interface FakeWebLinksAddonInstance {
-  activate(event: MouseEvent, target: string): void
-}
+type FakeWebLinksAddonInstance = { activate(event: MouseEvent, target: string): void }
 
-interface TerminalSize {
-  readonly columns: number
-  readonly rows: number
-}
+type TerminalSize = { readonly columns: number; readonly rows: number }
 
 const xtermMockState = vi.hoisted(() => ({
   fitAddons: [] as FakeFitAddonInstance[],
@@ -326,17 +321,20 @@ describe('terminal viewport interaction', () => {
     expect(writeText).toHaveBeenCalledWith('selected terminal output')
   })
 
-  it('updates the existing terminal theme without reinstalling xterm', async () => {
-    document.documentElement.style.setProperty('--cc-terminal-background', '#10151d')
-    renderTerminalViewport()
+  it('pins a CLI terminal to its source theme when the application theme changes', async () => {
+    document.documentElement.style.setProperty('--cc-terminal-dark-background', '#10151d')
+    document.documentElement.style.setProperty('--cc-terminal-light-background', '#f6f8fb')
+    const { container } = renderTerminalViewport()
     const terminal = await waitForInstalledTerminal()
+    const viewport = container.querySelector<HTMLElement>('.terminal-viewport')
 
     expect(terminal.options.theme?.background).toBe('#10151d')
+    expect(viewport?.dataset.terminalSourceTheme).toBe('dark')
 
-    document.documentElement.style.setProperty('--cc-terminal-background', '#f6f8fb')
+    document.documentElement.dataset.theme = 'light'
     window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
 
-    expect(terminal.options.theme?.background).toBe('#f6f8fb')
+    expect(terminal.options.theme?.background).toBe('#10151d')
     expect(xtermMockState.terminals).toHaveLength(1)
   })
 
@@ -605,6 +603,7 @@ function createRunningTerminalState(output = '') {
     sessionId: 'terminal-session-1',
     status: 'running' as const,
     output,
+    terminalSourceTheme: 'dark' as const,
     runIdentity: {
       projectId: 'project-alpha',
       workspaceName: 'feature/sidebar',

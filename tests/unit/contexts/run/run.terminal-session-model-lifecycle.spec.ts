@@ -10,6 +10,21 @@ import { TerminalSessionService } from '../../../../src/contexts/run/application
 import type { TerminalRunScope } from '../../../../src/contexts/run/domain/value-objects/TerminalRunScope'
 
 describe('terminal session model lifecycle', () => {
+  it('pins the terminal source theme on both the session and its authoritative model', async () => {
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(
+      new RecordingProcessPort(),
+      undefined,
+      undefined,
+      models
+    )
+
+    const session = await service.start({ ...startCommand(), terminalSourceTheme: 'light' })
+
+    expect(session.terminalSourceTheme).toBe('light')
+    expect(models.creates[0]).toMatchObject({ terminalSourceTheme: 'light' })
+  })
+
   it('routes valid PTY output through one authoritative model before application consumers', async () => {
     const processes = new RecordingProcessPort()
     const models = new RecordingModelPort()
@@ -289,6 +304,7 @@ function createSnapshot(identity: TerminalRunScope, sequence: number): TerminalS
     dimensions: { columns: 88, rows: 24 },
     title: '',
     workingDirectory: '/work/app',
+    terminalSourceTheme: 'dark',
     modes: {
       applicationCursorKeysMode: false,
       applicationKeypadMode: false,

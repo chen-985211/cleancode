@@ -2,6 +2,7 @@ import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { TerminalRetentionPolicy } from '../../contexts/run/domain/aggregates/TerminalSession'
 import type { ActualServiceEndpoint } from '../../contexts/run/domain/value-objects/ActualServiceEndpoint'
+import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 import type {
   OpenTerminalLinkCommand,
   TerminalLinkOpenResult
@@ -56,6 +57,7 @@ export interface TerminalIpcHandlersInput {
     readonly workspaceDirectory: string
     readonly gitBranch: string | null
     readonly workingDirectory: string
+    readonly terminalSourceTheme: TerminalSourceTheme
     readonly shell?: string
     readonly columns?: number
     readonly rows?: number
@@ -70,6 +72,7 @@ export interface TerminalIpcHandlersInput {
     readonly gitBranch: string | null
     readonly blockId: string
     readonly workingDirectory: string
+    readonly terminalSourceTheme: TerminalSourceTheme
     readonly shell?: string
     readonly columns?: number
     readonly rows?: number
@@ -135,6 +138,7 @@ interface StartTerminalIpcCommand {
   readonly workspaceName: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
+  readonly terminalSourceTheme: TerminalSourceTheme
   readonly shell?: string
   readonly columns?: number
   readonly rows?: number
@@ -205,6 +209,7 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
           gitBranch: launchCommand.gitBranch,
           blockId: launchCommand.terminalBlockId,
           workingDirectory: launchCommand.workspaceDirectory,
+          terminalSourceTheme: launchCommand.terminalSourceTheme,
           shell: launchCommand.shell,
           columns: launchCommand.columns,
           rows: launchCommand.rows,
@@ -617,6 +622,7 @@ function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {
     !isNonEmptyString(command.workspaceName) ||
     !isNonEmptyString(command.workspaceDirectory) ||
     !(command.gitBranch === null || typeof command.gitBranch === 'string') ||
+    !isTerminalSourceTheme(command.terminalSourceTheme) ||
     !(command.shell === undefined || typeof command.shell === 'string') ||
     !isOptionalPositiveInteger(command.columns) ||
     !isOptionalPositiveInteger(command.rows)
@@ -625,6 +631,10 @@ function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {
   }
 
   return command as unknown as StartTerminalIpcCommand
+}
+
+function isTerminalSourceTheme(value: unknown): value is TerminalSourceTheme {
+  return value === 'dark' || value === 'light'
 }
 
 function isNonEmptyString(value: unknown): value is string {

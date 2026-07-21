@@ -20,6 +20,7 @@ import {
   type TerminalSurface
 } from './terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
+import { readTerminalSourceTheme } from './terminalTheme'
 import type { TerminalDimensions, TerminalViewState } from './types'
 import { useI18n } from './i18n/useI18n'
 import {
@@ -250,11 +251,11 @@ export function TerminalViewport({
 
     const element = terminalElementRef.current
     const runIdentity = runIdentityRef.current
+    const terminalSourceTheme = session.terminalSourceTheme ?? readTerminalSourceTheme()
+    const createSurface = () => createTerminalXtermSurface(terminalSourceTheme)
     const lease =
-      runIdentity && surfaceRegistry
-        ? surfaceRegistry.create(runIdentity, createTerminalXtermSurface)
-        : null
-    const surface = lease?.surface ?? createTerminalXtermSurface()
+      runIdentity && surfaceRegistry ? surfaceRegistry.create(runIdentity, createSurface) : null
+    const surface = lease?.surface ?? createSurface()
     const api = window.cleancode
     let isReleased = false
     let restoreTail = Promise.resolve()
@@ -322,7 +323,7 @@ export function TerminalViewport({
         surfaceRef.current = null
       }
     }
-  }, [openSearch, surfaceIdentityKey, surfaceRegistry])
+  }, [openSearch, session.terminalSourceTheme, surfaceIdentityKey, surfaceRegistry])
 
   useEffect(() => {
     if (focusRequestId > 0) {
@@ -488,6 +489,7 @@ function createFallbackSnapshot(
     dimensions: { columns: 80, rows: 24 },
     title: '',
     workingDirectory: '',
+    terminalSourceTheme: 'dark',
     modes: {
       applicationCursorKeysMode: false,
       applicationKeypadMode: false,

@@ -29,6 +29,8 @@ import {
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import { createTerminalOscColorResponse } from './terminalSourcePalette'
 
 const nodeRequire = createRequire(import.meta.url)
 const { Terminal: HeadlessTerminal } = nodeRequire('@xterm/headless') as {
@@ -77,6 +79,7 @@ export class HeadlessTerminalModelAdapter implements TerminalModelRecoveryPort {
         columns: checkpoint.dimensions.columns,
         rows: checkpoint.dimensions.rows,
         workingDirectory: checkpoint.workingDirectory,
+        terminalSourceTheme: command.terminalSourceTheme,
         onQueryResponse: command.onQueryResponse,
         onFlowControlChange: command.onFlowControlChange
       },
@@ -176,6 +179,7 @@ class ManagedTerminalModel {
   private readonly serializeAddon: SerializeAddonInstance
   private readonly onQueryResponse: (response: string) => void
   private readonly onFlowControlChange: (isPaused: boolean) => void
+  private readonly terminalSourceTheme: TerminalSourceTheme
   private readonly flowControlReasons = new Set<'backpressure' | 'view-handoff'>()
   private activeView: AttachTerminalViewCommand | null = null
   private sequence = 0
@@ -190,6 +194,7 @@ class ManagedTerminalModel {
     this.workingDirectory = command.workingDirectory
     this.onQueryResponse = command.onQueryResponse
     this.onFlowControlChange = command.onFlowControlChange
+    this.terminalSourceTheme = command.terminalSourceTheme ?? 'dark'
     this.terminal = new HeadlessTerminal({
       allowProposedApi: true,
       cols: command.columns,
@@ -215,6 +220,8 @@ class ManagedTerminalModel {
       this.workingDirectory = readOscWorkingDirectory(data) ?? this.workingDirectory
       return true
     })
+    this.registerColorQueryHandler(10)
+    this.registerColorQueryHandler(11)
   }
 
   get hasAttachedView(): boolean {
@@ -347,7 +354,8 @@ class ManagedTerminalModel {
       dimensions: checkpoint.dimensions,
       title: checkpoint.title,
       workingDirectory: checkpoint.workingDirectory,
-      modes: checkpoint.modes
+      modes: checkpoint.modes,
+      terminalSourceTheme: this.terminalSourceTheme
     }
   }
 
@@ -378,6 +386,16 @@ class ManagedTerminalModel {
     else this.flowControlReasons.delete(reason)
     const isPaused = this.flowControlReasons.size > 0
     if (wasPaused !== isPaused) this.onFlowControlChange(isPaused)
+  }
+
+  private registerColorQueryHandler(code: 10 | 11): void {
+    this.terminal.parser.registerOscHandler(code, (data) => {
+      if (data !== '?') return false
+      if (!this.activeView) {
+        this.onQueryResponse(createTerminalOscColorResponse(code, this.terminalSourceTheme))
+      }
+      return true
+    })
   }
 
   private assertActive(): void {

@@ -241,6 +241,7 @@ function snapshot(): TerminalSnapshot {
     dimensions: { columns: 80, rows: 24 },
     title: '',
     workingDirectory: '/work/app',
+    terminalSourceTheme: 'dark',
     modes: {
       applicationCursorKeysMode: false,
       applicationKeypadMode: false,

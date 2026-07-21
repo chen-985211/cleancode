@@ -6,6 +6,7 @@ export type TerminalSessionKind = 'interactive' | 'direct' | 'workflow'
 export type TerminalRetentionPolicy =
   'terminate-on-application-exit' | 'keep-after-application-exit'
 export type TerminalRecoveryKind = 'fresh' | 'warm' | 'historical' | 'ended'
+export type TerminalSourceTheme = 'dark' | 'light'
 
 export interface TerminalSessionSnapshot extends TerminalRunScope {
   readonly id: string
@@ -16,6 +17,7 @@ export interface TerminalSessionSnapshot extends TerminalRunScope {
   readonly kind: TerminalSessionKind
   readonly retentionPolicy: TerminalRetentionPolicy
   readonly recoveryKind: TerminalRecoveryKind
+  readonly terminalSourceTheme: TerminalSourceTheme
   readonly inputHistory: readonly string[]
   readonly exitCode: number | null
   readonly failureReason: string | null
@@ -25,6 +27,7 @@ export interface CreateTerminalSessionInput {
   readonly scope: TerminalRunScope
   readonly workingDirectory: string
   readonly kind?: TerminalSessionKind
+  readonly terminalSourceTheme?: TerminalSourceTheme
 }
 
 export interface ReviveTerminalSessionInput {
@@ -33,6 +36,7 @@ export interface ReviveTerminalSessionInput {
   readonly kind: Exclude<TerminalSessionKind, 'workflow'>
   readonly retentionPolicy: TerminalRetentionPolicy
   readonly recoveryKind: Extract<TerminalRecoveryKind, 'warm' | 'historical'>
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly processId: number | null
   readonly inputHistory?: readonly string[]
   readonly exitCode?: number | null
@@ -51,11 +55,17 @@ export class TerminalSession {
   private constructor(
     public readonly scope: TerminalRunScope,
     public readonly workingDirectory: string,
-    public readonly kind: TerminalSessionKind
+    public readonly kind: TerminalSessionKind,
+    public readonly terminalSourceTheme: TerminalSourceTheme
   ) {}
 
   static create(input: CreateTerminalSessionInput): TerminalSession {
-    return new TerminalSession(input.scope, input.workingDirectory, input.kind ?? 'interactive')
+    return new TerminalSession(
+      input.scope,
+      input.workingDirectory,
+      input.kind ?? 'interactive',
+      input.terminalSourceTheme ?? 'dark'
+    )
   }
 
   static revive(input: ReviveTerminalSessionInput): TerminalSession {
@@ -73,7 +83,12 @@ export class TerminalSession {
       )
     }
 
-    const session = new TerminalSession(input.scope, input.workingDirectory, input.kind)
+    const session = new TerminalSession(
+      input.scope,
+      input.workingDirectory,
+      input.kind,
+      input.terminalSourceTheme ?? 'dark'
+    )
     session.processIdValue = input.processId
     session.statusValue = input.recoveryKind === 'warm' ? 'running' : 'exited'
     session.retentionPolicyValue = input.retentionPolicy
@@ -183,6 +198,7 @@ export class TerminalSession {
       kind: this.kind,
       retentionPolicy: this.retentionPolicyValue,
       recoveryKind: this.recoveryKindValue,
+      terminalSourceTheme: this.terminalSourceTheme,
       inputHistory: this.recordedInput,
       exitCode: this.exitCodeValue,
       failureReason: this.failureReasonValue

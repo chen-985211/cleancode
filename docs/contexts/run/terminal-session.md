@@ -43,7 +43,7 @@ idle -> running -> stopping -> exited
 
 `recordInput` 只允许在 `running` 状态执行。Ctrl+C 只是向当前 PTY 写入 `\x03`，不会把会话伪装成已退出；关闭会话才终止进程并标记 `exited`。普通直接启动命令运行在保留会话的交互式 shell 启动包装层中，命令自然结束或被 Ctrl+C 中断后必须回到可输入的 shell；依赖工作流有限任务和受管端口服务仍使用随命令退出的 PTY，以保留退出码调度与端口清理语义。
 
-会话还记录 `kind`、退出保留策略和恢复类型。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 永远不能启用退出保留。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
+会话还记录 `kind`、退出保留策略、恢复类型和不可变的 `terminalSourceTheme`。新 generation 从当前有效应用主题取得 `dark` 或 `light`；同一 generation 的普通启动、快速启动、受管服务、工作流、可见重挂载和恢复都必须沿用该值，应用主题切换不得改写它。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 永远不能启用退出保留。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
 ## 会话身份与隔离
 
@@ -80,7 +80,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 
 `TerminalSession` 继续拥有 PTY 业务生命周期；`TerminalModelPort` 只拥有同一运行在当前应用进程内的屏幕技术状态。PTY 输出通过 `TerminalSessionService` 的当前身份检查后，只进入权威模型一次，再携带该运行内单调递增的 `sequence` 交给应用消费者和当前视图。
 
-每个模型使用与可见终端一致的行列、Unicode 11 宽度规则和当前滚动历史预算，维护 ANSI 屏幕、光标、颜色、alternate buffer、已支持模式、标题、工作目录和可读 transcript。滚动历史预算只接受 1000、5000 或 10000 行，默认 1000 行；设置变更同步到当前及后续模型和视图，并随 snapshot 明确传递。`TerminalSnapshot.sequence` 与 `RestoreMarker` 表示快照已经包含到哪个输出；renderer 只接受同一 `viewId` 和完整运行身份的后续事件，并按序丢弃重复、检测缺口。
+每个模型使用与可见终端一致的行列、Unicode 11 宽度规则、会话源主题和当前滚动历史预算，维护 ANSI 屏幕、光标、颜色、alternate buffer、已支持模式、标题、工作目录和可读 transcript。滚动历史预算只接受 1000、5000 或 10000 行，默认 1000 行；设置变更同步到当前及后续模型和视图，并随 snapshot 明确传递。`TerminalSnapshot.sequence`、`terminalSourceTheme` 与 `RestoreMarker` 表示快照已经包含到哪个输出、应采用哪套 canonical palette；renderer 只接受同一 `viewId` 和完整运行身份的后续事件，并按序丢弃重复、检测缺口。
 
 视图生命周期遵守：
 
@@ -90,7 +90,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 4. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
 5. `ReplaceSession`、显式终止和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出和 Provider 故障只保留有界最终模型，不伪造 live 状态。
 
-因此，普通终端的 renderer xterm 是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏普通终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。
+因此，普通终端的 renderer xterm 是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏普通终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 
 ## 输入与安全打开边界
 
@@ -119,9 +119,9 @@ Run 应用层只依赖 `TerminalProcessPort`：
 
 Provider 启动协调使用短期、版本化且带唯一 owner 的本机租约。同一应用内的并发调用共享一次连接任务；空白或损坏租约先经过有界初始化宽限期，死亡 owner 和超期租约可以回收，旧 owner 迟到释放不得删除后继租约。应用退出先关闭新的连接准入并等待在途连接释放租约，再向已认证 Provider detach；断连期间只更新本地滚动历史设置，下一次任意连接在发送业务请求前统一同步最新值，不记录预期的断连设置警告。
 
-Provider 协议 v2 将存活探测与控制权变更分开：`health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程，先完成非保留会话清理与保留会话 checkpoint，再允许后继 controller。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。客户端只为已经运行的 v1 Provider 保留一版兼容读取，新启动的 Provider 必须写入 v2 metadata。
+Provider 协议 v3 沿用 v2 的控制权状态机，并把 `terminalSourceTheme` 纳入模型和进程创建契约；协议升级会替换不理解该字段的旧 Provider，避免新应用错误复用旧 palette。`health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程，先完成非保留会话清理与保留会话 checkpoint，再允许后继 controller。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。客户端仅为仍持有 live session 的遗留 v1 Provider 保留兼容读取，新启动的 Provider 必须写入当前 metadata。
 
-Run 基础设施在应用数据目录保存 schema v1 checkpoint 与追加式输出记录。checkpoint 包含有界普通/alternate 屏幕、可读 normal buffer 历史、cwd、行列、标题、模式和最后 sequence；输出记录只重放 checkpoint 之后的连续 sequence。写入使用同目录临时文件、同步、原子重命名和目录同步，单 checkpoint、输出日志、冷历史数量、保留期和全局字节数都有上限；容量清理只淘汰冷历史，不为腾出空间终止 live 会话。损坏或未知版本按 session 隔离。首次启用保留无法完成 checkpoint 时动作失败并回滚；后续持久化失效时 Provider 撤销保留并通知应用，应用退出时安全终止该会话。
+Run 基础设施在应用数据目录保存 schema v2 checkpoint record 与 schema v1 追加式输出记录。record 同时保存不可变源主题；checkpoint 包含有界普通/alternate 屏幕、可读 normal buffer 历史、cwd、行列、标题、模式和最后 sequence；输出记录只重放 checkpoint 之后的连续 sequence。读取旧 schema v1 record 时迁移为确定性的深色源主题，解决旧数据缺少该事实且无法从序列化屏幕可靠反推的问题。写入使用同目录临时文件、同步、原子重命名和目录同步，单 checkpoint、输出日志、冷历史数量、保留期和全局字节数都有上限；容量清理只淘汰冷历史，不为腾出空间终止 live 会话。损坏或未知版本按 session 隔离。首次启用保留无法完成 checkpoint 时动作失败并回滚；后续持久化失效时 Provider 撤销保留并通知应用，应用退出时安全终止该会话。
 
 应用重开优先对已认证 Provider 中仍存活的精确会话执行 warm attach，先取得 Provider 权威 snapshot，再接续实时 sequence。Provider 已丢失时，新 Provider 只从 checkpoint 和连续输出记录恢复 normal-buffer 历史、cwd、尺寸与模式，产生无进程声明的只读 `historical` 会话；alternate screen 不覆盖可读历史。损坏资料不会阻断其他会话，新建 shell 必须使用新的 `sessionId + runId + generation`。
 

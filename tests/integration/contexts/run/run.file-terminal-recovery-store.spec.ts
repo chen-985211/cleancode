@@ -123,6 +123,28 @@ describe('file terminal recovery store', () => {
     expect(loaded.sessions[0]?.checkpoint).toEqual(record)
   })
 
+  it('migrates legacy sessions to a deterministic dark terminal source theme', async () => {
+    const store = new FileTerminalRecoveryStore({ rootDirectory })
+    const current = createRecord()
+    await store.writeCheckpoint(current)
+    const sessionDirectory = await firstSessionDirectory(rootDirectory)
+    const legacySession: Record<string, unknown> = { ...current.session }
+    Reflect.deleteProperty(legacySession, 'terminalSourceTheme')
+    await writeFile(
+      join(sessionDirectory, 'checkpoint.json'),
+      `${JSON.stringify({ ...current, schemaVersion: 1, session: legacySession })}\n`,
+      'utf8'
+    )
+
+    const loaded = await store.load()
+
+    expect(loaded.issues).toEqual([])
+    expect(loaded.sessions[0]?.checkpoint).toMatchObject({
+      schemaVersion: 2,
+      session: { terminalSourceTheme: 'dark' }
+    })
+  })
+
   it('isolates an incomplete output tail without replaying partial data', async () => {
     const store = new FileTerminalRecoveryStore({ rootDirectory })
     const record = createRecord()
@@ -149,7 +171,7 @@ describe('file terminal recovery store', () => {
         await readFile(checkpointPath, 'utf8')
       ) as TerminalRecoveryRecord
       if (checkpoint.session.sessionId === unsupported.session.sessionId) {
-        await writeFile(checkpointPath, `${JSON.stringify({ ...checkpoint, schemaVersion: 2 })}\n`)
+        await writeFile(checkpointPath, `${JSON.stringify({ ...checkpoint, schemaVersion: 3 })}\n`)
       }
     }
 
@@ -196,7 +218,7 @@ function createRecord(
 ): TerminalRecoveryRecord {
   const identity = createIdentity(identityOverrides)
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     providerInstanceId: 'provider-1',
     updatedAt: '2026-07-21T00:00:00.000Z',
     session: {
@@ -209,6 +231,7 @@ function createRecord(
       kind: 'interactive',
       retentionPolicy: 'keep-after-application-exit',
       recoveryKind: 'warm',
+      terminalSourceTheme: 'dark',
       inputHistory: [],
       exitCode: null,
       failureReason: null

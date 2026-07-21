@@ -210,7 +210,7 @@ class ControllableProvider {
 
   constructor(
     readonly endpoint: string,
-    readonly protocolVersion: 1 | 2 = terminalProviderProtocolVersion
+    readonly protocolVersion: 1 | 2 | 3 = terminalProviderProtocolVersion
   ) {}
 
   async start(): Promise<void> {

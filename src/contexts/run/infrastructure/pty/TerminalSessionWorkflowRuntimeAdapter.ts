@@ -29,6 +29,7 @@ export class TerminalSessionWorkflowRuntimeAdapter implements TerminalWorkflowRu
       workspaceDirectory: command.workspaceDirectory,
       gitBranch: command.gitBranch,
       workingDirectory: command.workingDirectory,
+      terminalSourceTheme: command.terminalSourceTheme,
       runId: command.runId,
       launchCommand,
       sessionKind: 'workflow',

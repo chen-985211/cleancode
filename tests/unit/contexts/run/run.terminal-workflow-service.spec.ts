@@ -442,6 +442,7 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
     kind: 'workflow',
     retentionPolicy: 'terminate-on-application-exit',
     recoveryKind: 'fresh',
+    terminalSourceTheme: 'dark',
     inputHistory: [],
     exitCode: null,
     failureReason: null

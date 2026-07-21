@@ -14,6 +14,7 @@ import {
   type ServicePortIntent
 } from '../../domain/value-objects/ServicePortIntent'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import type { LocalPortAllocation } from './LocalPortAllocator'
 import type { LocalPortAllocator } from './LocalPortAllocator'
 import { createRunAttemptDetails } from './RunFailureDetails'
@@ -40,6 +41,7 @@ export interface LaunchManagedServiceCommand {
   readonly gitBranch: string | null
   readonly blockId: string
   readonly workingDirectory: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly launchCommand: string
   readonly environment?: Readonly<Record<string, string>>
   readonly shell?: string
@@ -285,6 +287,7 @@ export class ManagedServiceLauncher {
         gitBranch: command.gitBranch,
         terminalBlockId: command.blockId,
         workingDirectory: command.workingDirectory,
+        terminalSourceTheme: command.terminalSourceTheme,
         launchCommand: command.launchCommand,
         environment: command.environment,
         shell: command.shell,

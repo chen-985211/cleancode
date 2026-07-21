@@ -125,11 +125,13 @@ await expectAuthoritativeResult(currentIdentity)
 整套 E2E 可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。以下资源默认不能跨场景共享：
 
 - Electron 应用进程和 PTY。
-- 项目目录、应用状态目录和持久化 fixture。
+- 项目目录、应用状态目录、Electron `userData` profile 和持久化 fixture。
 - 会话 ID、端口、事件订阅和运行中任务。
 - 会被测试写入的报告文件。
 
 判断原则是：共享失败是否会让一个场景改变另一个场景的前置状态。答案为“会”时必须隔离。
+
+E2E 启动器必须把每个场景的 Electron `userData` 指向该场景独立的临时目录，不能复用开发实例的默认 profile。否则 Electron 单实例锁会把测试进程路由到已运行的应用，导致新进程在页面创建前正常退出；测试会统一表现为 `Target page, context or browser has been closed`，也无法证明任何产品行为。
 
 ## 后台与可见运行模式
 

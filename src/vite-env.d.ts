@@ -23,6 +23,7 @@ import type {
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalSourceTheme } from './contexts/run/domain/aggregates/TerminalSession'
 import type { TerminalRuntimeAvailabilitySnapshot } from './contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { TerminalSnapshot } from './contexts/run/application/dto/TerminalModelSnapshot'
 import type { TerminalViewOutputEvent } from './contexts/run/application/ports/TerminalModelPort'
@@ -256,6 +257,7 @@ declare global {
         readonly workspaceName: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
+        readonly terminalSourceTheme: TerminalSourceTheme
         readonly shell?: string
         readonly columns?: number
         readonly rows?: number
@@ -267,6 +269,7 @@ declare global {
         readonly workspaceName: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
+        readonly terminalSourceTheme: TerminalSourceTheme
         readonly shell?: string
         readonly columns?: number
         readonly rows?: number
@@ -353,6 +356,7 @@ declare global {
         readonly workspaceName: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
+        readonly terminalSourceTheme: TerminalSourceTheme
         readonly scope:
           { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
         readonly shell?: string

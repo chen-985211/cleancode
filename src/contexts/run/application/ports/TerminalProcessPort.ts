@@ -1,4 +1,5 @@
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 export type TerminalLaunchMode = 'command' | 'interactive'
 
@@ -28,6 +29,7 @@ export interface TerminalWorkingDirectorySnapshot {
 export interface StartTerminalProcessCommand {
   readonly scope: TerminalRunScope
   readonly workingDirectory: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly shell?: string
   readonly launchCommand?: string
   readonly launchMode?: TerminalLaunchMode

@@ -4,8 +4,26 @@ import type {
   TerminalLaunchMode,
   TerminalOutputEvent
 } from '../ports/TerminalProcessPort'
-import type { TerminalSessionKind } from '../../domain/aggregates/TerminalSession'
+import type {
+  TerminalSessionKind,
+  TerminalSourceTheme
+} from '../../domain/aggregates/TerminalSession'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalViewOutputEvent } from '../ports/TerminalModelPort'
+
+export interface TerminalViewIdentityCommand {
+  readonly projectId: string
+  readonly workspaceName: string
+  readonly blockId: string
+  readonly sessionId: string
+  readonly runId: string
+  readonly generation: number
+  readonly viewId: string
+}
+
+export interface AttachTerminalViewCommand extends TerminalViewIdentityCommand {
+  readonly onOutput: (event: TerminalViewOutputEvent) => void
+}
 
 export interface StartTerminalSessionCommand {
   readonly projectId: string
@@ -15,6 +33,7 @@ export interface StartTerminalSessionCommand {
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly workingDirectory: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly runId?: string
   readonly shell?: string
   readonly launchCommand?: string

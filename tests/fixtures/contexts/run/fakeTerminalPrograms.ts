@@ -49,11 +49,17 @@ process.stdin.resume()
 process.stdin.on('data', (data) => {
   input += data.toString('utf8')
 })
-process.stdout.write('\u001b[6n')
+process.stdout.write('\u001b[6n\u001b]11;?\u0007')
 
 setTimeout(() => {
   const responses = input.match(/\\u001b\\[\\d+;\\d+R/g) ?? []
-  writeFileSync(reportPath, JSON.stringify({ count: responses.length, responses }))
+  const backgroundResponses = input.match(/\\u001b\\]11;rgb:[0-9a-f/]+\\u001b\\\\/gi) ?? []
+  writeFileSync(reportPath, JSON.stringify({
+    count: responses.length,
+    responses,
+    backgroundCount: backgroundResponses.length,
+    backgroundResponses
+  }))
   process.exit(0)
 }, 300)
 `,

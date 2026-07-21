@@ -168,7 +168,8 @@
 
 :root,
 :root[data-theme='light'],
-.agent-terminal-viewport[data-agent-terminal-source-theme='light'] {
+.agent-terminal-viewport[data-agent-terminal-source-theme='light'],
+.terminal-viewport[data-terminal-source-theme='light'] {
   --cc-scrollbar: rgb(100 116 139 / 55%);
   --cc-terminal-background: var(--cc-terminal-light-background);
   --cc-terminal-foreground: var(--cc-terminal-light-foreground);
@@ -196,7 +197,8 @@
 }
 
 :root[data-theme='dark'],
-.agent-terminal-viewport[data-agent-terminal-source-theme='dark'] {
+.agent-terminal-viewport[data-agent-terminal-source-theme='dark'],
+.terminal-viewport[data-terminal-source-theme='dark'] {
   --cc-scrollbar: rgb(148 163 184 / 48%);
   --cc-terminal-background: var(--cc-terminal-dark-background);
   --cc-terminal-foreground: var(--cc-terminal-dark-foreground);

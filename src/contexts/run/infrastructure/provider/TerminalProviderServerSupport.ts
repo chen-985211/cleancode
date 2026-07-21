@@ -57,6 +57,7 @@ export function createProviderSessionSnapshot(
     kind: command.sessionKind ?? 'interactive',
     retentionPolicy: 'terminate-on-application-exit',
     recoveryKind: 'fresh',
+    terminalSourceTheme: command.terminalSourceTheme ?? 'dark',
     inputHistory: [],
     exitCode: null,
     failureReason: null

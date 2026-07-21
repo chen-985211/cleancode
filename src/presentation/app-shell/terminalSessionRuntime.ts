@@ -2,6 +2,7 @@ import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto
 import type { TerminalExitEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
 import type { TerminalRunIdentity, TerminalServiceEndpoint, TerminalViewState } from './types'
+import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 
 export interface StartTerminalRuntimeCommand {
   readonly projectId: string
@@ -12,6 +13,7 @@ export interface StartTerminalRuntimeCommand {
   readonly gitBranch: string | null
   readonly columns: number
   readonly rows: number
+  readonly terminalSourceTheme: TerminalSourceTheme
 }
 
 export type LaunchTerminalRuntimeCommand = StartTerminalRuntimeCommand
@@ -63,6 +65,7 @@ function toTerminalViewState(
     sessionKind: session.kind,
     retentionPolicy: session.retentionPolicy,
     recoveryKind: session.recoveryKind,
+    terminalSourceTheme: session.terminalSourceTheme,
     isRecoveryPending: false,
     runIdentity: toTerminalRunIdentity(session),
     actualEndpoint,

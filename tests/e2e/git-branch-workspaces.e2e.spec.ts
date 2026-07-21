@@ -190,7 +190,12 @@ describe('git branch workspaces e2e', () => {
         'Terminal 1',
         `node ${terminalQueryFixtureFileName} ${visibleQueryReport}\r`
       )
-      expect(JSON.parse(await waitForTextFile(visibleQueryReport))).toMatchObject({ count: 1 })
+      const visibleQuery = JSON.parse(await waitForTextFile(visibleQueryReport)) as {
+        readonly count: number
+        readonly backgroundCount: number
+        readonly backgroundResponses: readonly string[]
+      }
+      expect(visibleQuery).toMatchObject({ count: 1, backgroundCount: 1 })
       const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
       await markTerminalSurface(page, sessionId, terminalSurfaceToken)
 
@@ -222,7 +227,13 @@ describe('git branch workspaces e2e', () => {
           }),
         { hiddenQueryReport, queryFixtureFileName: terminalQueryFixtureFileName, sessionId }
       )
-      expect(JSON.parse(await waitForTextFile(hiddenQueryReport))).toMatchObject({ count: 1 })
+      const hiddenQuery = JSON.parse(await waitForTextFile(hiddenQueryReport)) as {
+        readonly count: number
+        readonly backgroundCount: number
+        readonly backgroundResponses: readonly string[]
+      }
+      expect(hiddenQuery).toMatchObject({ count: 1, backgroundCount: 1 })
+      expect(hiddenQuery.backgroundResponses).toEqual(visibleQuery.backgroundResponses)
 
       await featureWorkspace.click()
       await waitForRecreatedTerminalSurface(page, sessionId, terminalSurfaceToken)

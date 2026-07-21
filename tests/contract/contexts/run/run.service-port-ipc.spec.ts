@@ -67,6 +67,25 @@ describe('managed terminal service IPC contract', () => {
     expect(terminateTerminal).toHaveBeenCalledWith('missing-session')
   })
 
+  it('rejects an invalid terminal source theme before starting a process', async () => {
+    const ipcMain = new FakeIpcMain()
+    const startTerminal = vi.fn(async () => session)
+    registerTerminalIpcHandlers(
+      createInput({ ipcMain, startTerminal }) as unknown as TerminalIpcHandlersInput
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:start-terminal', {
+        ...launchCommand,
+        terminalSourceTheme: 'sepia'
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(startTerminal).not.toHaveBeenCalled()
+  })
+
   it('launches only from an exact Project workspace identity and forwards terminal events', async () => {
     const ipcMain = new FakeIpcMain()
     const launchTerminal = vi.fn(async (command: Record<string, unknown>) => {
@@ -111,6 +130,7 @@ describe('managed terminal service IPC contract', () => {
       workspaceName: launchCommand.workspaceName,
       workspaceDirectory: launchCommand.workspaceDirectory,
       gitBranch: launchCommand.gitBranch,
+      terminalSourceTheme: launchCommand.terminalSourceTheme,
       blockId: launchCommand.terminalBlockId,
       workingDirectory: launchCommand.workspaceDirectory,
       columns: launchCommand.columns,
@@ -253,6 +273,7 @@ const launchCommand = {
   workspaceName: 'main',
   workspaceDirectory: '/repo/app',
   gitBranch: 'main',
+  terminalSourceTheme: 'dark' as const,
   terminalBlockId: 'api',
   columns: 88,
   rows: 24

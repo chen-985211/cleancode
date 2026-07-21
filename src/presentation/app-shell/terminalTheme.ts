@@ -1,7 +1,6 @@
-import type { ITheme, Terminal as XTerm } from '@xterm/xterm'
+import type { ITheme } from '@xterm/xterm'
 
-import type { AgentTerminalSourceTheme } from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import { effectiveThemeChangeEventName } from './themePreference'
+import type { EffectiveTheme } from './themePreference'
 
 const terminalThemeVariables = {
   background: '--cc-terminal-background',
@@ -30,23 +29,42 @@ export function readTerminalTheme(root: HTMLElement = document.documentElement):
   return readTerminalThemeVariables(root, (variable) => variable)
 }
 
-export function readTerminalSearchTheme(root: HTMLElement = document.documentElement): {
+export function readCanonicalTerminalSearchTheme(theme: EffectiveTheme): {
+  readonly active: string
+  readonly border: string
+  readonly match: string
+} {
+  return readTerminalSearchThemeVariables(document.documentElement, (variable) =>
+    variable.replace('--cc-terminal-', `--cc-terminal-${theme}-`)
+  )
+}
+
+function readTerminalSearchThemeVariables(
+  root: HTMLElement,
+  resolveVariable: (variable: string) => string
+): {
   readonly active: string
   readonly border: string
   readonly match: string
 } {
   const styles = getComputedStyle(root)
   return {
-    active: styles.getPropertyValue('--cc-terminal-search-active').trim(),
-    border: styles.getPropertyValue('--cc-terminal-search-border').trim(),
-    match: styles.getPropertyValue('--cc-terminal-search-match').trim()
+    active: styles.getPropertyValue(resolveVariable('--cc-terminal-search-active')).trim(),
+    border: styles.getPropertyValue(resolveVariable('--cc-terminal-search-border')).trim(),
+    match: styles.getPropertyValue(resolveVariable('--cc-terminal-search-match')).trim()
   }
 }
 
-export function readCanonicalTerminalTheme(theme: AgentTerminalSourceTheme): ITheme {
+export function readCanonicalTerminalTheme(theme: EffectiveTheme): ITheme {
   return readTerminalThemeVariables(document.documentElement, (variable) =>
     variable.replace('--cc-terminal-', `--cc-terminal-${theme}-`)
   )
+}
+
+export function readTerminalSourceTheme(
+  root: HTMLElement = document.documentElement
+): EffectiveTheme {
+  return root.dataset.theme === 'light' ? 'light' : 'dark'
 }
 
 function readTerminalThemeVariables(
@@ -61,14 +79,4 @@ function readTerminalThemeVariables(
       styles.getPropertyValue(resolveVariable(variable)).trim()
     ])
   ) as ITheme
-}
-
-export function synchronizeTerminalTheme(terminal: XTerm): () => void {
-  const updateTheme = (): void => {
-    terminal.options.theme = readTerminalTheme()
-  }
-
-  window.addEventListener(effectiveThemeChangeEventName, updateTheme)
-
-  return () => window.removeEventListener(effectiveThemeChangeEventName, updateTheme)
 }

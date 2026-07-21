@@ -197,7 +197,11 @@ export async function launchApp(
 ): Promise<ElectronApplication> {
   const runElectronInBackground = process.env.CLEANCODE_E2E_VISIBLE !== '1'
   const electronApplication = await electron.launch({
-    args: ['.', '--lang=zh-CN'],
+    args: [
+      '.',
+      '--lang=zh-CN',
+      `--user-data-dir=${join(workbench.appStateDirectory, 'electron-user-data')}`
+    ],
     cwd: process.cwd(),
     env: {
       ...process.env,

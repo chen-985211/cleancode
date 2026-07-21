@@ -4,6 +4,7 @@ import type { TerminalLaunchPlanPort } from '../ports/TerminalLaunchPlanPort'
 import type { TerminalExitEvent, TerminalOutputEvent } from '../ports/TerminalProcessPort'
 import type { ManagedServiceLauncher } from '../services/ManagedServiceLauncher'
 import type { TerminalSessionService } from './TerminalSessionService'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 export interface LaunchTerminalCommand {
   readonly projectId: string
@@ -13,6 +14,7 @@ export interface LaunchTerminalCommand {
   readonly gitBranch: string | null
   readonly blockId: string
   readonly workingDirectory: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly shell?: string
   readonly columns?: number
   readonly rows?: number
@@ -65,6 +67,7 @@ export class LaunchTerminalCommandUseCase {
         gitBranch: command.gitBranch,
         blockId: command.blockId,
         workingDirectory: command.workingDirectory,
+        terminalSourceTheme: command.terminalSourceTheme,
         launchCommand: plan.launchCommand,
         shell: command.shell,
         columns: command.columns,
@@ -91,6 +94,7 @@ export class LaunchTerminalCommandUseCase {
       gitBranch: command.gitBranch,
       terminalBlockId: command.blockId,
       workingDirectory: command.workingDirectory,
+      terminalSourceTheme: command.terminalSourceTheme,
       launchCommand: plan.launchCommand,
       launchMode: 'interactive',
       sessionKind: 'direct',

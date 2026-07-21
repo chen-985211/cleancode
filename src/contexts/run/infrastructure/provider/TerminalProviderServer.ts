@@ -552,6 +552,7 @@ export class TerminalProviderServer {
       const exactCheckpoint = bundle.checkpoint.model
       await this.models.restoreCheckpoint({
         checkpoint: exactCheckpoint,
+        terminalSourceTheme: bundle.checkpoint.session.terminalSourceTheme,
         onQueryResponse: () => undefined,
         onFlowControlChange: () => undefined
       })
@@ -566,6 +567,7 @@ export class TerminalProviderServer {
       }
       await this.models.restoreCheckpoint({
         checkpoint: historicalCheckpoint,
+        terminalSourceTheme: bundle.checkpoint.session.terminalSourceTheme,
         onQueryResponse: () => undefined,
         onFlowControlChange: () => undefined
       })
@@ -623,7 +625,7 @@ export class TerminalProviderServer {
     truncateOutputLog: boolean
   ): Promise<void> {
     const record: TerminalRecoveryRecord = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       providerInstanceId: this.options.instanceId,
       updatedAt: new Date().toISOString(),
       session: session.snapshot,

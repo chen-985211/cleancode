@@ -1,5 +1,6 @@
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
 import type { TerminalExitEvent, TerminalOutputEvent } from './TerminalProcessPort'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 export interface StartWorkflowRuntimeCommand {
   readonly projectId: string
@@ -11,6 +12,7 @@ export interface StartWorkflowRuntimeCommand {
   readonly workingDirectory: string
   readonly runId: string
   readonly launchCommand: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly shell?: string
   readonly columns?: number
   readonly rows?: number

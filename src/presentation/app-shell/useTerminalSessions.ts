@@ -34,6 +34,7 @@ import {
   reconcileTerminalSessionSnapshots,
   startTerminalRuntimeSession
 } from './terminalSessionRuntime'
+import { readTerminalSourceTheme } from './terminalTheme'
 import { useTerminalRuntimeRecovery } from './useTerminalRuntimeRecovery'
 import {
   defaultTerminalDimensions,
@@ -276,7 +277,8 @@ export function useTerminalSessions({
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           columns: dimensions.columns,
-          rows: dimensions.rows
+          rows: dimensions.rows,
+          terminalSourceTheme: readTerminalSourceTheme()
         })
 
         if (session) bindTerminalSession(terminalStateKey, session)
@@ -504,7 +506,8 @@ export function useTerminalSessions({
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           columns: defaultTerminalDimensions.columns,
-          rows: defaultTerminalDimensions.rows
+          rows: defaultTerminalDimensions.rows,
+          terminalSourceTheme: readTerminalSourceTheme()
         })
 
         if (result) {

@@ -378,6 +378,7 @@ function createTerminalSessionSnapshot(
     kind: 'interactive',
     retentionPolicy: 'terminate-on-application-exit',
     recoveryKind: 'fresh',
+    terminalSourceTheme: 'dark',
     inputHistory: [],
     exitCode: null,
     failureReason: null
