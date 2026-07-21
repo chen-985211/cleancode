@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, openSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { connect, type Socket } from 'node:net'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -84,13 +84,16 @@ export class PersistentTerminalProviderClient
   private readonly pendingModelCreates = new Map<string, Promise<unknown>>()
   private readonly workingDirectories = new Map<string, string>()
   private readonly identities = new Map<string, TerminalRunScope>()
+  private connectionAttempt: Promise<TerminalProviderMetadata> | null = null
+  private connectedMetadata: TerminalProviderMetadata | null = null
+  private isDetaching = false
   private recoveryIssueHandler: ((issue: TerminalRuntimeRecoveryIssue) => void) | null = null
   private scrollbackRows: TerminalScrollbackRows = 1000
 
   constructor(private readonly options: PersistentTerminalProviderClientOptions) {}
 
   async initialize(): Promise<TerminalRuntimeRecoveryResult> {
-    const metadata = await this.connectOrLaunchProvider()
+    const metadata = await this.ensureProviderConnection()
     const connection = this.requireConnection()
     const result = await connection.request<TerminalRuntimeRecoveryResult>('listSessions')
     for (const session of result.sessions) {
@@ -250,6 +253,7 @@ export class PersistentTerminalProviderClient
 
   setScrollbackRows(rows: TerminalScrollbackRows): void {
     this.scrollbackRows = rows
+    if (!this.connection) return
     this.backgroundRequest('setScrollbackRows', { rows })
   }
 
@@ -292,13 +296,40 @@ export class PersistentTerminalProviderClient
   }
 
   async detachApplication(): Promise<void> {
+    this.isDetaching = true
+    await this.connectionAttempt?.catch(() => undefined)
     if (!this.connection) return
     try {
       await this.connection.request('detachApplication')
     } finally {
       this.connection.close()
       this.connection = null
+      this.connectedMetadata = null
     }
+  }
+
+  private ensureProviderConnection(): Promise<TerminalProviderMetadata> {
+    if (this.connection && this.connectedMetadata) return Promise.resolve(this.connectedMetadata)
+    if (this.connectionAttempt) return this.connectionAttempt
+    if (this.isDetaching) {
+      return Promise.reject(
+        providerUnavailable('Terminal provider connection is closed for application shutdown.')
+      )
+    }
+    const tracked = (async () => {
+      try {
+        const metadata = await this.connectOrLaunchProvider()
+        await this.requireConnection().request('setScrollbackRows', {
+          rows: this.scrollbackRows
+        })
+        this.connectedMetadata = metadata
+        return metadata
+      } finally {
+        this.connectionAttempt = null
+      }
+    })()
+    this.connectionAttempt = tracked
+    return tracked
   }
 
   private async connectOrLaunchProvider(): Promise<TerminalProviderMetadata> {
@@ -318,7 +349,6 @@ export class PersistentTerminalProviderClient
       return await this.connectOrLaunchWithLock(metadataPath)
     } finally {
       await launchLock.close()
-      await rm(this.launchLockPath(), { force: true })
     }
   }
 
@@ -471,6 +501,7 @@ export class PersistentTerminalProviderClient
   private handleProviderDisconnect(connection: TerminalProviderRpcConnection): void {
     if (this.connection !== connection) return
     this.connection = null
+    this.connectedMetadata = null
     for (const [sessionId, callbacks] of this.processCallbacks) {
       const scope = this.identities.get(sessionId)
       if (scope) callbacks.onExit({ scope, sessionId, exitCode: null })
@@ -478,7 +509,7 @@ export class PersistentTerminalProviderClient
   }
 
   private async request<T = void>(method: string, params?: unknown): Promise<T> {
-    if (!this.connection) await this.connectOrLaunchProvider()
+    if (!this.connection) await this.ensureProviderConnection()
     return this.requireConnection().request<T>(method, params)
   }
 

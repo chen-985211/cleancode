@@ -396,13 +396,14 @@ flowchart LR
 第三阶段于 2026-07-21 完成：
 
 - Electron main 通过带协议版本、随机认证 token、Provider instance、单 controller 和启动锁的本机长度帧协议连接独立终端 Provider；Provider 拥有普通交互/直接启动 PTY、headless 模型和权威输出 sequence，renderer 或 main 退出不等于 Provider shutdown。
+- Provider 启动锁采用带唯一 owner 和取得时间的短期租约：空白/损坏写入经过有界宽限后可恢复，死亡或超期 owner 可回收，所有权校验阻止旧租约误删后继锁；同一应用内并发终端共享单次连接，退出等待在途连接收敛，断连设置在重连后回放。
 - 会话级退出保留默认关闭，只允许当前 `interactive/direct` 运行会话明确启用；新 generation 恢复默认。首次 checkpoint 失败时回滚，运行中持久化失效时自动撤销保留并同步 UI；`workflow` 不可保留且不会被恢复为活动工作流。
 - warm attach 通过认证 Provider 和完整 `TerminalRunScope` 恢复同一个 live session、模型 snapshot 与后续输出；Provider 丢失时只从 schema v1 checkpoint 和连续输出记录恢复 normal-buffer 历史、cwd、尺寸与模式，不声明进程仍存活，也不让 alternate screen 覆盖可读历史。
 - checkpoint 使用同步临时文件、原子重命名和目录同步；单 checkpoint 12 MiB、单输出日志 4 MiB、冷历史 64 个、总量 512 MiB、保留 7 天，容量清理只淘汰冷历史。损坏/未知版本按 session 隔离，live 会话不因清理预算被终止。
 - retained 受管直接启动服务在应用重开后必须重新证明同一 live session、根进程与监听祖先所有权，才重建端口租约和实际端点；cold history 不恢复端点。
 - 显式终止、replacement、删除积木、checkout/归档工作区和移除项目继续走 Run 硬清理，覆盖退出保留并删除恢复资格/checkpoint；E2E 证明永久关闭和项目移除后 PTY 与恢复目录都被清理。
 - UI 以稳定文字区分“新会话”“已恢复”“历史”“已结束”，提供带可访问名称的当前会话保留开关，并在启动恢复对账完成前阻止自动创建 shell 抢占旧 identity。
-- Unit/Integration 覆盖退出策略、运行中存储降级、协议分帧/预算、认证、Provider 断连重连、checkpoint/输出 replay、alternate buffer 和端点所有权恢复；真实 Electron E2E 覆盖正常重启、renderer/main/Provider 故障、永久关闭、项目移除和工作流不恢复。
+- Unit/Integration 覆盖退出策略、启动租约损坏/超期/并发/所有权安全、运行中存储降级、协议分帧/预算、认证、Provider 断连重连、checkpoint/输出 replay、alternate buffer 和端点所有权恢复；真实 Electron E2E 覆盖正常重启、中断锁下多个终端重启、renderer/main/Provider 故障、永久关闭、项目移除和工作流不恢复。
 - 当前事实迁入[终端会话生命周期](../contexts/run/terminal-session.md)、[本地服务端口治理](../contexts/run/service-port-management.md)、[终端依赖工作流](../contexts/run/terminal-workflow.md)、[项目与分支工作区生命周期](../contexts/project/workspace-lifecycle.md)、[架构文档](../engineering/architecture.md)和 [UI 契约](../product/ui-contract.md)。
 
 ## 第四阶段：多运行环境与可编程控制

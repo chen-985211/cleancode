@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises'
+import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
+import type { FileHandle } from 'node:fs/promises'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -16,6 +17,33 @@ export interface TerminalProviderMetadata {
   readonly processId: number
   readonly startedAt: string
 }
+
+export interface ProviderLaunchLockLease {
+  close(): Promise<void>
+}
+
+interface ProviderLaunchLockRecord {
+  readonly schemaVersion: 1
+  readonly ownerId: string
+  readonly processId: number
+  readonly acquiredAt: string
+}
+
+interface ProviderLaunchLockSnapshot {
+  readonly contentFingerprint: string | null
+  readonly device: number
+  readonly inode: number
+  readonly modifiedAtMs: number
+  readonly record: ProviderLaunchLockRecord | LegacyProviderLaunchLockRecord | null
+  readonly size: number
+}
+
+interface LegacyProviderLaunchLockRecord {
+  readonly processId: number
+}
+
+const providerLaunchLockInitializationGraceMs = 250
+const providerLaunchLockStaleAfterMs = 15_000
 
 export async function readProviderMetadata(path: string): Promise<TerminalProviderMetadata | null> {
   try {
@@ -102,20 +130,29 @@ export function rotateProviderLog(path: string): void {
 
 export async function acquireProviderLaunchLock(
   path: string
-): Promise<Awaited<ReturnType<typeof open>> | null> {
-  try {
-    return await createLaunchLock(path)
-  } catch (error) {
-    if (getNodeErrorCode(error) !== 'EEXIST') throw error
-  }
-  const ownerProcessId = await readLaunchLockProcessId(path)
-  if (ownerProcessId === null || isProviderProcessAlive(ownerProcessId)) return null
-  await rm(path, { force: true })
-  try {
-    return await createLaunchLock(path)
-  } catch (error) {
-    if (getNodeErrorCode(error) === 'EEXIST') return null
-    throw error
+): Promise<ProviderLaunchLockLease | null> {
+  for (;;) {
+    try {
+      return await createLaunchLock(path)
+    } catch (error) {
+      if (getNodeErrorCode(error) !== 'EEXIST') throw error
+    }
+
+    const snapshot = await readLaunchLockSnapshot(path)
+    if (!snapshot) continue
+    const ageMs = getLaunchLockAgeMs(snapshot)
+    if (!snapshot.record && ageMs < providerLaunchLockInitializationGraceMs) {
+      await delayProviderOperation(providerLaunchLockInitializationGraceMs - ageMs)
+      continue
+    }
+    if (
+      ageMs < providerLaunchLockStaleAfterMs &&
+      snapshot.record &&
+      isProviderProcessAlive(snapshot.record.processId)
+    ) {
+      return null
+    }
+    if (!(await removeLaunchLockSnapshot(path, snapshot))) continue
   }
 }
 
@@ -157,12 +194,18 @@ function getNodeErrorCode(error: unknown): string | null {
     : null
 }
 
-async function createLaunchLock(path: string): Promise<Awaited<ReturnType<typeof open>>> {
+async function createLaunchLock(path: string): Promise<ProviderLaunchLockLease> {
   const handle = await open(path, 'wx', 0o600)
+  const record: ProviderLaunchLockRecord = {
+    schemaVersion: 1,
+    ownerId: randomUUID(),
+    processId: process.pid,
+    acquiredAt: new Date().toISOString()
+  }
   try {
-    await handle.writeFile(`${JSON.stringify({ processId: process.pid })}\n`, 'utf8')
+    await handle.writeFile(`${JSON.stringify(record)}\n`, 'utf8')
     await handle.sync()
-    return handle
+    return new FileProviderLaunchLockLease(path, handle, record.ownerId)
   } catch (error) {
     await handle.close()
     await rm(path, { force: true })
@@ -170,16 +213,117 @@ async function createLaunchLock(path: string): Promise<Awaited<ReturnType<typeof
   }
 }
 
-async function readLaunchLockProcessId(path: string): Promise<number | null> {
-  try {
-    const value: unknown = JSON.parse(await readFile(path, 'utf8'))
-    return typeof value === 'object' &&
-      value !== null &&
-      'processId' in value &&
-      typeof value.processId === 'number'
-      ? value.processId
-      : null
-  } catch {
+async function readLaunchLockSnapshot(path: string): Promise<ProviderLaunchLockSnapshot | null> {
+  const fileStat = await stat(path).catch(() => null)
+  if (!fileStat) return null
+  const content = await readFile(path, 'utf8').catch(() => null)
+  let record: ProviderLaunchLockSnapshot['record'] = null
+  if (content !== null) {
+    try {
+      record = readLaunchLockRecord(JSON.parse(content) as unknown)
+    } catch {
+      record = null
+    }
+  }
+  return {
+    contentFingerprint:
+      content === null ? null : createHash('sha256').update(content).digest('hex'),
+    device: fileStat.dev,
+    inode: fileStat.ino,
+    modifiedAtMs: fileStat.mtimeMs,
+    record,
+    size: fileStat.size
+  }
+}
+
+function getLaunchLockAgeMs(snapshot: ProviderLaunchLockSnapshot): number {
+  let acquiredAtMs = snapshot.modifiedAtMs
+  if (snapshot.record && 'acquiredAt' in snapshot.record) {
+    const recordedAtMs = Date.parse(snapshot.record.acquiredAt)
+    if (Number.isFinite(recordedAtMs)) acquiredAtMs = Math.min(acquiredAtMs, recordedAtMs)
+  }
+  return Math.max(0, Date.now() - acquiredAtMs)
+}
+
+function readLaunchLockRecord(
+  value: unknown
+): ProviderLaunchLockRecord | LegacyProviderLaunchLockRecord | null {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('processId' in value) ||
+    typeof value.processId !== 'number'
+  ) {
     return null
+  }
+  if (
+    'schemaVersion' in value &&
+    value.schemaVersion === 1 &&
+    'ownerId' in value &&
+    typeof value.ownerId === 'string' &&
+    'acquiredAt' in value &&
+    typeof value.acquiredAt === 'string'
+  ) {
+    return {
+      schemaVersion: 1,
+      ownerId: value.ownerId,
+      processId: value.processId,
+      acquiredAt: value.acquiredAt
+    }
+  }
+  return { processId: value.processId }
+}
+
+async function removeLaunchLockSnapshot(
+  path: string,
+  snapshot: ProviderLaunchLockSnapshot
+): Promise<boolean> {
+  const current = await readLaunchLockSnapshot(path)
+  if (!current || !isSameLaunchLockSnapshot(current, snapshot)) return false
+  await rm(path, { force: true })
+  return true
+}
+
+function isSameLaunchLockSnapshot(
+  current: ProviderLaunchLockSnapshot,
+  expected: ProviderLaunchLockSnapshot
+): boolean {
+  if (
+    current.contentFingerprint !== expected.contentFingerprint ||
+    current.device !== expected.device ||
+    current.inode !== expected.inode ||
+    current.modifiedAtMs !== expected.modifiedAtMs ||
+    current.size !== expected.size
+  ) {
+    return false
+  }
+  if (!current.record || !expected.record) return current.record === expected.record
+  if ('ownerId' in current.record || 'ownerId' in expected.record) {
+    return (
+      'ownerId' in current.record &&
+      'ownerId' in expected.record &&
+      current.record.ownerId === expected.record.ownerId
+    )
+  }
+  return current.record.processId === expected.record.processId
+}
+
+class FileProviderLaunchLockLease implements ProviderLaunchLockLease {
+  private isClosed = false
+
+  constructor(
+    private readonly path: string,
+    private readonly handle: FileHandle,
+    private readonly ownerId: string
+  ) {}
+
+  async close(): Promise<void> {
+    if (this.isClosed) return
+    this.isClosed = true
+    await this.handle.close()
+    const current = await readLaunchLockSnapshot(this.path)
+    if (current?.record && 'ownerId' in current.record && current.record.ownerId === this.ownerId) {
+      await removeLaunchLockSnapshot(this.path, current)
+    }
   }
 }
