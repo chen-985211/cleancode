@@ -64,7 +64,7 @@ describe('default block graph', () => {
       position: { x: 180, y: 270 }
     })
 
-    expect(terminalBlock.size).toEqual({ width: 560, height: 360 })
+    expect(terminalBlock.size).toEqual({ width: 720, height: 460 })
   })
 
   it('restores legacy terminal blocks with an empty launch command', () => {

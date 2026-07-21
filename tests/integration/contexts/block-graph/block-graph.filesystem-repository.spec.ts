@@ -100,7 +100,7 @@ describe('block graph filesystem repository', () => {
           type: 'terminal-group',
           name: '启动项目',
           position: { x: 208, y: 104 },
-          size: { width: 1144, height: 512 },
+          size: { width: 1304, height: 612 },
           isCollapsed: false,
           memberBlockIds: [terminalBlock.id, secondTerminalBlock.id]
         }

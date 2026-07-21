@@ -413,12 +413,9 @@
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
-  margin: 8px;
   overflow: hidden;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 8px;
+  border-radius: 0 0 11px 11px;
   background: var(--terminal-screen);
-  box-shadow: none;
 }
 
 .terminal-output-shell,
@@ -433,7 +430,7 @@
 
 .terminal-output-shell {
   position: relative;
-  padding: 10px 11px 11px;
+  padding: 9px 0 9px 10px;
 }
 
 .terminal-viewport {
@@ -588,8 +585,8 @@
 }
 
 .terminal-output-shell .xterm-viewport::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .terminal-output-shell .xterm-viewport::-webkit-scrollbar-track {
@@ -597,8 +594,7 @@
 }
 
 .terminal-output-shell .xterm-viewport::-webkit-scrollbar-thumb {
-  border: 2px solid var(--terminal-screen);
-  border-radius: 999px;
+  border-radius: 999px 0 0 999px;
   background: var(--cc-scrollbar);
 }
 

@@ -257,6 +257,8 @@ describe('run terminal sessions e2e', () => {
       await waitForTerminalSelectionState(page, true)
       await agentHeader.click()
       await waitForTerminalSelectionState(page, false)
+      await page.getByRole('button', { name: '收起小地图' }).click()
+      await page.locator('.canvas-minimap--collapsed').waitFor()
 
       const beforeBox = await readRequiredBoundingBox(terminalBlock)
       const beforePosition = await readTerminalBlockPosition(workbench)

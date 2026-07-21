@@ -12,17 +12,17 @@ describe('terminal block placement', () => {
   it('places a new terminal beside an occupied starting position', () => {
     const position = resolveNewTerminalBlockPosition([createTerminalBlock('Terminal 1', 180, 270)])
 
-    expect(position).toEqual({ x: 804, y: 270 })
+    expect(position).toEqual({ x: 964, y: 270 })
   })
 
   it('wraps to the next row when the first row is occupied', () => {
     const position = resolveNewTerminalBlockPosition([
       createTerminalBlock('Terminal 1', 180, 270),
-      createTerminalBlock('Terminal 2', 804, 270),
-      createTerminalBlock('Terminal 3', 1428, 270)
+      createTerminalBlock('Terminal 2', 964, 270),
+      createTerminalBlock('Terminal 3', 1748, 270)
     ])
 
-    expect(position).toEqual({ x: 180, y: 694 })
+    expect(position).toEqual({ x: 180, y: 794 })
   })
 
   it('skips grid positions covered by a resized terminal block', () => {
@@ -30,16 +30,16 @@ describe('terminal block placement', () => {
       createTerminalBlock('Terminal 1', 180, 270, { width: 904, height: 306 })
     ])
 
-    expect(position).toEqual({ x: 1428, y: 270 })
+    expect(position).toEqual({ x: 1748, y: 270 })
   })
 
   it('keeps new terminals close to the existing workbench cluster', () => {
     const position = resolveNewTerminalBlockPosition([
       createTerminalBlock('Terminal 1', 680, 520),
-      createTerminalBlock('Terminal 2', 1304, 520)
+      createTerminalBlock('Terminal 2', 1464, 520)
     ])
 
-    expect(position).toEqual({ x: 1928, y: 520 })
+    expect(position).toEqual({ x: 2248, y: 520 })
   })
 })
 

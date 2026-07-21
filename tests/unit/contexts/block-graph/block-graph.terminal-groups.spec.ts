@@ -34,7 +34,7 @@ describe('terminal groups in the default block graph', () => {
         type: 'terminal-group',
         name: '启动项目',
         position: { x: 288, y: 164 },
-        size: { width: 1124, height: 512 },
+        size: { width: 1284, height: 612 },
         isCollapsed: false,
         memberBlockIds: [backend.id, frontend.id]
       }
