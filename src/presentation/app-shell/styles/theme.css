@@ -2,7 +2,7 @@
 :root[data-theme='light'] {
   color-scheme: light;
   --cc-background: #eef1f5;
-  --cc-canvas: #f8f9fb;
+  --cc-canvas: #eceff4;
   --cc-chrome: #f3f5f8;
   --cc-chrome-raised: #f8f9fb;
   --cc-chrome-translucent: rgb(243 245 248 / 78%);
@@ -65,7 +65,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --cc-background: #101318;
-  --cc-canvas: #13171d;
+  --cc-canvas: #0d1015;
   --cc-chrome: #171b22;
   --cc-chrome-raised: #1b2028;
   --cc-chrome-translucent: rgb(23 27 34 / 82%);

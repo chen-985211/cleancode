@@ -20,7 +20,7 @@
   border: 1px solid var(--terminal-border);
   border-radius: 12px;
   background: var(--terminal-shell);
-  box-shadow: var(--cc-shadow-xs);
+  box-shadow: var(--cc-shadow-sm);
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
@@ -31,8 +31,8 @@
 }
 
 .terminal-node--selected {
-  border-color: var(--terminal-border);
-  box-shadow: var(--cc-shadow-sm);
+  border-color: var(--cc-primary-border);
+  box-shadow: var(--cc-shadow-node);
 }
 
 .terminal-node--group-selection-mode {
