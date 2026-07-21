@@ -3,6 +3,7 @@
   "entry": [
     "electron.vite.config.ts",
     "src/platform/electron-main/main.ts",
+    "src/platform/electron-main/terminal-runtime-provider.ts",
     "src/platform/electron-preload/preload.ts",
     "tests/**/*.spec.tsx"
   ],

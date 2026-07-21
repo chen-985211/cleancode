@@ -1,4 +1,6 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalRetentionPolicy } from '../../contexts/run/domain/aggregates/TerminalSession'
+import type { ActualServiceEndpoint } from '../../contexts/run/domain/value-objects/ActualServiceEndpoint'
 import type {
   OpenTerminalLinkCommand,
   TerminalLinkOpenResult
@@ -105,11 +107,20 @@ export interface TerminalIpcHandlersInput {
   readonly writeTerminal: (sessionId: string, input: string) => TerminalSessionSnapshot
   readonly interruptTerminal: (sessionId: string) => TerminalSessionSnapshot
   readonly listTerminalSessions: (sessionIds: readonly string[]) => TerminalSessionSnapshot[]
+  readonly listRecoveredTerminalSessions?: () => TerminalSessionSnapshot[]
+  readonly listRecoveredTerminalServiceEndpoints?: () => readonly {
+    readonly session: TerminalSessionSnapshot
+    readonly endpoint: ActualServiceEndpoint
+  }[]
   readonly listTerminalWorkingDirectories: (
     sessionIds: readonly string[]
   ) => Promise<TerminalWorkingDirectorySnapshot[]>
   readonly terminateTerminal: (sessionId: string) => Promise<TerminalSessionSnapshot | null>
   readonly updateTerminalScrollback: (rows: TerminalScrollbackRows) => void
+  readonly setTerminalRetention?: (
+    sessionId: string,
+    retentionPolicy: TerminalRetentionPolicy
+  ) => Promise<TerminalSessionSnapshot>
   readonly attachTerminalView: (command: AttachTerminalViewCommand) => Promise<TerminalSnapshot>
   readonly detachTerminalView: (command: TerminalViewIdentityCommand) => Promise<void>
 }
@@ -291,6 +302,59 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     logger: input.logger,
     operation: 'listTerminalSessions',
     scope: 'run.terminal'
+  })
+
+  registerIpcHandler<void, TerminalSessionSnapshot[]>({
+    channel: 'cleancode:list-recovered-terminal-sessions',
+    handler: () => input.listRecoveredTerminalSessions?.() ?? [],
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listRecoveredTerminalSessions',
+    scope: 'run.terminal-recovery'
+  })
+
+  registerIpcHandler<
+    void,
+    readonly { readonly sessionId: string; readonly endpoint: ActualServiceEndpoint }[]
+  >({
+    channel: 'cleancode:list-recovered-terminal-service-endpoints',
+    handler: () =>
+      (input.listRecoveredTerminalServiceEndpoints?.() ?? []).map(({ session, endpoint }) => ({
+        sessionId: session.id,
+        endpoint
+      })),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listRecoveredTerminalServiceEndpoints',
+    scope: 'run.service-port'
+  })
+
+  registerIpcHandler<
+    { readonly sessionId: string; readonly retentionPolicy: TerminalRetentionPolicy },
+    TerminalSessionSnapshot
+  >({
+    channel: 'cleancode:set-terminal-retention',
+    handler: (command) => {
+      if (
+        !isRecord(command) ||
+        typeof command.sessionId !== 'string' ||
+        (command.retentionPolicy !== 'terminate-on-application-exit' &&
+          command.retentionPolicy !== 'keep-after-application-exit')
+      ) {
+        throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal retention command.')
+      }
+      if (!input.setTerminalRetention) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_UNAVAILABLE',
+          'Terminal retention is unavailable.'
+        )
+      }
+      return input.setTerminalRetention(command.sessionId, command.retentionPolicy)
+    },
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'setTerminalRetention',
+    scope: 'run.terminal-recovery'
   })
 
   registerIpcHandler<

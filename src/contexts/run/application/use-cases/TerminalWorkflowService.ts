@@ -129,6 +129,23 @@ export class TerminalWorkflowService {
     return activeRun.run.toSnapshot()
   }
 
+  async stopAll(): Promise<void> {
+    const results = await Promise.allSettled(
+      this.activeRuns
+        .list()
+        .map((activeRun) =>
+          beginWorkflowHardDispose(activeRun, () => this.performHardDispose(activeRun))
+        )
+    )
+    const failures = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    )
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1) {
+      throw new AggregateError(failures, 'Multiple terminal workflows failed to stop.')
+    }
+  }
+
   private async schedule(activeRun: ActiveWorkflowRun): Promise<void> {
     if (!this.isCurrent(activeRun)) {
       return

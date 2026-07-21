@@ -86,6 +86,8 @@ Run 不得直接读取或修改 `BlockGraph` 聚合。它只能通过 `TerminalW
 
 表现层中的节点徽标、连线颜色和应用通知都是运行快照的派生投影，不是新的事实来源。通知关闭不得改变工作流、节点状态或终端输出，也不得隐式触发停止。应用重启后恢复连接和执行配置，但不恢复上一次活动工作流或通知。
 
+普通终端的退出保留不扩大到 `WorkflowRun`。应用正常退出和 Electron main 异常断开时，Provider 都会停止 `workflow` kind 的命令 PTY；持久化恢复存储发现工作流 checkpoint 时删除而不 revive。即使某个普通终端 PTY 能 warm attach，应用也不得据此重建调度器、节点状态、就绪结果、端口租约或活动通知，更不得显示为已经恢复的工作流。
+
 ## 图与计划规则
 
 依赖方向使用 `source -> target`：source 是上游，target 是下游。

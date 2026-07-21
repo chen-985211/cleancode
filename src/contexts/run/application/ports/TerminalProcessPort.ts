@@ -2,10 +2,12 @@ import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunSco
 
 export type TerminalLaunchMode = 'command' | 'interactive'
 
-interface TerminalProcessOutputEvent {
+export interface TerminalProcessOutputEvent {
   readonly scope: TerminalRunScope
   readonly sessionId: string
   readonly data: string
+  /** Present only when an external runtime provider already accepted this output into its model. */
+  readonly sequence?: number
 }
 
 export interface TerminalOutputEvent extends TerminalProcessOutputEvent {
@@ -29,6 +31,7 @@ export interface StartTerminalProcessCommand {
   readonly shell?: string
   readonly launchCommand?: string
   readonly launchMode?: TerminalLaunchMode
+  readonly sessionKind?: 'interactive' | 'direct' | 'workflow'
   readonly environment?: Readonly<Record<string, string>>
   readonly columns: number
   readonly rows: number

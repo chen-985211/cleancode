@@ -100,6 +100,12 @@ const cleancodeApi = {
   interruptTerminal: (command: unknown) => invokeCleancode('cleancode:interrupt-terminal', command),
   listTerminalSessions: (command: unknown) =>
     invokeCleancode('cleancode:list-terminal-sessions', command),
+  listRecoveredTerminalSessions: () =>
+    invokeCleancode('cleancode:list-recovered-terminal-sessions'),
+  listRecoveredTerminalServiceEndpoints: () =>
+    invokeCleancode('cleancode:list-recovered-terminal-service-endpoints'),
+  setTerminalRetention: (command: unknown) =>
+    invokeCleancode('cleancode:set-terminal-retention', command),
   listTerminalWorkingDirectories: (command: unknown) =>
     invokeCleancode('cleancode:list-terminal-working-directories', command),
   terminateTerminal: (command: unknown) => invokeCleancode('cleancode:terminate-terminal', command),
@@ -130,6 +136,8 @@ const cleancodeApi = {
   },
   onTerminalViewOutput: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:terminal-view-output', listener),
+  onTerminalSessionUpdated: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:terminal-session-updated', listener),
   onTerminalExit: (listener: (event: unknown) => void) => {
     const subscription = (_event: Electron.IpcRendererEvent, exitEvent: unknown) => {
       listener(exitEvent)

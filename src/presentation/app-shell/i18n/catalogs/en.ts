@@ -224,6 +224,26 @@ export const enMessages = {
     'Restart with an empty terminal session without running the launch command',
   'terminal.action.edit': 'Edit terminal details',
   'terminal.action.delete': 'Delete terminal',
+  'terminal.retention.enable': 'Keep this session running after the app exits',
+  'terminal.retention.disable': 'Stop keeping this session after the app exits',
+  'terminal.retention.workflowUnavailable': 'Workflow sessions always stop with the app',
+  'terminal.recovery.fresh': 'Fresh',
+  'terminal.recovery.warm': 'Restored',
+  'terminal.recovery.historical': 'History',
+  'terminal.recovery.ended': 'Ended',
+  'terminal.retention.failedTitle': 'Could not update session retention',
+  'terminal.retention.failed': 'The retention setting could not be updated.',
+  'error.TERMINAL_PROVIDER_AUTHENTICATION_FAILED':
+    'The terminal runtime provider could not be authenticated.',
+  'error.TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED':
+    'The terminal runtime provider uses an incompatible protocol.',
+  'error.TERMINAL_PROVIDER_UNAVAILABLE': 'The terminal runtime provider is unavailable.',
+  'error.TERMINAL_RECOVERY_DATA_CORRUPTED': 'The saved terminal recovery data is damaged.',
+  'error.TERMINAL_RECOVERY_STORAGE_LIMIT': 'The terminal recovery storage limit was reached.',
+  'error.TERMINAL_RECOVERY_VERSION_UNSUPPORTED':
+    'The saved terminal recovery data uses an unsupported version.',
+  'error.TERMINAL_SESSION_RETENTION_NOT_ALLOWED':
+    'This terminal session cannot stay alive after the app exits.',
   'terminal.defaultName': 'Terminal {index}',
   'terminal.defaultDescription': 'Local terminal',
   'terminal.namedAction': '{blockName} — {action}',

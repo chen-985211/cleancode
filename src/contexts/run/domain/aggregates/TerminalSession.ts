@@ -2,6 +2,10 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type { TerminalRunScope } from '../value-objects/TerminalRunScope'
 
 export type TerminalSessionStatus = 'idle' | 'running' | 'stopping' | 'exited' | 'failed'
+export type TerminalSessionKind = 'interactive' | 'direct' | 'workflow'
+export type TerminalRetentionPolicy =
+  'terminate-on-application-exit' | 'keep-after-application-exit'
+export type TerminalRecoveryKind = 'fresh' | 'warm' | 'historical' | 'ended'
 
 export interface TerminalSessionSnapshot extends TerminalRunScope {
   readonly id: string
@@ -9,6 +13,9 @@ export interface TerminalSessionSnapshot extends TerminalRunScope {
   readonly workingDirectory: string
   readonly processId: number | null
   readonly status: TerminalSessionStatus
+  readonly kind: TerminalSessionKind
+  readonly retentionPolicy: TerminalRetentionPolicy
+  readonly recoveryKind: TerminalRecoveryKind
   readonly inputHistory: readonly string[]
   readonly exitCode: number | null
   readonly failureReason: string | null
@@ -17,6 +24,19 @@ export interface TerminalSessionSnapshot extends TerminalRunScope {
 export interface CreateTerminalSessionInput {
   readonly scope: TerminalRunScope
   readonly workingDirectory: string
+  readonly kind?: TerminalSessionKind
+}
+
+export interface ReviveTerminalSessionInput {
+  readonly scope: TerminalRunScope
+  readonly workingDirectory: string
+  readonly kind: Exclude<TerminalSessionKind, 'workflow'>
+  readonly retentionPolicy: TerminalRetentionPolicy
+  readonly recoveryKind: Extract<TerminalRecoveryKind, 'warm' | 'historical'>
+  readonly processId: number | null
+  readonly inputHistory?: readonly string[]
+  readonly exitCode?: number | null
+  readonly failureReason?: string | null
 }
 
 export class TerminalSession {
@@ -25,14 +45,43 @@ export class TerminalSession {
   private readonly recordedInput: string[] = []
   private exitCodeValue: number | null = null
   private failureReasonValue: string | null = null
+  private retentionPolicyValue: TerminalRetentionPolicy = 'terminate-on-application-exit'
+  private recoveryKindValue: TerminalRecoveryKind = 'fresh'
 
   private constructor(
     public readonly scope: TerminalRunScope,
-    public readonly workingDirectory: string
+    public readonly workingDirectory: string,
+    public readonly kind: TerminalSessionKind
   ) {}
 
   static create(input: CreateTerminalSessionInput): TerminalSession {
-    return new TerminalSession(input.scope, input.workingDirectory)
+    return new TerminalSession(input.scope, input.workingDirectory, input.kind ?? 'interactive')
+  }
+
+  static revive(input: ReviveTerminalSessionInput): TerminalSession {
+    if (input.recoveryKind === 'warm' && input.processId === null) {
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_NOT_RUNNING',
+        'A warm terminal recovery requires a live process.'
+      )
+    }
+
+    if (input.recoveryKind === 'historical' && input.processId !== null) {
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
+        'Historical terminal recovery cannot claim a live process.'
+      )
+    }
+
+    const session = new TerminalSession(input.scope, input.workingDirectory, input.kind)
+    session.processIdValue = input.processId
+    session.statusValue = input.recoveryKind === 'warm' ? 'running' : 'exited'
+    session.retentionPolicyValue = input.retentionPolicy
+    session.recoveryKindValue = input.recoveryKind
+    session.recordedInput.push(...(input.inputHistory ?? []))
+    session.exitCodeValue = input.exitCode ?? null
+    session.failureReasonValue = input.failureReason ?? null
+    return session
   }
 
   get id(): string {
@@ -59,6 +108,14 @@ export class TerminalSession {
     return this.recordedInput
   }
 
+  get retentionPolicy(): TerminalRetentionPolicy {
+    return this.retentionPolicyValue
+  }
+
+  get recoveryKind(): TerminalRecoveryKind {
+    return this.recoveryKindValue
+  }
+
   markRunning(input: { readonly processId: number }): void {
     this.processIdValue = input.processId
     this.statusValue = 'running'
@@ -77,6 +134,24 @@ export class TerminalSession {
     this.recordedInput.push(input)
   }
 
+  setRetentionPolicy(policy: TerminalRetentionPolicy): void {
+    if (this.statusValue !== 'running') {
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_NOT_RUNNING',
+        'Terminal session is not running.'
+      )
+    }
+
+    if (this.kind === 'workflow' && policy === 'keep-after-application-exit') {
+      throw createExpectedAppError(
+        'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
+        'Workflow terminal sessions cannot survive application exit.'
+      )
+    }
+
+    this.retentionPolicyValue = policy
+  }
+
   markStopping(): void {
     if (this.statusValue === 'running') {
       this.statusValue = 'stopping'
@@ -86,6 +161,9 @@ export class TerminalSession {
   markExited(input: { readonly exitCode: number | null }): void {
     this.statusValue = 'exited'
     this.exitCodeValue = input.exitCode
+    if (this.recoveryKindValue !== 'historical') {
+      this.recoveryKindValue = 'ended'
+    }
   }
 
   markFailed(input: { readonly reason: string }): void {
@@ -102,6 +180,9 @@ export class TerminalSession {
       workingDirectory: this.workingDirectory,
       processId: this.processIdValue,
       status: this.statusValue,
+      kind: this.kind,
+      retentionPolicy: this.retentionPolicyValue,
+      recoveryKind: this.recoveryKindValue,
       inputHistory: this.recordedInput,
       exitCode: this.exitCodeValue,
       failureReason: this.failureReasonValue

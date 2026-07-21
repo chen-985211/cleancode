@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
@@ -129,6 +129,10 @@ async function captureFailureArtifacts(input: {
     ? await captureScreenshot(input.page, screenshotPath)
     : 'Renderer page was unavailable.'
   const traceError = await captureTrace(input.electronApp, input.diagnostics, tracePath)
+  const providerLog = await readFile(
+    join(input.workbench.appStateDirectory, 'terminal-runtime-provider', 'provider.log'),
+    'utf8'
+  ).catch(() => '')
 
   await writeFile(
     join(e2eArtifactDirectory, `${artifactStem}.json`),
@@ -136,6 +140,7 @@ async function captureFailureArtifacts(input: {
       {
         electronProcess: electronProcessState,
         processOutput: input.diagnostics.processOutput,
+        providerLog: providerLog.slice(-20_000),
         rendererOutput: input.diagnostics.rendererOutput,
         rendererState,
         screenshotError,

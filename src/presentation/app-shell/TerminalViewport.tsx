@@ -284,7 +284,10 @@ export function TerminalViewport({
           }
           const result = await surface.restore(snapshot)
           if (isReleased) return
-          outputTailRef.current = appendTerminalOutputTail('', snapshot.transcript)
+          outputTailRef.current = appendTerminalOutputTail(
+            '',
+            outputTailRef.current || snapshot.transcript
+          )
           if (outputTailElementRef.current) {
             outputTailElementRef.current.textContent = outputTailRef.current
           }

@@ -60,6 +60,10 @@ function toTerminalViewState(
     sessionId: session.id,
     status: session.status,
     output,
+    sessionKind: session.kind,
+    retentionPolicy: session.retentionPolicy,
+    recoveryKind: session.recoveryKind,
+    isRecoveryPending: false,
     runIdentity: toTerminalRunIdentity(session),
     actualEndpoint,
     portConflict: null,
@@ -86,13 +90,16 @@ export function applyTerminalSessionSnapshot(
     return states
   }
 
-  const nextState = toTerminalViewState(session, output, actualEndpoint)
   const currentState = states[terminalStateKey]
+  const isSameIdentity =
+    currentState?.runIdentity && isSameRunIdentity(currentState.runIdentity, nextIdentity)
+  const nextState = toTerminalViewState(
+    session,
+    isSameIdentity && output.length === 0 ? currentState.output : output,
+    actualEndpoint
+  )
   const acceptedState =
-    currentState?.runIdentity &&
-    isSameRunIdentity(currentState.runIdentity, nextIdentity) &&
-    isTerminalStatus(currentState.status) &&
-    !isTerminalStatus(session.status)
+    isSameIdentity && isTerminalStatus(currentState.status) && !isTerminalStatus(session.status)
       ? {
           ...nextState,
           status: currentState.status,
@@ -132,6 +139,9 @@ export function applyTerminalExitEvent(
       sessionId: event.sessionId,
       status: 'exited',
       output: '',
+      sessionKind: null,
+      retentionPolicy: 'terminate-on-application-exit',
+      recoveryKind: 'ended',
       runIdentity: identity,
       actualEndpoint: null,
       portConflict: null,
@@ -148,8 +158,24 @@ export function applyTerminalSessionStatusSnapshot(
   const current = states[terminalStateKey]
   const identity = toTerminalRunIdentity(session)
   if (!current?.runIdentity || !isSameRunIdentity(current.runIdentity, identity)) return states
-  if (current.status === session.status) return states
-  return { ...states, [terminalStateKey]: { ...current, status: session.status } }
+  if (
+    current.status === session.status &&
+    current.retentionPolicy === session.retentionPolicy &&
+    current.recoveryKind === session.recoveryKind &&
+    current.sessionKind === session.kind
+  ) {
+    return states
+  }
+  return {
+    ...states,
+    [terminalStateKey]: {
+      ...current,
+      status: session.status,
+      sessionKind: session.kind,
+      retentionPolicy: session.retentionPolicy,
+      recoveryKind: session.recoveryKind
+    }
+  }
 }
 
 export function reconcileTerminalSessionSnapshots(

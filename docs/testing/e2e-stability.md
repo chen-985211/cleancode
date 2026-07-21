@@ -165,7 +165,7 @@ afterEach(async ({ task }) => {
 })
 ```
 
-关闭动作不能只发送 `close` 后立即返回，还要等待真实子进程退出。超时后的强制结束是清理兜底，不是正常同步机制。诊断采集放在关闭前，资源释放放在 `finally` 中；即使截图或 trace 失败，也不能跳过进程和临时目录清理。
+关闭动作不能只发送 `close` 后立即返回，还要等待真实子进程退出。存在跨应用存活 Provider 时，Electron 退出不再代表全部终端资源退出；测试支撑必须读取该场景隔离状态目录中的 metadata，通过 token、协议和 instance 完成 health 认证后再请求/发送 Provider shutdown，PID 只能用于认证成功后的等待与强制兜底。超时后的强制结束是清理兜底，不是正常同步机制。诊断采集放在关闭前，资源释放放在 `finally` 中；即使截图或 trace 失败，也不能跳过进程和临时目录清理。
 
 ## 首次失败必须可诊断
 
@@ -178,7 +178,7 @@ E2E 失败诊断至少要回答：
 - 进程是否仍存活，退出码和信号是什么？
 - 测试使用了哪些临时目录和应用状态？
 
-推荐保留页面截图、Playwright trace、Electron stdout/stderr、renderer console/page error、当前稳定身份和关键状态快照。诊断产物属于本地失败证据，必须写入 Git 忽略目录。
+推荐保留页面截图、Playwright trace、Electron stdout/stderr、renderer console/page error、当前稳定身份和关键状态快照；涉及独立 Provider 时同时保留不含 token/终端内容的有界 Provider 日志尾部。诊断产物属于本地失败证据，必须写入 Git 忽略目录。
 
 ## 重复运行不是重试
 

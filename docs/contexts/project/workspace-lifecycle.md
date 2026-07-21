@@ -65,7 +65,7 @@ Project 上下文有两个聚合根：
 
 ### 归档分支工作区
 
-归档前必须确认工作区存在、不是主工作区、绑定了 Git 分支且工作树干净；普通脏工作树必须在任何运行时清理前拒绝。预检通过后，应用层先挂起并排空该目录的 Agent，再次确认工作树干净，随后通过 `WorkspaceAgentLifecyclePort` 取得 Agent attach lease，并通过 `WorkspaceRunLifecyclePort` 阻止新 Run 启动、等待在途启动并硬清理该工作区的终端、探测器和端口租约。若排空期间出现改动，必须恢复原 Agent、释放运行时 lease，且不得删除 worktree。二次检查通过后才删除并 prune worktree、保存聚合变化。保存成功后 resolve 两类 lease；若 worktree 已删除但 prune 或保存失败，则 quarantine blocker，避免旧界面向已删除目录重新附加或启动 PTY。后续归档重试可识别 quarantine，跳过已经完成的删除并在保存成功后 resolve。对应的 Git 分支继续存在。
+归档前必须确认工作区存在、不是主工作区、绑定了 Git 分支且工作树干净；普通脏工作树必须在任何运行时清理前拒绝。预检通过后，应用层先挂起并排空该目录的 Agent，再次确认工作树干净，随后通过 `WorkspaceAgentLifecyclePort` 取得 Agent attach lease，并通过 `WorkspaceRunLifecyclePort` 阻止新 Run 启动、等待在途启动并硬清理该工作区的终端、Provider 恢复资格/checkpoint、探测器和端口租约。终端的应用退出保留策略不能覆盖这个硬清理。若排空期间出现改动，必须恢复原 Agent、释放运行时 lease，且不得删除 worktree。二次检查通过后才删除并 prune worktree、保存聚合变化。保存成功后 resolve 两类 lease；若 worktree 已删除但 prune 或保存失败，则 quarantine blocker，避免旧界面向已删除目录重新附加或启动 PTY。后续归档重试可识别 quarantine，跳过已经完成的删除并在保存成功后 resolve。对应的 Git 分支继续存在。
 
 Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不写入 `Project` 快照。cleancode 创建和外部工具创建、随后被同步进项目的 worktree 使用同一归档规则：干净但锁定的 worktree 必须返回 `GIT_WORKTREE_LOCKED`，由界面展示锁定原因并取得“解除锁并归档”的单次显式确认。应用层在 Agent 排空后重新读取锁状态；锁原因变化或新出现未确认的锁时，必须恢复 Agent 并停止归档。
 
@@ -77,7 +77,7 @@ Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不�
 
 1. 确认目标分支存在、未被其他 worktree 占用，且主工作区没有未提交改动。
 2. 通过 Project 拥有的 `WorkspaceAgentLifecyclePort` 挂起该物理目录中的全部运行中 Agent，并取得阻止旧 owner 重新附加的 lease；Agent 完全排空后必须再次确认工作树干净，避免预检与挂起之间产生的改动被带入目标分支。
-3. 二次检查通过后，通过 `WorkspaceRunLifecyclePort` 阻止旧作用域启动并硬清理该工作区全部终端、工作流、探测器和端口租约；Agent 与 Run lease 都必须持有到 checkout 事务收束。
+3. 二次检查通过后，通过 `WorkspaceRunLifecyclePort` 阻止旧作用域启动并硬清理该工作区全部终端、工作流、Provider 恢复资料、探测器和端口租约；Agent 与 Run lease 都必须持有到 checkout 事务收束。
 4. 执行 Git checkout；检查失败或 checkout 失败时尽力恢复旧 Agent 作用域并释放 Run 闸门，且不自动重启已经停止的终端。若 checkout 已成功但后续保存失败，先 checkout 回原分支再恢复旧 Agent 作用域；补偿失败时 quarantine 两类 lease，不得在新分支目录中恢复旧作用域或允许旧 Run 重启。
 5. 成功后同步工作区绑定、保存项目并把主工作区设为当前工作区；完成后 resolve 两类 lease，新分支作用域才可在后续界面恢复时接管。
 
@@ -95,7 +95,7 @@ Agent 运行时如何按分支隔离，见 [Agent 与会话生命周期](../agen
 
 `Project` 与 `ProjectRegistry` 当前通过文件系统仓储保存为版本化 JSON。Git 仓库、分支和 worktree 的真实状态来自 `GitWorkspacePort`，但只有经过用例同步并保存后的 `Project` 才是 cleancode 已提交项目状态。
 
-项目登记簿保存有序项目目录和当前项目目录，不拥有项目名称、工作区或 Git 绑定。手动排序通过“把项目移动到另一项目之前”的相对命令表达，目标为空时移动到末尾；该写事务与 remember、forget、select 共享全局登记簿事务协调器，避免旧整表快照覆盖并发更新。应用启动时优先恢复登记簿中的当前项目；旧版登记簿缺少该字段、已选项目无法加载或选择无效时，回退到首个可加载项目并立即修复登记簿；没有可加载项目时清空当前项目。删除登记项不会删除项目目录、Git 分支或 worktree；删除登记前仍须释放项目内 Agent 与 Run 资源，并把两类 lifecycle lease 持有到登记簿保存完成。保存失败时释放 lease，但已经停止的终端不会自动重启。
+项目登记簿保存有序项目目录和当前项目目录，不拥有项目名称、工作区或 Git 绑定。手动排序通过“把项目移动到另一项目之前”的相对命令表达，目标为空时移动到末尾；该写事务与 remember、forget、select 共享全局登记簿事务协调器，避免旧整表快照覆盖并发更新。应用启动时优先恢复登记簿中的当前项目；旧版登记簿缺少该字段、已选项目无法加载或选择无效时，回退到首个可加载项目并立即修复登记簿；没有可加载项目时清空当前项目。删除登记项不会删除项目目录、Git 分支或 worktree；删除登记前仍须释放项目内 Agent 与 Run 资源，包括明确保留的 Provider session 和 checkpoint，并把两类 lifecycle lease 持有到登记簿保存完成。保存失败时释放 lease，但已经停止的终端不会自动重启。
 
 ## 实现入口
 

@@ -107,6 +107,13 @@ export class ServicePortLeaseRegistry {
     return lease
   }
 
+  adoptBound(owner: TerminalRunScope, endpoint: ActualServiceEndpoint): ServicePortLease {
+    const lease = this.reserve(owner, endpoint)
+    lease.markActivating()
+    lease.markBound()
+    return lease
+  }
+
   findActiveByPort(port: number): ServicePortLeaseSnapshot | null {
     return this.activeLeasesByPort.get(port)?.toSnapshot() ?? null
   }

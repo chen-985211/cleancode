@@ -160,6 +160,8 @@ resolveUserFacingErrorMessage(error, '工作区操作失败。')
 
 本地服务端口诊断可以记录稳定运行身份、候选/实际端口、租约状态、所有权分类、有限重试次数和结构化失败原因；不得记录完整环境变量、Bearer Token、项目命令输出或把操作系统 PID 直接提升为用户可见业务身份。当前冲突界面不展示外部 PID，也不提供终止未知进程的动作。
 
+终端 Provider 使用应用状态目录中的本地轮转诊断文件记录 ready、controller 断连、协议/存储失败等事件。日志可以记录 Provider instance、结构化失败原因和有界计数，不得记录认证 token、终端输入、terminal 输出、checkpoint 内容、环境变量或用户源码。E2E 失败证据可以附带有界 Provider 日志尾部，但仍遵守这些内容限制；Provider 日志不是会话或恢复事实来源。
+
 ## 工程门禁
 
 `pnpm check:logging` 必须检查：

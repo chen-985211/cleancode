@@ -29,6 +29,7 @@ interface TerminalFlowNodeHandlers {
   readonly onStop: (block: TerminalBlockSnapshot) => void
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
+  readonly onToggleRetention?: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
   readonly onUpdateDefinition: (
     block: TerminalBlockSnapshot,

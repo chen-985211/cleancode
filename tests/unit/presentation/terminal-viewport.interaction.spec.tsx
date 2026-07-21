@@ -391,6 +391,25 @@ describe('terminal viewport interaction', () => {
     })
   })
 
+  it('keeps live startup output when the screen snapshot contains only normal-buffer text', async () => {
+    attachTerminalView.mockImplementation(async (command) =>
+      createSnapshot(command, 1, 'normal-buffer snapshot')
+    )
+    const { getByLabelText } = renderTerminalViewport({
+      output: '\u001b[?1049hFULLSCREEN_STARTUP_OUTPUT'
+    })
+
+    await waitForAttachedViewId()
+    await waitFor(() =>
+      expect(getByLabelText('Terminal 1 文本输出').textContent).toContain(
+        'FULLSCREEN_STARTUP_OUTPUT'
+      )
+    )
+    expect(getByLabelText('Terminal 1 文本输出').textContent).not.toContain(
+      'normal-buffer snapshot'
+    )
+  })
+
   it('requests a fresh snapshot when live output has a sequence gap', async () => {
     attachTerminalView
       .mockImplementationOnce(async (command) => createSnapshot(command, 0, 'first'))
@@ -528,7 +547,8 @@ describe('terminal viewport interaction', () => {
 function renderTerminalViewport({
   isResizeSuspended = false,
   onDimensionsChange = vi.fn(),
-  onPaste = vi.fn(async () => undefined)
+  onPaste = vi.fn(async () => undefined),
+  output = ''
 }: {
   readonly isResizeSuspended?: boolean
   readonly onDimensionsChange?: (dimensions: {
@@ -536,12 +556,13 @@ function renderTerminalViewport({
     readonly rows: number
   }) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
+  readonly output?: string
 } = {}) {
   return render(
     <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
       <TerminalViewport
         block={createTerminalBlock()}
-        session={createRunningTerminalState()}
+        session={createRunningTerminalState(output)}
         focusRequestId={0}
         isResizeSuspended={isResizeSuspended}
         onDimensionsChange={onDimensionsChange}
@@ -579,11 +600,11 @@ function rerenderTerminalViewport(
   )
 }
 
-function createRunningTerminalState() {
+function createRunningTerminalState(output = '') {
   return {
     sessionId: 'terminal-session-1',
     status: 'running' as const,
-    output: '',
+    output,
     runIdentity: {
       projectId: 'project-alpha',
       workspaceName: 'feature/sidebar',

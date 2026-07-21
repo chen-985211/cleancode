@@ -53,6 +53,21 @@ describe('terminal session runtime reconciliation', () => {
     })
   })
 
+  it('preserves live output when recovery reconciliation refreshes the same identity', () => {
+    const session = sessionSnapshot('session-1', 'running')
+    const current = viewState(session, 'live output')
+
+    const states = applyTerminalSessionSnapshot(
+      { 'project-1\0main\0block-1': current },
+      'project-1\0main\0block-1',
+      session,
+      '',
+      null
+    )
+
+    expect(states['project-1\0main\0block-1']?.output).toBe('live output')
+  })
+
   it('marks a missing requested run exited and ignores a response for a replaced identity', () => {
     const requested = sessionSnapshot('session-old', 'running')
     const replacement = sessionSnapshot('session-new', 'running', 2)
@@ -89,6 +104,9 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited', genera
     workingDirectory: '/work/app',
     processId: status === 'running' ? 101 : null,
     status,
+    kind: 'interactive' as const,
+    retentionPolicy: 'terminate-on-application-exit' as const,
+    recoveryKind: status === 'running' ? ('fresh' as const) : ('ended' as const),
     inputHistory: [],
     exitCode: status === 'exited' ? 0 : null,
     failureReason: null
@@ -106,11 +124,11 @@ function identity(session: ReturnType<typeof sessionSnapshot>) {
   }
 }
 
-function viewState(session: ReturnType<typeof sessionSnapshot>): TerminalViewState {
+function viewState(session: ReturnType<typeof sessionSnapshot>, output = ''): TerminalViewState {
   return {
     sessionId: session.id,
     status: session.status,
-    output: '',
+    output,
     runIdentity: identity(session),
     actualEndpoint: null,
     portConflict: null

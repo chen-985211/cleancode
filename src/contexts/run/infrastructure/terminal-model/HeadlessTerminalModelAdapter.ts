@@ -10,6 +10,7 @@ import type {
 
 import type {
   TerminalModeSnapshot,
+  TerminalModelCheckpoint,
   TerminalModelDiagnosticsSnapshot,
   TerminalSnapshot
 } from '../../application/dto/TerminalModelSnapshot'
@@ -17,7 +18,8 @@ import type {
   AttachTerminalViewCommand,
   CreateTerminalModelCommand,
   SequencedTerminalOutput,
-  TerminalModelPort,
+  TerminalModelRecoveryPort,
+  RestoreTerminalModelCommand,
   TerminalViewOutputEvent
 } from '../../application/ports/TerminalModelPort'
 import {
@@ -44,7 +46,7 @@ const { Unicode11Addon } = nodeRequire('@xterm/addon-unicode11') as {
 const pendingOutputHighWatermarkBytes = 1024 * 1024
 const pendingOutputLowWatermarkBytes = 256 * 1024
 
-export class HeadlessTerminalModelAdapter implements TerminalModelPort {
+export class HeadlessTerminalModelAdapter implements TerminalModelRecoveryPort {
   private readonly models = new Map<string, ManagedTerminalModel>()
   private lastRestoreDurationMs = 0
   private scrollbackRows: TerminalScrollbackRows = defaultTerminalScrollbackRows
@@ -58,6 +60,36 @@ export class HeadlessTerminalModelAdapter implements TerminalModelPort {
 
   acceptOutput(identity: TerminalRunScope, data: string): SequencedTerminalOutput {
     return this.requireModel(identity).acceptOutput(data)
+  }
+
+  captureCheckpoint(identity: TerminalRunScope): Promise<TerminalModelCheckpoint> {
+    return this.requireModel(identity).captureCheckpoint()
+  }
+
+  async restoreCheckpoint(command: RestoreTerminalModelCommand): Promise<void> {
+    const { checkpoint } = command
+    const key = createModelKey(checkpoint.identity)
+    this.models.get(key)?.dispose()
+    this.models.delete(key)
+    const model = new ManagedTerminalModel(
+      {
+        identity: checkpoint.identity,
+        columns: checkpoint.dimensions.columns,
+        rows: checkpoint.dimensions.rows,
+        workingDirectory: checkpoint.workingDirectory,
+        onQueryResponse: command.onQueryResponse,
+        onFlowControlChange: command.onFlowControlChange
+      },
+      normalizeScrollbackRows(checkpoint.scrollbackRows)
+    )
+    this.models.set(key, model)
+    try {
+      await model.restoreCheckpoint(checkpoint)
+    } catch (error) {
+      model.dispose()
+      this.models.delete(key)
+      throw error
+    }
   }
 
   async attachView(command: AttachTerminalViewCommand): Promise<TerminalSnapshot> {
@@ -225,6 +257,25 @@ class ManagedTerminalModel {
     return output
   }
 
+  async captureCheckpoint(): Promise<TerminalModelCheckpoint> {
+    this.assertActive()
+    await this.flush()
+    return this.createCheckpoint()
+  }
+
+  async restoreCheckpoint(checkpoint: TerminalModelCheckpoint): Promise<void> {
+    this.assertActive()
+    this.sequence = checkpoint.sequence
+    this.title = checkpoint.title
+    this.workingDirectory = checkpoint.workingDirectory
+    await new Promise<void>((resolve) => {
+      this.terminal.write(checkpoint.content, () => {
+        if (!this.disposed) this.parsedSequence = checkpoint.sequence
+        resolve()
+      })
+    })
+  }
+
   async attachView(command: AttachTerminalViewCommand): Promise<TerminalSnapshot> {
     this.assertActive()
     this.setFlowControlReason('view-handoff', true)
@@ -284,14 +335,34 @@ class ManagedTerminalModel {
   }
 
   private createSnapshot(viewId: string): TerminalSnapshot {
+    const checkpoint = this.createCheckpoint()
     return {
+      identity: checkpoint.identity,
+      sequence: checkpoint.sequence,
+      scrollbackRows: checkpoint.scrollbackRows,
+      unicodeVersion: checkpoint.unicodeVersion,
+      restoreMarker: { viewId, sequence: this.parsedSequence },
+      content: checkpoint.content,
+      transcript: checkpoint.transcript,
+      dimensions: checkpoint.dimensions,
+      title: checkpoint.title,
+      workingDirectory: checkpoint.workingDirectory,
+      modes: checkpoint.modes
+    }
+  }
+
+  private createCheckpoint(): TerminalModelCheckpoint {
+    const scrollbackRows = this.terminal.options.scrollback ?? defaultTerminalScrollbackRows
+    return {
+      schemaVersion: 1,
       identity: this.identity,
       sequence: this.parsedSequence,
-      scrollbackRows: this.terminal.options.scrollback ?? defaultTerminalScrollbackRows,
+      scrollbackRows,
       unicodeVersion: '11',
-      restoreMarker: { viewId, sequence: this.parsedSequence },
-      content: this.serializeAddon.serialize({
-        scrollback: this.terminal.options.scrollback ?? defaultTerminalScrollbackRows
+      content: this.serializeAddon.serialize({ scrollback: scrollbackRows }),
+      normalContent: this.serializeAddon.serialize({
+        excludeAltBuffer: true,
+        scrollback: scrollbackRows
       }),
       transcript: readTranscript(this.terminal),
       dimensions: { columns: this.terminal.cols, rows: this.terminal.rows },
@@ -321,12 +392,17 @@ function readModes(terminal: HeadlessTerminalInstance): TerminalModeSnapshot {
 }
 
 function readTranscript(terminal: HeadlessTerminalInstance): string {
-  const buffer = terminal.buffer.active
+  const buffer = terminal.buffer.normal
   const lines: string[] = []
   for (let index = 0; index < buffer.length; index += 1) {
     lines.push(buffer.getLine(index)?.translateToString(true) ?? '')
   }
   return lines.join('\n').replace(/\n+$/u, '')
+}
+
+function normalizeScrollbackRows(rows: number): TerminalScrollbackRows {
+  if (rows === 1000 || rows === 5000 || rows === 10000) return rows
+  return defaultTerminalScrollbackRows
 }
 
 function readOscWorkingDirectory(data: string): string | null {

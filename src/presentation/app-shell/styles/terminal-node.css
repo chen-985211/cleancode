@@ -277,6 +277,18 @@
   color: var(--cc-danger);
 }
 
+.terminal-node__action--retention-active {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+}
+
+.terminal-node__action--retention-active:hover:not(:disabled) {
+  border-color: var(--cc-primary);
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary-hover);
+}
+
 .terminal-state {
   display: inline-flex;
   height: 14px;
@@ -318,6 +330,33 @@
 .terminal-state--failed::before {
   background: var(--cc-danger);
   box-shadow: 0 0 0 3px var(--cc-danger-border);
+}
+
+.terminal-recovery-state {
+  display: inline-flex;
+  height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  background: var(--cc-surface-subtle);
+  padding: 0 5px;
+  color: var(--cc-muted);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.terminal-recovery-state--warm {
+  border-color: var(--cc-success-border);
+  background: var(--cc-success-soft);
+  color: var(--cc-success-strong);
+}
+
+.terminal-recovery-state--historical {
+  border-color: var(--cc-warning-border);
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning-strong);
 }
 
 .workflow-state {

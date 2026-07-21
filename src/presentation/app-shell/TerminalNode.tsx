@@ -5,7 +5,7 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, CircleStop, Edit3, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
+import { Check, CircleStop, Edit3, Pin, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { GroupRestartIcon } from './TerminalGroupIcons'
@@ -66,16 +66,26 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         return
       }
 
-      if (session.status === 'idle' && !session.sessionId && !hasRequestedAutoStartRef.current) {
+      if (
+        session.status === 'idle' &&
+        !session.sessionId &&
+        !session.isRecoveryPending &&
+        !hasRequestedAutoStartRef.current
+      ) {
         hasRequestedAutoStartRef.current = true
         data.onStart(block, dimensions)
       }
     },
-    [block, data, session.sessionId, session.status]
+    [block, data, session.isRecoveryPending, session.sessionId, session.status]
   )
 
   useEffect(() => {
-    if (session.status === 'idle' && !session.sessionId && !hasRequestedAutoStartRef.current) {
+    if (
+      session.status === 'idle' &&
+      !session.sessionId &&
+      !session.isRecoveryPending &&
+      !hasRequestedAutoStartRef.current
+    ) {
       const dimensions = lastDimensionsRef.current
 
       if (!dimensions) {
@@ -85,7 +95,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       hasRequestedAutoStartRef.current = true
       data.onStart(block, dimensions)
     }
-  }, [block, data, session.sessionId, session.status])
+  }, [block, data, session.isRecoveryPending, session.sessionId, session.status])
 
   const startEditingMetadata = useCallback(() => {
     setShouldFocusLaunchCommand(false)
@@ -173,6 +183,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isSelectedForTerminalGroup={data.isSelected}
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
         sessionStatus={session.status}
+        sessionKind={session.sessionKind ?? null}
+        retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
+        recoveryKind={session.recoveryKind ?? 'fresh'}
         workflowStatus={data.workflowStatus}
         isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
         isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
@@ -182,6 +195,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         onStop={stopTerminal}
         onQuickLaunch={quickLaunchTerminal}
         onRestart={restartTerminal}
+        onToggleRetention={() => data.onToggleRetention?.(block)}
         onRunFromHere={() => data.onRunFromHere?.(block)}
         onStopWorkflow={() => data.onStopWorkflow?.()}
         onDelete={() => data.onDelete(block)}
@@ -256,6 +270,9 @@ interface TerminalHeaderProps {
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly sessionStatus: TerminalViewState['status']
+  readonly sessionKind: TerminalViewState['sessionKind']
+  readonly retentionPolicy: NonNullable<TerminalViewState['retentionPolicy']>
+  readonly recoveryKind: NonNullable<TerminalViewState['recoveryKind']>
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
@@ -265,6 +282,7 @@ interface TerminalHeaderProps {
   readonly onStop: () => void
   readonly onQuickLaunch: () => void
   readonly onRestart: () => void
+  readonly onToggleRetention: () => void
   readonly onRunFromHere: () => void
   readonly onStopWorkflow: () => void
   readonly onDelete: () => void
@@ -280,6 +298,9 @@ function TerminalHeader({
   isSelectedForTerminalGroup,
   canSelectForTerminalGroup,
   sessionStatus,
+  sessionKind,
+  retentionPolicy,
+  recoveryKind,
   workflowStatus,
   isActiveWorkflowRoot,
   isStoppingWorkflow,
@@ -289,6 +310,7 @@ function TerminalHeader({
   onStop,
   onQuickLaunch,
   onRestart,
+  onToggleRetention,
   onRunFromHere,
   onStopWorkflow,
   onDelete
@@ -307,6 +329,13 @@ function TerminalHeader({
       ? t('terminal.action.stoppingWorkflow')
       : t('terminal.action.stopWorkflow')
     : t('terminal.action.runWorkflow')
+  const isRetained = retentionPolicy === 'keep-after-application-exit'
+  const retentionActionLabel =
+    sessionKind === 'workflow'
+      ? t('terminal.retention.workflowUnavailable')
+      : isRetained
+        ? t('terminal.retention.disable')
+        : t('terminal.retention.enable')
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
@@ -352,6 +381,9 @@ function TerminalHeader({
                   : sessionStatus === 'exited'
                     ? t('terminal.status.exited')
                     : t('terminal.status.idle')}
+          </span>
+          <span className={`terminal-recovery-state terminal-recovery-state--${recoveryKind}`}>
+            {t(`terminal.recovery.${recoveryKind}`)}
           </span>
           {workflowStatus ? (
             <span className={`workflow-state workflow-state--${workflowStatus}`}>
@@ -415,6 +447,18 @@ function TerminalHeader({
             onClick={onStop}
           >
             <Square size={14} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+        <TooltipLabel content={retentionActionLabel}>
+          <button
+            className={`terminal-node__action terminal-node__action--retention${isRetained ? ' terminal-node__action--retention-active' : ''}`}
+            type="button"
+            aria-label={t('terminal.namedAction', { blockName, action: retentionActionLabel })}
+            aria-pressed={isRetained}
+            disabled={!isRunning || sessionKind === 'workflow'}
+            onClick={onToggleRetention}
+          >
+            <Pin size={14} fill={isRetained ? 'currentColor' : 'none'} aria-hidden="true" />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('terminal.action.restartEmptyDescription')}>

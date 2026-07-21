@@ -93,6 +93,7 @@ export class LaunchTerminalCommandUseCase {
       workingDirectory: command.workingDirectory,
       launchCommand: plan.launchCommand,
       launchMode: 'interactive',
+      sessionKind: 'direct',
       shell: command.shell,
       columns: command.columns,
       rows: command.rows,

@@ -38,9 +38,9 @@
 - `TerminalSession` 使用明确状态迁移管理一次 PTY 会话。
 - 每次启动产生精确 `sessionId + runId + generation`，旧运行的迟到事件不能覆盖当前运行。
 - 同一项目、目录、工作区和终端槽位的启动与清理按 owner 串行。
-- 每个可恢复运行在主进程维护独立的权威终端模型、单调输出 sequence 和有界 snapshot。
+- 每个可恢复运行在独立本地 Provider 维护权威终端模型、单调输出 sequence 和有界 snapshot；应用内恢复对账仍经 Run 用例。
 - 工作区切换会销毁旧 renderer xterm；返回时创建新视图，并按 snapshot marker 接续定向 live output。
-- 隐藏普通终端停止逐字节 renderer 投递，由主进程模型继续解析输出并响应 terminal query。
+- 隐藏普通终端停止逐字节 renderer 投递，由 Provider 模型继续解析输出并响应 terminal query。
 - 模型使用 PTY pause/resume 建立背压与 query 响应权交接；renderer 恢复队列和重试均有界。
 - 启动命令、停止当前命令、重开空终端和停止工作流具有不同作用对象和语义。
 - 依赖工作流支持并行根、汇合等待、失败传播、任务/服务模式、就绪和反向停止。
@@ -48,11 +48,11 @@
 
 当前限制：
 
-- PTY、输出、输入历史和终端屏幕状态只存在于当前应用进程。
-- 权威终端模型仍只存在于当前主进程，应用完整退出后不会保留 PTY 或屏幕状态。
+- 只有用户明确保留且 checkpoint 可靠的普通交互/直接启动会话可以跨应用退出；工作流和默认策略会话仍会停止。
+- Provider 故障后的 cold restore 只有只读 normal-buffer 历史，不恢复进程、工作流或服务端点。
 - 当前 headless 模型适配器仍需随终端依赖升级重新验证序列化和协议兼容性。
 - 普通终端日常交互已经覆盖搜索、安全链接、复杂输入、有界粘贴和渲染降级；更广泛平台与终端程序兼容性仍需随依赖升级持续回归。
-- 普通终端没有跨应用存活、磁盘 checkpoint、远程 provider 或外部控制协议。
+- 当前 Provider 只支持本机运行环境；远程 Provider 与外部可编程控制协议仍未实现。
 
 ## 目标用户体验
 
@@ -111,7 +111,7 @@ flowchart LR
 | ---- | ---------------------- | ---------------------------------------------- | ---------------------------------- | -------- |
 | 1    | 权威模型与可丢弃视图   | 终端状态脱离单个 renderer xterm                | 隐藏、切换和视图重建更加可靠       | 已完成   |
 | 2    | 日常交互与渲染质量     | 完整的检索、链接、输入和渲染降级能力           | 每天使用更快、更顺、更少误操作     | 已完成   |
-| 3    | 跨应用存活与故障恢复   | 持久运行 provider、warm attach 和 cold restore | 退出或故障后仍能找回符合策略的终端 | 尚未开始 |
+| 3    | 跨应用存活与故障恢复   | 持久运行 provider、warm attach 和 cold restore | 退出或故障后仍能找回符合策略的终端 | 已完成   |
 | 4    | 多运行环境与可编程控制 | 本地和远程 provider、CLI/受控工具协议          | 同一套终端体验覆盖更多运行环境     | 尚未开始 |
 
 阶段必须按顺序建立稳定边界。第二阶段中不依赖持久化的独立交互能力，可以在第一阶段接口稳定后并行推进；第三、四阶段不得绕过第一阶段的权威模型和生命周期契约另建状态通道。
@@ -391,6 +391,20 @@ flowchart LR
 - 所有永久关闭路径都能证明资源与恢复资格已经清理。
 - 强制结束和部分失败不会导致错误复活、误杀无关进程或无界磁盘增长。
 
+### 第三阶段完成证据
+
+第三阶段于 2026-07-21 完成：
+
+- Electron main 通过带协议版本、随机认证 token、Provider instance、单 controller 和启动锁的本机长度帧协议连接独立终端 Provider；Provider 拥有普通交互/直接启动 PTY、headless 模型和权威输出 sequence，renderer 或 main 退出不等于 Provider shutdown。
+- 会话级退出保留默认关闭，只允许当前 `interactive/direct` 运行会话明确启用；新 generation 恢复默认。首次 checkpoint 失败时回滚，运行中持久化失效时自动撤销保留并同步 UI；`workflow` 不可保留且不会被恢复为活动工作流。
+- warm attach 通过认证 Provider 和完整 `TerminalRunScope` 恢复同一个 live session、模型 snapshot 与后续输出；Provider 丢失时只从 schema v1 checkpoint 和连续输出记录恢复 normal-buffer 历史、cwd、尺寸与模式，不声明进程仍存活，也不让 alternate screen 覆盖可读历史。
+- checkpoint 使用同步临时文件、原子重命名和目录同步；单 checkpoint 12 MiB、单输出日志 4 MiB、冷历史 64 个、总量 512 MiB、保留 7 天，容量清理只淘汰冷历史。损坏/未知版本按 session 隔离，live 会话不因清理预算被终止。
+- retained 受管直接启动服务在应用重开后必须重新证明同一 live session、根进程与监听祖先所有权，才重建端口租约和实际端点；cold history 不恢复端点。
+- 显式终止、replacement、删除积木、checkout/归档工作区和移除项目继续走 Run 硬清理，覆盖退出保留并删除恢复资格/checkpoint；E2E 证明永久关闭和项目移除后 PTY 与恢复目录都被清理。
+- UI 以稳定文字区分“新会话”“已恢复”“历史”“已结束”，提供带可访问名称的当前会话保留开关，并在启动恢复对账完成前阻止自动创建 shell 抢占旧 identity。
+- Unit/Integration 覆盖退出策略、运行中存储降级、协议分帧/预算、认证、Provider 断连重连、checkpoint/输出 replay、alternate buffer 和端点所有权恢复；真实 Electron E2E 覆盖正常重启、renderer/main/Provider 故障、永久关闭、项目移除和工作流不恢复。
+- 当前事实迁入[终端会话生命周期](../contexts/run/terminal-session.md)、[本地服务端口治理](../contexts/run/service-port-management.md)、[终端依赖工作流](../contexts/run/terminal-workflow.md)、[项目与分支工作区生命周期](../contexts/project/workspace-lifecycle.md)、[架构文档](../engineering/architecture.md)和 [UI 契约](../product/ui-contract.md)。
+
 ## 第四阶段：多运行环境与可编程控制
 
 ### 阶段目标
@@ -495,7 +509,7 @@ flowchart LR
 | 第一阶段 Plan       | 已确认   | [第一阶段完成证据](#第一阶段完成证据) |
 | 第一阶段 TDD 与实现 | 已完成   | [第一阶段完成证据](#第一阶段完成证据) |
 | 第二阶段            | 已完成   | [第二阶段完成证据](#第二阶段完成证据) |
-| 第三阶段            | 尚未开始 | —                                     |
+| 第三阶段            | 已完成   | [第三阶段完成证据](#第三阶段完成证据) |
 | 第四阶段            | 尚未开始 | —                                     |
 
 每次阶段状态变化时更新本表，并链接对应的 owner 文档、测试或验证记录。不得只把勾选状态作为完成证据。

@@ -2,6 +2,8 @@ import type { ChildProcess } from 'node:child_process'
 import { access, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { connect } from 'node:net'
+import { randomUUID } from 'node:crypto'
 
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright'
 import { expect } from 'vitest'
@@ -13,6 +15,11 @@ import {
   stopE2eTracing
 } from './e2eDiagnostics'
 import { runE2eTeardown } from './e2eLifecycle'
+import {
+  encodeTerminalProviderFrame,
+  TerminalProviderFrameDecoder,
+  terminalProviderProtocolVersion
+} from '../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
 
 export const electronLaunchTimeoutMs = 30_000
 export const electronScenarioTimeoutMs = 60_000
@@ -46,9 +53,110 @@ export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> 
 }
 
 async function cleanupE2eWorkbench(workbench: E2eWorkbench): Promise<void> {
+  await stopTerminalProvider(workbench.appStateDirectory)
   await rm(workbench.projectDirectory, { recursive: true, force: true })
   await rm(workbench.registryDirectory, { recursive: true, force: true })
   await rm(workbench.appStateDirectory, { recursive: true, force: true })
+}
+
+async function stopTerminalProvider(appStateDirectory: string): Promise<void> {
+  const metadata = await readAuthenticatedTerminalProviderMetadata(appStateDirectory)
+  if (!metadata) return
+  try {
+    process.kill(metadata.processId, 'SIGTERM')
+  } catch {
+    return
+  }
+  await waitForProcessIdExit(metadata.processId)
+}
+
+export async function readAuthenticatedTerminalProviderMetadata(
+  appStateDirectory: string
+): Promise<{
+  readonly authToken: string
+  readonly endpoint: string
+  readonly instanceId: string
+  readonly processId: number
+} | null> {
+  const metadataPath = join(appStateDirectory, 'terminal-runtime-provider', 'provider.json')
+  let metadata: {
+    readonly authToken: string
+    readonly endpoint: string
+    readonly instanceId: string
+    readonly processId: number
+  }
+  try {
+    metadata = JSON.parse(await readFile(metadataPath, 'utf8')) as typeof metadata
+  } catch {
+    return null
+  }
+  const identity = await authenticateTerminalProvider(metadata).catch(() => null)
+  return identity === metadata.instanceId ? metadata : null
+}
+
+export async function waitForProcessIdExit(processId: number): Promise<void> {
+  const deadline = Date.now() + 3_000
+  while (Date.now() < deadline && isProcessAlive(processId)) {
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  if (isProcessAlive(processId)) {
+    try {
+      process.kill(processId, 'SIGKILL')
+    } catch {
+      // The provider exited between the liveness check and the signal.
+    }
+  }
+}
+
+async function authenticateTerminalProvider(metadata: {
+  readonly authToken: string
+  readonly endpoint: string
+}): Promise<string> {
+  const socket = connect(metadata.endpoint)
+  await new Promise<void>((resolve, reject) => {
+    socket.once('connect', resolve)
+    socket.once('error', reject)
+  })
+  const requestId = randomUUID()
+  const decoder = new TerminalProviderFrameDecoder()
+  const response = new Promise<string>((resolve, reject) => {
+    socket.on('data', (chunk) => {
+      for (const value of decoder.push(chunk)) {
+        const message = value as {
+          readonly type?: string
+          readonly requestId?: string
+          readonly ok?: boolean
+          readonly result?: { readonly instanceId?: string }
+        }
+        if (message.type !== 'response' || message.requestId !== requestId) continue
+        if (message.ok && message.result?.instanceId) resolve(message.result.instanceId)
+        else reject(new Error('Terminal provider authentication failed during E2E cleanup.'))
+      }
+    })
+  })
+  socket.write(
+    encodeTerminalProviderFrame({
+      type: 'request',
+      protocolVersion: terminalProviderProtocolVersion,
+      requestId,
+      authToken: metadata.authToken,
+      method: 'health'
+    })
+  )
+  try {
+    return await response
+  } finally {
+    socket.destroy()
+  }
+}
+
+function isProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function teardownE2eScenario(input: {

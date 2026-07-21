@@ -7,7 +7,10 @@ import {
   applyTerminalServiceRunEvent,
   type TerminalServiceRunEvent
 } from './terminalServiceRunProjection'
-import { applyTerminalExitEvent } from './terminalSessionRuntime'
+import {
+  applyTerminalExitEvent,
+  applyTerminalSessionStatusSnapshot
+} from './terminalSessionRuntime'
 import { applyTerminalWorkflowEventToStates } from './terminalWorkflowSessionEvents'
 import type { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import type { TerminalViewState } from './types'
@@ -43,13 +46,6 @@ export function useTerminalSessionEvents({
     const unsubscribeViewOutput =
       typeof api.onTerminalViewOutput === 'function'
         ? api.onTerminalViewOutput((event) => {
-            const outputEvent = {
-              scope: event.scope,
-              sessionId: event.sessionId,
-              sequence: event.output.sequence,
-              data: event.output.data
-            }
-            updateTerminalStates((states) => appendTerminalOutput(states, outputEvent))
             terminalSurfaceRegistry.write(event)
           })
         : () => undefined
@@ -62,11 +58,25 @@ export function useTerminalSessionEvents({
       if (exitedTerminalStateKey) clearPendingTerminalInput(exitedTerminalStateKey)
       updateTerminalStates((states) => applyTerminalExitEvent(states, event))
     })
+    const unsubscribeSessionUpdated =
+      typeof api.onTerminalSessionUpdated === 'function'
+        ? api.onTerminalSessionUpdated((session) => {
+            const terminalStateKey = findTerminalStateKeyBySession(
+              terminalStatesRef.current,
+              session.sessionId
+            )
+            if (!terminalStateKey) return
+            updateTerminalStates((states) =>
+              applyTerminalSessionStatusSnapshot(states, terminalStateKey, session)
+            )
+          })
+        : () => undefined
 
     return () => {
       unsubscribeOutput()
       unsubscribeViewOutput()
       unsubscribeExit()
+      unsubscribeSessionUpdated()
     }
   }, [
     clearPendingTerminalInput,

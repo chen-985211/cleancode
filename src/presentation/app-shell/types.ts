@@ -18,7 +18,12 @@ import type {
   TerminalServiceEndpoint,
   TerminalServicePortConflict
 } from '../../contexts/run/application/dto/TerminalRunEvent'
-import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type {
+  TerminalRecoveryKind,
+  TerminalRetentionPolicy,
+  TerminalSessionKind,
+  TerminalSessionStatus
+} from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 
@@ -41,6 +46,10 @@ export interface TerminalViewState {
   readonly sessionId: string | null
   readonly status: TerminalSessionStatus
   readonly output: string
+  readonly sessionKind?: TerminalSessionKind | null
+  readonly retentionPolicy?: TerminalRetentionPolicy
+  readonly recoveryKind?: TerminalRecoveryKind
+  readonly isRecoveryPending?: boolean
   readonly runIdentity?: TerminalRunIdentity | null
   readonly actualEndpoint?: TerminalServiceEndpoint | null
   readonly portConflict?: TerminalServicePortConflict | null
@@ -87,6 +96,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly onStop: (block: TerminalBlockSnapshot) => void
   readonly onQuickLaunch: (block: TerminalBlockSnapshot) => void
   readonly onRestart: (block: TerminalBlockSnapshot) => void
+  readonly onToggleRetention?: (block: TerminalBlockSnapshot) => void
   readonly onDelete: (block: TerminalBlockSnapshot) => void
   readonly onUpdateDefinition: (
     block: TerminalBlockSnapshot,
@@ -178,6 +188,9 @@ export function createIdleTerminalState(): TerminalViewState {
     sessionId: null,
     status: 'idle',
     output: '',
+    sessionKind: null,
+    retentionPolicy: 'terminate-on-application-exit',
+    recoveryKind: 'fresh',
     runIdentity: null,
     actualEndpoint: null,
     portConflict: null,

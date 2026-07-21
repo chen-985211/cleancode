@@ -5,6 +5,21 @@ import type { TerminalProcessPort } from '../../../../src/contexts/run/applicati
 import type { RunRuntimeScopeValidationPort } from '../../../../src/contexts/run/application/ports/RunRuntimeScopeValidationPort'
 
 describe('terminal session service', () => {
+  it('forwards output emitted before process startup returns', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort('startup output')
+    const service = new TerminalSessionService(terminalProcessPort)
+    const onOutput = vi.fn()
+
+    await service.start({
+      ...runOwner('/tmp/cleancode-demo', 'project-demo'),
+      terminalBlockId: 'block-1',
+      onOutput,
+      onExit: () => undefined
+    })
+
+    expect(onOutput).toHaveBeenCalledWith(expect.objectContaining({ data: 'startup output' }))
+  })
+
   it('interrupts a running terminal with Ctrl+C without exiting the session', async () => {
     const terminalProcessPort = new RecordingTerminalProcessPort()
     const service = new TerminalSessionService(terminalProcessPort)
@@ -404,10 +419,19 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
   deferStops = false
   private readonly pendingStops = new Map<string, () => void>()
 
+  constructor(private readonly outputOnStart?: string) {}
+
   async start(
     command: Parameters<TerminalProcessPort['start']>[0]
   ): Promise<{ readonly processId: number }> {
     this.starts.push(command)
+    if (this.outputOnStart) {
+      command.onOutput({
+        scope: command.scope,
+        sessionId: command.scope.sessionId,
+        data: this.outputOnStart
+      })
+    }
     return { processId: 101 }
   }
 

@@ -40,6 +40,23 @@ export interface TerminalSnapshot {
   readonly modes: TerminalModeSnapshot
 }
 
+export interface TerminalModelCheckpoint {
+  readonly schemaVersion: 1
+  readonly identity: TerminalModelIdentity
+  readonly sequence: OutputSequence
+  readonly scrollbackRows: number
+  readonly unicodeVersion: '11'
+  /** Restores the exact visible terminal, including an active alternate buffer. */
+  readonly content: string
+  /** Restores only durable shell history and deliberately excludes the alternate buffer. */
+  readonly normalContent: string
+  readonly transcript: string
+  readonly dimensions: TerminalDimensionsSnapshot
+  readonly title: string
+  readonly workingDirectory: string
+  readonly modes: TerminalModeSnapshot
+}
+
 export interface TerminalModelDiagnosticsSnapshot {
   readonly modelCount: number
   readonly attachedViewCount: number

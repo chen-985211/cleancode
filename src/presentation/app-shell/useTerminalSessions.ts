@@ -20,6 +20,7 @@ import { useTerminalSessionEvents } from './useTerminalSessionEvents'
 import { useTerminalSessionRetention } from './useTerminalSessionRetention'
 import type { NotifyApp } from './appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
+import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import { useI18n } from './i18n/useI18n'
 import {
@@ -33,7 +34,8 @@ import {
   defaultTerminalDimensions,
   type TerminalDimensions,
   type TerminalViewState,
-  type WorkbenchSnapshot
+  type WorkbenchSnapshot,
+  createIdleTerminalState
 } from './types'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
@@ -63,17 +65,38 @@ export function useTerminalSessions({
   )
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
   const [terminalSurfaceRegistry] = useState(() => new TerminalSurfaceRegistry())
+  const [reconciledRecoveryKey, setReconciledRecoveryKey] = useState<string | null>(null)
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
   const currentProjectId = currentProject?.id ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
-  const terminalStates = useMemo(
-    () =>
-      selectTerminalStatesForWorkspace(terminalStatesByKey, currentProjectId, currentWorkspaceName),
-    [currentProjectId, currentWorkspaceName, terminalStatesByKey]
-  )
+  const recoveryKey =
+    currentProjectId && currentWorkspaceName ? `${currentProjectId}\0${currentWorkspaceName}` : null
+  const terminalStates = useMemo(() => {
+    const selected = selectTerminalStatesForWorkspace(
+      terminalStatesByKey,
+      currentProjectId,
+      currentWorkspaceName
+    )
+    if (!recoveryKey || reconciledRecoveryKey === recoveryKey || !currentTerminalBlockIds) {
+      return selected
+    }
+    return Object.fromEntries(
+      currentTerminalBlockIds.map((blockId) => [
+        blockId,
+        selected[blockId] ?? { ...createIdleTerminalState(), isRecoveryPending: true }
+      ])
+    )
+  }, [
+    currentProjectId,
+    currentTerminalBlockIds,
+    currentWorkspaceName,
+    reconciledRecoveryKey,
+    recoveryKey,
+    terminalStatesByKey
+  ])
   const runningSessionIds = useMemo(
     () =>
       Object.values(terminalStates)
@@ -135,6 +158,56 @@ export function useTerminalSessions({
       isCurrentRequest = false
     }
   }, [currentProjectId, currentWorkspaceName, updateTerminalStates])
+
+  useEffect(() => {
+    const api = window.cleancode
+    if (!api?.listRecoveredTerminalSessions || !currentProjectId || !currentWorkspaceName) {
+      return undefined
+    }
+    let isCurrentRequest = true
+    void Promise.all([
+      api.listRecoveredTerminalSessions(),
+      api.listRecoveredTerminalServiceEndpoints?.() ?? Promise.resolve([])
+    ])
+      .then(([sessions, endpoints]) => {
+        if (!isCurrentRequest) return
+        const endpointsBySession = new Map(
+          endpoints.map(({ sessionId, endpoint }) => [sessionId, endpoint])
+        )
+        const visible = sessions.filter(
+          (session) =>
+            session.projectId === currentProjectId &&
+            session.workspaceName === currentWorkspaceName &&
+            (!currentTerminalBlockIds || currentTerminalBlockIds.includes(session.blockId))
+        )
+        updateTerminalStates((states) =>
+          visible.reduce(
+            (nextStates, session) =>
+              applyTerminalSessionSnapshot(
+                nextStates,
+                createTerminalStateKey(session.projectId, session.workspaceName, session.blockId),
+                session,
+                '',
+                endpointsBySession.get(session.id) ?? null
+              ),
+            states
+          )
+        )
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (isCurrentRequest) setReconciledRecoveryKey(recoveryKey)
+      })
+    return () => {
+      isCurrentRequest = false
+    }
+  }, [
+    currentProjectId,
+    currentTerminalBlockIds,
+    currentWorkspaceName,
+    recoveryKey,
+    updateTerminalStates
+  ])
 
   const clearPendingTerminalInput = useCallback((terminalStateKey: string) => {
     const buffer = inputBuffersRef.current.get(terminalStateKey)
@@ -338,6 +411,44 @@ export function useTerminalSessions({
       }
     },
     [focusTerminalBlock, startTerminal, terminateTerminalSession]
+  )
+
+  const toggleTerminalRetention = useCallback(
+    async (block: TerminalBlockSnapshot) => {
+      const terminalStateKey = resolveCurrentTerminalStateKey(
+        currentProjectId,
+        currentWorkspaceName,
+        block.id
+      )
+      const state = terminalStateKey ? terminalStatesRef.current[terminalStateKey] : undefined
+      if (
+        !terminalStateKey ||
+        !state?.sessionId ||
+        state.status !== 'running' ||
+        state.sessionKind === 'workflow' ||
+        !window.cleancode?.setTerminalRetention
+      ) {
+        return
+      }
+      const retentionPolicy =
+        state.retentionPolicy === 'keep-after-application-exit'
+          ? 'terminate-on-application-exit'
+          : 'keep-after-application-exit'
+      try {
+        const session = await window.cleancode.setTerminalRetention({
+          sessionId: state.sessionId,
+          retentionPolicy
+        })
+        reconcileTerminalActionSnapshot(terminalStateKey, session)
+      } catch (error) {
+        notify({
+          kind: 'error',
+          title: t('terminal.retention.failedTitle'),
+          message: resolveUserFacingErrorMessage(error, 'terminal.retention.failed', t)
+        })
+      }
+    },
+    [currentProjectId, currentWorkspaceName, notify, reconcileTerminalActionSnapshot, t]
   )
 
   const writeTerminal = useCallback(
@@ -558,6 +669,7 @@ export function useTerminalSessions({
     terminalSurfaceRegistry,
     terminalStatesRef,
     terminateTerminalSession,
+    toggleTerminalRetention,
     ...terminalSessionRetention,
     writeTerminal,
     writeTerminalImmediately

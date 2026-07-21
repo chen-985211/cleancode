@@ -124,6 +124,19 @@ export class LocalPortAllocator {
     )
   }
 
+  adoptBound(scope: TerminalRunScope, endpoint: ActualServiceEndpoint): LocalPortAllocation {
+    const lease = this.leases.adoptBound(scope, endpoint)
+    return {
+      endpoint,
+      lease,
+      reservation: {
+        host: endpoint.host,
+        port: endpoint.port,
+        release: () => Promise.resolve()
+      }
+    }
+  }
+
   private createAllocation(
     command: { readonly scope: TerminalRunScope; readonly intent: ServicePortIntent },
     requestedPort: number | null,

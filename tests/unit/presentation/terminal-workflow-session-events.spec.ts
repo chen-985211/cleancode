@@ -115,6 +115,9 @@ function session(id: string, generation = 1) {
     workingDirectory: '/project',
     processId: 1,
     status: 'running' as const,
+    kind: 'workflow' as const,
+    retentionPolicy: 'terminate-on-application-exit' as const,
+    recoveryKind: 'fresh' as const,
     inputHistory: [],
     exitCode: null,
     failureReason: null

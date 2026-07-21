@@ -4,6 +4,7 @@ import type { TcpListenerInspectionPort } from '../ports/TcpListenerInspectionPo
 import type { TcpReadinessPort } from '../ports/TcpReadinessPort'
 import type { TerminalExitEvent, TerminalOutputEvent } from '../ports/TerminalProcessPort'
 import type { RunLifecycleService } from '../use-cases/RunLifecycleService'
+import type { RecoveredManagedServiceEndpoint } from '../ports/TerminalRuntimeProviderPort'
 import type { TerminalSessionService } from '../use-cases/TerminalSessionService'
 import type { ServicePortLeaseSnapshot } from '../../domain/services/ServicePortLeaseRegistry'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
@@ -123,6 +124,11 @@ export class ManagedServiceLauncher {
         result.service.allocation.lease.markBound()
         const snapshot = toRunSnapshot(result.service)
         try {
+          await this.sessions.recordManagedServiceEndpoint(snapshot.session.id, snapshot.endpoint)
+        } catch (error) {
+          result.service.reportCleanupFailure(error)
+        }
+        try {
           command.onEndpointConfirmed?.(snapshot.session, snapshot.endpoint)
         } catch (error) {
           try {
@@ -187,6 +193,58 @@ export class ManagedServiceLauncher {
     return service ? toRunSnapshot(service) : null
   }
 
+  listActive(): readonly ManagedServiceRunSnapshot[] {
+    return [...this.activeServices.values()].map(toRunSnapshot)
+  }
+
+  async recover(
+    evidence: readonly RecoveredManagedServiceEndpoint[]
+  ): Promise<readonly ManagedServiceRunSnapshot[]> {
+    const recovered: ManagedServiceRunSnapshot[] = []
+    for (const candidate of evidence) {
+      const session = this.sessions.getSession(candidate.scope.sessionId)
+      if (
+        !session ||
+        session.status !== 'running' ||
+        session.processId !== candidate.rootProcessId ||
+        session.runId !== candidate.scope.runId ||
+        session.generation !== candidate.scope.generation
+      ) {
+        continue
+      }
+      const inspection = await this.listenerInspection.inspect({
+        host: candidate.endpoint.host,
+        port: candidate.endpoint.port,
+        rootProcessId: candidate.rootProcessId
+      })
+      if (inspection.ownership !== 'owned') continue
+      let allocation: LocalPortAllocation
+      try {
+        allocation = this.allocator.adoptBound(session, candidate.endpoint)
+      } catch {
+        continue
+      }
+      const service: ActiveManagedService = {
+        session,
+        allocation,
+        readinessController: new AbortController(),
+        unregisterLifecycle: () => undefined,
+        unregisterManagedTerminator: () => undefined,
+        stopPromise: null,
+        reportCleanupFailure: () => undefined,
+        reportPortState: () => undefined
+      }
+      this.activeServices.set(session.id, service)
+      service.unregisterManagedTerminator = this.sessions.registerManagedTerminator(
+        session.id,
+        () => this.ensureStopped(service)
+      )
+      service.unregisterLifecycle = this.lifecycle.track(session, () => this.ensureStopped(service))
+      recovered.push(toRunSnapshot(service))
+    }
+    return recovered
+  }
+
   private async activateAttempt(
     command: LaunchManagedServiceCommand,
     intent: ServicePortIntent,
@@ -233,6 +291,7 @@ export class ManagedServiceLauncher {
         columns: command.columns,
         rows: command.rows,
         runId,
+        sessionKind: 'direct',
         trackLifecycle: false,
         prepareLaunch: async (scope) => {
           const allocation = await this.allocator.allocate({

@@ -375,6 +375,9 @@ function createTerminalSessionSnapshot(
     workingDirectory,
     processId: 1001,
     status: 'running',
+    kind: 'interactive',
+    retentionPolicy: 'terminate-on-application-exit',
+    recoveryKind: 'fresh',
     inputHistory: [],
     exitCode: null,
     failureReason: null

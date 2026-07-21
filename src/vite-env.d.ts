@@ -309,6 +309,14 @@ declare global {
       listTerminalSessions(command: {
         readonly sessionIds: readonly string[]
       }): Promise<TerminalSessionSnapshot[]>
+      listRecoveredTerminalSessions(): Promise<TerminalSessionSnapshot[]>
+      listRecoveredTerminalServiceEndpoints(): Promise<
+        readonly { readonly sessionId: string; readonly endpoint: TerminalServiceEndpoint }[]
+      >
+      setTerminalRetention(command: {
+        readonly sessionId: string
+        readonly retentionPolicy: 'terminate-on-application-exit' | 'keep-after-application-exit'
+      }): Promise<TerminalSessionSnapshot>
       listTerminalWorkingDirectories(command: {
         readonly sessionIds: readonly string[]
       }): Promise<TerminalWorkingDirectorySnapshot[]>
@@ -360,6 +368,7 @@ declare global {
       onTerminalRunEvent(listener: (event: TerminalRunEvent) => void): () => void
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalViewOutput(listener: (event: TerminalViewOutputEvent) => void): () => void
+      onTerminalSessionUpdated(listener: (session: TerminalSessionSnapshot) => void): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }
   }

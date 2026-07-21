@@ -1,4 +1,7 @@
 export type {
   TerminalSessionSnapshot,
-  TerminalSessionStatus
+  TerminalSessionStatus,
+  TerminalSessionKind,
+  TerminalRetentionPolicy,
+  TerminalRecoveryKind
 } from '../../domain/aggregates/TerminalSession'

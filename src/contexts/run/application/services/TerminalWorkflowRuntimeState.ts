@@ -43,6 +43,10 @@ export class ActiveWorkflowRunRegistry {
     projectRuns.delete(workspaceName)
     if (projectRuns.size === 0) this.runsByProject.delete(projectDirectory)
   }
+
+  list(): readonly ActiveWorkflowRun[] {
+    return [...this.runsByProject.values()].flatMap((projectRuns) => [...projectRuns.values()])
+  }
 }
 
 export function createWorkflowRunOwners(activeRun: ActiveWorkflowRun): readonly TerminalRunOwner[] {

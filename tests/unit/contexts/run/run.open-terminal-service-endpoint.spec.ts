@@ -84,6 +84,9 @@ function createManagedRun(
       workingDirectory: scope.workspaceDirectory,
       processId: 101,
       status: 'running',
+      kind: 'direct',
+      retentionPolicy: 'terminate-on-application-exit',
+      recoveryKind: 'fresh',
       inputHistory: [],
       exitCode: null,
       failureReason: null

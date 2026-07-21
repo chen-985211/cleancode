@@ -278,6 +278,7 @@ describe('terminal tooltips', () => {
       'Terminal 从此处运行终端流程',
       'Terminal 启动命令',
       'Terminal 停止当前命令',
+      'Terminal 应用退出后继续运行此会话',
       'Terminal 重开空终端会话',
       'Terminal 编辑终端信息',
       'Terminal 删除终端'

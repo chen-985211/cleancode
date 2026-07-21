@@ -173,7 +173,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 积木图结构的唯一事实来源：`BlockGraph` 聚合。
 - 普通终端 PTY 会话生命周期的唯一事实来源：`TerminalSession` 聚合。
 - 终端依赖工作流运行生命周期的唯一事实来源：`WorkflowRun` 聚合。
-- 当前终端运行的 `sessionId + runId + generation`、服务端口租约、实际端点和监听者所有权判断属于 Run 上下文的易失运行时事实；端口策略和注入方式仍是 BlockGraph 持久化的服务意图。
+- 当前终端运行的 `sessionId + runId + generation` 与退出保留/恢复资格由 Run 上下文解释。live PTY 与权威终端模型可由独立 Provider 跨 Electron 应用进程持有；版本化 checkpoint 和有界输出记录是 Run 基础设施恢复资料，不是已提交业务状态。端口租约与实际端点仍是易失运行时事实，warm attach 后必须重新验证监听所有权；端口策略和注入方式仍是 BlockGraph 持久化的服务意图。
 - 运行期 Agent 操作历史的唯一事实来源：Agent 上下文的审计记录。
 - 工作区 Agent 的稳定身份、名称、已提交画布布局和 CleanCode 原生 MCP 能力开关的唯一事实来源：`AgentSession` 聚合及其仓储。
 - Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、工作区、Git 分支和 `agentId` 组成，绑定值是 Codex thread UUID。
@@ -234,7 +234,7 @@ MCP Server 和 JSON-RPC 桥接属于 Agent 基础设施层入站适配器。所�
 
 BlockGraph 领域层负责校验终端依赖图并生成不可变计划；Run 领域层负责维护运行状态和失败传播规则。
 
-基础设施层负责执行外部命令、启动 PTY、预留回环端口、探测服务就绪、检查监听者所有权和发布运行事件。当前活动运行、端口租约和实际端点只存在于进程内存中，不持久化运行实例。
+基础设施层负责执行外部命令、启动 PTY、预留回环端口、探测服务就绪、检查监听者所有权和发布运行事件。普通交互/直接启动终端可以由独立本地 Provider 持有 live PTY、权威模型和已认证 session，并通过版本化 checkpoint 与有界追加输出支持 cold history；领域和应用层只依赖 Provider/进程/模型端口，不依赖 socket、文件或 Electron API。端口租约和实际端点不作为 checkpoint 业务事实，warm attach 后必须由当前 Run 重新证明监听所有权。活动 `WorkflowRun` 仍只存在于当前应用进程，不随普通 PTY 恢复。
 
 表现层只订阅运行事件并展示终端输出、节点状态和失败反馈。
 
@@ -398,6 +398,8 @@ src/
 
 Electron 主进程代码只负责应用启动、窗口生命周期、菜单、IPC 注册和依赖装配。任何带有业务含义的 Electron 能力接入，必须通过所属限界上下文的应用层端口和基础设施适配器完成。
 
+普通终端持久 Provider 以独立 Node 进程入口运行：Platform 只负责构建入口、启动参数和 Run composition，协议认证、PTY/model 所有权、checkpoint 与恢复实现位于 Run infrastructure。renderer、Electron main 与 Provider 可以分别故障；重建窗口或应用 controller 不得绕过 `TerminalSessionService` 直接读取 Provider socket 或恢复文件。
+
 `src/presentation` 只放跨上下文的应用外壳、路由和布局。上下文专属界面必须放在对应上下文的 `presentation` 目录。
 
 目录允许随着实现演进新增子目录，但不得改变限界上下文优先、四层职责和依赖方向。
@@ -442,6 +444,6 @@ Agent CLI
 
 ## 项目数据
 
-当前持久化实现位于 Electron 应用数据目录：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储以版本 `1` 保存服务端口意图，并把旧版 TCP 固定端口确定性迁移为 `fixed + none + tcp`；未知版本或畸形配置必须拒绝读取，不能静默降级为任务。工作区 Agent 存储支持从旧版单 Agent 分支绑定迁移，并必须保留原有 Codex thread UUID。写入持久化业务状态必须通过应用层仓储端口；需要替换为 SQLite 时，只能替换基础设施实现，不得改变领域和应用层契约。
+当前持久化实现位于 Electron 应用数据目录：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储以版本 `1` 保存服务端口意图，并把旧版 TCP 固定端口确定性迁移为 `fixed + none + tcp`；未知版本或畸形配置必须拒绝读取，不能静默降级为任务。工作区 Agent 存储支持从旧版单 Agent 分支绑定迁移，并必须保留原有 Codex thread UUID。普通终端恢复目录另存 schema v1 checkpoint 和有界追加输出；它只用于 Run 技术恢复，不得被 Project、BlockGraph、UI 或 Agent 当作可编辑业务仓储。写入持久化业务状态必须通过应用层仓储端口；需要替换为 SQLite 时，只能替换基础设施实现，不得改变领域和应用层契约。
 
 当前没有工作流导入、导出、运行实例恢复、审计回放或撤销能力。这些方向只有在领域语义、用例和测试落地后才能迁入本文的当前事实。

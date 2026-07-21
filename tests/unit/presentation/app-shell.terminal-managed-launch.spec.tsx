@@ -214,6 +214,9 @@ function createTerminalSessionSnapshot(sessionId: string, generation = 1): Termi
     workingDirectory: '/tmp/alpha-project',
     processId: 1001,
     status: 'running',
+    kind: 'direct',
+    retentionPolicy: 'terminate-on-application-exit',
+    recoveryKind: 'fresh',
     inputHistory: [],
     exitCode: null,
     failureReason: null

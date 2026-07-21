@@ -2,7 +2,6 @@ import { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import {
   createTerminalRunScope,
   createTerminalRunSlotKey,
-  type TerminalRunOwner,
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
@@ -17,7 +16,6 @@ import type { TerminalLinkContext } from '../ports/TerminalLinkPorts'
 import type { TerminalModelPort, TerminalViewOutputEvent } from '../ports/TerminalModelPort'
 import type {
   TerminalExitEvent,
-  TerminalLaunchMode,
   TerminalOutputEvent,
   TerminalProcessPort,
   TerminalWorkingDirectorySnapshot
@@ -27,6 +25,19 @@ import {
   type RunRuntimeScopeValidationPort
 } from '../ports/RunRuntimeScopeValidationPort'
 import type { RunLifecycleService } from './RunLifecycleService'
+import type {
+  TerminalRuntimeProviderPort,
+  TerminalRuntimeRecoveryResult
+} from '../ports/TerminalRuntimeProviderPort'
+import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSession'
+import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
+import type { StartTerminalSessionCommand } from './TerminalSessionCommands'
+import {
+  createTerminalSessionId,
+  createTerminalSessionOwner,
+  getTerminalSessionErrorMessage,
+  throwTerminalSessionCleanupFailures
+} from './TerminalSessionServiceSupport'
 
 export interface TerminalViewIdentityCommand {
   readonly projectId: string
@@ -40,31 +51,6 @@ export interface TerminalViewIdentityCommand {
 
 export interface AttachTerminalViewCommand extends TerminalViewIdentityCommand {
   readonly onOutput: (event: TerminalViewOutputEvent) => void
-}
-
-export interface StartTerminalSessionCommand {
-  readonly projectId: string
-  readonly projectDirectory: string
-  readonly terminalBlockId: string
-  readonly workspaceName: string
-  readonly workspaceDirectory: string
-  readonly gitBranch: string | null
-  readonly workingDirectory: string
-  readonly runId?: string
-  readonly shell?: string
-  readonly launchCommand?: string
-  readonly launchMode?: TerminalLaunchMode
-  readonly environment?: Readonly<Record<string, string>>
-  readonly prepareLaunch?: (scope: TerminalRunScope) => Promise<{
-    readonly launchCommand: string | undefined
-    readonly environment: Readonly<Record<string, string>> | undefined
-  }>
-  readonly trackLifecycle?: boolean
-  readonly onStartedWithinGate?: (session: TerminalSessionSnapshot) => void
-  readonly columns?: number
-  readonly rows?: number
-  readonly onOutput: (event: TerminalOutputEvent) => void
-  readonly onExit: (event: TerminalExitEvent) => void
 }
 
 export class TerminalSessionService {
@@ -82,11 +68,120 @@ export class TerminalSessionService {
     private readonly terminalProcessPort: TerminalProcessPort,
     private readonly scopeValidation: RunRuntimeScopeValidationPort = noopRunRuntimeScopeValidationPort,
     private readonly lifecycle?: RunLifecycleService,
-    private readonly terminalModelPort?: TerminalModelPort
+    private readonly terminalModelPort?: TerminalModelPort,
+    private readonly runtimeProvider?: TerminalRuntimeProviderPort
   ) {}
 
+  async initializeRuntime(callbacks: {
+    readonly onOutput: (event: TerminalOutputEvent) => void
+    readonly onExit: (event: TerminalExitEvent) => void
+    readonly onSessionUpdated?: (session: TerminalSessionSnapshot) => void
+  }): Promise<TerminalRuntimeRecoveryResult> {
+    if (!this.runtimeProvider) return { sessions: [], issues: [], managedServiceEndpoints: [] }
+    this.runtimeProvider.bindRecoveryIssueHandler?.((issue) => {
+      if (!issue.sessionId) return
+      const session = this.sessions.get(issue.sessionId)
+      if (
+        !session ||
+        session.status !== 'running' ||
+        session.retentionPolicy !== 'keep-after-application-exit'
+      ) {
+        return
+      }
+      session.setRetentionPolicy('terminate-on-application-exit')
+      callbacks.onSessionUpdated?.(session.toSnapshot())
+    })
+    const recovered = await this.runtimeProvider.initialize()
+    const accepted: TerminalSessionSnapshot[] = []
+
+    for (const snapshot of recovered.sessions) {
+      if (
+        snapshot.kind === 'workflow' ||
+        (snapshot.recoveryKind !== 'warm' && snapshot.recoveryKind !== 'historical')
+      ) {
+        await this.retireTerminalModel(snapshot)
+        continue
+      }
+      try {
+        await this.scopeValidation.validate({
+          projectId: snapshot.projectId,
+          projectDirectory: snapshot.projectDirectory,
+          workspaceName: snapshot.workspaceName,
+          workspaceDirectory: snapshot.workspaceDirectory,
+          gitBranch: snapshot.gitBranch
+        })
+      } catch {
+        await this.retireTerminalModel(snapshot)
+        continue
+      }
+
+      const slotKey = createTerminalRunSlotKey(snapshot)
+      const previousGeneration = this.generationsBySlot.get(slotKey) ?? 0
+      if (snapshot.generation < previousGeneration) {
+        await this.retireTerminalModel(snapshot)
+        continue
+      }
+      const previousSessionId = this.restorableSessionIdsBySlot.get(slotKey)
+      if (previousSessionId) {
+        const previous = this.sessions.get(previousSessionId)
+        if (previous) await this.retireTerminalModel(previous.scope)
+        this.sessions.delete(previousSessionId)
+      }
+
+      const session = TerminalSession.revive({
+        scope: snapshot,
+        workingDirectory: snapshot.workingDirectory,
+        kind: snapshot.kind,
+        retentionPolicy: snapshot.retentionPolicy,
+        recoveryKind: snapshot.recoveryKind,
+        processId: snapshot.processId,
+        inputHistory: snapshot.inputHistory,
+        exitCode: snapshot.exitCode,
+        failureReason: snapshot.failureReason
+      })
+      this.sessions.set(session.id, session)
+      this.generationsBySlot.set(slotKey, snapshot.generation)
+      this.restorableSessionIdsBySlot.set(slotKey, session.id)
+      if (session.status === 'running') {
+        this.sessionIdsBySlot.set(slotKey, session.id)
+      }
+      if (this.lifecycle) {
+        this.resourceUntrackers.set(
+          session.id,
+          this.lifecycle.track(session.scope, async () =>
+            this.terminate(session.id).then(() => undefined)
+          )
+        )
+      }
+      this.runtimeProvider.bindRecoveredSession(session.scope, {
+        onOutput: (event) => {
+          if (!this.isCurrentRunningSession(slotKey, session) || event.sequence === undefined)
+            return
+          callbacks.onOutput({ ...event, sequence: event.sequence })
+        },
+        onExit: (event) => {
+          const wasCurrent = this.isCurrentGeneration(slotKey, session)
+          session.markExited({ exitCode: event.exitCode })
+          if (this.sessionIdsBySlot.get(slotKey) === session.id) {
+            this.sessionIdsBySlot.delete(slotKey)
+          }
+          if (wasCurrent) callbacks.onExit(event)
+        }
+      })
+      accepted.push(session.toSnapshot())
+    }
+
+    return {
+      sessions: accepted,
+      issues: recovered.issues,
+      managedServiceEndpoints: recovered.managedServiceEndpoints.filter((candidate) =>
+        accepted.some((session) => session.sessionId === candidate.scope.sessionId)
+      )
+    }
+  }
+
   async start(command: StartTerminalSessionCommand): Promise<TerminalSessionSnapshot> {
-    const owner = createOwner(command)
+    const owner = createTerminalSessionOwner(command)
     const slotKey = createTerminalRunSlotKey(owner)
 
     const operation = () =>
@@ -105,9 +200,57 @@ export class TerminalSessionService {
     })
   }
 
+  listAllSessions(): TerminalSessionSnapshot[] {
+    return [...this.sessions.values()].map((session) => session.toSnapshot())
+  }
+
+  async setRetentionPolicy(
+    sessionId: string,
+    retentionPolicy: TerminalRetentionPolicy
+  ): Promise<TerminalSessionSnapshot> {
+    const session = this.requireSession(sessionId)
+    const previous = session.retentionPolicy
+    session.setRetentionPolicy(retentionPolicy)
+    try {
+      await this.runtimeProvider?.setRetentionPolicy(sessionId, retentionPolicy)
+    } catch (error) {
+      session.setRetentionPolicy(previous)
+      throw error
+    }
+    return session.toSnapshot()
+  }
+
+  recordManagedServiceEndpoint(sessionId: string, endpoint: ActualServiceEndpoint): Promise<void> {
+    return (
+      this.runtimeProvider?.recordManagedServiceEndpoint(sessionId, endpoint) ?? Promise.resolve()
+    )
+  }
+
+  async prepareApplicationShutdown(): Promise<void> {
+    if (!this.runtimeProvider) {
+      await this.stopAll()
+      return
+    }
+    const results = await Promise.allSettled(
+      [...this.sessions.values()]
+        .filter(
+          (session) =>
+            session.status === 'running' &&
+            session.retentionPolicy === 'terminate-on-application-exit'
+        )
+        .map((session) => this.terminate(session.id))
+    )
+    await this.runtimeProvider.detachApplication()
+    throwTerminalSessionCleanupFailures(
+      results.map((result) =>
+        result.status === 'fulfilled' ? { status: 'fulfilled', value: undefined } : result
+      )
+    )
+  }
+
   private async startInSlot(
     command: StartTerminalSessionCommand,
-    owner: TerminalRunOwner,
+    owner: ReturnType<typeof createTerminalSessionOwner>,
     slotKey: string
   ): Promise<TerminalSessionSnapshot> {
     const existingSessionId =
@@ -137,11 +280,12 @@ export class TerminalSessionService {
     const session = TerminalSession.create({
       scope: createTerminalRunScope({
         ...owner,
-        sessionId: createId('terminal-session'),
-        runId: command.runId ?? createId('terminal-run'),
+        sessionId: createTerminalSessionId('terminal-session'),
+        runId: command.runId ?? createTerminalSessionId('terminal-run'),
         generation
       }),
-      workingDirectory: command.workingDirectory
+      workingDirectory: command.workingDirectory,
+      kind: command.sessionKind
     })
     this.sessions.set(session.id, session)
     this.sessionIdsBySlot.set(slotKey, session.id)
@@ -155,7 +299,7 @@ export class TerminalSessionService {
         launchCommand = prepared.launchCommand
         environment = prepared.environment
       } catch (error) {
-        session.markFailed({ reason: getErrorMessage(error) })
+        session.markFailed({ reason: getTerminalSessionErrorMessage(error) })
         if (this.sessionIdsBySlot.get(slotKey) === session.id) {
           this.sessionIdsBySlot.delete(slotKey)
         }
@@ -191,14 +335,18 @@ export class TerminalSessionService {
         shell: command.shell,
         launchCommand,
         launchMode: command.launchMode,
+        sessionKind: session.kind,
         environment,
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         onOutput: (event) => {
-          if (this.isCurrentRunningSession(slotKey, session)) {
-            const output = this.terminalModelPort
-              ? this.terminalModelPort.acceptOutput(session.scope, event.data)
-              : this.acceptFallbackOutput(session.id, event.data)
+          if (this.isCurrentStartingOrRunningSession(slotKey, session)) {
+            const output =
+              event.sequence === undefined
+                ? this.terminalModelPort
+                  ? this.terminalModelPort.acceptOutput(session.scope, event.data)
+                  : this.acceptFallbackOutput(session.id, event.data)
+                : { data: event.data, sequence: event.sequence }
             command.onOutput({ ...event, sequence: output.sequence })
           }
         },
@@ -209,21 +357,20 @@ export class TerminalSessionService {
           if (this.sessionIdsBySlot.get(slotKey) === session.id) {
             this.sessionIdsBySlot.delete(slotKey)
           }
-          this.untrackSession(session.id)
           if (!wasStopping && wasCurrentGeneration) {
             command.onExit(event)
           }
         }
       })
     } catch (error) {
-      this.terminalModelPort?.retire(session.scope)
+      await this.retireTerminalModel(session.scope)
       if (this.sessionIdsBySlot.get(slotKey) === session.id) {
         this.sessionIdsBySlot.delete(slotKey)
       }
       if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
         this.restorableSessionIdsBySlot.delete(slotKey)
       }
-      session.markFailed({ reason: getErrorMessage(error) })
+      session.markFailed({ reason: getTerminalSessionErrorMessage(error) })
 
       return session.toSnapshot()
     }
@@ -411,7 +558,7 @@ export class TerminalSessionService {
     this.resourceUntrackers.clear()
     this.managedTerminators.clear()
     this.fallbackOutputSequences.clear()
-    throwCleanupFailures(cleanupResults)
+    throwTerminalSessionCleanupFailures(cleanupResults)
   }
 
   private requireSession(sessionId: string): TerminalSession {
@@ -448,7 +595,7 @@ export class TerminalSessionService {
       if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
         this.restorableSessionIdsBySlot.delete(slotKey)
       }
-      this.terminalModelPort?.retire(session.scope)
+      await this.retireTerminalModel(session.scope)
       this.fallbackOutputSequences.delete(session.id)
       this.untrackSession(session.id)
 
@@ -461,6 +608,13 @@ export class TerminalSessionService {
 
   private isCurrentRunningSession(slotKey: string, session: TerminalSession): boolean {
     return session.status === 'running' && this.isCurrentGeneration(slotKey, session)
+  }
+
+  private isCurrentStartingOrRunningSession(slotKey: string, session: TerminalSession): boolean {
+    return (
+      (session.status === 'idle' || session.status === 'running') &&
+      this.isCurrentGeneration(slotKey, session)
+    )
   }
 
   private requireRestorableSession(command: TerminalLinkIdentity): TerminalSession {
@@ -508,6 +662,14 @@ export class TerminalSessionService {
     return { data, sequence }
   }
 
+  private async retireTerminalModel(identity: TerminalRunScope): Promise<void> {
+    if (this.runtimeProvider) {
+      await this.runtimeProvider.retireSession(identity)
+      return
+    }
+    await this.terminalModelPort?.retire(identity)
+  }
+
   private untrackSession(sessionId: string): void {
     this.resourceUntrackers.get(sessionId)?.()
     this.resourceUntrackers.delete(sessionId)
@@ -535,32 +697,4 @@ export class TerminalSessionService {
     })
     return result
   }
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-function throwCleanupFailures(results: readonly PromiseSettledResult<void>[]): void {
-  const failures = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason] : []
-  )
-  if (failures.length === 0) return
-  if (failures.length === 1) throw failures[0]
-  throw new AggregateError(failures, 'Multiple terminal session resources failed to dispose.')
-}
-
-function createOwner(command: StartTerminalSessionCommand): TerminalRunOwner {
-  return {
-    projectId: command.projectId,
-    projectDirectory: command.projectDirectory,
-    workspaceName: command.workspaceName,
-    workspaceDirectory: command.workspaceDirectory,
-    gitBranch: command.gitBranch,
-    blockId: command.terminalBlockId
-  }
-}
-
-function createId(prefix: string): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random()}`
 }

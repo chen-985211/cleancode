@@ -31,6 +31,7 @@ export class TerminalSessionWorkflowRuntimeAdapter implements TerminalWorkflowRu
       workingDirectory: command.workingDirectory,
       runId: command.runId,
       launchCommand,
+      sessionKind: 'workflow',
       shell: command.shell,
       columns: command.columns,
       rows: command.rows,

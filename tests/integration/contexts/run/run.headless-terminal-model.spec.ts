@@ -39,7 +39,8 @@ describe('headless terminal model', () => {
     expect(snapshot.content).toContain('normal')
     expect(snapshot.content).toContain('\u001b[?1049h')
     expect(snapshot.content).toContain('alternate')
-    expect(snapshot.transcript).toContain('alternate')
+    expect(snapshot.transcript).toContain('normal')
+    expect(snapshot.transcript).not.toContain('alternate')
     expect(snapshot.modes.bracketedPasteMode).toBe(true)
     expect(snapshot.dimensions).toEqual({ columns: 40, rows: 8 })
     expect(snapshot.title).toBe('Build Logs')
@@ -175,6 +176,51 @@ describe('headless terminal model', () => {
 
     expect(firstSnapshot.scrollbackRows).toBe(5000)
     expect(secondSnapshot.scrollbackRows).toBe(5000)
+  })
+
+  it('checkpoints and restores both buffers without losing sequence authority', async () => {
+    const original = new HeadlessTerminalModelAdapter()
+    const identity = createIdentity()
+    original.create({
+      identity,
+      columns: 40,
+      rows: 8,
+      workingDirectory: '/work/app',
+      onQueryResponse: () => undefined,
+      onFlowControlChange: () => undefined
+    })
+    original.acceptOutput(identity, 'normal history\r\n')
+    original.acceptOutput(identity, '\u001b[?2004h\u001b[?1049hfull-screen state')
+
+    const checkpoint = await original.captureCheckpoint(identity)
+
+    expect(checkpoint).toMatchObject({
+      schemaVersion: 1,
+      sequence: 2,
+      transcript: expect.stringContaining('normal history'),
+      dimensions: { columns: 40, rows: 8 },
+      modes: { bracketedPasteMode: true }
+    })
+    expect(checkpoint.normalContent).toContain('normal history')
+    expect(checkpoint.normalContent).not.toContain('full-screen state')
+    expect(checkpoint.content).toContain('full-screen state')
+
+    const restored = new HeadlessTerminalModelAdapter()
+    await restored.restoreCheckpoint({
+      checkpoint,
+      onQueryResponse: () => undefined,
+      onFlowControlChange: () => undefined
+    })
+    const snapshot = await restored.attachView({
+      identity,
+      viewId: 'restored-view',
+      onOutput: () => undefined
+    })
+
+    expect(snapshot.sequence).toBe(2)
+    expect(snapshot.content).toContain('normal history')
+    expect(snapshot.content).toContain('full-screen state')
+    expect(restored.acceptOutput(identity, '\r\nafter recovery').sequence).toBe(3)
   })
 })
 

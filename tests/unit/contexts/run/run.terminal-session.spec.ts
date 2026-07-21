@@ -43,6 +43,88 @@ describe('terminal session', () => {
     expect(session.status).toBe('stopping')
     expect(() => session.recordInput('late input')).toThrow('Terminal session is not running.')
   })
+
+  it('defaults a new interactive session to terminate on application exit', () => {
+    const session = TerminalSession.create({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo'
+    })
+
+    expect(session.toSnapshot()).toMatchObject({
+      kind: 'interactive',
+      retentionPolicy: 'terminate-on-application-exit',
+      recoveryKind: 'fresh'
+    })
+  })
+
+  it('allows a running direct session to opt in to cross-application retention', () => {
+    const session = TerminalSession.create({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo',
+      kind: 'direct'
+    })
+    session.markRunning({ processId: 1234 })
+
+    session.setRetentionPolicy('keep-after-application-exit')
+
+    expect(session.toSnapshot()).toMatchObject({
+      kind: 'direct',
+      retentionPolicy: 'keep-after-application-exit'
+    })
+  })
+
+  it('never permits workflow-owned sessions to survive application exit', () => {
+    const session = TerminalSession.create({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo',
+      kind: 'workflow'
+    })
+    session.markRunning({ processId: 1234 })
+
+    expect(() => session.setRetentionPolicy('keep-after-application-exit')).toThrow(
+      'Workflow terminal sessions cannot survive application exit.'
+    )
+  })
+
+  it('revives an authenticated live session without changing its run identity', () => {
+    const session = TerminalSession.revive({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo',
+      kind: 'interactive',
+      retentionPolicy: 'keep-after-application-exit',
+      recoveryKind: 'warm',
+      processId: 1234
+    })
+
+    expect(session.toSnapshot()).toMatchObject({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      generation: 1,
+      status: 'running',
+      processId: 1234,
+      recoveryKind: 'warm'
+    })
+  })
+
+  it('revives a cold checkpoint as read-only history instead of a live process', () => {
+    const session = TerminalSession.revive({
+      scope: runScope(),
+      workingDirectory: '/tmp/cleancode-demo',
+      kind: 'direct',
+      retentionPolicy: 'keep-after-application-exit',
+      recoveryKind: 'historical',
+      processId: null
+    })
+
+    expect(session.toSnapshot()).toMatchObject({
+      status: 'exited',
+      processId: null,
+      recoveryKind: 'historical'
+    })
+    expect(() => session.recordInput('must not reach a process')).toThrow(
+      'Terminal session is not running.'
+    )
+  })
 })
 
 function runScope() {

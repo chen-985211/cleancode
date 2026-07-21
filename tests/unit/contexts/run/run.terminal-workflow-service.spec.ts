@@ -439,6 +439,9 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
     workingDirectory: '/project',
     processId: 1,
     status: 'running',
+    kind: 'workflow',
+    retentionPolicy: 'terminate-on-application-exit',
+    recoveryKind: 'fresh',
     inputHistory: [],
     exitCode: null,
     failureReason: null

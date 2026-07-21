@@ -45,10 +45,18 @@ export function createMainWindow(input: {
     })
   }
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-    return
+  const loadRenderer = () => {
+    if (mainWindow.isDestroyed()) return
+    if (process.env.ELECTRON_RENDERER_URL) {
+      void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+      return
+    }
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
-
-  void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit' || mainWindow.isDestroyed()) return
+    createMainWindow(input)
+    mainWindow.destroy()
+  })
+  loadRenderer()
 }

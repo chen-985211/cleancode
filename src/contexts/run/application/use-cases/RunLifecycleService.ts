@@ -169,6 +169,14 @@ export class RunLifecycleService {
     this.quarantinedBlockers.clear()
   }
 
+  async prepareApplicationShutdown(): Promise<void> {
+    this.isShuttingDown = true
+    for (const release of [...this.activeLeaseReleases]) release()
+    await this.waitForOperations(() => true)
+    this.blockers.clear()
+    this.quarantinedBlockers.clear()
+  }
+
   private async runWithGate(
     lockKey: string,
     blockerSpecs: readonly RunGateBlockerSpec[]

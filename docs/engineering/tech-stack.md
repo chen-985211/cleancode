@@ -20,7 +20,7 @@
 | 伪终端         | node-pty                                                                            |
 | 本地运行时     | Node.js                                                                             |
 | 状态管理       | React 本地状态与 hooks；当前没有集中式状态库                                        |
-| 进程通信       | Electron IPC 与主进程事件                                                           |
+| 进程通信       | Electron IPC、主进程事件、本机 Unix socket / Windows named pipe 长度帧协议          |
 | 持久化         | Node.js 文件系统、版本化 JSON 与 JSONL                                              |
 | Agent CLI      | Codex CLI + node-pty                                                                |
 | Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                                                         |
@@ -50,13 +50,13 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。renderer 中的 xterm.js 负责渲染与输入；普通终端使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。普通终端另外在主进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护进程内权威屏幕模型与恢复 snapshot，具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。renderer 中的 xterm.js 负责渲染与输入；普通终端使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。普通终端另外在独立本地 Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence 与恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
 受管本地服务使用 Node.js `net.Server` 在 `127.0.0.1` 上预留固定、首选或操作系统动态端口，并在启动 PTY 前通过显式环境变量或安全命令参数后缀注入实际端口。预留句柄不能移交给任意项目进程，因此释放预留到目标进程监听之间仍存在竞争；Run 使用有限分配/激活重试和监听所有权校验收束该窗口，不引入新的第三方依赖。
 
-当前监听所有权验证只在 macOS 上使用系统 `/usr/sbin/lsof` 和 `/bin/ps`，通过两次监听 PID 快照、受管根进程存活检查和进程祖先关系证明监听者属于本次 PTY。Linux 和 Windows 保留 Run 应用端口边界，但当前适配器不能证明所有权时按 `unknown` 失败关闭，不把 TCP 可连接误判为服务就绪。进程清理在 POSIX 上等待异步 PTY/进程组退出；不持久化 PID，也不根据重启后的陈旧 PID 自动终止进程。
+当前监听所有权验证只在 macOS 上使用系统 `/usr/sbin/lsof` 和 `/bin/ps`，通过两次监听 PID 快照、受管根进程存活检查和进程祖先关系证明监听者属于本次 PTY。Linux 和 Windows 保留 Run 应用端口边界，但当前适配器不能证明所有权时按 `unknown` 失败关闭，不把 TCP 可连接误判为服务就绪。进程清理在 POSIX 上等待异步 PTY/进程组退出；Provider metadata 和 checkpoint 中的进程信息不能脱离认证 instance、live session 与完整运行身份单独证明恢复或授权终止，也不根据 cold restore 的陈旧 PID 自动终止进程。
 
 ## Agent 集成
 
@@ -66,7 +66,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。re
 
 ## 存储层
 
-当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。
+当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。Run 终端恢复目录使用独立 schema v1 JSON checkpoint 与有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
 
 需要原子替换的 JSON 仓储采用临时文件、同步和重命名流程。所有读写必须通过应用层仓储端口完成；存储文件不是供 UI、Agent 或其他上下文直接修改的共享接口。
 
@@ -77,7 +77,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。re
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 串行编排 Playwright，并在 suite 级 global setup 中只构建一次桌面产物；默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试，失败诊断保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 串行编排 Playwright，并在 suite 级 global setup 中只构建一次桌面产物；默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。

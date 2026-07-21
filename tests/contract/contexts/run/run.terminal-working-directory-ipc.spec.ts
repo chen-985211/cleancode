@@ -147,13 +147,62 @@ describe('terminal working directory IPC contract', () => {
     })
     expect(listTerminalSessions).not.toHaveBeenCalled()
   })
+
+  it('exposes recovered sessions, revalidated endpoints, and retention updates', async () => {
+    const ipcMain = new FakeIpcMain()
+    const warm = {
+      ...sessionSnapshot('session-1', 'running'),
+      retentionPolicy: 'keep-after-application-exit' as const,
+      recoveryKind: 'warm' as const
+    }
+    const endpoint = {
+      protocol: 'http' as const,
+      host: '127.0.0.1' as const,
+      port: 41_001,
+      requestedPort: 3_000,
+      fallback: true,
+      displayAddress: 'http://127.0.0.1:41001',
+      openable: true
+    }
+    const setTerminalRetention = vi.fn(async () => warm)
+    registerTerminalIpcHandlers(
+      createTerminalIpcHandlersInput({
+        ipcMain,
+        listRecoveredTerminalSessions: () => [warm],
+        listRecoveredTerminalServiceEndpoints: () => [{ session: warm, endpoint }],
+        listTerminalWorkingDirectories: vi.fn(async () => []),
+        setTerminalRetention
+      })
+    )
+
+    await expect(ipcMain.invoke('cleancode:list-recovered-terminal-sessions')).resolves.toEqual({
+      ok: true,
+      value: [warm]
+    })
+    await expect(
+      ipcMain.invoke('cleancode:list-recovered-terminal-service-endpoints')
+    ).resolves.toEqual({
+      ok: true,
+      value: [{ sessionId: 'session-1', endpoint }]
+    })
+    await expect(
+      ipcMain.invoke('cleancode:set-terminal-retention', {
+        sessionId: 'session-1',
+        retentionPolicy: 'keep-after-application-exit'
+      })
+    ).resolves.toEqual({ ok: true, value: warm })
+    expect(setTerminalRetention).toHaveBeenCalledWith('session-1', 'keep-after-application-exit')
+  })
 })
 
 function createTerminalIpcHandlersInput(input: {
   readonly ipcMain: IpcMainLike
   readonly listTerminalSessions?: TerminalIpcHandlersInput['listTerminalSessions']
+  readonly listRecoveredTerminalSessions?: TerminalIpcHandlersInput['listRecoveredTerminalSessions']
+  readonly listRecoveredTerminalServiceEndpoints?: TerminalIpcHandlersInput['listRecoveredTerminalServiceEndpoints']
   readonly listTerminalWorkingDirectories: TerminalIpcHandlersInput['listTerminalWorkingDirectories']
   readonly resizeTerminal?: TerminalIpcHandlersInput['resizeTerminal']
+  readonly setTerminalRetention?: TerminalIpcHandlersInput['setTerminalRetention']
 }): TerminalIpcHandlersInput {
   return {
     attachTerminalView: vi.fn(),
@@ -161,12 +210,15 @@ function createTerminalIpcHandlersInput(input: {
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: vi.fn(),
+    listRecoveredTerminalServiceEndpoints: input.listRecoveredTerminalServiceEndpoints,
+    listRecoveredTerminalSessions: input.listRecoveredTerminalSessions,
     listTerminalSessions: input.listTerminalSessions ?? vi.fn(() => []),
     listTerminalWorkingDirectories: input.listTerminalWorkingDirectories,
     logger: new SilentLogger(),
     openTerminalLink: vi.fn(),
     openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: input.resizeTerminal ?? vi.fn(),
+    setTerminalRetention: input.setTerminalRetention,
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),
     updateTerminalScrollback: vi.fn(),
@@ -190,6 +242,9 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited') {
     workingDirectory: '/work/app',
     processId: status === 'running' ? 101 : null,
     status,
+    kind: 'interactive' as const,
+    retentionPolicy: 'terminate-on-application-exit' as const,
+    recoveryKind: status === 'running' ? ('fresh' as const) : ('ended' as const),
     inputHistory: [],
     exitCode: status === 'exited' ? 0 : null,
     failureReason: null

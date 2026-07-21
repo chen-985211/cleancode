@@ -84,6 +84,7 @@ function createRuntime(
   resolveManagedServiceOwner: ManagedServiceOwnerResolver = async () => null
 ): ReturnType<typeof createRunRuntime> {
   return createRunRuntime({
+    appStateDirectory: '/tmp/cleancode-runtime-composition-test',
     launchPlans: unusedLaunchPlans,
     resolveManagedServiceOwner,
     scopeValidation: { validate: async () => undefined },

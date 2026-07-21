@@ -119,15 +119,18 @@ const updateTerminalDefinitionUseCase = new UpdateTerminalDefinitionUseCase(grap
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
 const {
+  initialize: initializeRunRuntime,
   launchTerminal,
   lifecycle: runLifecycleService,
   openTerminalServiceEndpoint,
   openTerminalLink,
   sessions: terminalSessionService,
   terminalRuns,
+  managedServices: terminalManagedServices,
   workflow: terminalWorkflowService,
   workspaceRuns
 } = createRunRuntime({
+  appStateDirectory: appStateDirectoryPath,
   launchPlans: new BlockGraphTerminalLaunchPlanAdapter(getTerminalLaunchPlanUseCase),
   resolveManagedServiceOwner,
   scopeValidation: createRunRuntimeScopeValidation(
@@ -270,6 +273,8 @@ registerTerminalIpcHandlers({
   ipcMain,
   launchTerminal: (command) => launchTerminal.execute(command),
   listTerminalSessions: (sessionIds) => terminalSessionService.listSessions(sessionIds),
+  listRecoveredTerminalSessions: () => terminalSessionService.listAllSessions(),
+  listRecoveredTerminalServiceEndpoints: () => terminalManagedServices.listActive(),
   listTerminalWorkingDirectories: (sessionIds) =>
     terminalSessionService.listWorkingDirectories(sessionIds),
   logger: consoleLogger,
@@ -279,6 +284,8 @@ registerTerminalIpcHandlers({
   resizeTerminal: (sessionId, columns, rows) =>
     terminalSessionService.resize(sessionId, columns, rows),
   startTerminal: (command) => terminalSessionService.start(command),
+  setTerminalRetention: (sessionId, retentionPolicy) =>
+    terminalSessionService.setRetentionPolicy(sessionId, retentionPolicy),
   terminateTerminal: (sessionId) => terminalSessionService.terminate(sessionId),
   updateTerminalScrollback: (rows) => terminalSessionService.updateTerminalScrollback(rows),
   writeTerminal: (sessionId, input) => terminalSessionService.write(sessionId, input)
@@ -417,7 +424,17 @@ function getAppStateDirectoryPath(): string {
   )
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await initializeRunRuntime()
+  } catch (error) {
+    consoleLogger.error({
+      scope: 'run.terminal-provider',
+      operation: 'initializeRuntime',
+      outcome: 'failure',
+      error: { message: error instanceof Error ? error.message : String(error) }
+    })
+  }
   const appIconPath = resolveAppIconPath({
     fileExists: existsSync,
     isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
@@ -460,8 +477,9 @@ app.on('before-quit', (event) => {
   isPreparingToQuit = true
   void disposeApplicationRuntime({
     disposeAgentSessions: () => agentSessionService.disposeAll(),
-    disposeRunLifecycle: () => runLifecycleService.hardDisposeAll(),
-    disposeTerminalSessions: () => terminalSessionService.stopAll(),
+    disposeRunLifecycle: () => runLifecycleService.prepareApplicationShutdown(),
+    disposeTerminalWorkflows: () => terminalWorkflowService.stopAll(),
+    disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),
     logger: consoleLogger
   }).finally(() => {
     isReadyToQuit = true

@@ -1,5 +1,6 @@
 import type {
   TerminalModelIdentity,
+  TerminalModelCheckpoint,
   TerminalModelDiagnosticsSnapshot,
   TerminalSnapshot
 } from '../dto/TerminalModelSnapshot'
@@ -32,6 +33,12 @@ export interface AttachTerminalViewCommand {
   readonly onOutput: (event: TerminalViewOutputEvent) => void
 }
 
+export interface RestoreTerminalModelCommand {
+  readonly checkpoint: TerminalModelCheckpoint
+  readonly onQueryResponse: (response: string) => void
+  readonly onFlowControlChange: (isPaused: boolean) => void
+}
+
 export interface TerminalModelPort {
   create(command: CreateTerminalModelCommand): void
   acceptOutput(identity: TerminalModelIdentity, data: string): SequencedTerminalOutput
@@ -45,4 +52,9 @@ export interface TerminalModelPort {
   retire(identity: TerminalModelIdentity): void
   disposeAll(): void
   getDiagnostics(): TerminalModelDiagnosticsSnapshot
+}
+
+export interface TerminalModelRecoveryPort extends TerminalModelPort {
+  captureCheckpoint(identity: TerminalModelIdentity): Promise<TerminalModelCheckpoint>
+  restoreCheckpoint(command: RestoreTerminalModelCommand): Promise<void>
 }

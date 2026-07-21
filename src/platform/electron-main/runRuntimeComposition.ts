@@ -19,10 +19,9 @@ import {
 } from '../../contexts/run/domain/value-objects/TerminalRunScope'
 import { NodeLocalPortReservationAdapter } from '../../contexts/run/infrastructure/network/NodeLocalPortReservationAdapter'
 import { NodeTcpListenerInspectionAdapter } from '../../contexts/run/infrastructure/network/NodeTcpListenerInspectionAdapter'
-import { NodePtyTerminalProcessAdapter } from '../../contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
 import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
-import { HeadlessTerminalModelAdapter } from '../../contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
+import { PersistentTerminalProviderClient } from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
 import { NodeTerminalLinkFileSystemAdapter } from '../../contexts/run/infrastructure/filesystem/NodeTerminalLinkFileSystemAdapter'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { createRunLifecycleAdapters } from './runLifecycleAdapters'
@@ -30,17 +29,25 @@ import type { ManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { projectTerminalPortConflict } from './terminalPortConflictProjection'
 
 export function createRunRuntime(input: {
+  readonly appStateDirectory: string
   readonly launchPlans: TerminalLaunchPlanPort
   readonly resolveManagedServiceOwner: ManagedServiceOwnerResolver
   readonly scopeValidation: RunRuntimeScopeValidationPort
   readonly workflowPlans: TerminalWorkflowPlanPort
 }) {
   const lifecycle = new RunLifecycleService()
+  const terminalProvider = new PersistentTerminalProviderClient({
+    stateDirectory: `${input.appStateDirectory}/terminal-runtime-provider`,
+    providerEntryPath: `${__dirname}/terminal-runtime-provider.js`,
+    onBackgroundError: logProviderError,
+    onOutput: (event) => broadcastRendererEvent('cleancode:terminal-output', event)
+  })
   const sessions = new TerminalSessionService(
-    new NodePtyTerminalProcessAdapter(),
+    terminalProvider,
     input.scopeValidation,
     lifecycle,
-    new HeadlessTerminalModelAdapter()
+    terminalProvider,
+    terminalProvider
   )
   const readiness = new NodeTcpReadinessAdapter()
   const leases = new ServicePortLeaseRegistry()
@@ -102,7 +109,17 @@ export function createRunRuntime(input: {
     openTerminalServiceEndpoint,
     openTerminalLink,
     sessions,
-    workflow
+    workflow,
+    initialize: async () => {
+      const recovery = await sessions.initializeRuntime({
+        onOutput: () => undefined,
+        onExit: (event) => broadcastRendererEvent('cleancode:terminal-exit', event),
+        onSessionUpdated: (session) =>
+          broadcastRendererEvent('cleancode:terminal-session-updated', session)
+      })
+      await managedServices.recover(recovery.managedServiceEndpoints)
+      return recovery
+    }
   }
 }
 
@@ -135,6 +152,15 @@ function logOwnerResolutionError(error: unknown): void {
   consoleLogger.warn({
     scope: 'run.terminal-workflow',
     operation: 'resolveManagedServiceOwner',
+    outcome: 'failure',
+    error: { message: error instanceof Error ? error.message : String(error) }
+  })
+}
+
+function logProviderError(error: unknown): void {
+  consoleLogger.warn({
+    scope: 'run.terminal-provider',
+    operation: 'providerBackgroundRequest',
     outcome: 'failure',
     error: { message: error instanceof Error ? error.message : String(error) }
   })

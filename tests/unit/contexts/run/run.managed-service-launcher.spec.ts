@@ -354,6 +354,43 @@ describe('managed service launcher', () => {
     expect(fixture.processes.stops).toEqual([fixture.processes.starts[0]!.scope.sessionId])
     lease.release()
   })
+
+  it('recovers a warm managed endpoint only after revalidating listener ownership', async () => {
+    const fixture = createFixture({
+      reservations: [],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }]
+    })
+    const session = await startDirectSession(fixture.sessions)
+    const endpoint = recoveredEndpoint()
+
+    const recovered = await fixture.launcher.recover([
+      { scope: session, endpoint, rootProcessId: session.processId! }
+    ])
+
+    expect(recovered).toHaveLength(1)
+    expect(recovered[0]).toMatchObject({ session, endpoint, lease: { state: 'bound' } })
+    expect(fixture.inspector.commands).toEqual([
+      { host: endpoint.host, port: endpoint.port, rootProcessId: session.processId }
+    ])
+    expect(fixture.registry.findActiveByPort(endpoint.port)?.owner).toEqual(session)
+  })
+
+  it('does not recover a managed endpoint whose listener ownership is unknown', async () => {
+    const fixture = createFixture({
+      reservations: [],
+      inspections: [{ ownership: 'unknown', reason: 'inspection unavailable' }]
+    })
+    const session = await startDirectSession(fixture.sessions)
+    const endpoint = recoveredEndpoint()
+
+    const recovered = await fixture.launcher.recover([
+      { scope: session, endpoint, rootProcessId: session.processId! }
+    ])
+
+    expect(recovered).toEqual([])
+    expect(fixture.launcher.getActive(session.id)).toBeNull()
+    expect(fixture.registry.findActiveByPort(endpoint.port)).toBeNull()
+  })
 })
 
 function createFixture(input: {
@@ -506,6 +543,33 @@ function preferredPort() {
     protocol: 'http' as const,
     policy: { type: 'preferred' as const, port: 3_000 },
     binding: { type: 'environment' as const, variableName: 'PORT' }
+  }
+}
+
+async function startDirectSession(sessions: TerminalSessionService) {
+  return sessions.start({
+    projectId: 'project-1',
+    projectDirectory: '/project',
+    workspaceName: 'main',
+    workspaceDirectory: '/project',
+    gitBranch: 'main',
+    terminalBlockId: 'api',
+    workingDirectory: '/project',
+    sessionKind: 'direct',
+    onOutput: () => undefined,
+    onExit: () => undefined
+  })
+}
+
+function recoveredEndpoint() {
+  return {
+    protocol: 'http' as const,
+    host: '127.0.0.1' as const,
+    port: 41_001,
+    requestedPort: 3_000,
+    fallback: true,
+    displayAddress: 'http://127.0.0.1:41001',
+    openable: true
   }
 }
 

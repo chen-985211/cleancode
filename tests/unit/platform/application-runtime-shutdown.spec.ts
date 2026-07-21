@@ -21,6 +21,7 @@ describe('application runtime shutdown', () => {
       throw new AggregateError([lifecycleFailure], 'run cleanup failed')
     })
     const disposeTerminalSessions = vi.fn(async () => pendingTerminalCleanup)
+    const disposeTerminalWorkflows = vi.fn(async () => undefined)
     const disposeAgentSessions = vi.fn(async () => {
       throw agentFailure
     })
@@ -30,6 +31,7 @@ describe('application runtime shutdown', () => {
       disposeAgentSessions,
       disposeRunLifecycle,
       disposeTerminalSessions,
+      disposeTerminalWorkflows,
       logger
     }).finally(() => {
       shutdownSettled = true
@@ -38,6 +40,7 @@ describe('application runtime shutdown', () => {
     await vi.waitFor(() => {
       expect(disposeRunLifecycle).toHaveBeenCalledOnce()
       expect(disposeTerminalSessions).toHaveBeenCalledOnce()
+      expect(disposeTerminalWorkflows).toHaveBeenCalledOnce()
       expect(disposeAgentSessions).toHaveBeenCalledOnce()
     })
     expect(shutdownSettled).toBe(false)

@@ -251,6 +251,9 @@ function createTerminalSessionSnapshot(terminalBlockId: string): TerminalSession
     workingDirectory: '/tmp/alpha-project',
     processId: 1001,
     status: 'running',
+    kind: 'interactive',
+    retentionPolicy: 'terminate-on-application-exit',
+    recoveryKind: 'fresh',
     inputHistory: [],
     exitCode: null,
     failureReason: null
