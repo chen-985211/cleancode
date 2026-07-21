@@ -15,7 +15,7 @@ import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 interface UseApplicationShortcutNavigationInput {
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly nodes: readonly WorkbenchFlowNode[]
+  readonly getNodes: () => readonly WorkbenchFlowNode[]
   readonly onSelectWorkspace: (
     workbench: WorkbenchSnapshot,
     workspaceName: string
@@ -30,7 +30,7 @@ interface UseApplicationShortcutNavigationInput {
 export function useApplicationShortcutNavigation({
   canvasSizeRef,
   currentWorkbench,
-  nodes,
+  getNodes,
   onSelectWorkspace,
   reactFlowInstanceRef,
   revealProjectSidebar,
@@ -44,10 +44,8 @@ export function useApplicationShortcutNavigation({
   )
   const intentIdRef = useRef(0)
   const isWorkspaceTransitionPendingRef = useRef(false)
-  const nodesRef = useRef(nodes)
   const selectedNodeIdRef = useRef(selectedNodeId)
   const selectWorkbenchNodeRef = useRef(selectWorkbenchNode)
-  nodesRef.current = nodes
   selectedNodeIdRef.current = selectedNodeId
   selectWorkbenchNodeRef.current = selectWorkbenchNode
 
@@ -69,7 +67,7 @@ export function useApplicationShortcutNavigation({
 
       const viewport = instance.getViewport()
       const target = resolveDirectionalWorkbenchNode(
-        nodesRef.current,
+        getNodes(),
         selectedNodeIdRef.current,
         viewport,
         canvasSizeRef.current,
@@ -83,7 +81,7 @@ export function useApplicationShortcutNavigation({
       const center = resolveWorkbenchNodeCenter(target)
       void instance.setCenter(center.x, center.y, { duration: 0, zoom: viewport.zoom })
     },
-    [canvasSizeRef, reactFlowInstanceRef]
+    [canvasSizeRef, getNodes, reactFlowInstanceRef]
   )
 
   const navigateWorkspace = useCallback(

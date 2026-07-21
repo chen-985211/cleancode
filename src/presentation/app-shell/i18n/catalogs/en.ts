@@ -126,6 +126,8 @@ export const enMessages = {
   'canvas.statusPreview': 'Browser preview',
   'canvas.statusConnected': 'Local runtime connected',
   'canvas.statusWaiting': 'Waiting for a project',
+  'canvas.layoutSaveFailedTitle': 'Could not save canvas layout',
+  'canvas.layoutSaveFailed': 'The node was restored to its previous position. Try again.',
   'minimap.title': 'Block navigation minimap',
   'minimap.controls': 'Minimap controls',
   'minimap.expand': 'Expand minimap',

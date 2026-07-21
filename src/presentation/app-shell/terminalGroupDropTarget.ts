@@ -1,5 +1,6 @@
 import type {
   TerminalFlowNode,
+  TerminalGroupDropFeedback,
   TerminalGroupFlowNode,
   WorkbenchFlowNode,
   WorkbenchSnapshot
@@ -57,6 +58,58 @@ export function resolveTerminalGroupDropAction({
   return targetGroupNode
     ? { type: 'join-group', terminalGroupId: targetGroupNode.id }
     : { type: 'none' }
+}
+
+export function projectTerminalGroupDropAction(
+  nodes: WorkbenchFlowNode[],
+  action: TerminalGroupDropAction
+): WorkbenchFlowNode[] {
+  let didChange = false
+  const nextNodes = nodes.map((node): WorkbenchFlowNode => {
+    if (node.type !== 'terminalGroup') return node
+
+    const dropFeedback = resolveTerminalGroupDropFeedback(node.id, action)
+
+    if (node.data.dropFeedback === dropFeedback) return node
+
+    didChange = true
+    return { ...node, data: { ...node.data, dropFeedback } }
+  })
+
+  return didChange ? nextNodes : nodes
+}
+
+export function resolveTerminalGroupDropFeedback(
+  terminalGroupId: string,
+  action: TerminalGroupDropAction
+): TerminalGroupDropFeedback | null {
+  if (action.type === 'join-group' && action.terminalGroupId === terminalGroupId) {
+    return 'join'
+  }
+
+  if (action.type === 'leave-group' && action.terminalGroupId === terminalGroupId) {
+    return action.willDissolveGroup ? 'dissolve' : 'leave'
+  }
+
+  return null
+}
+
+export function isSameTerminalGroupDropAction(
+  left: TerminalGroupDropAction,
+  right: TerminalGroupDropAction
+): boolean {
+  if (left.type !== right.type) return false
+  if (left.type === 'none' && right.type === 'none') return true
+  if (left.type === 'join-group' && right.type === 'join-group') {
+    return left.terminalGroupId === right.terminalGroupId
+  }
+
+  return (
+    left.type === 'leave-group' &&
+    right.type === 'leave-group' &&
+    left.terminalGroupId === right.terminalGroupId &&
+    left.willDissolveGroup === right.willDissolveGroup
+  )
 }
 
 function isPointInsideRect(

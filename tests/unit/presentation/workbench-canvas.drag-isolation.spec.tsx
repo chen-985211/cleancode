@@ -11,6 +11,7 @@ import type {
   WorkbenchFlowNode
 } from '../../../src/presentation/app-shell/types'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
@@ -133,6 +134,8 @@ function renderCanvas(
   onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void,
   onPaneClick = vi.fn()
 ): void {
+  const nodeStore = createWorkbenchNodeStore(nodes)
+
   render(
     <WorkbenchCanvas
       shortcutTooltips={{
@@ -158,8 +161,7 @@ function renderCanvas(
       isMinimapCollapsed={false}
       currentWorkbench={null}
       currentWorkspace={undefined}
-      nodes={nodes}
-      minimapNodes={nodes}
+      nodeStore={nodeStore}
       nodeTypes={{}}
       reactFlowInstanceRef={{ current: null }}
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}

@@ -10,6 +10,8 @@ import {
   useWorkbenchLayoutFocus,
   type WorkbenchLayoutFocusRequest
 } from './useWorkbenchLayoutFocus'
+import type { WorkbenchNodeStore } from './workbenchNodeStore'
+import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'
 
 interface UseAgentLayoutCoordinationInput {
   readonly clearTerminalGroupDropPreview: () => void
@@ -24,7 +26,7 @@ interface UseAgentLayoutCoordinationInput {
     position: { readonly x: number; readonly y: number },
     size: { readonly width: number; readonly height: number }
   ) => Promise<void>
-  readonly nodes: readonly WorkbenchFlowNode[]
+  readonly nodeStore: WorkbenchNodeStore
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
 }
@@ -35,7 +37,7 @@ export function useAgentLayoutCoordination({
   currentWorkspaceName,
   moveWorkbenchNode,
   moveWorkspaceAgent,
-  nodes,
+  nodeStore,
   reactFlowInstanceRef,
   setCurrentGraph
 }: UseAgentLayoutCoordinationInput) {
@@ -75,9 +77,9 @@ export function useAgentLayoutCoordination({
   const onNodeDragStart = useCallback(
     (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
       clearTerminalGroupDropPreview()
-      updateDragProtection(node.id, resolveDragProtectedNodeIds(node, nodes))
+      updateDragProtection(node.id, resolveDragProtectedNodeIds(node, nodeStore.getNodes()))
     },
-    [clearTerminalGroupDropPreview, nodes, updateDragProtection]
+    [clearTerminalGroupDropPreview, nodeStore, updateDragProtection]
   )
   const onNodeDragStop = useCallback(
     async (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): Promise<void> => {
@@ -89,12 +91,17 @@ export function useAgentLayoutCoordination({
 
         const width = resolveNodeSize(node.style?.width, node.data.agent.layout.size.width)
         const height = resolveNodeSize(node.style?.height, node.data.agent.layout.size.height)
-        await moveWorkspaceAgent(node.data.agent, node.position, { width, height })
+        try {
+          await moveWorkspaceAgent(node.data.agent, node.position, { width, height })
+        } catch (error) {
+          nodeStore.setNodes((nodes) => restoreWorkbenchNodeLayout(nodes, null, node))
+          throw error
+        }
       } finally {
         updateDragProtection(node.id, null)
       }
     },
-    [moveWorkbenchNode, moveWorkspaceAgent, updateDragProtection]
+    [moveWorkbenchNode, moveWorkspaceAgent, nodeStore, updateDragProtection]
   )
 
   useEffect(() => {
@@ -104,7 +111,7 @@ export function useAgentLayoutCoordination({
   }, [currentProjectId, currentWorkspaceName])
 
   useWorkbenchLayoutFocus({
-    nodes,
+    nodeStore,
     onHandled: handleLayoutFocusHandled,
     protectedNodeIds: protectedLayoutNodeIds,
     reactFlowInstanceRef,

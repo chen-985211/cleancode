@@ -18,7 +18,7 @@ import {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
-import type { MinimapNodeInteractionContextValue } from './minimapInteraction'
+import { filterMinimapNodes, type MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
@@ -28,6 +28,7 @@ import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprova
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
+import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -36,8 +37,7 @@ interface WorkbenchCanvasProps {
   readonly isDesktopRuntime: boolean
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
-  readonly nodes: WorkbenchFlowNode[]
-  readonly minimapNodes: MinimapFlowNode[]
+  readonly nodeStore: WorkbenchNodeStore
   readonly nodeTypes: NodeTypes
   readonly canvasSizeRef?: MutableRefObject<{ width: number; height: number }>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
@@ -82,8 +82,7 @@ export function WorkbenchCanvas({
   isDesktopRuntime,
   currentWorkbench,
   currentWorkspace,
-  nodes,
-  minimapNodes,
+  nodeStore,
   nodeTypes,
   canvasSizeRef,
   reactFlowInstanceRef,
@@ -117,6 +116,8 @@ export function WorkbenchCanvas({
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
   const { t } = useI18n()
+  const nodes = useWorkbenchNodes(nodeStore)
+  const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
   const approvalEdges = useMemo(
     () => createAgentApprovalIntentEdges(approvalIntents, currentWorkbench?.graph ?? null, t),
@@ -132,20 +133,13 @@ export function WorkbenchCanvas({
     [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
-  const [isDraggingTerminalNode, setIsDraggingTerminalNode] = useState(false)
   const [viewportZoom, setViewportZoom] = useState(1)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
-  const activeDraggedNodeIdRef = useRef<string | null>(null)
+  const activeDraggedNodeRef = useRef<WorkbenchFlowNode | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
-  const canvasSurfaceClassName = [
-    'canvas-surface',
-    isDraggingTerminalNode ? 'canvas-surface--dragging-terminal' : ''
-  ]
-    .filter(Boolean)
-    .join(' ')
   const moveCanvasViewportToMinimapCenter = (
     center: MinimapViewportCenter,
     persistViewport: boolean
@@ -226,7 +220,7 @@ export function WorkbenchCanvas({
 
   return (
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
-      <div ref={canvasSurfaceRef} className={canvasSurfaceClassName}>
+      <div ref={canvasSurfaceRef} className="canvas-surface">
         <WorkbenchToolbar
           shortcutTooltips={shortcutTooltips}
           isDesktopRuntime={isDesktopRuntime}
@@ -272,24 +266,22 @@ export function WorkbenchCanvas({
             setCanvasViewport(toCanvasViewportSnapshot(viewport))
           }}
           onNodesChange={(changes) =>
-            onNodesChange(
-              isolateWorkbenchNodeDragChanges(changes, nodes, activeDraggedNodeIdRef.current)
-            )
+            onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
           }
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onNodeDragStart={(event, node) => {
-            activeDraggedNodeIdRef.current = node.id
-            setIsDraggingTerminalNode(true)
+            activeDraggedNodeRef.current = node
+            canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
             onNodeDragStart(event, node)
           }}
           onNodeDrag={onNodeDrag}
           onNodeDragStop={(event, node) => {
             try {
-              setIsDraggingTerminalNode(false)
+              canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
               onNodeDragStop(event, node)
             } finally {
-              activeDraggedNodeIdRef.current = null
+              activeDraggedNodeRef.current = null
             }
           }}
           onMove={(_event, viewport) => {

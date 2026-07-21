@@ -66,7 +66,7 @@ function renderNavigationHook({
     useApplicationShortcutNavigation({
       canvasSizeRef: { current: { width: 960, height: 640 } },
       currentWorkbench: null,
-      nodes,
+      getNodes: () => nodes,
       onSelectWorkspace:
         vi.fn<(workbench: WorkbenchSnapshot, workspaceName: string) => Promise<void>>(),
       reactFlowInstanceRef,

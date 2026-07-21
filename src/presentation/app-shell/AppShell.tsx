@@ -6,7 +6,7 @@ import { PanelLeft } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { createMinimapNodeInteraction, filterMinimapNodes } from './minimapInteraction'
+import { createMinimapNodeInteraction } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
 import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
@@ -55,6 +55,7 @@ import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { createWorkbenchNodeStore } from './workbenchNodeStore'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -63,7 +64,7 @@ export function AppShell({
   const { t } = useI18n()
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
   const [currentWorkbench, setCurrentWorkbench] = useState<WorkbenchSnapshot | null>(null)
-  const [nodes, setNodes] = useState<WorkbenchFlowNode[]>([])
+  const [nodeStore] = useState(() => createWorkbenchNodeStore())
   const [selectedTerminalBlockIds, setSelectedTerminalBlockIds] = useState<string[]>([])
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
@@ -333,7 +334,7 @@ export function AppShell({
     isTerminalGroupSelectionMode,
     selectTerminalBlock,
     selectTerminalGroup,
-    setNodes,
+    setNodes: nodeStore.setNodes,
     setSelectedAgentId,
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
@@ -344,7 +345,7 @@ export function AppShell({
   const shortcutNavigation = useApplicationShortcutNavigation({
     canvasSizeRef,
     currentWorkbench,
-    nodes,
+    getNodes: nodeStore.getNodes,
     onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
     reactFlowInstanceRef,
     revealProjectSidebar,
@@ -353,20 +354,17 @@ export function AppShell({
     workbenches
   })
   const { selectTerminalFromTitle } = workbenchNodeSelection
-  const {
-    clearTerminalGroupDropPreview,
-    moveWorkbenchNode,
-    previewTerminalGroupDrop,
-    terminalGroupDropAction
-  } = useTerminalGroupDragActions({
-    currentWorkbench,
-    currentWorkspace,
-    graph,
-    isTerminalGroupSelectionMode,
-    layoutCommitQueue,
-    nodes,
-    setCurrentGraph
-  })
+  const { clearTerminalGroupDropPreview, moveWorkbenchNode, previewTerminalGroupDrop } =
+    useTerminalGroupDragActions({
+      currentWorkbench,
+      currentWorkspace,
+      getNodes: nodeStore.getNodes,
+      graph,
+      isTerminalGroupSelectionMode,
+      layoutCommitQueue,
+      setCurrentGraph,
+      setNodes: nodeStore.setNodes
+    })
   const { onAgentGraphUpdated, onNodeDragStart, onNodeDragStop, protectedLayoutNodeIds } =
     useAgentLayoutCoordination({
       clearTerminalGroupDropPreview,
@@ -374,7 +372,7 @@ export function AppShell({
       currentWorkspaceName: currentWorkspace?.name ?? null,
       moveWorkbenchNode,
       moveWorkspaceAgent,
-      nodes,
+      nodeStore,
       reactFlowInstanceRef,
       setCurrentGraph
     })
@@ -504,8 +502,7 @@ export function AppShell({
     selectedUngroupedTerminalBlockIds,
     protectedLayoutNodeIds,
     onAgentGraphUpdated,
-    setNodes,
-    terminalGroupDropAction,
+    setNodes: nodeStore.setNodes,
     terminalStates,
     activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
     isStoppingWorkflow: terminalWorkflow.isStopping,
@@ -516,7 +513,6 @@ export function AppShell({
     onResizeAgent: resizeWorkspaceAgent,
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
-  const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const hasMultipleWorkspaces =
     workbenches.reduce((count, workbench) => count + workbench.project.workspaces.length, 0) > 1
   const applicationShortcutActions = useAppShellShortcutActions({
@@ -544,6 +540,18 @@ export function AppShell({
     bindings,
     platform: shortcutPlatform
   })
+  const commitWorkbenchNodeDrag = useCallback(
+    (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
+      void onNodeDragStop(event, node).catch(() => {
+        notifications.notify({
+          kind: 'error',
+          message: t('canvas.layoutSaveFailed'),
+          title: t('canvas.layoutSaveFailedTitle')
+        })
+      })
+    },
+    [notifications, onNodeDragStop, t]
+  )
   return (
     <CodexCliStateProvider>
       <AgentTerminalEventProvider store={agentTerminalEvents}>
@@ -625,8 +633,7 @@ export function AppShell({
               isDesktopRuntime={isDesktopRuntime}
               currentWorkbench={currentWorkbench}
               currentWorkspace={currentWorkspace}
-              nodes={nodes}
-              minimapNodes={minimapNodes}
+              nodeStore={nodeStore}
               nodeTypes={workbenchNodeTypes}
               canvasSizeRef={canvasSizeRef}
               reactFlowInstanceRef={reactFlowInstanceRef}
@@ -652,7 +659,7 @@ export function AppShell({
               onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
               onNodeDrag={previewTerminalGroupDrop}
               onNodeDragStart={onNodeDragStart}
-              onNodeDragStop={(event, node) => void onNodeDragStop(event, node)}
+              onNodeDragStop={commitWorkbenchNodeDrag}
               onViewportChange={updateGraphViewport}
               onMinimapNodeClick={focusWorkbenchNode}
               getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}

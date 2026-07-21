@@ -8,7 +8,6 @@ import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentCo
 import { createAgentApprovalNodeIntents } from './agentApprovalPresentation'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
-import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
 import type {
   TerminalViewState,
   WorkbenchFlowNode,
@@ -34,7 +33,6 @@ interface UseWorkbenchFlowNodesInput {
   readonly protectedLayoutNodeIds: ReadonlySet<string>
   readonly onAgentGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
-  readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
   readonly activeWorkflowRootBlockIds?: readonly string[]
   readonly isStoppingWorkflow?: boolean
@@ -67,7 +65,6 @@ export function useWorkbenchFlowNodes({
   protectedLayoutNodeIds,
   onAgentGraphUpdated,
   setNodes,
-  terminalGroupDropAction,
   terminalStates,
   activeWorkflowRootBlockIds,
   isStoppingWorkflow,
@@ -106,7 +103,6 @@ export function useWorkbenchFlowNodes({
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
         selectedUngroupedTerminalBlockIds,
-        terminalGroupDropAction,
         terminalStates,
         workflowNodeStatuses
       })
@@ -153,7 +149,6 @@ export function useWorkbenchFlowNodes({
     protectedLayoutNodeIds,
     onAgentGraphUpdated,
     setNodes,
-    terminalGroupDropAction,
     terminalStates,
     workflowNodeStatuses,
     onRemoveAgent,

@@ -26,6 +26,19 @@ function preserveTransientGeometry(
   nextNode: WorkbenchFlowNode,
   currentNode: WorkbenchFlowNode
 ): WorkbenchFlowNode {
+  if (nextNode.type === 'terminalGroup' && currentNode.type === 'terminalGroup') {
+    return {
+      ...nextNode,
+      data: { ...nextNode.data, dropFeedback: currentNode.data.dropFeedback },
+      position: currentNode.position,
+      style: currentNode.style,
+      ...(currentNode.width === undefined ? {} : { width: currentNode.width }),
+      ...(currentNode.height === undefined ? {} : { height: currentNode.height }),
+      ...(currentNode.measured === undefined ? {} : { measured: currentNode.measured }),
+      ...(currentNode.dragging === undefined ? {} : { dragging: currentNode.dragging })
+    }
+  }
+
   return {
     ...nextNode,
     position: currentNode.position,

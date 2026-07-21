@@ -4,7 +4,10 @@ import {
   type TerminalFlowNode,
   type TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
-import { resolveTerminalGroupDropAction } from '../../../src/presentation/app-shell/terminalGroupDropTarget'
+import {
+  projectTerminalGroupDropAction,
+  resolveTerminalGroupDropAction
+} from '../../../src/presentation/app-shell/terminalGroupDropTarget'
 
 describe('terminal group drop target', () => {
   it('joins an ungrouped terminal when its center is dropped inside a group', () => {
@@ -104,6 +107,32 @@ describe('terminal group drop target', () => {
       terminalGroupId: 'development-group',
       willDissolveGroup: false
     })
+  })
+
+  it('updates only the affected group and reuses an unchanged preview snapshot', () => {
+    const terminal = createTerminalNode({ id: 'worker-terminal', position: { x: 420, y: 260 } })
+    const targetGroup = createGroupNode({
+      id: 'development-group',
+      position: { x: 300, y: 180 },
+      size: { width: 760, height: 380 },
+      memberBlockIds: ['backend-terminal', 'frontend-terminal']
+    })
+    const unaffectedGroup = createGroupNode({
+      id: 'operations-group',
+      position: { x: 1400, y: 180 },
+      size: { width: 760, height: 380 },
+      memberBlockIds: []
+    })
+    const nodes = [targetGroup, unaffectedGroup, terminal]
+    const action = { type: 'join-group', terminalGroupId: targetGroup.id } as const
+    const projectedNodes = projectTerminalGroupDropAction(nodes, action)
+
+    expect(projectedNodes).not.toBe(nodes)
+    expect(projectedNodes[0]).not.toBe(targetGroup)
+    expect((projectedNodes[0] as TerminalGroupFlowNode).data.dropFeedback).toBe('join')
+    expect(projectedNodes[1]).toBe(unaffectedGroup)
+    expect(projectedNodes[2]).toBe(terminal)
+    expect(projectTerminalGroupDropAction(projectedNodes, action)).toBe(projectedNodes)
   })
 })
 

@@ -118,6 +118,8 @@ export const zhCNMessages = {
   'canvas.statusPreview': '浏览器预览模式',
   'canvas.statusConnected': '已连接本地运行时',
   'canvas.statusWaiting': '等待项目',
+  'canvas.layoutSaveFailedTitle': '无法保存画布布局',
+  'canvas.layoutSaveFailed': '节点已恢复到保存前的位置，请重试。',
   'minimap.title': '积木导航小地图',
   'minimap.controls': '小地图控制',
   'minimap.expand': '展开小地图',

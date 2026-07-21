@@ -11,6 +11,7 @@ import type {
   WorkbenchSnapshot
 } from '../../../src/presentation/app-shell/types'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('Agent layout projection timing', () => {
   it('fits the arranged geometry after the existing terminal node has been reprojected', async () => {
@@ -50,14 +51,10 @@ function Harness({
   readonly onReady: (listener: (event: AgentGraphUpdatedEvent) => void) => void
 }) {
   const [graph, setGraph] = useState(createGraph({ x: 80, y: 80 }))
-  const [nodes, setNodes] = useState<WorkbenchFlowNode[]>([])
-  const nodesRef = useRef(nodes)
-  useEffect(() => {
-    nodesRef.current = nodes
-  }, [nodes])
+  const [nodeStore] = useState(() => createWorkbenchNodeStore())
   const reactFlowInstanceRef = useRef({
     fitView,
-    getNode: (nodeId: string) => nodesRef.current.find((node) => node.id === nodeId)
+    getNode: (nodeId: string) => nodeStore.getNodes().find((node) => node.id === nodeId)
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>)
   const coordination = useAgentLayoutCoordination({
     clearTerminalGroupDropPreview: noop,
@@ -65,7 +62,7 @@ function Harness({
     currentWorkspaceName: currentWorkspace.name,
     moveWorkbenchNode: noopAsync,
     moveWorkspaceAgent: noopAsync,
-    nodes,
+    nodeStore,
     reactFlowInstanceRef,
     setCurrentGraph: setGraph
   })
@@ -89,8 +86,7 @@ function Harness({
     selectedTerminalBlockIds: emptyIds,
     selectedTerminalGroupId: null,
     selectedUngroupedTerminalBlockIds: emptyIds,
-    setNodes,
-    terminalGroupDropAction,
+    setNodes: nodeStore.setNodes,
     terminalStates
   })
 
@@ -159,7 +155,6 @@ const workbench: WorkbenchSnapshot = {
 const currentWorkspace = workbench.project.workspaces[0]!
 const terminalHandlers = {} as never
 const emptyIds: readonly string[] = []
-const terminalGroupDropAction = { type: 'none' as const }
 const terminalStates = {}
 const agentToolApprovals = {
   approvals: [],

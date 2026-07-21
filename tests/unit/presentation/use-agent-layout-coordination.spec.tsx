@@ -5,12 +5,14 @@ import type { AgentGraphUpdatedEvent } from '../../../src/contexts/agent/applica
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/useAgentLayoutCoordination'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('Agent layout coordination', () => {
   it('keeps a user-dragged terminal protected and focuses once its commit settles', async () => {
     const terminalNode = createNode('terminal-1', 'terminal')
     const agentNode = createNode('agent:agent-1', 'agentConsole')
     const nodes = [agentNode, terminalNode]
+    const nodeStore = createWorkbenchNodeStore(nodes)
     const fitView = vi.fn(async () => undefined)
     const moveCommit = createDeferred<void>()
     const setCurrentGraph = vi.fn()
@@ -21,7 +23,7 @@ describe('Agent layout coordination', () => {
         currentWorkspaceName: 'main',
         moveWorkbenchNode: vi.fn(() => moveCommit.promise),
         moveWorkspaceAgent: vi.fn(async () => undefined),
-        nodes,
+        nodeStore,
         reactFlowInstanceRef: {
           current: createReactFlowInstance(nodes, fitView)
         },
@@ -52,6 +54,7 @@ describe('Agent layout coordination', () => {
     ['a group member', 'terminal-1']
   ])('protects the complete terminal group while dragging %s', (_label, draggedNodeId) => {
     const nodes = createGroupedNodes()
+    const nodeStore = createWorkbenchNodeStore(nodes)
     const draggedNode = nodes.find((node) => node.id === draggedNodeId)!
     const { result } = renderHook(() =>
       useAgentLayoutCoordination({
@@ -60,7 +63,7 @@ describe('Agent layout coordination', () => {
         currentWorkspaceName: 'main',
         moveWorkbenchNode: vi.fn(async () => undefined),
         moveWorkspaceAgent: vi.fn(async () => undefined),
-        nodes,
+        nodeStore,
         reactFlowInstanceRef: { current: null },
         setCurrentGraph: vi.fn()
       })
@@ -73,6 +76,48 @@ describe('Agent layout coordination', () => {
       'terminal-1',
       'terminal-2'
     ])
+  })
+
+  it('restores authoritative Agent geometry when the layout commit fails', async () => {
+    const agent = {
+      agentId: 'agent-1',
+      cleancodeMcpEnabled: true,
+      layout: {
+        position: { x: 40, y: 40 },
+        size: { width: 440, height: 520 }
+      },
+      name: 'Agent 1',
+      projectId: 'project-1',
+      workspaceName: 'main'
+    }
+    const movedAgentNode = {
+      id: 'agent:agent-1',
+      data: { agent },
+      position: { x: 720, y: 480 },
+      style: { width: 440, height: 520 },
+      type: 'agentConsole'
+    } as WorkbenchFlowNode
+    const nodeStore = createWorkbenchNodeStore([movedAgentNode])
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceName: 'main',
+        moveWorkbenchNode: vi.fn(async () => undefined),
+        moveWorkspaceAgent: vi.fn(async () => {
+          throw new Error('layout commit failed')
+        }),
+        nodeStore,
+        reactFlowInstanceRef: { current: null },
+        setCurrentGraph: vi.fn()
+      })
+    )
+
+    await expect(result.current.onNodeDragStop({} as MouseEvent, movedAgentNode)).rejects.toThrow(
+      'layout commit failed'
+    )
+
+    expect(nodeStore.getNodes()[0]?.position).toEqual(agent.layout.position)
   })
 })
 

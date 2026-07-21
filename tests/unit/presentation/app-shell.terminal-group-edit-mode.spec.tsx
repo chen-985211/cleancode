@@ -15,8 +15,21 @@ import type {
 } from '../../../src/presentation/app-shell/types'
 
 const reactFlowProps = vi.hoisted(() => ({
-  latest: null as MockReactFlowProps | null
+  latest: null as MockReactFlowProps | null,
+  renderCount: 0
 }))
+const appShellRenderStats = vi.hoisted(() => ({ sidebarRenderCount: 0 }))
+
+vi.mock('../../../src/presentation/app-shell/ProjectSidebar', async () => {
+  const React = await import('react')
+
+  return {
+    ProjectSidebar: () => {
+      appShellRenderStats.sidebarRenderCount += 1
+      return React.createElement('aside', { 'data-testid': 'mock-project-sidebar' })
+    }
+  }
+})
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()
@@ -32,6 +45,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       React.createElement('div', null, children),
     ReactFlow: (props: MockReactFlowProps) => {
       const hasInitializedRef = React.useRef(false)
+      reactFlowProps.renderCount += 1
       reactFlowProps.latest = props
 
       React.useEffect(() => {
@@ -51,10 +65,114 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('app shell terminal group edit mode', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
+    reactFlowProps.renderCount = 0
+    appShellRenderStats.sidebarRenderCount = 0
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: undefined
     })
+  })
+
+  it('does not re-render the canvas for a terminal drag preview outside group edit mode', async () => {
+    const workbench = createWorkbenchWithTerminalGroup()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
+
+    const terminalNode = reactFlowProps.latest?.nodes.find(
+      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
+    )
+    const renderCountBeforePreview = reactFlowProps.renderCount
+
+    expect(terminalNode).toBeDefined()
+
+    act(() => {
+      reactFlowProps.latest?.onNodeDrag?.({} as MouseEvent, terminalNode!)
+    })
+
+    expect(reactFlowProps.renderCount).toBe(renderCountBeforePreview)
+  })
+
+  it('updates dragged node geometry without re-rendering the app shell sidebar', async () => {
+    const workbench = createWorkbenchWithTerminalBlocks()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
+    const sidebarRenderCountBeforeDrag = appShellRenderStats.sidebarRenderCount
+
+    act(() => {
+      reactFlowProps.latest?.onNodesChange?.([
+        {
+          id: 'backend-terminal',
+          type: 'position',
+          position: { x: 860, y: 520 },
+          dragging: true
+        }
+      ])
+    })
+
+    await waitFor(() =>
+      expect(
+        reactFlowProps.latest?.nodes.find((node) => node.id === 'backend-terminal')?.position
+      ).toEqual({ x: 860, y: 520 })
+    )
+    expect(appShellRenderStats.sidebarRenderCount).toBe(sidebarRenderCountBeforeDrag)
+  })
+
+  it('reports a failed layout commit after restoring the terminal position', async () => {
+    const workbench = createWorkbenchWithTerminalBlocks()
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    const notify = vi.fn(() => 'notification-1')
+    runtimeApi.moveBlock.mockRejectedValue(new Error('layout commit failed'))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell notifications={{ dismiss: vi.fn(), notify, update: vi.fn(() => false) }} />)
+
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
+    const terminalNode = reactFlowProps.latest?.nodes.find(
+      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
+    )
+
+    if (!terminalNode) throw new Error('Expected backend terminal node')
+
+    const movedNode = { ...terminalNode, position: { x: 860, y: 520 } }
+
+    act(() => {
+      reactFlowProps.latest?.onNodesChange?.([
+        { id: terminalNode.id, type: 'position', position: movedNode.position, dragging: false }
+      ])
+      reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, movedNode)
+    })
+
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith({
+        kind: 'error',
+        message: '节点已恢复到保存前的位置，请重试。',
+        title: '无法保存画布布局'
+      })
+    )
   })
 
   it('moves and immediately adds an ungrouped terminal dropped inside a group', async () => {
@@ -363,6 +481,7 @@ interface MockReactFlowProps {
   readonly nodes: WorkbenchFlowNode[]
   readonly onInit?: (instance: MockReactFlowInstance) => void
   readonly onNodeClick?: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDrag?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void | Promise<void>
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
 }

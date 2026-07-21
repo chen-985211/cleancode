@@ -3,14 +3,16 @@ import type {
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
-import type { TerminalGroupDropAction } from './terminalGroupDropTarget'
+import {
+  resolveTerminalGroupDropFeedback,
+  type TerminalGroupDropAction
+} from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
 import {
   createIdleTerminalState,
   type TerminalDefinitionInput,
   type TerminalDimensions,
   type TerminalFlowNode,
-  type TerminalGroupDropFeedback,
   type TerminalGroupFlowNode,
   type TerminalGroupMetadataInput,
   type TerminalViewState,
@@ -277,21 +279,6 @@ function createTerminalGroupFlowNode({
       onDissolveGroup: handlers.onDissolveGroup ?? noopTerminalGroupPromiseAction
     }
   }
-}
-
-function resolveTerminalGroupDropFeedback(
-  terminalGroupId: string,
-  action: TerminalGroupDropAction
-): TerminalGroupDropFeedback | null {
-  if (action.type === 'join-group' && action.terminalGroupId === terminalGroupId) {
-    return 'join'
-  }
-
-  if (action.type === 'leave-group' && action.terminalGroupId === terminalGroupId) {
-    return action.willDissolveGroup ? 'dissolve' : 'leave'
-  }
-
-  return null
 }
 
 function noopTerminalGroupAction(): void {}

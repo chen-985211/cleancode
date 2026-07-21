@@ -52,7 +52,6 @@ function TimingProbe({
     setNodes: () => {
       phases.push('flow-nodes-projected')
     },
-    terminalGroupDropAction: { type: 'none' },
     terminalStates: {}
   })
 

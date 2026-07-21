@@ -1,11 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 
 import {
+  isSameTerminalGroupDropAction,
+  projectTerminalGroupDropAction,
   resolveTerminalGroupDropAction,
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
+import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -13,46 +16,59 @@ interface UseTerminalGroupDragActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly graph: WorkbenchSnapshot['graph'] | null
+  readonly getNodes: () => WorkbenchFlowNode[]
   readonly isTerminalGroupSelectionMode: boolean
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
-  readonly nodes: readonly WorkbenchFlowNode[]
   readonly setCurrentGraph: (graphSnapshot: WorkbenchSnapshot['graph']) => void
+  readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
 }
 
 export function useTerminalGroupDragActions({
   currentWorkbench,
   currentWorkspace,
   graph,
+  getNodes,
   isTerminalGroupSelectionMode,
   layoutCommitQueue,
-  nodes,
-  setCurrentGraph
+  setCurrentGraph,
+  setNodes
 }: UseTerminalGroupDragActionsInput) {
-  const [terminalGroupDropAction, setTerminalGroupDropAction] = useState<TerminalGroupDropAction>({
-    type: 'none'
-  })
+  const terminalGroupDropActionRef = useRef<TerminalGroupDropAction>({ type: 'none' })
+  const updateTerminalGroupDropAction = useCallback(
+    (action: TerminalGroupDropAction): void => {
+      if (isSameTerminalGroupDropAction(terminalGroupDropActionRef.current, action)) return
+
+      terminalGroupDropActionRef.current = action
+      setNodes((nodes) => projectTerminalGroupDropAction(nodes, action))
+    },
+    [setNodes]
+  )
 
   const previewTerminalGroupDrop = useCallback(
     (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => {
       if (!isTerminalGroupSelectionMode || node.type !== 'terminal' || !graph) {
-        setTerminalGroupDropAction({ type: 'none' })
+        updateTerminalGroupDropAction({ type: 'none' })
         return
       }
 
-      setTerminalGroupDropAction(
+      updateTerminalGroupDropAction(
         resolveTerminalGroupDropAction({
           graph,
           draggedNode: node,
-          nodes
+          nodes: getNodes()
         })
       )
     },
-    [graph, isTerminalGroupSelectionMode, nodes]
+    [getNodes, graph, isTerminalGroupSelectionMode, updateTerminalGroupDropAction]
   )
 
   const clearTerminalGroupDropPreview = useCallback(() => {
-    setTerminalGroupDropAction({ type: 'none' })
-  }, [])
+    updateTerminalGroupDropAction({ type: 'none' })
+  }, [updateTerminalGroupDropAction])
+
+  useEffect(() => {
+    if (!isTerminalGroupSelectionMode) clearTerminalGroupDropPreview()
+  }, [clearTerminalGroupDropPreview, isTerminalGroupSelectionMode])
 
   const moveWorkbenchNode = useCallback(
     async (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode) => {
@@ -61,78 +77,82 @@ export function useTerminalGroupDragActions({
       }
 
       if (node.type === 'agentConsole') {
-        setTerminalGroupDropAction({ type: 'none' })
+        clearTerminalGroupDropPreview()
         return
       }
 
-      if (node.type === 'terminal') {
-        const dropAction = isTerminalGroupSelectionMode
-          ? resolveTerminalGroupDropAction({
-              graph: currentWorkbench.graph,
-              draggedNode: node,
-              nodes
-            })
-          : { type: 'none' as const }
+      try {
+        if (node.type === 'terminal') {
+          const dropAction = isTerminalGroupSelectionMode
+            ? resolveTerminalGroupDropAction({
+                graph: currentWorkbench.graph,
+                draggedNode: node,
+                nodes: getNodes()
+              })
+            : { type: 'none' as const }
+          await layoutCommitQueue.enqueue(
+            `terminal:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+            async () => {
+              let graphSnapshot = await window.cleancode?.moveBlock({
+                projectDirectory: currentWorkbench.project.directory,
+                workspaceName: currentWorkspace.name,
+                blockId: node.id,
+                position: node.position
+              })
+
+              graphSnapshot =
+                (await applyTerminalGroupDropAction({
+                  action: dropAction,
+                  blockId: node.id,
+                  currentWorkbench,
+                  currentWorkspace
+                })) ?? graphSnapshot
+
+              return graphSnapshot
+            },
+            (graphSnapshot) => {
+              if (graphSnapshot) setCurrentGraph(graphSnapshot)
+            }
+          )
+          return
+        }
+
         await layoutCommitQueue.enqueue(
-          `terminal:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
-          async () => {
-            let graphSnapshot = await window.cleancode?.moveBlock({
+          `terminal-group:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+          () =>
+            window.cleancode?.moveTerminalGroup({
               projectDirectory: currentWorkbench.project.directory,
               workspaceName: currentWorkspace.name,
-              blockId: node.id,
+              terminalGroupId: node.id,
               position: node.position
-            })
-
-            graphSnapshot =
-              (await applyTerminalGroupDropAction({
-                action: dropAction,
-                blockId: node.id,
-                currentWorkbench,
-                currentWorkspace
-              })) ?? graphSnapshot
-
-            return graphSnapshot
-          },
+            }) ?? Promise.resolve(undefined),
           (graphSnapshot) => {
             if (graphSnapshot) setCurrentGraph(graphSnapshot)
           }
         )
-
-        setTerminalGroupDropAction({ type: 'none' })
-        return
+      } catch (error) {
+        setNodes((nodes) => restoreWorkbenchNodeLayout(nodes, currentWorkbench.graph, node))
+        throw error
+      } finally {
+        clearTerminalGroupDropPreview()
       }
-
-      await layoutCommitQueue.enqueue(
-        `terminal-group:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
-        () =>
-          window.cleancode?.moveTerminalGroup({
-            projectDirectory: currentWorkbench.project.directory,
-            workspaceName: currentWorkspace.name,
-            terminalGroupId: node.id,
-            position: node.position
-          }) ?? Promise.resolve(undefined),
-        (graphSnapshot) => {
-          if (graphSnapshot) setCurrentGraph(graphSnapshot)
-        }
-      )
-
-      setTerminalGroupDropAction({ type: 'none' })
     },
     [
+      clearTerminalGroupDropPreview,
       currentWorkbench,
       currentWorkspace,
+      getNodes,
       isTerminalGroupSelectionMode,
       layoutCommitQueue,
-      nodes,
-      setCurrentGraph
+      setCurrentGraph,
+      setNodes
     ]
   )
 
   return {
     clearTerminalGroupDropPreview,
     moveWorkbenchNode,
-    previewTerminalGroupDrop,
-    terminalGroupDropAction
+    previewTerminalGroupDrop
   }
 }
 

@@ -1,33 +1,23 @@
 import type { NodeChange } from '@xyflow/react'
 
+import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import type { WorkbenchFlowNode } from './types'
 
 export function isolateWorkbenchNodeDragChanges(
   changes: NodeChange<WorkbenchFlowNode>[],
-  nodes: WorkbenchFlowNode[],
-  activeDraggedNodeId: string | null
+  activeDraggedNode: WorkbenchFlowNode | null
 ): NodeChange<WorkbenchFlowNode>[] {
-  if (!activeDraggedNodeId) {
-    return changes
-  }
-
-  const nodesById = new Map(nodes.map((node) => [node.id, node]))
-  const activeNode = nodesById.get(activeDraggedNodeId)
-
-  if (!activeNode) {
-    return changes
-  }
+  if (!activeDraggedNode) return changes
 
   return changes.filter((change) => {
     if (change.type !== 'position') {
       return true
     }
 
-    if (activeNode.type === 'agentConsole') {
-      return change.id === activeNode.id
+    if (activeDraggedNode.type === 'agentConsole') {
+      return change.id === activeDraggedNode.id
     }
 
-    const changedNode = nodesById.get(change.id)
-    return changedNode?.type !== 'agentConsole'
+    return !readAgentIdFromFlowNodeId(change.id)
   })
 }

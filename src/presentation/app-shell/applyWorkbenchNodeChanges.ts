@@ -15,25 +15,29 @@ export function applyWorkbenchNodeChanges(
   const shouldResizeExpandedTerminalGroups = options.shouldResizeExpandedTerminalGroups ?? true
   const groupDeltas = collectTerminalGroupDragDeltas(changes, nodes)
   const changedNodes = applyNodeChanges(changes, nodes)
+  const affectedGroupIds = collectAffectedTerminalGroupIds(changes, nodes)
 
   if (groupDeltas.length === 0) {
     return shouldResizeExpandedTerminalGroups
-      ? resizeExpandedTerminalGroupShells(changedNodes)
+      ? resizeExpandedTerminalGroupShells(changedNodes, affectedGroupIds)
       : changedNodes
   }
 
+  const groupDeltaByMemberId = new Map(
+    groupDeltas.flatMap((delta) => [...delta.memberBlockIds].map((blockId) => [blockId, delta]))
+  )
   const nodesWithMovedGroupMembers = changedNodes.map((node) => {
     if (node.type !== 'terminal') {
       return node
     }
 
-    const delta = groupDeltas.find((entry) => entry.memberBlockIds.has(node.id))
+    const delta = groupDeltaByMemberId.get(node.id)
 
     return delta ? moveNodeByDelta(node, delta) : node
   })
 
   return shouldResizeExpandedTerminalGroups
-    ? resizeExpandedTerminalGroupShells(nodesWithMovedGroupMembers)
+    ? resizeExpandedTerminalGroupShells(nodesWithMovedGroupMembers, affectedGroupIds)
     : nodesWithMovedGroupMembers
 }
 
@@ -51,15 +55,18 @@ function collectTerminalGroupDragDeltas(
   changes: NodeChange<WorkbenchFlowNode>[],
   nodes: WorkbenchFlowNode[]
 ): TerminalGroupDragDelta[] {
+  const groupNodesById = new Map(
+    nodes
+      .filter((node): node is TerminalGroupFlowNode => node.type === 'terminalGroup')
+      .map((node) => [node.id, node])
+  )
+
   return changes.flatMap((change) => {
     if (change.type !== 'position' || !change.position) {
       return []
     }
 
-    const groupNode = nodes.find(
-      (node): node is TerminalGroupFlowNode =>
-        node.id === change.id && node.type === 'terminalGroup'
-    )
+    const groupNode = groupNodesById.get(change.id)
 
     if (!groupNode) {
       return []
@@ -83,6 +90,33 @@ function collectTerminalGroupDragDeltas(
   })
 }
 
+function collectAffectedTerminalGroupIds(
+  changes: NodeChange<WorkbenchFlowNode>[],
+  nodes: WorkbenchFlowNode[]
+): ReadonlySet<string> {
+  const terminalNodeIds = new Set(
+    nodes.flatMap((node) => (node.type === 'terminal' ? [node.id] : []))
+  )
+  const changedTerminalIds = new Set(
+    changes.flatMap((change) =>
+      (change.type === 'position' || change.type === 'dimensions') && terminalNodeIds.has(change.id)
+        ? [change.id]
+        : []
+    )
+  )
+
+  if (changedTerminalIds.size === 0) return new Set()
+
+  return new Set(
+    nodes.flatMap((node) =>
+      node.type === 'terminalGroup' &&
+      node.data.group.memberBlockIds.some((blockId) => changedTerminalIds.has(blockId))
+        ? [node.id]
+        : []
+    )
+  )
+}
+
 function moveNodeByDelta<TNode extends WorkbenchFlowNode>(
   node: TNode,
   delta: TerminalGroupDragDelta
@@ -96,15 +130,34 @@ function moveNodeByDelta<TNode extends WorkbenchFlowNode>(
   }
 }
 
-function resizeExpandedTerminalGroupShells(nodes: WorkbenchFlowNode[]): WorkbenchFlowNode[] {
+function resizeExpandedTerminalGroupShells(
+  nodes: WorkbenchFlowNode[],
+  affectedGroupIds: ReadonlySet<string>
+): WorkbenchFlowNode[] {
+  if (affectedGroupIds.size === 0) return nodes
+
+  const affectedMemberIds = new Set(
+    nodes.flatMap((node) =>
+      node.type === 'terminalGroup' && affectedGroupIds.has(node.id)
+        ? [...node.data.group.memberBlockIds]
+        : []
+    )
+  )
   const terminalNodesById = new Map(
     nodes
-      .filter((node): node is TerminalFlowNode => node.type === 'terminal')
+      .filter(
+        (node): node is TerminalFlowNode =>
+          node.type === 'terminal' && affectedMemberIds.has(node.id)
+      )
       .map((node) => [node.id, node])
   )
 
   return nodes.map((node) => {
-    if (node.type !== 'terminalGroup' || node.data.group.isCollapsed) {
+    if (
+      node.type !== 'terminalGroup' ||
+      node.data.group.isCollapsed ||
+      !affectedGroupIds.has(node.id)
+    ) {
       return node
     }
 

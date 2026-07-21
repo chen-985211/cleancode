@@ -1,4 +1,4 @@
-import { useContext, type KeyboardEvent, type MouseEvent, type SyntheticEvent } from 'react'
+import { memo, useContext, type KeyboardEvent, type MouseEvent, type SyntheticEvent } from 'react'
 
 import { MinimapNodeInteractionContext } from './minimapInteraction'
 import { useI18n } from './i18n/useI18n'
@@ -20,7 +20,7 @@ interface MinimapWorkbenchNodeProps {
   readonly onClick?: (event: MouseEvent<SVGGElement>, id: string) => void
 }
 
-export function MinimapWorkbenchNode({
+export const MinimapWorkbenchNode = memo(function MinimapWorkbenchNode({
   id,
   variant,
   kindLabel,
@@ -129,7 +129,7 @@ export function MinimapWorkbenchNode({
       )}
     </g>
   )
-}
+})
 
 interface MinimapPreviewProps {
   readonly x: number

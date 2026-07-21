@@ -51,16 +51,19 @@
   outline-offset: 4px;
 }
 
-.canvas-surface--dragging-terminal .terminal-node {
-  box-shadow: var(--cc-shadow-node);
+.react-flow__node.dragging {
   will-change: transform;
 }
 
-.canvas-surface--dragging-terminal .terminal-node--selected {
+.react-flow__node.dragging .terminal-node {
   box-shadow: var(--cc-shadow-node);
 }
 
-.canvas-surface--dragging-terminal .terminal-node__action {
+.react-flow__node.dragging .terminal-node--selected {
+  box-shadow: var(--cc-shadow-node);
+}
+
+.react-flow__node.dragging .terminal-node__action {
   transition: none;
 }
 

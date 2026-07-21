@@ -2,6 +2,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { WorkbenchFlowNode } from './types'
+import type { WorkbenchNodeStore } from './workbenchNodeStore'
 
 export interface WorkbenchLayoutFocusRequest {
   readonly operationId: string
@@ -17,7 +18,7 @@ interface WorkbenchExpectedNodeLayout {
 }
 
 interface UseWorkbenchLayoutFocusInput {
-  readonly nodes: readonly WorkbenchFlowNode[]
+  readonly nodeStore: Pick<WorkbenchNodeStore, 'getNodes' | 'subscribe'>
   readonly onHandled: (operationId: string) => void
   readonly protectedNodeIds: ReadonlySet<string>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
@@ -25,7 +26,7 @@ interface UseWorkbenchLayoutFocusInput {
 }
 
 export function useWorkbenchLayoutFocus({
-  nodes,
+  nodeStore,
   onHandled,
   protectedNodeIds,
   reactFlowInstanceRef,
@@ -57,20 +58,9 @@ export function useWorkbenchLayoutFocus({
       return
     }
 
-    const projectedNodesById = new Map(nodes.map((node) => [node.id, node]))
-
-    if (
-      !request.focusNodeIds.every((nodeId) => projectedNodesById.has(nodeId)) ||
-      (!deferredOperationIdsRef.current.has(request.operationId) &&
-        !request.expectedNodeLayouts.every((layout) =>
-          hasExpectedLayout(projectedNodesById.get(layout.nodeId), layout)
-        ))
-    ) {
-      return
-    }
-
     let animationFrame = 0
     let isCanceled = false
+    let isFocusScheduled = false
     const focusWhenProjected = (): void => {
       if (isCanceled || handledOperationIdsRef.current.has(request.operationId)) return
 
@@ -92,13 +82,34 @@ export function useWorkbenchLayoutFocus({
       onHandled(request.operationId)
     }
 
-    animationFrame = window.requestAnimationFrame(focusWhenProjected)
+    const scheduleFocusWhenProjected = (): void => {
+      if (isCanceled || isFocusScheduled) return
+
+      const projectedNodesById = new Map(nodeStore.getNodes().map((node) => [node.id, node]))
+
+      if (
+        !request.focusNodeIds.every((nodeId) => projectedNodesById.has(nodeId)) ||
+        (!deferredOperationIdsRef.current.has(request.operationId) &&
+          !request.expectedNodeLayouts.every((layout) =>
+            hasExpectedLayout(projectedNodesById.get(layout.nodeId), layout)
+          ))
+      ) {
+        return
+      }
+
+      isFocusScheduled = true
+      animationFrame = window.requestAnimationFrame(focusWhenProjected)
+    }
+
+    const unsubscribe = nodeStore.subscribe(scheduleFocusWhenProjected)
+    scheduleFocusWhenProjected()
 
     return () => {
       isCanceled = true
+      unsubscribe()
       window.cancelAnimationFrame(animationFrame)
     }
-  }, [nodes, onHandled, protectedNodeIds, reactFlowInstanceRef, request])
+  }, [nodeStore, onHandled, protectedNodeIds, reactFlowInstanceRef, request])
 }
 
 function hasExpectedLayout(

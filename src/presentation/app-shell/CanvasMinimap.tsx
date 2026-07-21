@@ -1,5 +1,5 @@
 import { ChevronLeft, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
-import { useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { useCallback, useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
@@ -90,6 +90,10 @@ export function CanvasMinimap({
   const { t } = useI18n()
   const isPanningViewportRef = useRef(false)
   const lastViewportCenterRef = useRef<MinimapViewportCenter | null>(null)
+  const focusMinimapNode = useCallback(
+    (_event: MouseEvent<SVGGElement>, blockId: string): void => onMinimapNodeClick(blockId),
+    [onMinimapNodeClick]
+  )
   const frames = nodes.map(toMinimapFrame)
   const viewBox = resolveMinimapViewBox(frames)
   const viewportFrame = resolveViewportFrame(canvasViewport, canvasSize)
@@ -196,10 +200,7 @@ export function CanvasMinimap({
                     strokeColor={getMiniMapNodeStrokeColor(frame.node)}
                     strokeWidth={1.2}
                     selected={Boolean(frame.node.selected)}
-                    onClick={(event: MouseEvent<SVGGElement>, blockId: string) => {
-                      event.stopPropagation()
-                      onMinimapNodeClick(blockId)
-                    }}
+                    onClick={focusMinimapNode}
                   />
                 ))}
               </svg>

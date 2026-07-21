@@ -8,6 +8,7 @@ import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/us
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
 import type { AgentToolApprovalViewState } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({ latest: null as MockReactFlowProps | null }))
 
@@ -69,8 +70,7 @@ describe('workbench canvas Agent approval edges', () => {
         isMinimapCollapsed={false}
         isTerminalGroupSelectionMode={false}
         minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
-        minimapNodes={[]}
-        nodes={[]}
+        nodeStore={createWorkbenchNodeStore()}
         nodeTypes={{}}
         onBeginTerminalGroupSelection={vi.fn()}
         onCancelTerminalGroupSelection={vi.fn()}

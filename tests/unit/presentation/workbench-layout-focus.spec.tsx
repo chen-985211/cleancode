@@ -1,12 +1,13 @@
 import { render, waitFor } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 
 import {
   useWorkbenchLayoutFocus,
   type WorkbenchLayoutFocusRequest
 } from '../../../src/presentation/app-shell/useWorkbenchLayoutFocus'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('workbench layout focus', () => {
   it('waits for every focus node to reach the arranged geometry, then fits exactly once', async () => {
@@ -156,9 +157,14 @@ function Harness({
   readonly request: WorkbenchLayoutFocusRequest | null
 }) {
   const instanceRef = useRef(instance)
+  const [nodeStore] = useState(() => createWorkbenchNodeStore([...nodes]))
+
+  useLayoutEffect(() => {
+    nodeStore.setNodes([...nodes])
+  }, [nodeStore, nodes])
 
   useWorkbenchLayoutFocus({
-    nodes,
+    nodeStore,
     onHandled,
     protectedNodeIds,
     reactFlowInstanceRef: instanceRef,
