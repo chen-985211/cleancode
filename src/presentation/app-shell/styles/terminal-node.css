@@ -413,12 +413,23 @@
 }
 
 .terminal-frame {
+  position: relative;
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
   border-radius: 0 0 11px 11px;
   background: var(--terminal-screen);
+}
+
+.terminal-frame::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 0 auto;
+  width: 1px;
+  background: var(--terminal-border);
+  content: '';
+  pointer-events: none;
 }
 
 .terminal-output-shell,

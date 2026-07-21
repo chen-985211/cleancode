@@ -216,6 +216,7 @@ export function AppShell({
     runningSessionIds
   })
   const setCurrentGraph = useCurrentGraphState({
+    currentWorkbench,
     setCurrentWorkbench,
     setWorkbenches,
     setSelectedTerminalBlockIds,

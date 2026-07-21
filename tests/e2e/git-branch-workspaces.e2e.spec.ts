@@ -5,7 +5,7 @@ import { access, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   terminalWorkspaceRetentionEarlyMarker,
@@ -107,19 +107,27 @@ describe('git branch workspaces e2e', () => {
       await projectCard.getByRole('button', { name: '新建分支工作区' }).click()
       await projectCard.getByLabel('分支名称').fill('feature/sidebar')
       await projectCard.getByRole('button', { name: '创建 Worktree' }).click()
-      await projectCard.getByRole('button', { name: /feature\/sidebar.*独立工作区/ }).waitFor()
+      const featureWorkspace = projectCard.getByRole('button', {
+        name: /feature\/sidebar.*独立工作区/
+      })
+      await featureWorkspace.waitFor()
+      await waitForCurrentWorkspace(featureWorkspace)
       await access(join(featureWorktreeDirectory, '.git'))
       const canonicalFeatureWorktreeDirectory = await realpath(featureWorktreeDirectory)
       await expectCurrentGitBranch(featureWorktreeDirectory, 'feature/sidebar')
 
       await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByText('运行中').waitFor()
+      await waitForTerminalShellReady(page, 'Terminal 1')
+      const featureSessionId = await readTerminalSessionId(page, 'Terminal 1')
       await expectTerminalWorkingDirectory(page, 'Terminal 1', featureWorktreeDirectory)
 
-      await projectCard.locator('.default-branch-selector__select').click()
-      await page.getByText('Terminal 1').waitFor({ state: 'detached' })
+      const mainWorkspace = projectCard.locator('.default-branch-selector__select')
+      await mainWorkspace.click()
+      await waitForCurrentWorkspace(mainWorkspace)
+      await waitForTerminalSessionDetached(page, featureSessionId)
       await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByText('运行中').waitFor()
+      await waitForTerminalShellReady(page, 'Terminal 1')
+      expect(await readTerminalSessionId(page, 'Terminal 1')).not.toBe(featureSessionId)
       await expectTerminalWorkingDirectory(page, 'Terminal 1', workbench.projectDirectory)
 
       const projectMetadata = JSON.parse(
@@ -173,6 +181,7 @@ describe('git branch workspaces e2e', () => {
         name: /feature\/terminal-retention.*独立工作区/
       })
       await featureWorkspace.waitFor()
+      await waitForCurrentWorkspace(featureWorkspace)
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await waitForTerminalShellReady(page, 'Terminal 1')
 
@@ -204,7 +213,9 @@ describe('git branch workspaces e2e', () => {
       expect(boundedOutputTail.length).toBeLessThanOrEqual(8192)
       expect(boundedOutputTail).toContain(terminalWorkspaceRetentionLateMarker)
 
-      await projectCard.locator('.default-branch-selector__select').click()
+      const mainWorkspace = projectCard.locator('.default-branch-selector__select')
+      await mainWorkspace.click()
+      await waitForCurrentWorkspace(mainWorkspace)
       await waitForTerminalSessionDetached(page, sessionId)
 
       const hiddenOutputMarker = '__TERMINAL_HIDDEN_WORKSPACE_OUTPUT__'
@@ -236,6 +247,7 @@ describe('git branch workspaces e2e', () => {
       expect(hiddenQuery.backgroundResponses).toEqual(visibleQuery.backgroundResponses)
 
       await featureWorkspace.click()
+      await waitForCurrentWorkspace(featureWorkspace)
       await waitForRecreatedTerminalSurface(page, sessionId, terminalSurfaceToken)
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForVisibleXtermText(page, sessionId, hiddenOutputMarker)
@@ -276,6 +288,10 @@ async function waitForTerminalSessionDetached(page: Page, sessionId: string): Pr
   await page
     .locator(`[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`)
     .waitFor({ state: 'detached' })
+}
+
+async function waitForCurrentWorkspace(workspace: Locator): Promise<void> {
+  await expect.poll(() => workspace.getAttribute('aria-current')).toBe('page')
 }
 
 async function markTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {
