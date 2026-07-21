@@ -25,7 +25,7 @@ describe('persistent terminal provider client lifecycle', () => {
     await provider.start()
     await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
       schemaVersion: 1,
-      protocolVersion: 1,
+      protocolVersion: provider.protocolVersion,
       instanceId: provider.instanceId,
       authToken: provider.authToken,
       endpoint: provider.endpoint,
@@ -61,10 +61,48 @@ describe('persistent terminal provider client lifecycle', () => {
 
     expect(provider.requests.map(({ method }) => method)).toEqual([
       'health',
+      'claimController',
       'setScrollbackRows',
       'readWorkingDirectory'
     ])
-    expect(provider.requests[1]?.params).toEqual({ rows: 10000 })
+    expect(provider.requests[2]?.params).toEqual({ rows: 10000 })
+    await client.detachApplication()
+  })
+
+  it('retries a releasing controller on the same connection before initialization continues', async () => {
+    provider.rejectControllerClaims(2)
+    const client = createClient(rootDirectory)
+
+    await client.initialize()
+
+    expect(provider.connectionCount).toBe(1)
+    expect(provider.requests.filter(({ method }) => method === 'claimController')).toHaveLength(3)
+    expect(provider.requests.at(-1)?.method).toBe('listSessions')
+    await client.detachApplication()
+  })
+
+  it('keeps one-version compatibility while a legacy provider still owns live sessions', async () => {
+    await provider.close()
+    provider = new ControllableProvider(createProviderEndpoint(rootDirectory), 1)
+    await provider.start()
+    await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
+      schemaVersion: 1,
+      protocolVersion: 1,
+      instanceId: provider.instanceId,
+      authToken: provider.authToken,
+      endpoint: provider.endpoint,
+      processId: process.pid,
+      startedAt: new Date().toISOString()
+    })
+    const client = createClient(rootDirectory)
+
+    await client.initialize()
+
+    expect(provider.requests.map(({ method }) => method)).toEqual([
+      'health',
+      'setScrollbackRows',
+      'listSessions'
+    ])
     await client.detachApplication()
   })
 
@@ -84,6 +122,21 @@ describe('persistent terminal provider client lifecycle', () => {
     }
 
     expect(provider.connectionCount).toBe(1)
+    await client.detachApplication()
+  })
+
+  it('publishes runtime unavailability when an established Provider disconnects', async () => {
+    const runtimeUnavailable = vi.fn()
+    const client = createClient(rootDirectory, undefined, runtimeUnavailable)
+
+    await client.initialize()
+    provider.disconnectClients()
+
+    await vi.waitFor(() =>
+      expect(runtimeUnavailable).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'TERMINAL_PROVIDER_UNAVAILABLE' })
+      )
+    )
     await client.detachApplication()
   })
 
@@ -107,11 +160,16 @@ describe('persistent terminal provider client lifecycle', () => {
   })
 })
 
-function createClient(rootDirectory: string, onBackgroundError?: (error: unknown) => void) {
+function createClient(
+  rootDirectory: string,
+  onBackgroundError?: (error: unknown) => void,
+  onRuntimeUnavailable?: (error: unknown) => void
+) {
   return new PersistentTerminalProviderClient({
     stateDirectory: rootDirectory,
     providerEntryPath: join(rootDirectory, 'unused-provider-entry.js'),
-    onBackgroundError
+    onBackgroundError,
+    onRuntimeUnavailable
   })
 }
 
@@ -148,8 +206,12 @@ class ControllableProvider {
   private readonly sockets = new Set<Socket>()
   private server: Server | null = null
   private healthResponses: Deferred | null = null
+  private rejectedControllerClaims = 0
 
-  constructor(readonly endpoint: string) {}
+  constructor(
+    readonly endpoint: string,
+    readonly protocolVersion: 1 | 2 = terminalProviderProtocolVersion
+  ) {}
 
   async start(): Promise<void> {
     await rm(this.endpoint, { force: true })
@@ -182,6 +244,14 @@ class ControllableProvider {
     this.healthResponses = null
   }
 
+  rejectControllerClaims(count: number): void {
+    this.rejectedControllerClaims = count
+  }
+
+  disconnectClients(): void {
+    for (const socket of this.sockets) socket.destroy()
+  }
+
   async waitForRequests(method: string, count: number): Promise<void> {
     await vi.waitFor(() => {
       expect(
@@ -206,6 +276,23 @@ class ControllableProvider {
   private async respond(socket: Socket, request: TerminalProviderRequest): Promise<void> {
     this.requests.push(request)
     if (request.method === 'health') await this.healthResponses?.promise
+    if (request.method === 'claimController' && this.rejectedControllerClaims > 0) {
+      this.rejectedControllerClaims -= 1
+      socket.write(
+        encodeTerminalProviderFrame({
+          type: 'response',
+          requestId: request.requestId,
+          ok: false,
+          error: {
+            code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY',
+            isExpected: true,
+            message: 'Terminal provider controller is releasing.',
+            details: { retryAfterMs: 1 }
+          }
+        })
+      )
+      return
+    }
     const result = this.resultFor(request.method, socket)
     socket.write(
       encodeTerminalProviderFrame({
@@ -221,10 +308,11 @@ class ControllableProvider {
     if (method === 'health') {
       return {
         instanceId: this.instanceId,
-        protocolVersion: terminalProviderProtocolVersion,
-        isController: true
+        protocolVersion: this.protocolVersion,
+        ...(this.protocolVersion === 1 ? { isController: true } : { controllerState: 'unclaimed' })
       }
     }
+    if (method === 'claimController') return { controllerLeaseId: 'controller-lease-1' }
     if (method === 'listSessions') {
       return { sessions: [], issues: [], managedServiceEndpoints: [] }
     }

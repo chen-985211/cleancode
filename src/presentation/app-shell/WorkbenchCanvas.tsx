@@ -26,6 +26,7 @@ import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTool
 import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
+import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
@@ -35,6 +36,7 @@ type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 interface WorkbenchCanvasProps {
   readonly approvalIntents?: readonly AgentToolApprovalViewState[]
   readonly isDesktopRuntime: boolean
+  readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly nodeStore: WorkbenchNodeStore
@@ -80,6 +82,7 @@ interface WorkbenchCanvasProps {
 export function WorkbenchCanvas({
   approvalIntents = [],
   isDesktopRuntime,
+  terminalRuntimeAvailability,
   currentWorkbench,
   currentWorkspace,
   nodeStore,
@@ -329,6 +332,7 @@ export function WorkbenchCanvas({
       </div>
       <CanvasStatusbar
         isDesktopRuntime={isDesktopRuntime}
+        terminalRuntimeAvailability={terminalRuntimeAvailability}
         currentWorkbench={currentWorkbench}
         currentWorkspace={currentWorkspace}
       />
@@ -440,25 +444,33 @@ function CanvasEmptyState({ isDesktopRuntime }: { readonly isDesktopRuntime: boo
 
 interface CanvasStatusbarProps {
   readonly isDesktopRuntime: boolean
+  readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
 }
 
 function CanvasStatusbar({
   isDesktopRuntime,
+  terminalRuntimeAvailability,
   currentWorkbench,
   currentWorkspace
 }: CanvasStatusbarProps) {
   const { t } = useI18n()
   return (
     <footer className="app-shell__statusbar">
-      <span className="status-dot status-dot--running" />
+      <span
+        className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
+      />
       <span>
         {!isDesktopRuntime
           ? t('canvas.statusPreview')
-          : currentWorkbench
-            ? t('canvas.statusConnected')
-            : t('canvas.statusWaiting')}
+          : terminalRuntimeAvailability.phase === 'initializing'
+            ? t('canvas.statusRuntimeInitializing')
+            : terminalRuntimeAvailability.phase === 'unavailable'
+              ? t('canvas.statusRuntimeUnavailable')
+              : currentWorkbench
+                ? t('canvas.statusConnected')
+                : t('canvas.statusWaiting')}
       </span>
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
     </footer>

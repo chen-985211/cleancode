@@ -158,6 +158,12 @@ function renderCanvas(
         toggleMinimap: '收起或展开小地图 (⌘⇧M)'
       }}
       isDesktopRuntime={true}
+      terminalRuntimeAvailability={{
+        phase: 'ready',
+        epoch: 1,
+        errorCode: null,
+        retryable: false
+      }}
       isMinimapCollapsed={false}
       currentWorkbench={null}
       currentWorkspace={undefined}

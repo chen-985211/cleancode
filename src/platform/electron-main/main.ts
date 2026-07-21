@@ -82,6 +82,17 @@ interface WorkbenchSnapshot {
   readonly graph: BlockGraphSnapshot
 }
 
+const isPrimaryAppInstance = app.requestSingleInstanceLock()
+if (!isPrimaryAppInstance) app.quit()
+
+app.on('second-instance', () => {
+  const window = BrowserWindow.getAllWindows()[0]
+  if (!window) return
+  if (window.isMinimized()) window.restore()
+  window.show()
+  window.focus()
+})
+
 const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
@@ -119,11 +130,13 @@ const updateTerminalDefinitionUseCase = new UpdateTerminalDefinitionUseCase(grap
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
 const {
+  getRuntimeAvailability: getTerminalRuntimeAvailability,
   initialize: initializeRunRuntime,
   launchTerminal,
   lifecycle: runLifecycleService,
   openTerminalServiceEndpoint,
   openTerminalLink,
+  retryInitialize: retryTerminalRuntime,
   sessions: terminalSessionService,
   terminalRuns,
   managedServices: terminalManagedServices,
@@ -269,6 +282,7 @@ registerBlockGraphIpcHandlers({
 registerTerminalIpcHandlers({
   attachTerminalView: (command) => terminalSessionService.attachView(command),
   detachTerminalView: (command) => terminalSessionService.detachView(command),
+  getTerminalRuntimeAvailability,
   interruptTerminal: (sessionId) => terminalSessionService.interrupt(sessionId),
   ipcMain,
   launchTerminal: (command) => launchTerminal.execute(command),
@@ -283,6 +297,7 @@ registerTerminalIpcHandlers({
   resolveManagedServiceOwner,
   resizeTerminal: (sessionId, columns, rows) =>
     terminalSessionService.resize(sessionId, columns, rows),
+  retryTerminalRuntime,
   startTerminal: (command) => terminalSessionService.start(command),
   setTerminalRetention: (sessionId, retentionPolicy) =>
     terminalSessionService.setRetentionPolicy(sessionId, retentionPolicy),
@@ -424,36 +439,38 @@ function getAppStateDirectoryPath(): string {
   )
 }
 
-app.whenReady().then(async () => {
-  try {
-    await initializeRunRuntime()
-  } catch (error) {
-    consoleLogger.error({
-      scope: 'run.terminal-provider',
-      operation: 'initializeRuntime',
-      outcome: 'failure',
-      error: { message: error instanceof Error ? error.message : String(error) }
-    })
-  }
-  const appIconPath = resolveAppIconPath({
-    fileExists: existsSync,
-    isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
-    mainDirectory: __dirname,
-    projectDirectory: process.cwd()
-  })
-
-  if (process.platform === 'darwin' && appIconPath) {
-    app.dock?.setIcon(appIconPath)
-  }
-
-  createMainWindow({ appIconPath, policy: electronWindowPolicy })
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow({ appIconPath, policy: electronWindowPolicy })
+if (isPrimaryAppInstance) {
+  void app.whenReady().then(async () => {
+    try {
+      await initializeRunRuntime()
+    } catch (error) {
+      consoleLogger.error({
+        scope: 'run.terminal-provider',
+        operation: 'initializeRuntime',
+        outcome: 'failure',
+        error: { message: error instanceof Error ? error.message : String(error) }
+      })
     }
+    const appIconPath = resolveAppIconPath({
+      fileExists: existsSync,
+      isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
+      mainDirectory: __dirname,
+      projectDirectory: process.cwd()
+    })
+
+    if (process.platform === 'darwin' && appIconPath) {
+      app.dock?.setIcon(appIconPath)
+    }
+
+    createMainWindow({ appIconPath, policy: electronWindowPolicy })
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow({ appIconPath, policy: electronWindowPolicy })
+      }
+    })
   })
-})
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -6,7 +6,7 @@ import { terminalProviderProtocolVersion } from '../../contexts/run/infrastructu
 
 interface ProviderMetadata {
   readonly schemaVersion: 1
-  readonly protocolVersion: 1
+  readonly protocolVersion: 2
   readonly instanceId: string
   readonly authToken: string
   readonly endpoint: string

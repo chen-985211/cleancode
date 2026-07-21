@@ -251,9 +251,9 @@ describe('run terminal sessions e2e', () => {
       await agentHeader.click()
       await waitForTerminalSelectionState(page, false)
 
-      await terminalBlock.locator('.terminal-frame').click()
+      await terminalBlock.locator('.terminal-frame').click({ position: { x: 24, y: 24 } })
       await waitForTerminalSelectionState(page, false)
-      await terminalBlock.locator('.terminal-node__header').click()
+      await terminalBlock.locator('.terminal-node__header').click({ position: { x: 24, y: 24 } })
       await waitForTerminalSelectionState(page, true)
       await agentHeader.click()
       await waitForTerminalSelectionState(page, false)

@@ -34,6 +34,7 @@ interface TerminalViewportProps {
   readonly session: TerminalViewState
   readonly focusRequestId: number
   readonly isResizeSuspended?: boolean
+  readonly isInputDisabled?: boolean
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
@@ -58,6 +59,7 @@ export function TerminalViewport({
   session,
   focusRequestId,
   isResizeSuspended = false,
+  isInputDisabled = false,
   onDimensionsChange,
   onInput,
   onPaste = async () => undefined
@@ -75,6 +77,7 @@ export function TerminalViewport({
   const onInputRef = useRef(onInput)
   const onPasteRef = useRef(onPaste)
   const isResizeSuspendedRef = useRef(isResizeSuspended)
+  const isInputDisabledRef = useRef(isInputDisabled)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [hasLinkError, setHasLinkError] = useState(false)
   const [pasteState, setPasteState] = useState<TerminalPasteState>({ status: 'idle' })
@@ -96,12 +99,16 @@ export function TerminalViewport({
     onPasteRef.current = onPaste
     onDimensionsChangeRef.current = onDimensionsChange
     isResizeSuspendedRef.current = isResizeSuspended
-  }, [block, isResizeSuspended, onDimensionsChange, onInput, onPaste, session])
+    isInputDisabledRef.current = isInputDisabled
+  }, [block, isInputDisabled, isResizeSuspended, onDimensionsChange, onInput, onPaste, session])
 
   const pasteControllerRef = useRef<TerminalPasteController | null>(null)
   useEffect(() => {
     const controller = new TerminalPasteController({
-      write: (chunk) => onPasteRef.current(blockRef.current, chunk),
+      write: (chunk) =>
+        isInputDisabledRef.current
+          ? Promise.resolve()
+          : onPasteRef.current(blockRef.current, chunk),
       onStateChange: (state) => {
         setPasteState(state)
         if (state.status === 'cancelled') setPasteNotice('cancelled')
@@ -182,6 +189,7 @@ export function TerminalViewport({
     (event: ClipboardEvent<HTMLDivElement>) => {
       event.preventDefault()
       event.stopPropagation()
+      if (isInputDisabled) return
       const files = Array.from(event.clipboardData.files)
       if (files.some((file) => file.type.startsWith('image/'))) {
         setPasteNotice('imageUnsupported')
@@ -223,7 +231,7 @@ export function TerminalViewport({
       }
       startPaste(text)
     },
-    [startPaste]
+    [isInputDisabled, startPaste]
   )
 
   const focusTerminalFromViewportFocus = useCallback(
@@ -256,7 +264,9 @@ export function TerminalViewport({
       element,
       isResizeSuspended: isResizeSuspendedRef.current,
       onDimensionsChange: (dimensions) => onDimensionsChangeRef.current(dimensions),
-      onInput: (input) => onInputRef.current(blockRef.current, input),
+      onInput: (input) => {
+        if (!isInputDisabledRef.current) onInputRef.current(blockRef.current, input)
+      },
       onOpenLink: (rawTarget) => {
         setHasLinkError(false)
         if (!runIdentity || !lease || !api?.openTerminalLink) return

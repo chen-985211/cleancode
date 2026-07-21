@@ -32,6 +32,25 @@ describe('Run runtime composition', () => {
     expect(dependencies.managedServices).toBe(runtime.managedServices)
   })
 
+  it('starts behind the runtime reconciliation gate and publishes each availability epoch', () => {
+    const send = vi.fn()
+    electronMocks.getAllWindows.mockReturnValue([
+      { isDestroyed: () => false, webContents: { send } }
+    ])
+    const runtime = createRuntime()
+
+    expect(runtime.getRuntimeAvailability()).toMatchObject({ phase: 'initializing', epoch: 0 })
+    runtime.lifecycle.markRuntimeReady()
+
+    expect(runtime.getRuntimeAvailability()).toMatchObject({ phase: 'ready', epoch: 1 })
+    expect(send).toHaveBeenCalledWith('cleancode:terminal-runtime-availability', {
+      phase: 'ready',
+      epoch: 1,
+      errorCode: null,
+      retryable: false
+    })
+  })
+
   it('projects a workflow managed-port conflict to the terminal run event channel', async () => {
     const send = vi.fn()
     electronMocks.getAllWindows.mockReturnValue([

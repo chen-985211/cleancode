@@ -1,5 +1,6 @@
 import {
   applyTerminalExitEvent,
+  applyRecoveredTerminalSessionSnapshot,
   applyTerminalSessionSnapshot,
   reconcileTerminalSessionSnapshots
 } from '../../../src/presentation/app-shell/terminalSessionRuntime'
@@ -66,6 +67,28 @@ describe('terminal session runtime reconciliation', () => {
     )
 
     expect(states['project-1\0main\0block-1']?.output).toBe('live output')
+  })
+
+  it('accepts an authoritative recovered running state after a Provider reconnect', () => {
+    const session = sessionSnapshot('session-1', 'running')
+    const exited = applyTerminalExitEvent(
+      {},
+      { scope: session, sessionId: session.id, exitCode: null }
+    )
+
+    const states = applyRecoveredTerminalSessionSnapshot(
+      exited,
+      'project-1\0main\0block-1',
+      { ...session, recoveryKind: 'warm' },
+      '',
+      null
+    )
+
+    expect(states['project-1\0main\0block-1']).toMatchObject({
+      sessionId: session.id,
+      status: 'running',
+      recoveryKind: 'warm'
+    })
   })
 
   it('marks a missing requested run exited and ignores a response for a replaced identity', () => {

@@ -1,4 +1,5 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { TerminalRetentionPolicy } from '../../contexts/run/domain/aggregates/TerminalSession'
 import type { ActualServiceEndpoint } from '../../contexts/run/domain/value-objects/ActualServiceEndpoint'
 import type {
@@ -45,6 +46,8 @@ interface TerminalViewIpcSender extends IpcSender {
 export interface TerminalIpcHandlersInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
+  readonly getTerminalRuntimeAvailability?: () => TerminalRuntimeAvailabilitySnapshot
+  readonly retryTerminalRuntime?: () => Promise<TerminalRuntimeAvailabilitySnapshot>
   readonly startTerminal: (command: {
     readonly projectId: string
     readonly projectDirectory: string
@@ -142,6 +145,24 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     string,
     { readonly sender: TerminalViewIpcSender; readonly listener: () => void }
   >()
+
+  registerIpcHandler<void, TerminalRuntimeAvailabilitySnapshot>({
+    channel: 'cleancode:get-terminal-runtime-availability',
+    handler: () => input.getTerminalRuntimeAvailability?.() ?? readyRuntimeAvailability,
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'getTerminalRuntimeAvailability',
+    scope: 'run.terminal-runtime'
+  })
+
+  registerIpcHandler<void, TerminalRuntimeAvailabilitySnapshot>({
+    channel: 'cleancode:retry-terminal-runtime',
+    handler: () => input.retryTerminalRuntime?.() ?? Promise.resolve(readyRuntimeAvailability),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'retryTerminalRuntime',
+    scope: 'run.terminal-runtime'
+  })
 
   registerIpcHandler<StartTerminalIpcCommand, TerminalSessionSnapshot>({
     channel: 'cleancode:start-terminal',
@@ -444,6 +465,13 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     operation: 'detachTerminalView',
     scope: 'run.terminal-view'
   })
+}
+
+const readyRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot = {
+  phase: 'ready',
+  epoch: 1,
+  errorCode: null,
+  retryable: false
 }
 
 function sendRendererEvent(sender: IpcSender, channel: string, event: unknown): void {

@@ -1,8 +1,48 @@
 import { timingSafeEqual } from 'node:crypto'
+import type { Socket } from 'node:net'
 
 import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
 import type { StartTerminalProcessCommand } from '../../application/ports/TerminalProcessPort'
-import type { TerminalProviderRequest } from './TerminalProviderProtocol'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  encodeTerminalProviderFrame,
+  type TerminalProviderEvent,
+  type TerminalProviderRequest,
+  type TerminalProviderResponse,
+  terminalProviderProtocolVersion
+} from './TerminalProviderProtocol'
+import type { ProviderControllerState } from './TerminalProviderServerTypes'
+
+export function authenticateTerminalProviderRequest(
+  request: TerminalProviderRequest,
+  expectedAuthToken: string
+): void {
+  if (request.protocolVersion !== terminalProviderProtocolVersion) {
+    throw createExpectedAppError(
+      'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
+      'Terminal provider protocol version is unsupported.'
+    )
+  }
+  if (!matchesAuthToken(request.authToken, expectedAuthToken)) {
+    throw createExpectedAppError(
+      'TERMINAL_PROVIDER_AUTHENTICATION_FAILED',
+      'Terminal provider authentication failed.'
+    )
+  }
+}
+
+export function authorizeTerminalProviderController(
+  socket: Socket,
+  method: string,
+  state: ProviderControllerState
+): void {
+  if (method === 'health' || method === 'claimController') return
+  if (state.kind === 'active' && state.socket === socket) return
+  throw createExpectedAppError(
+    'TERMINAL_PROVIDER_UNAVAILABLE',
+    'Terminal provider request requires the active application controller.'
+  )
+}
 
 export function createProviderSessionSnapshot(
   command: Omit<StartTerminalProcessCommand, 'onOutput' | 'onExit'>
@@ -63,8 +103,15 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export function matchesAuthToken(actual: string, expected: string): boolean {
+function matchesAuthToken(actual: string, expected: string): boolean {
   const actualBytes = Buffer.from(actual)
   const expectedBytes = Buffer.from(expected)
   return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes)
+}
+
+export function sendTerminalProviderMessage(
+  socket: Socket,
+  message: TerminalProviderResponse | TerminalProviderEvent
+): void {
+  if (!socket.destroyed) socket.write(encodeTerminalProviderFrame(message))
 }

@@ -78,6 +78,27 @@ export function applyTerminalSessionSnapshot(
   output: string,
   actualEndpoint: TerminalServiceEndpoint | null
 ): Record<string, TerminalViewState> {
+  return applySessionSnapshot(states, terminalStateKey, session, output, actualEndpoint, false)
+}
+
+export function applyRecoveredTerminalSessionSnapshot(
+  states: Record<string, TerminalViewState>,
+  terminalStateKey: string,
+  session: TerminalSessionSnapshot,
+  output: string,
+  actualEndpoint: TerminalServiceEndpoint | null
+): Record<string, TerminalViewState> {
+  return applySessionSnapshot(states, terminalStateKey, session, output, actualEndpoint, true)
+}
+
+function applySessionSnapshot(
+  states: Record<string, TerminalViewState>,
+  terminalStateKey: string,
+  session: TerminalSessionSnapshot,
+  output: string,
+  actualEndpoint: TerminalServiceEndpoint | null,
+  isAuthoritativeRecovery: boolean
+): Record<string, TerminalViewState> {
   const currentIdentity = states[terminalStateKey]?.runIdentity
   const nextIdentity = toTerminalRunIdentity(session)
   if (
@@ -99,7 +120,10 @@ export function applyTerminalSessionSnapshot(
     actualEndpoint
   )
   const acceptedState =
-    isSameIdentity && isTerminalStatus(currentState.status) && !isTerminalStatus(session.status)
+    !isAuthoritativeRecovery &&
+    isSameIdentity &&
+    isTerminalStatus(currentState.status) &&
+    !isTerminalStatus(session.status)
       ? {
           ...nextState,
           status: currentState.status,

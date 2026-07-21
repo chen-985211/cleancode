@@ -5,9 +5,47 @@ import type {
   TerminalRuntimeRecoveryIssue
 } from '../../../../src/contexts/run/application/ports/TerminalRuntimeProviderPort'
 import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
+import { RunRuntimeCoordinator } from '../../../../src/contexts/run/application/use-cases/RunRuntimeCoordinator'
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('terminal runtime recovery', () => {
+  it('keeps starts blocked after a failed reconciliation and opens one new runtime epoch on retry', async () => {
+    const provider = new RecordingRuntimeProvider(warmSession(), 1)
+    const lifecycle = new RunLifecycleService({ initialRuntimePhase: 'initializing' })
+    const service = new TerminalSessionService(
+      new NoopProcessPort(),
+      undefined,
+      lifecycle,
+      undefined,
+      provider
+    )
+    const coordinator = new RunRuntimeCoordinator(
+      lifecycle,
+      () => service.initializeRuntime({ onOutput: () => undefined, onExit: () => undefined }),
+      async () => undefined
+    )
+
+    await expect(coordinator.initialize()).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_UNAVAILABLE'
+    })
+    expect(lifecycle.getRuntimeAvailability()).toEqual({
+      phase: 'unavailable',
+      epoch: 0,
+      errorCode: 'TERMINAL_PROVIDER_UNAVAILABLE',
+      retryable: true
+    })
+
+    await coordinator.initialize()
+    expect(lifecycle.getRuntimeAvailability()).toEqual({
+      phase: 'ready',
+      epoch: 1,
+      errorCode: null,
+      retryable: false
+    })
+    expect(provider.initializeCount).toBe(2)
+  })
+
   it('revokes the visible retention policy when durable recovery becomes unavailable', async () => {
     const provider = new RecordingRuntimeProvider()
     const service = new TerminalSessionService(
@@ -57,10 +95,22 @@ describe('terminal runtime recovery', () => {
 class RecordingRuntimeProvider implements TerminalRuntimeProviderPort {
   private issueHandler: ((issue: TerminalRuntimeRecoveryIssue) => void) | null = null
   readonly retiredSessionIds: string[] = []
+  initializeCount = 0
 
-  constructor(private readonly recoveredSession: TerminalSessionSnapshot = warmSession()) {}
+  constructor(
+    private readonly recoveredSession: TerminalSessionSnapshot = warmSession(),
+    private initializationFailures = 0
+  ) {}
 
   async initialize() {
+    this.initializeCount += 1
+    if (this.initializationFailures > 0) {
+      this.initializationFailures -= 1
+      throw createExpectedAppError(
+        'TERMINAL_PROVIDER_UNAVAILABLE',
+        'Terminal provider is temporarily unavailable.'
+      )
+    }
     return { sessions: [this.recoveredSession], issues: [], managedServiceEndpoints: [] }
   }
 

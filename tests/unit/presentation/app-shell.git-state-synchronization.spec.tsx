@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import {
   createRuntimeApi,
@@ -52,5 +52,61 @@ describe('app shell git state synchronization', () => {
     act(() => resolveFirstSynchronization(synchronizedWorkbench))
     await waitFor(() => expect(within(projectCard).getByText('feature/free')).toBeInTheDocument())
     expect(terminateTerminal).not.toHaveBeenCalled()
+  })
+
+  it('does not let an older git synchronization overwrite a newer workspace graph', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranch: 'main'
+    })
+    const synchronizedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranch: 'feature/free'
+    })
+    const graphWithTerminal = {
+      ...workbench.graph,
+      blocks: [
+        {
+          id: 'terminal-new',
+          type: 'terminal' as const,
+          name: 'Terminal 1',
+          description: 'Local terminal',
+          launchCommand: '',
+          position: { x: 180, y: 270 },
+          size: { width: 720, height: 460 }
+        }
+      ]
+    }
+    let resolveSynchronization!: (workbench: typeof synchronizedWorkbench) => void
+    const synchronization = new Promise<typeof synchronizedWorkbench>((resolve) => {
+      resolveSynchronization = resolve
+    })
+    const synchronizeProjectGitState = vi
+      .fn()
+      .mockReturnValueOnce(synchronization)
+      .mockResolvedValue(null)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        createTerminalBlock: vi.fn(async () => graphWithTerminal),
+        listWorkbenches: vi.fn(async () => [workbench]),
+        synchronizeProjectGitState
+      })
+    })
+
+    render(<AppShell />)
+    await screen.findByRole('group', { name: '项目 alpha-project' })
+    await waitFor(() => expect(synchronizeProjectGitState).toHaveBeenCalledOnce())
+
+    fireEvent.click(screen.getByRole('button', { name: '新建终端积木' }))
+    await waitFor(() =>
+      expect(document.querySelector('[data-terminal-block-id="terminal-new"]')).not.toBeNull()
+    )
+
+    await act(async () => {
+      resolveSynchronization(synchronizedWorkbench)
+      await synchronization
+    })
+    expect(screen.queryByText('feature/free')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-terminal-block-id="terminal-new"]')).not.toBeNull()
   })
 })

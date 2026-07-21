@@ -67,6 +67,12 @@ describe('workbench canvas Agent approval edges', () => {
         getMiniMapNodeColor={() => '#fff'}
         getMiniMapNodeStrokeColor={() => '#000'}
         isDesktopRuntime={true}
+        terminalRuntimeAvailability={{
+          phase: 'ready',
+          epoch: 1,
+          errorCode: null,
+          retryable: false
+        }}
         isMinimapCollapsed={false}
         isTerminalGroupSelectionMode={false}
         minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}

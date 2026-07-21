@@ -1,4 +1,4 @@
-export const terminalProviderProtocolVersion = 1
+export const terminalProviderProtocolVersion = 2
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
 export const terminalProviderMaxOutputChunkBytes = 256 * 1024
 

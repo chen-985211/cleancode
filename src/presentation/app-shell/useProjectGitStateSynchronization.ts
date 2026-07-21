@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 import type { WorkbenchSnapshot } from './types'
 
@@ -13,6 +13,9 @@ export function useProjectGitStateSynchronization({
   currentWorkbench,
   replaceWorkbench
 }: UseProjectGitStateSynchronizationInput): void {
+  const latestWorkbenchRef = useRef(currentWorkbench)
+  latestWorkbenchRef.current = currentWorkbench
+
   useEffect(() => {
     const api = window.cleancode
     const projectDirectory = currentWorkbench?.project.directory
@@ -30,11 +33,16 @@ export function useProjectGitStateSynchronization({
       }
 
       isSynchronizing = true
+      const workbenchAtRequestStart = latestWorkbenchRef.current
 
       try {
         const synchronizedWorkbench = await api.synchronizeProjectGitState({ projectDirectory })
 
-        if (!isDisposed && synchronizedWorkbench) {
+        if (
+          !isDisposed &&
+          synchronizedWorkbench &&
+          latestWorkbenchRef.current === workbenchAtRequestStart
+        ) {
           replaceWorkbench(synchronizedWorkbench)
         }
       } catch {

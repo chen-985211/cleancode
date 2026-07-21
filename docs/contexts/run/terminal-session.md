@@ -59,6 +59,8 @@ idle -> running -> stopping -> exited
 
 Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层已经接受的会话，并只按完整运行身份收敛状态。应用完整重开时，Run 先完成 Provider 对账再允许终端节点自动启动，避免新 shell 抢占 warm/historical identity。退出事件先于启动响应抵达时，表现层先用事件中的项目、工作区、终端和运行身份建立 `exited` 投影；同一运行迟到的 `running` 启动响应不得把它降级。已经保留但不再运行的 session 收到迟到 `write`、Ctrl+C 或 resize 时，应用层不再访问 PTY，而是幂等返回当前权威快照；这些交互动作指向未知 session 时仍返回 `TERMINAL_SESSION_NOT_FOUND`。终止动作表达“确保该 session 不再存在”，因此未知 session 视为已经完成并返回空结果，不能阻断随后启动新会话。
 
+应用启动和 Provider 断连恢复使用应用级 `initializing -> ready | unavailable -> initializing` 可用性状态机。只有 Provider 会话对账和受管服务端点恢复都完成后才能进入 `ready`；`RunLifecycleService` 在其他阶段统一拒绝所有新启动并返回 `TERMINAL_RUNTIME_NOT_READY`。每次从非 ready 成功进入 ready 都递增 runtime epoch；renderer 先按该 epoch 查询并投影恢复会话，再让没有恢复身份的终端各自动启动至多一次。失败不能把某个终端永久锁在一次性的“已经请求过启动”标记中；用户显式重试或 Provider 断连后的成功恢复必须开启新 epoch。恢复查询失败时继续保持 pending，不得把“没有查到结果”当作“没有旧会话”并抢先创建 shell。
+
 会话的 `workingDirectory` 来自 Project 工作区 DTO；Run 不自行读取或切换 Project 聚合，而是通过调用方拥有的校验端口验证该 DTO 仍然权威。
 
 ## PTY 端口语义
@@ -116,6 +118,8 @@ Run 应用层只依赖 `TerminalProcessPort`：
 `TerminalSession` 业务状态继续由 Run 聚合解释；BlockGraph 只持久化终端定义和启动意图，不保存运行实例。独立 Provider 在 Electron renderer/main 之外拥有普通终端 PTY、headless 模型和 live session identity，并通过带协议版本、随机认证材料、实例 ID、进程信息和单 controller 约束的本机帧协议与应用协作。PID 只是一项证据，不能在未验证 metadata、认证、协议、Provider instance 和完整 `TerminalRunScope` 时用于 attach、替换或终止。
 
 Provider 启动协调使用短期、版本化且带唯一 owner 的本机租约。同一应用内的并发调用共享一次连接任务；空白或损坏租约先经过有界初始化宽限期，死亡 owner 和超期租约可以回收，旧 owner 迟到释放不得删除后继租约。应用退出先关闭新的连接准入并等待在途连接释放租约，再向已认证 Provider detach；断连期间只更新本地滚动历史设置，下一次任意连接在发送业务请求前统一同步最新值，不记录预期的断连设置警告。
+
+Provider 协议 v2 将存活探测与控制权变更分开：`health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程，先完成非保留会话清理与保留会话 checkpoint，再允许后继 controller。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。客户端只为已经运行的 v1 Provider 保留一版兼容读取，新启动的 Provider 必须写入 v2 metadata。
 
 Run 基础设施在应用数据目录保存 schema v1 checkpoint 与追加式输出记录。checkpoint 包含有界普通/alternate 屏幕、可读 normal buffer 历史、cwd、行列、标题、模式和最后 sequence；输出记录只重放 checkpoint 之后的连续 sequence。写入使用同目录临时文件、同步、原子重命名和目录同步，单 checkpoint、输出日志、冷历史数量、保留期和全局字节数都有上限；容量清理只淘汰冷历史，不为腾出空间终止 live 会话。损坏或未知版本按 session 隔离。首次启用保留无法完成 checkpoint 时动作失败并回滚；后续持久化失效时 Provider 撤销保留并通知应用，应用退出时安全终止该会话。
 

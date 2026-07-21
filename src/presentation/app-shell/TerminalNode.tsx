@@ -80,6 +80,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
 
   useEffect(() => {
+    if (session.isRecoveryPending) hasRequestedAutoStartRef.current = false
+  }, [session.isRecoveryPending])
+
+  useEffect(() => {
     if (
       session.status === 'idle' &&
       !session.sessionId &&
@@ -179,6 +183,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         blockLaunchCommand={block.launchCommand}
         terminalStateClassName={terminalStateClassName}
         isRunning={isRunning}
+        isRecoveryPending={Boolean(session.isRecoveryPending)}
         isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
         isSelectedForTerminalGroup={data.isSelected}
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
@@ -238,6 +243,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           session={session}
           focusRequestId={focusRequestId}
           isResizeSuspended={isResizingBlock}
+          isInputDisabled={Boolean(session.isRecoveryPending)}
           onDimensionsChange={handleDimensionsChange}
           onInput={data.onInput}
           onPaste={data.onPaste}
@@ -266,6 +272,7 @@ interface TerminalHeaderProps {
   readonly blockLaunchCommand: string
   readonly terminalStateClassName: string
   readonly isRunning: boolean
+  readonly isRecoveryPending: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
@@ -294,6 +301,7 @@ function TerminalHeader({
   blockLaunchCommand,
   terminalStateClassName,
   isRunning,
+  isRecoveryPending,
   isTerminalGroupSelectionMode,
   isSelectedForTerminalGroup,
   canSelectForTerminalGroup,
@@ -407,7 +415,9 @@ function TerminalHeader({
                 ? workflowActionLabel
                 : t('terminal.action.runTerminalWorkflow')
             })}
-            disabled={isActiveWorkflowRoot ? isStoppingWorkflow : !canQuickLaunch}
+            disabled={
+              isActiveWorkflowRoot ? isStoppingWorkflow : isRecoveryPending || !canQuickLaunch
+            }
             onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
           >
             {isActiveWorkflowRoot ? (
@@ -430,6 +440,7 @@ function TerminalHeader({
               action: t('terminal.action.launch')
             })}
             data-launch-command-state={launchCommandState}
+            disabled={isRecoveryPending && canQuickLaunch}
             onClick={onQuickLaunch}
           >
             <Play size={15} aria-hidden="true" />
@@ -443,7 +454,7 @@ function TerminalHeader({
               blockName,
               action: t('terminal.action.stopCommand')
             })}
-            disabled={!isRunning}
+            disabled={!isRunning || isRecoveryPending}
             onClick={onStop}
           >
             <Square size={14} aria-hidden="true" />
@@ -456,7 +467,7 @@ function TerminalHeader({
             aria-label={t('terminal.namedAction', { blockName, action: retentionActionLabel })}
             aria-pressed={isRetained}
             aria-disabled={isWorkflowRetentionUnavailable || undefined}
-            disabled={!isRunning}
+            disabled={!isRunning || isRecoveryPending}
             onClick={isWorkflowRetentionUnavailable ? undefined : onToggleRetention}
           >
             <Pin size={14} fill={isRetained ? 'currentColor' : 'none'} aria-hidden="true" />
@@ -470,6 +481,7 @@ function TerminalHeader({
               blockName,
               action: t('terminal.action.restartEmpty')
             })}
+            disabled={isRecoveryPending}
             onClick={onRestart}
           >
             <GroupRestartIcon size={16} />

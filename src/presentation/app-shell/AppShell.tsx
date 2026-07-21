@@ -54,6 +54,7 @@ import { useApplicationShortcutNavigation } from './useApplicationShortcutNaviga
 import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
+import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
 
@@ -73,6 +74,7 @@ export function AppShell({
   const [isProjectSidebarCollapsed, setIsProjectSidebarCollapsed] = useState(false)
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
+  const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
   const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
@@ -167,7 +169,8 @@ export function AppShell({
     currentWorkspace,
     currentTerminalBlockIds,
     focusTerminalBlock,
-    notify: notifications.notify
+    notify: notifications.notify,
+    runtimeAvailability: terminalRuntimeAvailability
   })
   const { changeTerminalScrollback, terminalScrollbackRows } =
     useTerminalRuntimePreference(terminalSurfaceRegistry)
@@ -631,6 +634,7 @@ export function AppShell({
             <WorkbenchCanvas
               approvalIntents={agentToolApprovals.approvals}
               isDesktopRuntime={isDesktopRuntime}
+              terminalRuntimeAvailability={terminalRuntimeAvailability}
               currentWorkbench={currentWorkbench}
               currentWorkspace={currentWorkspace}
               nodeStore={nodeStore}

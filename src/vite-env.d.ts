@@ -23,6 +23,7 @@ import type {
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
+import type { TerminalRuntimeAvailabilitySnapshot } from './contexts/run/application/dto/TerminalRuntimeAvailability'
 import type { TerminalSnapshot } from './contexts/run/application/dto/TerminalModelSnapshot'
 import type { TerminalViewOutputEvent } from './contexts/run/application/ports/TerminalModelPort'
 import type {
@@ -309,6 +310,8 @@ declare global {
       listTerminalSessions(command: {
         readonly sessionIds: readonly string[]
       }): Promise<TerminalSessionSnapshot[]>
+      getTerminalRuntimeAvailability(): Promise<TerminalRuntimeAvailabilitySnapshot>
+      retryTerminalRuntime(): Promise<TerminalRuntimeAvailabilitySnapshot>
       listRecoveredTerminalSessions(): Promise<TerminalSessionSnapshot[]>
       listRecoveredTerminalServiceEndpoints(): Promise<
         readonly { readonly sessionId: string; readonly endpoint: TerminalServiceEndpoint }[]
@@ -369,6 +372,9 @@ declare global {
       onTerminalOutput(listener: (event: TerminalOutputEvent) => void): () => void
       onTerminalViewOutput(listener: (event: TerminalViewOutputEvent) => void): () => void
       onTerminalSessionUpdated(listener: (session: TerminalSessionSnapshot) => void): () => void
+      onTerminalRuntimeAvailability(
+        listener: (availability: TerminalRuntimeAvailabilitySnapshot) => void
+      ): () => void
       onTerminalExit(listener: (event: TerminalExitEvent) => void): () => void
     }
   }

@@ -52,6 +52,45 @@ class SilentLogger implements Logger {
 }
 
 describe('terminal working directory IPC contract', () => {
+  it('exposes terminal runtime availability and one explicit retry boundary', async () => {
+    const ipcMain = new FakeIpcMain()
+    const availability = {
+      phase: 'unavailable' as const,
+      epoch: 0,
+      errorCode: 'TERMINAL_PROVIDER_UNAVAILABLE' as const,
+      retryable: true
+    }
+    const retryTerminalRuntime = vi.fn(async () => ({
+      phase: 'ready' as const,
+      epoch: 1,
+      errorCode: null,
+      retryable: false
+    }))
+    registerTerminalIpcHandlers(
+      createTerminalIpcHandlersInput({
+        ipcMain,
+        getTerminalRuntimeAvailability: () => availability,
+        retryTerminalRuntime,
+        listTerminalWorkingDirectories: vi.fn(async () => [])
+      })
+    )
+
+    await expect(ipcMain.invoke('cleancode:get-terminal-runtime-availability')).resolves.toEqual({
+      ok: true,
+      value: availability
+    })
+    await expect(ipcMain.invoke('cleancode:retry-terminal-runtime')).resolves.toEqual({
+      ok: true,
+      value: {
+        phase: 'ready',
+        epoch: 1,
+        errorCode: null,
+        retryable: false
+      }
+    })
+    expect(retryTerminalRuntime).toHaveBeenCalledOnce()
+  })
+
   it('returns current working directories for requested terminal sessions', async () => {
     const ipcMain = new FakeIpcMain()
     const listTerminalWorkingDirectories = vi.fn(async () => [
@@ -196,17 +235,22 @@ describe('terminal working directory IPC contract', () => {
 })
 
 function createTerminalIpcHandlersInput(input: {
+  readonly getTerminalRuntimeAvailability?: TerminalIpcHandlersInput['getTerminalRuntimeAvailability']
   readonly ipcMain: IpcMainLike
   readonly listTerminalSessions?: TerminalIpcHandlersInput['listTerminalSessions']
   readonly listRecoveredTerminalSessions?: TerminalIpcHandlersInput['listRecoveredTerminalSessions']
   readonly listRecoveredTerminalServiceEndpoints?: TerminalIpcHandlersInput['listRecoveredTerminalServiceEndpoints']
   readonly listTerminalWorkingDirectories: TerminalIpcHandlersInput['listTerminalWorkingDirectories']
   readonly resizeTerminal?: TerminalIpcHandlersInput['resizeTerminal']
+  readonly retryTerminalRuntime?: TerminalIpcHandlersInput['retryTerminalRuntime']
   readonly setTerminalRetention?: TerminalIpcHandlersInput['setTerminalRetention']
 }): TerminalIpcHandlersInput {
   return {
     attachTerminalView: vi.fn(),
     detachTerminalView: vi.fn(),
+    getTerminalRuntimeAvailability:
+      input.getTerminalRuntimeAvailability ??
+      (() => ({ phase: 'ready', epoch: 1, errorCode: null, retryable: false })),
     interruptTerminal: vi.fn(),
     ipcMain: input.ipcMain,
     launchTerminal: vi.fn(),
@@ -218,6 +262,9 @@ function createTerminalIpcHandlersInput(input: {
     openTerminalLink: vi.fn(),
     openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: input.resizeTerminal ?? vi.fn(),
+    retryTerminalRuntime:
+      input.retryTerminalRuntime ??
+      vi.fn(async () => ({ phase: 'ready' as const, epoch: 1, errorCode: null, retryable: false })),
     setTerminalRetention: input.setTerminalRetention,
     startTerminal: vi.fn(),
     terminateTerminal: vi.fn(),

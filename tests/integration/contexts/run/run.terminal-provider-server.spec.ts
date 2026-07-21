@@ -53,7 +53,7 @@ describe('terminal provider server', () => {
     incompatible.close()
 
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client, 'controller-1')
     await createAndStart(client, 'interactive')
     processes.emitOutput('session-1', 'provider output\r\n')
     await client.waitForEvent('terminal-output')
@@ -63,8 +63,8 @@ describe('terminal provider server', () => {
     })
 
     const probe = await TestProviderClient.connect(endpoint, 'secret-token')
-    const probeHealth = await probe.request<{ readonly isController: boolean }>('health')
-    expect(probeHealth.isController).toBe(false)
+    const probeHealth = await probe.request<{ readonly controllerState: string }>('health')
+    expect(probeHealth.controllerState).toBe('active')
     await expect(probe.request('listSessions')).rejects.toMatchObject({
       code: 'TERMINAL_PROVIDER_UNAVAILABLE'
     })
@@ -73,7 +73,9 @@ describe('terminal provider server', () => {
 
     await vi.waitFor(() => expect(processes.stops).not.toContain('session-1'))
     const reattached = await TestProviderClient.connect(endpoint, 'secret-token')
-    await reattached.request('health')
+    await vi.waitFor(async () => {
+      await expect(claimController(reattached, 'controller-2')).resolves.toBeDefined()
+    })
     const recovered = await reattached.request<{
       readonly sessions: readonly TerminalSessionSnapshot[]
     }>('listSessions')
@@ -99,12 +101,52 @@ describe('terminal provider server', () => {
     reattached.close()
   })
 
+  it('keeps health read-only and serializes controller handoff', async () => {
+    const processes = new RecordingProcessPort()
+    server = createServer(processes)
+    await server.start()
+
+    const first = await TestProviderClient.connect(endpoint, 'secret-token')
+    const initialHealth = await first.request<{ readonly controllerState: string }>('health')
+    expect(initialHealth.controllerState).toBe('unclaimed')
+    await expect(first.request('listSessions')).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_UNAVAILABLE'
+    })
+
+    await claimController(first, 'controller-1')
+    await createAndStart(first, 'interactive')
+    await first.request('setRetention', {
+      sessionId: 'session-1',
+      retentionPolicy: 'keep-after-application-exit'
+    })
+
+    const second = await TestProviderClient.connect(endpoint, 'secret-token')
+    await expect(claimController(second, 'controller-2')).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY'
+    })
+
+    first.close()
+    await vi.waitFor(async () => {
+      await expect(claimController(second, 'controller-2')).resolves.toMatchObject({
+        controllerLeaseId: expect.any(String)
+      })
+    })
+
+    const recovered = await second.request<{
+      readonly sessions: readonly TerminalSessionSnapshot[]
+    }>('listSessions')
+    expect(recovered.sessions).toEqual([
+      expect.objectContaining({ sessionId: 'session-1', recoveryKind: 'warm' })
+    ])
+    second.close()
+  })
+
   it('captures PTY output emitted before process startup returns', async () => {
     const processes = new RecordingProcessPort('eager startup output\r\n')
     server = createServer(processes)
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
 
     await createAndStart(client, 'interactive')
     const snapshot = await client.request<TerminalSnapshot>('attachView', {
@@ -124,7 +166,7 @@ describe('terminal provider server', () => {
     server = createServer(processes, store)
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
     await createAndStart(client, 'interactive')
 
     client.close()
@@ -143,7 +185,7 @@ describe('terminal provider server', () => {
     server = createServer(processes, store)
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
     await createAndStart(client, 'interactive')
     vi.spyOn(store, 'writeCheckpoint').mockRejectedValueOnce(new Error('disk unavailable'))
 
@@ -169,7 +211,7 @@ describe('terminal provider server', () => {
     server = createServer(processes, store)
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
     await createAndStart(client, 'interactive')
     await client.request('setRetention', {
       sessionId: 'session-1',
@@ -193,7 +235,7 @@ describe('terminal provider server', () => {
     server = createServer(firstProcesses)
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
     await createAndStart(client, 'direct')
     firstProcesses.emitOutput('session-1', 'durable history\r\n')
     firstProcesses.emitOutput('session-1', '\u001b[?1049htransient full-screen')
@@ -207,7 +249,7 @@ describe('terminal provider server', () => {
     await server.start()
 
     const restored = await TestProviderClient.connect(endpoint, 'secret-token')
-    await restored.request('health')
+    await claimController(restored)
     const recovered = await restored.request<{
       readonly sessions: readonly TerminalSessionSnapshot[]
     }>('listSessions')
@@ -229,14 +271,14 @@ describe('terminal provider server', () => {
     server = createServer(new RecordingProcessPort())
     await server.start()
     const client = await TestProviderClient.connect(endpoint, 'secret-token')
-    await client.request('health')
+    await claimController(client)
     await createAndStart(client, 'interactive')
     await server.close()
     server = createServer(new RecordingProcessPort())
     await server.start()
 
     const restored = await TestProviderClient.connect(endpoint, 'secret-token')
-    await restored.request('health')
+    await claimController(restored)
     const recovered = await restored.request<{
       readonly sessions: readonly TerminalSessionSnapshot[]
     }>('listSessions')
@@ -392,6 +434,13 @@ async function createAndStart(
       rows: 24,
       sessionKind
     }
+  })
+}
+
+function claimController(client: TestProviderClient, controllerId = 'controller-1') {
+  return client.request<{ readonly controllerLeaseId: string }>('claimController', {
+    controllerId,
+    processId: process.pid
   })
 }
 

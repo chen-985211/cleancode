@@ -1,7 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, openSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
-import { connect, type Socket } from 'node:net'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 
@@ -32,18 +31,14 @@ import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSe
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
 import {
-  createClientAppError,
   createExpectedAppError,
-  isSerializedAppError
+  isAppError
 } from '../../../../shared-kernel/application/errors/AppError'
 import {
-  encodeTerminalProviderFrame,
   type TerminalProviderEvent,
-  TerminalProviderFrameDecoder,
-  type TerminalProviderMessage,
-  type TerminalProviderRequest,
   terminalProviderProtocolVersion
 } from './TerminalProviderProtocol'
+import { TerminalProviderRpcConnection } from './TerminalProviderRpcConnection'
 import {
   acquireProviderLaunchLock,
   atomicWriteProviderMetadata,
@@ -59,13 +54,14 @@ import {
 } from './PersistentTerminalProviderClientSupport'
 
 const providerStartupTimeoutMs = 5_000
-const providerRequestTimeoutMs = 30_000
+const providerControllerClaimTimeoutMs = 5_000
 
 export interface PersistentTerminalProviderClientOptions {
   readonly stateDirectory: string
   readonly providerEntryPath: string
   readonly executablePath?: string
   readonly onBackgroundError?: (error: unknown) => void
+  readonly onRuntimeUnavailable?: (error: unknown) => void
   readonly onOutput?: (event: TerminalProcessOutputEvent) => void
 }
 
@@ -89,6 +85,7 @@ export class PersistentTerminalProviderClient
   private isDetaching = false
   private recoveryIssueHandler: ((issue: TerminalRuntimeRecoveryIssue) => void) | null = null
   private scrollbackRows: TerminalScrollbackRows = 1000
+  private readonly controllerId = randomUUID()
 
   constructor(private readonly options: PersistentTerminalProviderClientOptions) {}
 
@@ -413,30 +410,97 @@ export class PersistentTerminalProviderClient
     const connection = await TerminalProviderRpcConnection.connect({
       endpoint: metadata.endpoint,
       authToken: metadata.authToken,
+      protocolVersion: metadata.protocolVersion,
       onEvent: (event) => this.handleEvent(event),
       onDisconnect: () => this.handleProviderDisconnect(connection)
     })
     try {
+      if (metadata.protocolVersion === 1) {
+        await this.claimLegacyController(connection, metadata)
+        connection.instanceId = metadata.instanceId
+        this.connection?.close()
+        this.connection = connection
+        return
+      }
       const health = await connection.request<{
         readonly instanceId: string
         readonly protocolVersion: number
-        readonly isController: boolean
+        readonly controllerState: 'unclaimed' | 'active' | 'releasing'
       }>('health')
-      if (
-        health.instanceId !== metadata.instanceId ||
-        health.protocolVersion !== terminalProviderProtocolVersion ||
-        !health.isController
-      ) {
-        throw providerUnavailable(
-          'Terminal provider returned incompatible identity or controller evidence.'
+      if (health.instanceId !== metadata.instanceId) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_IDENTITY_MISMATCH',
+          'Terminal provider identity did not match its authenticated metadata.'
         )
       }
+      if (health.protocolVersion !== terminalProviderProtocolVersion) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
+          'Terminal provider protocol version is unsupported.'
+        )
+      }
+      await this.claimController(connection)
       connection.instanceId = health.instanceId
       this.connection?.close()
       this.connection = connection
     } catch (error) {
       connection.close()
       throw error
+    }
+  }
+
+  private async claimLegacyController(
+    connection: TerminalProviderRpcConnection,
+    metadata: TerminalProviderMetadata
+  ): Promise<void> {
+    const deadline = Date.now() + providerControllerClaimTimeoutMs
+    while (true) {
+      const health = await connection.request<{
+        readonly instanceId: string
+        readonly protocolVersion: number
+        readonly isController: boolean
+      }>('health')
+      if (health.instanceId !== metadata.instanceId) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_IDENTITY_MISMATCH',
+          'Terminal provider identity did not match its authenticated metadata.'
+        )
+      }
+      if (health.protocolVersion !== 1) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
+          'Terminal provider protocol version is unsupported.'
+        )
+      }
+      if (health.isController) return
+      if (Date.now() >= deadline) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_CONTROLLER_BUSY',
+          'Terminal provider controller is active or releasing.',
+          { retryAfterMs: 50 }
+        )
+      }
+      await delayProviderOperation(50)
+    }
+  }
+
+  private async claimController(connection: TerminalProviderRpcConnection): Promise<void> {
+    const deadline = Date.now() + providerControllerClaimTimeoutMs
+    while (true) {
+      try {
+        await connection.request('claimController', {
+          controllerId: this.controllerId,
+          processId: process.pid
+        })
+        return
+      } catch (error) {
+        if (!isAppError(error) || error.code !== 'TERMINAL_PROVIDER_CONTROLLER_BUSY') throw error
+        if (Date.now() >= deadline) throw error
+        const retryAfterMs = error.details?.retryAfterMs
+        await delayProviderOperation(
+          typeof retryAfterMs === 'number' ? Math.max(1, Math.min(500, retryAfterMs)) : 50
+        )
+      }
     }
   }
 
@@ -502,6 +566,11 @@ export class PersistentTerminalProviderClient
     if (this.connection !== connection) return
     this.connection = null
     this.connectedMetadata = null
+    const disconnectError = providerUnavailable('Terminal provider disconnected.')
+    if (!this.isDetaching) {
+      this.options.onBackgroundError?.(disconnectError)
+      this.options.onRuntimeUnavailable?.(disconnectError)
+    }
     for (const [sessionId, callbacks] of this.processCallbacks) {
       const scope = this.identities.get(sessionId)
       if (scope) callbacks.onExit({ scope, sessionId, exitCode: null })
@@ -515,9 +584,11 @@ export class PersistentTerminalProviderClient
 
   private backgroundRequest(method: string, params?: unknown): void {
     if (!this.connection) {
-      this.options.onBackgroundError?.(
-        providerUnavailable(`Terminal provider is disconnected; ignored background ${method}.`)
+      const error = providerUnavailable(
+        `Terminal provider is disconnected; ignored background ${method}.`
       )
+      this.options.onBackgroundError?.(error)
+      this.options.onRuntimeUnavailable?.(error)
       return
     }
     void this.connection
@@ -537,119 +608,6 @@ export class PersistentTerminalProviderClient
   private launchLockPath(): string {
     return join(this.options.stateDirectory, 'provider-launch.lock')
   }
-}
-
-class TerminalProviderRpcConnection {
-  instanceId = ''
-  private readonly pending = new Map<
-    string,
-    {
-      readonly resolve: (value: unknown) => void
-      readonly reject: (error: unknown) => void
-      readonly timeout: ReturnType<typeof setTimeout>
-    }
-  >()
-  private readonly decoder = new TerminalProviderFrameDecoder()
-
-  private constructor(
-    private readonly socket: Socket,
-    private readonly authToken: string,
-    private readonly onEvent: (event: TerminalProviderEvent) => void,
-    private readonly onDisconnect: () => void
-  ) {
-    socket.on('data', (chunk) => {
-      try {
-        for (const message of this.decoder.push(chunk)) this.handleMessage(message)
-      } catch (error) {
-        this.failAll(error)
-        socket.destroy()
-      }
-    })
-    socket.on('close', () => {
-      this.failAll(providerUnavailable('Terminal provider disconnected.'))
-      this.onDisconnect()
-    })
-    socket.on('error', (error) => this.failAll(error))
-  }
-
-  static async connect(input: {
-    readonly endpoint: string
-    readonly authToken: string
-    readonly onEvent: (event: TerminalProviderEvent) => void
-    readonly onDisconnect: () => void
-  }): Promise<TerminalProviderRpcConnection> {
-    const socket = connect(input.endpoint)
-    await new Promise<void>((resolve, reject) => {
-      socket.once('connect', resolve)
-      socket.once('error', reject)
-    })
-    return new TerminalProviderRpcConnection(
-      socket,
-      input.authToken,
-      input.onEvent,
-      input.onDisconnect
-    )
-  }
-
-  request<T = void>(method: string, params?: unknown): Promise<T> {
-    const requestId = randomUUID()
-    const request: TerminalProviderRequest = {
-      type: 'request',
-      protocolVersion: terminalProviderProtocolVersion,
-      requestId,
-      authToken: this.authToken,
-      method,
-      params
-    }
-    return new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(requestId)
-        reject(providerUnavailable(`Terminal provider request timed out: ${method}`))
-      }, providerRequestTimeoutMs)
-      this.pending.set(requestId, {
-        resolve: (value) => resolve(value as T),
-        reject,
-        timeout
-      })
-      this.socket.write(encodeTerminalProviderFrame(request))
-    })
-  }
-
-  close(): void {
-    this.socket.end()
-    this.socket.destroy()
-  }
-
-  private handleMessage(value: unknown): void {
-    if (!isProviderMessage(value)) {
-      throw new Error('Terminal provider returned an invalid message.')
-    }
-    if (value.type === 'event') {
-      this.onEvent(value)
-      return
-    }
-    const pending = this.pending.get(value.requestId)
-    if (!pending) return
-    this.pending.delete(value.requestId)
-    clearTimeout(pending.timeout)
-    if (value.ok) pending.resolve(value.result)
-    else if (isSerializedAppError(value.error)) pending.reject(createClientAppError(value.error))
-    else pending.reject(providerUnavailable('Terminal provider returned an invalid error.'))
-  }
-
-  private failAll(error: unknown): void {
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timeout)
-      pending.reject(error)
-    }
-    this.pending.clear()
-  }
-}
-
-function isProviderMessage(value: unknown): value is TerminalProviderMessage {
-  if (typeof value !== 'object' || value === null || !('type' in value)) return false
-  if (value.type === 'event') return 'event' in value && 'payload' in value
-  return value.type === 'response' && 'requestId' in value && 'ok' in value
 }
 
 function providerUnavailable(message: string) {

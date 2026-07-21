@@ -3,6 +3,36 @@ import { vi } from 'vitest'
 import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
 
 describe('run lifecycle service', () => {
+  it('blocks every run start until terminal runtime reconciliation is ready', async () => {
+    const lifecycle = new RunLifecycleService({ initialRuntimePhase: 'initializing' })
+    const owner = runOwner('api')
+
+    expect(lifecycle.getRuntimeAvailability()).toEqual({
+      phase: 'initializing',
+      epoch: 0,
+      errorCode: null,
+      retryable: false
+    })
+    await expect(lifecycle.runStart(owner, async () => 'started')).rejects.toMatchObject({
+      code: 'TERMINAL_RUNTIME_NOT_READY'
+    })
+
+    lifecycle.markRuntimeReady()
+    expect(lifecycle.getRuntimeAvailability()).toMatchObject({ phase: 'ready', epoch: 1 })
+    await expect(lifecycle.runStart(owner, async () => 'started')).resolves.toBe('started')
+
+    lifecycle.markRuntimeUnavailable('TERMINAL_PROVIDER_UNAVAILABLE', true)
+    await expect(lifecycle.runStart(owner, async () => undefined)).rejects.toMatchObject({
+      code: 'TERMINAL_RUNTIME_NOT_READY'
+    })
+    expect(lifecycle.getRuntimeAvailability()).toEqual({
+      phase: 'unavailable',
+      epoch: 1,
+      errorCode: 'TERMINAL_PROVIDER_UNAVAILABLE',
+      retryable: true
+    })
+  })
+
   it('blocks late starts before disposing a workspace and holds the gate until release', async () => {
     const lifecycle = new RunLifecycleService()
     const owner = runOwner('api')

@@ -10,6 +10,7 @@ import { LaunchTerminalCommandUseCase } from '../../contexts/run/application/use
 import { OpenTerminalLinkUseCase } from '../../contexts/run/application/use-cases/OpenTerminalLinkUseCase'
 import { OpenTerminalServiceEndpointUseCase } from '../../contexts/run/application/use-cases/OpenTerminalServiceEndpointUseCase'
 import { RunLifecycleService } from '../../contexts/run/application/use-cases/RunLifecycleService'
+import { RunRuntimeCoordinator } from '../../contexts/run/application/use-cases/RunRuntimeCoordinator'
 import { TerminalSessionService } from '../../contexts/run/application/use-cases/TerminalSessionService'
 import { TerminalWorkflowService } from '../../contexts/run/application/use-cases/TerminalWorkflowService'
 import { ServicePortLeaseRegistry } from '../../contexts/run/domain/services/ServicePortLeaseRegistry'
@@ -35,11 +36,13 @@ export function createRunRuntime(input: {
   readonly scopeValidation: RunRuntimeScopeValidationPort
   readonly workflowPlans: TerminalWorkflowPlanPort
 }) {
-  const lifecycle = new RunLifecycleService()
+  const lifecycle = new RunLifecycleService({ initialRuntimePhase: 'initializing' })
   const terminalProvider = new PersistentTerminalProviderClient({
     stateDirectory: `${input.appStateDirectory}/terminal-runtime-provider`,
     providerEntryPath: `${__dirname}/terminal-runtime-provider.js`,
     onBackgroundError: logProviderError,
+    onRuntimeUnavailable: () =>
+      lifecycle.markRuntimeUnavailable('TERMINAL_PROVIDER_UNAVAILABLE', true),
     onOutput: (event) => broadcastRendererEvent('cleancode:terminal-output', event)
   })
   const sessions = new TerminalSessionService(
@@ -100,6 +103,22 @@ export function createRunRuntime(input: {
     managedServices,
     lifecycle
   )
+  const runtimeCoordinator = new RunRuntimeCoordinator(
+    lifecycle,
+    () =>
+      sessions.initializeRuntime({
+        onOutput: () => undefined,
+        onExit: (event) => broadcastRendererEvent('cleancode:terminal-exit', event),
+        onSessionUpdated: (session) =>
+          broadcastRendererEvent('cleancode:terminal-session-updated', session)
+      }),
+    async (recovery) => {
+      await managedServices.recover(recovery.managedServiceEndpoints)
+    }
+  )
+  lifecycle.subscribeRuntimeAvailability((availability) =>
+    broadcastRendererEvent('cleancode:terminal-runtime-availability', availability)
+  )
 
   return {
     ...createRunLifecycleAdapters(lifecycle),
@@ -110,16 +129,9 @@ export function createRunRuntime(input: {
     openTerminalLink,
     sessions,
     workflow,
-    initialize: async () => {
-      const recovery = await sessions.initializeRuntime({
-        onOutput: () => undefined,
-        onExit: (event) => broadcastRendererEvent('cleancode:terminal-exit', event),
-        onSessionUpdated: (session) =>
-          broadcastRendererEvent('cleancode:terminal-session-updated', session)
-      })
-      await managedServices.recover(recovery.managedServiceEndpoints)
-      return recovery
-    }
+    getRuntimeAvailability: () => lifecycle.getRuntimeAvailability(),
+    initialize: () => runtimeCoordinator.initialize(),
+    retryInitialize: () => runtimeCoordinator.retry()
   }
 }
 

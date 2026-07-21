@@ -1,4 +1,9 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import type { AppErrorCode } from '../../../../shared-kernel/application/errors/AppError'
+import type {
+  TerminalRuntimeAvailabilitySnapshot,
+  TerminalRuntimePhase
+} from '../dto/TerminalRuntimeAvailability'
 import {
   createTerminalRunSlotKey,
   type TerminalRunOwner
@@ -25,6 +30,9 @@ interface RunGateBlockerSpec {
 }
 
 export class RunLifecycleService {
+  private readonly runtimeAvailabilityListeners = new Set<
+    (snapshot: TerminalRuntimeAvailabilitySnapshot) => void
+  >()
   private readonly blockers = new Set<OwnerPredicate>()
   private readonly resources = new Set<TrackedRunResource>()
   private readonly operationTails = new Map<
@@ -35,6 +43,55 @@ export class RunLifecycleService {
   private readonly activeLeaseReleases = new Set<() => void>()
   private readonly quarantinedBlockers = new Map<string, Set<() => void>>()
   private isShuttingDown = false
+  private runtimePhase: TerminalRuntimePhase
+  private runtimeEpoch = 0
+  private runtimeErrorCode: AppErrorCode | null = null
+  private isRuntimeRetryable = false
+
+  constructor(input: { readonly initialRuntimePhase?: TerminalRuntimePhase } = {}) {
+    this.runtimePhase = input.initialRuntimePhase ?? 'ready'
+  }
+
+  getRuntimeAvailability(): TerminalRuntimeAvailabilitySnapshot {
+    return {
+      phase: this.runtimePhase,
+      epoch: this.runtimeEpoch,
+      errorCode: this.runtimeErrorCode,
+      retryable: this.isRuntimeRetryable
+    }
+  }
+
+  subscribeRuntimeAvailability(
+    listener: (snapshot: TerminalRuntimeAvailabilitySnapshot) => void
+  ): () => void {
+    this.runtimeAvailabilityListeners.add(listener)
+    return () => this.runtimeAvailabilityListeners.delete(listener)
+  }
+
+  beginRuntimeInitialization(): void {
+    if (this.isShuttingDown) return
+    this.runtimePhase = 'initializing'
+    this.runtimeErrorCode = null
+    this.isRuntimeRetryable = false
+    this.publishRuntimeAvailability()
+  }
+
+  markRuntimeReady(): void {
+    if (this.isShuttingDown) return
+    if (this.runtimePhase !== 'ready') this.runtimeEpoch += 1
+    this.runtimePhase = 'ready'
+    this.runtimeErrorCode = null
+    this.isRuntimeRetryable = false
+    this.publishRuntimeAvailability()
+  }
+
+  markRuntimeUnavailable(errorCode: AppErrorCode, retryable: boolean): void {
+    if (this.isShuttingDown) return
+    this.runtimePhase = 'unavailable'
+    this.runtimeErrorCode = errorCode
+    this.isRuntimeRetryable = retryable
+    this.publishRuntimeAvailability()
+  }
 
   runStart<T>(owner: TerminalRunOwner, operation: () => Promise<T>): Promise<T> {
     return this.runStartMany([owner], operation)
@@ -162,6 +219,10 @@ export class RunLifecycleService {
 
   async hardDisposeAll(): Promise<void> {
     this.isShuttingDown = true
+    this.runtimePhase = 'shutting-down'
+    this.runtimeErrorCode = null
+    this.isRuntimeRetryable = false
+    this.publishRuntimeAvailability()
     for (const release of [...this.activeLeaseReleases]) release()
     await this.waitForOperations(() => true)
     await this.disposeResources(() => true)
@@ -171,6 +232,10 @@ export class RunLifecycleService {
 
   async prepareApplicationShutdown(): Promise<void> {
     this.isShuttingDown = true
+    this.runtimePhase = 'shutting-down'
+    this.runtimeErrorCode = null
+    this.isRuntimeRetryable = false
+    this.publishRuntimeAvailability()
     for (const release of [...this.activeLeaseReleases]) release()
     await this.waitForOperations(() => true)
     this.blockers.clear()
@@ -301,9 +366,21 @@ export class RunLifecycleService {
   }
 
   private assertStartAllowed(owner: TerminalRunOwner): void {
-    if (this.isShuttingDown || [...this.blockers].some((blocker) => blocker(owner))) {
+    if (this.isShuttingDown) startBlocked()
+    if (this.runtimePhase !== 'ready') {
+      throw createExpectedAppError(
+        'TERMINAL_RUNTIME_NOT_READY',
+        'Terminal runtime reconciliation has not completed.'
+      )
+    }
+    if ([...this.blockers].some((blocker) => blocker(owner))) {
       startBlocked()
     }
+  }
+
+  private publishRuntimeAvailability(): void {
+    const snapshot = this.getRuntimeAvailability()
+    for (const listener of this.runtimeAvailabilityListeners) listener(snapshot)
   }
 
   private hasQuarantine(key: string, prefix: boolean): boolean {

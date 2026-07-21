@@ -89,6 +89,8 @@ Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不�
 
 自动 Git 同步和重新打开项目会以真实 Git/worktree 状态保存 Project。同步发现工作区消失，或同名工作区的目录/Git 绑定变化时，必须先通过 `WorkspaceRunLifecyclePort` 清理旧 Run 作用域，再提交新 Project 快照。同一次同步涉及多个旧工作区时，调用方必须通过 `disposeWorkspaces` 在一个项目级 lease 内批量排空，不能逐个持有同项目 lease 形成自等待；批量失败后的启动隔离仍按每个 workspace key 独立保留和解除。只有 Git 适配器权威确认“非仓库”或完整检查成功，才允许保存并通过 Agent/Run lifecycle 端口 resolve 项目 quarantine。Git 命令不可执行、目录不可访问、仓库损坏或安全校验失败必须向上抛出，不能伪装成非 Git 项目并解除隔离。这样 checkout 补偿失败、归档部分完成或外部删除 worktree 不会永久阻塞运行时，同时仍保证恢复前旧作用域不能附加或启动。
 
+Renderer 发起自动同步时必须绑定请求开始时的 workbench 快照；响应返回前只要当前 workbench 已被终端图修改、Agent 布局、手动工作区切换或其他动作替换，就丢弃该响应并等待下一轮同步。后台读取不得用陈旧的整份 workbench 覆盖较新的图或当前工作区状态。
+
 Agent 运行时如何按分支隔离，见 [Agent 与会话生命周期](../agent/agent-session.md)；Run 的精确作用域、硬清理和端口资源语义见[终端会话生命周期](../run/terminal-session.md)与[本地服务端口治理](../run/service-port-management.md)。
 
 ## 状态与持久化

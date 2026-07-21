@@ -125,6 +125,8 @@ export const enMessages = {
     'This is browser preview mode. Use the Electron desktop app for live projects and terminals.',
   'canvas.statusPreview': 'Browser preview',
   'canvas.statusConnected': 'Local runtime connected',
+  'canvas.statusRuntimeInitializing': 'Restoring terminal runtime',
+  'canvas.statusRuntimeUnavailable': 'Terminal runtime unavailable',
   'canvas.statusWaiting': 'Waiting for a project',
   'canvas.layoutSaveFailedTitle': 'Could not save canvas layout',
   'canvas.layoutSaveFailed': 'The node was restored to its previous position. Try again.',
@@ -236,8 +238,17 @@ export const enMessages = {
   'terminal.recovery.ended': 'Ended',
   'terminal.retention.failedTitle': 'Could not update session retention',
   'terminal.retention.failed': 'The retention setting could not be updated.',
+  'terminalRuntime.unavailableTitle': 'Terminal runtime failed to start',
+  'terminalRuntime.unavailableMessage':
+    'Terminal recovery has not completed, so new sessions are blocked.',
+  'terminalRuntime.retry': 'Retry recovery',
+  'terminalRuntime.retrying': 'Retrying…',
   'error.TERMINAL_PROVIDER_AUTHENTICATION_FAILED':
     'The terminal runtime provider could not be authenticated.',
+  'error.TERMINAL_PROVIDER_CONTROLLER_BUSY':
+    'Another app instance still controls the terminal runtime. Close the duplicate instance and retry.',
+  'error.TERMINAL_PROVIDER_IDENTITY_MISMATCH':
+    'The terminal runtime identity does not match. The provider was left untouched to protect existing sessions.',
   'error.TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED':
     'The terminal runtime provider uses an incompatible protocol.',
   'error.TERMINAL_PROVIDER_UNAVAILABLE': 'The terminal runtime provider is unavailable.',
@@ -245,6 +256,8 @@ export const enMessages = {
   'error.TERMINAL_RECOVERY_STORAGE_LIMIT': 'The terminal recovery storage limit was reached.',
   'error.TERMINAL_RECOVERY_VERSION_UNSUPPORTED':
     'The saved terminal recovery data uses an unsupported version.',
+  'error.TERMINAL_RUNTIME_NOT_READY':
+    'The terminal runtime is still recovering. Wait for it to finish and try again.',
   'error.TERMINAL_SESSION_RETENTION_NOT_ALLOWED':
     'This terminal session cannot stay alive after the app exits.',
   'terminal.defaultName': 'Terminal {index}',
