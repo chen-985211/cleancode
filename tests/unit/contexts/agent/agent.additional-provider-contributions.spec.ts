@@ -57,7 +57,7 @@ describe('additional Agent Provider contributions', () => {
     expect(script).not.toContain(argument)
   })
 
-  it('creates an isolated Claude Code session with resumable identity and launch-scoped MCP', async () => {
+  it('waits for a durable Claude Code hook before publishing resumable identity', async () => {
     const identified = vi.fn()
     const contribution = new ClaudeCodeAgentProviderContribution({
       createSessionId: () => '550e8400-e29b-41d4-a716-446655440000',
@@ -88,11 +88,30 @@ describe('additional Agent Provider contributions', () => {
     )
     expect(plan.args).toEqual(expect.arrayContaining(['--settings', expect.any(String)]))
     expect(plan.args).not.toContain('--strict-mcp-config')
-    expect(identified).toHaveBeenCalledWith({
-      formatVersion: 1,
-      kind: 'claude-session',
-      value: '550e8400-e29b-41d4-a716-446655440000'
-    })
+    expect(identified).not.toHaveBeenCalled()
+
+    const userPromptHookRequest = {
+      body: JSON.stringify({
+        cwd: '/repo/worktree',
+        hook_event_name: 'UserPromptSubmit',
+        session_id: '550e8400-e29b-41d4-a716-446655440000'
+      }),
+      headers: { Authorization: `Bearer ${plan.env.CLEANCODE_CLAUDE_HOOK_TOKEN}` },
+      method: 'POST' as const
+    }
+    await Promise.all([
+      fetch(plan.env.CLEANCODE_CLAUDE_HOOK_URL!, userPromptHookRequest),
+      fetch(plan.env.CLEANCODE_CLAUDE_HOOK_URL!, userPromptHookRequest)
+    ])
+    await vi.waitFor(() =>
+      expect(identified).toHaveBeenCalledWith({
+        formatVersion: 1,
+        kind: 'claude-session',
+        metadata: { confirmedBy: 'user-prompt-hook' },
+        value: '550e8400-e29b-41d4-a716-446655440000'
+      })
+    )
+    expect(identified).toHaveBeenCalledTimes(1)
 
     const configPath = plan.args[plan.args.indexOf('--mcp-config') + 1]!
     const config = JSON.parse(await readFile(configPath, 'utf8'))
@@ -155,10 +174,22 @@ describe('additional Agent Provider contributions', () => {
         headers: { Authorization: `Bearer ${reporter.token}` },
         method: 'POST'
       })
+      await vi.waitFor(() => expect(onActivityChanged).toHaveBeenCalledWith('idle'))
+      expect(onSessionIdentified).not.toHaveBeenCalled()
+      await fetch(reporter.url, {
+        body: JSON.stringify({
+          cwd: process.cwd(),
+          hook_event_name: 'UserPromptSubmit',
+          session_id: '550e8400-e29b-41d4-a716-446655440000'
+        }),
+        headers: { Authorization: `Bearer ${reporter.token}` },
+        method: 'POST'
+      })
       await vi.waitFor(() =>
         expect(onSessionIdentified).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000')
       )
       expect(onActivityChanged).toHaveBeenCalledWith('idle')
+      expect(onActivityChanged).toHaveBeenCalledWith('working')
       expect(onActivityChanged).toHaveBeenCalledWith('waiting_approval')
 
       const unauthorized = await fetch(reporter.url, {

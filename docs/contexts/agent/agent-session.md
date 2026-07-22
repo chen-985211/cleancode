@@ -39,7 +39,7 @@
 1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。
 2. `providerId` 在创建时确定，没有领域方法、用例或 IPC 可以切换；attach 携带的 Provider 与持久化事实不一致时必须拒绝。
 3. 同一个 Agent 可以为不同 Git 分支保存不同 Provider session ref；引用只能绑定到该 Agent、项目和工作区的当前作用域。
-4. session ref 必须有已知 kind、版本和值。Codex 和 Claude Code 使用各自正式报告的 UUID，不扫描历史目录、终端输出或“最近会话”。
+4. session ref 必须有已知 kind、版本和值。Codex 和 Claude Code 使用各自正式报告的 UUID，不扫描历史目录、终端输出或“最近会话”。Claude Code 的 `SessionStart` 只证明进程启动，空会话尚不可恢复；只有首次 `UserPromptSubmit` Hook 才确认并持久化该 session ref。
 5. 同一工作区的多个相同或不同 Provider Agent 拥有独立 terminal、launch、对话、MCP、审批和审计，但共享工作目录。
 6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；URL、Token、Hook、活动状态、终端和 launch 都不持久化。
 7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
@@ -57,11 +57,11 @@
 
 当前内建 Provider：
 
-| Provider    | 基础终端 | 恢复 | 活动状态 | CleanCode MCP | 说明                                                 |
-| ----------- | -------- | ---- | -------- | ------------- | ---------------------------------------------------- |
-| Codex       | 是       | 是   | 否       | 是            | 正式 thread notify、`resume` 和进程级 config         |
-| Claude Code | 是       | 是   | 是       | 是            | 正式 session ID、Hooks、会话级 MCP/settings 临时文件 |
-| OpenCode    | 是       | 否   | 否       | 否            | 最小 Provider；activity 诚实显示为 `unavailable`     |
+| Provider    | 基础终端 | 恢复 | 活动状态 | CleanCode MCP | 说明                                                           |
+| ----------- | -------- | ---- | -------- | ------------- | -------------------------------------------------------------- |
+| Codex       | 是       | 是   | 否       | 是            | 正式 thread notify、`resume` 和进程级 config                   |
+| Claude Code | 是       | 是   | 是       | 是            | 用户输入后确认 session ID、Hooks、会话级 MCP/settings 临时文件 |
+| OpenCode    | 是       | 否   | 否       | 否            | 最小 Provider；activity 诚实显示为 `unavailable`               |
 
 增加基础 Agent CLI 时，只需在 Provider 模块实现 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。可选能力通过 contribution 增加；不得在 Agent domain、Run domain、通用 IPC 或 `AgentConsole` 中按 Provider ID 分支。
 
@@ -83,7 +83,7 @@
 4. 创建或复用 Run 的 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸。
 5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域。
 6. Provider 生成启动计划；Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`。
-7. Provider 正式报告 session ref 或 activity 时，只接受仍匹配当前 Agent runtime session 和 Provider launch generation 的回调。
+7. Provider 正式报告 session ref 或 activity 时，只接受仍匹配当前 Agent runtime session 和 Provider launch generation 的回调；尚未产生可恢复对话的启动事件不得提前建立稳定绑定。
 
 Provider CLI 自然退出或处理 `Ctrl+C` 后，Agent launch 状态变为 `exited`、activity 变为 `unavailable`，停止新的 MCP 调用并释放 launch 临时资源；Run terminal、权威屏幕和 shell 保留。用户可以继续使用 shell、恢复当前对话或开始新对话。shell/PTY 自身退出才清空 terminal identity 并使整个运行时不可输入。
 

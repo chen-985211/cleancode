@@ -106,6 +106,7 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
         command.onProviderSessionIdentified({
           formatVersion: 1,
           kind: 'claude-session',
+          metadata: { confirmedBy: 'user-prompt-hook' },
           value: sessionId
         }),
       workspaceDirectory: command.workspaceDirectory
@@ -149,7 +150,7 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
     try {
       const sessionArgs = command.providerSessionRef
         ? this.options.resume.createResumeArgs(command.providerSessionRef)
-        : this.createSessionArgs(command.onProviderSessionIdentified)
+        : this.createSessionArgs()
       const capability = command.cleancodeMcp
         ? await this.options.capability.inject(command.cleancodeMcp)
         : { args: [], env: {}, temporaryArtifacts: [] as readonly AgentRuntimeArtifact[] }
@@ -168,13 +169,10 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
     }
   }
 
-  private createSessionArgs(
-    onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
-  ): readonly string[] {
+  private createSessionArgs(): readonly string[] {
     const sessionId = this.options.createSessionId()
     const sessionRef = { formatVersion: 1, kind: 'claude-session', value: sessionId } as const
     assertClaudeCodeSessionRef(sessionRef)
-    onProviderSessionIdentified(sessionRef)
     return ['--session-id', sessionId]
   }
 }

@@ -275,6 +275,49 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
+    'keeps Agent terminal content visually stable when the canvas clears selection',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
+
+      const agent = page.locator('[data-agent-console-node]').first()
+      const terminal = agent.locator('.agent-terminal-viewport')
+      await ensureTerminalDomRenderer(terminal)
+      await agent.locator('.agent-console-actions__title').click()
+      await waitForAgentSelectionState(page, 'selected')
+      await terminal.locator('.xterm').evaluate((element) => {
+        element.setAttribute('data-selection-stability-token', 'stable-xterm-surface')
+      })
+
+      const selectedPresentation = await agent.evaluate((element) => {
+        const veil = element.querySelector<HTMLElement>('[data-workbench-node-selection]')
+        if (!veil) throw new Error('Agent selection feedback is unavailable.')
+
+        return {
+          backgroundColor: getComputedStyle(veil).backgroundColor,
+          terminalText: element.querySelector('.xterm-rows')?.textContent ?? ''
+        }
+      })
+
+      expect(selectedPresentation.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+      await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
+      await waitForAgentSelectionState(page, 'unselected')
+
+      expect(
+        await terminal
+          .locator('.xterm[data-selection-stability-token="stable-xterm-surface"]')
+          .count()
+      ).toBe(1)
+      expect(await terminal.locator('.xterm-rows').textContent()).toBe(
+        selectedPresentation.terminalText
+      )
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'selects and activates Agents continuously with a spatial shortcut from xterm',
     async () => {
       await expectDesktopRuntime(page)

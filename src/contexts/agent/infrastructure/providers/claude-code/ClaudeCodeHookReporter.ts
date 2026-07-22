@@ -27,6 +27,7 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
   }): Promise<ClaudeCodeHookReporter> {
     const token = randomBytes(24).toString('hex')
     const expectedDirectory = await resolveRealPath(input.workspaceDirectory)
+    const reportedSessionIds = new Set<string>()
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -39,7 +40,16 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
       })
       request.on('end', async () => {
         const payload = parsePayload(body)
-        if (payload) await acceptPayload(payload, expectedDirectory, input)
+        if (payload) {
+          await acceptPayload(payload, expectedDirectory, {
+            ...input,
+            onSessionIdentified: (sessionId) => {
+              if (reportedSessionIds.has(sessionId)) return
+              reportedSessionIds.add(sessionId)
+              input.onSessionIdentified(sessionId)
+            }
+          })
+        }
         response.writeHead(204).end()
       })
     })
@@ -72,10 +82,12 @@ async function acceptPayload(
   ) {
     return
   }
-  if (payload.hook_event_name === 'SessionStart' && isUuid(payload.session_id)) {
-    input.onSessionIdentified(payload.session_id)
+  if (payload.hook_event_name === 'SessionStart') {
     input.onActivityChanged('idle')
     return
+  }
+  if (payload.hook_event_name === 'UserPromptSubmit' && isUuid(payload.session_id)) {
+    input.onSessionIdentified(payload.session_id)
   }
   const activity = mapActivity(payload)
   if (activity) input.onActivityChanged(activity)

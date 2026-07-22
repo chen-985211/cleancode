@@ -430,7 +430,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - Agent terminal 已成为 Run 的 `agent` owner，会话内的 Agent CLI 是可重复启动的 `ForegroundJob`。macOS/Linux 使用 POSIX 控制脚本，Windows 使用 ConPTY/PowerShell 控制脚本；CLI 退出只结束本次 launch，shell、终端模型和视图继续存在。
 - Agent Console 已删除独立 xterm registry、输出尾部缓存和原始输出 IPC，复用 Run 的 snapshot、sequence、attach/detach 与共享 xterm surface。
 - 创建 Agent 时从 registry 选择一次 Provider；既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
-- Codex、Claude Code 和最小 OpenCode contribution 已注册。Claude Code 使用会话级临时 MCP/settings 文件、鉴权 Hook relay、正式 session ID/resume 参数和精确 CleanCode 工具预批准；OpenCode 证明无 resume、telemetry 或 MCP 时仍能获得基础终端能力。
+- Codex、Claude Code 和最小 OpenCode contribution 已注册。Claude Code 使用会话级临时 MCP/settings 文件、鉴权 Hook relay、正式 session ID/resume 参数和精确 CleanCode 工具预批准；空启动不建立对话绑定，首次用户输入 Hook 确认后才允许后续恢复。OpenCode 证明无 resume、telemetry 或 MCP 时仍能获得基础终端能力。
 - Provider launch callback 由 Agent session 与单调 launch generation 双重隔离；终端和 Provider 临时资源在替换、退出与生命周期清理时释放。
 - Terminal Provider 协议 v4 把前台任务请求和 started/exited 事件送入独立 Provider 进程；`awaiting_started` 阶段消费内部 shell transport 回显，Agent 屏幕只从 Provider started 后发布输出；当前 macOS 真实 Electron E2E 已证明 `Ctrl+C` 结束 Codex launch 后同一 shell 继续接受命令，Windows 由原生 ConPTY integration 门禁负责对等验收。
 
@@ -444,7 +444,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - Unit：179 个测试文件、826 项测试通过。
 - Integration：28 个测试文件、134 项测试通过；另有 2 个 Windows 原生测试文件、2 项测试因当前为 macOS 而按平台跳过。
 - Contract：11 个测试文件、68 项测试通过。
-- Electron E2E：10 个测试文件、41 项测试通过；其中包含多 Agent、固定 Provider 创建、`Ctrl+C` 后回到同一 shell、跨工作区主题/进程复用、普通终端、恢复、工作流、端口和 worktree 回归。
+- Electron E2E：11 个测试文件、43 项测试通过；其中包含多 Agent、固定 Provider 创建、Claude 空会话与首次输入后的恢复边界、画布取消选择时的 xterm 视觉稳定、`Ctrl+C` 后回到同一 shell、跨工作区主题/进程复用、普通终端、恢复、工作流、端口和 worktree 回归。
 - `pnpm build` 成功生成 Electron main、Terminal Provider、preload 和 renderer 产物。
 - 三平台 workflow 已加入仓库，但尚未在远端 Windows/Linux runner 执行，因此阶段 3、4、7 和全路线仍保持“实施中”。
 
@@ -678,7 +678,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 ### 计划能力
 
 - Claude Code CLI、版本和可用性检测。
-- 新会话启动与正式 session resume。
+- 新会话启动与正式 session resume；空启动不持久化，首次用户输入 Hook 确认后才建立可恢复绑定。
 - 通过 Provider 正式 Hook 获取 session ID、turn、工具、等待输入、等待审批和停止事件。
 - Hook relay 使用 launch Token、完整 owner 和 generation 校验；Hook 只提供 Agent activity，不替代前台任务退出事实。
 - 通过会话级临时配置注入 CleanCode MCP，不修改用户全局 Claude 配置。

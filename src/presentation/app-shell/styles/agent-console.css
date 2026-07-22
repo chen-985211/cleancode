@@ -17,6 +17,10 @@
   box-shadow: var(--cc-shadow-node);
 }
 
+.agent-console-node > .workbench-node-selection-veil {
+  background: transparent;
+}
+
 .agent-console {
   display: flex;
   height: 100%;

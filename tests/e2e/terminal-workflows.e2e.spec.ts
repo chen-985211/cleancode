@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   createE2eWorkbench,
@@ -77,12 +77,8 @@ describe('terminal workflows e2e', () => {
       await page.getByText('运行中').first().waitFor()
       await page.getByRole('button', { name: '适应画布' }).click()
 
-      const firstTerminal = page
-        .locator('[data-terminal-block-id]')
-        .filter({ hasText: 'Terminal 1' })
-      const secondTerminal = page
-        .locator('[data-terminal-block-id]')
-        .filter({ hasText: 'Terminal 2' })
+      const firstTerminal = terminalNodeByTitle(page, 'Terminal 1')
+      const secondTerminal = terminalNodeByTitle(page, 'Terminal 2')
       const firstBlockId = await firstTerminal.getAttribute('data-terminal-block-id')
       const secondBlockId = await secondTerminal.getAttribute('data-terminal-block-id')
       expect(firstBlockId).toBeTruthy()
@@ -152,14 +148,12 @@ async function configureLaunchCommand(
 }
 
 async function connectTerminalNodes(page: Page): Promise<void> {
-  const sourceHandle = page
-    .locator('[data-terminal-block-id]')
-    .filter({ hasText: 'Terminal 1' })
-    .locator('.terminal-node__handle--output')
-  const targetHandle = page
-    .locator('[data-terminal-block-id]')
-    .filter({ hasText: 'Terminal 2' })
-    .locator('.terminal-node__handle--input')
+  const sourceHandle = terminalNodeByTitle(page, 'Terminal 1').locator(
+    '.terminal-node__handle--output'
+  )
+  const targetHandle = terminalNodeByTitle(page, 'Terminal 2').locator(
+    '.terminal-node__handle--input'
+  )
   const sourceBox = await readRequiredBoundingBox(sourceHandle)
   const targetBox = await readRequiredBoundingBox(targetHandle)
 
@@ -170,6 +164,17 @@ async function connectTerminalNodes(page: Page): Promise<void> {
   })
   await page.mouse.up()
   await page.locator('.react-flow__edge').waitFor({ state: 'attached' })
+}
+
+function terminalNodeByTitle(page: Page, terminalName: string): Locator {
+  const exactTitle = page.locator('.terminal-node__title > strong').filter({
+    hasText: new RegExp(`^${escapeRegularExpression(terminalName)}$`)
+  })
+  return page.locator('[data-terminal-block-id]').filter({ has: exactTitle })
+}
+
+function escapeRegularExpression(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function waitForTerminalOutput(
