@@ -311,6 +311,22 @@ describe('workspace Agents e2e', () => {
       const selectedAgent = page.locator('[data-selection-state="selected"]').first()
       const selectedAgentId = await selectedAgent.getAttribute('data-agent-console-node')
       if (!selectedAgentId) throw new Error('Selected Agent id is unavailable.')
+      await page.waitForFunction((agentId) => {
+        const element = document.querySelector(`[data-agent-console-node="${agentId}"]`)
+        const canvas = document.querySelector('.react-flow')
+        if (!element || !canvas) return false
+
+        const agentBounds = element.getBoundingClientRect()
+        const canvasBounds = canvas.getBoundingClientRect()
+        return (
+          Math.abs(
+            agentBounds.x + agentBounds.width / 2 - (canvasBounds.x + canvasBounds.width / 2)
+          ) <= 2 &&
+          Math.abs(
+            agentBounds.y + agentBounds.height / 2 - (canvasBounds.y + canvasBounds.height / 2)
+          ) <= 2
+        )
+      }, selectedAgentId)
       const centerOffset = await selectedAgent.evaluate((element) => {
         const canvas = document.querySelector('.react-flow')
         if (!canvas) throw new Error('Canvas is unavailable.')

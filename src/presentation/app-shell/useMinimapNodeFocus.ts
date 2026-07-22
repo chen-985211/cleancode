@@ -16,6 +16,7 @@ import {
   resolveWorkbenchNodeSize,
   type WorkbenchNodeFocusSize
 } from './workbenchNodeFocusViewport'
+import { prefersReducedMotion } from './workbenchFocusTransition'
 
 interface UseMinimapNodeFocusInput {
   readonly terminalBlocksById: ReadonlyMap<string, TerminalBlockSnapshot>
@@ -249,6 +250,7 @@ export function useMinimapNodeFocus({
   )
 
   return {
+    cancelPendingWorkbenchInputFocus,
     focusAgentConsole,
     focusTerminalBlock,
     focusWorkbenchNode
@@ -260,6 +262,10 @@ function resolveFocusDuration(
   targetCenter: { readonly x: number; readonly y: number },
   targetZoom: number
 ): number {
+  if (prefersReducedMotion()) {
+    return 0
+  }
+
   return resolveMinimapFocusDuration({
     currentViewport: reactFlowInstance.getViewport(),
     canvasSize: readMinimapFocusCanvasSize(),

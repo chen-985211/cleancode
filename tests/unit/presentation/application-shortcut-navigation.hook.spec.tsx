@@ -8,7 +8,11 @@ import type {
 } from '../../../src/presentation/app-shell/types'
 
 describe('application shortcut navigation hook', () => {
-  it('immediately centers a selected target even when it is already visible', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('smoothly centers a selected target even when it is already visible', () => {
     const selected = createNode('selected', 100, 100)
     const target = createNode('target', 400, 100)
     const activateWorkbenchNodeInput = vi.fn()
@@ -25,11 +29,15 @@ describe('application shortcut navigation hook', () => {
     act(() => hook.result.current.selectCanvasNode('right'))
 
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
-    expect(setCenter).toHaveBeenCalledWith(460, 140, { duration: 0, zoom: 1 })
+    expect(setCenter).toHaveBeenCalledWith(460, 140, {
+      duration: 191,
+      interpolate: 'linear',
+      zoom: 1
+    })
     expect(activateWorkbenchNodeInput).toHaveBeenCalledWith(target)
   })
 
-  it('immediately centers a selected target when it is outside the viewport', () => {
+  it('gives a distant target more travel time while keeping the transition compact', () => {
     const target = createNode('offscreen', 1_200, 700)
     const selectWorkbenchNode = vi.fn()
     const setCenter = vi.fn(async () => true)
@@ -43,7 +51,11 @@ describe('application shortcut navigation hook', () => {
     act(() => hook.result.current.selectCanvasNode('right'))
 
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
-    expect(setCenter).toHaveBeenCalledWith(1_260, 740, { duration: 0, zoom: 1 })
+    expect(setCenter).toHaveBeenCalledWith(1_260, 740, {
+      duration: 233,
+      interpolate: 'linear',
+      zoom: 1
+    })
   })
 
   it('only zooms out when an oversized shortcut target exceeds the focus safe frame', () => {
@@ -65,12 +77,73 @@ describe('application shortcut navigation hook', () => {
     const [centerX, centerY, options] = setCenter.mock.calls[0] as unknown as [
       number,
       number,
-      { readonly duration: number; readonly zoom: number }
+      { readonly duration: number; readonly interpolate: string; readonly zoom: number }
     ]
     expect(centerX).toBe(1_900)
     expect(centerY).toBe(1_200)
-    expect(options.duration).toBe(0)
+    expect(options.duration).toBeGreaterThanOrEqual(180)
+    expect(options.duration).toBeLessThanOrEqual(260)
+    expect(options.interpolate).toBe('linear')
     expect(options.zoom).toBeCloseTo(0.4352, 4)
+  })
+
+  it('centers without spatial motion when the user prefers reduced motion', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        media: '(prefers-reduced-motion: reduce)',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }))
+    )
+    const target = createNode('target', 600, 100)
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      nodes: [target],
+      selectedNodeId: null,
+      selectWorkbenchNode: vi.fn(),
+      setCenter
+    })
+
+    act(() => hook.result.current.selectCanvasNode('right'))
+
+    expect(setCenter).toHaveBeenCalledWith(660, 140, {
+      duration: 0,
+      interpolate: 'linear',
+      zoom: 1
+    })
+  })
+
+  it('retargets an in-flight transition when directional input continues', () => {
+    const first = createNode('first', 100, 100)
+    const second = createNode('second', 400, 100)
+    const third = createNode('third', 700, 100)
+    const activateWorkbenchNodeInput = vi.fn()
+    const selectWorkbenchNode = vi.fn()
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      activateWorkbenchNodeInput,
+      nodes: [first, second, third],
+      selectedNodeId: first.id,
+      selectWorkbenchNode,
+      setCenter
+    })
+
+    act(() => {
+      hook.result.current.selectCanvasNode('right')
+      hook.result.current.selectCanvasNode('right')
+    })
+
+    expect(selectWorkbenchNode).toHaveBeenNthCalledWith(1, second)
+    expect(selectWorkbenchNode).toHaveBeenNthCalledWith(2, third)
+    expect(setCenter).toHaveBeenCalledTimes(2)
+    expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(1, second)
+    expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(2, third)
   })
 })
 

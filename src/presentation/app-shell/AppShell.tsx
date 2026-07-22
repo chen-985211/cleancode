@@ -136,7 +136,12 @@ export function AppShell({
   })
   useInitialWorkbenchLoad({ setCurrentWorkbench, setWorkbenches })
 
-  const { focusAgentConsole, focusTerminalBlock, focusWorkbenchNode } = useMinimapNodeFocus({
+  const {
+    cancelPendingWorkbenchInputFocus,
+    focusAgentConsole,
+    focusTerminalBlock,
+    focusWorkbenchNode
+  } = useMinimapNodeFocus({
     terminalBlocksById,
     terminalGroupsById,
     reactFlowInstanceRef,
@@ -146,6 +151,13 @@ export function AppShell({
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
   })
+  const activateWorkbenchNodeInputFromShortcut = useCallback(
+    (node: WorkbenchFlowNode): void => {
+      cancelPendingWorkbenchInputFocus()
+      activateWorkbenchNodeInput(node)
+    },
+    [cancelPendingWorkbenchInputFocus]
+  )
   const {
     dismissPortConflict,
     findTerminalBlockIdForSession,
@@ -348,7 +360,7 @@ export function AppShell({
     ? toAgentFlowNodeId(selectedAgentId)
     : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
   const shortcutNavigation = useApplicationShortcutNavigation({
-    activateWorkbenchNodeInput,
+    activateWorkbenchNodeInput: activateWorkbenchNodeInputFromShortcut,
     canvasSizeRef,
     currentWorkbench,
     getNodes: nodeStore.getNodes,

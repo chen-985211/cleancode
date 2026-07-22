@@ -11,6 +11,10 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useMinimapNodeFocus } from '../../../src/presentation/app-shell/useMinimapNodeFocus'
 
 describe('minimap node focus', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('uses the longer capped transition when a minimap terminal is far from the current view', () => {
     const setCenter = vi.fn(async () => true)
     const terminal = createTerminalBlock()
@@ -62,6 +66,41 @@ describe('minimap node focus', () => {
     expect(options.duration).toBeGreaterThanOrEqual(180)
     expect(options.duration).toBeLessThanOrEqual(300)
     expect(options.zoom).toBeCloseTo(0.4352, 4)
+  })
+
+  it('locates a minimap target without spatial motion when reduced motion is preferred', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        media: '(prefers-reduced-motion: reduce)',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }))
+    )
+    const setCenter = vi.fn(async () => true)
+    const terminal = createTerminalBlock()
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+
+    render(
+      <MinimapFocusHarness
+        instance={instance}
+        nodeId={terminal.id}
+        terminalBlocksById={new Map([[terminal.id, terminal]])}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
+
+    expect(setCenter).toHaveBeenCalledWith(4_200, 3_150, {
+      duration: 0,
+      interpolate: 'linear',
+      zoom: 1
+    })
   })
 
   it('activates xterm input after locating a terminal from the minimap', () => {
