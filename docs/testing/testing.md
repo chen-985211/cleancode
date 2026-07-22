@@ -77,6 +77,10 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
 
+主题静态门禁必须通过 `pnpm check:theme` 执行。除禁止生产 UI 在集中主题文件外写入颜色字面量外，它还必须校验由主题 CSS 确定性生成、供 Run 与 Presentation 共用的 canonical terminal palette，并拒绝缺失或陈旧生成物；显式生成入口是 `node scripts/check-theme.mjs --write-terminal-palette`，`tests/unit/support/check-theme.spec.ts` 使用生成、陈旧和合法 fixture 锁定边界。
+
+Agent Provider-neutral Presentation 门禁必须通过 `pnpm check:agent-provider-boundary` 执行。它必须从内建 contribution 的静态 descriptor 自动发现当前和未来 Provider ID，拒绝生产表现层中的品牌 ID 与具体 Provider infrastructure 引用，并在无法发现 ID 时失败关闭；`tests/unit/support/check-agent-provider-boundary.spec.ts` 锁定未知 Provider、TSX/CSS、import、legacy 例外和发现失败边界。Provider registry 与组件仍须分别使用行为测试证明未知 descriptor 能沿通用路径工作，静态门禁不能替代 capability 降级与 attach/retry 测试。
+
 `pnpm test` 必须按测试金字塔从低层到高层串行执行：
 
 ```txt

@@ -18,6 +18,18 @@ describe('Agent Provider registry', () => {
     })
   })
 
+  it('accepts a future Provider through the provider-neutral registry contract', async () => {
+    const fixture = createContribution('fixture-provider', 'Fixture Provider')
+    const registry = new AgentProviderRegistry([fixture])
+
+    expect(registry.listDescriptors()).toEqual([fixture.descriptor])
+    expect(registry.require('fixture-provider')).toBe(fixture)
+    await expect(registry.inspect('fixture-provider')).resolves.toMatchObject({
+      providerId: 'fixture-provider',
+      status: 'installed'
+    })
+  })
+
   it('parses a session reference through the owning Provider codec', () => {
     const codec = {
       parse: vi.fn((sessionRef) => ({ ...sessionRef, value: sessionRef.value.trim() }))

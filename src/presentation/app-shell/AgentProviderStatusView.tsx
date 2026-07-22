@@ -3,18 +3,23 @@ import { Check, CircleAlert, Copy, Download, Loader2, MonitorOff, RefreshCw } fr
 
 import type { AgentRuntimeSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentAttachOperation } from './useAgentSessionAttachment'
 import type { AgentProviderPanelState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
 
 export function AgentProviderStatusView({
+  attachment = { status: 'idle' },
   onNewConversation,
+  onRetryAttachment,
   onRetryInspection,
   onRetryRestore,
   providerName,
   runtime,
   state
 }: {
+  readonly attachment?: AgentAttachOperation
   readonly onNewConversation?: () => void
+  readonly onRetryAttachment?: () => void
   readonly onRetryInspection: () => void
   readonly onRetryRestore?: () => void
   readonly providerName: string
@@ -24,13 +29,44 @@ export function AgentProviderStatusView({
   const { t } = useI18n()
   if (runtime?.terminal.status === 'suspended') return null
 
+  if (attachment.status === 'failed') {
+    return (
+      <RuntimeNotice label={t('provider.attachFailed', { provider: providerName })} tone="warning">
+        <span className="agent-runtime-notice__actions">
+          <button
+            type="button"
+            aria-label={t('provider.retryAttach', { provider: providerName })}
+            onClick={onRetryAttachment}
+          >
+            <RefreshCw size={12} aria-hidden="true" />
+            <span>{t('provider.retry')}</span>
+          </button>
+        </span>
+      </RuntimeNotice>
+    )
+  }
+  if (attachment.status === 'pending') {
+    return (
+      <RuntimeNotice
+        label={t('provider.connecting', { provider: providerName })}
+        tone="neutral"
+        icon="checking"
+      />
+    )
+  }
+  if (attachment.status === 'measuring' && !runtime) {
+    return <RuntimeNotice label={t('provider.preparingTerminal')} tone="neutral" icon="checking" />
+  }
+
   if (runtime?.launch.status === 'failed' && runtime.launch.failureKind === 'restore') {
     return (
       <RuntimeNotice label={t('provider.restoreFailed')} tone="warning">
         <span className="agent-runtime-notice__actions">
-          <button type="button" onClick={onRetryRestore}>
-            {t('provider.retry')}
-          </button>
+          {onRetryRestore ? (
+            <button type="button" onClick={onRetryRestore}>
+              {t('provider.retry')}
+            </button>
+          ) : null}
           <button type="button" onClick={onNewConversation}>
             {t('provider.newConversation')}
           </button>
@@ -45,9 +81,11 @@ export function AgentProviderStatusView({
     return (
       <RuntimeNotice label={t('provider.sessionEnded', { provider: providerName })} tone="neutral">
         <span className="agent-runtime-notice__actions">
-          <button type="button" onClick={onRetryRestore}>
-            {t('provider.restart')}
-          </button>
+          {onRetryRestore ? (
+            <button type="button" onClick={onRetryRestore}>
+              {t('provider.restart')}
+            </button>
+          ) : null}
           <button type="button" onClick={onNewConversation}>
             {t('provider.newConversation')}
           </button>

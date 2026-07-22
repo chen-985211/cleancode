@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { canonicalTerminalPalettes } from '../../../src/contexts/run/application/dto/TerminalPalette.generated'
 import { TerminalViewport } from '../../../src/presentation/app-shell/TerminalViewport'
 import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
 import { effectiveThemeChangeEventName } from '../../../src/presentation/app-shell/themePreference'
@@ -322,19 +323,17 @@ describe('terminal viewport interaction', () => {
   })
 
   it('pins a CLI terminal to its source theme when the application theme changes', async () => {
-    document.documentElement.style.setProperty('--cc-terminal-dark-background', '#10151d')
-    document.documentElement.style.setProperty('--cc-terminal-light-background', '#f6f8fb')
     const { container } = renderTerminalViewport()
     const terminal = await waitForInstalledTerminal()
     const viewport = container.querySelector<HTMLElement>('.terminal-viewport')
 
-    expect(terminal.options.theme?.background).toBe('#10151d')
+    expect(terminal.options.theme?.background).toBe(canonicalTerminalPalettes.dark.background)
     expect(viewport?.dataset.terminalSourceTheme).toBe('dark')
 
     document.documentElement.dataset.theme = 'light'
     window.dispatchEvent(new CustomEvent(effectiveThemeChangeEventName))
 
-    expect(terminal.options.theme?.background).toBe('#10151d')
+    expect(terminal.options.theme?.background).toBe(canonicalTerminalPalettes.dark.background)
     expect(xtermMockState.terminals).toHaveLength(1)
   })
 

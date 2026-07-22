@@ -164,6 +164,7 @@
   --cc-terminal-dark-bright-magenta: #d7a8ff;
   --cc-terminal-dark-bright-cyan: #83e7f3;
   --cc-terminal-dark-bright-white: #ffffff;
+  --cc-terminal-theme-mismatch-filter: invert(1) hue-rotate(180deg);
 }
 
 :root,
@@ -223,4 +224,17 @@
   --cc-terminal-bright-magenta: var(--cc-terminal-dark-bright-magenta);
   --cc-terminal-bright-cyan: var(--cc-terminal-dark-bright-cyan);
   --cc-terminal-bright-white: var(--cc-terminal-dark-bright-white);
+}
+
+:root[data-theme='dark']
+  :is(
+    .agent-terminal-viewport[data-agent-terminal-source-theme='light'],
+    .terminal-viewport[data-terminal-source-theme='light']
+  ),
+:root[data-theme='light']
+  :is(
+    .agent-terminal-viewport[data-agent-terminal-source-theme='dark'],
+    .terminal-viewport[data-terminal-source-theme='dark']
+  ) {
+  filter: var(--cc-terminal-theme-mismatch-filter);
 }

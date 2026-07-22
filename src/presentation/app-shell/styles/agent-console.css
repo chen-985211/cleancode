@@ -4,7 +4,7 @@
   height: 100%;
   overflow: visible;
   border: 1px solid var(--cc-border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--cc-terminal-background);
   box-shadow: var(--cc-shadow-sm);
   transition:
@@ -136,6 +136,7 @@
 }
 
 .agent-console-actions__title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   border: 0;
@@ -154,7 +155,7 @@
 .agent-console-actions__title:focus-visible,
 .agent-console-actions__more:focus-visible,
 .agent-console-actions__editor input:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--cc-primary) 62%, transparent);
+  outline: 2px solid var(--cc-ring);
   outline-offset: 1px;
 }
 
@@ -212,6 +213,11 @@
   color: var(--cc-danger-strong);
 }
 
+.agent-console-actions__confirm button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
+}
+
 .agent-console__title-row,
 .agent-runtime-notice {
   display: flex;
@@ -233,14 +239,18 @@
 
 .agent-console__provider-controls {
   display: inline-flex;
+  max-width: min(55%, 260px);
   min-width: 0;
+  flex: 0 1 auto;
   align-items: center;
   gap: 6px;
 }
 
 .agent-console__provider-identity {
   display: inline-flex;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
   align-items: center;
   gap: 5px;
   color: var(--cc-muted);
@@ -249,7 +259,7 @@
   white-space: nowrap;
 }
 
-.agent-console__provider-identity > span {
+.agent-console__activity-indicator {
   width: 5px;
   height: 5px;
   flex: 0 0 auto;
@@ -257,18 +267,25 @@
   background: var(--cc-disabled);
 }
 
-.agent-console__provider-identity[data-activity='idle'] > span {
+.agent-console__provider-identity[data-activity='idle'] .agent-console__activity-indicator {
   background: var(--cc-success);
 }
 
-.agent-console__provider-identity[data-activity='working'] > span {
+.agent-console__provider-identity[data-activity='working'] .agent-console__activity-indicator {
   background: var(--cc-primary);
   box-shadow: 0 0 0 2px var(--cc-primary-ring);
 }
 
-.agent-console__provider-identity[data-activity='waiting_input'] > span,
-.agent-console__provider-identity[data-activity='waiting_approval'] > span {
+.agent-console__provider-identity[data-activity='waiting_input'] .agent-console__activity-indicator,
+.agent-console__provider-identity[data-activity='waiting_approval']
+  .agent-console__activity-indicator {
   background: var(--cc-warning);
+}
+
+.agent-console__provider-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .agent-console__terminal-shell {
@@ -322,17 +339,12 @@
   background: var(--cc-terminal-background);
 }
 
-:root[data-theme='dark'] .agent-terminal-viewport[data-agent-terminal-source-theme='light'],
-:root[data-theme='light'] .agent-terminal-viewport[data-agent-terminal-source-theme='dark'] {
-  filter: invert(1) hue-rotate(180deg);
-}
-
 .agent-terminal-fallback {
   display: grid;
   min-height: 0;
   flex: 1;
   grid-template-rows: minmax(0, 1fr) auto;
-  background: var(--cc-terminal);
+  background: var(--cc-terminal-background);
 }
 
 .agent-terminal-fallback pre {

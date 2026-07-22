@@ -9,6 +9,7 @@ import {
 } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { trapFocus } from './modalFocus'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
 
@@ -30,10 +31,15 @@ export function AgentConsoleActions({
   const [name, setName] = useState(agent.name)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const actionsRef = useRef<HTMLDivElement | null>(null)
+  const cancelRemoveRef = useRef<HTMLButtonElement | null>(null)
+  const confirmRemoveRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   useEffect(() => {
     if (mode !== 'menu') return undefined
+
+    menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
       if (!actionsRef.current?.contains(event.target as Node)) setMode('closed')
@@ -51,6 +57,14 @@ export function AgentConsoleActions({
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [mode])
+
+  useEffect(() => {
+    if (mode === 'remove') cancelRemoveRef.current?.focus()
+  }, [mode])
+
+  useEffect(() => {
+    if (mode === 'remove' && isSubmitting) confirmRemoveRef.current?.focus()
+  }, [isSubmitting, mode])
 
   const submitRename = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
@@ -77,6 +91,11 @@ export function AgentConsoleActions({
   const cancelRename = (): void => {
     setName(agent.name)
     setMode('closed')
+  }
+  const cancelRemove = (): void => {
+    if (isSubmitting) return
+    setMode('closed')
+    menuTriggerRef.current?.focus()
   }
   const startRename = (): void => {
     setName(agent.name)
@@ -150,6 +169,8 @@ export function AgentConsoleActions({
               className="agent-console-actions__menu nodrag"
               role="menu"
               aria-label={t('agent.actions', { agentName: agent.name })}
+              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+              ref={menuRef}
             >
               <button type="button" role="menuitem" onClick={startRename}>
                 <Pencil size={14} aria-hidden="true" />
@@ -170,12 +191,28 @@ export function AgentConsoleActions({
       ) : null}
       {mode === 'remove' ? (
         <div
+          aria-busy={isSubmitting}
           className="agent-console-actions__confirm nodrag"
+          ref={confirmRemoveRef}
           role="dialog"
+          tabIndex={-1}
           aria-label={t('agent.remove')}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !isSubmitting) {
+              event.stopPropagation()
+              cancelRemove()
+              return
+            }
+            trapFocus(event, event.currentTarget)
+          }}
         >
           <span>{t('agent.removeDescription')}</span>
-          <button type="button" onClick={() => setMode('closed')}>
+          <button
+            ref={cancelRemoveRef}
+            type="button"
+            disabled={isSubmitting}
+            onClick={cancelRemove}
+          >
             {t('common.cancel')}
           </button>
           <button type="button" onClick={() => void removeAgent()} disabled={isSubmitting}>
@@ -185,4 +222,23 @@ export function AgentConsoleActions({
       ) : null}
     </div>
   )
+}
+
+function moveMenuFocus(event: ReactKeyboardEvent<HTMLElement>, menu: HTMLElement | null): void {
+  if (!menu || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  if (items.length === 0) return
+  event.preventDefault()
+  const currentIndex = items.findIndex((item) => item === document.activeElement)
+  if (event.key === 'Home') {
+    items[0]?.focus()
+    return
+  }
+  if (event.key === 'End') {
+    items.at(-1)?.focus()
+    return
+  }
+  const direction = event.key === 'ArrowDown' ? 1 : -1
+  const nextIndex = (Math.max(currentIndex, 0) + direction + items.length) % items.length
+  items[nextIndex]?.focus()
 }

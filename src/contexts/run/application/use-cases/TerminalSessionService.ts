@@ -31,6 +31,7 @@ import {
   TerminalForegroundJobCoordinator,
   type LaunchForegroundJobCommand
 } from '../services/TerminalForegroundJobCoordinator'
+import { createTerminalCapabilityEnvironment } from '../services/TerminalCapabilityEnvironment'
 import type {
   TerminalRuntimeProviderPort,
   TerminalRuntimeRecoveryResult
@@ -358,7 +359,7 @@ export class TerminalSessionService {
         launchCommand,
         launchMode: command.launchMode,
         sessionKind: session.kind,
-        environment,
+        environment: createTerminalCapabilityEnvironment(environment, session.terminalSourceTheme),
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         onOutput: (event) => {

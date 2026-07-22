@@ -5,7 +5,10 @@ import type {
   SequencedTerminalOutput,
   TerminalModelPort
 } from '../../../../src/contexts/run/application/ports/TerminalModelPort'
-import type { TerminalProcessPort } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
+import type {
+  LaunchForegroundJobProcessCommand,
+  TerminalProcessPort
+} from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 import type { TerminalRunScope } from '../../../../src/contexts/run/domain/value-objects/TerminalRunScope'
 
@@ -23,6 +26,50 @@ describe('terminal session model lifecycle', () => {
 
     expect(session.terminalSourceTheme).toBe('light')
     expect(models.creates[0]).toMatchObject({ terminalSourceTheme: 'light' })
+  })
+
+  it('applies one Run-owned capability environment to terminal start and foreground jobs', async () => {
+    const processes = new RecordingProcessPort()
+    const service = new TerminalSessionService(processes)
+    const session = await service.start({
+      ...startCommand(),
+      owner: { id: 'agent-1', kind: 'agent' },
+      terminalSourceTheme: 'light',
+      environment: {
+        term: 'provider-terminal',
+        CoLoRtErM: 'provider-color',
+        TERM_PROGRAM: 'provider-program',
+        colorfgbg: 'provider-palette',
+        NO_COLOR: '1',
+        PROVIDER_TOKEN: 'provider-token'
+      }
+    })
+
+    service.launchForegroundJob({
+      args: ['--resume', 'thread-1'],
+      environment: {
+        Term: 'provider-terminal',
+        colorterm: 'provider-color',
+        term_program: 'provider-program',
+        ColorFgBg: 'provider-palette',
+        NO_COLOR: '1',
+        PROVIDER_TOKEN: 'provider-token'
+      },
+      executable: 'provider-cli',
+      onExit: () => undefined,
+      sessionId: session.id
+    })
+
+    const expectedEnvironment = {
+      NO_COLOR: '1',
+      PROVIDER_TOKEN: 'provider-token',
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      TERM_PROGRAM: 'cleancode',
+      COLORFGBG: '0;15'
+    }
+    expect(processes.starts[0]?.environment).toEqual(expectedEnvironment)
+    expect(processes.foregroundLaunches[0]?.environment).toEqual(expectedEnvironment)
   })
 
   it('routes valid PTY output through one authoritative model before application consumers', async () => {
@@ -173,6 +220,7 @@ describe('terminal session model lifecycle', () => {
 
 class RecordingProcessPort implements TerminalProcessPort {
   readonly starts: Parameters<TerminalProcessPort['start']>[0][] = []
+  readonly foregroundLaunches: LaunchForegroundJobProcessCommand[] = []
   readonly writes: Array<{ readonly sessionId: string; readonly input: string }> = []
   readonly flowControl: Array<{ readonly sessionId: string; readonly isPaused: boolean }> = []
   readonly workingDirectories = new Map<string, string>()
@@ -180,6 +228,10 @@ class RecordingProcessPort implements TerminalProcessPort {
   async start(command: Parameters<TerminalProcessPort['start']>[0]) {
     this.starts.push(command)
     return { processId: 101 }
+  }
+
+  launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
+    this.foregroundLaunches.push(command)
   }
 
   write(sessionId: string, input: string): void {

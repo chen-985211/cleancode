@@ -88,7 +88,8 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 - `check:deps`：检查精确依赖版本。
 - `check:max-lines`：限制代码文件行数。
 - `check:logging`：检查日志、错误码和 IPC 错误边界。
-- `check:theme`：检查集中主题与语义颜色 token。
+- `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
+- `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 

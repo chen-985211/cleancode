@@ -3,6 +3,7 @@ import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import { ForegroundJob, type ForegroundJobSnapshot } from '../../domain/aggregates/ForegroundJob'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalProcessPort } from '../ports/TerminalProcessPort'
+import { createTerminalCapabilityEnvironment } from './TerminalCapabilityEnvironment'
 
 export interface LaunchForegroundJobCommand {
   readonly args: readonly string[]
@@ -60,7 +61,10 @@ export class TerminalForegroundJobCoordinator {
     try {
       launch.call(this.terminalProcessPort, {
         args: command.args,
-        environment: command.environment ?? {},
+        environment: createTerminalCapabilityEnvironment(
+          command.environment,
+          session.terminalSourceTheme
+        ),
         executable: command.executable,
         generation,
         launchId: identity.launchId,

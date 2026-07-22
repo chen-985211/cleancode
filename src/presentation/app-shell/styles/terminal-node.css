@@ -457,11 +457,6 @@
   background: var(--cc-terminal-background);
 }
 
-:root[data-theme='dark'] .terminal-viewport[data-terminal-source-theme='light'],
-:root[data-theme='light'] .terminal-viewport[data-terminal-source-theme='dark'] {
-  filter: invert(1) hue-rotate(180deg);
-}
-
 .terminal-search {
   position: absolute;
   z-index: 4;

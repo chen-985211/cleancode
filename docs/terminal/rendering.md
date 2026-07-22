@@ -125,6 +125,12 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 
 Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色背景、composer 和状态区域。因此，“当前应用想显示的主题”和“仍在运行的 PTY 已经采用的源 palette”是两个不同事实。主题切换只改变前者，不得假定子进程会同步改变后者。
 
+排查不同 Agent CLI 的外观时，还要把三层事实分开：Run 提供 PTY 与终端能力环境，xterm/headless model 共同解释 canonical source palette，Provider CLI 再根据终端查询、自己的配置和版本输出 ANSI 或真彩色 TUI。前两层属于 cleancode 宿主契约，最后一层属于外部 CLI；宿主 palette 一致只能保证相同的默认颜色语义和可读基础，不能保证 Codex、Claude Code、OpenCode 的 composer、品牌强调色或布局相同。不得为了消除这类差异在 Presentation 添加 Provider ID 分支或修改用户全局 CLI 配置。
+
+Run 为普通 terminal 和 Agent foreground launch 都固定 `TERM=xterm-256color`、`COLORTERM=truecolor`、`TERM_PROGRAM=cleancode`，并根据 `terminalSourceTheme` 设置 `COLORFGBG`；Provider launch 环境中的同名键会被宿主值替换，`NO_COLOR` 则原样保留。出现同一个 CLI 在 shell 启动与应用启动时颜色能力不同的问题时，先记录这组最终子进程环境，再检查 CLI 自己的主题配置，不要只比较宿主进程继承到的环境。
+
+完整 canonical terminal palette 的手写来源只有 [`theme.css`](../../src/presentation/app-shell/styles/theme.css)。`node scripts/check-theme.mjs --write-terminal-palette` 生成 [`TerminalPalette.generated.ts`](../../src/contexts/run/application/dto/TerminalPalette.generated.ts)，renderer xterm 和隐藏 headless model 都消费这一产物；`pnpm check:theme` 在生成文件缺失、手改或落后于 CSS 时失败。这样 OSC 10/11 回答与可见 xterm 不再各自维护一组近似色值。
+
 Agent terminal 由 Run 承载，并在首次附加时固定 `terminalSourceTheme`。同一 terminal 再次附加时，renderer 发送当前有效主题作为新运行时提议，Run 为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；重新启动 Provider 或开始新对话只替换 terminal 内的 launch，不替换 terminal，也不改变 source theme。应用重启建立新 terminal 时才可以采用新的当前主题。
 
 Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequence 和 attach/detach 协议。工作区导航可以销毁 renderer xterm；隐藏期间 PTY 输出继续进入 Run 的 headless 模型，返回时创建新 surface，先注册定向视图，再恢复完整 snapshot 并接续严格连续的输出事件。不得依赖 renderer 常驻，也不得把截断输出尾部重新送入 parser。
@@ -132,6 +138,12 @@ Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequenc
 Provider launch replacement 不会重置 surface 或终端模型。只有 Agent terminal identity 真正变化时才按新 snapshot 恢复视图；旧 identity、旧 `viewId` 或 sequence 缺口都必须触发拒绝或有界重试。Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放 terminal、模型与视图租约；普通视图卸载只释放可丢弃 surface。
 
 [`agent-terminal-view.spec.tsx`](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 证明 Agent 使用共享 snapshot/sequence 视图协议、定向输出、输入、resize 和清理；[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明共享 registry 的精确 `viewId` 路由；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和 ANSI 输出证明工作区往返、源主题固定与最终像素明暗。
+
+### Agent attach 失败与重试
+
+空白终端不一定是 xterm 渲染失败。Agent 首次进入工作区时先等待有效 terminal 测量，再由 [`useAgentSessionAttachment.ts`](../../src/presentation/app-shell/useAgentSessionAttachment.ts) 发起 session attach；这两个阶段分别投影为 `measuring` 和 `pending`。attach 拒绝后进入 `failed` 并显示通用重试，不能把错误吞掉后留下一个看似正常的空 surface。
+
+同一工作区的重试是 single-flight。重新启动或新对话 attach 失败时，hook 保留原 terminal binding，输入仍指向原 session；切换作用域会使旧请求失效，迟到结果不能覆盖新工作区。排障时分别记录测量 key、attach operation、session binding 和 workspace generation，避免把 Provider launch 失败、Agent session attach 失败与后续 `AttachView` snapshot 恢复失败混为同一问题。[`agent-console.attach-lifecycle.spec.tsx`](../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx) 覆盖失败可见、重复重试、既有 binding 保留和迟到作用域隔离。
 
 ## 普通终端的 worktree 重挂载
 
@@ -382,18 +394,21 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 ### Unit：证明异步生命周期
 
-[agent-terminal-view.spec.tsx](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 覆盖共享视图的尺寸、输入和恢复协议；[agent-console.terminal-sizing.spec.tsx](../../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖 attach 期间的异步生命周期：
+[agent-terminal-view.spec.tsx](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 覆盖共享视图的尺寸、输入和恢复协议；[agent-console.terminal-sizing.spec.tsx](../../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖首次 attach 期间的尺寸生命周期，[agent-console.attach-lifecycle.spec.tsx](../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx) 覆盖失败与重试：
 
 - 首次有效测量前不 attach。
 - attach pending 期间的新尺寸会在 session 返回后同步。
 - 重复 fit 不会重复 attach 或重复 resize。
 - 旧工作区迟到的 attach 结果不会绑定到当前 surface。
+- attach 失败保持可见，重复重试 single-flight，替代 attach 失败保留原 binding。
 
 这些行为可以用 fake xterm、受控 `ResizeObserver` 和 deferred Promise 稳定证明，不应下放到高成本 E2E。
 
 ### 其余 Unit、Integration 和 Contract：证明边界传递
 
 - [agent.session-service.spec.ts](../../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
+- [run.terminal-capability-environment.spec.ts](../../tests/unit/contexts/run/run.terminal-capability-environment.spec.ts) 证明保留环境键、source-theme `COLORFGBG` 和 `NO_COLOR` 透传策略；[run.pty-terminal.spec.ts](../../tests/integration/contexts/run/run.pty-terminal.spec.ts) 再以真实 POSIX PTY 证明普通启动与 foreground launch 都收到同一 profile。
+- [run.terminal-source-palette.spec.ts](../../tests/unit/contexts/run/run.terminal-source-palette.spec.ts)、[terminal-theme.palette.spec.ts](../../tests/unit/presentation/terminal-theme.palette.spec.ts) 和 [check-theme.spec.ts](../../tests/unit/support/check-theme.spec.ts) 分别证明隐藏 OSC、renderer xterm 与生成门禁共用 canonical palette。
 - [agent.run-terminal-provider.spec.ts](../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts) 使用真实 Run terminal 和本地 fake Provider，证明 Agent CLI 启动、输入输出、`Ctrl+C` 与退出回到 shell。
 - [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
 - [RunAgentTerminalRuntimeAdapter.ts](../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts) 把 Agent 的 attach/resize 端口转交给 Run；[NodePtyTerminalProcessAdapter.ts](../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter.ts) 最终把行列传给 `node-pty.spawn` 和 PTY `resize`。
@@ -434,6 +449,9 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [ ] 首次 attach 的 `columns`、`rows` 等于当前 xterm 实测值。
 - [ ] resize 不创建第二个 PTY，重复尺寸不重复发送。
 - [ ] attach pending 和快速切换工作区都不会产生旧 session 污染。
+- [ ] attach 失败可见且可重试；替代 attach 失败不丢失原 terminal binding。
+- [ ] 子进程收到 Run 保留的 `TERM`、`COLORTERM`、`TERM_PROGRAM` 和 source-theme `COLORFGBG`，并保留明确的 `NO_COLOR`。
+- [ ] 修改终端色板后重新生成 palette，隐藏 OSC 与可见 xterm 使用同一份生成值，`pnpm check:theme` 通过。
 - [ ] 足量 scrollback 下滚动条贴住用户看到的右侧外框。
 - [ ] 单个与重复 `，。！？（）【】` 的宽度保持稳定。
 - [ ] DOM 行尾文本完整，最后字形 `right <= row.right`。

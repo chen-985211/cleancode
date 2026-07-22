@@ -14,6 +14,14 @@ export function collectThemeViolations(options?: {
   readonly cwd?: string
 }): Promise<ThemeViolation[]>
 
+export function collectTerminalPaletteViolations(options?: {
+  readonly cwd?: string
+}): Promise<ThemeViolation[]>
+
+export function createTerminalPaletteModule(themeSource: string): string
+
+export function writeTerminalPaletteModule(options?: { readonly cwd?: string }): void
+
 export function runThemeGate(options?: {
   readonly cwd?: string
   readonly logger?: ThemeGateLogger

@@ -1,8 +1,12 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { collectThemeViolations } from '../../../scripts/check-theme.mjs'
+import {
+  collectTerminalPaletteViolations,
+  collectThemeViolations,
+  createTerminalPaletteModule
+} from '../../../scripts/check-theme.mjs'
 
 describe('theme quality gate', () => {
   it('flags color literals in production UI CSS, TSX, and SVG files', async () => {
@@ -57,5 +61,65 @@ describe('theme quality gate', () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
+  })
+
+  it('generates the canonical terminal palette deterministically from the theme stylesheet', async () => {
+    const source = await readFile(
+      join(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', 'theme.css'),
+      'utf8'
+    )
+
+    const generated = createTerminalPaletteModule(source)
+
+    expect(generated).toContain("background: '#f7f9fc'")
+    expect(generated).toContain("foreground: '#d6dee8'")
+    expect(generated).toContain("selectionBackground: '#2d415c'")
+    expect(createTerminalPaletteModule(source)).toBe(generated)
+    expect(await collectTerminalPaletteViolations()).toEqual([])
+  })
+
+  it('flags a missing or stale generated terminal palette', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-theme-palette-'))
+
+    try {
+      const themeDirectory = join(directory, 'src', 'presentation', 'app-shell', 'styles')
+      const generatedDirectory = join(directory, 'src', 'contexts', 'run', 'application', 'dto')
+      await mkdir(themeDirectory, { recursive: true })
+      await mkdir(generatedDirectory, { recursive: true })
+      await writeFile(
+        join(themeDirectory, 'theme.css'),
+        await readFile(
+          join(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', 'theme.css'),
+          'utf8'
+        )
+      )
+
+      expect(await collectTerminalPaletteViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ rule: 'terminal-palette-generated' })
+      ])
+
+      await writeFile(join(generatedDirectory, 'TerminalPalette.generated.ts'), '// stale\n')
+
+      expect(await collectTerminalPaletteViolations({ cwd: directory })).toEqual([
+        expect.objectContaining({ rule: 'terminal-palette-generated' })
+      ])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a runtime CSS alias that drifts from its source-theme palette', async () => {
+    const source = await readFile(
+      join(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', 'theme.css'),
+      'utf8'
+    )
+    const driftedSource = source.replace(
+      '--cc-terminal-background: var(--cc-terminal-dark-background);',
+      '--cc-terminal-background: var(--cc-terminal-light-background);'
+    )
+
+    expect(() => createTerminalPaletteModule(driftedSource)).toThrow(
+      'Expected exactly one light terminal background alias.'
+    )
   })
 })

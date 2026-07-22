@@ -56,6 +56,8 @@
 - `resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
 - `AgentLaunchArtifactScope` 在资源创建后立即接管 reporter、临时配置和插件，按 LIFO 清理；并发清理合并为同一操作，成功项只清理一次，失败项保留给下次重试。
 
+Provider contribution 只拥有对应 CLI 的检测、结构化启动参数、进程级环境、正式恢复入口、结构化 telemetry 和本次 launch 的临时配置。它不得修改用户的全局 CLI 配置，也不得取得 Agent terminal 的 source palette、xterm surface 或视图生命周期所有权。终端宿主能力由 Run 统一提供；CLI 自己选择的 ANSI/真彩色语义、品牌色、TUI 布局和用户保存的 CLI 主题仍由对应 Provider 与用户拥有。共享同一个宿主终端不等于三方 CLI 必须生成相同像素。
+
 当前内建 Provider：
 
 | Provider    | 恢复 | 身份捕获 | 活动状态 | CleanCode MCP | 注入与回报方式                                                                                  |
@@ -64,7 +66,7 @@
 | Claude Code | 是   | 是       | 是       | `best_effort` | 首次用户输入确认 session ID、Hooks、环境变量 token 和 launch 临时 MCP/settings                  |
 | OpenCode    | 是   | 是       | 是       | `best_effort` | `--session`、插件事件、合并 `OPENCODE_CONFIG_CONTENT`、远程 MCP 环境变量引用和临时 instructions |
 
-增加基础 Agent CLI 时，只需在 Provider 模块实现 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。可选能力通过 contribution 增加；不得在 Agent domain、Run domain、通用 IPC 或 `AgentConsole` 中按 Provider ID 分支。
+增加基础 Agent CLI 时，只需在 Provider 模块实现 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。任意已注册 descriptor 都必须沿同一 Provider-neutral IPC 和 Presentation 投影；新增 Provider 不得要求修改 `AgentConsole` 或其他表现层组件。可选能力通过 contribution 增加；确需新的通用用户能力时，必须先扩展 capability 契约，并让所有现有 Provider 明确声明支持或诚实降级，不得在 Agent domain、Run domain、通用 IPC 或 Presentation 中按 Provider ID 分支。
 
 ## 分支与目录隔离
 
@@ -85,6 +87,8 @@
 5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域；registration handle 精确拥有这一代注册，旧 handle 的释放或回调不能影响替代注册。
 6. Provider 生成启动计划；Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`。
 7. Provider 正式报告 session ref 或 activity 时，只接受仍匹配当前 Agent runtime session 和 Provider launch generation 的回调；尚未产生可恢复对话的启动事件不得提前建立稳定绑定。`required` MCP 还要完成认证后的 `initialize` + `notifications/initialized` 握手才进入 running；`best_effort` Provider 可以在 MCP 仍初始化时运行，但失败必须单独投影。
+
+Renderer 将首次 attach、重新启动和新对话请求投影为独立的 `measuring / pending / failed` 操作状态，不用 `null session` 冒充失败含义。失败必须保留可重试提示；同一作用域的重复重试只能形成一个在途 attach。已有 terminal binding 在重新启动或新对话 attach 失败时继续可用，旧工作区迟到的成功或失败结果不得覆盖当前作用域。该操作状态是 Presentation 的易失事实，不进入 `AgentRuntimeSnapshot`、持久化 schema 或 Provider capability。
 
 Provider CLI 自然退出或处理 `Ctrl+C` 后，Agent launch 状态变为 `exited`、activity 变为 `unavailable`，停止新的 MCP 调用并释放 launch 临时资源；Run terminal、权威屏幕和 shell 保留。用户可以继续使用 shell、恢复当前对话或开始新对话。shell/PTY 自身退出才清空 terminal identity 并使整个运行时不可输入。
 
@@ -118,15 +122,15 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 
 ## 实现入口
 
-| 层级          | 入口                                                                                                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Domain        | [`AgentSession.ts`](../../../src/contexts/agent/domain/aggregates/AgentSession.ts)、[`ProviderSessionRef.ts`](../../../src/contexts/agent/domain/value-objects/ProviderSessionRef.ts)                              |
-| Application   | [`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts)、[`AgentProviderContribution.ts`](../../../src/contexts/agent/application/ports/AgentProviderContribution.ts) |
-| Registry      | [`AgentProviderRegistry.ts`](../../../src/contexts/agent/application/services/AgentProviderRegistry.ts)                                                                                                            |
-| Persistence   | [`FileSystemAgentSessionRepository.ts`](../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository.ts)                                                                                |
-| Run adapter   | [`RunAgentTerminalRuntimeAdapter.ts`](../../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts)                                                                                            |
-| Providers     | [`providers`](../../../src/contexts/agent/infrastructure/providers)                                                                                                                                                |
-| Platform / UI | [`agentIpcHandlers.ts`](../../../src/platform/electron-main/agentIpcHandlers.ts)、[`AgentConsole.tsx`](../../../src/presentation/app-shell/AgentConsole.tsx)                                                       |
+| 层级          | 入口                                                                                                                                                                                                                                                             |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain        | [`AgentSession.ts`](../../../src/contexts/agent/domain/aggregates/AgentSession.ts)、[`ProviderSessionRef.ts`](../../../src/contexts/agent/domain/value-objects/ProviderSessionRef.ts)                                                                            |
+| Application   | [`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts)、[`AgentProviderContribution.ts`](../../../src/contexts/agent/application/ports/AgentProviderContribution.ts)                                               |
+| Registry      | [`AgentProviderRegistry.ts`](../../../src/contexts/agent/application/services/AgentProviderRegistry.ts)                                                                                                                                                          |
+| Persistence   | [`FileSystemAgentSessionRepository.ts`](../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository.ts)                                                                                                                              |
+| Run adapter   | [`RunAgentTerminalRuntimeAdapter.ts`](../../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts)                                                                                                                                          |
+| Providers     | [`providers`](../../../src/contexts/agent/infrastructure/providers)                                                                                                                                                                                              |
+| Platform / UI | [`agentIpcHandlers.ts`](../../../src/platform/electron-main/agentIpcHandlers.ts)、[`AgentConsole.tsx`](../../../src/presentation/app-shell/AgentConsole.tsx)、[`useAgentSessionAttachment.ts`](../../../src/presentation/app-shell/useAgentSessionAttachment.ts) |
 
 ## 验证矩阵
 
@@ -134,6 +138,8 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 | ----------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit        | 固定 Provider、session ref、registry、统一 runtime、MCP readiness 与绑定降级                                 | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.provider-registry.spec.ts`](../../../tests/unit/contexts/agent/agent.provider-registry.spec.ts)、[`agent.unified-runtime-readiness.spec.ts`](../../../tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts)                                                                                                                                                                                            |
 | Unit        | Codex、Claude Code 和 OpenCode 启动参数、Hook/插件、MCP、平台安装配方与 launch artifact 重试清理             | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts) |
+| Unit / UI   | 未知 Provider descriptor 的通用投影、capability 降级、attach 失败保留、single-flight 重试和迟到作用域隔离    | [`agent-console.provider-neutral.spec.tsx`](../../../tests/unit/presentation/agent-console.provider-neutral.spec.tsx)、[`agent-provider-picker-dialog.spec.tsx`](../../../tests/unit/presentation/agent-provider-picker-dialog.spec.tsx)、[`agent-console.attach-lifecycle.spec.tsx`](../../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx)                                                                                                                                                                    |
+| Unit / Gate | 自动发现内建 Provider，并拒绝 Presentation 中的具体 Provider infrastructure 引用或品牌 ID                    | [`check-agent-provider-boundary.spec.ts`](../../../tests/unit/support/check-agent-provider-boundary.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Integration | schema 迁移、真实 Agent terminal、CLI 退出回 shell 与重复 launch                                             | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.run-terminal-provider.spec.ts`](../../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts)                                                                                                                                                                                                                                                                                         |
 | Platform    | macOS/Linux POSIX PTY 与 Windows `.cmd`/ConPTY 的 Provider 检测、`Ctrl+C`、退出码、重复 launch 和 shell 存活 | [`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`agent.windows-provider-cli.spec.ts`](../../../tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts)、[`run.windows-agent-pty.spec.ts`](../../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts)                                                                                                                                                                                                     |
 | Contract    | Provider-neutral Agent IPC 与共享终端视图身份                                                                | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)、[`run.terminal-view-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-view-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                             |
@@ -141,4 +147,4 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 
 ## 维护规则
 
-改变 Agent 身份、Provider、session ref、launch generation、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、migration、Provider contract、测试和本文。新增 Provider 不得修改核心控制流；如果需要新通用能力，应先扩展 capability 契约并证明现有 Provider 的诚实降级。
+改变 Agent 身份、Provider、session ref、launch generation、attach/retry、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、migration、Provider contract、测试和本文。新增 Provider 不得修改核心控制流；如果需要新通用能力，应先扩展 capability 契约并证明现有 Provider 的诚实降级。

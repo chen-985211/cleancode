@@ -89,9 +89,10 @@
 }
 
 .agent-provider-picker__option:focus-visible {
-  outline: none;
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
   border-color: var(--cc-primary);
-  box-shadow: 0 0 0 3px var(--cc-primary-ring);
+  box-shadow: none;
 }
 
 .agent-provider-picker__option-icon {
@@ -116,6 +117,8 @@
 }
 
 .agent-provider-picker__option-title strong {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   font-size: 13px;
   text-overflow: ellipsis;
@@ -129,7 +132,7 @@
 }
 
 .agent-provider-picker__option-title small[data-status='installed'] {
-  color: var(--cc-success);
+  color: var(--cc-success-strong);
 }
 
 .agent-provider-picker__capabilities {
@@ -177,4 +180,9 @@
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
+}
+
+.agent-provider-picker__footer button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
 }

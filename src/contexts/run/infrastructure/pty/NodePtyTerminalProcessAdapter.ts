@@ -16,6 +16,11 @@ import type {
   TerminalProcessHandle,
   TerminalProcessPort
 } from '../../application/ports/TerminalProcessPort'
+import {
+  createTerminalCapabilityEnvironment,
+  terminalEmulationName
+} from '../../application/services/TerminalCapabilityEnvironment'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalProcessLaunch } from './TerminalShellCommand'
 import {
   acceptForegroundJobOutput,
@@ -40,11 +45,11 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const shell = command.shell || getDefaultShell()
     const launch = createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
     const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
-      name: 'xterm-256color',
+      name: terminalEmulationName,
       cols: command.columns,
       rows: command.rows,
       cwd: command.workingDirectory,
-      env: createProcessEnvironment(command.environment)
+      env: createProcessEnvironment(command.environment, command.terminalSourceTheme)
     })
 
     let resolveExit: () => void = () => undefined
@@ -56,6 +61,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       process: ptyProcess,
       shell,
       scope: command.scope,
+      terminalSourceTheme: command.terminalSourceTheme ?? 'dark',
       exited,
       stopPromise: null
     }
@@ -122,10 +128,19 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         'A foreground job is already active in this terminal process.'
       )
     }
-    const control = createForegroundJobShellControl(command, {
-      platform: platform(),
-      shellExecutable: terminalProcess.shell
-    })
+    const control = createForegroundJobShellControl(
+      {
+        ...command,
+        environment: createTerminalCapabilityEnvironment(
+          command.environment,
+          terminalProcess.terminalSourceTheme
+        )
+      },
+      {
+        platform: platform(),
+        shellExecutable: terminalProcess.shell
+      }
+    )
     terminalProcess.foregroundJob = control
     terminalProcess.process.write(createForegroundJobProbe(control))
   }
@@ -195,6 +210,7 @@ interface ManagedTerminalProcess {
   readonly process: IPty
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
+  readonly terminalSourceTheme: TerminalSourceTheme
   readonly exited: Promise<void>
   stopPromise: Promise<void> | null
 }
@@ -204,7 +220,8 @@ function getDefaultShell(): string {
 }
 
 function createProcessEnvironment(
-  environment: Readonly<Record<string, string>> | undefined
+  environment: Readonly<Record<string, string>> | undefined,
+  terminalSourceTheme: TerminalSourceTheme = 'dark'
 ): Record<string, string> {
   const inheritedEnvironment = Object.fromEntries(
     Object.entries(process.env).filter((entry): entry is [string, string] => {
@@ -212,7 +229,8 @@ function createProcessEnvironment(
     })
   )
 
-  for (const [name, value] of Object.entries(environment ?? {})) {
+  const terminalEnvironment = createTerminalCapabilityEnvironment(environment, terminalSourceTheme)
+  for (const [name, value] of Object.entries(terminalEnvironment)) {
     if (platform() === 'win32') {
       const inheritedName = Object.keys(inheritedEnvironment).find(
         (candidate) => candidate.toLowerCase() === name.toLowerCase()

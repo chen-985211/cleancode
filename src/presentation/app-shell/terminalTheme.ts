@@ -1,29 +1,7 @@
 import type { ITheme } from '@xterm/xterm'
 
+import { canonicalTerminalPalettes } from '../../contexts/run/application/dto/TerminalPalette.generated'
 import type { EffectiveTheme } from './themePreference'
-
-const terminalThemeVariables = {
-  background: '--cc-terminal-background',
-  black: '--cc-terminal-black',
-  blue: '--cc-terminal-blue',
-  brightBlack: '--cc-terminal-bright-black',
-  brightBlue: '--cc-terminal-bright-blue',
-  brightCyan: '--cc-terminal-bright-cyan',
-  brightGreen: '--cc-terminal-bright-green',
-  brightMagenta: '--cc-terminal-bright-magenta',
-  brightRed: '--cc-terminal-bright-red',
-  brightWhite: '--cc-terminal-bright-white',
-  brightYellow: '--cc-terminal-bright-yellow',
-  cursor: '--cc-terminal-cursor',
-  cyan: '--cc-terminal-cyan',
-  foreground: '--cc-terminal-foreground',
-  green: '--cc-terminal-green',
-  magenta: '--cc-terminal-magenta',
-  red: '--cc-terminal-red',
-  selectionBackground: '--cc-terminal-selection',
-  white: '--cc-terminal-white',
-  yellow: '--cc-terminal-yellow'
-} as const satisfies Partial<Record<keyof ITheme, string>>
 
 export function readCanonicalTerminalSearchTheme(theme: EffectiveTheme): {
   readonly active: string
@@ -52,27 +30,11 @@ function readTerminalSearchThemeVariables(
 }
 
 export function readCanonicalTerminalTheme(theme: EffectiveTheme): ITheme {
-  return readTerminalThemeVariables(document.documentElement, (variable) =>
-    variable.replace('--cc-terminal-', `--cc-terminal-${theme}-`)
-  )
+  return canonicalTerminalPalettes[theme]
 }
 
 export function readTerminalSourceTheme(
   root: HTMLElement = document.documentElement
 ): EffectiveTheme {
   return root.dataset.theme === 'light' ? 'light' : 'dark'
-}
-
-function readTerminalThemeVariables(
-  root: HTMLElement,
-  resolveVariable: (variable: string) => string
-): ITheme {
-  const styles = getComputedStyle(root)
-
-  return Object.fromEntries(
-    Object.entries(terminalThemeVariables).map(([key, variable]) => [
-      key,
-      styles.getPropertyValue(resolveVariable(variable)).trim()
-    ])
-  ) as ITheme
 }

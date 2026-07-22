@@ -372,6 +372,8 @@ Large Change 或运行时风险变更必须显式检查以下事项，并在最�
 
 主题静态门禁由 `pnpm check:theme` 执行；检查范围、允许项和可执行规则以 `scripts/check-theme.mjs` 为准。
 
+Agent Provider-neutral Presentation 静态门禁由 `pnpm check:agent-provider-boundary` 执行；它从内建 contribution descriptor 自动发现 Provider ID，并阻止生产表现层引用具体 Provider infrastructure 或写入品牌 ID。检查范围和精确 legacy 例外以 `scripts/check-agent-provider-boundary.mjs` 为准。
+
 国际化静态门禁由 `pnpm check:i18n` 执行；文案规则由 [国际化规范](../i18n/README.md) 维护，可执行检查以 `scripts/check-i18n.mjs` 为准。
 
 开发协作 AI 不得绕过失败的质量门禁。若门禁失败，必须先修复失败原因，再重新运行门禁。

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
+    "check:agent-provider-boundary": "node scripts/check-agent-provider-boundary.mjs",
     "check:deps": "node scripts/check-exact-deps.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
@@ -22,7 +23,7 @@
     "lint": "eslint . --max-warnings=0",
     "lint:staged": "lint-staged",
     "prepare": "husky",
-    "pre-commit": "pnpm check:deps && pnpm check:docs && pnpm check:max-lines && pnpm check:logging && pnpm check:theme && pnpm check:i18n && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm knip",
+    "pre-commit": "pnpm check:deps && pnpm check:docs && pnpm check:max-lines && pnpm check:logging && pnpm check:agent-provider-boundary && pnpm check:theme && pnpm check:i18n && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm depcruise && pnpm knip",
     "typecheck": "tsc --noEmit",
     "test": "pnpm test:unit && pnpm test:integration && pnpm test:contract && pnpm test:e2e",
     "test:unit": "vitest run tests/unit",

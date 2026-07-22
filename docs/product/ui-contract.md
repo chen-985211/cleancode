@@ -66,6 +66,8 @@ locale catalog、Message key、文案归属、不可翻译边界和 AI 修改要
 
 主题必须覆盖主题设置入口、侧边栏、画布、终端积木、终端组合、Agent 控制台、小地图、菜单、表单、弹窗、提示和 xterm 内容。主题切换不得重建终端或 Agent 会话，也不得修改项目、工作区或画布业务状态。xterm 已缓冲的原始真彩色输出必须保持为统一可读的主题外观，不得在切换后混合展示切换前后的明暗配色。同一 Agent PTY 或普通终端 generation 运行期间，其终端源 palette 必须保持为创建时的主题；离开再返回工作区时必须沿用原 source，通过统一视觉转换匹配当前应用主题，不得用当前主题冒充仍在运行的 PTY 源主题。普通终端在可见和隐藏状态下对默认前景、背景查询的回答必须一致且只有一个响应者，避免其中启动的 Codex CLI 缓存错误主题。
 
+这里的主题覆盖保证应用 chrome、终端宿主 surface、默认 palette、光标、选区和运行时内容的整体可读性，不承诺把外部 Provider CLI 重绘成相同品牌或相同像素。Codex、Claude Code、OpenCode 或其他 CLI 自己输出的 ANSI/真彩色语义、TUI 布局和用户保存的 CLI 主题仍属于对应 CLI；cleancode 不得为追求外观一致而修改用户全局 Provider 配置，也不得在 Presentation 中按 Provider ID 添加专属视觉分支。
+
 尚未提供的颜色预设、字体、圆角和密度选项不得以空分组、禁用项或占位内容出现在主题设置中。
 
 ## 应用设置与快捷键
@@ -301,11 +303,13 @@ Agent 控制台必须：
 
 一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。新工作区首次进入时创建一个默认 Codex Agent；用户移除最后一个 Agent 后必须保留空状态。创建 Agent 时从 registry 返回的 Provider 中选择一次，创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
-Provider 列表、恢复动作、活动状态、MCP 开关和画布指令能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
+Provider 列表、恢复动作、活动状态、MCP 开关和画布指令能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一选择、状态和 Agent 控制台流程；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
 
 每个 Agent 必须拥有稳定身份、固定 Provider，以及独立的 Agent terminal、CLI launch、输入输出、审批、MCP 会话和分支对话绑定。移动、选择、重命名或调整大小不得重启 Agent terminal 或 Provider launch。
 
 Agent terminal 使用 Run 的长期 shell、权威终端模型、单调 sequence、snapshot 和 attach/detach 协议，但保持 Agent 自己的画布外观与动作。Provider CLI 自然退出或把 `Ctrl+C` 解释为退出时，只结束当前 Agent launch；Agent 节点、终端屏幕、对话绑定和底层可输入 shell 必须保留。会话结束状态提供“重新启动 Agent”和“新对话”：前者在同一 terminal 中恢复当前对话，后者清除当前分支绑定后启动新对话。两者都不得替换 Agent 身份或影响其他 Agent。
+
+首次连接 Agent terminal、重新启动或新对话 attach 失败时，Agent 控制台必须保留明确错误和同一作用域的重试动作，不得静默显示成空白终端。重复点击重试只能提交一个在途请求；已有 terminal 绑定在替代 attach 失败时继续可输入。用户切换项目或工作区后，旧作用域迟到的 attach 结果不得替换当前 Agent 状态。
 
 Provider-session binding 是独立于 terminal、launch 和 activity 的恢复持久化状态。正式会话引用保存失败时必须提示本次对话仍可继续、但不能承诺下次恢复；不得把仍在运行的 launch 或活动改写为失败，也不得回退到最近会话、其他 Agent 或其他分支的引用。
 

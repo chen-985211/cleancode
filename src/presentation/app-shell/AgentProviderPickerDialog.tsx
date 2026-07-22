@@ -1,9 +1,10 @@
 import { Bot, Check, PlugZap, RotateCcw, TerminalSquare } from 'lucide-react'
-import type { KeyboardEvent } from 'react'
+import { useEffect, useRef, type KeyboardEvent } from 'react'
 
 import type { AgentProviderDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import { useAgentProviderState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
+import { inertOutside, trapFocus } from './modalFocus'
 
 export function AgentProviderPickerDialog({
   providers,
@@ -15,9 +16,27 @@ export function AgentProviderPickerDialog({
   readonly onSelect: (providerId: string) => void
 }) {
   const { t } = useI18n()
+  const backdropRef = useRef<HTMLDivElement | null>(null)
+  const dialogRef = useRef<HTMLElement | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
+  )
+
+  useEffect(() => {
+    const backdrop = backdropRef.current
+    if (!backdrop) return undefined
+    const returnFocus = returnFocusRef.current
+    const restoreBackground = inertOutside(backdrop)
+    return () => {
+      restoreBackground()
+      if (returnFocus?.isConnected) returnFocus.focus()
+    }
+  }, [])
+
   return (
     <div
       className="agent-provider-picker__backdrop"
+      ref={backdropRef}
       onMouseDown={(event) => {
         if (event.currentTarget === event.target) onCancel()
       }}
@@ -26,7 +45,8 @@ export function AgentProviderPickerDialog({
         aria-label={t('agent.providerPicker.dialog')}
         aria-modal="true"
         className="agent-provider-picker"
-        onKeyDown={(event) => handleDialogKeyDown(event, onCancel)}
+        onKeyDown={(event) => handleDialogKeyDown(event, dialogRef.current, onCancel)}
+        ref={dialogRef}
         role="dialog"
       >
         <header className="agent-provider-picker__header">
@@ -84,7 +104,7 @@ function AgentProviderOption({
       </span>
       <span className="agent-provider-picker__option-copy">
         <span className="agent-provider-picker__option-title">
-          <strong>{provider.displayName}</strong>
+          <strong title={provider.displayName}>{provider.displayName}</strong>
           <small data-status={readAvailabilityTone(state)}>{availabilityLabel}</small>
         </span>
         <span className="agent-provider-picker__capabilities">
@@ -139,8 +159,15 @@ function readAvailabilityTone(
   return state.availability.status === 'installed' ? 'installed' : 'unavailable'
 }
 
-function handleDialogKeyDown(event: KeyboardEvent<HTMLElement>, onCancel: () => void): void {
-  if (event.key !== 'Escape') return
-  event.stopPropagation()
-  onCancel()
+function handleDialogKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  dialog: HTMLElement | null,
+  onCancel: () => void
+): void {
+  if (event.key === 'Escape') {
+    event.stopPropagation()
+    onCancel()
+    return
+  }
+  trapFocus(event, dialog)
 }

@@ -332,6 +332,89 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     expect(output).not.toContain('54321:\r\n')
   })
 
+  it('publishes the source-theme capability profile and preserves inherited NO_COLOR', async () => {
+    const previousNoColor = process.env.NO_COLOR
+    process.env.NO_COLOR = 'respect-no-color'
+    let output = ''
+    const exited = createDeferred<void>()
+
+    try {
+      await adapter.start({
+        scope: runScope('capability-environment-session'),
+        workingDirectory,
+        shell: '/bin/sh',
+        launchCommand:
+          'printf "%s|%s|%s|%s|%s\\n" "$TERM" "$COLORTERM" "$TERM_PROGRAM" "$COLORFGBG" "$NO_COLOR"',
+        terminalSourceTheme: 'light',
+        environment: {
+          term: 'provider-terminal',
+          ColorTerm: 'provider-color',
+          term_program: 'provider-program',
+          colorfgbg: 'provider-palette'
+        },
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => exited.resolve()
+      })
+
+      await exited.promise
+
+      expect(output).toContain('xterm-256color|truecolor|cleancode|0;15|respect-no-color')
+    } finally {
+      if (previousNoColor === undefined) delete process.env.NO_COLOR
+      else process.env.NO_COLOR = previousNoColor
+    }
+  })
+
+  it('reasserts Run-owned capabilities for a foreground job after shell environment mutation', async () => {
+    let output = ''
+    const exited = createDeferred<number | null>()
+
+    await adapter.start({
+      scope: agentRunScope('foreground-capability-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      terminalSourceTheme: 'dark',
+      environment: { NO_COLOR: 'respect-no-color' },
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    adapter.write(
+      'foreground-capability-session',
+      'export TERM=mutated COLORTERM=mutated TERM_PROGRAM=mutated COLORFGBG=mutated; printf "shell-mutated\\n"\r'
+    )
+    await waitUntil(() => output.includes('shell-mutated'))
+
+    adapter.launchForegroundJob({
+      args: [
+        '-c',
+        'printf "%s|%s|%s|%s|%s\\n" "$TERM" "$COLORTERM" "$TERM_PROGRAM" "$COLORFGBG" "$NO_COLOR"'
+      ],
+      environment: {
+        Term: 'provider-terminal',
+        colorterm: 'provider-color',
+        term_program: 'provider-program',
+        ColorFgBg: 'provider-palette'
+      },
+      executable: '/bin/sh',
+      generation: 1,
+      launchId: 'capability-launch',
+      onExit: (event) => exited.resolve(event.exitCode),
+      onStarted: () => undefined,
+      sessionId: 'foreground-capability-session'
+    })
+
+    await expect(exited.promise).resolves.toBe(0)
+    expect(output).toContain('xterm-256color|truecolor|cleancode|15;0|respect-no-color')
+  })
+
   it('waits for an ignoring child process group to exit and releases its listening port', async () => {
     const port = await reservePort()
     let output = ''

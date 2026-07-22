@@ -30,6 +30,14 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
       scope: agentRunScope('windows-agent-session'),
       workingDirectory,
       shell: 'powershell.exe',
+      terminalSourceTheme: 'light',
+      environment: {
+        term: 'outer-terminal',
+        ColorTerm: 'outer-color',
+        term_program: 'outer-program',
+        colorfgbg: 'outer-palette',
+        NO_COLOR: 'respect-no-color'
+      },
       columns: 80,
       rows: 24,
       onOutput: (event) => {
@@ -39,15 +47,28 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
         terminalExited = true
       }
     })
+    adapter.write(
+      'windows-agent-session',
+      "[Console]::WriteLine(('outer:{0}|{1}|{2}|{3}|{4}' -f $env:TERM, $env:COLORTERM, $env:TERM_PROGRAM, $env:COLORFGBG, $env:NO_COLOR))\r"
+    )
+    await waitUntil(() =>
+      output.includes('outer:xterm-256color|truecolor|cleancode|0;15|respect-no-color')
+    )
 
     adapter.launchForegroundJob({
       args: [
         '-NoLogo',
         '-NoProfile',
         '-Command',
-        "[Console]::WriteLine('windows-agent-ready'); while ($true) { Start-Sleep -Milliseconds 100 }"
+        "[Console]::WriteLine('windows-agent-ready'); [Console]::WriteLine(('{0}|{1}|{2}|{3}|{4}' -f $env:TERM, $env:COLORTERM, $env:TERM_PROGRAM, $env:COLORFGBG, $env:NO_COLOR)); while ($true) { Start-Sleep -Milliseconds 100 }"
       ],
-      environment: { CLEANCODE_TEST_SECRET: 'must-not-appear' },
+      environment: {
+        CLEANCODE_TEST_SECRET: 'must-not-appear',
+        Term: 'provider-terminal',
+        colorterm: 'provider-color',
+        term_program: 'provider-program',
+        ColorFgBg: 'provider-palette'
+      },
       executable: 'powershell.exe',
       generation: 1,
       launchId: 'launch-1',
@@ -58,6 +79,9 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
 
     await firstStarted.promise
     await waitUntil(() => output.includes('windows-agent-ready'))
+    await waitUntil(() =>
+      output.includes('xterm-256color|truecolor|cleancode|0;15|respect-no-color')
+    )
     adapter.write('windows-agent-session', '\x03')
     await firstExit.promise
 
