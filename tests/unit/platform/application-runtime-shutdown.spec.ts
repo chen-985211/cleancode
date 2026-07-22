@@ -21,6 +21,7 @@ describe('application runtime shutdown', () => {
       throw new AggregateError([lifecycleFailure], 'run cleanup failed')
     })
     const disposeTerminalSessions = vi.fn(async () => pendingTerminalCleanup)
+    const disposeTerminalViews = vi.fn(async () => undefined)
     const disposeTerminalWorkflows = vi.fn(async () => undefined)
     const disposeAgentSessions = vi.fn(async () => {
       throw agentFailure
@@ -31,6 +32,7 @@ describe('application runtime shutdown', () => {
       disposeAgentSessions,
       disposeRunLifecycle,
       disposeTerminalSessions,
+      disposeTerminalViews,
       disposeTerminalWorkflows,
       logger
     }).finally(() => {
@@ -40,6 +42,7 @@ describe('application runtime shutdown', () => {
     await vi.waitFor(() => {
       expect(disposeRunLifecycle).toHaveBeenCalledOnce()
       expect(disposeTerminalSessions).toHaveBeenCalledOnce()
+      expect(disposeTerminalViews).toHaveBeenCalledOnce()
       expect(disposeTerminalWorkflows).toHaveBeenCalledOnce()
       expect(disposeAgentSessions).toHaveBeenCalledOnce()
     })
@@ -82,6 +85,42 @@ describe('application runtime shutdown', () => {
           code: 'UNEXPECTED_ERROR',
           isExpected: false,
           message: 'agent cleanup failed'
+        })
+      })
+    )
+  })
+
+  it('releases terminal views before workflows, sessions and provider shutdown', async () => {
+    const order: string[] = []
+    const logger = createRecordingLogger()
+    const record = (stage: string) => async () => {
+      order.push(stage)
+    }
+
+    await disposeApplicationRuntime({
+      disposeAgentSessions: record('agent-sessions'),
+      disposeRunLifecycle: record('run-lifecycle'),
+      disposeTerminalSessions: record('terminal-sessions'),
+      disposeTerminalViews: async () => {
+        order.push('terminal-views')
+        throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+      },
+      disposeTerminalWorkflows: record('terminal-workflows'),
+      logger
+    })
+
+    expect(order.filter((stage) => stage !== 'agent-sessions')).toEqual([
+      'run-lifecycle',
+      'terminal-views',
+      'terminal-workflows',
+      'terminal-sessions'
+    ])
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({ cleanupStage: 'terminal-views' }),
+        error: expect.objectContaining({
+          code: 'TERMINAL_MODEL_NOT_FOUND',
+          isExpected: true
         })
       })
     )

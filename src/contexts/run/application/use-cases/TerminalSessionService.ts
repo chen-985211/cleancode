@@ -40,6 +40,8 @@ import {
   createTerminalSessionId,
   createTerminalSessionOwner,
   getTerminalSessionErrorMessage,
+  requireTerminalModelPort,
+  settleTerminalViewRelease,
   throwTerminalSessionCleanupFailures
 } from './TerminalSessionServiceSupport'
 
@@ -421,7 +423,7 @@ export class TerminalSessionService {
 
   async attachView(command: AttachTerminalViewCommand): Promise<TerminalSnapshot> {
     const session = this.requireRestorableSession(command)
-    const terminalModelPort = this.requireTerminalModelPort()
+    const terminalModelPort = requireTerminalModelPort(this.terminalModelPort)
     const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(session.id)
     if (workingDirectory) {
       terminalModelPort.updateWorkingDirectory(session.scope, workingDirectory)
@@ -434,8 +436,12 @@ export class TerminalSessionService {
   }
 
   async detachView(command: TerminalViewIdentityCommand): Promise<void> {
-    const session = this.requireRestorableSession(command)
-    await this.requireTerminalModelPort().detachView(session.scope, command.viewId)
+    await settleTerminalViewRelease(() =>
+      requireTerminalModelPort(this.terminalModelPort).detachView(
+        this.requireRestorableSession(command).scope,
+        command.viewId
+      )
+    )
   }
 
   async getTerminalLinkContext(command: TerminalLinkIdentity): Promise<TerminalLinkContext> {
@@ -646,13 +652,6 @@ export class TerminalSessionService {
       )
     }
     return session
-  }
-
-  private requireTerminalModelPort(): TerminalModelPort {
-    if (!this.terminalModelPort) {
-      throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
-    }
-    return this.terminalModelPort
   }
 
   private acceptFallbackOutput(sessionId: string, data: string) {

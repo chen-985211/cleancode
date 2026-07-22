@@ -18,6 +18,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { readE2eProcessOutput } from '../support/e2eDiagnostics'
 import {
   configureAndStartTerminalLaunchCommand,
   e2eShellReadyMarker,
@@ -72,6 +73,34 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_WARM\\n'\r")
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_WARM')
       await retireCurrentTerminal()
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'releases every terminal view before a normal application shutdown',
+    async () => {
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await waitForTerminalShellReady(page, 'Terminal 2')
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await waitForTerminalShellReady(page, 'Terminal 3')
+      const sessionIds = await Promise.all(
+        ['Terminal 1', 'Terminal 2', 'Terminal 3'].map((name) => readTerminalSessionId(page, name))
+      )
+      const processIds = await Promise.all(
+        sessionIds.map((sessionId) => readTerminalProcessId(page, sessionId))
+      )
+      const electronProcess = electronApp.process()
+
+      await closeElectronApp(electronApp)
+      resources.electronApp = undefined
+      resources.page = undefined
+
+      expect(electronProcess.exitCode).toBe(0)
+      await Promise.all(processIds.map((processId) => expectProcessToExit(processId)))
+      expect(readE2eProcessOutput(electronApp).join('\n')).not.toContain(
+        'detachDestroyedTerminalView'
+      )
     },
     electronScenarioTimeoutMs
   )

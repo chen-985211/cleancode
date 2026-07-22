@@ -1,7 +1,8 @@
 import { isAppError } from '../../shared-kernel/application/errors/AppError'
 import type { LogEvent, Logger } from '../logging/Logger'
 
-type CleanupStage = 'run-lifecycle' | 'terminal-workflows' | 'terminal-sessions' | 'agent-sessions'
+type CleanupStage =
+  'run-lifecycle' | 'terminal-views' | 'terminal-workflows' | 'terminal-sessions' | 'agent-sessions'
 
 interface CleanupFailure {
   readonly stage: CleanupStage
@@ -10,6 +11,7 @@ interface CleanupFailure {
 
 export interface DisposeApplicationRuntimeInput {
   readonly disposeRunLifecycle: () => Promise<void>
+  readonly disposeTerminalViews: () => Promise<void>
   readonly disposeTerminalWorkflows: () => Promise<void>
   readonly disposeTerminalSessions: () => Promise<void>
   readonly disposeAgentSessions: () => Promise<void>
@@ -19,12 +21,18 @@ export interface DisposeApplicationRuntimeInput {
 export async function disposeApplicationRuntime({
   disposeAgentSessions,
   disposeRunLifecycle,
+  disposeTerminalViews,
   disposeTerminalWorkflows,
   disposeTerminalSessions,
   logger
 }: DisposeApplicationRuntimeInput): Promise<void> {
   const [runFailures, agentResult] = await Promise.all([
-    disposeRunRuntime(disposeRunLifecycle, disposeTerminalWorkflows, disposeTerminalSessions),
+    disposeRunRuntime(
+      disposeRunLifecycle,
+      disposeTerminalViews,
+      disposeTerminalWorkflows,
+      disposeTerminalSessions
+    ),
     settleCleanup(disposeAgentSessions)
   ])
   const failures = [...runFailures, ...collectCleanupFailures('agent-sessions', agentResult)]
@@ -50,14 +58,17 @@ export async function disposeApplicationRuntime({
 
 async function disposeRunRuntime(
   disposeRunLifecycle: () => Promise<void>,
+  disposeTerminalViews: () => Promise<void>,
   disposeTerminalWorkflows: () => Promise<void>,
   disposeTerminalSessions: () => Promise<void>
 ): Promise<readonly CleanupFailure[]> {
   const lifecycleResult = await settleCleanup(disposeRunLifecycle)
+  const viewResult = await settleCleanup(disposeTerminalViews)
   const workflowResult = await settleCleanup(disposeTerminalWorkflows)
   const terminalResult = await settleCleanup(disposeTerminalSessions)
   return [
     ...collectCleanupFailures('run-lifecycle', lifecycleResult),
+    ...collectCleanupFailures('terminal-views', viewResult),
     ...collectCleanupFailures('terminal-workflows', workflowResult),
     ...collectCleanupFailures('terminal-sessions', terminalResult)
   ]

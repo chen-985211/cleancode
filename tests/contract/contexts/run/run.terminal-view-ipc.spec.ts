@@ -4,6 +4,7 @@ import {
   registerTerminalIpcHandlers,
   type TerminalIpcHandlersInput
 } from '../../../../src/platform/electron-main/terminalIpcHandlers'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 import type { IpcInvokeResult, IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandler'
 import type { Logger } from '../../../../src/platform/logging/Logger'
 
@@ -51,6 +52,115 @@ describe('terminal view IPC contract', () => {
 
     expect(detachTerminalView).toHaveBeenCalledWith(viewCommand('view-2'))
     expect(explicitSender.listenerCount).toBe(0)
+  })
+
+  it('releases every registered view before application shutdown and ignores later destruction', async () => {
+    const ipcMain = new FakeIpcMain()
+    const firstSender = new FakeSender()
+    const secondSender = new FakeSender()
+    const detachTerminalView = vi.fn(async () => undefined)
+    const lifecycle = registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView }))
+
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand('view-1'), firstSender)
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand('view-2'), secondSender)
+
+    await lifecycle.prepareApplicationShutdown()
+
+    expect(detachTerminalView).toHaveBeenCalledTimes(2)
+    expect(detachTerminalView).toHaveBeenCalledWith(viewCommand('view-1'))
+    expect(detachTerminalView).toHaveBeenCalledWith(viewCommand('view-2'))
+    expect(firstSender.listenerCount).toBe(0)
+    expect(secondSender.listenerCount).toBe(0)
+
+    firstSender.destroy()
+    secondSender.destroy()
+    await lifecycle.prepareApplicationShutdown()
+
+    expect(detachTerminalView).toHaveBeenCalledTimes(2)
+  })
+
+  it('rejects new view attachments after application shutdown starts', async () => {
+    const ipcMain = new FakeIpcMain()
+    const attachTerminalView = vi.fn(async () => snapshot())
+    const lifecycle = registerTerminalIpcHandlers(createInput({ ipcMain, attachTerminalView }))
+
+    await lifecycle.prepareApplicationShutdown()
+
+    await expect(
+      ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), new FakeSender())
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'TERMINAL_RUNTIME_NOT_READY', isExpected: true }
+    })
+    expect(attachTerminalView).not.toHaveBeenCalled()
+  })
+
+  it('continues releasing remaining views when one shutdown release fails', async () => {
+    const ipcMain = new FakeIpcMain()
+    const detachTerminalView = vi.fn(async (command: ReturnType<typeof viewCommand>) => {
+      if (command.viewId === 'view-1') {
+        throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+      }
+    })
+    const lifecycle = registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView }))
+
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand('view-1'), new FakeSender())
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand('view-2'), new FakeSender())
+
+    await expect(lifecycle.prepareApplicationShutdown()).rejects.toMatchObject({
+      code: 'TERMINAL_MODEL_NOT_FOUND'
+    })
+    expect(detachTerminalView).toHaveBeenCalledTimes(2)
+    expect(detachTerminalView).toHaveBeenCalledWith(viewCommand('view-2'))
+  })
+
+  it('shares one detach when explicit release races with renderer destruction', async () => {
+    const ipcMain = new FakeIpcMain()
+    const sender = new FakeSender()
+    let finishDetach: () => void = () => undefined
+    const detachTerminalView = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDetach = resolve
+        })
+    )
+    registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView }))
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), sender)
+
+    const explicitDetach = ipcMain.invoke('cleancode:detach-terminal-view', viewCommand(), sender)
+    sender.destroy()
+
+    expect(detachTerminalView).toHaveBeenCalledOnce()
+    finishDetach()
+    await expect(explicitDetach).resolves.toEqual({ ok: true, value: undefined })
+    expect(detachTerminalView).toHaveBeenCalledOnce()
+  })
+
+  it('preserves structured errors when renderer destruction cannot release a view', async () => {
+    const ipcMain = new FakeIpcMain()
+    const sender = new FakeSender()
+    const logger = createRecordingLogger()
+    const detachTerminalView = vi.fn(async () => {
+      throw createExpectedAppError('TERMINAL_MODEL_NOT_FOUND', 'Terminal model was not found.')
+    })
+    registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView, logger }))
+    await ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), sender)
+
+    sender.destroy()
+
+    await vi.waitFor(() => expect(logger.warn).toHaveBeenCalledOnce())
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: {
+          code: 'TERMINAL_MODEL_NOT_FOUND',
+          isExpected: true,
+          message: 'Terminal model was not found.'
+        },
+        operation: 'detachDestroyedTerminalView',
+        outcome: 'failure',
+        scope: 'run.terminal-view'
+      })
+    )
   })
 
   it('rejects incomplete restore identities at the IPC boundary', async () => {
@@ -192,6 +302,7 @@ function createInput(input: {
   readonly detachTerminalView?: TerminalIpcHandlersInput['detachTerminalView']
   readonly openTerminalLink?: TerminalIpcHandlersInput['openTerminalLink']
   readonly updateTerminalScrollback?: TerminalIpcHandlersInput['updateTerminalScrollback']
+  readonly logger?: Logger
 }): TerminalIpcHandlersInput {
   return {
     attachTerminalView: input.attachTerminalView ?? vi.fn(async () => snapshot()),
@@ -201,7 +312,7 @@ function createInput(input: {
     launchTerminal: vi.fn(),
     listTerminalSessions: vi.fn(() => []),
     listTerminalWorkingDirectories: vi.fn(async () => []),
-    logger: new SilentLogger(),
+    logger: input.logger ?? new SilentLogger(),
     openTerminalLink: input.openTerminalLink ?? vi.fn(),
     openTerminalServiceEndpoint: vi.fn(),
     resizeTerminal: vi.fn(),
@@ -210,6 +321,15 @@ function createInput(input: {
     updateTerminalScrollback: input.updateTerminalScrollback ?? vi.fn(),
     writeTerminal: vi.fn()
   }
+}
+
+function createRecordingLogger() {
+  return {
+    debug: vi.fn<Logger['debug']>(),
+    error: vi.fn<Logger['error']>(),
+    info: vi.fn<Logger['info']>(),
+    warn: vi.fn<Logger['warn']>()
+  } satisfies Logger
 }
 
 function viewCommand(viewId = 'view-1') {

@@ -33,15 +33,15 @@ import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
 import type { ManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { projectTerminalPortConflict } from './terminalPortConflictProjection'
+import {
+  createTerminalViewLifecycle,
+  type TerminalViewIpcSender,
+  type TerminalViewLifecycle
+} from './terminalViewLifecycle'
 
 interface IpcSender {
   isDestroyed(): boolean
   send(channel: string, event: unknown): void
-}
-
-interface TerminalViewIpcSender extends IpcSender {
-  once(event: 'destroyed', listener: () => void): void
-  removeListener(event: 'destroyed', listener: () => void): void
 }
 
 export interface TerminalIpcHandlersInput {
@@ -144,11 +144,13 @@ interface StartTerminalIpcCommand {
   readonly rows?: number
 }
 
-export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): void {
-  const viewCleanupListeners = new Map<
-    string,
-    { readonly sender: TerminalViewIpcSender; readonly listener: () => void }
-  >()
+export function registerTerminalIpcHandlers(
+  input: TerminalIpcHandlersInput
+): TerminalViewLifecycle {
+  const viewLifecycle = createTerminalViewLifecycle({
+    detachView: input.detachTerminalView,
+    logger: input.logger
+  })
 
   registerIpcHandler<void, TerminalRuntimeAvailabilitySnapshot>({
     channel: 'cleancode:get-terminal-runtime-availability',
@@ -409,20 +411,7 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     handler: async (command, event) => {
       const viewCommand = readTerminalViewCommand(command)
       const sender = readTerminalViewIpcSender(event)
-      unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
-      const cleanupListener = () => {
-        viewCleanupListeners.delete(viewCommand.viewId)
-        void input.detachTerminalView(viewCommand).catch((error) => {
-          input.logger.warn({
-            scope: 'run.terminal-view',
-            operation: 'detachDestroyedTerminalView',
-            outcome: 'failure',
-            error: { message: error instanceof Error ? error.message : String(error) }
-          })
-        })
-      }
-      sender.once('destroyed', cleanupListener)
-      viewCleanupListeners.set(viewCommand.viewId, { sender, listener: cleanupListener })
+      viewLifecycle.registerView(viewCommand, sender)
 
       try {
         return await input.attachTerminalView({
@@ -431,7 +420,7 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
             sendRendererEvent(sender, 'cleancode:terminal-view-output', outputEvent)
         })
       } catch (error) {
-        unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
+        viewLifecycle.discardView(viewCommand)
         throw error
       }
     },
@@ -459,17 +448,15 @@ export function registerTerminalIpcHandlers(input: TerminalIpcHandlersInput): vo
     channel: 'cleancode:detach-terminal-view',
     handler: async (command) => {
       const viewCommand = readTerminalViewCommand(command)
-      try {
-        await input.detachTerminalView(viewCommand)
-      } finally {
-        unregisterViewCleanup(viewCleanupListeners, viewCommand.viewId)
-      }
+      await viewLifecycle.releaseView(viewCommand)
     },
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'detachTerminalView',
     scope: 'run.terminal-view'
   })
+
+  return viewLifecycle
 }
 
 const readyRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot = {
@@ -567,16 +554,6 @@ function readTerminalViewIpcSender(event: unknown): TerminalViewIpcSender {
     throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view IPC sender.')
   }
   return candidate as TerminalViewIpcSender
-}
-
-function unregisterViewCleanup(
-  listeners: Map<string, { readonly sender: TerminalViewIpcSender; readonly listener: () => void }>,
-  viewId: string
-): void {
-  const cleanup = listeners.get(viewId)
-  if (!cleanup) return
-  cleanup.sender.removeListener('destroyed', cleanup.listener)
-  listeners.delete(viewId)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

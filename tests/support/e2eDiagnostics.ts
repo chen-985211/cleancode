@@ -34,6 +34,10 @@ export function initializeE2eDiagnostics(electronApp: ElectronApplication): void
   electronApp.on('window', (page) => captureRendererOutput(page, diagnostics))
 }
 
+export function readE2eProcessOutput(electronApp: ElectronApplication): readonly string[] {
+  return [...requireApplicationDiagnostics(electronApp).processOutput]
+}
+
 export async function startE2eTracing(electronApp: ElectronApplication): Promise<void> {
   const diagnostics = requireApplicationDiagnostics(electronApp)
 

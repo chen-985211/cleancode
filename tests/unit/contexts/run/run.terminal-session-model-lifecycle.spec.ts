@@ -133,6 +133,31 @@ describe('terminal session model lifecycle', () => {
     expect(models.attaches).toEqual([])
   })
 
+  it('treats detach for retired, replaced or unknown view identities as already released', async () => {
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(
+      new RecordingProcessPort(),
+      undefined,
+      undefined,
+      models
+    )
+    const first = await service.start(startCommand())
+    const second = await service.start(startCommand())
+
+    await expect(
+      service.detachView({ ...toViewIdentity(first), viewId: 'retired-view' })
+    ).resolves.toBeUndefined()
+    await expect(
+      service.detachView({
+        ...toViewIdentity(second),
+        sessionId: 'missing-session',
+        viewId: 'missing-view'
+      })
+    ).resolves.toBeUndefined()
+
+    expect(models.detaches).toEqual([])
+  })
+
   it('retires a naturally exited model when a new generation replaces its slot', async () => {
     const processes = new RecordingProcessPort()
     const models = new RecordingModelPort()

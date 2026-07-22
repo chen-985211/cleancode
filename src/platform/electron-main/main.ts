@@ -279,7 +279,7 @@ registerBlockGraphIpcHandlers({
   updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command)
 })
 
-registerTerminalIpcHandlers({
+const terminalViewLifecycle = registerTerminalIpcHandlers({
   attachTerminalView: (command) => terminalSessionService.attachView(command),
   detachTerminalView: (command) => terminalSessionService.detachView(command),
   getTerminalRuntimeAvailability,
@@ -495,6 +495,7 @@ app.on('before-quit', (event) => {
   void disposeApplicationRuntime({
     disposeAgentSessions: () => agentSessionService.disposeAll(),
     disposeRunLifecycle: () => runLifecycleService.prepareApplicationShutdown(),
+    disposeTerminalViews: () => terminalViewLifecycle.prepareApplicationShutdown(),
     disposeTerminalWorkflows: () => terminalWorkflowService.stopAll(),
     disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),
     logger: consoleLogger

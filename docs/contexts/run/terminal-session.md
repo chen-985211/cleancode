@@ -90,6 +90,8 @@ Run 应用层只依赖 `TerminalProcessPort`：
 4. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
 5. `ReplaceSession`、显式终止和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出和 Provider 故障只保留有界最终模型，不伪造 live 状态。
 
+应用正常退出时，Electron main 必须先关闭新的视图登记并等待全部当前视图租约释放，再停止工作流、终止默认策略会话和断开 Provider。renderer 销毁监听只负责异常退出兜底；显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
+
 因此，普通终端的 renderer xterm 是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏普通终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 
 ## 输入与安全打开边界
