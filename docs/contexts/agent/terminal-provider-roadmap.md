@@ -432,7 +432,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - 创建 Agent 时从 registry 选择一次 Provider；既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
 - Codex、Claude Code 和最小 OpenCode contribution 已注册。Claude Code 使用会话级临时 MCP/settings 文件、鉴权 Hook relay、正式 session ID/resume 参数和精确 CleanCode 工具预批准；OpenCode 证明无 resume、telemetry 或 MCP 时仍能获得基础终端能力。
 - Provider launch callback 由 Agent session 与单调 launch generation 双重隔离；终端和 Provider 临时资源在替换、退出与生命周期清理时释放。
-- Terminal Provider 协议 v4 把前台任务请求和 started/exited 事件送入独立 Provider 进程；当前 macOS 真实 Electron E2E 已证明 `Ctrl+C` 结束 Codex launch 后同一 shell 继续接受命令，Windows 由原生 ConPTY integration 门禁负责对等验收。
+- Terminal Provider 协议 v4 把前台任务请求和 started/exited 事件送入独立 Provider 进程；`awaiting_started` 阶段消费内部 shell transport 回显，Agent 屏幕只从 Provider started 后发布输出；当前 macOS 真实 Electron E2E 已证明 `Ctrl+C` 结束 Codex launch 后同一 shell 继续接受命令，Windows 由原生 ConPTY integration 门禁负责对等验收。
 
 后续增加 Agent CLI 的标准步骤是：在 `src/contexts/agent/infrastructure/providers/<provider>/` 实现 contribution，为其增加 provider contract/参数/清理测试，并在 composition root 注册。只有展示名称、安装命令或图标等资源可以作为伴随改动；若必须修改 Agent domain、Run domain、通用 IPC 或 `AgentConsole` 控制流，应先修正 Provider 边界，而不是增加中央分支。
 
@@ -441,7 +441,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 2026-07-22 在 `feature/agent-terminal-providers` 分支完成以下 macOS 本机验证；这些证据不替代尚未执行的 Linux/Windows 原生 runner：
 
 - 全部依赖、文档、行数、日志、主题、国际化、格式、Lint、TypeScript、依赖方向、未使用代码和 diff 门禁通过。
-- Unit：179 个测试文件、825 项测试通过。
+- Unit：179 个测试文件、826 项测试通过。
 - Integration：28 个测试文件、134 项测试通过；另有 2 个 Windows 原生测试文件、2 项测试因当前为 macOS 而按平台跳过。
 - Contract：11 个测试文件、68 项测试通过。
 - Electron E2E：10 个测试文件、41 项测试通过；其中包含多 Agent、固定 Provider 创建、`Ctrl+C` 后回到同一 shell、跨工作区主题/进程复用、普通终端、恢复、工作流、端口和 worktree 回归。

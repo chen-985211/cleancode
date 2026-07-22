@@ -270,6 +270,9 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     expect(terminalExited).toBe(false)
     expect(output).not.toContain('must-not-appear')
     expect(output).not.toContain('\x1eCLEANCODE_JOB:')
+    expect(output).not.toContain('CLEANCODE_JOB:')
+    expect(output).not.toContain('cleancode-agent-job-')
+    expect(output).not.toContain('cleancode_job_status')
   }, 10_000)
 
   it('runs a command directly and reports its real exit code', async () => {

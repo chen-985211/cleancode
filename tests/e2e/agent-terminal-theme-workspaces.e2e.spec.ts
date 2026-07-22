@@ -196,6 +196,9 @@ async function waitForAgentTerminal(
   await waitForTerminalDomText(viewport, fakeCodexMarker)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
   expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
+  expect(visibleOutput).not.toContain('CLEANCODE_JOB:')
+  expect(visibleOutput).not.toContain('cleancode-agent-job-')
+  expect(visibleOutput).not.toContain('cleancode_job_status')
   const providerProcessId = visibleOutput?.match(
     new RegExp(`${fakeCodexMarker}:${sourceTheme}:(\\d+)`)
   )?.[1]

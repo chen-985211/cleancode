@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 import type { LaunchForegroundJobProcessCommand } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import {
+  acceptForegroundJobOutput,
   createForegroundJobProbe,
   createForegroundJobShellControl,
   disposeForegroundJobShellControl
@@ -76,6 +77,43 @@ describe('foreground job shell control', () => {
     ).toThrow('Invalid environment name')
 
     expect(readdirSync(temporaryRoot)).toEqual([])
+  })
+
+  it('hides shell transport output until the Agent process reports started', () => {
+    const onExit = vi.fn()
+    const onStarted = vi.fn()
+    const control = createForegroundJobShellControl(createCommand(), {
+      platform: 'darwin',
+      shellExecutable: '/bin/zsh',
+      temporaryRoot,
+      token: 'fixedtoken'
+    })
+    const handlers = { onExit, onStarted }
+
+    expect(
+      acceptForegroundJobOutput(
+        control,
+        "prompt % '/tmp/cleancode-agent-job/launch.sh'; cleancode_job_status=$?\r\n",
+        handlers
+      )
+    ).toBe('')
+    expect(acceptForegroundJobOutput(control, '\x1eCLEANCODE_JOB:fixedtoken:star', handlers)).toBe(
+      ''
+    )
+    expect(acceptForegroundJobOutput(control, 'ted\x1fCodex ready\r\n', handlers)).toBe(
+      'Codex ready\r\n'
+    )
+    expect(
+      acceptForegroundJobOutput(
+        control,
+        'Agent output\r\n\x1eCLEANCODE_JOB:fixedtoken:exit:7\x1fprompt % ',
+        handlers
+      )
+    ).toBe('Agent output\r\nprompt % ')
+    expect(onStarted).toHaveBeenCalledWith(control.command)
+    expect(onExit).toHaveBeenCalledWith({ ...control.command, exitCode: 7 })
+
+    disposeForegroundJobShellControl(control)
   })
 })
 

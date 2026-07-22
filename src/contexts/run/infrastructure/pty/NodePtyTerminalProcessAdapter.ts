@@ -127,7 +127,6 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       shellExecutable: terminalProcess.shell
     })
     terminalProcess.foregroundJob = control
-    control.launchSent = true
     terminalProcess.process.write(createForegroundJobProbe(control))
   }
 

@@ -16,7 +16,7 @@ export interface ForegroundJobShellControl {
   readonly token: string
   readonly command: LaunchForegroundJobProcessCommand
   buffer: string
-  launchSent: boolean
+  outputPhase: 'awaiting_started' | 'running'
   readonly shellExecutable: string
   readonly shellFamily: 'posix' | 'powershell'
   readonly scriptDirectory: string
@@ -63,7 +63,7 @@ export function createForegroundJobShellControl(
   return {
     buffer: '',
     command,
-    launchSent: false,
+    outputPhase: 'awaiting_started',
     shellExecutable,
     shellFamily,
     scriptDirectory,
@@ -207,11 +207,15 @@ export function acceptForegroundJobOutput(
     const markerIndex = control.buffer.indexOf(exactPrefix)
     if (markerIndex < 0) {
       const retainedLength = longestSuffixPrefix(control.buffer, exactPrefix)
-      output += control.buffer.slice(0, control.buffer.length - retainedLength)
+      if (control.outputPhase === 'running') {
+        output += control.buffer.slice(0, control.buffer.length - retainedLength)
+      }
       control.buffer = control.buffer.slice(control.buffer.length - retainedLength)
       break
     }
-    output += control.buffer.slice(0, markerIndex)
+    if (control.outputPhase === 'running') {
+      output += control.buffer.slice(0, markerIndex)
+    }
     const endIndex = control.buffer.indexOf(markerEnd, markerIndex + exactPrefix.length)
     if (endIndex < 0) {
       control.buffer = control.buffer.slice(markerIndex)
@@ -219,9 +223,12 @@ export function acceptForegroundJobOutput(
     }
     const payload = control.buffer.slice(markerIndex + exactPrefix.length, endIndex)
     control.buffer = control.buffer.slice(endIndex + markerEnd.length)
-    if (payload === 'started') handlers.onStarted(control.command)
-    else if (payload.startsWith('exit:')) {
+    if (payload === 'started' && control.outputPhase === 'awaiting_started') {
+      control.outputPhase = 'running'
+      handlers.onStarted(control.command)
+    } else if (payload.startsWith('exit:')) {
       const exitCode = Number.parseInt(payload.slice('exit:'.length), 10)
+      control.outputPhase = 'running'
       handlers.onExit({
         ...control.command,
         exitCode: Number.isInteger(exitCode) ? exitCode : null

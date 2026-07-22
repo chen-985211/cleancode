@@ -79,6 +79,9 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     expect(terminalExited).toBe(false)
     expect(output).not.toContain('must-not-appear')
     expect(output).not.toContain('\x1eCLEANCODE_JOB:')
+    expect(output).not.toContain('CLEANCODE_JOB:')
+    expect(output).not.toContain('cleancode-agent-job-')
+    expect(output).not.toContain('launch.ps1')
   }, 20_000)
 })
 
