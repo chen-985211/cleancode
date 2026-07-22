@@ -1,26 +1,15 @@
-import type {
-  AgentGraphUpdatedEvent,
-  AgentSessionSnapshot
-} from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import {
   defaultAgentLayoutPosition,
   defaultAgentLayoutSize
 } from '../../contexts/agent/domain/aggregates/AgentSession'
-import type { AgentXtermController } from './agentTerminalXterm'
-import type { AgentTerminalSurfaceOwner } from './agentTerminalSurfaceRegistry'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
 
 export interface AgentTerminalMeasurement {
   readonly dimensions: TerminalDimensions
-  readonly workspaceKey: string
-}
-
-export interface AgentSessionBinding {
-  readonly session: AgentSessionSnapshot
-  readonly terminalController: AgentXtermController | null
   readonly workspaceKey: string
 }
 
@@ -49,14 +38,6 @@ export function createWorkspaceKey(
     : null
 }
 
-export function createAgentTerminalOwner(
-  agentId: string,
-  projectId: string,
-  workspaceName: string
-): AgentTerminalSurfaceOwner {
-  return { agentId, projectId, workspaceName }
-}
-
 export function createFallbackAgent(
   workbench: WorkbenchSnapshot | null,
   workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
@@ -67,6 +48,7 @@ export function createFallbackAgent(
     layout: { position: defaultAgentLayoutPosition, size: defaultAgentLayoutSize },
     name: 'Agent 1',
     projectId: workbench?.project.id ?? 'unselected-project',
+    providerId: 'codex',
     workspaceName: workspace?.name ?? 'unselected-workspace'
   }
 }
@@ -77,17 +59,4 @@ export function isTestRuntime(): boolean {
 
 export function noop(): void {
   return undefined
-}
-
-export function haveSameDimensions(left: TerminalDimensions, right: TerminalDimensions): boolean {
-  return left.columns === right.columns && left.rows === right.rows
-}
-
-export function restoreRecordedAgentSessionExit(
-  session: AgentSessionSnapshot,
-  exitedSessionIds: ReadonlySet<string>
-): AgentSessionSnapshot {
-  return exitedSessionIds.has(session.sessionId) && session.status === 'running'
-    ? { ...session, status: 'exited' }
-    : session
 }

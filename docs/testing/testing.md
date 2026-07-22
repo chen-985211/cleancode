@@ -93,6 +93,18 @@ pnpm test:e2e
 
 开发协作 AI 在最终说明中必须说明新增或更新了哪些测试、运行了哪些测试，以及是否存在未覆盖风险。
 
+### Agent terminal 跨平台门禁
+
+Agent 基础终端能力的支持矩阵是 macOS、Linux 和 Windows，平台条件分支或在其他系统上生成 PowerShell 文本不算 Windows 验收。修改 Agent Provider 检测、前台任务 shell 控制、node-pty、`Ctrl+C`、launch/terminal 退出边界或相关临时资源时，[Agent terminal platforms workflow](../../.github/workflows/agent-terminal-platform.yml)必须在三个原生 runner 上通过：
+
+| Runner         | 原生边界                     | 必须证明                                                                |
+| -------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| macOS latest   | node-pty + POSIX PTY/shell   | 结构化 argv/environment、`Ctrl+C`、launch 退出、第二次启动和 shell 可写 |
+| Ubuntu latest  | node-pty + POSIX PTY/shell   | 与 macOS 相同，防止实现隐式依赖 Darwin                                  |
+| Windows latest | node-pty + ConPTY/PowerShell | npm `.cmd` CLI 检测、`Ctrl+C`、退出码、第二次启动和外层 PowerShell 可写 |
+
+三条 runner 都必须执行相关 unit 回归、TypeScript 检查和 `pnpm build`；Windows 还必须真实运行 `tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts` 和 `tests/integration/contexts/run/run.windows-agent-pty.spec.ts`。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+
 ## 标准目录结构
 
 ```txt

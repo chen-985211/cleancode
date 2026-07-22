@@ -22,6 +22,7 @@ import type {
   RestoreTerminalModelCommand,
   TerminalViewOutputEvent
 } from '../../application/ports/TerminalModelPort'
+import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import {
   defaultTerminalScrollbackRows,
   type TerminalScrollbackRows
@@ -433,12 +434,14 @@ function readOscWorkingDirectory(data: string): string | null {
 }
 
 function createModelKey(identity: TerminalRunScope): string {
+  const owner = resolveTerminalOwnerRef(identity)
   return [
     identity.projectId,
     identity.projectDirectory,
     identity.workspaceName,
     identity.workspaceDirectory,
-    identity.blockId,
+    owner.kind,
+    owner.id,
     identity.sessionId
   ].join('\0')
 }

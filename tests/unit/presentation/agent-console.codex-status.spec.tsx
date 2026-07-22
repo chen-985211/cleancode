@@ -42,18 +42,19 @@ describe('agent console Codex status', () => {
   it('trusts a running Codex session over a stale missing-CLI inspection', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
     const currentWorkspace = workbench.project.workspaces[0]!
+    const inspectCodexCli = vi.fn(async () => createMissingSnapshot())
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
-        inspectCodexCli: vi.fn(async () => createMissingSnapshot())
+        inspectCodexCli
       })
     })
 
     render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
     await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
-    await waitFor(() => expect(window.cleancode?.inspectCodexCli).toHaveBeenCalled())
+    await waitFor(() => expect(inspectCodexCli).toHaveBeenCalled())
     expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
   })
 
@@ -246,6 +247,39 @@ describe('agent console Codex status', () => {
     await waitFor(() =>
       expect(attachAgentSession).toHaveBeenLastCalledWith(
         expect.objectContaining({ restartMode: 'new' })
+      )
+    )
+  })
+
+  it('keeps the terminal available and offers restart actions after the Provider exits', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const attachAgentSession = vi.fn(async (command) => ({
+      agentId: command.agentId,
+      gitBranch: null,
+      processId: 42,
+      projectDirectory: '/repo/app',
+      projectId: workbench.project.id,
+      providerId: 'codex',
+      providerSessionRef: null,
+      sessionId: 'agent-session-exited',
+      status: command.restartMode ? ('running' as const) : ('exited' as const),
+      terminalSourceTheme: command.terminalSourceTheme,
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    }))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ attachAgentSession })
+    })
+
+    render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
+
+    expect(await screen.findByText('Codex 会话已结束')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重新启动 Agent' }))
+    await waitFor(() =>
+      expect(attachAgentSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ restartMode: 'retry' })
       )
     )
   })

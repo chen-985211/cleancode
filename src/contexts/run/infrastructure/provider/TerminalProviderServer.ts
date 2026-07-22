@@ -42,6 +42,7 @@ import {
   sendTerminalProviderMessage,
   splitUtf8
 } from './TerminalProviderServerSupport'
+import { launchTerminalProviderForegroundJob } from './TerminalProviderForegroundJob'
 import {
   countLiveProviderSessions,
   hasRetainedLiveProviderSessions,
@@ -238,6 +239,13 @@ export class TerminalProviderServer {
         return null
       case 'startProcess':
         return this.startProcess(input.command)
+      case 'launchForegroundJob':
+        return launchTerminalProviderForegroundJob({
+          command: input.foregroundJob,
+          processes: this.processes,
+          sessions: this.sessions,
+          broadcast: (event) => this.broadcast(event)
+        })
       case 'write':
         this.processes.write(input.sessionId, input.input)
         return null

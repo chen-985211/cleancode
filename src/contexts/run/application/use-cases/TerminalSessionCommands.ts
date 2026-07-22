@@ -9,6 +9,7 @@ import type {
   TerminalSourceTheme
 } from '../../domain/aggregates/TerminalSession'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalViewOutputEvent } from '../ports/TerminalModelPort'
 
 export interface TerminalViewIdentityCommand {
@@ -19,6 +20,7 @@ export interface TerminalViewIdentityCommand {
   readonly runId: string
   readonly generation: number
   readonly viewId: string
+  readonly owner?: TerminalOwnerRef
 }
 
 export interface AttachTerminalViewCommand extends TerminalViewIdentityCommand {
@@ -29,6 +31,7 @@ export interface StartTerminalSessionCommand {
   readonly projectId: string
   readonly projectDirectory: string
   readonly terminalBlockId: string
+  readonly owner?: TerminalOwnerRef
   readonly workspaceName: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null

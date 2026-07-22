@@ -232,6 +232,7 @@ function createNodes(): {
       cleancodeMcpEnabled: true,
       name: 'Agent 1',
       projectId: 'project-1',
+      providerId: 'codex',
       workspaceName: 'main',
       layout: {
         position: { x: 560, y: 200 },

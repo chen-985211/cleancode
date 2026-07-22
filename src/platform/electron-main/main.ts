@@ -6,7 +6,9 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
-import { InspectCodexCliUseCase } from '../../contexts/agent/application/use-cases/InspectCodexCliUseCase'
+import { AgentProviderRegistry } from '../../contexts/agent/application/services/AgentProviderRegistry'
+import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
+import { ListAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/ListAgentProvidersUseCase'
 import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
 import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
 import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
@@ -17,7 +19,10 @@ import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/Nod
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
 import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
-import { NodePtyCodexAgentProcessAdapter } from '../../contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter'
+import { CodexAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
+import { ClaudeCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
+import { OpenCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
 import { BuildTerminalWorkflowPlanUseCase } from '../../contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
@@ -154,7 +159,13 @@ const {
 })
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
 const codexCliAdapter = new NodeCodexCliAdapter()
-const inspectCodexCliUseCase = new InspectCodexCliUseCase(codexCliAdapter)
+const agentProviderRegistry = new AgentProviderRegistry([
+  new CodexAgentProviderContribution({ detector: codexCliAdapter }),
+  new ClaudeCodeAgentProviderContribution(),
+  new OpenCodeAgentProviderContribution()
+])
+const inspectAgentProviderUseCase = new InspectAgentProviderUseCase(agentProviderRegistry)
+const listAgentProvidersUseCase = new ListAgentProvidersUseCase(agentProviderRegistry)
 const agentAuditRepository = new FileSystemAgentAuditRepository(
   join(appStateDirectoryPath, 'agent-audit.jsonl')
 )
@@ -191,10 +202,11 @@ const executeAgentToolUseCase = new ExecuteAgentToolUseCase(
   agentSessionRepository
 )
 const agentSessionService = new AgentSessionService(
-  new NodePtyCodexAgentProcessAdapter(),
+  new RunAgentTerminalRuntimeAdapter(terminalSessionService),
   new CleancodeMcpHttpServer(),
   executeAgentToolUseCase,
   agentSessionRepository,
+  agentProviderRegistry,
   createAgentRuntimeScopeValidation(
     agentSessionRepository,
     getProjectRegistryRepository(),
@@ -327,7 +339,8 @@ registerAgentIpcHandlers({
     isAgentAutostartDisabledForTest
       ? Promise.resolve()
       : disposeRuntime(() => agentSessionService.disposeProject(projectDirectory)),
-  inspectCodexCli: () => inspectCodexCliUseCase.execute(),
+  inspectAgentProvider: (providerId) => inspectAgentProviderUseCase.execute(providerId),
+  listAgentProviders: () => listAgentProvidersUseCase.execute(),
   ipcMain,
   logger: consoleLogger,
   rejectAgentTool: (approvalId) => agentSessionService.rejectTool({ approvalId }),

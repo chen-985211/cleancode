@@ -85,6 +85,7 @@ function createAgent(): AgentSession {
     layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
     name: 'Agent 1',
     projectId: 'project-1',
+    providerId: 'codex',
     workspaceName: 'main'
   })
 }

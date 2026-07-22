@@ -1,18 +1,17 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { AgentProviderDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { resolveNewAgentConsolePosition } from './agentConsolePlacement'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
-import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
 import { useI18n } from './i18n/useI18n'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 export function useWorkspaceAgentActions({
-  agentTerminalSurfaceRegistry,
   currentWorkbench,
   currentWorkspace,
   layoutCommitQueue,
@@ -21,7 +20,6 @@ export function useWorkspaceAgentActions({
   setSelectedAgentId,
   setWorkbenches
 }: {
-  readonly agentTerminalSurfaceRegistry: AgentTerminalSurfaceRegistry
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
@@ -31,6 +29,10 @@ export function useWorkspaceAgentActions({
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
 }) {
   const { t } = useI18n()
+  const [agentProviderChoices, setAgentProviderChoices] = useState<
+    readonly AgentProviderDescriptor[] | null
+  >(null)
+  const isProviderListPendingRef = useRef(false)
   const setWorkspaceAgents = useCallback(
     (projectId: string, workspaceName: string, agents: readonly WorkspaceAgentSnapshot[]): void => {
       const update = (workbench: WorkbenchSnapshot): WorkbenchSnapshot =>
@@ -47,26 +49,57 @@ export function useWorkspaceAgentActions({
     [setCurrentWorkbench, setSelectedAgentId, setWorkbenches]
   )
 
+  const createWorkspaceAgentWithProvider = useCallback(
+    async (providerId: string) => {
+      if (!currentWorkbench || !currentWorkspace) return
+      const agents = currentWorkbench.agents ?? []
+      const position = resolveNewAgentConsolePosition(agents.map((agent) => agent.layout))
+      const created = await window.cleancode?.createWorkspaceAgent({
+        layout: {
+          position,
+          size: defaultAgentLayoutSize
+        },
+        projectId: currentWorkbench.project.id,
+        providerId,
+        workspaceName: currentWorkspace.name
+      })
+      if (created) {
+        setWorkspaceAgents(currentWorkbench.project.id, currentWorkspace.name, [...agents, created])
+        onWorkspaceAgentCreated(created)
+      }
+    },
+    [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents]
+  )
+
   const createWorkspaceAgent = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace) return
+    if (!currentWorkbench || !currentWorkspace || isProviderListPendingRef.current) return
     const agents = currentWorkbench.agents ?? []
-    if (agents.length > 0 && !window.confirm(t('agent.multipleWarning'))) {
-      return
+    if (agents.length > 0 && !window.confirm(t('agent.multipleWarning'))) return
+
+    const listProviders = window.cleancode?.listAgentProviders
+    if (!listProviders) return
+    isProviderListPendingRef.current = true
+    try {
+      const providers = await listProviders()
+      if (providers.length === 1) {
+        await createWorkspaceAgentWithProvider(providers[0].id)
+      } else if (providers.length > 1) {
+        setAgentProviderChoices(providers)
+      }
+    } finally {
+      isProviderListPendingRef.current = false
     }
-    const position = resolveNewAgentConsolePosition(agents.map((agent) => agent.layout))
-    const created = await window.cleancode?.createWorkspaceAgent({
-      layout: {
-        position,
-        size: defaultAgentLayoutSize
-      },
-      projectId: currentWorkbench.project.id,
-      workspaceName: currentWorkspace.name
-    })
-    if (created) {
-      setWorkspaceAgents(currentWorkbench.project.id, currentWorkspace.name, [...agents, created])
-      onWorkspaceAgentCreated(created)
-    }
-  }, [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents, t])
+  }, [createWorkspaceAgentWithProvider, currentWorkbench, currentWorkspace, t])
+
+  const selectAgentProvider = useCallback(
+    async (providerId: string) => {
+      setAgentProviderChoices(null)
+      await createWorkspaceAgentWithProvider(providerId)
+    },
+    [createWorkspaceAgentWithProvider]
+  )
+
+  const cancelAgentProviderSelection = useCallback(() => setAgentProviderChoices(null), [])
 
   const updateAgentInWorkspace = useCallback(
     (updated: WorkspaceAgentSnapshot): void => {
@@ -164,19 +197,21 @@ export function useWorkspaceAgentActions({
         workspaceName: agent.workspaceName
       })
       if (remaining) {
-        agentTerminalSurfaceRegistry.release(agent)
         setWorkspaceAgents(agent.projectId, agent.workspaceName, remaining)
       }
     },
-    [agentTerminalSurfaceRegistry, setWorkspaceAgents]
+    [setWorkspaceAgents]
   )
 
   return {
+    agentProviderChoices,
+    cancelAgentProviderSelection,
     createWorkspaceAgent,
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
     resizeWorkspaceAgent,
+    selectAgentProvider,
     updateWorkspaceAgentMcpCapability
   }
 }

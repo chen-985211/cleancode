@@ -1,3 +1,5 @@
+import type { TerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
+
 export interface TerminalLinkIdentity {
   readonly projectId: string
   readonly workspaceName: string
@@ -6,6 +8,7 @@ export interface TerminalLinkIdentity {
   readonly runId: string
   readonly generation: number
   readonly viewId: string
+  readonly owner?: TerminalOwnerRef
 }
 
 export interface OpenTerminalLinkCommand extends TerminalLinkIdentity {

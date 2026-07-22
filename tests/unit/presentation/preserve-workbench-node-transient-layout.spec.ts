@@ -192,6 +192,7 @@ function createAgentNode(
     layout: { position, size },
     name: 'Agent 1',
     projectId: 'project-1',
+    providerId: 'codex',
     workspaceName: 'main'
   }
   return {

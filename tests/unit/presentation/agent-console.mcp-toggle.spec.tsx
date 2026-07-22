@@ -9,6 +9,45 @@ import {
 } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent console CleanCode MCP toggle', () => {
+  it('hides the MCP control when the current Provider does not contribute that capability', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const runtime = createRuntimeApi({
+      listAgentProviders: vi.fn(async () => [
+        {
+          capabilities: {
+            cleancodeMcp: false,
+            resume: false,
+            structuredLifecycle: false,
+            systemInstructions: false
+          },
+          displayName: 'OpenCode',
+          id: 'opencode'
+        }
+      ])
+    })
+    Object.defineProperty(window, 'cleancode', { configurable: true, value: runtime })
+
+    render(
+      <AgentConsole
+        agent={{
+          ...createAgent(workbench.project.id, currentWorkspace.name),
+          providerId: 'opencode'
+        }}
+        currentWorkbench={workbench}
+        currentWorkspace={currentWorkspace}
+        onMcpCapabilityChange={vi.fn()}
+        onRemove={vi.fn()}
+        onRename={vi.fn()}
+      />
+    )
+
+    await waitFor(() => expect(runtime.listAgentProviders).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(screen.queryByRole('switch', { name: 'CleanCode MCP' })).not.toBeInTheDocument()
+    )
+  })
+
   it('keeps the switch in the title bar and clears stale deletion approval after restart', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
     const currentWorkspace = workbench.project.workspaces[0]!
@@ -18,6 +57,7 @@ describe('Agent console CleanCode MCP toggle', () => {
       layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
       name: 'Agent 1',
       projectId: workbench.project.id,
+      providerId: 'codex',
       workspaceName: currentWorkspace.name
     }
     const clearForAgent = vi.fn()
@@ -47,11 +87,12 @@ describe('Agent console CleanCode MCP toggle', () => {
       agent: { ...agent, cleancodeMcpEnabled: false },
       session: {
         agentId: agent.agentId,
-        codexThreadId: null,
         gitBranch: null,
         processId: 2,
         projectDirectory: workbench.project.directory,
         projectId: workbench.project.id,
+        providerId: 'codex',
+        providerSessionRef: null,
         sessionId: 'agent-session-restarted',
         status: 'running' as const,
         terminalSourceTheme: 'light' as const,
@@ -141,11 +182,12 @@ describe('Agent console CleanCode MCP toggle', () => {
         agent: { ...mainAgent, cleancodeMcpEnabled: false },
         session: {
           agentId: mainAgent.agentId,
-          codexThreadId: null,
           gitBranch: null,
           processId: 7,
           projectDirectory: '/repo/app',
           projectId: mainWorkbench.project.id,
+          providerId: 'codex',
+          providerSessionRef: null,
           sessionId: 'agent-main-restarted',
           status: 'running',
           terminalSourceTheme: 'light',
@@ -172,6 +214,7 @@ function createAgent(projectId: string, workspaceName: string) {
     layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
     name: 'Agent 1',
     projectId,
+    providerId: 'codex',
     workspaceName
   }
 }

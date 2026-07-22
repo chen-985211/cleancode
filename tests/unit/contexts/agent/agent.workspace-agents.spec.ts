@@ -1,6 +1,6 @@
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
-import { CodexThreadId } from '../../../../src/contexts/agent/domain/value-objects/CodexThreadId'
+import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 
 describe('workspace Agents', () => {
   it('keeps identity, layout, and branch conversations independent for every Agent', () => {
@@ -9,37 +9,63 @@ describe('workspace Agents', () => {
       layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
       name: '实现 Agent',
       projectId: 'project-1',
+      providerId: 'codex',
       workspaceName: 'main'
     })
 
-    agent.bindCodexThread(
+    agent.bindProviderSession(
       AgentConversationScope.create({
         agentId: 'agent-1',
         gitBranch: 'main',
         projectId: 'project-1',
         workspaceName: 'main'
       }),
-      CodexThreadId.create('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+      ProviderSessionRef.create({
+        formatVersion: 1,
+        kind: 'codex-thread',
+        value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+      })
     )
-    agent.bindCodexThread(
+    agent.bindProviderSession(
       AgentConversationScope.create({
         agentId: 'agent-1',
         gitBranch: 'feature/login',
         projectId: 'project-1',
         workspaceName: 'main'
       }),
-      CodexThreadId.create('0190d8a2-4f13-7e17-a0c1-64c303571909')
+      ProviderSessionRef.create({
+        formatVersion: 1,
+        kind: 'codex-thread',
+        value: '0190d8a2-4f13-7e17-a0c1-64c303571909'
+      })
     )
 
-    expect(agent.findCodexThreadId('main')).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
-    expect(agent.findCodexThreadId('feature/login')).toBe('0190d8a2-4f13-7e17-a0c1-64c303571909')
+    expect(agent.findProviderSessionRef('main')?.value).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+    expect(agent.findProviderSessionRef('feature/login')?.value).toBe(
+      '0190d8a2-4f13-7e17-a0c1-64c303571909'
+    )
     expect(agent.toSnapshot()).toMatchObject({
       agentId: 'agent-1',
       layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
       name: '实现 Agent',
       projectId: 'project-1',
+      providerId: 'codex',
       workspaceName: 'main'
     })
+  })
+
+  it('keeps the Provider fixed as part of Agent identity', () => {
+    const agent = AgentSession.create({
+      agentId: 'agent-claude',
+      layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
+      name: 'Claude Agent',
+      projectId: 'project-1',
+      providerId: 'claude-code',
+      workspaceName: 'main'
+    })
+
+    expect(agent.providerId).toBe('claude-code')
+    expect(agent.toSnapshot()).toMatchObject({ providerId: 'claude-code' })
   })
 
   it('can be persisted before Codex reports a thread and can update its presentation facts', () => {
@@ -48,6 +74,7 @@ describe('workspace Agents', () => {
       layout: { position: { x: 540, y: 180 }, size: { width: 440, height: 520 } },
       name: 'Agent 2',
       projectId: 'project-1',
+      providerId: 'codex',
       workspaceName: 'main'
     })
 
@@ -68,6 +95,7 @@ describe('workspace Agents', () => {
       layout: { position: { x: 540, y: 180 }, size: { width: 440, height: 520 } },
       name: 'Agent 3',
       projectId: 'project-1',
+      providerId: 'codex',
       workspaceName: 'main'
     })
 

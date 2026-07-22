@@ -56,60 +56,14 @@ class SilentLogger implements Logger {
 }
 
 describe('agent IPC contract', () => {
-  it('returns Codex CLI installation status through the preload-facing channel', async () => {
-    const ipcMain = new FakeIpcMain()
-
-    registerAgentIpcHandlers(
-      createAgentIpcHandlersInput({
-        inspectCodexCli: async () => ({
-          status: 'installed',
-          version: 'codex-cli 0.143.0'
-        }),
-        ipcMain
-      })
-    )
-
-    await expect(ipcMain.invoke('cleancode:inspect-codex-cli')).resolves.toEqual({
-      ok: true,
-      value: {
-        status: 'installed',
-        version: 'codex-cli 0.143.0'
-      }
-    })
-  })
-
-  it('keeps a temporary Codex CLI inspection failure distinct from a missing executable', async () => {
-    const ipcMain = new FakeIpcMain()
-
-    registerAgentIpcHandlers(
-      createAgentIpcHandlersInput({
-        inspectCodexCli: async () => ({
-          reason: 'timed_out',
-          status: 'temporarily_unavailable',
-          version: null
-        }),
-        ipcMain
-      })
-    )
-
-    await expect(ipcMain.invoke('cleancode:inspect-codex-cli')).resolves.toEqual({
-      ok: true,
-      value: {
-        reason: 'timed_out',
-        status: 'temporarily_unavailable',
-        version: null
-      }
-    })
-  })
-
   it('attaches the renderer to a workspace Codex PTY session and streams session events to it', async () => {
     const ipcMain = new FakeIpcMain()
     const sender = createSender()
     const attachAgentSession = vi.fn<AgentIpcHandlersInput['attachAgentSession']>(
       async (command) => {
-        command.onOutput({
+        command.onActivityChanged({
+          activity: 'working',
           agentId: command.agentId,
-          data: 'Codex ready\r\n',
           sessionId: 'agent-session-1'
         })
         command.onToolApprovalRequested({
@@ -138,14 +92,25 @@ describe('agent IPC contract', () => {
         })
 
         return {
+          activity: 'working',
           agentId: command.agentId,
-          codexThreadId: null,
           gitBranch: command.gitBranch ?? null,
           processId: 42,
           projectDirectory: command.projectDirectory,
           projectId: command.projectId,
+          providerId: 'codex',
+          providerSessionRef: null,
           sessionId: 'agent-session-1',
           status: 'running',
+          terminalViewIdentity: {
+            blockId: command.agentId,
+            generation: 1,
+            owner: { id: command.agentId, kind: 'agent' },
+            projectId: command.projectId,
+            runId: 'agent-terminal:agent-session-1',
+            sessionId: 'run-session-1',
+            workspaceName: command.workspaceName
+          },
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: command.workspaceDirectory,
           workspaceName: command.workspaceName
@@ -174,14 +139,25 @@ describe('agent IPC contract', () => {
     ).resolves.toEqual({
       ok: true,
       value: {
+        activity: 'working',
         agentId: 'agent-2',
-        codexThreadId: null,
         gitBranch: 'feature/login',
         processId: 42,
         projectDirectory: '/repo/app',
         projectId: 'project-1',
+        providerId: 'codex',
+        providerSessionRef: null,
         sessionId: 'agent-session-1',
         status: 'running',
+        terminalViewIdentity: {
+          blockId: 'agent-2',
+          generation: 1,
+          owner: { id: 'agent-2', kind: 'agent' },
+          projectId: 'project-1',
+          runId: 'agent-terminal:agent-session-1',
+          sessionId: 'run-session-1',
+          workspaceName: 'feature'
+        },
         terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
         workspaceName: 'feature'
@@ -200,9 +176,9 @@ describe('agent IPC contract', () => {
         workspaceName: 'feature'
       })
     )
-    expect(sender.send).toHaveBeenCalledWith('cleancode:agent-pty-output', {
+    expect(sender.send).toHaveBeenCalledWith('cleancode:agent-activity-changed', {
+      activity: 'working',
       agentId: 'agent-2',
-      data: 'Codex ready\r\n',
       sessionId: 'agent-session-1'
     })
     expect(sender.send).toHaveBeenCalledWith(
@@ -263,6 +239,7 @@ describe('agent IPC contract', () => {
     await ipcMain.invoke('cleancode:create-workspace-agent', {
       layout: { position: { x: 620, y: 160 }, size: { width: 440, height: 520 } },
       projectId: 'project-1',
+      providerId: 'claude-code',
       workspaceName: 'main'
     })
     await ipcMain.invoke('cleancode:rename-workspace-agent', {
@@ -283,7 +260,9 @@ describe('agent IPC contract', () => {
       workspaceName: 'main'
     })
 
-    expect(createWorkspaceAgent).toHaveBeenCalledOnce()
+    expect(createWorkspaceAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'claude-code' })
+    )
     expect(renameWorkspaceAgent).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-2', name: 'Review Agent' })
     )
@@ -408,7 +387,8 @@ function createAgentIpcHandlersInput(input: {
   readonly createWorkspaceAgent?: AgentIpcHandlersInput['createWorkspaceAgent']
   readonly disposeAgentWorkspaceSession?: AgentIpcHandlersInput['disposeAgentWorkspaceSession']
   readonly disposeProjectAgentSessions?: AgentIpcHandlersInput['disposeProjectAgentSessions']
-  readonly inspectCodexCli?: AgentIpcHandlersInput['inspectCodexCli']
+  readonly inspectAgentProvider?: AgentIpcHandlersInput['inspectAgentProvider']
+  readonly listAgentProviders?: AgentIpcHandlersInput['listAgentProviders']
   readonly ipcMain: IpcMainLike
   readonly rejectAgentTool?: AgentIpcHandlersInput['rejectAgentTool']
   readonly removeWorkspaceAgent?: AgentIpcHandlersInput['removeWorkspaceAgent']
@@ -424,11 +404,12 @@ function createAgentIpcHandlersInput(input: {
       input.attachAgentSession ??
       (async (command) => ({
         agentId: command.agentId,
-        codexThreadId: null,
         gitBranch: command.gitBranch ?? null,
         processId: 1,
         projectDirectory: command.projectDirectory,
         projectId: command.projectId,
+        providerId: 'codex',
+        providerSessionRef: null,
         sessionId: 'agent-session-1',
         status: 'running' as const,
         terminalSourceTheme: command.terminalSourceTheme,
@@ -439,15 +420,24 @@ function createAgentIpcHandlersInput(input: {
       input.createWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-2')),
     disposeAgentWorkspaceSession: input.disposeAgentWorkspaceSession ?? (async () => undefined),
     disposeProjectAgentSessions: input.disposeProjectAgentSessions ?? (async () => undefined),
-    inspectCodexCli:
-      input.inspectCodexCli ??
-      (async () => ({
-        installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-        reason: 'not_found' as const,
-        status: 'missing' as const,
-        version: null
-      })),
+    inspectAgentProvider:
+      input.inspectAgentProvider ??
+      (async (providerId) => ({ providerId, status: 'installed' as const, version: '1.0.0' })),
     ipcMain: input.ipcMain,
+    listAgentProviders:
+      input.listAgentProviders ??
+      (() => [
+        {
+          capabilities: {
+            cleancodeMcp: true,
+            resume: true,
+            structuredLifecycle: true,
+            systemInstructions: true
+          },
+          displayName: 'Codex',
+          id: 'codex'
+        }
+      ]),
     logger: new SilentLogger(),
     rejectAgentTool: input.rejectAgentTool ?? (async () => undefined),
     removeWorkspaceAgent:
@@ -471,6 +461,7 @@ function createWorkspaceAgentSnapshot(agentId: string) {
     layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
     name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
     projectId: 'project-1',
+    providerId: 'codex',
     workspaceName: 'main'
   }
 }

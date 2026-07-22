@@ -113,6 +113,7 @@ describe('app shell Agent console', () => {
         size: { width: 720, height: 460 }
       },
       projectId: baseWorkbench.project.id,
+      providerId: 'codex',
       workspaceName: 'main'
     })
     expect(document.querySelector('[aria-label="移除 Agent 2"]')).not.toBeInTheDocument()
@@ -166,6 +167,7 @@ function createAgent(agentId: string, name: string, projectId: string, x = 320) 
     layout: { position: { x, y: 140 }, size: { width: 440, height: 520 } },
     name,
     projectId,
+    providerId: 'codex',
     workspaceName: 'main'
   }
 }

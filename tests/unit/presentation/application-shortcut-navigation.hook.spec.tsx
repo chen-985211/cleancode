@@ -145,6 +145,36 @@ describe('application shortcut navigation hook', () => {
     expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(1, second)
     expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(2, third)
   })
+
+  it('reactivates the selected target after its viewport transition settles', async () => {
+    const target = createNode('target', 600, 100)
+    const activateWorkbenchNodeInput = vi.fn()
+    let resolveCenter: (value: boolean) => void = () => undefined
+    const setCenter = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCenter = resolve
+        })
+    )
+    const hook = renderNavigationHook({
+      activateWorkbenchNodeInput,
+      nodes: [target],
+      selectedNodeId: null,
+      selectWorkbenchNode: vi.fn(),
+      setCenter
+    })
+
+    act(() => hook.result.current.selectCanvasNode('right'))
+    expect(activateWorkbenchNodeInput).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveCenter(true)
+      await Promise.resolve()
+    })
+
+    expect(activateWorkbenchNodeInput).toHaveBeenCalledTimes(2)
+    expect(activateWorkbenchNodeInput).toHaveBeenLastCalledWith(target)
+  })
 })
 
 function renderNavigationHook({

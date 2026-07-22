@@ -7,7 +7,7 @@ import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infr
 import { NodeTcpReadinessAdapter } from '../../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
 import { createDeferred } from '../../../fixtures/deferred'
 
-describe('pty terminal process adapter', () => {
+describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter', () => {
   let workingDirectory: string
   let adapter: NodePtyTerminalProcessAdapter
 
@@ -218,6 +218,60 @@ describe('pty terminal process adapter', () => {
     expect(output).toContain('after-completion')
   }, 10_000)
 
+  it('reports foreground job exit without exiting the Agent terminal and accepts a second launch', async () => {
+    let output = ''
+    let terminalExited = false
+    const firstExit = createDeferred<number | null>()
+    const secondExit = createDeferred<number | null>()
+
+    await adapter.start({
+      scope: agentRunScope('agent-foreground-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => {
+        terminalExited = true
+      }
+    })
+
+    adapter.launchForegroundJob({
+      args: ['-c', 'printf "foreground-ready\\n"; while :; do sleep 1; done'],
+      environment: { CLEANCODE_TEST_SECRET: 'must-not-appear' },
+      executable: '/bin/sh',
+      generation: 1,
+      launchId: 'launch-1',
+      onExit: (event) => firstExit.resolve(event.exitCode),
+      onStarted: () => undefined,
+      sessionId: 'agent-foreground-session'
+    })
+    await waitUntil(() => output.includes('foreground-ready'))
+    adapter.write('agent-foreground-session', '\x03')
+    await firstExit.promise
+
+    adapter.launchForegroundJob({
+      args: ['-c', 'printf "second-launch\\n"; exit 7'],
+      environment: {},
+      executable: '/bin/sh',
+      generation: 2,
+      launchId: 'launch-2',
+      onExit: (event) => secondExit.resolve(event.exitCode),
+      onStarted: () => undefined,
+      sessionId: 'agent-foreground-session'
+    })
+
+    await expect(secondExit.promise).resolves.toBe(7)
+    adapter.write('agent-foreground-session', 'printf "shell-still-running\\n"\r')
+    await waitUntil(() => output.includes('shell-still-running'))
+
+    expect(terminalExited).toBe(false)
+    expect(output).not.toContain('must-not-appear')
+    expect(output).not.toContain('\x1eCLEANCODE_JOB:')
+  }, 10_000)
+
   it('runs a command directly and reports its real exit code', async () => {
     let output = ''
     let resolveExit: (exitCode: number | null) => void = () => undefined
@@ -275,45 +329,41 @@ describe('pty terminal process adapter', () => {
     expect(output).not.toContain('54321:\r\n')
   })
 
-  it.runIf(process.platform !== 'win32')(
-    'waits for an ignoring child process group to exit and releases its listening port',
-    async () => {
-      const port = await reservePort()
-      let output = ''
-      const nodeProgram = [
-        'const net = require("node:net")',
-        'process.on("SIGHUP", () => {})',
-        'process.on("SIGTERM", () => {})',
-        `net.createServer().listen(${port}, "127.0.0.1", () => console.log("PORT_READY"))`
-      ].join(';')
+  it('waits for an ignoring child process group to exit and releases its listening port', async () => {
+    const port = await reservePort()
+    let output = ''
+    const nodeProgram = [
+      'const net = require("node:net")',
+      'process.on("SIGHUP", () => {})',
+      'process.on("SIGTERM", () => {})',
+      `net.createServer().listen(${port}, "127.0.0.1", () => console.log("PORT_READY"))`
+    ].join(';')
 
-      await adapter.start({
-        scope: runScope('stubborn-tree-session'),
-        workingDirectory,
-        shell: '/bin/sh',
-        launchCommand: `${shellQuote(process.execPath)} -e ${shellQuote(nodeProgram)}`,
-        columns: 80,
-        rows: 24,
-        onOutput: (event) => {
-          output += event.data
-        },
-        onExit: () => undefined
+    await adapter.start({
+      scope: runScope('stubborn-tree-session'),
+      workingDirectory,
+      shell: '/bin/sh',
+      launchCommand: `${shellQuote(process.execPath)} -e ${shellQuote(nodeProgram)}`,
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    await waitUntil(() => output.includes('PORT_READY'))
+
+    await adapter.stop('stubborn-tree-session')
+
+    const replacement = createServer()
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        replacement.once('error', reject)
+        replacement.listen(port, '127.0.0.1', resolve)
       })
-      await waitUntil(() => output.includes('PORT_READY'))
-
-      await adapter.stop('stubborn-tree-session')
-
-      const replacement = createServer()
-      await expect(
-        new Promise<void>((resolve, reject) => {
-          replacement.once('error', reject)
-          replacement.listen(port, '127.0.0.1', resolve)
-        })
-      ).resolves.toBeUndefined()
-      await new Promise<void>((resolve) => replacement.close(() => resolve()))
-    },
-    10_000
-  )
+    ).resolves.toBeUndefined()
+    await new Promise<void>((resolve) => replacement.close(() => resolve()))
+  }, 10_000)
 })
 
 describe('TCP service readiness adapter', () => {
@@ -375,6 +425,14 @@ function runScope(sessionId: string) {
     sessionId,
     runId: `run-${sessionId}`,
     generation: 1
+  }
+}
+
+function agentRunScope(sessionId: string) {
+  return {
+    ...runScope(sessionId),
+    blockId: 'agent-1',
+    owner: { id: 'agent-1', kind: 'agent' as const }
   }
 }
 

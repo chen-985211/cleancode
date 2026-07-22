@@ -3,7 +3,7 @@ import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { PanelLeft } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
+import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction } from './minimapInteraction'
@@ -42,9 +42,8 @@ import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
-import { CodexCliStateProvider } from './CodexCliStateProvider'
-import { AgentTerminalEventProvider } from './AgentTerminalEventProvider'
-import { createAgentTerminalEventStore } from './agentTerminalEventState'
+import { AgentProviderStateProvider } from './AgentProviderStateProvider'
+import { AgentProviderPickerDialog } from './AgentProviderPickerDialog'
 import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -79,7 +78,6 @@ export function AppShell({
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
   const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
-  const [agentTerminalEvents] = useState(createAgentTerminalEventStore)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
   const canvasSizeRef = useRef({ width: 0, height: 0 })
   const zoomCanvasIn = useCallback((): void => {
@@ -101,10 +99,6 @@ export function AppShell({
   }, [isProjectSidebarCollapsed])
   const revealProjectSidebar = useCallback((): void => setIsProjectSidebarCollapsed(false), [])
   const openApplicationSettings = useCallback((): void => setIsApplicationSettingsOpen(true), [])
-  useEffect(
-    () => () => agentTerminalEvents.surfaceRegistry.disposeAll(),
-    [agentTerminalEvents.surfaceRegistry]
-  )
   const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
     useWorkbenchGraphIndex(currentWorkbench)
   const currentTerminalBlockIds = useMemo(() => graph?.blocks.map((block) => block.id), [graph])
@@ -204,14 +198,16 @@ export function AppShell({
     setCurrentWorkbench(workbench)
   }, [])
   const {
+    agentProviderChoices,
+    cancelAgentProviderSelection,
     createWorkspaceAgent,
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
     resizeWorkspaceAgent,
+    selectAgentProvider,
     updateWorkspaceAgentMcpCapability
   } = useWorkspaceAgentActions({
-    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     currentWorkbench,
     currentWorkspace,
     layoutCommitQueue,
@@ -265,7 +261,6 @@ export function AppShell({
   })
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
-    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     currentWorkbench,
     replaceWorkbench,
     setHoveredTerminalBlockId,
@@ -282,7 +277,6 @@ export function AppShell({
     removeProject,
     reorderProject
   } = useProjectActions({
-    agentTerminalSurfaceRegistry: agentTerminalEvents.surfaceRegistry,
     rememberWorkbench,
     setCurrentWorkbench,
     setHoveredTerminalBlockId,
@@ -571,123 +565,121 @@ export function AppShell({
     [notifications, onNodeDragStop, t]
   )
   return (
-    <CodexCliStateProvider>
-      <AgentTerminalEventProvider store={agentTerminalEvents}>
-        <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
-          <main
-            className={[
-              'app-shell',
-              shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
-              isWindowFullScreen ? 'app-shell--window-full-screen' : '',
-              isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            aria-label={t('app.workspace')}
-          >
-            <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
-              <LanguageSettingsRoot />
-              <ThemeSettingsRoot />
-              <ApplicationSettingsRoot
-                bindings={bindings}
-                isOpen={isApplicationSettingsOpen}
-                platform={shortcutPlatform}
-                onBindingChange={changeBinding}
-                onClose={() => setIsApplicationSettingsOpen(false)}
-                onOpen={() => setIsApplicationSettingsOpen(true)}
-                onResetAll={resetAllBindings}
-                terminalScrollbackRows={terminalScrollbackRows}
-                onTerminalScrollbackChange={changeTerminalScrollback}
-              />
-            </div>
-            <div className="project-sidebar-column">
-              <nav
-                className="app-shell__titlebar-navigation"
-                aria-label={t('app.windowNavigation')}
-              >
-                <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
-                <TooltipLabel content={shortcutTooltips.toggleSidebar} side="bottom">
-                  <button
-                    ref={projectSidebarToggleRef}
-                    className="project-sidebar-toggle"
-                    type="button"
-                    aria-controls="project-sidebar"
-                    aria-expanded={!isProjectSidebarCollapsed}
-                    aria-label={t(
-                      isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse'
-                    )}
-                    onClick={toggleProjectSidebar}
-                  >
-                    <PanelLeft size={16} aria-hidden="true" />
-                  </button>
-                </TooltipLabel>
-              </nav>
-              <ProjectSidebar
-                workbenches={workbenches}
-                currentWorkbench={currentWorkbench}
-                isCollapsed={isProjectSidebarCollapsed}
-                isDesktopRuntime={isDesktopRuntime}
-                intent={shortcutNavigation.projectSidebarIntent}
-                shortcutTooltips={shortcutTooltips}
-                actionError={
-                  projectActionError ?? branchWorkspaceActions.branchWorkspaceActionError
-                }
-                isReorderPending={isReorderingProject}
-                onAddProject={addProject}
-                onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
-                onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
-                onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-                onDismissActionError={() => {
-                  dismissProjectActionError()
-                  branchWorkspaceActions.dismissBranchWorkspaceActionError()
-                }}
-                onRemoveProject={removeProject}
-                onReorderProject={reorderProject}
-                onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
-              />
-            </div>
-            <WorkbenchCanvas
-              approvalIntents={agentToolApprovals.approvals}
-              isDesktopRuntime={isDesktopRuntime}
-              terminalRuntimeAvailability={terminalRuntimeAvailability}
-              currentWorkbench={currentWorkbench}
-              currentWorkspace={currentWorkspace}
-              nodeStore={nodeStore}
-              nodeTypes={workbenchNodeTypes}
-              canvasSizeRef={canvasSizeRef}
-              reactFlowInstanceRef={reactFlowInstanceRef}
-              minimapNodeInteraction={minimapNodeInteraction}
-              terminalWorkflow={terminalWorkflow}
-              shortcutTooltips={shortcutTooltips}
-              isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
-              onToggleMinimap={shortcutNavigation.toggleMinimap}
-              onZoomCanvasIn={zoomCanvasIn}
-              onZoomCanvasOut={zoomCanvasOut}
-              onFitCanvas={fitCanvas}
-              onCreateTerminalBlock={createTerminalBlock}
-              onCreateWorkspaceAgent={createWorkspaceAgent}
-              onBeginTerminalGroupSelection={beginTerminalGroupSelection}
-              onCreateTerminalGroup={createTerminalGroup}
-              onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
-              isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
-              selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
-              canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
-              canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
-              onNodesChange={workbenchNodeSelection.onNodesChange}
-              onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
-              onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
-              onNodeDrag={previewTerminalGroupDrop}
-              onNodeDragStart={onNodeDragStart}
-              onNodeDragStop={commitWorkbenchNodeDrag}
-              onViewportChange={updateGraphViewport}
-              onMinimapNodeClick={focusWorkbenchNode}
-              getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
-              getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
-              getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
+    <AgentProviderStateProvider>
+      <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
+        <main
+          className={[
+            'app-shell',
+            shortcutPlatform === 'mac' ? 'app-shell--mac' : '',
+            isWindowFullScreen ? 'app-shell--window-full-screen' : '',
+            isProjectSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          aria-label={t('app.workspace')}
+        >
+          <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
+            <LanguageSettingsRoot />
+            <ThemeSettingsRoot />
+            <ApplicationSettingsRoot
+              bindings={bindings}
+              isOpen={isApplicationSettingsOpen}
+              platform={shortcutPlatform}
+              onBindingChange={changeBinding}
+              onClose={() => setIsApplicationSettingsOpen(false)}
+              onOpen={() => setIsApplicationSettingsOpen(true)}
+              onResetAll={resetAllBindings}
+              terminalScrollbackRows={terminalScrollbackRows}
+              onTerminalScrollbackChange={changeTerminalScrollback}
             />
-          </main>
-        </TerminalSurfaceRegistryProvider>
-      </AgentTerminalEventProvider>
-    </CodexCliStateProvider>
+          </div>
+          <div className="project-sidebar-column">
+            <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
+              <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
+              <TooltipLabel content={shortcutTooltips.toggleSidebar} side="bottom">
+                <button
+                  ref={projectSidebarToggleRef}
+                  className="project-sidebar-toggle"
+                  type="button"
+                  aria-controls="project-sidebar"
+                  aria-expanded={!isProjectSidebarCollapsed}
+                  aria-label={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
+                  onClick={toggleProjectSidebar}
+                >
+                  <PanelLeft size={16} aria-hidden="true" />
+                </button>
+              </TooltipLabel>
+            </nav>
+            <ProjectSidebar
+              workbenches={workbenches}
+              currentWorkbench={currentWorkbench}
+              isCollapsed={isProjectSidebarCollapsed}
+              isDesktopRuntime={isDesktopRuntime}
+              intent={shortcutNavigation.projectSidebarIntent}
+              shortcutTooltips={shortcutTooltips}
+              actionError={projectActionError ?? branchWorkspaceActions.branchWorkspaceActionError}
+              isReorderPending={isReorderingProject}
+              onAddProject={addProject}
+              onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
+              onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
+              onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
+              onDismissActionError={() => {
+                dismissProjectActionError()
+                branchWorkspaceActions.dismissBranchWorkspaceActionError()
+              }}
+              onRemoveProject={removeProject}
+              onReorderProject={reorderProject}
+              onSelectWorkspace={branchWorkspaceActions.selectWorkspace}
+            />
+          </div>
+          <WorkbenchCanvas
+            approvalIntents={agentToolApprovals.approvals}
+            isDesktopRuntime={isDesktopRuntime}
+            terminalRuntimeAvailability={terminalRuntimeAvailability}
+            currentWorkbench={currentWorkbench}
+            currentWorkspace={currentWorkspace}
+            nodeStore={nodeStore}
+            nodeTypes={workbenchNodeTypes}
+            canvasSizeRef={canvasSizeRef}
+            reactFlowInstanceRef={reactFlowInstanceRef}
+            minimapNodeInteraction={minimapNodeInteraction}
+            terminalWorkflow={terminalWorkflow}
+            shortcutTooltips={shortcutTooltips}
+            isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
+            onToggleMinimap={shortcutNavigation.toggleMinimap}
+            onZoomCanvasIn={zoomCanvasIn}
+            onZoomCanvasOut={zoomCanvasOut}
+            onFitCanvas={fitCanvas}
+            onCreateTerminalBlock={createTerminalBlock}
+            onCreateWorkspaceAgent={createWorkspaceAgent}
+            onBeginTerminalGroupSelection={beginTerminalGroupSelection}
+            onCreateTerminalGroup={createTerminalGroup}
+            onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
+            isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+            selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
+            canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
+            canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
+            onNodesChange={workbenchNodeSelection.onNodesChange}
+            onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
+            onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
+            onNodeDrag={previewTerminalGroupDrop}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDragStop={commitWorkbenchNodeDrag}
+            onViewportChange={updateGraphViewport}
+            onMinimapNodeClick={focusWorkbenchNode}
+            getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
+            getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
+            getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
+          />
+          {agentProviderChoices ? (
+            <AgentProviderPickerDialog
+              providers={agentProviderChoices}
+              onCancel={cancelAgentProviderSelection}
+              onSelect={(providerId) => void selectAgentProvider(providerId)}
+            />
+          ) : null}
+        </main>
+      </TerminalSurfaceRegistryProvider>
+    </AgentProviderStateProvider>
   )
 }

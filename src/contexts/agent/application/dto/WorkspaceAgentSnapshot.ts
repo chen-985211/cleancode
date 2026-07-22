@@ -6,6 +6,7 @@ export interface WorkspaceAgentSnapshot {
   readonly layout: AgentLayoutSnapshot
   readonly name: string
   readonly projectId: string
+  readonly providerId: string
   readonly workspaceName: string
 }
 
@@ -16,6 +17,7 @@ export function toWorkspaceAgentSnapshot(agent: AgentSession): WorkspaceAgentSna
     layout: agent.layout,
     name: agent.name,
     projectId: agent.projectId,
+    providerId: agent.providerId,
     workspaceName: agent.workspaceName
   }
 }

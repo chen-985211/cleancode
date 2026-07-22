@@ -11,11 +11,20 @@ import { spawn as spawnPtyProcess } from 'node-pty'
 
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type {
+  LaunchForegroundJobProcessCommand,
   StartTerminalProcessCommand,
   TerminalProcessHandle,
   TerminalProcessPort
 } from '../../application/ports/TerminalProcessPort'
 import { createTerminalProcessLaunch } from './TerminalShellCommand'
+import {
+  acceptForegroundJobOutput,
+  createForegroundJobProbe,
+  createForegroundJobShellControl,
+  disposeForegroundJobShellControl,
+  supportsForegroundJobShell,
+  type ForegroundJobShellControl
+} from './ForegroundJobShellControl'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -43,20 +52,43 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       resolveExit = resolve
     })
     const managedProcess: ManagedTerminalProcess = {
+      foregroundJob: null,
       process: ptyProcess,
+      shell,
       scope: command.scope,
       exited,
       stopPromise: null
     }
     this.processes.set(command.scope.sessionId, managedProcess)
-    ptyProcess.onData((data) =>
-      command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data })
-    )
+    ptyProcess.onData((data) => {
+      const output = managedProcess.foregroundJob
+        ? acceptForegroundJobOutput(managedProcess.foregroundJob, data, {
+            onStarted: (identity) => managedProcess.foregroundJob?.command.onStarted(identity),
+            onExit: (event) => {
+              const control = managedProcess.foregroundJob
+              if (!control) return
+              managedProcess.foregroundJob = null
+              disposeForegroundJobShellControl(control)
+              control.command.onExit(event)
+            }
+          })
+        : data
+      if (output) {
+        command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data: output })
+      }
+    })
     ptyProcess.onExit((event) => {
       if (this.processes.get(command.scope.sessionId) === managedProcess) {
         this.processes.delete(command.scope.sessionId)
       }
       resolveExit()
+      const foregroundJob = managedProcess.foregroundJob
+      managedProcess.foregroundJob = null
+      if (foregroundJob) disposeForegroundJobShellControl(foregroundJob)
+      foregroundJob?.command.onExit({
+        ...foregroundJob.command,
+        exitCode: null
+      })
       command.onExit({
         scope: command.scope,
         sessionId: command.scope.sessionId,
@@ -73,6 +105,30 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const terminalProcess = this.requireProcess(sessionId)
 
     terminalProcess.process.write(input)
+  }
+
+  launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
+    const terminalProcess = this.requireProcess(command.sessionId)
+    if (!supportsForegroundJobShell(platform(), terminalProcess.shell)) {
+      throw createExpectedAppError(
+        'TERMINAL_SHELL_UNSUPPORTED',
+        'Agent foreground jobs on Windows require PowerShell or PowerShell Core.',
+        { shell: terminalProcess.shell }
+      )
+    }
+    if (terminalProcess.foregroundJob) {
+      throw createExpectedAppError(
+        'TERMINAL_PROVIDER_CONTROLLER_BUSY',
+        'A foreground job is already active in this terminal process.'
+      )
+    }
+    const control = createForegroundJobShellControl(command, {
+      platform: platform(),
+      shellExecutable: terminalProcess.shell
+    })
+    terminalProcess.foregroundJob = control
+    control.launchSent = true
+    terminalProcess.process.write(createForegroundJobProbe(control))
   }
 
   resize(sessionId: string, columns: number, rows: number): void {
@@ -136,7 +192,9 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 }
 
 interface ManagedTerminalProcess {
+  foregroundJob: ForegroundJobShellControl | null
   readonly process: IPty
+  readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
   readonly exited: Promise<void>
   stopPromise: Promise<void> | null

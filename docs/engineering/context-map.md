@@ -6,13 +6,13 @@
 
 ## 当前上下文
 
-| 上下文     | 状态   | 核心聚合                         | 拥有的事实                                                         |
-| ---------- | ------ | -------------------------------- | ------------------------------------------------------------------ |
-| Project    | 已实现 | `Project`、`ProjectRegistry`     | 项目目录、工作区、Git 绑定、当前工作区、最近项目目录               |
-| BlockGraph | 已实现 | `BlockGraph`                     | 终端积木、组合、布局、执行配置和依赖连接                           |
-| Run        | 已实现 | `TerminalSession`、`WorkflowRun` | PTY 会话、精确运行身份、服务端口租约、实际端点、工作流和节点状态   |
-| Agent      | 已实现 | `AgentSession`                   | Agent 身份、布局、原生 MCP 开关、thread 绑定、工具协议、审批和审计 |
-| Plugin     | 规划中 | 尚无                             | 尚未形成当前领域模型、用例或持久化事实                             |
+| 上下文     | 状态   | 核心聚合                                          | 拥有的事实                                                               |
+| ---------- | ------ | ------------------------------------------------- | ------------------------------------------------------------------------ |
+| Project    | 已实现 | `Project`、`ProjectRegistry`                      | 项目目录、工作区、Git 绑定、当前工作区、最近项目目录                     |
+| BlockGraph | 已实现 | `BlockGraph`                                      | 终端积木、组合、布局、执行配置和依赖连接                                 |
+| Run        | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun` | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态        |
+| Agent      | 已实现 | `AgentSession`                                    | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计 |
+| Plugin     | 规划中 | 尚无                                              | 尚未形成当前领域模型、用例或持久化事实                                   |
 
 `src/platform` 是最外层 composition root 与 Electron 适配层，不是限界上下文。`src/presentation` 负责跨上下文应用外壳与派生视图，也不拥有领域事实。
 
@@ -38,6 +38,11 @@ Agent application
   -> AgentRuntimeScopeValidationPort
   -> Platform adapter
   -> ValidateProjectWorkspaceScopeUseCase
+
+Agent application
+  -> AgentTerminalRuntimePort
+  -> RunAgentTerminalRuntimeAdapter
+  -> Run TerminalSessionService / ForegroundJob
 
 Run application
   -> RunRuntimeScopeValidationPort
@@ -105,7 +110,22 @@ Agent application
 | 契约             | 项目仍被记住，项目 ID、工作区名称/目录和 Git 分支全部匹配；Platform 同时确认 Agent 定义仍存在 |
 | 禁止             | Agent 直接读取 Project/ProjectRegistry 聚合或仓储                                             |
 
-该校验是 lifecycle lease 的提交后防线：即使旧 renderer 命令在 lease resolve 后才抵达，已删除 Agent、已归档工作区、已遗忘项目或旧分支作用域也不能重新启动 PTY。
+该校验是 lifecycle lease 的提交后防线：即使旧 renderer 命令在 lease resolve 后才抵达，已删除 Agent、已归档工作区、已遗忘项目或旧分支作用域也不能重新启动 Agent terminal 或 Provider launch。
+
+## Agent 到 Run：Agent terminal 与前台任务
+
+| 项目             | 说明                                                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Agent                                                                                                                  |
+| 调用方拥有的端口 | `AgentTerminalRuntimePort`                                                                                             |
+| 提供方           | Run 的 `TerminalSessionService`、类型化 agent owner、共享终端模型/视图和 `ForegroundJob`                               |
+| 适配器           | Agent infrastructure 的 `RunAgentTerminalRuntimeAdapter`                                                               |
+| 契约             | Agent 传入稳定 owner 和结构化 Provider launch plan；Run 返回 terminal/view identity 和权威前台任务事件                 |
+| Agent 所有权     | 固定 Provider、session ref、launch generation、activity、MCP、审批与审计                                               |
+| Run 所有权       | PTY、shell、`sessionId + runId + generation`、输出 sequence、snapshot、view lease、ForegroundJob started/exit          |
+| 禁止             | Run 导入 Agent 聚合或 Provider 类型；Agent 访问 Run 会话表/PTY map；agent owner 参与 BlockGraph 工作流、组合或端口治理 |
+
+Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession` 退出。Agent 删除、挂起和项目生命周期清理通过该端口终止 terminal；普通键盘输入和原始 `Ctrl+C` 仍由 Run 写入当前 PTY。
 
 ## Run 到 Project：终端运行作用域有效性
 
@@ -152,7 +172,7 @@ Agent application
 - Presentation 调用应用层用例、订阅 IPC 事件并形成派生视图，不是上下文之间的数据后门。
 - Platform 注册 IPC、创建仓储和适配器、连接端口，不拥有 Project、BlockGraph、Run 或 Agent 业务状态。
 - Shared Kernel 只容纳稳定且确实被多个上下文共同使用的错误/契约；不得用它规避端口边界。
-- JSON 文件、PTY、Git CLI、HTTP Server 和 Codex CLI 都是基础设施细节，不是新的限界上下文。
+- JSON 文件、PTY、Git CLI、HTTP Server、Codex、Claude Code 和 OpenCode CLI 都是基础设施细节，不是新的限界上下文。
 
 ## 规划中的 Plugin
 

@@ -282,17 +282,20 @@ function createManagedSession(): ManagedAgentSession {
     callbacks: {
       onExit: vi.fn(),
       onGraphUpdated: vi.fn(),
-      onOutput: vi.fn(),
       onToolApprovalRequested: vi.fn()
     },
     cleancodeMcpEnabled: true,
-    codexThreadId: null,
     columns: 80,
     gitBranch: null,
+    isTerminalRunning: true,
     isStopping: false,
+    launchArtifacts: [],
     processId: 1,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
+    providerId: 'codex',
+    providerLaunchGeneration: 0,
+    providerSessionRef: null,
     rows: 24,
     scope: AgentConversationScope.create({
       agentId: 'agent-1',

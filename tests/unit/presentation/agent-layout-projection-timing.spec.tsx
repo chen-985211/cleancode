@@ -147,6 +147,7 @@ const workbench: WorkbenchSnapshot = {
       },
       name: 'Agent 1',
       projectId: 'project-alpha-project',
+      providerId: 'codex',
       workspaceName: 'main'
     }
   ],

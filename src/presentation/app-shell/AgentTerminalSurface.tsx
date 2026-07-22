@@ -5,12 +5,14 @@ import { useI18n } from './i18n/useI18n'
 
 export function AgentTerminalSurface({
   activeOutput,
+  providerName,
   terminalElementRef,
   onFallbackInput,
   session,
   useFallback
 }: {
   readonly activeOutput: string
+  readonly providerName: string
   readonly terminalElementRef: MutableRefObject<HTMLDivElement | null>
   readonly onFallbackInput: (input: string) => void
   readonly session: AgentSessionSnapshot | null
@@ -20,9 +22,9 @@ export function AgentTerminalSurface({
   if (useFallback) {
     return (
       <div className="agent-terminal-fallback">
-        <pre aria-label={t('agent.cliTerminal')}>{activeOutput}</pre>
+        <pre aria-label={t('agent.cliTerminal', { provider: providerName })}>{activeOutput}</pre>
         <textarea
-          aria-label={t('agent.cliInput')}
+          aria-label={t('agent.cliInput', { provider: providerName })}
           onChange={(event) => {
             onFallbackInput(event.target.value)
             event.target.value = ''
@@ -40,6 +42,7 @@ export function AgentTerminalSurface({
         data-agent-terminal-output-length={activeOutput.length}
         data-agent-terminal-process-id={session?.processId ?? undefined}
         data-agent-terminal-session-id={session?.sessionId}
+        data-agent-terminal-source-theme={session?.terminalSourceTheme}
         data-agent-terminal-workspace-name={session?.workspaceName}
         ref={terminalElementRef}
       />

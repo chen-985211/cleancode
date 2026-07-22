@@ -1,13 +1,26 @@
 import type { AgentBlockGraphSnapshot } from './AgentBlockGraphProtocol'
 import type { AgentToolErrorSnapshot } from './AgentToolProtocol'
 import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
+import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 
 export type AgentTerminalSourceTheme = 'dark' | 'light'
+export type AgentActivityStatus =
+  'unavailable' | 'idle' | 'working' | 'waiting_input' | 'waiting_approval'
 
-export interface AgentPtyOutputEvent {
+export interface AgentActivityChangedEvent {
+  readonly activity: AgentActivityStatus
   readonly agentId: string
-  readonly data: string
   readonly sessionId: string
+}
+
+export interface AgentTerminalViewIdentity {
+  readonly blockId: string
+  readonly generation: number
+  readonly owner: { readonly id: string; readonly kind: 'agent' }
+  readonly projectId: string
+  readonly runId: string
+  readonly sessionId: string
+  readonly workspaceName: string
 }
 
 export interface AgentPtyExitEvent {
@@ -69,14 +82,17 @@ export interface AgentToolApprovalRequest {
 }
 
 export interface AgentSessionSnapshot {
+  readonly activity?: AgentActivityStatus
   readonly agentId: string
-  readonly codexThreadId: string | null
   readonly gitBranch: string | null
   readonly processId: number | null
   readonly projectDirectory: string
   readonly projectId: string
+  readonly providerId: string
+  readonly providerSessionRef: ProviderSessionRefSnapshot | null
   readonly sessionId: string
   readonly status: 'running' | 'suspended' | 'exited' | 'failed' | 'restore_failed'
+  readonly terminalViewIdentity?: AgentTerminalViewIdentity | null
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string

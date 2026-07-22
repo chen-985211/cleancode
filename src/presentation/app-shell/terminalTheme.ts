@@ -25,10 +25,6 @@ const terminalThemeVariables = {
   yellow: '--cc-terminal-yellow'
 } as const satisfies Partial<Record<keyof ITheme, string>>
 
-export function readTerminalTheme(root: HTMLElement = document.documentElement): ITheme {
-  return readTerminalThemeVariables(root, (variable) => variable)
-}
-
 export function readCanonicalTerminalSearchTheme(theme: EffectiveTheme): {
   readonly active: string
   readonly border: string

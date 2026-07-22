@@ -27,7 +27,9 @@ const cleancodeApi = {
     invokeCleancode('cleancode:checkout-main-workspace-branch', command),
   synchronizeProjectGitState: (command: unknown) =>
     invokeCleancode('cleancode:synchronize-project-git-state', command),
-  inspectCodexCli: () => invokeCleancode('cleancode:inspect-codex-cli'),
+  inspectAgentProvider: (command: unknown) =>
+    invokeCleancode('cleancode:inspect-agent-provider', command),
+  listAgentProviders: () => invokeCleancode('cleancode:list-agent-providers'),
   attachAgentSession: (command: unknown) =>
     invokeCleancode('cleancode:attach-agent-session', command),
   createWorkspaceAgent: (command: unknown) =>
@@ -50,10 +52,10 @@ const cleancodeApi = {
     invokeCleancode('cleancode:dispose-project-agent-sessions', command),
   approveAgentTool: (command: unknown) => invokeCleancode('cleancode:approve-agent-tool', command),
   rejectAgentTool: (command: unknown) => invokeCleancode('cleancode:reject-agent-tool', command),
-  onAgentPtyOutput: (listener: (event: unknown) => void) =>
-    subscribeRendererEvent('cleancode:agent-pty-output', listener),
   onAgentPtyExit: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-pty-exit', listener),
+  onAgentActivityChanged: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-activity-changed', listener),
   onAgentGraphUpdated: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-graph-updated', listener),
   onAgentToolApprovalRequested: (listener: (event: unknown) => void) =>

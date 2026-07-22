@@ -181,6 +181,25 @@ describe('terminal view IPC contract', () => {
     expect(attachTerminalView).not.toHaveBeenCalled()
   })
 
+  it('forwards a typed Agent owner through the shared terminal view protocol', async () => {
+    const ipcMain = new FakeIpcMain()
+    const attachTerminalView = vi.fn(async () => snapshot())
+    registerTerminalIpcHandlers(createInput({ ipcMain, attachTerminalView }))
+    const command = {
+      ...viewCommand(),
+      blockId: 'agent-1',
+      owner: { id: 'agent-1', kind: 'agent' as const }
+    }
+
+    await expect(
+      ipcMain.invoke('cleancode:attach-terminal-view', command, new FakeSender())
+    ).resolves.toMatchObject({ ok: true })
+    expect(attachTerminalView).toHaveBeenCalledWith({
+      ...command,
+      onOutput: expect.any(Function)
+    })
+  })
+
   it('accepts only a supported terminal scrollback budget', async () => {
     const ipcMain = new FakeIpcMain()
     const updateTerminalScrollback = vi.fn()

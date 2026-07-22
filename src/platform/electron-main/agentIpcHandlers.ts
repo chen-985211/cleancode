@@ -1,7 +1,7 @@
 import type {
+  AgentActivityChangedEvent,
   AgentGraphUpdatedEvent,
   AgentPtyExitEvent,
-  AgentPtyOutputEvent,
   AgentSessionSnapshot,
   AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
@@ -9,7 +9,10 @@ import type {
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
-import type { CodexCliInstallationSnapshot } from '../../contexts/agent/application/ports/CodexCliPort'
+import type {
+  AgentProviderAvailability,
+  AgentProviderDescriptor
+} from '../../contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentLayoutSnapshot } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
@@ -24,16 +27,17 @@ interface IpcSender {
 export interface AgentIpcHandlersInput {
   readonly approveAgentTool: (approvalId: string) => Promise<AgentToolApprovalDecisionResult>
   readonly attachAgentSession: (command: {
+    readonly onActivityChanged: (event: AgentActivityChangedEvent) => void
     readonly agentId: string
     readonly columns?: number
     readonly gitBranch?: string | null
     readonly onExit: (event: AgentPtyExitEvent) => void
     readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
-    readonly onOutput: (event: AgentPtyOutputEvent) => void
     readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
     readonly persistenceMode?: 'ephemeral' | 'persistent'
     readonly projectDirectory: string
     readonly projectId: string
+    readonly providerId?: string
     readonly restartMode?: 'new' | 'retry'
     readonly rows?: number
     readonly terminalSourceTheme: AgentTerminalSourceTheme
@@ -43,6 +47,7 @@ export interface AgentIpcHandlersInput {
   readonly createWorkspaceAgent: (command: {
     readonly layout: AgentLayoutSnapshot
     readonly projectId: string
+    readonly providerId: string
     readonly workspaceName: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly disposeAgentWorkspaceSession: (command: {
@@ -50,7 +55,8 @@ export interface AgentIpcHandlersInput {
     readonly workspaceName: string
   }) => Promise<void>
   readonly disposeProjectAgentSessions: (projectDirectory: string) => Promise<void>
-  readonly inspectCodexCli: () => Promise<CodexCliInstallationSnapshot>
+  readonly inspectAgentProvider: (providerId: string) => Promise<AgentProviderAvailability>
+  readonly listAgentProviders: () => readonly AgentProviderDescriptor[]
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
   readonly rejectAgentTool: (approvalId: string) => Promise<void>
@@ -82,12 +88,21 @@ export interface AgentIpcHandlersInput {
 }
 
 export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
-  registerIpcHandler<void, CodexCliInstallationSnapshot>({
-    channel: 'cleancode:inspect-codex-cli',
-    handler: () => input.inspectCodexCli(),
+  registerIpcHandler<{ readonly providerId: string }, AgentProviderAvailability>({
+    channel: 'cleancode:inspect-agent-provider',
+    handler: (command) => input.inspectAgentProvider(readProviderId(command.providerId)),
     ipcMain: input.ipcMain,
     logger: input.logger,
-    operation: 'inspectCodexCli',
+    operation: 'inspectAgentProvider',
+    scope: 'agent'
+  })
+
+  registerIpcHandler<void, readonly AgentProviderDescriptor[]>({
+    channel: 'cleancode:list-agent-providers',
+    handler: () => input.listAgentProviders(),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listAgentProviders',
     scope: 'agent'
   })
 
@@ -98,6 +113,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly gitBranch?: string | null
       readonly projectDirectory: string
       readonly projectId: string
+      readonly providerId?: string
       readonly persistenceMode?: 'ephemeral' | 'persistent'
       readonly restartMode?: 'new' | 'retry'
       readonly rows?: number
@@ -116,15 +132,17 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
         agentId: command.agentId,
         columns: command.columns,
         gitBranch: command.gitBranch,
+        onActivityChanged: (activityEvent) =>
+          sendIfAlive(sender, 'cleancode:agent-activity-changed', activityEvent),
         onExit: (exitEvent) => sendIfAlive(sender, 'cleancode:agent-pty-exit', exitEvent),
         onGraphUpdated: (graphEvent) =>
           sendIfAlive(sender, 'cleancode:agent-graph-updated', graphEvent),
-        onOutput: (outputEvent) => sendIfAlive(sender, 'cleancode:agent-pty-output', outputEvent),
         onToolApprovalRequested: (approvalEvent) =>
           sendIfAlive(sender, 'cleancode:agent-tool-approval-requested', approvalEvent),
         persistenceMode: command.persistenceMode,
         projectDirectory: command.projectDirectory,
         projectId: command.projectId,
+        providerId: command.providerId,
         restartMode: command.restartMode,
         rows: command.rows,
         terminalSourceTheme,
@@ -142,12 +160,14 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     {
       readonly layout: AgentLayoutSnapshot
       readonly projectId: string
+      readonly providerId: string
       readonly workspaceName: string
     },
     WorkspaceAgentSnapshot
   >({
     channel: 'cleancode:create-workspace-agent',
-    handler: (command) => input.createWorkspaceAgent(command),
+    handler: (command) =>
+      input.createWorkspaceAgent({ ...command, providerId: readProviderId(command.providerId) }),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'createWorkspaceAgent',
@@ -301,6 +321,14 @@ function readAgentTerminalSourceTheme(value: unknown): AgentTerminalSourceTheme 
   throw createExpectedAppError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: terminalSourceTheme must be light or dark.'
+  )
+}
+
+function readProviderId(value: unknown): string {
+  if (typeof value === 'string' && value.trim() === value && value.length > 0) return value
+  throw createExpectedAppError(
+    'INVALID_IPC_COMMAND',
+    'Invalid IPC command: providerId must be a non-empty string.'
   )
 }
 

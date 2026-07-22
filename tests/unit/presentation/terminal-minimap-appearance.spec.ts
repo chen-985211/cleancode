@@ -91,6 +91,7 @@ function createAgentConsoleNode(): AgentConsoleFlowNode {
         layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
         name: 'Agent 1',
         projectId: 'project-1',
+        providerId: 'codex',
         workspaceName: 'main'
       },
       currentWorkbench: null,

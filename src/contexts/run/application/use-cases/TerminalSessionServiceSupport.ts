@@ -4,6 +4,10 @@ import {
   isAppError
 } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalModelPort } from '../ports/TerminalModelPort'
+import type { TerminalModelDiagnosticsSnapshot } from '../dto/TerminalModelSnapshot'
+import type { TerminalLinkIdentity } from '../dto/TerminalLink'
+import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
+import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 
 export function getTerminalSessionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -41,6 +45,19 @@ export function requireTerminalModelPort(port: TerminalModelPort | undefined): T
   return port
 }
 
+export function readTerminalModelDiagnostics(
+  port: TerminalModelPort | undefined
+): TerminalModelDiagnosticsSnapshot {
+  return (
+    port?.getDiagnostics() ?? {
+      modelCount: 0,
+      attachedViewCount: 0,
+      pendingOutputBytes: 0,
+      lastRestoreDurationMs: 0
+    }
+  )
+}
+
 export function createTerminalSessionOwner(command: {
   readonly projectId: string
   readonly projectDirectory: string
@@ -48,6 +65,7 @@ export function createTerminalSessionOwner(command: {
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly terminalBlockId: string
+  readonly owner?: TerminalRunOwner['owner']
 }): TerminalRunOwner {
   return {
     projectId: command.projectId,
@@ -55,10 +73,50 @@ export function createTerminalSessionOwner(command: {
     workspaceName: command.workspaceName,
     workspaceDirectory: command.workspaceDirectory,
     gitBranch: command.gitBranch,
-    blockId: command.terminalBlockId
+    blockId: command.terminalBlockId,
+    owner: command.owner ?? { id: command.terminalBlockId, kind: 'block' }
   }
 }
 
 export function createTerminalSessionId(prefix: string): string {
   return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random()}`
+}
+
+export function assertCurrentTerminalViewIdentity(
+  command: TerminalLinkIdentity,
+  session: TerminalSession,
+  state: {
+    readonly currentSessionId: string | undefined
+    readonly latestGeneration: number | undefined
+    readonly restorableSessionId: string | undefined
+  }
+): void {
+  const commandOwner = command.owner ?? { id: command.blockId, kind: 'block' as const }
+  const sessionOwner = resolveTerminalOwnerRef(session.scope)
+  const matchesIdentity =
+    session.scope.projectId === command.projectId &&
+    session.scope.workspaceName === command.workspaceName &&
+    session.scope.blockId === command.blockId &&
+    session.scope.sessionId === command.sessionId &&
+    session.scope.runId === command.runId &&
+    session.scope.generation === command.generation
+  const isCurrentOrNaturallyExited =
+    state.currentSessionId === session.id ||
+    (state.currentSessionId === undefined &&
+      session.status === 'exited' &&
+      state.restorableSessionId === session.id)
+
+  if (
+    !matchesIdentity ||
+    commandOwner.kind !== sessionOwner.kind ||
+    commandOwner.id !== sessionOwner.id ||
+    state.latestGeneration !== command.generation ||
+    !isCurrentOrNaturallyExited ||
+    (session.status !== 'running' && session.status !== 'exited')
+  ) {
+    throw createExpectedAppError(
+      'RUN_SCOPE_STALE',
+      'Terminal view no longer matches the current runtime scope.'
+    )
+  }
 }

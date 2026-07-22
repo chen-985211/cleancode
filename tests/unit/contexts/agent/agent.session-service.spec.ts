@@ -3,10 +3,10 @@ import type {
   AgentMcpServerPort,
   RegisteredAgentMcpSession
 } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
-import type {
-  CodexAgentProcessPort,
-  StartCodexAgentProcessCommand
-} from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
+import {
+  RecordingAgentProviderRegistry,
+  RecordingAgentTerminalRuntime
+} from '../../../fixtures/agentTerminalRuntime'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { ExecuteAgentToolCommand } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
@@ -17,7 +17,7 @@ import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/ap
 
 describe('agent session service', () => {
   it('keeps one background Codex PTY per workspace and reattaches without restarting it', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
 
     const firstSession = await service.attach({
@@ -25,7 +25,6 @@ describe('agent session service', () => {
       columns: 100,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
-      onOutput: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 32,
@@ -38,7 +37,6 @@ describe('agent session service', () => {
       columns: 120,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
-      onOutput: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 40,
@@ -51,7 +49,6 @@ describe('agent session service', () => {
       columns: 80,
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
-      onOutput: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 24,
@@ -62,7 +59,7 @@ describe('agent session service', () => {
 
     expect(reattachedSession.sessionId).toBe(firstSession.sessionId)
     expect(branchSession.sessionId).not.toBe(firstSession.sessionId)
-    expect(processPort.starts.map((start) => start.workspaceDirectory)).toEqual([
+    expect(processPort.opens.map((start) => start.workspaceDirectory)).toEqual([
       '/repo/app',
       '/repo/app-worktrees/feature'
     ])
@@ -72,7 +69,7 @@ describe('agent session service', () => {
   })
 
   it('runs multiple Agents in the same workspace without stopping each other', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
 
     const first = await attachMainSession(service, { agentId: 'agent-1' })
@@ -80,12 +77,67 @@ describe('agent session service', () => {
 
     expect(first.agentId).toBe('agent-1')
     expect(second.agentId).toBe('agent-2')
-    expect(processPort.starts).toHaveLength(2)
+    expect(processPort.launches).toHaveLength(2)
     expect(processPort.stops).toEqual([])
   })
 
+  it('rejects attempts to attach an existing Agent with a different Provider', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    await repository.save(
+      AgentSession.create({
+        agentId: 'agent-1',
+        layout: { position: { x: 540, y: 120 }, size: { height: 460, width: 720 } },
+        name: 'Agent 1',
+        projectId: 'project-1',
+        providerId: 'claude-code',
+        workspaceName: 'main'
+      })
+    )
+    const service = createSessionService({ repository })
+
+    await expect(attachMainSession(service, { providerId: 'codex' })).rejects.toMatchObject({
+      code: 'AGENT_PROVIDER_MISMATCH'
+    })
+  })
+
+  it('accepts structured activity only from the current Provider launch', async () => {
+    const processPort = new RecordingAgentTerminalRuntime()
+    const providers = new RecordingAgentProviderRegistry()
+    const service = createSessionService({ processPort, providers })
+    const onActivityChanged = vi.fn()
+    const session = await attachMainSession(service, { onActivityChanged })
+
+    providers.launchCommands[0]?.onActivityChanged?.('working')
+
+    expect(onActivityChanged).toHaveBeenCalledWith({
+      activity: 'working',
+      agentId: 'agent-1',
+      sessionId: session.sessionId
+    })
+    expect((await attachMainSession(service, { onActivityChanged })).activity).toBe('working')
+
+    processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
+
+    expect(onActivityChanged).toHaveBeenLastCalledWith({
+      activity: 'unavailable',
+      agentId: 'agent-1',
+      sessionId: session.sessionId
+    })
+
+    await attachMainSession(service, { onActivityChanged, restartMode: 'retry' })
+    providers.launchCommands[0]?.onActivityChanged?.('working')
+    expect(onActivityChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ activity: 'unavailable' })
+    )
+
+    providers.launchCommands[1]?.onActivityChanged?.('idle')
+    expect(onActivityChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ activity: 'idle' })
+    )
+  })
+
   it('suspends and resumes every Agent in a physical workspace directory', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const first = await attachMainSession(service, { agentId: 'agent-1' })
     const second = await attachMainSession(service, { agentId: 'agent-2' })
@@ -96,11 +148,11 @@ describe('agent session service', () => {
 
     await suspension.resume()
     suspension.release()
-    expect(processPort.starts).toHaveLength(4)
+    expect(processPort.launches).toHaveLength(4)
   })
 
   it('ignores a stale resize emitted after its Agent session has been disposed', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const session = await attachMainSession(service)
 
@@ -116,12 +168,11 @@ describe('agent session service', () => {
   })
 
   it('keeps separate Codex sessions for different branches in the same workspace', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const callbacks = {
       onExit: () => undefined,
       onGraphUpdated: () => undefined,
-      onOutput: () => undefined,
       onToolApprovalRequested: () => undefined
     }
     const mainBranchCommand = {
@@ -149,36 +200,48 @@ describe('agent session service', () => {
     const featureSession = await service.attach(featureBranchCommand)
 
     expect(featureSession.sessionId).not.toBe(mainSession.sessionId)
-    expect(processPort.starts).toHaveLength(2)
+    expect(processPort.launches).toHaveLength(2)
   })
 
   it('resumes the persisted Codex thread after the application service is recreated', async () => {
     const repository = new RecordingAgentSessionRepository()
-    const firstProcessPort = new RecordingCodexAgentProcessPort()
-    const firstService = createSessionService({ processPort: firstProcessPort, repository })
+    const firstProcessPort = new RecordingAgentTerminalRuntime()
+    const firstProviders = new RecordingAgentProviderRegistry()
+    const firstService = createSessionService({
+      processPort: firstProcessPort,
+      providers: firstProviders,
+      repository
+    })
     const command = {
       gitBranch: 'main',
       projectId: 'project-1'
     }
 
     await attachMainSession(firstService, command)
-    firstProcessPort.starts[0]?.onCodexThreadIdentified('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+    firstProviders.launchCommands[0]?.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
     await vi.waitFor(() => expect(repository.sessions.size).toBe(1))
 
-    const restartedProcessPort = new RecordingCodexAgentProcessPort()
+    const restartedProcessPort = new RecordingAgentTerminalRuntime()
+    const restartedProviders = new RecordingAgentProviderRegistry()
     const restartedService = createSessionService({
       processPort: restartedProcessPort,
+      providers: restartedProviders,
       repository
     })
     await attachMainSession(restartedService, command)
 
-    expect(restartedProcessPort.starts[0]?.resumeThreadId).toBe(
-      '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
-    )
+    expect(restartedProviders.launchCommands[0]?.providerSessionRef).toMatchObject({
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
   })
 
   it('passes user input and terminal resize to the bound Codex PTY', async () => {
-    const processPort = new RecordingCodexAgentProcessPort()
+    const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const session = await attachMainSession(service)
 
@@ -187,6 +250,26 @@ describe('agent session service', () => {
 
     expect(processPort.writes).toEqual([{ input: 'build the app\r', sessionId: session.sessionId }])
     expect(processPort.resizes).toEqual([{ columns: 132, rows: 36, sessionId: session.sessionId }])
+  })
+
+  it('keeps the Agent terminal after Provider exit and relaunches in the same shell', async () => {
+    const processPort = new RecordingAgentTerminalRuntime()
+    const service = createSessionService({ processPort })
+    const first = await attachMainSession(service)
+
+    processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
+    const shellAttachment = await attachMainSession(service)
+
+    expect(shellAttachment).toMatchObject({ sessionId: first.sessionId, status: 'exited' })
+    expect(processPort.opens).toHaveLength(1)
+    service.write({ input: 'pwd\r', sessionId: first.sessionId })
+    expect(processPort.writes).toContainEqual({ input: 'pwd\r', sessionId: first.sessionId })
+
+    const relaunched = await attachMainSession(service, { restartMode: 'retry' })
+
+    expect(relaunched.sessionId).toBe(first.sessionId)
+    expect(processPort.opens).toHaveLength(1)
+    expect(processPort.launches).toHaveLength(2)
   })
 
   it('waits for UI approval before executing destructive MCP tools', async () => {
@@ -291,38 +374,6 @@ type CancelAgentTool = (
   reason: string
 ) => Promise<AgentToolExecutionResult>
 
-class RecordingCodexAgentProcessPort implements CodexAgentProcessPort {
-  readonly resizes: {
-    readonly columns: number
-    readonly rows: number
-    readonly sessionId: string
-  }[] = []
-  readonly starts: StartCodexAgentProcessCommand[] = []
-  readonly stops: string[] = []
-  readonly writes: { readonly input: string; readonly sessionId: string }[] = []
-
-  async start(command: StartCodexAgentProcessCommand): Promise<{ readonly processId: number }> {
-    this.starts.push(command)
-    return { processId: this.starts.length }
-  }
-
-  write(sessionId: string, input: string): void {
-    this.writes.push({ input, sessionId })
-  }
-
-  resize(sessionId: string, columns: number, rows: number): void {
-    this.resizes.push({ columns, rows, sessionId })
-  }
-
-  async stop(sessionId: string): Promise<void> {
-    this.stops.push(sessionId)
-  }
-
-  async disposeAll(): Promise<void> {
-    this.stops.push('*')
-  }
-}
-
 class RecordingMcpServerPort implements AgentMcpServerPort {
   readonly sessions = new Map<string, RegisteredAgentMcpSession>()
 
@@ -351,12 +402,13 @@ function createSessionService(
     readonly executeAgentTool?: ExecuteAgentTool
     readonly cancelAgentTool?: CancelAgentTool
     readonly mcpServerPort?: AgentMcpServerPort
-    readonly processPort?: CodexAgentProcessPort
+    readonly processPort?: RecordingAgentTerminalRuntime
+    readonly providers?: RecordingAgentProviderRegistry
     readonly repository?: AgentSessionRepository
   } = {}
 ): AgentSessionService {
   return new AgentSessionService(
-    input.processPort ?? new RecordingCodexAgentProcessPort(),
+    input.processPort ?? new RecordingAgentTerminalRuntime(),
     input.mcpServerPort ?? new RecordingMcpServerPort(),
     {
       cancel:
@@ -368,7 +420,8 @@ function createSessionService(
         })),
       execute: input.executeAgentTool ?? (async () => completedToolResult('tool-call-1'))
     },
-    input.repository ?? new RecordingAgentSessionRepository()
+    input.repository ?? new RecordingAgentSessionRepository(),
+    input.providers ?? new RecordingAgentProviderRegistry()
   )
 }
 
@@ -404,7 +457,7 @@ class RecordingAgentSessionRepository implements AgentSessionRepository {
   async delete(scope: AgentConversationScope): Promise<void> {
     const session = await this.find(scope)
     if (session) {
-      session.clearCodexThread(scope.toSnapshot().gitBranch)
+      session.clearProviderSession(scope.toSnapshot().gitBranch)
       await this.save(session)
     }
   }
@@ -431,7 +484,6 @@ async function attachMainSession(
     columns: 80,
     onExit: () => undefined,
     onGraphUpdated: () => undefined,
-    onOutput: () => undefined,
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',

@@ -17,6 +17,7 @@ import type { TerminalModelCheckpoint } from '../../application/dto/TerminalMode
 import type { SequencedTerminalOutput } from '../../application/ports/TerminalModelPort'
 import type { TerminalSessionSnapshot } from '../../domain/aggregates/TerminalSession'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import { isSameTerminalRun } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
@@ -447,10 +448,21 @@ function isTerminalRunScope(value: unknown): value is TerminalRunScope {
     typeof value.workspaceDirectory === 'string' &&
     (typeof value.gitBranch === 'string' || value.gitBranch === null) &&
     typeof value.blockId === 'string' &&
+    isTerminalOwnerRef(value.owner) &&
     typeof value.sessionId === 'string' &&
     typeof value.runId === 'string' &&
     Number.isInteger(value.generation) &&
     (value.generation as number) > 0
+  )
+}
+
+function isTerminalOwnerRef(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      (value.kind === 'block' || value.kind === 'agent') &&
+      typeof value.id === 'string' &&
+      value.id.length > 0)
   )
 }
 
@@ -468,6 +480,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function createStorageKey(identity: TerminalRunScope): string {
+  const owner = resolveTerminalOwnerRef(identity)
   return createHash('sha256')
     .update(
       JSON.stringify([
@@ -475,7 +488,7 @@ function createStorageKey(identity: TerminalRunScope): string {
         identity.projectDirectory,
         identity.workspaceName,
         identity.workspaceDirectory,
-        identity.blockId,
+        ...(owner.kind === 'block' ? [identity.blockId] : [owner.kind, owner.id]),
         identity.sessionId,
         identity.runId,
         identity.generation

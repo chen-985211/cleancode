@@ -22,7 +22,7 @@
 | 状态管理       | React 本地状态与 hooks；当前没有集中式状态库                                        |
 | 进程通信       | Electron IPC、主进程事件、本机 Unix socket / Windows named pipe 长度帧协议          |
 | 持久化         | Node.js 文件系统、版本化 JSON 与 JSONL                                              |
-| Agent CLI      | Codex CLI + node-pty                                                                |
+| Agent CLI      | Codex CLI、Claude Code、OpenCode Provider contributions + node-pty                  |
 | Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                                                         |
 | 测试           | Vitest、Testing Library、Playwright                                                 |
 
@@ -50,7 +50,7 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。renderer 中的 xterm.js 负责渲染与输入；普通终端使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。普通终端另外在独立本地 Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence 与恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 使用 ConPTY，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 使用 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
@@ -60,13 +60,13 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Codex Agent PTY。re
 
 ## Agent 集成
 
-当前嵌入式 Agent 使用 Codex CLI。cleancode 通过 node-pty 启动独立进程，通过 Codex CLI 的正式 resume 入口恢复 thread，并由进程级 `notify` 向本机随机令牌通道报告当前 thread UUID，不扫描历史目录或修改用户全局配置。
+当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；resume、结构化活动、CleanCode MCP 与系统指令是 Provider 声明并实现的可选能力。Windows 上的 Provider CLI 检测通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；不得把 executable 或 argv 拼接成可注入的命令文本。
 
-每个运行时 Agent 拥有独立 `sessionId`、PTY 和审批队列；启用 CleanCode MCP 时才注册该会话独立的 MCP URL 与 Bearer Token，把该 Server 标记为 required、把全部当前和未来工具默认预批准，并为该 Codex 进程注入画布路由 developer instructions。Codex 子进程的 sandbox 与全局 approval policy 继续继承用户配置，CleanCode 的预批准不得扩展到 Shell、文件、Git、网络或其他 MCP；进程级画布路由不写入用户全局配置。稳定身份、能力开关与 thread 绑定见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
+每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列。Codex 通过正式 resume 和进程级 `notify` 报告 thread UUID；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 当前只声明基础终端能力。启用且 Provider 支持 CleanCode MCP 时，cleancode 才注册该 launch 独立的 MCP URL 与 Bearer Token，并通过会话级参数或临时配置注入；不得修改用户全局配置，也不得把预批准扩大到 Shell、文件、Git、网络或其他 MCP。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
 ## 存储层
 
-当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。Run 终端恢复目录使用独立 schema v1 JSON checkpoint 与有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
+当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。Run 终端恢复目录使用独立 schema v2 JSON checkpoint 与 schema v1 有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
 
 需要原子替换的 JSON 仓储采用临时文件、同步和重命名流程。所有读写必须通过应用层仓储端口完成；存储文件不是供 UI、Agent 或其他上下文直接修改的共享接口。
 

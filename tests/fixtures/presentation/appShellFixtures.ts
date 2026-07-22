@@ -11,6 +11,8 @@ export interface RuntimeApiOverrides {
   readonly checkoutMainWorkspaceBranch?: ReturnType<typeof vi.fn>
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
   readonly inspectCodexCli?: ReturnType<typeof vi.fn>
+  readonly inspectAgentProvider?: ReturnType<typeof vi.fn>
+  readonly listAgentProviders?: ReturnType<typeof vi.fn>
   readonly attachAgentSession?: ReturnType<typeof vi.fn>
   readonly createWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly renameWorkspaceAgent?: ReturnType<typeof vi.fn>
@@ -23,7 +25,6 @@ export interface RuntimeApiOverrides {
   readonly disposeProjectAgentSessions?: ReturnType<typeof vi.fn>
   readonly approveAgentTool?: ReturnType<typeof vi.fn>
   readonly rejectAgentTool?: ReturnType<typeof vi.fn>
-  readonly onAgentPtyOutput?: ReturnType<typeof vi.fn>
   readonly onAgentPtyExit?: ReturnType<typeof vi.fn>
   readonly onAgentGraphUpdated?: ReturnType<typeof vi.fn>
   readonly onAgentToolApprovalRequested?: ReturnType<typeof vi.fn>
@@ -39,6 +40,14 @@ export interface RuntimeApiOverrides {
 }
 
 export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
+  const inspectCodexCli =
+    overrides.inspectCodexCli ??
+    vi.fn(async () => ({
+      installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+      reason: 'not_found' as const,
+      status: 'missing',
+      version: null
+    }))
   return {
     appName: 'cleancode',
     listWorkbenches: overrides.listWorkbenches ?? vi.fn(async () => []),
@@ -50,14 +59,34 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     switchBranchWorkspace: overrides.switchBranchWorkspace ?? vi.fn(),
     checkoutMainWorkspaceBranch: overrides.checkoutMainWorkspaceBranch ?? vi.fn(),
     synchronizeProjectGitState: overrides.synchronizeProjectGitState ?? vi.fn(async () => null),
-    inspectCodexCli:
-      overrides.inspectCodexCli ??
-      vi.fn(async () => ({
-        installCommand: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
-        reason: 'not_found' as const,
-        status: 'missing',
-        version: null
-      })),
+    inspectAgentProvider:
+      overrides.inspectAgentProvider ??
+      vi.fn(async (command: { readonly providerId: string }) =>
+        command.providerId === 'codex'
+          ? {
+              ...(await (inspectCodexCli as () => Promise<Record<string, unknown>>)()),
+              providerId: 'codex'
+            }
+          : {
+              providerId: command.providerId,
+              status: 'installed' as const,
+              version: 'test'
+            }
+      ),
+    listAgentProviders:
+      overrides.listAgentProviders ??
+      vi.fn(async () => [
+        {
+          capabilities: {
+            cleancodeMcp: true,
+            resume: true,
+            structuredLifecycle: true,
+            systemInstructions: true
+          },
+          displayName: 'Codex',
+          id: 'codex'
+        }
+      ]),
     attachAgentSession:
       overrides.attachAgentSession ??
       vi.fn(async (command) => ({
@@ -87,7 +116,6 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     approveAgentTool:
       overrides.approveAgentTool ?? vi.fn(async () => ({ status: 'not_found' as const })),
     rejectAgentTool: overrides.rejectAgentTool ?? vi.fn(async () => undefined),
-    onAgentPtyOutput: overrides.onAgentPtyOutput ?? vi.fn(() => vi.fn()),
     onAgentPtyExit: overrides.onAgentPtyExit ?? vi.fn(() => vi.fn()),
     onAgentGraphUpdated: overrides.onAgentGraphUpdated ?? vi.fn(() => vi.fn()),
     onAgentToolApprovalRequested: overrides.onAgentToolApprovalRequested ?? vi.fn(() => vi.fn()),

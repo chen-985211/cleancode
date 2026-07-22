@@ -117,6 +117,7 @@ function renderAgentNode(
           },
           name: 'Agent 1',
           projectId: 'project-1',
+          providerId: 'codex',
           workspaceName: 'main'
         },
         currentWorkbench: null,

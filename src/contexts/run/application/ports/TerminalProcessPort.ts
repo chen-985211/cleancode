@@ -45,7 +45,24 @@ export interface TerminalProcessHandle {
   readonly processId: number
 }
 
+export interface ForegroundJobProcessIdentity {
+  readonly generation: number
+  readonly launchId: string
+  readonly sessionId: string
+}
+
+export interface LaunchForegroundJobProcessCommand extends ForegroundJobProcessIdentity {
+  readonly args: readonly string[]
+  readonly environment: Readonly<Record<string, string>>
+  readonly executable: string
+  readonly onExit: (
+    event: ForegroundJobProcessIdentity & { readonly exitCode: number | null }
+  ) => void
+  readonly onStarted: (event: ForegroundJobProcessIdentity) => void
+}
+
 export interface TerminalProcessPort {
+  launchForegroundJob?(command: LaunchForegroundJobProcessCommand): void
   start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle>
   write(sessionId: string, input: string): void
   resize(sessionId: string, columns: number, rows: number): void

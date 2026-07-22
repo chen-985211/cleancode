@@ -1,7 +1,9 @@
 import { TerminalSession } from '../../domain/aggregates/TerminalSession'
+import type { ForegroundJobSnapshot } from '../../domain/aggregates/ForegroundJob'
 import {
   createTerminalRunScope,
   createTerminalRunSlotKey,
+  isBlockTerminalOwner,
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
@@ -25,6 +27,10 @@ import {
   type RunRuntimeScopeValidationPort
 } from '../ports/RunRuntimeScopeValidationPort'
 import type { RunLifecycleService } from './RunLifecycleService'
+import {
+  TerminalForegroundJobCoordinator,
+  type LaunchForegroundJobCommand
+} from '../services/TerminalForegroundJobCoordinator'
 import type {
   TerminalRuntimeProviderPort,
   TerminalRuntimeRecoveryResult
@@ -37,9 +43,11 @@ import type {
   TerminalViewIdentityCommand
 } from './TerminalSessionCommands'
 import {
+  assertCurrentTerminalViewIdentity,
   createTerminalSessionId,
   createTerminalSessionOwner,
   getTerminalSessionErrorMessage,
+  readTerminalModelDiagnostics,
   requireTerminalModelPort,
   settleTerminalViewRelease,
   throwTerminalSessionCleanupFailures
@@ -60,6 +68,7 @@ export class TerminalSessionService {
   private readonly resourceUntrackers = new Map<string, () => void>()
   private readonly managedTerminators = new Map<string, () => Promise<void>>()
   private readonly fallbackOutputSequences = new Map<string, number>()
+  private readonly foregroundJobCoordinator: TerminalForegroundJobCoordinator
 
   constructor(
     private readonly terminalProcessPort: TerminalProcessPort,
@@ -67,7 +76,12 @@ export class TerminalSessionService {
     private readonly lifecycle?: RunLifecycleService,
     private readonly terminalModelPort?: TerminalModelPort,
     private readonly runtimeProvider?: TerminalRuntimeProviderPort
-  ) {}
+  ) {
+    this.foregroundJobCoordinator = new TerminalForegroundJobCoordinator(
+      terminalProcessPort,
+      (sessionId) => this.requireSession(sessionId)
+    )
+  }
 
   async initializeRuntime(callbacks: {
     readonly onOutput: (event: TerminalOutputEvent) => void
@@ -219,6 +233,13 @@ export class TerminalSessionService {
   }
 
   recordManagedServiceEndpoint(sessionId: string, endpoint: ActualServiceEndpoint): Promise<void> {
+    const session = this.requireSession(sessionId)
+    if (!isBlockTerminalOwner(session.scope)) {
+      throw createExpectedAppError(
+        'RUN_START_BLOCKED',
+        'Agent-owned terminals cannot own managed service endpoints.'
+      )
+    }
     return (
       this.runtimeProvider?.recordManagedServiceEndpoint(sessionId, endpoint) ?? Promise.resolve()
     )
@@ -404,6 +425,14 @@ export class TerminalSessionService {
     return session.toSnapshot()
   }
 
+  launchForegroundJob(command: LaunchForegroundJobCommand): ForegroundJobSnapshot {
+    return this.foregroundJobCoordinator.launch(command)
+  }
+
+  getForegroundJob(sessionId: string): ForegroundJobSnapshot | null {
+    return this.foregroundJobCoordinator.get(sessionId)
+  }
+
   interrupt(sessionId: string): TerminalSessionSnapshot {
     const session = this.requireSession(sessionId)
     if (session.status !== 'running') return session.toSnapshot()
@@ -472,14 +501,7 @@ export class TerminalSessionService {
   }
 
   getTerminalModelDiagnostics(): TerminalModelDiagnosticsSnapshot {
-    return (
-      this.terminalModelPort?.getDiagnostics() ?? {
-        modelCount: 0,
-        attachedViewCount: 0,
-        pendingOutputBytes: 0,
-        lastRestoreDurationMs: 0
-      }
-    )
+    return readTerminalModelDiagnostics(this.terminalModelPort)
   }
 
   updateTerminalScrollback(rows: TerminalScrollbackRows): void {
@@ -494,15 +516,11 @@ export class TerminalSessionService {
     for (const sessionId of sessionIds) {
       const session = this.sessions.get(sessionId)
 
-      if (!session || session.status !== 'running') {
-        continue
-      }
+      if (!session || session.status !== 'running') continue
 
       const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(sessionId)
 
-      if (!workingDirectory) {
-        continue
-      }
+      if (!workingDirectory) continue
 
       workingDirectories.push({ sessionId, workingDirectory })
     }
@@ -563,6 +581,7 @@ export class TerminalSessionService {
     this.resourceUntrackers.clear()
     this.managedTerminators.clear()
     this.fallbackOutputSequences.clear()
+    this.foregroundJobCoordinator.clear()
     throwTerminalSessionCleanupFailures(cleanupResults)
   }
 
@@ -602,6 +621,7 @@ export class TerminalSessionService {
       }
       await this.retireTerminalModel(session.scope)
       this.fallbackOutputSequences.delete(session.id)
+      this.foregroundJobCoordinator.forget(session.id)
       this.untrackSession(session.id)
 
       return session.toSnapshot()
@@ -625,32 +645,11 @@ export class TerminalSessionService {
   private requireRestorableSession(command: TerminalLinkIdentity): TerminalSession {
     const session = this.requireSession(command.sessionId)
     const slotKey = createTerminalRunSlotKey(session.scope)
-    const currentSessionId = this.sessionIdsBySlot.get(slotKey)
-    const matchesIdentity =
-      session.scope.projectId === command.projectId &&
-      session.scope.workspaceName === command.workspaceName &&
-      session.scope.blockId === command.blockId &&
-      session.scope.sessionId === command.sessionId &&
-      session.scope.runId === command.runId &&
-      session.scope.generation === command.generation
-    const isLatestGeneration = this.generationsBySlot.get(slotKey) === command.generation
-    const isCurrentOrNaturallyExited =
-      currentSessionId === session.id ||
-      (currentSessionId === undefined &&
-        session.status === 'exited' &&
-        this.restorableSessionIdsBySlot.get(slotKey) === session.id)
-
-    if (
-      !matchesIdentity ||
-      !isLatestGeneration ||
-      !isCurrentOrNaturallyExited ||
-      (session.status !== 'running' && session.status !== 'exited')
-    ) {
-      throw createExpectedAppError(
-        'RUN_SCOPE_STALE',
-        'Terminal view no longer matches the current runtime scope.'
-      )
-    }
+    assertCurrentTerminalViewIdentity(command, session, {
+      currentSessionId: this.sessionIdsBySlot.get(slotKey),
+      latestGeneration: this.generationsBySlot.get(slotKey),
+      restorableSessionId: this.restorableSessionIdsBySlot.get(slotKey)
+    })
     return session
   }
 

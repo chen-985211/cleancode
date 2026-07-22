@@ -2,21 +2,23 @@ import { useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Copy, Download, Loader2, MonitorOff, RefreshCw } from 'lucide-react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import type { CodexCliInstallationSnapshot } from '../../contexts/agent/application/ports/CodexCliPort'
-import type { CodexCliPanelState } from './useCodexCliState'
+import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderPanelState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
 
-export function CodexCliStatusView({
+export function AgentProviderStatusView({
   onNewConversation,
   onRetryInspection,
   onRetryRestore,
+  providerName,
   state,
   sessionStatus
 }: {
   readonly onNewConversation?: () => void
   readonly onRetryInspection: () => void
   readonly onRetryRestore?: () => void
-  readonly state: CodexCliPanelState
+  readonly providerName: string
+  readonly state: AgentProviderPanelState
   readonly sessionStatus: AgentSessionSnapshot['status'] | null
 }) {
   const { t } = useI18n()
@@ -24,107 +26,126 @@ export function CodexCliStatusView({
 
   if (sessionStatus === 'restore_failed') {
     return (
-      <RuntimeNotice label={t('codex.restoreFailed')} tone="warning">
+      <RuntimeNotice label={t('provider.restoreFailed')} tone="warning">
         <span className="agent-runtime-notice__actions">
           <button type="button" onClick={onRetryRestore}>
-            {t('codex.retry')}
+            {t('provider.retry')}
           </button>
           <button type="button" onClick={onNewConversation}>
-            {t('codex.newConversation')}
+            {t('provider.newConversation')}
           </button>
         </span>
       </RuntimeNotice>
     )
   }
-
   if (sessionStatus === 'exited') {
-    return <RuntimeNotice label={t('codex.sessionEnded')} tone="neutral" />
+    return (
+      <RuntimeNotice label={t('provider.sessionEnded', { provider: providerName })} tone="neutral">
+        <span className="agent-runtime-notice__actions">
+          <button type="button" onClick={onRetryRestore}>
+            {t('provider.restart')}
+          </button>
+          <button type="button" onClick={onNewConversation}>
+            {t('provider.newConversation')}
+          </button>
+        </span>
+      </RuntimeNotice>
+    )
   }
-
   if (sessionStatus === 'failed') {
-    if (state.status === 'ready' && state.installation.status === 'missing') {
+    if (state.status === 'ready' && state.availability.status === 'missing') {
       return (
         <MissingCliNotice
-          installation={state.installation}
-          label={t('codex.startFailedMissing')}
+          availability={state.availability}
+          label={t('provider.startFailedMissing', { provider: providerName })}
           onRetry={onRetryInspection}
+          providerName={providerName}
         />
       )
     }
-
-    return <RuntimeNotice label={t('codex.startFailed')} tone="warning" />
+    return (
+      <RuntimeNotice label={t('provider.startFailed', { provider: providerName })} tone="warning" />
+    )
   }
-
   if (state.status === 'unavailable') {
-    return <RuntimeNotice label={t('codex.runtimeUnavailable')} tone="neutral" icon="offline" />
+    return <RuntimeNotice label={t('provider.runtimeUnavailable')} tone="neutral" icon="offline" />
   }
-
   if (state.status === 'checking') {
     return state.visible ? (
-      <RuntimeNotice label={t('codex.checking')} tone="neutral" icon="checking" />
+      <RuntimeNotice
+        label={t('provider.checking', { provider: providerName })}
+        tone="neutral"
+        icon="checking"
+      />
     ) : null
   }
-
-  if (state.installation.status === 'temporarily_unavailable') {
+  if (state.availability.status === 'temporarily_unavailable') {
     return (
-      <RuntimeNotice label={t('codex.checkUnavailable')} tone="neutral">
+      <RuntimeNotice
+        label={t('provider.checkUnavailable', { provider: providerName })}
+        tone="neutral"
+      >
         <span className="agent-runtime-notice__actions">
-          <RetryInspectionButton onRetry={onRetryInspection} />
+          <RetryInspectionButton onRetry={onRetryInspection} providerName={providerName} />
         </span>
       </RuntimeNotice>
     )
   }
-
-  if (state.installation.status === 'missing') {
-    return <MissingCliNotice installation={state.installation} onRetry={onRetryInspection} />
+  if (state.availability.status === 'missing') {
+    return (
+      <MissingCliNotice
+        availability={state.availability}
+        onRetry={onRetryInspection}
+        providerName={providerName}
+      />
+    )
   }
-
   return null
 }
 
 function MissingCliNotice({
-  installation,
+  availability,
   label,
-  onRetry
+  onRetry,
+  providerName
 }: {
-  readonly installation: Extract<CodexCliInstallationSnapshot, { readonly status: 'missing' }>
+  readonly availability: Extract<AgentProviderAvailability, { readonly status: 'missing' }>
   readonly label?: string
   readonly onRetry: () => void
+  readonly providerName: string
 }) {
   const { t } = useI18n()
   const [isHelpVisible, setIsHelpVisible] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
-
   const copyInstallCommand = async (): Promise<void> => {
     try {
       if (!navigator.clipboard) return
-      await navigator.clipboard.writeText(installation.installCommand)
+      await navigator.clipboard.writeText(availability.installCommand)
       setIsCopied(true)
     } catch {
       setIsCopied(false)
     }
   }
-
   return (
     <div className="agent-runtime-notice" role="status" data-tone="warning">
       <Download size={14} aria-hidden="true" />
-      <span>{label ?? t('codex.missing')}</span>
+      <span>{label ?? t('provider.missing', { provider: providerName })}</span>
       <span className="agent-runtime-notice__actions">
-        <RetryInspectionButton onRetry={onRetry} />
+        <RetryInspectionButton onRetry={onRetry} providerName={providerName} />
         <button
           type="button"
           aria-expanded={isHelpVisible}
           onClick={() => setIsHelpVisible((visible) => !visible)}
         >
-          {t('codex.installHelp')}
+          {t('provider.installHelp')}
         </button>
       </span>
       {isHelpVisible ? (
         <span className="agent-runtime-notice__install-help">
-          <code>{installation.installCommand}</code>
+          <code>{availability.installCommand}</code>
           <button
             type="button"
-            aria-label={t('codex.copyInstallCommand')}
+            aria-label={t('provider.copyInstallCommand')}
             onClick={() => void copyInstallCommand()}
           >
             {isCopied ? (
@@ -132,7 +153,7 @@ function MissingCliNotice({
             ) : (
               <Copy size={12} aria-hidden="true" />
             )}
-            <span>{isCopied ? t('codex.copied') : t('codex.copy')}</span>
+            <span>{isCopied ? t('provider.copied') : t('provider.copy')}</span>
           </button>
         </span>
       ) : null}
@@ -140,12 +161,22 @@ function MissingCliNotice({
   )
 }
 
-function RetryInspectionButton({ onRetry }: { readonly onRetry: () => void }) {
+function RetryInspectionButton({
+  onRetry,
+  providerName
+}: {
+  readonly onRetry: () => void
+  readonly providerName: string
+}) {
   const { t } = useI18n()
   return (
-    <button type="button" aria-label={t('codex.recheck')} onClick={onRetry}>
+    <button
+      type="button"
+      aria-label={t('provider.recheck', { provider: providerName })}
+      onClick={onRetry}
+    >
       <RefreshCw size={12} aria-hidden="true" />
-      <span>{t('codex.recheckShort')}</span>
+      <span>{t('provider.recheckShort')}</span>
     </button>
   )
 }
@@ -162,7 +193,6 @@ function RuntimeNotice({
   readonly tone: 'neutral' | 'warning'
 }) {
   const Icon = icon === 'checking' ? Loader2 : icon === 'offline' ? MonitorOff : CircleAlert
-
   return (
     <div
       className={`agent-runtime-notice${icon === 'checking' ? ' agent-runtime-notice--checking' : ''}`}

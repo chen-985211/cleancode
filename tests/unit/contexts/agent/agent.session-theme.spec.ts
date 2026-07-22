@@ -5,9 +5,10 @@ import type {
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type { AgentTerminalSourceTheme } from '../../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type {
-  CodexAgentProcessPort,
-  StartCodexAgentProcessCommand
-} from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
+  AgentTerminalRuntimePort,
+  OpenAgentTerminalCommand
+} from '../../../../src/contexts/agent/application/ports/AgentTerminalRuntimePort'
+import { RecordingAgentProviderRegistry } from '../../../fixtures/agentTerminalRuntime'
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 
@@ -32,16 +33,16 @@ describe('agent session terminal source theme', () => {
     const processPort = new RecordingCodexAgentProcessPort()
     const repository = new GatedEmptyAgentSessionRepository()
     const service = createSessionService(processPort, repository)
-    const firstOutput: string[] = []
-    const secondOutput: string[] = []
+    const firstExit: number[] = []
+    const secondExit: number[] = []
 
     const firstAttach = attachSession(service, {
-      onOutput: (event) => firstOutput.push(event.data),
+      onExit: (event) => firstExit.push(event.exitCode ?? -1),
       terminalSourceTheme: 'light'
     })
     await repository.lookupStarted.promise
     const secondAttach = attachSession(service, {
-      onOutput: (event) => secondOutput.push(event.data),
+      onExit: (event) => secondExit.push(event.exitCode ?? -1),
       terminalSourceTheme: 'dark'
     })
     repository.release()
@@ -54,12 +55,9 @@ describe('agent session terminal source theme', () => {
       terminalSourceTheme: 'light'
     })
 
-    processPort.starts[0]?.onOutput({
-      data: 'latest attachment\r\n',
-      sessionId: firstSession.sessionId
-    })
-    expect(firstOutput).toEqual([])
-    expect(secondOutput).toEqual(['latest attachment\r\n'])
+    processPort.starts[0]?.onTerminalExit(0)
+    expect(firstExit).toEqual([])
+    expect(secondExit).toEqual([0])
   })
 
   it('serializes different branch scopes that share one physical Agent runtime owner', async () => {
@@ -329,7 +327,7 @@ describe('agent session terminal source theme', () => {
 })
 
 function createSessionService(
-  processPort: CodexAgentProcessPort,
+  processPort: AgentTerminalRuntimePort,
   repository: AgentSessionRepository
 ): AgentSessionService {
   return new AgentSessionService(
@@ -343,7 +341,8 @@ function createSessionService(
         throw new Error('Agent tools are not used by these tests.')
       }
     },
-    repository
+    repository,
+    new RecordingAgentProviderRegistry()
   )
 }
 
@@ -352,7 +351,7 @@ function attachSession(
   input: {
     readonly agentId?: string
     readonly gitBranch?: string
-    readonly onOutput?: Parameters<AgentSessionService['attach']>[0]['onOutput']
+    readonly onExit?: Parameters<AgentSessionService['attach']>[0]['onExit']
     readonly terminalSourceTheme: AgentTerminalSourceTheme
     readonly workspaceDirectory?: string
     readonly workspaceName?: string
@@ -362,9 +361,8 @@ function attachSession(
     agentId: input.agentId ?? 'agent-1',
     columns: 80,
     gitBranch: input.gitBranch,
-    onExit: () => undefined,
+    onExit: input.onExit ?? (() => undefined),
     onGraphUpdated: () => undefined,
-    onOutput: input.onOutput ?? (() => undefined),
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
@@ -379,18 +377,30 @@ function attachSession(
   return service.attach(command)
 }
 
-class RecordingCodexAgentProcessPort implements CodexAgentProcessPort {
+class RecordingCodexAgentProcessPort implements AgentTerminalRuntimePort {
   readonly events: string[] = []
-  readonly starts: StartCodexAgentProcessCommand[] = []
+  readonly starts: OpenAgentTerminalCommand[] = []
   readonly stops: string[] = []
   failStartAt: number | null = null
   stopError: Error | null = null
 
-  start(command: StartCodexAgentProcessCommand): Promise<{ readonly processId: number }> {
+  open(
+    command: OpenAgentTerminalCommand
+  ): Promise<{ readonly processId: number; readonly terminalId: string }> {
     this.events.push(`start:${command.sessionId}`)
     this.starts.push(command)
     if (this.failStartAt === this.starts.length) return Promise.reject(new Error('start failed'))
-    return Promise.resolve({ processId: this.starts.length })
+    return Promise.resolve({
+      processId: this.starts.length,
+      terminalId: `terminal-${this.starts.length}`
+    })
+  }
+
+  launch(command: Parameters<AgentTerminalRuntimePort['launch']>[0]) {
+    const generation = this.starts.length
+    const launchId = `launch-${generation}`
+    command.onStarted?.({ generation, launchId })
+    return { generation, launchId }
   }
 
   write(): void {}

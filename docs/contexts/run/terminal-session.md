@@ -2,19 +2,21 @@
 
 ## 文档地位
 
-本文是当前已实现普通终端 PTY 会话的统一维护入口。终端依赖图、任务/服务调度与 `WorkflowRun` 由[终端依赖工作流](terminal-workflow.md)单独维护。
+本文是当前已实现 Run 终端 PTY、类型化 owner、权威终端模型、视图协议和前台任务技术生命周期的统一维护入口。终端依赖图、任务/服务调度与 `WorkflowRun` 由[终端依赖工作流](terminal-workflow.md)单独维护；Provider 对话和 Agent 活动语义由 [Agent 与会话生命周期](../agent/agent-session.md)维护。
 
 全仓边界以[架构文档](../../engineering/architecture.md)为准；终端界面的稳定交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 能力状态与范围
 
-普通终端会话负责：
+Run 终端会话负责：
 
 - 在指定工作区目录启动交互式 shell 或带启动命令的 PTY。
 - 转发输出、写入键盘输入、发送 Ctrl+C、调整行列和终止进程。
 - 记录精确运行作用域、进程 ID、状态、输入历史、退出码或启动失败原因。
 - 查询运行中 PTY 的当前工作目录，用于工作区切换安全判断。
 - 保持同一项目/工作区/终端槽位只有一个当前会话，并隔离旧 generation 的迟到事件。
+- 以 `block | agent` 类型化 owner 区分普通终端积木与 Agent terminal；owner kind 进入槽位和完整运行身份。
+- 在 agent-owned terminal 的长期 shell 中启动可重复的 `ForegroundJob`，权威区分前台任务退出与 PTY 退出。
 - 为每个可恢复运行维护进程内权威终端模型、单调输出序号和有界屏幕快照。
 - 通过独立本地 Provider 承载普通终端 PTY 和权威模型；用户可以按当前会话选择应用退出后继续运行。
 - 在应用重开时区分精确 live attach、只读历史恢复、自然结束和新会话，并校验完整运行身份与 Provider 证据。
@@ -22,7 +24,7 @@
 - 统一当前与后续权威模型的滚动历史预算，并为安全打开终端链接提供精确运行上下文。
 - 在 Project/BlockGraph 生命周期变更时异步硬清理匹配 PTY、恢复资料及其受管资源；应用退出只保留明确选择且可可靠 checkpoint 的普通会话。
 
-它不拥有终端积木配置、工作区选择或终端依赖图；这些事实分别属于 BlockGraph 与 Project。
+它不拥有终端积木配置、工作区选择、终端依赖图、Agent Provider、对话绑定、MCP 或活动状态；这些事实分别属于 BlockGraph、Project 与 Agent。
 
 ## 聚合与状态
 
@@ -47,10 +49,10 @@ idle -> running -> stopping -> exited
 
 ## 会话身份与隔离
 
-每次启动都会创建新的 `sessionId`、`runId` 和单调递增的 `generation`。完整 `TerminalRunScope` 还包含项目 ID/目录、工作区名称/目录、Git 分支和终端积木 ID。`TerminalSessionService` 使用精确项目/目录/工作区/终端 owner 识别当前槽位：
+每次启动都会创建新的 `sessionId`、`runId` 和单调递增的 `generation`。完整 `TerminalRunScope` 还包含项目 ID/目录、工作区名称/目录、Git 分支、兼容 block ID 和类型化 `owner`。`TerminalSessionService` 使用精确项目/目录/工作区/owner kind/owner ID 识别当前槽位：
 
 - 同一槽位启动新会话时，先异步终止并等待旧会话清理完成。
-- 相同工作区名或终端积木 ID 在不同项目、目录或 worktree 中拥有独立会话，可以同时运行。
+- 相同工作区名或 owner ID 在不同项目、目录、worktree 或 owner kind 中拥有独立会话，可以同时运行。
 - 进程自然退出后移除活动槽位映射，但保留最新 generation 的会话快照和有界终端模型；显式终止或后续 replacement 撤销该恢复资格。
 - 输出、退出、视图、快照和服务端点事件必须同时匹配当前槽位的完整运行身份；旧运行的迟到回调不能覆盖新会话。
 - 每次启动在取得 PTY 前通过 `RunRuntimeScopeValidationPort` 校验 Project 的权威项目/工作区/分支身份，并受 `RunLifecycleService` 启动闸门保护。
@@ -63,18 +65,27 @@ Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层�
 
 会话的 `workingDirectory` 来自 Project 工作区 DTO；Run 不自行读取或切换 Project 聚合，而是通过调用方拥有的校验端口验证该 DTO 仍然权威。
 
+### Agent owner 与前台任务
+
+`owner.kind = agent` 只开放基础终端和前台任务能力。它不能进入 BlockGraph 组合、依赖工作流、受管服务端口或普通终端批量动作；Agent 通过自己拥有的 `AgentTerminalRuntimePort` 和基础设施 adapter 调用 Run 应用层，Run 不反向依赖 Agent 类型。
+
+`launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。控制帧在进入权威模型前被消费，不能出现在 transcript、snapshot 或用户屏幕；临时目录在退出、替换、terminal 终止或失败时幂等删除。
+
+前台任务自然结束或被 `Ctrl+C` 中断后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job。
+
 ## PTY 端口语义
 
 Run 应用层只依赖 `TerminalProcessPort`：
 
-- `start`：以工作目录、shell、可选启动命令和行列启动 PTY，返回真实进程 ID。
+- `start`：以工作目录、类型化 owner、shell、可选启动命令和行列启动 PTY，返回真实进程 ID。
+- `launchForegroundJob`：在 macOS/Linux 的 POSIX shell 或 Windows 的 PowerShell/PowerShell Core 中，为仍运行的 agent-owned terminal 启动结构化 executable/argv/environment，返回 `launchId + generation`。Windows 普通 `cmd.exe` terminal 仍可使用，但不承载 Agent 前台任务。
 - `write`：只向仍运行的 PTY 写入原始输入；已退出快照返回当前状态而不写入进程。
 - `resize`：只同步仍运行的 PTY 行列，并返回当前会话快照供调用方对账。
 - `pauseOutput` / `resumeOutput`：只用于模型背压和视图响应权交接，暂停读取 PTY 输出但不终止进程。
 - `readWorkingDirectory`：在 macOS 通过 `lsof`、Linux 通过 `/proc/<pid>/cwd` 尽力读取；不支持或进程消失时返回 `null`。
 - `stop` / `disposeAll`：异步终止一个或全部受管 PTY，并等待适配器确认退出。
 
-基础设施默认使用系统 shell；有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，避免只关闭 shell 而遗留仍占用端口的子进程；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
+基础设施默认在 macOS/Linux 使用用户 shell，在 Windows 使用 `powershell.exe` 和 node-pty ConPTY。有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell；Windows Agent 前台任务由子 PowerShell 执行，`Ctrl+C` 结束子任务后回到同一个外层 PowerShell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，Windows 关闭 ConPTY 并等待退出，避免把 Agent launch 退出误判为 terminal 退出；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
 
 ## 权威终端模型与视图协议
 
@@ -92,11 +103,11 @@ Run 应用层只依赖 `TerminalProcessPort`：
 
 应用正常退出时，Electron main 必须先关闭新的视图登记并等待全部当前视图租约释放，再停止工作流、终止默认策略会话和断开 Provider。renderer 销毁监听只负责异常退出兜底；显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
-因此，普通终端的 renderer xterm 是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏普通终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
+因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 
 ## 输入与安全打开边界
 
-普通键盘输入、IME 提交和粘贴最终都通过 `TerminalSessionService.write` 写入精确且仍运行的 session。Presentation 可以负责 composition 状态、剪贴板来源、用户确认、UTF-8 分片和 bracketed-paste 协议，但不得因此获得 PTY 生命周期、输入历史或当前运行身份的所有权。分片写入按调用顺序串行，取消或失败必须在已经打开 bracketed-paste 时尽力发送结束标记。
+普通键盘输入、Agent 输入、IME 提交和粘贴最终都通过 `TerminalSessionService.write` 写入精确且仍运行的 session。没有文本选区时，xterm 产生的 `Ctrl+C` 原始 `\x03` 沿同一输入通道进入当前前台程序；有选区时表现层只复制选区。Presentation 可以负责 composition 状态、剪贴板来源、用户确认、UTF-8 分片和 bracketed-paste 协议，但不得因此获得 PTY 生命周期、输入历史或当前运行身份的所有权。分片写入按调用顺序串行，取消或失败必须在已经打开 bracketed-paste 时尽力发送结束标记。
 
 打开终端链接由 `OpenTerminalLinkUseCase` 重新建立授权边界：
 
@@ -121,7 +132,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 
 Provider 启动协调使用短期、版本化且带唯一 owner 的本机租约。同一应用内的并发调用共享一次连接任务；空白或损坏租约先经过有界初始化宽限期，死亡 owner 和超期租约可以回收，旧 owner 迟到释放不得删除后继租约。应用退出先关闭新的连接准入并等待在途连接释放租约，再向已认证 Provider detach；断连期间只更新本地滚动历史设置，下一次任意连接在发送业务请求前统一同步最新值，不记录预期的断连设置警告。
 
-Provider 协议 v3 沿用 v2 的控制权状态机，并把 `terminalSourceTheme` 纳入模型和进程创建契约；协议升级会替换不理解该字段的旧 Provider，避免新应用错误复用旧 palette。`health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程，先完成非保留会话清理与保留会话 checkpoint，再允许后继 controller。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。客户端仅为仍持有 live session 的遗留 v1 Provider 保留兼容读取，新启动的 Provider 必须写入当前 metadata。
+Provider 协议 v4 沿用 v3 的控制权与 `terminalSourceTheme` 契约，并增加结构化 `launchForegroundJob` 请求及 started/exited 定向事件，使 Electron main 外的长期 shell 可以承载 Agent launch。`health` 永远只读，应用必须在同一条已认证连接上显式 `claimController`，Provider 只允许 `unclaimed -> active -> releasing -> unclaimed` 的串行迁移。活动 controller 或释放中的 Provider 返回可重试的 `TERMINAL_PROVIDER_CONTROLLER_BUSY`；客户端在同一连接上有界等待，不能通过重复 health 或新建连接隐式抢占。正常 detach 和意外断连复用同一释放流程，先完成非保留会话清理与保留会话 checkpoint，再允许后继 controller。应用进程另使用 Electron 单实例锁阻止正常情况下的重复主进程；协议控制权仍是保护现有 PTY 的最终边界。客户端可以连接当前版本或紧邻的前一版本 Provider，以免为了升级杀死仍持有普通终端的进程；前一版本不具备的新方法必须诚实返回 unsupported。新启动的 Provider 必须写入当前 metadata 和协议版本。
 
 Run 基础设施在应用数据目录保存 schema v2 checkpoint record 与 schema v1 追加式输出记录。record 同时保存不可变源主题；checkpoint 包含有界普通/alternate 屏幕、可读 normal buffer 历史、cwd、行列、标题、模式和最后 sequence；输出记录只重放 checkpoint 之后的连续 sequence。读取旧 schema v1 record 时迁移为确定性的深色源主题，解决旧数据缺少该事实且无法从序列化屏幕可靠反推的问题。写入使用同目录临时文件、同步、原子重命名和目录同步，单 checkpoint、输出日志、冷历史数量、保留期和全局字节数都有上限；容量清理只淘汰冷历史，不为腾出空间终止 live 会话。损坏或未知版本按 session 隔离。首次启用保留无法完成 checkpoint 时动作失败并回滚；后续持久化失效时 Provider 撤销保留并通知应用，应用退出时安全终止该会话。
 
@@ -134,7 +145,7 @@ Run 基础设施在应用数据目录保存 schema v2 checkpoint record 与 sche
 | 层级           | 入口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Domain         | [`TerminalSession.ts`](../../../src/contexts/run/domain/aggregates/TerminalSession.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Application    | [`TerminalSessionService.ts`](../../../src/contexts/run/application/use-cases/TerminalSessionService.ts)、[`LaunchTerminalCommandUseCase.ts`](../../../src/contexts/run/application/use-cases/LaunchTerminalCommandUseCase.ts)、[`OpenTerminalLinkUseCase.ts`](../../../src/contexts/run/application/use-cases/OpenTerminalLinkUseCase.ts)、[`RunLifecycleService.ts`](../../../src/contexts/run/application/use-cases/RunLifecycleService.ts)、[`TerminalProcessPort.ts`](../../../src/contexts/run/application/ports/TerminalProcessPort.ts)、[`TerminalModelPort.ts`](../../../src/contexts/run/application/ports/TerminalModelPort.ts)、[`TerminalLinkPorts.ts`](../../../src/contexts/run/application/ports/TerminalLinkPorts.ts)                 |
+| Application    | [`TerminalSessionService.ts`](../../../src/contexts/run/application/use-cases/TerminalSessionService.ts)、[`ForegroundJob.ts`](../../../src/contexts/run/domain/aggregates/ForegroundJob.ts)、[`LaunchTerminalCommandUseCase.ts`](../../../src/contexts/run/application/use-cases/LaunchTerminalCommandUseCase.ts)、[`OpenTerminalLinkUseCase.ts`](../../../src/contexts/run/application/use-cases/OpenTerminalLinkUseCase.ts)、[`RunLifecycleService.ts`](../../../src/contexts/run/application/use-cases/RunLifecycleService.ts)、[`TerminalProcessPort.ts`](../../../src/contexts/run/application/ports/TerminalProcessPort.ts)、[`TerminalModelPort.ts`](../../../src/contexts/run/application/ports/TerminalModelPort.ts)                         |
 | Infrastructure | [`NodePtyTerminalProcessAdapter.ts`](../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter.ts)、[`HeadlessTerminalModelAdapter.ts`](../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter.ts)、[`TerminalProviderServer.ts`](../../../src/contexts/run/infrastructure/provider/TerminalProviderServer.ts)、[`PersistentTerminalProviderClient.ts`](../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClient.ts)、[`FileTerminalRecoveryStore.ts`](../../../src/contexts/run/infrastructure/persistence/FileTerminalRecoveryStore.ts)、[`NodeTerminalLinkFileSystemAdapter.ts`](../../../src/contexts/run/infrastructure/filesystem/NodeTerminalLinkFileSystemAdapter.ts) |
 | Platform       | [`terminal-runtime-provider.ts`](../../../src/platform/electron-main/terminal-runtime-provider.ts)、[`terminalIpcHandlers.ts`](../../../src/platform/electron-main/terminalIpcHandlers.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -143,7 +154,7 @@ Run 基础设施在应用数据目录保存 schema v2 checkpoint record 与 sche
 | 层级           | 证明内容                                                                                                                                      | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit / Domain  | 状态迁移、退出策略、恢复资格与仅运行中可输入                                                                                                  | [`run.terminal-session.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session.spec.ts)、[`run.terminal-runtime-recovery.spec.ts`](../../../tests/unit/contexts/run/run.terminal-runtime-recovery.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Unit / Service | 精确作用域、替换、迟到事件、sequence、视图 attach/detach、Ctrl+C、链接授权、异步关闭、启动校验与 lifecycle gate                               | [`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts)、[`run.terminal-session-model-lifecycle.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-model-lifecycle.spec.ts)、[`run.open-terminal-link.spec.ts`](../../../tests/unit/contexts/run/run.open-terminal-link.spec.ts)、[`run.run-lifecycle-service.spec.ts`](../../../tests/unit/contexts/run/run.run-lifecycle-service.spec.ts)、[`run.launch-terminal-command.spec.ts`](../../../tests/unit/contexts/run/run.launch-terminal-command.spec.ts)                                                                                                                                                                                                                                                                                                    |
+| Unit / Service | typed owner、ForegroundJob、精确作用域、替换、迟到事件、sequence、视图 attach/detach、Ctrl+C、链接授权和 lifecycle gate                       | [`run.terminal-owner.spec.ts`](../../../tests/unit/contexts/run/run.terminal-owner.spec.ts)、[`run.foreground-job.spec.ts`](../../../tests/unit/contexts/run/run.foreground-job.spec.ts)、[`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts)、[`run.terminal-session-model-lifecycle.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-model-lifecycle.spec.ts)、[`run.run-lifecycle-service.spec.ts`](../../../tests/unit/contexts/run/run.run-lifecycle-service.spec.ts)                                                                                                                                                                                                                                                                                                                              |
 | Integration    | 真实 node-pty、Provider 启动租约、并发连接、attach/detach、checkpoint/cold restore、headless 模型、alternate buffer、背压、路径边界和进程清理 | [`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`run.terminal-provider-launch-lock.spec.ts`](../../../tests/integration/contexts/run/run.terminal-provider-launch-lock.spec.ts)、[`run.terminal-provider-client-lifecycle.spec.ts`](../../../tests/integration/contexts/run/run.terminal-provider-client-lifecycle.spec.ts)、[`run.terminal-provider-server.spec.ts`](../../../tests/integration/contexts/run/run.terminal-provider-server.spec.ts)、[`run.file-terminal-recovery-store.spec.ts`](../../../tests/integration/contexts/run/run.file-terminal-recovery-store.spec.ts)、[`run.headless-terminal-model.spec.ts`](../../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts)、[`run.terminal-link-filesystem.spec.ts`](../../../tests/integration/contexts/run/run.terminal-link-filesystem.spec.ts) |
 | Contract       | snapshot、scrollback、restore marker、视图身份、链接命令、定向输出和 renderer 销毁清理                                                        | [`run.terminal-view-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-view-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Unit / UI 协作 | 工作区切换时终端会话迁移                                                                                                                      | [`terminal-session-workspace-migration.spec.ts`](../../../tests/unit/presentation/terminal-session-workspace-migration.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |

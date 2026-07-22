@@ -39,6 +39,7 @@ describe('manage workspace Agents', () => {
       agentId: 'agent-2',
       layout: { position: { x: 620, y: 160 }, size: { width: 440, height: 520 } },
       projectId: 'project-1',
+      providerId: 'claude-code',
       workspaceName: 'main'
     })
 
@@ -66,7 +67,8 @@ describe('manage workspace Agents', () => {
       expect.objectContaining({
         agentId: 'agent-2',
         layout: { position: { x: 700, y: 220 }, size: { width: 520, height: 460 } },
-        name: 'Review Agent'
+        name: 'Review Agent',
+        providerId: 'claude-code'
       })
     ])
   })

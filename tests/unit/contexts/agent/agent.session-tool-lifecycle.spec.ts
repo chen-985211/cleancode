@@ -1,6 +1,10 @@
 import type { AgentMcpServerPort } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
-import type { CodexAgentProcessPort } from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
+import type { AgentTerminalRuntimePort } from '../../../../src/contexts/agent/application/ports/AgentTerminalRuntimePort'
+import {
+  RecordingAgentProviderRegistry,
+  RecordingAgentTerminalRuntime
+} from '../../../fixtures/agentTerminalRuntime'
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 
@@ -22,7 +26,8 @@ describe('Agent session tool lifecycle', () => {
       processPort,
       mcpServer,
       { cancel: vi.fn(), execute },
-      createSessionRepository()
+      createSessionRepository(),
+      new RecordingAgentProviderRegistry()
     )
     const session = await service.attach(attachCommand())
     const admittedWrite = service.executeMcpTool({
@@ -70,7 +75,8 @@ describe('Agent session tool lifecycle', () => {
       processPort,
       mcpServer,
       { cancel: vi.fn(), execute },
-      createSessionRepository()
+      createSessionRepository(),
+      new RecordingAgentProviderRegistry()
     )
     const session = await service.attach(attachCommand())
     processPort.stop.mockRejectedValueOnce(new Error('PTY stop failed'))
@@ -108,7 +114,8 @@ describe('Agent session tool lifecycle', () => {
         })),
         execute: vi.fn(async (command) => awaitingApproval(command.toolCallId))
       },
-      createSessionRepository()
+      createSessionRepository(),
+      new RecordingAgentProviderRegistry()
     )
     const session = await service.attach(attachCommand())
     const toolResult = service.executeMcpTool({
@@ -138,7 +145,6 @@ function attachCommand() {
     agentId: 'agent-1',
     onExit: vi.fn(),
     onGraphUpdated: vi.fn(),
-    onOutput: vi.fn(),
     onToolApprovalRequested: vi.fn(),
     projectDirectory: '/repo/app',
     projectId: 'project-1',
@@ -148,14 +154,11 @@ function attachCommand() {
   }
 }
 
-function createProcessPort(): CodexAgentProcessPort & { readonly stop: ReturnType<typeof vi.fn> } {
-  return {
-    disposeAll: vi.fn(async () => undefined),
-    resize: vi.fn(),
-    start: vi.fn(async () => ({ processId: 1 })),
-    stop: vi.fn(async () => undefined),
-    write: vi.fn()
-  }
+function createProcessPort(): AgentTerminalRuntimePort & {
+  readonly stop: ReturnType<typeof vi.fn>
+} {
+  const runtime = new RecordingAgentTerminalRuntime()
+  return Object.assign(runtime, { stop: vi.fn(runtime.stop.bind(runtime)) })
 }
 
 function createMcpServer(): AgentMcpServerPort & {

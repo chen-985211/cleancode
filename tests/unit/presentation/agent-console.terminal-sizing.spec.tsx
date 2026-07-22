@@ -1,338 +1,99 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, render, waitFor } from '@testing-library/react'
 
-import type { AgentSessionSnapshot } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
+import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import type {
+  TerminalSurface,
+  TerminalSurfaceAttachment
+} from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
+import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 
-interface FakeAgentTerminal {
-  cols: number
-  element: HTMLElement | null
-  rows: number
-  readonly options: { theme?: Record<string, string> }
-  readonly attachCustomKeyEventHandler: ReturnType<typeof vi.fn>
-  readonly dispose: ReturnType<typeof vi.fn>
-  readonly getSelection: ReturnType<typeof vi.fn>
-  readonly hasSelection: ReturnType<typeof vi.fn>
-  readonly loadAddon: ReturnType<typeof vi.fn>
-  readonly onData: ReturnType<typeof vi.fn>
-  readonly onResize: ReturnType<typeof vi.fn>
-  readonly open: ReturnType<typeof vi.fn>
-  readonly refresh: ReturnType<typeof vi.fn>
-  readonly reset: ReturnType<typeof vi.fn>
-  readonly write: ReturnType<typeof vi.fn>
-  resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null
-}
+const sizingMockState = vi.hoisted(() => ({ surfaces: [] as TerminalSurface[] }))
 
-interface FakeFitAddon {
-  terminal?: FakeAgentTerminal
-  readonly fit: ReturnType<typeof vi.fn>
-}
-
-interface ControlledResizeObserver {
-  disconnected: boolean
-  readonly callback: ResizeObserverCallback
-  target: Element | null
-}
-
-const sizingMockState = vi.hoisted(() => ({
-  fitDimensions: { columns: 64, rows: 18 },
-  animationFrames: [] as FrameRequestCallback[],
-  resizeObservers: [] as ControlledResizeObserver[],
-  terminals: [] as FakeAgentTerminal[]
+vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
+  createTerminalXtermSurface: vi.fn(() => {
+    const surface = {
+      attach: vi.fn(),
+      clearSearch: vi.fn(),
+      detach: vi.fn(),
+      dispose: vi.fn(),
+      find: vi.fn(),
+      focus: vi.fn(),
+      getDiagnostics: vi.fn(() => ({ pendingOutputBytes: 0, rendererState: 'dom' })),
+      isBracketedPasteMode: vi.fn(() => false),
+      restore: vi.fn(async () => 'ready'),
+      setResizeSuspended: vi.fn(),
+      setScrollbackRows: vi.fn(),
+      write: vi.fn()
+    } as unknown as TerminalSurface
+    sizingMockState.surfaces.push(surface)
+    return surface
+  })
 }))
 
-vi.mock('@xterm/xterm', () => ({
-  Terminal: class FakeTerminal implements FakeAgentTerminal {
-    cols = 88
-    element: HTMLElement | null = null
-    rows = 24
-    readonly options: { theme?: Record<string, string> }
-    resizeListener: ((dimensions: { cols: number; rows: number }) => void) | null = null
-
-    readonly attachCustomKeyEventHandler = vi.fn()
-    readonly dispose = vi.fn()
-    readonly getSelection = vi.fn(() => '')
-    readonly hasSelection = vi.fn(() => false)
-    readonly open = vi.fn((host: HTMLElement) => {
-      this.element = document.createElement('div')
-      host.append(this.element)
-    })
-    readonly refresh = vi.fn()
-    readonly reset = vi.fn()
-    readonly write = vi.fn((_data: string, callback?: () => void) => callback?.())
-    readonly loadAddon = vi.fn((addon: FakeFitAddon) => {
-      addon.terminal = this
-    })
-    readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
-    readonly onResize = vi.fn((listener: (dimensions: { cols: number; rows: number }) => void) => {
-      this.resizeListener = listener
-      return { dispose: vi.fn() }
-    })
-
-    constructor(options: { theme?: Record<string, string> }) {
-      this.options = options
-      sizingMockState.terminals.push(this)
-    }
-  }
-}))
-
-vi.mock('@xterm/addon-fit', () => ({
-  FitAddon: class FakeFitAddonInstance implements FakeFitAddon {
-    terminal?: FakeAgentTerminal
-
-    readonly fit = vi.fn(() => {
-      if (!this.terminal) return
-      const next = sizingMockState.fitDimensions
-      const changed = this.terminal.cols !== next.columns || this.terminal.rows !== next.rows
-      this.terminal.cols = next.columns
-      this.terminal.rows = next.rows
-      if (changed) this.terminal.resizeListener?.({ cols: next.columns, rows: next.rows })
-    })
-  }
-}))
-
-describe('agent console terminal sizing', () => {
-  let originalResizeObserver: typeof ResizeObserver | undefined
-  let originalUserAgent: string
+describe('Agent console terminal sizing', () => {
+  const originalUserAgent = navigator.userAgent
 
   beforeEach(() => {
-    originalResizeObserver = globalThis.ResizeObserver
-    originalUserAgent = navigator.userAgent
-    sizingMockState.fitDimensions = { columns: 64, rows: 18 }
-    sizingMockState.animationFrames = []
-    sizingMockState.resizeObservers = []
-    sizingMockState.terminals = []
-
-    Object.defineProperty(navigator, 'userAgent', {
-      configurable: true,
-      value: 'cleancode desktop renderer'
-    })
-    globalThis.ResizeObserver = class StubResizeObserver {
-      private readonly observer: ControlledResizeObserver
-
-      constructor(callback: ResizeObserverCallback) {
-        this.observer = { callback, disconnected: false, target: null }
-        sizingMockState.resizeObservers.push(this.observer)
-      }
-
-      observe(target: Element): void {
-        this.observer.target = target
-      }
-      unobserve(): void {}
-      disconnect(): void {
-        this.observer.disconnected = true
-      }
-    }
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      sizingMockState.animationFrames.push(callback)
-      return sizingMockState.animationFrames.length
-    })
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined)
+    sizingMockState.surfaces = []
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Chromium' })
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
       value: originalUserAgent
     })
-    if (originalResizeObserver) {
-      globalThis.ResizeObserver = originalResizeObserver
-    } else {
-      Reflect.deleteProperty(globalThis, 'ResizeObserver')
-    }
+    Reflect.deleteProperty(window, 'cleancode')
   })
 
-  it('waits for the current xterm surface to report valid dimensions before attaching its PTY', async () => {
-    sizingMockState.fitDimensions = { columns: 0, rows: 0 }
-    const attachAgentSession = vi.fn(async () => createAgentSession('agent-main', 'main'))
-    installRuntime(attachAgentSession)
+  it('waits for the first visible grid measurement before attaching the Agent session', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const attachAgentSession = vi.fn(async (command) => ({
+      agentId: command.agentId,
+      activity: 'idle' as const,
+      gitBranch: command.gitBranch ?? null,
+      processId: 42,
+      projectDirectory: command.projectDirectory,
+      projectId: command.projectId,
+      providerId: command.providerId,
+      providerSessionRef: null,
+      sessionId: 'agent-session-1',
+      status: 'running' as const,
+      terminalSourceTheme: command.terminalSourceTheme,
+      terminalViewIdentity: null,
+      workspaceDirectory: command.workspaceDirectory,
+      workspaceName: command.workspaceName
+    }))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ attachAgentSession })
+    })
 
-    render(<AppShell />)
+    render(
+      <TerminalSurfaceRegistryProvider registry={new TerminalSurfaceRegistry()}>
+        <AgentConsole
+          currentWorkbench={workbench}
+          currentWorkspace={workbench.project.workspaces[0]}
+        />
+      </TerminalSurfaceRegistryProvider>
+    )
 
-    await waitFor(() => expect(sizingMockState.terminals).toHaveLength(1))
+    await waitFor(() => expect(sizingMockState.surfaces).toHaveLength(1))
     expect(attachAgentSession).not.toHaveBeenCalled()
+    const measurementSurface = sizingMockState.surfaces[0]!
+    const attachment = vi.mocked(measurementSurface.attach).mock
+      .calls[0]![0] as TerminalSurfaceAttachment
 
-    sizingMockState.fitDimensions = { columns: 71, rows: 22 }
-    triggerTerminalResize()
-
-    await waitFor(() =>
-      expect(attachAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({ columns: 71, rows: 22, workspaceName: 'main' })
-      )
-    )
-  })
-
-  it('synchronizes the latest xterm dimensions when they change while attach is pending', async () => {
-    const pendingSession = createDeferred<AgentSessionSnapshot>()
-    const attachAgentSession = vi.fn(() => pendingSession.promise)
-    const resizeAgentSession = vi.fn(async () => undefined)
-    installRuntime(attachAgentSession, resizeAgentSession)
-
-    render(<AppShell />)
-
-    await waitFor(() =>
-      expect(attachAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({ columns: 64, rows: 18 })
-      )
-    )
-    sizingMockState.fitDimensions = { columns: 73, rows: 21 }
-    triggerTerminalResize()
-    expect(resizeAgentSession).not.toHaveBeenCalled()
-
-    pendingSession.resolve(createAgentSession('agent-main', 'main'))
-
-    await waitFor(() =>
-      expect(resizeAgentSession).toHaveBeenCalledWith({
-        columns: 73,
-        rows: 21,
-        sessionId: 'agent-main'
-      })
-    )
-  })
-
-  it('coalesces repeated fits without attaching another PTY or repeating the same resize', async () => {
-    const attachAgentSession = vi.fn(async () => createAgentSession('agent-main', 'main'))
-    const resizeAgentSession = vi.fn(async () => undefined)
-    installRuntime(attachAgentSession, resizeAgentSession)
-
-    render(<AppShell />)
+    act(() => attachment.onDimensionsChange({ columns: 112, rows: 34 }))
 
     await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(1))
-    triggerTerminalResize()
-    expect(resizeAgentSession).not.toHaveBeenCalled()
-
-    sizingMockState.fitDimensions = { columns: 76, rows: 23 }
-    triggerTerminalResize(2)
-
-    await waitFor(() =>
-      expect(resizeAgentSession).toHaveBeenCalledWith({
-        columns: 76,
-        rows: 23,
-        sessionId: 'agent-main'
-      })
-    )
-    expect(resizeAgentSession).toHaveBeenCalledTimes(1)
-    expect(attachAgentSession).toHaveBeenCalledTimes(1)
-  })
-
-  it('never binds a late attach result from the previous workspace to the current xterm surface', async () => {
-    const mainSession = createDeferred<AgentSessionSnapshot>()
-    const attachAgentSession = vi
-      .fn()
-      .mockImplementationOnce(() => mainSession.promise)
-      .mockResolvedValueOnce(createAgentSession('agent-feature', 'feature'))
-    const resizeAgentSession = vi.fn(async () => undefined)
-    const mainWorkbench = createWorkbenchSnapshot('/repo/app', 'app', {
-      workspaces: [
-        { directory: '/repo/app', gitBranch: 'main', isCurrent: true, name: 'main' },
-        {
-          directory: '/repo/app-worktrees/feature',
-          gitBranch: 'feature',
-          isCurrent: false,
-          name: 'feature'
-        }
-      ]
-    })
-    const featureWorkbench = {
-      ...mainWorkbench,
-      graph: { ...mainWorkbench.graph, workspaceName: 'feature' },
-      project: {
-        ...mainWorkbench.project,
-        workspaces: mainWorkbench.project.workspaces.map((workspace) => ({
-          ...workspace,
-          isCurrent: workspace.name === 'feature'
-        }))
-      }
-    }
-    installRuntime(attachAgentSession, resizeAgentSession, {
-      listWorkbenches: vi.fn(async () => [mainWorkbench]),
-      switchBranchWorkspace: vi.fn(async () => featureWorkbench)
-    })
-
-    render(<AppShell />)
-
-    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(1))
-    fireEvent.click(await screen.findByRole('button', { name: 'feature 独立工作区' }))
-    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(2))
-    mainSession.resolve(createAgentSession('agent-main', 'main'))
-    sizingMockState.fitDimensions = { columns: 78, rows: 24 }
-    triggerTerminalResize()
-
-    await waitFor(() =>
-      expect(resizeAgentSession).toHaveBeenLastCalledWith({
-        columns: 78,
-        rows: 24,
-        sessionId: 'agent-feature'
-      })
-    )
-    expect(resizeAgentSession).not.toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: 'agent-main' })
+    expect(attachAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({ columns: 112, rows: 34 })
     )
   })
 })
-
-function installRuntime(
-  attachAgentSession: ReturnType<typeof vi.fn>,
-  resizeAgentSession = vi.fn(async () => undefined),
-  overrides: Parameters<typeof createRuntimeApi>[0] = {}
-): void {
-  const workbench = createWorkbenchSnapshot('/repo/app', 'app')
-  Object.defineProperty(window, 'cleancode', {
-    configurable: true,
-    value: createRuntimeApi({
-      attachAgentSession,
-      listWorkbenches: vi.fn(async () => [workbench]),
-      resizeAgentSession,
-      ...overrides
-    })
-  })
-}
-
-function triggerTerminalResize(times = 1): void {
-  act(() => {
-    for (let index = 0; index < times; index += 1) {
-      sizingMockState.resizeObservers
-        .filter(
-          (observer) =>
-            !observer.disconnected && observer.target?.classList.contains('agent-terminal-viewport')
-        )
-        .forEach((observer) => observer.callback([], observer as unknown as ResizeObserver))
-    }
-    const frames = sizingMockState.animationFrames.splice(0)
-    frames.forEach((frame) => frame(0))
-  })
-}
-
-function createAgentSession(sessionId: string, workspaceName: string): AgentSessionSnapshot {
-  return {
-    agentId: 'default-agent',
-    codexThreadId: null,
-    gitBranch: workspaceName === 'main' ? null : workspaceName,
-    processId: 42,
-    projectDirectory: '/repo/app',
-    projectId: 'project-app',
-    sessionId,
-    status: 'running',
-    terminalSourceTheme: 'light',
-    workspaceDirectory:
-      workspaceName === 'main' ? '/repo/app' : `/repo/app-worktrees/${workspaceName}`,
-    workspaceName
-  }
-}
-
-function createDeferred<T>(): {
-  readonly promise: Promise<T>
-  resolve(value: T): void
-} {
-  let resolvePromise!: (value: T) => void
-  return {
-    promise: new Promise<T>((resolve) => {
-      resolvePromise = resolve
-    }),
-    resolve: resolvePromise
-  }
-}

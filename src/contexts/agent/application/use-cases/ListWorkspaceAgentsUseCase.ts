@@ -30,6 +30,7 @@ export class ListWorkspaceAgentsUseCase {
       },
       name: 'Agent 1',
       projectId: command.projectId,
+      providerId: 'codex',
       workspaceName: command.workspaceName
     })
     await this.repository.save(defaultAgent)

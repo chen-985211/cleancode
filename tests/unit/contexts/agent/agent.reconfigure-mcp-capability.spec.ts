@@ -2,17 +2,17 @@ import type {
   AgentMcpServerPort,
   RegisteredAgentMcpSession
 } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
-import type {
-  CodexAgentProcessPort,
-  StartCodexAgentProcessCommand
-} from '../../../../src/contexts/agent/application/ports/CodexAgentProcessPort'
+import {
+  RecordingAgentProviderRegistry,
+  RecordingAgentTerminalRuntime
+} from '../../../fixtures/agentTerminalRuntime'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type { AgentRuntimeScopeValidationPort } from '../../../../src/contexts/agent/application/ports/AgentRuntimeScopeValidationPort'
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type { AgentToolExecutionResult } from '../../../../src/contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
-import { CodexThreadId } from '../../../../src/contexts/agent/domain/value-objects/CodexThreadId'
+import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 
 describe('reconfigure Agent CleanCode MCP capability', () => {
   it('starts a disabled Agent without registering or injecting the built-in MCP', async () => {
@@ -24,7 +24,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
     await service.attach(attachCommand())
 
     expect(mcpServer.registered).toEqual([])
-    expect(processPort.starts[0]?.cleancodeMcp).toBeUndefined()
+    expect(processPort.providers.launchCommands[0]?.cleancodeMcp).toBeUndefined()
   })
 
   it('cancels approvals and restarts only the target Agent on its original thread when disabled', async () => {
@@ -51,11 +51,14 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
     await expect(approval).resolves.toMatchObject({ status: 'canceled' })
     expect(restarted?.sessionId).not.toBe(first.sessionId)
     expect(processPort.stops).toEqual([first.sessionId])
-    expect(processPort.starts).toHaveLength(2)
-    expect(processPort.starts[1]).toMatchObject({
-      resumeThreadId: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    expect(processPort.launches).toHaveLength(2)
+    expect(processPort.providers.launchCommands[1]).toMatchObject({
+      providerSessionRef: {
+        kind: 'codex-thread',
+        value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+      }
     })
-    expect(processPort.starts[1]?.cleancodeMcp).toBeUndefined()
+    expect(processPort.providers.launchCommands[1]?.cleancodeMcp).toBeUndefined()
     expect(mcpServer.unregistered).toEqual([first.sessionId])
     expect(service.listPendingApprovals()).toEqual([])
   })
@@ -72,11 +75,11 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
       workspaceName: 'main'
     })
 
-    processPort.starts[0]?.onExit({ exitCode: 0, sessionId: processPort.starts[0].sessionId })
+    processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
     const reattached = await service.attach(attachCommand())
 
     expect(reattached.sessionId).toBe(restarted?.sessionId)
-    expect(processPort.starts).toHaveLength(2)
+    expect(processPort.launches).toHaveLength(2)
   })
 
   it('does not restart a suspended old-scope session after checkout commits', async () => {
@@ -100,7 +103,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
     ).resolves.toBeNull()
 
     expect(processPort.stops).toEqual([attached.sessionId])
-    expect(processPort.starts).toHaveLength(1)
+    expect(processPort.launches).toHaveLength(1)
   })
 
   it('validates the complete runtime scope before restarting an active session', async () => {
@@ -136,27 +139,12 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
       workspaceName: 'main'
     })
     expect(processPort.stops).toEqual([])
-    expect(processPort.starts).toHaveLength(1)
+    expect(processPort.launches).toHaveLength(1)
   })
 })
 
-class RecordingProcessPort implements CodexAgentProcessPort {
-  readonly starts: StartCodexAgentProcessCommand[] = []
-  readonly stops: string[] = []
-
-  async start(command: StartCodexAgentProcessCommand): Promise<{ readonly processId: number }> {
-    this.starts.push(command)
-    return { processId: this.starts.length }
-  }
-
-  write(): void {}
-  resize(): void {}
-
-  async stop(sessionId: string): Promise<void> {
-    this.stops.push(sessionId)
-  }
-
-  async disposeAll(): Promise<void> {}
+class RecordingProcessPort extends RecordingAgentTerminalRuntime {
+  readonly providers = new RecordingAgentProviderRegistry()
 }
 
 class RecordingMcpServerPort implements AgentMcpServerPort {
@@ -201,7 +189,7 @@ class MemoryAgentRepository implements AgentSessionRepository {
 
 function createService(
   repository: AgentSessionRepository,
-  processPort: CodexAgentProcessPort,
+  processPort: RecordingProcessPort,
   mcpServer: AgentMcpServerPort,
   scopeValidation?: AgentRuntimeScopeValidationPort
 ): AgentSessionService {
@@ -225,6 +213,7 @@ function createService(
       })
     },
     repository,
+    processPort.providers,
     scopeValidation
   )
 }
@@ -236,17 +225,22 @@ function createAgent(enabled: boolean, withThread = false): AgentSession {
     layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
     name: 'Agent 1',
     projectId: 'project-1',
+    providerId: 'codex',
     workspaceName: 'main'
   })
   if (withThread) {
-    agent.bindCodexThread(
+    agent.bindProviderSession(
       AgentConversationScope.create({
         agentId: 'agent-1',
         gitBranch: null,
         projectId: 'project-1',
         workspaceName: 'main'
       }),
-      CodexThreadId.create('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
+      ProviderSessionRef.create({
+        formatVersion: 1,
+        kind: 'codex-thread',
+        value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+      })
     )
   }
   return agent
@@ -257,7 +251,6 @@ function attachCommand() {
     agentId: 'agent-1',
     onExit: () => undefined,
     onGraphUpdated: () => undefined,
-    onOutput: () => undefined,
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',

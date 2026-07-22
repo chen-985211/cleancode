@@ -1,4 +1,4 @@
-export const terminalProviderProtocolVersion = 3
+export const terminalProviderProtocolVersion = 4
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
 export const terminalProviderMaxOutputChunkBytes = 256 * 1024
 
@@ -21,7 +21,12 @@ export interface TerminalProviderResponse {
 
 export interface TerminalProviderEvent {
   readonly type: 'event'
-  readonly event: 'terminal-output' | 'terminal-exit' | 'recovery-issue'
+  readonly event:
+    | 'terminal-output'
+    | 'terminal-exit'
+    | 'foreground-job-started'
+    | 'foreground-job-exited'
+    | 'recovery-issue'
   readonly payload: unknown
 }
 

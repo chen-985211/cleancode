@@ -113,8 +113,8 @@ Clean Architecture 用于定义代码分层、依赖方向、用例入口、端�
 
 - 项目上下文：负责项目、本地项目目录、项目登记簿、分支工作区和 Git 分支绑定。
 - 积木图上下文：负责终端积木、终端组合、viewport、依赖连接、图校验和图变更。
-- 运行上下文：负责普通终端 PTY 会话、终端工作流计划、精确运行身份、受管本地服务端口租约、实际端点、运行状态、就绪探测、停止和失败传播。
-- Agent 上下文：负责工作区 Agent、Codex 运行时会话、工具调用、审批、审计和权限约束。
+- 运行上下文：负责 block/agent 类型化终端 owner、PTY 会话、权威终端模型与视图、前台任务、终端工作流计划、服务端口租约、运行状态和失败传播。
+- Agent 上下文：负责工作区 Agent、固定 Provider、Provider session ref、Agent launch/activity、原生 MCP、工具调用、审批、审计和权限约束。
 
 Plugin 是规划中的候选上下文，预期负责积木能力声明、自定义积木定义和扩展生命周期；当前没有 Plugin 领域模型、用例、端口或持久化事实，不属于已实现能力。
 
@@ -143,9 +143,10 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - `Project`：项目上下文的项目与分支工作区聚合根。
 - `ProjectRegistry`：项目上下文的最近项目目录与当前项目选择登记簿聚合根。
 - `BlockGraph`：积木图上下文的聚合根。
-- `TerminalSession`：运行上下文的普通终端 PTY 会话聚合根。
+- `TerminalSession`：运行上下文的类型化 owner PTY 会话聚合根。
+- `ForegroundJob`：长期交互 shell 中一次受管前台任务的技术聚合。
 - `WorkflowRun`：运行上下文的终端依赖工作流聚合根。
-- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、名称、画布布局、CleanCode 原生 MCP 能力开关和各 Git 分支的对话恢复绑定。
+- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、固定 Provider、名称、画布布局、CleanCode MCP 开关和各 Git 分支的 Provider session ref。
 
 聚合外部只能通过聚合根修改聚合内部状态。任何代码不得绕过聚合根直接修改聚合内部实体或集合。
 
@@ -171,14 +172,14 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 项目、项目目录、分支工作区和 Git 分支绑定的唯一事实来源：`Project` 聚合。
 - 最近项目目录列表与当前项目选择的唯一事实来源：`ProjectRegistry` 聚合。
 - 积木图结构的唯一事实来源：`BlockGraph` 聚合。
-- 普通终端 PTY 会话生命周期的唯一事实来源：`TerminalSession` 聚合。
+- 普通终端和 Agent terminal 的 PTY 会话生命周期、类型化 owner 与终端运行身份的唯一事实来源：Run 上下文的 `TerminalSession` 聚合。
 - 终端依赖工作流运行生命周期的唯一事实来源：`WorkflowRun` 聚合。
 - 当前终端运行的 `sessionId + runId + generation` 与退出保留/恢复资格由 Run 上下文解释。live PTY 与权威终端模型可由独立 Provider 跨 Electron 应用进程持有；版本化 checkpoint 和有界输出记录是 Run 基础设施恢复资料，不是已提交业务状态。端口租约与实际端点仍是易失运行时事实，warm attach 后必须重新验证监听所有权；端口策略和注入方式仍是 BlockGraph 持久化的服务意图。
 - 运行期 Agent 操作历史的唯一事实来源：Agent 上下文的审计记录。
-- 工作区 Agent 的稳定身份、名称、已提交画布布局和 CleanCode 原生 MCP 能力开关的唯一事实来源：`AgentSession` 聚合及其仓储。
-- Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、工作区、Git 分支和 `agentId` 组成，绑定值是 Codex thread UUID。
-- Codex 对话内容的唯一事实来源：Codex CLI 自身持久化的 thread；cleancode 不复制或解析对话正文。
-- 当前 Agent PTY、进程号、终端输出尾部和运行中 turn 属于易失运行时状态，不是持久化业务事实。
+- 工作区 Agent 的稳定身份、固定 Provider、名称、已提交画布布局和 CleanCode MCP 开关的唯一事实来源：`AgentSession` 聚合及其仓储。
+- Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、工作区、Git 分支和 `agentId` 组成，绑定值是版本化 Provider session ref。
+- Provider 对话正文的唯一事实来源：对应 CLI 自身；cleancode 不复制或解析对话正文。
+- Agent terminal 的 PTY、权威屏幕、sequence 和视图由 Run 拥有；当前 Provider launch、activity、MCP URL/Token、Hook 和审批属于 Agent 易失状态。
 - 选择、悬停、拖动中尺寸等临时交互状态的唯一事实来源：表现层状态。已经提交的积木图布局由 `BlockGraph` 聚合拥有，已经提交的 Agent 画布布局由 `AgentSession` 聚合拥有。
 - 技术能力实现的唯一事实来源：基础设施层适配器。
 
@@ -190,9 +191,9 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 
 运行期 Agent 工具调用进入系统的唯一入口是应用层用例。运行期 Agent 桥接层属于基础设施层入站适配器，负责把 Codex、Claude Code、Gemini CLI 或其他本地 CLI Agent 的输入转换为应用层命令。
 
-Agent 会话必须按项目、工作区、Git 分支和 `agentId` 隔离。一个工作区允许拥有多个 Agent，同一分支作用域内的不同 Agent 可以同时运行独立可写 PTY；它们共享工作目录，应用不得把这种共享误表示为文件级隔离。同一物理工作目录在同一时刻最多只能由一个 Git 分支作用域接管；项目上下文切换该目录的 Git 分支前，必须通过应用层端口等待该目录的全部 Agent PTY 挂起。Git 检出失败时必须恢复全部旧作用域 Agent，检出成功后由新分支作用域接管。非 Git 项目使用显式的无分支持久化作用域；Git detached HEAD 没有稳定分支身份，其 Agent 对话必须是易失的，不得复用无分支绑定。
+Agent 会话必须按项目、工作区、Git 分支和 `agentId` 隔离。Provider 在 Agent 创建时确定且不可切换；一个工作区允许同时拥有多个相同或不同 Provider Agent。每个 Agent 通过应用层端口取得独立 agent-owned Run terminal、Provider launch、MCP 与审批，但共享工作目录，应用不得把这种共享误表示为文件级隔离。同一物理工作目录在同一时刻最多只能由一个 Git 分支作用域接管；项目上下文切换该目录的 Git 分支前，必须通过应用层端口等待该目录的全部 Agent terminal 挂起。Git 检出失败时必须恢复全部旧作用域 Agent，检出成功后由新分支作用域接管。非 Git 项目使用显式的无分支持久化作用域；Git detached HEAD 的 Agent 对话必须是易失的。
 
-cleancode 只持久化 Codex thread UUID，并通过 Codex CLI 的正式恢复入口恢复对话。UUID 必须来自当前子进程的明确生命周期通知，不得通过扫描历史目录、猜测最近会话或跨工作区回退获得。
+cleancode 只持久化版本化 Provider session ref，并通过该 Provider 的正式恢复入口恢复。引用必须来自仍匹配当前 Agent runtime session 与 launch generation 的结构化通知，不能扫描历史目录、解析终端输出、猜测最近会话或跨 Agent 回退。Provider registry 负责差异；Agent domain、Run domain、通用 IPC 和 UI 不得按 Provider ID 分支。
 
 运行期 Agent 不得直接执行以下操作：
 
@@ -429,9 +430,11 @@ Electron 主进程代码只负责应用启动、窗口生命周期、菜单、IP
 ```txt
 Agent CLI
   ↓
-基础设施层 Agent 适配器
+Provider contribution / MCP 入站适配器
   ↓
-应用层用例
+Agent 应用层用例
+  ↓ AgentTerminalRuntimePort
+Run 应用层 TerminalSession / ForegroundJob
   ↓
 领域模型
   ↓
@@ -444,6 +447,6 @@ Agent CLI
 
 ## 项目数据
 
-当前持久化实现位于 Electron 应用数据目录：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储以版本 `1` 保存服务端口意图，并把旧版 TCP 固定端口确定性迁移为 `fixed + none + tcp`；未知版本或畸形配置必须拒绝读取，不能静默降级为任务。工作区 Agent 存储支持从旧版单 Agent 分支绑定迁移，并必须保留原有 Codex thread UUID。普通终端恢复目录另存 schema v1 checkpoint 和有界追加输出；它只用于 Run 技术恢复，不得被 Project、BlockGraph、UI 或 Agent 当作可编辑业务仓储。写入持久化业务状态必须通过应用层仓储端口；需要替换为 SQLite 时，只能替换基础设施实现，不得改变领域和应用层契约。
+当前持久化实现位于 Electron 应用数据目录：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储以版本 `1` 保存服务端口意图，并把旧版 TCP 固定端口确定性迁移为 `fixed + none + tcp`；未知版本或畸形配置必须拒绝读取。工作区 Agent 仓储使用 schema v4，支持旧版单 Agent/分支绑定迁移，并把原 Codex thread UUID 保留为版本化 `codex-thread` 引用。Run 终端恢复目录另存 checkpoint 和有界追加输出；它只用于技术恢复，不得被 Project、BlockGraph、UI 或 Agent 当作可编辑业务仓储。写入持久化业务状态必须通过应用层仓储端口。
 
 当前没有工作流导入、导出、运行实例恢复、审计回放或撤销能力。这些方向只有在领域语义、用例和测试落地后才能迁入本文的当前事实。

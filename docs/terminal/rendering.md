@@ -74,7 +74,7 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 如果 attach Promise 尚未完成时尺寸再次变化，在 session 返回后补发最新 resize。
 - 测量结果和 session 都必须带当前 workspace key，旧工作区迟到的 Promise 不得绑定到新工作区。
 
-当前实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [agentTerminalXterm.ts](../../src/presentation/app-shell/agentTerminalXterm.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 node-pty 只消费 attach/resize 命令，不反向猜测 UI 尺寸。
+当前 Agent 视图实现位于 [AgentConsole.tsx](../../src/presentation/app-shell/AgentConsole.tsx) 和 [useAgentTerminalView.ts](../../src/presentation/app-shell/useAgentTerminalView.ts)，并与普通终端共享 [terminalXtermSurface.ts](../../src/presentation/app-shell/terminalXtermSurface.ts)。表现层拥有“当前可见网格多大”这个事实；Agent 应用层和 Run 的 node-pty 适配器只消费 attach/resize 命令，不反向猜测 UI 尺寸。
 
 ### 2. 右侧 padding 把滚动条整体推向左边
 
@@ -125,20 +125,13 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 
 Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色背景、composer 和状态区域。因此，“当前应用想显示的主题”和“仍在运行的 PTY 已经采用的源 palette”是两个不同事实。主题切换只改变前者，不得假定子进程会同步改变后者。
 
-Agent 运行时在首次附加时固定 `terminalSourceTheme`。同一作用域再次附加时，renderer 发送当前有效主题作为新运行时提议，应用层则为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；应用重启或显式新对话产生的新运行时可以采用新的当前主题。
+Agent terminal 由 Run 承载，并在首次附加时固定 `terminalSourceTheme`。同一 terminal 再次附加时，renderer 发送当前有效主题作为新运行时提议，Run 为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；重新启动 Provider 或开始新对话只替换 terminal 内的 launch，不替换 terminal，也不改变 source theme。应用重启建立新 terminal 时才可以采用新的当前主题。
 
-工作区导航不得重建 Agent 的 xterm surface。Presentation 使用 `projectId + workspaceName + agentId` 持有独立 surface registry：离开工作区时只 detach xterm 根 DOM，保留 terminal、parser、屏幕缓冲和 scrollback；隐藏期间到达的 PTY 输出仍按 `sessionId` 直接写入该 surface；返回时把同一 DOM 挂到新 host 并重新 fit、refresh，不 reset，也不 replay 输出尾部。
+Agent 与普通终端使用相同的权威模型、`viewId`、snapshot、sequence 和 attach/detach 协议。工作区导航可以销毁 renderer xterm；隐藏期间 PTY 输出继续进入 Run 的 headless 模型，返回时创建新 surface，先注册定向视图，再恢复完整 snapshot 并接续严格连续的输出事件。不得依赖 renderer 常驻，也不得把截断输出尾部重新送入 parser。
 
-8192 字符尾部只用于无障碍文本、诊断和非 xterm 回退，不是 TUI 屏幕恢复来源。任意字符截断都可能落在 CSI、OSC 或 UTF-8 序列中，把 `2m`、`H` 等控制序列残片显示为普通文本。首次绑定尚未完成的短暂竞态必须保存完整 PTY 事件块，绑定后按原顺序写入；不得先裁剪再交给 parser。
+Provider launch replacement 不会重置 surface 或终端模型。只有 Agent terminal identity 真正变化时才按新 snapshot 恢复视图；旧 identity、旧 `viewId` 或 sequence 缺口都必须触发拒绝或有界重试。Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放 terminal、模型与视图租约；普通视图卸载只释放可丢弃 surface。
 
-只有真实 session replacement 才重置已有 surface，并必须遵守以下顺序：
-
-1. 等待 xterm FIFO 中已经排队的 write 完成；连续 replacement 使用 generation，只允许最新请求提交。
-2. 从集中主题 token 读取 canonical source 的完整 palette，并同时设置 surface 的 source dataset。
-3. reset xterm，原子提交新 `sessionId` 绑定，再读取绑定前的完整启动输出；之后到达的 live output 直接进入新绑定。
-4. Agent 删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出释放对应 surface；普通工作区导航不得释放。
-
-这一顺序避免旧 write 跨过 reset、旧 OSC 查询响应被送往新 session，以及工作区快速往返时迟到的 replacement 覆盖当前 surface。主题差异由 source dataset 上的统一滤镜完成，不重启 PTY，也不改写原始 ANSI 输出。[`agent-terminal-surface-registry.spec.ts`](../../tests/unit/presentation/agent-terminal-surface-registry.spec.ts) 证明隐藏期间完整输出路由、绑定前完整事件块和生命周期清理；[`agent-console.terminal.spec.tsx`](../../tests/unit/presentation/agent-console.terminal.spec.tsx) 证明工作区往返复用同一 xterm 且不 reset；[`agent-console.terminal-generation.spec.tsx`](../../tests/unit/presentation/agent-console.terminal-generation.spec.tsx) 验证 FIFO 与 generation；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和超过 8192 字符的 ANSI 输出，证明工作区往返期间 surface/session/进程复用、源主题固定、无控制序列残片以及最终像素明暗。
+[`agent-terminal-view.spec.tsx`](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 证明 Agent 使用共享 snapshot/sequence 视图协议、定向输出、输入、resize 和清理；[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明共享 registry 的精确 `viewId` 路由；[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 通过真实 Electron、node-pty 和 ANSI 输出证明工作区往返、源主题固定与最终像素明暗。
 
 ## 普通终端的 worktree 重挂载
 
@@ -215,7 +208,7 @@ localY = (clientY - rect.top) / scaleY - topPadding
 
 ## 推荐实现不变量
 
-Agent 控制台当前应维护以下不变量。普通终端可以复用排查模型，但必须根据自己的 session identity、restart 和 group 流程建立对应不变量，不能直接套用 Agent 的 workspace-key attach 模型。
+Agent 控制台与普通终端共享 Run 视图不变量；Agent 额外维护首次预测量、固定 Provider 和 launch 不替换 terminal 的语义。
 
 1. PTY 首次 attach 使用当前可见 xterm 的首次有效行列，不使用占位尺寸抢跑。
 2. 当前 xterm 的最新有效行列最终会到达对应 session 的 `resize`；允许 RAF 合并不需要落地的中间值。
@@ -227,7 +220,7 @@ Agent 控制台当前应维护以下不变量。普通终端可以复用排查�
 8. 行内最后一个可见字形不超过行右边界，终端没有水平溢出。
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
 10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
-11. 同一 Agent PTY 的终端源主题在运行期间保持不变；工作区往返复用同一 surface，真实 session replacement 才恢复 canonical palette、reset 并重新绑定。
+11. 同一 Agent terminal 的终端源主题在运行期间保持不变；工作区往返可以创建新 surface，但必须从同一 Run 模型恢复 canonical palette、snapshot 和连续 sequence。
 
 ## 排障流程
 
@@ -389,7 +382,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 ### Unit：证明异步生命周期
 
-[agent-console.terminal-sizing.spec.tsx](../../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖：
+[agent-terminal-view.spec.tsx](../../tests/unit/presentation/agent-terminal-view.spec.tsx) 覆盖共享视图的尺寸、输入和恢复协议；[agent-console.terminal-sizing.spec.tsx](../../tests/unit/presentation/agent-console.terminal-sizing.spec.tsx) 覆盖 attach 期间的异步生命周期：
 
 - 首次有效测量前不 attach。
 - attach pending 期间的新尺寸会在 session 返回后同步。
@@ -401,9 +394,9 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 ### 其余 Unit、Integration 和 Contract：证明边界传递
 
 - [agent.session-service.spec.ts](../../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
-- [agent.codex-pty-process.spec.ts](../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts) 使用真实 node-pty 和本地 fake Codex 进程，证明 Agent PTY 适配器能够启动并传递输入输出。
+- [agent.run-terminal-provider.spec.ts](../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts) 使用真实 Run terminal 和本地 fake Provider，证明 Agent CLI 启动、输入输出、`Ctrl+C` 与退出回到 shell。
 - [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
-- [NodePtyCodexAgentProcessAdapter.ts](../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts) 最终把 attach 行列传给 `node-pty.spawn`，并把 resize 转成 PTY 的 `resize(columns, rows)`。
+- [RunAgentTerminalRuntimeAdapter.ts](../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts) 把 Agent 的 attach/resize 端口转交给 Run；[NodePtyTerminalProcessAdapter.ts](../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter.ts) 最终把行列传给 `node-pty.spawn` 和 PTY `resize`。
 
 ### Electron E2E：证明真实浏览器几何与终端视觉组合
 

@@ -1,9 +1,11 @@
 import type {
+  AgentActivityChangedEvent,
+  AgentActivityStatus,
   AgentGraphUpdatedEvent,
   AgentPtyExitEvent,
-  AgentPtyOutputEvent,
   AgentSessionSnapshot,
   AgentTerminalSourceTheme,
+  AgentTerminalViewIdentity,
   AgentToolApprovalRequest
 } from '../dto/AgentSessionProtocol'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
@@ -16,6 +18,8 @@ import {
   AgentConversationScope,
   type AgentConversationScopeSnapshot
 } from '../../domain/value-objects/AgentConversationScope'
+import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
+import type { AgentRuntimeArtifact } from '../ports/AgentProviderContribution'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import {
   isOwnedAgentSession,
@@ -27,6 +31,7 @@ export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
   readonly columns?: number
   readonly gitBranch?: string | null
   readonly persistenceMode?: 'ephemeral' | 'persistent'
+  readonly providerId?: string
   readonly projectDirectory: string
   readonly projectId?: string
   readonly restartMode?: 'new' | 'retry'
@@ -37,29 +42,35 @@ export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
 }
 
 export interface AgentSessionCallbacks {
+  readonly onActivityChanged?: (event: AgentActivityChangedEvent) => void
   readonly onExit: (event: AgentPtyExitEvent) => void
   readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
-  readonly onOutput: (event: AgentPtyOutputEvent) => void
   readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
 }
 
 export interface ManagedAgentSession {
+  activity?: AgentActivityStatus
   readonly agentId: string
   callbacks: AgentSessionCallbacks
   cleancodeMcpEnabled: boolean
-  codexThreadId: string | null
   columns: number
   readonly gitBranch: string | null
+  isTerminalRunning: boolean
   isStopping: boolean
+  launchArtifacts: readonly AgentRuntimeArtifact[]
   mcpEndpoint?: { readonly bearerToken: string; readonly url: string }
   processId: number | null
   readonly projectDirectory: string
   readonly projectId: string
+  readonly providerId: string
+  providerLaunchGeneration: number
+  providerSessionRef: ProviderSessionRefSnapshot | null
   rows: number
   readonly shouldPersist: boolean
   readonly scope: AgentConversationScope
   sessionId: string
   status: AgentSessionSnapshot['status']
+  terminalViewIdentity?: AgentTerminalViewIdentity | null
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
@@ -67,9 +78,9 @@ export interface ManagedAgentSession {
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {
   return {
+    onActivityChanged: command.onActivityChanged,
     onExit: command.onExit,
     onGraphUpdated: command.onGraphUpdated,
-    onOutput: command.onOutput,
     onToolApprovalRequested: command.onToolApprovalRequested
   }
 }
@@ -157,7 +168,7 @@ export function recordAgentSessionStartFailure(
   session: ManagedAgentSession,
   mcpServerPort: AgentMcpServerPort
 ): void {
-  session.status = session.codexThreadId ? 'restore_failed' : 'failed'
+  session.status = session.providerSessionRef ? 'restore_failed' : 'failed'
   unregisterAgentMcpEndpoint(session, mcpServerPort)
 }
 
@@ -189,27 +200,33 @@ export function requireManagedAgentSession(
 }
 
 export function toAgentSessionSnapshot(session: {
+  readonly activity?: AgentActivityStatus
   readonly agentId: string
-  readonly codexThreadId: string | null
   readonly gitBranch: string | null
   readonly processId: number | null
   readonly projectDirectory: string
   readonly projectId: string
+  readonly providerId: string
+  readonly providerSessionRef: ProviderSessionRefSnapshot | null
   readonly sessionId: string
   readonly status: AgentSessionSnapshot['status']
+  readonly terminalViewIdentity?: AgentTerminalViewIdentity | null
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }): AgentSessionSnapshot {
   return {
+    activity: session.activity ?? 'unavailable',
     agentId: session.agentId,
-    codexThreadId: session.codexThreadId,
     gitBranch: session.gitBranch,
     processId: session.processId,
     projectDirectory: session.projectDirectory,
     projectId: session.projectId,
+    providerId: session.providerId,
+    providerSessionRef: session.providerSessionRef,
     sessionId: session.sessionId,
     status: session.status,
+    terminalViewIdentity: session.terminalViewIdentity ?? null,
     terminalSourceTheme: session.terminalSourceTheme,
     workspaceDirectory: session.workspaceDirectory,
     workspaceName: session.workspaceName

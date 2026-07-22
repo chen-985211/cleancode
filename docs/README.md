@@ -37,13 +37,13 @@ docs/
 
 ## 限界上下文文档
 
-| 限界上下文 | 状态   | 负责范围                                         | 当前文档                                                                                                                                                               |
-| ---------- | ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Project    | 已实现 | 项目、分支工作区、Git 绑定和项目登记簿           | [项目与分支工作区生命周期](contexts/project/workspace-lifecycle.md)                                                                                                    |
-| BlockGraph | 已实现 | 终端积木、组合、连接、图校验和布局               | [积木图模型](contexts/block-graph/block-graph.md)、[积木动作模型](contexts/block-graph/block-action-model.md)                                                          |
-| Run        | 已实现 | PTY 会话、运行身份、服务端口、执行计划和失败恢复 | [终端会话生命周期](contexts/run/terminal-session.md)、[终端依赖工作流](contexts/run/terminal-workflow.md)、[本地服务端口治理](contexts/run/service-port-management.md) |
-| Agent      | 已实现 | Agent 身份、运行时会话、工具、审计和权限         | [Agent 与会话生命周期](contexts/agent/agent-session.md)、[cleancode 原生 MCP](contexts/agent/cleancode-mcp.md)                                                         |
-| Plugin     | 规划中 | 候选的积木能力声明和扩展                         | 当前没有领域实现；规划边界见[上下文地图](engineering/context-map.md)与 [UI 路线图](product/ui-roadmap.md)                                                              |
+| 限界上下文 | 状态   | 负责范围                                         | 当前文档                                                                                                                                                                                            |
+| ---------- | ------ | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project    | 已实现 | 项目、分支工作区、Git 绑定和项目登记簿           | [项目与分支工作区生命周期](contexts/project/workspace-lifecycle.md)                                                                                                                                 |
+| BlockGraph | 已实现 | 终端积木、组合、连接、图校验和布局               | [积木图模型](contexts/block-graph/block-graph.md)、[积木动作模型](contexts/block-graph/block-action-model.md)                                                                                       |
+| Run        | 已实现 | PTY 会话、运行身份、服务端口、执行计划和失败恢复 | [终端会话生命周期](contexts/run/terminal-session.md)、[终端依赖工作流](contexts/run/terminal-workflow.md)、[本地服务端口治理](contexts/run/service-port-management.md)                              |
+| Agent      | 已实现 | Agent 身份、运行时会话、工具、审计和权限         | [Agent 与会话生命周期](contexts/agent/agent-session.md)、[cleancode 原生 MCP](contexts/agent/cleancode-mcp.md)、[Agent 终端底座与 Provider 扩展路线图](contexts/agent/terminal-provider-roadmap.md) |
+| Plugin     | 规划中 | 候选的积木能力声明和扩展                         | 当前没有领域实现；规划边界见[上下文地图](engineering/context-map.md)与 [UI 路线图](product/ui-roadmap.md)                                                                                           |
 
 跨上下文能力应归入发起协作、拥有生命周期的上下文，并在文档中显式列出其他上下文提供的契约。终端依赖工作流由 Run 拥有运行生命周期，因此专文位于 `contexts/run/`；BlockGraph 通过稳定计划契约提供图结构事实。
 

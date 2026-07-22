@@ -78,6 +78,52 @@ describe('app shell create Agent focus', () => {
         duration: 220
       })
     )
+    expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ providerId: 'codex' })
+    )
+  })
+
+  it('creates a new Agent only after selecting one of multiple registered Providers', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listAgentProviders: vi.fn(async () => [
+        createProviderDescriptor('codex', 'Codex', true),
+        createProviderDescriptor('claude-code', 'Claude Code', false)
+      ]),
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.createWorkspaceAgent.mockImplementation(async (command) =>
+      createAgent(
+        'agent-1',
+        workbench.project.id,
+        {
+          position: command.layout.position,
+          size: command.layout.size
+        },
+        command.providerId
+      )
+    )
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+
+    expect(await screen.findByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
+    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /Claude Code/ }))
+
+    await waitFor(() =>
+      expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ providerId: 'claude-code' })
+      )
+    )
+    expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
   })
 })
 
@@ -116,7 +162,8 @@ function createAgent(
   layout: {
     readonly position: { readonly x: number; readonly y: number }
     readonly size: { readonly width: number; readonly height: number }
-  }
+  },
+  providerId = 'codex'
 ) {
   return {
     agentId,
@@ -124,6 +171,20 @@ function createAgent(
     layout,
     name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
     projectId,
+    providerId,
     workspaceName: 'main'
+  }
+}
+
+function createProviderDescriptor(id: string, displayName: string, cleancodeMcp: boolean) {
+  return {
+    capabilities: {
+      cleancodeMcp,
+      resume: id === 'codex',
+      structuredLifecycle: id === 'codex',
+      systemInstructions: cleancodeMcp
+    },
+    displayName,
+    id
   }
 }

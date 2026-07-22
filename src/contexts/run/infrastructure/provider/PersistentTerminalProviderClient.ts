@@ -16,6 +16,8 @@ import type {
   TerminalModelPort
 } from '../../application/ports/TerminalModelPort'
 import type {
+  ForegroundJobProcessIdentity,
+  LaunchForegroundJobProcessCommand,
   StartTerminalProcessCommand,
   TerminalExitEvent,
   TerminalProcessHandle,
@@ -76,6 +78,7 @@ export class PersistentTerminalProviderClient
       readonly onExit: (event: TerminalExitEvent) => void
     }
   >()
+  private readonly foregroundJobCallbacks = new Map<string, LaunchForegroundJobProcessCommand>()
   private readonly viewCallbacks = new Map<string, AttachTerminalViewCommand>()
   private readonly pendingModelCreates = new Map<string, Promise<unknown>>()
   private readonly workingDirectories = new Map<string, string>()
@@ -183,6 +186,30 @@ export class PersistentTerminalProviderClient
     this.backgroundRequest('write', { sessionId, input })
   }
 
+  launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
+    this.foregroundJobCallbacks.set(command.sessionId, command)
+    void this.request('launchForegroundJob', {
+      foregroundJob: {
+        args: command.args,
+        environment: command.environment,
+        executable: command.executable,
+        generation: command.generation,
+        launchId: command.launchId,
+        sessionId: command.sessionId
+      }
+    }).catch((error) => {
+      if (this.foregroundJobCallbacks.get(command.sessionId) !== command) return
+      this.foregroundJobCallbacks.delete(command.sessionId)
+      this.options.onBackgroundError?.(error)
+      command.onExit({
+        generation: command.generation,
+        launchId: command.launchId,
+        sessionId: command.sessionId,
+        exitCode: null
+      })
+    })
+  }
+
   pauseOutput(sessionId: string): void {
     this.backgroundRequest('pauseOutput', { sessionId })
   }
@@ -193,10 +220,12 @@ export class PersistentTerminalProviderClient
 
   async stop(sessionId: string): Promise<void> {
     await this.request('stopProcess', { sessionId })
+    this.foregroundJobCallbacks.delete(sessionId)
   }
 
   async disposeAll(): Promise<void> {
     await this.request('disposeProcesses')
+    this.foregroundJobCallbacks.clear()
     await this.request('disposeModels')
   }
 
@@ -264,6 +293,7 @@ export class PersistentTerminalProviderClient
   retire(identity: TerminalRunScope): void {
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
+    this.foregroundJobCallbacks.delete(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
     this.backgroundRequest('retireModel', { identity })
@@ -272,6 +302,7 @@ export class PersistentTerminalProviderClient
   async retireSession(identity: TerminalRunScope): Promise<void> {
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
+    this.foregroundJobCallbacks.delete(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
     await this.request('retireModel', { identity })
@@ -417,13 +448,6 @@ export class PersistentTerminalProviderClient
       onDisconnect: () => this.handleProviderDisconnect(connection)
     })
     try {
-      if (metadata.protocolVersion === 1) {
-        await this.claimLegacyController(connection, metadata)
-        connection.instanceId = metadata.instanceId
-        this.connection?.close()
-        this.connection = connection
-        return
-      }
       const health = await connection.request<{
         readonly instanceId: string
         readonly protocolVersion: number
@@ -435,7 +459,11 @@ export class PersistentTerminalProviderClient
           'Terminal provider identity did not match its authenticated metadata.'
         )
       }
-      if (health.protocolVersion !== terminalProviderProtocolVersion) {
+      if (
+        health.protocolVersion !== metadata.protocolVersion ||
+        health.protocolVersion < terminalProviderProtocolVersion - 1 ||
+        health.protocolVersion > terminalProviderProtocolVersion
+      ) {
         throw createExpectedAppError(
           'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
           'Terminal provider protocol version is unsupported.'
@@ -448,41 +476,6 @@ export class PersistentTerminalProviderClient
     } catch (error) {
       connection.close()
       throw error
-    }
-  }
-
-  private async claimLegacyController(
-    connection: TerminalProviderRpcConnection,
-    metadata: TerminalProviderMetadata
-  ): Promise<void> {
-    const deadline = Date.now() + providerControllerClaimTimeoutMs
-    while (true) {
-      const health = await connection.request<{
-        readonly instanceId: string
-        readonly protocolVersion: number
-        readonly isController: boolean
-      }>('health')
-      if (health.instanceId !== metadata.instanceId) {
-        throw createExpectedAppError(
-          'TERMINAL_PROVIDER_IDENTITY_MISMATCH',
-          'Terminal provider identity did not match its authenticated metadata.'
-        )
-      }
-      if (health.protocolVersion !== 1) {
-        throw createExpectedAppError(
-          'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
-          'Terminal provider protocol version is unsupported.'
-        )
-      }
-      if (health.isController) return
-      if (Date.now() >= deadline) {
-        throw createExpectedAppError(
-          'TERMINAL_PROVIDER_CONTROLLER_BUSY',
-          'Terminal provider controller is active or releasing.',
-          { retryAfterMs: 50 }
-        )
-      }
-      await delayProviderOperation(50)
     }
   }
 
@@ -559,6 +552,22 @@ export class PersistentTerminalProviderClient
       this.processCallbacks.get(exit.sessionId)?.onExit(exit)
       return
     }
+    if (event.event === 'foreground-job-started') {
+      const started = event.payload as ForegroundJobProcessIdentity
+      const callbacks = this.foregroundJobCallbacks.get(started.sessionId)
+      if (callbacks && matchesForegroundJob(callbacks, started)) callbacks.onStarted(started)
+      return
+    }
+    if (event.event === 'foreground-job-exited') {
+      const exit = event.payload as ForegroundJobProcessIdentity & {
+        readonly exitCode: number | null
+      }
+      const callbacks = this.foregroundJobCallbacks.get(exit.sessionId)
+      if (!callbacks || !matchesForegroundJob(callbacks, exit)) return
+      this.foregroundJobCallbacks.delete(exit.sessionId)
+      callbacks.onExit(exit)
+      return
+    }
     if (event.event === 'recovery-issue') {
       this.recoveryIssueHandler?.(event.payload as TerminalRuntimeRecoveryIssue)
     }
@@ -577,6 +586,15 @@ export class PersistentTerminalProviderClient
       const scope = this.identities.get(sessionId)
       if (scope) callbacks.onExit({ scope, sessionId, exitCode: null })
     }
+    for (const callbacks of this.foregroundJobCallbacks.values()) {
+      callbacks.onExit({
+        generation: callbacks.generation,
+        launchId: callbacks.launchId,
+        sessionId: callbacks.sessionId,
+        exitCode: null
+      })
+    }
+    this.foregroundJobCallbacks.clear()
   }
 
   private async request<T = void>(method: string, params?: unknown): Promise<T> {
@@ -614,4 +632,15 @@ export class PersistentTerminalProviderClient
 
 function providerUnavailable(message: string) {
   return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
+}
+
+function matchesForegroundJob(
+  expected: ForegroundJobProcessIdentity,
+  actual: ForegroundJobProcessIdentity
+): boolean {
+  return (
+    expected.sessionId === actual.sessionId &&
+    expected.launchId === actual.launchId &&
+    expected.generation === actual.generation
+  )
 }

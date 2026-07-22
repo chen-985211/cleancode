@@ -22,6 +22,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 const execFileAsync = promisify(execFile)
 const featureBranchName = 'feature/agent-theme'
@@ -130,7 +131,8 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const restoredMainSession = await waitForAgentTerminal(page, 'main', 'light')
 
       expect(restoredMainSession.sessionId).toBe(mainSession.sessionId)
-      expect(restoredMainSession.processId).toBe(mainSession.processId)
+      expect(restoredMainSession.terminalProcessId).toBe(mainSession.terminalProcessId)
+      expect(restoredMainSession.providerProcessId).toBe(mainSession.providerProcessId)
       await expectTerminalPresentation(page, restoredMainSession.viewport, 'dark', true)
 
       await selectTheme(page, 'light')
@@ -138,7 +140,8 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const restoredFeatureSession = await waitForAgentTerminal(page, featureBranchName, 'dark')
 
       expect(restoredFeatureSession.sessionId).toBe(featureSession.sessionId)
-      expect(restoredFeatureSession.processId).toBe(featureSession.processId)
+      expect(restoredFeatureSession.terminalProcessId).toBe(featureSession.terminalProcessId)
+      expect(restoredFeatureSession.providerProcessId).toBe(featureSession.providerProcessId)
       await expectTerminalPresentation(page, restoredFeatureSession.viewport, 'light', true)
 
       const reports = await readFakeCodexCliReports(fakeCodex.reportPath)
@@ -147,7 +150,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const sessionReports = reports.filter((report) => report.kind === 'session')
       expect(sessionReports).toHaveLength(2)
       expect(new Set(sessionReports.map((report) => String(report.pid)))).toEqual(
-        new Set([mainSession.processId, featureSession.processId])
+        new Set([mainSession.providerProcessId, featureSession.providerProcessId])
       )
       expect(new Set(sessionReports.map((report) => report.cwd))).toEqual(
         new Set([workbench.projectDirectory, canonicalFeatureDirectory])
@@ -158,9 +161,10 @@ describe('Agent terminal theme across workspaces e2e', () => {
 })
 
 interface AgentTerminalIdentity {
-  readonly processId: string
+  readonly providerProcessId: string
   readonly sessionId: string
   readonly sourceTheme: 'dark' | 'light'
+  readonly terminalProcessId: string
   readonly viewport: Locator
   readonly workspaceName: string
 }
@@ -171,7 +175,7 @@ async function waitForAgentTerminal(
   sourceTheme: 'dark' | 'light'
 ): Promise<AgentTerminalIdentity> {
   await page.waitForFunction(
-    ({ marker, source, workspace }) => {
+    ({ source, workspace }) => {
       const viewport = Array.from(
         document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
       ).find((element) => element.dataset.agentTerminalWorkspaceName === workspace)
@@ -180,17 +184,21 @@ async function waitForAgentTerminal(
         viewport?.dataset.agentTerminalSessionId &&
         viewport.dataset.agentTerminalProcessId &&
         viewport.dataset.agentTerminalSourceTheme === source &&
-        viewport.querySelector('.xterm-rows')?.textContent?.includes(marker)
+        viewport.querySelector('.xterm-helper-textarea')
       )
     },
-    { marker: fakeCodexMarker, source: sourceTheme, workspace: workspaceName }
+    { source: sourceTheme, workspace: workspaceName }
   )
 
   const viewport = page.locator(
     `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceName}"]`
   )
+  await waitForTerminalDomText(viewport, fakeCodexMarker)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
   expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
+  const providerProcessId = visibleOutput?.match(
+    new RegExp(`${fakeCodexMarker}:${sourceTheme}:(\\d+)`)
+  )?.[1]
   const attributes = await viewport.evaluate((element) => ({
     processId: element.getAttribute('data-agent-terminal-process-id'),
     sessionId: element.getAttribute('data-agent-terminal-session-id'),
@@ -200,6 +208,7 @@ async function waitForAgentTerminal(
 
   if (
     !attributes.processId ||
+    !providerProcessId ||
     !attributes.sessionId ||
     (attributes.sourceTheme !== 'dark' && attributes.sourceTheme !== 'light') ||
     !attributes.workspaceName
@@ -208,12 +217,27 @@ async function waitForAgentTerminal(
   }
 
   return {
-    processId: attributes.processId,
+    providerProcessId,
     sessionId: attributes.sessionId,
     sourceTheme: attributes.sourceTheme,
+    terminalProcessId: attributes.processId,
     viewport,
     workspaceName: attributes.workspaceName
   }
+}
+
+async function waitForTerminalDomText(viewport: Locator, text: string): Promise<void> {
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline) {
+    await ensureTerminalDomRenderer(viewport)
+    const contents = await viewport
+      .locator('.xterm-rows')
+      .textContent()
+      .catch(() => '')
+    if (contents?.includes(text)) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
 }
 
 async function expectTerminalPresentation(
@@ -288,7 +312,7 @@ async function expectFakeCodexSession(
       return reports.some(
         (report) =>
           report.kind === 'session' &&
-          String(report.pid) === identity.processId &&
+          String(report.pid) === identity.providerProcessId &&
           report.cwd === expectedDirectory
       )
     })
@@ -302,7 +326,7 @@ function expectSessionReport(
   sourceTheme: 'dark' | 'light'
 ): void {
   const matchingReports = reports.filter(
-    (report) => report.kind === 'session' && String(report.pid) === identity.processId
+    (report) => report.kind === 'session' && String(report.pid) === identity.providerProcessId
   )
 
   expect(matchingReports).toHaveLength(1)

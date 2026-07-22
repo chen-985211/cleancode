@@ -2,7 +2,10 @@ import type { Socket } from 'node:net'
 
 import type { TerminalSessionSnapshot } from '../../application/dto/TerminalSessionSnapshot'
 import type { TerminalScrollbackRows } from '../../application/dto/TerminalRuntimeSettings'
-import type { StartTerminalProcessCommand } from '../../application/ports/TerminalProcessPort'
+import type {
+  LaunchForegroundJobProcessCommand,
+  StartTerminalProcessCommand
+} from '../../application/ports/TerminalProcessPort'
 import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSession'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
@@ -32,6 +35,7 @@ export interface TerminalProviderRequestParams {
   readonly command: Omit<StartTerminalProcessCommand, 'onOutput' | 'onExit'> & {
     readonly identity: TerminalRunScope
   }
+  readonly foregroundJob: Omit<LaunchForegroundJobProcessCommand, 'onExit' | 'onStarted'>
   readonly sessionId: string
   readonly input: string
   readonly columns: number

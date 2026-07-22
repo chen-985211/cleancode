@@ -8,6 +8,7 @@ const agent = {
   layout: { position: { x: 320, y: 140 }, size: { width: 720, height: 460 } },
   name: 'Agent 2',
   projectId: 'project-1',
+  providerId: 'codex',
   workspaceName: 'main'
 }
 

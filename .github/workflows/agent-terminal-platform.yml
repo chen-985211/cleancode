@@ -1,0 +1,53 @@
+name: Agent terminal platforms
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agent-terminal-platform.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'src/contexts/agent/**'
+      - 'src/contexts/run/**'
+      - 'src/platform/**'
+      - 'tests/fixtures/contexts/agent/**'
+      - 'tests/integration/contexts/run/**'
+      - 'tests/unit/contexts/agent/**'
+      - 'tests/unit/contexts/run/**'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-terminal:
+    name: Agent terminal / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm exec vitest run tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts
+
+      - if: runner.os != 'Windows'
+        run: pnpm exec vitest run tests/integration/contexts/run/run.pty-terminal.spec.ts -t "reports foreground job exit without exiting the Agent terminal"
+
+      - if: runner.os == 'Windows'
+        run: pnpm exec vitest run tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts tests/integration/contexts/run/run.windows-agent-pty.spec.ts
+
+      - run: pnpm build

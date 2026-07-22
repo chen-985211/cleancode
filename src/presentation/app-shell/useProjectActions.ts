@@ -4,10 +4,8 @@ import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import { resolveCurrentWorkbenchAfterRemoval } from './workbenchListUpdates'
-import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
 
 interface UseProjectActionsInput {
-  readonly agentTerminalSurfaceRegistry: AgentTerminalSurfaceRegistry
   readonly rememberWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
@@ -18,7 +16,6 @@ interface UseProjectActionsInput {
 }
 
 export function useProjectActions({
-  agentTerminalSurfaceRegistry,
   rememberWorkbench,
   setCurrentWorkbench,
   setHoveredTerminalBlockId,
@@ -49,7 +46,6 @@ export function useProjectActions({
 
       if (!rememberedWorkbenches) return
 
-      agentTerminalSurfaceRegistry.releaseProject(workbench.project.id)
       setSelectedTerminalBlockIds([])
       setSelectedTerminalGroupId(null)
       setHoveredTerminalBlockId(null)
@@ -59,7 +55,6 @@ export function useProjectActions({
       )
     },
     [
-      agentTerminalSurfaceRegistry,
       setCurrentWorkbench,
       setHoveredTerminalBlockId,
       setSelectedTerminalBlockIds,

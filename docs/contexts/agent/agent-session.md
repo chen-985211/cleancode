@@ -2,111 +2,132 @@
 
 ## 文档地位
 
-本文是当前已实现 Agent 身份、对话绑定和运行时会话的统一维护入口。原生工具协议、MCP 鉴权和工具目录由 [cleancode 原生 MCP](cleancode-mcp.md)单独维护。
+本文是当前已实现 Agent 身份、固定 Provider、对话绑定、Agent launch 和运行时生命周期的统一维护入口。原生工具协议、MCP 鉴权和工具目录由 [cleancode 原生 MCP](cleancode-mcp.md)单独维护；Agent terminal 的 PTY、前台任务和视图事实由[终端会话生命周期](../run/terminal-session.md)维护。
 
 全仓边界与事实来源以[架构文档](../../engineering/architecture.md)为准；Agent 控制台的用户可见语义以 [UI 契约](../../product/ui-contract.md)为准。
 
-## 两类会话必须区分
+## 三类对象必须区分
 
-“Agent”与“运行时会话”不是同一个对象：
+- 工作区 Agent 是可持久化的稳定对象：`agentId`、固定 `providerId`、名称、画布布局、CleanCode MCP 偏好和各 Git 分支的 Provider 对话绑定。
+- Agent terminal 是 Run 上下文拥有的长期 shell/PTY、权威终端模型和可丢弃视图。它使用类型化 `agent` owner，但不是 TerminalBlock，也不参与组合、连线、端口治理或终端工作流。
+- Agent launch 是 Agent terminal 内一次 Provider CLI 前台任务。CLI 退出只结束 launch，底层 shell 和 Agent terminal 继续运行；删除 Agent 或工作区生命周期清理才终止 terminal。
 
-- `AgentSession` 聚合表示可持久化的工作区 Agent：稳定 `agentId`、名称、画布布局、CleanCode 原生 MCP 能力开关和各 Git 分支的 Codex thread 绑定。
-- Agent 运行时会话表示当前进程中的一次 Codex PTY：易失 `sessionId`、进程号、状态、回调、终端源主题和待审批请求，以及能力开启时存在的 MCP 端点与 Token。
-
-重启 PTY 不应创造新的 Agent 身份；删除 Agent 则必须同时释放其运行时并删除全部持久化绑定。
+重启 launch 或新建对话都不创造新的 Agent 身份。Provider 在 Agent 创建后不可修改；需要另一个 Provider 时必须创建另一个 Agent。
 
 ## 统一语言
 
-| 术语         | 含义                                                                |
-| ------------ | ------------------------------------------------------------------- |
-| 工作区 Agent | 画布中的稳定 Agent 对象，可被创建、重命名、移动、缩放和删除         |
-| 对话作用域   | `projectId + workspaceName + gitBranch + agentId` 形成的隔离键      |
-| 对话绑定     | 一个作用域到 Codex thread UUID 的持久化映射                         |
-| 运行时会话   | 一个当前 Codex PTY 及其审批和输出回调；能力开启时拥有独立 MCP       |
-| 终端源主题   | 本次 PTY 首次附加时采用的浅色或深色 palette；运行期间保持不变       |
-| 持久恢复     | 通过已保存 UUID 调用 Codex CLI 的正式恢复入口                       |
-| 易失会话     | 不保存或复用 thread 绑定的运行方式，例如 detached HEAD              |
-| 挂起/恢复    | 项目切换物理目录分支前停止旧 PTY，并在失败时恢复原作用域的协调动作  |
-| 生命周期隔离 | 外部所有权事务部分提交后保留的 attach blocker；同步完成后显式解除   |
-| MCP 能力开关 | 每个工作区 Agent 独立保存、只控制 CleanCode 内建画布 MCP 的布尔状态 |
+| 术语                 | 含义                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| 工作区 Agent         | 画布中的稳定 Agent 对象，可创建、重命名、移动、缩放和删除                           |
+| Agent Provider       | CLI 的 detector、launcher、resume、telemetry 和能力注入 contribution                |
+| 对话作用域           | `projectId + workspaceName + gitBranch + agentId` 形成的隔离键                      |
+| Provider session ref | Provider 正式报告的版本化对话引用，例如 `codex-thread` 或 `claude-session`          |
+| Agent terminal       | Run 按 `owner.kind = agent` 承载的长期 shell、PTY、终端模型和视图                   |
+| Agent launch         | Agent terminal 中一次带 generation 的 Provider CLI 前台任务                         |
+| Agent activity       | Provider 结构化事件投影的 `idle/working/waiting_input/waiting_approval/unavailable` |
+| 终端源主题           | Agent terminal generation 创建时采用的浅色或深色 palette；该 generation 内保持不变  |
+| 持久恢复             | 通过当前 Provider 的正式 resume 参数恢复已保存的 session ref                        |
+| 易失会话             | 不保存或复用对话绑定的运行方式，例如 detached HEAD                                  |
+| 生命周期隔离         | 外部所有权事务部分提交后保留的 attach blocker；同步完成后显式解除                   |
 
-## 聚合与持久化规则
+## 聚合、Provider 与持久化
 
-每个工作区允许有零个或多个 Agent。首次初始化从未存在过的工作区时创建一个默认 `Agent 1`；用户删除最后一个 Agent 后，重新打开该已初始化工作区仍保持零个，不偷偷补回默认项。
+每个工作区允许有零个或多个 Agent。首次初始化从未存在过的工作区时创建一个默认 Codex Agent；用户删除最后一个 Agent 后，重新打开该已初始化工作区仍保持零个。
 
 `AgentSession` 保持以下不变量：
 
-1. `agentId`、`projectId`、`workspaceName` 和名称不能为空。
-2. 布局坐标和尺寸必须是有限数，宽高必须大于零。
-3. 同一个 Agent 可以为不同 Git 分支保存不同 Codex thread UUID。
-4. 一个 thread 只能绑定到属于该 Agent、项目和工作区的作用域。
-5. 创建多个 Agent 时名称使用当前空缺的 `Agent N`，身份和布局互不影响。
-6. 新建 Agent 和从旧存储迁移的 Agent 默认启用 CleanCode MCP；关闭状态必须随 Agent 持久化并跨应用重启恢复。
-7. 当前 Agent 的持久化布局是其画布工具自动落位和整理终端时的权威锚点；同工作区其他 Agent 的布局是保留区域。只有 Agent 应用层可以按当前会话身份注入这些事实，模型不得提供或伪造，布局工具也不得反向移动 Agent。
+1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。
+2. `providerId` 在创建时确定，没有领域方法、用例或 IPC 可以切换；attach 携带的 Provider 与持久化事实不一致时必须拒绝。
+3. 同一个 Agent 可以为不同 Git 分支保存不同 Provider session ref；引用只能绑定到该 Agent、项目和工作区的当前作用域。
+4. session ref 必须有已知 kind、版本和值。Codex 和 Claude Code 使用各自正式报告的 UUID，不扫描历史目录、终端输出或“最近会话”。
+5. 同一工作区的多个相同或不同 Provider Agent 拥有独立 terminal、launch、对话、MCP、审批和审计，但共享工作目录。
+6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；URL、Token、Hook、活动状态、终端和 launch 都不持久化。
+7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
 
-当前文件系统仓储使用版本化 JSON，支持从旧版单 Agent 分支绑定迁移。cleancode 只保存 thread UUID，不复制、扫描或解析 Codex 对话正文。
+文件系统仓储当前使用 schema v4。旧版 Codex `codexThreadId` 会无损迁移为 `{ kind: "codex-thread", formatVersion: 1 }`；未知 schema、未知 session ref 版本或畸形数据必须拒绝读取。cleancode 不复制或解析 Provider 对话正文。
+
+## Provider contribution
+
+`AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：
+
+- `descriptor` 声明名称以及 resume、structured lifecycle、CleanCode MCP 和 system instructions 能力。
+- `detector` 返回 installed、missing 或 temporarily unavailable 的结构化诊断。
+- `launcher` 只返回经过校验的 executable、argv、environment 和临时资源，不把参数拼成用户可控 shell 文本。
+- `resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
+
+当前内建 Provider：
+
+| Provider    | 基础终端 | 恢复 | 活动状态 | CleanCode MCP | 说明                                                 |
+| ----------- | -------- | ---- | -------- | ------------- | ---------------------------------------------------- |
+| Codex       | 是       | 是   | 否       | 是            | 正式 thread notify、`resume` 和进程级 config         |
+| Claude Code | 是       | 是   | 是       | 是            | 正式 session ID、Hooks、会话级 MCP/settings 临时文件 |
+| OpenCode    | 是       | 否   | 否       | 否            | 最小 Provider；activity 诚实显示为 `unavailable`     |
+
+增加基础 Agent CLI 时，只需在 Provider 模块实现 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。可选能力通过 contribution 增加；不得在 Agent domain、Run domain、通用 IPC 或 `AgentConsole` 中按 Provider ID 分支。
 
 ## 分支与目录隔离
 
-对话绑定键包含项目、工作区、Git 分支和 `agentId`：
-
-- 普通 Git 分支使用稳定分支名，可在应用重启后恢复。
-- 非 Git 项目使用显式 `null` 分支作用域，可以持久化。
+- 普通 Git 分支使用稳定分支名，可以在应用重启后恢复。
+- 非 Git 项目使用显式 `null` 分支作用域并允许持久化。
 - detached HEAD 没有稳定分支身份，必须使用易失模式，不得复用非 Git 的 `null` 绑定。
-- 同一工作区的多个 Agent 可以各自运行独立可写 PTY，但共享同一个工作目录；这不是文件级隔离。
-- 同一个 Agent 在同一物理目录切换到另一个分支作用域前，旧作用域运行时必须先被释放。
-
-Project 上下文切换主工作区分支时，通过它拥有的 `WorkspaceAgentLifecyclePort` 协调该目录内的全部 Agent，详见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
+- 同一个 Agent 在同一物理目录切换到另一个分支作用域前，旧作用域运行时必须先释放。
+- Project 通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
 
 ## 运行时生命周期
 
-附加 Agent 时，应用层按以下顺序工作：
+附加 Agent 时，应用层依次：
 
-1. 建立对话作用域，并在物理 owner 队列中通过 `AgentRuntimeScopeValidationPort` 重新确认项目仍在登记簿、工作区目录与 Git 分支仍匹配、Agent 定义仍存在；提交后迟到的旧界面命令必须在主进程被拒绝。
-2. 以 `projectId + workspaceDirectory + agentId` 作为物理运行时 owner，串行处理该 owner 的附加、挂起、恢复、重配和释放；可复用的运行中会话只更新回调和 PTY 尺寸，继续返回首次附加确定的终端源主题。
-3. 释放同一 Agent 在同一物理目录中的其他作用域。
-4. 按持久化模式查找 thread 绑定；“新对话”会先清除当前作用域绑定。
-5. 为本次运行生成独立 `sessionId`；仅当该 Agent 已启用 CleanCode MCP 时，注册独立 MCP URL 与 Bearer Token。
-6. 每次真正启动 Codex PTY 前再次校验 session 的完整运行时作用域；attach、挂起恢复和 MCP 重配共用同一校验，任一事实失效都不得调用进程端口。校验通过后，在存在 UUID 时使用正式 resume 参数；已启用的 CleanCode MCP Server 必须成功初始化、单独把全部当前和未来工具默认预批准，并向本次进程注入画布路由 developer instructions；sandbox 与全局 approval policy 继续继承用户 Codex 配置。
-7. 仅在当前子进程明确报告 thread UUID 后，才把它绑定并保存到当前作用域。
+1. 建立对话作用域，并重新确认项目、工作区目录、Git 分支和 Agent 定义仍有效。
+2. 按 `projectId + workspaceDirectory + agentId` 串行 attach、挂起、恢复、重配和释放，阻止迟到 renderer 命令穿过生命周期 lease。
+3. 读取稳定 Agent 的固定 Provider 和当前分支 session ref；“新对话”先等待在途绑定保存，再清除当前作用域引用。
+4. 创建或复用 Run 的 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸。
+5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域。
+6. Provider 生成启动计划；Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`。
+7. Provider 正式报告 session ref 或 activity 时，只接受仍匹配当前 Agent runtime session 和 Provider launch generation 的回调。
 
-运行时状态包括 `running`、`suspended`、`exited`、`failed` 和 `restore_failed`。终端源主题由新运行时首次附加时的有效应用主题确定；同一 PTY 的重挂载、挂起恢复和 MCP 能力重配必须保留该值，新对话或应用重启后的新运行时可以重新采用当时的有效主题。PTY、进程号、终端源主题、终端输出、当前 turn、MCP URL、Token 和待审批请求都不持久化。
+Provider CLI 自然退出或处理 `Ctrl+C` 后，Agent launch 状态变为 `exited`、activity 变为 `unavailable`，停止新的 MCP 调用并释放 launch 临时资源；Run terminal、权威屏幕和 shell 保留。用户可以继续使用 shell、恢复当前对话或开始新对话。shell/PTY 自身退出才清空 terminal identity 并使整个运行时不可输入。
+
+该基础终端能力必须同时支持 macOS、Linux 和 Windows。macOS/Linux 由 POSIX PTY/shell 承载；Windows 由 node-pty ConPTY 和 PowerShell/PowerShell Core 承载，并兼容 Provider 的 npm `.cmd` shim。平台模拟、PowerShell 脚本文本断言或 fake process 只能证明编码和契约，不能替代对应原生平台上的 PTY 中断、launch 退出和 shell 继续可写集成测试。
+
+应用层公开 `running`、`suspended`、`exited`、`failed` 和 `restore_failed`。activity 与该状态独立；不支持结构化 telemetry 的 Provider 必须使用 `unavailable`，不能按输出频率猜测。
 
 ## 管理动作
 
-- 创建：保存一个新的稳定 Agent，不自动启动 Codex PTY。
-- 列出：读取工作区 Agent；只在工作区从未初始化时建立默认 Agent。
-- 重命名/布局：只修改目标 Agent 的持久化事实。
-- 删除：先释放目标 Agent 的运行时与审批，再删除定义和所有分支绑定；允许删除到零个。
-- 新对话：清除当前作用域 thread 绑定并启动新的运行时，不删除 Agent 本身。
-- 切换 MCP 能力：先保存目标 Agent 的期望状态；仅当 PTY 仍为 `running` 且完整作用域校验通过时，才取消旧审批、注销旧端点、生成新 `sessionId` 并用原 thread 重启，仅在开启时注入内建 MCP。已挂起的旧分支 session 不得被重配动作唤醒，其他 Agent 不受影响。
-- 应用退出：先停止接受新附加并排空已经开始的运行时操作，再释放所有进程、审批与 MCP 端点，等待已收到的 thread 绑定写入完成。
+- 创建：从 registry 列出的 Provider 中选择一次，保存稳定 Agent；不提供 Provider 切换。
+- 列出：只在工作区从未初始化时建立默认 Codex Agent。
+- 重命名/布局：只修改目标 Agent 的稳定事实。
+- 删除：停止目标 launch 和 terminal，取消审批、注销 MCP、删除定义和全部分支绑定；其他 Agent 不受影响。
+- 重新启动：在同一 Agent terminal 创建新 generation；Provider 支持恢复时使用当前分支 session ref。
+- 新对话：清除当前分支 session ref，在同一 Agent terminal 创建新 launch。
+- 切换 MCP：先保存偏好；活动运行时会关闭旧审批和端点并建立新 session/launch，其他 Agent 不受影响。
+- 挂起/恢复：工作目录所有权变化时停止整个 Agent terminal；失败补偿可以按稳定 Provider session ref 恢复。
+- 应用退出：停止新附加、排空运行时操作和绑定保存，再释放全部 Agent terminal、Hook、MCP 与审批。Agent terminal 当前不跨应用保留。
 
-挂起、删除 Agent、释放工作区或项目时，清理动作必须与同一物理运行时 owner 的 pending attach 共用串行队列，并先同步安装拒绝迟到附加的 lifecycle lease。Project 的写用例另由项目级事务协调器从首次仓储读取开始串行，避免自动 Git 同步或另一个写动作使用旧快照覆盖结果。lease 不能在 PTY 清理返回时提前结束：调用方必须把它持有到 checkout 与项目保存、worktree 归档与项目保存、Agent 定义删除或项目登记删除全部完成。
-
-lease 的结束语义必须明确区分：`release` 只结束当前安全失败或普通清理，不解除历史隔离；`resolve` 表示外部事实已经提交或补偿完成，并只解除对应工作区的 quarantine，项目级 resolve 才能批量解除该项目；`quarantine` 表示外部状态已前进但保存/补偿失败，保留 attach blocker、释放事务互斥，使后续归档重试或自动项目同步可以恢复并 resolve。应用退出会清理全部 blocker。清理不能只扫描已经进入运行时 Map 的 session，否则仓储读取中的 attach 会在所有权事务完成前重新启动 PTY；MCP 重配等任何可能启动 PTY 的动作既必须服从 blocker，也必须在进程启动前重新通过作用域校验。
+生命周期 lease 的 `release`、`resolve` 和 `quarantine` 语义继续由 Project 协调：清理返回不代表外部 checkout、归档或仓储提交已经完成。任何可能启动 terminal 或 launch 的操作都必须服从 blocker 并在启动前重新校验作用域。
 
 ## 实现入口
 
-| 层级        | 入口                                                                                                                                                                                                                                                                                                             |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Domain      | [`AgentSession.ts`](../../../src/contexts/agent/domain/aggregates/AgentSession.ts)、[`AgentConversationScope.ts`](../../../src/contexts/agent/domain/value-objects/AgentConversationScope.ts)                                                                                                                    |
-| Management  | [`ListWorkspaceAgentsUseCase.ts`](../../../src/contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase.ts)、[`CreateWorkspaceAgentUseCase.ts`](../../../src/contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase.ts)                                                                         |
-| Runtime     | [`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts)、[`AgentSessionRuntimeCoordinator.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionRuntimeCoordinator.ts)                                                                                 |
-| Persistence | [`FileSystemAgentSessionRepository.ts`](../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository.ts)                                                                                                                                                                              |
-| Codex PTY   | [`NodePtyCodexAgentProcessAdapter.ts`](../../../src/contexts/agent/infrastructure/pty/NodePtyCodexAgentProcessAdapter.ts)                                                                                                                                                                                        |
-| Platform    | [`agentIpcHandlers.ts`](../../../src/platform/electron-main/agentIpcHandlers.ts)、[`agentRuntimeLifecycleAdapter.ts`](../../../src/platform/electron-main/agentRuntimeLifecycleAdapter.ts)、[`agentRuntimeScopeValidationAdapter.ts`](../../../src/platform/electron-main/agentRuntimeScopeValidationAdapter.ts) |
+| 层级          | 入口                                                                                                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domain        | [`AgentSession.ts`](../../../src/contexts/agent/domain/aggregates/AgentSession.ts)、[`ProviderSessionRef.ts`](../../../src/contexts/agent/domain/value-objects/ProviderSessionRef.ts)                              |
+| Application   | [`AgentSessionService.ts`](../../../src/contexts/agent/application/use-cases/AgentSessionService.ts)、[`AgentProviderContribution.ts`](../../../src/contexts/agent/application/ports/AgentProviderContribution.ts) |
+| Registry      | [`AgentProviderRegistry.ts`](../../../src/contexts/agent/application/services/AgentProviderRegistry.ts)                                                                                                            |
+| Persistence   | [`FileSystemAgentSessionRepository.ts`](../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository.ts)                                                                                |
+| Run adapter   | [`RunAgentTerminalRuntimeAdapter.ts`](../../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts)                                                                                            |
+| Providers     | [`providers`](../../../src/contexts/agent/infrastructure/providers)                                                                                                                                                |
+| Platform / UI | [`agentIpcHandlers.ts`](../../../src/platform/electron-main/agentIpcHandlers.ts)、[`AgentConsole.tsx`](../../../src/presentation/app-shell/AgentConsole.tsx)                                                       |
 
 ## 验证矩阵
 
-| 层级        | 证明内容                                                                        | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ----------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit        | 身份、布局、分支绑定与多 Agent 管理                                             | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.manage-workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.manage-workspace-agents.spec.ts)                                                                                                                                                                                                                       |
-| Unit        | attach/restart、源主题、并发附加、隔离/恢复、MCP 重配、作用域校验和运行时清理   | [`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts)、[`agent.session-theme.spec.ts`](../../../tests/unit/contexts/agent/agent.session-theme.spec.ts)、[`agent.reconfigure-mcp-capability.spec.ts`](../../../tests/unit/contexts/agent/agent.reconfigure-mcp-capability.spec.ts)、[`agent-runtime-scope-validation.spec.ts`](../../../tests/unit/platform/agent-runtime-scope-validation.spec.ts) |
-| Integration | JSON 迁移、thread 持久化和 Codex PTY 参数/必需 MCP/会话路由/默认预批准/生命周期 | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.codex-pty-process.spec.ts`](../../../tests/integration/contexts/agent/agent.codex-pty-process.spec.ts)                                                                                                                                                                                                               |
-| Contract    | Electron IPC 的会话和管理契约                                                   | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                  |
-| E2E         | 多 Agent 主路径，以及跨主题工作区往返时的 PTY 复用与源主题恢复                  | [`workspace-agents.e2e.spec.ts`](../../../tests/e2e/workspace-agents.e2e.spec.ts)、[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts)                                                                                                                                                                                                                                               |
+| 层级        | 证明内容                                                                                                     | 主要测试                                                                                                                                                                                                                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit        | 固定 Provider、session ref、registry、launch generation 与能力降级                                           | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.provider-registry.spec.ts`](../../../tests/unit/contexts/agent/agent.provider-registry.spec.ts)、[`agent.session-service.spec.ts`](../../../tests/unit/contexts/agent/agent.session-service.spec.ts)            |
+| Unit        | Codex、Claude Code 和 OpenCode 启动参数、Hook、MCP 与临时资源                                                | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)                                                           |
+| Integration | schema 迁移、真实 Agent terminal、CLI 退出回 shell 与重复 launch                                             | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.run-terminal-provider.spec.ts`](../../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts)                                                                                     |
+| Platform    | macOS/Linux POSIX PTY 与 Windows `.cmd`/ConPTY 的 Provider 检测、`Ctrl+C`、退出码、重复 launch 和 shell 存活 | [`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`agent.windows-provider-cli.spec.ts`](../../../tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts)、[`run.windows-agent-pty.spec.ts`](../../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) |
+| Contract    | Provider-neutral Agent IPC 与共享终端视图身份                                                                | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)、[`run.terminal-view-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-view-ipc.spec.ts)                                                                                                                                         |
+| E2E         | 多 Agent、工作区往返、主题、审批、创建/删除和共享 xterm 交互                                                 | [`workspace-agents.e2e.spec.ts`](../../../tests/e2e/workspace-agents.e2e.spec.ts)、[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts)                                                                                                                             |
 
 ## 维护规则
 
-改变 Agent 身份、作用域、thread 获取方式、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、迁移、测试和本文。改变 MCP 工具或鉴权时，只更新原生 MCP 专文及其协议测试，不在本文复制工具目录。
+改变 Agent 身份、Provider、session ref、launch generation、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、migration、Provider contract、测试和本文。新增 Provider 不得修改核心控制流；如果需要新通用能力，应先扩展 capability 契约并证明现有 Provider 的诚实降级。

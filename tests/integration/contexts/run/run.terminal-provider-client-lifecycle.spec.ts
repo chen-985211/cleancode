@@ -81,13 +81,16 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
-  it('keeps one-version compatibility while a legacy provider still owns live sessions', async () => {
+  it('keeps one-version compatibility while the previous provider owns live sessions', async () => {
     await provider.close()
-    provider = new ControllableProvider(createProviderEndpoint(rootDirectory), 1)
+    provider = new ControllableProvider(
+      createProviderEndpoint(rootDirectory),
+      terminalProviderProtocolVersion - 1
+    )
     await provider.start()
     await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
       schemaVersion: 1,
-      protocolVersion: 1,
+      protocolVersion: terminalProviderProtocolVersion - 1,
       instanceId: provider.instanceId,
       authToken: provider.authToken,
       endpoint: provider.endpoint,
@@ -100,6 +103,7 @@ describe('persistent terminal provider client lifecycle', () => {
 
     expect(provider.requests.map(({ method }) => method)).toEqual([
       'health',
+      'claimController',
       'setScrollbackRows',
       'listSessions'
     ])
@@ -136,6 +140,52 @@ describe('persistent terminal provider client lifecycle', () => {
       expect(runtimeUnavailable).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'TERMINAL_PROVIDER_UNAVAILABLE' })
       )
+    )
+    await client.detachApplication()
+  })
+
+  it('routes only matching foreground job lifecycle events to the launch callback', async () => {
+    const client = createClient(rootDirectory)
+    const onStarted = vi.fn()
+    const onExit = vi.fn()
+    await client.initialize()
+
+    client.launchForegroundJob({
+      args: ['--resume', 'conversation-1'],
+      environment: {},
+      executable: 'fake-agent',
+      generation: 2,
+      launchId: 'launch-2',
+      onExit,
+      onStarted,
+      sessionId: 'session-1'
+    })
+    await provider.waitForRequests('launchForegroundJob', 1)
+    provider.emitEvent('foreground-job-started', {
+      generation: 1,
+      launchId: 'stale-launch',
+      sessionId: 'session-1'
+    })
+    provider.emitEvent('foreground-job-started', {
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+    provider.emitEvent('foreground-job-exited', {
+      exitCode: 130,
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+
+    await vi.waitFor(() => expect(onStarted).toHaveBeenCalledTimes(1))
+    expect(onStarted).toHaveBeenCalledWith({
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+    await vi.waitFor(() =>
+      expect(onExit).toHaveBeenCalledWith(expect.objectContaining({ exitCode: 130 }))
     )
     await client.detachApplication()
   })
@@ -210,7 +260,7 @@ class ControllableProvider {
 
   constructor(
     readonly endpoint: string,
-    readonly protocolVersion: 1 | 2 | 3 = terminalProviderProtocolVersion
+    readonly protocolVersion: number = terminalProviderProtocolVersion
   ) {}
 
   async start(): Promise<void> {
@@ -250,6 +300,12 @@ class ControllableProvider {
 
   disconnectClients(): void {
     for (const socket of this.sockets) socket.destroy()
+  }
+
+  emitEvent(event: string, payload: unknown): void {
+    for (const socket of this.sockets) {
+      socket.write(encodeTerminalProviderFrame({ event, payload, type: 'event' }))
+    }
   }
 
   async waitForRequests(method: string, count: number): Promise<void> {
@@ -309,7 +365,7 @@ class ControllableProvider {
       return {
         instanceId: this.instanceId,
         protocolVersion: this.protocolVersion,
-        ...(this.protocolVersion === 1 ? { isController: true } : { controllerState: 'unclaimed' })
+        controllerState: 'unclaimed'
       }
     }
     if (method === 'claimController') return { controllerLeaseId: 'controller-lease-1' }

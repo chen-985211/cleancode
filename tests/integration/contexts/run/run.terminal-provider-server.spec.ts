@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type {
+  LaunchForegroundJobProcessCommand,
   StartTerminalProcessCommand,
   TerminalProcessPort
 } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
@@ -160,6 +161,47 @@ describe('terminal provider server', () => {
     client.close()
   })
 
+  it('forwards foreground Agent job lifecycle through the Provider protocol', async () => {
+    const processes = new RecordingProcessPort()
+    server = createServer(processes)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    await createAndStart(client, 'interactive')
+
+    await client.request('launchForegroundJob', {
+      foregroundJob: {
+        args: ['--resume', 'conversation-1'],
+        environment: { AGENT_MODE: 'test' },
+        executable: 'fake-agent',
+        generation: 2,
+        launchId: 'launch-2',
+        sessionId: 'session-1'
+      }
+    })
+
+    expect(processes.foregroundJobs[0]).toMatchObject({
+      executable: 'fake-agent',
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+    expect((await client.waitForEvent('foreground-job-started')).payload).toEqual({
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+
+    processes.emitForegroundExit('session-1', 130)
+    expect((await client.waitForEvent('foreground-job-exited')).payload).toEqual({
+      exitCode: 130,
+      generation: 2,
+      launchId: 'launch-2',
+      sessionId: 'session-1'
+    })
+    client.close()
+  })
+
   it('stops a default session when its application controller disappears', async () => {
     const processes = new RecordingProcessPort()
     const store = new FileTerminalRecoveryStore({
@@ -302,6 +344,7 @@ describe('terminal provider server', () => {
 })
 
 class RecordingProcessPort implements TerminalProcessPort {
+  readonly foregroundJobs: LaunchForegroundJobProcessCommand[] = []
   readonly starts: StartTerminalProcessCommand[] = []
   readonly stops: string[] = []
 
@@ -317,6 +360,11 @@ class RecordingProcessPort implements TerminalProcessPort {
       })
     }
     return { processId: 4242 }
+  }
+
+  launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
+    this.foregroundJobs.push(command)
+    command.onStarted(command)
   }
 
   write(): void {}
@@ -338,6 +386,12 @@ class RecordingProcessPort implements TerminalProcessPort {
     const command = this.starts.find((candidate) => candidate.scope.sessionId === sessionId)
     if (!command) throw new Error('Missing provider process.')
     command.onOutput({ scope: command.scope, sessionId, data })
+  }
+
+  emitForegroundExit(sessionId: string, exitCode: number | null): void {
+    const command = this.foregroundJobs.find((candidate) => candidate.sessionId === sessionId)
+    if (!command) throw new Error('Missing foreground job.')
+    command.onExit({ ...command, exitCode })
   }
 }
 

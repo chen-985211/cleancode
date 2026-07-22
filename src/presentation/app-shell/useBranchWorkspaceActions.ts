@@ -4,10 +4,8 @@ import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { useI18n } from './i18n/useI18n'
 import { manualWorkspaceSelectionBrowserEventName } from './useTerminalWorkspaceSynchronization'
 import type { WorkbenchSnapshot } from './types'
-import type { AgentTerminalSurfaceRegistry } from './agentTerminalSurfaceRegistry'
 
 interface UseBranchWorkspaceActionsInput {
-  readonly agentTerminalSurfaceRegistry: AgentTerminalSurfaceRegistry
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
   readonly setHoveredTerminalBlockId: Dispatch<SetStateAction<string | null>>
@@ -20,7 +18,6 @@ interface UseBranchWorkspaceActionsInput {
 }
 
 export function useBranchWorkspaceActions({
-  agentTerminalSurfaceRegistry,
   currentWorkbench,
   replaceWorkbench,
   setHoveredTerminalBlockId,
@@ -116,7 +113,6 @@ export function useBranchWorkspaceActions({
         })
 
         if (archivedWorkbench) {
-          agentTerminalSurfaceRegistry.releaseWorkspace(workbench.project.id, workspaceName)
           forgetWorkspaceTerminalStates(workbench.project.id, workspaceName)
           clearCurrentBlockSelection()
           replaceWorkbench(archivedWorkbench)
@@ -130,7 +126,6 @@ export function useBranchWorkspaceActions({
     [
       clearCurrentBlockSelection,
       currentWorkbench,
-      agentTerminalSurfaceRegistry,
       replaceWorkbench,
       t,
       terminateWorkspaceTerminalSessions,
@@ -146,18 +141,12 @@ export function useBranchWorkspaceActions({
       })
 
       if (checkedOutWorkbench) {
-        agentTerminalSurfaceRegistry.releaseWorkspace(workbench.project.id, 'main')
         forgetWorkspaceTerminalStates(workbench.project.id, 'main')
         clearCurrentBlockSelection()
         replaceWorkbench(checkedOutWorkbench)
       }
     },
-    [
-      agentTerminalSurfaceRegistry,
-      clearCurrentBlockSelection,
-      forgetWorkspaceTerminalStates,
-      replaceWorkbench
-    ]
+    [clearCurrentBlockSelection, forgetWorkspaceTerminalStates, replaceWorkbench]
   )
 
   return {

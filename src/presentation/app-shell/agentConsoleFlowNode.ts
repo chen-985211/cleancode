@@ -92,6 +92,7 @@ export function createLegacyAgentSnapshot(
     },
     name: 'Agent 1',
     projectId: currentWorkbench?.project.id ?? 'unselected-project',
+    providerId: 'codex',
     workspaceName: currentWorkspace?.name ?? 'unselected-workspace'
   }
 }

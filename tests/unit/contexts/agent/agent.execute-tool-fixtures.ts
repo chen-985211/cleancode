@@ -45,6 +45,7 @@ export function createAgent(
     layout: { position, size },
     name: agentId,
     projectId: 'project-1',
+    providerId: 'codex',
     workspaceName: 'main'
   })
 }

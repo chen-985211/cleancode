@@ -63,6 +63,7 @@ describe('Agent destructive approval canvas', () => {
           layout: { position: { x: 540, y: 120 }, size: { height: 520, width: 720 } },
           name: 'Agent 1',
           projectId: baseWorkbench.project.id,
+          providerId: 'codex',
           workspaceName: 'main'
         }
       ],

@@ -7,6 +7,7 @@ export interface CreateWorkspaceAgentCommand {
   readonly agentId?: string
   readonly layout: AgentLayoutSnapshot
   readonly projectId: string
+  readonly providerId: string
   readonly workspaceName: string
 }
 
@@ -21,6 +22,7 @@ export class CreateWorkspaceAgentUseCase {
       layout: command.layout,
       name: nextAgentName(agents.map((candidate) => candidate.name)),
       projectId: command.projectId,
+      providerId: command.providerId,
       workspaceName: command.workspaceName
     })
     await this.repository.save(agent)

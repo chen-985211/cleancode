@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 import type {
+  AgentActivityChangedEvent,
   AgentGraphUpdatedEvent,
   AgentPtyExitEvent,
-  AgentPtyOutputEvent,
   AgentSessionSnapshot,
   AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
@@ -11,7 +11,10 @@ import type {
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from './contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
-import type { CodexCliInstallationSnapshot } from './contexts/agent/application/ports/CodexCliPort'
+import type {
+  AgentProviderAvailability,
+  AgentProviderDescriptor
+} from './contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
   BlockGraphSnapshot,
@@ -81,7 +84,10 @@ declare global {
       synchronizeProjectGitState(command: {
         readonly projectDirectory: string
       }): Promise<WorkbenchSnapshot | null>
-      inspectCodexCli(): Promise<CodexCliInstallationSnapshot>
+      inspectAgentProvider(command: {
+        readonly providerId: string
+      }): Promise<AgentProviderAvailability>
+      listAgentProviders(): Promise<readonly AgentProviderDescriptor[]>
       attachAgentSession(command: {
         readonly agentId: string
         readonly columns?: number
@@ -89,6 +95,7 @@ declare global {
         readonly persistenceMode?: 'ephemeral' | 'persistent'
         readonly projectDirectory: string
         readonly projectId: string
+        readonly providerId?: string
         readonly restartMode?: 'new' | 'retry'
         readonly rows?: number
         readonly terminalSourceTheme: AgentTerminalSourceTheme
@@ -98,6 +105,7 @@ declare global {
       createWorkspaceAgent(command: {
         readonly layout: AgentLayoutSnapshot
         readonly projectId: string
+        readonly providerId: string
         readonly workspaceName: string
       }): Promise<WorkspaceAgentSnapshot>
       renameWorkspaceAgent(command: {
@@ -141,8 +149,8 @@ declare global {
         readonly approvalId: string
       }): Promise<AgentToolApprovalDecisionResult>
       rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
-      onAgentPtyOutput(listener: (event: AgentPtyOutputEvent) => void): () => void
       onAgentPtyExit(listener: (event: AgentPtyExitEvent) => void): () => void
+      onAgentActivityChanged(listener: (event: AgentActivityChangedEvent) => void): () => void
       onAgentGraphUpdated(listener: (event: AgentGraphUpdatedEvent) => void): () => void
       onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void
       createTerminalBlock(command: {
@@ -290,6 +298,7 @@ declare global {
         readonly runId: string
         readonly generation: number
         readonly viewId: string
+        readonly owner?: { readonly id: string; readonly kind: 'agent' | 'block' }
         readonly rawTarget: string
       }): Promise<
         | { readonly kind: 'external'; readonly target: string }
@@ -337,6 +346,7 @@ declare global {
         readonly runId: string
         readonly generation: number
         readonly viewId: string
+        readonly owner?: { readonly id: string; readonly kind: 'agent' | 'block' }
       }): Promise<TerminalSnapshot>
       detachTerminalView(command: {
         readonly projectId: string

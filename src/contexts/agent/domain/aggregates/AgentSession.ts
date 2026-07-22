@@ -1,5 +1,8 @@
 import type { AgentConversationScope } from '../value-objects/AgentConversationScope'
-import { CodexThreadId } from '../value-objects/CodexThreadId'
+import {
+  ProviderSessionRef,
+  type ProviderSessionRefSnapshot
+} from '../value-objects/ProviderSessionRef'
 
 export interface AgentLayoutSnapshot {
   readonly position: { readonly x: number; readonly y: number }
@@ -9,9 +12,9 @@ export interface AgentLayoutSnapshot {
 export const defaultAgentLayoutPosition = { x: 540, y: 120 } as const
 export const defaultAgentLayoutSize = { width: 720, height: 460 } as const
 
-export interface AgentConversationBindingSnapshot {
-  readonly codexThreadId: string
+interface AgentConversationBindingSnapshot {
   readonly gitBranch: string | null
+  readonly sessionRef: ProviderSessionRefSnapshot
 }
 
 export interface PersistedAgentSessionSnapshot {
@@ -21,6 +24,7 @@ export interface PersistedAgentSessionSnapshot {
   readonly layout: AgentLayoutSnapshot
   readonly name: string
   readonly projectId: string
+  readonly providerId: string
   readonly workspaceName: string
 }
 
@@ -30,7 +34,13 @@ export interface CreateAgentSessionInput {
   readonly layout: AgentLayoutSnapshot
   readonly name: string
   readonly projectId: string
+  readonly providerId: string
   readonly workspaceName: string
+}
+
+interface AgentConversationBinding {
+  readonly gitBranch: string | null
+  readonly sessionRef: ProviderSessionRef
 }
 
 export class AgentSession {
@@ -38,10 +48,11 @@ export class AgentSession {
     readonly id: string,
     readonly projectId: string,
     readonly workspaceName: string,
+    readonly providerId: string,
     private agentName: string,
     private agentLayout: AgentLayoutSnapshot,
     private isCleancodeMcpEnabled: boolean,
-    private readonly conversations: Map<string, AgentConversationBindingSnapshot>,
+    private readonly conversations: Map<string, AgentConversationBinding>,
     private activeScope: AgentConversationScope | null = null
   ) {}
 
@@ -50,6 +61,7 @@ export class AgentSession {
       requireValue(input.agentId, 'agentId'),
       requireValue(input.projectId, 'projectId'),
       requireValue(input.workspaceName, 'workspaceName'),
+      requireValue(input.providerId, 'providerId'),
       normalizeName(input.name),
       normalizeLayout(input.layout),
       input.cleancodeMcpEnabled ?? true,
@@ -57,7 +69,7 @@ export class AgentSession {
     )
   }
 
-  static start(scope: AgentConversationScope): AgentSession {
+  static start(scope: AgentConversationScope, providerId = 'codex'): AgentSession {
     const snapshot = scope.toSnapshot()
     const session = AgentSession.create({
       agentId: snapshot.agentId,
@@ -67,6 +79,7 @@ export class AgentSession {
       },
       name: 'Agent 1',
       projectId: snapshot.projectId,
+      providerId,
       workspaceName: snapshot.workspaceName
     })
     session.activeScope = scope
@@ -81,6 +94,7 @@ export class AgentSession {
       requireValue(snapshot.agentId, 'agentId'),
       requireValue(snapshot.projectId, 'projectId'),
       requireValue(snapshot.workspaceName, 'workspaceName'),
+      requireValue(snapshot.providerId, 'providerId'),
       normalizeName(snapshot.name),
       normalizeLayout(snapshot.layout),
       snapshot.cleancodeMcpEnabled,
@@ -88,8 +102,8 @@ export class AgentSession {
         snapshot.conversations.map((conversation) => [
           branchKey(conversation.gitBranch),
           {
-            codexThreadId: CodexThreadId.create(conversation.codexThreadId).value,
-            gitBranch: normalizeBranch(conversation.gitBranch)
+            gitBranch: normalizeBranch(conversation.gitBranch),
+            sessionRef: ProviderSessionRef.create(conversation.sessionRef)
           }
         ])
       ),
@@ -98,32 +112,36 @@ export class AgentSession {
     return session
   }
 
-  bindCodexThread(codexThreadId: CodexThreadId): void
-  bindCodexThread(scope: AgentConversationScope, codexThreadId: CodexThreadId): void
-  bindCodexThread(
-    scopeOrThread: AgentConversationScope | CodexThreadId,
-    explicitThread?: CodexThreadId
+  bindProviderSession(sessionRef: ProviderSessionRef): void
+  bindProviderSession(scope: AgentConversationScope, sessionRef: ProviderSessionRef): void
+  bindProviderSession(
+    scopeOrSessionRef: AgentConversationScope | ProviderSessionRef,
+    explicitSessionRef?: ProviderSessionRef
   ): void {
-    const scope = explicitThread ? (scopeOrThread as AgentConversationScope) : this.activeScope
-    const thread = explicitThread ?? (scopeOrThread as CodexThreadId)
+    const scope = explicitSessionRef
+      ? (scopeOrSessionRef as AgentConversationScope)
+      : this.activeScope
+    const sessionRef = explicitSessionRef ?? (scopeOrSessionRef as ProviderSessionRef)
 
     if (!scope) {
       throw createExpectedAppError(
         'AGENT_SESSION_INVALID',
-        'An Agent conversation scope is required before binding a Codex thread.'
+        'An Agent conversation scope is required before binding a Provider session.'
       )
     }
 
     this.assertOwnsScope(scope)
     const gitBranch = scope.toSnapshot().gitBranch
     this.conversations.set(branchKey(gitBranch), {
-      codexThreadId: thread.value,
-      gitBranch
+      gitBranch,
+      sessionRef
     })
   }
 
-  get boundCodexThreadId(): string | null {
-    return this.activeScope ? this.findCodexThreadId(this.activeScope.toSnapshot().gitBranch) : null
+  get boundProviderSessionRef(): ProviderSessionRef | null {
+    return this.activeScope
+      ? this.findProviderSessionRef(this.activeScope.toSnapshot().gitBranch)
+      : null
   }
 
   get name(): string {
@@ -138,8 +156,8 @@ export class AgentSession {
     return this.isCleancodeMcpEnabled
   }
 
-  findCodexThreadId(gitBranch: string | null): string | null {
-    return this.conversations.get(branchKey(gitBranch))?.codexThreadId ?? null
+  findProviderSessionRef(gitBranch: string | null): ProviderSessionRef | null {
+    return this.conversations.get(branchKey(gitBranch))?.sessionRef ?? null
   }
 
   rename(name: string): void {
@@ -154,7 +172,7 @@ export class AgentSession {
     this.isCleancodeMcpEnabled = enabled
   }
 
-  clearCodexThread(gitBranch: string | null): void {
+  clearProviderSession(gitBranch: string | null): void {
     this.conversations.delete(branchKey(gitBranch))
   }
 
@@ -162,10 +180,14 @@ export class AgentSession {
     return {
       agentId: this.id,
       cleancodeMcpEnabled: this.isCleancodeMcpEnabled,
-      conversations: [...this.conversations.values()],
+      conversations: [...this.conversations.values()].map((conversation) => ({
+        gitBranch: conversation.gitBranch,
+        sessionRef: conversation.sessionRef.toSnapshot()
+      })),
       layout: copyLayout(this.agentLayout),
       name: this.agentName,
       projectId: this.projectId,
+      providerId: this.providerId,
       workspaceName: this.workspaceName
     }
   }

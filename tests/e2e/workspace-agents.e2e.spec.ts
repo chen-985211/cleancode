@@ -1,6 +1,13 @@
 // @vitest-environment node
 
-import type { ElectronApplication, Page } from 'playwright'
+import { delimiter } from 'node:path'
+
+import type { ElectronApplication, Locator, Page } from 'playwright'
+
+import {
+  installFakeCodexCli,
+  type FakeCodexCliFixture
+} from '../fixtures/contexts/agent/fakeCodexCli'
 
 import {
   closeElectronApp,
@@ -16,6 +23,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
+  ensureTerminalDomRenderer,
   readCanvasViewportTransform,
   readXtermSelection,
   selectExactXtermText,
@@ -25,6 +33,7 @@ import {
 describe('workspace Agents e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
+  let fakeCodex: FakeCodexCliFixture
   let page: Page
   let resources: E2eScenarioResources
 
@@ -32,7 +41,15 @@ describe('workspace Agents e2e', () => {
     resources = {}
     workbench = await createE2eWorkbench('cleancode-workspace-agents-e2e')
     resources.workbench = workbench
-    electronApp = await launchApp(workbench)
+    fakeCodex = await installFakeCodexCli(workbench.appStateDirectory)
+    electronApp = await launchApp(workbench, {
+      environment: {
+        CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
+        CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
+        PATH: [fakeCodex.binDirectory, process.env.PATH].filter(Boolean).join(delimiter),
+        SHELL: '/bin/sh'
+      }
+    })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
     resources.page = page
@@ -54,6 +71,7 @@ describe('workspace Agents e2e', () => {
       await selectTheme(page, '浅色')
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
 
       const agentTerminal = page.locator('.agent-terminal-viewport').first()
       await agentTerminal.waitFor()
@@ -67,6 +85,7 @@ describe('workspace Agents e2e', () => {
       const viewportBeforeCreatingAgent = await readCanvasViewportTransform(page)
       page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('button', { name: '新建 Agent' }).click()
+      await selectAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 2)
       await page.waitForFunction((previousViewport) => {
         const viewport = document.querySelector('.react-flow__viewport')
@@ -87,7 +106,7 @@ describe('workspace Agents e2e', () => {
       const store = JSON.parse(
         await waitForJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
       ) as { version: number; workspaces: Array<{ agents: unknown[] }> }
-      expect(store.version).toBe(3)
+      expect(store.version).toBe(4)
       expect(store.workspaces[0]?.agents).toHaveLength(1)
     },
     electronScenarioTimeoutMs
@@ -105,7 +124,12 @@ describe('workspace Agents e2e', () => {
       expect(await toggle.getAttribute('aria-checked')).toBe('true')
       await toggle.click()
       await waitForAgentMcpCapability(workbench, false)
-      expect(await toggle.getAttribute('aria-checked')).toBe('false')
+      await page.waitForFunction(
+        () =>
+          document
+            .querySelector('[role="switch"][aria-label="CleanCode MCP"]')
+            ?.getAttribute('aria-checked') === 'false'
+      )
 
       await closeElectronApp(electronApp)
       resources.electronApp = undefined
@@ -131,6 +155,7 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
 
       const rightInsets = await page
         .locator('.agent-terminal-viewport')
@@ -167,34 +192,23 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
-      await page.getByText('Codex 会话已结束').waitFor()
+      await waitForAgentTerminals(page, 1)
 
       const agent = page.locator('[data-agent-console-node]').first()
-      const agentId = await agent.getAttribute('data-agent-console-node')
       const selectedText = 'cleancode-agent-selection'
       const outputLine = `left-guard-${selectedText}-right-guard`
+      const terminal = agent.locator('.agent-terminal-viewport')
 
-      expect(agentId).not.toBeNull()
-      await electronApp.evaluate(
-        ({ BrowserWindow }, event) => {
-          BrowserWindow.getAllWindows()[0]?.webContents.send('cleancode:agent-pty-output', event)
-        },
-        {
-          agentId: agentId!,
-          data: `\r\n\r\n\r\n${outputLine}\r\n`,
-          sessionId: 'test-agent-main'
-        }
-      )
-      await page.waitForFunction(
-        (text) =>
-          Array.from(document.querySelectorAll('.agent-terminal-viewport .xterm-rows > div')).some(
-            (row) => row.textContent?.includes(text)
-          ),
-        outputLine
-      )
+      await ensureTerminalDomRenderer(terminal)
+      await terminal.click()
+      await page.keyboard.press('Control+C')
+      await page.getByText('Codex 会话已结束').waitFor()
+      await terminal.click()
+      await page.keyboard.type(`printf '\\n\\n\\n${outputLine}\\n'`)
+      await page.keyboard.press('Enter')
+      await waitForTerminalDomText(terminal, outputLine)
 
       const zoom = await setCanvasZoomFromDefault(page, 'in')
-      const terminal = agent.locator('.agent-terminal-viewport')
       const beforeLayout = await readAgentLayout(workbench)
       const beforeViewport = await readCanvasViewportTransform(page)
 
@@ -214,6 +228,7 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
       await waitForPersistedAgent(page)
 
       const agent = page.locator('[data-agent-console-node]').first()
@@ -253,7 +268,7 @@ describe('workspace Agents e2e', () => {
       expect(afterBox.height).toBeGreaterThan(beforeBox.height + 45)
       await waitForAgentSelectionState(page, 'unselected')
 
-      await agent.locator('.agent-console__header').click()
+      await agent.locator('.agent-console-actions__title').click()
       await waitForAgentSelectionState(page, 'selected')
     },
     electronScenarioTimeoutMs
@@ -267,7 +282,9 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCount(page, 1)
       page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('button', { name: '新建 Agent' }).click()
+      await selectAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 2)
+      await waitForAgentTerminals(page, 2)
       await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
       await waitForAllAgentsUnselected(page)
 
@@ -402,41 +419,41 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
 
-      const punctuationWidths = await page
-        .locator('.agent-terminal-viewport')
-        .first()
-        .evaluate((element) => {
-          const helperContainer = element.querySelector('.xterm-helpers')
-          const rows = element.querySelector('.xterm-rows')
+      const terminal = page.locator('.agent-terminal-viewport').first()
+      await ensureTerminalDomRenderer(terminal)
+      const punctuationWidths = await terminal.evaluate((element) => {
+        const helperContainer = element.querySelector('.xterm-helpers')
+        const rows = element.querySelector('.xterm-rows')
 
-          if (!helperContainer || !rows) {
-            throw new Error('Agent terminal text metrics are unavailable.')
-          }
+        if (!helperContainer || !rows) {
+          throw new Error('Agent terminal text metrics are unavailable.')
+        }
 
-          const rowStyle = getComputedStyle(rows)
-          const measure = (text: string): number => {
-            const sample = document.createElement('span')
-            sample.textContent = text
-            sample.style.display = 'inline-block'
-            sample.style.fontFamily = rowStyle.fontFamily
-            sample.style.fontKerning = 'none'
-            sample.style.fontSize = rowStyle.fontSize
-            sample.style.fontWeight = rowStyle.fontWeight
-            sample.style.position = 'absolute'
-            sample.style.visibility = 'hidden'
-            sample.style.whiteSpace = 'pre'
-            helperContainer.append(sample)
-            const width = sample.offsetWidth
-            sample.remove()
-            return width
-          }
+        const rowStyle = getComputedStyle(rows)
+        const measure = (text: string): number => {
+          const sample = document.createElement('span')
+          sample.textContent = text
+          sample.style.display = 'inline-block'
+          sample.style.fontFamily = rowStyle.fontFamily
+          sample.style.fontKerning = 'none'
+          sample.style.fontSize = rowStyle.fontSize
+          sample.style.fontWeight = rowStyle.fontWeight
+          sample.style.position = 'absolute'
+          sample.style.visibility = 'hidden'
+          sample.style.whiteSpace = 'pre'
+          helperContainer.append(sample)
+          const width = sample.offsetWidth
+          sample.remove()
+          return width
+        }
 
-          return {
-            repeated: measure('，'.repeat(32)) / 32,
-            single: measure('，')
-          }
-        })
+        return {
+          repeated: measure('，'.repeat(32)) / 32,
+          single: measure('，')
+        }
+      })
 
       expect(Math.abs(punctuationWidths.repeated - punctuationWidths.single)).toBeLessThanOrEqual(
         0.1
@@ -452,6 +469,43 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
       document.querySelectorAll('[data-agent-console-node]').length === expectedCount,
     count
   )
+}
+
+async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
+  await page.waitForFunction((expectedCount) => {
+    const terminals = Array.from(document.querySelectorAll<HTMLElement>('.agent-terminal-viewport'))
+    return (
+      terminals.length === expectedCount &&
+      terminals.every(
+        (terminal) =>
+          terminal.querySelector('.xterm-helper-textarea') &&
+          terminal.dataset.agentTerminalProcessId &&
+          terminal.dataset.agentTerminalSessionId &&
+          (terminal.dataset.agentTerminalSourceTheme === 'light' ||
+            terminal.dataset.agentTerminalSourceTheme === 'dark')
+      )
+    )
+  }, count)
+}
+
+async function waitForTerminalDomText(terminal: Locator, text: string): Promise<void> {
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline) {
+    await ensureTerminalDomRenderer(terminal)
+    const contents = await terminal
+      .locator('.xterm-rows')
+      .textContent()
+      .catch(() => '')
+    if (contents?.includes(text)) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
+}
+
+async function selectAgentProvider(page: Page, providerName: string): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '选择 Agent Provider' })
+  await dialog.waitFor()
+  await dialog.getByRole('button', { name: new RegExp(`^${providerName} ·`) }).click()
 }
 
 async function waitForPersistedAgent(page: Page): Promise<void> {

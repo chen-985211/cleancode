@@ -9,16 +9,3 @@ export function appendTerminalOutputTail(currentTail: string, output: string): s
 
   return nextTail.slice(nextTail.length - terminalOutputTailMaxCharacters)
 }
-
-export function appendTerminalOutputForSession(
-  outputBySession: Map<string, string>,
-  event: { readonly data: string; readonly sessionId: string }
-): string {
-  const nextOutput = appendTerminalOutputTail(
-    outputBySession.get(event.sessionId) ?? '',
-    event.data
-  )
-
-  outputBySession.set(event.sessionId, nextOutput)
-  return nextOutput
-}

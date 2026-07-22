@@ -574,6 +574,14 @@ function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand 
   ) {
     throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view identity.')
   }
+  if (
+    command.owner !== undefined &&
+    (!isRecord(command.owner) ||
+      (command.owner.kind !== 'block' && command.owner.kind !== 'agent') ||
+      !isNonEmptyString(command.owner.id))
+  ) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid terminal view owner.')
+  }
   return command as unknown as TerminalViewIdentityCommand
 }
 

@@ -103,8 +103,13 @@ export function useApplicationShortcutNavigation({
         targetCenter: center,
         targetZoom: zoom
       })
-      void instance.setCenter(center.x, center.y, { ...transition, zoom })
+      const transitionCompletion = instance.setCenter(center.x, center.y, { ...transition, zoom })
       activateWorkbenchNodeInputRef.current(target)
+      void transitionCompletion.then(() => {
+        if (selectedNodeIdRef.current === target.id) {
+          activateWorkbenchNodeInputRef.current(target)
+        }
+      })
     },
     [canvasSizeRef, getNodes, reactFlowInstanceRef]
   )

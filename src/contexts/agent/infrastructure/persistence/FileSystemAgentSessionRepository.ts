@@ -6,10 +6,11 @@ import { basename, dirname, join } from 'node:path'
 import type { AgentSessionRepository } from '../../application/ports/AgentSessionRepository'
 import {
   AgentSession,
+  type AgentLayoutSnapshot,
   type PersistedAgentSessionSnapshot
 } from '../../domain/aggregates/AgentSession'
 import { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
-import { CodexThreadId } from '../../domain/value-objects/CodexThreadId'
+import { ProviderSessionRef } from '../../domain/value-objects/ProviderSessionRef'
 
 interface AgentWorkspaceSnapshot {
   readonly agents: readonly PersistedAgentSessionSnapshot[]
@@ -18,11 +19,37 @@ interface AgentWorkspaceSnapshot {
 }
 
 interface AgentSessionStore {
-  readonly version: 3
+  readonly version: 4
   readonly workspaces: readonly AgentWorkspaceSnapshot[]
 }
 
-type Version2AgentSessionSnapshot = Omit<PersistedAgentSessionSnapshot, 'cleancodeMcpEnabled'>
+interface Version3AgentConversationBindingSnapshot {
+  readonly codexThreadId: string
+  readonly gitBranch: string | null
+}
+
+interface Version3AgentSessionSnapshot {
+  readonly agentId: string
+  readonly cleancodeMcpEnabled: boolean
+  readonly conversations: readonly Version3AgentConversationBindingSnapshot[]
+  readonly layout: AgentLayoutSnapshot
+  readonly name: string
+  readonly projectId: string
+  readonly workspaceName: string
+}
+
+interface Version3AgentWorkspaceSnapshot {
+  readonly agents: readonly Version3AgentSessionSnapshot[]
+  readonly projectId: string
+  readonly workspaceName: string
+}
+
+interface Version3AgentSessionStore {
+  readonly version: 3
+  readonly workspaces: readonly Version3AgentWorkspaceSnapshot[]
+}
+
+type Version2AgentSessionSnapshot = Omit<Version3AgentSessionSnapshot, 'cleancodeMcpEnabled'>
 
 interface Version2AgentWorkspaceSnapshot {
   readonly agents: readonly Version2AgentSessionSnapshot[]
@@ -110,7 +137,7 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       return
     }
 
-    session.clearCodexThread(scope.toSnapshot().gitBranch)
+    session.clearProviderSession(scope.toSnapshot().gitBranch)
     await this.save(session)
   }
 
@@ -144,7 +171,7 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       .catch(() => undefined)
       .then(async () => {
         const store = await this.readStore()
-        await this.writeStore({ version: 3, workspaces: updateWorkspaces(store.workspaces) })
+        await this.writeStore({ version: 4, workspaces: updateWorkspaces(store.workspaces) })
       })
 
     this.saveQueue = update
@@ -155,11 +182,20 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as
         | Partial<AgentSessionStore>
+        | Partial<Version3AgentSessionStore>
         | Partial<Version2AgentSessionStore>
         | Partial<LegacyAgentSessionStore>
 
+      if (parsed.version === 4 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
+        return { version: 4, workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[] }
+      }
+
       if (parsed.version === 3 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        return { version: 3, workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[] }
+        const migratedStore = migrateVersion3Store(
+          parsed.workspaces as readonly Version3AgentWorkspaceSnapshot[]
+        )
+        await this.writeStore(migratedStore)
+        return migratedStore
       }
 
       if (parsed.version === 2 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
@@ -181,7 +217,7 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       throw new Error('Persisted Agent session store is invalid.')
     } catch (error) {
       if (isMissingFileError(error)) {
-        return { version: 3, workspaces: [] }
+        return { version: 4, workspaces: [] }
       }
 
       throw error
@@ -209,6 +245,7 @@ function migrateLegacyStore(sessions: readonly LegacyAgentSessionSnapshot[]): Ag
         layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
         name: 'Agent 1',
         projectId: session.scope.projectId,
+        providerId: 'codex',
         workspaceName: session.scope.workspaceName
       })
       workspace = {
@@ -219,14 +256,14 @@ function migrateLegacyStore(sessions: readonly LegacyAgentSessionSnapshot[]): Ag
       workspaces.set(key, workspace)
     }
 
-    workspace.agent.bindCodexThread(
+    workspace.agent.bindProviderSession(
       createMigratedScope(workspace.agent.id, session.scope),
-      CodexThreadId.create(session.codexThreadId)
+      createCodexSessionRef(session.codexThreadId)
     )
   }
 
   return {
-    version: 3,
+    version: 4,
     workspaces: [...workspaces.values()].map((workspace) => ({
       agents: [workspace.agent.toSnapshot()],
       projectId: workspace.projectId,
@@ -238,16 +275,39 @@ function migrateLegacyStore(sessions: readonly LegacyAgentSessionSnapshot[]): Ag
 function migrateVersion2Store(
   workspaces: readonly Version2AgentWorkspaceSnapshot[]
 ): AgentSessionStore {
+  return migrateVersion3Store(
+    workspaces.map((workspace) => ({
+      ...workspace,
+      agents: workspace.agents.map((agent) => ({ ...agent, cleancodeMcpEnabled: true }))
+    }))
+  )
+}
+
+function migrateVersion3Store(
+  workspaces: readonly Version3AgentWorkspaceSnapshot[]
+): AgentSessionStore {
   return {
-    version: 3,
+    version: 4,
     workspaces: workspaces.map((workspace) => ({
       ...workspace,
       agents: workspace.agents.map((agent) => ({
         ...agent,
-        cleancodeMcpEnabled: true
+        conversations: agent.conversations.map((conversation) => ({
+          gitBranch: conversation.gitBranch,
+          sessionRef: createCodexSessionRef(conversation.codexThreadId).toSnapshot()
+        })),
+        providerId: 'codex'
       }))
     }))
   }
+}
+
+function createCodexSessionRef(threadId: string): ProviderSessionRef {
+  return ProviderSessionRef.create({
+    formatVersion: 1,
+    kind: 'codex-thread',
+    value: threadId
+  })
 }
 
 function createMigratedScope(

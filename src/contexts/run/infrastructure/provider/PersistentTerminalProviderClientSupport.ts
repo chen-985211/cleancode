@@ -10,7 +10,7 @@ import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
 
 export interface TerminalProviderMetadata {
   readonly schemaVersion: 1
-  readonly protocolVersion: 1 | 2 | 3
+  readonly protocolVersion: number
   readonly instanceId: string
   readonly authToken: string
   readonly endpoint: string
@@ -171,7 +171,8 @@ function isProviderMetadata(value: unknown): value is TerminalProviderMetadata {
     'schemaVersion' in value &&
     value.schemaVersion === 1 &&
     'protocolVersion' in value &&
-    (value.protocolVersion === 1 || value.protocolVersion === terminalProviderProtocolVersion) &&
+    (value.protocolVersion === terminalProviderProtocolVersion ||
+      value.protocolVersion === terminalProviderProtocolVersion - 1) &&
     'instanceId' in value &&
     typeof value.instanceId === 'string' &&
     'authToken' in value &&

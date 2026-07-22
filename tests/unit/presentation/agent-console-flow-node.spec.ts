@@ -12,6 +12,7 @@ describe('Agent console flow node', () => {
         layout: { position: { x: 320, y: 140 }, size: { width: 520, height: 460 } },
         name: '实现 Agent',
         projectId: workbench.project.id,
+        providerId: 'codex',
         workspaceName: currentWorkspace.name
       },
       currentWorkbench: workbench,
