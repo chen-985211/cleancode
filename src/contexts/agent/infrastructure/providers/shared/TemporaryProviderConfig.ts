@@ -14,16 +14,43 @@ export async function createTemporaryProviderConfig(
   contents: string
 ): Promise<TemporaryProviderConfig> {
   const directory = await mkdtemp(join(tmpdir(), prefix))
-  await chmod(directory, 0o700)
   const path = join(directory, filename)
-  await writeFile(path, contents, { encoding: 'utf8', mode: 0o600 })
+  try {
+    await chmod(directory, 0o700)
+    await writeFile(path, contents, { encoding: 'utf8', mode: 0o600 })
+  } catch (setupError) {
+    try {
+      await removeTemporaryProviderDirectory(directory)
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [setupError, cleanupError],
+        'Temporary Agent Provider config setup and rollback both failed.'
+      )
+    }
+    throw setupError
+  }
+
   let disposed = false
+  let disposalPromise: Promise<void> | null = null
   return {
     path,
-    async dispose() {
-      if (disposed) return
-      disposed = true
-      await rm(directory, { force: true, recursive: true })
+    dispose() {
+      if (disposed) return Promise.resolve()
+      if (disposalPromise) return disposalPromise
+
+      const disposal = removeTemporaryProviderDirectory(directory).then(() => {
+        disposed = true
+      })
+      disposalPromise = disposal
+      const clearDisposal = (): void => {
+        if (disposalPromise === disposal) disposalPromise = null
+      }
+      void disposal.then(clearDisposal, clearDisposal)
+      return disposal
     }
   }
+}
+
+function removeTemporaryProviderDirectory(directory: string): Promise<void> {
+  return rm(directory, { force: true, recursive: true })
 }

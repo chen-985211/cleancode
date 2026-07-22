@@ -1,6 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import type {
+  AgentLaunchRuntimeStatus,
+  AgentRuntimeChangedEvent,
+  AgentRuntimeSnapshot,
+  AgentSessionSnapshot,
+  AgentTerminalRuntimeStatus
+} from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import {
   createRuntimeApi,
   createWorkbenchSnapshot
@@ -184,13 +191,13 @@ describe('agent console Codex status', () => {
       value: createRuntimeApi({
         attachAgentSession: vi.fn(async (command) => ({
           agentId: command.agentId,
-          codexThreadId: null,
           gitBranch: command.gitBranch ?? null,
-          processId: null,
           projectDirectory: '/repo/app',
           projectId: command.projectId,
+          providerId: 'codex',
+          providerSessionRef: null,
+          runtime: createRuntime(0, 1, 'not_started', { terminalStatus: 'failed' }),
           sessionId: 'agent-session-failed',
-          status: 'failed',
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: '/repo/app',
           workspaceName: 'main'
@@ -210,13 +217,16 @@ describe('agent console Codex status', () => {
     const currentWorkspace = workbench.project.workspaces[0]!
     const attachAgentSession = vi.fn(async (command) => ({
       agentId: command.agentId,
-      codexThreadId: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33',
       gitBranch: 'feature/login',
-      processId: null,
       projectDirectory: '/repo/app',
       projectId: workbench.project.id,
+      providerId: 'codex',
+      providerSessionRef: null,
+      runtime: createRuntime(0, 1, 'failed', {
+        failureKind: 'restore',
+        terminalStatus: 'not_started'
+      }),
       sessionId: 'agent-session-failed',
-      status: 'restore_failed' as const,
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
@@ -257,13 +267,16 @@ describe('agent console Codex status', () => {
     const attachAgentSession = vi.fn(async (command) => ({
       agentId: command.agentId,
       gitBranch: null,
-      processId: 42,
       projectDirectory: '/repo/app',
       projectId: workbench.project.id,
       providerId: 'codex',
       providerSessionRef: null,
+      runtime: createRuntime(
+        command.restartMode ? 2 : 1,
+        command.restartMode ? 3 : 2,
+        command.restartMode ? 'running' : 'exited'
+      ),
       sessionId: 'agent-session-exited',
-      status: command.restartMode ? ('running' as const) : ('exited' as const),
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: '/repo/app',
       workspaceName: 'main'
@@ -282,6 +295,49 @@ describe('agent console Codex status', () => {
         expect.objectContaining({ restartMode: 'retry' })
       )
     )
+  })
+
+  it('reconciles a launch exit racing attach without poisoning a newer launch generation', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    let runtimeListener: ((event: AgentRuntimeChangedEvent) => void) | null = null
+    const subscribeRuntime = vi.fn((listener: (event: AgentRuntimeChangedEvent) => void) => {
+      runtimeListener = listener
+      return vi.fn()
+    })
+    let resolveInitialAttach: ((snapshot: ReturnType<typeof createRuntimeSession>) => void) | null =
+      null
+    const initialAttach = new Promise<ReturnType<typeof createRuntimeSession>>((resolve) => {
+      resolveInitialAttach = resolve
+    })
+    const attachAgentSession = vi.fn((command) =>
+      command.restartMode ? Promise.resolve(createRuntimeSession(2, 4, 'running')) : initialAttach
+    )
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession,
+        onAgentRuntimeChanged: subscribeRuntime
+      })
+    })
+
+    render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      runtimeListener?.(createRuntimeEvent(1, 2, 'exited'))
+      resolveInitialAttach?.(createRuntimeSession(1, 1, 'running'))
+    })
+
+    expect(await screen.findByText('Codex 会话已结束')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重新启动 Agent' }))
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByText('Codex 会话已结束')).not.toBeInTheDocument())
+
+    act(() => runtimeListener?.(createRuntimeEvent(1, 3, 'exited')))
+
+    expect(screen.queryByText('Codex 会话已结束')).not.toBeInTheDocument()
   })
 
   it('keeps the browser preview honest when the desktop runtime is unavailable', async () => {
@@ -322,4 +378,67 @@ async function flushMicrotasks(): Promise<void> {
   await act(async () => {
     await Promise.resolve()
   })
+}
+
+function createRuntimeSession(
+  generation: number,
+  revision: number,
+  launchStatus: 'exited' | 'running'
+): AgentSessionSnapshot {
+  return {
+    agentId: 'default-agent',
+    gitBranch: null,
+    projectDirectory: '/repo/app',
+    projectId: 'project-app',
+    providerId: 'codex',
+    providerSessionRef: null,
+    runtime: createRuntime(generation, revision, launchStatus),
+    sessionId: 'agent-session-race',
+    terminalSourceTheme: 'dark' as const,
+    workspaceDirectory: '/repo/app',
+    workspaceName: 'main'
+  }
+}
+
+function createRuntimeEvent(
+  generation: number,
+  revision: number,
+  launchStatus: 'exited' | 'running'
+): AgentRuntimeChangedEvent {
+  return {
+    agentId: 'default-agent',
+    runtime: createRuntime(generation, revision, launchStatus),
+    sessionId: 'agent-session-race'
+  }
+}
+
+function createRuntime(
+  generation: number,
+  revision: number,
+  launchStatus: AgentLaunchRuntimeStatus,
+  options: {
+    readonly failureKind?: AgentRuntimeSnapshot['launch']['failureKind']
+    readonly terminalStatus?: AgentTerminalRuntimeStatus
+  } = {}
+): AgentRuntimeSnapshot {
+  const terminalStatus = options.terminalStatus ?? 'running'
+  return {
+    activity: { status: 'unavailable' as const },
+    binding: { status: 'unbound' },
+    launch: {
+      exitCode: launchStatus === 'exited' ? 0 : null,
+      failureKind: options.failureKind ?? null,
+      generation,
+      launchId: generation === 0 ? null : `launch-${generation}`,
+      status: launchStatus
+    },
+    mcp: { status: 'ready' },
+    revision,
+    terminal: {
+      exitCode: null,
+      processId: terminalStatus === 'running' ? 42 : null,
+      status: terminalStatus,
+      viewIdentity: null
+    }
+  }
 }

@@ -1,9 +1,8 @@
 /// <reference types="vite/client" />
 
 import type {
-  AgentActivityChangedEvent,
   AgentGraphUpdatedEvent,
-  AgentPtyExitEvent,
+  AgentRuntimeChangedEvent,
   AgentSessionSnapshot,
   AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
@@ -149,8 +148,7 @@ declare global {
         readonly approvalId: string
       }): Promise<AgentToolApprovalDecisionResult>
       rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
-      onAgentPtyExit(listener: (event: AgentPtyExitEvent) => void): () => void
-      onAgentActivityChanged(listener: (event: AgentActivityChangedEvent) => void): () => void
+      onAgentRuntimeChanged(listener: (event: AgentRuntimeChangedEvent) => void): () => void
       onAgentGraphUpdated(listener: (event: AgentGraphUpdatedEvent) => void): () => void
       onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void
       createTerminalBlock(command: {

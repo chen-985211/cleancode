@@ -104,6 +104,84 @@ describe('cleancode HTTP MCP server', () => {
     )
   })
 
+  it('publishes readiness once only after the authenticated initialize handshake completes', async () => {
+    const onInitialized = vi.fn()
+    const registration = await server.registerSession({
+      executeTool: async () => completedToolResult('tool-call-1'),
+      onInitialized,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+
+    await expect(
+      sendMcp(registration, { jsonrpc: '2.0', method: 'notifications/initialized' })
+    ).resolves.toMatchObject({ status: 202 })
+    expect(onInitialized).not.toHaveBeenCalled()
+
+    await postMcp(registration, { id: 1, jsonrpc: '2.0', method: 'initialize' })
+    expect(onInitialized).not.toHaveBeenCalled()
+
+    await sendMcp(registration, { jsonrpc: '2.0', method: 'notifications/initialized' })
+    await sendMcp(registration, { jsonrpc: '2.0', method: 'notifications/initialized' })
+
+    expect(onInitialized).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not publish readiness for an unauthenticated initialized notification', async () => {
+    const onInitialized = vi.fn()
+    const registration = await server.registerSession({
+      executeTool: async () => completedToolResult('tool-call-1'),
+      onInitialized,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+
+    await postMcp(registration, { id: 1, jsonrpc: '2.0', method: 'initialize' })
+    const response = await fetch(registration.url, {
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST'
+    })
+
+    expect(response.status).toBe(401)
+    expect(onInitialized).not.toHaveBeenCalled()
+  })
+
+  it('keeps a replacement registration active when the stale registration is disposed', async () => {
+    const firstInitialized = vi.fn()
+    const firstRegistration = await server.registerSession({
+      executeTool: async () => completedToolResult('tool-call-1'),
+      onInitialized: firstInitialized,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+    const currentInitialized = vi.fn()
+    const currentRegistration = await server.registerSession({
+      executeTool: async () => completedToolResult('tool-call-2'),
+      onInitialized: currentInitialized,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceName: 'main'
+    })
+
+    firstRegistration.dispose()
+
+    await expect(
+      sendMcp(firstRegistration, { id: 1, jsonrpc: '2.0', method: 'initialize' })
+    ).resolves.toMatchObject({ status: 401 })
+    await postMcp(currentRegistration, { id: 2, jsonrpc: '2.0', method: 'initialize' })
+    await sendMcp(currentRegistration, {
+      jsonrpc: '2.0',
+      method: 'notifications/initialized'
+    })
+
+    expect(firstInitialized).not.toHaveBeenCalled()
+    expect(currentInitialized).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps recognized tool execution errors on the HTTP 200 MCP result channel', async () => {
     const endpoint = await server.registerSession({
       executeTool: async () => {
@@ -298,7 +376,13 @@ interface McpEndpoint {
 }
 
 async function postMcp(endpoint: McpEndpoint, body: unknown): Promise<unknown> {
-  const response = await fetch(endpoint.url, {
+  const response = await sendMcp(endpoint, body)
+
+  return response.json()
+}
+
+function sendMcp(endpoint: McpEndpoint, body: unknown): Promise<Response> {
+  return fetch(endpoint.url, {
     body: JSON.stringify(body),
     headers: {
       Authorization: `Bearer ${endpoint.bearerToken}`,
@@ -306,8 +390,6 @@ async function postMcp(endpoint: McpEndpoint, body: unknown): Promise<unknown> {
     },
     method: 'POST'
   })
-
-  return response.json()
 }
 
 function readToolNames(response: unknown): string[] {

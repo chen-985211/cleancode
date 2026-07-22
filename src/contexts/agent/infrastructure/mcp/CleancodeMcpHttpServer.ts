@@ -8,7 +8,7 @@ import {
 import { randomBytes } from 'node:crypto'
 
 import type {
-  AgentMcpEndpoint,
+  AgentMcpRegistration,
   AgentMcpServerPort,
   RegisteredAgentMcpSession
 } from '../../application/ports/AgentMcpServerPort'
@@ -27,34 +27,37 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
     ) => createServer(requestListener)
   ) {}
 
-  async registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpEndpoint> {
+  async registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpRegistration> {
     await this.ensureListening()
 
     const bearerToken = createBearerToken()
-    const registeredSession = {
+    const registeredSession: RegisteredHttpMcpSession = {
+      active: true,
+      bearerToken,
       bridge: new CleancodeAgentJsonRpcToolBridge({
         executeMcpTool: session.executeTool,
+        onInitialized: () => {
+          if (registeredSession.active) session.onInitialized?.()
+        },
         projectDirectory: session.projectDirectory,
         sessionId: session.sessionId,
         workspaceName: session.workspaceName
       }),
-      bearerToken,
       session
     }
 
+    this.deactivateSession(session.sessionId)
     this.sessions.set(session.sessionId, registeredSession)
 
     return {
       bearerToken,
+      dispose: () => this.deactivateRegistration(session.sessionId, registeredSession),
       url: `${this.baseUrl()}/mcp/${encodeURIComponent(session.sessionId)}`
     }
   }
 
-  unregisterSession(sessionId: string): void {
-    this.sessions.delete(sessionId)
-  }
-
   dispose(): void {
+    for (const session of this.sessions.values()) session.active = false
     this.sessions.clear()
     this.server?.close()
     this.server = null
@@ -145,6 +148,11 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
         return
       }
 
+      if (!session.active) {
+        writeJson(response, 404, { error: 'MCP session not found.' })
+        return
+      }
+
       const result = await session.bridge.handle(body)
 
       if (result === null) {
@@ -183,9 +191,21 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
 
     return `http://127.0.0.1:${address.port}`
   }
+
+  private deactivateRegistration(sessionId: string, registration: RegisteredHttpMcpSession): void {
+    registration.active = false
+    if (this.sessions.get(sessionId) === registration) this.sessions.delete(sessionId)
+  }
+
+  private deactivateSession(sessionId: string): void {
+    const registration = this.sessions.get(sessionId)
+    if (!registration) return
+    this.deactivateRegistration(sessionId, registration)
+  }
 }
 
 interface RegisteredHttpMcpSession {
+  active: boolean
   readonly bearerToken: string
   readonly bridge: CleancodeAgentJsonRpcToolBridge
   readonly session: RegisteredAgentMcpSession

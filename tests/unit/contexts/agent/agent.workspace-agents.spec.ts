@@ -68,6 +68,35 @@ describe('workspace Agents', () => {
     expect(agent.toSnapshot()).toMatchObject({ providerId: 'claude-code' })
   })
 
+  it('rejects a Provider session reference owned by another Provider', () => {
+    const agent = AgentSession.create({
+      agentId: 'agent-codex',
+      layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
+      name: 'Codex Agent',
+      projectId: 'project-1',
+      providerId: 'codex',
+      workspaceName: 'main'
+    })
+    expect(() =>
+      agent.bindProviderSession(
+        AgentConversationScope.create({
+          agentId: 'agent-codex',
+          gitBranch: 'main',
+          projectId: 'project-1',
+          workspaceName: 'main'
+        }),
+        ProviderSessionRef.create(
+          {
+            formatVersion: 1,
+            kind: 'claude-session',
+            value: '550e8400-e29b-41d4-a716-446655440000'
+          },
+          'claude-code'
+        )
+      )
+    ).toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_MISMATCH' }))
+  })
+
   it('can be persisted before Codex reports a thread and can update its presentation facts', () => {
     const agent = AgentSession.create({
       agentId: 'agent-2',

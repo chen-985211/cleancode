@@ -5,24 +5,39 @@ export function createUnrestorableAgentSessionSnapshot(input: {
   readonly gitBranch: string | null
   readonly projectDirectory: string
   readonly projectId: string
-  readonly providerId?: string
+  readonly providerId: string
   readonly sessionId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string
 }): AgentSessionSnapshot {
   return {
-    activity: 'unavailable',
     agentId: input.agentId,
     gitBranch: input.gitBranch,
-    processId: null,
     projectDirectory: input.projectDirectory,
     projectId: input.projectId,
-    providerId: input.providerId ?? 'codex',
+    providerId: input.providerId,
     providerSessionRef: null,
+    runtime: {
+      activity: { status: 'unavailable' },
+      binding: { status: 'persistence_failed' },
+      launch: {
+        exitCode: null,
+        failureKind: 'restore',
+        generation: 0,
+        launchId: null,
+        status: 'failed'
+      },
+      mcp: { status: 'inactive' },
+      revision: 1,
+      terminal: {
+        exitCode: null,
+        processId: null,
+        status: 'not_started',
+        viewIdentity: null
+      }
+    },
     sessionId: input.sessionId,
-    status: 'restore_failed',
-    terminalViewIdentity: null,
     terminalSourceTheme: input.terminalSourceTheme,
     workspaceDirectory: input.workspaceDirectory,
     workspaceName: input.workspaceName

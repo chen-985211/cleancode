@@ -155,12 +155,9 @@ class RecordingMcpServerPort implements AgentMcpServerPort {
     this.registered.push(session.sessionId)
     return {
       bearerToken: `token-${session.sessionId}`,
+      dispose: () => this.unregistered.push(session.sessionId),
       url: `http://127.0.0.1:43123/mcp/${session.sessionId}`
     }
-  }
-
-  unregisterSession(sessionId: string): void {
-    this.unregistered.push(sessionId)
   }
 
   dispose(): void {}
@@ -214,6 +211,7 @@ function createService(
     },
     repository,
     processPort.providers,
+    'codex',
     scopeValidation
   )
 }
@@ -249,8 +247,8 @@ function createAgent(enabled: boolean, withThread = false): AgentSession {
 function attachCommand() {
   return {
     agentId: 'agent-1',
-    onExit: () => undefined,
     onGraphUpdated: () => undefined,
+    onRuntimeChanged: () => undefined,
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',

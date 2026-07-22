@@ -69,7 +69,7 @@ export class AgentSession {
     )
   }
 
-  static start(scope: AgentConversationScope, providerId = 'codex'): AgentSession {
+  static start(scope: AgentConversationScope, providerId: string): AgentSession {
     const snapshot = scope.toSnapshot()
     const session = AgentSession.create({
       agentId: snapshot.agentId,
@@ -103,7 +103,7 @@ export class AgentSession {
           branchKey(conversation.gitBranch),
           {
             gitBranch: normalizeBranch(conversation.gitBranch),
-            sessionRef: ProviderSessionRef.create(conversation.sessionRef)
+            sessionRef: ProviderSessionRef.create(conversation.sessionRef, snapshot.providerId)
           }
         ])
       ),
@@ -134,7 +134,7 @@ export class AgentSession {
     const gitBranch = scope.toSnapshot().gitBranch
     this.conversations.set(branchKey(gitBranch), {
       gitBranch,
-      sessionRef
+      sessionRef: sessionRef.forProvider(this.providerId)
     })
   }
 

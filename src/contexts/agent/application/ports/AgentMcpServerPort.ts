@@ -10,18 +10,22 @@ export interface AgentMcpToolCallCommand {
 
 export interface RegisteredAgentMcpSession {
   readonly executeTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
+  readonly onInitialized?: () => void
   readonly projectDirectory: string
   readonly sessionId: string
   readonly workspaceName: string
 }
 
-export interface AgentMcpEndpoint {
+interface AgentMcpEndpoint {
   readonly bearerToken: string
   readonly url: string
 }
 
+export interface AgentMcpRegistration extends AgentMcpEndpoint {
+  dispose(): void
+}
+
 export interface AgentMcpServerPort {
-  registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpEndpoint>
-  unregisterSession(sessionId: string): void
+  registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpRegistration>
   dispose(): void
 }

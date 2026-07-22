@@ -9,7 +9,8 @@ on:
       - 'src/contexts/agent/**'
       - 'src/contexts/run/**'
       - 'src/platform/**'
-      - 'tests/fixtures/contexts/agent/**'
+      - 'tests/fixtures/**'
+      - 'tests/integration/contexts/agent/**'
       - 'tests/integration/contexts/run/**'
       - 'tests/unit/contexts/agent/**'
       - 'tests/unit/contexts/run/**'
@@ -42,10 +43,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm exec vitest run tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts
+      - name: Verify Provider contracts and foreground runtime
+        run: >-
+          pnpm exec vitest run
+          tests/unit/contexts/agent/agent.provider-registry.spec.ts
+          tests/unit/contexts/agent/agent.provider-installation.spec.ts
+          tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts
+          tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts
+          tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts
+          tests/unit/contexts/agent/agent.launch-artifact-scope.spec.ts
+          tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts
+          tests/integration/contexts/agent/agent.provider-cli-detector.spec.ts
+          tests/integration/contexts/agent/agent.claude-hook-runtime.spec.ts
+          tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts
 
       - if: runner.os != 'Windows'
         run: pnpm exec vitest run tests/integration/contexts/run/run.pty-terminal.spec.ts -t "reports foreground job exit without exiting the Agent terminal"
+
+      - if: runner.os != 'Windows'
+        run: pnpm exec vitest run tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts
 
       - if: runner.os == 'Windows'
         run: pnpm exec vitest run tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts tests/integration/contexts/run/run.windows-agent-pty.spec.ts

@@ -8,7 +8,7 @@
 
 本文不重新定义当前事实：
 
-- 当前 Agent 身份、Codex thread 绑定、运行时和工作区生命周期以 [Agent 与会话生命周期](agent-session.md)为准。
+- 当前 Agent 身份、Provider 对话绑定、运行时和工作区生命周期以 [Agent 与会话生命周期](agent-session.md)为准。
 - 当前 CleanCode MCP、审批、鉴权和审计以 [cleancode 原生 MCP](cleancode-mcp.md)为准。
 - 当前普通终端 PTY、运行身份、权威模型和恢复以[终端会话生命周期](../run/terminal-session.md)为准。
 - 当前跨上下文 owner 和协作关系以[架构文档](../../engineering/architecture.md)与[上下文地图](../../engineering/context-map.md)为准。
@@ -67,7 +67,7 @@ Run 当前已经具备可复用的技术基础：
 - Agent CLI 作为终端前台任务的启动、退出、重新启动、中断和资源清理。
 - Codex 从专用 PTY 迁移到通用终端底座。
 - Claude Code 作为第二个完整 Provider 的接入。
-- OpenCode 等后续 Provider 的最小接入契约和可选能力降级。
+- OpenCode 第三 Provider、后续最小接入契约和可选能力降级。
 - CleanCode MCP、审批、审计和画布刷新在多 Provider 下的安全注入。
 - 对应的 unit、integration、contract、E2E 和运行风险验证。
 
@@ -87,18 +87,18 @@ Run 当前已经具备可复用的技术基础：
 
 ## 统一语言
 
-| 术语                 | 含义                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| 工作区 Agent         | 画布中的稳定业务对象，拥有身份、固定 Provider、名称、布局、MCP 偏好和分支对话绑定                 |
-| Agent Provider       | 一个 CLI Agent 的能力贡献，负责检测、启动、恢复、遥测和能力注入                                   |
-| Agent terminal       | 由 Run 承载、归属于一个工作区 Agent 的长期 shell/PTY，不是普通终端积木                            |
-| Agent launch         | Agent terminal 内一次具体的 Agent CLI 前台任务，拥有独立 `launchId + generation`                  |
-| Provider session ref | Provider 正式报告、用于恢复其对话的版本化引用，例如 Codex thread UUID 或 Claude session ID        |
-| Agent activity       | Provider 结构化事件归一化后的 `idle`、`working`、`waiting_input` 或 `waiting_approval` 等活动状态 |
-| 基础终端能力         | 启动、输入、输出、resize、`Ctrl+C` 和 CLI 退出后回到 shell，不要求 Provider 支持额外协议          |
-| Provider 增强能力    | 对话恢复、精确活动状态、CleanCode MCP、系统指令或安装诊断等可选能力                               |
-| 终端退出             | shell/PTY 已结束，整个 Agent terminal 不再接受输入                                                |
-| Agent 退出           | 当前 Agent launch 已结束，但 Agent terminal 仍然运行并可接受 shell 输入                           |
+| 术语                 | 含义                                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 工作区 Agent         | 画布中的稳定业务对象，拥有身份、固定 Provider、名称、布局、MCP 偏好和分支对话绑定                              |
+| Agent Provider       | 一个 CLI Agent 的能力贡献，负责检测、启动、恢复、遥测和能力注入                                                |
+| Agent terminal       | 由 Run 承载、归属于一个工作区 Agent 的长期 shell/PTY，不是普通终端积木                                         |
+| Agent launch         | Agent terminal 内一次具体的 Agent CLI 前台任务，拥有独立 `launchId + generation`                               |
+| Provider session ref | Provider 正式报告、用于恢复其对话的版本化引用，例如 Codex thread UUID、Claude session ID 或 OpenCode `ses_` ID |
+| Agent activity       | Provider 结构化事件归一化后的 `idle`、`working`、`waiting_input` 或 `waiting_approval` 等活动状态              |
+| 基础终端能力         | 启动、输入、输出、resize、`Ctrl+C` 和 CLI 退出后回到 shell，不要求 Provider 支持额外协议                       |
+| Provider 增强能力    | 对话恢复、精确活动状态、CleanCode MCP、系统指令或安装诊断等可选能力                                            |
+| 终端退出             | shell/PTY 已结束，整个 Agent terminal 不再接受输入                                                             |
+| Agent 退出           | 当前 Agent launch 已结束，但 Agent terminal 仍然运行并可接受 shell 输入                                        |
 
 ## 全程不变量
 
@@ -250,7 +250,8 @@ interface AgentProviderContribution {
   readonly detector: AgentProviderDetector
   readonly launcher: AgentLaunchPlanner
   readonly resume?: AgentResumeStrategy
-  readonly telemetry?: AgentTelemetryStrategy
+  readonly sessionRefCodec?: AgentProviderSessionRefCodec
+  readonly telemetry?: AgentTelemetryContribution
   readonly cleancodeCapability?: AgentCapabilityInjector
 }
 ```
@@ -262,10 +263,12 @@ interface AgentProviderDescriptor {
   readonly id: string
   readonly displayName: string
   readonly capabilities: {
+    readonly sessionRefCodec: boolean
     readonly resume: boolean
-    readonly structuredLifecycle: boolean
-    readonly cleancodeMcp: boolean
-    readonly systemInstructions: boolean
+    readonly sessionIdentityCapture: boolean
+    readonly activityTracking: boolean
+    readonly launchInstructions: boolean
+    readonly cleancodeMcp: 'required' | 'best_effort' | 'unsupported'
   }
 }
 ```
@@ -277,22 +280,26 @@ interface AgentLaunchPlan {
   readonly executable: string
   readonly args: readonly string[]
   readonly env: Readonly<Record<string, string>>
-  readonly temporaryArtifacts: readonly RuntimeArtifact[]
 }
 ```
+
+launch 前由应用层创建 `AgentLaunchArtifactScope` 并通过 command 中的 registrar 交给 contribution；Provider 创建的 reporter、临时文件和其他资源必须立即登记。计划建立后 scope 封口，替换、退出或失败时由同一 scope 逆序清理和重试，不再由 launch plan 携带可被遗漏的临时资源数组。
 
 通用层不得把用户文本或 session ID 拼接为未经转义的 shell 命令。内建 Provider 应优先使用解析后的可执行文件和 argv；必须经过 shell 的部分由 Run 的平台相关编码器处理。
 
 ### 能力分级
 
-| 能力           | 最低 Provider 要求               | 通用 UI 行为                                                |
-| -------------- | -------------------------------- | ----------------------------------------------------------- |
-| 基础终端       | descriptor、detector、launcher   | 可以创建、输入、输出、resize、中断和在 CLI 退出后使用 shell |
-| 对话恢复       | resume、Provider session ref     | “重新启动 Agent”恢复当前分支对话                            |
-| 精确活动状态   | telemetry 和结构化生命周期事件   | 展示 working、waiting、approval、idle                       |
-| CleanCode MCP  | 会话级 capability injector       | MCP 开关可用；初始化失败时阻止 Agent launch 进入可用状态    |
-| 画布语义指令   | 会话级追加指令能力               | MCP 开启时注入画布语义，不替换 Provider 默认安全和工具指导  |
-| 安装与版本诊断 | detector 返回结构化 availability | 显示未安装、未登录、版本过旧或策略阻止，而不是通用启动失败  |
+| 能力              | 最低 Provider 要求                              | 通用 UI 行为                                                                               |
+| ----------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 基础终端          | descriptor、detector、launcher                  | 可以创建、输入、输出、resize、中断和在 CLI 退出后使用 shell                                |
+| 对话引用          | session-ref codec 与正式身份捕获                | 只持久化经过当前 Provider 校验的当前作用域引用                                             |
+| 对话恢复          | resume 与已持久化 Provider session ref          | “重新启动 Agent”恢复当前分支对话                                                           |
+| 精确活动状态      | telemetry 声明 activity signal 并提供结构化事件 | 展示 working、waiting、approval、idle；不支持时不得从输出频率猜测                          |
+| `required` MCP    | 会话级 capability injector                      | 开关可用；认证初始化握手完成前 launch 保持 launching，失败则启动失败                       |
+| `best_effort` MCP | 会话级 capability injector                      | 开关可用；MCP 初始化或失败独立展示，基础 terminal/launch 可以继续                          |
+| `unsupported` MCP | 无 capability injector                          | 不注册端点、不注入配置，隐藏 MCP 开关                                                      |
+| 画布语义指令      | launch instructions 与 capability injector      | MCP 开启时注入画布语义，不替换 Provider 默认安全和工具指导                                 |
+| 安装与版本诊断    | detector 返回结构化 availability                | 区分 installed、missing、upgrade_required 和 temporarily_unavailable；只比较声明的最低版本 |
 
 创建 Agent 的 Provider 列表、能力开关和错误展示必须从 registry/descriptor 投影。Presentation 不维护 Provider switch。
 
@@ -362,13 +369,13 @@ CleanCode MCP 继续由 Agent 上下文拥有，Provider 只负责把当前 laun
 1. 重新校验项目、工作区、分支、Agent 身份和 Provider 可用性。
 2. 如果 Agent 启用 CleanCode MCP，创建本 launch 独立的 URL、Bearer Token 和审批作用域。
 3. Provider capability injector 生成仅作用于本次进程的 MCP 配置和追加指令。
-4. 启动 Agent CLI，并等待 Provider 原生 required 契约或 cleancode 认证初始化握手。
-5. MCP 初始化失败时结束当前 launch、清理端点并显示明确失败；不得静默进入缺少画布能力的会话。
+4. 启动 Agent CLI；`required` Provider 在当前 registration 完成认证 `initialize` 与 `notifications/initialized` 握手前保持 launching，`best_effort` Provider 可以先进入 running。
+5. MCP 注册或握手失败时，`required` Provider 结束当前 launch；`best_effort` Provider 独立投影 failed 并保留基础 terminal/launch。两者都必须清理失效端点并明确显示失败，不得伪装为 ready。
 6. Agent CLI 退出时立即关闭新调用准入、取消等待审批、排空已准入调用、注销端点并清理临时配置；Agent terminal 继续运行。
 
 Provider 的预批准范围只能匹配当前 `cleancode` Server。即使 Provider 已预批准，删除积木、解散组合和断开依赖仍由 cleancode 自己的审批策略决定。
 
-Provider 不支持安全的会话级 MCP 注入时，Agent 仍可使用基础终端能力，但 UI 必须禁用 CleanCode MCP 开关并解释能力限制。
+Provider 不支持安全的会话级 MCP 注入时，Agent 仍可使用基础终端能力，但 UI 不提供 CleanCode MCP 开关；不得先注册端点再静默降级。
 
 ## 工作区和应用生命周期
 
@@ -410,28 +417,30 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 阶段总览
 
-| 阶段 | 名称                            | 核心结果                                                           | 状态   |
-| ---- | ------------------------------- | ------------------------------------------------------------------ | ------ |
-| 0    | 当前行为证据                    | 用自动化测试锁定 Codex、Ctrl+C、MCP、多 Agent 和工作区生命周期基线 | 已完成 |
-| 1    | Provider 中立领域与持久化       | 固定 Provider Agent、通用 session ref 和无损 schema 迁移           | 已完成 |
-| 2    | Provider registry 与 Codex 封装 | 核心流程依赖通用 contribution，Codex 行为暂时不变                  | 已完成 |
-| 3    | Agent terminal 与前台任务       | Run 支持 agent owner、长期 shell 和可重复 Agent launch             | 实施中 |
-| 4    | Codex 迁移与行为对等            | Codex 使用 Run 终端底座，CLI 退出后终端继续运行                    | 实施中 |
-| 5    | 终端视图、IPC 与创建体验统一    | Agent 复用 Run 视图协议，创建时选择固定 Provider                   | 已完成 |
-| 6    | Claude Code 完整 Provider       | 同工作区可同时运行 Codex 与 Claude Code                            | 已完成 |
-| 7    | Provider 扩展契约稳定化         | OpenCode 等新 Agent 只需新增和注册 Provider contribution           | 实施中 |
+| 阶段 | 名称                            | 核心结果                                                             | 状态   |
+| ---- | ------------------------------- | -------------------------------------------------------------------- | ------ |
+| 0    | 当前行为证据                    | 用自动化测试锁定 Codex、Ctrl+C、MCP、多 Agent 和工作区生命周期基线   | 已完成 |
+| 1    | Provider 中立领域与持久化       | 固定 Provider Agent、通用 session ref 和无损 schema 迁移             | 已完成 |
+| 2    | Provider registry 与 Codex 封装 | 核心流程依赖通用 contribution，Codex 行为暂时不变                    | 已完成 |
+| 3    | Agent terminal 与前台任务       | Run 支持 agent owner、长期 shell 和可重复 Agent launch               | 实施中 |
+| 4    | Codex 迁移与行为对等            | Codex 使用 Run 终端底座，CLI 退出后终端继续运行                      | 实施中 |
+| 5    | 终端视图、IPC 与创建体验统一    | Agent 复用 Run 视图协议，创建时选择固定 Provider                     | 已完成 |
+| 6    | Claude Code 完整 Provider       | 同工作区可同时运行 Codex 与 Claude Code                              | 已完成 |
+| 7    | Provider 扩展契约稳定化         | OpenCode 完整 contribution 与后续最小 Provider contract 同时验证边界 | 实施中 |
 
 阶段按顺序建立边界。阶段 1 和 2 不得提前改变用户可见运行语义；阶段 3 必须先证明终端/前台任务边界，再迁移 Codex；Claude Code 不得在 Codex 行为对等之前进入主路径。
 
 ## 完成结果
 
 - 稳定 Agent 已持久化不可变 `providerId` 和版本化 `ProviderSessionRef`；schema v4 会把旧 Codex UUID 确定性迁移为 `codex-thread` 引用。
-- `AgentProviderRegistry` 只组合 descriptor、detector、launcher、resume、telemetry 和 capability injector；通用 Agent service、IPC 和 UI 不按 Provider ID 分支。
+- `AgentProviderRegistry` 只组合 descriptor、detector、launcher、session-ref codec、resume、telemetry 和 capability injector，并校验 capability 与实际 contribution 一致；通用 Agent service、IPC 和 UI 不按 Provider ID 分支。
 - Agent terminal 已成为 Run 的 `agent` owner，会话内的 Agent CLI 是可重复启动的 `ForegroundJob`。macOS/Linux 使用 POSIX 控制脚本，Windows 使用 ConPTY/PowerShell 控制脚本；CLI 退出只结束本次 launch，shell、终端模型和视图继续存在。
 - Agent Console 已删除独立 xterm registry、输出尾部缓存和原始输出 IPC，复用 Run 的 snapshot、sequence、attach/detach 与共享 xterm surface。
 - 创建 Agent 时从 registry 选择一次 Provider；既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
-- Codex、Claude Code 和最小 OpenCode contribution 已注册。Claude Code 使用会话级临时 MCP/settings 文件、鉴权 Hook relay、正式 session ID/resume 参数和精确 CleanCode 工具预批准；空启动不建立对话绑定，首次用户输入 Hook 确认后才允许后续恢复。OpenCode 证明无 resume、telemetry 或 MCP 时仍能获得基础终端能力。
-- Provider launch callback 由 Agent session 与单调 launch generation 双重隔离；终端和 Provider 临时资源在替换、退出与生命周期清理时释放。
+- Codex、Claude Code 和 OpenCode contribution 已注册。Codex 提供 thread 身份与恢复、`required` MCP 和 launch instructions，但不声明精确活动跟踪；Claude Code 提供首次用户输入确认的 session 绑定、恢复、Hook 活动和 `best_effort` MCP；OpenCode 提供 `opencode-session` codec、`--session` 恢复、顶层 session/活动插件事件、合并用户 inline config 的 `best_effort` 远程 MCP 与临时 instructions。共享 contract fixture 另行证明只有 descriptor、detector 和 launcher 的最小 Provider 可以诚实降级。
+- CLI availability 已区分 installed、missing、upgrade_required 与 temporarily_unavailable；当前只有 Claude Code 声明 `2.1.119` 最低版本，Codex 与 OpenCode 不制造最低版本门槛。
+- terminal、launch、activity、MCP readiness 与 Provider-session binding 已独立投影。`required` MCP 握手未完成时 launch 保持 launching；`best_effort` MCP 失败不终止基础 launch；binding 保存失败只标记 `persistence_failed`，不会覆盖仍在运行的 launch/activity。
+- Provider launch callback 由 Agent session 与单调 launch generation 双重隔离；临时资源通过每次 launch 的 `AgentLaunchArtifactScope` 登记，并在替换、退出与生命周期清理时释放或保留失败 scope 供重试。
 - Terminal Provider 协议 v4 把前台任务请求和 started/exited 事件送入独立 Provider 进程；`awaiting_started` 阶段消费内部 shell transport 回显，Agent 屏幕只从 Provider started 后发布输出；当前 macOS 真实 Electron E2E 已证明 `Ctrl+C` 结束 Codex launch 后同一 shell 继续接受命令，Windows 由原生 ConPTY integration 门禁负责对等验收。
 
 后续增加 Agent CLI 的标准步骤是：在 `src/contexts/agent/infrastructure/providers/<provider>/` 实现 contribution，为其增加 provider contract/参数/清理测试，并在 composition root 注册。只有展示名称、安装命令或图标等资源可以作为伴随改动；若必须修改 Agent domain、Run domain、通用 IPC 或 `AgentConsole` 控制流，应先修正 Provider 边界，而不是增加中央分支。
@@ -646,7 +655,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - 新建 Agent 流程从 registry 获取可用 Provider，用户创建时作出一次选择。
 - 不显示“切换 Provider”；菜单保留重命名、重新启动、新对话、CleanCode MCP 和删除。
 - 标题栏只增加低噪声 Provider 身份和必要状态，不把 Agent 控制台变成复杂状态面板。
-- Provider 不可用、版本过旧、未登录或 capability 被策略阻止时显示结构化反馈。
+- Provider 未安装、声明的最低版本不满足或 CLI 检查返回 `temporarily_unavailable` 时显示对应结构化反馈；MCP 与 binding 异常由独立 runtime 维度展示，不混入 availability。
 
 ### TDD 与验证计划
 
@@ -677,7 +686,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ### 计划能力
 
-- Claude Code CLI、版本和可用性检测。
+- Claude Code CLI、`2.1.119` 最低版本与可用性检测；更旧版本返回 `upgrade_required`，而不是伪装为已安装可用。
 - 新会话启动与正式 session resume；空启动不持久化，首次用户输入 Hook 确认后才建立可恢复绑定。
 - 通过 Provider 正式 Hook 获取 session ID、turn、工具、等待输入、等待审批和停止事件。
 - Hook relay 使用 launch Token、完整 owner 和 generation 校验；Hook 只提供 Agent activity，不替代前台任务退出事实。
@@ -685,7 +694,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - 只预批准 `mcp__cleancode__*`，不扩大其他工具权限。
 - 追加 cleancode 画布语义，不替换 Claude 默认 system prompt、安全或工具指导。
 - 不使用会屏蔽用户其他 MCP 的严格配置，除非未来有独立产品策略明确要求。
-- MCP 连接通过 cleancode 认证初始化握手验证；组织策略阻止时显示 capability unavailable。
+- MCP 连接通过 cleancode 认证初始化握手验证；注册或握手失败按 `best_effort` 独立显示 capability unavailable，不覆盖仍在运行的 terminal/launch。
 
 ### TDD 与验证计划
 
@@ -713,20 +722,21 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ### 阶段目标
 
-以 OpenCode 或一个能力较弱的 CLI Agent 验证最小接入路径，形成以后新增 Provider 的稳定维护约束。
+以具备完整增强能力的 OpenCode 和共享最小 Provider fixture 同时验证扩展路径，形成以后新增 Provider 的稳定维护约束。
 
 ### 计划能力
 
 - 建立 Provider 模板和共享 contract suite，但不建立动态插件加载器。
 - 最小 Provider 只实现 descriptor、detector 和 launcher 即可获得基础终端能力。
 - resume、telemetry、CleanCode MCP 和系统指令按 capability 独立启用。
+- OpenCode 通过正式 session ID/`--session`、launch 级事件插件、inline config 合并和 `best_effort` 远程 MCP 验证完整增强组合，同时不得写用户工作区或全局配置。
 - 通用 UI 自动根据 capability 展示、禁用或解释功能，不增加 Provider switch。
-- Provider 注册冲突、未知 capability、失效版本和临时资源清理具有统一诊断。
+- Provider 注册冲突、capability/contribution 不一致、声明的最低版本不满足和 launch scope 清理具有统一诊断。
 - 文档记录新增 Provider 的目录、注册、测试和安全检查清单。
 
 ### TDD 与验证计划
 
-- Contract：最小 Provider、不支持恢复 Provider、不支持 MCP Provider 和完整 Provider 的共享行为。
+- Contract：最小 Provider、不支持恢复 Provider、不支持 MCP Provider，以及完整 OpenCode Provider 的共享行为。
 - Integration：Provider CLI 退出、`Ctrl+C`、重新启动、错误启动和临时资源清理。
 - Architecture：静态检查或评审规则保证核心层没有 Provider ID 条件分支。
 - E2E：至少一个非 Codex/Claude Provider 完成创建、运行、退出到 shell 和删除主路径。
@@ -740,7 +750,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ### 阶段退出条件
 
-- OpenCode 或等价第三 Provider 通过最小接入验收。
+- OpenCode 通过完整 Provider 验收，最小 Provider fixture 通过诚实降级验收。
 - 后续 Provider 可以沿模板独立开发和验证。
 - 是否进入动态 Plugin Provider 另立 Spec，不在本路线内自动启动。
 
@@ -757,7 +767,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 7. Agent terminal 视图与 IPC 统一，删除重复 xterm 基础设施。
 8. 创建 Agent 的固定 Provider 选择和 capability UI。
 9. Claude Code contribution、Hook、resume 和 MCP。
-10. OpenCode 或等价最小 Provider 验证。
+10. OpenCode 完整 Provider 与等价最小 Provider fixture 验证。
 11. 删除迁移兼容层，迁移已经实现的规则到当前事实文档。
 
 任何变更集只要改变生产运行、schema、IPC、PTY 或跨上下文端口，都必须单独按 Large Change 完成 Spec、Plan、TDD 和完整门禁，不能因为路线图已经确认而跳过实施确认。
@@ -786,7 +796,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 | Agent CLI 退出误杀终端          | 独立 ForegroundJob 状态和退出事件；TerminalSession 只响应 shell/PTY 退出           |
 | 旧 launch 事件污染新会话        | 全部 Hook、MCP、退出和输出携带并校验 launchId、generation 和 Token                 |
 | Provider session 串用           | Provider 固定在 Agent；分支绑定归属校验；禁止最近会话和跨 Agent 回退               |
-| MCP 被静默禁用                  | required/认证握手；失败时结束 launch 或明确 capability unavailable                 |
+| MCP 被静默禁用                  | `required` 认证握手失败时结束 launch；`best_effort` 失败时独立显示 unavailable     |
 | Provider 预批准扩大用户权限     | 只允许匹配 cleancode Server；破坏性动作继续走 cleancode 审批                       |
 | shell 命令注入或参数损坏        | 内建 Provider 使用结构化 executable/argv；平台编码集中在 Run；session ref 严格校验 |
 | Agent 与 Run 形成循环依赖       | Agent 定义端口，外层适配器调用 Run 用例；Run 不导入 Agent 类型                     |

@@ -302,8 +302,9 @@ describe('agent tool protocol', () => {
   })
 
   it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {
-    expect(cleancodeMcpInstructions).toContain('pre-approved at the Codex MCP layer')
-    expect(cleancodeMcpInstructions).toContain('global Codex sandbox or approval policy')
+    expect(cleancodeMcpInstructions).toContain('Provider launch integration')
+    expect(cleancodeMcpInstructions).toContain('Provider sandbox or approval policy')
+    expect(cleancodeMcpInstructions).not.toMatch(/\b(?:Codex|Claude|OpenCode)\b/)
     expect(cleancodeMcpInstructions).toContain('other MCP servers')
     expect(cleancodeMcpInstructions).toContain(
       'Deletion tools still require independent CleanCode UI approval'

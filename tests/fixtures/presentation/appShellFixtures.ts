@@ -1,4 +1,8 @@
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type {
+  AgentRuntimeSnapshot,
+  AgentSessionSnapshot
+} from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 
 export interface RuntimeApiOverrides {
   readonly listWorkbenches?: ReturnType<typeof vi.fn>
@@ -25,7 +29,7 @@ export interface RuntimeApiOverrides {
   readonly disposeProjectAgentSessions?: ReturnType<typeof vi.fn>
   readonly approveAgentTool?: ReturnType<typeof vi.fn>
   readonly rejectAgentTool?: ReturnType<typeof vi.fn>
-  readonly onAgentPtyExit?: ReturnType<typeof vi.fn>
+  readonly onAgentRuntimeChanged?: ReturnType<typeof vi.fn>
   readonly onAgentGraphUpdated?: ReturnType<typeof vi.fn>
   readonly onAgentToolApprovalRequested?: ReturnType<typeof vi.fn>
   readonly createTerminalBlock?: ReturnType<typeof vi.fn>
@@ -78,10 +82,12 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
       vi.fn(async () => [
         {
           capabilities: {
-            cleancodeMcp: true,
+            activityTracking: false,
+            cleancodeMcp: 'required',
+            launchInstructions: true,
             resume: true,
-            structuredLifecycle: true,
-            systemInstructions: true
+            sessionIdentityCapture: true,
+            sessionRefCodec: true
           },
           displayName: 'Codex',
           id: 'codex'
@@ -89,19 +95,19 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
       ]),
     attachAgentSession:
       overrides.attachAgentSession ??
-      vi.fn(async (command) => ({
-        agentId: command.agentId,
-        codexThreadId: null,
-        gitBranch: command.gitBranch ?? null,
-        processId: 1,
-        projectDirectory: command.projectDirectory,
-        projectId: command.projectId,
-        sessionId: `agent-${command.workspaceName}`,
-        status: 'running',
-        terminalSourceTheme: command.terminalSourceTheme,
-        workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
-      })),
+      vi.fn(async (command) =>
+        createAgentSessionSnapshot({
+          agentId: command.agentId,
+          gitBranch: command.gitBranch ?? null,
+          projectDirectory: command.projectDirectory,
+          projectId: command.projectId,
+          providerId: command.providerId ?? 'codex',
+          sessionId: `agent-${command.workspaceName}`,
+          terminalSourceTheme: command.terminalSourceTheme,
+          workspaceDirectory: command.workspaceDirectory,
+          workspaceName: command.workspaceName
+        })
+      ),
     createWorkspaceAgent: overrides.createWorkspaceAgent ?? vi.fn(),
     renameWorkspaceAgent: overrides.renameWorkspaceAgent ?? vi.fn(),
     updateWorkspaceAgentLayout: overrides.updateWorkspaceAgentLayout ?? vi.fn(),
@@ -116,7 +122,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     approveAgentTool:
       overrides.approveAgentTool ?? vi.fn(async () => ({ status: 'not_found' as const })),
     rejectAgentTool: overrides.rejectAgentTool ?? vi.fn(async () => undefined),
-    onAgentPtyExit: overrides.onAgentPtyExit ?? vi.fn(() => vi.fn()),
+    onAgentRuntimeChanged: overrides.onAgentRuntimeChanged ?? vi.fn(() => vi.fn()),
     onAgentGraphUpdated: overrides.onAgentGraphUpdated ?? vi.fn(() => vi.fn()),
     onAgentToolApprovalRequested: overrides.onAgentToolApprovalRequested ?? vi.fn(() => vi.fn()),
     createTerminalBlock: overrides.createTerminalBlock ?? vi.fn(),
@@ -141,6 +147,44 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     terminateTerminal: overrides.terminateTerminal ?? vi.fn(),
     onTerminalOutput: overrides.onTerminalOutput ?? vi.fn(() => vi.fn()),
     onTerminalExit: overrides.onTerminalExit ?? vi.fn(() => vi.fn())
+  }
+}
+
+export function createAgentSessionSnapshot(
+  input: Partial<Omit<AgentSessionSnapshot, 'runtime'>> & {
+    readonly runtime?: AgentRuntimeSnapshot
+  } = {}
+): AgentSessionSnapshot {
+  return {
+    agentId: input.agentId ?? 'agent-1',
+    gitBranch: input.gitBranch ?? null,
+    projectDirectory: input.projectDirectory ?? '/repo/app',
+    projectId: input.projectId ?? 'project-1',
+    providerId: input.providerId ?? 'codex',
+    providerSessionRef: input.providerSessionRef ?? null,
+    runtime: input.runtime ?? {
+      activity: { status: 'unavailable' },
+      binding: { status: 'unbound' },
+      launch: {
+        exitCode: null,
+        failureKind: null,
+        generation: 1,
+        launchId: 'launch-1',
+        status: 'running'
+      },
+      mcp: { status: 'ready' },
+      revision: 1,
+      terminal: {
+        exitCode: null,
+        processId: 1,
+        status: 'running',
+        viewIdentity: null
+      }
+    },
+    sessionId: input.sessionId ?? 'agent-session-1',
+    terminalSourceTheme: input.terminalSourceTheme ?? 'dark',
+    workspaceDirectory: input.workspaceDirectory ?? '/repo/app',
+    workspaceName: input.workspaceName ?? 'main'
   }
 }
 

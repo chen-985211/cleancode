@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Check, CircleAlert, Copy, Download, Loader2, MonitorOff, RefreshCw } from 'lucide-react'
 
-import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { AgentRuntimeSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentProviderPanelState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
@@ -11,20 +11,20 @@ export function AgentProviderStatusView({
   onRetryInspection,
   onRetryRestore,
   providerName,
-  state,
-  sessionStatus
+  runtime,
+  state
 }: {
   readonly onNewConversation?: () => void
   readonly onRetryInspection: () => void
   readonly onRetryRestore?: () => void
   readonly providerName: string
+  readonly runtime: AgentRuntimeSnapshot | null
   readonly state: AgentProviderPanelState
-  readonly sessionStatus: AgentSessionSnapshot['status'] | null
 }) {
   const { t } = useI18n()
-  if (sessionStatus === 'running' || sessionStatus === 'suspended') return null
+  if (runtime?.terminal.status === 'suspended') return null
 
-  if (sessionStatus === 'restore_failed') {
+  if (runtime?.launch.status === 'failed' && runtime.launch.failureKind === 'restore') {
     return (
       <RuntimeNotice label={t('provider.restoreFailed')} tone="warning">
         <span className="agent-runtime-notice__actions">
@@ -38,7 +38,10 @@ export function AgentProviderStatusView({
       </RuntimeNotice>
     )
   }
-  if (sessionStatus === 'exited') {
+  if (
+    runtime?.terminal.status === 'running' &&
+    (runtime.launch.status === 'exited' || runtime.launch.status === 'stopped')
+  ) {
     return (
       <RuntimeNotice label={t('provider.sessionEnded', { provider: providerName })} tone="neutral">
         <span className="agent-runtime-notice__actions">
@@ -52,12 +55,29 @@ export function AgentProviderStatusView({
       </RuntimeNotice>
     )
   }
-  if (sessionStatus === 'failed') {
+  if (
+    runtime?.terminal.status === 'failed' ||
+    runtime?.terminal.status === 'exited' ||
+    runtime?.launch.status === 'failed'
+  ) {
     if (state.status === 'ready' && state.availability.status === 'missing') {
       return (
-        <MissingCliNotice
+        <InstallCliNotice
           availability={state.availability}
           label={t('provider.startFailedMissing', { provider: providerName })}
+          onRetry={onRetryInspection}
+          providerName={providerName}
+        />
+      )
+    }
+    if (state.status === 'ready' && state.availability.status === 'upgrade_required') {
+      return (
+        <InstallCliNotice
+          availability={state.availability}
+          label={t('provider.startFailedUpgrade', {
+            minimumVersion: state.availability.minimumVersion,
+            provider: providerName
+          })}
           onRetry={onRetryInspection}
           providerName={providerName}
         />
@@ -67,6 +87,16 @@ export function AgentProviderStatusView({
       <RuntimeNotice label={t('provider.startFailed', { provider: providerName })} tone="warning" />
     )
   }
+  if (runtime?.mcp.status === 'failed') {
+    return <RuntimeNotice label={t('provider.mcpUnavailable')} tone="warning" />
+  }
+  if (runtime?.binding.status === 'persistence_failed') {
+    return <RuntimeNotice label={t('provider.bindingSaveFailed')} tone="warning" />
+  }
+  if (runtime?.mcp.status === 'initializing' && runtime.launch.status === 'launching') {
+    return <RuntimeNotice label={t('provider.mcpInitializing')} tone="neutral" icon="checking" />
+  }
+  if (runtime) return null
   if (state.status === 'unavailable') {
     return <RuntimeNotice label={t('provider.runtimeUnavailable')} tone="neutral" icon="offline" />
   }
@@ -91,9 +121,22 @@ export function AgentProviderStatusView({
       </RuntimeNotice>
     )
   }
+  if (state.availability.status === 'upgrade_required') {
+    return (
+      <InstallCliNotice
+        availability={state.availability}
+        label={t('provider.upgradeRequired', {
+          minimumVersion: state.availability.minimumVersion,
+          provider: providerName
+        })}
+        onRetry={onRetryInspection}
+        providerName={providerName}
+      />
+    )
+  }
   if (state.availability.status === 'missing') {
     return (
-      <MissingCliNotice
+      <InstallCliNotice
         availability={state.availability}
         onRetry={onRetryInspection}
         providerName={providerName}
@@ -103,13 +146,15 @@ export function AgentProviderStatusView({
   return null
 }
 
-function MissingCliNotice({
+function InstallCliNotice({
   availability,
   label,
   onRetry,
   providerName
 }: {
-  readonly availability: Extract<AgentProviderAvailability, { readonly status: 'missing' }>
+  readonly availability:
+    | Extract<AgentProviderAvailability, { readonly status: 'missing' }>
+    | Extract<AgentProviderAvailability, { readonly status: 'upgrade_required' }>
   readonly label?: string
   readonly onRetry: () => void
   readonly providerName: string

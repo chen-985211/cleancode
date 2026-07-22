@@ -1,7 +1,6 @@
 import type {
-  AgentActivityChangedEvent,
   AgentGraphUpdatedEvent,
-  AgentPtyExitEvent,
+  AgentRuntimeChangedEvent,
   AgentSessionSnapshot,
   AgentTerminalSourceTheme,
   AgentToolApprovalDecisionResult,
@@ -27,12 +26,11 @@ interface IpcSender {
 export interface AgentIpcHandlersInput {
   readonly approveAgentTool: (approvalId: string) => Promise<AgentToolApprovalDecisionResult>
   readonly attachAgentSession: (command: {
-    readonly onActivityChanged: (event: AgentActivityChangedEvent) => void
     readonly agentId: string
     readonly columns?: number
     readonly gitBranch?: string | null
-    readonly onExit: (event: AgentPtyExitEvent) => void
     readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
+    readonly onRuntimeChanged: (event: AgentRuntimeChangedEvent) => void
     readonly onToolApprovalRequested: (event: AgentToolApprovalRequest) => void
     readonly persistenceMode?: 'ephemeral' | 'persistent'
     readonly projectDirectory: string
@@ -132,11 +130,10 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
         agentId: command.agentId,
         columns: command.columns,
         gitBranch: command.gitBranch,
-        onActivityChanged: (activityEvent) =>
-          sendIfAlive(sender, 'cleancode:agent-activity-changed', activityEvent),
-        onExit: (exitEvent) => sendIfAlive(sender, 'cleancode:agent-pty-exit', exitEvent),
         onGraphUpdated: (graphEvent) =>
           sendIfAlive(sender, 'cleancode:agent-graph-updated', graphEvent),
+        onRuntimeChanged: (runtimeEvent) =>
+          sendIfAlive(sender, 'cleancode:agent-runtime-changed', runtimeEvent),
         onToolApprovalRequested: (approvalEvent) =>
           sendIfAlive(sender, 'cleancode:agent-tool-approval-requested', approvalEvent),
         persistenceMode: command.persistenceMode,

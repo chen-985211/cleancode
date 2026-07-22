@@ -211,7 +211,8 @@ export class AgentToolApprovalCoordinator {
   private isSessionActive(session: ManagedAgentSession): boolean {
     return (
       this.findSessionById(session.sessionId) === session &&
-      session.status === 'running' &&
+      session.runtime.terminal.status === 'running' &&
+      session.runtime.launch.status === 'running' &&
       !session.isStopping
     )
   }

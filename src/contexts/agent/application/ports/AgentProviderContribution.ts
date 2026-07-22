@@ -1,11 +1,15 @@
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentActivityStatus } from '../dto/AgentSessionProtocol'
 
+export type AgentProviderMcpSupport = 'unsupported' | 'best_effort' | 'required'
+
 interface AgentProviderCapabilities {
-  readonly cleancodeMcp: boolean
+  readonly activityTracking: boolean
+  readonly cleancodeMcp: AgentProviderMcpSupport
+  readonly launchInstructions: boolean
   readonly resume: boolean
-  readonly structuredLifecycle: boolean
-  readonly systemInstructions: boolean
+  readonly sessionIdentityCapture: boolean
+  readonly sessionRefCodec: boolean
 }
 
 export interface AgentProviderDescriptor {
@@ -18,6 +22,13 @@ export type AgentProviderAvailability =
   | {
       readonly providerId: string
       readonly status: 'installed'
+      readonly version: string
+    }
+  | {
+      readonly installCommand: string
+      readonly minimumVersion: string
+      readonly providerId: string
+      readonly status: 'upgrade_required'
       readonly version: string
     }
   | {
@@ -42,14 +53,18 @@ export interface AgentRuntimeArtifact {
   dispose(): Promise<void>
 }
 
+interface AgentLaunchArtifactRegistrar {
+  track<TArtifact extends AgentRuntimeArtifact>(label: string, artifact: TArtifact): TArtifact
+}
+
 export interface AgentLaunchPlan {
   readonly args: readonly string[]
   readonly env: Readonly<Record<string, string>>
   readonly executable: string
-  readonly temporaryArtifacts: readonly AgentRuntimeArtifact[]
 }
 
 export interface CreateAgentLaunchPlanCommand {
+  readonly artifacts: AgentLaunchArtifactRegistrar
   readonly cleancodeMcp?: {
     readonly bearerToken: string
     readonly serverUrl: string
@@ -68,29 +83,39 @@ export interface AgentResumeStrategy {
   createResumeArgs(sessionRef: ProviderSessionRefSnapshot): readonly string[]
 }
 
+export interface AgentProviderSessionRefCodec {
+  parse(sessionRef: ProviderSessionRefSnapshot): ProviderSessionRefSnapshot
+}
+
 export interface AgentTelemetryContribution {
+  readonly signals: {
+    readonly activity: boolean
+    readonly sessionIdentity: boolean
+  }
   prepare(command: {
+    readonly artifacts: AgentLaunchArtifactRegistrar
     readonly onActivityChanged?: (activity: AgentActivityStatus) => void
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
     readonly workspaceDirectory: string
   }): Promise<{
     readonly args: readonly string[]
     readonly env: Readonly<Record<string, string>>
-    readonly temporaryArtifacts: readonly AgentRuntimeArtifact[]
   }>
 }
 
 export interface AgentCapabilityInjector {
-  inject(command: { readonly bearerToken: string; readonly serverUrl: string }):
+  inject(command: {
+    readonly artifacts: AgentLaunchArtifactRegistrar
+    readonly bearerToken: string
+    readonly serverUrl: string
+  }):
     | Promise<{
         readonly args: readonly string[]
         readonly env: Readonly<Record<string, string>>
-        readonly temporaryArtifacts?: readonly AgentRuntimeArtifact[]
       }>
     | {
         readonly args: readonly string[]
         readonly env: Readonly<Record<string, string>>
-        readonly temporaryArtifacts?: readonly AgentRuntimeArtifact[]
       }
 }
 
@@ -100,5 +125,6 @@ export interface AgentProviderContribution {
   readonly detector: AgentProviderDetector
   readonly launcher: AgentLaunchPlanner
   readonly resume?: AgentResumeStrategy
+  readonly sessionRefCodec?: AgentProviderSessionRefCodec
   readonly telemetry?: AgentTelemetryContribution
 }

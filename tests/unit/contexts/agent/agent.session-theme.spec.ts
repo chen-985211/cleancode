@@ -1,4 +1,5 @@
 import type {
+  AgentMcpRegistration,
   AgentMcpServerPort,
   RegisteredAgentMcpSession
 } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
@@ -22,7 +23,7 @@ describe('agent session terminal source theme', () => {
 
     expect(firstSession).toMatchObject({ terminalSourceTheme: 'light' })
     expect(reattachedSession).toMatchObject({
-      processId: firstSession.processId,
+      runtime: { terminal: { processId: firstSession.runtime.terminal.processId } },
       sessionId: firstSession.sessionId,
       terminalSourceTheme: 'light'
     })
@@ -37,12 +38,20 @@ describe('agent session terminal source theme', () => {
     const secondExit: number[] = []
 
     const firstAttach = attachSession(service, {
-      onExit: (event) => firstExit.push(event.exitCode ?? -1),
+      onRuntimeChanged: (event) => {
+        if (event.runtime.terminal.status === 'exited') {
+          firstExit.push(event.runtime.terminal.exitCode ?? -1)
+        }
+      },
       terminalSourceTheme: 'light'
     })
     await repository.lookupStarted.promise
     const secondAttach = attachSession(service, {
-      onExit: (event) => secondExit.push(event.exitCode ?? -1),
+      onRuntimeChanged: (event) => {
+        if (event.runtime.terminal.status === 'exited') {
+          secondExit.push(event.runtime.terminal.exitCode ?? -1)
+        }
+      },
       terminalSourceTheme: 'dark'
     })
     repository.release()
@@ -342,7 +351,8 @@ function createSessionService(
       }
     },
     repository,
-    new RecordingAgentProviderRegistry()
+    new RecordingAgentProviderRegistry(),
+    'codex'
   )
 }
 
@@ -351,7 +361,7 @@ function attachSession(
   input: {
     readonly agentId?: string
     readonly gitBranch?: string
-    readonly onExit?: Parameters<AgentSessionService['attach']>[0]['onExit']
+    readonly onRuntimeChanged?: Parameters<AgentSessionService['attach']>[0]['onRuntimeChanged']
     readonly terminalSourceTheme: AgentTerminalSourceTheme
     readonly workspaceDirectory?: string
     readonly workspaceName?: string
@@ -361,8 +371,8 @@ function attachSession(
     agentId: input.agentId ?? 'agent-1',
     columns: 80,
     gitBranch: input.gitBranch,
-    onExit: input.onExit ?? (() => undefined),
     onGraphUpdated: () => undefined,
+    onRuntimeChanged: input.onRuntimeChanged ?? (() => undefined),
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
@@ -421,17 +431,13 @@ class RecordingCodexAgentProcessPort implements AgentTerminalRuntimePort {
 }
 
 class NoopAgentMcpServerPort implements AgentMcpServerPort {
-  registerSession(session: RegisteredAgentMcpSession): Promise<{
-    readonly bearerToken: string
-    readonly url: string
-  }> {
+  registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpRegistration> {
     return Promise.resolve({
       bearerToken: `token-${session.sessionId}`,
+      dispose: () => undefined,
       url: `http://127.0.0.1/${session.sessionId}`
     })
   }
-
-  unregisterSession(): void {}
 
   dispose(): void {}
 }

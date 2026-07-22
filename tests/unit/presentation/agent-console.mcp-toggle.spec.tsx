@@ -4,6 +4,7 @@ import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../src/conte
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
 import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 import {
+  createAgentSessionSnapshot,
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
@@ -16,10 +17,12 @@ describe('Agent console CleanCode MCP toggle', () => {
       listAgentProviders: vi.fn(async () => [
         {
           capabilities: {
-            cleancodeMcp: false,
+            activityTracking: false,
+            cleancodeMcp: 'unsupported',
+            launchInstructions: false,
             resume: false,
-            structuredLifecycle: false,
-            systemInstructions: false
+            sessionIdentityCapture: false,
+            sessionRefCodec: false
           },
           displayName: 'OpenCode',
           id: 'opencode'
@@ -85,20 +88,17 @@ describe('Agent console CleanCode MCP toggle', () => {
     }
     const onMcpCapabilityChange = vi.fn(async () => ({
       agent: { ...agent, cleancodeMcpEnabled: false },
-      session: {
+      session: createAgentSessionSnapshot({
         agentId: agent.agentId,
         gitBranch: null,
-        processId: 2,
         projectDirectory: workbench.project.directory,
         projectId: workbench.project.id,
         providerId: 'codex',
-        providerSessionRef: null,
         sessionId: 'agent-session-restarted',
-        status: 'running' as const,
         terminalSourceTheme: 'light' as const,
         workspaceDirectory: currentWorkspace.directory,
         workspaceName: currentWorkspace.name
-      }
+      })
     }))
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -180,20 +180,17 @@ describe('Agent console CleanCode MCP toggle', () => {
     await act(async () => {
       pendingUpdate.resolve({
         agent: { ...mainAgent, cleancodeMcpEnabled: false },
-        session: {
+        session: createAgentSessionSnapshot({
           agentId: mainAgent.agentId,
           gitBranch: null,
-          processId: 7,
           projectDirectory: '/repo/app',
           projectId: mainWorkbench.project.id,
           providerId: 'codex',
-          providerSessionRef: null,
           sessionId: 'agent-main-restarted',
-          status: 'running',
           terminalSourceTheme: 'light',
           workspaceDirectory: '/repo/app',
           workspaceName: 'main'
-        }
+        })
       })
     })
     fireEvent.change(screen.getByLabelText('Codex CLI 输入'), {

@@ -8,6 +8,7 @@ import type {
 import { TerminalSurfaceRegistry } from '../../../src/presentation/app-shell/terminalSurfaceRegistry'
 import { TerminalSurfaceRegistryProvider } from '../../../src/presentation/app-shell/TerminalSurfaceRegistryProvider'
 import {
+  createAgentSessionSnapshot,
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
@@ -53,22 +54,19 @@ describe('Agent console terminal sizing', () => {
 
   it('waits for the first visible grid measurement before attaching the Agent session', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
-    const attachAgentSession = vi.fn(async (command) => ({
-      agentId: command.agentId,
-      activity: 'idle' as const,
-      gitBranch: command.gitBranch ?? null,
-      processId: 42,
-      projectDirectory: command.projectDirectory,
-      projectId: command.projectId,
-      providerId: command.providerId,
-      providerSessionRef: null,
-      sessionId: 'agent-session-1',
-      status: 'running' as const,
-      terminalSourceTheme: command.terminalSourceTheme,
-      terminalViewIdentity: null,
-      workspaceDirectory: command.workspaceDirectory,
-      workspaceName: command.workspaceName
-    }))
+    const attachAgentSession = vi.fn(async (command) =>
+      createAgentSessionSnapshot({
+        agentId: command.agentId,
+        gitBranch: command.gitBranch ?? null,
+        projectDirectory: command.projectDirectory,
+        projectId: command.projectId,
+        providerId: command.providerId,
+        sessionId: 'agent-session-1',
+        terminalSourceTheme: command.terminalSourceTheme,
+        workspaceDirectory: command.workspaceDirectory,
+        workspaceName: command.workspaceName
+      })
+    )
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({ attachAgentSession })

@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject } from 'react'
+import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
@@ -22,7 +22,11 @@ export function useAgentTerminalView({
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
 }): void {
   const surfaceRegistry = useTerminalSurfaceRegistry()
-  const identity = session?.terminalViewIdentity
+  const identity = session?.runtime.terminal.viewIdentity
+  const runtimeSessionId = session?.sessionId ?? null
+  const terminalSourceTheme = session?.terminalSourceTheme
+  const onDimensionsChangeRef = useRef(onDimensionsChange)
+  onDimensionsChangeRef.current = onDimensionsChange
   const identityKey = identity
     ? [identity.sessionId, identity.runId, identity.generation].join('\0')
     : null
@@ -34,14 +38,14 @@ export function useAgentTerminalView({
       return undefined
     }
 
-    if (!identity || !session) {
+    if (!identity || !runtimeSessionId) {
       const measurementSurface = createTerminalXtermSurface()
       measurementSurface.attach({
         element,
         isResizeSuspended: false,
         onDimensionsChange: (dimensions) => {
           dimensionsRef.current = { dimensions, workspaceKey }
-          onDimensionsChange(dimensions)
+          onDimensionsChangeRef.current(dimensions)
         },
         onInput: () => undefined,
         onOpenLink: () => undefined,
@@ -58,7 +62,7 @@ export function useAgentTerminalView({
     if (!surfaceRegistry || !api?.attachTerminalView) return undefined
 
     const lease = surfaceRegistry.create(identity, () =>
-      createTerminalXtermSurface(session.terminalSourceTheme)
+      createTerminalXtermSurface(terminalSourceTheme)
     )
     const surface = lease.surface
     let isReleased = false
@@ -81,11 +85,11 @@ export function useAgentTerminalView({
       isResizeSuspended: false,
       onDimensionsChange: (dimensions) => {
         dimensionsRef.current = { dimensions, workspaceKey }
-        onDimensionsChange(dimensions)
-        void api.resizeAgentSession({ ...dimensions, sessionId: session.sessionId })
+        onDimensionsChangeRef.current(dimensions)
+        void api.resizeAgentSession({ ...dimensions, sessionId: runtimeSessionId })
       },
       onInput: (input) => {
-        void api.writeAgentSession({ input, sessionId: session.sessionId })
+        void api.writeAgentSession({ input, sessionId: runtimeSessionId })
       },
       onOpenLink: () => undefined,
       onOpenSearch: () => undefined,
@@ -106,10 +110,10 @@ export function useAgentTerminalView({
     dimensionsRef,
     enabled,
     identityKey,
-    onDimensionsChange,
-    session,
+    runtimeSessionId,
     surfaceRegistry,
     terminalElementRef,
+    terminalSourceTheme,
     workspaceKey
   ])
 }

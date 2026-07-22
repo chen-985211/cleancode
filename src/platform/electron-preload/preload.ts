@@ -52,10 +52,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:dispose-project-agent-sessions', command),
   approveAgentTool: (command: unknown) => invokeCleancode('cleancode:approve-agent-tool', command),
   rejectAgentTool: (command: unknown) => invokeCleancode('cleancode:reject-agent-tool', command),
-  onAgentPtyExit: (listener: (event: unknown) => void) =>
-    subscribeRendererEvent('cleancode:agent-pty-exit', listener),
-  onAgentActivityChanged: (listener: (event: unknown) => void) =>
-    subscribeRendererEvent('cleancode:agent-activity-changed', listener),
+  onAgentRuntimeChanged: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-runtime-changed', listener),
   onAgentGraphUpdated: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-graph-updated', listener),
   onAgentToolApprovalRequested: (listener: (event: unknown) => void) =>

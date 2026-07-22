@@ -53,7 +53,12 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
         response.writeHead(204).end()
       })
     })
-    await listen(server)
+    try {
+      await listen(server)
+    } catch (error) {
+      closeAfterFailedStart(server)
+      throw error
+    }
     const address = server.address()
     if (!address || typeof address === 'string') {
       server.close()
@@ -64,6 +69,14 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
 
   async dispose(): Promise<void> {
     await new Promise<void>((resolveClosed) => this.server.close(() => resolveClosed()))
+  }
+}
+
+function closeAfterFailedStart(server: Server): void {
+  try {
+    server.close()
+  } catch {
+    // Preserve the startup failure; no reporter handle exists for a later cleanup attempt.
   }
 }
 

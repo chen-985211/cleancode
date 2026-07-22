@@ -10,6 +10,7 @@ import type { AgentToolName } from '../../domain/value-objects/AgentToolName'
 
 export interface CleancodeAgentJsonRpcToolBridgeInput {
   readonly executeMcpTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
+  readonly onInitialized?: () => void
   readonly projectDirectory: string
   readonly sessionId: string
   readonly workspaceName: string
@@ -35,12 +36,22 @@ type JsonRpcResponse =
     }
 
 export class CleancodeAgentJsonRpcToolBridge {
+  private initializeAccepted = false
+  private initializedPublished = false
+
   constructor(private readonly input: CleancodeAgentJsonRpcToolBridgeInput) {}
 
   async handle(request: JsonRpcRequest): Promise<JsonRpcResponse | null> {
-    if (request.method === 'notifications/initialized') return null
+    if (request.method === 'notifications/initialized') {
+      if (this.initializeAccepted && !this.initializedPublished) {
+        this.initializedPublished = true
+        this.input.onInitialized?.()
+      }
+      return null
+    }
 
     if (request.method === 'initialize') {
+      this.initializeAccepted = true
       return createResult(request.id, {
         capabilities: { tools: { listChanged: false } },
         instructions: cleancodeMcpInstructions,

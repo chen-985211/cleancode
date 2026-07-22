@@ -280,8 +280,8 @@ function createManagedSession(): ManagedAgentSession {
   return {
     agentId: 'agent-1',
     callbacks: {
-      onExit: vi.fn(),
       onGraphUpdated: vi.fn(),
+      onRuntimeChanged: vi.fn(),
       onToolApprovalRequested: vi.fn()
     },
     cleancodeMcpEnabled: true,
@@ -289,14 +289,33 @@ function createManagedSession(): ManagedAgentSession {
     gitBranch: null,
     isTerminalRunning: true,
     isStopping: false,
-    launchArtifacts: [],
-    processId: 1,
+    launchArtifacts: null,
+    mcpSupport: 'required',
     projectDirectory: '/repo/app',
     projectId: 'project-1',
     providerId: 'codex',
     providerLaunchGeneration: 0,
     providerSessionRef: null,
     rows: 24,
+    runtime: {
+      activity: { status: 'idle' },
+      binding: { status: 'unbound' },
+      launch: {
+        exitCode: null,
+        failureKind: null,
+        generation: 1,
+        launchId: 'launch-1',
+        status: 'running'
+      },
+      mcp: { status: 'ready' },
+      revision: 1,
+      terminal: {
+        exitCode: null,
+        processId: 1,
+        status: 'running',
+        viewIdentity: null
+      }
+    },
     scope: AgentConversationScope.create({
       agentId: 'agent-1',
       gitBranch: null,
@@ -305,7 +324,6 @@ function createManagedSession(): ManagedAgentSession {
     }),
     sessionId: 'agent-session-1',
     shouldPersist: true,
-    status: 'running',
     terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
     workspaceName: 'main'

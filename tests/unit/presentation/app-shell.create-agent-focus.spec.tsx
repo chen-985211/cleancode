@@ -179,10 +179,12 @@ function createAgent(
 function createProviderDescriptor(id: string, displayName: string, cleancodeMcp: boolean) {
   return {
     capabilities: {
-      cleancodeMcp,
+      activityTracking: false,
+      cleancodeMcp: cleancodeMcp ? ('best_effort' as const) : ('unsupported' as const),
+      launchInstructions: cleancodeMcp,
       resume: id === 'codex',
-      structuredLifecycle: id === 'codex',
-      systemInstructions: cleancodeMcp
+      sessionIdentityCapture: id === 'codex',
+      sessionRefCodec: id === 'codex'
     },
     displayName,
     id

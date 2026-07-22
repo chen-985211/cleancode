@@ -94,13 +94,13 @@ function AgentProviderOption({
               {t('agent.providerPicker.resume')}
             </span>
           ) : null}
-          {provider.capabilities.cleancodeMcp ? (
+          {provider.capabilities.cleancodeMcp !== 'unsupported' ? (
             <span>
               <PlugZap size={11} aria-hidden="true" />
               {t('agent.providerPicker.mcp')}
             </span>
           ) : null}
-          {!provider.capabilities.resume && !provider.capabilities.cleancodeMcp ? (
+          {!provider.capabilities.resume && provider.capabilities.cleancodeMcp === 'unsupported' ? (
             <span>
               <Check size={11} aria-hidden="true" />
               {t('agent.providerPicker.terminal')}
@@ -122,6 +122,12 @@ function resolveAvailabilityLabel(
   if (state.availability.status === 'installed') return state.availability.version
   if (state.availability.status === 'missing') {
     return t('agent.providerPicker.notInstalled', { provider: providerName })
+  }
+  if (state.availability.status === 'upgrade_required') {
+    return t('agent.providerPicker.upgradeRequired', {
+      minimumVersion: state.availability.minimumVersion,
+      provider: providerName
+    })
   }
   return t('agent.providerPicker.unknown')
 }

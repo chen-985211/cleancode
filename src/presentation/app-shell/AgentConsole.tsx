@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 
 import type {
   AgentActivityStatus,
+  AgentRuntimeChangedEvent,
   AgentSessionSnapshot
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { AgentConsoleActions } from './AgentConsoleActions'
@@ -18,6 +19,10 @@ import {
   type AgentConsoleProps,
   type AgentTerminalMeasurement
 } from './agentConsoleModel'
+import {
+  applyAgentRuntimeEvent,
+  rememberLatestAgentRuntimeEvent
+} from './agentRuntimeReconciliation'
 import { formatProviderDisplayName, useAgentProviderDescriptor } from './useAgentProviderCatalog'
 import { useAgentProviderState } from './useAgentProviderState'
 import { useAgentTerminalView } from './useAgentTerminalView'
@@ -47,9 +52,8 @@ export function AgentConsole({
   const providerCatalog = useAgentProviderDescriptor(activeAgent.providerId)
   const providerName =
     providerCatalog.descriptor?.displayName ?? formatProviderDisplayName(activeAgent.providerId)
-  const supportsMcp = providerCatalog.descriptor?.capabilities.cleancodeMcp !== false
+  const supportsMcp = providerCatalog.descriptor?.capabilities.cleancodeMcp !== 'unsupported'
   const [session, setSession] = useState<AgentSessionSnapshot | null>(null)
-  const [activity, setActivity] = useState<AgentActivityStatus>('unavailable')
   const [attachAttempt, setAttachAttempt] = useState(0)
   const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
   const [isMcpCapabilityUpdating, setIsMcpCapabilityUpdating] = useState(false)
@@ -61,9 +65,10 @@ export function AgentConsole({
   )
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
+  const activity = session?.runtime.activity.status ?? 'unavailable'
   const dimensionsRef = useRef<AgentTerminalMeasurement | null>(null)
-  const exitedSessionIdsRef = useRef(new Set<string>())
   const isMountedRef = useRef(true)
+  const pendingRuntimeEventsRef = useRef(new Map<string, AgentRuntimeChangedEvent>())
   const restartRequestRef = useRef<{
     readonly mode: 'new' | 'retry'
     readonly workspaceKey: string
@@ -97,9 +102,12 @@ export function AgentConsole({
   })
 
   useLayoutEffect(() => {
+    const pendingRuntimeEvents = pendingRuntimeEventsRef.current
     workspaceGenerationRef.current += 1
+    pendingRuntimeEvents.clear()
     return () => {
       workspaceGenerationRef.current += 1
+      pendingRuntimeEvents.clear()
     }
   }, [currentWorkspaceKey])
 
@@ -114,25 +122,18 @@ export function AgentConsole({
     const api = window.cleancode
     if (!api || !currentProjectDirectory || !currentWorkspaceName) return undefined
 
-    const unsubscribeExit =
-      api.onAgentPtyExit?.((event) => {
+    const unsubscribeRuntime =
+      api.onAgentRuntimeChanged?.((event) => {
         if (event.agentId !== activeAgent.agentId) return
-        exitedSessionIdsRef.current.add(event.sessionId)
         const activeBinding = sessionBindingRef.current
-        if (activeBinding?.session.sessionId !== event.sessionId) return
-        setActivity('unavailable')
-        setSession((currentSession) =>
-          currentSession?.sessionId === event.sessionId
-            ? { ...currentSession, activity: 'unavailable', status: 'exited' }
-            : currentSession
-        )
-      }) ?? noop
-    const unsubscribeActivity =
-      api.onAgentActivityChanged?.((event) => {
-        if (event.agentId !== activeAgent.agentId) return
-        if (sessionBindingRef.current?.session.sessionId === event.sessionId) {
-          setActivity(event.activity)
+        if (activeBinding?.session.sessionId !== event.sessionId) {
+          rememberLatestAgentRuntimeEvent(pendingRuntimeEventsRef.current, event)
+          return
         }
+        const nextSession = applyAgentRuntimeEvent(activeBinding.session, event)
+        if (nextSession === activeBinding.session) return
+        sessionBindingRef.current = { ...activeBinding, session: nextSession }
+        setSession(nextSession)
       }) ?? noop
     const unsubscribeGraph =
       api.onAgentGraphUpdated?.((event) => {
@@ -145,8 +146,7 @@ export function AgentConsole({
         }
       }) ?? noop
     return () => {
-      unsubscribeExit()
-      unsubscribeActivity()
+      unsubscribeRuntime()
       unsubscribeGraph()
     }
   }, [activeAgent.agentId, currentProjectDirectory, currentWorkspaceName, onGraphUpdated])
@@ -199,13 +199,13 @@ export function AgentConsole({
       if (!isCurrent) return
       if (restartMode) restartRequestRef.current = null
 
-      const committedSession =
-        exitedSessionIdsRef.current.has(nextSession.sessionId) && nextSession.status === 'running'
-          ? { ...nextSession, activity: 'unavailable' as const, status: 'exited' as const }
-          : nextSession
+      const pendingRuntimeEvent = pendingRuntimeEventsRef.current.get(nextSession.sessionId)
+      const committedSession = pendingRuntimeEvent
+        ? applyAgentRuntimeEvent(nextSession, pendingRuntimeEvent)
+        : nextSession
+      pendingRuntimeEventsRef.current.delete(nextSession.sessionId)
       sessionBindingRef.current = { session: committedSession, workspaceKey: currentWorkspaceKey }
       setSession(committedSession)
-      setActivity(committedSession.activity ?? 'unavailable')
 
       const latestMeasurement = dimensionsRef.current
       if (
@@ -223,7 +223,6 @@ export function AgentConsole({
       if (!isCurrent) return
       sessionBindingRef.current = null
       setSession(null)
-      setActivity('unavailable')
     })
     return () => {
       isCurrent = false
@@ -271,9 +270,13 @@ export function AgentConsole({
         return
       }
       if (result.session) {
-        sessionBindingRef.current = { session: result.session, workspaceKey: requestWorkspaceKey }
-        setSession(result.session)
-        setActivity(result.session.activity ?? 'unavailable')
+        const pendingRuntimeEvent = pendingRuntimeEventsRef.current.get(result.session.sessionId)
+        const nextSession = pendingRuntimeEvent
+          ? applyAgentRuntimeEvent(result.session, pendingRuntimeEvent)
+          : result.session
+        pendingRuntimeEventsRef.current.delete(result.session.sessionId)
+        sessionBindingRef.current = { session: nextSession, workspaceKey: requestWorkspaceKey }
+        setSession(nextSession)
       }
     } catch {
       if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
@@ -324,8 +327,8 @@ export function AgentConsole({
         </div>
         <AgentProviderStatusView
           providerName={providerName}
+          runtime={session?.runtime ?? null}
           state={providerController.state}
-          sessionStatus={session?.status ?? null}
           onNewConversation={() => restartSession('new')}
           onRetryInspection={providerController.retry}
           onRetryRestore={() => restartSession('retry')}

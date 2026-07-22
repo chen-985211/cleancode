@@ -45,7 +45,7 @@ function createAdapter(input: {
     projectId: command.projectId,
     workspaceName: command.workspaceName
   })
-  const agent = AgentSession.start(scope)
+  const agent = AgentSession.start(scope, 'codex')
   const agents = {
     delete: vi.fn(async () => undefined),
     deleteAgent: vi.fn(async () => undefined),

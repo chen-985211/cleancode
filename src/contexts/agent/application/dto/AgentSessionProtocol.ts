@@ -7,12 +7,6 @@ export type AgentTerminalSourceTheme = 'dark' | 'light'
 export type AgentActivityStatus =
   'unavailable' | 'idle' | 'working' | 'waiting_input' | 'waiting_approval'
 
-export interface AgentActivityChangedEvent {
-  readonly activity: AgentActivityStatus
-  readonly agentId: string
-  readonly sessionId: string
-}
-
 export interface AgentTerminalViewIdentity {
   readonly blockId: string
   readonly generation: number
@@ -23,9 +17,41 @@ export interface AgentTerminalViewIdentity {
   readonly workspaceName: string
 }
 
-export interface AgentPtyExitEvent {
+export type AgentTerminalRuntimeStatus =
+  'not_started' | 'starting' | 'running' | 'suspended' | 'exited' | 'failed'
+
+export type AgentLaunchRuntimeStatus =
+  'not_started' | 'launching' | 'running' | 'exited' | 'stopped' | 'failed'
+
+export type AgentBindingRuntimeStatus =
+  'unbound' | 'persisting' | 'persisted' | 'persistence_failed'
+
+export type AgentMcpRuntimeStatus =
+  'disabled' | 'unsupported' | 'inactive' | 'initializing' | 'ready' | 'failed'
+
+export interface AgentRuntimeSnapshot {
+  readonly activity: { readonly status: AgentActivityStatus }
+  readonly binding: { readonly status: AgentBindingRuntimeStatus }
+  readonly launch: {
+    readonly exitCode: number | null
+    readonly failureKind: 'restore' | 'start' | null
+    readonly generation: number
+    readonly launchId: string | null
+    readonly status: AgentLaunchRuntimeStatus
+  }
+  readonly mcp: { readonly status: AgentMcpRuntimeStatus }
+  readonly revision: number
+  readonly terminal: {
+    readonly exitCode: number | null
+    readonly processId: number | null
+    readonly status: AgentTerminalRuntimeStatus
+    readonly viewIdentity: AgentTerminalViewIdentity | null
+  }
+}
+
+export interface AgentRuntimeChangedEvent {
   readonly agentId: string
-  readonly exitCode: number | null
+  readonly runtime: AgentRuntimeSnapshot
   readonly sessionId: string
 }
 
@@ -82,17 +108,14 @@ export interface AgentToolApprovalRequest {
 }
 
 export interface AgentSessionSnapshot {
-  readonly activity?: AgentActivityStatus
   readonly agentId: string
   readonly gitBranch: string | null
-  readonly processId: number | null
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
   readonly providerSessionRef: ProviderSessionRefSnapshot | null
+  readonly runtime: AgentRuntimeSnapshot
   readonly sessionId: string
-  readonly status: 'running' | 'suspended' | 'exited' | 'failed' | 'restore_failed'
-  readonly terminalViewIdentity?: AgentTerminalViewIdentity | null
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
   readonly workspaceName: string

@@ -15,7 +15,6 @@ import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/us
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
 import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
-import { NodeCodexCliAdapter } from '../../contexts/agent/infrastructure/cli/NodeCodexCliAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
 import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
@@ -158,9 +157,9 @@ const {
   workflowPlans: new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase)
 })
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
-const codexCliAdapter = new NodeCodexCliAdapter()
+const defaultAgentProviderId = 'codex'
 const agentProviderRegistry = new AgentProviderRegistry([
-  new CodexAgentProviderContribution({ detector: codexCliAdapter }),
+  new CodexAgentProviderContribution(),
   new ClaudeCodeAgentProviderContribution(),
   new OpenCodeAgentProviderContribution()
 ])
@@ -170,10 +169,18 @@ const agentAuditRepository = new FileSystemAgentAuditRepository(
   join(appStateDirectoryPath, 'agent-audit.jsonl')
 )
 const agentSessionRepository = new FileSystemAgentSessionRepository(
-  join(appStateDirectoryPath, 'agent-sessions.json')
+  join(appStateDirectoryPath, 'agent-sessions.json'),
+  agentProviderRegistry
 )
-const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(agentSessionRepository)
-const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(agentSessionRepository)
+const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
+  agentSessionRepository,
+  agentProviderRegistry,
+  defaultAgentProviderId
+)
+const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
+  agentSessionRepository,
+  agentProviderRegistry
+)
 const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
 const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
   agentSessionRepository
@@ -207,6 +214,7 @@ const agentSessionService = new AgentSessionService(
   executeAgentToolUseCase,
   agentSessionRepository,
   agentProviderRegistry,
+  defaultAgentProviderId,
   createAgentRuntimeScopeValidation(
     agentSessionRepository,
     getProjectRegistryRepository(),
@@ -235,7 +243,8 @@ const {
 })
 const updateWorkspaceAgentMcpCapabilityUseCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
   agentSessionRepository,
-  agentSessionService
+  agentSessionService,
+  agentProviderRegistry
 )
 const removeWorkspaceAgentUseCase = new RemoveWorkspaceAgentUseCase(
   agentSessionRepository,
@@ -328,7 +337,12 @@ registerAgentIpcHandlers({
   approveAgentTool: (approvalId) => agentSessionService.approveTool({ approvalId }),
   attachAgentSession: (command) =>
     isAgentAutostartDisabledForTest
-      ? Promise.resolve(createDisabledAgentSessionSnapshot(command))
+      ? Promise.resolve(
+          createDisabledAgentSessionSnapshot({
+            ...command,
+            providerId: command.providerId ?? defaultAgentProviderId
+          })
+        )
       : agentSessionService.attach(command),
   createWorkspaceAgent: (command) => createWorkspaceAgentUseCase.execute(command),
   disposeAgentWorkspaceSession: (command) =>

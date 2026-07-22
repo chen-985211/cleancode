@@ -1,7 +1,6 @@
 import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
-import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConsoleFlowNode, WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 
@@ -73,26 +72,4 @@ export function toAgentFlowNodeId(agentId: string): string {
 
 export function readAgentIdFromFlowNodeId(nodeId: string): string | null {
   return nodeId.startsWith('agent:') ? nodeId.slice('agent:'.length) || null : null
-}
-
-function resolveDefaultAgentConsoleX(): number {
-  return globalThis.innerWidth <= 1080 ? 300 : 540
-}
-
-export function createLegacyAgentSnapshot(
-  currentWorkbench: WorkbenchSnapshot | null,
-  currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
-): WorkspaceAgentSnapshot | null {
-  return {
-    agentId: 'default-agent',
-    cleancodeMcpEnabled: true,
-    layout: {
-      position: { x: resolveDefaultAgentConsoleX(), y: 120 },
-      size: defaultAgentLayoutSize
-    },
-    name: 'Agent 1',
-    projectId: currentWorkbench?.project.id ?? 'unselected-project',
-    providerId: 'codex',
-    workspaceName: currentWorkspace?.name ?? 'unselected-workspace'
-  }
 }

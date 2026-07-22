@@ -1,11 +1,14 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
 import { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 import { FileSystemAgentSessionRepository } from '../../../../src/contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
+import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
+import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 
 describe('filesystem Agent session repository', () => {
   let storageDirectory: string
@@ -15,7 +18,7 @@ describe('filesystem Agent session repository', () => {
   beforeEach(async () => {
     storageDirectory = await mkdtemp(join(tmpdir(), 'cleancode-agent-session-'))
     filePath = join(storageDirectory, 'agent-sessions.json')
-    repository = new FileSystemAgentSessionRepository(filePath)
+    repository = new FileSystemAgentSessionRepository(filePath, createProviderRegistry())
   })
 
   afterEach(async () => {
@@ -37,7 +40,10 @@ describe('filesystem Agent session repository', () => {
     await repository.save(firstAgent)
     await repository.save(secondAgent)
 
-    const reopenedRepository = new FileSystemAgentSessionRepository(filePath)
+    const reopenedRepository = new FileSystemAgentSessionRepository(
+      filePath,
+      createProviderRegistry()
+    )
     const agents = await reopenedRepository.findWorkspace('project-1', 'main')
 
     expect(agents?.map((agent) => agent.id)).toEqual(['agent-1', 'agent-2'])
@@ -55,6 +61,150 @@ describe('filesystem Agent session repository', () => {
     expect(agents?.[0]?.cleancodeMcpEnabled).toBe(true)
     expect(agents?.[1]?.cleancodeMcpEnabled).toBe(false)
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 4 })
+  })
+
+  it('restores a Claude Code reference through its Provider codec without changing v4 shape', async () => {
+    const agent = AgentSession.create({
+      agentId: 'agent-claude',
+      layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+      name: 'Claude Agent',
+      projectId: 'project-1',
+      providerId: 'claude-code',
+      workspaceName: 'main'
+    })
+    agent.bindProviderSession(
+      createScope('agent-claude', 'main'),
+      ProviderSessionRef.create(
+        {
+          formatVersion: 1,
+          kind: 'claude-session',
+          value: '550e8400-e29b-41d4-a716-446655440000'
+        },
+        'claude-code'
+      )
+    )
+    await repository.save(agent)
+
+    const reopened = await new FileSystemAgentSessionRepository(
+      filePath,
+      createProviderRegistry()
+    ).findAgent('project-1', 'main', 'agent-claude')
+    const persisted = JSON.parse(await readFile(filePath, 'utf8'))
+
+    expect(reopened?.findProviderSessionRef('main')?.providerId).toBe('claude-code')
+    expect(persisted.workspaces[0].agents[0].conversations[0].sessionRef).toEqual({
+      formatVersion: 1,
+      kind: 'claude-session',
+      value: '550e8400-e29b-41d4-a716-446655440000'
+    })
+  })
+
+  it('does not save an Agent whose Provider is not registered', async () => {
+    const agent = AgentSession.create({
+      agentId: 'agent-unknown',
+      layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
+      name: 'Unknown Agent',
+      projectId: 'project-1',
+      providerId: 'unknown-provider',
+      workspaceName: 'main'
+    })
+
+    await expect(repository.save(agent)).rejects.toMatchObject({
+      code: 'AGENT_PROVIDER_NOT_FOUND'
+    })
+    await expect(readFile(filePath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('rejects a v4 session reference that does not match its owning Provider without rewriting it', async () => {
+    const contents = JSON.stringify({
+      version: 4,
+      workspaces: [
+        {
+          agents: [
+            {
+              agentId: 'agent-1',
+              cleancodeMcpEnabled: true,
+              conversations: [
+                {
+                  gitBranch: 'main',
+                  sessionRef: {
+                    formatVersion: 1,
+                    kind: 'claude-session',
+                    value: '550e8400-e29b-41d4-a716-446655440000'
+                  }
+                }
+              ],
+              layout: {
+                position: { x: 540, y: 120 },
+                size: { width: 440, height: 520 }
+              },
+              name: 'Agent 1',
+              projectId: 'project-1',
+              providerId: 'codex',
+              workspaceName: 'main'
+            }
+          ],
+          projectId: 'project-1',
+          workspaceName: 'main'
+        }
+      ]
+    })
+    await writeFile(filePath, contents)
+
+    await expect(repository.findWorkspace('project-1', 'main')).rejects.toMatchObject({
+      code: 'AGENT_SESSION_INVALID'
+    })
+    await expect(readFile(filePath, 'utf8')).resolves.toBe(contents)
+  })
+
+  it('raw-clears one corrupt v4 binding without decoding the Agent snapshot', async () => {
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        version: 4,
+        workspaces: [
+          {
+            agents: [
+              {
+                agentId: 'agent-1',
+                cleancodeMcpEnabled: true,
+                conversations: [
+                  {
+                    gitBranch: 'main',
+                    sessionRef: { formatVersion: 0, kind: '', value: '' }
+                  },
+                  {
+                    gitBranch: 'feature/keep',
+                    sessionRef: { formatVersion: 0, kind: 'also-corrupt', value: '' }
+                  }
+                ],
+                layout: {
+                  position: { x: 540, y: 120 },
+                  size: { width: 440, height: 520 }
+                },
+                name: 'Agent 1',
+                projectId: 'project-1',
+                providerId: 'codex',
+                workspaceName: 'main'
+              }
+            ],
+            projectId: 'project-1',
+            workspaceName: 'main'
+          }
+        ]
+      })
+    )
+
+    await expect(repository.delete(createScope('agent-1', 'main'))).resolves.toBeUndefined()
+
+    const persisted = JSON.parse(await readFile(filePath, 'utf8'))
+    expect(persisted.version).toBe(4)
+    expect(persisted.workspaces[0].agents[0].conversations).toEqual([
+      {
+        gitBranch: 'feature/keep',
+        sessionRef: { formatVersion: 0, kind: 'also-corrupt', value: '' }
+      }
+    ])
   })
 
   it('migrates version 3 Codex bindings into Provider-neutral session references', async () => {
@@ -205,6 +355,24 @@ describe('filesystem Agent session repository', () => {
     expect(agents?.[0]?.cleancodeMcpEnabled).toBe(true)
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 4 })
   })
+
+  it('does not rewrite a legacy store when its migrated Provider session reference is invalid', async () => {
+    const contents = JSON.stringify({
+      version: 1,
+      sessions: [
+        {
+          codexThreadId: 'not-a-codex-thread-id',
+          scope: { gitBranch: 'main', projectId: 'project-1', workspaceName: 'main' }
+        }
+      ]
+    })
+    await writeFile(filePath, contents)
+
+    await expect(repository.findWorkspace('project-1', 'main')).rejects.toMatchObject({
+      code: 'AGENT_SESSION_INVALID'
+    })
+    await expect(readFile(filePath, 'utf8')).resolves.toBe(contents)
+  })
 })
 
 function createScope(agentId: string, gitBranch: string) {
@@ -229,4 +397,22 @@ function createAgent(agentId: string, name: string): AgentSession {
 
 function thread(value: string) {
   return ProviderSessionRef.create({ formatVersion: 1, kind: 'codex-thread', value })
+}
+
+function createProviderRegistry(): AgentProviderRegistry {
+  const installedDetector = {
+    inspect: async () => ({ providerId: 'codex', status: 'installed' as const, version: 'test' })
+  }
+  return new AgentProviderRegistry([
+    new CodexAgentProviderContribution({ detector: installedDetector }),
+    new ClaudeCodeAgentProviderContribution({
+      detector: {
+        inspect: async () => ({
+          providerId: 'claude-code',
+          status: 'installed' as const,
+          version: 'test'
+        })
+      }
+    })
+  ])
 }

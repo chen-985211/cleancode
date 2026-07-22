@@ -104,6 +104,25 @@ describe('Agent shared terminal view', () => {
     })
     expect(surface.write).toHaveBeenCalledWith({ data: 'live output', sequence: 5 })
 
+    const exitedSession = createSession()
+    view.rerender(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness
+          session={{
+            ...exitedSession,
+            runtime: {
+              ...exitedSession.runtime,
+              launch: { ...exitedSession.runtime.launch, exitCode: 0, status: 'exited' },
+              revision: exitedSession.runtime.revision + 1
+            }
+          }}
+        />
+      </TerminalSurfaceRegistryProvider>
+    )
+
+    expect(attachTerminalView).toHaveBeenCalledTimes(1)
+    expect(surface.detach).not.toHaveBeenCalled()
+
     view.unmount()
     await waitFor(() => expect(detachTerminalView).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(surface.dispose).toHaveBeenCalledTimes(1))
@@ -159,26 +178,41 @@ function Harness({
 
 function createSession(): AgentSessionSnapshot {
   return {
-    activity: 'idle',
     agentId: 'agent-1',
     gitBranch: null,
-    processId: 42,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
     providerId: 'codex',
     providerSessionRef: null,
-    sessionId: 'agent-session-1',
-    status: 'running',
-    terminalSourceTheme: 'light',
-    terminalViewIdentity: {
-      blockId: 'agent-1',
-      generation: 3,
-      owner: { id: 'agent-1', kind: 'agent' },
-      projectId: 'project-1',
-      runId: 'agent-terminal:agent-session-1',
-      sessionId: 'terminal-session-1',
-      workspaceName: 'main'
+    runtime: {
+      activity: { status: 'idle' },
+      binding: { status: 'unbound' },
+      launch: {
+        exitCode: null,
+        failureKind: null,
+        generation: 1,
+        launchId: 'launch-1',
+        status: 'running'
+      },
+      mcp: { status: 'ready' },
+      revision: 1,
+      terminal: {
+        exitCode: null,
+        processId: 42,
+        status: 'running',
+        viewIdentity: {
+          blockId: 'agent-1',
+          generation: 3,
+          owner: { id: 'agent-1', kind: 'agent' },
+          projectId: 'project-1',
+          runId: 'agent-terminal:agent-session-1',
+          sessionId: 'terminal-session-1',
+          workspaceName: 'main'
+        }
+      }
     },
+    sessionId: 'agent-session-1',
+    terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
     workspaceName: 'main'
   }

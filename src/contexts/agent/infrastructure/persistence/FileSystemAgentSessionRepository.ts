@@ -4,6 +4,7 @@ import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 import type { AgentSessionRepository } from '../../application/ports/AgentSessionRepository'
+import type { AgentProviderRegistryPort } from '../../application/ports/AgentProviderRegistryPort'
 import {
   AgentSession,
   type AgentLayoutSnapshot,
@@ -79,7 +80,10 @@ interface LegacyAgentSessionStore {
 export class FileSystemAgentSessionRepository implements AgentSessionRepository {
   private saveQueue = Promise.resolve()
 
-  constructor(private readonly filePath: string) {}
+  constructor(
+    private readonly filePath: string,
+    private readonly providers: AgentProviderRegistryPort
+  ) {}
 
   async find(scope: AgentConversationScope): Promise<AgentSession | null> {
     const scopeSnapshot = scope.toSnapshot()
@@ -107,14 +111,12 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       (candidate) => candidate.projectId === projectId && candidate.workspaceName === workspaceName
     )
 
-    return workspace
-      ? workspace.agents.map((snapshot) => AgentSession.fromSnapshot(snapshot))
-      : null
+    return workspace ? workspace.agents.map((snapshot) => this.hydrate(snapshot)) : null
   }
 
   async save(session: AgentSession): Promise<void> {
+    const snapshot = this.validateSnapshot(session.toSnapshot())
     await this.update((workspaces) => {
-      const snapshot = session.toSnapshot()
       const existingWorkspace = findWorkspace(
         workspaces,
         snapshot.projectId,
@@ -131,14 +133,23 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
   }
 
   async delete(scope: AgentConversationScope): Promise<void> {
-    const session = await this.find(scope)
+    const target = scope.toSnapshot()
+    await this.update((workspaces) => {
+      const workspace = findWorkspace(workspaces, target.projectId, target.workspaceName)
+      if (!workspace) return workspaces
+      const agent = workspace.agents.find((candidate) => candidate.agentId === target.agentId)
+      if (!agent) return workspaces
 
-    if (!session) {
-      return
-    }
-
-    session.clearProviderSession(scope.toSnapshot().gitBranch)
-    await this.save(session)
+      return replaceWorkspace(workspaces, {
+        ...workspace,
+        agents: replaceAgentSnapshot(workspace.agents, {
+          ...agent,
+          conversations: agent.conversations.filter(
+            (conversation) => branchKey(conversation.gitBranch) !== branchKey(target.gitBranch)
+          )
+        })
+      })
+    })
   }
 
   async deleteAgent(projectId: string, workspaceName: string, agentId: string): Promise<void> {
@@ -191,24 +202,24 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
       }
 
       if (parsed.version === 3 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        const migratedStore = migrateVersion3Store(
-          parsed.workspaces as readonly Version3AgentWorkspaceSnapshot[]
+        const migratedStore = this.validateStore(
+          migrateVersion3Store(parsed.workspaces as readonly Version3AgentWorkspaceSnapshot[])
         )
         await this.writeStore(migratedStore)
         return migratedStore
       }
 
       if (parsed.version === 2 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        const migratedStore = migrateVersion2Store(
-          parsed.workspaces as readonly Version2AgentWorkspaceSnapshot[]
+        const migratedStore = this.validateStore(
+          migrateVersion2Store(parsed.workspaces as readonly Version2AgentWorkspaceSnapshot[])
         )
         await this.writeStore(migratedStore)
         return migratedStore
       }
 
       if (parsed.version === 1 && 'sessions' in parsed && Array.isArray(parsed.sessions)) {
-        const migratedStore = migrateLegacyStore(
-          parsed.sessions as readonly LegacyAgentSessionSnapshot[]
+        const migratedStore = this.validateStore(
+          migrateLegacyStore(parsed.sessions as readonly LegacyAgentSessionSnapshot[])
         )
         await this.writeStore(migratedStore)
         return migratedStore
@@ -226,6 +237,33 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
 
   private async writeStore(store: AgentSessionStore): Promise<void> {
     await writeFileAtomically(this.filePath, `${JSON.stringify(store, null, 2)}\n`)
+  }
+
+  private hydrate(snapshot: PersistedAgentSessionSnapshot): AgentSession {
+    return AgentSession.fromSnapshot(this.validateSnapshot(snapshot))
+  }
+
+  private validateStore(store: AgentSessionStore): AgentSessionStore {
+    return {
+      version: 4,
+      workspaces: store.workspaces.map((workspace) => ({
+        ...workspace,
+        agents: workspace.agents.map((agent) => this.validateSnapshot(agent))
+      }))
+    }
+  }
+
+  private validateSnapshot(snapshot: PersistedAgentSessionSnapshot): PersistedAgentSessionSnapshot {
+    this.providers.require(snapshot.providerId)
+    return {
+      ...snapshot,
+      conversations: snapshot.conversations.map((conversation) => ({
+        ...conversation,
+        sessionRef: this.providers
+          .parseSessionRef(snapshot.providerId, conversation.sessionRef)
+          .toSnapshot()
+      }))
+    }
   }
 }
 
@@ -356,6 +394,10 @@ function replaceAgentSnapshot(
   return agents.some((candidate) => candidate.agentId === snapshot.agentId)
     ? agents.map((candidate) => (candidate.agentId === snapshot.agentId ? snapshot : candidate))
     : [...agents, snapshot]
+}
+
+function branchKey(gitBranch: string | null): string {
+  return gitBranch?.trim() || '\0no-branch'
 }
 
 async function writeFileAtomically(filePath: string, contents: string): Promise<void> {

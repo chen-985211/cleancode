@@ -82,8 +82,10 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
   async stop(sessionId: string): Promise<void> {
     const terminal = this.terminals.get(sessionId)
     if (!terminal) return
-    this.terminals.delete(sessionId)
     await this.terminalSessions.terminate(terminal.sessionId)
+    if (this.terminals.get(sessionId)?.sessionId === terminal.sessionId) {
+      this.terminals.delete(sessionId)
+    }
   }
 
   async disposeAll(): Promise<void> {

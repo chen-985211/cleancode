@@ -289,7 +289,7 @@ Agent 控制台是画布内的本地 Agent CLI 交互工作面。它采用节点
 
 Agent 控制台必须：
 
-- 在紧凑头部显示稳定 Agent 名称和低噪声 Provider 身份/活动状态，不把当前工作区、版本号或连接成功状态做成重复副标题。
+- 在紧凑头部显示稳定 Agent 名称和低噪声 Provider 身份/必要活动状态，不把当前工作区、版本号或连接成功状态做成重复副标题；Provider 未声明 `activityTracking` 时不得从输出频率猜测活动。
 - 仅当当前 Provider 声明支持时，显示“CleanCode MCP”图标开关；说明它只授予当前 Agent 查看和修改画布终端、组合、执行配置与依赖工作流的能力。
 - 把重命名和删除等低频动作收纳在常驻可见的更多菜单中；支持双击名称就地重命名。
 - 承载真实 Provider CLI 的终端输入输出，并支持选择、移动和调整大小。
@@ -301,11 +301,15 @@ Agent 控制台必须：
 
 一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。新工作区首次进入时创建一个默认 Codex Agent；用户移除最后一个 Agent 后必须保留空状态。创建 Agent 时从 registry 返回的 Provider 中选择一次，创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
+Provider 列表、恢复动作、活动状态、MCP 开关和画布指令能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
+
 每个 Agent 必须拥有稳定身份、固定 Provider，以及独立的 Agent terminal、CLI launch、输入输出、审批、MCP 会话和分支对话绑定。移动、选择、重命名或调整大小不得重启 Agent terminal 或 Provider launch。
 
 Agent terminal 使用 Run 的长期 shell、权威终端模型、单调 sequence、snapshot 和 attach/detach 协议，但保持 Agent 自己的画布外观与动作。Provider CLI 自然退出或把 `Ctrl+C` 解释为退出时，只结束当前 Agent launch；Agent 节点、终端屏幕、对话绑定和底层可输入 shell 必须保留。会话结束状态提供“重新启动 Agent”和“新对话”：前者在同一 terminal 中恢复当前对话，后者清除当前分支绑定后启动新对话。两者都不得替换 Agent 身份或影响其他 Agent。
 
-CleanCode MCP 开关只控制 cleancode 内建画布 MCP。Provider 不支持该能力时不显示开关；支持时只注入本 launch 的 URL、Token、精确工具允许范围和画布语义，不修改用户全局配置或扩大 Shell、文件、Git、网络和其他 MCP 权限。切换能力可以替换当前 runtime session/launch并继续受支持的原对话，必须释放旧端点、临时配置和待审批请求。删除画布对象、解散组合和断开终端依赖始终经过 cleancode 独立审批，不能被 Provider 原生允许范围绕过。
+Provider-session binding 是独立于 terminal、launch 和 activity 的恢复持久化状态。正式会话引用保存失败时必须提示本次对话仍可继续、但不能承诺下次恢复；不得把仍在运行的 launch 或活动改写为失败，也不得回退到最近会话、其他 Agent 或其他分支的引用。
+
+CleanCode MCP 开关只控制 cleancode 内建画布 MCP。Provider 不支持该能力时不显示开关；支持时只注入本 launch 的 URL、Token、精确工具允许范围和画布语义，不修改用户全局配置或扩大 Shell、文件、Git、网络和其他 MCP 权限。当前 Codex 的 MCP 为 `required`：开启后，当前 registration 完成认证初始化握手前 launch 不得进入 running，失败时本次 launch 失败。Claude Code 和 OpenCode 为 `best_effort`：launch 可以在 MCP 初始化时运行，MCP 失败必须独立告警并保留基础 terminal/launch。切换能力可以替换当前 runtime session/launch 并继续受支持的原对话，必须释放旧端点、临时配置和待审批请求。删除画布对象、解散组合和断开终端依赖始终经过 cleancode 独立审批，不能被 Provider 原生允许范围绕过。
 
 删除终端或解散组合的审批必须明确展示动作、目标名称、目标 ID、影响范围和保留/执行动作，不得只展示机器 ID。断开依赖的审批必须显示上游名称/ID、下游名称/ID、精确连接 ID，并说明只断开这一条依赖，保留两端终端、启动命令、执行配置和组合。审批出现时，画布必须用临时“审批意图连线”连接发起请求的 Agent 与目标对象，并为目标提供区别于普通选择态的审批高亮；折叠组合中的目标终端由组合节点作为可见代理并标明对应待处理内容。断开依赖时，展开端点高亮真实依赖边，折叠端点使用不可交互的临时代理边；两端位于同一折叠组合时不得画自环，只标明组合“包含待断开依赖”。这些投影不得持久化、参与选择、删除或重连。用户可以通过“在画布中查看”同时聚焦 Agent 与所有可见目标，但不得因此改写现有选择。批准后卡片保持执行中状态直到收到实际结果；拒绝、成功或会话取消后移除，执行失败时保留明确错误，目标已不存在时禁用破坏性动作并提示 AI 重新检查画布。多个请求按到达顺序展示，并提示剩余请求数量。
 
@@ -315,7 +319,7 @@ CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”
 
 Agent 控制台不得展示终端端口，不得加入终端组合，也不得进入普通终端积木的创建、删除、组合或批量运行流程。
 
-正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，不得常驻展示“已安装”“已连接”、版本号或同义状态卡。短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的临时失败。
+正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、版本号或同义状态卡；创建 Agent 的 Provider 选择器可以展示 detector 返回的已安装版本。短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，Codex 与 OpenCode 不得因虚构的版本门槛显示升级要求。
 
 每个 Provider 的 CLI 检查结果属于应用级共享的易失能力快照，不得由每个 Agent 重复维护。Agent 自身运行状态优先于该快照：运行中的 launch 必须保持静默，恢复失败、启动失败和会话结束不得被检查提示遮挡；旧检查结果不得覆盖较新的重试。
 

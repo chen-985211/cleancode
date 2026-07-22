@@ -3,6 +3,7 @@ import type { AgentSessionSnapshot } from '../dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
+import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import type { WorkspaceAgentRuntimePort } from '../ports/WorkspaceAgentRuntimePort'
 
 export interface UpdateWorkspaceAgentMcpCapabilityResult {
@@ -13,7 +14,8 @@ export interface UpdateWorkspaceAgentMcpCapabilityResult {
 export class UpdateWorkspaceAgentMcpCapabilityUseCase {
   constructor(
     private readonly repository: AgentSessionRepository,
-    private readonly runtime: WorkspaceAgentRuntimePort
+    private readonly runtime: WorkspaceAgentRuntimePort,
+    private readonly providers: AgentProviderRegistryPort
   ) {}
 
   async execute(command: {
@@ -29,6 +31,18 @@ export class UpdateWorkspaceAgentMcpCapabilityUseCase {
     )
     if (!agent) {
       throw createExpectedAppError('AGENT_SESSION_NOT_FOUND', 'Agent was not found.')
+    }
+
+    const provider = this.providers.require(agent.providerId)
+    if (
+      command.cleancodeMcpEnabled &&
+      provider.descriptor.capabilities.cleancodeMcp === 'unsupported'
+    ) {
+      throw createExpectedAppError(
+        'AGENT_TOOL_UNAVAILABLE',
+        'CleanCode MCP is unavailable for this Agent Provider.',
+        { providerId: agent.providerId }
+      )
     }
 
     agent.setCleancodeMcpEnabled(command.cleancodeMcpEnabled)

@@ -3,15 +3,35 @@ import { ListWorkspaceAgentsUseCase } from '../../../../src/contexts/agent/appli
 import { RemoveWorkspaceAgentUseCase } from '../../../../src/contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
 import { RenameWorkspaceAgentUseCase } from '../../../../src/contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
+import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
+import type { AgentProviderContribution } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type { WorkspaceAgentRuntimePort } from '../../../../src/contexts/agent/application/ports/WorkspaceAgentRuntimePort'
 import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
 
 describe('manage workspace Agents', () => {
+  it('does not persist an Agent for an unregistered Provider', async () => {
+    const repository = new MemoryAgentRepository()
+    const save = vi.spyOn(repository, 'save')
+    const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
+
+    await expect(
+      useCase.execute({
+        agentId: 'agent-unknown',
+        layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
+        projectId: 'project-1',
+        providerId: 'unknown-provider',
+        workspaceName: 'main'
+      })
+    ).rejects.toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_NOT_FOUND' }))
+
+    expect(save).not.toHaveBeenCalled()
+  })
+
   it('creates one default Agent only when a workspace is first initialized', async () => {
     const repository = new MemoryAgentRepository()
-    const useCase = new ListWorkspaceAgentsUseCase(repository)
+    const useCase = new ListWorkspaceAgentsUseCase(repository, createProviderRegistry(), 'codex')
 
     const first = await useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
     await repository.deleteAgent('project-1', 'main', first[0]!.agentId)
@@ -26,11 +46,24 @@ describe('manage workspace Agents', () => {
     expect(reopened).toEqual([])
   })
 
+  it('uses the configured registered Provider for a workspace default Agent', async () => {
+    const repository = new MemoryAgentRepository()
+    const useCase = new ListWorkspaceAgentsUseCase(
+      repository,
+      createProviderRegistry(),
+      'claude-code'
+    )
+
+    await expect(
+      useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
+    ).resolves.toEqual([expect.objectContaining({ providerId: 'claude-code' })])
+  })
+
   it('creates, renames, lays out, and removes one Agent without affecting its sibling', async () => {
     const repository = new MemoryAgentRepository()
     const runtime = new RecordingWorkspaceAgentRuntime()
-    const list = new ListWorkspaceAgentsUseCase(repository)
-    const create = new CreateWorkspaceAgentUseCase(repository)
+    const list = new ListWorkspaceAgentsUseCase(repository, createProviderRegistry(), 'codex')
+    const create = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
     const rename = new RenameWorkspaceAgentUseCase(repository)
     const updateLayout = new UpdateWorkspaceAgentLayoutUseCase(repository)
     const remove = new RemoveWorkspaceAgentUseCase(repository, runtime)
@@ -169,4 +202,38 @@ class MemoryAgentRepository implements AgentSessionRepository {
 
 function workspaceKey(projectId: string, workspaceName: string): string {
   return JSON.stringify([projectId, workspaceName])
+}
+
+function createProviderRegistry(): AgentProviderRegistry {
+  return new AgentProviderRegistry([
+    createProviderContribution('codex'),
+    createProviderContribution('claude-code')
+  ])
+}
+
+function createProviderContribution(id: string): AgentProviderContribution {
+  return {
+    descriptor: {
+      capabilities: {
+        activityTracking: false,
+        cleancodeMcp: 'unsupported',
+        launchInstructions: false,
+        resume: false,
+        sessionIdentityCapture: false,
+        sessionRefCodec: false
+      },
+      displayName: id,
+      id
+    },
+    detector: {
+      inspect: async () => ({ providerId: id, status: 'installed', version: 'test' })
+    },
+    launcher: {
+      createLaunchPlan: async () => ({
+        args: [],
+        env: {},
+        executable: id
+      })
+    }
+  }
 }

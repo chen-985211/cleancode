@@ -53,13 +53,18 @@ export class CodexThreadIdentityReporter {
       })
     })
 
-    await new Promise<void>((resolveListening, reject) => {
-      server.once('error', reject)
-      server.listen(0, '127.0.0.1', () => {
-        server.off('error', reject)
-        resolveListening()
+    try {
+      await new Promise<void>((resolveListening, reject) => {
+        server.once('error', reject)
+        server.listen(0, '127.0.0.1', () => {
+          server.off('error', reject)
+          resolveListening()
+        })
       })
-    })
+    } catch (error) {
+      closeAfterFailedStart(server)
+      throw error
+    }
 
     const address = server.address()
 
@@ -77,6 +82,14 @@ export class CodexThreadIdentityReporter {
 
   async close(): Promise<void> {
     await new Promise<void>((resolveClosed) => this.server.close(() => resolveClosed()))
+  }
+}
+
+function closeAfterFailedStart(server: Server): void {
+  try {
+    server.close()
+  } catch {
+    // Preserve the startup failure; no reporter handle exists for a later cleanup attempt.
   }
 }
 

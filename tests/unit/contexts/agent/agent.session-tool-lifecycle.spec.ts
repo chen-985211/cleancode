@@ -27,7 +27,8 @@ describe('Agent session tool lifecycle', () => {
       mcpServer,
       { cancel: vi.fn(), execute },
       createSessionRepository(),
-      new RecordingAgentProviderRegistry()
+      new RecordingAgentProviderRegistry(),
+      'codex'
     )
     const session = await service.attach(attachCommand())
     const admittedWrite = service.executeMcpTool({
@@ -43,9 +44,7 @@ describe('Agent session tool lifecycle', () => {
       projectId: 'project-1',
       workspaceName: 'main'
     })
-    await vi.waitFor(() =>
-      expect(mcpServer.unregisterSession).toHaveBeenCalledWith(session.sessionId)
-    )
+    await vi.waitFor(() => expect(mcpServer.disposedSessionIds).toContain(session.sessionId))
 
     expect(processPort.stop).not.toHaveBeenCalled()
     await expect(
@@ -76,7 +75,8 @@ describe('Agent session tool lifecycle', () => {
       mcpServer,
       { cancel: vi.fn(), execute },
       createSessionRepository(),
-      new RecordingAgentProviderRegistry()
+      new RecordingAgentProviderRegistry(),
+      'codex'
     )
     const session = await service.attach(attachCommand())
     processPort.stop.mockRejectedValueOnce(new Error('PTY stop failed'))
@@ -90,7 +90,7 @@ describe('Agent session tool lifecycle', () => {
       })
     ).rejects.toThrow('PTY stop failed')
 
-    expect(mcpServer.unregisterSession).not.toHaveBeenCalled()
+    expect(mcpServer.disposedSessionIds).toEqual([])
     await expect(
       service.executeMcpTool({
         input: {},
@@ -115,7 +115,8 @@ describe('Agent session tool lifecycle', () => {
         execute: vi.fn(async (command) => awaitingApproval(command.toolCallId))
       },
       createSessionRepository(),
-      new RecordingAgentProviderRegistry()
+      new RecordingAgentProviderRegistry(),
+      'codex'
     )
     const session = await service.attach(attachCommand())
     const toolResult = service.executeMcpTool({
@@ -143,8 +144,8 @@ describe('Agent session tool lifecycle', () => {
 function attachCommand() {
   return {
     agentId: 'agent-1',
-    onExit: vi.fn(),
     onGraphUpdated: vi.fn(),
+    onRuntimeChanged: vi.fn(),
     onToolApprovalRequested: vi.fn(),
     projectDirectory: '/repo/app',
     projectId: 'project-1',
@@ -162,16 +163,17 @@ function createProcessPort(): AgentTerminalRuntimePort & {
 }
 
 function createMcpServer(): AgentMcpServerPort & {
-  readonly unregisterSession: ReturnType<typeof vi.fn>
+  readonly disposedSessionIds: string[]
 } {
-  const unregisterSession = vi.fn<(sessionId: string) => void>()
+  const disposedSessionIds: string[] = []
   return {
+    disposedSessionIds,
     dispose: vi.fn(),
     registerSession: vi.fn(async (session) => ({
       bearerToken: `token-${session.sessionId}`,
+      dispose: vi.fn(() => disposedSessionIds.push(session.sessionId)),
       url: `http://127.0.0.1/mcp/${session.sessionId}`
-    })),
-    unregisterSession
+    }))
   }
 }
 

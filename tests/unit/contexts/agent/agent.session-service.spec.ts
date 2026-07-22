@@ -1,5 +1,6 @@
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import type {
+  AgentMcpRegistration,
   AgentMcpServerPort,
   RegisteredAgentMcpSession
 } from '../../../../src/contexts/agent/application/ports/AgentMcpServerPort'
@@ -23,8 +24,8 @@ describe('agent session service', () => {
     const firstSession = await service.attach({
       agentId: 'agent-1',
       columns: 100,
-      onExit: () => undefined,
       onGraphUpdated: () => undefined,
+      onRuntimeChanged: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 32,
@@ -35,8 +36,8 @@ describe('agent session service', () => {
     const reattachedSession = await service.attach({
       agentId: 'agent-1',
       columns: 120,
-      onExit: () => undefined,
       onGraphUpdated: () => undefined,
+      onRuntimeChanged: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 40,
@@ -47,8 +48,8 @@ describe('agent session service', () => {
     const branchSession = await service.attach({
       agentId: 'agent-2',
       columns: 80,
-      onExit: () => undefined,
       onGraphUpdated: () => undefined,
+      onRuntimeChanged: () => undefined,
       onToolApprovalRequested: () => undefined,
       projectDirectory: '/repo/app',
       rows: 24,
@@ -100,39 +101,65 @@ describe('agent session service', () => {
     })
   })
 
+  it('does not launch a Provider whose installed CLI is below its compatibility floor', async () => {
+    const processPort = new RecordingAgentTerminalRuntime()
+    const providers = new RecordingAgentProviderRegistry()
+    vi.spyOn(providers.contribution.detector, 'inspect').mockResolvedValue({
+      installCommand: 'install codex',
+      minimumVersion: '0.143.0',
+      providerId: 'codex',
+      status: 'upgrade_required',
+      version: 'codex-cli 0.142.9'
+    })
+    const service = createSessionService({ processPort, providers })
+
+    const session = await attachMainSession(service)
+
+    expect(processPort.opens).toHaveLength(1)
+    expect(processPort.launches).toHaveLength(0)
+    expect(session.runtime.terminal.status).toBe('running')
+    expect(session.runtime.launch).toMatchObject({ failureKind: 'start', status: 'failed' })
+  })
+
   it('accepts structured activity only from the current Provider launch', async () => {
     const processPort = new RecordingAgentTerminalRuntime()
     const providers = new RecordingAgentProviderRegistry()
     const service = createSessionService({ processPort, providers })
-    const onActivityChanged = vi.fn()
-    const session = await attachMainSession(service, { onActivityChanged })
+    const onRuntimeChanged = vi.fn()
+    const session = await attachMainSession(service, { onRuntimeChanged })
 
     providers.launchCommands[0]?.onActivityChanged?.('working')
 
-    expect(onActivityChanged).toHaveBeenCalledWith({
-      activity: 'working',
+    expect(onRuntimeChanged).toHaveBeenCalledWith({
       agentId: 'agent-1',
+      runtime: expect.objectContaining({ activity: { status: 'working' } }),
       sessionId: session.sessionId
     })
-    expect((await attachMainSession(service, { onActivityChanged })).activity).toBe('working')
+    expect((await attachMainSession(service, { onRuntimeChanged })).runtime.activity.status).toBe(
+      'working'
+    )
 
     processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
 
-    expect(onActivityChanged).toHaveBeenLastCalledWith({
-      activity: 'unavailable',
+    expect(onRuntimeChanged).toHaveBeenLastCalledWith({
       agentId: 'agent-1',
+      runtime: expect.objectContaining({ activity: { status: 'unavailable' } }),
       sessionId: session.sessionId
     })
 
-    await attachMainSession(service, { onActivityChanged, restartMode: 'retry' })
+    await attachMainSession(service, { onRuntimeChanged, restartMode: 'retry' })
     providers.launchCommands[0]?.onActivityChanged?.('working')
-    expect(onActivityChanged).toHaveBeenLastCalledWith(
-      expect.objectContaining({ activity: 'unavailable' })
+    expect(onRuntimeChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({ activity: { status: 'unavailable' } })
+      })
     )
 
     providers.launchCommands[1]?.onActivityChanged?.('idle')
-    expect(onActivityChanged).toHaveBeenLastCalledWith(
-      expect.objectContaining({ activity: 'idle' })
+    expect(onRuntimeChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        runtime: expect.objectContaining({ activity: { status: 'idle' } })
+      })
     )
   })
 
@@ -171,8 +198,8 @@ describe('agent session service', () => {
     const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const callbacks = {
-      onExit: () => undefined,
       onGraphUpdated: () => undefined,
+      onRuntimeChanged: () => undefined,
       onToolApprovalRequested: () => undefined
     }
     const mainBranchCommand = {
@@ -252,6 +279,72 @@ describe('agent session service', () => {
     expect(processPort.resizes).toEqual([{ columns: 132, rows: 36, sessionId: session.sessionId }])
   })
 
+  it('does not revive a terminal that exits before open returns its handle', async () => {
+    const processPort = new SynchronouslyExitingAgentTerminalRuntime()
+    const service = createSessionService({ processPort })
+
+    const session = await attachMainSession(service)
+
+    expect(session.runtime.terminal).toMatchObject({
+      exitCode: 9,
+      processId: null,
+      status: 'exited',
+      viewIdentity: null
+    })
+    expect(session.runtime.launch.status).toBe('not_started')
+    expect(processPort.launches).toEqual([])
+  })
+
+  it('isolates runtime observers from terminal and Provider lifecycle transitions', async () => {
+    const processPort = new RecordingAgentTerminalRuntime()
+    const service = createSessionService({ processPort })
+
+    const session = await attachMainSession(service, {
+      onRuntimeChanged: () => {
+        throw new Error('renderer observer failed')
+      }
+    })
+
+    expect(session.runtime).toMatchObject({
+      launch: { status: 'running' },
+      terminal: { processId: 1, status: 'running' }
+    })
+    expect(processPort.launches).toHaveLength(1)
+    expect(() =>
+      processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
+    ).not.toThrow()
+    expect((await attachMainSession(service)).runtime).toMatchObject({
+      launch: { exitCode: 0, status: 'exited' },
+      terminal: { processId: 1, status: 'running' }
+    })
+  })
+
+  it('projects and strictly matches the launch identity returned by the Run runtime', async () => {
+    const processPort = new NonSequentialLaunchIdentityRuntime()
+    const service = createSessionService({ processPort })
+
+    const session = await attachMainSession(service)
+
+    expect(session.runtime.launch).toMatchObject({
+      generation: 41,
+      launchId: 'run-launch-41',
+      status: 'running'
+    })
+
+    processPort.launches[0]?.onExit({
+      exitCode: 9,
+      generation: 40,
+      launchId: 'run-launch-41'
+    })
+
+    expect((await attachMainSession(service)).runtime.launch).toMatchObject({
+      exitCode: null,
+      generation: 41,
+      launchId: 'run-launch-41',
+      status: 'running'
+    })
+  })
+
   it('keeps the Agent terminal after Provider exit and relaunches in the same shell', async () => {
     const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
@@ -260,7 +353,18 @@ describe('agent session service', () => {
     processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
     const shellAttachment = await attachMainSession(service)
 
-    expect(shellAttachment).toMatchObject({ sessionId: first.sessionId, status: 'exited' })
+    expect(shellAttachment).toMatchObject({
+      runtime: {
+        launch: {
+          exitCode: 0,
+          generation: 1,
+          launchId: 'launch-1',
+          status: 'exited'
+        },
+        terminal: { status: 'running' }
+      },
+      sessionId: first.sessionId
+    })
     expect(processPort.opens).toHaveLength(1)
     service.write({ input: 'pwd\r', sessionId: first.sessionId })
     expect(processPort.writes).toContainEqual({ input: 'pwd\r', sessionId: first.sessionId })
@@ -268,6 +372,10 @@ describe('agent session service', () => {
     const relaunched = await attachMainSession(service, { restartMode: 'retry' })
 
     expect(relaunched.sessionId).toBe(first.sessionId)
+    expect(relaunched.runtime).toMatchObject({
+      launch: { generation: 2, launchId: 'launch-2', status: 'running' },
+      terminal: { status: 'running' }
+    })
     expect(processPort.opens).toHaveLength(1)
     expect(processPort.launches).toHaveLength(2)
   })
@@ -377,23 +485,34 @@ type CancelAgentTool = (
 class RecordingMcpServerPort implements AgentMcpServerPort {
   readonly sessions = new Map<string, RegisteredAgentMcpSession>()
 
-  async registerSession(session: RegisteredAgentMcpSession): Promise<{
-    readonly bearerToken: string
-    readonly url: string
-  }> {
+  async registerSession(session: RegisteredAgentMcpSession): Promise<AgentMcpRegistration> {
     this.sessions.set(session.sessionId, session)
     return {
       bearerToken: `token-${session.sessionId}`,
+      dispose: () => this.sessions.delete(session.sessionId),
       url: `http://127.0.0.1:3000/mcp/${session.sessionId}`
     }
   }
 
-  unregisterSession(sessionId: string): void {
-    this.sessions.delete(sessionId)
-  }
-
   dispose(): void {
     this.sessions.clear()
+  }
+}
+
+class SynchronouslyExitingAgentTerminalRuntime extends RecordingAgentTerminalRuntime {
+  override async open(command: Parameters<RecordingAgentTerminalRuntime['open']>[0]) {
+    const handle = await super.open(command)
+    command.onTerminalExit(9)
+    return handle
+  }
+}
+
+class NonSequentialLaunchIdentityRuntime extends RecordingAgentTerminalRuntime {
+  override launch(command: Parameters<RecordingAgentTerminalRuntime['launch']>[0]) {
+    this.launches.push(command)
+    const identity = { generation: 41, launchId: 'run-launch-41' }
+    command.onStarted?.(identity)
+    return identity
   }
 }
 
@@ -421,7 +540,8 @@ function createSessionService(
       execute: input.executeAgentTool ?? (async () => completedToolResult('tool-call-1'))
     },
     input.repository ?? new RecordingAgentSessionRepository(),
-    input.providers ?? new RecordingAgentProviderRegistry()
+    input.providers ?? new RecordingAgentProviderRegistry(),
+    'codex'
   )
 }
 
@@ -482,8 +602,8 @@ async function attachMainSession(
   return service.attach({
     agentId: 'agent-1',
     columns: 80,
-    onExit: () => undefined,
     onGraphUpdated: () => undefined,
+    onRuntimeChanged: () => undefined,
     onToolApprovalRequested: () => undefined,
     projectDirectory: '/repo/app',
     projectId: 'project-1',

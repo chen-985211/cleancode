@@ -5,6 +5,10 @@ import type {
   CreateAgentLaunchPlanCommand
 } from '../../src/contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentProviderRegistryPort } from '../../src/contexts/agent/application/ports/AgentProviderRegistryPort'
+import {
+  ProviderSessionRef,
+  type ProviderSessionRefSnapshot
+} from '../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 import type {
   AgentTerminalRuntimePort,
   OpenAgentTerminalCommand
@@ -21,10 +25,12 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
   ) {
     this.descriptor = {
       capabilities: {
-        cleancodeMcp: true,
+        activityTracking: false,
+        cleancodeMcp: 'best_effort',
+        launchInstructions: true,
         resume: true,
-        structuredLifecycle: true,
-        systemInstructions: true,
+        sessionIdentityCapture: true,
+        sessionRefCodec: true,
         ...capabilities
       },
       displayName: providerId,
@@ -43,14 +49,20 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
           return {
             args: [],
             env,
-            executable: 'fake-agent',
-            temporaryArtifacts: []
+            executable: 'fake-agent'
           }
         }
       },
       resume: { createResumeArgs: () => [] },
+      sessionRefCodec: {
+        parse: (sessionRef) => ProviderSessionRef.create(sessionRef).toSnapshot()
+      },
       telemetry: {
-        prepare: async () => ({ args: [], env: {}, temporaryArtifacts: [] })
+        prepare: async () => ({ args: [], env: {} }),
+        signals: {
+          activity: this.descriptor.capabilities.activityTracking,
+          sessionIdentity: this.descriptor.capabilities.sessionIdentityCapture
+        }
       }
     }
   }
@@ -61,6 +73,11 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
 
   listDescriptors(): readonly AgentProviderDescriptor[] {
     return [this.descriptor]
+  }
+
+  parseSessionRef(providerId: string, sessionRef: ProviderSessionRefSnapshot): ProviderSessionRef {
+    const contribution = this.require(providerId)
+    return ProviderSessionRef.create(contribution.sessionRefCodec!.parse(sessionRef), providerId)
   }
 
   require(providerId: string): AgentProviderContribution {

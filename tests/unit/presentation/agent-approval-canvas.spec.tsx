@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AgentToolApprovalRequest } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import {
+  createAgentSessionSnapshot,
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
@@ -110,19 +111,19 @@ describe('Agent destructive approval canvas', () => {
       configurable: true,
       value: createRuntimeApi({
         approveAgentTool,
-        attachAgentSession: vi.fn(async (command) => ({
-          agentId: command.agentId,
-          codexThreadId: null,
-          gitBranch: command.gitBranch ?? null,
-          processId: 1,
-          projectDirectory: '/repo/app',
-          projectId: command.projectId,
-          sessionId: 'agent-session-1',
-          status: 'running',
-          terminalSourceTheme: command.terminalSourceTheme,
-          workspaceDirectory: '/repo/app',
-          workspaceName: 'main'
-        })),
+        attachAgentSession: vi.fn(async (command) =>
+          createAgentSessionSnapshot({
+            agentId: command.agentId,
+            gitBranch: command.gitBranch ?? null,
+            projectDirectory: '/repo/app',
+            projectId: command.projectId,
+            providerId: 'codex',
+            sessionId: 'agent-session-1',
+            terminalSourceTheme: command.terminalSourceTheme,
+            workspaceDirectory: '/repo/app',
+            workspaceName: 'main'
+          })
+        ),
         inspectCodexCli: vi.fn(async () => ({
           status: 'installed',
           version: 'codex-cli 0.143.0'

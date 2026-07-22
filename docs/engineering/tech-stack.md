@@ -60,9 +60,13 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 ## Agent 集成
 
-当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；resume、结构化活动、CleanCode MCP 与系统指令是 Provider 声明并实现的可选能力。Windows 上的 Provider CLI 检测通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；不得把 executable 或 argv 拼接成可注入的命令文本。
+当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。Windows 上的 Provider CLI 检测通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；不得把 executable 或 argv 拼接成可注入的命令文本。
 
-每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列。Codex 通过正式 resume 和进程级 `notify` 报告 thread UUID；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 当前只声明基础终端能力。启用且 Provider 支持 CleanCode MCP 时，cleancode 才注册该 launch 独立的 MCP URL 与 Bearer Token，并通过会话级参数或临时配置注入；不得修改用户全局配置，也不得把预批准扩大到 Shell、文件、Git、网络或其他 MCP。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
+共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，Codex 与 OpenCode 未声明最低版本门槛，不得为它们虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
+
+每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume` 和进程级 `notify` 报告 thread UUID，不声明精确活动跟踪，CleanCode MCP 为 `required`；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动，MCP 为 `best_effort`；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入 `best_effort` 远程 MCP 与临时 instructions。三者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
+
+`required` MCP 必须完成当前 registration 的认证初始化握手后 launch 才能进入 running；`best_effort` Provider 可以在 MCP 初始化或失败时继续使用终端，但必须独立投影能力状态。Provider session ref 保存失败只把 binding 标记为 `persistence_failed`，不得把仍在运行的 launch 或活动误报为失败。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
 ## 存储层
 

@@ -61,9 +61,9 @@ describe('agent IPC contract', () => {
     const sender = createSender()
     const attachAgentSession = vi.fn<AgentIpcHandlersInput['attachAgentSession']>(
       async (command) => {
-        command.onActivityChanged({
-          activity: 'working',
+        command.onRuntimeChanged({
           agentId: command.agentId,
+          runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 2),
           sessionId: 'agent-session-1'
         })
         command.onToolApprovalRequested({
@@ -92,25 +92,14 @@ describe('agent IPC contract', () => {
         })
 
         return {
-          activity: 'working',
           agentId: command.agentId,
           gitBranch: command.gitBranch ?? null,
-          processId: 42,
           projectDirectory: command.projectDirectory,
           projectId: command.projectId,
           providerId: 'codex',
           providerSessionRef: null,
+          runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 2),
           sessionId: 'agent-session-1',
-          status: 'running',
-          terminalViewIdentity: {
-            blockId: command.agentId,
-            generation: 1,
-            owner: { id: command.agentId, kind: 'agent' },
-            projectId: command.projectId,
-            runId: 'agent-terminal:agent-session-1',
-            sessionId: 'run-session-1',
-            workspaceName: command.workspaceName
-          },
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: command.workspaceDirectory,
           workspaceName: command.workspaceName
@@ -139,25 +128,14 @@ describe('agent IPC contract', () => {
     ).resolves.toEqual({
       ok: true,
       value: {
-        activity: 'working',
         agentId: 'agent-2',
         gitBranch: 'feature/login',
-        processId: 42,
         projectDirectory: '/repo/app',
         projectId: 'project-1',
         providerId: 'codex',
         providerSessionRef: null,
+        runtime: createRuntime('agent-2', 'project-1', 'feature', 2),
         sessionId: 'agent-session-1',
-        status: 'running',
-        terminalViewIdentity: {
-          blockId: 'agent-2',
-          generation: 1,
-          owner: { id: 'agent-2', kind: 'agent' },
-          projectId: 'project-1',
-          runId: 'agent-terminal:agent-session-1',
-          sessionId: 'run-session-1',
-          workspaceName: 'feature'
-        },
         terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
         workspaceName: 'feature'
@@ -176,9 +154,9 @@ describe('agent IPC contract', () => {
         workspaceName: 'feature'
       })
     )
-    expect(sender.send).toHaveBeenCalledWith('cleancode:agent-activity-changed', {
-      activity: 'working',
+    expect(sender.send).toHaveBeenCalledWith('cleancode:agent-runtime-changed', {
       agentId: 'agent-2',
+      runtime: createRuntime('agent-2', 'project-1', 'feature', 2),
       sessionId: 'agent-session-1'
     })
     expect(sender.send).toHaveBeenCalledWith(
@@ -405,13 +383,12 @@ function createAgentIpcHandlersInput(input: {
       (async (command) => ({
         agentId: command.agentId,
         gitBranch: command.gitBranch ?? null,
-        processId: 1,
         projectDirectory: command.projectDirectory,
         projectId: command.projectId,
         providerId: 'codex',
         providerSessionRef: null,
+        runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 1),
         sessionId: 'agent-session-1',
-        status: 'running' as const,
         terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
         workspaceName: command.workspaceName
@@ -429,10 +406,12 @@ function createAgentIpcHandlersInput(input: {
       (() => [
         {
           capabilities: {
-            cleancodeMcp: true,
+            activityTracking: false,
+            cleancodeMcp: 'required',
+            launchInstructions: true,
             resume: true,
-            structuredLifecycle: true,
-            systemInstructions: true
+            sessionIdentityCapture: true,
+            sessionRefCodec: true
           },
           displayName: 'Codex',
           id: 'codex'
@@ -463,6 +442,41 @@ function createWorkspaceAgentSnapshot(agentId: string) {
     projectId: 'project-1',
     providerId: 'codex',
     workspaceName: 'main'
+  }
+}
+
+function createRuntime(
+  agentId: string,
+  projectId: string,
+  workspaceName: string,
+  revision: number
+) {
+  return {
+    activity: { status: 'working' as const },
+    binding: { status: 'unbound' as const },
+    launch: {
+      exitCode: null,
+      failureKind: null,
+      generation: 1,
+      launchId: 'launch-1',
+      status: 'running' as const
+    },
+    mcp: { status: 'ready' as const },
+    revision,
+    terminal: {
+      exitCode: null,
+      processId: 42,
+      status: 'running' as const,
+      viewIdentity: {
+        blockId: agentId,
+        generation: 1,
+        owner: { id: agentId, kind: 'agent' as const },
+        projectId,
+        runId: 'agent-terminal:agent-session-1',
+        sessionId: 'run-session-1',
+        workspaceName
+      }
+    }
   }
 }
 

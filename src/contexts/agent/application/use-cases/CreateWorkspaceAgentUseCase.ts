@@ -1,6 +1,7 @@
 import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
+import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import { AgentSession, type AgentLayoutSnapshot } from '../../domain/aggregates/AgentSession'
 
 export interface CreateWorkspaceAgentCommand {
@@ -12,13 +13,18 @@ export interface CreateWorkspaceAgentCommand {
 }
 
 export class CreateWorkspaceAgentUseCase {
-  constructor(private readonly repository: AgentSessionRepository) {}
+  constructor(
+    private readonly repository: AgentSessionRepository,
+    private readonly providers: AgentProviderRegistryPort
+  ) {}
 
   async execute(command: CreateWorkspaceAgentCommand): Promise<WorkspaceAgentSnapshot> {
+    const provider = this.providers.require(command.providerId)
     const agents =
       (await this.repository.findWorkspace(command.projectId, command.workspaceName)) ?? []
     const agent = AgentSession.create({
       agentId: command.agentId ?? createAgentId(),
+      cleancodeMcpEnabled: provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
       layout: command.layout,
       name: nextAgentName(agents.map((candidate) => candidate.name)),
       projectId: command.projectId,

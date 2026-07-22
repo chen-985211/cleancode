@@ -8,9 +8,12 @@ export interface ProviderSessionRefSnapshot {
 }
 
 export class ProviderSessionRef {
-  private constructor(private readonly snapshot: ProviderSessionRefSnapshot) {}
+  private constructor(
+    private readonly snapshot: ProviderSessionRefSnapshot,
+    private readonly owningProviderId: string | null
+  ) {}
 
-  static create(input: ProviderSessionRefSnapshot): ProviderSessionRef {
+  static create(input: ProviderSessionRefSnapshot, providerId?: string): ProviderSessionRef {
     if (!Number.isSafeInteger(input.formatVersion) || input.formatVersion <= 0) {
       throw invalidProviderSessionRef('formatVersion')
     }
@@ -19,12 +22,15 @@ export class ProviderSessionRef {
     const value = requireSessionRefText(input.value, 'value', 8_192)
     const metadata = copyMetadata(input.metadata)
 
-    return new ProviderSessionRef({
-      formatVersion: input.formatVersion,
-      kind,
-      ...(metadata ? { metadata } : {}),
-      value
-    })
+    return new ProviderSessionRef(
+      {
+        formatVersion: input.formatVersion,
+        kind,
+        ...(metadata ? { metadata } : {}),
+        value
+      },
+      providerId === undefined ? null : requireSessionRefText(providerId, 'providerId', 100)
+    )
   }
 
   get formatVersion(): number {
@@ -35,8 +41,29 @@ export class ProviderSessionRef {
     return this.snapshot.kind
   }
 
+  get providerId(): string | null {
+    return this.owningProviderId
+  }
+
   get value(): string {
     return this.snapshot.value
+  }
+
+  forProvider(providerId: string): ProviderSessionRef {
+    const normalizedProviderId = requireSessionRefText(providerId, 'providerId', 100)
+    if (this.owningProviderId && this.owningProviderId !== normalizedProviderId) {
+      throw createExpectedAppError(
+        'AGENT_PROVIDER_MISMATCH',
+        'Agent Provider session reference belongs to a different Provider.',
+        {
+          actualProviderId: this.owningProviderId,
+          expectedProviderId: normalizedProviderId
+        }
+      )
+    }
+    return this.owningProviderId
+      ? this
+      : new ProviderSessionRef(this.toSnapshot(), normalizedProviderId)
   }
 
   toSnapshot(): ProviderSessionRefSnapshot {

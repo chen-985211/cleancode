@@ -5,6 +5,10 @@ import type {
   AgentProviderDescriptor
 } from '../ports/AgentProviderContribution'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
+import {
+  ProviderSessionRef,
+  type ProviderSessionRefSnapshot
+} from '../../domain/value-objects/ProviderSessionRef'
 
 export class AgentProviderRegistry implements AgentProviderRegistryPort {
   private readonly contributions = new Map<string, AgentProviderContribution>()
@@ -43,18 +47,39 @@ export class AgentProviderRegistry implements AgentProviderRegistryPort {
   inspect(providerId: string): Promise<AgentProviderAvailability> {
     return this.require(providerId).detector.inspect()
   }
+
+  parseSessionRef(providerId: string, sessionRef: ProviderSessionRefSnapshot): ProviderSessionRef {
+    const codec = this.require(providerId).sessionRefCodec
+    if (!codec) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        `Agent Provider "${providerId}" does not support session references.`,
+        { providerId }
+      )
+    }
+    return ProviderSessionRef.create(codec.parse(sessionRef), providerId)
+  }
 }
 
 function validateContribution(contribution: AgentProviderContribution): void {
   const { capabilities, id } = contribution.descriptor
+  const telemetrySignals = contribution.telemetry?.signals ?? {
+    activity: false,
+    sessionIdentity: false
+  }
+  const supportsMcp = capabilities.cleancodeMcp !== 'unsupported'
   const invalid =
     !id ||
     id !== id.trim() ||
     !contribution.descriptor.displayName.trim() ||
     capabilities.resume !== Boolean(contribution.resume) ||
-    capabilities.structuredLifecycle !== Boolean(contribution.telemetry) ||
-    capabilities.cleancodeMcp !== Boolean(contribution.cleancodeCapability) ||
-    (capabilities.systemInstructions && !contribution.cleancodeCapability)
+    telemetrySignals.activity !== capabilities.activityTracking ||
+    telemetrySignals.sessionIdentity !== capabilities.sessionIdentityCapture ||
+    supportsMcp !== Boolean(contribution.cleancodeCapability) ||
+    capabilities.sessionRefCodec !== Boolean(contribution.sessionRefCodec) ||
+    (capabilities.resume && !capabilities.sessionRefCodec) ||
+    (capabilities.sessionIdentityCapture && !capabilities.sessionRefCodec) ||
+    (capabilities.launchInstructions && !contribution.cleancodeCapability)
 
   if (invalid) {
     throw createExpectedAppError(

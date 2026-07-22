@@ -2,13 +2,19 @@ import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../../../src/contex
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type { WorkspaceAgentRuntimePort } from '../../../../src/contexts/agent/application/ports/WorkspaceAgentRuntimePort'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
+import type { AgentProviderContribution } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 
 describe('update workspace Agent MCP capability', () => {
   it('persists the desired capability before reconfiguring only the target Agent runtime', async () => {
     const agent = createAgent()
     const repository = new MemoryAgentRepository(agent)
     const runtime = new RecordingWorkspaceAgentRuntime(repository)
-    const useCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(repository, runtime)
+    const useCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
+      repository,
+      runtime,
+      new AgentProviderRegistry([createProviderContribution('codex', true)])
+    )
 
     const result = await useCase.execute({
       agentId: agent.id,
@@ -28,6 +34,30 @@ describe('update workspace Agent MCP capability', () => {
     expect(runtime.persistedValuesAtReconfigure).toEqual([false])
     expect(result.agent.cleancodeMcpEnabled).toBe(false)
     expect(result.session).toBeNull()
+  })
+
+  it('does not enable CleanCode MCP for a Provider that does not contribute the capability', async () => {
+    const agent = createAgent({ cleancodeMcpEnabled: false, providerId: 'opencode' })
+    const repository = new MemoryAgentRepository(agent)
+    const save = vi.spyOn(repository, 'save')
+    const runtime = new RecordingWorkspaceAgentRuntime(repository)
+    const useCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
+      repository,
+      runtime,
+      new AgentProviderRegistry([createProviderContribution('opencode', false)])
+    )
+
+    await expect(
+      useCase.execute({
+        agentId: agent.id,
+        cleancodeMcpEnabled: true,
+        projectId: agent.projectId,
+        workspaceName: agent.workspaceName
+      })
+    ).rejects.toMatchObject({ code: 'AGENT_TOOL_UNAVAILABLE' })
+
+    expect(save).not.toHaveBeenCalled()
+    expect(runtime.reconfigured).toEqual([])
   })
 })
 
@@ -79,13 +109,44 @@ class MemoryAgentRepository implements AgentSessionRepository {
   async deleteProject(): Promise<void> {}
 }
 
-function createAgent(): AgentSession {
+function createAgent(
+  input: { readonly cleancodeMcpEnabled?: boolean; readonly providerId?: string } = {}
+): AgentSession {
   return AgentSession.create({
     agentId: 'agent-1',
+    cleancodeMcpEnabled: input.cleancodeMcpEnabled,
     layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
     name: 'Agent 1',
     projectId: 'project-1',
-    providerId: 'codex',
+    providerId: input.providerId ?? 'codex',
     workspaceName: 'main'
   })
+}
+
+function createProviderContribution(id: string, cleancodeMcp: boolean): AgentProviderContribution {
+  return {
+    ...(cleancodeMcp ? { cleancodeCapability: { inject: () => ({ args: [], env: {} }) } } : {}),
+    descriptor: {
+      capabilities: {
+        activityTracking: false,
+        cleancodeMcp: cleancodeMcp ? 'best_effort' : 'unsupported',
+        launchInstructions: cleancodeMcp,
+        resume: false,
+        sessionIdentityCapture: false,
+        sessionRefCodec: false
+      },
+      displayName: id,
+      id
+    },
+    detector: {
+      inspect: async () => ({ providerId: id, status: 'installed', version: 'test' })
+    },
+    launcher: {
+      createLaunchPlan: async () => ({
+        args: [],
+        env: {},
+        executable: id
+      })
+    }
+  }
 }

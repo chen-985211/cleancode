@@ -4,7 +4,8 @@ import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dt
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
-import { createAgentConsoleFlowNode, createLegacyAgentSnapshot } from './agentConsoleFlowNode'
+import { createAgentConsoleFlowNode } from './agentConsoleFlowNode'
+import { createLegacyAgentSnapshot } from './agentConsoleModel'
 import { createAgentApprovalNodeIntents } from './agentApprovalPresentation'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'

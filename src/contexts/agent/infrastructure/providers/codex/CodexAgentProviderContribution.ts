@@ -1,21 +1,31 @@
-import type { CodexCliPort } from '../../../application/ports/CodexCliPort'
+import { createExpectedAppError } from '../../../../../shared-kernel/application/errors/AppError'
 import type {
   AgentCapabilityInjector,
   AgentLaunchPlanner,
   AgentProviderContribution,
   AgentProviderDetector,
+  AgentProviderSessionRefCodec,
   AgentResumeStrategy,
   AgentRuntimeArtifact,
   AgentTelemetryContribution,
   CreateAgentLaunchPlanCommand
 } from '../../../application/ports/AgentProviderContribution'
 import { cleancodeMcpDeveloperInstructions } from '../../../application/dto/AgentToolProtocol'
-import { CodexThreadId } from '../../../domain/value-objects/CodexThreadId'
-import type { ProviderSessionRefSnapshot } from '../../../domain/value-objects/ProviderSessionRef'
+import {
+  ProviderSessionRef,
+  type ProviderSessionRefSnapshot
+} from '../../../domain/value-objects/ProviderSessionRef'
 import { CodexThreadIdentityReporter } from '../../pty/CodexThreadIdentityReporter'
+import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
+import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
+import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 
-const localMcpNoProxyHosts = ['127.0.0.1', 'localhost', '::1']
-
+export const codexInstallCommands = {
+  linux: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+  macos: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
+  windows:
+    'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://chatgpt.com/codex/install.ps1 | iex"'
+} as const
 interface CodexTelemetryRuntime extends AgentRuntimeArtifact {
   readonly env: Readonly<Record<string, string>>
   readonly notifyCommand: readonly string[]
@@ -29,29 +39,38 @@ type CodexTelemetryFactory = (command: {
 export interface CodexAgentProviderContributionOptions {
   readonly baseArgs?: readonly string[]
   readonly command?: string
-  readonly detector: CodexCliPort
+  readonly detector?: AgentProviderDetector
   readonly telemetryFactory?: CodexTelemetryFactory
 }
 
 export class CodexAgentProviderContribution implements AgentProviderContribution {
   readonly descriptor = {
     capabilities: {
-      cleancodeMcp: true,
+      activityTracking: false,
+      cleancodeMcp: 'required',
+      launchInstructions: true,
       resume: true,
-      structuredLifecycle: true,
-      systemInstructions: true
+      sessionIdentityCapture: true,
+      sessionRefCodec: true
     },
     displayName: 'Codex',
     id: 'codex'
   } as const
   readonly detector: AgentProviderDetector
-  readonly resume: AgentResumeStrategy = new CodexResumeStrategy()
+  readonly sessionRefCodec: AgentProviderSessionRefCodec = new CodexSessionRefCodec()
+  readonly resume: AgentResumeStrategy = new CodexResumeStrategy(this.sessionRefCodec)
   readonly telemetry: AgentTelemetryContribution
   readonly cleancodeCapability: AgentCapabilityInjector = new CodexCleancodeCapabilityInjector()
   readonly launcher: AgentLaunchPlanner
 
-  constructor(options: CodexAgentProviderContributionOptions) {
-    this.detector = new CodexProviderDetector(options.detector)
+  constructor(options: CodexAgentProviderContributionOptions = {}) {
+    this.detector =
+      options.detector ??
+      new NodeAgentProviderCliDetector({
+        executable: options.command ?? 'codex',
+        installCommand: resolveAgentProviderInstallCommand(codexInstallCommands),
+        providerId: this.descriptor.id
+      })
     this.telemetry = new CodexTelemetryContribution(
       options.telemetryFactory ?? createCodexTelemetryRuntime
     )
@@ -65,39 +84,54 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   }
 }
 
-class CodexProviderDetector implements AgentProviderDetector {
-  constructor(private readonly codexCli: CodexCliPort) {}
+class CodexResumeStrategy implements AgentResumeStrategy {
+  constructor(private readonly sessionRefCodec: AgentProviderSessionRefCodec) {}
 
-  async inspect() {
-    const availability = await this.codexCli.inspect()
-    return { ...availability, providerId: 'codex' } as const
+  createResumeArgs(sessionRef: ProviderSessionRefSnapshot): readonly string[] {
+    const parsed = this.sessionRefCodec.parse(sessionRef)
+    return ['resume', parsed.value]
   }
 }
 
-class CodexResumeStrategy implements AgentResumeStrategy {
-  createResumeArgs(sessionRef: ProviderSessionRefSnapshot): readonly string[] {
-    if (sessionRef.formatVersion !== 1 || sessionRef.kind !== 'codex-thread') {
-      throw new Error('Unsupported Codex Provider session reference.')
+class CodexSessionRefCodec implements AgentProviderSessionRefCodec {
+  parse(sessionRef: ProviderSessionRefSnapshot): ProviderSessionRefSnapshot {
+    const parsed = ProviderSessionRef.create(sessionRef).toSnapshot()
+    if (
+      parsed.formatVersion !== 1 ||
+      parsed.kind !== 'codex-thread' ||
+      !isCodexThreadUuid(parsed.value)
+    ) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_INVALID',
+        'Unsupported Codex Provider session reference.',
+        { providerId: 'codex' }
+      )
     }
-    return ['resume', CodexThreadId.create(sessionRef.value).value]
+    return parsed
   }
+}
+
+function isCodexThreadUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
 class CodexTelemetryContribution implements AgentTelemetryContribution {
+  readonly signals = { activity: false, sessionIdentity: true } as const
+
   constructor(private readonly factory: CodexTelemetryFactory) {}
 
   async prepare(command: Parameters<AgentTelemetryContribution['prepare']>[0]) {
     const runtime = await this.factory(command)
+    command.artifacts.track('codex-notify-reporter', runtime)
     return {
       args: ['--config', `notify=${JSON.stringify(runtime.notifyCommand)}`],
-      env: runtime.env,
-      temporaryArtifacts: [runtime]
+      env: runtime.env
     }
   }
 }
 
 class CodexCleancodeCapabilityInjector implements AgentCapabilityInjector {
-  inject(command: { readonly bearerToken: string; readonly serverUrl: string }) {
+  inject(command: Parameters<AgentCapabilityInjector['inject']>[0]) {
     return {
       args: [
         '--config',
@@ -105,7 +139,7 @@ class CodexCleancodeCapabilityInjector implements AgentCapabilityInjector {
         '--config',
         `developer_instructions=${JSON.stringify(cleancodeMcpDeveloperInstructions)}`
       ],
-      env: createMcpEnvironment(inheritedEnvironment(), command.bearerToken)
+      env: createMcpEnvironment(command.bearerToken)
     }
   }
 }
@@ -124,8 +158,11 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
   async createLaunchPlan(command: CreateAgentLaunchPlanCommand) {
     const telemetry = await this.options.telemetry.prepare(command)
     const capability = command.cleancodeMcp
-      ? await this.options.cleancodeCapability.inject(command.cleancodeMcp)
-      : { args: [], env: {}, temporaryArtifacts: [] }
+      ? await this.options.cleancodeCapability.inject({
+          ...command.cleancodeMcp,
+          artifacts: command.artifacts
+        })
+      : { args: [], env: {} }
     return {
       args: [
         ...this.options.baseArgs,
@@ -142,13 +179,10 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         ELECTRON_RUN_AS_NODE: '1',
         PROMPT_EOL_MARK: '',
         ...capability.env,
-        ...telemetry.env
+        ...telemetry.env,
+        ...createAgentProviderLoopbackEnvironment()
       },
-      executable: this.options.command,
-      temporaryArtifacts: [
-        ...telemetry.temporaryArtifacts,
-        ...(capability.temporaryArtifacts ?? [])
-      ]
+      executable: this.options.command
     }
   }
 }
@@ -176,50 +210,8 @@ async function createCodexTelemetryRuntime(command: {
   }
 }
 
-function inheritedEnvironment(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => typeof entry[1] === 'string'
-    )
-  )
-}
-
-function createMcpEnvironment(
-  environment: Record<string, string>,
-  bearerToken: string
-): Record<string, string> {
-  const noProxy = mergeNoProxyHosts(
-    environment.NO_PROXY,
-    environment.no_proxy,
-    localMcpNoProxyHosts
-  )
-  return { CLEANCODE_MCP_TOKEN: bearerToken, NO_PROXY: noProxy, no_proxy: noProxy }
-}
-
-function mergeNoProxyHosts(
-  uppercaseNoProxy: string | undefined,
-  lowercaseNoProxy: string | undefined,
-  requiredHosts: readonly string[]
-): string {
-  const hosts: string[] = []
-  const normalizedHosts = new Set<string>()
-  for (const value of [uppercaseNoProxy, lowercaseNoProxy]) {
-    for (const host of value
-      ?.split(',')
-      .map((item) => item.trim())
-      .filter(Boolean) ?? []) {
-      addNoProxyHost(hosts, normalizedHosts, host)
-    }
-  }
-  for (const host of requiredHosts) addNoProxyHost(hosts, normalizedHosts, host)
-  return hosts.join(',')
-}
-
-function addNoProxyHost(hosts: string[], normalizedHosts: Set<string>, host: string): void {
-  const normalizedHost = host.toLowerCase()
-  if (normalizedHosts.has(normalizedHost)) return
-  normalizedHosts.add(normalizedHost)
-  hosts.push(host)
+function createMcpEnvironment(bearerToken: string): Record<string, string> {
+  return { CLEANCODE_MCP_TOKEN: bearerToken }
 }
 
 const codexNotifyReporterScript = [

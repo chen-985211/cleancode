@@ -20,6 +20,7 @@ export interface AgentProviderCliProcessInvocation {
 interface NodeAgentProviderCliDetectorOptions {
   readonly executable: string
   readonly installCommand: string
+  readonly minimumVersion?: string
   readonly providerId: string
   readonly runCommand?: AgentProviderCliCommandRunner
   readonly versionArgs?: readonly string[]
@@ -42,13 +43,26 @@ export class NodeAgentProviderCliDetector implements AgentProviderDetector {
         { timeoutMs: inspectionTimeoutMs }
       )
       const version = `${result.stdout}\n${result.stderr}`.trim()
-      return version
-        ? {
+      if (!version) return this.unavailable('invalid_output')
+      if (this.options.minimumVersion) {
+        const parsedVersion = readSemanticVersion(version)
+        const minimumVersion = readSemanticVersion(this.options.minimumVersion)
+        if (!parsedVersion || !minimumVersion) return this.unavailable('invalid_output')
+        if (compareSemanticVersions(parsedVersion, minimumVersion) < 0) {
+          return {
+            installCommand: this.options.installCommand,
+            minimumVersion: this.options.minimumVersion,
             providerId: this.options.providerId,
-            status: 'installed',
+            status: 'upgrade_required',
             version
           }
-        : this.unavailable('invalid_output')
+        }
+      }
+      return {
+        providerId: this.options.providerId,
+        status: 'installed',
+        version
+      }
     } catch (error) {
       const commandError = readCommandError(error)
       if (commandError?.code === 'ENOENT') {
@@ -83,6 +97,22 @@ export class NodeAgentProviderCliDetector implements AgentProviderDetector {
       version: null
     }
   }
+}
+
+type SemanticVersion = readonly [major: number, minor: number, patch: number]
+
+function readSemanticVersion(value: string): SemanticVersion | null {
+  const match = /(?:^|\D)(\d+)\.(\d+)\.(\d+)(?:\D|$)/.exec(value)
+  if (!match) return null
+  return [Number(match[1]), Number(match[2]), Number(match[3])]
+}
+
+function compareSemanticVersions(first: SemanticVersion, second: SemanticVersion): number {
+  for (let index = 0; index < first.length; index += 1) {
+    const difference = first[index]! - second[index]!
+    if (difference !== 0) return difference
+  }
+  return 0
 }
 
 function readCommandError(error: unknown): {
