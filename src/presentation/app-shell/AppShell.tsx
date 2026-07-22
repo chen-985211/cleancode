@@ -57,6 +57,7 @@ import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
+import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -347,6 +348,7 @@ export function AppShell({
     ? toAgentFlowNodeId(selectedAgentId)
     : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
   const shortcutNavigation = useApplicationShortcutNavigation({
+    activateWorkbenchNodeInput,
     canvasSizeRef,
     currentWorkbench,
     getNodes: nodeStore.getNodes,

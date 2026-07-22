@@ -11,8 +11,13 @@ import {
 } from './applicationShortcutNavigation'
 import type { ProjectSidebarIntent } from './ProjectSidebar'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import {
+  resolveWorkbenchNodeFocusZoom,
+  resolveWorkbenchNodeSize
+} from './workbenchNodeFocusViewport'
 
 interface UseApplicationShortcutNavigationInput {
+  readonly activateWorkbenchNodeInput: (node: WorkbenchFlowNode) => void
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly getNodes: () => readonly WorkbenchFlowNode[]
@@ -28,6 +33,7 @@ interface UseApplicationShortcutNavigationInput {
 }
 
 export function useApplicationShortcutNavigation({
+  activateWorkbenchNodeInput,
   canvasSizeRef,
   currentWorkbench,
   getNodes,
@@ -45,8 +51,10 @@ export function useApplicationShortcutNavigation({
   const intentIdRef = useRef(0)
   const isWorkspaceTransitionPendingRef = useRef(false)
   const selectedNodeIdRef = useRef(selectedNodeId)
+  const activateWorkbenchNodeInputRef = useRef(activateWorkbenchNodeInput)
   const selectWorkbenchNodeRef = useRef(selectWorkbenchNode)
   selectedNodeIdRef.current = selectedNodeId
+  activateWorkbenchNodeInputRef.current = activateWorkbenchNodeInput
   selectWorkbenchNodeRef.current = selectWorkbenchNode
 
   const revealProject = useCallback(
@@ -79,7 +87,14 @@ export function useApplicationShortcutNavigation({
 
       selectWorkbenchNodeRef.current(target)
       const center = resolveWorkbenchNodeCenter(target)
-      void instance.setCenter(center.x, center.y, { duration: 0, zoom: viewport.zoom })
+      const zoom = resolveWorkbenchNodeFocusZoom({
+        canvasSize: canvasSizeRef.current,
+        currentZoom: viewport.zoom,
+        intent: 'shortcut',
+        nodeSize: resolveWorkbenchNodeSize(target)
+      })
+      void instance.setCenter(center.x, center.y, { duration: 0, zoom })
+      activateWorkbenchNodeInputRef.current(target)
     },
     [canvasSizeRef, getNodes, reactFlowInstanceRef]
   )

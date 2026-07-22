@@ -48,7 +48,7 @@ describe('terminal workflows e2e', () => {
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('运行中').first().waitFor()
-      await page.getByRole('button', { name: '小地图适应' }).click()
+      await page.getByRole('button', { name: '适应画布' }).click()
       await page.waitForTimeout(250)
 
       await configureLaunchCommand(page, 'Terminal 1', 'printf "workflow-install-complete\\n"')
@@ -63,6 +63,77 @@ describe('terminal workflows e2e', () => {
       const graph = await readE2eBlockGraph(workbench)
 
       expect(graph.connections).toHaveLength(1)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'navigates from active minimap terminal input without nudging any canvas node',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await page.getByText('运行中').first().waitFor()
+      await page.getByRole('button', { name: '适应画布' }).click()
+
+      const firstTerminal = page
+        .locator('[data-terminal-block-id]')
+        .filter({ hasText: 'Terminal 1' })
+      const secondTerminal = page
+        .locator('[data-terminal-block-id]')
+        .filter({ hasText: 'Terminal 2' })
+      const firstBlockId = await firstTerminal.getAttribute('data-terminal-block-id')
+      const secondBlockId = await secondTerminal.getAttribute('data-terminal-block-id')
+      expect(firstBlockId).toBeTruthy()
+      expect(secondBlockId).toBeTruthy()
+      const firstFlowNode = page.locator(`.react-flow__node[data-id="${firstBlockId}"]`)
+      const secondFlowNode = page.locator(`.react-flow__node[data-id="${secondBlockId}"]`)
+      const agentFlowNode = page.locator('.react-flow__node-agentConsole').first()
+
+      await page.getByRole('button', { name: '聚焦终端 Terminal 1' }).click()
+      await expect
+        .poll(() =>
+          firstTerminal.evaluate(
+            (node) =>
+              node.contains(document.activeElement) &&
+              document.activeElement?.matches('.xterm-helper-textarea')
+          )
+        )
+        .toBe(true)
+      await expect
+        .poll(() => firstTerminal.getAttribute('class'))
+        .toContain('terminal-node--selected')
+      const beforeTransforms = await Promise.all([
+        firstFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
+        secondFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
+        agentFlowNode.evaluate((node) => (node as HTMLElement).style.transform)
+      ])
+
+      await page.keyboard.press(
+        process.platform === 'darwin' ? 'Meta+ArrowRight' : 'Control+ArrowRight'
+      )
+
+      await expect
+        .poll(() =>
+          agentFlowNode.locator('[data-selection-state]').getAttribute('data-selection-state')
+        )
+        .toBe('selected')
+      await expect
+        .poll(() =>
+          agentFlowNode.evaluate(
+            (node) =>
+              node.contains(document.activeElement) &&
+              document.activeElement?.matches('.xterm-helper-textarea')
+          )
+        )
+        .toBe(true)
+      const afterTransforms = await Promise.all([
+        firstFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
+        secondFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
+        agentFlowNode.evaluate((node) => (node as HTMLElement).style.transform)
+      ])
+      expect(afterTransforms).toEqual(beforeTransforms)
     },
     electronScenarioTimeoutMs
   )

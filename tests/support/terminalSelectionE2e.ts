@@ -7,7 +7,7 @@ export async function setCanvasZoomFromDefault(
   direction: CanvasZoomDirection
 ): Promise<number> {
   const expectedZoom = direction === 'in' ? 1.2 : 1 / 1.2
-  const buttonName = direction === 'in' ? '小地图放大' : '小地图缩小'
+  const buttonName = direction === 'in' ? '放大画布' : '缩小画布'
 
   await page.waitForFunction(() => {
     const viewport = document.querySelector('.react-flow__viewport')

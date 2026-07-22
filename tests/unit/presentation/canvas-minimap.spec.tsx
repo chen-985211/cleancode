@@ -47,9 +47,9 @@ describe('canvas minimap', () => {
 
     expect(screen.getByText('151%')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '小地图放大' }))
-    fireEvent.click(screen.getByRole('button', { name: '小地图缩小' }))
-    fireEvent.click(screen.getByRole('button', { name: '小地图适应' }))
+    fireEvent.click(screen.getByRole('button', { name: '放大画布' }))
+    fireEvent.click(screen.getByRole('button', { name: '缩小画布' }))
+    fireEvent.click(screen.getByRole('button', { name: '适应画布' }))
     fireEvent.click(screen.getByRole('button', { name: '聚焦终端 Terminal 1' }))
     fireEvent.click(screen.getByRole('button', { name: '收起小地图' }))
 
@@ -139,7 +139,7 @@ describe('canvas minimap', () => {
       .map(Number)
 
     expect(viewBox).toHaveLength(4)
-    expect(viewBox![2]! / viewBox![3]!).toBeCloseTo(220 / 156, 6)
+    expect(viewBox![2]! / viewBox![3]!).toBeCloseTo(184 / 120, 6)
   })
 
   it('focuses a minimap node once for each pointer or keyboard activation', () => {
@@ -171,36 +171,49 @@ describe('canvas minimap', () => {
     expect(focusNode).toHaveBeenCalledTimes(1)
   })
 
-  it('exposes the side controls as an ordered minimap control group', () => {
-    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />)
+  it('keeps keyboard focus on the minimap node after pointer activation', () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} />)
 
-    const controlGroup = screen.getByRole('group', { name: '小地图控制' })
-    const controls = within(controlGroup).getAllByRole('button')
+    const node = screen.getByRole('button', { name: '聚焦终端 Terminal 1' })
 
-    expect(controls.map((control) => control.getAttribute('aria-label'))).toEqual([
-      '收起小地图',
-      '小地图放大',
-      '小地图缩小',
-      '小地图适应'
-    ])
-    expect(within(controlGroup).getByLabelText('画布缩放比例')).toHaveTextContent('70%')
+    fireEvent.click(node, { button: 0 })
+
+    expect(node).toHaveFocus()
   })
 
-  it('keeps only the minimap restore control visible while collapsed', () => {
+  it('separates the minimap toggle from the canvas viewport controls', () => {
+    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />)
+
+    const minimapControls = screen.getByRole('group', { name: '小地图控制' })
+    const viewportControls = screen.getByRole('group', { name: '画布视图控制' })
+
+    expect(within(minimapControls).getAllByRole('button')).toHaveLength(1)
+    expect(within(minimapControls).getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
+    expect(
+      within(viewportControls)
+        .getAllByRole('button')
+        .map((control) => control.getAttribute('aria-label'))
+    ).toEqual(['缩小画布', '放大画布', '适应画布'])
+    expect(within(viewportControls).getByLabelText('画布缩放比例')).toHaveTextContent('70%')
+  })
+
+  it('keeps the canvas viewport controls available while the minimap is collapsed', () => {
     render(<CanvasMinimap {...createCanvasMinimapProps()} isCollapsed />)
 
-    const controlGroup = screen.getByRole('group', { name: '小地图控制' })
+    const minimapControls = screen.getByRole('group', { name: '小地图控制' })
+    const viewportControls = screen.getByRole('group', { name: '画布视图控制' })
 
     expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
-    expect(within(controlGroup).getAllByRole('button')).toHaveLength(1)
-    expect(within(controlGroup).getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('画布缩放比例')).not.toBeInTheDocument()
+    expect(within(minimapControls).getAllByRole('button')).toHaveLength(1)
+    expect(within(minimapControls).getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
+    expect(within(viewportControls).getAllByRole('button')).toHaveLength(3)
+    expect(within(viewportControls).getByLabelText('画布缩放比例')).toHaveTextContent('100%')
   })
 
   it('shows the configured canvas shortcuts in control tooltips', async () => {
     render(<CanvasMinimap {...createCanvasMinimapProps()} />)
 
-    fireEvent.pointerMove(screen.getByRole('button', { name: '小地图放大' }), {
+    fireEvent.pointerMove(screen.getByRole('button', { name: '放大画布' }), {
       pointerType: 'mouse'
     })
 

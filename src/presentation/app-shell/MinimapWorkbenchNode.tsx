@@ -58,6 +58,7 @@ export const MinimapWorkbenchNode = memo(function MinimapWorkbenchNode({
   const inset = Math.max(3, Math.min(width, height) * 0.08)
   const activate = (event: SyntheticEvent<SVGGElement>): void => {
     event.stopPropagation()
+    event.currentTarget.focus()
     onClick?.(event as MouseEvent<SVGGElement>, id)
   }
   const activateFromKeyboard = (event: KeyboardEvent<SVGGElement>): void => {
@@ -109,7 +110,6 @@ export const MinimapWorkbenchNode = memo(function MinimapWorkbenchNode({
           borderRadius={borderRadius}
           inset={inset}
           headerHeight={headerHeight}
-          statusColor={statusColor}
           strokeColor={effectiveStrokeColor}
           strokeWidth={effectiveStrokeWidth}
         />
@@ -153,10 +153,9 @@ function MinimapAgentPreview({
   borderRadius,
   inset,
   headerHeight,
-  statusColor,
   strokeColor,
   strokeWidth
-}: MinimapPreviewProps) {
+}: Omit<MinimapPreviewProps, 'statusColor' | 'selected'>) {
   const contentY = y + headerHeight + inset * 1.2
 
   return (
@@ -179,7 +178,7 @@ function MinimapAgentPreview({
         width={Math.max(4, width - inset * 2)}
         height={Math.max(5, headerHeight - inset * 0.45)}
         rx={Math.max(2, borderRadius * 0.55)}
-        fill={statusColor}
+        fill="var(--cc-border)"
       />
       <rect
         className="canvas-minimap__agent-icon"
@@ -255,7 +254,7 @@ function MinimapTerminalPreview({
         width={Math.max(4, width - inset * 2)}
         height={screenHeight}
         rx={Math.max(2, borderRadius * 0.45)}
-        fill="var(--cc-foreground)"
+        fill="var(--cc-muted-strong)"
       />
     </>
   )

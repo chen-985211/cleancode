@@ -260,7 +260,7 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
-    'selects an Agent by spatial shortcut without stealing the same shortcut from xterm',
+    'selects and activates Agents continuously with a spatial shortcut from xterm',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -326,15 +326,56 @@ describe('workspace Agents e2e', () => {
       expect(Math.abs(centerOffset.x)).toBeLessThanOrEqual(2)
       expect(Math.abs(centerOffset.y)).toBeLessThanOrEqual(2)
 
-      await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
-      await waitForAllAgentsUnselected(page)
-      await page
-        .locator(`[data-agent-console-node="${selectedAgentId}"] .xterm-helper-textarea`)
-        .focus()
-      await page.keyboard.press(`${primaryModifier}+${target.key}`)
-      await page.waitForTimeout(100)
+      await page.waitForFunction(
+        (agentId) =>
+          document.activeElement?.matches('.xterm-helper-textarea') === true &&
+          document.activeElement
+            .closest('[data-agent-console-node]')
+            ?.getAttribute('data-agent-console-node') === agentId,
+        selectedAgentId
+      )
+      const nextTarget = await agents.evaluateAll((elements, currentAgentId) => {
+        const current = elements.find(
+          (element) => element.getAttribute('data-agent-console-node') === currentAgentId
+        )
+        const other = elements.find(
+          (element) => element.getAttribute('data-agent-console-node') !== currentAgentId
+        )
+        if (!current || !other) throw new Error('Agent navigation pair is unavailable.')
 
-      await waitForAllAgentsUnselected(page)
+        const currentBounds = current.getBoundingClientRect()
+        const otherBounds = other.getBoundingClientRect()
+        const horizontalDelta =
+          otherBounds.x + otherBounds.width / 2 - (currentBounds.x + currentBounds.width / 2)
+        const verticalDelta =
+          otherBounds.y + otherBounds.height / 2 - (currentBounds.y + currentBounds.height / 2)
+
+        return {
+          agentId: other.getAttribute('data-agent-console-node'),
+          key:
+            Math.abs(horizontalDelta) >= Math.abs(verticalDelta)
+              ? horizontalDelta >= 0
+                ? 'ArrowRight'
+                : 'ArrowLeft'
+              : verticalDelta >= 0
+                ? 'ArrowDown'
+                : 'ArrowUp'
+        }
+      }, selectedAgentId)
+      if (!nextTarget.agentId) throw new Error('Next Agent id is unavailable.')
+
+      await page.keyboard.press(`${primaryModifier}+${nextTarget.key}`)
+      await page.waitForFunction(
+        (agentId) =>
+          document
+            .querySelector(`[data-agent-console-node="${agentId}"]`)
+            ?.getAttribute('data-selection-state') === 'selected' &&
+          document.activeElement?.matches('.xterm-helper-textarea') === true &&
+          document.activeElement
+            .closest('[data-agent-console-node]')
+            ?.getAttribute('data-agent-console-node') === agentId,
+        nextTarget.agentId
+      )
     },
     electronScenarioTimeoutMs
   )

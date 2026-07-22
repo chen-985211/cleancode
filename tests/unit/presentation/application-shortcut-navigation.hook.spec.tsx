@@ -11,11 +11,13 @@ describe('application shortcut navigation hook', () => {
   it('immediately centers a selected target even when it is already visible', () => {
     const selected = createNode('selected', 100, 100)
     const target = createNode('target', 400, 100)
+    const activateWorkbenchNodeInput = vi.fn()
     const selectWorkbenchNode = vi.fn()
     const setCenter = vi.fn(async () => true)
     const hook = renderNavigationHook({
       nodes: [selected, target],
       selectedNodeId: selected.id,
+      activateWorkbenchNodeInput,
       selectWorkbenchNode,
       setCenter
     })
@@ -24,6 +26,7 @@ describe('application shortcut navigation hook', () => {
 
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
     expect(setCenter).toHaveBeenCalledWith(460, 140, { duration: 0, zoom: 1 })
+    expect(activateWorkbenchNodeInput).toHaveBeenCalledWith(target)
   })
 
   it('immediately centers a selected target when it is outside the viewport', () => {
@@ -42,22 +45,53 @@ describe('application shortcut navigation hook', () => {
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
     expect(setCenter).toHaveBeenCalledWith(1_260, 740, { duration: 0, zoom: 1 })
   })
+
+  it('only zooms out when an oversized shortcut target exceeds the focus safe frame', () => {
+    const target = createNode('oversized', 1_200, 700, { width: 1_400, height: 1_000 })
+    const selectWorkbenchNode = vi.fn()
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      nodes: [target],
+      selectedNodeId: null,
+      selectWorkbenchNode,
+      setCenter,
+      zoom: 0.9
+    })
+
+    act(() => hook.result.current.selectCanvasNode('right'))
+
+    expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
+    expect(setCenter).toHaveBeenCalledOnce()
+    const [centerX, centerY, options] = setCenter.mock.calls[0] as unknown as [
+      number,
+      number,
+      { readonly duration: number; readonly zoom: number }
+    ]
+    expect(centerX).toBe(1_900)
+    expect(centerY).toBe(1_200)
+    expect(options.duration).toBe(0)
+    expect(options.zoom).toBeCloseTo(0.4352, 4)
+  })
 })
 
 function renderNavigationHook({
+  activateWorkbenchNodeInput = vi.fn(),
   nodes,
   selectedNodeId,
   selectWorkbenchNode,
-  setCenter
+  setCenter,
+  zoom = 1
 }: {
+  readonly activateWorkbenchNodeInput?: (node: WorkbenchFlowNode) => void
   readonly nodes: WorkbenchFlowNode[]
   readonly selectedNodeId: string | null
   readonly selectWorkbenchNode: (node: WorkbenchFlowNode) => void
   readonly setCenter: ReturnType<typeof vi.fn>
+  readonly zoom?: number
 }) {
   const reactFlowInstanceRef = {
     current: {
-      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      getViewport: () => ({ x: 0, y: 0, zoom }),
       setCenter
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
   }
@@ -65,6 +99,7 @@ function renderNavigationHook({
   return renderHook(() =>
     useApplicationShortcutNavigation({
       canvasSizeRef: { current: { width: 960, height: 640 } },
+      activateWorkbenchNodeInput,
       currentWorkbench: null,
       getNodes: () => nodes,
       onSelectWorkspace:
@@ -78,11 +113,16 @@ function renderNavigationHook({
   )
 }
 
-function createNode(id: string, x: number, y: number): WorkbenchFlowNode {
+function createNode(
+  id: string,
+  x: number,
+  y: number,
+  size = { width: 120, height: 80 }
+): WorkbenchFlowNode {
   return {
     id,
     type: 'terminal',
     position: { x, y },
-    style: { width: 120, height: 80 }
+    style: size
   } as WorkbenchFlowNode
 }

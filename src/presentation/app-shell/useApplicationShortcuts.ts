@@ -23,6 +23,13 @@ interface UseApplicationShortcutsInput {
   readonly platform: ShortcutPlatform
 }
 
+const directionalCanvasSelectionCommands = new Set<ApplicationShortcutCommand>([
+  'selectCanvasNodeLeft',
+  'selectCanvasNodeRight',
+  'selectCanvasNodeUp',
+  'selectCanvasNodeDown'
+])
+
 export function useApplicationShortcuts({
   actions,
   bindings,
@@ -34,10 +41,10 @@ export function useApplicationShortcuts({
   }, [actions])
 
   useEffect(() => {
-    const dispatchShortcut = (event: KeyboardEvent): void => {
+    const dispatchShortcut = (event: KeyboardEvent, captureDirectional: boolean): void => {
       if (
         event.defaultPrevented ||
-        isProtectedShortcutTarget(event.target) ||
+        isShortcutCaptureTarget(event.target) ||
         document.querySelector('[role="dialog"][aria-modal="true"]') !== null
       ) {
         return
@@ -46,22 +53,42 @@ export function useApplicationShortcuts({
       const command = applicationShortcutCommands.find((candidate) =>
         matchesShortcutEvent(event, bindings[candidate], platform)
       )
+      const isDirectionalSelection =
+        command !== undefined && directionalCanvasSelectionCommands.has(command)
+      if (!isDirectionalSelection && isProtectedShortcutTarget(event.target)) {
+        return
+      }
+      if (isDirectionalSelection !== captureDirectional) {
+        return
+      }
+
       const action = command === undefined ? undefined : actionsRef.current[command]
       if (command === undefined || !action?.enabled) {
         return
       }
 
       event.preventDefault()
+      if (isDirectionalSelection) {
+        event.stopPropagation()
+      }
       if (event.repeat) {
         return
       }
 
       void action.run()
     }
+    const captureDirectionalShortcut = (event: KeyboardEvent): void => {
+      dispatchShortcut(event, true)
+    }
+    const dispatchBubblingShortcut = (event: KeyboardEvent): void => {
+      dispatchShortcut(event, false)
+    }
 
-    document.addEventListener('keydown', dispatchShortcut)
+    document.addEventListener('keydown', captureDirectionalShortcut, true)
+    document.addEventListener('keydown', dispatchBubblingShortcut)
     return () => {
-      document.removeEventListener('keydown', dispatchShortcut)
+      document.removeEventListener('keydown', captureDirectionalShortcut, true)
+      document.removeEventListener('keydown', dispatchBubblingShortcut)
     }
   }, [bindings, platform])
 }
@@ -73,7 +100,11 @@ function isProtectedShortcutTarget(target: EventTarget | null): boolean {
 
   return (
     target.closest(
-      'input, textarea, select, [contenteditable]:not([contenteditable="false"]), .xterm, [data-shortcut-capture]'
+      'input, textarea, select, [contenteditable]:not([contenteditable="false"]), .xterm'
     ) !== null
   )
+}
+
+function isShortcutCaptureTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-shortcut-capture]') !== null
 }

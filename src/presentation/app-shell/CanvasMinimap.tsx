@@ -1,4 +1,4 @@
-import { ChevronLeft, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
+import { ChevronUp, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
 import { useCallback, useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -61,8 +61,8 @@ interface MinimapViewBox {
   readonly height: number
 }
 
-const minimapMapWidth = 220
-const minimapMapHeight = 156
+const minimapMapWidth = 184
+const minimapMapHeight = 120
 const minimapMapAspect = minimapMapWidth / minimapMapHeight
 const minimapNodePadding = 132
 const minimapMinimumWidth = 720
@@ -206,52 +206,66 @@ export function CanvasMinimap({
               </svg>
             </MinimapNodeInteractionContext.Provider>
           </div>
+          <div
+            className="canvas-minimap__map-controls"
+            role="group"
+            aria-label={t('minimap.controls')}
+          >
+            <MinimapControlButton
+              label={t('minimap.collapse')}
+              tooltip={shortcutTooltips.toggleMinimap}
+              onClick={onToggleCollapsed}
+            >
+              <ChevronUp size={13} aria-hidden="true" />
+            </MinimapControlButton>
+          </div>
         </div>
       ) : null}
-      <div className="canvas-minimap__controls" role="group" aria-label={t('minimap.controls')}>
-        <div className="canvas-minimap__control-group canvas-minimap__control-group--top">
-          <MinimapControlButton
-            label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
-            tooltip={shortcutTooltips.toggleMinimap}
-            onClick={onToggleCollapsed}
+      <div className="canvas-minimap__navigation-row">
+        {isCollapsed ? (
+          <div
+            className="canvas-minimap__map-controls canvas-minimap__map-controls--collapsed"
+            role="group"
+            aria-label={t('minimap.controls')}
           >
-            {isCollapsed ? (
+            <MinimapControlButton
+              label={t('minimap.expand')}
+              tooltip={shortcutTooltips.toggleMinimap}
+              onClick={onToggleCollapsed}
+            >
               <MapIcon size={14} aria-hidden="true" />
-            ) : (
-              <ChevronLeft size={14} aria-hidden="true" />
-            )}
+            </MinimapControlButton>
+          </div>
+        ) : null}
+        <div
+          className="canvas-minimap__viewport-controls"
+          role="group"
+          aria-label={t('canvas.viewportControls')}
+        >
+          <MinimapControlButton
+            label={t('minimap.zoomOutTitle')}
+            tooltip={shortcutTooltips.zoomCanvasOut}
+            onClick={onZoomOut}
+          >
+            <Minus size={14} aria-hidden="true" />
+          </MinimapControlButton>
+          <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
+          <MinimapControlButton
+            label={t('minimap.zoomInTitle')}
+            tooltip={shortcutTooltips.zoomCanvasIn}
+            onClick={onZoomIn}
+          >
+            <Plus size={14} aria-hidden="true" />
+          </MinimapControlButton>
+          <span className="canvas-minimap__viewport-divider" aria-hidden="true" />
+          <MinimapControlButton
+            label={t('minimap.fitTitle')}
+            tooltip={shortcutTooltips.fitCanvas}
+            onClick={onFitCanvas}
+          >
+            <Scan size={14} aria-hidden="true" />
           </MinimapControlButton>
         </div>
-        {!isCollapsed ? (
-          <>
-            <div className="canvas-minimap__control-group canvas-minimap__control-group--zoom">
-              <MinimapControlButton
-                label={t('minimap.zoomInLabel')}
-                tooltip={shortcutTooltips.zoomCanvasIn}
-                onClick={onZoomIn}
-              >
-                <Plus size={14} aria-hidden="true" />
-              </MinimapControlButton>
-              <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
-              <MinimapControlButton
-                label={t('minimap.zoomOutLabel')}
-                tooltip={shortcutTooltips.zoomCanvasOut}
-                onClick={onZoomOut}
-              >
-                <Minus size={14} aria-hidden="true" />
-              </MinimapControlButton>
-            </div>
-            <div className="canvas-minimap__control-group canvas-minimap__control-group--bottom">
-              <MinimapControlButton
-                label={t('minimap.fitLabel')}
-                tooltip={shortcutTooltips.fitCanvas}
-                onClick={onFitCanvas}
-              >
-                <Scan size={14} aria-hidden="true" />
-              </MinimapControlButton>
-            </div>
-          </>
-        ) : null}
       </div>
     </div>
   )

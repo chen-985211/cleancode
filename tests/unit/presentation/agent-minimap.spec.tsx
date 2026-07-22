@@ -39,7 +39,7 @@ describe('Agent minimap navigation', () => {
     expect(container.querySelector('.canvas-minimap__node--agent-console')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__agent-header')).toHaveAttribute(
       'fill',
-      'var(--cc-muted)'
+      'var(--cc-border)'
     )
     expect(container.querySelector('.canvas-minimap__agent-body')).toBeInTheDocument()
     expect(container.querySelector('.canvas-minimap__node-screen')).not.toBeInTheDocument()

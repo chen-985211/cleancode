@@ -69,6 +69,20 @@ describe('application shortcut dispatch', () => {
     expect(actions[command].run).toHaveBeenCalledTimes(1)
   })
 
+  it('consumes a directional shortcut before a focused canvas node can move itself', () => {
+    const actions = createActions()
+    const moveFocusedNode = vi.fn()
+    render(<ShortcutHarness actions={actions} onCanvasNodeArrowKey={moveFocusedNode} />)
+
+    fireEvent.keyDown(screen.getByLabelText('已选中画布节点'), {
+      key: 'ArrowRight',
+      metaKey: true
+    })
+
+    expect(actions.selectCanvasNodeRight.run).toHaveBeenCalledOnce()
+    expect(moveFocusedNode).not.toHaveBeenCalled()
+  })
+
   it('ignores keyboard auto-repeat for non-pan actions', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} />)
@@ -93,17 +107,18 @@ describe('application shortcut dispatch', () => {
     expect(actions.selectCanvasNodeLeft.run).toHaveBeenCalledTimes(1)
   })
 
-  it('protects xterm from directional selection shortcuts', () => {
+  it('captures directional selection shortcuts from xterm without forwarding them to terminal input', () => {
     const actions = createActions()
-    render(<ShortcutHarness actions={actions} />)
+    const handleTerminalArrowKey = vi.fn()
+    render(<ShortcutHarness actions={actions} onTerminalArrowKey={handleTerminalArrowKey} />)
 
     fireEvent.keyDown(screen.getByLabelText('快捷键测试终端'), {
       key: 'ArrowLeft',
-      metaKey: true,
-      repeat: true
+      metaKey: true
     })
 
-    expect(actions.selectCanvasNodeLeft.run).not.toHaveBeenCalled()
+    expect(actions.selectCanvasNodeLeft.run).toHaveBeenCalledOnce()
+    expect(handleTerminalArrowKey).not.toHaveBeenCalled()
   })
 
   it('does not dispatch disabled actions or partial modifier matches', () => {
@@ -152,15 +167,31 @@ describe('application shortcut dispatch', () => {
     expect(actions.createTerminal.run).not.toHaveBeenCalled()
     expect(actions.openSettings.run).not.toHaveBeenCalled()
   })
+
+  it('suspends directional selection while a shortcut recorder owns the key event', () => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(screen.getByLabelText('快捷键录制器'), {
+      key: 'ArrowRight',
+      metaKey: true
+    })
+
+    expect(actions.selectCanvasNodeRight.run).not.toHaveBeenCalled()
+  })
 })
 
 function ShortcutHarness({
   actions,
   bindings = defaultApplicationShortcutBindings,
+  onCanvasNodeArrowKey,
+  onTerminalArrowKey,
   showDialog = false
 }: {
   readonly actions: ApplicationShortcutActions
   readonly bindings?: ApplicationShortcutBindings
+  readonly onCanvasNodeArrowKey?: () => void
+  readonly onTerminalArrowKey?: () => void
   readonly showDialog?: boolean
 }) {
   useApplicationShortcuts({
@@ -175,7 +206,23 @@ function ShortcutHarness({
       <div aria-label="快捷键测试编辑区" contentEditable suppressContentEditableWarning>
         编辑
       </div>
-      <div className="xterm" aria-label="快捷键测试终端" tabIndex={0} />
+      <div
+        className="xterm"
+        aria-label="快捷键测试终端"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key.startsWith('Arrow')) onTerminalArrowKey?.()
+        }}
+      />
+      <div
+        aria-label="已选中画布节点"
+        role="group"
+        tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key.startsWith('Arrow')) onCanvasNodeArrowKey?.()
+        }}
+      />
+      <button type="button" aria-label="快捷键录制器" data-shortcut-capture />
       {showDialog ? <div role="dialog" aria-modal="true" aria-label="测试对话框" /> : null}
     </>
   )

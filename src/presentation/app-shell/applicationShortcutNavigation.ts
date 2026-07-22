@@ -1,6 +1,7 @@
 import type { Viewport } from '@xyflow/react'
 
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import { resolveWorkbenchNodeSize } from './workbenchNodeFocusViewport'
 
 export type WorkspaceNavigationDirection = 'next' | 'previous'
 
@@ -84,10 +85,7 @@ function pointToCanvasRect(point: { readonly x: number; readonly y: number }): C
 }
 
 function toCanvasRect(node: WorkbenchFlowNode): CanvasRect {
-  const width =
-    node.measured?.width ?? resolveDimension(node.style?.width) ?? resolveNodeSize(node).width
-  const height =
-    node.measured?.height ?? resolveDimension(node.style?.height) ?? resolveNodeSize(node).height
+  const { width, height } = resolveWorkbenchNodeSize(node)
   const left = node.position.x
   const top = node.position.y
 
@@ -99,12 +97,6 @@ function toCanvasRect(node: WorkbenchFlowNode): CanvasRect {
     right: left + width,
     top
   }
-}
-
-function resolveNodeSize(node: WorkbenchFlowNode) {
-  if (node.type === 'agentConsole') return node.data.agent.layout.size
-  if (node.type === 'terminal') return node.data.block.size
-  return node.data.group.size
 }
 
 function isInDirection(
@@ -180,13 +172,6 @@ function rangeGap(
 ): number {
   if (rangesOverlap(firstStart, firstEnd, secondStart, secondEnd)) return 0
   return secondStart > firstEnd ? secondStart - firstEnd : firstStart - secondEnd
-}
-
-function resolveDimension(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value !== 'string') return null
-  const parsed = Number.parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : null
 }
 
 function resolveCanvasDimension(value: number, fallback: number): number {
