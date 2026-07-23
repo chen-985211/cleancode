@@ -106,9 +106,12 @@ declare global {
         readonly workspaceName: string
       }): Promise<AgentSessionSnapshot>
       createWorkspaceAgent(command: {
-        readonly layout: AgentLayoutSnapshot
+        readonly agentId: string
+        readonly gitBranch: string | null
+        readonly projectDirectory: string
         readonly projectId: string
         readonly providerId: string
+        readonly workspaceDirectory: string
         readonly workspaceName: string
       }): Promise<WorkspaceAgentSnapshot>
       renameWorkspaceAgent(command: {

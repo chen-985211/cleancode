@@ -307,7 +307,7 @@ Agent 控制台必须：
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
-“新建 Agent”每次都必须打开统一的检测选择器，不能因只有一个候选项而跳过选择。检测期间只显示中性的加载状态，不得先闪现静态注册目录；没有可创建 Provider 时显示明确空状态和重新检测入口。用户选择 Provider 后，系统必须在持久化前重新验证当前可用性并阻止重复提交；Provider 在发现后变为不可用或创建发生其他错误时保留选择器和错误反馈，只有成功创建才关闭。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+“新建 Agent”每次都必须打开统一的检测选择器，不能因只有一个候选项而跳过选择。检测期间只显示中性的加载状态，不得先闪现静态注册目录；没有可创建 Provider 时显示明确空状态和重新检测入口。选择器打开时建立一次稳定创建意图，创建失败后的重试必须复用同一身份；用户取消或切换项目/工作区才废弃该意图。用户选择 Provider 后，系统必须在持久化前重新验证当前可用性和完整 Project 工作区作用域并阻止重复提交；Provider 在发现后变为不可用或创建发生其他错误时保留选择器和错误反馈，只有当前作用域成功创建才关闭。名称和初始布局由后端原子分配，旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
 
 Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、选择、状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
 

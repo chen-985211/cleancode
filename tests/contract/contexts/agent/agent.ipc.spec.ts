@@ -215,9 +215,12 @@ describe('agent IPC contract', () => {
     )
 
     await ipcMain.invoke('cleancode:create-workspace-agent', {
-      layout: { position: { x: 620, y: 160 }, size: { width: 440, height: 520 } },
+      agentId: 'agent-2',
+      gitBranch: null,
+      projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',
+      workspaceDirectory: '/work/app',
       workspaceName: 'main'
     })
     await ipcMain.invoke('cleancode:rename-workspace-agent', {
@@ -238,9 +241,15 @@ describe('agent IPC contract', () => {
       workspaceName: 'main'
     })
 
-    expect(createWorkspaceAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ providerId: 'claude-code' })
-    )
+    expect(createWorkspaceAgent).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      gitBranch: null,
+      projectDirectory: '/work/app',
+      projectId: 'project-1',
+      providerId: 'claude-code',
+      workspaceDirectory: '/work/app',
+      workspaceName: 'main'
+    })
     expect(renameWorkspaceAgent).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-2', name: 'Review Agent' })
     )

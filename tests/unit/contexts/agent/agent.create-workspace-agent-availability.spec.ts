@@ -26,9 +26,11 @@ describe('create workspace Agent availability', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-1',
-        layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
+        gitBranch: null,
+        projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
+        workspaceDirectory: '/work/app',
         workspaceName: 'main'
       })
     ).rejects.toThrowError(

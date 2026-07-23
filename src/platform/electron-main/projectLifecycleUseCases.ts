@@ -24,9 +24,11 @@ export function createProjectLifecycleUseCases(input: {
   readonly gitWorkspace: GitWorkspacePort
   readonly projectRegistry: ProjectRegistryRepository
   readonly projects: ProjectRepository
+  readonly workspaceTransactions?: ProjectWorkspaceTransactionCoordinator
 }) {
   const registryTransactions = new ProjectRegistryTransactionCoordinator()
-  const workspaceTransactions = new ProjectWorkspaceTransactionCoordinator()
+  const workspaceTransactions =
+    input.workspaceTransactions ?? new ProjectWorkspaceTransactionCoordinator()
   return {
     archiveBranchWorkspaceUseCase: new ArchiveBranchWorkspaceUseCase(
       input.projects,

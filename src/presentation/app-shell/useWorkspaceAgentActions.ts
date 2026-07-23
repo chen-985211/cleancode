@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
-import { resolveNewAgentConsolePosition } from './agentConsolePlacement'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
@@ -12,6 +10,7 @@ import { useI18n } from './i18n/useI18n'
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 export interface AgentProviderPickerState {
+  readonly agentId: string
   readonly error: 'creation' | 'discovery' | null
   readonly pendingProviderId: string | null
   readonly providers: readonly CreatableAgentProviderSnapshot[] | null
@@ -40,14 +39,18 @@ export function useWorkspaceAgentActions({
   )
   const providerRequestGenerationRef = useRef(0)
   const providerDiscoveryPendingRef = useRef(false)
+  const creationIntentIdRef = useRef<string | null>(null)
   const workspaceScopeKey =
     currentWorkbench && currentWorkspace
       ? `${currentWorkbench.project.id}\0${currentWorkspace.name}`
       : null
+  const workspaceScopeKeyRef = useRef(workspaceScopeKey)
+  workspaceScopeKeyRef.current = workspaceScopeKey
 
   useEffect(() => {
     providerRequestGenerationRef.current += 1
     providerDiscoveryPendingRef.current = false
+    creationIntentIdRef.current = null
     setAgentProviderPicker(null)
   }, [workspaceScopeKey])
 
@@ -69,25 +72,21 @@ export function useWorkspaceAgentActions({
 
   const createWorkspaceAgentWithProvider = useCallback(
     async (providerId: string): Promise<WorkspaceAgentSnapshot | null> => {
-      if (!currentWorkbench || !currentWorkspace) return null
-      const agents = currentWorkbench.agents ?? []
-      const position = resolveNewAgentConsolePosition(agents.map((agent) => agent.layout))
-      const created = await window.cleancode?.createWorkspaceAgent({
-        layout: {
-          position,
-          size: defaultAgentLayoutSize
-        },
-        projectId: currentWorkbench.project.id,
-        providerId,
-        workspaceName: currentWorkspace.name
-      })
-      if (created) {
-        setWorkspaceAgents(currentWorkbench.project.id, currentWorkspace.name, [...agents, created])
-        onWorkspaceAgentCreated(created)
-      }
-      return created ?? null
+      const agentId = creationIntentIdRef.current
+      if (!currentWorkbench || !currentWorkspace || !agentId) return null
+      return (
+        (await window.cleancode?.createWorkspaceAgent({
+          agentId,
+          gitBranch: currentWorkspace.gitBranch,
+          projectDirectory: currentWorkbench.project.directory,
+          projectId: currentWorkbench.project.id,
+          providerId,
+          workspaceDirectory: currentWorkspace.directory,
+          workspaceName: currentWorkspace.name
+        })) ?? null
+      )
     },
-    [currentWorkbench, currentWorkspace, onWorkspaceAgentCreated, setWorkspaceAgents]
+    [currentWorkbench, currentWorkspace]
   )
 
   const discoverAgentProviders = useCallback(async () => {
@@ -95,7 +94,10 @@ export function useWorkspaceAgentActions({
     const discoverProviders = window.cleancode?.discoverCreatableAgentProviders
     const generation = ++providerRequestGenerationRef.current
     providerDiscoveryPendingRef.current = true
+    const agentId = creationIntentIdRef.current ?? createAgentId()
+    creationIntentIdRef.current = agentId
     setAgentProviderPicker({
+      agentId,
       error: null,
       pendingProviderId: null,
       providers: null
@@ -103,6 +105,7 @@ export function useWorkspaceAgentActions({
     if (!discoverProviders) {
       providerDiscoveryPendingRef.current = false
       setAgentProviderPicker({
+        agentId,
         error: 'discovery',
         pendingProviderId: null,
         providers: []
@@ -114,6 +117,7 @@ export function useWorkspaceAgentActions({
       const providers = await discoverProviders({ refresh: true })
       if (providerRequestGenerationRef.current !== generation) return
       setAgentProviderPicker({
+        agentId,
         error: null,
         pendingProviderId: null,
         providers
@@ -121,6 +125,7 @@ export function useWorkspaceAgentActions({
     } catch {
       if (providerRequestGenerationRef.current !== generation) return
       setAgentProviderPicker({
+        agentId,
         error: 'discovery',
         pendingProviderId: null,
         providers: []
@@ -136,6 +141,7 @@ export function useWorkspaceAgentActions({
     if (!currentWorkbench || !currentWorkspace || agentProviderPicker) return
     const agents = currentWorkbench.agents ?? []
     if (agents.length > 0 && !window.confirm(t('agent.multipleWarning'))) return
+    creationIntentIdRef.current = createAgentId()
     await discoverAgentProviders()
   }, [agentProviderPicker, currentWorkbench, currentWorkspace, discoverAgentProviders, t])
 
@@ -143,6 +149,7 @@ export function useWorkspaceAgentActions({
     async (providerId: string) => {
       if (!agentProviderPicker || agentProviderPicker.pendingProviderId) return
       const generation = providerRequestGenerationRef.current
+      const scopeKey = workspaceScopeKey
       setAgentProviderPicker({
         ...agentProviderPicker,
         error: null,
@@ -150,9 +157,20 @@ export function useWorkspaceAgentActions({
       })
       try {
         const created = await createWorkspaceAgentWithProvider(providerId)
-        if (providerRequestGenerationRef.current !== generation) return
+        if (
+          providerRequestGenerationRef.current !== generation ||
+          workspaceScopeKeyRef.current !== scopeKey
+        ) {
+          return
+        }
         if (created) {
+          updateWorkspaceAgentState(setCurrentWorkbench, created)
+          setWorkbenches((entries) =>
+            entries.map((workbench) => updateWorkbenchAgent(workbench, created))
+          )
+          onWorkspaceAgentCreated(created)
           setAgentProviderPicker(null)
+          creationIntentIdRef.current = null
           return
         }
         setAgentProviderPicker({
@@ -161,7 +179,12 @@ export function useWorkspaceAgentActions({
           pendingProviderId: null
         })
       } catch {
-        if (providerRequestGenerationRef.current !== generation) return
+        if (
+          providerRequestGenerationRef.current !== generation ||
+          workspaceScopeKeyRef.current !== scopeKey
+        ) {
+          return
+        }
         setAgentProviderPicker({
           ...agentProviderPicker,
           error: 'creation',
@@ -169,12 +192,20 @@ export function useWorkspaceAgentActions({
         })
       }
     },
-    [agentProviderPicker, createWorkspaceAgentWithProvider]
+    [
+      agentProviderPicker,
+      createWorkspaceAgentWithProvider,
+      onWorkspaceAgentCreated,
+      setCurrentWorkbench,
+      setWorkbenches,
+      workspaceScopeKey
+    ]
   )
 
   const cancelAgentProviderSelection = useCallback(() => {
     providerRequestGenerationRef.current += 1
     providerDiscoveryPendingRef.current = false
+    creationIntentIdRef.current = null
     setAgentProviderPicker(null)
   }, [])
 
@@ -299,4 +330,36 @@ function replaceAgent(
   updated: WorkspaceAgentSnapshot
 ): readonly WorkspaceAgentSnapshot[] {
   return agents.map((agent) => (agent.agentId === updated.agentId ? updated : agent))
+}
+
+function upsertAgent(
+  agents: readonly WorkspaceAgentSnapshot[],
+  updated: WorkspaceAgentSnapshot
+): readonly WorkspaceAgentSnapshot[] {
+  return agents.some((agent) => agent.agentId === updated.agentId)
+    ? replaceAgent(agents, updated)
+    : [...agents, updated]
+}
+
+function updateWorkbenchAgent(
+  workbench: WorkbenchSnapshot,
+  updated: WorkspaceAgentSnapshot
+): WorkbenchSnapshot {
+  return workbench.project.id === updated.projectId &&
+    findCurrentWorkspace(workbench)?.name === updated.workspaceName
+    ? { ...workbench, agents: upsertAgent(workbench.agents ?? [], updated) }
+    : workbench
+}
+
+function updateWorkspaceAgentState(
+  setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>,
+  updated: WorkspaceAgentSnapshot
+): void {
+  setCurrentWorkbench((workbench) =>
+    workbench ? updateWorkbenchAgent(workbench, updated) : workbench
+  )
+}
+
+function createAgentId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `agent-${Date.now()}-${Math.random()}`
 }

@@ -9,6 +9,7 @@ import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-ca
 import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
 import { AgentProviderAvailabilityService } from '../../contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../contexts/agent/application/services/AgentProviderRegistry'
+import { AgentWorkspaceTransactionCoordinator } from '../../contexts/agent/application/services/AgentWorkspaceTransactionCoordinator'
 import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
 import { ListAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/ListAgentProvidersUseCase'
 import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
@@ -50,6 +51,8 @@ import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { ListGitBranchNavigationUseCase } from '../../contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
+import { ProjectWorkspaceTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
+import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
 import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
@@ -66,6 +69,7 @@ import { consoleLogger } from '../logging/ConsoleLogSink'
 import { registerAgentIpcHandlers } from './agentIpcHandlers'
 import { createAgentLifecycle, disposeRuntime } from './agentRuntimeLifecycleAdapter'
 import { createAgentRuntimeScopeValidation } from './agentRuntimeScopeValidationAdapter'
+import { AgentWorkspaceCreationScopeAdapter } from './agentWorkspaceCreationScopeAdapter'
 import { createProjectLifecycleUseCases } from './projectLifecycleUseCases'
 import { createRunRuntimeScopeValidation } from './runRuntimeScopeValidationAdapter'
 import { createRunRuntime } from './runRuntimeComposition'
@@ -182,16 +186,25 @@ const agentSessionRepository = new FileSystemAgentSessionRepository(
   join(appStateDirectoryPath, 'agent-sessions.json'),
   agentProviderRegistry
 )
+const agentWorkspaceTransactions = new AgentWorkspaceTransactionCoordinator()
+const projectWorkspaceTransactions = new ProjectWorkspaceTransactionCoordinator()
+const agentWorkspaceCreationScope = new AgentWorkspaceCreationScopeAdapter(
+  new ValidateProjectWorkspaceScopeUseCase(projectRepository, getProjectRegistryRepository()),
+  projectWorkspaceTransactions
+)
 const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
   agentSessionRepository,
   agentProviderRegistry,
   defaultAgentProviderId,
-  agentProviderAvailability
+  agentProviderAvailability,
+  agentWorkspaceTransactions
 )
 const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
   agentSessionRepository,
   agentProviderRegistry,
-  agentProviderAvailability
+  agentProviderAvailability,
+  agentWorkspaceTransactions,
+  agentWorkspaceCreationScope
 )
 const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
 const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
@@ -252,7 +265,8 @@ const {
   branchDirectories: branchWorkspaceDirectoryResolver,
   gitWorkspace: gitWorkspaceAdapter,
   projectRegistry: getProjectRegistryRepository(),
-  projects: projectRepository
+  projects: projectRepository,
+  workspaceTransactions: projectWorkspaceTransactions
 })
 const updateWorkspaceAgentMcpCapabilityUseCase = new UpdateWorkspaceAgentMcpCapabilityUseCase(
   agentSessionRepository,

@@ -108,14 +108,15 @@ describe('app shell Agent console', () => {
       expect(document.querySelectorAll('[data-agent-console-node]')).toHaveLength(2)
     )
 
+    const currentWorkspace = baseWorkbench.project.workspaces[0]!
     expect(createWorkspaceAgent).toHaveBeenCalledWith({
-      layout: {
-        position: { x: 808, y: 140 },
-        size: { width: 720, height: 460 }
-      },
+      agentId: expect.any(String),
+      gitBranch: currentWorkspace.gitBranch,
+      projectDirectory: baseWorkbench.project.directory,
       projectId: baseWorkbench.project.id,
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceDirectory: currentWorkspace.directory,
+      workspaceName: currentWorkspace.name
     })
     expect(document.querySelector('[aria-label="移除 Agent 2"]')).not.toBeInTheDocument()
     expect(document.querySelector('[aria-label="Agent 2 更多操作"]')).toBeInTheDocument()

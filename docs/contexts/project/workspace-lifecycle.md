@@ -83,7 +83,7 @@ Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不�
 
 ### 项目写事务与自动同步
 
-`CreateOrOpenProject`、创建/选择工作区、主目录 checkout、归档、自动 Git 同步和移除项目必须共享同一个 `ProjectWorkspaceTransactionCoordinator`。协调器从每个用例的首次仓储读取开始按项目目录串行，自动同步不得在 checkout 或归档中间缓存旧快照后再覆盖提交结果。
+`CreateOrOpenProject`、创建/选择工作区、主目录 checkout、归档、自动 Git 同步、移除项目，以及保存新 Agent 前的工作区作用域验证必须共享同一个 `ProjectWorkspaceTransactionCoordinator`。协调器从每个用例的首次仓储读取开始按项目目录串行，自动同步不得在 checkout 或归档中间缓存旧快照后再覆盖提交结果；Agent 创建只有在该事务内重新确认项目仍被记住且工作区名称、目录和 Git 分支完整匹配后才能提交。
 
 `ProjectRegistry` 是跨项目目录共享的一份整表快照，其 remember/forget/select 读改写必须另行共享全局 `ProjectRegistryTransactionCoordinator`。移除项目同时持有该目录的 workspace transaction 与全局 registry transaction；不同目录的并发移除以及 remember/forget/select 并发都不得用旧登记簿快照覆盖另一项更新。
 

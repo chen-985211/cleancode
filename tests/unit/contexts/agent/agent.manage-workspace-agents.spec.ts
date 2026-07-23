@@ -5,6 +5,7 @@ import { RenameWorkspaceAgentUseCase } from '../../../../src/contexts/agent/appl
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
 import { AgentProviderAvailabilityService } from '../../../../src/contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
+import { AgentWorkspaceTransactionCoordinator } from '../../../../src/contexts/agent/application/services/AgentWorkspaceTransactionCoordinator'
 import type { AgentProviderContribution } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
 import type {
@@ -14,6 +15,7 @@ import type {
 import type { WorkspaceAgentRuntimePort } from '../../../../src/contexts/agent/application/ports/WorkspaceAgentRuntimePort'
 import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('manage workspace Agents', () => {
   it('does not persist an Agent for an unregistered Provider', async () => {
@@ -24,14 +26,126 @@ describe('manage workspace Agents', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-unknown',
-        layout: { position: { x: 540, y: 120 }, size: { width: 720, height: 460 } },
+        gitBranch: null,
+        projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'unknown-provider',
+        workspaceDirectory: '/work/app',
         workspaceName: 'main'
       })
     ).rejects.toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_NOT_FOUND' }))
 
     expect(save).not.toHaveBeenCalled()
+  })
+
+  it('persists one Agent when the same creation intent is submitted concurrently', async () => {
+    const repository = new MemoryAgentRepository()
+    const save = vi.spyOn(repository, 'save')
+    const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
+    const command = {
+      agentId: 'agent-create-1',
+      gitBranch: null,
+      projectDirectory: '/work/app',
+      projectId: 'project-1',
+      providerId: 'codex',
+      workspaceDirectory: '/work/app',
+      workspaceName: 'main'
+    }
+
+    const [first, repeated] = await Promise.all([
+      useCase.execute(command),
+      useCase.execute(command)
+    ])
+
+    expect(repeated).toEqual(first)
+    expect(save).toHaveBeenCalledOnce()
+  })
+
+  it('rejects changing the Provider of an already committed creation intent', async () => {
+    const repository = new MemoryAgentRepository()
+    const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
+    const command = {
+      agentId: 'agent-create-1',
+      gitBranch: null,
+      projectDirectory: '/work/app',
+      projectId: 'project-1',
+      providerId: 'codex',
+      workspaceDirectory: '/work/app',
+      workspaceName: 'main'
+    }
+
+    await useCase.execute(command)
+
+    await expect(useCase.execute({ ...command, providerId: 'claude-code' })).rejects.toMatchObject({
+      code: 'AGENT_CREATION_CONFLICT'
+    })
+    await expect(repository.findAgent('project-1', 'main', command.agentId)).resolves.toMatchObject(
+      {
+        providerId: 'codex'
+      }
+    )
+  })
+
+  it('does not persist an Agent when the requested Project workspace scope is stale', async () => {
+    const repository = new MemoryAgentRepository()
+    const providers = createProviderRegistry()
+    const save = vi.spyOn(repository, 'save')
+    const useCase = new CreateWorkspaceAgentUseCase(
+      repository,
+      providers,
+      new AgentProviderAvailabilityService(providers),
+      new AgentWorkspaceTransactionCoordinator(),
+      {
+        run: async () => {
+          throw createExpectedAppError(
+            'AGENT_WORKSPACE_SCOPE_STALE',
+            'Agent workspace scope is no longer active.'
+          )
+        }
+      }
+    )
+
+    await expect(
+      useCase.execute({
+        agentId: 'agent-stale',
+        gitBranch: null,
+        projectDirectory: '/work/app',
+        projectId: 'project-1',
+        providerId: 'codex',
+        workspaceDirectory: '/work/app',
+        workspaceName: 'main'
+      })
+    ).rejects.toMatchObject({ code: 'AGENT_WORKSPACE_SCOPE_STALE' })
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('allocates unique names when different Agent creation intents run concurrently', async () => {
+    const repository = new MemoryAgentRepository()
+    const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
+    const create = (agentId: string) =>
+      useCase.execute({
+        agentId,
+        gitBranch: null,
+        projectDirectory: '/work/app',
+        projectId: 'project-1',
+        providerId: 'codex',
+        workspaceDirectory: '/work/app',
+        workspaceName: 'main'
+      })
+
+    const created = await Promise.all([create('agent-create-1'), create('agent-create-2')])
+
+    expect(created.map((agent) => agent.name)).toEqual(['Agent 1', 'Agent 2'])
+    expect(created.map((agent) => agent.layout)).toEqual([
+      {
+        position: { x: 540, y: 120 },
+        size: { width: 720, height: 460 }
+      },
+      {
+        position: { x: 1308, y: 120 },
+        size: { width: 720, height: 460 }
+      }
+    ])
   })
 
   it('creates one default Agent only when a workspace is first initialized', async () => {
@@ -125,9 +239,11 @@ describe('manage workspace Agents', () => {
     const [first] = await list.execute({ projectId: 'project-1', workspaceName: 'main' })
     const second = await create.execute({
       agentId: 'agent-2',
-      layout: { position: { x: 620, y: 160 }, size: { width: 440, height: 520 } },
+      gitBranch: null,
+      projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',
+      workspaceDirectory: '/work/app',
       workspaceName: 'main'
     })
 

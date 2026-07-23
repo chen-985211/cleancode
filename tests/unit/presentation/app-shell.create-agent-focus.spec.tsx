@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
@@ -98,11 +98,11 @@ describe('app shell create Agent focus', () => {
     })
     runtimeApi.createWorkspaceAgent.mockImplementation(async (command) =>
       createAgent(
-        'agent-1',
+        command.agentId,
         workbench.project.id,
         {
-          position: command.layout.position,
-          size: command.layout.size
+          position: { x: 540, y: 120 },
+          size: { width: 720, height: 460 }
         },
         command.providerId
       )
@@ -254,7 +254,101 @@ describe('app shell create Agent focus', () => {
     fireEvent.click(screen.getByRole('button', { name: /Codex/ }))
 
     await waitFor(() => expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledTimes(2))
+    const [firstCommand, repeatedCommand] = runtimeApi.createWorkspaceAgent.mock.calls.map(
+      ([command]) => command
+    )
+    expect(repeatedCommand.agentId).toBe(firstCommand.agentId)
+    const currentWorkspace = workbench.project.workspaces[0]!
+    expect(firstCommand).toEqual({
+      agentId: expect.any(String),
+      gitBranch: currentWorkspace.gitBranch,
+      projectDirectory: workbench.project.directory,
+      projectId: workbench.project.id,
+      providerId: 'codex',
+      workspaceDirectory: currentWorkspace.directory,
+      workspaceName: currentWorkspace.name
+    })
     expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
+  })
+
+  it('ignores a creation result that arrives after switching workspaces', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      workspaces: [
+        {
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: true,
+          name: 'main'
+        },
+        {
+          directory: '/tmp/alpha-feature',
+          gitBranch: 'feature/agent',
+          isCurrent: false,
+          name: 'feature/agent'
+        }
+      ]
+    })
+    const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
+      gitBranch: 'feature/agent',
+      workspaceDirectory: '/tmp/alpha-feature',
+      workspaceName: 'feature/agent',
+      workspaces: [
+        {
+          directory: '/tmp/alpha-project',
+          gitBranch: 'main',
+          isCurrent: false,
+          name: 'main'
+        },
+        {
+          directory: '/tmp/alpha-feature',
+          gitBranch: 'feature/agent',
+          isCurrent: true,
+          name: 'feature/agent'
+        }
+      ]
+    })
+    let resolveCreation = (agent: ReturnType<typeof createAgent>): void => {
+      void agent
+    }
+    const creation = new Promise<ReturnType<typeof createAgent>>((resolve) => {
+      resolveCreation = resolve
+    })
+    const runtimeApi = createRuntimeApi({
+      createWorkspaceAgent: vi.fn(() => creation),
+      discoverCreatableAgentProviders: vi.fn(async () => [
+        createCreatableProvider('codex', 'Codex', true)
+      ]),
+      listWorkbenches: vi.fn(async () => [workbench]),
+      switchBranchWorkspace: vi.fn(async () => switchedWorkbench)
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
+
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+    fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/agent 独立工作区' }))
+    await waitFor(() => expect(runtimeApi.switchBranchWorkspace).toHaveBeenCalledOnce())
+
+    await act(async () => {
+      resolveCreation(
+        createAgent('agent-stale', workbench.project.id, {
+          position: { x: 540, y: 120 },
+          size: { width: 720, height: 460 }
+        })
+      )
+      await creation
+    })
+
+    expect(
+      document.querySelector('[data-agent-console-node="agent-stale"]')
+    ).not.toBeInTheDocument()
+    expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
   })
 })
 

@@ -44,9 +44,12 @@ export interface AgentIpcHandlersInput {
     readonly workspaceName: string
   }) => Promise<AgentSessionSnapshot>
   readonly createWorkspaceAgent: (command: {
-    readonly layout: AgentLayoutSnapshot
+    readonly agentId: string
+    readonly gitBranch: string | null
+    readonly projectDirectory: string
     readonly projectId: string
     readonly providerId: string
+    readonly workspaceDirectory: string
     readonly workspaceName: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly discoverCreatableAgentProviders: (options: {
@@ -171,16 +174,18 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
 
   registerIpcHandler<
     {
-      readonly layout: AgentLayoutSnapshot
+      readonly agentId: string
+      readonly gitBranch: string | null
+      readonly projectDirectory: string
       readonly projectId: string
       readonly providerId: string
+      readonly workspaceDirectory: string
       readonly workspaceName: string
     },
     WorkspaceAgentSnapshot
   >({
     channel: 'cleancode:create-workspace-agent',
-    handler: (command) =>
-      input.createWorkspaceAgent({ ...command, providerId: readProviderId(command.providerId) }),
+    handler: (command) => input.createWorkspaceAgent(readCreateWorkspaceAgentCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'createWorkspaceAgent',
@@ -342,6 +347,38 @@ function readProviderId(value: unknown): string {
   throw createExpectedAppError(
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: providerId must be a non-empty string.'
+  )
+}
+
+function readCreateWorkspaceAgentCommand(command: unknown): {
+  readonly agentId: string
+  readonly gitBranch: string | null
+  readonly projectDirectory: string
+  readonly projectId: string
+  readonly providerId: string
+  readonly workspaceDirectory: string
+  readonly workspaceName: string
+} {
+  if (!isRecord(command)) {
+    throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid Agent creation command.')
+  }
+  return {
+    agentId: readRequiredString(command.agentId, 'agentId'),
+    gitBranch:
+      command.gitBranch === null ? null : readRequiredString(command.gitBranch, 'gitBranch'),
+    projectDirectory: readRequiredString(command.projectDirectory, 'projectDirectory'),
+    projectId: readRequiredString(command.projectId, 'projectId'),
+    providerId: readProviderId(command.providerId),
+    workspaceDirectory: readRequiredString(command.workspaceDirectory, 'workspaceDirectory'),
+    workspaceName: readRequiredString(command.workspaceName, 'workspaceName')
+  }
+}
+
+function readRequiredString(value: unknown, fieldName: string): string {
+  if (typeof value === 'string' && value.trim() === value && value.length > 0) return value
+  throw createExpectedAppError(
+    'INVALID_IPC_COMMAND',
+    `Invalid IPC command: ${fieldName} must be a non-empty string.`
   )
 }
 

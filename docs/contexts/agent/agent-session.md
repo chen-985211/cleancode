@@ -36,6 +36,8 @@
 
 每个工作区允许有零个或多个 Agent。首次初始化从未存在过的工作区时，只有共享可用性服务确认 Codex 为 `installed` 才创建默认 Codex Agent；否则原子写入已初始化的空 Agent 列表，不回退到其他 Provider。仓储把“检查是否已经初始化”和“写入默认 Agent 或空列表”作为同一个串行操作，因此并发首次列出不能重复创建默认 Agent。已经初始化为空的工作区不会在以后仅因 CLI 安装状态变化而自动补建；用户删除最后一个 Agent 后，重新打开同样保持零个。
 
+手动创建由 Presentation 在打开选择器时生成稳定 `agentId`，同一次选择流程的失败重试必须复用该 ID。应用层按 `projectId + workspaceName` 串行检查和保存；相同 ID 与 Provider 的重复请求返回已提交 Agent，相同 ID 请求其他 Provider 以 `AGENT_CREATION_CONFLICT` 拒绝。名称和初始布局由 Agent domain 根据事务内重新读取的工作区 Agent 统一分配，Renderer 不得提交这两项事实，因此并发创建不能重名或重叠。保存前还必须在 Project 写事务内验证项目仍被记住且项目 ID、工作区名称、目录和 Git 分支完整匹配；失效作用域以 `AGENT_WORKSPACE_SCOPE_STALE` 拒绝且不保存。
+
 `AgentSession` 保持以下不变量：
 
 1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。

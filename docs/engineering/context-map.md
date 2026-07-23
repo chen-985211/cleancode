@@ -99,16 +99,16 @@ Agent application
 | 契约             | 图校验通过后，删除提交前阻止并硬清理该项目/工作区/终端作用域；保存成功 resolve，清理已确认但保存失败 release，清理结果不确定时 quarantine |
 | 禁止             | BlockGraph 直接停止 PTY、释放端口租约或读取 Run 内部状态                                                                                  |
 
-## Agent 到 Project：运行时作用域有效性
+## Agent 到 Project：创建与运行时作用域有效性
 
-| 项目             | 说明                                                                                          |
-| ---------------- | --------------------------------------------------------------------------------------------- |
-| 发起方           | Agent                                                                                         |
-| 调用方拥有的端口 | `AgentRuntimeScopeValidationPort`                                                             |
-| 提供方           | Project 的 `ValidateProjectWorkspaceScopeUseCase`                                             |
-| 触发条件         | 每次附加，以及挂起恢复、MCP 重配等任何 Agent PTY 启动                                         |
-| 契约             | 项目仍被记住，项目 ID、工作区名称/目录和 Git 分支全部匹配；Platform 同时确认 Agent 定义仍存在 |
-| 禁止             | Agent 直接读取 Project/ProjectRegistry 聚合或仓储                                             |
+| 项目             | 说明                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Agent                                                                                                                                             |
+| 调用方拥有的端口 | `AgentWorkspaceCreationScopePort`、`AgentRuntimeScopeValidationPort`                                                                              |
+| 提供方           | Project 的 `ValidateProjectWorkspaceScopeUseCase`                                                                                                 |
+| 触发条件         | 保存新 Agent；每次附加，以及挂起恢复、MCP 重配等任何 Agent PTY 启动                                                                               |
+| 契约             | 项目仍被记住，项目 ID、工作区名称/目录和 Git 分支全部匹配；创建校验与 Project 写操作共享项目事务；运行时校验由 Platform 同时确认 Agent 定义仍存在 |
+| 禁止             | Agent 直接读取 Project/ProjectRegistry 聚合或仓储                                                                                                 |
 
 该校验是 lifecycle lease 的提交后防线：即使旧 renderer 命令在 lease resolve 后才抵达，已删除 Agent、已归档工作区、已遗忘项目或旧分支作用域也不能重新启动 Agent terminal 或 Provider launch。
 
