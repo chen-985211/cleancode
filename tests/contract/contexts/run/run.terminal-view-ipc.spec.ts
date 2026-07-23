@@ -54,6 +54,33 @@ describe('terminal view IPC contract', () => {
     expect(explicitSender.listenerCount).toBe(0)
   })
 
+  it('shares one renderer destruction listener across every view owned by the same sender', async () => {
+    const ipcMain = new FakeIpcMain()
+    const sender = new FakeSender()
+    const detachTerminalView = vi.fn(
+      async (command: ReturnType<typeof viewCommand>) => void command
+    )
+    registerTerminalIpcHandlers(createInput({ ipcMain, detachTerminalView }))
+    const commands = Array.from({ length: 12 }, (_, index) => viewCommand(`view-${index + 1}`))
+
+    await Promise.all(
+      commands.map((command) => ipcMain.invoke('cleancode:attach-terminal-view', command, sender))
+    )
+
+    expect(sender.listenerCount).toBe(1)
+
+    await ipcMain.invoke('cleancode:detach-terminal-view', commands[0], sender)
+    expect(sender.listenerCount).toBe(1)
+
+    sender.destroy()
+
+    await vi.waitFor(() => expect(detachTerminalView).toHaveBeenCalledTimes(commands.length))
+    expect(detachTerminalView.mock.calls.map(([command]) => command)).toEqual(
+      expect.arrayContaining(commands)
+    )
+    expect(sender.listenerCount).toBe(0)
+  })
+
   it('releases every registered view before application shutdown and ignores later destruction', async () => {
     const ipcMain = new FakeIpcMain()
     const firstSender = new FakeSender()

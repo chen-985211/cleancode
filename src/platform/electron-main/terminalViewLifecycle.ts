@@ -19,6 +19,11 @@ export interface TerminalViewLifecycle {
 interface TerminalViewRegistration {
   readonly command: TerminalViewIdentityCommand
   readonly sender: TerminalViewIpcSender
+}
+
+interface TerminalViewSenderRegistration {
+  readonly sender: TerminalViewIpcSender
+  readonly viewIds: Set<string>
   readonly listener: () => void
 }
 
@@ -33,14 +38,20 @@ export function createTerminalViewLifecycle(input: {
   readonly logger: Logger
 }): TerminalViewLifecycle {
   const registrations = new Map<string, TerminalViewRegistration>()
+  const senderRegistrations = new Map<TerminalViewIpcSender, TerminalViewSenderRegistration>()
   const releases = new Map<string, Promise<void>>()
   let isShuttingDown = false
   let shutdownPromise: Promise<void> | null = null
 
   const discardRegistration = (registration: TerminalViewRegistration): void => {
     if (registrations.get(registration.command.viewId) !== registration) return
-    registration.sender.removeListener('destroyed', registration.listener)
     registrations.delete(registration.command.viewId)
+    const senderRegistration = senderRegistrations.get(registration.sender)
+    if (!senderRegistration) return
+    senderRegistration.viewIds.delete(registration.command.viewId)
+    if (senderRegistration.viewIds.size > 0) return
+    registration.sender.removeListener('destroyed', senderRegistration.listener)
+    senderRegistrations.delete(registration.sender)
   }
 
   const discardView = (command: TerminalViewIdentityCommand): void => {
@@ -76,6 +87,35 @@ export function createTerminalViewLifecycle(input: {
     return deferred.promise
   }
 
+  const getOrCreateSenderRegistration = (
+    sender: TerminalViewIpcSender
+  ): TerminalViewSenderRegistration => {
+    const existing = senderRegistrations.get(sender)
+    if (existing) return existing
+
+    const senderRegistration: TerminalViewSenderRegistration = {
+      listener: () => {
+        for (const viewId of [...senderRegistration.viewIds]) {
+          const registration = registrations.get(viewId)
+          if (!registration || registration.sender !== sender) continue
+          void releaseView(registration.command).catch((error) => {
+            input.logger.warn({
+              error: resolveLogError(error),
+              operation: 'detachDestroyedTerminalView',
+              outcome: 'failure',
+              scope: 'run.terminal-view'
+            })
+          })
+        }
+      },
+      sender,
+      viewIds: new Set()
+    }
+    sender.once('destroyed', senderRegistration.listener)
+    senderRegistrations.set(sender, senderRegistration)
+    return senderRegistration
+  }
+
   const registerView = (
     command: TerminalViewIdentityCommand,
     sender: TerminalViewIpcSender
@@ -89,19 +129,9 @@ export function createTerminalViewLifecycle(input: {
 
     const existing = registrations.get(command.viewId)
     if (existing) discardRegistration(existing)
-    const listener = () => {
-      void releaseView(command).catch((error) => {
-        input.logger.warn({
-          error: resolveLogError(error),
-          operation: 'detachDestroyedTerminalView',
-          outcome: 'failure',
-          scope: 'run.terminal-view'
-        })
-      })
-    }
-    const registration = { command, sender, listener }
-    sender.once('destroyed', listener)
+    const registration = { command, sender }
     registrations.set(command.viewId, registration)
+    getOrCreateSenderRegistration(sender).viewIds.add(command.viewId)
   }
 
   const prepareApplicationShutdown = (): Promise<void> => {
