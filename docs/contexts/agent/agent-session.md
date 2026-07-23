@@ -122,13 +122,14 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 ## 管理动作
 
 - 发现：刷新共享检测环境并从注册 catalog 中只返回当前 `installed` Provider；加载、空结果和重试是选择器的易失状态。
-- 创建：从可创建发现结果中选择一次，并在保存前刷新验证；失败不保存 Agent 且保留选择流程，不提供 Provider 切换。
-- 列出：只在工作区从未初始化且 Codex 当前为 `installed` 时原子建立默认 Codex Agent，否则原子建立空工作区；既有 Agent 不按 CLI 可用性过滤。
+- 创建：从可创建发现结果中选择一次，并在保存前刷新验证 Provider 仍为 `installed` 且没有被用户禁用；MCP 初始值读取应用级新建默认并受 Provider capability 限制。失败不保存 Agent 且保留选择流程，不提供 Provider 切换。
+- 列出：只在工作区从未初始化、Codex 当前为 `installed` 且没有被用户禁用时原子建立默认 Codex Agent，否则原子建立空工作区；既有 Agent 不按 CLI 可用性或启用偏好过滤。
 - 重命名/布局：只修改目标 Agent 的稳定事实。
 - 删除：停止目标 launch 和 terminal，取消审批、注销 MCP、删除定义和全部分支绑定；其他 Agent 不受影响。
 - 重新启动：在同一 Agent terminal 创建新 generation；Provider 支持恢复时使用当前分支 session ref。
 - 新对话：清除当前分支 session ref，在同一 Agent terminal 创建新 launch。
 - 切换 MCP：先保存偏好；活动运行时会关闭旧审批和端点并建立新 session/launch，其他 Agent 不受影响。
+- 修改 Provider 启动偏好：应用级保存权限模式、默认 Provider、启用集合、MCP 新建默认和逐 Provider 启动覆盖；只影响之后的创建或下一次 launch，不批量重启、不改写已有 Agent 的 MCP 开关。
 - 挂起/恢复：工作目录所有权变化时停止整个 Agent terminal；失败补偿可以按稳定 Provider session ref 恢复。
 - 应用退出：`prepare` 停止新附加，排空在途运行时操作和绑定保存，收敛工具/审批并清理 launch artifact 与 MCP；Run 把全部 PTY 一次性交给独立 Provider 后，`complete` 才清除 Agent 的本地 session、runtime 和 terminal 引用。Agent 上下文不逐会话发起 PTY stop，Agent terminal 永远不能启用退出保留；Provider 必须将其作为终止候选处理。
 

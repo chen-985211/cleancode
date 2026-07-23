@@ -2,7 +2,8 @@ import type {
   AgentLaunchPlanner,
   AgentProviderContribution,
   AgentProviderDescriptor,
-  AgentProviderDetector
+  AgentProviderDetector,
+  AgentProviderLaunchConfiguration
 } from '../../../application/ports/AgentProviderContribution'
 import { NodeAgentProviderCommandDetector } from '../shared/NodeAgentProviderCommandDetector'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
@@ -13,8 +14,11 @@ export interface TerminalCliAgentProviderOptions {
 }
 
 interface TerminalCliAgentProviderConfig {
-  readonly args: readonly string[]
+  readonly detectionExecutable?: string
+  readonly executableAliases?: readonly string[]
+  readonly launch: AgentProviderLaunchConfiguration
   readonly providerId: string
+  readonly requiredExecutables?: readonly string[]
 }
 
 export const baselineTerminalCliCapabilities = {
@@ -35,22 +39,25 @@ export abstract class TerminalCliAgentProviderContribution implements AgentProvi
     config: TerminalCliAgentProviderConfig,
     options: TerminalCliAgentProviderOptions
   ) {
-    const command = options.command ?? config.providerId
+    const command = options.command ?? config.launch.executable
     this.detector =
       options.detector ??
       new NodeAgentProviderCommandDetector({
-        executable: command,
-        providerId: config.providerId
+        executable: options.command ?? config.detectionExecutable ?? config.launch.executable,
+        executableAliases: config.executableAliases,
+        providerId: config.providerId,
+        requiredExecutables: config.requiredExecutables
       })
     this.launcher = {
-      createLaunchPlan: async () => ({
-        args: config.args,
+      createLaunchPlan: async (launchCommand) => ({
+        args: launchCommand.launchProfile?.arguments ?? config.launch.defaultArguments,
         env: {
           ELECTRON_RUN_AS_NODE: '1',
           PROMPT_EOL_MARK: '',
-          ...createAgentProviderLoopbackEnvironment()
+          ...createAgentProviderLoopbackEnvironment(),
+          ...(launchCommand.launchProfile?.environment ?? config.launch.defaultEnvironment)
         },
-        executable: command
+        executable: launchCommand.launchProfile?.executable ?? command
       })
     }
   }

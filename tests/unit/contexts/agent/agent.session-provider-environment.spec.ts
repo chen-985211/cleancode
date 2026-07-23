@@ -11,6 +11,7 @@ import { AgentProviderRegistry } from '../../../../src/contexts/agent/applicatio
 import { AgentSessionService } from '../../../../src/contexts/agent/application/use-cases/AgentSessionService'
 import { validateAgentProviderAvailability } from '../../../../src/contexts/agent/application/use-cases/AgentSessionRuntimeState'
 import { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
+import { AgentProviderPreferences } from '../../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
 import { RecordingAgentTerminalRuntime } from '../../../fixtures/agentTerminalRuntime'
 
 describe('Agent session Provider environment', () => {
@@ -92,6 +93,61 @@ describe('Agent session Provider environment', () => {
     expect(environment.prepare).toHaveBeenCalledOnce()
     expect(contribution.detector.inspect).toHaveBeenCalledOnce()
   })
+
+  it('resolves the persisted Yolo mode and launch overrides before creating a launch plan', async () => {
+    const contribution = createContribution('codex', {
+      defaultArguments: ['--base'],
+      defaultEnvironment: { BASE: '1' },
+      executable: 'codex',
+      permission: {
+        arguments: ['--yolo'],
+        environment: { TRUSTED: '1' }
+      }
+    })
+    const registry = new AgentProviderRegistry([contribution])
+    const preferences = AgentProviderPreferences.create()
+    preferences.setProviderOverride('codex', {
+      argumentsText: '--profile "Clean Code"',
+      environment: { BASE: '2', CUSTOM: 'yes' },
+      executable: '/opt/bin/codex'
+    })
+    const service = new AgentSessionService(
+      new RecordingAgentTerminalRuntime(),
+      noopMcpServer,
+      unusedToolExecution,
+      restoredAgentRepository,
+      registry,
+      'codex',
+      allowAgentRuntimeScope,
+      new AgentProviderAvailabilityService(registry),
+      {
+        load: async () => preferences.toSnapshot(),
+        save: async () => undefined
+      }
+    )
+
+    await service.attach({
+      agentId: 'agent-1',
+      onGraphUpdated: vi.fn(),
+      onRuntimeChanged: vi.fn(),
+      onToolApprovalRequested: vi.fn(),
+      projectDirectory: '/repo/app',
+      projectId: 'project-1',
+      terminalSourceTheme: 'light',
+      workspaceDirectory: '/repo/app',
+      workspaceName: 'main'
+    })
+
+    expect(contribution.launcher.createLaunchPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        launchProfile: {
+          arguments: ['--base', '--yolo', '--profile', 'Clean Code'],
+          environment: { BASE: '2', CUSTOM: 'yes', TRUSTED: '1' },
+          executable: '/opt/bin/codex'
+        }
+      })
+    )
+  })
 })
 
 const restoredAgent = AgentSession.create({
@@ -129,8 +185,12 @@ const unusedToolExecution = {
   }
 }
 
-function createContribution(id: string): AgentProviderContribution & {
+function createContribution(
+  id: string,
+  launch?: NonNullable<AgentProviderContribution['descriptor']['launch']>
+): AgentProviderContribution & {
   readonly detector: { readonly inspect: ReturnType<typeof vi.fn> }
+  readonly launcher: { readonly createLaunchPlan: ReturnType<typeof vi.fn> }
 } {
   return {
     descriptor: {
@@ -147,7 +207,8 @@ function createContribution(id: string): AgentProviderContribution & {
         paths: [{ d: 'M2 2h20v20H2z' }],
         viewBox: '0 0 24 24'
       },
-      id
+      id,
+      ...(launch ? { launch } : {})
     },
     detector: {
       inspect: vi.fn(async (): Promise<AgentProviderAvailability> => ({
@@ -157,7 +218,7 @@ function createContribution(id: string): AgentProviderContribution & {
       }))
     },
     launcher: {
-      createLaunchPlan: async () => ({ args: [], env: {}, executable: id })
+      createLaunchPlan: vi.fn(async () => ({ args: [], env: {}, executable: id }))
     }
   }
 }

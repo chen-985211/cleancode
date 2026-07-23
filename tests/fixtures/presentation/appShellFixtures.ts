@@ -5,6 +5,16 @@ import type {
   AgentSessionSnapshot
 } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderPreferencesSnapshot } from '../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
+
+const defaultAgentProviderPreferences: AgentProviderPreferencesSnapshot = {
+  defaultCleancodeMcpEnabled: true,
+  defaultProviderId: 'codex',
+  disabledProviderIds: [],
+  permissionMode: 'yolo',
+  providerOverrides: {},
+  version: 1
+}
 
 const defaultAgentProviderDescriptor: AgentProviderDescriptor = {
   capabilities: {
@@ -35,6 +45,8 @@ export interface RuntimeApiOverrides {
   readonly synchronizeProjectGitState?: ReturnType<typeof vi.fn>
   readonly inspectCodexCli?: ReturnType<typeof vi.fn>
   readonly inspectAgentProvider?: ReturnType<typeof vi.fn>
+  readonly getAgentProviderPreferences?: ReturnType<typeof vi.fn>
+  readonly updateAgentProviderPreferences?: ReturnType<typeof vi.fn>
   readonly listAgentProviders?: ReturnType<typeof vi.fn>
   readonly discoverCreatableAgentProviders?: ReturnType<typeof vi.fn>
   readonly attachAgentSession?: ReturnType<typeof vi.fn>
@@ -97,6 +109,11 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
               version: 'test'
             }
       ),
+    getAgentProviderPreferences:
+      overrides.getAgentProviderPreferences ?? vi.fn(async () => defaultAgentProviderPreferences),
+    updateAgentProviderPreferences:
+      overrides.updateAgentProviderPreferences ??
+      vi.fn(async (command) => ({ ...defaultAgentProviderPreferences, ...command })),
     listAgentProviders:
       overrides.listAgentProviders ?? vi.fn(async () => [defaultAgentProviderDescriptor]),
     discoverCreatableAgentProviders:

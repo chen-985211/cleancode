@@ -36,6 +36,43 @@ describe('Agent Provider registry', () => {
     })
   })
 
+  it('accepts safe gradients and transforms in a vector Provider icon', () => {
+    const contribution = createContribution('fixture-provider')
+    const icon = {
+      linearGradients: [
+        {
+          id: 'brand',
+          stops: [
+            { offset: '0', stopColor: 'oklch(0.7 0.24 340)' },
+            { offset: '100%', stopColor: '#FFFFFF' }
+          ],
+          x1: '0',
+          x2: '1',
+          y1: '0',
+          y2: '1'
+        }
+      ],
+      paths: [
+        {
+          d: 'M2 2h20v20H2z',
+          fill: 'url(#brand)',
+          transform: 'translate(0 24) scale(.1 -.1)'
+        }
+      ],
+      viewBox: '0 0 24 24'
+    } as const
+
+    expect(
+      () =>
+        new AgentProviderRegistry([
+          {
+            ...contribution,
+            descriptor: { ...contribution.descriptor, icon }
+          }
+        ])
+    ).not.toThrow()
+  })
+
   it('accepts the safe serializable icons contributed by every built-in Provider', () => {
     const registry = new AgentProviderRegistry([
       new CodexAgentProviderContribution(),
@@ -162,6 +199,40 @@ describe('Agent Provider registry', () => {
       'unsafe path fill',
       {
         paths: [{ d: 'M2 2h20v20H2z', fill: 'url(https://example.com/mark.svg)' }],
+        viewBox: '0 0 24 24'
+      }
+    ],
+    [
+      'missing gradient reference',
+      {
+        paths: [{ d: 'M2 2h20v20H2z', fill: 'url(#missing)' }],
+        viewBox: '0 0 24 24'
+      }
+    ],
+    [
+      'unsafe path transform',
+      {
+        paths: [{ d: 'M2 2h20v20H2z', transform: 'translate(0) url(example)' }],
+        viewBox: '0 0 24 24'
+      }
+    ],
+    [
+      'unsafe gradient color',
+      {
+        linearGradients: [
+          {
+            id: 'brand',
+            stops: [
+              { offset: '0', stopColor: '#000000' },
+              { offset: '1', stopColor: 'url(https://example.com/mark.svg)' }
+            ],
+            x1: '0',
+            x2: '1',
+            y1: '0',
+            y2: '1'
+          }
+        ],
+        paths: [{ d: 'M2 2h20v20H2z', fill: 'url(#brand)' }],
         viewBox: '0 0 24 24'
       }
     ]

@@ -28,10 +28,14 @@ import { TooltipLabel } from './Tooltip'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalSettingsPane } from './TerminalSettingsPane'
 import { AgentSettingsPane } from './AgentSettingsPane'
+import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
+import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 
 export type ApplicationSettingsPane = 'agents' | 'shortcuts' | 'terminal'
 
 interface ApplicationSettingsRootProps {
+  readonly agentProviderPreferences?: AgentProviderPreferencesSnapshot
+  readonly agentProviderPreferencesStatus?: 'loading' | 'ready' | 'unavailable'
   readonly bindings: ApplicationShortcutBindings
   readonly defaultAgentProviderId?: string | null
   readonly initialPane?: ApplicationSettingsPane
@@ -43,7 +47,9 @@ interface ApplicationSettingsRootProps {
   ) => void
   readonly onClose: () => void
   readonly onOpen: () => void
-  readonly onAgentProviderChange?: (providerId: string) => void
+  readonly onAgentProviderPreferencesChange?: (
+    command: UpdateAgentProviderPreferencesCommand
+  ) => Promise<void> | void
   readonly onAgentProvidersRefresh?: () => Promise<void> | void
   readonly onResetAll: () => void
   readonly terminalScrollbackRows: TerminalScrollbackRows
@@ -178,8 +184,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               {activePane === 'agents' ? (
                 <AgentSettingsPane
                   defaultProviderId={props.defaultAgentProviderId ?? null}
+                  preferences={props.agentProviderPreferences}
+                  preferencesStatus={props.agentProviderPreferencesStatus}
                   onRefresh={props.onAgentProvidersRefresh ?? noop}
-                  onDefaultProviderChange={props.onAgentProviderChange ?? noop}
+                  onPreferencesChange={props.onAgentProviderPreferencesChange ?? noop}
                 />
               ) : activePane === 'terminal' ? (
                 <TerminalSettingsPane

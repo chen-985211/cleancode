@@ -122,16 +122,94 @@ function isValidProviderIcon(icon: AgentProviderDescriptor['icon'] | undefined):
   }
   if (!Array.isArray(icon.paths) || icon.paths.length === 0 || icon.paths.length > 16) return false
 
+  const gradientIds = validateLinearGradients(icon.linearGradients)
+  if (gradientIds === null) return false
+
   return icon.paths.every((path) => {
     if (!path || typeof path !== 'object' || typeof path.d !== 'string') return false
-    const { d, fill, fillRule } = path
+    const { d, fill, fillRule, transform } = path
     const normalizedPath = d.trim()
     return (
       normalizedPath.length > 0 &&
       normalizedPath.length <= 8192 &&
       /^[MmZzLlHhVvCcSsQqTtAaEe0-9+\-.,\s]+$/.test(normalizedPath) &&
-      (fill === undefined || fill === 'currentColor' || /^#[0-9a-fA-F]{6}$/.test(fill)) &&
-      (fillRule === undefined || fillRule === 'evenodd' || fillRule === 'nonzero')
+      isValidPathFill(fill, gradientIds) &&
+      (fillRule === undefined || fillRule === 'evenodd' || fillRule === 'nonzero') &&
+      isValidPathTransform(transform)
     )
   })
+}
+
+function validateLinearGradients(
+  gradients: Extract<
+    AgentProviderDescriptor['icon'],
+    { readonly paths: unknown }
+  >['linearGradients']
+): ReadonlySet<string> | null {
+  if (gradients === undefined) return new Set()
+  if (!Array.isArray(gradients) || gradients.length === 0 || gradients.length > 8) return null
+
+  const ids = new Set<string>()
+  for (const gradient of gradients) {
+    if (!gradient || typeof gradient !== 'object') return null
+    const { id, stops, x1, x2, y1, y2 } = gradient
+    if (
+      typeof id !== 'string' ||
+      !/^[A-Za-z][A-Za-z0-9_-]{0,31}$/.test(id) ||
+      ids.has(id) ||
+      ![x1, x2, y1, y2].every(isValidSvgCoordinate) ||
+      !Array.isArray(stops) ||
+      stops.length < 2 ||
+      stops.length > 8 ||
+      !stops.every(
+        (stop) =>
+          Boolean(stop) &&
+          typeof stop === 'object' &&
+          isValidGradientOffset(stop.offset) &&
+          isValidCssColor(stop.stopColor)
+      )
+    ) {
+      return null
+    }
+    ids.add(id)
+  }
+  return ids
+}
+
+function isValidPathFill(fill: unknown, gradientIds: ReadonlySet<string>): boolean {
+  if (fill === undefined || fill === 'currentColor') return true
+  if (typeof fill !== 'string') return false
+  if (/^#[0-9a-fA-F]{6}$/.test(fill)) return true
+  const gradientReference = fill.match(/^url\(#([A-Za-z][A-Za-z0-9_-]{0,31})\)$/)
+  return Boolean(gradientReference?.[1] && gradientIds.has(gradientReference[1]))
+}
+
+function isValidPathTransform(transform: unknown): boolean {
+  if (transform === undefined) return true
+  return (
+    typeof transform === 'string' &&
+    transform.length <= 256 &&
+    /^(?:(?:matrix|rotate|scale|skewX|skewY|translate)\([0-9eE+\-.,\s]+\)\s*)+$/.test(transform)
+  )
+}
+
+function isValidSvgCoordinate(value: unknown): value is string {
+  return typeof value === 'string' && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?$/.test(value)
+}
+
+function isValidGradientOffset(value: unknown): boolean {
+  if (!isValidSvgCoordinate(value)) return false
+  const numericValue = Number.parseFloat(value)
+  return value.endsWith('%')
+    ? numericValue >= 0 && numericValue <= 100
+    : numericValue >= 0 && numericValue <= 1
+}
+
+function isValidCssColor(value: unknown): boolean {
+  return (
+    typeof value === 'string' &&
+    (value === 'currentColor' ||
+      /^#[0-9a-fA-F]{6}$/.test(value) ||
+      /^(?:hsl|hsla|oklch|rgb|rgba)\([0-9.%+\-,\s/]+\)$/.test(value))
+  )
 }

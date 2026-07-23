@@ -126,10 +126,35 @@ describe('additional Agent Provider contributions', () => {
     })
   })
 
+  it('detects command aliases and requires companion executables without running them', async () => {
+    const present = new Set(['/bin/vibe', '/bin/helper'])
+    const detector = new NodeAgentProviderCommandDetector({
+      executable: 'mistral-vibe',
+      executableAliases: ['vibe'],
+      findExecutable: async (command) =>
+        present.has(`/bin/${command}`) ? `/bin/${command}` : null,
+      providerId: 'mistral-vibe',
+      requiredExecutables: ['helper']
+    })
+
+    await expect(detector.inspect()).resolves.toEqual({
+      providerId: 'mistral-vibe',
+      status: 'installed',
+      version: 'available'
+    })
+
+    present.delete('/bin/helper')
+    await expect(detector.inspect()).resolves.toMatchObject({
+      providerId: 'mistral-vibe',
+      reason: 'not_found',
+      status: 'missing'
+    })
+  })
+
   it.each([
     [PiAgentProviderContribution, 'pi', 'Pi', 'pi', []],
     [HermesAgentProviderContribution, 'hermes', 'Hermes', 'hermes', ['--tui']],
-    [OpenClawAgentProviderContribution, 'openclaw', 'OpenClaw', 'openclaw', []]
+    [OpenClawAgentProviderContribution, 'openclaw', 'OpenClaw', 'openclaw', ['tui']]
   ] as const)(
     'adds %s as a baseline terminal Provider',
     async (Contribution, providerId, displayName, executable, args) => {
@@ -373,7 +398,12 @@ describe('additional Agent Provider contributions', () => {
         displayName: 'OpenCode',
         documentationUrl: 'https://opencode.ai/docs/cli/',
         icon: openCodeProviderIcon,
-        id: 'opencode'
+        id: 'opencode',
+        launch: {
+          defaultArguments: [],
+          defaultEnvironment: {},
+          executable: 'opencode'
+        }
       })
       expect(contribution).toMatchObject({
         cleancodeCapability: expect.any(Object),

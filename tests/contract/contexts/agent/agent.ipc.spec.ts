@@ -56,6 +56,52 @@ class SilentLogger implements Logger {
 }
 
 describe('agent IPC contract', () => {
+  it('reads and updates validated Agent Provider preferences through typed channels', async () => {
+    const ipcMain = new FakeIpcMain()
+    const getAgentProviderPreferences = vi.fn(async () => createAgentProviderPreferences())
+    const updateAgentProviderPreferences = vi.fn(async () => ({
+      ...createAgentProviderPreferences(),
+      defaultProviderId: 'claude-code',
+      permissionMode: 'manual' as const
+    }))
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({
+        getAgentProviderPreferences,
+        ipcMain,
+        updateAgentProviderPreferences
+      })
+    )
+
+    await expect(ipcMain.invoke('cleancode:get-agent-provider-preferences')).resolves.toEqual({
+      ok: true,
+      value: createAgentProviderPreferences()
+    })
+    await expect(
+      ipcMain.invoke('cleancode:update-agent-provider-preferences', {
+        defaultProviderId: 'claude-code',
+        permissionMode: 'manual'
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { defaultProviderId: 'claude-code', permissionMode: 'manual' }
+    })
+    expect(updateAgentProviderPreferences).toHaveBeenCalledWith({
+      defaultProviderId: 'claude-code',
+      permissionMode: 'manual'
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:update-agent-provider-preferences', {
+        permissionMode: 'unsafe'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(updateAgentProviderPreferences).toHaveBeenCalledOnce()
+  })
+
   it('attaches the renderer to a workspace Codex PTY session and streams session events to it', async () => {
     const ipcMain = new FakeIpcMain()
     const sender = createSender()
@@ -433,6 +479,7 @@ function createAgentIpcHandlersInput(input: {
   readonly disposeAgentWorkspaceSession?: AgentIpcHandlersInput['disposeAgentWorkspaceSession']
   readonly disposeProjectAgentSessions?: AgentIpcHandlersInput['disposeProjectAgentSessions']
   readonly inspectAgentProvider?: AgentIpcHandlersInput['inspectAgentProvider']
+  readonly getAgentProviderPreferences?: AgentIpcHandlersInput['getAgentProviderPreferences']
   readonly listAgentProviders?: AgentIpcHandlersInput['listAgentProviders']
   readonly ipcMain: IpcMainLike
   readonly rejectAgentTool?: AgentIpcHandlersInput['rejectAgentTool']
@@ -442,6 +489,7 @@ function createAgentIpcHandlersInput(input: {
   readonly writeAgentSession?: AgentIpcHandlersInput['writeAgentSession']
   readonly updateWorkspaceAgentLayout?: AgentIpcHandlersInput['updateWorkspaceAgentLayout']
   readonly updateWorkspaceAgentMcpCapability?: AgentIpcHandlersInput['updateWorkspaceAgentMcpCapability']
+  readonly updateAgentProviderPreferences?: AgentIpcHandlersInput['updateAgentProviderPreferences']
 }): AgentIpcHandlersInput {
   return {
     approveAgentTool: input.approveAgentTool ?? (async () => ({ status: 'not_found' })),
@@ -468,6 +516,8 @@ function createAgentIpcHandlersInput(input: {
     inspectAgentProvider:
       input.inspectAgentProvider ??
       (async (providerId) => ({ providerId, status: 'installed' as const, version: '1.0.0' })),
+    getAgentProviderPreferences:
+      input.getAgentProviderPreferences ?? (async () => createAgentProviderPreferences()),
     ipcMain: input.ipcMain,
     listAgentProviders:
       input.listAgentProviders ??
@@ -501,7 +551,20 @@ function createAgentIpcHandlersInput(input: {
       input.updateWorkspaceAgentLayout ?? (async () => createWorkspaceAgentSnapshot('agent-1')),
     updateWorkspaceAgentMcpCapability:
       input.updateWorkspaceAgentMcpCapability ??
-      (async () => ({ agent: createWorkspaceAgentSnapshot('agent-1'), session: null }))
+      (async () => ({ agent: createWorkspaceAgentSnapshot('agent-1'), session: null })),
+    updateAgentProviderPreferences:
+      input.updateAgentProviderPreferences ?? (async () => createAgentProviderPreferences())
+  }
+}
+
+function createAgentProviderPreferences() {
+  return {
+    defaultCleancodeMcpEnabled: true,
+    defaultProviderId: null,
+    disabledProviderIds: [],
+    permissionMode: 'yolo' as const,
+    providerOverrides: {},
+    version: 1 as const
   }
 }
 

@@ -7,6 +7,8 @@ import type {
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
+import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type {
   AgentProviderAvailability,
@@ -61,6 +63,7 @@ export interface AgentIpcHandlersInput {
   }) => Promise<void>
   readonly disposeProjectAgentSessions: (projectDirectory: string) => Promise<void>
   readonly inspectAgentProvider: (providerId: string) => Promise<AgentProviderAvailability>
+  readonly getAgentProviderPreferences: () => Promise<AgentProviderPreferencesSnapshot>
   readonly listAgentProviders: () => readonly AgentProviderDescriptor[]
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
@@ -90,9 +93,32 @@ export interface AgentIpcHandlersInput {
     readonly projectId: string
     readonly workspaceName: string
   }) => Promise<UpdateWorkspaceAgentMcpCapabilityResult>
+  readonly updateAgentProviderPreferences: (
+    command: UpdateAgentProviderPreferencesCommand
+  ) => Promise<AgentProviderPreferencesSnapshot>
 }
 
 export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
+  registerIpcHandler<void, AgentProviderPreferencesSnapshot>({
+    channel: 'cleancode:get-agent-provider-preferences',
+    handler: () => input.getAgentProviderPreferences(),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'getAgentProviderPreferences',
+    scope: 'agent'
+  })
+
+  registerIpcHandler<unknown, AgentProviderPreferencesSnapshot>({
+    channel: 'cleancode:update-agent-provider-preferences',
+    handler: (command) =>
+      input.updateAgentProviderPreferences(readAgentProviderPreferencesPatch(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateAgentProviderPreferences',
+    scope: 'agent',
+    successLogLevel: 'info'
+  })
+
   registerIpcHandler<
     { readonly refresh?: boolean } | undefined,
     readonly CreatableAgentProviderSnapshot[]
@@ -391,6 +417,81 @@ function readDiscoveryOptions(value: unknown): { readonly refresh?: boolean } {
     )
   }
   return value.refresh === undefined ? {} : { refresh: value.refresh }
+}
+
+function readAgentProviderPreferencesPatch(value: unknown): UpdateAgentProviderPreferencesCommand {
+  if (!isRecord(value)) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      'Invalid IPC command: Agent Provider preferences patch is required.'
+    )
+  }
+  const patch: UpdateAgentProviderPreferencesCommand = {}
+  if ('defaultCleancodeMcpEnabled' in value) {
+    if (typeof value.defaultCleancodeMcpEnabled !== 'boolean') {
+      throw invalidPreferencesPatch('defaultCleancodeMcpEnabled must be a boolean.')
+    }
+    Object.assign(patch, { defaultCleancodeMcpEnabled: value.defaultCleancodeMcpEnabled })
+  }
+  if ('defaultProviderId' in value) {
+    if (value.defaultProviderId !== null && typeof value.defaultProviderId !== 'string') {
+      throw invalidPreferencesPatch('defaultProviderId must be a string or null.')
+    }
+    Object.assign(patch, { defaultProviderId: value.defaultProviderId })
+  }
+  if ('disabledProviderIds' in value) {
+    if (
+      !Array.isArray(value.disabledProviderIds) ||
+      !value.disabledProviderIds.every((providerId) => typeof providerId === 'string')
+    ) {
+      throw invalidPreferencesPatch('disabledProviderIds must be a string array.')
+    }
+    Object.assign(patch, { disabledProviderIds: value.disabledProviderIds })
+  }
+  if ('permissionMode' in value) {
+    if (value.permissionMode !== 'yolo' && value.permissionMode !== 'manual') {
+      throw invalidPreferencesPatch('permissionMode must be yolo or manual.')
+    }
+    Object.assign(patch, { permissionMode: value.permissionMode })
+  }
+  if ('providerOverrides' in value) {
+    Object.assign(patch, { providerOverrides: readProviderOverrides(value.providerOverrides) })
+  }
+  return patch
+}
+
+function readProviderOverrides(value: unknown) {
+  if (!isRecord(value)) throw invalidPreferencesPatch('providerOverrides must be an object.')
+  return Object.fromEntries(
+    Object.entries(value).map(([providerId, override]) => {
+      if (!isRecord(override)) {
+        throw invalidPreferencesPatch(`Provider override "${providerId}" must be an object.`)
+      }
+      if (
+        typeof override.argumentsText !== 'string' ||
+        !isStringRecord(override.environment) ||
+        (override.executable !== undefined && typeof override.executable !== 'string')
+      ) {
+        throw invalidPreferencesPatch(`Provider override "${providerId}" is invalid.`)
+      }
+      return [
+        providerId,
+        {
+          argumentsText: override.argumentsText,
+          environment: override.environment,
+          ...(override.executable === undefined ? {} : { executable: override.executable })
+        }
+      ]
+    })
+  )
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string')
+}
+
+function invalidPreferencesPatch(message: string) {
+  return createExpectedAppError('INVALID_IPC_COMMAND', `Invalid IPC command: ${message}`)
 }
 
 function sendIfAlive(sender: IpcSender, channel: string, event: unknown): void {

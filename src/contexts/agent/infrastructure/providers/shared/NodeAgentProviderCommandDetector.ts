@@ -11,9 +11,11 @@ export type FindAgentProviderExecutable = (executable: string) => Promise<string
 
 interface NodeAgentProviderCommandDetectorOptions {
   readonly executable: string
+  readonly executableAliases?: readonly string[]
   readonly findExecutable?: FindAgentProviderExecutable
   readonly installCommand?: string
   readonly providerId: string
+  readonly requiredExecutables?: readonly string[]
 }
 
 export class NodeAgentProviderCommandDetector implements AgentProviderDetector {
@@ -25,8 +27,16 @@ export class NodeAgentProviderCommandDetector implements AgentProviderDetector {
 
   async inspect(): Promise<AgentProviderAvailability> {
     try {
-      const executablePath = await this.findExecutable(this.options.executable)
-      if (executablePath) {
+      const executablePath = await this.findFirstExecutable([
+        this.options.executable,
+        ...(this.options.executableAliases ?? [])
+      ])
+      const requiredExecutables = await Promise.all(
+        (this.options.requiredExecutables ?? []).map((executable) =>
+          this.findExecutable(executable)
+        )
+      )
+      if (executablePath && requiredExecutables.every(Boolean)) {
         return {
           providerId: this.options.providerId,
           status: 'installed',
@@ -52,6 +62,14 @@ export class NodeAgentProviderCommandDetector implements AgentProviderDetector {
         version: null
       }
     }
+  }
+
+  private async findFirstExecutable(executables: readonly string[]): Promise<string | null> {
+    for (const executable of executables) {
+      const found = await this.findExecutable(executable)
+      if (found) return found
+    }
+    return null
   }
 }
 

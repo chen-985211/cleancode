@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { AgentProviderStateProvider } from '../../../src/presentation/app-shell/AgentProviderStateProvider'
 import { AgentSettingsPane } from '../../../src/presentation/app-shell/AgentSettingsPane'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderPreferencesSnapshot } from '../../../src/contexts/agent/domain/aggregates/AgentProviderPreferences'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 const codex = createProvider('codex', 'Codex')
@@ -39,29 +40,54 @@ describe('Agent settings pane', () => {
   it('shows the full catalog, changes the default, and guides missing Providers', async () => {
     render(<AgentSettingsHarness />)
 
-    expect(await screen.findByText('Codex')).toBeVisible()
-    await waitFor(() => expect(screen.getAllByText('可用')).toHaveLength(2))
+    await waitFor(() => expect(screen.getAllByText('启用')).toHaveLength(2))
+    expect(screen.getByText('Codex')).toBeVisible()
+    expect(screen.getByText('已安装')).toBeVisible()
+    expect(screen.getByText('可安装')).toBeVisible()
     expect(await screen.findByText('未安装')).toBeVisible()
     expect(screen.queryByText('hidden-version')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '配置' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '打开 OpenCode 文档' })).toHaveAttribute(
       'href',
       'https://opencode.ai/docs/cli/'
+    )
+    expect(screen.getByRole('button', { name: 'Yolo' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('switch', { name: '新 Agent 默认启用 CleanCode MCP' })).toHaveAttribute(
+      'aria-checked',
+      'true'
     )
 
     const claudeRow = screen.getByText('Claude Code').closest('.agent-settings-row')!
     fireEvent.click(within(claudeRow as HTMLElement).getByRole('button', { name: '设为默认' }))
-    expect(claudeRow).toHaveAttribute('data-default', 'true')
-    expect(screen.getByRole('button', { name: '默认' })).toBeDisabled()
+    await waitFor(() => expect(claudeRow).toHaveAttribute('data-default', 'true'))
+    expect(within(claudeRow as HTMLElement).getByRole('button', { name: '默认' })).toBeDisabled()
   })
 })
 
 function AgentSettingsHarness() {
-  const [defaultProviderId, setDefaultProviderId] = useState('codex')
+  const [preferences, setPreferences] = useState<AgentProviderPreferencesSnapshot>({
+    defaultCleancodeMcpEnabled: true,
+    defaultProviderId: 'codex',
+    disabledProviderIds: [],
+    permissionMode: 'yolo',
+    providerOverrides: {},
+    version: 1
+  })
   return (
     <AgentProviderStateProvider>
       <AgentSettingsPane
-        defaultProviderId={defaultProviderId}
-        onDefaultProviderChange={setDefaultProviderId}
+        defaultProviderId={preferences.defaultProviderId}
+        preferences={preferences}
+        onPreferencesChange={(command) =>
+          setPreferences((current) => ({
+            ...current,
+            ...command,
+            disabledProviderIds: [...(command.disabledProviderIds ?? current.disabledProviderIds)],
+            providerOverrides: {
+              ...(command.providerOverrides ?? current.providerOverrides)
+            },
+            version: 1
+          }))
+        }
         onRefresh={vi.fn()}
       />
     </AgentProviderStateProvider>

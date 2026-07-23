@@ -60,13 +60,13 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 ## Agent 集成
 
-当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；descriptor 还提供由通用表现组件渲染的受限矢量图标，session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。
+当前 registry 内建 33 个 Agent Provider。Codex、Claude Code 和 OpenCode 提供增强 contribution；其余项目以数据驱动的基础终端 contribution 提供 PATH 检测、交互启动命令、离线品牌图标与官方文档。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。
 
 registry descriptor 集合是完整的受支持 Provider catalog；专用 discovery 用例通过共享 `AgentProviderAvailabilityService` 检查该 catalog，只把 `installed` Provider 投影为可创建结果。共享服务合并并发检查、缓存易失快照并支持显式刷新；Agent 创建在持久化前执行新的可用性检查，已有持久化 Agent 则不因当前 CLI 不可用而从工作区消失。新工作区只在 Codex 检测为已安装时原子初始化默认 Agent，否则原子初始化空列表。
 
 macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前 POSIX shell 的交互式 login invocation 获取用户 PATH，并把去重后的 shell 路径优先合并进 Electron 主进程环境；需要新建 Agent PTY 时，这一步和可用性预检必须在 PTY 快照主进程环境之前完成。超时或异常时保留继承 PATH。Windows 跳过 POSIX hydration，Provider CLI 检测继续通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；任何平台都不得把 executable 或 argv 拼接成可注入的命令文本。
 
-共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，Codex 与 OpenCode 未声明最低版本门槛，不得为它们虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
+共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。基础终端目录只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，其他 Provider 不得虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
 
 每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume` 和进程级 `notify` 报告 thread UUID，不声明精确活动跟踪，CleanCode MCP 为 `required`；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动，MCP 为 `best_effort`；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入 `best_effort` 远程 MCP 与临时 instructions。三者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
 

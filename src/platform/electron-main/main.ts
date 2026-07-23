@@ -13,20 +13,18 @@ import { AgentWorkspaceTransactionCoordinator } from '../../contexts/agent/appli
 import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
 import { ListAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/ListAgentProvidersUseCase'
 import { ListWorkspaceAgentsUseCase } from '../../contexts/agent/application/use-cases/ListWorkspaceAgentsUseCase'
+import { GetAgentProviderPreferencesUseCase } from '../../contexts/agent/application/use-cases/GetAgentProviderPreferencesUseCase'
 import { RemoveWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
 import { RenameWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
+import { UpdateAgentProviderPreferencesUseCase } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
 import { UpdateWorkspaceAgentMcpCapabilityUseCase } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { BlockGraphAgentToolAdapter } from '../../contexts/agent/infrastructure/block-graph/BlockGraphAgentToolAdapter'
 import { CleancodeMcpHttpServer } from '../../contexts/agent/infrastructure/mcp/CleancodeMcpHttpServer'
 import { FileSystemAgentAuditRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentAuditRepository'
+import { FileSystemAgentProviderPreferencesRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentProviderPreferencesRepository'
 import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastructure/persistence/FileSystemAgentSessionRepository'
-import { CodexAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
-import { ClaudeCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
-import { OpenCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
-import { HermesAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
-import { OpenClawAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/openclaw/OpenClawAgentProviderContribution'
-import { PiAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
+import { createBuiltinAgentProviderContributions } from '../../contexts/agent/infrastructure/providers/catalog/BuiltinAgentProviderCatalog'
 import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
 import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
@@ -168,14 +166,17 @@ const {
 })
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
 const defaultAgentProviderId = 'codex'
-const agentProviderRegistry = new AgentProviderRegistry([
-  new CodexAgentProviderContribution(),
-  new ClaudeCodeAgentProviderContribution(),
-  new PiAgentProviderContribution(),
-  new HermesAgentProviderContribution(),
-  new OpenClawAgentProviderContribution(),
-  new OpenCodeAgentProviderContribution()
-])
+const agentProviderRegistry = new AgentProviderRegistry(createBuiltinAgentProviderContributions())
+const agentProviderPreferencesRepository = new FileSystemAgentProviderPreferencesRepository(
+  join(appStateDirectoryPath, 'agent-provider-preferences.json')
+)
+const getAgentProviderPreferencesUseCase = new GetAgentProviderPreferencesUseCase(
+  agentProviderPreferencesRepository
+)
+const updateAgentProviderPreferencesUseCase = new UpdateAgentProviderPreferencesUseCase(
+  agentProviderPreferencesRepository,
+  agentProviderRegistry
+)
 const agentProviderAvailability = new AgentProviderAvailabilityService(
   agentProviderRegistry,
   new NodeAgentProviderShellPathHydrator()
@@ -203,14 +204,16 @@ const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
   agentProviderRegistry,
   defaultAgentProviderId,
   agentProviderAvailability,
-  agentWorkspaceTransactions
+  agentWorkspaceTransactions,
+  agentProviderPreferencesRepository
 )
 const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
   agentSessionRepository,
   agentProviderRegistry,
   agentProviderAvailability,
   agentWorkspaceTransactions,
-  agentWorkspaceCreationScope
+  agentWorkspaceCreationScope,
+  agentProviderPreferencesRepository
 )
 const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
 const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
@@ -251,7 +254,8 @@ const agentSessionService = new AgentSessionService(
     getProjectRegistryRepository(),
     projectRepository
   ),
-  agentProviderAvailability
+  agentProviderAvailability,
+  agentProviderPreferencesRepository
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
@@ -388,6 +392,7 @@ registerAgentIpcHandlers({
     isAgentAutostartDisabledForTest
       ? Promise.resolve()
       : disposeRuntime(() => agentSessionService.disposeProject(projectDirectory)),
+  getAgentProviderPreferences: () => getAgentProviderPreferencesUseCase.execute(),
   inspectAgentProvider: (providerId) => inspectAgentProviderUseCase.execute(providerId),
   listAgentProviders: () => listAgentProvidersUseCase.execute(),
   ipcMain,
@@ -407,7 +412,9 @@ registerAgentIpcHandlers({
   },
   updateWorkspaceAgentLayout: (command) => updateWorkspaceAgentLayoutUseCase.execute(command),
   updateWorkspaceAgentMcpCapability: (command) =>
-    updateWorkspaceAgentMcpCapabilityUseCase.execute(command)
+    updateWorkspaceAgentMcpCapabilityUseCase.execute(command),
+  updateAgentProviderPreferences: (command) =>
+    updateAgentProviderPreferencesUseCase.execute(command)
 })
 
 async function selectProjectDirectory(): Promise<string | null> {

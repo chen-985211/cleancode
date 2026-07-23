@@ -3,6 +3,10 @@ import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import type { AgentWorkspaceInitializer } from '../ports/AgentWorkspaceInitializer'
+import {
+  defaultAgentProviderPreferencesRepository,
+  type AgentProviderPreferencesRepository
+} from '../ports/AgentProviderPreferencesRepository'
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { AgentWorkspaceTransactionCoordinator } from '../services/AgentWorkspaceTransactionCoordinator'
 import {
@@ -22,7 +26,8 @@ export class ListWorkspaceAgentsUseCase {
     private readonly providers: AgentProviderRegistryPort,
     private readonly defaultProviderId: string,
     private readonly availability = new AgentProviderAvailabilityService(providers),
-    private readonly transactions = new AgentWorkspaceTransactionCoordinator()
+    private readonly transactions = new AgentWorkspaceTransactionCoordinator(),
+    private readonly preferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository
   ) {}
 
   async execute(command: ListWorkspaceAgentsCommand): Promise<readonly WorkspaceAgentSnapshot[]> {
@@ -33,11 +38,17 @@ export class ListWorkspaceAgentsUseCase {
         return agents.map(toWorkspaceAgentSnapshot)
       }
 
-      const providerAvailability = await this.availability.inspect(this.defaultProviderId, {
-        refresh: true
-      })
+      const preferences = await this.preferences.load()
+      const defaultProviderEnabled = !preferences.disabledProviderIds.includes(
+        this.defaultProviderId
+      )
+      const providerAvailability = defaultProviderEnabled
+        ? await this.availability.inspect(this.defaultProviderId, { refresh: true })
+        : null
       const initialAgents =
-        providerAvailability.status === 'installed' ? [this.createDefaultAgent(command)] : []
+        providerAvailability?.status === 'installed'
+          ? [this.createDefaultAgent(command, preferences.defaultCleancodeMcpEnabled)]
+          : []
       const initialized = await this.repository.initializeWorkspace({
         agents: initialAgents,
         projectId: command.projectId,
@@ -47,11 +58,16 @@ export class ListWorkspaceAgentsUseCase {
     })
   }
 
-  private createDefaultAgent(command: ListWorkspaceAgentsCommand): AgentSession {
+  private createDefaultAgent(
+    command: ListWorkspaceAgentsCommand,
+    defaultCleancodeMcpEnabled: boolean
+  ): AgentSession {
     const provider = this.providers.require(this.defaultProviderId)
     return AgentSession.create({
       agentId: createAgentId(),
-      cleancodeMcpEnabled: provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
+      cleancodeMcpEnabled:
+        defaultCleancodeMcpEnabled &&
+        provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
       layout: {
         position: defaultAgentLayoutPosition,
         size: defaultAgentLayoutSize

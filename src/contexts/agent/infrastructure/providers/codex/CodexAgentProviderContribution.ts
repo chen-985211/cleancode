@@ -57,7 +57,13 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
     displayName: 'Codex',
     documentationUrl: 'https://developers.openai.com/codex/cli/',
     icon: codexProviderIcon,
-    id: 'codex'
+    id: 'codex',
+    launch: {
+      defaultArguments: [],
+      defaultEnvironment: {},
+      executable: 'codex',
+      permission: { arguments: ['--dangerously-bypass-approvals-and-sandbox'] }
+    }
   } as const
   readonly detector: AgentProviderDetector
   readonly sessionRefCodec: AgentProviderSessionRefCodec = new CodexSessionRefCodec()
@@ -169,6 +175,7 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
     return {
       args: [
         ...this.options.baseArgs,
+        ...(command.launchProfile?.arguments ?? []),
         ...(command.providerSessionRef
           ? this.options.resume.createResumeArgs(command.providerSessionRef)
           : []),
@@ -181,11 +188,12 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       env: {
         ELECTRON_RUN_AS_NODE: '1',
         PROMPT_EOL_MARK: '',
+        ...(command.launchProfile?.environment ?? {}),
         ...capability.env,
         ...telemetry.env,
         ...createAgentProviderLoopbackEnvironment()
       },
-      executable: this.options.command
+      executable: command.launchProfile?.executable ?? this.options.command
     }
   }
 }

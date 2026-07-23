@@ -52,7 +52,12 @@ export class OpenCodeAgentProviderContribution implements AgentProviderContribut
     displayName: 'OpenCode',
     documentationUrl: 'https://opencode.ai/docs/cli/',
     icon: openCodeProviderIcon,
-    id: 'opencode'
+    id: 'opencode',
+    launch: {
+      defaultArguments: [],
+      defaultEnvironment: {},
+      executable: 'opencode'
+    }
   } as const
   readonly detector: AgentProviderDetector
   readonly sessionRefCodec: AgentProviderSessionRefCodec = new OpenCodeSessionRefCodec()
@@ -200,12 +205,14 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
     return {
       args: [
         ...this.options.baseArgs,
+        ...(command.launchProfile?.arguments ?? []),
         ...(sessionRef ? this.options.resume.createResumeArgs(sessionRef) : []),
         ...capability.args,
         ...telemetry.args,
         command.workspaceDirectory
       ],
       env: {
+        ...(command.launchProfile?.environment ?? {}),
         ...capability.env,
         ...telemetry.env,
         ...createAgentProviderLoopbackEnvironment(),
@@ -216,7 +223,7 @@ class OpenCodeLaunchPlanner implements AgentLaunchPlanner {
           pluginUrl: telemetry.pluginUrl
         })
       },
-      executable: this.options.command
+      executable: command.launchProfile?.executable ?? this.options.command
     }
   }
 }

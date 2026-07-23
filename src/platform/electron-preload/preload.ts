@@ -29,6 +29,9 @@ const cleancodeApi = {
     invokeCleancode('cleancode:synchronize-project-git-state', command),
   inspectAgentProvider: (command: unknown) =>
     invokeCleancode('cleancode:inspect-agent-provider', command),
+  getAgentProviderPreferences: () => invokeCleancode('cleancode:get-agent-provider-preferences'),
+  updateAgentProviderPreferences: (command: unknown) =>
+    invokeCleancode('cleancode:update-agent-provider-preferences', command),
   discoverCreatableAgentProviders: (command?: unknown) =>
     invokeCleancode('cleancode:discover-creatable-agent-providers', command),
   listAgentProviders: () => invokeCleancode('cleancode:list-agent-providers'),

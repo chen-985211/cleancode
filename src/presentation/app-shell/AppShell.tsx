@@ -56,9 +56,7 @@ import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
-import { useCreatableAgentProviders } from './useCreatableAgentProviders'
-import { useAgentProviderPreference } from './useAgentProviderPreference'
-import { resolveEffectiveAgentProviderId } from './agentProviderPreference'
+import { useAgentCreationProviders } from './useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 
 export function AppShell({
@@ -79,12 +77,13 @@ export function AppShell({
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
-  const { changePreferredProvider, preferredProviderId } = useAgentProviderPreference()
-  const creatableAgentProviders = useCreatableAgentProviders()
-  const effectiveAgentProviderId = resolveEffectiveAgentProviderId(
-    preferredProviderId,
-    creatableAgentProviders.state.providers.map((provider) => provider.descriptor.id)
-  )
+  const {
+    agentProviderPreferences,
+    changePreferredProvider,
+    creatableAgentProviders,
+    effectiveAgentProviderId,
+    enabledCreatableAgentProviders
+  } = useAgentCreationProviders()
   const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -591,6 +590,8 @@ export function AppShell({
             <LanguageSettingsRoot />
             <ThemeSettingsRoot />
             <ApplicationSettingsRoot
+              agentProviderPreferences={agentProviderPreferences.state.preferences}
+              agentProviderPreferencesStatus={agentProviderPreferences.state.status}
               bindings={bindings}
               defaultAgentProviderId={effectiveAgentProviderId}
               initialPane={applicationSettings.initialPane}
@@ -599,7 +600,7 @@ export function AppShell({
               onBindingChange={changeBinding}
               onClose={applicationSettings.close}
               onOpen={applicationSettings.open}
-              onAgentProviderChange={changePreferredProvider}
+              onAgentProviderPreferencesChange={agentProviderPreferences.update}
               onAgentProvidersRefresh={() => creatableAgentProviders.refresh(true)}
               onResetAll={resetAllBindings}
               terminalScrollbackRows={terminalScrollbackRows}
@@ -647,7 +648,7 @@ export function AppShell({
           </div>
           <WorkbenchCanvas
             approvalIntents={agentToolApprovals.approvals}
-            agentProviders={creatableAgentProviders.state.providers}
+            agentProviders={enabledCreatableAgentProviders}
             defaultAgentProviderId={effectiveAgentProviderId}
             isDesktopRuntime={isDesktopRuntime}
             isCreatingAgent={isCreatingAgent}

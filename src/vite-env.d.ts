@@ -14,6 +14,8 @@ import type {
   AgentProviderAvailability,
   AgentProviderDescriptor
 } from './contexts/agent/application/ports/AgentProviderContribution'
+import type { AgentProviderPreferencesSnapshot } from './contexts/agent/domain/aggregates/AgentProviderPreferences'
+import type { UpdateAgentProviderPreferencesCommand } from './contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type { CreatableAgentProviderSnapshot } from './contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
@@ -87,6 +89,10 @@ declare global {
       inspectAgentProvider(command: {
         readonly providerId: string
       }): Promise<AgentProviderAvailability>
+      getAgentProviderPreferences(): Promise<AgentProviderPreferencesSnapshot>
+      updateAgentProviderPreferences(
+        command: UpdateAgentProviderPreferencesCommand
+      ): Promise<AgentProviderPreferencesSnapshot>
       discoverCreatableAgentProviders(command?: {
         readonly refresh?: boolean
       }): Promise<readonly CreatableAgentProviderSnapshot[]>

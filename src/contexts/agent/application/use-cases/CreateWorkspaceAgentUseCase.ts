@@ -3,6 +3,10 @@ import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import {
+  defaultAgentProviderPreferencesRepository,
+  type AgentProviderPreferencesRepository
+} from '../ports/AgentProviderPreferencesRepository'
+import {
   allowAgentWorkspaceCreationScope,
   type AgentWorkspaceCreationScopePort
 } from '../ports/AgentWorkspaceCreationScopePort'
@@ -28,7 +32,8 @@ export class CreateWorkspaceAgentUseCase {
     private readonly providers: AgentProviderRegistryPort,
     private readonly availability = new AgentProviderAvailabilityService(providers),
     private readonly transactions = new AgentWorkspaceTransactionCoordinator(),
-    private readonly creationScope: AgentWorkspaceCreationScopePort = allowAgentWorkspaceCreationScope
+    private readonly creationScope: AgentWorkspaceCreationScopePort = allowAgentWorkspaceCreationScope,
+    private readonly preferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository
   ) {}
 
   async execute(command: CreateWorkspaceAgentCommand): Promise<WorkspaceAgentSnapshot> {
@@ -55,6 +60,14 @@ export class CreateWorkspaceAgentUseCase {
         return toWorkspaceAgentSnapshot(existing)
       }
 
+      const preferences = await this.preferences.load()
+      if (preferences.disabledProviderIds.includes(command.providerId)) {
+        throw createExpectedAppError(
+          'AGENT_PROVIDER_DISABLED',
+          `Agent Provider "${command.providerId}" is disabled.`,
+          { providerId: command.providerId }
+        )
+      }
       const availability = await this.availability.inspect(command.providerId, { refresh: true })
       if (availability.status !== 'installed') {
         throw createExpectedAppError(
@@ -71,7 +84,9 @@ export class CreateWorkspaceAgentUseCase {
           (await this.repository.findWorkspace(command.projectId, command.workspaceName)) ?? []
         const agent = AgentSession.create({
           agentId,
-          cleancodeMcpEnabled: provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
+          cleancodeMcpEnabled:
+            preferences.defaultCleancodeMcpEnabled &&
+            provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
           layout: resolveInitialAgentLayout(agents.map((candidate) => candidate.layout)),
           name: nextAgentName(agents.map((candidate) => candidate.name)),
           projectId: command.projectId,

@@ -14,11 +14,25 @@ interface AgentProviderCapabilities {
 
 interface AgentProviderIconPath {
   readonly d: string
-  readonly fill?: 'currentColor' | `#${string}`
+  readonly fill?: 'currentColor' | `#${string}` | `url(#${string})`
   readonly fillRule?: 'evenodd' | 'nonzero'
+  readonly transform?: string
+}
+
+interface AgentProviderIconLinearGradient {
+  readonly id: string
+  readonly stops: readonly {
+    readonly offset: string
+    readonly stopColor: string
+  }[]
+  readonly x1: string
+  readonly x2: string
+  readonly y1: string
+  readonly y2: string
 }
 
 interface AgentProviderVectorIcon {
+  readonly linearGradients?: readonly AgentProviderIconLinearGradient[]
   readonly paths: readonly AgentProviderIconPath[]
   readonly viewBox: string
 }
@@ -30,12 +44,31 @@ interface AgentProviderRasterIcon {
 
 export type AgentProviderIcon = AgentProviderVectorIcon | AgentProviderRasterIcon
 
+export interface AgentProviderPermissionConfiguration {
+  readonly arguments?: readonly string[]
+  readonly environment?: Readonly<Record<string, string>>
+}
+
+export interface AgentProviderLaunchConfiguration {
+  readonly defaultArguments: readonly string[]
+  readonly defaultEnvironment: Readonly<Record<string, string>>
+  readonly executable: string
+  readonly permission?: AgentProviderPermissionConfiguration
+}
+
+export interface AgentProviderLaunchProfile {
+  readonly arguments: readonly string[]
+  readonly environment: Readonly<Record<string, string>>
+  readonly executable: string
+}
+
 export interface AgentProviderDescriptor {
   readonly capabilities: AgentProviderCapabilities
   readonly displayName: string
   readonly documentationUrl?: string
   readonly icon: AgentProviderIcon
   readonly id: string
+  readonly launch?: AgentProviderLaunchConfiguration
 }
 
 export type AgentProviderAvailability =
@@ -89,6 +122,7 @@ export interface CreateAgentLaunchPlanCommand {
     readonly bearerToken: string
     readonly serverUrl: string
   }
+  readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged?: (activity: AgentActivityStatus) => void
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
   readonly providerSessionRef?: ProviderSessionRefSnapshot

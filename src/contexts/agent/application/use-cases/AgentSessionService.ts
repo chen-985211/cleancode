@@ -12,12 +12,17 @@ import {
 } from '../ports/AgentRuntimeScopeValidationPort'
 import type { AgentTerminalRuntimePort } from '../ports/AgentTerminalRuntimePort'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
+import {
+  defaultAgentProviderPreferencesRepository,
+  type AgentProviderPreferencesRepository
+} from '../ports/AgentProviderPreferencesRepository'
 import type { AgentLaunchPlan } from '../ports/AgentProviderContribution'
 import type { AgentSession } from '../../domain/aggregates/AgentSession'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
+import { resolvePersistedAgentProviderLaunchProfile } from '../services/AgentProviderLaunchProfileResolver'
 import {
   AgentToolApprovalCoordinator,
   type AgentToolExecutionOperations
@@ -81,7 +86,8 @@ export class AgentSessionService {
     private readonly providers: AgentProviderRegistryPort,
     private readonly defaultProviderId: string,
     private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope,
-    private readonly providerAvailability = new AgentProviderAvailabilityService(providers)
+    private readonly providerAvailability = new AgentProviderAvailabilityService(providers),
+    private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository
   ) {
     this.toolInvocations = new AgentToolInvocationCoordinator(toolExecution)
     this.approvalCoordinator = new AgentToolApprovalCoordinator(this.toolInvocations, (sessionId) =>
@@ -246,14 +252,11 @@ export class AgentSessionService {
       recordAgentSessionStartFailure(session)
       this.toolInvocations.beginSessionClosing(session.sessionId)
     }
-
     return toAgentSessionSnapshot(session)
   }
-
   write(command: { readonly input: string; readonly sessionId: string }): void {
     this.terminalRuntime.write(command.sessionId, command.input)
   }
-
   resize(command: {
     readonly columns: number
     readonly rows: number
@@ -267,7 +270,6 @@ export class AgentSessionService {
     session.rows = command.rows
     this.terminalRuntime.resize(command.sessionId, command.columns, command.rows)
   }
-
   async suspendWorkspaceDirectory(
     workspaceDirectory: string
   ): Promise<AgentRuntimeSuspensionLease> {
@@ -291,18 +293,15 @@ export class AgentSessionService {
       throw error
     }
   }
-
   async resumeWorkspaceDirectory(workspaceDirectory: string): Promise<void> {
     await this.runtimeCoordinator.runForOwners(
       (owner) => owner.workspaceDirectory === workspaceDirectory,
       (owner) => this.resumeRuntimeOwner(owner)
     )
   }
-
   isWorkspaceQuarantined(projectDirectory: string, workspaceName: string): boolean {
     return this.runtimeCoordinator.isWorkspaceQuarantined(projectDirectory, workspaceName)
   }
-
   resolveProjectQuarantines(projectDirectory: string): void {
     this.runtimeCoordinator.resolveProjectQuarantines(projectDirectory)
   }
@@ -562,6 +561,11 @@ export class AgentSessionService {
     if (!canLaunchAgentProvider(session, processSessionId)) return
     const provider = this.providers.require(session.providerId)
     await validateAgentProviderAvailability(provider, this.providerAvailability, refresh)
+    const launchProfile = await resolvePersistedAgentProviderLaunchProfile(
+      provider.descriptor.launch,
+      this.providerPreferences,
+      session.providerId
+    )
     transitionAgentRuntime(session, {
       activity: 'unavailable',
       launch: { exitCode: null, failureKind: null, launchId: null, status: 'launching' }
@@ -578,6 +582,7 @@ export class AgentSessionService {
               serverUrl: session.mcpRegistration.url
             }
           : undefined,
+        ...(launchProfile ? { launchProfile } : {}),
         onProviderSessionIdentified: (sessionRef) => {
           if (
             session.sessionId !== processSessionId ||

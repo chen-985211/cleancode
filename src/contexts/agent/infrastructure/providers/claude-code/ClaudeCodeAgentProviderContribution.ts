@@ -52,7 +52,13 @@ export class ClaudeCodeAgentProviderContribution implements AgentProviderContrib
     displayName: 'Claude Code',
     documentationUrl: 'https://docs.anthropic.com/claude/docs/claude-code',
     icon: claudeCodeProviderIcon,
-    id: 'claude-code'
+    id: 'claude-code',
+    launch: {
+      defaultArguments: [],
+      defaultEnvironment: {},
+      executable: 'claude',
+      permission: { arguments: ['--dangerously-skip-permissions'] }
+    }
   } as const
   readonly detector: AgentProviderDetector
   readonly sessionRefCodec: AgentProviderSessionRefCodec = new ClaudeCodeSessionRefCodec()
@@ -203,13 +209,20 @@ class ClaudeCodeLaunchPlanner implements AgentLaunchPlanner {
         })
       : { args: [], env: {} }
     return {
-      args: [...this.options.baseArgs, ...sessionArgs, ...capability.args, ...telemetry.args],
+      args: [
+        ...this.options.baseArgs,
+        ...(command.launchProfile?.arguments ?? []),
+        ...sessionArgs,
+        ...capability.args,
+        ...telemetry.args
+      ],
       env: {
+        ...(command.launchProfile?.environment ?? {}),
         ...capability.env,
         ...telemetry.env,
         ...createAgentProviderLoopbackEnvironment()
       },
-      executable: this.options.command
+      executable: command.launchProfile?.executable ?? this.options.command
     }
   }
 

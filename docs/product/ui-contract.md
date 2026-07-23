@@ -303,15 +303,21 @@ Agent 控制台必须：
 - 切换分支工作区时连接对应 Agent 与分支对话，不串用其他工作区或其他 Agent 状态。
 - 应用重开时恢复 Agent 的固定 Provider、数量、名称、位置、大小、MCP 偏好和 Provider 支持的分支对话绑定；Agent terminal 本身当前不跨应用保留。
 
-一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时，只有本机检测到 Codex CLI 已安装才创建默认 Codex Agent；否则必须原子持久化一个已初始化的空 Agent 列表，不静默改用其他 Provider，也不得在以后仅因 Codex 安装状态改变而自动补建。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
+一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时，只有本机检测到 Codex CLI 已安装且 Codex 没有被用户禁用时才创建默认 Codex Agent；其 MCP 初始值读取应用级“新 Agent 默认启用 CleanCode MCP”。否则必须原子持久化一个已初始化的空 Agent 列表，不静默改用其他 Provider，也不得在以后仅因 Codex 安装状态改变而自动补建。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
-“新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 只修改后续创建使用的默认值，不在同一步创建 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
+“新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 且没有被用户禁用的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 只修改后续创建使用的默认值，不在同一步创建 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
 
 用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称和初始布局由后端原子分配，旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
 
-Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。Pi、Hermes 和 OpenClaw 当前只声明基础终端能力，不展示虚假的恢复、活动状态或 MCP 承诺。
+Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。其余目录项当前只声明基础终端能力，不展示虚假的恢复、活动状态或 MCP 承诺。
+
+Agent 设置必须用单一页面展示应用级默认值和完整目录，不提供模型选择。页面顶部提供 `Yolo / 手动` 权限选择与“新 Agent 默认启用 CleanCode MCP”开关；默认值分别为 `Yolo` 和开启。MCP 默认开关只初始化之后新建的 Agent，不能批量改写已有 Agent，且不支持 MCP 的 Provider 最终仍保持关闭。权限模式和 Provider 启动覆盖在下次启动或重启时生效。
+
+完整目录按 `已安装` 与 `可安装` 分组。已安装项提供启用状态、默认标记、官方文档和可折叠的命令、附加参数、环境变量编辑；可安装项提供检测状态与官方安装文档，不自动执行安装命令。禁用只影响之后的创建候选，不得删除、隐藏或阻止已有 Agent 恢复。设置页不得展示 detector 版本、模型说明、能力说明堆叠或其他与当前决策无关的小字。
+
+启动覆盖必须建立在 Provider registry 的内建 launch metadata 上，按“内建命令与基础参数、权限模式参数、用户覆盖、系统管理参数”合并。用户可以覆盖可执行文件、增加参数和覆盖普通环境变量，但不能移除系统管理的 MCP、session 恢复、遥测、工作目录或安全控制参数。环境变量编辑必须验证 `NAME=value` 结构；无效输入不得持久化。
 
 每个 Agent 必须拥有稳定身份、固定 Provider，以及独立的 Agent terminal、CLI launch、输入输出、审批、MCP 会话和分支对话绑定。移动、选择、重命名或调整大小不得重启 Agent terminal 或 Provider launch。
 
