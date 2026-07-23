@@ -157,14 +157,6 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             <nav className="application-settings-navigation" aria-label={t('settings.navigation')}>
               <button
                 type="button"
-                aria-current={activePane === 'agents' ? 'page' : undefined}
-                onClick={() => setSelectedPane('agents')}
-              >
-                <Bot size={17} aria-hidden="true" />
-                <span>{t('settings.agents.title')}</span>
-              </button>
-              <button
-                type="button"
                 aria-current={activePane === 'shortcuts' ? 'page' : undefined}
                 onClick={() => setSelectedPane('shortcuts')}
               >
@@ -178,6 +170,14 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               >
                 <SquareTerminal size={17} aria-hidden="true" />
                 <span>{t('settings.terminal.title')}</span>
+              </button>
+              <button
+                type="button"
+                aria-current={activePane === 'agents' ? 'page' : undefined}
+                onClick={() => setSelectedPane('agents')}
+              >
+                <Bot size={17} aria-hidden="true" />
+                <span>{t('settings.agents.title')}</span>
               </button>
             </nav>
             <main className="application-settings-content">
@@ -197,10 +197,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               ) : (
                 <div className="shortcut-settings-pane">
                   <header className="shortcut-settings-pane__header">
-                    <div>
-                      <h2>{t('settings.shortcuts.title')}</h2>
-                      <p>{t('settings.shortcuts.description')}</p>
-                    </div>
+                    <h2>{t('settings.shortcuts.title')}</h2>
                     <button
                       className="shortcut-settings-reset-all"
                       type="button"

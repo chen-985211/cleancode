@@ -1,5 +1,5 @@
 .agent-settings-pane {
-  width: min(100%, 860px);
+  width: min(100%, 1120px);
   padding-bottom: 48px;
 }
 
@@ -7,22 +7,11 @@
   padding-bottom: 18px;
 }
 
-.agent-settings-pane__header h2,
-.agent-settings-pane__header p {
-  margin: 0;
-}
-
 .agent-settings-pane__header h2 {
+  margin: 0;
   font-size: 22px;
   font-weight: 690;
   letter-spacing: -0.025em;
-}
-
-.agent-settings-pane__header p {
-  margin-top: 6px;
-  color: var(--cc-muted);
-  font-size: 12px;
-  line-height: 1.55;
 }
 
 .agent-settings-preferences {
@@ -47,21 +36,10 @@
   border-top: 1px solid var(--cc-divider);
 }
 
-.agent-settings-preference-row > span {
-  display: grid;
-  gap: 3px;
-}
-
 .agent-settings-preference-row strong {
   color: var(--cc-foreground);
   font-size: 12px;
   font-weight: 640;
-}
-
-.agent-settings-preference-row small {
-  color: var(--cc-muted);
-  font-size: 10.5px;
-  line-height: 1.45;
 }
 
 .agent-settings-segmented {

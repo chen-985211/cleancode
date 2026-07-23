@@ -22,8 +22,6 @@ export const enMessages = {
   'settings.back': 'Back to workspace',
   'settings.navigation': 'Settings navigation',
   'settings.shortcuts.title': 'Keyboard shortcuts',
-  'settings.shortcuts.description':
-    'Customize key combinations for common cleancode actions. Changes take effect immediately.',
   'settings.shortcuts.resetAll': 'Reset all',
   'settings.shortcuts.recording': 'Press a new shortcut',
   'settings.shortcuts.unassigned': 'Unassigned',
@@ -55,22 +53,14 @@ export const enMessages = {
   'settings.shortcuts.command.fitCanvas': 'Fit canvas',
   'settings.shortcuts.command.toggleMinimap': 'Collapse or expand minimap',
   'settings.terminal.title': 'Terminal',
-  'settings.terminal.description': 'Tune terminal history while keeping running sessions intact.',
   'settings.terminal.scrollback': 'Scrollback history',
-  'settings.terminal.scrollbackDescription':
-    'The same limit applies to background terminal state and visible terminal views.',
   'settings.terminal.scrollbackRows': '{rows} lines',
   'settings.agents.title': 'Agents',
-  'settings.agents.description': 'Choose the default Agent and check local CLI availability.',
   'settings.agents.preferences': 'Agent defaults',
   'settings.agents.permission': 'Agent permissions',
-  'settings.agents.permissionDescription':
-    'Yolo adds the supported confirmation-bypass options when an Agent starts.',
   'settings.agents.permission.yolo': 'Yolo',
   'settings.agents.permission.manual': 'Manual',
   'settings.agents.defaultMcp': 'Enable CleanCode MCP for new Agents',
-  'settings.agents.defaultMcpDescription':
-    'Applies only to Agents created later and does not change existing Agents.',
   'settings.agents.refresh': 'Detect again',
   'settings.agents.loading': 'Loading Agents…',
   'settings.agents.unavailable': 'Agent detection is unavailable in this runtime.',

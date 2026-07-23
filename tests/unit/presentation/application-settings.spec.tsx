@@ -30,9 +30,17 @@ describe('application settings', () => {
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
     expect(screen.getByLabelText('项目区域').inert).toBe(true)
     expect(screen.getByLabelText('工作区状态').inert).toBe(true)
-    expect(screen.getByRole('navigation', { name: '设置导航' })).toBeInTheDocument()
+    const settingsNavigation = screen.getByRole('navigation', { name: '设置导航' })
+    expect(
+      within(settingsNavigation)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+    ).toEqual(['快捷键', '终端', 'Agent'])
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
+    expect(
+      screen.queryByText('自定义 cleancode 中常用操作的按键组合。更改会立即生效。')
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '修改“切换侧边栏”快捷键' })).toHaveTextContent('⌘B')
     const projectShortcuts = screen.getByRole('group', { name: '项目与工作区' })
     expect(
@@ -127,9 +135,15 @@ describe('application settings', () => {
     fireEvent.click(screen.getByRole('button', { name: '终端' }))
 
     expect(screen.getByRole('heading', { name: '终端' })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
-    fireEvent.click(screen.getByRole('radio', { name: '5,000 行' }))
-    expect(screen.getByRole('radio', { name: '5,000 行' })).toBeChecked()
+    expect(screen.queryByText('调整终端历史记录，不会重启正在运行的会话。')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('后台终端状态和可见终端视图使用相同的历史上限。')
+    ).not.toBeInTheDocument()
+    const scrollbackOptions = screen.getByRole('radiogroup', { name: '滚动历史' })
+    expect(within(scrollbackOptions).getAllByRole('radio')).toHaveLength(3)
+    expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
+    fireEvent.click(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' }))
+    expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).toBeChecked()
   })
 })
 

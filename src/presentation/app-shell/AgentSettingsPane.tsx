@@ -127,17 +127,13 @@ export function AgentSettingsPane({
   return (
     <div className="agent-settings-pane">
       <header className="agent-settings-pane__header">
-        <div>
-          <h2>{t('settings.agents.title')}</h2>
-          <p>{t('settings.agents.description')}</p>
-        </div>
+        <h2>{t('settings.agents.title')}</h2>
       </header>
 
       <section className="agent-settings-preferences" aria-label={t('settings.agents.preferences')}>
         <div className="agent-settings-preference-row">
           <span>
             <strong>{t('settings.agents.permission')}</strong>
-            <small>{t('settings.agents.permissionDescription')}</small>
           </span>
           <div className="agent-settings-segmented" role="group">
             {(['yolo', 'manual'] as const).map((mode) => (
@@ -156,7 +152,6 @@ export function AgentSettingsPane({
         <div className="agent-settings-preference-row">
           <span>
             <strong>{t('settings.agents.defaultMcp')}</strong>
-            <small>{t('settings.agents.defaultMcpDescription')}</small>
           </span>
           <button
             aria-checked={preferences.defaultCleancodeMcpEnabled}

@@ -55,6 +55,13 @@ describe('Agent settings pane', () => {
       'aria-checked',
       'true'
     )
+    expect(screen.queryByText('选择默认 Agent，并检查本机可用的 CLI。')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Yolo 会在启动时加入该 Agent 支持的免确认参数。')
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('只影响之后新建的 Agent，不会改动已有 Agent。')
+    ).not.toBeInTheDocument()
 
     const claudeRow = screen.getByText('Claude Code').closest('.agent-settings-row')!
     fireEvent.click(within(claudeRow as HTMLElement).getByRole('button', { name: '设为默认' }))

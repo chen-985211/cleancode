@@ -17,12 +17,14 @@ export function TerminalSettingsPane({
     <div className="terminal-settings-pane">
       <header className="terminal-settings-pane__header">
         <h2>{t('settings.terminal.title')}</h2>
-        <p>{t('settings.terminal.description')}</p>
       </header>
-      <fieldset className="terminal-settings-group">
-        <legend>{t('settings.terminal.scrollback')}</legend>
-        <p>{t('settings.terminal.scrollbackDescription')}</p>
-        <div className="terminal-settings-options">
+      <section className="terminal-settings-group" aria-labelledby="terminal-scrollback-title">
+        <h3 id="terminal-scrollback-title">{t('settings.terminal.scrollback')}</h3>
+        <div
+          className="terminal-settings-options"
+          role="radiogroup"
+          aria-labelledby="terminal-scrollback-title"
+        >
           {terminalScrollbackOptions.map((rows) => (
             <label key={rows}>
               <input
@@ -35,7 +37,7 @@ export function TerminalSettingsPane({
             </label>
           ))}
         </div>
-      </fieldset>
+      </section>
     </div>
   )
 }
