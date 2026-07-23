@@ -18,6 +18,7 @@ import type {
   TerminalWorkflowRuntimePort
 } from '../ports/TerminalWorkflowRuntimePort'
 import type { ManagedServiceLauncher } from '../services/ManagedServiceLauncher'
+import { TerminalWorkflowApplicationShutdown } from '../services/TerminalWorkflowApplicationShutdown'
 import {
   ActiveWorkflowRunRegistry,
   beginWorkflowHardDispose,
@@ -35,6 +36,7 @@ export type {
 
 export class TerminalWorkflowService {
   private readonly activeRuns = new ActiveWorkflowRunRegistry()
+  private readonly applicationShutdown = new TerminalWorkflowApplicationShutdown()
 
   constructor(
     private readonly planPort: TerminalWorkflowPlanPort,
@@ -45,7 +47,11 @@ export class TerminalWorkflowService {
     private readonly lifecycle?: RunLifecycleService
   ) {}
 
-  async start(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
+  start(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
+    return this.applicationShutdown.runStart(() => this.startWorkflow(command))
+  }
+
+  private async startWorkflow(command: StartTerminalWorkflowCommand): Promise<WorkflowRunSnapshot> {
     const existing = this.findActiveRun(command)
     if (existing) {
       await beginWorkflowHardDispose(existing, () => this.performHardDispose(existing))
@@ -146,6 +152,30 @@ export class TerminalWorkflowService {
     }
   }
 
+  prepareApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.prepare({
+      clearNodeGuards: (activeRun, blockId) => this.clearNodeGuards(activeRun, blockId),
+      completeManagedServices: () =>
+        this.managedServices?.completeApplicationShutdown() ?? Promise.resolve(),
+      listRuns: () => this.activeRuns.list(),
+      prepareManagedServices: () =>
+        this.managedServices?.prepareApplicationShutdown() ?? Promise.resolve(),
+      removeRun: (activeRun) => this.activeRuns.remove(activeRun)
+    })
+  }
+
+  completeApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.complete({
+      clearNodeGuards: (activeRun, blockId) => this.clearNodeGuards(activeRun, blockId),
+      completeManagedServices: () =>
+        this.managedServices?.completeApplicationShutdown() ?? Promise.resolve(),
+      listRuns: () => this.activeRuns.list(),
+      prepareManagedServices: () =>
+        this.managedServices?.prepareApplicationShutdown() ?? Promise.resolve(),
+      removeRun: (activeRun) => this.activeRuns.remove(activeRun)
+    })
+  }
+
   private async schedule(activeRun: ActiveWorkflowRun): Promise<void> {
     if (!this.isCurrent(activeRun)) {
       return
@@ -186,7 +216,7 @@ export class TerminalWorkflowService {
         this.createRuntimeCommand(activeRun, node.blockId, node.launchCommand)
       )
       if (!this.isCurrent(activeRun)) {
-        await this.runtimePort.stop(session.id)
+        if (!this.applicationShutdown.isShuttingDown) await this.runtimePort.stop(session.id)
         return
       }
       activeRun.sessionIds.set(node.blockId, session.id)
@@ -266,6 +296,7 @@ export class TerminalWorkflowService {
         this.publishRun(activeRun)
       },
       onPortStateChanged: (session, _endpoint, state) => {
+        if (!this.isCurrent(activeRun)) return
         this.eventPublisher.publish({
           type: 'service-port-state-changed',
           scope: session,
@@ -280,7 +311,9 @@ export class TerminalWorkflowService {
     })
 
     if (!this.isCurrent(activeRun)) {
-      await this.managedServices.stop(managedRun.session.id)
+      if (!this.applicationShutdown.isShuttingDown) {
+        await this.managedServices.stop(managedRun.session.id)
+      }
       return
     }
     activeRun.sessionIds.set(node.blockId, managedRun.session.id)
@@ -437,7 +470,7 @@ export class TerminalWorkflowService {
       this.createRuntimeCommand(activeRun, blockId, '')
     )
     if (!this.isCurrent(activeRun)) {
-      await this.runtimePort.stop(session.id)
+      if (!this.applicationShutdown.isShuttingDown) await this.runtimePort.stop(session.id)
       return
     }
     activeRun.sessionIds.set(blockId, session.id)
@@ -466,7 +499,11 @@ export class TerminalWorkflowService {
   }
 
   private isCurrent(activeRun: ActiveWorkflowRun): boolean {
-    return !activeRun.hardDisposing && this.findActiveRun(activeRun.command) === activeRun
+    return (
+      !this.applicationShutdown.isShuttingDown &&
+      !activeRun.hardDisposing &&
+      this.findActiveRun(activeRun.command) === activeRun
+    )
   }
 
   private async performHardDispose(activeRun: ActiveWorkflowRun): Promise<void> {

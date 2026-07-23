@@ -1,5 +1,5 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import type { TerminalRunScope } from '../value-objects/TerminalRunScope'
+import { resolveTerminalOwnerRef, type TerminalRunScope } from '../value-objects/TerminalRunScope'
 
 export type TerminalSessionStatus = 'idle' | 'running' | 'stopping' | 'exited' | 'failed'
 export type TerminalSessionKind = 'interactive' | 'direct' | 'workflow'
@@ -69,6 +69,7 @@ export class TerminalSession {
   }
 
   static revive(input: ReviveTerminalSessionInput): TerminalSession {
+    assertRetentionAllowed(input.scope, input.kind, input.retentionPolicy)
     if (input.recoveryKind === 'warm' && input.processId === null) {
       throw createExpectedAppError(
         'TERMINAL_SESSION_NOT_RUNNING',
@@ -157,13 +158,7 @@ export class TerminalSession {
       )
     }
 
-    if (this.kind === 'workflow' && policy === 'keep-after-application-exit') {
-      throw createExpectedAppError(
-        'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
-        'Workflow terminal sessions cannot survive application exit.'
-      )
-    }
-
+    assertRetentionAllowed(this.scope, this.kind, policy)
     this.retentionPolicyValue = policy
   }
 
@@ -203,5 +198,25 @@ export class TerminalSession {
       exitCode: this.exitCodeValue,
       failureReason: this.failureReasonValue
     }
+  }
+}
+
+function assertRetentionAllowed(
+  scope: TerminalRunScope,
+  kind: TerminalSessionKind,
+  policy: TerminalRetentionPolicy
+): void {
+  if (policy !== 'keep-after-application-exit') return
+  if (kind === 'workflow') {
+    throw createExpectedAppError(
+      'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
+      'Workflow terminal sessions cannot survive application exit.'
+    )
+  }
+  if (resolveTerminalOwnerRef(scope).kind === 'agent') {
+    throw createExpectedAppError(
+      'TERMINAL_SESSION_RETENTION_NOT_ALLOWED',
+      'Agent terminal sessions cannot survive application exit.'
+    )
   }
 }

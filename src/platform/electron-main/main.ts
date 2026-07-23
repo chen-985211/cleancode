@@ -79,7 +79,7 @@ import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
-import { disposeApplicationRuntime } from './applicationRuntimeShutdown'
+import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 
 interface WorkbenchSnapshot {
@@ -522,6 +522,16 @@ app.on('window-all-closed', () => {
 
 let isReadyToQuit = false
 let isPreparingToQuit = false
+const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
+  completeAgentSessions: () => agentSessionService.completeApplicationShutdown(),
+  completeTerminalWorkflows: () => terminalWorkflowService.completeApplicationShutdown(),
+  disposeRunLifecycle: () => runLifecycleService.prepareApplicationShutdown(),
+  disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),
+  disposeTerminalViews: () => terminalViewLifecycle.prepareApplicationShutdown(),
+  logger: consoleLogger,
+  prepareAgentSessions: () => agentSessionService.prepareApplicationShutdown(),
+  prepareTerminalWorkflows: () => terminalWorkflowService.prepareApplicationShutdown()
+})
 
 app.on('before-quit', (event) => {
   if (isReadyToQuit) {
@@ -534,14 +544,7 @@ app.on('before-quit', (event) => {
   }
 
   isPreparingToQuit = true
-  void disposeApplicationRuntime({
-    disposeAgentSessions: () => agentSessionService.disposeAll(),
-    disposeRunLifecycle: () => runLifecycleService.prepareApplicationShutdown(),
-    disposeTerminalViews: () => terminalViewLifecycle.prepareApplicationShutdown(),
-    disposeTerminalWorkflows: () => terminalWorkflowService.stopAll(),
-    disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),
-    logger: consoleLogger
-  }).finally(() => {
+  void applicationRuntimeShutdown.dispose().finally(() => {
     isReadyToQuit = true
     app.quit()
   })

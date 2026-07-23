@@ -67,7 +67,16 @@ async function stopTerminalProvider(appStateDirectory: string): Promise<void> {
   } catch {
     return
   }
-  await waitForProcessIdExit(metadata.processId)
+  try {
+    await waitForProcessIdExit(metadata.processId)
+  } catch {
+    try {
+      process.kill(metadata.processId, 'SIGKILL')
+    } catch {
+      return
+    }
+    await waitForProcessIdExit(metadata.processId)
+  }
 }
 
 export async function readAuthenticatedTerminalProviderMetadata(
@@ -94,17 +103,13 @@ export async function readAuthenticatedTerminalProviderMetadata(
   return identity === metadata.instanceId ? metadata : null
 }
 
-export async function waitForProcessIdExit(processId: number): Promise<void> {
-  const deadline = Date.now() + 3_000
+export async function waitForProcessIdExit(processId: number, timeoutMs = 3_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline && isProcessAlive(processId)) {
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
   if (isProcessAlive(processId)) {
-    try {
-      process.kill(processId, 'SIGKILL')
-    } catch {
-      // The provider exited between the liveness check and the signal.
-    }
+    throw new Error(`Process ${processId} did not exit naturally within ${timeoutMs}ms.`)
   }
 }
 

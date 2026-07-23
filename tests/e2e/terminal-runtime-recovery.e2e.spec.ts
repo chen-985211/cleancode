@@ -78,26 +78,34 @@ describe('terminal runtime recovery e2e', () => {
   )
 
   it(
-    'releases every terminal view before a normal application shutdown',
+    'naturally exits Electron, PTYs, and the Provider within a bounded multi-terminal shutdown',
     async () => {
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await waitForTerminalShellReady(page, 'Terminal 2')
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await waitForTerminalShellReady(page, 'Terminal 3')
+      const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
+      for (const terminalName of terminalNames.slice(1)) {
+        await page.getByRole('button', { name: '新建终端积木' }).click()
+        await waitForTerminalShellReady(page, terminalName)
+      }
       const sessionIds = await Promise.all(
-        ['Terminal 1', 'Terminal 2', 'Terminal 3'].map((name) => readTerminalSessionId(page, name))
+        terminalNames.map((name) => readTerminalSessionId(page, name))
       )
       const processIds = await Promise.all(
         sessionIds.map((sessionId) => readTerminalProcessId(page, sessionId))
       )
+      const provider = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
+      expect(provider).not.toBeNull()
       const electronProcess = electronApp.process()
+      const shutdownStartedAt = performance.now()
 
       await closeElectronApp(electronApp)
+      const shutdownDurationMs = performance.now() - shutdownStartedAt
       resources.electronApp = undefined
       resources.page = undefined
 
       expect(electronProcess.exitCode).toBe(0)
+      expect(electronProcess.signalCode).toBeNull()
+      expect(shutdownDurationMs).toBeLessThan(8_000)
       await Promise.all(processIds.map((processId) => expectProcessToExit(processId)))
+      await waitForProcessIdExit(provider!.processId, 5_000)
       expect(readE2eProcessOutput(electronApp).join('\n')).not.toContain(
         'detachDestroyedTerminalView'
       )

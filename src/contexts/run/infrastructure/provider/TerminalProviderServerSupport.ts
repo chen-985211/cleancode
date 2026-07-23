@@ -38,6 +38,15 @@ export function authorizeTerminalProviderController(
 ): void {
   if (method === 'health' || method === 'claimController') return
   if (state.kind === 'active' && state.socket === socket) return
+  if (
+    state.kind === 'releasing' &&
+    state.socket === socket &&
+    (method === 'beginApplicationDetach' ||
+      method === 'awaitApplicationDetach' ||
+      method === 'detachApplication')
+  ) {
+    return
+  }
   throw createExpectedAppError(
     'TERMINAL_PROVIDER_UNAVAILABLE',
     'Terminal provider request requires the active application controller.'

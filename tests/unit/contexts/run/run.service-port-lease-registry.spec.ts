@@ -67,6 +67,21 @@ describe('service port lease registry', () => {
     expect(registry.findActiveByPort(41_000)).toBeNull()
     expect(lease.toSnapshot().state).toBe('released')
   })
+
+  it('clears application references and settles lease waiters without claiming port closure', async () => {
+    const registry = new ServicePortLeaseRegistry()
+    const lease = registry.reserve(runScope('run-1'), endpoint(41_000))
+    lease.markActivating()
+    lease.markBound()
+    const waiting = registry.waitForSettlement({ port: 41_000, leaseId: lease.id })
+
+    registry.clearApplicationReferences()
+    registry.clearApplicationReferences()
+
+    await expect(waiting).resolves.toBeNull()
+    expect(registry.findActiveByPort(41_000)).toBeNull()
+    expect(lease.toSnapshot().state).toBe('bound')
+  })
 })
 
 function runScope(runId: string) {

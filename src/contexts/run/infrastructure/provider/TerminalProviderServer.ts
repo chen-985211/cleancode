@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import { chmod, rm } from 'node:fs/promises'
 import { createServer, type Server, type Socket } from 'node:net'
 
@@ -43,11 +42,12 @@ import {
 } from './TerminalProviderServerSupport'
 import { launchTerminalProviderForegroundJob } from './TerminalProviderForegroundJob'
 import { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
+import { TerminalProviderControllerLifecycle } from './TerminalProviderControllerLifecycle'
+import { TerminalProviderShutdownCoordinator } from './TerminalProviderShutdownCoordinator'
 import {
   countLiveProviderSessions,
-  hasRetainedLiveProviderSessions,
-  type ProviderControllerReleaseReason,
-  type ProviderControllerState,
+  hasLiveProviderSessions,
+  hasUnsafeLiveProviderSessions,
   type ProviderTerminalSession,
   type TerminalProviderRequestParams
 } from './TerminalProviderServerTypes'
@@ -63,6 +63,7 @@ export interface TerminalProviderServerOptions {
   readonly models?: TerminalModelRecoveryPort
   readonly store?: FileTerminalRecoveryStore
   readonly outputPersistenceBatchWindowMs?: number
+  readonly shutdownConcurrency?: number
   readonly onExitRequested?: () => void
   readonly log?: (message: string, details?: Readonly<Record<string, unknown>>) => void
 }
@@ -71,11 +72,12 @@ export class TerminalProviderServer {
   private readonly processes: TerminalProcessPort
   private readonly models: TerminalModelRecoveryPort
   private readonly store: FileTerminalRecoveryStore
+  private readonly shutdownCoordinator: TerminalProviderShutdownCoordinator
+  private readonly controllerLifecycle: TerminalProviderControllerLifecycle
   private readonly sessions = new Map<string, ProviderTerminalSession>()
   private readonly recoveryIssues: TerminalRecoveryLoadIssue[] = []
   private readonly sockets = new Set<Socket>()
   private server: Server | null = null
-  private controllerState: ProviderControllerState = { kind: 'unclaimed' }
   private exitTimer: ReturnType<typeof setTimeout> | null = null
   private isClosing = false
 
@@ -84,6 +86,34 @@ export class TerminalProviderServer {
     this.models = options.models ?? new HeadlessTerminalModelAdapter()
     this.store =
       options.store ?? new FileTerminalRecoveryStore({ rootDirectory: options.recoveryDirectory })
+    this.shutdownCoordinator = new TerminalProviderShutdownCoordinator({
+      concurrency: options.shutdownConcurrency,
+      processes: this.processes,
+      retireSession: (identity) => this.retireSession(identity),
+      onFailure: (error, session, phase) => {
+        if (phase === 'checkpoint') {
+          this.recordPersistenceFailure(error, session)
+          return
+        }
+        this.log('shutdown-session-failed', {
+          message: getErrorMessage(error),
+          sessionId: session.snapshot.sessionId
+        })
+      }
+    })
+    this.controllerLifecycle = new TerminalProviderControllerLifecycle({
+      createRelease: (releaseId) => {
+        const sessions = [...this.sessions.values()]
+        return Promise.resolve().then(() =>
+          this.shutdownCoordinator.release({ releaseId, sessions })
+        )
+      },
+      hasLiveSessions: () => hasLiveProviderSessions(this.sessions.values()),
+      hasUnsafeLiveSessions: () => hasUnsafeLiveProviderSessions(this.sessions.values()),
+      log: (message, details) => this.log(message, details),
+      onClaim: () => this.prepareControllerClaim(),
+      onIdleWithoutLiveSessions: () => this.scheduleExit()
+    })
   }
 
   async start(): Promise<void> {
@@ -151,8 +181,8 @@ export class TerminalProviderServer {
     socket.on('close', () => {
       this.sockets.delete(socket)
       if (this.isClosing || detachedCleanly) return
-      if (this.controllerState.kind !== 'active' || this.controllerState.socket !== socket) return
-      this.beginControllerRelease('unexpected-disconnect')
+      const pendingRequests = requestTail
+      void pendingRequests.finally(() => this.controllerLifecycle.handleSocketClose(socket))
     })
     socket.on('error', (error) => this.log('socket-error', { message: error.message }))
   }
@@ -165,7 +195,7 @@ export class TerminalProviderServer {
     const request = value
     try {
       authenticateTerminalProviderRequest(request, this.options.authToken)
-      authorizeTerminalProviderController(socket, request.method, this.controllerState)
+      authorizeTerminalProviderController(socket, request.method, this.controllerLifecycle.state)
       const result = await this.dispatch(request.method, request.params, socket)
       sendTerminalProviderMessage(socket, {
         type: 'response',
@@ -173,7 +203,7 @@ export class TerminalProviderServer {
         ok: true,
         result
       })
-      if (request.method === 'detachApplication') {
+      if (request.method === 'detachApplication' || request.method === 'awaitApplicationDetach') {
         setTimeout(() => socket.end(), 0)
         return true
       }
@@ -197,10 +227,10 @@ export class TerminalProviderServer {
           instanceId: this.options.instanceId,
           protocolVersion: terminalProviderProtocolVersion,
           processId: process.pid,
-          controllerState: this.controllerState.kind
+          controllerState: this.controllerLifecycle.state.kind
         }
       case 'claimController':
-        return this.claimController(socket, input.controllerId, input.processId)
+        return this.controllerLifecycle.claim(socket, input.controllerId, input.processId)
       case 'listSessions':
         return {
           sessions: [...this.sessions.values()].map(({ snapshot }) => snapshot),
@@ -300,8 +330,20 @@ export class TerminalProviderServer {
       case 'recordManagedServiceEndpoint':
         await this.recordManagedServiceEndpoint(input.sessionId, input.endpoint)
         return null
+      case 'beginApplicationDetach': {
+        const release = this.controllerLifecycle.beginRelease('application-detach')
+        if (!release) {
+          throw createExpectedAppError(
+            'TERMINAL_PROVIDER_UNAVAILABLE',
+            'Terminal provider controller release is unavailable.'
+          )
+        }
+        return { releaseId: release.releaseId }
+      }
+      case 'awaitApplicationDetach':
+        return this.controllerLifecycle.awaitRelease(socket, input.releaseId)
       case 'detachApplication':
-        await this.releaseController('application-detach')
+        await this.controllerLifecycle.releaseController('application-detach')
         return null
       default:
         throw createExpectedAppError(
@@ -425,47 +467,7 @@ export class TerminalProviderServer {
     await session.persistence.checkpoint(true)
   }
 
-  private async detachApplicationSessions(): Promise<void> {
-    const retired = [...this.sessions.values()].filter(
-      ({ snapshot }) =>
-        snapshot.retentionPolicy === 'terminate-on-application-exit' || snapshot.kind === 'workflow'
-    )
-    const stops = retired
-      .filter(({ snapshot }) => snapshot.status === 'running')
-      .map(({ snapshot }) => this.processes.stop(snapshot.sessionId))
-    await Promise.allSettled(stops)
-    for (const { snapshot } of retired) await this.retireSession(snapshot)
-    for (const session of this.sessions.values()) {
-      await session.persistence
-        .checkpoint(true)
-        .catch((error) => this.recordPersistenceFailure(error, session))
-    }
-  }
-
-  private claimController(
-    socket: Socket,
-    controllerId: string,
-    processId: number
-  ): {
-    readonly controllerLeaseId: string
-  } {
-    if (!controllerId || !Number.isSafeInteger(processId) || processId <= 0) {
-      throw createExpectedAppError(
-        'TERMINAL_PROVIDER_AUTHENTICATION_FAILED',
-        'Terminal provider controller evidence is invalid.'
-      )
-    }
-    if (this.controllerState.kind === 'active') {
-      if (
-        this.controllerState.socket === socket &&
-        this.controllerState.controllerId === controllerId
-      ) {
-        return { controllerLeaseId: this.controllerState.controllerLeaseId }
-      }
-      throw this.controllerBusy()
-    }
-    if (this.controllerState.kind === 'releasing') throw this.controllerBusy()
-
+  private prepareControllerClaim(): void {
     if (this.exitTimer) clearTimeout(this.exitTimer)
     this.exitTimer = null
     for (const session of this.sessions.values()) {
@@ -473,46 +475,6 @@ export class TerminalProviderServer {
         session.snapshot = { ...session.snapshot, recoveryKind: 'warm' }
       }
     }
-    const controllerLeaseId = randomUUID()
-    this.controllerState = {
-      kind: 'active',
-      socket,
-      controllerId,
-      controllerLeaseId,
-      processId
-    }
-    this.log('controller-claimed', { controllerId, processId })
-    return { controllerLeaseId }
-  }
-
-  private controllerBusy() {
-    return createExpectedAppError(
-      'TERMINAL_PROVIDER_CONTROLLER_BUSY',
-      'Terminal provider controller is active or releasing.',
-      { retryAfterMs: 50 }
-    )
-  }
-
-  private async releaseController(reason: ProviderControllerReleaseReason): Promise<void> {
-    if (this.controllerState.kind !== 'active') return
-    const release = this.detachApplicationSessions()
-    this.controllerState = { kind: 'releasing', release }
-    this.log('controller-releasing', { reason })
-    try {
-      await release
-    } finally {
-      if (this.controllerState.kind === 'releasing' && this.controllerState.release === release) {
-        this.controllerState = { kind: 'unclaimed' }
-        this.log('controller-released', { reason })
-        if (!hasRetainedLiveProviderSessions(this.sessions.values())) this.scheduleExit()
-      }
-    }
-  }
-
-  private beginControllerRelease(reason: ProviderControllerReleaseReason): void {
-    void this.releaseController(reason).catch((error) =>
-      this.log('controller-release-failed', { message: getErrorMessage(error), reason })
-    )
   }
 
   private async retireSession(identity: TerminalRunScope): Promise<void> {
@@ -627,8 +589,8 @@ export class TerminalProviderServer {
     this.exitTimer = setTimeout(() => {
       this.exitTimer = null
       if (
-        this.controllerState.kind !== 'unclaimed' ||
-        hasRetainedLiveProviderSessions(this.sessions.values())
+        this.controllerLifecycle.state.kind !== 'unclaimed' ||
+        hasLiveProviderSessions(this.sessions.values())
       ) {
         return
       }
@@ -637,8 +599,9 @@ export class TerminalProviderServer {
   }
 
   private broadcast(event: TerminalProviderEvent): void {
-    if (this.controllerState.kind !== 'active' || this.controllerState.socket.destroyed) return
-    sendTerminalProviderMessage(this.controllerState.socket, event)
+    const controller = this.controllerLifecycle.state
+    if (controller.kind !== 'active' || controller.socket.destroyed) return
+    sendTerminalProviderMessage(controller.socket, event)
   }
 
   private log(message: string, details: Readonly<Record<string, unknown>> = {}): void {

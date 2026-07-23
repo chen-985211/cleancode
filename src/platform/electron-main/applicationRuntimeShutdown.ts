@@ -1,101 +1,276 @@
 import { isAppError } from '../../shared-kernel/application/errors/AppError'
 import type { LogEvent, Logger } from '../logging/Logger'
 
-type CleanupStage =
-  'run-lifecycle' | 'terminal-views' | 'terminal-workflows' | 'terminal-sessions' | 'agent-sessions'
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 5_000
+const DEFAULT_TERMINAL_SESSION_RESERVE_MS = 2_000
 
-interface CleanupFailure {
+type CleanupStage =
+  | 'run-lifecycle'
+  | 'terminal-views'
+  | 'agent-sessions-prepare'
+  | 'terminal-workflows-prepare'
+  | 'terminal-sessions'
+  | 'agent-sessions-complete'
+  | 'terminal-workflows-complete'
+
+interface CleanupStageResult {
   readonly stage: CleanupStage
-  readonly error: unknown
+  readonly durationMs: number
+  readonly outcome: 'success' | 'failure' | 'timeout'
+  readonly errors: readonly unknown[]
 }
 
 export interface DisposeApplicationRuntimeInput {
+  readonly completeAgentSessions: () => Promise<void>
+  readonly completeTerminalWorkflows: () => Promise<void>
   readonly disposeRunLifecycle: () => Promise<void>
   readonly disposeTerminalViews: () => Promise<void>
-  readonly disposeTerminalWorkflows: () => Promise<void>
   readonly disposeTerminalSessions: () => Promise<void>
-  readonly disposeAgentSessions: () => Promise<void>
   readonly logger: Logger
+  readonly prepareAgentSessions: () => Promise<void>
+  readonly prepareTerminalWorkflows: () => Promise<void>
 }
 
-export async function disposeApplicationRuntime({
-  disposeAgentSessions,
-  disposeRunLifecycle,
-  disposeTerminalViews,
-  disposeTerminalWorkflows,
-  disposeTerminalSessions,
-  logger
-}: DisposeApplicationRuntimeInput): Promise<void> {
-  const [runFailures, agentResult] = await Promise.all([
-    disposeRunRuntime(
-      disposeRunLifecycle,
-      disposeTerminalViews,
-      disposeTerminalWorkflows,
-      disposeTerminalSessions
-    ),
-    settleCleanup(disposeAgentSessions)
-  ])
-  const failures = [...runFailures, ...collectCleanupFailures('agent-sessions', agentResult)]
+export interface DisposeApplicationRuntimeOptions {
+  readonly correlationId?: string
+  readonly terminalSessionReserveMs?: number
+  readonly timeoutMs?: number
+}
 
-  failures.forEach((failure, index) => {
-    try {
-      logger.error({
+export interface ApplicationRuntimeShutdownCoordinator {
+  dispose(): Promise<void>
+}
+
+export function createApplicationRuntimeShutdownCoordinator(
+  input: DisposeApplicationRuntimeInput,
+  options: DisposeApplicationRuntimeOptions = {}
+): ApplicationRuntimeShutdownCoordinator {
+  let shutdown: Promise<void> | undefined
+
+  return {
+    dispose() {
+      shutdown ??= performApplicationRuntimeShutdown(input, options)
+      return shutdown
+    }
+  }
+}
+
+export function disposeApplicationRuntime(
+  input: DisposeApplicationRuntimeInput,
+  options: DisposeApplicationRuntimeOptions = {}
+): Promise<void> {
+  return createApplicationRuntimeShutdownCoordinator(input, options).dispose()
+}
+
+async function performApplicationRuntimeShutdown(
+  {
+    completeAgentSessions,
+    completeTerminalWorkflows,
+    disposeRunLifecycle,
+    disposeTerminalViews,
+    disposeTerminalSessions,
+    logger,
+    prepareAgentSessions,
+    prepareTerminalWorkflows
+  }: DisposeApplicationRuntimeInput,
+  options: DisposeApplicationRuntimeOptions
+): Promise<void> {
+  const startedAt = performance.now()
+  const timeoutMs = resolveDuration(options.timeoutMs, DEFAULT_SHUTDOWN_TIMEOUT_MS)
+  const terminalSessionReserveMs = Math.min(
+    timeoutMs,
+    resolveDuration(
+      options.terminalSessionReserveMs,
+      Math.min(DEFAULT_TERMINAL_SESSION_RESERVE_MS, timeoutMs * 0.4)
+    )
+  )
+  const shutdownDeadline = startedAt + timeoutMs
+  const preTerminalDeadline = shutdownDeadline - terminalSessionReserveMs
+  const correlationId = options.correlationId ?? createShutdownCorrelationId()
+  const lifecycleResult = await runCleanupStage(
+    'run-lifecycle',
+    disposeRunLifecycle,
+    preTerminalDeadline
+  )
+  const viewResult = await runCleanupStage(
+    'terminal-views',
+    disposeTerminalViews,
+    preTerminalDeadline
+  )
+  const [agentPrepareResult, workflowPrepareResult] = await Promise.all([
+    runCleanupStage('agent-sessions-prepare', prepareAgentSessions, preTerminalDeadline),
+    runCleanupStage('terminal-workflows-prepare', prepareTerminalWorkflows, preTerminalDeadline)
+  ])
+  const terminalResult = await runCleanupStage(
+    'terminal-sessions',
+    disposeTerminalSessions,
+    shutdownDeadline
+  )
+  const [agentCompleteResult, workflowCompleteResult] = await Promise.all([
+    runCleanupStage('agent-sessions-complete', completeAgentSessions, shutdownDeadline),
+    runCleanupStage('terminal-workflows-complete', completeTerminalWorkflows, shutdownDeadline)
+  ])
+
+  logCleanupResults(
+    logger,
+    [
+      lifecycleResult,
+      viewResult,
+      agentPrepareResult,
+      workflowPrepareResult,
+      terminalResult,
+      agentCompleteResult,
+      workflowCompleteResult
+    ],
+    correlationId
+  )
+}
+
+async function runCleanupStage(
+  stage: CleanupStage,
+  operation: () => Promise<void>,
+  deadline: number
+): Promise<CleanupStageResult> {
+  const startedAt = performance.now()
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+  const operationResult = Promise.resolve()
+    .then(operation)
+    .then<CleanupStageResult, CleanupStageResult>(
+      () => ({
+        durationMs: resolveElapsedDuration(startedAt),
+        errors: [],
+        outcome: 'success',
+        stage
+      }),
+      (error: unknown) => ({
+        durationMs: resolveElapsedDuration(startedAt),
+        errors: flattenCleanupErrors(error),
+        outcome: 'failure',
+        stage
+      })
+    )
+  const timeoutResult = new Promise<CleanupStageResult>((resolve) => {
+    timeoutHandle = setTimeout(
+      () => {
+        resolve({
+          durationMs: resolveElapsedDuration(startedAt),
+          errors: [],
+          outcome: 'timeout',
+          stage
+        })
+      },
+      Math.max(0, deadline - performance.now())
+    )
+  })
+  const result = await Promise.race([operationResult, timeoutResult])
+
+  if (timeoutHandle !== undefined) {
+    clearTimeout(timeoutHandle)
+  }
+  return result
+}
+
+function logCleanupResults(
+  logger: Logger,
+  results: readonly CleanupStageResult[],
+  correlationId: string
+): void {
+  const failureCount = results.reduce(
+    (count, result) =>
+      count +
+      (result.outcome === 'timeout' ? 1 : result.outcome === 'failure' ? result.errors.length : 0),
+    0
+  )
+  let failureIndex = 0
+
+  for (const result of results) {
+    if (result.outcome === 'success') {
+      safeLog(logger, 'info', {
+        correlationId,
         details: {
-          cleanupStage: failure.stage,
-          failureCount: failures.length,
-          failureIndex: index + 1
+          cleanupStage: result.stage,
+          timedOut: false
         },
-        error: resolveLogError(failure.error),
+        durationMs: result.durationMs,
+        operation: 'disposeApplicationRuntime',
+        outcome: 'success',
+        scope: 'platform.lifecycle'
+      })
+      continue
+    }
+
+    if (result.outcome === 'timeout') {
+      failureIndex += 1
+      safeLog(logger, 'warn', {
+        correlationId,
+        details: {
+          cleanupStage: result.stage,
+          failureCount,
+          failureIndex,
+          timedOut: true
+        },
+        durationMs: result.durationMs,
+        error: {
+          code: 'COMMAND_TIMED_OUT',
+          isExpected: true,
+          message: `Application cleanup stage "${result.stage}" exceeded its shutdown budget.`
+        },
         operation: 'disposeApplicationRuntime',
         outcome: 'failure',
         scope: 'platform.lifecycle'
       })
-    } catch {
-      // Shutdown must continue even if the diagnostic sink itself is unavailable.
+      continue
     }
-  })
+
+    for (const error of result.errors) {
+      failureIndex += 1
+      safeLog(logger, 'error', {
+        correlationId,
+        details: {
+          cleanupStage: result.stage,
+          failureCount,
+          failureIndex,
+          timedOut: false
+        },
+        durationMs: result.durationMs,
+        error: resolveLogError(error),
+        operation: 'disposeApplicationRuntime',
+        outcome: 'failure',
+        scope: 'platform.lifecycle'
+      })
+    }
+  }
 }
 
-async function disposeRunRuntime(
-  disposeRunLifecycle: () => Promise<void>,
-  disposeTerminalViews: () => Promise<void>,
-  disposeTerminalWorkflows: () => Promise<void>,
-  disposeTerminalSessions: () => Promise<void>
-): Promise<readonly CleanupFailure[]> {
-  const lifecycleResult = await settleCleanup(disposeRunLifecycle)
-  const viewResult = await settleCleanup(disposeTerminalViews)
-  const workflowResult = await settleCleanup(disposeTerminalWorkflows)
-  const terminalResult = await settleCleanup(disposeTerminalSessions)
-  return [
-    ...collectCleanupFailures('run-lifecycle', lifecycleResult),
-    ...collectCleanupFailures('terminal-views', viewResult),
-    ...collectCleanupFailures('terminal-workflows', workflowResult),
-    ...collectCleanupFailures('terminal-sessions', terminalResult)
-  ]
-}
-
-async function settleCleanup(operation: () => Promise<void>): Promise<PromiseSettledResult<void>> {
+function safeLog(
+  logger: Logger,
+  level: 'error' | 'info' | 'warn',
+  event: Omit<LogEvent, 'level' | 'timestamp'>
+): void {
   try {
-    await operation()
-    return { status: 'fulfilled', value: undefined }
-  } catch (reason) {
-    return { status: 'rejected', reason }
+    logger[level](event)
+  } catch {
+    // Shutdown must continue even if the diagnostic sink itself is unavailable.
   }
 }
 
-function collectCleanupFailures(
-  stage: CleanupStage,
-  result: PromiseSettledResult<void>
-): readonly CleanupFailure[] {
-  if (result.status === 'fulfilled') return []
-  return flattenCleanupFailure(stage, result.reason)
-}
-
-function flattenCleanupFailure(stage: CleanupStage, error: unknown): readonly CleanupFailure[] {
+function flattenCleanupErrors(error: unknown): readonly unknown[] {
   if (error instanceof AggregateError) {
-    return error.errors.flatMap((nestedError) => flattenCleanupFailure(stage, nestedError))
+    return error.errors.flatMap((nestedError) => flattenCleanupErrors(nestedError))
   }
-  return [{ stage, error }]
+  return [error]
+}
+
+function resolveDuration(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && value !== undefined ? Math.max(0, value) : fallback
+}
+
+function resolveElapsedDuration(startedAt: number): number {
+  return Math.max(0, performance.now() - startedAt)
+}
+
+function createShutdownCorrelationId(): string {
+  return `application-shutdown-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 function resolveLogError(error: unknown): NonNullable<LogEvent['error']> {

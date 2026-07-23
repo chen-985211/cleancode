@@ -10,6 +10,8 @@ import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSe
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
+import type { TerminalProviderApplicationDetachResult } from './TerminalProviderProtocol'
+import { shouldTerminateProviderSession } from './TerminalProviderShutdownCoordinator'
 
 export interface ProviderTerminalSession {
   snapshot: TerminalSessionSnapshot
@@ -20,6 +22,16 @@ export interface ProviderTerminalSession {
 
 export type ProviderControllerReleaseReason = 'application-detach' | 'unexpected-disconnect'
 
+export interface ProviderControllerRelease {
+  readonly socket: Socket
+  readonly controllerId: string
+  readonly controllerLeaseId: string
+  readonly processId: number
+  readonly reason: ProviderControllerReleaseReason
+  readonly releaseId: string
+  readonly release: Promise<TerminalProviderApplicationDetachResult>
+}
+
 export type ProviderControllerState =
   | { readonly kind: 'unclaimed' }
   | {
@@ -29,7 +41,7 @@ export type ProviderControllerState =
       readonly controllerLeaseId: string
       readonly processId: number
     }
-  | { readonly kind: 'releasing'; readonly release: Promise<void> }
+  | ({ readonly kind: 'releasing' } & ProviderControllerRelease)
 
 export interface TerminalProviderRequestParams {
   readonly command: Omit<StartTerminalProcessCommand, 'onOutput' | 'onExit'> & {
@@ -47,17 +59,21 @@ export interface TerminalProviderRequestParams {
   readonly endpoint: ActualServiceEndpoint
   readonly controllerId: string
   readonly processId: number
+  readonly releaseId: string
 }
 
 export function countLiveProviderSessions(sessions: Iterable<ProviderTerminalSession>): number {
   return [...sessions].filter(({ snapshot }) => snapshot.status === 'running').length
 }
 
-export function hasRetainedLiveProviderSessions(
+export function hasLiveProviderSessions(sessions: Iterable<ProviderTerminalSession>): boolean {
+  return [...sessions].some(({ snapshot }) => snapshot.status === 'running')
+}
+
+export function hasUnsafeLiveProviderSessions(
   sessions: Iterable<ProviderTerminalSession>
 ): boolean {
   return [...sessions].some(
-    ({ snapshot }) =>
-      snapshot.status === 'running' && snapshot.retentionPolicy === 'keep-after-application-exit'
+    ({ snapshot }) => snapshot.status === 'running' && shouldTerminateProviderSession(snapshot)
   )
 }

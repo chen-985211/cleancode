@@ -18,6 +18,7 @@ import {
   closeElectronApp,
   launchApp,
   teardownE2eScenario,
+  waitForProcessIdExit,
   type E2eWorkbench
 } from '../../support/e2eWorkbench'
 import { runE2eTeardown } from '../../support/e2eLifecycle'
@@ -101,6 +102,23 @@ describe('E2E workbench lifecycle', () => {
         taskName: 'failed before setup'
       })
     ).resolves.toBeUndefined()
+  })
+
+  it('does not force-kill a process while asserting a natural exit', async () => {
+    vi.useFakeTimers()
+    try {
+      const kill = vi.spyOn(process, 'kill').mockReturnValue(true)
+      const naturalExit = expect(waitForProcessIdExit(456)).rejects.toThrow(
+        'Process 456 did not exit naturally'
+      )
+
+      await vi.advanceTimersByTimeAsync(3_001)
+      await naturalExit
+
+      expect(kill).not.toHaveBeenCalledWith(456, 'SIGKILL')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('closes the application and cleans the scenario when diagnostics fail', async () => {

@@ -41,6 +41,7 @@ import {
 } from '../../../../shared-kernel/application/errors/AppError'
 import {
   type TerminalProviderEvent,
+  terminalProviderApplicationDetachProtocolVersion,
   terminalProviderProtocolVersion
 } from './TerminalProviderProtocol'
 import { TerminalProviderRpcConnection } from './TerminalProviderRpcConnection'
@@ -331,13 +332,30 @@ export class PersistentTerminalProviderClient
   async detachApplication(): Promise<void> {
     this.isDetaching = true
     await this.connectionAttempt?.catch(() => undefined)
-    if (!this.connection) return
-    try {
-      await this.connection.request('detachApplication')
-    } finally {
-      this.connection.close()
-      this.connection = null
+    if (!this.connection) {
       this.connectedMetadata = null
+      this.clearApplicationReferences()
+      return
+    }
+    const connection = this.connection
+    const protocolVersion = this.connectedMetadata?.protocolVersion ?? 0
+    try {
+      if (protocolVersion >= terminalProviderApplicationDetachProtocolVersion) {
+        const receipt = await connection.request<unknown>('beginApplicationDetach')
+        if (!isApplicationDetachReceipt(receipt)) {
+          throw providerUnavailable('Terminal provider returned an invalid detach receipt.')
+        }
+        await connection.request('awaitApplicationDetach', { releaseId: receipt.releaseId })
+      } else {
+        await connection.request('detachApplication')
+      }
+    } finally {
+      if (this.connection === connection) {
+        this.connection = null
+        this.connectedMetadata = null
+      }
+      connection.close()
+      this.clearApplicationReferences()
     }
   }
 
@@ -631,6 +649,16 @@ export class PersistentTerminalProviderClient
   private launchLockPath(): string {
     return join(this.options.stateDirectory, 'provider-launch.lock')
   }
+
+  private clearApplicationReferences(): void {
+    this.processCallbacks.clear()
+    this.foregroundJobCallbacks.clear()
+    this.viewCallbacks.clear()
+    this.pendingModelCreates.clear()
+    this.workingDirectories.clear()
+    this.identities.clear()
+    this.recoveryIssueHandler = null
+  }
 }
 
 function providerUnavailable(message: string) {
@@ -645,5 +673,15 @@ function matchesForegroundJob(
     expected.sessionId === actual.sessionId &&
     expected.launchId === actual.launchId &&
     expected.generation === actual.generation
+  )
+}
+
+function isApplicationDetachReceipt(value: unknown): value is { readonly releaseId: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'releaseId' in value &&
+    typeof value.releaseId === 'string' &&
+    value.releaseId.length > 0
   )
 }

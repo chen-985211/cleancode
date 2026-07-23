@@ -55,7 +55,13 @@ export function linkAbortSignal(source: AbortSignal): AbortController {
   if (source.aborted) {
     controller.abort(source.reason)
   } else {
-    source.addEventListener('abort', () => controller.abort(source.reason), { once: true })
+    const handleSourceAbort = (): void => controller.abort(source.reason)
+    source.addEventListener('abort', handleSourceAbort, { once: true })
+    controller.signal.addEventListener(
+      'abort',
+      () => source.removeEventListener('abort', handleSourceAbort),
+      { once: true }
+    )
   }
   return controller
 }

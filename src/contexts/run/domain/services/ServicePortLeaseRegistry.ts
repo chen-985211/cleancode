@@ -85,7 +85,7 @@ export class ServicePortLeaseRegistry {
   private readonly activeLeasesByPort = new Map<number, ServicePortLease>()
   private readonly settlementWaiters = new Map<
     string,
-    Set<(snapshot: ServicePortLeaseSnapshot) => void>
+    Set<(snapshot: ServicePortLeaseSnapshot | null) => void>
   >()
 
   reserve(owner: TerminalRunScope, endpoint: ActualServiceEndpoint): ServicePortLease {
@@ -143,6 +143,14 @@ export class ServicePortLeaseRegistry {
     }
     lease.recoverQuarantined()
     return true
+  }
+
+  clearApplicationReferences(): void {
+    this.activeLeasesByPort.clear()
+    for (const waiters of this.settlementWaiters.values()) {
+      for (const resolve of waiters) resolve(null)
+    }
+    this.settlementWaiters.clear()
   }
 
   private notifySettlement(snapshot: ServicePortLeaseSnapshot): void {

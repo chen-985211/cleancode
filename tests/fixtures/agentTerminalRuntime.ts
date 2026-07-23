@@ -146,4 +146,6 @@ export class RecordingAgentTerminalRuntime implements AgentTerminalRuntimePort {
   async disposeAll(): Promise<void> {
     this.stops.push('*')
   }
+
+  releaseApplicationShutdown(): void {}
 }

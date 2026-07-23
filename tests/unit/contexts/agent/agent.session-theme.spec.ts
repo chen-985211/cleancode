@@ -428,6 +428,8 @@ class RecordingCodexAgentProcessPort implements AgentTerminalRuntimePort {
     this.events.push('dispose-all')
     return Promise.resolve()
   }
+
+  releaseApplicationShutdown(): void {}
 }
 
 class NoopAgentMcpServerPort implements AgentMcpServerPort {

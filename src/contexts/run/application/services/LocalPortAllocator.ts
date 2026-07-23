@@ -137,6 +137,10 @@ export class LocalPortAllocator {
     }
   }
 
+  clearApplicationReferences(): void {
+    this.leases.clearApplicationReferences()
+  }
+
   private createAllocation(
     command: { readonly scope: TerminalRunScope; readonly intent: ServicePortIntent },
     requestedPort: number | null,

@@ -36,6 +36,7 @@ export interface AgentTerminalRuntimePort {
     readonly sessionId: string
   }): { readonly generation: number; readonly launchId: string }
   open(command: OpenAgentTerminalCommand): Promise<AgentTerminalHandle>
+  releaseApplicationShutdown(): void
   resize(sessionId: string, columns: number, rows: number): void
   stop(sessionId: string): Promise<void>
   write(sessionId: string, input: string): void

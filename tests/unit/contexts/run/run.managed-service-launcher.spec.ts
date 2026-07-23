@@ -391,6 +391,90 @@ describe('managed service launcher', () => {
     expect(fixture.launcher.getActive(session.id)).toBeNull()
     expect(fixture.registry.findActiveByPort(endpoint.port)).toBeNull()
   })
+
+  it('hands an in-flight service to the Provider without stopping its PTY during app shutdown', async () => {
+    const readinessGate = deferred<void>()
+    const fixture = createFixture({
+      reservations: [41_001],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }],
+      readinessGate
+    })
+    const launching = fixture.launcher.launch({
+      ...launchCommand(),
+      portIntent: preferredPort()
+    })
+    await vi.waitFor(() => expect(fixture.processes.starts).toHaveLength(1))
+    const sessionId = fixture.processes.starts[0]!.scope.sessionId
+    await vi.waitFor(() => expect(fixture.launcher.getActive(sessionId)).not.toBeNull())
+
+    const preparing = fixture.launcher.prepareApplicationShutdown()
+    readinessGate.resolve()
+    await expect(launching).rejects.toMatchObject({ code: 'RUN_START_BLOCKED' })
+    await preparing
+
+    expect(fixture.processes.stops).toEqual([])
+    expect(fixture.launcher.getActive(sessionId)).not.toBeNull()
+    expect(fixture.registry.findActiveByPort(41_001)).not.toBeNull()
+
+    await fixture.launcher.completeApplicationShutdown()
+    await fixture.launcher.completeApplicationShutdown()
+
+    expect(fixture.launcher.getActive(sessionId)).toBeNull()
+    expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
+    expect(fixture.processes.stops).toEqual([])
+    await expect(
+      fixture.launcher.launch({ ...launchCommand(), portIntent: preferredPort() })
+    ).rejects.toMatchObject({ code: 'RUN_START_BLOCKED' })
+  })
+
+  it('keeps a late admitted service registered until Provider handoff completion', async () => {
+    const startGate = deferred<void>()
+    const fixture = createFixture({
+      reservations: [41_001],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }],
+      startGate
+    })
+    const launching = fixture.launcher.launch({
+      ...launchCommand(),
+      portIntent: preferredPort()
+    })
+    await vi.waitFor(() => expect(fixture.processes.starts).toHaveLength(1))
+
+    const preparing = fixture.launcher.prepareApplicationShutdown()
+    startGate.resolve()
+    await expect(launching).rejects.toMatchObject({ code: 'RUN_START_BLOCKED' })
+    await preparing
+
+    const sessionId = fixture.processes.starts[0]!.scope.sessionId
+    expect(fixture.launcher.getActive(sessionId)).not.toBeNull()
+    expect(fixture.registry.findActiveByPort(41_001)).not.toBeNull()
+    expect(fixture.processes.stops).toEqual([])
+
+    await fixture.launcher.completeApplicationShutdown()
+
+    expect(fixture.launcher.getActive(sessionId)).toBeNull()
+    expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
+    expect(fixture.processes.stops).toEqual([])
+  })
+
+  it('does not restart per-session cleanup when Provider exit arrives after local completion', async () => {
+    const fixture = createFixture({
+      reservations: [41_001],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }]
+    })
+    await fixture.launcher.launch({
+      ...launchCommand(),
+      portIntent: preferredPort()
+    })
+
+    await fixture.launcher.prepareApplicationShutdown()
+    await fixture.launcher.completeApplicationShutdown()
+    fixture.processes.exitLatest(0)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(fixture.processes.stops).toEqual([])
+    expect(fixture.readiness.closedCommands).toEqual([])
+  })
 })
 
 function createFixture(input: {

@@ -251,21 +251,7 @@ export class TerminalSessionService {
       await this.stopAll()
       return
     }
-    const results = await Promise.allSettled(
-      [...this.sessions.values()]
-        .filter(
-          (session) =>
-            session.status === 'running' &&
-            session.retentionPolicy === 'terminate-on-application-exit'
-        )
-        .map((session) => this.terminate(session.id))
-    )
     await this.runtimeProvider.detachApplication()
-    throwTerminalSessionCleanupFailures(
-      results.map((result) =>
-        result.status === 'fulfilled' ? { status: 'fulfilled', value: undefined } : result
-      )
-    )
   }
 
   private async startInSlot(

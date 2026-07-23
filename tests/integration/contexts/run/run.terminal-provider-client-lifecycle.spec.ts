@@ -111,6 +111,31 @@ describe('persistent terminal provider client lifecycle', () => {
       'listSessions'
     ])
     await client.detachApplication()
+    expect(provider.requests.at(-1)?.method).toBe('detachApplication')
+  })
+
+  it('receives a shutdown handoff before waiting for the current Provider to finish', async () => {
+    provider.pauseApplicationDetachCompletion()
+    const client = createClient(rootDirectory)
+    await client.initialize()
+
+    let detachSettled = false
+    const detach = client.detachApplication().finally(() => {
+      detachSettled = true
+    })
+    await provider.waitForRequests('awaitApplicationDetach', 1)
+
+    expect(provider.requests.slice(-2)).toEqual([
+      expect.objectContaining({ method: 'beginApplicationDetach' }),
+      expect.objectContaining({
+        method: 'awaitApplicationDetach',
+        params: { releaseId: 'application-release-1' }
+      })
+    ])
+    expect(detachSettled).toBe(false)
+
+    provider.resumeApplicationDetachCompletion()
+    await detach
   })
 
   it('shares one connection attempt across concurrent initialization callers', async () => {
@@ -220,6 +245,27 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
+  it('releases application callbacks after the Provider connection is already absent', async () => {
+    const client = createClient(rootDirectory)
+    const identity = outputIdentity('agent')
+    client.bindRecoveredSession(identity, {
+      onExit: vi.fn(),
+      onOutput: vi.fn()
+    })
+    client.bindRecoveryIssueHandler(vi.fn())
+
+    expect(client.getDiagnostics().modelCount).toBe(1)
+
+    await client.detachApplication()
+
+    expect(client.getDiagnostics()).toEqual({
+      attachedViewCount: 0,
+      lastRestoreDurationMs: 0,
+      modelCount: 0,
+      pendingOutputBytes: 0
+    })
+  })
+
   it('waits for an in-flight connection before detaching the application', async () => {
     provider.pauseHealthResponses()
     const client = createClient(rootDirectory)
@@ -236,7 +282,7 @@ describe('persistent terminal provider client lifecycle', () => {
     provider.resumeHealthResponses()
     const [, detachmentResult] = await Promise.allSettled([initialization, detachment])
     expect(detachmentResult.status).toBe('fulfilled')
-    expect(provider.requests.some(({ method }) => method === 'detachApplication')).toBe(true)
+    expect(provider.requests.some(({ method }) => method === 'beginApplicationDetach')).toBe(true)
   })
 })
 
@@ -304,6 +350,7 @@ class ControllableProvider {
   private readonly sockets = new Set<Socket>()
   private server: Server | null = null
   private healthResponses: Deferred | null = null
+  private applicationDetachCompletion: Deferred | null = null
   private rejectedControllerClaims = 0
 
   constructor(
@@ -335,6 +382,15 @@ class ControllableProvider {
 
   pauseHealthResponses(): void {
     this.healthResponses = createDeferred()
+  }
+
+  pauseApplicationDetachCompletion(): void {
+    this.applicationDetachCompletion = createDeferred()
+  }
+
+  resumeApplicationDetachCompletion(): void {
+    this.applicationDetachCompletion?.resolve()
+    this.applicationDetachCompletion = null
   }
 
   resumeHealthResponses(): void {
@@ -380,6 +436,9 @@ class ControllableProvider {
   private async respond(socket: Socket, request: TerminalProviderRequest): Promise<void> {
     this.requests.push(request)
     if (request.method === 'health') await this.healthResponses?.promise
+    if (request.method === 'awaitApplicationDetach') {
+      await this.applicationDetachCompletion?.promise
+    }
     if (request.method === 'claimController' && this.rejectedControllerClaims > 0) {
       this.rejectedControllerClaims -= 1
       socket.write(
@@ -420,6 +479,10 @@ class ControllableProvider {
     if (method === 'listSessions') {
       return { sessions: [], issues: [], managedServiceEndpoints: [] }
     }
+    if (method === 'beginApplicationDetach') {
+      return { releaseId: 'application-release-1' }
+    }
+    if (method === 'awaitApplicationDetach') setTimeout(() => socket.end(), 0)
     if (method === 'detachApplication') setTimeout(() => socket.end(), 0)
     return undefined
   }

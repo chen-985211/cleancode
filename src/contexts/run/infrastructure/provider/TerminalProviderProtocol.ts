@@ -1,6 +1,21 @@
-export const terminalProviderProtocolVersion = 4
+export const terminalProviderProtocolVersion = 5
+export const terminalProviderApplicationDetachProtocolVersion = 5
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
 export const terminalProviderMaxOutputChunkBytes = 256 * 1024
+
+export interface TerminalProviderApplicationDetachReceipt {
+  readonly releaseId: string
+}
+
+export interface TerminalProviderApplicationDetachResult {
+  readonly releaseId: string
+  readonly outcome: 'completed' | 'partial-failure'
+  readonly terminateCandidateCount: number
+  readonly retainedSessionCount: number
+  readonly stoppedSessionCount: number
+  readonly retiredSessionCount: number
+  readonly failureCount: number
+}
 
 export interface TerminalProviderRequest {
   readonly type: 'request'

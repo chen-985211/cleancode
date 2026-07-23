@@ -17,6 +17,7 @@ import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunSco
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import type { LocalPortAllocation } from './LocalPortAllocator'
 import type { LocalPortAllocator } from './LocalPortAllocator'
+import { ManagedServiceApplicationShutdown } from './ManagedServiceApplicationShutdown'
 import { createRunAttemptDetails } from './RunFailureDetails'
 import {
   createManagedRunId,
@@ -87,6 +88,8 @@ interface ActiveManagedService {
 
 export class ManagedServiceLauncher {
   private readonly activeServices = new Map<string, ActiveManagedService>()
+  private readonly activationControllers = new Set<AbortController>()
+  private readonly applicationShutdown = new ManagedServiceApplicationShutdown()
   private readonly maxActivationAttempts: number
   private readonly cleanupTimeoutMs: number
 
@@ -105,13 +108,22 @@ export class ManagedServiceLauncher {
     this.cleanupTimeoutMs = options.cleanupTimeoutMs ?? 2_000
   }
 
-  async launch(command: LaunchManagedServiceCommand): Promise<ManagedServiceRunSnapshot> {
+  launch(command: LaunchManagedServiceCommand): Promise<ManagedServiceRunSnapshot> {
+    return this.applicationShutdown.runLaunch(() => this.launchManagedService(command))
+  }
+
+  private async launchManagedService(
+    command: LaunchManagedServiceCommand
+  ): Promise<ManagedServiceRunSnapshot> {
     const intent = validateServicePortIntent(command.portIntent)
     const runId = command.runId ?? createManagedRunId()
 
     for (let attempt = 0; attempt < this.maxActivationAttempts; attempt += 1) {
       const result = await this.activateAttempt(command, intent, runId)
 
+      if (this.shouldDelegateToProvider(result.service)) {
+        throw this.applicationShutdown.createBlockedError()
+      }
       if (result.inspection === 'owned') {
         if (
           result.service.stopPromise ||
@@ -188,6 +200,20 @@ export class ManagedServiceLauncher {
     }
 
     await this.ensureStopped(service)
+  }
+
+  prepareApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.prepare({
+      abortInFlightWork: () => this.abortApplicationWork(),
+      clearApplicationReferences: () => this.clearApplicationReferences()
+    })
+  }
+
+  completeApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.complete({
+      abortInFlightWork: () => this.abortApplicationWork(),
+      clearApplicationReferences: () => this.clearApplicationReferences()
+    })
   }
 
   getActive(sessionId: string): ManagedServiceRunSnapshot | null {
@@ -269,6 +295,7 @@ export class ManagedServiceLauncher {
       rejectExit = reject
     })
     const readinessController = linkAbortSignal(command.signal)
+    this.activationControllers.add(readinessController)
     const timeoutId = setTimeout(
       () =>
         readinessController.abort(
@@ -300,7 +327,7 @@ export class ManagedServiceLauncher {
           const allocation = await this.allocator.allocate({
             scope,
             intent,
-            signal: command.signal
+            signal: readinessController.signal
           })
           attemptState.allocation = allocation
           const bound = applyServicePortBinding({
@@ -332,7 +359,7 @@ export class ManagedServiceLauncher {
           )
           command.onExit(event)
           const service = attemptState.service
-          if (service) {
+          if (service && !this.shouldDelegateToProvider(service)) {
             void this.ensureStopped(service).catch(service.reportCleanupFailure)
           }
         },
@@ -368,6 +395,7 @@ export class ManagedServiceLauncher {
       })
     } catch (error) {
       clearTimeout(timeoutId)
+      this.activationControllers.delete(readinessController)
       await releaseUnusedAllocation(attemptState.allocation ?? null)
       throw error
     }
@@ -375,6 +403,7 @@ export class ManagedServiceLauncher {
     const allocation = attemptState.allocation
     if (!allocation) {
       clearTimeout(timeoutId)
+      this.activationControllers.delete(readinessController)
       throw createExpectedAppError(
         'SERVICE_PORT_ALLOCATION_EXHAUSTED',
         'Managed service did not receive a local port allocation.'
@@ -382,6 +411,7 @@ export class ManagedServiceLauncher {
     }
     if (session.status !== 'running' || session.processId === null) {
       clearTimeout(timeoutId)
+      this.activationControllers.delete(readinessController)
       await releaseUnusedAllocation(allocation)
       throw createExpectedAppError(
         'UNEXPECTED_ERROR',
@@ -391,6 +421,7 @@ export class ManagedServiceLauncher {
     const service = attemptState.service
     if (!service || this.activeServices.get(session.id) !== service) {
       clearTimeout(timeoutId)
+      this.activationControllers.delete(readinessController)
       await this.sessions.terminateProcess(session.id)
       await releaseUnusedAllocation(allocation)
       throw createExpectedAppError(
@@ -423,14 +454,19 @@ export class ManagedServiceLauncher {
       ])
       return { service, inspection: inspection.ownership }
     } catch (error) {
-      try {
-        await this.ensureStopped(service)
-      } catch (cleanupError) {
-        service.reportCleanupFailure(cleanupError)
+      if (!this.shouldDelegateToProvider(service)) {
+        try {
+          await this.ensureStopped(service)
+        } catch (cleanupError) {
+          service.reportCleanupFailure(cleanupError)
+        }
       }
-      throw error
+      throw this.applicationShutdown.isShuttingDown
+        ? this.applicationShutdown.createBlockedError()
+        : error
     } finally {
       clearTimeout(timeoutId)
+      this.activationControllers.delete(readinessController)
     }
   }
 
@@ -524,6 +560,24 @@ export class ManagedServiceLauncher {
     } catch (error) {
       service.reportCleanupFailure(error)
     }
+  }
+
+  private shouldDelegateToProvider(service: ActiveManagedService): boolean {
+    return this.applicationShutdown.isShuttingDown && !service.stopPromise
+  }
+
+  private abortApplicationWork(): void {
+    const reason = this.applicationShutdown.createBlockedError()
+    for (const controller of this.activationControllers) controller.abort(reason)
+    for (const service of this.activeServices.values()) {
+      service.readinessController.abort(reason)
+    }
+  }
+
+  private clearApplicationReferences(): void {
+    for (const service of [...this.activeServices.values()]) this.removeActive(service)
+    this.activationControllers.clear()
+    this.allocator.clearApplicationReferences()
   }
 }
 

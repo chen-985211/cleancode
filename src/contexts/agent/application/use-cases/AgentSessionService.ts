@@ -13,8 +13,7 @@ import {
 import type { AgentTerminalRuntimePort } from '../ports/AgentTerminalRuntimePort'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
 import type { AgentLaunchPlan } from '../ports/AgentProviderContribution'
-import { AgentSession } from '../../domain/aggregates/AgentSession'
-import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
+import type { AgentSession } from '../../domain/aggregates/AgentSession'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
@@ -23,6 +22,9 @@ import {
   AgentToolApprovalCoordinator,
   type AgentToolExecutionOperations
 } from './AgentToolApprovalCoordinator'
+import { AgentApplicationShutdownCoordinator } from './AgentApplicationShutdownCoordinator'
+import { AgentProviderSessionPersistenceCoordinator } from './AgentProviderSessionPersistenceCoordinator'
+import { disposeOtherAgentSessionScopes } from './AgentSessionCollection'
 import { AgentToolInvocationCoordinator } from './AgentToolInvocationCoordinator'
 import {
   AgentSessionRuntimeCoordinator,
@@ -64,10 +66,12 @@ import {
 
 export class AgentSessionService {
   private readonly sessions = new Map<string, ManagedAgentSession>()
-  private readonly pendingPersistence = new Set<Promise<void>>()
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
+  private readonly applicationShutdown: AgentApplicationShutdownCoordinator
+  private readonly persistence: AgentProviderSessionPersistenceCoordinator
   private readonly toolInvocations: AgentToolInvocationCoordinator
   private readonly runtimeCoordinator = new AgentSessionRuntimeCoordinator()
+  private isApplicationShuttingDown = false
 
   constructor(
     private readonly terminalRuntime: AgentTerminalRuntimePort,
@@ -83,6 +87,23 @@ export class AgentSessionService {
     this.approvalCoordinator = new AgentToolApprovalCoordinator(this.toolInvocations, (sessionId) =>
       this.findSessionById(sessionId)
     )
+    this.persistence = new AgentProviderSessionPersistenceCoordinator(sessionRepository, providers)
+    this.applicationShutdown = new AgentApplicationShutdownCoordinator({
+      beginClosing: (session) => this.beginSessionToolClosing(session),
+      clearRuntime: () => this.runtimeCoordinator.clear(),
+      clearSessions: () => this.sessions.clear(),
+      disposeMcpServer: () => this.mcpServerPort.dispose(),
+      forgetSession: (sessionId) => this.toolInvocations.forgetSession(sessionId),
+      listSessions: () => [...this.sessions.values()],
+      releaseTerminalReferences: () => this.terminalRuntime.releaseApplicationShutdown(),
+      settleTools: (session) => this.settleSessionToolCalls(session),
+      stopAdmission: () => {
+        this.isApplicationShuttingDown = true
+        this.runtimeCoordinator.stop()
+      },
+      waitForAdmissionIdle: () => this.runtimeCoordinator.waitForIdle(),
+      waitForPersistence: () => this.persistence.waitForIdle()
+    })
   }
 
   async attach(command: AttachAgentSessionCommand): Promise<AgentSessionSnapshot> {
@@ -117,7 +138,7 @@ export class AgentSessionService {
     if (existingSession?.isTerminalRunning) {
       existingSession.callbacks = createAgentSessionCallbacks(command)
       if (command.restartMode === 'new' && existingSession.shouldPersist) {
-        await this.waitForPendingPersistence()
+        await this.persistence.waitForIdle()
         await this.sessionRepository.delete(scope)
         existingSession.providerSessionRef = null
         transitionAgentRuntime(existingSession, { binding: 'unbound' })
@@ -136,10 +157,12 @@ export class AgentSessionService {
     if (existingSession) {
       await this.disposeManagedSession(sessionKey, existingSession)
     }
-    await this.disposeOtherScopeForAgentInDirectory(
+    await disposeOtherAgentSessionScopes(
+      this.sessions,
       command.workspaceDirectory,
       command.agentId,
-      sessionKey
+      sessionKey,
+      (key, session) => this.disposeManagedSession(key, session)
     )
     const shouldPersist = command.persistenceMode !== 'ephemeral'
     if (command.restartMode === 'new' && shouldPersist) {
@@ -285,6 +308,12 @@ export class AgentSessionService {
   }
 
   async executeMcpTool(command: AgentMcpToolCallCommand): Promise<AgentToolExecutionResult> {
+    if (this.isApplicationShuttingDown) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_NOT_FOUND',
+        'Agent session service is shutting down.'
+      )
+    }
     const session = requireManagedAgentSession(this.sessions.values(), command.sessionId)
     return this.toolInvocations.runSessionToolCall(session.sessionId, () =>
       this.approvalCoordinator.execute(session, command)
@@ -370,11 +399,19 @@ export class AgentSessionService {
       disposeTerminalRuntime: () => this.terminalRuntime.disposeAll(),
       sessions,
       settleTools: (session) => this.settleSessionToolCalls(session),
-      waitForPersistence: () => this.waitForPendingPersistence()
+      waitForPersistence: () => this.persistence.waitForIdle()
     })
     this.sessions.clear()
     this.runtimeCoordinator.clear()
     for (const session of sessions) this.toolInvocations.forgetSession(session.sessionId)
+  }
+
+  prepareApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.prepare()
+  }
+
+  completeApplicationShutdown(): Promise<void> {
+    return this.applicationShutdown.complete()
   }
 
   private async suspendRuntimeOwner(owner: AgentSessionRuntimeOwner): Promise<boolean> {
@@ -393,7 +430,7 @@ export class AgentSessionService {
     recordAgentTerminalStopped(session, 'suspended')
     unregisterAgentMcpEndpoint(session)
     await disposeAgentLaunchArtifacts(session)
-    await this.waitForPendingPersistence()
+    await this.persistence.waitForIdle()
     session.isStopping = false
     return true
   }
@@ -466,55 +503,21 @@ export class AgentSessionService {
     return toAgentSessionSnapshot(session)
   }
 
-  private persistProviderSession(
-    session: ManagedAgentSession,
-    sessionRefSnapshot: ProviderSessionRefSnapshot,
-    providerLaunchGeneration: number
-  ): void {
-    if (!session.shouldPersist) {
-      return
-    }
-
-    let sessionRef
-    try {
-      sessionRef = this.providers.parseSessionRef(session.providerId, sessionRefSnapshot)
-    } catch {
-      transitionAgentRuntime(session, { binding: 'persistence_failed' })
-      return
-    }
-    transitionAgentRuntime(session, { binding: 'persisting' })
-
-    const persistence = (async () => {
-      if (session.providerLaunchGeneration !== providerLaunchGeneration || session.isStopping)
-        return
-      const persistedSession =
-        (await this.sessionRepository.find(session.scope)) ??
-        AgentSession.start(session.scope, session.providerId)
-      if (session.providerLaunchGeneration !== providerLaunchGeneration || session.isStopping)
-        return
-      persistedSession.bindProviderSession(session.scope, sessionRef)
-      await this.sessionRepository.save(persistedSession)
-      if (session.providerLaunchGeneration === providerLaunchGeneration) {
-        session.providerSessionRef = sessionRef.toSnapshot()
-        transitionAgentRuntime(session, { binding: 'persisted' })
-      }
-    })().catch(() => {
-      if (session.providerLaunchGeneration === providerLaunchGeneration) {
-        transitionAgentRuntime(session, { binding: 'persistence_failed' })
-      }
-    })
-
-    this.pendingPersistence.add(persistence)
-    void persistence.finally(() => this.pendingPersistence.delete(persistence))
-  }
-
-  private async waitForPendingPersistence(): Promise<void> {
-    await Promise.all([...this.pendingPersistence])
-  }
-
   private async startManagedProcess(session: ManagedAgentSession): Promise<void> {
+    if (this.isApplicationShuttingDown) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_NOT_FOUND',
+        'Agent session service is shutting down.'
+      )
+    }
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     await this.providerAvailability.inspect(session.providerId, { refresh: true })
+    if (this.isApplicationShuttingDown) {
+      throw createExpectedAppError(
+        'AGENT_SESSION_NOT_FOUND',
+        'Agent session service is shutting down.'
+      )
+    }
     const processSessionId = session.sessionId
     let exitObserved = false
     beginAgentTerminalRuntime(session)
@@ -540,6 +543,10 @@ export class AgentSessionService {
         workspaceName: session.workspaceName
       })
       if (exitObserved || !recordAgentTerminalRunning(session, processSessionId, handle)) return
+      if (this.isApplicationShuttingDown) {
+        this.beginSessionToolClosing(session)
+        return
+      }
     } catch (error) {
       recordAgentTerminalStartFailure(session)
       throw error
@@ -550,7 +557,7 @@ export class AgentSessionService {
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     const providerLaunchGeneration = ++session.providerLaunchGeneration
     await disposeAgentLaunchArtifacts(session)
-    await this.waitForPendingPersistence()
+    await this.persistence.waitForIdle()
     const processSessionId = session.sessionId
     if (!canLaunchAgentProvider(session, processSessionId)) return
     const provider = this.providers.require(session.providerId)
@@ -578,7 +585,7 @@ export class AgentSessionService {
             session.isStopping
           )
             return
-          this.persistProviderSession(session, sessionRef, providerLaunchGeneration)
+          this.persistence.persist(session, sessionRef, providerLaunchGeneration)
         },
         onActivityChanged: (activity) => {
           if (
@@ -633,6 +640,10 @@ export class AgentSessionService {
   }
 
   private async registerMcpEndpoint(session: ManagedAgentSession): Promise<void> {
+    if (this.isApplicationShuttingDown) {
+      this.beginSessionToolClosing(session)
+      return
+    }
     if (!session.cleancodeMcpEnabled || session.mcpSupport === 'unsupported') {
       await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
         this.executeMcpTool(toolCommand)
@@ -649,22 +660,6 @@ export class AgentSessionService {
       recordAgentMcpRegistrationFailure(session)
       this.toolInvocations.beginSessionClosing(session.sessionId)
       if (session.mcpSupport === 'required') throw error
-    }
-  }
-
-  private async disposeOtherScopeForAgentInDirectory(
-    workspaceDirectory: string,
-    agentId: string,
-    activeScopeKey: string
-  ): Promise<void> {
-    for (const [sessionKey, session] of this.sessions.entries()) {
-      if (
-        sessionKey !== activeScopeKey &&
-        session.agentId === agentId &&
-        session.workspaceDirectory === workspaceDirectory
-      ) {
-        await this.disposeManagedSession(sessionKey, session)
-      }
     }
   }
 

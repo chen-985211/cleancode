@@ -92,6 +92,10 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
     await Promise.all([...this.terminals.keys()].map((sessionId) => this.stop(sessionId)))
   }
 
+  releaseApplicationShutdown(): void {
+    this.terminals.clear()
+  }
+
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {
     const terminal = this.terminals.get(sessionId)
     if (!terminal) {

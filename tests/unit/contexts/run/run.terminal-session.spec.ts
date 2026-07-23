@@ -86,6 +86,37 @@ describe('terminal session', () => {
     )
   })
 
+  it('never permits Agent-owned sessions to survive application exit', () => {
+    const session = TerminalSession.create({
+      scope: {
+        ...runScope(),
+        owner: { id: 'agent-1', kind: 'agent' }
+      },
+      workingDirectory: '/tmp/cleancode-demo'
+    })
+    session.markRunning({ processId: 1234 })
+
+    expect(() => session.setRetentionPolicy('keep-after-application-exit')).toThrow(
+      'Agent terminal sessions cannot survive application exit.'
+    )
+  })
+
+  it('rejects a persisted live Agent terminal that claims cross-application retention', () => {
+    expect(() =>
+      TerminalSession.revive({
+        scope: {
+          ...runScope(),
+          owner: { id: 'agent-1', kind: 'agent' }
+        },
+        workingDirectory: '/tmp/cleancode-demo',
+        kind: 'interactive',
+        retentionPolicy: 'keep-after-application-exit',
+        recoveryKind: 'warm',
+        processId: 1234
+      })
+    ).toThrow('Agent terminal sessions cannot survive application exit.')
+  })
+
   it('revives an authenticated live session without changing its run identity', () => {
     const session = TerminalSession.revive({
       scope: runScope(),
