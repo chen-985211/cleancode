@@ -383,10 +383,8 @@ export const enMessages = {
   'agent.renameTitle': 'Double-click to rename',
   'agent.moreActions': 'More actions for {agentName}',
   'agent.actions': 'Actions for {agentName}',
-  'agent.rename': 'Rename Agent',
-  'agent.remove': 'Remove Agent',
-  'agent.removeDescription':
-    'Stop and remove this Agent, cancel pending approvals, and delete its conversation bindings. This does not revert project files, delete Git commits, or affect other Agents.',
+  'agent.rename': 'Rename',
+  'agent.remove': 'Remove',
   'agent.multipleNoticeTitle': 'Agents share this workspace',
   'agent.multipleNotice':
     'Multiple Agents may edit the same files. Keep an eye on uncommitted changes.',

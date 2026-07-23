@@ -1,4 +1,7 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { AgentConsoleActions } from '../../../src/presentation/app-shell/AgentConsoleActions'
 
@@ -42,9 +45,10 @@ describe('Agent console actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
 
     const menu = screen.getByRole('menu', { name: 'Agent 2 操作' })
-    expect(screen.getByRole('menuitem', { name: '重命名 Agent' })).toHaveFocus()
-    expect(screen.getByRole('menuitem', { name: '移除 Agent' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('menuitem', { name: '重命名 Agent' }))
+    expect(menu.parentElement).toBe(document.body)
+    expect(screen.getByRole('menuitem', { name: '重命名' })).toHaveFocus()
+    expect(screen.getByRole('menuitem', { name: '移除' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
 
     expect(menu).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Agent 名称' })).toHaveFocus()
@@ -54,11 +58,15 @@ describe('Agent console actions', () => {
     render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
     fireEvent.click(trigger)
-    const rename = screen.getByRole('menuitem', { name: '重命名 Agent' })
-    const remove = screen.getByRole('menuitem', { name: '移除 Agent' })
+    const rename = screen.getByRole('menuitem', { name: '重命名' })
+    const remove = screen.getByRole('menuitem', { name: '移除' })
 
+    expect(rename).toHaveAttribute('tabindex', '0')
+    expect(remove).toHaveAttribute('tabindex', '-1')
     fireEvent.keyDown(rename, { key: 'ArrowDown' })
     expect(remove).toHaveFocus()
+    expect(rename).toHaveAttribute('tabindex', '-1')
+    expect(remove).toHaveAttribute('tabindex', '0')
     fireEvent.keyDown(remove, { key: 'ArrowDown' })
     expect(rename).toHaveFocus()
     fireEvent.keyDown(rename, { key: 'End' })
@@ -81,34 +89,34 @@ describe('Agent console actions', () => {
     expect(trigger).toHaveFocus()
   })
 
-  it('confirms the impact before removing an Agent', async () => {
+  it('closes the menu when keyboard focus leaves it', () => {
+    render(
+      <>
+        <AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />
+        <button type="button">下一个控件</button>
+      </>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
+    const rename = screen.getByRole('menuitem', { name: '重命名' })
+    fireEvent.blur(rename, { relatedTarget: screen.getByRole('button', { name: '下一个控件' }) })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('removes an Agent directly from its scoped action menu', async () => {
     const onRemove = vi.fn(async () => undefined)
     render(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '移除 Agent' }))
-
-    const dialog = screen.getByRole('dialog', { name: '移除 Agent' })
-    expect(within(dialog).getByRole('button', { name: '取消' })).toHaveFocus()
-    expect(dialog).toHaveTextContent('取消未完成审批并删除其对话绑定')
-    expect(dialog).toHaveTextContent('不会回滚项目文件、删除 Git 提交或影响其他 Agent')
-    fireEvent.click(within(dialog).getByRole('button', { name: '移除' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '移除' }))
 
     await waitFor(() => expect(onRemove).toHaveBeenCalledWith(agent))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('returns focus to the action trigger when removal is cancelled', () => {
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
-    const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
-    fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('menuitem', { name: '移除 Agent' }))
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
-
-    expect(screen.queryByRole('dialog', { name: '移除 Agent' })).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
-  })
-
-  it('traps confirmation focus and disables every exit while removal is pending', async () => {
+  it('closes the menu and prevents repeated removal while the request is pending', async () => {
     let finishRemove!: () => void
     const onRemove = vi.fn(
       () =>
@@ -117,26 +125,34 @@ describe('Agent console actions', () => {
         })
     )
     render(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '移除 Agent' }))
-    const dialog = screen.getByRole('dialog', { name: '移除 Agent' })
-    const cancel = within(dialog).getByRole('button', { name: '取消' })
-    const remove = within(dialog).getByRole('button', { name: '移除' })
-
-    fireEvent.keyDown(cancel, { key: 'Tab', shiftKey: true })
-    expect(remove).toHaveFocus()
-    fireEvent.keyDown(remove, { key: 'Tab' })
-    expect(cancel).toHaveFocus()
-    fireEvent.click(remove)
+    fireEvent.click(screen.getByRole('menuitem', { name: '移除' }))
 
     await waitFor(() => expect(onRemove).toHaveBeenCalledOnce())
-    expect(dialog).toHaveAttribute('aria-busy', 'true')
-    expect(dialog).toHaveFocus()
-    expect(cancel).toBeDisabled()
-    expect(remove).toBeDisabled()
-    fireEvent.keyDown(dialog, { key: 'Escape' })
-    expect(dialog).toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toBeDisabled()
 
     await act(async () => finishRemove())
+    expect(trigger).toBeEnabled()
+  })
+
+  it('uses a resilient floating menu and an adequate icon-button target', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+      'utf8'
+    )
+    const moreButtonRule = styles.split('.agent-console-actions__more {')[1]?.split('}')[0] ?? ''
+    const menuRule = styles.split('.agent-console-actions__menu {')[1]?.split('}')[0] ?? ''
+    const focusRule = styles
+      .split(
+        '.agent-console-actions__menu button:hover,\n.agent-console-actions__menu button:focus-visible {'
+      )[1]
+      ?.split('}')[0]
+
+    expect(moreButtonRule).toContain('width: 30px;')
+    expect(moreButtonRule).toContain('height: 30px;')
+    expect(menuRule).toContain('position: fixed;')
+    expect(focusRule).toContain('outline: 2px solid var(--cc-ring);')
   })
 })

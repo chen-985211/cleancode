@@ -1,17 +1,24 @@
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode
 } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { trapFocus } from './modalFocus'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
+
+interface MenuPosition {
+  readonly left: number
+  readonly side: 'bottom' | 'top'
+  readonly top: number
+}
 
 export function AgentConsoleActions({
   agent,
@@ -29,14 +36,15 @@ export function AgentConsoleActions({
   readonly onSelect?: () => void
 }) {
   const { t } = useI18n()
-  const [mode, setMode] = useState<'closed' | 'menu' | 'remove' | 'rename'>('closed')
+  const [mode, setMode] = useState<'closed' | 'menu' | 'rename'>('closed')
   const [name, setName] = useState(agent.name)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeMenuItem, setActiveMenuItem] = useState(0)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const actionsRef = useRef<HTMLDivElement | null>(null)
-  const cancelRemoveRef = useRef<HTMLButtonElement | null>(null)
-  const confirmRemoveRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuId = `agent-actions-menu-${agent.agentId}`
 
   useEffect(() => {
     if (mode !== 'menu') return undefined
@@ -44,7 +52,10 @@ export function AgentConsoleActions({
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
-      if (!actionsRef.current?.contains(event.target as Node)) setMode('closed')
+      const target = event.target as Node
+      if (!actionsRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setMode('closed')
+      }
     }
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
@@ -60,13 +71,46 @@ export function AgentConsoleActions({
     }
   }, [mode])
 
-  useEffect(() => {
-    if (mode === 'remove') cancelRemoveRef.current?.focus()
-  }, [mode])
+  useLayoutEffect(() => {
+    if (mode !== 'menu') return undefined
 
-  useEffect(() => {
-    if (mode === 'remove' && isSubmitting) confirmRemoveRef.current?.focus()
-  }, [isSubmitting, mode])
+    const positionMenu = (): void => {
+      const trigger = menuTriggerRef.current
+      const menu = menuRef.current
+      if (!trigger || !menu) return
+
+      const triggerRect = trigger.getBoundingClientRect()
+      const menuWidth = menu.offsetWidth
+      const menuHeight = menu.offsetHeight
+      const viewportPadding = 8
+      const gap = 6
+      const opensAbove =
+        triggerRect.bottom + gap + menuHeight > window.innerHeight - viewportPadding &&
+        triggerRect.top - gap - menuHeight >= viewportPadding
+      const preferredTop = opensAbove
+        ? triggerRect.top - gap - menuHeight
+        : triggerRect.bottom + gap
+      const maximumTop = Math.max(
+        viewportPadding,
+        window.innerHeight - menuHeight - viewportPadding
+      )
+      const maximumLeft = Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
+
+      setMenuPosition({
+        left: Math.min(Math.max(viewportPadding, triggerRect.right - menuWidth), maximumLeft),
+        side: opensAbove ? 'top' : 'bottom',
+        top: Math.min(Math.max(viewportPadding, preferredTop), maximumTop)
+      })
+    }
+
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
+  }, [mode])
 
   const submitRename = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
@@ -82,6 +126,7 @@ export function AgentConsoleActions({
   }
   const removeAgent = async (): Promise<void> => {
     if (isSubmitting) return
+    setMode('closed')
     setIsSubmitting(true)
     try {
       await onRemove(agent)
@@ -93,11 +138,6 @@ export function AgentConsoleActions({
   const cancelRename = (): void => {
     setName(agent.name)
     setMode('closed')
-  }
-  const cancelRemove = (): void => {
-    if (isSubmitting) return
-    setMode('closed')
-    menuTriggerRef.current?.focus()
   }
   const startRename = (): void => {
     setName(agent.name)
@@ -158,75 +198,71 @@ export function AgentConsoleActions({
                 className="agent-console-actions__more nodrag"
                 ref={menuTriggerRef}
                 type="button"
+                aria-controls={mode === 'menu' ? menuId : undefined}
                 aria-label={t('agent.moreActions', { agentName: agent.name })}
                 aria-expanded={mode === 'menu'}
                 aria-haspopup="menu"
                 disabled={isSubmitting}
                 onClick={(event) => {
                   event.stopPropagation()
+                  setMenuPosition(null)
+                  setActiveMenuItem(0)
                   setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
                 }}
               >
                 <MoreHorizontal size={15} aria-hidden="true" />
               </button>
             </TooltipLabel>
-            {mode === 'menu' ? (
-              <div
-                className="agent-console-actions__menu nodrag"
-                role="menu"
-                aria-label={t('agent.actions', { agentName: agent.name })}
-                onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
-                ref={menuRef}
-              >
-                <button type="button" role="menuitem" onClick={startRename}>
-                  <Pencil size={14} aria-hidden="true" />
-                  {t('agent.rename')}
-                </button>
-                <button
-                  className="agent-console-actions__menu-item--danger"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => setMode('remove')}
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                  {t('agent.remove')}
-                </button>
-              </div>
-            ) : null}
           </span>
         ) : null}
       </div>
-      {mode === 'remove' ? (
-        <div
-          aria-busy={isSubmitting}
-          className="agent-console-actions__confirm nodrag"
-          ref={confirmRemoveRef}
-          role="dialog"
-          tabIndex={-1}
-          aria-label={t('agent.remove')}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && !isSubmitting) {
-              event.stopPropagation()
-              cancelRemove()
-              return
-            }
-            trapFocus(event, event.currentTarget)
-          }}
-        >
-          <span>{t('agent.removeDescription')}</span>
-          <button
-            ref={cancelRemoveRef}
-            type="button"
-            disabled={isSubmitting}
-            onClick={cancelRemove}
-          >
-            {t('common.cancel')}
-          </button>
-          <button type="button" onClick={() => void removeAgent()} disabled={isSubmitting}>
-            {t('common.remove')}
-          </button>
-        </div>
-      ) : null}
+      {mode === 'menu'
+        ? createPortal(
+            <div
+              id={menuId}
+              className="agent-console-actions__menu nodrag"
+              role="menu"
+              aria-label={t('agent.actions', { agentName: agent.name })}
+              data-side={menuPosition?.side ?? 'bottom'}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setMode('closed')
+                }
+              }}
+              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+              ref={menuRef}
+              style={{
+                left: menuPosition?.left ?? 0,
+                top: menuPosition?.top ?? 0,
+                visibility: menuPosition ? 'visible' : 'hidden'
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                tabIndex={activeMenuItem === 0 ? 0 : -1}
+                onClick={startRename}
+                onFocus={() => setActiveMenuItem(0)}
+              >
+                <Pencil size={14} aria-hidden="true" />
+                {t('agent.rename')}
+              </button>
+              <div className="agent-console-actions__menu-separator" role="separator" />
+              <button
+                className="agent-console-actions__menu-item--danger"
+                type="button"
+                role="menuitem"
+                tabIndex={activeMenuItem === 1 ? 0 : -1}
+                onClick={() => void removeAgent()}
+                onFocus={() => setActiveMenuItem(1)}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+                {t('agent.remove')}
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   )
 }

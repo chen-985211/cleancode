@@ -94,11 +94,7 @@ describe('workspace Agents e2e', () => {
       expect(await page.locator('[data-minimap-node-id^="agent:"]').count()).toBe(2)
 
       await page.getByRole('button', { name: 'Agent 2 更多操作' }).click()
-      await page.getByRole('menuitem', { name: '移除 Agent' }).click()
-      await page
-        .getByRole('dialog', { name: '移除 Agent' })
-        .getByRole('button', { name: '移除' })
-        .click()
+      await page.getByRole('menuitem', { name: '移除' }).click()
       await waitForAgentCount(page, 1)
 
       const store = JSON.parse(

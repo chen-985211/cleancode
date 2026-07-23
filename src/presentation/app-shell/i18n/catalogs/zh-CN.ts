@@ -360,10 +360,8 @@ export const zhCNMessages = {
   'agent.renameTitle': '双击重命名',
   'agent.moreActions': '{agentName} 更多操作',
   'agent.actions': '{agentName} 操作',
-  'agent.rename': '重命名 Agent',
-  'agent.remove': '移除 Agent',
-  'agent.removeDescription':
-    '停止并移除此 Agent，取消未完成审批并删除其对话绑定。不会回滚项目文件、删除 Git 提交或影响其他 Agent。',
+  'agent.rename': '重命名',
+  'agent.remove': '移除',
   'agent.multipleNoticeTitle': 'Agent 共享当前工作区',
   'agent.multipleNotice': '多个 Agent 可能同时修改相同文件，请留意未提交更改。',
   'agent.creationFailed': '无法创建 Agent',
