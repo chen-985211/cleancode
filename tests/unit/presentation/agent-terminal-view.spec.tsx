@@ -93,10 +93,12 @@ describe('Agent shared terminal view', () => {
       })
     })
 
-    expect(writeAgentSession).toHaveBeenCalledWith({
-      input: '\x03',
-      sessionId: 'agent-session-1'
-    })
+    await waitFor(() =>
+      expect(writeAgentSession).toHaveBeenCalledWith({
+        input: '\x03',
+        sessionId: 'agent-session-1'
+      })
+    )
     expect(resizeAgentSession).toHaveBeenCalledWith({
       columns: 104,
       rows: 31,
@@ -126,6 +128,51 @@ describe('Agent shared terminal view', () => {
     view.unmount()
     await waitFor(() => expect(detachTerminalView).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(surface.dispose).toHaveBeenCalledTimes(1))
+  })
+
+  it('coalesces high-frequency terminal input inside one rendering frame', async () => {
+    const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
+    const writeAgentSession = vi.fn(async () => undefined)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi({ writeAgentSession }),
+        attachTerminalView: vi.fn(async (command) => createSnapshot(command.viewId)),
+        detachTerminalView: vi.fn(async () => undefined)
+      }
+    })
+    const view = render(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness session={createSession()} />
+      </TerminalSurfaceRegistryProvider>
+    )
+    await waitFor(() => expect(terminalViewMockState.surfaces).toHaveLength(1))
+    const surface = terminalViewMockState.surfaces[0]!
+    await waitFor(() => expect(surface.restore).toHaveBeenCalled())
+    const attachment = vi.mocked(surface.attach).mock.calls[0]![0] as TerminalSurfaceAttachment
+
+    vi.useFakeTimers()
+    try {
+      act(() => {
+        attachment.onInput('\u001b[<64;10;5M')
+        attachment.onInput('\u001b[<64;10;5M')
+        attachment.onInput('\u001b[<65;10;5M')
+      })
+      expect(writeAgentSession).not.toHaveBeenCalled()
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16)
+      })
+
+      expect(writeAgentSession).toHaveBeenCalledOnce()
+      expect(writeAgentSession).toHaveBeenCalledWith({
+        input: '\u001b[<64;10;5M\u001b[<64;10;5M\u001b[<65;10;5M',
+        sessionId: 'agent-session-1'
+      })
+    } finally {
+      vi.useRealTimers()
+      view.unmount()
+    }
   })
 
   it('measures the visible grid before an Agent terminal identity exists', () => {

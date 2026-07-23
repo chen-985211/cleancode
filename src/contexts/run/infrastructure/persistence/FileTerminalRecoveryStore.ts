@@ -99,6 +99,14 @@ export class FileTerminalRecoveryStore {
     identity: TerminalRunScope,
     output: SequencedTerminalOutput
   ): Promise<'appended' | 'checkpoint-required'> {
+    return this.appendOutputs(identity, [output])
+  }
+
+  async appendOutputs(
+    identity: TerminalRunScope,
+    outputs: readonly SequencedTerminalOutput[]
+  ): Promise<'appended' | 'checkpoint-required'> {
+    if (outputs.length === 0) return 'appended'
     const sessionDirectory = this.sessionDirectory(identity)
     const checkpointPath = join(sessionDirectory, 'checkpoint.json')
     if (!(await pathExists(checkpointPath))) {
@@ -108,8 +116,10 @@ export class FileTerminalRecoveryStore {
       )
     }
 
-    const line = `${JSON.stringify({ schemaVersion: 1, ...output })}\n`
-    const byteLength = Buffer.byteLength(line)
+    const contents = outputs
+      .map((output) => `${JSON.stringify({ schemaVersion: 1, ...output })}\n`)
+      .join('')
+    const byteLength = Buffer.byteLength(contents)
     const outputPath = join(sessionDirectory, 'output.log')
     const currentBytes = await fileSize(outputPath)
     const totalBytes = await directorySize(this.sessionsDirectory())
@@ -122,7 +132,7 @@ export class FileTerminalRecoveryStore {
 
     const handle = await open(outputPath, 'a', 0o600)
     try {
-      await handle.writeFile(line, 'utf8')
+      await handle.writeFile(contents, 'utf8')
       await handle.sync()
     } finally {
       await handle.close()

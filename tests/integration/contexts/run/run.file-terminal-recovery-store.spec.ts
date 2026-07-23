@@ -41,6 +41,40 @@ describe('file terminal recovery store', () => {
     expect(JSON.parse(checkpointContents)).toEqual(record)
   })
 
+  it('appends an ordered output batch without changing the recovery log format', async () => {
+    const store = new FileTerminalRecoveryStore({ rootDirectory })
+    const record = createRecord()
+    await store.writeCheckpoint(record)
+
+    await store.appendOutputs(record.session, [
+      { sequence: 2, data: 'first batch output\r\n' },
+      { sequence: 3, data: 'second batch output\r\n' }
+    ])
+
+    const loaded = await new FileTerminalRecoveryStore({ rootDirectory }).load()
+    expect(loaded.issues).toEqual([])
+    expect(loaded.sessions[0]?.output).toEqual([
+      { sequence: 2, data: 'first batch output\r\n' },
+      { sequence: 3, data: 'second batch output\r\n' }
+    ])
+  })
+
+  it('checks the output log byte budget against the complete batch', async () => {
+    const record = createRecord()
+    const store = new FileTerminalRecoveryStore({
+      rootDirectory,
+      limits: { maxOutputLogBytes: 180 }
+    })
+    await store.writeCheckpoint(record)
+
+    const result = await store.appendOutputs(record.session, [
+      { sequence: 2, data: 'x'.repeat(60) },
+      { sequence: 3, data: 'y'.repeat(60) }
+    ])
+
+    expect(result).toBe('checkpoint-required')
+  })
+
   it('requests compaction before an append log exceeds its byte budget', async () => {
     const record = createRecord()
     const store = new FileTerminalRecoveryStore({

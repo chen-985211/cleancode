@@ -30,7 +30,10 @@ import type {
   TerminalRuntimeRecoveryResult
 } from '../../application/ports/TerminalRuntimeProviderPort'
 import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSession'
-import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import {
+  isBlockTerminalOwner,
+  type TerminalRunScope
+} from '../../domain/value-objects/TerminalRunScope'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
 import {
   createExpectedAppError,
@@ -534,7 +537,7 @@ export class PersistentTerminalProviderClient
   private handleEvent(event: TerminalProviderEvent): void {
     if (event.event === 'terminal-output') {
       const output = event.payload as TerminalProcessOutputEvent & { readonly sequence: number }
-      this.options.onOutput?.(output)
+      if (isBlockTerminalOwner(output.scope)) this.options.onOutput?.(output)
       this.processCallbacks.get(output.sessionId)?.onOutput(output)
       const view = this.viewCallbacks.get(output.sessionId)
       if (view) {

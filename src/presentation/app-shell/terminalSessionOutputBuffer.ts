@@ -13,16 +13,24 @@ export function appendTerminalOutput(
   states: Record<string, TerminalViewState>,
   event: TerminalOutputEvent
 ): Record<string, TerminalViewState> {
-  return Object.fromEntries(
-    Object.entries(states).map(([blockId, state]) => [
-      blockId,
-      state.sessionId === event.sessionId &&
-      state.runIdentity?.runId === event.scope.runId &&
-      state.runIdentity.generation === event.scope.generation
-        ? { ...state, output: appendTerminalOutputTail(state.output, event.data) }
-        : state
-    ])
-  )
+  let nextStates: Record<string, TerminalViewState> | null = null
+
+  for (const [blockId, state] of Object.entries(states)) {
+    if (
+      state.sessionId !== event.sessionId ||
+      state.runIdentity?.runId !== event.scope.runId ||
+      state.runIdentity.generation !== event.scope.generation
+    ) {
+      continue
+    }
+    nextStates ??= { ...states }
+    nextStates[blockId] = {
+      ...state,
+      output: appendTerminalOutputTail(state.output, event.data)
+    }
+  }
+
+  return nextStates ?? states
 }
 
 export function bufferTerminalStartupOutput(

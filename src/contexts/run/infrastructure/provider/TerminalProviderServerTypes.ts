@@ -9,11 +9,11 @@ import type {
 import type { TerminalRetentionPolicy } from '../../domain/aggregates/TerminalSession'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
 
 export interface ProviderTerminalSession {
   snapshot: TerminalSessionSnapshot
-  checkpointTimer: ReturnType<typeof setTimeout> | null
-  persistenceTail: Promise<void>
+  persistence: TerminalProviderSessionPersistence
   managedServiceEndpoint: ActualServiceEndpoint | undefined
   retired: boolean
 }

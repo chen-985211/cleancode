@@ -161,6 +161,56 @@ describe('terminal provider server', () => {
     client.close()
   })
 
+  it('persists a burst of PTY output through one ordered batch append', async () => {
+    const processes = new RecordingProcessPort()
+    const store = new FileTerminalRecoveryStore({
+      rootDirectory: join(rootDirectory, 'recovery')
+    })
+    const appendOutputs = vi.spyOn(store, 'appendOutputs')
+    server = createServer(processes, store, 5)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    await createAndStart(client, 'interactive')
+
+    processes.emitOutput('session-1', 'first')
+    processes.emitOutput('session-1', 'second')
+    processes.emitOutput('session-1', 'third')
+    await client.waitForEvent('terminal-output')
+
+    await vi.waitFor(() => expect(appendOutputs).toHaveBeenCalledOnce())
+    expect(appendOutputs.mock.calls[0]?.[1]).toEqual([
+      { sequence: 1, data: 'first' },
+      { sequence: 2, data: 'second' },
+      { sequence: 3, data: 'third' }
+    ])
+    client.close()
+  })
+
+  it('checkpoints output still waiting inside the persistence batch window on detach', async () => {
+    const processes = new RecordingProcessPort()
+    const store = new FileTerminalRecoveryStore({
+      rootDirectory: join(rootDirectory, 'recovery')
+    })
+    server = createServer(processes, store, 60_000)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    await createAndStart(client, 'interactive')
+    await client.request('setRetention', {
+      sessionId: 'session-1',
+      retentionPolicy: 'keep-after-application-exit'
+    })
+
+    processes.emitOutput('session-1', 'pending detach output\r\n')
+    await client.waitForEvent('terminal-output')
+    await client.request('detachApplication')
+
+    const loaded = await store.load()
+    expect(loaded.sessions[0]?.checkpoint.model.transcript).toContain('pending detach output')
+    expect(loaded.sessions[0]?.output).toEqual([])
+  })
+
   it('forwards foreground Agent job lifecycle through the Provider protocol', async () => {
     const processes = new RecordingProcessPort()
     server = createServer(processes)
@@ -261,7 +311,7 @@ describe('terminal provider server', () => {
       sessionId: 'session-1',
       retentionPolicy: 'keep-after-application-exit'
     })
-    vi.spyOn(store, 'appendOutput').mockRejectedValueOnce(new Error('disk unavailable'))
+    vi.spyOn(store, 'appendOutputs').mockRejectedValueOnce(new Error('disk unavailable'))
 
     processes.emitOutput('session-1', 'cannot persist\r\n')
 
@@ -331,14 +381,19 @@ describe('terminal provider server', () => {
     restored.close()
   })
 
-  function createServer(processes: TerminalProcessPort, store?: FileTerminalRecoveryStore) {
+  function createServer(
+    processes: TerminalProcessPort,
+    store?: FileTerminalRecoveryStore,
+    outputPersistenceBatchWindowMs?: number
+  ) {
     return new TerminalProviderServer({
       endpoint,
       authToken: 'secret-token',
       instanceId: 'provider-1',
       recoveryDirectory: join(rootDirectory, 'recovery'),
       processes,
-      store
+      store,
+      outputPersistenceBatchWindowMs
     })
   }
 })

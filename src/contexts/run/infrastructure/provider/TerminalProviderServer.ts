@@ -16,8 +16,7 @@ import {
 } from '../../domain/value-objects/TerminalRunScope'
 import {
   FileTerminalRecoveryStore,
-  type TerminalRecoveryLoadIssue,
-  type TerminalRecoveryRecord
+  type TerminalRecoveryLoadIssue
 } from '../persistence/FileTerminalRecoveryStore'
 import { HeadlessTerminalModelAdapter } from '../terminal-model/HeadlessTerminalModelAdapter'
 import { NodePtyTerminalProcessAdapter } from '../pty/NodePtyTerminalProcessAdapter'
@@ -43,6 +42,7 @@ import {
   splitUtf8
 } from './TerminalProviderServerSupport'
 import { launchTerminalProviderForegroundJob } from './TerminalProviderForegroundJob'
+import { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
 import {
   countLiveProviderSessions,
   hasRetainedLiveProviderSessions,
@@ -52,7 +52,6 @@ import {
   type TerminalProviderRequestParams
 } from './TerminalProviderServerTypes'
 
-const checkpointIntervalMs = 2_000
 const maxRetainedLiveSessions = 32
 
 export interface TerminalProviderServerOptions {
@@ -63,6 +62,7 @@ export interface TerminalProviderServerOptions {
   readonly processes?: TerminalProcessPort
   readonly models?: TerminalModelRecoveryPort
   readonly store?: FileTerminalRecoveryStore
+  readonly outputPersistenceBatchWindowMs?: number
   readonly onExitRequested?: () => void
   readonly log?: (message: string, details?: Readonly<Record<string, unknown>>) => void
 }
@@ -112,10 +112,9 @@ export class TerminalProviderServer {
     if (this.exitTimer) clearTimeout(this.exitTimer)
     this.exitTimer = null
     for (const session of this.sessions.values()) {
-      if (session.checkpointTimer) clearTimeout(session.checkpointTimer)
-      await this.queueCheckpoint(session, true).catch((error) =>
-        this.log('checkpoint-failed', { message: getErrorMessage(error) })
-      )
+      await session.persistence
+        .checkpoint(true)
+        .catch((error) => this.log('checkpoint-failed', { message: getErrorMessage(error) }))
     }
     for (const socket of this.sockets) socket.destroy()
     await new Promise<void>((resolve) => {
@@ -321,16 +320,10 @@ export class TerminalProviderServer {
         'Terminal provider live-session limit was exceeded.'
       )
     }
-    const session: ProviderTerminalSession = {
-      snapshot: createProviderSessionSnapshot(command),
-      checkpointTimer: null,
-      persistenceTail: Promise.resolve(),
-      managedServiceEndpoint: undefined,
-      retired: false
-    }
+    const session = this.createProviderSession(createProviderSessionSnapshot(command))
     this.sessions.set(command.scope.sessionId, session)
     try {
-      await this.queueCheckpoint(session, true)
+      await session.persistence.checkpoint(true)
       const handle = await this.processes.start({
         ...command,
         onOutput: (event) => this.acceptProcessOutput(session, event.data),
@@ -342,7 +335,7 @@ export class TerminalProviderServer {
           processId: handle.processId,
           status: 'running'
         }
-        await this.queueCheckpoint(session, true)
+        await session.persistence.checkpoint(true)
       }
       return handle
     } catch (error) {
@@ -370,13 +363,7 @@ export class TerminalProviderServer {
           sequence: output.sequence
         }
       })
-      session.persistenceTail = session.persistenceTail
-        .then(async () => {
-          const result = await this.store.appendOutput(session.snapshot, output)
-          if (result === 'checkpoint-required') await this.persistCheckpoint(session, true)
-        })
-        .catch((error) => this.recordPersistenceFailure(error, session))
-      this.scheduleCheckpoint(session)
+      session.persistence.appendOutput(output)
     }
   }
 
@@ -385,8 +372,6 @@ export class TerminalProviderServer {
     exitCode: number | null
   ): Promise<void> {
     if (session.retired) return
-    if (session.checkpointTimer) clearTimeout(session.checkpointTimer)
-    session.checkpointTimer = null
     session.snapshot = {
       ...session.snapshot,
       processId: null,
@@ -394,9 +379,9 @@ export class TerminalProviderServer {
       exitCode,
       recoveryKind: 'ended'
     }
-    await this.queueCheckpoint(session, true).catch((error) =>
-      this.recordPersistenceFailure(error, session)
-    )
+    await session.persistence
+      .checkpoint(true)
+      .catch((error) => this.recordPersistenceFailure(error, session))
     if (session.retired) return
     this.broadcast({
       type: 'event',
@@ -423,7 +408,7 @@ export class TerminalProviderServer {
     const previousRetentionPolicy = session.snapshot.retentionPolicy
     session.snapshot = { ...session.snapshot, retentionPolicy }
     try {
-      await this.queueCheckpoint(session, true)
+      await session.persistence.checkpoint(true)
     } catch (error) {
       session.snapshot = { ...session.snapshot, retentionPolicy: previousRetentionPolicy }
       throw error
@@ -437,7 +422,7 @@ export class TerminalProviderServer {
     const session = this.requireSession(sessionId)
     if (session.snapshot.status !== 'running' || session.snapshot.kind !== 'direct') return
     session.managedServiceEndpoint = endpoint
-    await this.queueCheckpoint(session, true)
+    await session.persistence.checkpoint(true)
   }
 
   private async detachApplicationSessions(): Promise<void> {
@@ -451,9 +436,9 @@ export class TerminalProviderServer {
     await Promise.allSettled(stops)
     for (const { snapshot } of retired) await this.retireSession(snapshot)
     for (const session of this.sessions.values()) {
-      await this.queueCheckpoint(session, true).catch((error) =>
-        this.recordPersistenceFailure(error, session)
-      )
+      await session.persistence
+        .checkpoint(true)
+        .catch((error) => this.recordPersistenceFailure(error, session))
     }
   }
 
@@ -534,8 +519,7 @@ export class TerminalProviderServer {
     const session = this.sessions.get(identity.sessionId)
     if (!session || !isSameTerminalRun(session.snapshot, identity)) return
     session.retired = true
-    if (session.checkpointTimer) clearTimeout(session.checkpointTimer)
-    await session.persistenceTail.catch(() => undefined)
+    await session.persistence.retire()
     this.models.retire(identity)
     this.sessions.delete(identity.sessionId)
     await this.store.delete(identity)
@@ -585,64 +569,34 @@ export class TerminalProviderServer {
         status: 'exited',
         recoveryKind: 'historical'
       }
-      const session: ProviderTerminalSession = {
-        snapshot,
-        checkpointTimer: null,
-        persistenceTail: Promise.resolve(),
-        managedServiceEndpoint: undefined,
-        retired: false
-      }
+      const session = this.createProviderSession(snapshot)
       this.sessions.set(snapshot.sessionId, session)
-      await this.writeCheckpoint(session, historicalCheckpoint, true)
+      await session.persistence.replaceCheckpoint(historicalCheckpoint, true)
     }
   }
 
-  private scheduleCheckpoint(session: ProviderTerminalSession): void {
-    if (session.checkpointTimer) return
-    session.checkpointTimer = setTimeout(() => {
-      session.checkpointTimer = null
-      void this.queueCheckpoint(session, true).catch((error) =>
-        this.recordPersistenceFailure(error, session)
-      )
-    }, checkpointIntervalMs)
-  }
-
-  private queueCheckpoint(
-    session: ProviderTerminalSession,
-    truncateOutputLog: boolean
-  ): Promise<void> {
-    session.persistenceTail = session.persistenceTail
-      .catch(() => undefined)
-      .then(() => this.persistCheckpoint(session, truncateOutputLog))
-    return session.persistenceTail
-  }
-
-  private async persistCheckpoint(
-    session: ProviderTerminalSession,
-    truncateOutputLog: boolean
-  ): Promise<void> {
-    if (session.retired) return
-    const checkpoint = await this.models.captureCheckpoint(session.snapshot)
-    if (session.retired) return
-    await this.writeCheckpoint(session, checkpoint, truncateOutputLog)
-  }
-
-  private writeCheckpoint(
-    session: ProviderTerminalSession,
-    model: Awaited<ReturnType<TerminalModelRecoveryPort['captureCheckpoint']>>,
-    truncateOutputLog: boolean
-  ): Promise<void> {
-    const record: TerminalRecoveryRecord = {
-      schemaVersion: 2,
-      providerInstanceId: this.options.instanceId,
-      updatedAt: new Date().toISOString(),
-      session: session.snapshot,
-      model
+  private createProviderSession(snapshot: TerminalSessionSnapshot): ProviderTerminalSession {
+    const sessionState: Omit<ProviderTerminalSession, 'persistence'> = {
+      snapshot,
+      managedServiceEndpoint: undefined,
+      retired: false
     }
-    return this.store.writeCheckpoint(record, { truncateOutputLog })
+    const persistence = new TerminalProviderSessionPersistence({
+      batchWindowMs: this.options.outputPersistenceBatchWindowMs,
+      captureCheckpoint: () => this.models.captureCheckpoint(sessionState.snapshot),
+      getSession: () => sessionState.snapshot,
+      instanceId: this.options.instanceId,
+      isRetired: () => sessionState.retired,
+      onBackgroundError: (error) => this.recordPersistenceFailure(error, sessionState),
+      store: this.store
+    })
+    return Object.assign(sessionState, { persistence })
   }
 
-  private recordPersistenceFailure(error: unknown, session?: ProviderTerminalSession): void {
+  private recordPersistenceFailure(
+    error: unknown,
+    session?: Pick<ProviderTerminalSession, 'snapshot'>
+  ): void {
     if (session?.snapshot.retentionPolicy === 'keep-after-application-exit') {
       session.snapshot = {
         ...session.snapshot,

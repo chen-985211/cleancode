@@ -3,7 +3,10 @@ import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { PersistentTerminalProviderClient } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
+import {
+  PersistentTerminalProviderClient,
+  type PersistentTerminalProviderClientOptions
+} from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
 import {
   atomicWriteProviderMetadata,
   createProviderEndpoint
@@ -190,6 +193,33 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
+  it('publishes only block-owned terminal output through the global output callback', async () => {
+    const onOutput = vi.fn()
+    const client = createClient(rootDirectory, undefined, undefined, onOutput)
+    await client.initialize()
+    const agentScope = outputIdentity('agent')
+    const blockScope = outputIdentity('block')
+
+    provider.emitEvent('terminal-output', {
+      data: 'agent redraw',
+      scope: agentScope,
+      sequence: 1,
+      sessionId: agentScope.sessionId
+    })
+    provider.emitEvent('terminal-output', {
+      data: 'block output',
+      scope: blockScope,
+      sequence: 1,
+      sessionId: blockScope.sessionId
+    })
+
+    await vi.waitFor(() => expect(onOutput).toHaveBeenCalledOnce())
+    expect(onOutput).toHaveBeenCalledWith(
+      expect.objectContaining({ data: 'block output', sessionId: blockScope.sessionId })
+    )
+    await client.detachApplication()
+  })
+
   it('waits for an in-flight connection before detaching the application', async () => {
     provider.pauseHealthResponses()
     const client = createClient(rootDirectory)
@@ -213,14 +243,32 @@ describe('persistent terminal provider client lifecycle', () => {
 function createClient(
   rootDirectory: string,
   onBackgroundError?: (error: unknown) => void,
-  onRuntimeUnavailable?: (error: unknown) => void
+  onRuntimeUnavailable?: (error: unknown) => void,
+  onOutput?: PersistentTerminalProviderClientOptions['onOutput']
 ) {
   return new PersistentTerminalProviderClient({
     stateDirectory: rootDirectory,
     providerEntryPath: join(rootDirectory, 'unused-provider-entry.js'),
     onBackgroundError,
-    onRuntimeUnavailable
+    onRuntimeUnavailable,
+    onOutput
   })
+}
+
+function outputIdentity(ownerKind: 'agent' | 'block') {
+  const ownerId = ownerKind === 'agent' ? 'agent-1' : 'block-1'
+  return {
+    blockId: ownerId,
+    generation: 1,
+    gitBranch: 'main',
+    owner: { id: ownerId, kind: ownerKind },
+    projectDirectory: '/work/app',
+    projectId: 'project-1',
+    runId: `${ownerKind}-run-1`,
+    sessionId: `${ownerKind}-session-1`,
+    workspaceDirectory: '/work/app',
+    workspaceName: 'main'
+  }
 }
 
 async function expectNoAdditionalConnections(
