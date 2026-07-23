@@ -120,7 +120,7 @@
 }
 
 :root {
-  --cc-terminal-light-background: #f7f9fc;
+  --cc-terminal-light-background: #ffffff;
   --cc-terminal-light-foreground: #243142;
   --cc-terminal-light-cursor: #172033;
   --cc-terminal-light-selection: #cbdcf8;
@@ -142,7 +142,7 @@
   --cc-terminal-light-bright-magenta: #a565cb;
   --cc-terminal-light-bright-cyan: #188fa8;
   --cc-terminal-light-bright-white: #ffffff;
-  --cc-terminal-dark-background: #0b1017;
+  --cc-terminal-dark-background: #000000;
   --cc-terminal-dark-foreground: #d6dee8;
   --cc-terminal-dark-cursor: #f8fafc;
   --cc-terminal-dark-selection: #2d415c;
@@ -168,9 +168,17 @@
 }
 
 :root,
+:root[data-theme='light'] {
+  --cc-terminal-projection-background: var(--cc-terminal-light-background);
+}
+
+:root[data-theme='dark'] {
+  --cc-terminal-projection-background: var(--cc-terminal-dark-background);
+}
+
+:root,
 :root[data-theme='light'],
-.agent-terminal-viewport[data-agent-terminal-source-theme='light'],
-.terminal-viewport[data-terminal-source-theme='light'] {
+.terminal-theme-projection[data-terminal-source-theme='light'] {
   --cc-scrollbar: rgb(100 116 139 / 55%);
   --cc-terminal-background: var(--cc-terminal-light-background);
   --cc-terminal-foreground: var(--cc-terminal-light-foreground);
@@ -198,8 +206,7 @@
 }
 
 :root[data-theme='dark'],
-.agent-terminal-viewport[data-agent-terminal-source-theme='dark'],
-.terminal-viewport[data-terminal-source-theme='dark'] {
+.terminal-theme-projection[data-terminal-source-theme='dark'] {
   --cc-scrollbar: rgb(148 163 184 / 48%);
   --cc-terminal-background: var(--cc-terminal-dark-background);
   --cc-terminal-foreground: var(--cc-terminal-dark-foreground);
@@ -227,14 +234,10 @@
 }
 
 :root[data-theme='dark']
-  :is(
-    .agent-terminal-viewport[data-agent-terminal-source-theme='light'],
-    .terminal-viewport[data-terminal-source-theme='light']
-  ),
+  .terminal-theme-projection[data-terminal-source-theme='light']
+  > :is(.agent-terminal-viewport, .terminal-viewport),
 :root[data-theme='light']
-  :is(
-    .agent-terminal-viewport[data-agent-terminal-source-theme='dark'],
-    .terminal-viewport[data-terminal-source-theme='dark']
-  ) {
+  .terminal-theme-projection[data-terminal-source-theme='dark']
+  > :is(.agent-terminal-viewport, .terminal-viewport) {
   filter: var(--cc-terminal-theme-mismatch-filter);
 }

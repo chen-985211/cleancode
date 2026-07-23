@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AgentActivityStatus } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
+import { AgentProviderIcon } from './AgentProviderIcon'
 import { AgentProviderStatusView } from './AgentProviderStatusView'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
@@ -89,9 +90,6 @@ export function AgentConsole({
     terminalElementRef,
     workspaceKey: currentWorkspaceKey
   })
-  const activity = session?.runtime.activity.status ?? 'unavailable'
-  const showActivity =
-    providerCatalog.descriptor?.capabilities.activityTracking === true && activity !== 'unavailable'
   const isAttachPending = attachOperation.status === 'pending'
 
   useEffect(() => {
@@ -186,36 +184,38 @@ export function AgentConsole({
           {agent && onRename && onRemove ? (
             <AgentConsoleActions
               agent={agent}
+              identityControl={
+                <AgentProviderIdentity
+                  icon={providerCatalog.descriptor?.icon ?? null}
+                  providerName={providerName}
+                />
+              }
               capabilityControl={
-                <span className="agent-console__provider-controls">
-                  <AgentProviderIdentity
-                    activity={activity}
-                    providerName={providerName}
-                    showActivity={showActivity}
+                onMcpCapabilityChange && supportsMcp ? (
+                  <AgentMcpCapabilityToggle
+                    enabled={agent.cleancodeMcpEnabled}
+                    error={mcpCapabilityError}
+                    onChange={(enabled) => void updateMcpCapability(enabled)}
+                    pending={isMcpCapabilityUpdating || isAttachPending}
                   />
-                  {onMcpCapabilityChange && supportsMcp ? (
-                    <AgentMcpCapabilityToggle
-                      enabled={agent.cleancodeMcpEnabled}
-                      error={mcpCapabilityError}
-                      onChange={(enabled) => void updateMcpCapability(enabled)}
-                      pending={isMcpCapabilityUpdating || isAttachPending}
-                    />
-                  ) : null}
-                </span>
+                ) : null
               }
               onRemove={onRemove}
               onRename={onRename}
               onSelect={onSelect ?? noop}
             />
           ) : (
-            <>
-              <strong className="agent-console__title">{activeAgent.name}</strong>
-              <AgentProviderIdentity
-                activity={activity}
-                providerName={providerName}
-                showActivity={showActivity}
-              />
-            </>
+            <div className="agent-console-actions">
+              <div className="agent-console-actions__start">
+                <AgentProviderIdentity
+                  icon={providerCatalog.descriptor?.icon ?? null}
+                  providerName={providerName}
+                />
+                <strong className="agent-console__title">{activeAgent.name}</strong>
+              </div>
+              <div className="agent-console-actions__center" />
+              <div className="agent-console-actions__end" />
+            </div>
           )}
         </div>
         <AgentProviderStatusView
@@ -267,32 +267,20 @@ export function AgentConsole({
 }
 
 function AgentProviderIdentity({
-  activity,
-  providerName,
-  showActivity
+  icon,
+  providerName
 }: {
-  readonly activity: AgentActivityStatus
+  readonly icon: AgentProviderIconDescriptor | null
   readonly providerName: string
-  readonly showActivity: boolean
 }) {
-  const { t } = useI18n()
-  const activityLabel =
-    showActivity && activity !== 'unavailable' ? t(`agent.activity.${activity}` as const) : null
   return (
     <span
-      aria-label={
-        activityLabel
-          ? t('agent.providerActivity', { activity: activityLabel, provider: providerName })
-          : providerName
-      }
+      aria-label={providerName}
       className="agent-console__provider-identity"
-      data-activity={showActivity ? activity : undefined}
+      role="img"
       title={providerName}
     >
-      {showActivity ? (
-        <span aria-hidden="true" className="agent-console__activity-indicator" />
-      ) : null}
-      <span className="agent-console__provider-name">{providerName}</span>
+      <AgentProviderIcon icon={icon} />
     </span>
   )
 }

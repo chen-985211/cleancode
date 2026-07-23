@@ -34,6 +34,10 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
         ...capabilities
       },
       displayName: providerId,
+      icon: {
+        paths: [{ d: 'M2 2h20v20H2z' }],
+        viewBox: '0 0 24 24'
+      },
       id: providerId
     }
     this.contribution = {
@@ -68,7 +72,7 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
   }
 
   inspect(): Promise<AgentProviderAvailability> {
-    return Promise.resolve(this.installedAvailability())
+    return this.contribution.detector.inspect()
   }
 
   listDescriptors(): readonly AgentProviderDescriptor[] {

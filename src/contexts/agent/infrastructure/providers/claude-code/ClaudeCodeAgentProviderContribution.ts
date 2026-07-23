@@ -17,6 +17,7 @@ import {
   type ProviderSessionRefSnapshot
 } from '../../../domain/value-objects/ProviderSessionRef'
 import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
+import { claudeCodeProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
 import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
@@ -49,6 +50,7 @@ export class ClaudeCodeAgentProviderContribution implements AgentProviderContrib
       sessionRefCodec: true
     },
     displayName: 'Claude Code',
+    icon: claudeCodeProviderIcon,
     id: 'claude-code'
   } as const
   readonly detector: AgentProviderDetector

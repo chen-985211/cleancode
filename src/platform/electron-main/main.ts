@@ -4,8 +4,10 @@ import { join } from 'node:path'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
+import { DiscoverCreatableAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/DiscoverCreatableAgentProvidersUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
 import { AgentSessionService } from '../../contexts/agent/application/use-cases/AgentSessionService'
+import { AgentProviderAvailabilityService } from '../../contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../contexts/agent/application/services/AgentProviderRegistry'
 import { InspectAgentProviderUseCase } from '../../contexts/agent/application/use-cases/InspectAgentProviderUseCase'
 import { ListAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/ListAgentProvidersUseCase'
@@ -21,6 +23,7 @@ import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastru
 import { CodexAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 import { ClaudeCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { OpenCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
 import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
@@ -163,7 +166,14 @@ const agentProviderRegistry = new AgentProviderRegistry([
   new ClaudeCodeAgentProviderContribution(),
   new OpenCodeAgentProviderContribution()
 ])
-const inspectAgentProviderUseCase = new InspectAgentProviderUseCase(agentProviderRegistry)
+const agentProviderAvailability = new AgentProviderAvailabilityService(
+  agentProviderRegistry,
+  new NodeAgentProviderShellPathHydrator()
+)
+const discoverCreatableAgentProvidersUseCase = new DiscoverCreatableAgentProvidersUseCase(
+  agentProviderAvailability
+)
+const inspectAgentProviderUseCase = new InspectAgentProviderUseCase(agentProviderAvailability)
 const listAgentProvidersUseCase = new ListAgentProvidersUseCase(agentProviderRegistry)
 const agentAuditRepository = new FileSystemAgentAuditRepository(
   join(appStateDirectoryPath, 'agent-audit.jsonl')
@@ -175,11 +185,13 @@ const agentSessionRepository = new FileSystemAgentSessionRepository(
 const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
   agentSessionRepository,
   agentProviderRegistry,
-  defaultAgentProviderId
+  defaultAgentProviderId,
+  agentProviderAvailability
 )
 const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
   agentSessionRepository,
-  agentProviderRegistry
+  agentProviderRegistry,
+  agentProviderAvailability
 )
 const renameWorkspaceAgentUseCase = new RenameWorkspaceAgentUseCase(agentSessionRepository)
 const updateWorkspaceAgentLayoutUseCase = new UpdateWorkspaceAgentLayoutUseCase(
@@ -219,7 +231,8 @@ const agentSessionService = new AgentSessionService(
     agentSessionRepository,
     getProjectRegistryRepository(),
     projectRepository
-  )
+  ),
+  agentProviderAvailability
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
@@ -345,6 +358,8 @@ registerAgentIpcHandlers({
         )
       : agentSessionService.attach(command),
   createWorkspaceAgent: (command) => createWorkspaceAgentUseCase.execute(command),
+  discoverCreatableAgentProviders: (options) =>
+    discoverCreatableAgentProvidersUseCase.execute(options),
   disposeAgentWorkspaceSession: (command) =>
     isAgentAutostartDisabledForTest
       ? Promise.resolve()

@@ -65,6 +65,48 @@
   padding: 12px;
 }
 
+.agent-provider-picker__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 12px 12px 0;
+  border: 1px solid var(--cc-danger-border);
+  border-radius: 7px;
+  background: var(--cc-danger-soft);
+  padding: 8px 9px;
+  color: var(--cc-danger-strong);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.agent-provider-picker__error svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.agent-provider-picker__state {
+  display: grid;
+  min-height: 116px;
+  place-content: center;
+  justify-items: center;
+  gap: 7px;
+  padding: 24px;
+  color: var(--cc-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.agent-provider-picker__state strong {
+  color: var(--cc-foreground);
+  font-size: 12px;
+}
+
+.agent-provider-picker__spinner {
+  color: var(--cc-primary);
+  animation: agent-provider-picker-spin 700ms linear infinite;
+}
+
 .agent-provider-picker__option {
   display: flex;
   width: 100%;
@@ -88,6 +130,16 @@
   background: var(--cc-primary-wash);
 }
 
+.agent-provider-picker__option:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.agent-provider-picker__option:disabled:hover {
+  border-color: var(--cc-border);
+  background: var(--cc-surface);
+}
+
 .agent-provider-picker__option:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 1px;
@@ -99,6 +151,11 @@
   width: 32px;
   height: 32px;
   border-radius: 7px;
+}
+
+.agent-provider-picker__option-icon .agent-provider-icon {
+  width: 17px;
+  height: 17px;
 }
 
 .agent-provider-picker__option-copy {
@@ -164,8 +221,18 @@
   font-size: 10px;
 }
 
+.agent-provider-picker__footer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+}
+
 .agent-provider-picker__footer button {
+  display: inline-flex;
   height: 28px;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--cc-border);
   border-radius: 6px;
   background: var(--cc-surface);
@@ -176,13 +243,30 @@
   font-weight: 600;
 }
 
-.agent-provider-picker__footer button:hover {
+.agent-provider-picker__footer button:hover:not(:disabled) {
   border-color: var(--cc-border-strong);
   background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
 }
 
+.agent-provider-picker__footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .agent-provider-picker__footer button:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 1px;
+}
+
+@keyframes agent-provider-picker-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-provider-picker__spinner {
+    animation: none;
+  }
 }

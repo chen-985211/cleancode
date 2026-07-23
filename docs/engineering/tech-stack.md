@@ -50,7 +50,7 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 使用 ConPTY，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 使用 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 使用 ConPTY，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 使用 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。两种可见终端都通过共享 React `TerminalThemeProjection` 协调源主题与当前应用主题：wrapper 使用当前应用主题的终端背景并承载上、左、下阅读留白，直接子 viewport 使用源 palette，并且只在源主题与当前主题不一致时应用 mismatch filter。搜索、粘贴、错误、节点边框和其他第一方 chrome 均位于被过滤子树之外。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
@@ -60,7 +60,11 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 ## Agent 集成
 
-当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。Windows 上的 Provider CLI 检测通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；不得把 executable 或 argv 拼接成可注入的命令文本。
+当前内建 Codex、Claude Code 和 OpenCode Provider contribution。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；descriptor 还提供由通用表现组件渲染的受限矢量图标，session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。
+
+registry descriptor 集合是完整的受支持 Provider catalog；专用 discovery 用例通过共享 `AgentProviderAvailabilityService` 检查该 catalog，只把 `installed` Provider 投影为可创建结果。共享服务合并并发检查、缓存易失快照并支持显式刷新；Agent 创建在持久化前执行新的可用性检查，已有持久化 Agent 则不因当前 CLI 不可用而从工作区消失。新工作区只在 Codex 检测为已安装时原子初始化默认 Agent，否则原子初始化空列表。
+
+macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前 POSIX shell 的交互式 login invocation 获取用户 PATH，并把去重后的 shell 路径优先合并进 Electron 主进程环境；需要新建 Agent PTY 时，这一步和可用性预检必须在 PTY 快照主进程环境之前完成。超时或异常时保留继承 PATH。Windows 跳过 POSIX hydration，Provider CLI 检测继续通过参数边界明确的 PowerShell 调用兼容 npm `.cmd` shim；任何平台都不得把 executable 或 argv 拼接成可注入的命令文本。
 
 共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，Codex 与 OpenCode 未声明最低版本门槛，不得为它们虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
 

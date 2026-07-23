@@ -29,6 +29,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:synchronize-project-git-state', command),
   inspectAgentProvider: (command: unknown) =>
     invokeCleancode('cleancode:inspect-agent-provider', command),
+  discoverCreatableAgentProviders: (command?: unknown) =>
+    invokeCleancode('cleancode:discover-creatable-agent-providers', command),
   listAgentProviders: () => invokeCleancode('cleancode:list-agent-providers'),
   attachAgentSession: (command: unknown) =>
     invokeCleancode('cleancode:attach-agent-session', command),

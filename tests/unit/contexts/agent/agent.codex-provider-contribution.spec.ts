@@ -53,6 +53,10 @@ describe('Codex Agent Provider contribution', () => {
           sessionIdentityCapture: true,
           sessionRefCodec: true
         },
+        icon: {
+          paths: expect.arrayContaining([expect.objectContaining({ d: expect.any(String) })]),
+          viewBox: '0 0 24 24'
+        },
         id: 'codex'
       })
       expect(contribution).toHaveProperty('sessionRefCodec')

@@ -17,6 +17,7 @@ import {
   type ProviderSessionRefSnapshot
 } from '../../../domain/value-objects/ProviderSessionRef'
 import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
+import { openCodeProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
 import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 import {
@@ -49,6 +50,7 @@ export class OpenCodeAgentProviderContribution implements AgentProviderContribut
       sessionRefCodec: true
     },
     displayName: 'OpenCode',
+    icon: openCodeProviderIcon,
     id: 'opencode'
   } as const
   readonly detector: AgentProviderDetector

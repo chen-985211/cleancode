@@ -3,6 +3,9 @@ import type {
   AgentProviderContribution,
   AgentProviderAvailability
 } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
+import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
+import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
+import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
 
 describe('Agent Provider registry', () => {
   it('lists descriptors and resolves a contribution without Provider branches', async () => {
@@ -28,6 +31,21 @@ describe('Agent Provider registry', () => {
       providerId: 'fixture-provider',
       status: 'installed'
     })
+  })
+
+  it('accepts the safe serializable icons contributed by every built-in Provider', () => {
+    const registry = new AgentProviderRegistry([
+      new CodexAgentProviderContribution(),
+      new ClaudeCodeAgentProviderContribution(),
+      new OpenCodeAgentProviderContribution()
+    ])
+
+    expect(registry.listDescriptors().map(({ icon, id }) => ({ icon, id }))).toEqual([
+      expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 24 24' }) }),
+      expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 24 24' }) }),
+      expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 512 512' }) })
+    ])
+    expect(() => structuredClone(registry.listDescriptors())).not.toThrow()
   })
 
   it('parses a session reference through the owning Provider codec', () => {
@@ -120,6 +138,36 @@ describe('Agent Provider registry', () => {
   })
 
   it.each([
+    ['missing icon', undefined],
+    ['empty path list', { paths: [], viewBox: '0 0 24 24' }],
+    ['invalid view box', { paths: [{ d: 'M2 2h20v20H2z' }], viewBox: '0 0 -24 24' }],
+    ['raw SVG markup', { paths: [{ d: '<svg onload=alert(1) />' }], viewBox: '0 0 24 24' }],
+    ['malformed path entry', { paths: [null], viewBox: '0 0 24 24' }],
+    [
+      'unsafe path fill',
+      {
+        paths: [{ d: 'M2 2h20v20H2z', fill: 'url(https://example.com/mark.svg)' }],
+        viewBox: '0 0 24 24'
+      }
+    ]
+  ])('rejects a Provider descriptor with invalid icon: %s', (_case, icon) => {
+    const contribution = createContribution('fixture-provider')
+
+    expect(
+      () =>
+        new AgentProviderRegistry([
+          {
+            ...contribution,
+            descriptor: {
+              ...contribution.descriptor,
+              icon
+            } as AgentProviderContribution['descriptor']
+          }
+        ])
+    ).toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_INVALID' }))
+  })
+
+  it.each([
     {
       actual: { activity: false, sessionIdentity: false },
       advertised: { activity: true, sessionIdentity: false },
@@ -192,6 +240,10 @@ function createContribution(id: string, displayName = id): AgentProviderContribu
         sessionRefCodec: false
       },
       displayName,
+      icon: {
+        paths: [{ d: 'M2 2h20v20H2z' }],
+        viewBox: '0 0 24 24'
+      },
       id
     },
     detector: {

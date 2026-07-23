@@ -40,12 +40,34 @@
 }
 
 .agent-console-actions {
-  display: flex;
+  position: relative;
+  display: grid;
   width: 100%;
   min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
+}
+
+.agent-console-actions__start,
+.agent-console-actions__center,
+.agent-console-actions__end {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.agent-console-actions__start {
+  overflow: hidden;
+  gap: 6px;
+}
+
+.agent-console-actions__center {
+  justify-self: center;
+}
+
+.agent-console-actions__end {
+  justify-self: end;
 }
 
 .agent-console-actions__menu-anchor {
@@ -237,55 +259,24 @@
   line-height: 1.2;
 }
 
-.agent-console__provider-controls {
-  display: inline-flex;
-  max-width: min(55%, 260px);
-  min-width: 0;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 6px;
-}
-
 .agent-console__provider-identity {
   display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   align-items: center;
-  gap: 5px;
-  color: var(--cc-muted);
-  font-size: 10px;
-  font-weight: 600;
-  white-space: nowrap;
+  justify-content: center;
+  border: 1px solid var(--cc-divider);
+  border-radius: 7px;
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
 }
 
-.agent-console__activity-indicator {
-  width: 5px;
-  height: 5px;
+.agent-provider-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
   flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--cc-disabled);
-}
-
-.agent-console__provider-identity[data-activity='idle'] .agent-console__activity-indicator {
-  background: var(--cc-success);
-}
-
-.agent-console__provider-identity[data-activity='working'] .agent-console__activity-indicator {
-  background: var(--cc-primary);
-  box-shadow: 0 0 0 2px var(--cc-primary-ring);
-}
-
-.agent-console__provider-identity[data-activity='waiting_input'] .agent-console__activity-indicator,
-.agent-console__provider-identity[data-activity='waiting_approval']
-  .agent-console__activity-indicator {
-  background: var(--cc-warning);
-}
-
-.agent-console__provider-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .agent-console__terminal-shell {
@@ -300,7 +291,6 @@
 .agent-terminal-frame {
   min-height: 0;
   flex: 1;
-  padding: 9px 0 9px 10px;
 }
 
 .agent-terminal-viewport {
@@ -333,10 +323,6 @@
 .agent-terminal-viewport .xterm-viewport::-webkit-scrollbar-thumb {
   border-radius: 999px 0 0 999px;
   background: var(--cc-scrollbar);
-}
-
-.agent-terminal-viewport[data-agent-terminal-source-theme] {
-  background: var(--cc-terminal-background);
 }
 
 .agent-terminal-fallback {

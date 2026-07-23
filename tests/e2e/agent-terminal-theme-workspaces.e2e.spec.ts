@@ -158,6 +158,81 @@ describe('Agent terminal theme across workspaces e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'keeps MCP geometrically centered and presents the Provider as the leading icon',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForPersistedAgent(page)
+
+      const agent = page.locator('[data-agent-console-node]').first()
+      await agent.getByRole('img', { name: 'Codex' }).waitFor()
+      await agent.getByRole('switch', { name: 'CleanCode MCP' }).waitFor()
+
+      const geometry = await agent.evaluate((element) => {
+        const header = element.querySelector<HTMLElement>('.agent-console__header')
+        const center = element.querySelector<HTMLElement>('.agent-console-actions__center')
+        const identity = element.querySelector<HTMLElement>('.agent-console__provider-identity')
+        const title = element.querySelector<HTMLElement>('.agent-console-actions__title')
+        if (!header || !center || !identity || !title) {
+          throw new Error('Agent header layout is incomplete.')
+        }
+        const headerBounds = header.getBoundingClientRect()
+        const centerBounds = center.getBoundingClientRect()
+        const identityBounds = identity.getBoundingClientRect()
+        const titleBounds = title.getBoundingClientRect()
+
+        return {
+          centerDelta:
+            centerBounds.left +
+            centerBounds.width / 2 -
+            (headerBounds.left + headerBounds.width / 2),
+          iconBeforeTitle: identityBounds.right <= titleBounds.left,
+          iconPathCount: identity.querySelectorAll('svg path').length,
+          visibleProviderText: Array.from(header.querySelectorAll('*')).some(
+            (candidate) =>
+              candidate.children.length === 0 && candidate.textContent?.trim() === 'Codex'
+          )
+        }
+      })
+
+      expect(Math.abs(geometry.centerDelta)).toBeLessThanOrEqual(0.5)
+      expect(geometry.iconBeforeTitle).toBe(true)
+      expect(geometry.iconPathCount).toBeGreaterThan(0)
+      expect(geometry.visibleProviderText).toBe(false)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'keeps terminal reading insets on the same visual plane after a theme switch',
+    async () => {
+      await expectDesktopRuntime(page)
+      await selectTheme(page, 'light')
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForPersistedAgent(page)
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+
+      const terminalProjection = page.locator(
+        '[data-terminal-block-id] .terminal-theme-projection[data-terminal-source-theme="light"]'
+      )
+      const agentProjection = page.locator(
+        '[data-agent-console-node] .terminal-theme-projection[data-terminal-source-theme="light"]'
+      )
+      await terminalProjection.locator('.terminal-viewport .xterm-helper-textarea').waitFor()
+      await agentProjection.locator('.agent-terminal-viewport .xterm-helper-textarea').waitFor()
+
+      await selectTheme(page, 'dark')
+      await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
+
+      const agentMinimapNode = page.locator('[data-minimap-node-id^="agent:"]').first()
+      await agentMinimapNode.focus()
+      await agentMinimapNode.press('Enter')
+      await expectProjectionColorContinuity(page, agentProjection, 'agent')
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 interface AgentTerminalIdentity {
@@ -249,6 +324,14 @@ async function expectTerminalPresentation(
   visualTheme: 'dark' | 'light',
   shouldBeFiltered: boolean
 ): Promise<void> {
+  const projection = viewport.locator('..')
+
+  await expect
+    .poll(() => projection.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
+      interval: 50,
+      timeout: 5_000
+    })
+    .toBe(false)
   await expect
     .poll(() => viewport.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
       interval: 50,
@@ -266,6 +349,143 @@ async function expectTerminalPresentation(
   } else {
     await luminance.toBeGreaterThan(0.8)
   }
+}
+
+interface PixelColor {
+  readonly blue: number
+  readonly green: number
+  readonly red: number
+}
+
+async function readProjectionColors(
+  page: Page,
+  projection: Locator
+): Promise<{
+  readonly bottom: PixelColor
+  readonly content: PixelColor
+  readonly left: PixelColor
+  readonly top: PixelColor
+}> {
+  const geometry = await projection.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const content = element.firstElementChild
+    if (!content) throw new Error('Terminal theme projection has no content.')
+    const contentBounds = content.getBoundingClientRect()
+    const leftInset = contentBounds.left - bounds.left
+    const topInset = contentBounds.top - bounds.top
+    const bottomInset = bounds.bottom - contentBounds.bottom
+
+    return {
+      cssHeight: bounds.height,
+      cssWidth: bounds.width,
+      sampleBottomY: bounds.height - bottomInset / 2,
+      sampleContentX: contentBounds.right - bounds.left - 24,
+      sampleContentY: contentBounds.top - bounds.top + contentBounds.height / 2,
+      sampleLeftX: leftInset / 2,
+      sampleTopY: topInset / 2
+    }
+  })
+  const screenshot = await projection.screenshot()
+
+  return page.evaluate(
+    async ({
+      base64Png,
+      cssHeight,
+      cssWidth,
+      sampleBottomY,
+      sampleContentX,
+      sampleContentY,
+      sampleLeftX,
+      sampleTopY
+    }) => {
+      const image = new Image()
+      image.src = `data:image/png;base64,${base64Png}`
+      await image.decode()
+
+      const canvas = document.createElement('canvas')
+      canvas.width = image.naturalWidth
+      canvas.height = image.naturalHeight
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Unable to sample terminal theme projection.')
+      context.drawImage(image, 0, 0)
+
+      const scaleX = canvas.width / cssWidth
+      const scaleY = canvas.height / cssHeight
+      const read = (cssX: number, cssY: number) => {
+        const pixel = context.getImageData(
+          Math.max(0, Math.min(canvas.width - 1, Math.round(cssX * scaleX))),
+          Math.max(0, Math.min(canvas.height - 1, Math.round(cssY * scaleY))),
+          1,
+          1
+        ).data
+        return { blue: pixel[2]!, green: pixel[1]!, red: pixel[0]! }
+      }
+
+      return {
+        bottom: read(sampleContentX, sampleBottomY),
+        content: read(sampleContentX, sampleContentY),
+        left: read(sampleLeftX, sampleContentY),
+        top: read(sampleContentX, sampleTopY)
+      }
+    },
+    {
+      base64Png: screenshot.toString('base64'),
+      ...geometry
+    }
+  )
+}
+
+async function expectProjectionColorContinuity(
+  page: Page,
+  projection: Locator,
+  kind: 'agent' | 'terminal'
+): Promise<void> {
+  const content = projection
+    .locator(':scope > .agent-terminal-viewport, :scope > .terminal-viewport')
+    .first()
+  await expect
+    .poll(() => content.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
+      interval: 50,
+      timeout: 5_000
+    })
+    .toBe(true)
+  expect(await projection.evaluate((element) => getComputedStyle(element).filter)).toBe('none')
+  await expect
+    .poll(
+      () =>
+        projection.evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          const canvasBounds = element.closest('.react-flow')?.getBoundingClientRect()
+          return Boolean(
+            canvasBounds &&
+            bounds.left >= canvasBounds.left &&
+            bounds.top >= canvasBounds.top &&
+            bounds.right <= canvasBounds.right &&
+            bounds.bottom <= canvasBounds.bottom
+          )
+        }),
+      { interval: 50, timeout: 5_000 }
+    )
+    .toBe(true)
+
+  const colors = await readProjectionColors(page, projection)
+  const distances = {
+    bottom: maximumColorDistance(colors.content, colors.bottom),
+    left: maximumColorDistance(colors.content, colors.left),
+    top: maximumColorDistance(colors.content, colors.top)
+  }
+  const message = `${kind} projection colors: ${JSON.stringify(colors)}`
+  expect(distances.bottom, message).toBeLessThanOrEqual(2)
+  expect(distances.left, message).toBeLessThanOrEqual(2)
+  expect(distances.top, message).toBeLessThanOrEqual(2)
+}
+
+function maximumColorDistance(left: PixelColor, right: PixelColor): number {
+  return Math.max(
+    Math.abs(left.red - right.red),
+    Math.abs(left.green - right.green),
+    Math.abs(left.blue - right.blue)
+  )
 }
 
 async function readCenterLuminance(page: Page, viewport: Locator): Promise<number> {

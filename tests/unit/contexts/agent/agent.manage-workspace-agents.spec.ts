@@ -3,9 +3,14 @@ import { ListWorkspaceAgentsUseCase } from '../../../../src/contexts/agent/appli
 import { RemoveWorkspaceAgentUseCase } from '../../../../src/contexts/agent/application/use-cases/RemoveWorkspaceAgentUseCase'
 import { RenameWorkspaceAgentUseCase } from '../../../../src/contexts/agent/application/use-cases/RenameWorkspaceAgentUseCase'
 import { UpdateWorkspaceAgentLayoutUseCase } from '../../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentLayoutUseCase'
+import { AgentProviderAvailabilityService } from '../../../../src/contexts/agent/application/services/AgentProviderAvailabilityService'
 import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
 import type { AgentProviderContribution } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentSessionRepository } from '../../../../src/contexts/agent/application/ports/AgentSessionRepository'
+import type {
+  AgentWorkspaceInitializer,
+  InitializeAgentWorkspaceCommand
+} from '../../../../src/contexts/agent/application/ports/AgentWorkspaceInitializer'
 import type { WorkspaceAgentRuntimePort } from '../../../../src/contexts/agent/application/ports/WorkspaceAgentRuntimePort'
 import type { AgentSession } from '../../../../src/contexts/agent/domain/aggregates/AgentSession'
 import type { AgentConversationScope } from '../../../../src/contexts/agent/domain/value-objects/AgentConversationScope'
@@ -57,6 +62,56 @@ describe('manage workspace Agents', () => {
     await expect(
       useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
     ).resolves.toEqual([expect.objectContaining({ providerId: 'claude-code' })])
+  })
+
+  it('initializes an empty workspace when the preferred Provider is unavailable', async () => {
+    const repository = new MemoryAgentRepository()
+    const providers = createProviderRegistry({
+      codex: 'missing',
+      'claude-code': 'installed'
+    })
+    const useCase = new ListWorkspaceAgentsUseCase(repository, providers, 'codex')
+
+    const initialized = await useCase.execute({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+    const reopened = await useCase.execute({
+      projectId: 'project-1',
+      workspaceName: 'main'
+    })
+
+    expect(initialized).toEqual([])
+    expect(reopened).toEqual([])
+    expect(repository.initializeWorkspace).toHaveBeenCalledOnce()
+  })
+
+  it('refreshes a cached preferred Provider result before initializing a new workspace', async () => {
+    const repository = new MemoryAgentRepository()
+    const codex = createProviderContribution('codex')
+    const inspect = vi
+      .spyOn(codex.detector, 'inspect')
+      .mockResolvedValueOnce({
+        installCommand: 'install codex',
+        providerId: 'codex',
+        reason: 'not_found',
+        status: 'missing',
+        version: null
+      })
+      .mockResolvedValueOnce({
+        providerId: 'codex',
+        status: 'installed',
+        version: 'test'
+      })
+    const providers = new AgentProviderRegistry([codex])
+    const availability = new AgentProviderAvailabilityService(providers)
+    await availability.inspect('codex')
+    const useCase = new ListWorkspaceAgentsUseCase(repository, providers, 'codex', availability)
+
+    await expect(
+      useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
+    ).resolves.toEqual([expect.objectContaining({ providerId: 'codex' })])
+    expect(inspect).toHaveBeenCalledTimes(2)
   })
 
   it('creates, renames, lays out, and removes one Agent without affecting its sibling', async () => {
@@ -144,8 +199,18 @@ class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
   }
 }
 
-class MemoryAgentRepository implements AgentSessionRepository {
+class MemoryAgentRepository implements AgentSessionRepository, AgentWorkspaceInitializer {
   private readonly workspaces = new Map<string, AgentSession[]>()
+  readonly initializeWorkspace = vi.fn(
+    async (command: InitializeAgentWorkspaceCommand): Promise<readonly AgentSession[]> => {
+      const key = workspaceKey(command.projectId, command.workspaceName)
+      const existing = this.workspaces.get(key)
+      if (existing) return existing
+      const initialized = [...command.agents]
+      this.workspaces.set(key, initialized)
+      return initialized
+    }
+  )
 
   async find(): Promise<AgentSession | null> {
     return null
@@ -204,14 +269,19 @@ function workspaceKey(projectId: string, workspaceName: string): string {
   return JSON.stringify([projectId, workspaceName])
 }
 
-function createProviderRegistry(): AgentProviderRegistry {
+function createProviderRegistry(
+  availability: Readonly<Record<string, 'installed' | 'missing'>> = {}
+): AgentProviderRegistry {
   return new AgentProviderRegistry([
-    createProviderContribution('codex'),
-    createProviderContribution('claude-code')
+    createProviderContribution('codex', availability.codex),
+    createProviderContribution('claude-code', availability['claude-code'])
   ])
 }
 
-function createProviderContribution(id: string): AgentProviderContribution {
+function createProviderContribution(
+  id: string,
+  availability: 'installed' | 'missing' = 'installed'
+): AgentProviderContribution {
   return {
     descriptor: {
       capabilities: {
@@ -223,10 +293,23 @@ function createProviderContribution(id: string): AgentProviderContribution {
         sessionRefCodec: false
       },
       displayName: id,
+      icon: {
+        paths: [{ d: 'M2 2h20v20H2z' }],
+        viewBox: '0 0 24 24'
+      },
       id
     },
     detector: {
-      inspect: async () => ({ providerId: id, status: 'installed', version: 'test' })
+      inspect: async () =>
+        availability === 'installed'
+          ? { providerId: id, status: 'installed', version: 'test' }
+          : {
+              installCommand: `install ${id}`,
+              providerId: id,
+              reason: 'not_found',
+              status: 'missing',
+              version: null
+            }
     },
     launcher: {
       createLaunchPlan: async () => ({

@@ -113,7 +113,7 @@ describe('headless terminal model', () => {
 
     expect(queryResponses).toEqual([
       '\u001b]10;rgb:d6d6/dede/e8e8\u001b\\',
-      '\u001b]11;rgb:0b0b/1010/1717\u001b\\'
+      '\u001b]11;rgb:0000/0000/0000\u001b\\'
     ])
 
     const snapshot = await adapter.attachView({
@@ -131,7 +131,7 @@ describe('headless terminal model', () => {
     adapter.acceptOutput(identity, '\u001b]11;?\u001b\\')
     await adapter.flush(identity)
 
-    expect(queryResponses.at(-1)).toBe('\u001b]11;rgb:0b0b/1010/1717\u001b\\')
+    expect(queryResponses.at(-1)).toBe('\u001b]11;rgb:0000/0000/0000\u001b\\')
     expect(queryResponses).toHaveLength(3)
   })
 
@@ -154,7 +154,7 @@ describe('headless terminal model', () => {
 
     expect(queryResponses).toEqual([
       '\u001b]10;rgb:2424/3131/4242\u001b\\',
-      '\u001b]11;rgb:f7f7/f9f9/fcfc\u001b\\'
+      '\u001b]11;rgb:ffff/ffff/ffff\u001b\\'
     ])
   })
 

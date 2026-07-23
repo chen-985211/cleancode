@@ -136,6 +136,10 @@ function createProviderContribution(id: string, cleancodeMcp: boolean): AgentPro
         sessionRefCodec: false
       },
       displayName: id,
+      icon: {
+        paths: [{ d: 'M2 2h20v20H2z' }],
+        viewBox: '0 0 24 24'
+      },
       id
     },
     detector: {

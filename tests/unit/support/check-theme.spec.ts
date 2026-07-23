@@ -71,7 +71,7 @@ describe('theme quality gate', () => {
 
     const generated = createTerminalPaletteModule(source)
 
-    expect(generated).toContain("background: '#f7f9fc'")
+    expect(generated).toContain("background: '#ffffff'")
     expect(generated).toContain("foreground: '#d6dee8'")
     expect(generated).toContain("selectionBackground: '#2d415c'")
     expect(createTerminalPaletteModule(source)).toBe(generated)

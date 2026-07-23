@@ -68,6 +68,9 @@ describe('Claude Code Agent session e2e', () => {
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await selectAgentProvider(page, 'Claude Code')
       await waitForAgentCount(page, 2)
+      const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
+      await claudeIdentity.waitFor()
+      expect(await claudeIdentity.locator('.agent-console__activity-indicator').count()).toBe(0)
 
       const firstLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 1)
       expect(firstLaunch.args).toContain('--session-id')
@@ -83,7 +86,7 @@ describe('Claude Code Agent session e2e', () => {
 
       const claudeTerminal = page
         .locator('[data-agent-console-node]')
-        .filter({ hasText: 'Claude Code' })
+        .filter({ has: page.getByRole('img', { name: 'Claude Code' }) })
         .locator('.agent-terminal-viewport')
       await claudeTerminal.click()
       await page.keyboard.type('confirm durable Claude conversation')

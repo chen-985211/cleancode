@@ -4,6 +4,7 @@ import { AgentLaunchArtifactScope } from '../../../../src/contexts/agent/applica
 import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { ClaudeCodeHookReporter } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeHookReporter'
 import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { openCodeProviderIcon } from '../../../../src/contexts/agent/infrastructure/providers/shared/AgentProviderBrandIcons'
 import {
   createAgentProviderCliProcessInvocation,
   NodeAgentProviderCliDetector
@@ -23,6 +24,7 @@ describe('additional Agent Provider contributions', () => {
     })
 
     expect(contribution).toHaveProperty('sessionRefCodec')
+    expect(contribution.descriptor.icon.paths).not.toHaveLength(0)
     expect(
       contribution.sessionRefCodec.parse({
         formatVersion: 1,
@@ -282,6 +284,7 @@ describe('additional Agent Provider contributions', () => {
           sessionRefCodec: true
         },
         displayName: 'OpenCode',
+        icon: openCodeProviderIcon,
         id: 'opencode'
       })
       expect(contribution).toMatchObject({

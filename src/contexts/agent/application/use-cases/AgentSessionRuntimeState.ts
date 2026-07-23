@@ -29,6 +29,7 @@ import type {
   AgentProviderMcpSupport
 } from '../ports/AgentProviderContribution'
 import type { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
+import type { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import {
   isOwnedAgentSession,
@@ -416,9 +417,13 @@ export async function validateAgentRuntimeScope(
 }
 
 export async function validateAgentProviderAvailability(
-  provider: AgentProviderContribution
+  provider: AgentProviderContribution,
+  availabilityService?: AgentProviderAvailabilityService,
+  refresh = true
 ): Promise<void> {
-  const availability = await provider.detector.inspect()
+  const availability = availabilityService
+    ? await availabilityService.inspect(provider.descriptor.id, { refresh })
+    : await provider.detector.inspect()
   if (availability.status === 'installed') return
   throw createExpectedAppError(
     'AGENT_PROVIDER_UNAVAILABLE',

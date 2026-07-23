@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import { AgentProviderPickerDialog } from '../../../src/presentation/app-shell/AgentProviderPickerDialog'
+import type { CreatableAgentProviderSnapshot } from '../../../src/contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
-const providers: readonly AgentProviderDescriptor[] = [
+const providers: readonly CreatableAgentProviderSnapshot[] = [
   createProvider('future-provider', 'A Very Long Future Provider Name'),
   createProvider('another-provider', 'Another Provider')
 ]
@@ -24,7 +25,14 @@ describe('Agent provider picker dialog', () => {
     const { rerender } = render(
       <>
         <button type="button">新建 Agent</button>
-        <AgentProviderPickerDialog providers={providers} onCancel={onCancel} onSelect={vi.fn()} />
+        <AgentProviderPickerDialog
+          error={null}
+          pendingProviderId={null}
+          providers={providers}
+          onCancel={onCancel}
+          onRefresh={vi.fn()}
+          onSelect={vi.fn()}
+        />
       </>
     )
     const trigger = screen.getByRole('button', { name: '新建 Agent' })
@@ -46,17 +54,65 @@ describe('Agent provider picker dialog', () => {
 
   it('preserves the complete provider name for truncated visual copy', () => {
     render(
-      <AgentProviderPickerDialog providers={providers} onCancel={vi.fn()} onSelect={vi.fn()} />
+      <AgentProviderPickerDialog
+        error={null}
+        pendingProviderId={null}
+        providers={providers}
+        onCancel={vi.fn()}
+        onRefresh={vi.fn()}
+        onSelect={vi.fn()}
+      />
     )
 
     expect(screen.getByTitle('A Very Long Future Provider Name')).toHaveTextContent(
       'A Very Long Future Provider Name'
     )
   })
+
+  it('renders every registered provider icon through the descriptor', () => {
+    render(
+      <AgentProviderPickerDialog
+        error={null}
+        pendingProviderId={null}
+        providers={providers}
+        onCancel={vi.fn()}
+        onRefresh={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+
+    const option = screen.getByRole('button', { name: /A Very Long Future Provider Name/ })
+    expect(option.querySelector('.agent-provider-icon path')).toHaveAttribute(
+      'd',
+      providers[0]?.descriptor.icon.paths[0]?.d
+    )
+  })
+
+  it('cannot dismiss the picker while Agent creation is pending', () => {
+    const onCancel = vi.fn()
+    const { container } = render(
+      <AgentProviderPickerDialog
+        error={null}
+        pendingProviderId="future-provider"
+        providers={providers}
+        onCancel={onCancel}
+        onRefresh={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+
+    const dialog = screen.getByRole('dialog')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    fireEvent.mouseDown(container.querySelector('.agent-provider-picker__backdrop')!)
+
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '取消' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /A Very Long Future Provider Name/ })).toBeDisabled()
+  })
 })
 
-function createProvider(id: string, displayName: string): AgentProviderDescriptor {
-  return {
+function createProvider(id: string, displayName: string): CreatableAgentProviderSnapshot {
+  const descriptor: AgentProviderDescriptor = {
     capabilities: {
       activityTracking: false,
       cleancodeMcp: 'unsupported',
@@ -66,6 +122,18 @@ function createProvider(id: string, displayName: string): AgentProviderDescripto
       sessionRefCodec: false
     },
     displayName,
+    icon: {
+      paths: [{ d: `M2 2h20v20H2z M${id.length} 4v16` }],
+      viewBox: '0 0 24 24'
+    },
     id
+  }
+  return {
+    availability: {
+      providerId: id,
+      status: 'installed',
+      version: 'test'
+    },
+    descriptor
   }
 }

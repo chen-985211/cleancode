@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
@@ -61,6 +61,9 @@ describe('app shell create Agent focus', () => {
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [{ ...workbench, agents: [firstAgent] }])
     })
+    runtimeApi.discoverCreatableAgentProviders.mockResolvedValue([
+      createCreatableProvider('codex', 'Codex', true)
+    ])
     runtimeApi.createWorkspaceAgent.mockResolvedValue(createdAgent)
 
     Object.defineProperty(window, 'cleancode', {
@@ -71,6 +74,7 @@ describe('app shell create Agent focus', () => {
     render(<AppShell />)
 
     fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
 
     await waitFor(() =>
       expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(1_260, 470, {
@@ -86,9 +90,9 @@ describe('app shell create Agent focus', () => {
   it('creates a new Agent only after selecting one of multiple registered Providers', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({
-      listAgentProviders: vi.fn(async () => [
-        createProviderDescriptor('codex', 'Codex', true),
-        createProviderDescriptor('claude-code', 'Claude Code', false)
+      discoverCreatableAgentProviders: vi.fn(async () => [
+        createCreatableProvider('codex', 'Codex', true),
+        createCreatableProvider('claude-code', 'Claude Code', false)
       ]),
       listWorkbenches: vi.fn(async () => [workbench])
     })
@@ -123,6 +127,133 @@ describe('app shell create Agent focus', () => {
         expect.objectContaining({ providerId: 'claude-code' })
       )
     )
+    expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
+  })
+
+  it('does not flash the registered catalog before creatable Provider discovery completes', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    let resolveDiscovery: (
+      providers: readonly ReturnType<typeof createCreatableProvider>[]
+    ) => void = () => undefined
+    const discovery = new Promise<readonly ReturnType<typeof createCreatableProvider>[]>(
+      (resolve) => {
+        resolveDiscovery = resolve
+      }
+    )
+    const runtimeApi = createRuntimeApi({
+      discoverCreatableAgentProviders: vi.fn(() => discovery),
+      listAgentProviders: vi.fn(async () => [
+        createProviderDescriptor('codex', 'Codex', true),
+        createProviderDescriptor('claude-code', 'Claude Code', false)
+      ]),
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+
+    expect(await screen.findByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
+    expect(screen.getByText('正在检测可用 Agent…')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Codex/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Claude Code/ })).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveDiscovery([createCreatableProvider('codex', 'Codex', true)])
+      await discovery
+    })
+
+    expect(await screen.findByRole('button', { name: /Codex/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Claude Code/ })).not.toBeInTheDocument()
+  })
+
+  it('shows a retryable empty state without creating an Agent when no CLI is available', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const discoverCreatableAgentProviders = vi.fn(async () => [])
+    const runtimeApi = createRuntimeApi({
+      discoverCreatableAgentProviders,
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+
+    expect(await screen.findByText('未检测到可用的 Agent CLI')).toBeVisible()
+    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '重新检测' }))
+    await waitFor(() => expect(discoverCreatableAgentProviders).toHaveBeenCalledTimes(2))
+    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
+  })
+
+  it('keeps the picker open and retries after Agent discovery fails', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const discoverCreatableAgentProviders = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('probe failed'))
+      .mockResolvedValueOnce([createCreatableProvider('codex', 'Codex', true)])
+    const runtimeApi = createRuntimeApi({
+      discoverCreatableAgentProviders,
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('检测可用 Agent 失败')
+    expect(screen.getByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: '重新检测' }))
+
+    expect(await screen.findByRole('button', { name: /Codex/ })).toBeVisible()
+    expect(discoverCreatableAgentProviders).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the picker open after creation fails and allows retrying the same Provider', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const createdAgent = createAgent('agent-1', workbench.project.id, {
+      position: { x: 320, y: 140 },
+      size: { width: 440, height: 520 }
+    })
+    const runtimeApi = createRuntimeApi({
+      discoverCreatableAgentProviders: vi.fn(async () => [
+        createCreatableProvider('codex', 'Codex', true)
+      ]),
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.createWorkspaceAgent
+      .mockRejectedValueOnce(new Error('CLI disappeared'))
+      .mockResolvedValueOnce(createdAgent)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('创建 Agent 失败')
+    expect(screen.getByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: /Codex/ }))
+
+    await waitFor(() => expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
   })
 })
@@ -187,6 +318,21 @@ function createProviderDescriptor(id: string, displayName: string, cleancodeMcp:
       sessionRefCodec: id === 'codex'
     },
     displayName,
+    icon: {
+      paths: [{ d: 'M2 2h20v20H2z' }],
+      viewBox: '0 0 24 24'
+    },
     id
+  }
+}
+
+function createCreatableProvider(id: string, displayName: string, cleancodeMcp: boolean) {
+  return {
+    availability: {
+      providerId: id,
+      status: 'installed' as const,
+      version: 'test'
+    },
+    descriptor: createProviderDescriptor(id, displayName, cleancodeMcp)
   }
 }

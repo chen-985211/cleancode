@@ -2,7 +2,9 @@ import type { WorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import { toWorkspaceAgentSnapshot } from '../dto/WorkspaceAgentSnapshot'
 import type { AgentSessionRepository } from '../ports/AgentSessionRepository'
 import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
+import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { AgentSession, type AgentLayoutSnapshot } from '../../domain/aggregates/AgentSession'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateWorkspaceAgentCommand {
   readonly agentId?: string
@@ -15,11 +17,23 @@ export interface CreateWorkspaceAgentCommand {
 export class CreateWorkspaceAgentUseCase {
   constructor(
     private readonly repository: AgentSessionRepository,
-    private readonly providers: AgentProviderRegistryPort
+    private readonly providers: AgentProviderRegistryPort,
+    private readonly availability = new AgentProviderAvailabilityService(providers)
   ) {}
 
   async execute(command: CreateWorkspaceAgentCommand): Promise<WorkspaceAgentSnapshot> {
     const provider = this.providers.require(command.providerId)
+    const availability = await this.availability.inspect(command.providerId, { refresh: true })
+    if (availability.status !== 'installed') {
+      throw createExpectedAppError(
+        'AGENT_PROVIDER_UNAVAILABLE',
+        `Agent Provider "${command.providerId}" is unavailable.`,
+        {
+          providerId: command.providerId,
+          status: availability.status
+        }
+      )
+    }
     const agents =
       (await this.repository.findWorkspace(command.projectId, command.workspaceName)) ?? []
     const agent = AgentSession.create({

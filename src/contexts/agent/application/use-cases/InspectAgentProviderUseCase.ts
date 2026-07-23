@@ -1,10 +1,10 @@
 import type { AgentProviderAvailability } from '../ports/AgentProviderContribution'
-import type { AgentProviderRegistryPort } from '../ports/AgentProviderRegistryPort'
+import type { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 
 export class InspectAgentProviderUseCase {
-  constructor(private readonly providers: AgentProviderRegistryPort) {}
+  constructor(private readonly availability: AgentProviderAvailabilityService) {}
 
   execute(providerId: string): Promise<AgentProviderAvailability> {
-    return this.providers.inspect(providerId)
+    return this.availability.inspect(providerId, { refresh: true })
   }
 }

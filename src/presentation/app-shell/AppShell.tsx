@@ -198,9 +198,10 @@ export function AppShell({
     setCurrentWorkbench(workbench)
   }, [])
   const {
-    agentProviderChoices,
+    agentProviderPicker,
     cancelAgentProviderSelection,
     createWorkspaceAgent,
+    discoverAgentProviders,
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
@@ -671,10 +672,13 @@ export function AppShell({
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
             getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
           />
-          {agentProviderChoices ? (
+          {agentProviderPicker ? (
             <AgentProviderPickerDialog
-              providers={agentProviderChoices}
+              error={agentProviderPicker.error}
+              pendingProviderId={agentProviderPicker.pendingProviderId}
+              providers={agentProviderPicker.providers}
               onCancel={cancelAgentProviderSelection}
+              onRefresh={() => void discoverAgentProviders()}
               onSelect={(providerId) => void selectAgentProvider(providerId)}
             />
           ) : null}

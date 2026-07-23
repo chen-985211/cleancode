@@ -119,6 +119,10 @@ class DesiredProviderRegistry {
         sessionRefCodec: true
       },
       displayName: 'Codex',
+      icon: {
+        paths: [{ d: 'M2 2h20v20H2z' }],
+        viewBox: '0 0 24 24'
+      },
       id: 'codex'
     } satisfies AgentProviderDescriptor
     const contribution = {

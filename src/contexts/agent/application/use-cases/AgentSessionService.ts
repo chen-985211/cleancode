@@ -18,6 +18,7 @@ import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/Prov
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
+import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import {
   AgentToolApprovalCoordinator,
   type AgentToolExecutionOperations
@@ -75,7 +76,8 @@ export class AgentSessionService {
     private readonly sessionRepository: AgentSessionRepository,
     private readonly providers: AgentProviderRegistryPort,
     private readonly defaultProviderId: string,
-    private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope
+    private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope,
+    private readonly providerAvailability = new AgentProviderAvailabilityService(providers)
   ) {
     this.toolInvocations = new AgentToolInvocationCoordinator(toolExecution)
     this.approvalCoordinator = new AgentToolApprovalCoordinator(this.toolInvocations, (sessionId) =>
@@ -512,6 +514,7 @@ export class AgentSessionService {
 
   private async startManagedProcess(session: ManagedAgentSession): Promise<void> {
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
+    await this.providerAvailability.inspect(session.providerId, { refresh: true })
     const processSessionId = session.sessionId
     let exitObserved = false
     beginAgentTerminalRuntime(session)
@@ -541,10 +544,9 @@ export class AgentSessionService {
       recordAgentTerminalStartFailure(session)
       throw error
     }
-    await this.launchManagedProvider(session)
+    await this.launchManagedProvider(session, false)
   }
-
-  private async launchManagedProvider(session: ManagedAgentSession): Promise<void> {
+  private async launchManagedProvider(session: ManagedAgentSession, refresh = true): Promise<void> {
     await validateManagedAgentRuntimeScope(session, this.scopeValidation)
     const providerLaunchGeneration = ++session.providerLaunchGeneration
     await disposeAgentLaunchArtifacts(session)
@@ -552,7 +554,7 @@ export class AgentSessionService {
     const processSessionId = session.sessionId
     if (!canLaunchAgentProvider(session, processSessionId)) return
     const provider = this.providers.require(session.providerId)
-    await validateAgentProviderAvailability(provider)
+    await validateAgentProviderAvailability(provider, this.providerAvailability, refresh)
     transitionAgentRuntime(session, {
       activity: 'unavailable',
       launch: { exitCode: null, failureKind: null, launchId: null, status: 'launching' }

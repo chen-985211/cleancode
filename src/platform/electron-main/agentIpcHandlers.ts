@@ -12,6 +12,7 @@ import type {
   AgentProviderAvailability,
   AgentProviderDescriptor
 } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentLayoutSnapshot } from '../../contexts/agent/domain/aggregates/AgentSession'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
@@ -48,6 +49,9 @@ export interface AgentIpcHandlersInput {
     readonly providerId: string
     readonly workspaceName: string
   }) => Promise<WorkspaceAgentSnapshot>
+  readonly discoverCreatableAgentProviders: (options: {
+    readonly refresh?: boolean
+  }) => Promise<readonly CreatableAgentProviderSnapshot[]>
   readonly disposeAgentWorkspaceSession: (command: {
     readonly projectDirectory: string
     readonly workspaceName: string
@@ -86,6 +90,18 @@ export interface AgentIpcHandlersInput {
 }
 
 export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
+  registerIpcHandler<
+    { readonly refresh?: boolean } | undefined,
+    readonly CreatableAgentProviderSnapshot[]
+  >({
+    channel: 'cleancode:discover-creatable-agent-providers',
+    handler: (command) => input.discoverCreatableAgentProviders(readDiscoveryOptions(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'discoverCreatableAgentProviders',
+    scope: 'agent'
+  })
+
   registerIpcHandler<{ readonly providerId: string }, AgentProviderAvailability>({
     channel: 'cleancode:inspect-agent-provider',
     handler: (command) => input.inspectAgentProvider(readProviderId(command.providerId)),
@@ -327,6 +343,17 @@ function readProviderId(value: unknown): string {
     'INVALID_IPC_COMMAND',
     'Invalid IPC command: providerId must be a non-empty string.'
   )
+}
+
+function readDiscoveryOptions(value: unknown): { readonly refresh?: boolean } {
+  if (value === undefined) return {}
+  if (!isRecord(value) || (value.refresh !== undefined && typeof value.refresh !== 'boolean')) {
+    throw createExpectedAppError(
+      'INVALID_IPC_COMMAND',
+      'Invalid IPC command: refresh must be a boolean.'
+    )
+  }
+  return value.refresh === undefined ? {} : { refresh: value.refresh }
 }
 
 function sendIfAlive(sender: IpcSender, channel: string, event: unknown): void {

@@ -103,6 +103,7 @@ describe('app shell Agent console', () => {
 
     render(<AppShell />)
     fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^Codex ·/ }))
     await waitFor(() =>
       expect(document.querySelectorAll('[data-agent-console-node]')).toHaveLength(2)
     )

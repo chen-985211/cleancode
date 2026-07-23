@@ -69,7 +69,7 @@ describe('app shell', () => {
     expect(screen.queryByText('添加数据库终端')).not.toBeInTheDocument()
     expect(screen.queryByText('添加测试终端')).not.toBeInTheDocument()
     expect(screen.queryByText('本地 Agent 入口已预留。')).not.toBeInTheDocument()
-    expect(screen.getByText('Codex')).toBeInTheDocument()
+    expect(screen.queryByText('Codex')).not.toBeInTheDocument()
     expect(screen.queryByText('待接入')).not.toBeInTheDocument()
     expect(screen.queryByText('React Flow')).not.toBeInTheDocument()
     expect(

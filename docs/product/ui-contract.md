@@ -64,7 +64,7 @@ locale catalog、Message key、文案归属、不可翻译边界和 AI 修改要
 
 主题偏好固定包含“系统”“浅色”和“深色”三种状态。首次使用默认为“系统”，用户选择必须跨应用重启恢复。选择“系统”时，有效主题必须跟随操作系统并响应运行中的系统主题变化；选择“浅色”或“深色”时，有效主题不得被系统变化覆盖。
 
-主题必须覆盖主题设置入口、侧边栏、画布、终端积木、终端组合、Agent 控制台、小地图、菜单、表单、弹窗、提示和 xterm 内容。主题切换不得重建终端或 Agent 会话，也不得修改项目、工作区或画布业务状态。xterm 已缓冲的原始真彩色输出必须保持为统一可读的主题外观，不得在切换后混合展示切换前后的明暗配色。同一 Agent PTY 或普通终端 generation 运行期间，其终端源 palette 必须保持为创建时的主题；离开再返回工作区时必须沿用原 source，通过统一视觉转换匹配当前应用主题，不得用当前主题冒充仍在运行的 PTY 源主题。普通终端在可见和隐藏状态下对默认前景、背景查询的回答必须一致且只有一个响应者，避免其中启动的 Codex CLI 缓存错误主题。
+主题必须覆盖主题设置入口、侧边栏、画布、终端积木、终端组合、Agent 控制台、小地图、菜单、表单、弹窗、提示和 xterm 内容。主题切换不得重建终端或 Agent 会话，也不得修改项目、工作区或画布业务状态。xterm 已缓冲的原始真彩色输出必须保持为统一可读的主题外观，不得在切换后混合展示切换前后的明暗配色。同一 Agent PTY 或普通终端 generation 运行期间，其终端源 palette 必须保持为创建时的主题；离开再返回工作区时必须沿用原 source，通过统一视觉转换匹配当前应用主题，不得用当前主题冒充仍在运行的 PTY 源主题。xterm 转换后的最终背景必须与当前主题的上、左、下阅读留白形成完整、连续的终端平面，切换后不得在内容三侧留下不同颜色的窄带；右侧 viewport 和滚动条仍须贴住内容外框。搜索、粘贴确认等第一方覆盖层继续使用当前应用主题，不随外部 CLI 内容反色。普通终端在可见和隐藏状态下对默认前景、背景查询的回答必须一致且只有一个响应者，避免其中启动的 Codex CLI 缓存错误主题。
 
 这里的主题覆盖保证应用 chrome、终端宿主 surface、默认 palette、光标、选区和运行时内容的整体可读性，不承诺把外部 Provider CLI 重绘成相同品牌或相同像素。Codex、Claude Code、OpenCode 或其他 CLI 自己输出的 ANSI/真彩色语义、TUI 布局和用户保存的 CLI 主题仍属于对应 CLI；cleancode 不得为追求外观一致而修改用户全局 Provider 配置，也不得在 Presentation 中按 Provider ID 添加专属视觉分支。
 
@@ -291,8 +291,8 @@ Agent 控制台是画布内的本地 Agent CLI 交互工作面。它采用节点
 
 Agent 控制台必须：
 
-- 在紧凑头部显示稳定 Agent 名称和低噪声 Provider 身份/必要活动状态，不把当前工作区、版本号或连接成功状态做成重复副标题；Provider 未声明 `activityTracking` 时不得从输出频率猜测活动。
-- 仅当当前 Provider 声明支持时，显示“CleanCode MCP”图标开关；说明它只授予当前 Agent 查看和修改画布终端、组合、执行配置与依赖工作流的能力。
+- 在紧凑头部最左侧显示 Provider 图标，随后显示稳定 Agent 名称；Provider 名称保留为 Tooltip、可访问名称或等效辅助语义，不作为重复的常驻可见文字。Provider 图标只表达品牌身份，不叠加活动圆点、角标或其他状态装饰；Provider 未声明 `activityTracking` 时仍不得从输出频率猜测活动。
+- 仅当当前 Provider 声明支持时，在头部几何中心显示“CleanCode MCP”图标开关；身份区域或右侧菜单宽度变化时不得带偏该控件。说明它只授予当前 Agent 查看和修改画布终端、组合、执行配置与依赖工作流的能力。
 - 把重命名和删除等低频动作收纳在常驻可见的更多菜单中；支持双击名称就地重命名。
 - 承载真实 Provider CLI 的终端输入输出，并支持选择、移动和调整大小。
 - Agent launch 只能展示 Provider 自身输出；cleancode 写入长期 shell 的临时脚本路径、状态变量、随机控制 Token 和其他内部启动命令不得出现在屏幕、滚动历史或恢复 snapshot 中。
@@ -301,9 +301,13 @@ Agent 控制台必须：
 - 切换分支工作区时连接对应 Agent 与分支对话，不串用其他工作区或其他 Agent 状态。
 - 应用重开时恢复 Agent 的固定 Provider、数量、名称、位置、大小、MCP 偏好和 Provider 支持的分支对话绑定；Agent terminal 本身当前不跨应用保留。
 
-一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。新工作区首次进入时创建一个默认 Codex Agent；用户移除最后一个 Agent 后必须保留空状态。创建 Agent 时从 registry 返回的 Provider 中选择一次，创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
+一个工作区允许拥有零个或多个相同或不同 Provider 的 Agent。首次初始化新工作区时，只有本机检测到 Codex CLI 已安装才创建默认 Codex Agent；否则必须原子持久化一个已初始化的空 Agent 列表，不静默改用其他 Provider，也不得在以后仅因 Codex 安装状态改变而自动补建。用户移除最后一个 Agent 后同样必须保留空状态。创建第二个及后续 Agent 时必须说明它们共享工作区目录、可能同时修改相同文件；需要文件级隔离时应使用不同 worktree。
 
-Provider 列表、恢复动作、活动状态、MCP 开关和画布指令能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一选择、状态和 Agent 控制台流程；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
+注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
+
+“新建 Agent”每次都必须打开统一的检测选择器，不能因只有一个候选项而跳过选择。检测期间只显示中性的加载状态，不得先闪现静态注册目录；没有可创建 Provider 时显示明确空状态和重新检测入口。用户选择 Provider 后，系统必须在持久化前重新验证当前可用性并阻止重复提交；Provider 在发现后变为不可用或创建发生其他错误时保留选择器和错误反馈，只有成功创建才关闭。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+
+Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、选择、状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
 
 每个 Agent 必须拥有稳定身份、固定 Provider，以及独立的 Agent terminal、CLI launch、输入输出、审批、MCP 会话和分支对话绑定。移动、选择、重命名或调整大小不得重启 Agent terminal 或 Provider launch。
 
@@ -323,7 +327,7 @@ CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”
 
 Agent 控制台不得展示终端端口，不得加入终端组合，也不得进入普通终端积木的创建、删除、组合或批量运行流程。
 
-正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、版本号或同义状态卡；创建 Agent 的 Provider 选择器可以展示 detector 返回的已安装版本。短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，Codex 与 OpenCode 不得因虚构的版本门槛显示升级要求。
+正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；创建 Agent 的 Provider 选择器可以展示 detector 返回的已安装版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，Codex 与 OpenCode 不得因虚构的版本门槛显示升级要求。新建选择器不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项。
 
 每个 Provider 的 CLI 检查结果属于应用级共享的易失能力快照，不得由每个 Agent 重复维护。Agent 自身运行状态优先于该快照：运行中的 launch 必须保持静默，恢复失败、启动失败和会话结束不得被检查提示遮挡；旧检查结果不得覆盖较新的重试。
 

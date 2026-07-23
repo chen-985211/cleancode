@@ -2,6 +2,7 @@ import type { MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { useI18n } from './i18n/useI18n'
+import { TerminalThemeProjection } from './TerminalThemeProjection'
 
 export function AgentTerminalSurface({
   activeOutput,
@@ -35,7 +36,10 @@ export function AgentTerminalSurface({
   }
 
   return (
-    <div className="agent-terminal-frame nodrag nopan nowheel">
+    <TerminalThemeProjection
+      className="agent-terminal-frame nodrag nopan nowheel"
+      sourceTheme={session?.terminalSourceTheme}
+    >
       <div
         className="agent-terminal-viewport nodrag nopan nowheel"
         data-agent-terminal-agent-id={session?.agentId}
@@ -46,6 +50,6 @@ export function AgentTerminalSurface({
         data-agent-terminal-workspace-name={session?.workspaceName}
         ref={terminalElementRef}
       />
-    </div>
+    </TerminalThemeProjection>
   )
 }

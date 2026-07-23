@@ -56,7 +56,7 @@ xterm 缓冲区中的 cell
 
 不要用其中一层的修复去掩盖另一层的问题。
 
-## 本次缺陷的三个根因
+## 常见缺陷的多个根因
 
 ### 1. PTY 在首次有效测量前启动
 
@@ -86,21 +86,33 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 - 减少可用于 cell 的宽度，改变列数和换行点。
 - 掩盖真正的字宽或 PTY 尺寸问题。
 
-当前做法把文字留白和滚动条几何分开：
+当前做法把文字留白、源主题投影和滚动条几何分开。普通终端和 Agent terminal 都把阅读留白交给共享投影边界，而不是各自在外壳或 xterm mount 上声明：
 
 ```css
-.agent-terminal-frame {
+.terminal-theme-projection {
+  box-sizing: border-box;
+  background: var(--cc-terminal-projection-background);
   padding: 9px 0 9px 10px;
 }
 
+.terminal-viewport,
 .agent-terminal-viewport {
   width: 100%;
   height: 100%;
   overflow: hidden;
 }
+
+:root[data-theme='dark']
+  .terminal-theme-projection[data-terminal-source-theme='light']
+  > :is(.terminal-viewport, .agent-terminal-viewport),
+:root[data-theme='light']
+  .terminal-theme-projection[data-terminal-source-theme='dark']
+  > :is(.terminal-viewport, .agent-terminal-viewport) {
+  filter: var(--cc-terminal-theme-mismatch-filter);
+}
 ```
 
-左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。对应样式位于 [agent-console.css](../../src/presentation/app-shell/styles/agent-console.css)。
+左、上、下仍保留阅读留白，xterm viewport 则在右侧 full-bleed。wrapper 留白使用当前应用主题背景并保持未过滤，只有直接子 viewport 在源主题与当前主题不一致时应用滤镜。滚动条 track 和 viewport 使用透明背景，避免它们自身形成实色底边。共享边界实现位于 [TerminalThemeProjection.tsx](../../src/presentation/app-shell/TerminalThemeProjection.tsx) 和 [terminal-theme-projection.css](../../src/presentation/app-shell/styles/terminal-theme-projection.css)，Agent 与普通终端的局部几何分别位于 [agent-console.css](../../src/presentation/app-shell/styles/agent-console.css) 和 [terminal-node.css](../../src/presentation/app-shell/styles/terminal-node.css)。
 
 ### 3. Chromium 对连续全角标点进行上下文压缩
 
@@ -121,6 +133,12 @@ Agent 控制台旧的 PTY attach fallback 是 `88 x 24`。旧实现会直接拿�
 
 `space-all` 的目的不是美化普通段落，而是让全角标点在测量和显示时都保持全宽，维护 terminal cell 的确定性。W3C 的 `text-spacing` shorthand 也把 `space-all` 与 `no-autospace` 的组合定义为关闭全部自动文本间距。该行为定义可参阅 [CSS Text Module Level 4](https://www.w3.org/TR/css-text-4/#text-spacing-trim-property)。本次 E2E 直接证明的是组合后的字宽结果，没有分别证明两个 longhand 各自都是必要条件。
 
+### 4. 当前主题留白与源主题内容分层协调
+
+运行中的 terminal generation 会保留创建时的源 palette；应用主题变化时，renderer 只转换仍按该 palette 绘制的 viewport 内容。`TerminalThemeProjection` wrapper 保持无滤镜，使用当前应用主题背景绘制 `9px 0 9px 10px` 阅读留白；直接子 viewport 则继承 `data-terminal-source-theme` 对应的 terminal token，并且只在源主题与当前主题不一致时应用 mismatch filter。
+
+canonical 浅色和深色背景必须在该滤镜下精确映射到 wrapper 的目标背景，使内容边缘与上、左、下阅读留白形成连续像素平面。最右侧没有 padding，viewport 和滚动条继续贴住内容外框。节点边框、标题、搜索、粘贴确认、链接错误和进度等第一方界面位于被过滤子树之外，不能随外部 CLI 内容一起反色。修复时不得通过在三侧补伪元素或近似色掩盖背景映射不一致。
+
 ## Agent 会话源主题与重挂载
 
 Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色背景、composer 和状态区域。因此，“当前应用想显示的主题”和“仍在运行的 PTY 已经采用的源 palette”是两个不同事实。主题切换只改变前者，不得假定子进程会同步改变后者。
@@ -130,6 +148,8 @@ Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色
 Run 为普通 terminal 和 Agent foreground launch 都固定 `TERM=xterm-256color`、`COLORTERM=truecolor`、`TERM_PROGRAM=cleancode`，并根据 `terminalSourceTheme` 设置 `COLORFGBG`；Provider launch 环境中的同名键会被宿主值替换，`NO_COLOR` 则原样保留。出现同一个 CLI 在 shell 启动与应用启动时颜色能力不同的问题时，先记录这组最终子进程环境，再检查 CLI 自己的主题配置，不要只比较宿主进程继承到的环境。
 
 完整 canonical terminal palette 的手写来源只有 [`theme.css`](../../src/presentation/app-shell/styles/theme.css)。`node scripts/check-theme.mjs --write-terminal-palette` 生成 [`TerminalPalette.generated.ts`](../../src/contexts/run/application/dto/TerminalPalette.generated.ts)，renderer xterm 和隐藏 headless model 都消费这一产物；`pnpm check:theme` 在生成文件缺失、手改或落后于 CSS 时失败。这样 OSC 10/11 回答与可见 xterm 不再各自维护一组近似色值。
+
+可见 renderer 的 source-theme token 由共享 `.terminal-theme-projection[data-terminal-source-theme]` 建立作用域；mismatch filter 则有意只匹配其直接子 `.terminal-viewport` 或 `.agent-terminal-viewport`。wrapper 的当前主题背景和阅读留白保持未过滤，第一方覆盖层也继续使用当前应用主题。
 
 Agent terminal 由 Run 承载，并在首次附加时固定 `terminalSourceTheme`。同一 terminal 再次附加时，renderer 发送当前有效主题作为新运行时提议，Run 为已存在的 PTY 返回原有 canonical source。该值不进入 Agent 持久化 schema；重新启动 Provider 或开始新对话只替换 terminal 内的 launch，不替换 terminal，也不改变 source theme。应用重启建立新 terminal 时才可以采用新的当前主题。
 
@@ -233,6 +253,7 @@ Agent 控制台与普通终端共享 Run 视图不变量；Agent 额外维护首
 9. 主题切换、节点 resize 和画布非 100% 缩放不会重建 session，也不会重新引入裁剪。
 10. 画布缩小、100% 和放大时，指针命中的选区字符与 TUI cell 都保持一致，交互不会拖动画布或节点。
 11. 同一 Agent terminal 的终端源主题在运行期间保持不变；工作区往返可以创建新 surface，但必须从同一 Run 模型恢复 canonical palette、snapshot 和连续 sequence。
+12. 未过滤 wrapper 承载当前主题背景和上/左/下阅读留白，mismatch filter 只作用于源主题 direct viewport；两者最终颜色连续，第一方覆盖层位于被过滤子树之外。
 
 ## 排障流程
 
@@ -409,6 +430,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [agent.session-service.spec.ts](../../tests/unit/contexts/agent/agent.session-service.spec.ts) 证明应用服务会把 session resize 转发给已经绑定的 PTY。
 - [run.terminal-capability-environment.spec.ts](../../tests/unit/contexts/run/run.terminal-capability-environment.spec.ts) 证明保留环境键、source-theme `COLORFGBG` 和 `NO_COLOR` 透传策略；[run.pty-terminal.spec.ts](../../tests/integration/contexts/run/run.pty-terminal.spec.ts) 再以真实 POSIX PTY 证明普通启动与 foreground launch 都收到同一 profile。
 - [run.terminal-source-palette.spec.ts](../../tests/unit/contexts/run/run.terminal-source-palette.spec.ts)、[terminal-theme.palette.spec.ts](../../tests/unit/presentation/terminal-theme.palette.spec.ts) 和 [check-theme.spec.ts](../../tests/unit/support/check-theme.spec.ts) 分别证明隐藏 OSC、renderer xterm 与生成门禁共用 canonical palette。
+- [terminal-theme-projection.spec.tsx](../../tests/unit/presentation/terminal-theme-projection.spec.tsx) 证明 Agent 与普通终端共享由 wrapper 留白和 direct viewport 组成的主题协调边界；[terminal-viewport.interaction.spec.tsx](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明普通终端的搜索覆盖层位于投影之外。
 - [agent.run-terminal-provider.spec.ts](../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts) 使用真实 Run terminal 和本地 fake Provider，证明 Agent CLI 启动、输入输出、`Ctrl+C` 与退出回到 shell。
 - [agent.ipc.spec.ts](../../tests/contract/contexts/agent/agent.ipc.spec.ts) 证明 resize 的 `sessionId`、`columns`、`rows` 能正确跨 Electron IPC 边界。
 - [RunAgentTerminalRuntimeAdapter.ts](../../src/contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter.ts) 把 Agent 的 attach/resize 端口转交给 Run；[NodePtyTerminalProcessAdapter.ts](../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter.ts) 最终把行列传给 `node-pty.spawn` 和 PTY `resize`。
@@ -423,7 +445,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 
 [run-terminal-sessions.e2e.spec.ts](../../tests/e2e/run-terminal-sessions.e2e.spec.ts) 还覆盖普通终端在默认与缩小画布下的精确选区，以及缩小画布下 SGR mouse 的按下、移动、抬起 cell。这样组合覆盖小于 100%、100% 和大于 100% 三个坐标区间，同时证明普通终端与 Agent 两个 surface。
 
-[agent-terminal-theme-workspaces.e2e.spec.ts](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 使用两个不同源主题的真实常驻 Agent PTY，在浅色与深色应用主题间往返 main/worktree。它断言每个工作区继续使用原 session 和进程、surface 恢复对应源主题、跨主题滤镜方向正确，并以截图中心像素验证用户最终看到的明暗。
+[agent-terminal-theme-workspaces.e2e.spec.ts](../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts) 使用不同源主题的真实常驻 Agent PTY，在浅色与深色应用主题间往返 main/worktree。它断言每个工作区继续使用原 session 和进程、surface 恢复对应源主题、共享 wrapper 保持无滤镜并且只有 source/target 不一致的 direct viewport 应用滤镜，再以截图中心像素验证用户最终看到的明暗。它还在 Agent 和普通终端切换主题后分别采样内容中心与上、左、下阅读留白，要求每个颜色通道的最大差值不超过 2，直接防止三侧色缝回归。
 
 这里使用 E2E 的理由不是“改动发生在 UI”，而是 jsdom 不执行 Chromium 的真实 CSS Text 排版，也不能可信测量 WebKit scrollbar pseudo-element。
 
@@ -452,6 +474,8 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 - [ ] attach 失败可见且可重试；替代 attach 失败不丢失原 terminal binding。
 - [ ] 子进程收到 Run 保留的 `TERM`、`COLORTERM`、`TERM_PROGRAM` 和 source-theme `COLORFGBG`，并保留明确的 `NO_COLOR`。
 - [ ] 修改终端色板后重新生成 palette，隐藏 OSC 与可见 xterm 使用同一份生成值，`pnpm check:theme` 通过。
+- [ ] 当前主题背景和阅读留白由未过滤 wrapper 承载，mismatch filter 只作用于 direct viewport；两者最终颜色连续，第一方覆盖层位于被过滤子树之外。
+- [ ] 主题切换后内容中心与上、左、下留白处于同一视觉平面，没有三侧异色带。
 - [ ] 足量 scrollback 下滚动条贴住用户看到的右侧外框。
 - [ ] 单个与重复 `，。！？（）【】` 的宽度保持稳定。
 - [ ] DOM 行尾文本完整，最后字形 `right <= row.right`。

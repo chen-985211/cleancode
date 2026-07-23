@@ -18,6 +18,7 @@ import {
 import { CodexThreadIdentityReporter } from '../../pty/CodexThreadIdentityReporter'
 import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInstallation'
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
+import { codexProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
 
 export const codexInstallCommands = {
@@ -54,6 +55,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
       sessionRefCodec: true
     },
     displayName: 'Codex',
+    icon: codexProviderIcon,
     id: 'codex'
   } as const
   readonly detector: AgentProviderDetector

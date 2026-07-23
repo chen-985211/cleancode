@@ -16,12 +16,14 @@ import { useI18n } from './i18n/useI18n'
 export function AgentConsoleActions({
   agent,
   capabilityControl,
+  identityControl,
   onRemove,
   onRename,
   onSelect
 }: {
   readonly agent: WorkspaceAgentSnapshot
   readonly capabilityControl?: ReactNode
+  readonly identityControl?: ReactNode
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onSelect?: () => void
@@ -107,88 +109,93 @@ export function AgentConsoleActions({
 
   return (
     <div className="agent-console-actions" ref={actionsRef}>
-      {mode === 'rename' ? (
-        <form
-          className="agent-console-actions__editor nodrag"
-          onSubmit={(event) => void submitRename(event)}
-        >
-          <input
-            aria-label={t('agent.name')}
-            autoFocus
-            value={name}
-            onBlur={cancelRename}
-            onChange={(event) => setName(event.target.value)}
-            onFocus={(event) => event.currentTarget.select()}
-            onKeyDown={handleEditorKeyDown}
-          />
-        </form>
-      ) : (
-        <TooltipLabel content={t('agent.renameTitle')}>
-          <button
-            className="agent-console-actions__title"
-            type="button"
-            aria-label={t('agent.renameHint', { agentName: agent.name })}
-            onClick={(event) => {
-              event.stopPropagation()
-              onSelect?.()
-            }}
-            onDoubleClick={(event) => {
-              event.stopPropagation()
-              startRename()
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'F2') startRename()
-            }}
+      <div className="agent-console-actions__start">
+        {identityControl}
+        {mode === 'rename' ? (
+          <form
+            className="agent-console-actions__editor nodrag"
+            onSubmit={(event) => void submitRename(event)}
           >
-            {agent.name}
-          </button>
-        </TooltipLabel>
-      )}
-      {capabilityControl}
-      {mode !== 'rename' ? (
-        <span className="agent-console-actions__menu-anchor">
-          <TooltipLabel content={t('sidebar.more')}>
+            <input
+              aria-label={t('agent.name')}
+              autoFocus
+              value={name}
+              onBlur={cancelRename}
+              onChange={(event) => setName(event.target.value)}
+              onFocus={(event) => event.currentTarget.select()}
+              onKeyDown={handleEditorKeyDown}
+            />
+          </form>
+        ) : (
+          <TooltipLabel content={t('agent.renameTitle')}>
             <button
-              className="agent-console-actions__more nodrag"
-              ref={menuTriggerRef}
+              className="agent-console-actions__title"
               type="button"
-              aria-label={t('agent.moreActions', { agentName: agent.name })}
-              aria-expanded={mode === 'menu'}
-              aria-haspopup="menu"
-              disabled={isSubmitting}
+              aria-label={t('agent.renameHint', { agentName: agent.name })}
               onClick={(event) => {
                 event.stopPropagation()
-                setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
+                onSelect?.()
+              }}
+              onDoubleClick={(event) => {
+                event.stopPropagation()
+                startRename()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'F2') startRename()
               }}
             >
-              <MoreHorizontal size={15} aria-hidden="true" />
+              {agent.name}
             </button>
           </TooltipLabel>
-          {mode === 'menu' ? (
-            <div
-              className="agent-console-actions__menu nodrag"
-              role="menu"
-              aria-label={t('agent.actions', { agentName: agent.name })}
-              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
-              ref={menuRef}
-            >
-              <button type="button" role="menuitem" onClick={startRename}>
-                <Pencil size={14} aria-hidden="true" />
-                {t('agent.rename')}
-              </button>
+        )}
+      </div>
+      <div className="agent-console-actions__center">{capabilityControl}</div>
+      <div className="agent-console-actions__end">
+        {mode !== 'rename' ? (
+          <span className="agent-console-actions__menu-anchor">
+            <TooltipLabel content={t('sidebar.more')}>
               <button
-                className="agent-console-actions__menu-item--danger"
+                className="agent-console-actions__more nodrag"
+                ref={menuTriggerRef}
                 type="button"
-                role="menuitem"
-                onClick={() => setMode('remove')}
+                aria-label={t('agent.moreActions', { agentName: agent.name })}
+                aria-expanded={mode === 'menu'}
+                aria-haspopup="menu"
+                disabled={isSubmitting}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
+                }}
               >
-                <Trash2 size={14} aria-hidden="true" />
-                {t('agent.remove')}
+                <MoreHorizontal size={15} aria-hidden="true" />
               </button>
-            </div>
-          ) : null}
-        </span>
-      ) : null}
+            </TooltipLabel>
+            {mode === 'menu' ? (
+              <div
+                className="agent-console-actions__menu nodrag"
+                role="menu"
+                aria-label={t('agent.actions', { agentName: agent.name })}
+                onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+                ref={menuRef}
+              >
+                <button type="button" role="menuitem" onClick={startRename}>
+                  <Pencil size={14} aria-hidden="true" />
+                  {t('agent.rename')}
+                </button>
+                <button
+                  className="agent-console-actions__menu-item--danger"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => setMode('remove')}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  {t('agent.remove')}
+                </button>
+              </div>
+            ) : null}
+          </span>
+        ) : null}
+      </div>
       {mode === 'remove' ? (
         <div
           aria-busy={isSubmitting}

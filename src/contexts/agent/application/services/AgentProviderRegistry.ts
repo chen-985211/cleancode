@@ -62,7 +62,7 @@ export class AgentProviderRegistry implements AgentProviderRegistryPort {
 }
 
 function validateContribution(contribution: AgentProviderContribution): void {
-  const { capabilities, id } = contribution.descriptor
+  const { capabilities, icon, id } = contribution.descriptor
   const telemetrySignals = contribution.telemetry?.signals ?? {
     activity: false,
     sessionIdentity: false
@@ -72,6 +72,7 @@ function validateContribution(contribution: AgentProviderContribution): void {
     !id ||
     id !== id.trim() ||
     !contribution.descriptor.displayName.trim() ||
+    !isValidProviderIcon(icon) ||
     capabilities.resume !== Boolean(contribution.resume) ||
     telemetrySignals.activity !== capabilities.activityTracking ||
     telemetrySignals.sessionIdentity !== capabilities.sessionIdentityCapture ||
@@ -88,4 +89,34 @@ function validateContribution(contribution: AgentProviderContribution): void {
       { providerId: id || '<empty>' }
     )
   }
+}
+
+function isValidProviderIcon(icon: AgentProviderDescriptor['icon'] | undefined): boolean {
+  if (!icon || typeof icon !== 'object' || typeof icon.viewBox !== 'string') return false
+  const viewBox = icon.viewBox
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number)
+  if (
+    viewBox.length !== 4 ||
+    viewBox.some((value) => !Number.isFinite(value)) ||
+    (viewBox[2] ?? 0) <= 0 ||
+    (viewBox[3] ?? 0) <= 0
+  ) {
+    return false
+  }
+  if (!Array.isArray(icon.paths) || icon.paths.length === 0 || icon.paths.length > 16) return false
+
+  return icon.paths.every((path) => {
+    if (!path || typeof path !== 'object' || typeof path.d !== 'string') return false
+    const { d, fill, fillRule } = path
+    const normalizedPath = d.trim()
+    return (
+      normalizedPath.length > 0 &&
+      normalizedPath.length <= 8192 &&
+      /^[MmZzLlHhVvCcSsQqTtAaEe0-9+\-.,\s]+$/.test(normalizedPath) &&
+      (fill === undefined || fill === 'currentColor' || /^#[0-9a-fA-F]{6}$/.test(fill)) &&
+      (fillRule === undefined || fillRule === 'evenodd' || fillRule === 'nonzero')
+    )
+  })
 }

@@ -14,6 +14,7 @@ import type {
   AgentProviderAvailability,
   AgentProviderDescriptor
 } from './contexts/agent/application/ports/AgentProviderContribution'
+import type { CreatableAgentProviderSnapshot } from './contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
   BlockGraphSnapshot,
@@ -86,6 +87,9 @@ declare global {
       inspectAgentProvider(command: {
         readonly providerId: string
       }): Promise<AgentProviderAvailability>
+      discoverCreatableAgentProviders(command?: {
+        readonly refresh?: boolean
+      }): Promise<readonly CreatableAgentProviderSnapshot[]>
       listAgentProviders(): Promise<readonly AgentProviderDescriptor[]>
       attachAgentSession(command: {
         readonly agentId: string

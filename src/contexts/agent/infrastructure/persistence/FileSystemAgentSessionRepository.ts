@@ -4,6 +4,10 @@ import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 import type { AgentSessionRepository } from '../../application/ports/AgentSessionRepository'
+import type {
+  AgentWorkspaceInitializer,
+  InitializeAgentWorkspaceCommand
+} from '../../application/ports/AgentWorkspaceInitializer'
 import type { AgentProviderRegistryPort } from '../../application/ports/AgentProviderRegistryPort'
 import {
   AgentSession,
@@ -77,7 +81,9 @@ interface LegacyAgentSessionStore {
   readonly version: 1
 }
 
-export class FileSystemAgentSessionRepository implements AgentSessionRepository {
+export class FileSystemAgentSessionRepository
+  implements AgentSessionRepository, AgentWorkspaceInitializer
+{
   private saveQueue = Promise.resolve()
 
   constructor(
@@ -130,6 +136,38 @@ export class FileSystemAgentSessionRepository implements AgentSessionRepository 
 
       return replaceWorkspace(workspaces, nextWorkspace)
     })
+  }
+
+  async initializeWorkspace(
+    command: InitializeAgentWorkspaceCommand
+  ): Promise<readonly AgentSession[]> {
+    const initialSnapshots = command.agents.map((agent) => {
+      const snapshot = this.validateSnapshot(agent.toSnapshot())
+      if (
+        snapshot.projectId !== command.projectId ||
+        snapshot.workspaceName !== command.workspaceName
+      ) {
+        throw new Error('Initial Agent does not belong to the target workspace.')
+      }
+      return snapshot
+    })
+    let resolvedSnapshots: readonly PersistedAgentSessionSnapshot[] = initialSnapshots
+
+    await this.update((workspaces) => {
+      const existing = findWorkspace(workspaces, command.projectId, command.workspaceName)
+      if (existing) {
+        resolvedSnapshots = existing.agents
+        return workspaces
+      }
+
+      return replaceWorkspace(workspaces, {
+        agents: initialSnapshots,
+        projectId: command.projectId,
+        workspaceName: command.workspaceName
+      })
+    })
+
+    return resolvedSnapshots.map((snapshot) => this.hydrate(snapshot))
   }
 
   async delete(scope: AgentConversationScope): Promise<void> {

@@ -63,6 +63,38 @@ describe('filesystem Agent session repository', () => {
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toMatchObject({ version: 4 })
   })
 
+  it('atomically initializes an empty workspace exactly once', async () => {
+    const firstAgent = createAgent('agent-first', 'Agent 1')
+    const secondAgent = createAgent('agent-second', 'Agent 1')
+
+    const [firstResult, secondResult] = await Promise.all([
+      repository.initializeWorkspace({
+        agents: [firstAgent],
+        projectId: 'project-1',
+        workspaceName: 'main'
+      }),
+      repository.initializeWorkspace({
+        agents: [secondAgent],
+        projectId: 'project-1',
+        workspaceName: 'main'
+      })
+    ])
+    const stored = await repository.findWorkspace('project-1', 'main')
+
+    expect(firstResult.map((agent) => agent.id)).toEqual(secondResult.map((agent) => agent.id))
+    expect(stored?.map((agent) => agent.id)).toEqual(firstResult.map((agent) => agent.id))
+    expect(stored).toHaveLength(1)
+
+    await expect(
+      repository.initializeWorkspace({
+        agents: [],
+        projectId: 'project-empty',
+        workspaceName: 'main'
+      })
+    ).resolves.toEqual([])
+    await expect(repository.findWorkspace('project-empty', 'main')).resolves.toEqual([])
+  })
+
   it('restores a Claude Code reference through its Provider codec without changing v4 shape', async () => {
     const agent = AgentSession.create({
       agentId: 'agent-claude',

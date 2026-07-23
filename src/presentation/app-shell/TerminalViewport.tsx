@@ -29,6 +29,7 @@ import {
   quoteTerminalFilePaths,
   type TerminalPasteState
 } from './terminalPaste'
+import { TerminalThemeProjection } from './TerminalThemeProjection'
 
 interface TerminalViewportProps {
   readonly block: TerminalBlockSnapshot
@@ -89,6 +90,7 @@ export function TerminalViewport({
     resultCount: 0,
     resultIndex: 0
   })
+  const terminalSourceTheme = session.terminalSourceTheme ?? readTerminalSourceTheme()
   const surfaceIdentityKey = session.runIdentity
     ? createTerminalSurfaceKey(session.runIdentity)
     : null
@@ -251,7 +253,6 @@ export function TerminalViewport({
 
     const element = terminalElementRef.current
     const runIdentity = runIdentityRef.current
-    const terminalSourceTheme = session.terminalSourceTheme ?? readTerminalSourceTheme()
     const createSurface = () => createTerminalXtermSurface(terminalSourceTheme)
     const lease =
       runIdentity && surfaceRegistry ? surfaceRegistry.create(runIdentity, createSurface) : null
@@ -323,7 +324,7 @@ export function TerminalViewport({
         surfaceRef.current = null
       }
     }
-  }, [openSearch, session.terminalSourceTheme, surfaceIdentityKey, surfaceRegistry])
+  }, [openSearch, surfaceIdentityKey, surfaceRegistry, terminalSourceTheme])
 
   useEffect(() => {
     if (focusRequestId > 0) {
@@ -436,12 +437,14 @@ export function TerminalViewport({
           {t(pasteNoticeMessages[pasteNotice])}
         </div>
       ) : null}
-      <div
-        className="terminal-viewport nodrag nopan nowheel"
-        ref={terminalElementRef}
-        tabIndex={0}
-        onFocus={focusTerminalFromViewportFocus}
-      />
+      <TerminalThemeProjection sourceTheme={terminalSourceTheme}>
+        <div
+          className="terminal-viewport nodrag nopan nowheel"
+          ref={terminalElementRef}
+          tabIndex={0}
+          onFocus={focusTerminalFromViewportFocus}
+        />
+      </TerminalThemeProjection>
       <pre
         className="terminal-output-tail"
         ref={outputTailElementRef}

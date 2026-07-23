@@ -12,9 +12,21 @@ interface AgentProviderCapabilities {
   readonly sessionRefCodec: boolean
 }
 
+interface AgentProviderIconPath {
+  readonly d: string
+  readonly fill?: 'currentColor' | `#${string}`
+  readonly fillRule?: 'evenodd' | 'nonzero'
+}
+
+export interface AgentProviderIcon {
+  readonly paths: readonly AgentProviderIconPath[]
+  readonly viewBox: string
+}
+
 export interface AgentProviderDescriptor {
   readonly capabilities: AgentProviderCapabilities
   readonly displayName: string
+  readonly icon: AgentProviderIcon
   readonly id: string
 }
 

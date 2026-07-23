@@ -101,6 +101,10 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 
 普通终端和 Agent terminal 的应用外框、标题、状态、错误、重试入口、xterm 默认 palette、光标与选区属于 cleancode 宿主界面，必须复用同一组语义 token 和终端主题规则。相同宿主状态不得因为 Provider 品牌不同而选择另一套边框、背景、字号或状态色；Provider 名称和能力从 descriptor 投影，不通过 Provider ID 选择专属组件或 CSS。
 
+普通终端和 Agent terminal 必须共用同一种终端主题协调边界。wrapper 使用当前应用主题背景并承载上、左、下阅读留白；源主题 dataset 和 terminal token 作用于内层 viewport，跨明暗主题的 mismatch filter 只作用于该 viewport 及其 xterm 内容。滤镜不得作用于 wrapper 留白、节点边框、标题或第一方覆盖层。内层内容转换后的背景必须与 wrapper 当前主题背景形成同一视觉平面；右侧继续保持零留白，使 viewport 与滚动条贴住内容外框。
+
+Agent 头部左侧使用 Provider descriptor 提供的图标和稳定 Agent 名称表达身份，不常驻重复显示 Provider 名称；Provider 名称仍须通过 Tooltip、`title`、可访问名称或等效语义可获得。图标由同一个 Provider-neutral 组件渲染 descriptor 中经过校验的矢量数据，不按 Provider ID 选择组件或 CSS，也不叠加活动圆点、角标或其他状态装饰。CleanCode MCP 控件占据头部的几何中心，左右区域使用对称布局承载身份和更多菜单；两侧内容宽度不同、名称截断或菜单状态变化时都不得带偏中心控件。
+
 终端网格内由外部 CLI 写入的 ANSI、真彩色品牌色、文本布局和 TUI 控件属于运行时内容，不是第一方 UI token。应用可以在不重建会话、不改写 buffer 的前提下对整个终端 surface 做统一可读性适配，但不得逐 Provider 猜测或重写其语义色，也不得用修改用户全局 CLI 主题的方式追求截图像素一致。评审时应分别检查宿主 chrome 是否一致、CLI 内容是否可读，不能把不同 CLI 自身的视觉差异误判为第一方组件不统一。
 
 Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反馈；attach 失败使用保留的警告与明确重试动作，不以空白 surface、无限 spinner 或 Provider 安装提示替代。替代 attach 失败时，既有 terminal 内容和输入能力保持原位；在途期间禁用会触发冲突重配的控件，但不添加遮挡 terminal 正文的状态层。

@@ -252,6 +252,63 @@ describe('agent IPC contract', () => {
     )
   })
 
+  it('discovers only currently creatable Agent Providers through a refreshable channel', async () => {
+    const ipcMain = new FakeIpcMain()
+    const discoverCreatableAgentProviders = vi.fn(async () => [
+      {
+        availability: {
+          providerId: 'claude-code',
+          status: 'installed' as const,
+          version: '2.1.217'
+        },
+        descriptor: {
+          capabilities: {
+            activityTracking: true,
+            cleancodeMcp: 'best_effort' as const,
+            launchInstructions: true,
+            resume: true,
+            sessionIdentityCapture: true,
+            sessionRefCodec: true
+          },
+          displayName: 'Claude Code',
+          icon: {
+            paths: [{ d: 'M2 2h20v20H2z' }],
+            viewBox: '0 0 24 24'
+          },
+          id: 'claude-code'
+        }
+      }
+    ])
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({ discoverCreatableAgentProviders, ipcMain })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:discover-creatable-agent-providers', { refresh: true })
+    ).resolves.toEqual({
+      ok: true,
+      value: [
+        expect.objectContaining({
+          availability: expect.objectContaining({
+            providerId: 'claude-code',
+            status: 'installed'
+          }),
+          descriptor: expect.objectContaining({ id: 'claude-code' })
+        })
+      ]
+    })
+    expect(discoverCreatableAgentProviders).toHaveBeenCalledWith({ refresh: true })
+
+    await expect(
+      ipcMain.invoke('cleancode:discover-creatable-agent-providers', { refresh: 'yes' })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(discoverCreatableAgentProviders).toHaveBeenCalledOnce()
+  })
+
   it('updates one Agent CleanCode MCP capability through a dedicated typed channel', async () => {
     const ipcMain = new FakeIpcMain()
     const updateWorkspaceAgentMcpCapability = vi.fn(async () => ({
@@ -363,6 +420,7 @@ function createAgentIpcHandlersInput(input: {
   readonly approveAgentTool?: AgentIpcHandlersInput['approveAgentTool']
   readonly attachAgentSession?: AgentIpcHandlersInput['attachAgentSession']
   readonly createWorkspaceAgent?: AgentIpcHandlersInput['createWorkspaceAgent']
+  readonly discoverCreatableAgentProviders?: AgentIpcHandlersInput['discoverCreatableAgentProviders']
   readonly disposeAgentWorkspaceSession?: AgentIpcHandlersInput['disposeAgentWorkspaceSession']
   readonly disposeProjectAgentSessions?: AgentIpcHandlersInput['disposeProjectAgentSessions']
   readonly inspectAgentProvider?: AgentIpcHandlersInput['inspectAgentProvider']
@@ -395,6 +453,7 @@ function createAgentIpcHandlersInput(input: {
       })),
     createWorkspaceAgent:
       input.createWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-2')),
+    discoverCreatableAgentProviders: input.discoverCreatableAgentProviders ?? (async () => []),
     disposeAgentWorkspaceSession: input.disposeAgentWorkspaceSession ?? (async () => undefined),
     disposeProjectAgentSessions: input.disposeProjectAgentSessions ?? (async () => undefined),
     inspectAgentProvider:
@@ -414,6 +473,10 @@ function createAgentIpcHandlersInput(input: {
             sessionRefCodec: true
           },
           displayName: 'Codex',
+          icon: {
+            paths: [{ d: 'M2 2h20v20H2z' }],
+            viewBox: '0 0 24 24'
+          },
           id: 'codex'
         }
       ]),

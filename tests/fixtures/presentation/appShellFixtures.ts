@@ -1,8 +1,27 @@
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
+import type { CreatableAgentProviderSnapshot } from '../../../src/contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type {
   AgentRuntimeSnapshot,
   AgentSessionSnapshot
 } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
+import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
+
+const defaultAgentProviderDescriptor: AgentProviderDescriptor = {
+  capabilities: {
+    activityTracking: false,
+    cleancodeMcp: 'required',
+    launchInstructions: true,
+    resume: true,
+    sessionIdentityCapture: true,
+    sessionRefCodec: true
+  },
+  displayName: 'Codex',
+  icon: {
+    paths: [{ d: 'M2 2h20v20H2z' }],
+    viewBox: '0 0 24 24'
+  },
+  id: 'codex'
+}
 
 export interface RuntimeApiOverrides {
   readonly listWorkbenches?: ReturnType<typeof vi.fn>
@@ -17,6 +36,7 @@ export interface RuntimeApiOverrides {
   readonly inspectCodexCli?: ReturnType<typeof vi.fn>
   readonly inspectAgentProvider?: ReturnType<typeof vi.fn>
   readonly listAgentProviders?: ReturnType<typeof vi.fn>
+  readonly discoverCreatableAgentProviders?: ReturnType<typeof vi.fn>
   readonly attachAgentSession?: ReturnType<typeof vi.fn>
   readonly createWorkspaceAgent?: ReturnType<typeof vi.fn>
   readonly renameWorkspaceAgent?: ReturnType<typeof vi.fn>
@@ -78,19 +98,17 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
             }
       ),
     listAgentProviders:
-      overrides.listAgentProviders ??
-      vi.fn(async () => [
+      overrides.listAgentProviders ?? vi.fn(async () => [defaultAgentProviderDescriptor]),
+    discoverCreatableAgentProviders:
+      overrides.discoverCreatableAgentProviders ??
+      vi.fn(async (): Promise<readonly CreatableAgentProviderSnapshot[]> => [
         {
-          capabilities: {
-            activityTracking: false,
-            cleancodeMcp: 'required',
-            launchInstructions: true,
-            resume: true,
-            sessionIdentityCapture: true,
-            sessionRefCodec: true
+          availability: {
+            providerId: 'codex',
+            status: 'installed',
+            version: 'test'
           },
-          displayName: 'Codex',
-          id: 'codex'
+          descriptor: defaultAgentProviderDescriptor
         }
       ]),
     attachAgentSession:
