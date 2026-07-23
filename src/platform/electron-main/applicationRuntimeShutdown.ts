@@ -185,17 +185,6 @@ function logCleanupResults(
 
   for (const result of results) {
     if (result.outcome === 'success') {
-      safeLog(logger, 'info', {
-        correlationId,
-        details: {
-          cleanupStage: result.stage,
-          timedOut: false
-        },
-        durationMs: result.durationMs,
-        operation: 'disposeApplicationRuntime',
-        outcome: 'success',
-        scope: 'platform.lifecycle'
-      })
       continue
     }
 
@@ -244,7 +233,7 @@ function logCleanupResults(
 
 function safeLog(
   logger: Logger,
-  level: 'error' | 'info' | 'warn',
+  level: 'error' | 'warn',
   event: Omit<LogEvent, 'level' | 'timestamp'>
 ): void {
   try {

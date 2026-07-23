@@ -107,7 +107,7 @@ Run application 统一拥有终端能力环境。普通终端启动和 Agent for
 
 Provider Client 的全局普通终端输出投影只接收 block-owned terminal；agent-owned terminal 输出只进入其精确绑定的 view 和进程回调。表现层对找不到匹配运行身份的普通终端输出必须保持状态引用不变，不能把 Agent 全屏重绘暂存为普通终端启动输出，也不能触发画布节点重投影。
 
-应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Provider 处理，再让两个上下文 complete 并清除本地引用。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Provider release，也不证明全部 PTY 已物理退出。Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
+应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Provider 处理，再让两个上下文 complete 并清除本地引用。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Provider release，也不证明全部 PTY 已物理退出。Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Provider 或形成不可用告警；正常运行期的同类失败仍必须向外传播。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
 因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 

@@ -1,8 +1,10 @@
 import { vi } from 'vitest'
 
+import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 import type { TerminalProcessPort } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { RunRuntimeScopeValidationPort } from '../../../../src/contexts/run/application/ports/RunRuntimeScopeValidationPort'
+import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('terminal session service', () => {
   it('forwards output emitted before process startup returns', async () => {
@@ -169,6 +171,82 @@ describe('terminal session service', () => {
     await service.terminate(session.id)
 
     await expect(service.listWorkingDirectories([session.id])).resolves.toEqual([])
+  })
+
+  it('does not inspect terminal working directories after application shutdown begins', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const lifecycle = new RunLifecycleService()
+    const service = new TerminalSessionService(terminalProcessPort, undefined, lifecycle)
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    terminalProcessPort.workingDirectories.set(session.id, '/work/app-worktree/src')
+
+    await lifecycle.prepareApplicationShutdown()
+
+    await expect(service.listWorkingDirectories([session.id])).resolves.toEqual([])
+    expect(terminalProcessPort.readWorkingDirectoryCalls).toEqual([])
+  })
+
+  it('cancels an in-flight working directory query when application shutdown begins', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const lifecycle = new RunLifecycleService()
+    const service = new TerminalSessionService(terminalProcessPort, undefined, lifecycle)
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    let rejectRead: (error: unknown) => void = () => undefined
+    vi.spyOn(terminalProcessPort, 'readWorkingDirectory').mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject
+        })
+    )
+
+    const query = service.listWorkingDirectories([session.id])
+    await vi.waitFor(() =>
+      expect(terminalProcessPort.readWorkingDirectory).toHaveBeenCalledWith(session.id)
+    )
+    await lifecycle.prepareApplicationShutdown()
+    rejectRead(
+      createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', 'Terminal provider is unavailable.')
+    )
+
+    await expect(query).resolves.toEqual([])
+  })
+
+  it('preserves working directory failures while the terminal runtime is active', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const lifecycle = new RunLifecycleService()
+    const service = new TerminalSessionService(terminalProcessPort, undefined, lifecycle)
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      workspaceName: 'main',
+      workingDirectory: '/work/app',
+      shell: '/bin/sh',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+    const providerFailure = createExpectedAppError(
+      'TERMINAL_PROVIDER_UNAVAILABLE',
+      'Terminal provider is unavailable.'
+    )
+    vi.spyOn(terminalProcessPort, 'readWorkingDirectory').mockRejectedValue(providerFailure)
+
+    await expect(service.listWorkingDirectories([session.id])).rejects.toBe(providerFailure)
   })
 
   it('returns authoritative snapshots without forwarding stale actions after a session exits', async () => {
@@ -414,6 +492,7 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
   }> = []
   readonly stoppedSessionIds: string[] = []
   readonly workingDirectories = new Map<string, string>()
+  readonly readWorkingDirectoryCalls: string[] = []
   readonly starts: Parameters<TerminalProcessPort['start']>[0][] = []
   disposeAllCalls = 0
   deferStops = false
@@ -455,6 +534,7 @@ class RecordingTerminalProcessPort implements TerminalProcessPort {
   }
 
   async readWorkingDirectory(sessionId: string): Promise<string | null> {
+    this.readWorkingDirectoryCalls.push(sessionId)
     return this.workingDirectories.get(sessionId) ?? null
   }
 

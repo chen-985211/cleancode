@@ -498,21 +498,33 @@ export class TerminalSessionService {
   async listWorkingDirectories(
     sessionIds: readonly string[]
   ): Promise<TerminalWorkingDirectorySnapshot[]> {
+    if (this.isApplicationShuttingDown()) return []
     const workingDirectories: TerminalWorkingDirectorySnapshot[] = []
 
-    for (const sessionId of sessionIds) {
-      const session = this.sessions.get(sessionId)
+    try {
+      for (const sessionId of sessionIds) {
+        if (this.isApplicationShuttingDown()) return []
+        const session = this.sessions.get(sessionId)
 
-      if (!session || session.status !== 'running') continue
+        if (!session || session.status !== 'running') continue
 
-      const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(sessionId)
+        const workingDirectory = await this.terminalProcessPort.readWorkingDirectory(sessionId)
+        if (this.isApplicationShuttingDown()) return []
 
-      if (!workingDirectory) continue
+        if (!workingDirectory) continue
 
-      workingDirectories.push({ sessionId, workingDirectory })
+        workingDirectories.push({ sessionId, workingDirectory })
+      }
+    } catch (error) {
+      if (this.isApplicationShuttingDown()) return []
+      throw error
     }
 
     return workingDirectories
+  }
+
+  private isApplicationShuttingDown(): boolean {
+    return this.lifecycle?.getRuntimeAvailability().phase === 'shutting-down'
   }
 
   terminate(sessionId: string): Promise<TerminalSessionSnapshot | null> {

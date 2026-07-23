@@ -89,6 +89,8 @@
 - 终端 resize/write。
 - 工作区切换或窗口恢复过程中批量发生的终端 start/terminate。
 
+应用正常退出时，各清理阶段成功必须保持静默；只有阶段超时或失败才记录包含阶段、耗时和关联 ID 的 `warn` 或 `error`。
+
 工作区重挂载对已退出 session 产生的迟到 write/resize/interrupt 属于可收敛生命周期竞态，应由 Run 幂等返回权威快照，不记录 `TERMINAL_SESSION_NOT_RUNNING` 警告。renderer 终止一个已经不存在的旧 session 同样属于已完成的幂等清理，不记录 `TERMINAL_SESSION_NOT_FOUND` 警告。受管服务监听关闭失败则必须以 `run.service-port`、`SERVICE_PORT_CLEANUP_FAILED` 和精确运行身份记录结构化清理失败。
 
 ## 错误码

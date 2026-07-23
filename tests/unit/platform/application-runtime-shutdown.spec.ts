@@ -231,17 +231,7 @@ describe('application runtime shutdown', () => {
         ...logger.warn.mock.calls,
         ...logger.error.mock.calls
       ].map(([event]) => event.details?.cleanupStage)
-      expect(new Set(loggedStages)).toEqual(
-        new Set([
-          'run-lifecycle',
-          'terminal-views',
-          'agent-sessions-prepare',
-          'terminal-workflows-prepare',
-          'terminal-sessions',
-          'agent-sessions-complete',
-          'terminal-workflows-complete'
-        ])
-      )
+      expect(new Set(loggedStages)).toEqual(new Set(['run-lifecycle', 'terminal-sessions']))
       expect(completeAgentSessions).toHaveBeenCalledOnce()
       expect(completeTerminalWorkflows).toHaveBeenCalledOnce()
       expect(vi.getTimerCount()).toBe(0)
@@ -250,7 +240,7 @@ describe('application runtime shutdown', () => {
     }
   })
 
-  it('reuses one shutdown promise when the coordinator is asked to dispose repeatedly', async () => {
+  it('reuses one shutdown promise and keeps a successful shutdown silent', async () => {
     const logger = createRecordingLogger()
     const disposeRunLifecycle = vi.fn(async () => undefined)
     const disposeTerminalViews = vi.fn(async () => undefined)
@@ -283,18 +273,10 @@ describe('application runtime shutdown', () => {
     expect(completeTerminalWorkflows).toHaveBeenCalledOnce()
     expect(completeAgentSessions).toHaveBeenCalledOnce()
 
-    const successEvents = logger.info.mock.calls.map(([event]) => event)
-    expect(successEvents).toHaveLength(7)
-    expect(successEvents).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          details: expect.objectContaining({ cleanupStage: 'terminal-sessions', timedOut: false }),
-          durationMs: expect.any(Number),
-          operation: 'disposeApplicationRuntime',
-          outcome: 'success'
-        })
-      ])
-    )
+    expect(logger.debug).not.toHaveBeenCalled()
+    expect(logger.info).not.toHaveBeenCalled()
+    expect(logger.warn).not.toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
   })
 })
 
