@@ -1,14 +1,19 @@
 import { readFile } from 'node:fs/promises'
 
 import { AgentLaunchArtifactScope } from '../../../../src/contexts/agent/application/services/AgentLaunchArtifactScope'
+import { AgentProviderRegistry } from '../../../../src/contexts/agent/application/services/AgentProviderRegistry'
 import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { ClaudeCodeHookReporter } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeHookReporter'
+import { HermesAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
 import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { OpenClawAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/openclaw/OpenClawAgentProviderContribution'
+import { PiAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
 import { openCodeProviderIcon } from '../../../../src/contexts/agent/infrastructure/providers/shared/AgentProviderBrandIcons'
 import {
   createAgentProviderCliProcessInvocation,
   NodeAgentProviderCliDetector
 } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCliDetector'
+import { NodeAgentProviderCommandDetector } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCommandDetector'
 
 const launchArtifactScopes: AgentLaunchArtifactScope[] = []
 
@@ -91,6 +96,88 @@ describe('additional Agent Provider contributions', () => {
     expect(script).toContain('CLEANCODE_PROVIDER_CLI_NOT_FOUND')
     expect(script).not.toContain(executable)
     expect(script).not.toContain(argument)
+  })
+
+  it('detects baseline terminal Providers without executing their CLI', async () => {
+    const installed = new NodeAgentProviderCommandDetector({
+      executable: 'pi',
+      findExecutable: async () => '/opt/homebrew/bin/pi',
+      installCommand: 'install pi',
+      providerId: 'pi'
+    })
+    const missing = new NodeAgentProviderCommandDetector({
+      executable: 'hermes',
+      findExecutable: async () => null,
+      installCommand: 'install hermes',
+      providerId: 'hermes'
+    })
+
+    await expect(installed.inspect()).resolves.toEqual({
+      providerId: 'pi',
+      status: 'installed',
+      version: 'available'
+    })
+    await expect(missing.inspect()).resolves.toEqual({
+      installCommand: 'install hermes',
+      providerId: 'hermes',
+      reason: 'not_found',
+      status: 'missing',
+      version: null
+    })
+  })
+
+  it.each([
+    [PiAgentProviderContribution, 'pi', 'Pi', 'pi', []],
+    [HermesAgentProviderContribution, 'hermes', 'Hermes', 'hermes', ['--tui']],
+    [OpenClawAgentProviderContribution, 'openclaw', 'OpenClaw', 'openclaw', []]
+  ] as const)(
+    'adds %s as a baseline terminal Provider',
+    async (Contribution, providerId, displayName, executable, args) => {
+      const contribution = new Contribution({
+        detector: createInstalledDetector(providerId)
+      })
+      const artifacts = createLaunchArtifactScope()
+      const plan = await contribution.launcher.createLaunchPlan({
+        artifacts,
+        onProviderSessionIdentified: vi.fn(),
+        workspaceDirectory: '/repo/worktree'
+      })
+      artifacts.seal()
+
+      expect(contribution.descriptor).toMatchObject({
+        capabilities: {
+          activityTracking: false,
+          cleancodeMcp: 'unsupported',
+          launchInstructions: false,
+          resume: false,
+          sessionIdentityCapture: false,
+          sessionRefCodec: false
+        },
+        displayName,
+        id: providerId
+      })
+      expect(
+        'paths' in contribution.descriptor.icon
+          ? contribution.descriptor.icon.paths.length > 0
+          : contribution.descriptor.icon.imageDataUrl.startsWith('data:image/png;base64,')
+      ).toBe(true)
+      expect(plan).toMatchObject({
+        args,
+        executable
+      })
+      expect(plan.env.ELECTRON_RUN_AS_NODE).toBe('1')
+      await artifacts.dispose()
+    }
+  )
+
+  it('registers Pi, Hermes, and OpenClaw without optional capability contributions', () => {
+    const registry = new AgentProviderRegistry([
+      new PiAgentProviderContribution({ detector: createInstalledDetector('pi') }),
+      new HermesAgentProviderContribution({ detector: createInstalledDetector('hermes') }),
+      new OpenClawAgentProviderContribution({ detector: createInstalledDetector('openclaw') })
+    ])
+
+    expect(registry.listDescriptors().map(({ id }) => id)).toEqual(['pi', 'hermes', 'openclaw'])
   })
 
   it('waits for a durable Claude Code hook before publishing resumable identity', async () => {
@@ -284,6 +371,7 @@ describe('additional Agent Provider contributions', () => {
           sessionRefCodec: true
         },
         displayName: 'OpenCode',
+        documentationUrl: 'https://opencode.ai/docs/cli/',
         icon: openCodeProviderIcon,
         id: 'opencode'
       })

@@ -41,6 +41,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('app shell create Agent focus', () => {
   beforeEach(() => {
     reactFlowSpies.setCenter.mockClear()
+    window.localStorage.clear()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -48,7 +49,7 @@ describe('app shell create Agent focus', () => {
     })
   })
 
-  it('focuses the Agent returned by creation before its flow node has rendered', async () => {
+  it('creates with the default Provider immediately and focuses the returned Agent', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const firstAgent = createAgent('agent-1', workbench.project.id, {
       position: { x: 320, y: 140 },
@@ -73,8 +74,9 @@ describe('app shell create Agent focus', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
 
     await waitFor(() =>
       expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(1_260, 470, {
@@ -85,9 +87,10 @@ describe('app shell create Agent focus', () => {
     expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
       expect.objectContaining({ providerId: 'codex' })
     )
+    expect(window.confirm).not.toHaveBeenCalled()
   })
 
-  it('creates a new Agent only after selecting one of multiple registered Providers', async () => {
+  it('changes the default from the arrow menu without creating until the main segment is used', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({
       discoverCreatableAgentProviders: vi.fn(async () => [
@@ -115,22 +118,24 @@ describe('app shell create Agent focus', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-
-    expect(await screen.findByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    const menuButton = screen.getByRole('button', { name: '选择默认 Agent' })
+    await waitFor(() => expect(menuButton).toBeEnabled())
+    fireEvent.click(menuButton)
     expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: /Claude Code/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Claude Code' }))
+    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
+    fireEvent.click(createButton)
 
     await waitFor(() =>
       expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
         expect.objectContaining({ providerId: 'claude-code' })
       )
     )
-    expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
   })
 
-  it('does not flash the registered catalog before creatable Provider discovery completes', async () => {
+  it('keeps both split-button segments disabled until creatable Provider discovery completes', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     let resolveDiscovery: (
       providers: readonly ReturnType<typeof createCreatableProvider>[]
@@ -155,23 +160,24 @@ describe('app shell create Agent focus', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-
-    expect(await screen.findByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
-    expect(screen.getByText('正在检测可用 Agent…')).toBeVisible()
-    expect(screen.queryByRole('button', { name: /Codex/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Claude Code/ })).not.toBeInTheDocument()
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    const menuButton = screen.getByRole('button', { name: '选择默认 Agent' })
+    expect(createButton).toBeDisabled()
+    expect(menuButton).toBeDisabled()
+    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
 
     await act(async () => {
       resolveDiscovery([createCreatableProvider('codex', 'Codex', true)])
       await discovery
     })
 
-    expect(await screen.findByRole('button', { name: /Codex/ })).toBeVisible()
-    expect(screen.queryByRole('button', { name: /Claude Code/ })).not.toBeInTheDocument()
+    await waitFor(() => expect(menuButton).toBeEnabled())
+    fireEvent.click(menuButton)
+    expect(screen.getByRole('menuitemradio', { name: 'Codex' })).toBeVisible()
+    expect(screen.queryByRole('menuitemradio', { name: 'Claude Code' })).not.toBeInTheDocument()
   })
 
-  it('shows a retryable empty state without creating an Agent when no CLI is available', async () => {
+  it('opens Agent settings without creating when no CLI is available', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const discoverCreatableAgentProviders = vi.fn(async () => [])
     const runtimeApi = createRuntimeApi({
@@ -185,17 +191,16 @@ describe('app shell create Agent focus', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
 
-    expect(await screen.findByText('未检测到可用的 Agent CLI')).toBeVisible()
-    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: '重新检测' }))
-    await waitFor(() => expect(discoverCreatableAgentProviders).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('dialog', { name: '设置' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Agent' })).toBeVisible()
     expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
   })
 
-  it('keeps the picker open and retries after Agent discovery fails', async () => {
+  it('can retry discovery from Agent settings and then create directly', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const discoverCreatableAgentProviders = vi
       .fn()
@@ -212,18 +217,26 @@ describe('app shell create Agent focus', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('检测可用 Agent 失败')
-    expect(screen.getByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
-
+    expect(await screen.findByRole('heading', { name: 'Agent' })).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: '重新检测' }))
+    await waitFor(() => expect(discoverCreatableAgentProviders).toHaveBeenCalledTimes(2))
+    fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
 
-    expect(await screen.findByRole('button', { name: /Codex/ })).toBeVisible()
+    await waitFor(() =>
+      expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ providerId: 'codex' })
+      )
+    )
     expect(discoverCreatableAgentProviders).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps the picker open after creation fails and allows retrying the same Provider', async () => {
+  it('reports creation failure without reopening Provider selection and allows retry', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const createdAgent = createAgent('agent-1', workbench.project.id, {
       position: { x: 320, y: 140 },
@@ -244,20 +257,29 @@ describe('app shell create Agent focus', () => {
       value: runtimeApi
     })
 
-    render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('创建 Agent 失败')
-    expect(screen.getByRole('dialog', { name: '选择 Agent Provider' })).toBeVisible()
-
-    fireEvent.click(screen.getByRole('button', { name: /Codex/ }))
+    const notify = vi.fn(() => 'notification-1')
+    render(
+      <AppShell
+        notifications={{
+          dismiss: vi.fn(),
+          notify,
+          update: vi.fn(() => true)
+        }}
+      />
+    )
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'error', title: '无法创建 Agent' })
+      )
+    )
+    expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
+    fireEvent.click(createButton)
 
     await waitFor(() => expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledTimes(2))
-    const [firstCommand, repeatedCommand] = runtimeApi.createWorkspaceAgent.mock.calls.map(
-      ([command]) => command
-    )
-    expect(repeatedCommand.agentId).toBe(firstCommand.agentId)
+    const firstCommand = runtimeApi.createWorkspaceAgent.mock.calls[0]![0]
     const currentWorkspace = workbench.project.workspaces[0]!
     expect(firstCommand).toEqual({
       agentId: expect.any(String),
@@ -268,7 +290,6 @@ describe('app shell create Agent focus', () => {
       workspaceDirectory: currentWorkspace.directory,
       workspaceName: currentWorkspace.name
     })
-    expect(screen.queryByRole('dialog', { name: '选择 Agent Provider' })).not.toBeInTheDocument()
   })
 
   it('ignores a creation result that arrives after switching workspaces', async () => {
@@ -328,8 +349,9 @@ describe('app shell create Agent focus', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Codex/ }))
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
 
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
     fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/agent 独立工作区' }))

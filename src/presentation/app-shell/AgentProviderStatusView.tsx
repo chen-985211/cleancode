@@ -202,7 +202,7 @@ function InstallCliNotice({
   const [isCopied, setIsCopied] = useState(false)
   const copyInstallCommand = async (): Promise<void> => {
     try {
-      if (!navigator.clipboard) return
+      if (!navigator.clipboard || !availability.installCommand) return
       await navigator.clipboard.writeText(availability.installCommand)
       setIsCopied(true)
     } catch {
@@ -215,15 +215,17 @@ function InstallCliNotice({
       <span>{label ?? t('provider.missing', { provider: providerName })}</span>
       <span className="agent-runtime-notice__actions">
         <RetryInspectionButton onRetry={onRetry} providerName={providerName} />
-        <button
-          type="button"
-          aria-expanded={isHelpVisible}
-          onClick={() => setIsHelpVisible((visible) => !visible)}
-        >
-          {t('provider.installHelp')}
-        </button>
+        {availability.installCommand ? (
+          <button
+            type="button"
+            aria-expanded={isHelpVisible}
+            onClick={() => setIsHelpVisible((visible) => !visible)}
+          >
+            {t('provider.installHelp')}
+          </button>
+        ) : null}
       </span>
-      {isHelpVisible ? (
+      {isHelpVisible && availability.installCommand ? (
         <span className="agent-runtime-notice__install-help">
           <code>{availability.installCommand}</code>
           <button

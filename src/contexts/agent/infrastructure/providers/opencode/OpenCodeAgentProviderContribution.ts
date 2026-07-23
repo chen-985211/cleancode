@@ -50,6 +50,7 @@ export class OpenCodeAgentProviderContribution implements AgentProviderContribut
       sessionRefCodec: true
     },
     displayName: 'OpenCode',
+    documentationUrl: 'https://opencode.ai/docs/cli/',
     icon: openCodeProviderIcon,
     id: 'opencode'
   } as const

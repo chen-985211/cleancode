@@ -83,9 +83,7 @@ describe('workspace Agents e2e', () => {
       expect(await agentTerminal.getAttribute('data-agent-terminal-source-theme')).toBe('light')
 
       const viewportBeforeCreatingAgent = await readCanvasViewportTransform(page)
-      page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('button', { name: '新建 Agent' }).click()
-      await selectAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 2)
       await page.waitForFunction((previousViewport) => {
         const viewport = document.querySelector('.react-flow__viewport')
@@ -323,9 +321,7 @@ describe('workspace Agents e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
-      page.once('dialog', (dialog) => dialog.accept())
       await page.getByRole('button', { name: '新建 Agent' }).click()
-      await selectAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 2)
       await waitForAgentTerminals(page, 2)
       await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
@@ -543,12 +539,6 @@ async function waitForTerminalDomText(terminal: Locator, text: string): Promise<
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
-}
-
-async function selectAgentProvider(page: Page, providerName: string): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: '选择 Agent Provider' })
-  await dialog.waitFor()
-  await dialog.getByRole('button', { name: new RegExp(`^${providerName} ·`) }).click()
 }
 
 async function waitForPersistedAgent(page: Page): Promise<void> {

@@ -1,0 +1,158 @@
+.agent-settings-pane {
+  width: min(100%, 800px);
+}
+
+.agent-settings-pane__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 22px;
+}
+
+.agent-settings-pane__header h2,
+.agent-settings-pane__header p {
+  margin: 0;
+}
+
+.agent-settings-pane__header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.agent-settings-pane__header p {
+  margin-top: 8px;
+  color: var(--cc-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.agent-settings-refresh,
+.agent-settings-default,
+.agent-settings-row__actions a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  background: var(--cc-surface);
+  padding: 0 9px;
+  color: var(--cc-muted-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 620;
+  text-decoration: none;
+}
+
+.agent-settings-refresh:hover:not(:disabled),
+.agent-settings-default:hover:not(:disabled),
+.agent-settings-row__actions a:hover {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-hover);
+  color: var(--cc-foreground);
+}
+
+.agent-settings-list {
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  background: var(--cc-surface);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.agent-settings-row {
+  display: grid;
+  min-height: 62px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.agent-settings-row + .agent-settings-row {
+  border-top: 1px solid var(--cc-divider);
+}
+
+.agent-settings-row[data-default='true'] {
+  background: var(--cc-primary-wash);
+}
+
+.agent-settings-row__icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface-subtle);
+  color: var(--cc-muted-strong);
+}
+
+.agent-settings-row__icon .agent-provider-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.agent-settings-row__identity {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.agent-settings-row__identity strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-settings-row__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cc-muted);
+  font-size: 11px;
+}
+
+.agent-settings-row__status[data-installed='true'] {
+  color: var(--cc-success-strong);
+}
+
+.agent-settings-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.agent-settings-default[aria-pressed='true'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--cc-primary);
+  opacity: 1;
+}
+
+.agent-settings-state {
+  display: flex;
+  min-height: 160px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  color: var(--cc-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .agent-settings-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .agent-settings-row__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

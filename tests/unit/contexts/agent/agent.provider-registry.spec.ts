@@ -5,7 +5,10 @@ import type {
 } from '../../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { ClaudeCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
+import { HermesAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
+import { OpenClawAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/openclaw/OpenClawAgentProviderContribution'
 import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { PiAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
 
 describe('Agent Provider registry', () => {
   it('lists descriptors and resolves a contribution without Provider branches', async () => {
@@ -37,12 +40,22 @@ describe('Agent Provider registry', () => {
     const registry = new AgentProviderRegistry([
       new CodexAgentProviderContribution(),
       new ClaudeCodeAgentProviderContribution(),
+      new PiAgentProviderContribution(),
+      new HermesAgentProviderContribution(),
+      new OpenClawAgentProviderContribution(),
       new OpenCodeAgentProviderContribution()
     ])
 
     expect(registry.listDescriptors().map(({ icon, id }) => ({ icon, id }))).toEqual([
       expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 24 24' }) }),
       expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 24 24' }) }),
+      expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 800 800' }) }),
+      expect.objectContaining({
+        icon: expect.objectContaining({ imageDataUrl: expect.stringMatching(/^data:image\/png/) })
+      }),
+      expect.objectContaining({
+        icon: expect.objectContaining({ imageDataUrl: expect.stringMatching(/^data:image\/png/) })
+      }),
       expect.objectContaining({ icon: expect.objectContaining({ viewBox: '0 0 512 512' }) })
     ])
     expect(() => structuredClone(registry.listDescriptors())).not.toThrow()
@@ -143,6 +156,8 @@ describe('Agent Provider registry', () => {
     ['invalid view box', { paths: [{ d: 'M2 2h20v20H2z' }], viewBox: '0 0 -24 24' }],
     ['raw SVG markup', { paths: [{ d: '<svg onload=alert(1) />' }], viewBox: '0 0 24 24' }],
     ['malformed path entry', { paths: [null], viewBox: '0 0 24 24' }],
+    ['remote raster URL', { imageDataUrl: 'https://example.com/icon.png', imageType: 'png' }],
+    ['malformed PNG data', { imageDataUrl: 'data:image/png;base64,not-a-png', imageType: 'png' }],
     [
       'unsafe path fill',
       {

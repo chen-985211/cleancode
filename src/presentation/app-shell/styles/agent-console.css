@@ -279,6 +279,11 @@
   flex: 0 0 auto;
 }
 
+img.agent-provider-icon {
+  border-radius: 2px;
+  object-fit: contain;
+}
+
 .agent-console__terminal-shell {
   display: flex;
   min-height: 0;

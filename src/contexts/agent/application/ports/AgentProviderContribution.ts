@@ -18,14 +18,22 @@ interface AgentProviderIconPath {
   readonly fillRule?: 'evenodd' | 'nonzero'
 }
 
-export interface AgentProviderIcon {
+interface AgentProviderVectorIcon {
   readonly paths: readonly AgentProviderIconPath[]
   readonly viewBox: string
 }
 
+interface AgentProviderRasterIcon {
+  readonly imageDataUrl: `data:image/png;base64,${string}`
+  readonly imageType: 'png'
+}
+
+export type AgentProviderIcon = AgentProviderVectorIcon | AgentProviderRasterIcon
+
 export interface AgentProviderDescriptor {
   readonly capabilities: AgentProviderCapabilities
   readonly displayName: string
+  readonly documentationUrl?: string
   readonly icon: AgentProviderIcon
   readonly id: string
 }
@@ -44,7 +52,7 @@ export type AgentProviderAvailability =
       readonly version: string
     }
   | {
-      readonly installCommand: string
+      readonly installCommand?: string
       readonly providerId: string
       readonly reason: 'not_found'
       readonly status: 'missing'

@@ -19,7 +19,8 @@
 @import './styles/terminal-service-runtime.css';
 @import './styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';
-@import './styles/agent-provider-picker.css';
+@import './styles/agent-create.css';
+@import './styles/agent-settings.css';
 @import './styles/agent-tool-approval.css';
 @import './styles/agent-tool-approval-connection.css';
 @import './styles/agent-mcp-capability.css';

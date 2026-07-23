@@ -10,7 +10,7 @@ import {
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
 
-const futureProvider: AgentProviderDescriptor = {
+const futureProvider = {
   capabilities: {
     activityTracking: false,
     cleancodeMcp: 'unsupported',
@@ -25,7 +25,7 @@ const futureProvider: AgentProviderDescriptor = {
     viewBox: '0 0 24 24'
   },
   id: 'fixture-provider'
-}
+} as const satisfies AgentProviderDescriptor
 
 describe('Agent console provider-neutral presentation', () => {
   afterEach(() => Reflect.deleteProperty(window, 'cleancode'))

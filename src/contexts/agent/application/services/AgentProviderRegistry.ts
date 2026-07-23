@@ -92,7 +92,22 @@ function validateContribution(contribution: AgentProviderContribution): void {
 }
 
 function isValidProviderIcon(icon: AgentProviderDescriptor['icon'] | undefined): boolean {
-  if (!icon || typeof icon !== 'object' || typeof icon.viewBox !== 'string') return false
+  if (!icon || typeof icon !== 'object') return false
+  if ('imageDataUrl' in icon) {
+    const prefix = 'data:image/png;base64,'
+    const imageDataUrl = icon.imageDataUrl
+    const payload = typeof imageDataUrl === 'string' ? imageDataUrl.slice(prefix.length) : ''
+    return (
+      icon.imageType === 'png' &&
+      typeof imageDataUrl === 'string' &&
+      imageDataUrl.startsWith(`${prefix}iVBORw0KGgo`) &&
+      payload.length >= 16 &&
+      payload.length <= 65_536 &&
+      payload.length % 4 === 0 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(payload)
+    )
+  }
+  if (typeof icon.viewBox !== 'string') return false
   const viewBox = icon.viewBox
     .trim()
     .split(/[\s,]+/)

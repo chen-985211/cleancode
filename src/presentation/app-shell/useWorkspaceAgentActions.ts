@@ -1,25 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 
-import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { useI18n } from './i18n/useI18n'
+import type { NotifyApp } from './appNotifications'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
-
-export interface AgentProviderPickerState {
-  readonly agentId: string
-  readonly error: 'creation' | 'discovery' | null
-  readonly pendingProviderId: string | null
-  readonly providers: readonly CreatableAgentProviderSnapshot[] | null
-}
 
 export function useWorkspaceAgentActions({
   currentWorkbench,
   currentWorkspace,
+  defaultProviderId,
   layoutCommitQueue,
+  notify,
+  onConfigureAgentProviders,
   onWorkspaceAgentCreated,
   setCurrentWorkbench,
   setSelectedAgentId,
@@ -27,19 +23,19 @@ export function useWorkspaceAgentActions({
 }: {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly defaultProviderId: string | null
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
+  readonly notify: NotifyApp
+  readonly onConfigureAgentProviders: () => void
   readonly onWorkspaceAgentCreated: (agent: WorkspaceAgentSnapshot) => void
   readonly setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
 }) {
   const { t } = useI18n()
-  const [agentProviderPicker, setAgentProviderPicker] = useState<AgentProviderPickerState | null>(
-    null
-  )
-  const providerRequestGenerationRef = useRef(0)
-  const providerDiscoveryPendingRef = useRef(false)
-  const creationIntentIdRef = useRef<string | null>(null)
+  const [isCreatingAgent, setIsCreatingAgent] = useState(false)
+  const creationGenerationRef = useRef(0)
+  const warnedWorkspaceScopesRef = useRef(new Set<string>())
   const workspaceScopeKey =
     currentWorkbench && currentWorkspace
       ? `${currentWorkbench.project.id}\0${currentWorkspace.name}`
@@ -48,10 +44,8 @@ export function useWorkspaceAgentActions({
   workspaceScopeKeyRef.current = workspaceScopeKey
 
   useEffect(() => {
-    providerRequestGenerationRef.current += 1
-    providerDiscoveryPendingRef.current = false
-    creationIntentIdRef.current = null
-    setAgentProviderPicker(null)
+    creationGenerationRef.current += 1
+    setIsCreatingAgent(false)
   }, [workspaceScopeKey])
 
   const setWorkspaceAgents = useCallback(
@@ -70,144 +64,78 @@ export function useWorkspaceAgentActions({
     [setCurrentWorkbench, setSelectedAgentId, setWorkbenches]
   )
 
-  const createWorkspaceAgentWithProvider = useCallback(
-    async (providerId: string): Promise<WorkspaceAgentSnapshot | null> => {
-      const agentId = creationIntentIdRef.current
-      if (!currentWorkbench || !currentWorkspace || !agentId) return null
-      return (
+  const createWorkspaceAgent = useCallback(async () => {
+    if (!currentWorkbench || !currentWorkspace || isCreatingAgent) return
+    if (!defaultProviderId) {
+      onConfigureAgentProviders()
+      return
+    }
+    const generation = ++creationGenerationRef.current
+    const scopeKey = workspaceScopeKey
+    setIsCreatingAgent(true)
+    if (
+      (currentWorkbench.agents?.length ?? 0) > 0 &&
+      scopeKey &&
+      !warnedWorkspaceScopesRef.current.has(scopeKey)
+    ) {
+      warnedWorkspaceScopesRef.current.add(scopeKey)
+      notify({
+        autoDismissMs: 6_000,
+        kind: 'info',
+        message: t('agent.multipleNotice'),
+        title: t('agent.multipleNoticeTitle')
+      })
+    }
+    try {
+      const created =
         (await window.cleancode?.createWorkspaceAgent({
-          agentId,
+          agentId: createAgentId(),
           gitBranch: currentWorkspace.gitBranch,
           projectDirectory: currentWorkbench.project.directory,
           projectId: currentWorkbench.project.id,
-          providerId,
+          providerId: defaultProviderId,
           workspaceDirectory: currentWorkspace.directory,
           workspaceName: currentWorkspace.name
         })) ?? null
+      if (
+        generation !== creationGenerationRef.current ||
+        workspaceScopeKeyRef.current !== scopeKey
+      ) {
+        return
+      }
+      if (!created) throw new Error('Agent creation returned no snapshot.')
+      updateWorkspaceAgentState(setCurrentWorkbench, created)
+      setWorkbenches((entries) =>
+        entries.map((workbench) => updateWorkbenchAgent(workbench, created))
       )
-    },
-    [currentWorkbench, currentWorkspace]
-  )
-
-  const discoverAgentProviders = useCallback(async () => {
-    if (providerDiscoveryPendingRef.current) return
-    const discoverProviders = window.cleancode?.discoverCreatableAgentProviders
-    const generation = ++providerRequestGenerationRef.current
-    providerDiscoveryPendingRef.current = true
-    const agentId = creationIntentIdRef.current ?? createAgentId()
-    creationIntentIdRef.current = agentId
-    setAgentProviderPicker({
-      agentId,
-      error: null,
-      pendingProviderId: null,
-      providers: null
-    })
-    if (!discoverProviders) {
-      providerDiscoveryPendingRef.current = false
-      setAgentProviderPicker({
-        agentId,
-        error: 'discovery',
-        pendingProviderId: null,
-        providers: []
-      })
-      return
-    }
-
-    try {
-      const providers = await discoverProviders({ refresh: true })
-      if (providerRequestGenerationRef.current !== generation) return
-      setAgentProviderPicker({
-        agentId,
-        error: null,
-        pendingProviderId: null,
-        providers
-      })
+      onWorkspaceAgentCreated(created)
     } catch {
-      if (providerRequestGenerationRef.current !== generation) return
-      setAgentProviderPicker({
-        agentId,
-        error: 'discovery',
-        pendingProviderId: null,
-        providers: []
-      })
+      if (
+        generation === creationGenerationRef.current &&
+        workspaceScopeKeyRef.current === scopeKey
+      ) {
+        notify({
+          kind: 'error',
+          message: t('agent.creationFailedDescription'),
+          title: t('agent.creationFailed')
+        })
+      }
     } finally {
-      if (providerRequestGenerationRef.current === generation) {
-        providerDiscoveryPendingRef.current = false
-      }
+      if (generation === creationGenerationRef.current) setIsCreatingAgent(false)
     }
-  }, [])
-
-  const createWorkspaceAgent = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || agentProviderPicker) return
-    const agents = currentWorkbench.agents ?? []
-    if (agents.length > 0 && !window.confirm(t('agent.multipleWarning'))) return
-    creationIntentIdRef.current = createAgentId()
-    await discoverAgentProviders()
-  }, [agentProviderPicker, currentWorkbench, currentWorkspace, discoverAgentProviders, t])
-
-  const selectAgentProvider = useCallback(
-    async (providerId: string) => {
-      if (!agentProviderPicker || agentProviderPicker.pendingProviderId) return
-      const generation = providerRequestGenerationRef.current
-      const scopeKey = workspaceScopeKey
-      setAgentProviderPicker({
-        ...agentProviderPicker,
-        error: null,
-        pendingProviderId: providerId
-      })
-      try {
-        const created = await createWorkspaceAgentWithProvider(providerId)
-        if (
-          providerRequestGenerationRef.current !== generation ||
-          workspaceScopeKeyRef.current !== scopeKey
-        ) {
-          return
-        }
-        if (created) {
-          updateWorkspaceAgentState(setCurrentWorkbench, created)
-          setWorkbenches((entries) =>
-            entries.map((workbench) => updateWorkbenchAgent(workbench, created))
-          )
-          onWorkspaceAgentCreated(created)
-          setAgentProviderPicker(null)
-          creationIntentIdRef.current = null
-          return
-        }
-        setAgentProviderPicker({
-          ...agentProviderPicker,
-          error: 'creation',
-          pendingProviderId: null
-        })
-      } catch {
-        if (
-          providerRequestGenerationRef.current !== generation ||
-          workspaceScopeKeyRef.current !== scopeKey
-        ) {
-          return
-        }
-        setAgentProviderPicker({
-          ...agentProviderPicker,
-          error: 'creation',
-          pendingProviderId: null
-        })
-      }
-    },
-    [
-      agentProviderPicker,
-      createWorkspaceAgentWithProvider,
-      onWorkspaceAgentCreated,
-      setCurrentWorkbench,
-      setWorkbenches,
-      workspaceScopeKey
-    ]
-  )
-
-  const cancelAgentProviderSelection = useCallback(() => {
-    providerRequestGenerationRef.current += 1
-    providerDiscoveryPendingRef.current = false
-    creationIntentIdRef.current = null
-    setAgentProviderPicker(null)
-  }, [])
+  }, [
+    currentWorkbench,
+    currentWorkspace,
+    defaultProviderId,
+    isCreatingAgent,
+    notify,
+    onConfigureAgentProviders,
+    onWorkspaceAgentCreated,
+    setCurrentWorkbench,
+    setWorkbenches,
+    t,
+    workspaceScopeKey
+  ])
 
   const updateAgentInWorkspace = useCallback(
     (updated: WorkspaceAgentSnapshot): void => {
@@ -312,15 +240,12 @@ export function useWorkspaceAgentActions({
   )
 
   return {
-    agentProviderPicker,
-    cancelAgentProviderSelection,
     createWorkspaceAgent,
-    discoverAgentProviders,
+    isCreatingAgent,
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
     resizeWorkspaceAgent,
-    selectAgentProvider,
     updateWorkspaceAgentMcpCapability
   }
 }

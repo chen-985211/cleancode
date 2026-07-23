@@ -1,4 +1,4 @@
-import { ArrowLeft, Keyboard, RotateCcw, Settings, SquareTerminal, X } from 'lucide-react'
+import { ArrowLeft, Bot, Keyboard, RotateCcw, Settings, SquareTerminal, X } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -27,9 +27,14 @@ import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalSettingsPane } from './TerminalSettingsPane'
+import { AgentSettingsPane } from './AgentSettingsPane'
+
+export type ApplicationSettingsPane = 'agents' | 'shortcuts' | 'terminal'
 
 interface ApplicationSettingsRootProps {
   readonly bindings: ApplicationShortcutBindings
+  readonly defaultAgentProviderId?: string | null
+  readonly initialPane?: ApplicationSettingsPane
   readonly isOpen: boolean
   readonly platform: ShortcutPlatform
   readonly onBindingChange: (
@@ -38,6 +43,8 @@ interface ApplicationSettingsRootProps {
   ) => void
   readonly onClose: () => void
   readonly onOpen: () => void
+  readonly onAgentProviderChange?: (providerId: string) => void
+  readonly onAgentProvidersRefresh?: () => Promise<void> | void
   readonly onResetAll: () => void
   readonly terminalScrollbackRows: TerminalScrollbackRows
   readonly onTerminalScrollbackChange: (rows: TerminalScrollbackRows) => void
@@ -51,7 +58,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const dialogRef = useRef<HTMLElement | null>(null)
   const onCloseRef = useRef(props.onClose)
   const [recordingCommand, setRecordingCommand] = useState<ApplicationShortcutCommand | null>(null)
-  const [activePane, setActivePane] = useState<'shortcuts' | 'terminal'>('shortcuts')
+  const [selectedPane, setSelectedPane] = useState<ApplicationSettingsPane | null>(null)
+  const activePane = selectedPane ?? props.initialPane ?? 'shortcuts'
   const [captureError, setCaptureError] = useState<
     { readonly command: ApplicationShortcutCommand; readonly message: string } | undefined
   >()
@@ -59,6 +67,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const closeSettings = useCallback((): void => {
     setRecordingCommand(null)
     setCaptureError(undefined)
+    setSelectedPane(null)
     onCloseRef.current()
     triggerRef.current?.focus()
   }, [])
@@ -106,7 +115,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
           aria-expanded={props.isOpen}
           aria-haspopup="dialog"
           aria-label={t('settings.open')}
-          onClick={props.onOpen}
+          onClick={() => {
+            setSelectedPane(null)
+            props.onOpen()
+          }}
         >
           <Settings size={17} aria-hidden="true" />
         </button>
@@ -139,8 +151,16 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             <nav className="application-settings-navigation" aria-label={t('settings.navigation')}>
               <button
                 type="button"
+                aria-current={activePane === 'agents' ? 'page' : undefined}
+                onClick={() => setSelectedPane('agents')}
+              >
+                <Bot size={17} aria-hidden="true" />
+                <span>{t('settings.agents.title')}</span>
+              </button>
+              <button
+                type="button"
                 aria-current={activePane === 'shortcuts' ? 'page' : undefined}
-                onClick={() => setActivePane('shortcuts')}
+                onClick={() => setSelectedPane('shortcuts')}
               >
                 <Keyboard size={17} aria-hidden="true" />
                 <span>{t('settings.shortcuts.title')}</span>
@@ -148,14 +168,20 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               <button
                 type="button"
                 aria-current={activePane === 'terminal' ? 'page' : undefined}
-                onClick={() => setActivePane('terminal')}
+                onClick={() => setSelectedPane('terminal')}
               >
                 <SquareTerminal size={17} aria-hidden="true" />
                 <span>{t('settings.terminal.title')}</span>
               </button>
             </nav>
             <main className="application-settings-content">
-              {activePane === 'terminal' ? (
+              {activePane === 'agents' ? (
+                <AgentSettingsPane
+                  defaultProviderId={props.defaultAgentProviderId ?? null}
+                  onRefresh={props.onAgentProvidersRefresh ?? noop}
+                  onDefaultProviderChange={props.onAgentProviderChange ?? noop}
+                />
+              ) : activePane === 'terminal' ? (
                 <TerminalSettingsPane
                   scrollbackRows={props.terminalScrollbackRows}
                   onScrollbackChange={props.onTerminalScrollbackChange}
@@ -338,6 +364,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     setCaptureError(undefined)
   }
 }
+
+function noop(): void {}
 
 const applicationShortcutGroupMessageKeys = {
   application: 'settings.shortcuts.group.application',

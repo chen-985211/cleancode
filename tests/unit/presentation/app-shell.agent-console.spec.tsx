@@ -92,7 +92,6 @@ describe('app shell Agent console', () => {
     const first = createAgent('agent-1', 'Agent 1', baseWorkbench.project.id)
     const second = createAgent('agent-2', 'Agent 2', baseWorkbench.project.id, 680)
     const createWorkspaceAgent = vi.fn(async () => second)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi({
@@ -102,8 +101,9 @@ describe('app shell Agent console', () => {
     })
 
     render(<AppShell />)
-    fireEvent.click(await screen.findByRole('button', { name: '新建 Agent' }))
-    fireEvent.click(await screen.findByRole('button', { name: /^Codex ·/ }))
+    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await waitFor(() => expect(createButton).toBeEnabled())
+    fireEvent.click(createButton)
     await waitFor(() =>
       expect(document.querySelectorAll('[data-agent-console-node]')).toHaveLength(2)
     )

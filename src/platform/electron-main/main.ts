@@ -24,6 +24,9 @@ import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastru
 import { CodexAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
 import { ClaudeCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/claude-code/ClaudeCodeAgentProviderContribution'
 import { OpenCodeAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
+import { HermesAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/hermes/HermesAgentProviderContribution'
+import { OpenClawAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/openclaw/OpenClawAgentProviderContribution'
+import { PiAgentProviderContribution } from '../../contexts/agent/infrastructure/providers/pi/PiAgentProviderContribution'
 import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
 import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
@@ -168,6 +171,9 @@ const defaultAgentProviderId = 'codex'
 const agentProviderRegistry = new AgentProviderRegistry([
   new CodexAgentProviderContribution(),
   new ClaudeCodeAgentProviderContribution(),
+  new PiAgentProviderContribution(),
+  new HermesAgentProviderContribution(),
+  new OpenClawAgentProviderContribution(),
   new OpenCodeAgentProviderContribution()
 ])
 const agentProviderAvailability = new AgentProviderAvailabilityService(

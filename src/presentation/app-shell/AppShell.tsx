@@ -43,7 +43,6 @@ import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
 import { AgentProviderStateProvider } from './AgentProviderStateProvider'
-import { AgentProviderPickerDialog } from './AgentProviderPickerDialog'
 import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -57,6 +56,10 @@ import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
+import { useCreatableAgentProviders } from './useCreatableAgentProviders'
+import { useAgentProviderPreference } from './useAgentProviderPreference'
+import { resolveEffectiveAgentProviderId } from './agentProviderPreference'
+import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -70,12 +73,18 @@ export function AppShell({
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(null)
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
-  const [isApplicationSettingsOpen, setIsApplicationSettingsOpen] = useState(false)
+  const applicationSettings = useApplicationSettingsNavigation()
   const [isProjectSidebarCollapsed, setIsProjectSidebarCollapsed] = useState(false)
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
+  const { changePreferredProvider, preferredProviderId } = useAgentProviderPreference()
+  const creatableAgentProviders = useCreatableAgentProviders()
+  const effectiveAgentProviderId = resolveEffectiveAgentProviderId(
+    preferredProviderId,
+    creatableAgentProviders.state.providers.map((provider) => provider.descriptor.id)
+  )
   const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -98,7 +107,6 @@ export function AppShell({
     setIsProjectSidebarCollapsed((collapsed) => !collapsed)
   }, [isProjectSidebarCollapsed])
   const revealProjectSidebar = useCallback((): void => setIsProjectSidebarCollapsed(false), [])
-  const openApplicationSettings = useCallback((): void => setIsApplicationSettingsOpen(true), [])
   const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
     useWorkbenchGraphIndex(currentWorkbench)
   const currentTerminalBlockIds = useMemo(() => graph?.blocks.map((block) => block.id), [graph])
@@ -198,20 +206,20 @@ export function AppShell({
     setCurrentWorkbench(workbench)
   }, [])
   const {
-    agentProviderPicker,
-    cancelAgentProviderSelection,
     createWorkspaceAgent,
-    discoverAgentProviders,
+    isCreatingAgent,
     moveWorkspaceAgent,
     removeWorkspaceAgent,
     renameWorkspaceAgent,
     resizeWorkspaceAgent,
-    selectAgentProvider,
     updateWorkspaceAgentMcpCapability
   } = useWorkspaceAgentActions({
     currentWorkbench,
     currentWorkspace,
+    defaultProviderId: effectiveAgentProviderId,
     layoutCommitQueue,
+    notify: notifications.notify,
+    onConfigureAgentProviders: applicationSettings.openAgents,
     onWorkspaceAgentCreated: focusAgentConsole,
     setCurrentWorkbench,
     setSelectedAgentId,
@@ -539,9 +547,9 @@ export function AppShell({
     hasWorkbench: Boolean(currentWorkbench),
     isDesktopRuntime,
     isGroupSelectionMode: isTerminalGroupSelectionMode,
-    isSettingsOpen: isApplicationSettingsOpen,
+    isSettingsOpen: applicationSettings.isOpen,
     navigateWorkspace: shortcutNavigation.navigateWorkspace,
-    openSettings: openApplicationSettings,
+    openSettings: applicationSettings.open,
     selectCanvasNode: shortcutNavigation.selectCanvasNode,
     toggleMinimap: shortcutNavigation.toggleMinimap,
     toggleSidebar: toggleProjectSidebar,
@@ -584,11 +592,15 @@ export function AppShell({
             <ThemeSettingsRoot />
             <ApplicationSettingsRoot
               bindings={bindings}
-              isOpen={isApplicationSettingsOpen}
+              defaultAgentProviderId={effectiveAgentProviderId}
+              initialPane={applicationSettings.initialPane}
+              isOpen={applicationSettings.isOpen}
               platform={shortcutPlatform}
               onBindingChange={changeBinding}
-              onClose={() => setIsApplicationSettingsOpen(false)}
-              onOpen={() => setIsApplicationSettingsOpen(true)}
+              onClose={applicationSettings.close}
+              onOpen={applicationSettings.open}
+              onAgentProviderChange={changePreferredProvider}
+              onAgentProvidersRefresh={() => creatableAgentProviders.refresh(true)}
               onResetAll={resetAllBindings}
               terminalScrollbackRows={terminalScrollbackRows}
               onTerminalScrollbackChange={changeTerminalScrollback}
@@ -635,7 +647,11 @@ export function AppShell({
           </div>
           <WorkbenchCanvas
             approvalIntents={agentToolApprovals.approvals}
+            agentProviders={creatableAgentProviders.state.providers}
+            defaultAgentProviderId={effectiveAgentProviderId}
             isDesktopRuntime={isDesktopRuntime}
+            isCreatingAgent={isCreatingAgent}
+            isAgentProviderDiscoveryPending={creatableAgentProviders.state.status === 'loading'}
             terminalRuntimeAvailability={terminalRuntimeAvailability}
             currentWorkbench={currentWorkbench}
             currentWorkspace={currentWorkspace}
@@ -653,6 +669,8 @@ export function AppShell({
             onFitCanvas={fitCanvas}
             onCreateTerminalBlock={createTerminalBlock}
             onCreateWorkspaceAgent={createWorkspaceAgent}
+            onOpenAgentSettings={applicationSettings.openAgents}
+            onSelectDefaultAgentProvider={changePreferredProvider}
             onBeginTerminalGroupSelection={beginTerminalGroupSelection}
             onCreateTerminalGroup={createTerminalGroup}
             onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
@@ -672,16 +690,6 @@ export function AppShell({
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}
             getMiniMapNodeClassName={minimapAppearance.getMiniMapNodeClassName}
           />
-          {agentProviderPicker ? (
-            <AgentProviderPickerDialog
-              error={agentProviderPicker.error}
-              pendingProviderId={agentProviderPicker.pendingProviderId}
-              providers={agentProviderPicker.providers}
-              onCancel={cancelAgentProviderSelection}
-              onRefresh={() => void discoverAgentProviders()}
-              onSelect={(providerId) => void selectAgentProvider(providerId)}
-            />
-          ) : null}
         </main>
       </TerminalSurfaceRegistryProvider>
     </AgentProviderStateProvider>

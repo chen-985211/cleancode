@@ -289,7 +289,7 @@ Electron 正常退出流程等待运行时清理的默认预算为 5 秒。该�
 
 ## Agent 控制台
 
-Agent 控制台是画布内的本地 Agent CLI 交互工作面。它采用节点式画布交互，但不是普通终端积木，也不属于终端组合。cleancode 复用终端技术底座，不复制标签页、Agent 切换器或其他 Orca 式信息架构。
+Agent 控制台是画布内的本地 Agent CLI 交互工作面。它采用节点式画布交互，但不是普通终端积木，也不属于终端组合。cleancode 复用终端技术底座，不引入标签页、Agent 切换器或其他不属于画布模型的信息架构。
 
 Agent 控制台必须：
 
@@ -307,9 +307,11 @@ Agent 控制台必须：
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
-“新建 Agent”每次都必须打开统一的检测选择器，不能因只有一个候选项而跳过选择。检测期间只显示中性的加载状态，不得先闪现静态注册目录；没有可创建 Provider 时显示明确空状态和重新检测入口。选择器打开时建立一次稳定创建意图，创建失败后的重试必须复用同一身份；用户取消或切换项目/工作区才废弃该意图。用户选择 Provider 后，系统必须在持久化前重新验证当前可用性和完整 Project 工作区作用域并阻止重复提交；Provider 在发现后变为不可用或创建发生其他错误时保留选择器和错误反馈，只有当前作用域成功创建才关闭。名称和初始布局由后端原子分配，旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+“新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 只修改后续创建使用的默认值，不在同一步创建 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
 
-Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、选择、状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 均提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。
+用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称和初始布局由后端原子分配，旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
+
+Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。Pi、Hermes 和 OpenClaw 当前只声明基础终端能力，不展示虚假的恢复、活动状态或 MCP 承诺。
 
 每个 Agent 必须拥有稳定身份、固定 Provider，以及独立的 Agent terminal、CLI launch、输入输出、审批、MCP 会话和分支对话绑定。移动、选择、重命名或调整大小不得重启 Agent terminal 或 Provider launch。
 
@@ -329,7 +331,7 @@ CleanCode MCP 开启时，用户未加限定地说“终端”“整理终端”
 
 Agent 控制台不得展示终端端口，不得加入终端组合，也不得进入普通终端积木的创建、删除、组合或批量运行流程。
 
-正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；创建 Agent 的 Provider 选择器可以展示 detector 返回的已安装版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，Codex 与 OpenCode 不得因虚构的版本门槛显示升级要求。新建选择器不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项。
+正常状态必须保持静默：Provider CLI 已安装且 launch 正常运行时，Agent 头部和运行区不得常驻展示“已安装”“已连接”、Provider 名称、版本号或同义状态卡；新建 Agent 的默认选择菜单同样不得展示 detector 版本。对于既有 Agent，短时间 CLI 检查不得闪现提示；检查持续较久时才显示中性反馈。首次未取得可用结果必须自动重试一次，只有连续确认找不到当前 Provider 可执行文件时才显示 Provider 对应的未安装和渐进安装帮助；超时、权限或其他命令异常必须显示为可重试的 `temporarily_unavailable`。只有 Provider 声明最低版本且已安装版本不足时才显示 `upgrade_required` 与最低版本；当前仅 Claude Code 声明 `2.1.119`，其他 Provider 不得因虚构的版本门槛显示升级要求。快捷菜单不得列出 `missing`、`upgrade_required` 或 `temporarily_unavailable` 项，这些状态只进入 Agent 设置和既有 Agent 的诊断反馈。
 
 每个 Provider 的 CLI 检查结果属于应用级共享的易失能力快照，不得由每个 Agent 重复维护。Agent 自身运行状态优先于该快照：运行中的 launch 必须保持静默，恢复失败、启动失败和会话结束不得被检查提示遮挡；旧检查结果不得覆盖较新的重试。
 

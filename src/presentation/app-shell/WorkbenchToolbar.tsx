@@ -1,10 +1,16 @@
-import { Bot, Box, Check, Terminal, X } from 'lucide-react'
+import { Box, Check, Terminal, X } from 'lucide-react'
+import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
+import { AgentCreateSplitButton } from './AgentCreateSplitButton'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 
 interface WorkbenchToolbarProps {
+  readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]
+  readonly defaultAgentProviderId?: string | null
   readonly isDesktopRuntime: boolean
+  readonly isCreatingAgent?: boolean
+  readonly isAgentProviderDiscoveryPending?: boolean
   readonly hasWorkbench: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalGroupCandidateCount: number
@@ -16,6 +22,8 @@ interface WorkbenchToolbarProps {
   >
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
+  readonly onOpenAgentSettings?: () => void
+  readonly onSelectDefaultAgentProvider?: (providerId: string) => void
   readonly onBeginTerminalGroupSelection: () => void
   readonly onCreateTerminalGroup: () => void
   readonly onCancelTerminalGroupSelection: () => void
@@ -89,18 +97,23 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
         role="group"
         aria-label={t('toolbar.agentTools')}
       >
-        <TooltipLabel content={props.shortcutTooltips.createAgent} side="bottom">
-          <button
-            className="toolbar-button"
-            type="button"
-            onClick={props.onCreateWorkspaceAgent}
-            disabled={!props.isDesktopRuntime || !props.hasWorkbench}
-          >
-            <Bot size={16} aria-hidden="true" />
-            {t('toolbar.newAgent')}
-          </button>
-        </TooltipLabel>
+        <AgentCreateSplitButton
+          defaultProviderId={props.defaultAgentProviderId ?? null}
+          disabled={
+            !props.isDesktopRuntime ||
+            !props.hasWorkbench ||
+            props.isAgentProviderDiscoveryPending === true
+          }
+          isCreating={props.isCreatingAgent ?? false}
+          providers={props.agentProviders ?? []}
+          shortcutTooltip={props.shortcutTooltips.createAgent}
+          onCreate={props.onCreateWorkspaceAgent}
+          onOpenAgentSettings={props.onOpenAgentSettings ?? noop}
+          onSelectDefault={props.onSelectDefaultAgentProvider ?? noop}
+        />
       </div>
     </div>
   )
 }
+
+function noop(): void {}

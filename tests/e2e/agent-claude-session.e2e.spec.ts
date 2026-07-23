@@ -64,9 +64,8 @@ describe('Claude Code Agent session e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
-      page.once('dialog', (dialog) => dialog.accept())
+      await selectDefaultAgentProvider(page, 'Claude Code')
       await page.getByRole('button', { name: '新建 Agent' }).click()
-      await selectAgentProvider(page, 'Claude Code')
       await waitForAgentCount(page, 2)
       const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
       await claudeIdentity.waitFor()
@@ -152,10 +151,9 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
   }, count)
 }
 
-async function selectAgentProvider(page: Page, providerName: string): Promise<void> {
-  const dialog = page.getByRole('dialog', { name: '选择 Agent Provider' })
-  await dialog.waitFor()
-  await dialog.getByRole('button', { name: new RegExp(`^${providerName} ·`) }).click()
+async function selectDefaultAgentProvider(page: Page, providerName: string): Promise<void> {
+  await page.getByRole('button', { name: '选择默认 Agent' }).click()
+  await page.getByRole('menuitemradio', { name: providerName, exact: true }).click()
 }
 
 async function waitForClaudeLaunch(

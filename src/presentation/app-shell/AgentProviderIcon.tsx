@@ -7,6 +7,19 @@ export function AgentProviderIcon({ icon }: { readonly icon: AgentProviderIconDe
     return <Bot aria-hidden="true" className="agent-provider-icon" />
   }
 
+  if ('imageDataUrl' in icon) {
+    return (
+      <img
+        alt=""
+        aria-hidden="true"
+        className="agent-provider-icon"
+        decoding="async"
+        draggable={false}
+        src={icon.imageDataUrl}
+      />
+    )
+  }
+
   return (
     <svg
       aria-hidden="true"

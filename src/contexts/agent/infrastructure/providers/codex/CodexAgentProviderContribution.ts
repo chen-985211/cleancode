@@ -55,6 +55,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
       sessionRefCodec: true
     },
     displayName: 'Codex',
+    documentationUrl: 'https://developers.openai.com/codex/cli/',
     icon: codexProviderIcon,
     id: 'codex'
   } as const

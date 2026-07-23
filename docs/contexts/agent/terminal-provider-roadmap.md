@@ -20,9 +20,9 @@
 
 以下方向已经由产品决策确认，后续阶段不得重新解释为其他产品模型：
 
-1. cleancode 只复用“Agent CLI 运行在终端之上”的技术底座，不复制 Orca 的标签页、Agent 切换或工作台产品结构。
+1. cleancode 只复用“Agent CLI 运行在终端之上”的技术底座，不引入标签页、Agent 切换或其他工作台产品结构。
 2. Agent 继续是 cleancode 画布中的稳定对象，不是普通终端积木，也不加入终端组合、端口治理或终端依赖工作流。
-3. 创建 Agent 时选择 Provider；Provider 是该 Agent 的不可变属性。需要使用另一个 Provider 时，新建另一个 Agent，不在既有 Agent 上切换 Provider。
+3. 新建 Agent 主动作使用应用级默认 Provider；用户通过相邻菜单或 Agent 设置修改后续创建使用的默认值。Provider 在 Agent 创建后仍是不可变属性；需要使用另一个 Provider 时，新建另一个 Agent，不在既有 Agent 上切换 Provider。
 4. 同一工作区可以同时存在多个相同或不同 Provider 的 Agent。每个 Agent 拥有独立终端、Agent CLI、输入输出、对话绑定、MCP 会话、审批和审计，但共享工作区目录。
 5. Agent CLI 是长期终端中的受管前台任务。Agent CLI 正常退出或被中断退出后，底层终端继续运行并回到可输入 shell。
 6. 没有终端文本选区时，`Ctrl+C` 必须以原始 `\x03` 输入交给当前前台程序；cleancode 不把它直接映射成关闭 Agent 或关闭终端。有选区时继续复制选中内容。
@@ -77,7 +77,7 @@ Run 当前已经具备可复用的技术基础：
 
 - 在已经创建的 Agent 上切换 Provider。
 - 把 Agent 改造成普通 TerminalBlock、加入终端组合或参与普通终端工作流。
-- 复制 Orca 的标签页、会话列表、Agent 切换器或其他产品信息架构。
+- 引入标签页、会话列表、Agent 切换器或其他不属于 cleancode 画布模型的产品信息架构。
 - 动态插件市场、第三方 Provider 包安装、签名、来源信任或卸载迁移。
 - 复制、解析或持久化 Provider 的对话正文。
 - 通过扫描历史目录、最近会话或终端输出猜测 Provider session ID。
@@ -424,7 +424,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 | 2    | Provider registry 与 Codex 封装 | 核心流程依赖通用 contribution，Codex 行为暂时不变                    | 已完成 |
 | 3    | Agent terminal 与前台任务       | Run 支持 agent owner、长期 shell 和可重复 Agent launch               | 实施中 |
 | 4    | Codex 迁移与行为对等            | Codex 使用 Run 终端底座，CLI 退出后终端继续运行                      | 实施中 |
-| 5    | 终端视图、IPC 与创建体验统一    | Agent 复用 Run 视图协议，创建时选择固定 Provider                     | 已完成 |
+| 5    | 终端视图、IPC 与创建体验统一    | Agent 复用 Run 视图协议，创建时固定使用当前默认 Provider             | 已完成 |
 | 6    | Claude Code 完整 Provider       | 同工作区可同时运行 Codex 与 Claude Code                              | 已完成 |
 | 7    | Provider 扩展契约稳定化         | OpenCode 完整 contribution 与后续最小 Provider contract 同时验证边界 | 实施中 |
 
@@ -436,7 +436,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - `AgentProviderRegistry` 只组合 descriptor、detector、launcher、session-ref codec、resume、telemetry 和 capability injector，并校验 capability 与实际 contribution 一致；通用 Agent service、IPC 和 UI 不按 Provider ID 分支。
 - Agent terminal 已成为 Run 的 `agent` owner，会话内的 Agent CLI 是可重复启动的 `ForegroundJob`。macOS/Linux 使用 POSIX 控制脚本，Windows 使用 ConPTY/PowerShell 控制脚本；CLI 退出只结束本次 launch，shell、终端模型和视图继续存在。
 - Agent Console 已删除独立 xterm registry、输出尾部缓存和原始输出 IPC，复用 Run 的 snapshot、sequence、attach/detach 与共享 xterm surface。
-- 创建 Agent 时从 registry 选择一次 Provider；既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
+- 创建 Agent 时从 registry 当前可用项解析默认 Provider；默认值只影响后续新建，既有 Agent 没有切换入口，主进程也拒绝与持久化 Provider 不一致的 attach。
 - Codex、Claude Code 和 OpenCode contribution 已注册。Codex 提供 thread 身份与恢复、`required` MCP 和 launch instructions，但不声明精确活动跟踪；Claude Code 提供首次用户输入确认的 session 绑定、恢复、Hook 活动和 `best_effort` MCP；OpenCode 提供 `opencode-session` codec、`--session` 恢复、顶层 session/活动插件事件、合并用户 inline config 的 `best_effort` 远程 MCP 与临时 instructions。共享 contract fixture 另行证明只有 descriptor、detector 和 launcher 的最小 Provider 可以诚实降级。
 - CLI availability 已区分 installed、missing、upgrade_required 与 temporarily_unavailable；当前只有 Claude Code 声明 `2.1.119` 最低版本，Codex 与 OpenCode 不制造最低版本门槛。
 - terminal、launch、activity、MCP readiness 与 Provider-session binding 已独立投影。`required` MCP 握手未完成时 launch 保持 launching；`best_effort` MCP 失败不终止基础 launch；binding 保存失败只标记 `persistence_failed`，不会覆盖仍在运行的 launch/activity。
@@ -645,21 +645,21 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ### 阶段目标
 
-让 Agent 复用 Run 的权威终端模型和视图协议，同时保留独立的 Agent 画布外观与动作语义；创建 Agent 时选择固定 Provider。
+让 Agent 复用 Run 的权威终端模型和视图协议，同时保留独立的 Agent 画布外观与动作语义；创建 Agent 时固定使用当前默认 Provider。
 
 ### 计划能力
 
 - Agent terminal 使用 Run 的 snapshot、sequence、attach/detach、query ownership、scrollback 和主题转换。
 - 删除独立 Agent xterm registry、截断输出恢复和 Codex 专用终端事件。
 - AgentConsole 继续作为独立画布组件，不直接复用 TerminalNode 的组合、端口和工具栏。
-- 新建 Agent 流程从 registry 获取可用 Provider，用户创建时作出一次选择。
+- 新建 Agent 流程从 registry 获取可用 Provider；主动作直接使用当前默认项，相邻菜单只修改后续创建的默认值。
 - 不显示“切换 Provider”；菜单保留重命名、重新启动、新对话、CleanCode MCP 和删除。
 - 标题栏只增加低噪声 Provider 身份和必要状态，不把 Agent 控制台变成复杂状态面板。
 - Provider 未安装、声明的最低版本不满足或 CLI 检查返回 `temporarily_unavailable` 时显示对应结构化反馈；MCP 与 binding 异常由独立 runtime 维度展示，不混入 availability。
 
 ### TDD 与验证计划
 
-- Unit：创建 Agent Provider 选择、固定 Provider 菜单、capability 降级和可访问名称。
+- Unit：默认 Provider 解析、分段创建按钮、固定 Provider、capability 降级和可访问名称。
 - Unit：Agent terminal snapshot 恢复、sequence 去重、选区复制与方向导航。
 - Contract：通用 Provider availability、Agent runtime 三层状态和终端视图身份。
 - E2E：创建多个 Provider Agent、工作区往返、主题切换、小地图、移动缩放、输入焦点和删除隔离。
@@ -790,20 +790,20 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 最高风险与控制措施
 
-| 风险                            | 控制措施                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| `Ctrl+C` 被误映射成关闭 Agent   | 保留 raw input 路径；选区复制单独判断；真实 PTY 集成和 E2E 验证                    |
-| Agent CLI 退出误杀终端          | 独立 ForegroundJob 状态和退出事件；TerminalSession 只响应 shell/PTY 退出           |
-| 旧 launch 事件污染新会话        | 全部 Hook、MCP、退出和输出携带并校验 launchId、generation 和 Token                 |
-| Provider session 串用           | Provider 固定在 Agent；分支绑定归属校验；禁止最近会话和跨 Agent 回退               |
-| MCP 被静默禁用                  | `required` 认证握手失败时结束 launch；`best_effort` 失败时独立显示 unavailable     |
-| Provider 预批准扩大用户权限     | 只允许匹配 cleancode Server；破坏性动作继续走 cleancode 审批                       |
-| shell 命令注入或参数损坏        | 内建 Provider 使用结构化 executable/argv；平台编码集中在 Run；session ref 严格校验 |
-| Agent 与 Run 形成循环依赖       | Agent 定义端口，外层适配器调用 Run 用例；Run 不导入 Agent 类型                     |
-| 普通终端行为被 Agent owner 破坏 | typed owner capability gate；Run 普通终端和工作流全量回归                          |
-| 数据迁移丢失 Codex thread       | 确定性 migration、原子写入、旧版本 fixture、UUID 保留断言和明确回滚策略            |
-| 多 Agent 资源增长               | PTY、模型、Hook、MCP、审批、临时文件和缓冲全部有界；长时间运行和批量清理测试       |
-| UI 退化为通用终端或 Orca 克隆   | Agent 继续独立画布组件；UI 契约和样式回归；不引入标签页和 Provider 切换            |
+| 风险                              | 控制措施                                                                           |
+| --------------------------------- | ---------------------------------------------------------------------------------- |
+| `Ctrl+C` 被误映射成关闭 Agent     | 保留 raw input 路径；选区复制单独判断；真实 PTY 集成和 E2E 验证                    |
+| Agent CLI 退出误杀终端            | 独立 ForegroundJob 状态和退出事件；TerminalSession 只响应 shell/PTY 退出           |
+| 旧 launch 事件污染新会话          | 全部 Hook、MCP、退出和输出携带并校验 launchId、generation 和 Token                 |
+| Provider session 串用             | Provider 固定在 Agent；分支绑定归属校验；禁止最近会话和跨 Agent 回退               |
+| MCP 被静默禁用                    | `required` 认证握手失败时结束 launch；`best_effort` 失败时独立显示 unavailable     |
+| Provider 预批准扩大用户权限       | 只允许匹配 cleancode Server；破坏性动作继续走 cleancode 审批                       |
+| shell 命令注入或参数损坏          | 内建 Provider 使用结构化 executable/argv；平台编码集中在 Run；session ref 严格校验 |
+| Agent 与 Run 形成循环依赖         | Agent 定义端口，外层适配器调用 Run 用例；Run 不导入 Agent 类型                     |
+| 普通终端行为被 Agent owner 破坏   | typed owner capability gate；Run 普通终端和工作流全量回归                          |
+| 数据迁移丢失 Codex thread         | 确定性 migration、原子写入、旧版本 fixture、UUID 保留断言和明确回滚策略            |
+| 多 Agent 资源增长                 | PTY、模型、Hook、MCP、审批、临时文件和缓冲全部有界；长时间运行和批量清理测试       |
+| UI 退化为通用终端或其他工作台克隆 | Agent 继续独立画布组件；UI 契约和样式回归；不引入标签页和 Provider 切换            |
 
 ## 发布与回退原则
 
@@ -832,7 +832,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 满足以下条件时，本路线可以宣告完成：
 
 1. Codex、Claude Code 和至少一个第三 Provider 共用同一套 Agent 核心用例、Run terminal port、IPC 和 AgentConsole。
-2. 创建 Agent 时选择固定 Provider，产品中不存在切换既有 Agent Provider 的入口。
+2. 创建 Agent 时使用固定的默认 Provider，产品中不存在切换既有 Agent Provider 的入口。
 3. 所有 Provider 的 CLI 退出后底层终端继续运行并可重新启动 Agent。
 4. `Ctrl+C` 在有选区和无选区时分别保持复制与原始 PTY 中断语义。
 5. 多 Provider Agent 可以在同一工作区并行运行，且终端、会话、MCP、审批、审计和事件完全隔离。

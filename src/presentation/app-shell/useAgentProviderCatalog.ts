@@ -9,7 +9,7 @@ import {
 
 import type { AgentProviderDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
 
-type AgentProviderCatalogState =
+export type AgentProviderCatalogState =
   | { readonly status: 'loading' }
   | { readonly providers: readonly AgentProviderDescriptor[]; readonly status: 'ready' }
   | { readonly status: 'unavailable' }
@@ -55,10 +55,7 @@ export class AgentProviderCatalogStore {
 
 export const AgentProviderCatalogContext = createContext<AgentProviderCatalogStore | null>(null)
 
-export function useAgentProviderDescriptor(providerId: string): {
-  readonly descriptor: AgentProviderDescriptor | null
-  readonly isResolved: boolean
-} {
+export function useAgentProviderCatalog(): AgentProviderCatalogState {
   const sharedStore = useContext(AgentProviderCatalogContext)
   const [localStore] = useState(() => new AgentProviderCatalogStore())
   const store = sharedStore ?? localStore
@@ -75,6 +72,14 @@ export function useAgentProviderDescriptor(providerId: string): {
     [localStore, sharedStore]
   )
 
+  return state
+}
+
+export function useAgentProviderDescriptor(providerId: string): {
+  readonly descriptor: AgentProviderDescriptor | null
+  readonly isResolved: boolean
+} {
+  const state = useAgentProviderCatalog()
   return {
     descriptor:
       state.status === 'ready'

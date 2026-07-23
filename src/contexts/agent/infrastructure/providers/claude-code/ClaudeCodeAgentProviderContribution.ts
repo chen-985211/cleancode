@@ -50,6 +50,7 @@ export class ClaudeCodeAgentProviderContribution implements AgentProviderContrib
       sessionRefCodec: true
     },
     displayName: 'Claude Code',
+    documentationUrl: 'https://docs.anthropic.com/claude/docs/claude-code',
     icon: claudeCodeProviderIcon,
     id: 'claude-code'
   } as const

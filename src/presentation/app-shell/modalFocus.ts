@@ -33,22 +33,3 @@ export function trapFocus(
     first.focus()
   }
 }
-
-export function inertOutside(element: HTMLElement): () => void {
-  const previous = new Map<HTMLElement, boolean>()
-  let current: HTMLElement = element
-  while (current.parentElement) {
-    const parent = current.parentElement
-    for (const sibling of Array.from(parent.children)) {
-      if (!(sibling instanceof HTMLElement) || sibling === current || previous.has(sibling))
-        continue
-      previous.set(sibling, sibling.inert)
-      sibling.inert = true
-    }
-    if (parent === document.body) break
-    current = parent
-  }
-  return () => {
-    for (const [region, wasInert] of previous) region.inert = wasInert
-  }
-}

@@ -30,12 +30,17 @@ import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/app
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
+import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
 interface WorkbenchCanvasProps {
+  readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]
   readonly approvalIntents?: readonly AgentToolApprovalViewState[]
   readonly isDesktopRuntime: boolean
+  readonly isCreatingAgent?: boolean
+  readonly isAgentProviderDiscoveryPending?: boolean
+  readonly defaultAgentProviderId?: string | null
   readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
@@ -53,6 +58,8 @@ interface WorkbenchCanvasProps {
   readonly onFitCanvas: () => void
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
+  readonly onOpenAgentSettings?: () => void
+  readonly onSelectDefaultAgentProvider?: (providerId: string) => void
   readonly onBeginTerminalGroupSelection: () => void
   readonly onCreateTerminalGroup: () => void
   readonly onCancelTerminalGroupSelection: () => void
@@ -81,7 +88,11 @@ interface WorkbenchCanvasProps {
 
 export function WorkbenchCanvas({
   approvalIntents = [],
+  agentProviders = [],
   isDesktopRuntime,
+  isCreatingAgent = false,
+  isAgentProviderDiscoveryPending = false,
+  defaultAgentProviderId = null,
   terminalRuntimeAvailability,
   currentWorkbench,
   currentWorkspace,
@@ -99,6 +110,8 @@ export function WorkbenchCanvas({
   onFitCanvas,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
+  onOpenAgentSettings,
+  onSelectDefaultAgentProvider,
   onBeginTerminalGroupSelection,
   onCreateTerminalGroup,
   onCancelTerminalGroupSelection,
@@ -225,8 +238,12 @@ export function WorkbenchCanvas({
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
       <div ref={canvasSurfaceRef} className="canvas-surface">
         <WorkbenchToolbar
+          agentProviders={agentProviders}
+          defaultAgentProviderId={defaultAgentProviderId}
           shortcutTooltips={shortcutTooltips}
           isDesktopRuntime={isDesktopRuntime}
+          isCreatingAgent={isCreatingAgent}
+          isAgentProviderDiscoveryPending={isAgentProviderDiscoveryPending}
           hasWorkbench={Boolean(currentWorkbench)}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
           selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
@@ -234,6 +251,8 @@ export function WorkbenchCanvas({
           canCreateTerminalGroup={canCreateTerminalGroup}
           onCreateTerminalBlock={onCreateTerminalBlock}
           onCreateWorkspaceAgent={onCreateWorkspaceAgent}
+          onOpenAgentSettings={onOpenAgentSettings}
+          onSelectDefaultAgentProvider={onSelectDefaultAgentProvider}
           onBeginTerminalGroupSelection={beginTerminalGroupSelection}
           onCreateTerminalGroup={onCreateTerminalGroup}
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
