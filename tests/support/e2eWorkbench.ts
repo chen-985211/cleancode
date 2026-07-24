@@ -399,8 +399,13 @@ export async function closeElectronApp(
   }
 
   try {
-    await withE2eDeadline(electronApp.close(), electronCloseTimeoutMs, 'Electron application close')
-    await waitForProcessExit(electronProcess, electronCloseTimeoutMs)
+    const processExit = waitForProcessExit(electronProcess, electronCloseTimeoutMs)
+    await withE2eDeadline(
+      Promise.race([electronApp.close(), processExit]),
+      electronCloseTimeoutMs,
+      'Electron application close'
+    )
+    await processExit
   } catch (error) {
     electronProcess.kill('SIGKILL')
     await waitForProcessExit(electronProcess, electronCloseTimeoutMs).catch(() => undefined)

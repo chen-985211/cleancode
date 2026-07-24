@@ -122,6 +122,28 @@ describe('E2E workbench lifecycle', () => {
     ).resolves.toBeUndefined()
   })
 
+  it('accepts a normal process exit when Playwright close never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const electronProcess = createElectronProcess()
+      const electronApp = {
+        close: vi.fn(() => new Promise<never>(() => undefined)),
+        process: () => electronProcess
+      } as unknown as ElectronApplication
+      const closing = expect(closeElectronApp(electronApp)).resolves.toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(0)
+      electronProcess.exitCode = 0
+      electronProcess.emit('exit', 0, null)
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      await closing
+      expect(electronProcess.kill).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not force-kill a process while asserting a natural exit', async () => {
     vi.useFakeTimers()
     try {

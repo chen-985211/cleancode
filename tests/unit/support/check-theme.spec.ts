@@ -108,6 +108,30 @@ describe('theme quality gate', () => {
     }
   })
 
+  it('accepts a generated terminal palette checked out with CRLF line endings', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-theme-palette-'))
+
+    try {
+      const themeDirectory = join(directory, 'src', 'presentation', 'app-shell', 'styles')
+      const generatedDirectory = join(directory, 'src', 'contexts', 'run', 'application', 'dto')
+      const source = await readFile(
+        join(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', 'theme.css'),
+        'utf8'
+      )
+      await mkdir(themeDirectory, { recursive: true })
+      await mkdir(generatedDirectory, { recursive: true })
+      await writeFile(join(themeDirectory, 'theme.css'), source)
+      await writeFile(
+        join(generatedDirectory, 'TerminalPalette.generated.ts'),
+        createTerminalPaletteModule(source).replaceAll('\n', '\r\n')
+      )
+
+      expect(await collectTerminalPaletteViolations({ cwd: directory })).toEqual([])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('rejects a runtime CSS alias that drifts from its source-theme palette', async () => {
     const source = await readFile(
       join(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', 'theme.css'),

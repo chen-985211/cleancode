@@ -252,8 +252,15 @@ async function createHttpServiceTerminal(
 }
 
 async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {
+  const launchAction = terminal.getByRole('button', { name: 'Terminal 1 启动命令' })
+  await expect
+    .poll(() => launchAction.getAttribute('data-launch-command-state'), {
+      interval: 50,
+      timeout: 10_000
+    })
+    .toBe('configured')
   const previousSessionId = await readTerminalSessionId(page, 'Terminal 1')
-  await terminal.getByRole('button', { name: 'Terminal 1 启动命令' }).click()
+  await launchAction.click()
   await page.waitForFunction(
     ({ previousSessionId }) => {
       const currentSessionId = document
