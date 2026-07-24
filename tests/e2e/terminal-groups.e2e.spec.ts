@@ -115,14 +115,15 @@ async function dragTerminalHeader(
     `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
   )
   const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const viewport = page.viewportSize()
+  const startX = headerBox.x + headerBox.width / 2
+  const startY = headerBox.y + headerBox.height / 2
+  const targetX = viewport ? Math.min(startX + deltaX, viewport.width - 16) : startX + deltaX
+  const targetY = viewport ? Math.min(startY + deltaY, viewport.height - 16) : startY + deltaY
 
-  await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2)
+  await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(
-    headerBox.x + headerBox.width / 2 + deltaX,
-    headerBox.y + headerBox.height / 2 + deltaY,
-    { steps: process.platform === 'win32' ? 1 : 18 }
-  )
+  await page.mouse.move(targetX, targetY, { steps: 18 })
   await page.mouse.up()
 }
 
