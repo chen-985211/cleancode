@@ -115,6 +115,7 @@ export async function readXtermAsciiCellCenter(
   input: { readonly column: number; readonly rowMarker: string }
 ): Promise<{ readonly row: number; readonly x: number; readonly y: number }> {
   await ensureTerminalDomRenderer(terminal)
+  await terminal.locator('.xterm-rows > div').filter({ hasText: input.rowMarker }).first().waitFor()
   return terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.find((candidate) => candidate.textContent?.includes(target.rowMarker))

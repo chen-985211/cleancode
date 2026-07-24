@@ -7,8 +7,8 @@ import {
   acceptForegroundJobOutput,
   createForegroundJobProbe,
   createForegroundJobShellControl,
-  disposeForegroundJobShellControl,
-  escapeWindowsPowerShellLegacyNativeArgument
+  createWindowsProcessArguments,
+  disposeForegroundJobShellControl
 } from '../../../../src/contexts/run/infrastructure/pty/ForegroundJobShellControl'
 import { createWindowsForegroundJobInterruptInvocation } from '../../../../src/contexts/run/infrastructure/pty/WindowsForegroundJobInterrupt'
 
@@ -44,8 +44,9 @@ describe('foreground job shell control', () => {
     expect(probe).toContain("cleancode-foreground-''")
     expect(probe.endsWith('\r')).toBe(true)
     expect(script).toContain('$cleancodeJobExitCode = 130')
-    expect(script).toContain('$PSVersionTable.PSEdition -eq "Desktop"')
     expect(script).toContain('$cleancodeJobArguments = @(')
+    expect(script).toContain('System.Diagnostics.ProcessStartInfo')
+    expect(script).toContain("@('.cmd', '.bat') -notcontains $cleancodeJobExtension")
     expect(script).toContain('finally {')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:exit:')
@@ -59,11 +60,19 @@ describe('foreground job shell control', () => {
     expect(existsSync(control.scriptDirectory)).toBe(false)
   })
 
-  it('preserves nested JSON quote escapes for Windows PowerShell legacy argument passing', () => {
+  it('creates one exact Windows native command line for nested quotes and trailing slashes', () => {
     const argument = String.raw`notify=["node","console.log(\"ok\")"]`
 
-    expect(escapeWindowsPowerShellLegacyNativeArgument(argument)).toBe(
-      String.raw`notify=[\"node\",\"console.log(\\\"ok\\\")\"]`
+    expect(
+      createWindowsProcessArguments(['plain', 'space value', '', argument, 'C:\\work\\'])
+    ).toBe(
+      [
+        'plain',
+        '"space value"',
+        '""',
+        String.raw`"notify=[\"node\",\"console.log(\\\"ok\\\")\"]"`,
+        'C:\\work\\'
+      ].join(' ')
     )
   })
 

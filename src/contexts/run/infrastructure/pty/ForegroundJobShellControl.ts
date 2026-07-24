@@ -159,10 +159,7 @@ function createPowerShellLaunchScript(
   const arguments_ = command.args.map(
     (argument) => `  (Decode-CleancodeJobValue '${encodePowerShellValue(argument)}')`
   )
-  const legacyArguments = command.args.map(
-    (argument) =>
-      `    (Decode-CleancodeJobValue '${encodePowerShellValue(escapeWindowsPowerShellLegacyNativeArgument(argument))}')`
-  )
+  const nativeArguments = encodePowerShellValue(createWindowsProcessArguments(command.args))
   return (
     [
       '$cleancodeJobEncoding = [System.Text.Encoding]::UTF8',
@@ -173,24 +170,39 @@ function createPowerShellLaunchScript(
       '$cleancodeJobArguments = @(',
       arguments_.join('\n'),
       ')',
-      'if ($PSVersionTable.PSEdition -eq "Desktop") {',
-      '  $cleancodeJobArguments = @(',
-      legacyArguments.join('\n'),
-      '  )',
-      '}',
+      `$cleancodeJobNativeArguments = Decode-CleancodeJobValue '${nativeArguments}'`,
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
       `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
-      '  & $cleancodeJobExecutable @cleancodeJobArguments',
-      '  $cleancodeJobSucceeded = $?',
-      '  $cleancodeJobNativeExitCode = $LASTEXITCODE',
-      '  if ($null -ne $cleancodeJobNativeExitCode) {',
-      '    $cleancodeJobExitCode = [int]$cleancodeJobNativeExitCode',
-      '  } elseif ($cleancodeJobSucceeded) {',
-      '    $cleancodeJobExitCode = 0',
+      '  $cleancodeJobCommand = Get-Command -Name $cleancodeJobExecutable -ErrorAction Stop | Select-Object -First 1',
+      '  $cleancodeJobExtension = [System.IO.Path]::GetExtension($cleancodeJobCommand.Path).ToLowerInvariant()',
+      "  $cleancodeJobIsNativeApplication = ([string]$cleancodeJobCommand.CommandType -eq 'Application') -and (@('.cmd', '.bat') -notcontains $cleancodeJobExtension)",
+      '  if ($cleancodeJobIsNativeApplication) {',
+      '    $cleancodeJobStartInfo = New-Object System.Diagnostics.ProcessStartInfo',
+      '    $cleancodeJobStartInfo.FileName = $cleancodeJobCommand.Path',
+      '    $cleancodeJobStartInfo.UseShellExecute = $false',
+      '    $cleancodeJobStartInfo.Arguments = $cleancodeJobNativeArguments',
+      '    $cleancodeJobProcess = New-Object System.Diagnostics.Process',
+      '    $cleancodeJobProcess.StartInfo = $cleancodeJobStartInfo',
+      '    if (-not $cleancodeJobProcess.Start()) {',
+      "      throw 'Unable to start the foreground job process.'",
+      '    }',
+      '    $cleancodeJobProcess.WaitForExit()',
+      '    $cleancodeJobExitCode = [int]$cleancodeJobProcess.ExitCode',
+      '    $cleancodeJobProcess.Dispose()',
       '  } else {',
-      '    $cleancodeJobExitCode = 1',
+      '    $global:LASTEXITCODE = $null',
+      '    & $cleancodeJobExecutable @cleancodeJobArguments',
+      '    $cleancodeJobSucceeded = $?',
+      '    $cleancodeJobNativeExitCode = $LASTEXITCODE',
+      '    if ($null -ne $cleancodeJobNativeExitCode) {',
+      '      $cleancodeJobExitCode = [int]$cleancodeJobNativeExitCode',
+      '    } elseif ($cleancodeJobSucceeded) {',
+      '      $cleancodeJobExitCode = 0',
+      '    } else {',
+      '      $cleancodeJobExitCode = 1',
+      '    }',
       '  }',
       '} catch {',
       '  $cleancodeJobExitCode = 1',
@@ -211,10 +223,31 @@ function encodePowerShellValue(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64')
 }
 
-export function escapeWindowsPowerShellLegacyNativeArgument(value: string): string {
-  return value.replace(/(\\*)"/g, (_match, backslashes: string) => {
-    return `${'\\'.repeat(backslashes.length * 2 + 1)}"`
-  })
+export function createWindowsProcessArguments(args: readonly string[]): string {
+  return args.map(quoteWindowsProcessArgument).join(' ')
+}
+
+function quoteWindowsProcessArgument(value: string): string {
+  if (value && !/[\s"]/.test(value)) return value
+
+  let quoted = '"'
+  let backslashCount = 0
+
+  for (const character of value) {
+    if (character === '\\') {
+      backslashCount += 1
+      continue
+    }
+    if (character === '"') {
+      quoted += `${'\\'.repeat(backslashCount * 2 + 1)}"`
+      backslashCount = 0
+      continue
+    }
+    quoted += `${'\\'.repeat(backslashCount)}${character}`
+    backslashCount = 0
+  }
+
+  return `${quoted}${'\\'.repeat(backslashCount * 2)}"`
 }
 
 export function acceptForegroundJobOutput(

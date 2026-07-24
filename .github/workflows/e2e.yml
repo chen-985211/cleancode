@@ -60,17 +60,25 @@ jobs:
       - run: pnpm exec electron-vite build
       - name: Package Electron binary
         shell: bash
-        run: >-
-          tar -czf electron-e2e-runtime-${{ matrix.id }}.tgz
-          node_modules/electron/dist
-          node_modules/electron/path.txt
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -c -k --sequesterRsrc --keepParent \
+              node_modules/electron/dist electron-e2e-runtime-${{ matrix.id }}.zip
+            cp node_modules/electron/path.txt electron-e2e-path-${{ matrix.id }}.txt
+          else
+            tar -czf electron-e2e-runtime-${{ matrix.id }}.tgz \
+              -C node_modules/electron \
+              dist \
+              path.txt
+          fi
       - uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
           name: electron-e2e-application-${{ matrix.id }}
           path: |
             out
-            electron-e2e-runtime-${{ matrix.id }}.tgz
+            electron-e2e-runtime-${{ matrix.id }}.*
+            electron-e2e-path-${{ matrix.id }}.txt
           retention-days: 1
 
   e2e:
@@ -132,11 +140,22 @@ jobs:
       - name: Restore prebuilt Electron binary
         shell: bash
         run: |
-          tar -xzf electron-e2e-runtime-${{ matrix.id }}.tgz
-          rm electron-e2e-runtime-${{ matrix.id }}.tgz
+          electron_package_directory=$(cd node_modules/electron && pwd -P)
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -x -k \
+              electron-e2e-runtime-${{ matrix.id }}.zip "$electron_package_directory"
+            cp electron-e2e-path-${{ matrix.id }}.txt "$electron_package_directory/path.txt"
+            rm electron-e2e-runtime-${{ matrix.id }}.zip
+            rm electron-e2e-path-${{ matrix.id }}.txt
+            pnpm exec electron --version
+          else
+            tar -C "$electron_package_directory" \
+              -xzf electron-e2e-runtime-${{ matrix.id }}.tgz
+            rm electron-e2e-runtime-${{ matrix.id }}.tgz
+          fi
           if [ "$RUNNER_OS" = "Linux" ]; then
             test -x node_modules/electron/dist/electron
-          else
+          elif [ "$RUNNER_OS" = "Windows" ]; then
             pnpm exec electron --version
           fi
       - name: Run E2E shard on Linux

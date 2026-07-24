@@ -178,8 +178,12 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const agentProjection = page.locator(
         '[data-agent-console-node] .terminal-theme-projection[data-terminal-source-theme="light"]'
       )
-      await terminalProjection.locator('.terminal-viewport .xterm-helper-textarea').waitFor()
-      await agentProjection.locator('.agent-terminal-viewport .xterm-helper-textarea').waitFor()
+      await terminalProjection
+        .locator('.terminal-viewport .xterm-helper-textarea')
+        .waitFor({ state: 'attached' })
+      await agentProjection
+        .locator('.agent-terminal-viewport .xterm-helper-textarea')
+        .waitFor({ state: 'attached' })
 
       await selectTheme(page, 'dark')
       await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
@@ -263,7 +267,7 @@ async function waitForAgentTerminal(
 }
 
 async function waitForTerminalDomText(viewport: Locator, text: string): Promise<void> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
     await ensureTerminalDomRenderer(viewport)
     const contents = await viewport

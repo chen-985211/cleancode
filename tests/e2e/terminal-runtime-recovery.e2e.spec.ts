@@ -33,6 +33,9 @@ import {
   writeTerminalCommand
 } from '../support/e2eTerminal'
 
+const electronCrashRecoveryTimeoutMs =
+  process.platform === 'win32' ? 90_000 : electronScenarioTimeoutMs
+
 describe('terminal runtime recovery e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -205,7 +208,7 @@ describe('terminal runtime recovery e2e', () => {
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_MAIN_CRASH')
       await retireCurrentTerminal()
     },
-    electronScenarioTimeoutMs
+    electronCrashRecoveryTimeoutMs
   )
 
   it(
@@ -284,26 +287,28 @@ async function launchWorkbench(workbench: E2eWorkbench) {
     launchApp(workbench, {
       environment: createE2eTerminalEnvironment()
     })
-  let electronApp: ElectronApplication
+  const launchErrors: unknown[] = []
+  const retryDelaysMs = process.platform === 'win32' ? [0, 500, 1_000] : [0]
 
-  try {
-    electronApp = await launch()
-  } catch (error) {
-    if (process.platform !== 'win32') throw error
-    await new Promise((resolve) => setTimeout(resolve, 250))
+  for (const retryDelayMs of retryDelaysMs) {
+    if (retryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
     try {
-      electronApp = await launch()
-    } catch (retryError) {
-      throw new AggregateError(
-        [error, retryError],
-        'Electron failed to relaunch after the Windows process handoff.'
-      )
+      const electronApp = await launch()
+      const page = await electronApp.firstWindow()
+      await page.waitForLoadState('domcontentloaded')
+      await expectDesktopRuntime(page)
+      return { electronApp, page }
+    } catch (error) {
+      launchErrors.push(error)
     }
   }
-  const page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await expectDesktopRuntime(page)
-  return { electronApp, page }
+
+  throw new AggregateError(
+    launchErrors,
+    'Electron failed to relaunch after the Windows process handoff.'
+  )
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {

@@ -112,9 +112,8 @@ describe('Agent Providers on the Run Agent terminal', () => {
       sessionId: 'agent-session-1'
     })
 
-    await expect(
-      withTimeout(launchExited, () => `launch did not exit; output=${output}`)
-    ).resolves.toBe(7)
+    const exitCode = await withTimeout(launchExited, () => `launch did not exit; output=${output}`)
+    expect(exitCode, `unexpected Codex exit; output=${output}`).toBe(7)
     await waitUntil(() => sessionRef !== null)
     writeShellCommand(runtime, 'agent-session-1', createE2ePrintCommand('same-shell'))
     await waitUntil(() => output.includes('same-shell'))
