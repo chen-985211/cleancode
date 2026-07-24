@@ -27,6 +27,7 @@ describe('manage workspace Agents', () => {
       useCase.execute({
         agentId: 'agent-unknown',
         gitBranch: null,
+        initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'unknown-provider',
@@ -45,6 +46,7 @@ describe('manage workspace Agents', () => {
     const command = {
       agentId: 'agent-create-1',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
@@ -67,6 +69,7 @@ describe('manage workspace Agents', () => {
     const command = {
       agentId: 'agent-create-1',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
@@ -109,6 +112,7 @@ describe('manage workspace Agents', () => {
       useCase.execute({
         agentId: 'agent-stale',
         gitBranch: null,
+        initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
@@ -122,10 +126,11 @@ describe('manage workspace Agents', () => {
   it('allocates unique names when different Agent creation intents run concurrently', async () => {
     const repository = new MemoryAgentRepository()
     const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
-    const create = (agentId: string) =>
+    const create = (agentId: string, initialPosition: { readonly x: number; readonly y: number }) =>
       useCase.execute({
         agentId,
         gitBranch: null,
+        initialPosition,
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
@@ -133,16 +138,19 @@ describe('manage workspace Agents', () => {
         workspaceName: 'main'
       })
 
-    const created = await Promise.all([create('agent-create-1'), create('agent-create-2')])
+    const created = await Promise.all([
+      create('agent-create-1', { x: 240, y: 320 }),
+      create('agent-create-2', { x: 1_024, y: 320 })
+    ])
 
     expect(created.map((agent) => agent.name)).toEqual(['Agent 1', 'Agent 2'])
     expect(created.map((agent) => agent.layout)).toEqual([
       {
-        position: { x: 540, y: 120 },
+        position: { x: 240, y: 320 },
         size: { width: 720, height: 460 }
       },
       {
-        position: { x: 1308, y: 120 },
+        position: { x: 1_024, y: 320 },
         size: { width: 720, height: 460 }
       }
     ])
@@ -173,6 +181,7 @@ describe('manage workspace Agents', () => {
       create.execute({
         agentId: 'agent-create-1',
         gitBranch: null,
+        initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
@@ -198,6 +207,7 @@ describe('manage workspace Agents', () => {
     const first = await create.execute({
       agentId: 'agent-1',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
@@ -207,6 +217,7 @@ describe('manage workspace Agents', () => {
     const second = await create.execute({
       agentId: 'agent-2',
       gitBranch: null,
+      initialPosition: { x: 1_024, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',

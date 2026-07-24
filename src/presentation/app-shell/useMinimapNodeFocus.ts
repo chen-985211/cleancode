@@ -35,6 +35,7 @@ interface RevealTerminalBlockOptions {
   readonly fallbackBlock?: TerminalBlockSnapshot
   readonly interpolate?: 'smooth' | 'linear'
   readonly targetZoom?: number
+  readonly viewportIntent?: 'creation' | 'navigation'
 }
 
 export function useMinimapNodeFocus({
@@ -73,6 +74,7 @@ export function useMinimapNodeFocus({
         duration: options.duration,
         interpolate: options.interpolate,
         targetZoom: options.targetZoom,
+        viewportIntent: options.viewportIntent,
         reactFlowInstance: reactFlowInstanceRef.current,
         setHoveredTerminalBlockId,
         setSelectedTerminalBlockId
@@ -152,6 +154,17 @@ export function useMinimapNodeFocus({
     ]
   )
 
+  const focusCreatedTerminalBlock = useCallback(
+    (block: TerminalBlockSnapshot, duration = 220) =>
+      revealTerminalBlock(block.id, {
+        activateTerminalInput: true,
+        duration,
+        fallbackBlock: block,
+        viewportIntent: 'creation'
+      }),
+    [revealTerminalBlock]
+  )
+
   const focusAgentConsole = useCallback(
     (agent: WorkspaceAgentSnapshot) => {
       cancelPendingWorkbenchInputFocus()
@@ -159,6 +172,7 @@ export function useMinimapNodeFocus({
         activateAgentInput: true,
         agent,
         reactFlowInstance: reactFlowInstanceRef.current,
+        viewportIntent: 'creation',
         setSelectedAgentId,
         setSelectedTerminalBlockIds,
         setSelectedTerminalGroupId,
@@ -252,6 +266,7 @@ export function useMinimapNodeFocus({
   return {
     cancelPendingWorkbenchInputFocus,
     focusAgentConsole,
+    focusCreatedTerminalBlock,
     focusTerminalBlock,
     focusWorkbenchNode
   }

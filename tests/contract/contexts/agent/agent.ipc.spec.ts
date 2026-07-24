@@ -263,6 +263,7 @@ describe('agent IPC contract', () => {
     await ipcMain.invoke('cleancode:create-workspace-agent', {
       agentId: 'agent-2',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',
@@ -290,6 +291,7 @@ describe('agent IPC contract', () => {
     expect(createWorkspaceAgent).toHaveBeenCalledWith({
       agentId: 'agent-2',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',
@@ -305,6 +307,34 @@ describe('agent IPC contract', () => {
     expect(removeWorkspaceAgent).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-2' })
     )
+  })
+
+  it('rejects an Agent creation command without a finite initial position', async () => {
+    const ipcMain = new FakeIpcMain()
+    const createWorkspaceAgent = vi.fn(async () => createWorkspaceAgentSnapshot('agent-2'))
+
+    registerAgentIpcHandlers(
+      createAgentIpcHandlersInput({
+        createWorkspaceAgent,
+        ipcMain
+      })
+    )
+
+    await expect(
+      ipcMain.invoke('cleancode:create-workspace-agent', {
+        agentId: 'agent-2',
+        gitBranch: null,
+        projectDirectory: '/work/app',
+        projectId: 'project-1',
+        providerId: 'codex',
+        workspaceDirectory: '/work/app',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(createWorkspaceAgent).not.toHaveBeenCalled()
   })
 
   it('discovers only currently creatable Agent Providers through a refreshable channel', async () => {

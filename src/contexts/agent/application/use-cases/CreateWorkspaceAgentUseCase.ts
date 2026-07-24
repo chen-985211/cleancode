@@ -12,13 +12,13 @@ import {
 } from '../ports/AgentWorkspaceCreationScopePort'
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { AgentWorkspaceTransactionCoordinator } from '../services/AgentWorkspaceTransactionCoordinator'
-import { AgentSession } from '../../domain/aggregates/AgentSession'
-import { resolveInitialAgentLayout } from '../../domain/services/AgentInitialLayoutPolicy'
+import { AgentSession, defaultAgentLayoutSize } from '../../domain/aggregates/AgentSession'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface CreateWorkspaceAgentCommand {
   readonly agentId: string
   readonly gitBranch: string | null
+  readonly initialPosition: { readonly x: number; readonly y: number }
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
@@ -87,7 +87,10 @@ export class CreateWorkspaceAgentUseCase {
           cleancodeMcpEnabled:
             preferences.defaultCleancodeMcpEnabled &&
             provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
-          layout: resolveInitialAgentLayout(agents.map((candidate) => candidate.layout)),
+          layout: {
+            position: { ...command.initialPosition },
+            size: { ...defaultAgentLayoutSize }
+          },
           name: nextAgentName(agents.map((candidate) => candidate.name)),
           projectId: command.projectId,
           providerId: command.providerId,

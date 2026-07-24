@@ -38,7 +38,7 @@
 
 Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加载时按空列表处理，不得合成 `default-agent`、默认 Codex 身份或启动任何 Provider。
 
-手动创建由 Presentation 在打开选择器时生成稳定 `agentId`，同一次选择流程的失败重试必须复用该 ID。应用层按 `projectId + workspaceName` 串行检查和保存；相同 ID 与 Provider 的重复请求返回已提交 Agent，相同 ID 请求其他 Provider 以 `AGENT_CREATION_CONFLICT` 拒绝。名称和初始布局由 Agent domain 根据事务内重新读取的工作区 Agent 统一分配，Renderer 不得提交这两项事实，因此并发创建不能重名或重叠。保存前还必须在 Project 写事务内验证项目仍被记住且项目 ID、工作区名称、目录和 Git 分支完整匹配；失效作用域以 `AGENT_WORKSPACE_SCOPE_STALE` 拒绝且不保存。
+手动创建由 Presentation 生成稳定 `agentId`，同一次选择流程的失败重试必须复用该 ID。Presentation 还必须通过主画布统一创建协调器，依据终端、终端组合与 Agent 的当前投影以及在途创建预留一个有限 `initialPosition`；该坐标是跨节点类型的用户可见布局意图，不是 Agent domain 私有落位策略。应用层按 `projectId + workspaceName` 串行检查和保存；相同 ID 与 Provider 的重复请求返回已提交 Agent，相同 ID 请求其他 Provider 以 `AGENT_CREATION_CONFLICT` 拒绝。Agent domain 根据事务内重新读取的工作区 Agent 原子分配唯一名称，校验 `initialPosition`，组合领域默认尺寸并持久化完整布局。Presentation 的预留阻止跨终端与 Agent 的并发重叠，Agent 事务阻止重名和重复身份；任一创建失败都必须由 Presentation 释放对应预留。保存前还必须在 Project 写事务内验证项目仍被记住且项目 ID、工作区名称、目录和 Git 分支完整匹配；失效作用域以 `AGENT_WORKSPACE_SCOPE_STALE` 拒绝且不保存。
 
 `AgentSession` 保持以下不变量：
 

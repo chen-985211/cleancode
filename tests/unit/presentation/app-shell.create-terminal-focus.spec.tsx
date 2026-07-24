@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
+import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
 
 import {
   createRuntimeApi,
@@ -19,6 +20,18 @@ const reactFlowSpies = vi.hoisted(() => ({
   zoomIn: vi.fn(async () => undefined),
   zoomOut: vi.fn(async () => undefined)
 }))
+const creationGeometry = vi.hoisted(() => ({
+  canvasSize: { height: 900, width: 1_400 },
+  safeViewport: { height: 676, width: 1_352, x: 24, y: 200 }
+}))
+
+vi.mock(
+  '../../../src/presentation/app-shell/workbenchCanvasSafeViewport',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof WorkbenchCanvasSafeViewportModule>()),
+    readWorkbenchCanvasCreationGeometry: () => creationGeometry
+  })
+)
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()
@@ -76,15 +89,14 @@ describe('app shell create terminal focus', () => {
 
   it('animates toward the terminal block returned by creation before the next graph render catches up', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
-    const createdBlock = createTerminalBlockSnapshot()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
     })
 
-    runtimeApi.createTerminalBlock.mockResolvedValue({
+    runtimeApi.createTerminalBlock.mockImplementation(async (command) => ({
       ...workbench.graph,
-      blocks: [createdBlock]
-    })
+      blocks: [createTerminalBlockSnapshot({ position: command.position })]
+    }))
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -96,11 +108,22 @@ describe('app shell create terminal focus', () => {
     fireEvent.click(await screen.findByRole('button', { name: '新建终端积木' }))
 
     await waitFor(() =>
-      expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(730, 420, {
-        zoom: 1,
-        duration: 220
-      })
+      expect(runtimeApi.createTerminalBlock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          position: { x: 340, y: 308 }
+        })
+      )
     )
+    await waitFor(() =>
+      expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(
+        { x: 0, y: 0, zoom: 1 },
+        {
+          duration: 220,
+          interpolate: 'linear'
+        }
+      )
+    )
+    expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
   })
 
   it('fits the canvas when entering terminal group selection mode', async () => {
@@ -272,6 +295,6 @@ function createTerminalBlockSnapshot(
     description: '本地终端',
     launchCommand: '',
     position: input.position ?? { x: 450, y: 240 },
-    size: { width: 560, height: 360 }
+    size: { width: 720, height: 460 }
   }
 }

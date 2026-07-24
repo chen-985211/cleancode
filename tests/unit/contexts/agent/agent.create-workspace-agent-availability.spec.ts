@@ -28,6 +28,7 @@ describe('create workspace Agent availability', () => {
       useCase.execute({
         agentId: 'agent-1',
         gitBranch: null,
+        initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
@@ -74,6 +75,7 @@ describe('create workspace Agent availability', () => {
     const snapshot = await useCase.execute({
       agentId: 'agent-1',
       gitBranch: null,
+      initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
@@ -110,6 +112,7 @@ describe('create workspace Agent availability', () => {
       useCase.execute({
         agentId: 'agent-1',
         gitBranch: null,
+        initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',

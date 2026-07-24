@@ -112,6 +112,10 @@ describe('app shell Agent console', () => {
     expect(createWorkspaceAgent).toHaveBeenCalledWith({
       agentId: expect.any(String),
       gitBranch: currentWorkspace.gitBranch,
+      initialPosition: {
+        x: expect.any(Number),
+        y: expect.any(Number)
+      },
       projectDirectory: baseWorkbench.project.directory,
       projectId: baseWorkbench.project.id,
       providerId: 'codex',

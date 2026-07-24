@@ -28,6 +28,12 @@ import {
   selectExactXtermText,
   setCanvasZoomFromDefault
 } from '../support/terminalSelectionE2e'
+import {
+  createdWorkbenchNodeZoomUpperBound,
+  readCanvasNodeGap,
+  setCanvasZoomToMaximum,
+  waitForCreatedWorkbenchNodeResult
+} from '../support/workbenchNodeCreationE2e'
 
 describe('workspace Agents e2e', () => {
   let workbench: E2eWorkbench
@@ -89,6 +95,51 @@ describe('workspace Agents e2e', () => {
       expect(store.version).toBe(4)
       expect(store.workspaces[0]?.agents).toHaveLength(1)
     }
+  )
+
+  it(
+    'normalizes terminal and Agent creation into the same safe result from maximum zoom',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCreationReady(page)
+      await waitForAgentCount(page, 0)
+
+      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      const terminalSelector = '[data-terminal-block-id]'
+      await page.locator(terminalSelector).first().waitFor()
+      const terminalResult = await waitForCreatedWorkbenchNodeResult(page, terminalSelector)
+
+      expect(terminalResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
+      expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
+      await page.waitForFunction(
+        (selector) =>
+          document.querySelector(selector)?.classList.contains('terminal-node--selected') ===
+            true &&
+          document.activeElement?.closest('[data-terminal-block-id]')?.matches(selector) === true,
+        terminalSelector
+      )
+
+      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      await createCodexAgent(page)
+      await waitForAgentCount(page, 1)
+      const agentSelector = '[data-agent-console-node]'
+      const agentResult = await waitForCreatedWorkbenchNodeResult(page, agentSelector)
+
+      expect(agentResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
+      expect(Object.values(agentResult.insets).every((inset) => inset >= -1)).toBe(true)
+      expect(await readCanvasNodeGap(page, terminalSelector, agentSelector)).toBeGreaterThanOrEqual(
+        63
+      )
+      await page.waitForFunction(
+        (selector) =>
+          document.querySelector(selector)?.getAttribute('data-selection-state') === 'selected' &&
+          document.activeElement?.closest('[data-agent-console-node]')?.matches(selector) === true,
+        agentSelector
+      )
+    },
+    electronScenarioTimeoutMs
   )
 
   it(

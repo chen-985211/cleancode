@@ -130,7 +130,7 @@ export function CanvasMinimap({
   }
 
   return (
-    <div className={minimapClassName}>
+    <div className={minimapClassName} data-workbench-canvas-obstruction>
       {!isCollapsed ? (
         <div className="canvas-minimap__panel">
           <div className="canvas-minimap__map-frame">

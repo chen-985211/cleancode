@@ -2,6 +2,9 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
+import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewport'
+import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
+import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from './types'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 
@@ -12,6 +15,7 @@ interface FocusAgentConsoleInCanvasInput {
   readonly duration?: number
   readonly interpolate?: 'smooth' | 'linear'
   readonly targetZoom?: number
+  readonly viewportIntent?: 'creation' | 'navigation'
   readonly resolveDuration?: (input: {
     readonly targetCenter: { readonly x: number; readonly y: number }
     readonly targetZoom: number
@@ -29,6 +33,7 @@ export function focusAgentConsoleInCanvas({
   duration = 220,
   interpolate,
   targetZoom,
+  viewportIntent = 'navigation',
   resolveDuration,
   setSelectedAgentId,
   setSelectedTerminalBlockIds,
@@ -54,6 +59,57 @@ export function focusAgentConsoleInCanvas({
     x: position.x + width / 2,
     y: position.y + height / 2
   }
+  const transitionDuration =
+    viewportIntent === 'creation'
+      ? revealCreatedWorkbenchNode({
+          ...readWorkbenchCanvasCreationGeometry(),
+          duration,
+          nodePosition: position,
+          nodeSize: { height, width },
+          reactFlowInstance
+        })
+      : revealNavigatedAgentConsole({
+          duration,
+          interpolate,
+          reactFlowInstance,
+          resolveDuration,
+          targetCenter,
+          targetZoom
+        })
+
+  if (!activateAgentInput) {
+    return null
+  }
+
+  return scheduleWorkbenchNodeInputActivation({
+    activate: () =>
+      activateWorkbenchNodeInput(
+        node ??
+          ({
+            id: toAgentFlowNodeId(agent.agentId),
+            position,
+            type: 'agentConsole'
+          } as WorkbenchFlowNode)
+      ),
+    transitionDuration
+  })
+}
+
+function revealNavigatedAgentConsole({
+  duration,
+  interpolate,
+  reactFlowInstance,
+  resolveDuration,
+  targetCenter,
+  targetZoom
+}: {
+  readonly duration: number
+  readonly interpolate?: 'smooth' | 'linear'
+  readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  readonly resolveDuration?: FocusAgentConsoleInCanvasInput['resolveDuration']
+  readonly targetCenter: { readonly x: number; readonly y: number }
+  readonly targetZoom?: number
+}): number {
   const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
   const transitionDuration = resolveDuration?.({ targetCenter, targetZoom: nextZoom }) ?? duration
 
@@ -63,31 +119,7 @@ export function focusAgentConsoleInCanvas({
     ...(interpolate ? { interpolate } : {})
   })
 
-  if (!activateAgentInput) {
-    return null
-  }
-
-  let isPending = true
-  const timeoutId = window.setTimeout(() => {
-    isPending = false
-    activateWorkbenchNodeInput(
-      node ??
-        ({
-          id: toAgentFlowNodeId(agent.agentId),
-          position,
-          type: 'agentConsole'
-        } as WorkbenchFlowNode)
-    )
-  }, transitionDuration + 20)
-
-  return () => {
-    if (!isPending) {
-      return
-    }
-
-    isPending = false
-    window.clearTimeout(timeoutId)
-  }
+  return transitionDuration
 }
 
 function resolveDimension(value: unknown): number | null {

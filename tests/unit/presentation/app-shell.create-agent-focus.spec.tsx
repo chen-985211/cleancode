@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
+import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
 
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 import type { WorkbenchSnapshot } from '../../../src/presentation/app-shell/types'
@@ -10,8 +11,21 @@ import {
 } from '../../fixtures/presentation/appShellFixtures'
 
 const reactFlowSpies = vi.hoisted(() => ({
-  setCenter: vi.fn(async () => undefined)
+  setCenter: vi.fn(async () => undefined),
+  setViewport: vi.fn(async () => undefined)
 }))
+const creationGeometry = vi.hoisted(() => ({
+  canvasSize: { height: 900, width: 1_400 },
+  safeViewport: { height: 676, width: 1_352, x: 24, y: 200 }
+}))
+
+vi.mock(
+  '../../../src/presentation/app-shell/workbenchCanvasSafeViewport',
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof WorkbenchCanvasSafeViewportModule>()),
+    readWorkbenchCanvasCreationGeometry: () => creationGeometry
+  })
+)
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()
@@ -41,6 +55,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('app shell create Agent focus', () => {
   beforeEach(() => {
     reactFlowSpies.setCenter.mockClear()
+    reactFlowSpies.setViewport.mockClear()
     window.localStorage.clear()
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     Object.defineProperty(window, 'cleancode', {
@@ -55,17 +70,18 @@ describe('app shell create Agent focus', () => {
       position: { x: 320, y: 140 },
       size: { width: 440, height: 520 }
     })
-    const createdAgent = createAgent('agent-2', workbench.project.id, {
-      position: { x: 900, y: 240 },
-      size: { width: 720, height: 460 }
-    })
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [{ ...workbench, agents: [firstAgent] }])
     })
     runtimeApi.discoverCreatableAgentProviders.mockResolvedValue([
       createCreatableProvider('codex', 'Codex', true)
     ])
-    runtimeApi.createWorkspaceAgent.mockResolvedValue(createdAgent)
+    runtimeApi.createWorkspaceAgent.mockImplementation(async (command) =>
+      createAgent('agent-2', workbench.project.id, {
+        position: command.initialPosition,
+        size: { width: 720, height: 460 }
+      })
+    )
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -79,14 +95,31 @@ describe('app shell create Agent focus', () => {
     fireEvent.click(createButton)
 
     await waitFor(() =>
-      expect(reactFlowSpies.setCenter).toHaveBeenCalledWith(1_260, 470, {
-        zoom: 0.9,
-        duration: 220
-      })
+      expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          initialPosition: {
+            x: expect.any(Number),
+            y: expect.any(Number)
+          },
+          providerId: 'codex'
+        })
+      )
     )
-    expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
-      expect.objectContaining({ providerId: 'codex' })
+    const initialPosition = runtimeApi.createWorkspaceAgent.mock.calls[0]![0].initialPosition
+    await waitFor(() =>
+      expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(
+        {
+          x: 700 - (initialPosition.x + 360),
+          y: 538 - (initialPosition.y + 230),
+          zoom: 1
+        },
+        {
+          duration: 220,
+          interpolate: 'linear'
+        }
+      )
     )
+    expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
@@ -284,6 +317,10 @@ describe('app shell create Agent focus', () => {
     expect(firstCommand).toEqual({
       agentId: expect.any(String),
       gitBranch: currentWorkspace.gitBranch,
+      initialPosition: {
+        x: expect.any(Number),
+        y: expect.any(Number)
+      },
       projectDirectory: workbench.project.directory,
       projectId: workbench.project.id,
       providerId: 'codex',
@@ -356,6 +393,7 @@ describe('app shell create Agent focus', () => {
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
     fireEvent.click(within(projectCard).getByRole('button', { name: 'feature/agent 独立工作区' }))
     await waitFor(() => expect(runtimeApi.switchBranchWorkspace).toHaveBeenCalledOnce())
+    reactFlowSpies.setViewport.mockClear()
 
     await act(async () => {
       resolveCreation(
@@ -371,6 +409,7 @@ describe('app shell create Agent focus', () => {
       document.querySelector('[data-agent-console-node="agent-stale"]')
     ).not.toBeInTheDocument()
     expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
+    expect(reactFlowSpies.setViewport).not.toHaveBeenCalled()
   })
 })
 
@@ -384,7 +423,7 @@ interface MockReactFlowInstance {
   readonly getViewport: () => WorkbenchSnapshot['graph']['viewport']
   readonly getZoom: () => number
   readonly setCenter: typeof reactFlowSpies.setCenter
-  readonly setViewport: () => Promise<void>
+  readonly setViewport: typeof reactFlowSpies.setViewport
   readonly zoomOut: () => Promise<void>
   readonly zoomIn: () => Promise<void>
   readonly fitView: () => Promise<void>
@@ -396,7 +435,7 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     getViewport: () => ({ x: 0, y: 0, zoom: 0.6 }),
     getZoom: () => 0.6,
     setCenter: reactFlowSpies.setCenter,
-    setViewport: async () => undefined,
+    setViewport: reactFlowSpies.setViewport,
     zoomOut: async () => undefined,
     zoomIn: async () => undefined,
     fitView: async () => undefined

@@ -114,6 +114,7 @@ declare global {
       createWorkspaceAgent(command: {
         readonly agentId: string
         readonly gitBranch: string | null
+        readonly initialPosition: { readonly x: number; readonly y: number }
         readonly projectDirectory: string
         readonly projectId: string
         readonly providerId: string

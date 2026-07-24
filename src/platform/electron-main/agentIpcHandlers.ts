@@ -48,6 +48,7 @@ export interface AgentIpcHandlersInput {
   readonly createWorkspaceAgent: (command: {
     readonly agentId: string
     readonly gitBranch: string | null
+    readonly initialPosition: { readonly x: number; readonly y: number }
     readonly projectDirectory: string
     readonly projectId: string
     readonly providerId: string
@@ -202,6 +203,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     {
       readonly agentId: string
       readonly gitBranch: string | null
+      readonly initialPosition: { readonly x: number; readonly y: number }
       readonly projectDirectory: string
       readonly projectId: string
       readonly providerId: string
@@ -379,6 +381,7 @@ function readProviderId(value: unknown): string {
 function readCreateWorkspaceAgentCommand(command: unknown): {
   readonly agentId: string
   readonly gitBranch: string | null
+  readonly initialPosition: { readonly x: number; readonly y: number }
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
@@ -392,12 +395,27 @@ function readCreateWorkspaceAgentCommand(command: unknown): {
     agentId: readRequiredString(command.agentId, 'agentId'),
     gitBranch:
       command.gitBranch === null ? null : readRequiredString(command.gitBranch, 'gitBranch'),
+    initialPosition: readAgentInitialPosition(command.initialPosition),
     projectDirectory: readRequiredString(command.projectDirectory, 'projectDirectory'),
     projectId: readRequiredString(command.projectId, 'projectId'),
     providerId: readProviderId(command.providerId),
     workspaceDirectory: readRequiredString(command.workspaceDirectory, 'workspaceDirectory'),
     workspaceName: readRequiredString(command.workspaceName, 'workspaceName')
   }
+}
+
+function readAgentInitialPosition(value: unknown): { readonly x: number; readonly y: number } {
+  if (isRecord(value) && Number.isFinite(value.x) && Number.isFinite(value.y)) {
+    return {
+      x: value.x as number,
+      y: value.y as number
+    }
+  }
+
+  throw createExpectedAppError(
+    'INVALID_IPC_COMMAND',
+    'Invalid IPC command: initialPosition must contain finite x and y coordinates.'
+  )
 }
 
 function readRequiredString(value: unknown, fieldName: string): string {

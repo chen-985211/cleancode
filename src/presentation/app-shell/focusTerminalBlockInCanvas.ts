@@ -1,7 +1,11 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewport'
+import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
+import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from './types'
+import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 
 interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
@@ -10,6 +14,7 @@ interface FocusTerminalBlockInCanvasInput {
   readonly duration?: number
   readonly interpolate?: 'smooth' | 'linear'
   readonly targetZoom?: number
+  readonly viewportIntent?: 'creation' | 'navigation'
   readonly setSelectedTerminalBlockId: (blockId: string | null) => void
   readonly setHoveredTerminalBlockId: (blockId: string | null) => void
 }
@@ -21,6 +26,7 @@ export function focusTerminalBlockInCanvas({
   duration = 220,
   interpolate,
   targetZoom,
+  viewportIntent = 'navigation',
   setSelectedTerminalBlockId,
   setHoveredTerminalBlockId
 }: FocusTerminalBlockInCanvasInput): (() => void) | null {
@@ -35,39 +41,67 @@ export function focusTerminalBlockInCanvas({
   const measuredWidth = node?.measured?.width ?? block.size.width
   const measuredHeight = node?.measured?.height ?? block.size.height
   const position = node?.position ?? block.position
-  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
-
-  void reactFlowInstance.setCenter(
-    position.x + measuredWidth / 2,
-    position.y + measuredHeight / 2,
-    {
-      zoom: nextZoom,
-      duration,
-      ...(interpolate ? { interpolate } : {})
-    }
-  )
+  const transitionDuration =
+    viewportIntent === 'creation'
+      ? revealCreatedWorkbenchNode({
+          ...readWorkbenchCanvasCreationGeometry(),
+          duration,
+          nodePosition: position,
+          nodeSize: { height: measuredHeight, width: measuredWidth },
+          reactFlowInstance
+        })
+      : revealNavigatedTerminalBlock({
+          duration,
+          height: measuredHeight,
+          interpolate,
+          position,
+          reactFlowInstance,
+          targetZoom,
+          width: measuredWidth
+        })
 
   if (!activateTerminalInput) {
     return null
   }
 
-  let isPending = true
-  const timeoutId = window.setTimeout(() => {
-    isPending = false
-    const terminalNode = document.querySelector<HTMLElement>(
-      `[data-terminal-block-id="${block.id}"]`
-    )
+  return scheduleWorkbenchNodeInputActivation({
+    activate: () =>
+      activateWorkbenchNodeInput(
+        node ??
+          ({
+            id: block.id,
+            position,
+            type: 'terminal'
+          } as WorkbenchFlowNode)
+      ),
+    transitionDuration
+  })
+}
 
-    terminalNode?.querySelector<HTMLElement>('.terminal-viewport')?.focus()
-    terminalNode?.querySelector<HTMLElement>('.xterm-helper-textarea')?.focus()
-  }, duration + 20)
+function revealNavigatedTerminalBlock({
+  duration,
+  height,
+  interpolate,
+  position,
+  reactFlowInstance,
+  targetZoom,
+  width
+}: {
+  readonly duration: number
+  readonly height: number
+  readonly interpolate?: 'smooth' | 'linear'
+  readonly position: { readonly x: number; readonly y: number }
+  readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  readonly targetZoom?: number
+  readonly width: number
+}): number {
+  const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
 
-  return () => {
-    if (!isPending) {
-      return
-    }
+  void reactFlowInstance.setCenter(position.x + width / 2, position.y + height / 2, {
+    zoom: nextZoom,
+    duration,
+    ...(interpolate ? { interpolate } : {})
+  })
 
-    isPending = false
-    window.clearTimeout(timeoutId)
-  }
+  return duration
 }

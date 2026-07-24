@@ -32,7 +32,12 @@ interface WorkbenchToolbarProps {
 export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
   const { t } = useI18n()
   return (
-    <div className="app-shell__toolbar" role="toolbar" aria-label={t('toolbar.label')}>
+    <div
+      className="app-shell__toolbar"
+      data-workbench-canvas-obstruction
+      role="toolbar"
+      aria-label={t('toolbar.label')}
+    >
       <div
         className="app-shell__toolbar-group"
         role="group"

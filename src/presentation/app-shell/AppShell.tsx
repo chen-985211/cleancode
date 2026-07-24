@@ -8,7 +8,6 @@ import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'rea
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { resolveNewTerminalBlockPosition } from './terminalBlockPlacement'
 import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
@@ -58,6 +57,7 @@ import { createWorkbenchNodeStore } from './workbenchNodeStore'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 import { useAgentCreationProviders } from './useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
+import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -140,6 +140,7 @@ export function AppShell({
   const {
     cancelPendingWorkbenchInputFocus,
     focusAgentConsole,
+    focusCreatedTerminalBlock,
     focusTerminalBlock,
     focusWorkbenchNode
   } = useMinimapNodeFocus({
@@ -204,6 +205,23 @@ export function AppShell({
     )
     setCurrentWorkbench(workbench)
   }, [])
+  const setCurrentGraph = useCurrentGraphState({
+    currentWorkbench,
+    setCurrentWorkbench,
+    setWorkbenches,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId,
+    setHoveredTerminalBlockId
+  })
+  const { createTerminalBlock, nodeCreationCoordinator, reserveWorkbenchNodeCreation } =
+    useWorkbenchNodeCreationActions({
+      currentWorkbench,
+      currentWorkspace,
+      focusCreatedTerminalBlock,
+      nodeStore,
+      reactFlowInstanceRef,
+      setCurrentGraph
+    })
   const {
     createWorkspaceAgent,
     isCreatingAgent,
@@ -217,9 +235,11 @@ export function AppShell({
     currentWorkspace,
     defaultProviderId: effectiveAgentProviderId,
     layoutCommitQueue,
+    nodeCreationCoordinator,
     notify: notifications.notify,
     onConfigureAgentProviders: applicationSettings.openAgents,
     onWorkspaceAgentCreated: focusAgentConsole,
+    reserveWorkbenchNodeCreation,
     setCurrentWorkbench,
     setSelectedAgentId,
     setWorkbenches
@@ -231,14 +251,6 @@ export function AppShell({
     moveTerminalSessionToWorkspace,
     replaceWorkbench,
     runningSessionIds
-  })
-  const setCurrentGraph = useCurrentGraphState({
-    currentWorkbench,
-    setCurrentWorkbench,
-    setWorkbenches,
-    setSelectedTerminalBlockIds,
-    setSelectedTerminalGroupId,
-    setHoveredTerminalBlockId
   })
   const agentToolApprovals = useAgentToolApprovals({
     graph,
@@ -293,30 +305,6 @@ export function AppShell({
     setWorkbenches,
     terminateWorkbenchTerminalSessions
   })
-  const createTerminalBlock = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace) {
-      return
-    }
-
-    const existingBlockIds = new Set(currentWorkbench.graph.blocks.map((block) => block.id))
-    const graphSnapshot = await window.cleancode?.createTerminalBlock({
-      projectDirectory: currentWorkbench.project.directory,
-      workspaceName: currentWorkspace.name,
-      name: t('terminal.defaultName', { index: currentWorkbench.graph.blocks.length + 1 }),
-      description: t('terminal.defaultDescription'),
-      position: resolveNewTerminalBlockPosition(currentWorkbench.graph.blocks)
-    })
-
-    if (graphSnapshot) {
-      setCurrentGraph(graphSnapshot)
-      const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
-
-      if (createdBlock) {
-        focusTerminalBlock(createdBlock.id, 220, createdBlock)
-      }
-    }
-  }, [currentWorkbench, currentWorkspace, focusTerminalBlock, setCurrentGraph, t])
-
   const createTerminalGroup = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
       return

@@ -1,5 +1,7 @@
 import type { AgentLayoutSnapshot, AgentSession } from '../../domain/aggregates/AgentSession'
 
+export { defaultAgentLayoutSize } from '../../domain/aggregates/AgentSession'
+
 export interface WorkspaceAgentSnapshot {
   readonly agentId: string
   readonly cleancodeMcpEnabled: boolean

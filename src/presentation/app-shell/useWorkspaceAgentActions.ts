@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 
-import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import {
+  defaultAgentLayoutSize,
+  type WorkspaceAgentSnapshot
+} from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { findCurrentWorkspace } from './findCurrentWorkspace'
 import type { WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { WorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { useI18n } from './i18n/useI18n'
 import type { NotifyApp } from './appNotifications'
+import type {
+  WorkbenchNodeCreationCoordinator,
+  WorkbenchNodeCreationReservation
+} from './workbenchNodeCreationCoordinator'
+import type { WorkbenchNodeSize } from './workbenchNodeCreationPolicy'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -14,9 +23,11 @@ export function useWorkspaceAgentActions({
   currentWorkspace,
   defaultProviderId,
   layoutCommitQueue,
+  nodeCreationCoordinator,
   notify,
   onConfigureAgentProviders,
   onWorkspaceAgentCreated,
+  reserveWorkbenchNodeCreation,
   setCurrentWorkbench,
   setSelectedAgentId,
   setWorkbenches
@@ -25,9 +36,13 @@ export function useWorkspaceAgentActions({
   readonly currentWorkspace: CurrentWorkspace | undefined
   readonly defaultProviderId: string | null
   readonly layoutCommitQueue: WorkbenchNodeLayoutCommitQueue
+  readonly nodeCreationCoordinator: WorkbenchNodeCreationCoordinator
   readonly notify: NotifyApp
   readonly onConfigureAgentProviders: () => void
   readonly onWorkspaceAgentCreated: (agent: WorkspaceAgentSnapshot) => void
+  readonly reserveWorkbenchNodeCreation: (
+    nodeSize: WorkbenchNodeSize
+  ) => WorkbenchNodeCreationReservation | null
   readonly setCurrentWorkbench: Dispatch<SetStateAction<WorkbenchSnapshot | null>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setWorkbenches: Dispatch<SetStateAction<WorkbenchSnapshot[]>>
@@ -70,8 +85,15 @@ export function useWorkspaceAgentActions({
       onConfigureAgentProviders()
       return
     }
+    const reservation = reserveWorkbenchNodeCreation(defaultAgentLayoutSize)
+
+    if (!reservation) {
+      return
+    }
+
     const generation = ++creationGenerationRef.current
     const scopeKey = workspaceScopeKey
+    let isCommitted = false
     setIsCreatingAgent(true)
     if (
       (currentWorkbench.agents?.length ?? 0) > 0 &&
@@ -94,6 +116,7 @@ export function useWorkspaceAgentActions({
           projectDirectory: currentWorkbench.project.directory,
           projectId: currentWorkbench.project.id,
           providerId: defaultProviderId,
+          initialPosition: reservation.position,
           workspaceDirectory: currentWorkspace.directory,
           workspaceName: currentWorkspace.name
         })) ?? null
@@ -104,6 +127,8 @@ export function useWorkspaceAgentActions({
         return
       }
       if (!created) throw new Error('Agent creation returned no snapshot.')
+      nodeCreationCoordinator.commit(reservation.reservationId, toAgentFlowNodeId(created.agentId))
+      isCommitted = true
       updateWorkspaceAgentState(setCurrentWorkbench, created)
       setWorkbenches((entries) =>
         entries.map((workbench) => updateWorkbenchAgent(workbench, created))
@@ -121,6 +146,9 @@ export function useWorkspaceAgentActions({
         })
       }
     } finally {
+      if (!isCommitted) {
+        nodeCreationCoordinator.release(reservation.reservationId)
+      }
       if (generation === creationGenerationRef.current) setIsCreatingAgent(false)
     }
   }, [
@@ -128,9 +156,11 @@ export function useWorkspaceAgentActions({
     currentWorkspace,
     defaultProviderId,
     isCreatingAgent,
+    nodeCreationCoordinator,
     notify,
     onConfigureAgentProviders,
     onWorkspaceAgentCreated,
+    reserveWorkbenchNodeCreation,
     setCurrentWorkbench,
     setWorkbenches,
     t,
