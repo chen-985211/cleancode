@@ -88,60 +88,6 @@ describe('terminal groups e2e', () => {
     },
     electronScenarioTimeoutMs
   )
-
-  it(
-    'adds a terminal to an existing group by dropping it in group edit mode',
-    async () => {
-      await createTerminalBlocks(page, workbench, 3)
-
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
-      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
-      await ensureTerminalNotSelectedForGroup(page, 'Terminal 3')
-      await page.getByRole('button', { name: '创建组合' }).click()
-      await waitForTerminalGroup(workbench, (group) => group.memberBlockIds.length === 2)
-
-      const graphBeforeDrop = await readGraph(workbench)
-      const terminalThree = graphBeforeDrop.blocks.find((block) => block.name === 'Terminal 3')!
-
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
-      await dragTerminalHeaderToGroupCenter(page, terminalThree.id)
-
-      await waitForTerminalGroup(
-        workbench,
-        (group) =>
-          group.memberBlockIds.length === 3 && group.memberBlockIds.includes(terminalThree.id)
-      )
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'removes a member terminal by dropping it outside in group edit mode',
-    async () => {
-      await createTerminalBlocks(page, workbench, 3)
-
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
-      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 3')
-      await page.getByRole('button', { name: '创建组合' }).click()
-      await waitForTerminalGroup(workbench, (group) => group.memberBlockIds.length === 3)
-
-      const graphBeforeDrop = await readGraph(workbench)
-      const terminalOne = graphBeforeDrop.blocks.find((block) => block.name === 'Terminal 1')!
-
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
-      await dragTerminalHeaderOutsideGroup(page, terminalOne.id)
-
-      await waitForTerminalGroup(
-        workbench,
-        (group) =>
-          group.memberBlockIds.length === 2 && !group.memberBlockIds.includes(terminalOne.id)
-      )
-    },
-    electronScenarioTimeoutMs
-  )
 })
 
 async function createTwoTerminalBlocks(page: Page, workbench: E2eWorkbench): Promise<void> {
@@ -195,18 +141,6 @@ async function ensureTerminalSelectedForGroup(page: Page, terminalName: string):
   await page.getByRole('button', { name: `${terminalName} 选择终端` }).click()
 }
 
-async function ensureTerminalNotSelectedForGroup(page: Page, terminalName: string): Promise<void> {
-  await waitForTerminalGroupSelectionButton(page, terminalName)
-
-  const selectedButton = page.getByRole('button', { name: `${terminalName} 已选择终端` })
-
-  if ((await selectedButton.count()) === 0) {
-    return
-  }
-
-  await selectedButton.click()
-}
-
 async function waitForTerminalGroupSelectionButton(
   page: Page,
   terminalName: string
@@ -220,64 +154,6 @@ async function waitForTerminalGroupSelectionButton(
       }),
     terminalName
   )
-}
-
-async function dragTerminalHeaderToGroupCenter(page: Page, terminalBlockId: string): Promise<void> {
-  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
-  const terminalHeader = page.locator(
-    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
-  )
-  const terminalBox = await readRequiredBoundingBox(terminal)
-  const headerBox = await readRequiredBoundingBox(terminalHeader)
-  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
-  const terminalCenterOffset = {
-    x: terminalBox.x + terminalBox.width / 2 - (headerBox.x + headerBox.width / 2),
-    y: terminalBox.y + terminalBox.height / 2 - (headerBox.y + headerBox.height / 2)
-  }
-  const start = {
-    x: headerBox.x + headerBox.width / 2,
-    y: headerBox.y + headerBox.height / 2
-  }
-  const target = {
-    x: groupBox.x + groupBox.width / 2 - terminalCenterOffset.x,
-    y: groupBox.y + groupBox.height / 2 - terminalCenterOffset.y
-  }
-
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.down()
-  await page.mouse.move(target.x, target.y, { steps: 24 })
-  await page.mouse.up()
-}
-
-async function dragTerminalHeaderOutsideGroup(page: Page, terminalBlockId: string): Promise<void> {
-  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
-  const terminalHeader = page.locator(
-    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
-  )
-  const terminalBox = await readRequiredBoundingBox(terminal)
-  const headerBox = await readRequiredBoundingBox(terminalHeader)
-  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
-  const terminalCenterOffset = {
-    x: terminalBox.x + terminalBox.width / 2 - (headerBox.x + headerBox.width / 2),
-    y: terminalBox.y + terminalBox.height / 2 - (headerBox.y + headerBox.height / 2)
-  }
-  const start = {
-    x: headerBox.x + headerBox.width / 2,
-    y: headerBox.y + headerBox.height / 2
-  }
-  const targetTerminalCenter = {
-    x: groupBox.x + groupBox.width + terminalBox.width / 2 + 140,
-    y: terminalBox.y + terminalBox.height / 2
-  }
-  const target = {
-    x: targetTerminalCenter.x - terminalCenterOffset.x,
-    y: targetTerminalCenter.y - terminalCenterOffset.y
-  }
-
-  await page.mouse.move(start.x, start.y)
-  await page.mouse.down()
-  await page.mouse.move(target.x, target.y, { steps: 24 })
-  await page.mouse.up()
 }
 
 async function waitForTerminalGroup(

@@ -64,6 +64,8 @@ describe('Claude Code Agent session e2e', () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
+      await expectAgentProviderInstalled(page, 'claude-code')
+      await waitForClaudeInspection(fakeClaude.reportPath)
       await selectDefaultAgentProvider(page, 'Claude Code')
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 2)
@@ -126,10 +128,15 @@ function createAgentProviderEnvironment(
     CLEANCODE_FAKE_CLAUDE_REPORT_PATH: fakeClaude.reportPath,
     CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
     CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-    PATH: [fakeCodex.binDirectory, fakeClaude.binDirectory, process.env.PATH]
-      .filter(Boolean)
-      .join(delimiter),
-    SHELL: '/bin/sh'
+    PATH: [
+      fakeCodex.binDirectory,
+      fakeClaude.binDirectory,
+      '/usr/bin',
+      '/bin',
+      '/usr/sbin',
+      '/sbin'
+    ].join(delimiter),
+    SHELL: fakeClaude.shellPath
   }
 }
 
@@ -153,7 +160,38 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
 
 async function selectDefaultAgentProvider(page: Page, providerName: string): Promise<void> {
   await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  await page.getByRole('menuitemradio', { name: providerName, exact: true }).click()
+  const providerOption = page.getByRole('menuitemradio', { name: providerName, exact: true })
+
+  try {
+    await providerOption.waitFor({ state: 'visible', timeout: 5_000 })
+  } catch {
+    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
+    throw new Error(
+      `Provider "${providerName}" did not become selectable. Visible Providers: ${JSON.stringify(visibleProviders)}`
+    )
+  }
+
+  await providerOption.click({ timeout: 1_000 })
+}
+
+async function expectAgentProviderInstalled(page: Page, providerId: string): Promise<void> {
+  const availability = await page.evaluate(async (requestedProviderId) => {
+    const inspect = window.cleancode?.inspectAgentProvider
+    if (!inspect) throw new Error('Agent Provider inspection is unavailable.')
+    return inspect({ providerId: requestedProviderId })
+  }, providerId)
+
+  expect(availability).toMatchObject({ providerId, status: 'installed' })
+}
+
+async function waitForClaudeInspection(reportPath: string): Promise<void> {
+  const deadline = Date.now() + 5_000
+  while (Date.now() < deadline) {
+    const reports = await readFakeClaudeCliReports(reportPath)
+    if (reports.some((report) => report.kind === 'inspection')) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error('Claude Code was reported installed without inspecting the fake CLI.')
 }
 
 async function waitForClaudeLaunch(

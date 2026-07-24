@@ -8,6 +8,18 @@ export interface MouseReport {
   readonly row: number
 }
 
+export interface FakeAgentReport {
+  readonly columns: number
+  readonly kind: 'exit' | 'resize' | 'start'
+  readonly resizeCount: number
+  readonly rows: number
+}
+
+export interface FakeAgentFixture {
+  readonly reportPath: string
+  readonly scriptPath: string
+}
+
 export const terminalWorkspaceRetentionFixtureFileName = 'terminal-workspace-retention-fixture.mjs'
 export const terminalWorkspaceRetentionEarlyMarker = '__TERMINAL_SCROLLBACK_EARLY_MARKER__'
 export const terminalWorkspaceRetentionLateMarker = '__TERMINAL_SCROLLBACK_LATE_MARKER__'
@@ -43,25 +55,40 @@ import { writeFileSync } from 'node:fs'
 
 const reportPath = process.argv[2]
 let input = ''
+let finished = false
 
-process.stdin.setRawMode?.(true)
-process.stdin.resume()
-process.stdin.on('data', (data) => {
-  input += data.toString('utf8')
-})
-process.stdout.write('\u001b[6n\u001b]11;?\u0007')
+function readResponses() {
+  return {
+    responses: input.match(/\\u001b\\[\\d+;\\d+R/g) ?? [],
+    backgroundResponses: input.match(/\\u001b\\]11;rgb:[0-9a-f/]+\\u001b\\\\/gi) ?? []
+  }
+}
 
-setTimeout(() => {
-  const responses = input.match(/\\u001b\\[\\d+;\\d+R/g) ?? []
-  const backgroundResponses = input.match(/\\u001b\\]11;rgb:[0-9a-f/]+\\u001b\\\\/gi) ?? []
+function finish(exitCode) {
+  if (finished) return
+  finished = true
+  const { responses, backgroundResponses } = readResponses()
   writeFileSync(reportPath, JSON.stringify({
     count: responses.length,
     responses,
     backgroundCount: backgroundResponses.length,
     backgroundResponses
   }))
-  process.exit(0)
-}, 300)
+  process.exit(exitCode)
+}
+
+process.stdin.setRawMode?.(true)
+process.stdin.resume()
+process.stdin.on('data', (data) => {
+  input += data.toString('utf8')
+  const { responses, backgroundResponses } = readResponses()
+  if (responses.length > 0 && backgroundResponses.length > 0) {
+    finish(0)
+  }
+})
+process.stdout.write('\u001b[6n\u001b]11;?\u0007')
+
+setTimeout(() => finish(1), 2_000)
 `,
     'utf8'
   )
@@ -111,22 +138,40 @@ process.stdout.write(outputMarker)
   return { reportPath, scriptPath }
 }
 
-export async function writeFakeAgentScript(projectDirectory: string): Promise<string> {
+export async function writeFakeAgentScript(projectDirectory: string): Promise<FakeAgentFixture> {
+  const reportPath = join(projectDirectory, 'fake-agent-reports.jsonl')
   const scriptPath = join(projectDirectory, 'fake-agent-tui.mjs')
 
   await writeFile(
     scriptPath,
     `
+import { appendFileSync } from 'node:fs'
+
 const CSI = '\\x1b['
+const reportPath = ${JSON.stringify(reportPath)}
 let resizeCount = 0
 
-function draw(label) {
+function report(kind) {
+  appendFileSync(
+    reportPath,
+    JSON.stringify({
+      columns: process.stdout.columns,
+      kind,
+      resizeCount,
+      rows: process.stdout.rows
+    }) + '\\n'
+  )
+}
+
+function draw(label, kind) {
+  report(kind)
   process.stdout.write(
     \`\${CSI}H\${CSI}2JFAKE_AGENT_READY\\n\${label}\\nSIZE:\${process.stdout.columns}x\${process.stdout.rows}\\n\`
   )
 }
 
 function cleanup() {
+  report('exit')
   process.stdout.write(\`\${CSI}?1006l\${CSI}?1002l\${CSI}?1000l\${CSI}?1049l\`)
   process.exit(0)
 }
@@ -134,11 +179,11 @@ function cleanup() {
 process.stdin.setRawMode?.(true)
 process.stdin.resume()
 process.stdout.write(\`\${CSI}?1049h\${CSI}?1000h\${CSI}?1002h\${CSI}?1006h\`)
-draw('START')
+draw('START', 'start')
 
 process.stdout.on('resize', () => {
   resizeCount += 1
-  draw(\`SIGWINCH:\${resizeCount}\`)
+  draw(\`SIGWINCH:\${resizeCount}\`, 'resize')
 })
 
 process.stdin.on('data', (data) => {
@@ -148,7 +193,22 @@ process.stdin.on('data', (data) => {
     'utf8'
   )
 
-  return scriptPath
+  return { reportPath, scriptPath }
+}
+
+export async function readFakeAgentReports(
+  reportPath: string
+): Promise<readonly FakeAgentReport[]> {
+  try {
+    const contents = await readFile(reportPath, 'utf8')
+
+    return contents
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as FakeAgentReport)
+  } catch {
+    return []
+  }
 }
 
 export async function writeMouseReporterScript(projectDirectory: string): Promise<{

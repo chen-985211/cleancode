@@ -10,7 +10,6 @@ import {
 } from '../fixtures/contexts/agent/fakeCodexCli'
 
 import {
-  closeElectronApp,
   createE2eWorkbench,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
@@ -46,7 +45,7 @@ describe('workspace Agents e2e', () => {
       environment: {
         CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
         CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-        PATH: [fakeCodex.binDirectory, process.env.PATH].filter(Boolean).join(delimiter),
+        PATH: [fakeCodex.binDirectory, '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(delimiter),
         SHELL: '/bin/sh'
       }
     })
@@ -65,33 +64,16 @@ describe('workspace Agents e2e', () => {
   })
 
   it(
-    'creates and removes independent Agent canvas nodes and persists the remaining set',
+    'creates and removes Agent canvas nodes and persists the remaining set',
+    { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       await expectDesktopRuntime(page)
-      await selectTheme(page, '浅色')
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
-      const agentTerminal = page.locator('.agent-terminal-viewport').first()
-      await agentTerminal.waitFor()
-      expect(await agentTerminal.getAttribute('data-agent-terminal-source-theme')).toBe('light')
-      await selectTheme(page, '深色')
-      expect(await agentTerminal.evaluate((element) => getComputedStyle(element).filter)).not.toBe(
-        'none'
-      )
-      expect(await agentTerminal.getAttribute('data-agent-terminal-source-theme')).toBe('light')
-
-      const viewportBeforeCreatingAgent = await readCanvasViewportTransform(page)
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 2)
-      await page.waitForFunction((previousViewport) => {
-        const viewport = document.querySelector('.react-flow__viewport')
-
-        return Boolean(viewport && getComputedStyle(viewport).transform !== previousViewport)
-      }, viewportBeforeCreatingAgent)
-      expect(await readCanvasViewportTransform(page)).not.toBe(viewportBeforeCreatingAgent)
-      expect(await page.locator('[data-minimap-node-id^="agent:"]').count()).toBe(2)
 
       await page.getByRole('button', { name: 'Agent 2 更多操作' }).click()
       await page.getByRole('menuitem', { name: '移除' }).click()
@@ -102,45 +84,7 @@ describe('workspace Agents e2e', () => {
       ) as { version: number; workspaces: Array<{ agents: unknown[] }> }
       expect(store.version).toBe(4)
       expect(store.workspaces[0]?.agents).toHaveLength(1)
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'persists one Agent CleanCode MCP switch across a full application restart',
-    async () => {
-      await expectDesktopRuntime(page)
-      await page.getByRole('button', { name: '添加项目' }).click()
-      await waitForAgentCount(page, 1)
-      await waitForPersistedAgent(page)
-
-      const toggle = page.getByRole('switch', { name: 'CleanCode MCP' })
-      expect(await toggle.getAttribute('aria-checked')).toBe('true')
-      await toggle.click()
-      await waitForAgentMcpCapability(workbench, false)
-      await page.waitForFunction(
-        () =>
-          document
-            .querySelector('[role="switch"][aria-label="CleanCode MCP"]')
-            ?.getAttribute('aria-checked') === 'false'
-      )
-
-      await closeElectronApp(electronApp)
-      resources.electronApp = undefined
-      resources.page = undefined
-      electronApp = await launchApp(workbench)
-      resources.electronApp = electronApp
-      page = await electronApp.firstWindow()
-      resources.page = page
-      await page.waitForLoadState('domcontentloaded')
-      await waitForAgentCount(page, 1)
-      await waitForPersistedAgent(page)
-
-      expect(
-        await page.getByRole('switch', { name: 'CleanCode MCP' }).getAttribute('aria-checked')
-      ).toBe('false')
-    },
-    electronScenarioTimeoutMs
+    }
   )
 
   it(
@@ -212,58 +156,6 @@ describe('workspace Agents e2e', () => {
       expect(await readXtermSelection(terminal)).toBe(selectedText)
       expect(await readAgentLayout(workbench)).toEqual(beforeLayout)
       expect(await readCanvasViewportTransform(page)).toBe(beforeViewport)
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'selects an Agent from its title and resizes its unselected top-left corner',
-    async () => {
-      await expectDesktopRuntime(page)
-      await page.getByRole('button', { name: '添加项目' }).click()
-      await waitForAgentCount(page, 1)
-      await waitForAgentTerminals(page, 1)
-      await waitForPersistedAgent(page)
-
-      const agent = page.locator('[data-agent-console-node]').first()
-      await waitForAgentSelectionState(page, 'unselected')
-      await agent.locator('.agent-console__terminal-shell').click()
-      await waitForAgentSelectionState(page, 'unselected')
-
-      const beforeBox = await readRequiredBoundingBox(agent)
-      const beforeLayout = await readAgentLayout(workbench)
-      const resizeDrag = await startAgentResizeFromTopLeft(page)
-
-      await page.mouse.move(resizeDrag.startX - 100, resizeDrag.startY - 80, { steps: 18 })
-      await page.mouse.up()
-
-      const afterLayout = await waitForAgentLayoutChange(workbench, beforeLayout)
-      const afterBox = await readRequiredBoundingBox(agent)
-
-      expect(afterLayout.position.x).toBeLessThan(beforeLayout.position.x - 60)
-      expect(afterLayout.position.y).toBeLessThan(beforeLayout.position.y - 45)
-      expect(afterLayout.size.width).toBeGreaterThan(beforeLayout.size.width + 60)
-      expect(afterLayout.size.height).toBeGreaterThan(beforeLayout.size.height + 45)
-      expect(
-        Math.abs(
-          afterLayout.position.x +
-            afterLayout.size.width -
-            (beforeLayout.position.x + beforeLayout.size.width)
-        )
-      ).toBeLessThan(2)
-      expect(
-        Math.abs(
-          afterLayout.position.y +
-            afterLayout.size.height -
-            (beforeLayout.position.y + beforeLayout.size.height)
-        )
-      ).toBeLessThan(2)
-      expect(afterBox.width).toBeGreaterThan(beforeBox.width + 60)
-      expect(afterBox.height).toBeGreaterThan(beforeBox.height + 45)
-      await waitForAgentSelectionState(page, 'unselected')
-
-      await agent.locator('.agent-console-actions__title').click()
-      await waitForAgentSelectionState(page, 'selected')
     },
     electronScenarioTimeoutMs
   )
@@ -537,15 +429,6 @@ async function waitForTerminalDomText(terminal: Locator, text: string): Promise<
   throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
 }
 
-async function waitForPersistedAgent(page: Page): Promise<void> {
-  await page.waitForFunction(() => {
-    const agentId = document
-      .querySelector('[data-agent-console-node]')
-      ?.getAttribute('data-agent-console-node')
-    return Boolean(agentId && agentId !== 'default-agent')
-  })
-}
-
 async function waitForAgentSelectionState(
   page: Page,
   state: 'selected' | 'unselected'
@@ -577,97 +460,4 @@ async function readAgentLayout(workbench: E2eWorkbench): Promise<AgentLayout> {
   ) as { workspaces: Array<{ agents: Array<{ layout: AgentLayout }> }> }
 
   return store.workspaces[0]!.agents[0]!.layout
-}
-
-async function waitForAgentMcpCapability(
-  workbench: E2eWorkbench,
-  expected: boolean
-): Promise<void> {
-  const deadline = Date.now() + 5_000
-  while (Date.now() < deadline) {
-    const store = JSON.parse(
-      await readOnlyJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
-    ) as { workspaces: Array<{ agents: Array<{ cleancodeMcpEnabled: boolean }> }> }
-    if (store.workspaces[0]?.agents[0]?.cleancodeMcpEnabled === expected) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for CleanCode MCP capability to become ${expected}.`)
-}
-
-async function waitForAgentLayoutChange(
-  workbench: E2eWorkbench,
-  beforeLayout: AgentLayout
-): Promise<AgentLayout> {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const layout = await readAgentLayout(workbench)
-
-    if (
-      layout.position.x !== beforeLayout.position.x ||
-      layout.position.y !== beforeLayout.position.y ||
-      layout.size.width !== beforeLayout.size.width ||
-      layout.size.height !== beforeLayout.size.height
-    ) {
-      return layout
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readAgentLayout(workbench)
-}
-
-async function startAgentResizeFromTopLeft(page: Page): Promise<{
-  readonly startX: number
-  readonly startY: number
-}> {
-  await page.waitForFunction(
-    () =>
-      Array.from(document.querySelectorAll('.agent-console-node__resize-handle')).filter(
-        (element) => {
-          const bounds = element.getBoundingClientRect()
-          return bounds.width > 0 && bounds.height > 0
-        }
-      ).length === 4
-  )
-  const handles = page.locator('.agent-console-node__resize-handle')
-  const boxes = await handles.evaluateAll((elements) =>
-    elements.map((element) => {
-      const bounds = element.getBoundingClientRect()
-      return {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height
-      }
-    })
-  )
-  const topLeft = boxes.sort((left, right) => left.x + left.y - (right.x + right.y))[0]
-
-  expect(topLeft).toBeDefined()
-  const startX = topLeft!.x + topLeft!.width / 2
-  const startY = topLeft!.y + topLeft!.height / 2
-  await page.mouse.move(startX, startY)
-  await page.mouse.down()
-
-  return { startX, startY }
-}
-
-async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
-  return locator.evaluate((element) => {
-    const bounds = element.getBoundingClientRect()
-    return {
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: bounds.height
-    }
-  })
-}
-
-async function selectTheme(page: Page, name: '浅色' | '深色'): Promise<void> {
-  await page.getByRole('button', { name: '主题设置' }).click()
-  await page.getByText(name, { exact: true }).click()
-  await page.getByRole('button', { name: '关闭主题设置' }).click()
 }

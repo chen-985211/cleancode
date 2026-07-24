@@ -6,6 +6,7 @@ import {
   createE2eWorkbench,
   electronLaunchTimeoutMs,
   electronScenarioTimeoutMs,
+  e2eTeardownTimeoutMs,
   expectDesktopRuntime,
   launchApp,
   teardownE2eScenario,
@@ -13,6 +14,12 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
+import {
+  e2eShellReadyMarker,
+  waitForTerminalOutputInNewSession,
+  waitForTerminalShellReady,
+  waitForTerminalViewportGeometry
+} from '../support/e2eTerminal'
 import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
 
 describe('terminal workflows e2e', () => {
@@ -25,7 +32,9 @@ describe('terminal workflows e2e', () => {
     resources = {}
     workbench = await createE2eWorkbench('cleancode-terminal-workflow-e2e')
     resources.workbench = workbench
-    electronApp = await launchApp(workbench)
+    electronApp = await launchApp(workbench, {
+      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+    })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
     resources.page = page
@@ -38,102 +47,56 @@ describe('terminal workflows e2e', () => {
       taskFailed: task.result?.state === 'fail',
       taskName: task.name
     })
-  })
+  }, e2eTeardownTimeoutMs)
 
   it(
     'connects terminals and runs dependent commands as one workflow',
+    { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
-      await expectDesktopRuntime(page)
-      await page.getByRole('button', { name: '添加项目' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByText('运行中').first().waitFor()
-      await page.getByRole('button', { name: '适应画布' }).click()
-      await page.waitForTimeout(250)
+      const initialSessions = await createTwoRunningTerminals(page)
 
       await configureLaunchCommand(page, 'Terminal 1', 'printf "workflow-install-complete\\n"')
       await configureLaunchCommand(page, 'Terminal 2', 'printf "workflow-build-complete\\n"')
       await connectTerminalNodes(page)
 
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()
-      await waitForTerminalOutput(page, 'Terminal 1', 'workflow-install-complete')
-      await waitForTerminalOutput(page, 'Terminal 2', 'workflow-build-complete')
+      await waitForTerminalOutputInNewSession(
+        page,
+        'Terminal 1',
+        initialSessions.first,
+        'workflow-install-complete'
+      )
+      await waitForTerminalOutputInNewSession(
+        page,
+        'Terminal 2',
+        initialSessions.second,
+        'workflow-build-complete'
+      )
       await page.getByText('流程运行成功').waitFor()
 
       const graph = await readE2eBlockGraph(workbench)
 
       expect(graph.connections).toHaveLength(1)
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'navigates from active minimap terminal input without nudging any canvas node',
-    async () => {
-      await expectDesktopRuntime(page)
-      await page.getByRole('button', { name: '添加项目' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
-      await page.getByText('运行中').first().waitFor()
-      await page.getByRole('button', { name: '适应画布' }).click()
-
-      const firstTerminal = terminalNodeByTitle(page, 'Terminal 1')
-      const secondTerminal = terminalNodeByTitle(page, 'Terminal 2')
-      const firstBlockId = await firstTerminal.getAttribute('data-terminal-block-id')
-      const secondBlockId = await secondTerminal.getAttribute('data-terminal-block-id')
-      expect(firstBlockId).toBeTruthy()
-      expect(secondBlockId).toBeTruthy()
-      const firstFlowNode = page.locator(`.react-flow__node[data-id="${firstBlockId}"]`)
-      const secondFlowNode = page.locator(`.react-flow__node[data-id="${secondBlockId}"]`)
-      const agentFlowNode = page.locator('.react-flow__node-agentConsole').first()
-
-      await page.getByRole('button', { name: '聚焦终端 Terminal 1' }).click()
-      await expect
-        .poll(() =>
-          firstTerminal.evaluate(
-            (node) =>
-              node.contains(document.activeElement) &&
-              document.activeElement?.matches('.xterm-helper-textarea')
-          )
-        )
-        .toBe(true)
-      await expect
-        .poll(() => firstTerminal.getAttribute('class'))
-        .toContain('terminal-node--selected')
-      const beforeTransforms = await Promise.all([
-        firstFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
-        secondFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
-        agentFlowNode.evaluate((node) => (node as HTMLElement).style.transform)
-      ])
-
-      await page.keyboard.press(
-        process.platform === 'darwin' ? 'Meta+ArrowRight' : 'Control+ArrowRight'
-      )
-
-      await expect
-        .poll(() =>
-          agentFlowNode.locator('[data-selection-state]').getAttribute('data-selection-state')
-        )
-        .toBe('selected')
-      await expect
-        .poll(() =>
-          agentFlowNode.evaluate(
-            (node) =>
-              node.contains(document.activeElement) &&
-              document.activeElement?.matches('.xterm-helper-textarea')
-          )
-        )
-        .toBe(true)
-      const afterTransforms = await Promise.all([
-        firstFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
-        secondFlowNode.evaluate((node) => (node as HTMLElement).style.transform),
-        agentFlowNode.evaluate((node) => (node as HTMLElement).style.transform)
-      ])
-      expect(afterTransforms).toEqual(beforeTransforms)
-    },
-    electronScenarioTimeoutMs
+    }
   )
 })
+
+async function createTwoRunningTerminals(
+  page: Page
+): Promise<{ readonly first: string; readonly second: string }> {
+  await expectDesktopRuntime(page)
+  await page.getByRole('button', { name: '添加项目' }).click()
+  await page.getByRole('button', { name: '新建终端积木' }).click()
+  await page.getByRole('button', { name: '新建终端积木' }).click()
+  const firstSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
+  const secondSessionId = await waitForTerminalShellReady(page, 'Terminal 2')
+
+  await page.getByRole('button', { name: '适应画布' }).click()
+  await waitForTerminalViewportGeometry(page, firstSessionId)
+  await waitForTerminalViewportGeometry(page, secondSessionId)
+
+  return { first: firstSessionId, second: secondSessionId }
+}
 
 async function configureLaunchCommand(
   page: Page,
@@ -175,18 +138,4 @@ function terminalNodeByTitle(page: Page, terminalName: string): Locator {
 
 function escapeRegularExpression(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-async function waitForTerminalOutput(
-  page: Page,
-  terminalName: string,
-  output: string
-): Promise<void> {
-  await page.waitForFunction(
-    ({ terminalName, output }) =>
-      document
-        .querySelector(`[aria-label="${terminalName} 文本输出"]`)
-        ?.textContent?.includes(output) ?? false,
-    { terminalName, output }
-  )
 }

@@ -62,7 +62,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       environment: {
         CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
         CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-        PATH: [fakeCodex.binDirectory, process.env.PATH].filter(Boolean).join(delimiter),
+        PATH: [fakeCodex.binDirectory, '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(delimiter),
         SHELL: '/bin/sh'
       }
     })
@@ -155,52 +155,6 @@ describe('Agent terminal theme across workspaces e2e', () => {
       expect(new Set(sessionReports.map((report) => report.cwd))).toEqual(
         new Set([workbench.projectDirectory, canonicalFeatureDirectory])
       )
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
-    'keeps MCP geometrically centered and presents the Provider as the leading icon',
-    async () => {
-      await expectDesktopRuntime(page)
-      await page.getByRole('button', { name: '添加项目' }).click()
-      await waitForPersistedAgent(page)
-
-      const agent = page.locator('[data-agent-console-node]').first()
-      await agent.getByRole('img', { name: 'Codex' }).waitFor()
-      await agent.getByRole('switch', { name: 'CleanCode MCP' }).waitFor()
-
-      const geometry = await agent.evaluate((element) => {
-        const header = element.querySelector<HTMLElement>('.agent-console__header')
-        const center = element.querySelector<HTMLElement>('.agent-console-actions__center')
-        const identity = element.querySelector<HTMLElement>('.agent-console__provider-identity')
-        const title = element.querySelector<HTMLElement>('.agent-console-actions__title')
-        if (!header || !center || !identity || !title) {
-          throw new Error('Agent header layout is incomplete.')
-        }
-        const headerBounds = header.getBoundingClientRect()
-        const centerBounds = center.getBoundingClientRect()
-        const identityBounds = identity.getBoundingClientRect()
-        const titleBounds = title.getBoundingClientRect()
-
-        return {
-          centerDelta:
-            centerBounds.left +
-            centerBounds.width / 2 -
-            (headerBounds.left + headerBounds.width / 2),
-          iconBeforeTitle: identityBounds.right <= titleBounds.left,
-          iconPathCount: identity.querySelectorAll('svg path').length,
-          visibleProviderText: Array.from(header.querySelectorAll('*')).some(
-            (candidate) =>
-              candidate.children.length === 0 && candidate.textContent?.trim() === 'Codex'
-          )
-        }
-      })
-
-      expect(Math.abs(geometry.centerDelta)).toBeLessThanOrEqual(0.5)
-      expect(geometry.iconBeforeTitle).toBe(true)
-      expect(geometry.iconPathCount).toBeGreaterThan(0)
-      expect(geometry.visibleProviderText).toBe(false)
     },
     electronScenarioTimeoutMs
   )

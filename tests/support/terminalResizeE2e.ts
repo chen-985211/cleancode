@@ -11,16 +11,6 @@ export async function readRequiredBoundingBox(locator: ReturnType<Page['locator'
   return box!
 }
 
-export async function waitForTerminalSelectionState(page: Page, selected: boolean): Promise<void> {
-  await page.waitForFunction(
-    (expectedSelected) =>
-      document
-        .querySelector('[data-terminal-block-id]')
-        ?.classList.contains('terminal-node--selected') === expectedSelected,
-    selected
-  )
-}
-
 export async function resizeTerminalBlockFromBottomRight(
   page: Page,
   deltaX: number,
@@ -41,18 +31,7 @@ export async function startTerminalBlockResizeFromBottomRight(page: Page): Promi
     () => document.querySelectorAll('.terminal-node__resize-handle').length > 0
   )
 
-  return startTerminalResizeFromHandle(page, 'bottom-right')
-}
-
-export async function startTerminalBlockResizeFromTopLeft(page: Page): Promise<{
-  readonly startX: number
-  readonly startY: number
-}> {
-  await page.waitForFunction(
-    () => document.querySelectorAll('.terminal-node__resize-handle').length === 4
-  )
-
-  return startTerminalResizeFromHandle(page, 'top-left')
+  return startTerminalResizeFromBottomRight(page)
 }
 
 export async function readTerminalBlockPosition(workbench: E2eWorkbench) {
@@ -97,9 +76,8 @@ export async function waitForTerminalBlockSizeChange(
   return readTerminalBlockSize(workbench)
 }
 
-async function startTerminalResizeFromHandle(
-  page: Page,
-  corner: 'top-left' | 'bottom-right'
+async function startTerminalResizeFromBottomRight(
+  page: Page
 ): Promise<{ readonly startX: number; readonly startY: number }> {
   const handles = page.locator('.terminal-node__resize-handle')
   const boxes = await Promise.all(
@@ -108,7 +86,7 @@ async function startTerminalResizeFromHandle(
   const orderedBoxes = boxes
     .filter((box): box is NonNullable<typeof box> => Boolean(box))
     .sort((left, right) => left.x + left.y - (right.x + right.y))
-  const box = corner === 'top-left' ? orderedBoxes[0] : orderedBoxes.at(-1)
+  const box = orderedBoxes.at(-1)
 
   expect(box).toBeDefined()
   const startX = box!.x + box!.width / 2

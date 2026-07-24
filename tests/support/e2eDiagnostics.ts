@@ -4,6 +4,8 @@ import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
 
+import { withE2eDeadline } from './e2eLifecycle'
+
 interface ApplicationDiagnostics {
   readonly processOutput: string[]
   readonly rendererOutput: string[]
@@ -17,6 +19,7 @@ interface DiagnosticWorkbench {
 }
 
 const e2eArtifactDirectory = join(process.cwd(), 'test-results', 'e2e')
+const e2eDiagnosticOperationTimeoutMs = 5_000
 const applicationDiagnostics = new WeakMap<ElectronApplication, ApplicationDiagnostics>()
 
 export function initializeE2eDiagnostics(electronApp: ElectronApplication): void {
@@ -160,29 +163,33 @@ async function captureFailureArtifacts(input: {
 
 async function readRendererState(page: Page): Promise<unknown> {
   try {
-    return await page.evaluate(() => ({
-      activeElement:
-        document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.className,
-      agentTerminals: Array.from(
-        document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
-      ).map((element) => ({
-        filter: getComputedStyle(element).filter,
-        bufferedOutputLength: Number(element.dataset.agentTerminalOutputLength ?? 0),
-        outputTail: element.querySelector('.xterm-rows')?.textContent?.slice(-4_000) ?? '',
-        processId: element.dataset.agentTerminalProcessId,
-        sessionId: element.dataset.agentTerminalSessionId,
-        sourceTheme: element.dataset.agentTerminalSourceTheme,
-        workspaceName: element.dataset.agentTerminalWorkspaceName
+    return await withE2eDeadline(
+      page.evaluate(() => ({
+        activeElement:
+          document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.className,
+        agentTerminals: Array.from(
+          document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
+        ).map((element) => ({
+          filter: getComputedStyle(element).filter,
+          bufferedOutputLength: Number(element.dataset.agentTerminalOutputLength ?? 0),
+          outputTail: element.querySelector('.xterm-rows')?.textContent?.slice(-4_000) ?? '',
+          processId: element.dataset.agentTerminalProcessId,
+          sessionId: element.dataset.agentTerminalSessionId,
+          sourceTheme: element.dataset.agentTerminalSourceTheme,
+          workspaceName: element.dataset.agentTerminalWorkspaceName
+        })),
+        terminalOutputs: Array.from(
+          document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
+        ).map((element) => ({
+          ariaLabel: element.getAttribute('aria-label'),
+          sessionId: element.dataset.terminalSessionId,
+          outputTail: element.textContent?.slice(-4_000) ?? ''
+        })),
+        url: window.location.href
       })),
-      terminalOutputs: Array.from(
-        document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
-      ).map((element) => ({
-        ariaLabel: element.getAttribute('aria-label'),
-        sessionId: element.dataset.terminalSessionId,
-        outputTail: element.textContent?.slice(-4_000) ?? ''
-      })),
-      url: window.location.href
-    }))
+      e2eDiagnosticOperationTimeoutMs,
+      'E2E renderer diagnostics'
+    )
   } catch (error) {
     return { error: getErrorMessage(error) }
   }
@@ -190,7 +197,15 @@ async function readRendererState(page: Page): Promise<unknown> {
 
 async function captureScreenshot(page: Page, screenshotPath: string): Promise<string | null> {
   try {
-    await page.screenshot({ fullPage: true, path: screenshotPath })
+    await withE2eDeadline(
+      page.screenshot({
+        fullPage: true,
+        path: screenshotPath,
+        timeout: e2eDiagnosticOperationTimeoutMs
+      }),
+      e2eDiagnosticOperationTimeoutMs,
+      'E2E failure screenshot'
+    )
     return null
   } catch (error) {
     return getErrorMessage(error)
@@ -220,7 +235,11 @@ async function stopTracing(
   }
 
   diagnostics.tracingActive = false
-  await electronApp.context().tracing.stop(tracePath ? { path: tracePath } : undefined)
+  await withE2eDeadline(
+    electronApp.context().tracing.stop(tracePath ? { path: tracePath } : undefined),
+    e2eDiagnosticOperationTimeoutMs,
+    'E2E tracing stop'
+  )
 }
 
 function createArtifactStem(taskName: string): string {

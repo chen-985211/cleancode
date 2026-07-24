@@ -4,6 +4,7 @@ import { join } from 'node:path'
 export interface FakeClaudeCliFixture {
   readonly binDirectory: string
   readonly reportPath: string
+  readonly shellPath: string
 }
 
 export interface FakeClaudeCliReport {
@@ -21,12 +22,15 @@ export async function installFakeClaudeCli(
   const binDirectory = join(fixtureDirectory, 'bin')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
   const executablePath = join(binDirectory, 'claude')
+  const shellPath = join(fixtureDirectory, 'sh')
 
   await mkdir(binDirectory, { recursive: true })
   await writeFile(executablePath, createFakeClaudeProgram(), 'utf8')
+  await writeFile(shellPath, createDeterministicShellProgram(), 'utf8')
   await chmod(executablePath, 0o755)
+  await chmod(shellPath, 0o755)
 
-  return { binDirectory, reportPath }
+  return { binDirectory, reportPath, shellPath }
 }
 
 export async function readFakeClaudeCliReports(
@@ -103,5 +107,22 @@ process.stdin.on('data', (data) => {
 process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)
 process.on('SIGTERM', exitCleanly)
+`
+}
+
+function createDeterministicShellProgram(): string {
+  return `#!/bin/sh
+if [ "$1" = "-ilc" ]; then
+  case "$2" in
+    *"__CLEANCODE_AGENT_SHELL_PATH__"*)
+      printf '%s' '__CLEANCODE_AGENT_SHELL_PATH__'
+      printf '%s' "$PATH"
+      printf '%s' '__CLEANCODE_AGENT_SHELL_PATH__'
+      exit 0
+      ;;
+  esac
+fi
+
+exec /bin/sh "$@"
 `
 }

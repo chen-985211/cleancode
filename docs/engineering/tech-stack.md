@@ -85,7 +85,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 串行编排 Playwright，并在 suite 级 global setup 中只构建一次桌面产物；默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行，CI 由独立 build job 上传同一份 `out` artifact，再分到三个相互隔离的 macOS runner，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。
@@ -97,7 +97,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
-本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖上述自定义检查、格式、Lint、类型检查、全部测试、依赖方向和未使用代码检查。
+本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖上述自定义检查、格式、Lint、类型检查、全部 unit/integration/contract、关键 E2E smoke、依赖方向和未使用代码检查。完整 Electron E2E 由 CI workflow 和显式 `pnpm test:full` 覆盖。
 
 ## 候选技术与触发条件
 

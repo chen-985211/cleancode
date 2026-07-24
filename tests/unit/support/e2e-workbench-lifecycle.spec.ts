@@ -1,27 +1,38 @@
 // @vitest-environment node
 
 import { EventEmitter } from 'node:events'
-import { rm } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { ElectronApplication } from 'playwright'
 
-const launchElectron = vi.hoisted(() => vi.fn())
+const { connectSocket, launchElectron } = vi.hoisted(() => ({
+  connectSocket: vi.fn(),
+  launchElectron: vi.fn()
+}))
 
 vi.mock('playwright', () => ({
   _electron: {
     launch: launchElectron
   }
 }))
+vi.mock('node:net', async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
+  connect: connectSocket
+}))
 
 import {
   closeElectronApp,
   launchApp,
+  readAuthenticatedTerminalProviderMetadata,
   teardownE2eScenario,
+  waitForTextFile,
   waitForProcessIdExit,
   type E2eWorkbench
 } from '../../support/e2eWorkbench'
-import { runE2eTeardown } from '../../support/e2eLifecycle'
+import { runE2eTeardown, withE2eDeadline } from '../../support/e2eLifecycle'
 
 const workbench: E2eWorkbench = {
   appStateDirectory: '/tmp/cleancode-e2e-state',
@@ -36,8 +47,15 @@ interface MutableElectronProcess extends EventEmitter {
   signalCode: NodeJS.Signals | null
 }
 
+interface MutableSocket extends EventEmitter {
+  destroy: ReturnType<typeof vi.fn>
+  destroyed: boolean
+  write: ReturnType<typeof vi.fn>
+}
+
 describe('E2E workbench lifecycle', () => {
   beforeEach(() => {
+    connectSocket.mockReset()
     launchElectron.mockReset()
     vi.stubEnv('CLEANCODE_E2E_VISIBLE', '0')
   })
@@ -141,6 +159,100 @@ describe('E2E workbench lifecycle', () => {
     ).rejects.toBe(diagnosticsError)
     expect(order).toEqual(['capture diagnostics', 'close application', 'cleanup scenario'])
   })
+
+  it('bounds teardown operations that never settle', async () => {
+    vi.useFakeTimers()
+    try {
+      const deadline = expect(
+        withE2eDeadline(new Promise<never>(() => undefined), 25, 'stuck teardown operation')
+      ).rejects.toThrow('stuck teardown operation timed out after 25ms')
+
+      await vi.advanceTimersByTimeAsync(25)
+      await deadline
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('waits for text file content to become complete and stable', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-e2e-text-file-'))
+    const filePath = join(directory, 'report.txt')
+
+    try {
+      await writeFile(filePath, 'partial', 'utf8')
+      const rewrite = new Promise<void>((resolve, reject) => {
+        setTimeout(() => {
+          void writeFile(filePath, 'complete', 'utf8').then(resolve, reject)
+        }, 5)
+      })
+
+      await expect(
+        waitForTextFile(filePath, {
+          intervalMs: 10,
+          isComplete: (contents) => contents === 'complete',
+          timeoutMs: 500
+        })
+      ).resolves.toBe('complete')
+      await rewrite
+    } finally {
+      await rm(directory, { force: true, recursive: true })
+    }
+  })
+
+  it('retains the last transient file error when a text report never appears', async () => {
+    const missingPath = join(tmpdir(), `cleancode-missing-${randomUUID()}.txt`)
+
+    await expect(
+      waitForTextFile(missingPath, { intervalMs: 5, timeoutMs: 20 })
+    ).rejects.toMatchObject({
+      cause: {
+        code: 'ENOENT'
+      }
+    })
+  })
+
+  it('destroys a provider socket when the health response deadline expires', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-e2e-provider-health-'))
+    const providerDirectory = join(directory, 'terminal-runtime-provider')
+    const socket = createSocket()
+    let resolveConnectionStarted!: () => void
+    const connectionStarted = new Promise<void>((resolve) => {
+      resolveConnectionStarted = resolve
+    })
+
+    try {
+      await mkdir(providerDirectory, { recursive: true })
+      connectSocket.mockImplementation(() => {
+        resolveConnectionStarted()
+        queueMicrotask(() => socket.emit('connect'))
+        return socket
+      })
+      await writeFile(
+        join(providerDirectory, 'provider.json'),
+        JSON.stringify({
+          authToken: 'test-token',
+          endpoint: '/test/provider.sock',
+          instanceId: 'test-instance',
+          processId: 999_999
+        }),
+        'utf8'
+      )
+
+      vi.useFakeTimers()
+      const metadata = readAuthenticatedTerminalProviderMetadata(directory)
+      const deadline = expect(metadata).resolves.toBeNull()
+      await connectionStarted
+      await vi.advanceTimersByTimeAsync(0)
+      await vi.advanceTimersByTimeAsync(2_000)
+      await deadline
+
+      expect(socket.destroy).toHaveBeenCalledOnce()
+      expect(socket.destroyed).toBe(true)
+    } finally {
+      vi.useRealTimers()
+      await rm(directory, { force: true, recursive: true })
+    }
+  })
 })
 
 function createElectronProcess(): MutableElectronProcess {
@@ -152,4 +264,18 @@ function createElectronProcess(): MutableElectronProcess {
   electronProcess.kill = vi.fn(() => true)
 
   return electronProcess
+}
+
+function createSocket(): MutableSocket {
+  const socket = new EventEmitter() as MutableSocket
+
+  socket.destroyed = false
+  socket.destroy = vi.fn(() => {
+    socket.destroyed = true
+    socket.emit('close')
+    return socket
+  })
+  socket.write = vi.fn(() => true)
+
+  return socket
 }

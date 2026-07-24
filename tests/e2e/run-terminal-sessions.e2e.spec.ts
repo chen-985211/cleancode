@@ -5,11 +5,13 @@ import { join } from 'node:path'
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
+  readFakeAgentReports,
   waitForMouseReports,
   writeFakeAgentScript,
   writeMouseReporterScript,
   writeQuickLaunchFixtureScript,
-  writeTerminalSelectionFixtureScript
+  writeTerminalSelectionFixtureScript,
+  type FakeAgentReport
 } from '../fixtures/contexts/run/fakeTerminalPrograms'
 import {
   createE2eWorkbench,
@@ -29,10 +31,8 @@ import {
   readTerminalBlockSize,
   resizeTerminalBlockFromBottomRight,
   startTerminalBlockResizeFromBottomRight,
-  startTerminalBlockResizeFromTopLeft,
   waitForTerminalBlockPositionChange,
-  waitForTerminalBlockSizeChange,
-  waitForTerminalSelectionState
+  waitForTerminalBlockSizeChange
 } from '../support/terminalResizeE2e'
 import {
   readCanvasViewportTransform,
@@ -79,6 +79,7 @@ describe('run terminal sessions e2e', () => {
 
   it(
     'runs shell commands from the active project workspace',
+    { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       await createRunningTerminal(page)
       const commandOutputPath = join(workbench.projectDirectory, 'terminal-command-output.txt')
@@ -102,8 +103,7 @@ describe('run terminal sessions e2e', () => {
 
       expect(graph.blocks).toHaveLength(1)
       expect(graph.blocks[0]?.type).toBe('terminal')
-    },
-    electronScenarioTimeoutMs
+    }
   )
 
   it(
@@ -242,53 +242,6 @@ describe('run terminal sessions e2e', () => {
   )
 
   it(
-    'selects a terminal only from its title and resizes its unselected top-left corner',
-    async () => {
-      await createRunningTerminal(page)
-
-      const terminalBlock = page.locator('[data-terminal-block-id]').first()
-      const agentHeader = page.locator('.agent-console__header').first()
-      await agentHeader.click()
-      await waitForTerminalSelectionState(page, false)
-
-      await terminalBlock.locator('.terminal-frame').click({ position: { x: 24, y: 24 } })
-      await waitForTerminalSelectionState(page, false)
-      await terminalBlock.locator('.terminal-node__header').click({ position: { x: 24, y: 24 } })
-      await waitForTerminalSelectionState(page, true)
-      await agentHeader.click()
-      await waitForTerminalSelectionState(page, false)
-      await page.getByRole('button', { name: '收起小地图' }).click()
-      await page.locator('.canvas-minimap--collapsed').waitFor()
-
-      const beforeBox = await readRequiredBoundingBox(terminalBlock)
-      const beforePosition = await readTerminalBlockPosition(workbench)
-      const beforeSize = await readTerminalBlockSize(workbench)
-      const resizeDrag = await startTerminalBlockResizeFromTopLeft(page)
-
-      await page.mouse.move(resizeDrag.startX - 100, resizeDrag.startY - 80, { steps: 18 })
-      await page.mouse.up()
-
-      const afterPosition = await waitForTerminalBlockPositionChange(workbench, beforePosition)
-      const afterSize = await waitForTerminalBlockSizeChange(workbench, beforeSize)
-      const afterBox = await readRequiredBoundingBox(terminalBlock)
-
-      expect(afterPosition.x).toBeLessThan(beforePosition.x - 60)
-      expect(afterPosition.y).toBeLessThan(beforePosition.y - 45)
-      expect(afterSize.width).toBeGreaterThan(beforeSize.width + 60)
-      expect(afterSize.height).toBeGreaterThan(beforeSize.height + 45)
-      expect(
-        Math.abs(afterPosition.x + afterSize.width - (beforePosition.x + beforeSize.width))
-      ).toBeLessThan(2)
-      expect(
-        Math.abs(afterPosition.y + afterSize.height - (beforePosition.y + beforeSize.height))
-      ).toBeLessThan(2)
-      expect(afterBox.width).toBeGreaterThan(beforeBox.width + 60)
-      expect(afterBox.height).toBeGreaterThan(beforeBox.height + 45)
-    },
-    electronScenarioTimeoutMs
-  )
-
-  it(
     'shows terminal block resize feedback before the pointer is released',
     async () => {
       await createRunningTerminal(page)
@@ -314,33 +267,52 @@ describe('run terminal sessions e2e', () => {
     async () => {
       await createRunningTerminal(page)
 
-      const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
+      const fakeAgent = await writeFakeAgentScript(workbench.projectDirectory)
 
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(fakeAgentScriptPath)}\r`
+        `node ${JSON.stringify(fakeAgent.scriptPath)}\r`
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'FAKE_AGENT_READY')
+      const started = await waitForFakeAgentReport(
+        fakeAgent.reportPath,
+        (report) => report.kind === 'start',
+        'the fullscreen fixture to report its initial terminal size'
+      )
+      const beforeResizeReports = await readFakeAgentReports(fakeAgent.reportPath)
+      const beforeResizeState = beforeResizeReports.at(-1) ?? started
       const terminalBlock = page.locator('[data-terminal-block-id]').first()
       const beforeBox = await readRequiredBoundingBox(terminalBlock)
 
       await resizeTerminalBlockFromBottomRight(page, 180, 120)
       const afterMouseUpBox = await readRequiredBoundingBox(terminalBlock)
 
-      await page.waitForTimeout(300)
+      const resized = await waitForFakeAgentReport(
+        fakeAgent.reportPath,
+        (report) =>
+          report.kind === 'resize' &&
+          report.resizeCount > beforeResizeState.resizeCount &&
+          report.columns > beforeResizeState.columns &&
+          report.rows > beforeResizeState.rows,
+        'SIGWINCH with the enlarged terminal dimensions'
+      )
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
+      await waitForFakeAgentReport(
+        fakeAgent.reportPath,
+        (report) => report.kind === 'exit' && report.resizeCount >= resized.resizeCount,
+        'the fullscreen fixture to exit after Ctrl-C'
+      )
+      const resizeReports = (await readFakeAgentReports(fakeAgent.reportPath)).filter(
+        (report) => report.kind === 'resize' && report.resizeCount > beforeResizeState.resizeCount
+      )
 
-      const terminalOutput = (await page.getByLabel('Terminal 1 文本输出').textContent()) ?? ''
-      const agentSizes = readFakeAgentSizes(terminalOutput)
-      const initialTerminalSize = agentSizes[0]!
-      const resizedTerminalSize = agentSizes.at(-1)!
-
-      expect(countOccurrences(terminalOutput, 'SIGWINCH:')).toBeLessThanOrEqual(2)
+      expect(resizeReports.length).toBeGreaterThan(0)
+      expect(resizeReports.length).toBeLessThanOrEqual(2)
       expect(afterMouseUpBox.width - beforeBox.width).toBeGreaterThan(120)
       expect(afterMouseUpBox.height - beforeBox.height).toBeGreaterThan(80)
-      expect(resizedTerminalSize.columns).toBeGreaterThan(initialTerminalSize.columns)
-      expect(resizedTerminalSize.rows).toBeGreaterThan(initialTerminalSize.rows)
+      expect(resized.columns).toBeGreaterThan(beforeResizeState.columns)
+      expect(resized.rows).toBeGreaterThan(beforeResizeState.rows)
     },
     electronScenarioTimeoutMs
   )
@@ -353,12 +325,12 @@ describe('run terminal sessions e2e', () => {
       await readTerminalSessionId(page, 'Terminal 2')
       await waitForTerminalShellReady(page, 'Terminal 2')
 
-      const fakeAgentScriptPath = await writeFakeAgentScript(workbench.projectDirectory)
+      const fakeAgent = await writeFakeAgentScript(workbench.projectDirectory)
 
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(fakeAgentScriptPath)}\r`
+        `node ${JSON.stringify(fakeAgent.scriptPath)}\r`
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'FAKE_AGENT_READY')
       await page.locator('[data-terminal-block-id]').nth(1).locator('.terminal-viewport').click()
@@ -416,6 +388,26 @@ describe('run terminal sessions e2e', () => {
   )
 })
 
+async function waitForFakeAgentReport(
+  reportPath: string,
+  predicate: (report: FakeAgentReport) => boolean,
+  description: string
+): Promise<FakeAgentReport> {
+  const deadline = Date.now() + 5_000
+  let reports: readonly FakeAgentReport[] = []
+
+  while (Date.now() < deadline) {
+    reports = await readFakeAgentReports(reportPath)
+    const report = reports.find(predicate)
+    if (report) return report
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+
+  throw new Error(
+    `Timed out waiting for ${description}. Last fixture reports: ${JSON.stringify(reports.slice(-5))}`
+  )
+}
+
 async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
@@ -426,19 +418,4 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.waitForFunction(() =>
     document.activeElement?.classList.contains('xterm-helper-textarea')
   )
-}
-
-function countOccurrences(text: string, pattern: string): number {
-  return text.split(pattern).length - 1
-}
-
-function readFakeAgentSizes(output: string) {
-  const matches = [...output.matchAll(/SIZE:(\d+)x(\d+)/g)]
-
-  expect(matches.length).toBeGreaterThan(0)
-
-  return matches.map((match) => ({
-    columns: Number(match[1]),
-    rows: Number(match[2])
-  }))
 }

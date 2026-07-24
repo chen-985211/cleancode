@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process'
 import { access, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { connect } from 'node:net'
+import { connect, type Socket } from 'node:net'
 import { randomUUID } from 'node:crypto'
 
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright'
@@ -14,17 +14,21 @@ import {
   startE2eTracing,
   stopE2eTracing
 } from './e2eDiagnostics'
-import { runE2eTeardown } from './e2eLifecycle'
+import { runE2eTeardown, withE2eDeadline } from './e2eLifecycle'
 import {
   encodeTerminalProviderFrame,
   TerminalProviderFrameDecoder,
   terminalProviderProtocolVersion
 } from '../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
 
+export { e2eTeardownTimeoutMs } from './e2eLifecycle'
+
 export const electronLaunchTimeoutMs = 30_000
 export const electronScenarioTimeoutMs = 60_000
 const electronCloseTimeoutMs = 10_000
 const electronWindowStateTimeoutMs = 10_000
+const terminalProviderConnectTimeoutMs = 1_500
+const terminalProviderResponseTimeoutMs = 2_000
 
 export interface E2eWorkbench {
   readonly projectDirectory: string
@@ -118,41 +122,106 @@ async function authenticateTerminalProvider(metadata: {
   readonly endpoint: string
 }): Promise<string> {
   const socket = connect(metadata.endpoint)
-  await new Promise<void>((resolve, reject) => {
-    socket.once('connect', resolve)
-    socket.once('error', reject)
-  })
-  const requestId = randomUUID()
-  const decoder = new TerminalProviderFrameDecoder()
-  const response = new Promise<string>((resolve, reject) => {
-    socket.on('data', (chunk) => {
-      for (const value of decoder.push(chunk)) {
-        const message = value as {
-          readonly type?: string
-          readonly requestId?: string
-          readonly ok?: boolean
-          readonly result?: { readonly instanceId?: string }
-        }
-        if (message.type !== 'response' || message.requestId !== requestId) continue
-        if (message.ok && message.result?.instanceId) resolve(message.result.instanceId)
-        else reject(new Error('Terminal provider authentication failed during E2E cleanup.'))
-      }
-    })
-  })
-  socket.write(
-    encodeTerminalProviderFrame({
-      type: 'request',
-      protocolVersion: terminalProviderProtocolVersion,
-      requestId,
-      authToken: metadata.authToken,
-      method: 'health'
-    })
-  )
+
   try {
-    return await response
+    await withE2eDeadline(
+      waitForSocketConnect(socket),
+      terminalProviderConnectTimeoutMs,
+      'Terminal provider health connection'
+    )
+    const requestId = randomUUID()
+    const response = waitForTerminalProviderHealthResponse(socket, requestId)
+    socket.write(
+      encodeTerminalProviderFrame({
+        type: 'request',
+        protocolVersion: terminalProviderProtocolVersion,
+        requestId,
+        authToken: metadata.authToken,
+        method: 'health'
+      })
+    )
+    return await withE2eDeadline(
+      response,
+      terminalProviderResponseTimeoutMs,
+      'Terminal provider health response'
+    )
   } finally {
     socket.destroy()
   }
+}
+
+function waitForSocketConnect(socket: Socket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      socket.off('close', handleClose)
+      socket.off('connect', handleConnect)
+      socket.off('error', handleError)
+    }
+    const handleClose = (): void => {
+      cleanup()
+      reject(new Error('Terminal provider socket closed before the health connection completed.'))
+    }
+    const handleConnect = (): void => {
+      cleanup()
+      resolve()
+    }
+    const handleError = (error: Error): void => {
+      cleanup()
+      reject(error)
+    }
+
+    socket.once('close', handleClose)
+    socket.once('connect', handleConnect)
+    socket.once('error', handleError)
+  })
+}
+
+function waitForTerminalProviderHealthResponse(socket: Socket, requestId: string): Promise<string> {
+  const decoder = new TerminalProviderFrameDecoder()
+
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      socket.off('close', handleClose)
+      socket.off('data', handleData)
+      socket.off('error', handleError)
+    }
+    const handleClose = (): void => {
+      cleanup()
+      reject(new Error('Terminal provider socket closed before the health response arrived.'))
+    }
+    const handleData = (chunk: Buffer): void => {
+      try {
+        for (const value of decoder.push(chunk)) {
+          const message = value as {
+            readonly type?: string
+            readonly requestId?: string
+            readonly ok?: boolean
+            readonly result?: { readonly instanceId?: string }
+          }
+          if (message.type !== 'response' || message.requestId !== requestId) continue
+
+          cleanup()
+          if (message.ok && message.result?.instanceId) {
+            resolve(message.result.instanceId)
+          } else {
+            reject(new Error('Terminal provider authentication failed during E2E cleanup.'))
+          }
+          return
+        }
+      } catch (error) {
+        cleanup()
+        reject(error)
+      }
+    }
+    const handleError = (error: Error): void => {
+      cleanup()
+      reject(error)
+    }
+
+    socket.once('close', handleClose)
+    socket.on('data', handleData)
+    socket.once('error', handleError)
+  })
 }
 
 function isProcessAlive(processId: number): boolean {
@@ -330,7 +399,7 @@ export async function closeElectronApp(
   }
 
   try {
-    await withTimeout(electronApp.close(), electronCloseTimeoutMs, 'Electron application close')
+    await withE2eDeadline(electronApp.close(), electronCloseTimeoutMs, 'Electron application close')
     await waitForProcessExit(electronProcess, electronCloseTimeoutMs)
   } catch (error) {
     electronProcess.kill('SIGKILL')
@@ -367,18 +436,63 @@ export async function waitForJsonFile(directory: string, fileName: string): Prom
   return readOnlyJsonFile(directory, fileName)
 }
 
-export async function waitForTextFile(filePath: string): Promise<string> {
-  const deadline = Date.now() + 5_000
+export interface WaitForTextFileOptions {
+  readonly intervalMs?: number
+  readonly isComplete?: (contents: string) => boolean
+  readonly timeoutMs?: number
+}
 
-  while (Date.now() < deadline) {
+export async function waitForTextFile(
+  filePath: string,
+  options: WaitForTextFileOptions = {}
+): Promise<string> {
+  const timeoutMs = options.timeoutMs ?? 5_000
+  const intervalMs = Math.max(1, options.intervalMs ?? 50)
+  const deadline = Date.now() + timeoutMs
+  let lastError: unknown
+  let previousContents: string | undefined
+
+  do {
     try {
-      return await readFile(filePath, 'utf8')
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    }
-  }
+      const contents = await readFile(filePath, 'utf8')
+      let isComplete = true
 
-  return readFile(filePath, 'utf8')
+      try {
+        isComplete = options.isComplete?.(contents) ?? true
+      } catch (error) {
+        isComplete = false
+        lastError = error
+      }
+
+      if (!isComplete) {
+        previousContents = undefined
+        lastError ??= new Error('Text file content did not pass readiness validation.')
+      } else if (contents === previousContents) {
+        return contents
+      } else {
+        previousContents = contents
+        lastError = new Error(
+          `Text file content had not settled yet (last length: ${contents.length}).`
+        )
+      }
+    } catch (error) {
+      if (!isTransientTextFileReadError(error)) {
+        throw error
+      }
+      previousContents = undefined
+      lastError = error
+    }
+
+    const remainingMs = deadline - Date.now()
+    if (remainingMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, remainingMs)))
+    }
+  } while (Date.now() < deadline)
+
+  throw new Error(
+    `Text file ${filePath} did not become complete and stable within ${timeoutMs}ms. Last observation: ${describeError(lastError)}`,
+    { cause: lastError }
+  )
 }
 
 export async function pathExists(path: string): Promise<boolean> {
@@ -427,33 +541,24 @@ async function waitForProcessExit(electronProcess: ChildProcess, timeoutMs: numb
     return
   }
 
-  await withTimeout(
+  await withE2eDeadline(
     new Promise<void>((resolve) => electronProcess.once('exit', () => resolve())),
     timeoutMs,
     'Electron process exit'
   )
 }
 
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  operation: string
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout | undefined
+function isTransientTextFileReadError(error: unknown): error is NodeJS.ErrnoException {
+  const code = (error as NodeJS.ErrnoException | null)?.code
 
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(
-          () => reject(new Error(`${operation} timed out after ${timeoutMs}ms.`)),
-          timeoutMs
-        )
-      })
-    ])
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
+  return code === 'EACCES' || code === 'EBUSY' || code === 'ENOENT' || code === 'EPERM'
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code
+    return code ? `${code}: ${error.message}` : error.message
   }
+
+  return String(error)
 }

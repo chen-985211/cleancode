@@ -1,0 +1,102 @@
+name: Electron E2E
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'electron.vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'src/**'
+      - 'tests/e2e/**'
+      - 'tests/fixtures/**'
+      - 'tests/support/**'
+      - 'tsconfig.json'
+      - 'vitest.e2e.config.ts'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'electron.vite.config.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'src/**'
+      - 'tests/e2e/**'
+      - 'tests/fixtures/**'
+      - 'tests/support/**'
+      - 'tsconfig.json'
+      - 'vitest.e2e.config.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: electron-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Electron application
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec electron-vite build
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: electron-e2e-application
+          path: out
+          retention-days: 1
+
+  e2e:
+    name: Electron E2E / shard ${{ matrix.shard }}
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v8
+        with:
+          name: electron-e2e-application
+          path: out
+      - name: Run E2E shard
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: pnpm test:e2e --shard=${{ matrix.shard }}/3
+
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: ignore
+          name: electron-e2e-diagnostics-${{ matrix.shard }}
+          path: test-results/e2e
+          retention-days: 7

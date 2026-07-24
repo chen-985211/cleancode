@@ -92,6 +92,7 @@ describe('git branch workspaces e2e', () => {
 
   it(
     'creates a git worktree branch workspace and switches terminal working directories',
+    { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -155,8 +156,7 @@ describe('git branch workspaces e2e', () => {
           isCurrent: false
         }
       ])
-    },
-    electronScenarioTimeoutMs
+    }
   )
 
   it(

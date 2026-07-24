@@ -71,7 +71,7 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 应用开发测试必须纳入本地统一质量门禁。
 
-`pnpm pre-commit` 必须执行 `pnpm test`，确保 AI 或开发者每次修改生产代码、测试代码、构建配置、工具配置或依赖后都会运行测试。
+`pnpm pre-commit` 必须执行 `pnpm test`，确保 AI 或开发者每次修改生产代码、测试代码、构建配置、工具配置或依赖后都会运行全部低层测试和关键 E2E smoke。
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
@@ -81,7 +81,7 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 Agent Provider-neutral Presentation 门禁必须通过 `pnpm check:agent-provider-boundary` 执行。它必须从内建 contribution 的静态 descriptor 自动发现当前和未来 Provider ID，拒绝生产表现层中的品牌 ID 与具体 Provider infrastructure 引用，并在无法发现 ID 时失败关闭；`tests/unit/support/check-agent-provider-boundary.spec.ts` 锁定未知 Provider、TSX/CSS、import、legacy 例外和发现失败边界。Provider registry 与组件仍须分别使用行为测试证明未知 descriptor 能沿通用路径工作，静态门禁不能替代 capability 降级与 attach/retry 测试。
 
-`pnpm test` 必须按测试金字塔从低层到高层串行执行：
+`pnpm test` 是本地快速测试门禁，必须按测试金字塔从低层到高层串行执行：
 
 ```txt
 pnpm test:unit
@@ -90,10 +90,14 @@ pnpm test:integration
   ↓
 pnpm test:contract
   ↓
-pnpm test:e2e
+pnpm test:e2e:smoke
 ```
 
-底层测试必须先失败先反馈。更慢、更接近真实用户路径的测试必须放在后面运行。任何新增测试类型或调整测试目录时，都必须同步维护 `package.json` 的测试脚本和本文档。
+底层测试必须先失败先反馈。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
+
+`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`。完整 Electron E2E 由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在相关 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时也必须使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
+
+任何新增测试类型、调整测试目录或改变快速/完整门禁时，都必须同步维护 `package.json`、对应 CI workflow 和本文档。
 
 开发协作 AI 在最终说明中必须说明新增或更新了哪些测试、运行了哪些测试，以及是否存在未覆盖风险。
 
@@ -228,11 +232,11 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 普通终端日常交互主路径由 `terminal-daily-interactions.e2e.spec.ts` 在同一真实 session 中覆盖 Unicode 输出、搜索结果、WebGL context loss 后的 DOM fallback，以及降级后的剪贴板输入到 PTY。该场景必须使用真实 Electron，因为 unit 测试无法证明 GPU context、真实 xterm buffer、ClipboardEvent、IPC 和 node-pty 的连续组合；搜索分支、链接授权、粘贴分片和 renderer controller 清理仍放在 unit、integration 与 contract 层。
 
-普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 覆盖正常退出重开、renderer/main/Provider 故障、永久关闭、项目移除和工作流不恢复。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入和用户可见恢复类型的组合；退出策略、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
+普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 代表性覆盖正常退出重开、renderer/main/Provider 故障和多终端自然退出。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入和用户可见恢复类型的组合；永久关闭、项目清理、工作流保留限制、启动锁回收、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
 
-整套 Electron E2E 只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
+单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 分片必须由独立 build job 生成同一份不可变 `out` artifact；分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
 
-`pnpm test:e2e` 默认使用屏幕外非激活的真实 Electron `BrowserWindow` 运行，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。
+`pnpm test:e2e:smoke` 只运行带 `smoke` 标签的关键路径；`pnpm test:e2e` 运行完整套件。两者默认使用屏幕外非激活的真实 Electron `BrowserWindow`，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。
 
 `pnpm test:e2e:visible` 使用相同构建产物、启动支撑和测试套件，仅显式显示 Electron 窗口用于诊断。只有必须验证系统焦点、原生对话框、原生菜单或操作系统级输入的个别场景，才应通过该入口定向运行；这类场景不得迫使默认套件切回前台。系统剪贴板不要求窗口可见，但测试必须在 `finally` 中恢复原值，且不得与其他剪贴板写入场景并行执行。
 

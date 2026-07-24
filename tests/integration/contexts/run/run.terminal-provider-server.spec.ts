@@ -38,7 +38,10 @@ describe('terminal provider server', () => {
 
   it('requires authentication and warm-attaches to the exact retained live session', async () => {
     const processes = new RecordingProcessPort()
-    server = createServer(processes)
+    const store = new FileTerminalRecoveryStore({
+      rootDirectory: join(rootDirectory, 'recovery')
+    })
+    server = createServer(processes, store)
     await server.start()
 
     const unauthorized = await TestProviderClient.connect(endpoint, 'wrong-token')
@@ -101,6 +104,13 @@ describe('terminal provider server', () => {
 
     await reattached.request('stopProcess', { sessionId: 'session-1' })
     await reattached.request('retireModel', { identity: identity() })
+    const remaining = await reattached.request<{
+      readonly sessions: readonly TerminalSessionSnapshot[]
+    }>('listSessions')
+    expect(remaining.sessions).toEqual([])
+    await vi.waitFor(async () => {
+      expect((await store.load()).sessions).toEqual([])
+    })
     reattached.close()
   })
 
