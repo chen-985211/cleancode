@@ -6,6 +6,7 @@ import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import type { ForegroundJobProcessIdentity } from '../../application/ports/TerminalProcessPort'
 import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
 
 export interface TerminalProviderMetadata {
@@ -44,6 +45,29 @@ interface LegacyProviderLaunchLockRecord {
 
 const providerLaunchLockInitializationGraceMs = 250
 const providerLaunchLockStaleAfterMs = 15_000
+
+export function matchesForegroundJob(
+  expected: ForegroundJobProcessIdentity,
+  actual: ForegroundJobProcessIdentity
+): boolean {
+  return (
+    expected.sessionId === actual.sessionId &&
+    expected.launchId === actual.launchId &&
+    expected.generation === actual.generation
+  )
+}
+
+export function isApplicationDetachReceipt(
+  value: unknown
+): value is { readonly releaseId: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'releaseId' in value &&
+    typeof value.releaseId === 'string' &&
+    value.releaseId.length > 0
+  )
+}
 
 export async function readProviderMetadata(path: string): Promise<TerminalProviderMetadata | null> {
   try {

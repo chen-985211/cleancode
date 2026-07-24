@@ -51,13 +51,16 @@ import {
   createProviderEndpoint,
   delayProviderOperation,
   getProviderErrorMessage,
+  isApplicationDetachReceipt,
   isProviderProcessAlive,
+  matchesForegroundJob,
   providerEndpointAcceptsConnections,
   readProviderMetadata,
   removeStaleProviderMetadata,
   rotateProviderLog,
   type TerminalProviderMetadata
 } from './PersistentTerminalProviderClientSupport'
+import { TerminalProviderProcessEventGate } from './TerminalProviderProcessEventGate'
 
 const providerStartupTimeoutMs = 5_000
 const providerControllerClaimTimeoutMs = 5_000
@@ -85,6 +88,7 @@ export class PersistentTerminalProviderClient
   private readonly foregroundJobCallbacks = new Map<string, LaunchForegroundJobProcessCommand>()
   private readonly viewCallbacks = new Map<string, AttachTerminalViewCommand>()
   private readonly pendingModelCreates = new Map<string, Promise<unknown>>()
+  private readonly processEventGate = new TerminalProviderProcessEventGate()
   private readonly workingDirectories = new Map<string, string>()
   private readonly identities = new Map<string, TerminalRunScope>()
   private connectionAttempt: Promise<TerminalProviderMetadata> | null = null
@@ -160,13 +164,15 @@ export class PersistentTerminalProviderClient
 
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     await this.pendingModelCreates.get(command.scope.sessionId)
-    this.processCallbacks.set(command.scope.sessionId, {
+    const sessionId = command.scope.sessionId
+    this.processCallbacks.set(sessionId, {
       onOutput: command.onOutput,
       onExit: command.onExit
     })
-    this.identities.set(command.scope.sessionId, command.scope)
+    this.identities.set(sessionId, command.scope)
+    this.processEventGate.begin(sessionId)
     try {
-      return await this.request('startProcess', {
+      const handle = await this.request<TerminalProcessHandle>('startProcess', {
         command: {
           scope: command.scope,
           workingDirectory: command.workingDirectory,
@@ -180,8 +186,13 @@ export class PersistentTerminalProviderClient
           rows: command.rows
         }
       })
+      setImmediate(() => {
+        for (const event of this.processEventGate.release(sessionId)) this.handleEvent(event)
+      })
+      return handle
     } catch (error) {
-      this.processCallbacks.delete(command.scope.sessionId)
+      this.processEventGate.forget(sessionId)
+      this.processCallbacks.delete(sessionId)
       throw error
     }
   }
@@ -298,6 +309,7 @@ export class PersistentTerminalProviderClient
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
     this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
     this.backgroundRequest('retireModel', { identity })
@@ -307,6 +319,7 @@ export class PersistentTerminalProviderClient
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
     this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
     await this.request('retireModel', { identity })
@@ -553,6 +566,8 @@ export class PersistentTerminalProviderClient
   }
 
   private handleEvent(event: TerminalProviderEvent): void {
+    if (this.processEventGate.defer(event)) return
+
     if (event.event === 'terminal-output') {
       const output = event.payload as TerminalProcessOutputEvent & { readonly sequence: number }
       if (isBlockTerminalOwner(output.scope)) this.options.onOutput?.(output)
@@ -604,6 +619,7 @@ export class PersistentTerminalProviderClient
       this.options.onRuntimeUnavailable?.(disconnectError)
     }
     for (const [sessionId, callbacks] of this.processCallbacks) {
+      if (this.processEventGate.isPending(sessionId)) continue
       const scope = this.identities.get(sessionId)
       if (scope) callbacks.onExit({ scope, sessionId, exitCode: null })
     }
@@ -655,6 +671,7 @@ export class PersistentTerminalProviderClient
     this.foregroundJobCallbacks.clear()
     this.viewCallbacks.clear()
     this.pendingModelCreates.clear()
+    this.processEventGate.clear()
     this.workingDirectories.clear()
     this.identities.clear()
     this.recoveryIssueHandler = null
@@ -663,25 +680,4 @@ export class PersistentTerminalProviderClient
 
 function providerUnavailable(message: string) {
   return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
-}
-
-function matchesForegroundJob(
-  expected: ForegroundJobProcessIdentity,
-  actual: ForegroundJobProcessIdentity
-): boolean {
-  return (
-    expected.sessionId === actual.sessionId &&
-    expected.launchId === actual.launchId &&
-    expected.generation === actual.generation
-  )
-}
-
-function isApplicationDetachReceipt(value: unknown): value is { readonly releaseId: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'releaseId' in value &&
-    typeof value.releaseId === 'string' &&
-    value.releaseId.length > 0
-  )
 }

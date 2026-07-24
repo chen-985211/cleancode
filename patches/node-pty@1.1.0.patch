@@ -1,0 +1,37 @@
+diff --git a/lib/conpty_console_list_agent.js b/lib/conpty_console_list_agent.js
+index 8c4fca9022a6d6f015bca87f61625cde2278f428..9bdf4e3263bc741b3ba647649700c2c97fdffb71 100644
+--- a/lib/conpty_console_list_agent.js
++++ b/lib/conpty_console_list_agent.js
+@@ -10,7 +10,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ var utils_1 = require("./utils");
+ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').module.getConsoleProcessList;
+ var shellPid = parseInt(process.argv[2], 10);
+-var consoleProcessList = getConsoleProcessList(shellPid);
++var consoleProcessList;
++try {
++    consoleProcessList = getConsoleProcessList(shellPid);
++}
++catch (_a) {
++    // The shell can exit before this best-effort cleanup helper attaches.
++    consoleProcessList = [shellPid];
++}
+ process.send({ consoleProcessList: consoleProcessList });
+ process.exit(0);
+ //# sourceMappingURL=conpty_console_list_agent.js.map
+diff --git a/src/conpty_console_list_agent.ts b/src/conpty_console_list_agent.ts
+index 181ccabbbe9c4948a9725fb1db907a68e9de01fc..b0247707bbd6bdd1864783106b6674d579383d7d 100644
+--- a/src/conpty_console_list_agent.ts
++++ b/src/conpty_console_list_agent.ts
+@@ -11,5 +11,11 @@
+ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.getConsoleProcessList;
+ const shellPid = parseInt(process.argv[2], 10);
+-const consoleProcessList = getConsoleProcessList(shellPid);
++let consoleProcessList: number[];
++try {
++  consoleProcessList = getConsoleProcessList(shellPid);
++} catch {
++  // The shell can exit before this best-effort cleanup helper attaches.
++  consoleProcessList = [shellPid];
++}
+ process.send!({ consoleProcessList });
+ process.exit(0);

@@ -84,7 +84,7 @@ export async function waitForTerminalShellReady(page: Page, terminalName: string
       const sessionId = output?.dataset.terminalSessionId
       const terminalText = output?.textContent?.trimEnd() ?? ''
       const promptReady = windows
-        ? terminalText.endsWith('>') && terminalText.slice(-512).includes('PS ')
+        ? /PS [^\r\n>]*>/u.test(terminalText.slice(-4_096))
         : terminalText.endsWith(marker)
 
       return sessionId && promptReady ? sessionId : ''

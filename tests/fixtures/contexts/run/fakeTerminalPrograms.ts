@@ -23,7 +23,7 @@ export interface FakeAgentFixture {
 export const terminalWorkspaceRetentionFixtureFileName = 'terminal-workspace-retention-fixture.mjs'
 export const terminalWorkspaceRetentionEarlyMarker = '__TERMINAL_SCROLLBACK_EARLY_MARKER__'
 export const terminalWorkspaceRetentionLateMarker = '__TERMINAL_SCROLLBACK_LATE_MARKER__'
-export const terminalWorkspaceRetentionInvisiblePadding = '\u001b[0m'.repeat(2_200)
+export const terminalWorkspaceRetentionInvisiblePadding = '\u0000'.repeat(8_193)
 export const terminalQueryFixtureFileName = 'terminal-query-fixture.mjs'
 
 export async function writeTerminalWorkspaceRetentionFixtureScript(
