@@ -46,6 +46,7 @@ export async function selectExactXtermText(
   targetText: string
 ): Promise<void> {
   await ensureTerminalDomRenderer(terminal)
+  await terminal.locator('.xterm-helper-textarea').focus()
   await terminal.locator('.xterm-rows > div').filter({ hasText: targetText }).last().waitFor()
   const selection = await terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))

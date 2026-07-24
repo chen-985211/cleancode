@@ -126,13 +126,12 @@ async function connectTerminalNodes(page: Page): Promise<void> {
   const targetHandle = terminalNodeByTitle(page, 'Terminal 2').locator(
     '.terminal-node__handle--input'
   )
-  const sourceBox = await readRequiredBoundingBox(sourceHandle)
   const targetBox = await readRequiredBoundingBox(targetHandle)
 
-  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+  await sourceHandle.hover()
   await page.mouse.down()
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, {
-    steps: 12
+    steps: 20
   })
   await page.mouse.up()
   await page.locator('.react-flow__edge').waitFor({ state: 'attached' })

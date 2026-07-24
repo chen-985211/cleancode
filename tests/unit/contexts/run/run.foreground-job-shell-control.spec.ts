@@ -143,6 +143,38 @@ describe('foreground job shell control', () => {
 
     disposeForegroundJobShellControl(control)
   })
+
+  it('parses ConPTY-safe PowerShell OSC control frames across output chunks', () => {
+    const onExit = vi.fn()
+    const onStarted = vi.fn()
+    const control = createForegroundJobShellControl(createCommand(), {
+      platform: 'win32',
+      shellExecutable: 'powershell.exe',
+      temporaryRoot,
+      token: 'fixedtoken'
+    })
+    const handlers = { onExit, onStarted }
+
+    expect(
+      acceptForegroundJobOutput(
+        control,
+        "PS> & 'powershell.exe' -File 'launch.ps1'\r\n\u001b]633;CLEANCODE_JOB:fixed",
+        handlers
+      )
+    ).toBe('')
+    expect(
+      acceptForegroundJobOutput(
+        control,
+        'token:started\u0007Agent ready\r\n\u001b]633;CLEANCODE_JOB:fixedtoken:exit:7',
+        handlers
+      )
+    ).toBe('Agent ready\r\n')
+    expect(acceptForegroundJobOutput(control, '\u0007PS> ', handlers)).toBe('PS> ')
+    expect(onStarted).toHaveBeenCalledWith(control.command)
+    expect(onExit).toHaveBeenCalledWith({ ...control.command, exitCode: 7 })
+
+    disposeForegroundJobShellControl(control)
+  })
 })
 
 function createCommand(

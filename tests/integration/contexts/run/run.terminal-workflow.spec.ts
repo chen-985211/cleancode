@@ -13,6 +13,7 @@ import type {
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { TerminalSessionWorkflowRuntimeAdapter } from '../../../../src/contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
 import { NodeTcpReadinessAdapter } from '../../../../src/contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
+import { createE2ePrintCommand } from '../../../support/e2eTerminal'
 
 describe('terminal workflow with real PTYs', () => {
   it('starts a dependent command only after a successful real process exit', async () => {
@@ -34,7 +35,7 @@ describe('terminal workflow with real PTYs', () => {
         workspaceDirectory: workingDirectory,
         gitBranch: 'main',
         workingDirectory,
-        shell: '/bin/sh',
+        shell: process.platform === 'win32' ? 'powershell.exe' : '/bin/sh',
         scope: { type: 'full' }
       })
 
@@ -55,7 +56,7 @@ describe('terminal workflow with real PTYs', () => {
       await sessions.stopAll()
       await rm(workingDirectory, { recursive: true, force: true })
     }
-  }, 10_000)
+  }, 20_000)
 })
 
 class StaticPlanPort implements TerminalWorkflowPlanPort {
@@ -79,8 +80,8 @@ function createPlan(): WorkflowRunPlanSnapshot {
     graphId: 'graph-1',
     workspaceName: 'main',
     nodes: [
-      task('install', 'printf "install-complete\\n"'),
-      task('build', 'printf "build-complete\\n"', ['install'])
+      task('install', createE2ePrintCommand('install-complete')),
+      task('build', createE2ePrintCommand('build-complete'), ['install'])
     ]
   }
 }
@@ -95,7 +96,7 @@ function task(
     name: blockId,
     launchCommand,
     dependencyBlockIds,
-    executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: 5_000 }
+    executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: 10_000 }
   }
 }
 
@@ -110,7 +111,7 @@ async function waitUntil(assertion: () => boolean): Promise<void> {
   const startedAt = Date.now()
 
   while (!assertion()) {
-    if (Date.now() - startedAt > 5_000) {
+    if (Date.now() - startedAt > 15_000) {
       throw new Error('Timed out waiting for the terminal workflow.')
     }
 

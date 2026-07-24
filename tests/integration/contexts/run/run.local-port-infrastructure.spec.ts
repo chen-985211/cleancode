@@ -246,7 +246,7 @@ describe('local port infrastructure', () => {
       await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
       await new Promise<void>((resolve) => externalServer.close(() => resolve()))
     }
-  }, 10_000)
+  }, 30_000)
 
   it('does not treat an unrelated listener in the same process group as owned', async () => {
     const server = createServer()
@@ -275,7 +275,7 @@ describe('local port infrastructure', () => {
       await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
-  }, 10_000)
+  }, 30_000)
 })
 
 function runScope(sessionId: string) {

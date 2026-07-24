@@ -10,6 +10,7 @@ import type {
 } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalSessionSnapshot } from '../../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import { TerminalProviderServer } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderServer'
+import { createProviderEndpoint } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
 import {
   encodeTerminalProviderFrame,
   type TerminalProviderApplicationDetachReceipt,
@@ -26,7 +27,7 @@ describe('terminal provider application shutdown', () => {
 
   beforeEach(async () => {
     rootDirectory = await mkdtemp(join(tmpdir(), 'cc-provider-shutdown-'))
-    endpoint = join(rootDirectory, 'provider.sock')
+    endpoint = createProviderEndpoint(rootDirectory)
   })
 
   afterEach(async () => {

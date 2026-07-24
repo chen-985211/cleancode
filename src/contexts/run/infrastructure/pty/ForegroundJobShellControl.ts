@@ -8,8 +8,10 @@ import type {
   LaunchForegroundJobProcessCommand
 } from '../../application/ports/TerminalProcessPort'
 
-const markerStart = '\x1eCLEANCODE_JOB:'
-const markerEnd = '\x1f'
+const posixMarkerStart = '\x1eCLEANCODE_JOB:'
+const posixMarkerEnd = '\x1f'
+const powershellMarkerStart = '\x1b]633;CLEANCODE_JOB:'
+const powershellMarkerEnd = '\x07'
 const environmentNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export interface ForegroundJobShellControl {
@@ -170,7 +172,7 @@ function createPowerShellLaunchScript(
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
-      `  [Console]::Write(([char]30) + 'CLEANCODE_JOB:${token}:started' + ([char]31))`,
+      `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
       '  & $cleancodeJobExecutable @cleancodeJobArguments',
       '  $cleancodeJobSucceeded = $?',
       '  $cleancodeJobNativeExitCode = $LASTEXITCODE',
@@ -185,7 +187,7 @@ function createPowerShellLaunchScript(
       '  $cleancodeJobExitCode = 1',
       '  [Console]::Error.WriteLine($_.Exception.Message)',
       '} finally {',
-      `  [Console]::Write(([char]30) + 'CLEANCODE_JOB:${token}:exit:' + [string]$cleancodeJobExitCode + ([char]31))`,
+      `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:exit:' + [string]$cleancodeJobExitCode + ([char]7))`,
       '}',
       'exit $cleancodeJobExitCode'
     ].join('\n') + '\n'
@@ -211,6 +213,9 @@ export function acceptForegroundJobOutput(
   }
 ): string {
   control.buffer += data
+  const markerStart =
+    control.shellFamily === 'powershell' ? powershellMarkerStart : posixMarkerStart
+  const markerEnd = control.shellFamily === 'powershell' ? powershellMarkerEnd : posixMarkerEnd
   const exactPrefix = `${markerStart}${control.token}:`
   let output = ''
 

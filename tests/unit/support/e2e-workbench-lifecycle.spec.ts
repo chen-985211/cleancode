@@ -26,6 +26,7 @@ vi.mock('node:net', async (importOriginal) => ({
 import {
   closeElectronApp,
   launchApp,
+  mergeE2eProcessEnvironment,
   readAuthenticatedTerminalProviderMetadata,
   teardownE2eScenario,
   waitForTextFile,
@@ -108,6 +109,29 @@ describe('E2E workbench lifecycle', () => {
     ])
     expect(tracing.stop).toHaveBeenCalledWith({
       path: join(process.cwd(), 'test-results', 'e2e', '123-electron-launch-failure.zip')
+    })
+  })
+
+  it('keeps one canonical Windows Path entry and gives launch overrides precedence', () => {
+    const environment = mergeE2eProcessEnvironment(
+      { Path: 'C:\\Windows', TEMP: 'C:\\Temp' },
+      { PATH: 'C:\\fake-cli;C:\\Windows' },
+      'win32'
+    )
+
+    expect(Object.keys(environment).filter((name) => name.toLowerCase() === 'path')).toEqual([
+      'Path'
+    ])
+    expect(environment.Path).toBe('C:\\fake-cli;C:\\Windows')
+    expect(environment.TEMP).toBe('C:\\Temp')
+  })
+
+  it('preserves case-sensitive path variables outside Windows', () => {
+    expect(
+      mergeE2eProcessEnvironment({ Path: '/base' }, { PATH: '/override' }, 'linux')
+    ).toMatchObject({
+      Path: '/base',
+      PATH: '/override'
     })
   })
 

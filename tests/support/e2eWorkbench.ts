@@ -58,9 +58,15 @@ export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> 
 
 async function cleanupE2eWorkbench(workbench: E2eWorkbench): Promise<void> {
   await stopTerminalProvider(workbench.appStateDirectory)
-  await rm(workbench.projectDirectory, { recursive: true, force: true })
-  await rm(workbench.registryDirectory, { recursive: true, force: true })
-  await rm(workbench.appStateDirectory, { recursive: true, force: true })
+  const removeOptions = {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100
+  } as const
+  await rm(workbench.projectDirectory, removeOptions)
+  await rm(workbench.registryDirectory, removeOptions)
+  await rm(workbench.appStateDirectory, removeOptions)
 }
 
 async function stopTerminalProvider(appStateDirectory: string): Promise<void> {
@@ -277,18 +283,22 @@ export async function launchApp(
       `--user-data-dir=${join(workbench.appStateDirectory, 'electron-user-data')}`
     ],
     cwd: process.cwd(),
-    env: {
-      ...process.env,
-      CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '1',
-      CLEANCODE_TEST_PROJECT_DIRECTORY: workbench.projectDirectory,
-      CLEANCODE_TEST_APP_STATE_DIRECTORY: workbench.appStateDirectory,
-      CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(
-        workbench.registryDirectory,
-        'project-registry.json'
-      ),
-      ...options.environment,
-      CLEANCODE_TEST_BACKGROUND_E2E: runElectronInBackground ? '1' : '0'
-    }
+    env: mergeE2eProcessEnvironment(
+      {
+        ...process.env,
+        CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '1',
+        CLEANCODE_TEST_PROJECT_DIRECTORY: workbench.projectDirectory,
+        CLEANCODE_TEST_APP_STATE_DIRECTORY: workbench.appStateDirectory,
+        CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(
+          workbench.registryDirectory,
+          'project-registry.json'
+        )
+      },
+      {
+        ...options.environment,
+        CLEANCODE_TEST_BACKGROUND_E2E: runElectronInBackground ? '1' : '0'
+      }
+    )
   })
   initializeE2eDiagnostics(electronApplication)
   try {
@@ -328,6 +338,40 @@ export async function launchApp(
   }
 
   return electronApplication
+}
+
+export function mergeE2eProcessEnvironment(
+  baseEnvironment: NodeJS.ProcessEnv,
+  overrides: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform
+): Record<string, string> {
+  const environment = Object.fromEntries(
+    Object.entries({ ...baseEnvironment, ...overrides }).filter(
+      (entry): entry is [string, string] => entry[1] !== undefined
+    )
+  )
+  if (platform !== 'win32') return environment
+
+  const path =
+    readCaseInsensitiveEnvironmentValue(overrides, 'PATH') ??
+    readCaseInsensitiveEnvironmentValue(baseEnvironment, 'PATH')
+  for (const name of Object.keys(environment)) {
+    if (name.toLowerCase() === 'path') delete environment[name]
+  }
+  if (path !== undefined) environment.Path = path
+
+  return environment
+}
+
+function readCaseInsensitiveEnvironmentValue(
+  environment: NodeJS.ProcessEnv,
+  expectedName: string
+): string | undefined {
+  const name = Object.keys(environment).find(
+    (candidate) => candidate.toLowerCase() === expectedName.toLowerCase()
+  )
+
+  return name ? environment[name] : undefined
 }
 
 async function assertElectronRunsInBackground(

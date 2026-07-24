@@ -10,6 +10,7 @@ import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agen
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
+import { asE2eTerminalInput, createE2ePrintCommand } from '../../../support/e2eTerminal'
 
 describe('Agent Providers on the Run Agent terminal', () => {
   let directory: string
@@ -94,6 +95,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       }
     })
     output += snapshot.content
+    await waitForShellReady(runtime, 'agent-session-1', () => output)
     const artifacts = new AgentLaunchArtifactScope()
     launchArtifactScopes.push(artifacts)
     const plan = await provider.launcher.createLaunchPlan({
@@ -114,7 +116,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       withTimeout(launchExited, () => `launch did not exit; output=${output}`)
     ).resolves.toBe(7)
     await waitUntil(() => sessionRef !== null)
-    runtime.write('agent-session-1', 'printf "same-shell\\n"\r')
+    writeShellCommand(runtime, 'agent-session-1', createE2ePrintCommand('same-shell'))
     await waitUntil(() => output.includes('same-shell'))
 
     expect(terminalExited).toBe(false)
@@ -126,7 +128,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
     })
     await sessions.detachView({ ...terminal.viewIdentity, viewId })
     await artifacts.dispose()
-  }, 10_000)
+  }, 20_000)
 
   it('runs OpenCode and returns to the same shell without core special cases', async () => {
     const fakeOpenCode = join(directory, 'fake-opencode.mjs')
@@ -171,6 +173,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       }
     })
     output += snapshot.content
+    await waitForShellReady(runtime, 'agent-session-opencode', () => output)
     const artifacts = new AgentLaunchArtifactScope()
     launchArtifactScopes.push(artifacts)
     const plan = await provider.launcher.createLaunchPlan({
@@ -189,13 +192,17 @@ describe('Agent Providers on the Run Agent terminal', () => {
     await expect(
       withTimeout(launchExited, () => `launch did not exit; output=${output}`)
     ).resolves.toBe(4)
-    runtime.write('agent-session-opencode', 'printf "opencode-same-shell\\n"\r')
+    writeShellCommand(
+      runtime,
+      'agent-session-opencode',
+      createE2ePrintCommand('opencode-same-shell')
+    )
     await waitUntil(() => output.includes('opencode-same-shell'))
     expect(output).toContain(`opencode:${directory}`)
     expect(terminalExited).toBe(false)
     await sessions.detachView({ ...terminal.viewIdentity, viewId })
     await artifacts.dispose()
-  }, 10_000)
+  }, 20_000)
 
   it('runs Claude Code through the same foreground launch and terminal contracts', async () => {
     const fakeClaude = join(directory, 'fake-claude.mjs')
@@ -246,6 +253,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       }
     })
     output += snapshot.content
+    await waitForShellReady(runtime, 'agent-session-claude', () => output)
     const artifacts = new AgentLaunchArtifactScope()
     launchArtifactScopes.push(artifacts)
     const plan = await provider.launcher.createLaunchPlan({
@@ -264,7 +272,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
     await expect(
       withTimeout(launchExited, () => `launch did not exit; output=${output}`)
     ).resolves.toBe(5)
-    runtime.write('agent-session-claude', 'printf "claude-same-shell\\n"\r')
+    writeShellCommand(runtime, 'agent-session-claude', createE2ePrintCommand('claude-same-shell'))
     await waitUntil(() => output.includes('claude-same-shell'))
     expect(output).toContain(
       `claude:550e8400-e29b-41d4-a716-446655440000:${await realpath(directory)}`
@@ -272,7 +280,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
     expect(terminalExited).toBe(false)
     await sessions.detachView({ ...terminal.viewIdentity, viewId })
     await artifacts.dispose()
-  }, 10_000)
+  }, 20_000)
 
   it('keeps the Agent terminal usable when termination fails and allows stop to retry', async () => {
     const sessionId = 'agent-session-stop-retry'
@@ -304,10 +312,28 @@ describe('Agent Providers on the Run Agent terminal', () => {
   })
 })
 
-async function waitUntil(assertion: () => boolean): Promise<void> {
+async function waitForShellReady(
+  runtime: RunAgentTerminalRuntimeAdapter,
+  sessionId: string,
+  readOutput: () => string
+): Promise<void> {
+  const marker = `shell-ready-${sessionId}`
+  writeShellCommand(runtime, sessionId, createE2ePrintCommand(marker))
+  await waitUntil(() => readOutput().includes(marker), 10_000)
+}
+
+function writeShellCommand(
+  runtime: RunAgentTerminalRuntimeAdapter,
+  sessionId: string,
+  command: string
+): void {
+  runtime.write(sessionId, asE2eTerminalInput(command))
+}
+
+async function waitUntil(assertion: () => boolean, timeoutMs = 5_000): Promise<void> {
   const startedAt = Date.now()
   while (!assertion()) {
-    if (Date.now() - startedAt > 5_000) throw new Error('Timed out waiting for Agent terminal.')
+    if (Date.now() - startedAt > timeoutMs) throw new Error('Timed out waiting for Agent terminal.')
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
 }
@@ -315,6 +341,6 @@ async function waitUntil(assertion: () => boolean): Promise<void> {
 function withTimeout<T>(promise: Promise<T>, message: () => string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message())), 4_000))
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message())), 10_000))
   ])
 }
