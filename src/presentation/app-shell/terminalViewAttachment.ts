@@ -28,10 +28,19 @@ export async function attachTerminalViewWithRetry<T>(input: {
 function isTransientTerminalViewAttachError(error: unknown): boolean {
   const code = getAppErrorCode(error)
 
-  return (
+  if (
     code === 'RUN_SCOPE_STALE' ||
     code === 'TERMINAL_MODEL_NOT_FOUND' ||
     code === 'TERMINAL_RUNTIME_NOT_READY' ||
     code === 'TERMINAL_SESSION_NOT_FOUND'
+  ) {
+    return true
+  }
+
+  const message = error instanceof Error ? error.message : String(error)
+
+  return (
+    message.includes('RUN_SCOPE_STALE') ||
+    message.includes('Terminal view no longer matches the current runtime scope.')
   )
 }

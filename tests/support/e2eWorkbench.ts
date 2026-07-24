@@ -287,6 +287,7 @@ export async function launchApp(
       {
         ...process.env,
         CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '1',
+        CLEANCODE_TEST_DISABLE_SINGLE_INSTANCE_LOCK: '1',
         CLEANCODE_TEST_PROJECT_DIRECTORY: workbench.projectDirectory,
         CLEANCODE_TEST_APP_STATE_DIRECTORY: workbench.appStateDirectory,
         CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(

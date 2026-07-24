@@ -101,6 +101,13 @@ describe('E2E workbench lifecycle', () => {
     launchElectron.mockResolvedValue(electronApp)
 
     await expect(launchApp(workbench)).rejects.toBe(launchError)
+    expect(launchElectron).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          CLEANCODE_TEST_DISABLE_SINGLE_INSTANCE_LOCK: '1'
+        })
+      })
+    )
     expect(order).toEqual([
       'start tracing',
       'verify background window',

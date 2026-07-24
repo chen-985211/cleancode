@@ -18,13 +18,24 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   const fixtureDirectory = join(appStateDirectory, 'fake-codex-cli')
   const binDirectory = join(fixtureDirectory, 'bin')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
-  const executablePath = join(binDirectory, process.platform === 'win32' ? 'codex.cmd' : 'codex')
   const programPath = join(fixtureDirectory, 'codex.mjs')
 
   await mkdir(binDirectory, { recursive: true })
   await writeFile(programPath, createFakeCodexProgram(), 'utf8')
-  await writeFile(executablePath, createNodeCliLauncher(programPath), 'utf8')
-  if (process.platform !== 'win32') await chmod(executablePath, 0o755)
+  if (process.platform === 'win32') {
+    await Promise.all([
+      writeFile(join(binDirectory, 'codex.cmd'), createWindowsCmdLauncher(programPath), 'utf8'),
+      writeFile(
+        join(binDirectory, 'codex.ps1'),
+        createWindowsPowerShellLauncher(programPath),
+        'utf8'
+      )
+    ])
+  } else {
+    const executablePath = join(binDirectory, 'codex')
+    await writeFile(executablePath, createPosixNodeCliLauncher(programPath), 'utf8')
+    await chmod(executablePath, 0o755)
+  }
 
   return { binDirectory, reportPath }
 }
@@ -161,14 +172,24 @@ process.stdout.write(OSC + '11;?' + '\\x07')
 `
 }
 
-function createNodeCliLauncher(programPath: string): string {
-  return process.platform === 'win32'
-    ? `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
-    : `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
+function createWindowsCmdLauncher(programPath: string): string {
+  return `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
+}
+
+function createWindowsPowerShellLauncher(programPath: string): string {
+  return `& ${quotePowerShellWord(process.execPath)} ${quotePowerShellWord(programPath)} @args\nexit $LASTEXITCODE\n`
+}
+
+function createPosixNodeCliLauncher(programPath: string): string {
+  return `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
 }
 
 function quotePosixWord(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`
+}
+
+function quotePowerShellWord(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
 }
 
 function isMissingFileError(error: unknown): boolean {

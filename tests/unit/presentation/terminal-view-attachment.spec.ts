@@ -21,6 +21,25 @@ describe('terminal view attachment', () => {
     expect(attach).toHaveBeenCalledTimes(2)
   })
 
+  it('recognizes a stale-scope error after contextBridge strips custom fields', async () => {
+    const attach = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error(
+          'Error invoking remote method: Terminal view no longer matches the current runtime scope.'
+        )
+      )
+      .mockResolvedValueOnce('attached')
+
+    await expect(
+      attachTerminalViewWithRetry({
+        attach,
+        isCancelled: () => false
+      })
+    ).resolves.toBe('attached')
+    expect(attach).toHaveBeenCalledTimes(2)
+  })
+
   it('does not retry an unexpected attachment failure', async () => {
     const failure = new Error('Unexpected attachment failure.')
     const attach = vi.fn().mockRejectedValue(failure)

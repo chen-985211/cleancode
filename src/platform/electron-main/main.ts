@@ -86,6 +86,7 @@ import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
+import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
@@ -94,16 +95,19 @@ interface WorkbenchSnapshot {
   readonly graph: BlockGraphSnapshot
 }
 
-const isPrimaryAppInstance = app.requestSingleInstanceLock()
+const acquiresSingleInstanceLock = shouldAcquireSingleInstanceLock(process.env)
+const isPrimaryAppInstance = !acquiresSingleInstanceLock || app.requestSingleInstanceLock()
 if (!isPrimaryAppInstance) app.quit()
 
-app.on('second-instance', () => {
-  const window = BrowserWindow.getAllWindows()[0]
-  if (!window) return
-  if (window.isMinimized()) window.restore()
-  window.show()
-  window.focus()
-})
+if (acquiresSingleInstanceLock) {
+  app.on('second-instance', () => {
+    const window = BrowserWindow.getAllWindows()[0]
+    if (!window) return
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.focus()
+  })
+}
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)

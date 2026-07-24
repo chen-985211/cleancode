@@ -76,6 +76,8 @@ export function useTerminalSessions({
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
+  const delayedFocusTimersRef = useRef<Set<number>>(new Set())
+  const isMountedRef = useRef(true)
   const currentProjectId = currentProject?.id ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const isRuntimeReady = runtimeAvailability.phase === 'ready'
@@ -212,8 +214,29 @@ export function useTerminalSessions({
     [enqueueTerminalInputWrite]
   )
 
-  useEffect(
-    () => () => {
+  const scheduleTerminalFocus = useCallback(
+    (blockId: string) => {
+      if (!isMountedRef.current) return
+
+      const timerId = window.setTimeout(() => {
+        delayedFocusTimersRef.current.delete(timerId)
+        if (isMountedRef.current) focusTerminalBlock(blockId)
+      }, 80)
+      delayedFocusTimersRef.current.add(timerId)
+    },
+    [focusTerminalBlock]
+  )
+
+  useEffect(() => {
+    isMountedRef.current = true
+
+    return () => {
+      isMountedRef.current = false
+      for (const timerId of delayedFocusTimersRef.current) {
+        window.clearTimeout(timerId)
+      }
+      delayedFocusTimersRef.current.clear()
+
       for (const buffer of inputBuffersRef.current.values()) {
         if (buffer.timerId !== null) {
           window.clearTimeout(buffer.timerId)
@@ -225,9 +248,8 @@ export function useTerminalSessions({
       terminalStartupOutputsRef.current.clear()
       quickLaunchesRef.current.clear()
       terminalSurfaceRegistry.disposeAll()
-    },
-    [terminalSurfaceRegistry]
-  )
+    }
+  }, [terminalSurfaceRegistry])
 
   useTerminalSessionEvents({
     clearPendingTerminalInput,
@@ -359,10 +381,10 @@ export function useTerminalSessions({
       await startTerminal(block, defaultTerminalDimensions)
 
       if (shouldFocusTerminalAfterAction(options)) {
-        window.setTimeout(() => focusTerminalBlock(block.id), 80)
+        scheduleTerminalFocus(block.id)
       }
     },
-    [focusTerminalBlock, startTerminal, terminateTerminalSession]
+    [scheduleTerminalFocus, startTerminal, terminateTerminalSession]
   )
 
   const toggleTerminalRetention = useCallback(
@@ -526,7 +548,7 @@ export function useTerminalSessions({
         }
 
         if (shouldFocusTerminalAfterAction(options)) {
-          window.setTimeout(() => focusTerminalBlock(block.id), 80)
+          scheduleTerminalFocus(block.id)
         }
       } catch (error) {
         notifyTerminalLaunchFailure(notify, error, t)
@@ -540,9 +562,9 @@ export function useTerminalSessions({
       bindTerminalSession,
       currentProject,
       currentWorkspace,
-      focusTerminalBlock,
       isRuntimeReady,
       notify,
+      scheduleTerminalFocus,
       t,
       terminateTerminalSession
     ]

@@ -82,6 +82,10 @@ describe('app shell terminal launch command', () => {
     })
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('configures a missing launch command from the quick launch button', async () => {
     const workbench = createWorkbenchWithTerminal({ launchCommand: '' })
     const updateTerminalDefinition = vi.fn(async (command) => ({
@@ -145,6 +149,8 @@ describe('app shell terminal launch command', () => {
   })
 
   it('quick launches a configured terminal command in a replacement terminal session', async () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-ok'
     })
@@ -175,7 +181,7 @@ describe('app shell terminal launch command', () => {
       value: runtimeApi
     })
 
-    render(<AppShell />)
+    const app = render(<AppShell />)
 
     const quickLaunchButton = await screen.findByRole('button', {
       name: 'Terminal 1 启动命令'
@@ -201,6 +207,14 @@ describe('app shell terminal launch command', () => {
     expect(window.cleancode?.setTerminalRetention).not.toHaveBeenCalled()
     expect(writeTerminal).not.toHaveBeenCalled()
     expect(await screen.findByLabelText('实际服务地址')).toHaveTextContent('http://127.0.0.1:4317')
+
+    const delayedFocusTimerIndex = setTimeoutSpy.mock.calls.findIndex(([, delay]) => delay === 80)
+    expect(delayedFocusTimerIndex).toBeGreaterThanOrEqual(0)
+    const delayedFocusTimerId = setTimeoutSpy.mock.results[delayedFocusTimerIndex]?.value
+
+    app.unmount()
+
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(delayedFocusTimerId)
   })
 
   it('inherits retention when quick launching from a retained ordinary session', async () => {
