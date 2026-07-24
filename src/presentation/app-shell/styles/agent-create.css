@@ -3,11 +3,15 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
+  border-radius: 7px;
+  background: transparent;
   pointer-events: auto;
+  transition: background 150ms ease;
 }
 
 .agent-create-split .toolbar-button {
   border-color: transparent;
+  background: transparent;
 }
 
 .agent-create-split__main {
@@ -26,11 +30,13 @@
   border-radius: 3px 7px 7px 3px;
 }
 
-.agent-create-split__main:hover:not(:disabled),
-.agent-create-split__trigger:hover:not(:disabled),
-.agent-create-split__trigger[aria-expanded='true'] {
+.agent-create-split[data-disabled='false']:hover {
+  background: var(--cc-surface-subtle);
+}
+
+.agent-create-split[data-disabled='false']:hover .toolbar-button:not(:disabled) {
   border-color: transparent;
-  background: var(--cc-surface-hover);
+  background: transparent;
 }
 
 .agent-create-split__main:focus-visible,

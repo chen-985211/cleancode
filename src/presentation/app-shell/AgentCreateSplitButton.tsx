@@ -30,6 +30,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const isDisabled = props.disabled || props.isCreating
   const defaultProvider =
     props.providers.find((provider) => provider.descriptor.id === props.defaultProviderId) ?? null
 
@@ -89,12 +90,12 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
   }
 
   return (
-    <div className="agent-create-split" ref={rootRef}>
+    <div className="agent-create-split" data-disabled={isDisabled} ref={rootRef}>
       <TooltipLabel content={props.shortcutTooltip} side="bottom">
         <button
           aria-label={t('toolbar.newAgent')}
           className="toolbar-button agent-create-split__main"
-          disabled={props.disabled || props.isCreating}
+          disabled={isDisabled}
           type="button"
           onClick={() => (props.defaultProviderId ? props.onCreate() : props.onOpenAgentSettings())}
         >
@@ -114,7 +115,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
         aria-haspopup="menu"
         aria-label={t('toolbar.chooseDefaultAgent')}
         className="toolbar-button agent-create-split__trigger"
-        disabled={props.disabled || props.isCreating}
+        disabled={isDisabled}
         type="button"
         onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
           event.stopPropagation()

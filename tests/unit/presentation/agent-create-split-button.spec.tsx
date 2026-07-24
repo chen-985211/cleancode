@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import { AgentCreateSplitButton } from '../../../src/presentation/app-shell/AgentCreateSplitButton'
@@ -96,6 +99,42 @@ describe('Agent create split button', () => {
     expect(screen.getByText('没有可用的 Agent')).toBeVisible()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Agent 设置…' }))
     expect(onOpenAgentSettings).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses one borderless hover surface while keeping both segments transparent', () => {
+    const { container } = render(
+      <AgentCreateSplitButton
+        defaultProviderId="codex"
+        disabled={false}
+        isCreating={false}
+        providers={providers}
+        shortcutTooltip="新建 Agent (⌘⇧A)"
+        onCreate={vi.fn()}
+        onOpenAgentSettings={vi.fn()}
+        onSelectDefault={vi.fn()}
+      />
+    )
+    const styles = readFileSync(
+      resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-create.css'),
+      'utf8'
+    )
+    const buttonRule = styles.split('.agent-create-split .toolbar-button {')[1]?.split('}')[0] ?? ''
+    const hoverRule =
+      styles.split(".agent-create-split[data-disabled='false']:hover {")[1]?.split('}')[0] ?? ''
+    const hoveredButtonRule =
+      styles
+        .split(
+          ".agent-create-split[data-disabled='false']:hover .toolbar-button:not(:disabled) {"
+        )[1]
+        ?.split('}')[0] ?? ''
+
+    expect(container.querySelector('.agent-create-split')).toHaveAttribute('data-disabled', 'false')
+    expect(buttonRule).toContain('border-color: transparent;')
+    expect(buttonRule).toContain('background: transparent;')
+    expect(hoverRule).toContain('background: var(--cc-surface-subtle);')
+    expect(hoverRule).not.toContain('border')
+    expect(hoveredButtonRule).toContain('border-color: transparent;')
+    expect(hoveredButtonRule).toContain('background: transparent;')
   })
 })
 
