@@ -232,7 +232,7 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 普通终端日常交互主路径由 `terminal-daily-interactions.e2e.spec.ts` 在同一真实 session 中覆盖 Unicode 输出、搜索结果、WebGL context loss 后的 DOM fallback，以及降级后的剪贴板输入到 PTY。该场景必须使用真实 Electron，因为 unit 测试无法证明 GPU context、真实 xterm buffer、ClipboardEvent、IPC 和 node-pty 的连续组合；搜索分支、链接授权、粘贴分片和 renderer controller 清理仍放在 unit、integration 与 contract 层。
 
-普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 代表性覆盖正常退出重开、renderer/main/Provider 故障和多终端自然退出。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入和用户可见恢复类型的组合；永久关闭、项目清理、工作流保留限制、启动锁回收、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
+普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 代表性覆盖正常退出重开、renderer/main/Provider 故障和多终端自然退出。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入、精确会话身份和可写 live/只读 history 交互的组合；永久关闭、项目清理、工作流保留限制、启动锁回收、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
 
 单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 分片必须由独立 build job 生成同一份不可变 `out` artifact；分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
 

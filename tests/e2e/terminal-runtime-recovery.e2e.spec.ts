@@ -64,7 +64,6 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
-      await page.getByText('已恢复', { exact: true }).waitFor()
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
@@ -134,7 +133,6 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
-      await page.getByText('已恢复', { exact: true }).waitFor()
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(inheritedSessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
       await retireCurrentTerminal()
@@ -183,7 +181,6 @@ describe('terminal runtime recovery e2e', () => {
       resources.electronApp = electronApp
       resources.page = page
 
-      await page.getByText('已恢复', { exact: true }).waitFor()
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_MAIN_CRASH\\n'\r")
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_MAIN_CRASH')
@@ -202,13 +199,13 @@ describe('terminal runtime recovery e2e', () => {
       expect(metadata).not.toBeNull()
       process.kill(metadata!.processId, 'SIGKILL')
       await waitForProcessIdExit(metadata!.processId)
-      await page.getByText('已退出', { exact: true }).waitFor()
+      await waitForTerminalStopActionDisabled(page)
 
       await restartApplication()
 
-      await page.getByText('历史', { exact: true }).waitFor()
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'DURABLE_PROVIDER_HISTORY')
+      await waitForTerminalStopActionDisabled(page)
       await retireCurrentTerminal()
     },
     electronScenarioTimeoutMs
@@ -245,8 +242,12 @@ async function launchWorkbench(workbench: E2eWorkbench) {
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
   await page.getByRole('button', { name: '新建终端积木' }).click()
-  await page.getByText('运行中', { exact: true }).waitFor()
   await waitForTerminalShellReady(page, 'Terminal 1')
+}
+
+async function waitForTerminalStopActionDisabled(page: Page): Promise<void> {
+  const stopAction = page.getByRole('button', { name: 'Terminal 1 停止当前命令' })
+  await expect.poll(() => stopAction.isDisabled(), { timeout: 5_000 }).toBe(true)
 }
 
 async function retainTerminal(page: Page): Promise<string> {

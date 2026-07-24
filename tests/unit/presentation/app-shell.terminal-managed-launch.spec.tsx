@@ -77,7 +77,7 @@ describe('app shell managed terminal launch', () => {
     )
   })
 
-  it('shows the service as running while its launch is waiting for readiness', async () => {
+  it('enables running-session actions without repeating session state in the header', async () => {
     const workbench = createWorkbenchWithTerminal()
     const replacementSession = createDeferred<{
       readonly session: TerminalSessionSnapshot
@@ -115,8 +115,11 @@ describe('app shell managed terminal launch', () => {
       })
     })
 
-    await waitFor(() => expect(screen.getByText('运行中')).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Terminal 1 停止当前命令' })).toBeEnabled()
+    )
+    expect(screen.queryByText('运行中')).not.toBeInTheDocument()
+    expect(screen.queryByText('新会话')).not.toBeInTheDocument()
 
     replacementSession.resolve({
       session: createTerminalSessionSnapshot('session-pending'),

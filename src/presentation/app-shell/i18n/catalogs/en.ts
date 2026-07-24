@@ -264,10 +264,6 @@ export const enMessages = {
   'terminal.retention.disable': 'Stop keeping this session after the app exits',
   'terminal.retention.workflowUnavailable':
     'Workflow sessions stop when the app exits and cannot be kept across app restarts.',
-  'terminal.recovery.fresh': 'Fresh',
-  'terminal.recovery.warm': 'Restored',
-  'terminal.recovery.historical': 'History',
-  'terminal.recovery.ended': 'Ended',
   'terminal.retention.failedTitle': 'Could not update session retention',
   'terminal.retention.failed': 'The retention setting could not be updated.',
   'terminalRuntime.unavailableTitle': 'Terminal runtime failed to start',

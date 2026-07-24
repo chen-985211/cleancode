@@ -113,7 +113,6 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
   await page.getByRole('button', { name: '新建终端积木' }).click()
-  await page.getByText('运行中').waitFor()
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
   await page.waitForFunction(() =>

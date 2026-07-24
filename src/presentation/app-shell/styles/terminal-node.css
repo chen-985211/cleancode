@@ -8,7 +8,6 @@
   --terminal-muted: var(--cc-muted);
   --terminal-soft-control: var(--cc-surface);
   --terminal-soft-control-hover: var(--cc-surface-subtle);
-  --terminal-success: var(--cc-success);
   --terminal-screen: var(--cc-terminal-background);
   position: relative;
   display: flex;
@@ -292,76 +291,6 @@
   border-color: var(--cc-primary);
   background: var(--cc-primary-soft);
   color: var(--cc-primary-hover);
-}
-
-.terminal-state {
-  display: inline-flex;
-  height: 14px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  padding: 0;
-  color: var(--cc-muted);
-  background: transparent;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1;
-}
-
-.terminal-state::before {
-  width: 6.5px;
-  height: 6.5px;
-  border-radius: 999px;
-  background: currentcolor;
-  content: '';
-  opacity: 0.9;
-}
-
-.terminal-state--running {
-  color: var(--cc-muted-strong);
-}
-
-.terminal-state--running::before {
-  background: var(--terminal-success);
-  box-shadow: 0 0 0 2px var(--cc-success-border);
-}
-
-.terminal-state--failed {
-  color: var(--cc-danger-strong);
-}
-
-.terminal-state--failed::before {
-  background: var(--cc-danger);
-  box-shadow: 0 0 0 3px var(--cc-danger-border);
-}
-
-.terminal-recovery-state {
-  display: inline-flex;
-  height: 16px;
-  flex: 0 0 auto;
-  align-items: center;
-  border: 1px solid var(--cc-border);
-  border-radius: 5px;
-  background: var(--cc-surface-subtle);
-  padding: 0 5px;
-  color: var(--cc-muted);
-  font-size: 10px;
-  font-weight: 650;
-  line-height: 1;
-}
-
-.terminal-recovery-state--warm {
-  border-color: var(--cc-success-border);
-  background: var(--cc-success-soft);
-  color: var(--cc-success-strong);
-}
-
-.terminal-recovery-state--historical {
-  border-color: var(--cc-warning-border);
-  background: var(--cc-warning-soft);
-  color: var(--cc-warning-strong);
 }
 
 .workflow-state {

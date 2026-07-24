@@ -371,7 +371,7 @@ flowchart LR
 
 1. 符合策略的普通终端在应用正常退出后继续运行并可 warm attach。
 2. 用户永久关闭或删除作用域后，对应 provider session 和恢复资料均被清理。
-3. renderer 故障、应用故障和 provider 故障分别显示准确恢复状态。
+3. renderer 故障、应用故障和 provider 故障分别收敛到准确的恢复行为。
 4. cold restore 能恢复有界历史、cwd、尺寸和模式，但不会伪造进程存活。
 5. 协议升级、旧 checkpoint、损坏尾部和部分写入均能安全失败或迁移。
 6. 存储容量、输出记录、checkpoint 周期和清理时间都有明确上限。
@@ -387,7 +387,7 @@ flowchart LR
 
 ### 第三阶段退出条件
 
-- “继续运行”“历史恢复”“已结束”“新建会话”在状态和界面上可区分。
+- “继续运行”“历史恢复”“已结束”“新建会话”在状态和交互能力上可区分。
 - 所有永久关闭路径都能证明资源与恢复资格已经清理。
 - 强制结束和部分失败不会导致错误复活、误杀无关进程或无界磁盘增长。
 
@@ -402,7 +402,7 @@ flowchart LR
 - checkpoint 使用同步临时文件、原子重命名和目录同步；单 checkpoint 12 MiB、单输出日志 4 MiB、冷历史 64 个、总量 512 MiB、保留 7 天，容量清理只淘汰冷历史。损坏/未知版本按 session 隔离，live 会话不因清理预算被终止。
 - retained 受管直接启动服务在应用重开后必须重新证明同一 live session、根进程与监听祖先所有权，才重建端口租约和实际端点；cold history 不恢复端点。
 - 显式终止、replacement、删除积木、checkout/归档工作区和移除项目继续走 Run 硬清理，覆盖退出保留并删除恢复资格/checkpoint；E2E 证明永久关闭和项目移除后 PTY 与恢复目录都被清理。
-- UI 以稳定文字区分“新会话”“已恢复”“历史”“已结束”，提供带可访问名称的当前会话保留开关，并在启动恢复对账完成前阻止自动创建 shell 抢占旧 identity。
+- UI 不在终端标题栏常驻重复会话状态或恢复类型；当前权威状态通过输入能力、运行中动作和带可访问名称的会话保留开关体现，并在启动恢复对账完成前阻止自动创建 shell 抢占旧 identity。
 - Unit/Integration 覆盖退出策略、启动租约损坏/超期/并发/所有权安全、运行中存储降级、协议分帧/预算、认证、Provider 断连重连、checkpoint/输出 replay、alternate buffer 和端点所有权恢复；真实 Electron E2E 覆盖正常重启、中断锁下多个终端重启、renderer/main/Provider 故障、永久关闭、项目移除和工作流不恢复。
 - 当前事实迁入[终端会话生命周期](../contexts/run/terminal-session.md)、[本地服务端口治理](../contexts/run/service-port-management.md)、[终端依赖工作流](../contexts/run/terminal-workflow.md)、[项目与分支工作区生命周期](../contexts/project/workspace-lifecycle.md)、[架构文档](../engineering/architecture.md)和 [UI 契约](../product/ui-contract.md)。
 

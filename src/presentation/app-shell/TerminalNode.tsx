@@ -37,12 +37,6 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [isResizingBlock, setIsResizingBlock] = useState(false)
   const hasRequestedAutoStartRef = useRef(false)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
-  const terminalStateClassName =
-    session.status === 'running'
-      ? 'terminal-state terminal-state--running'
-      : session.status === 'failed'
-        ? 'terminal-state terminal-state--failed'
-        : 'terminal-state'
   const terminalNodeClassName = [
     'terminal-node',
     isRunning ? 'terminal-node--running' : '',
@@ -181,16 +175,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         blockName={block.name}
         blockDescription={block.description}
         blockLaunchCommand={block.launchCommand}
-        terminalStateClassName={terminalStateClassName}
         isRunning={isRunning}
         isRecoveryPending={Boolean(session.isRecoveryPending)}
         isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
         isSelectedForTerminalGroup={data.isSelected}
         canSelectForTerminalGroup={data.canSelectForTerminalGroup}
-        sessionStatus={session.status}
         sessionKind={session.sessionKind ?? null}
         retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
-        recoveryKind={session.recoveryKind ?? 'fresh'}
         workflowStatus={data.workflowStatus}
         isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
         isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
@@ -270,16 +261,13 @@ interface TerminalHeaderProps {
   readonly blockName: string
   readonly blockDescription: string
   readonly blockLaunchCommand: string
-  readonly terminalStateClassName: string
   readonly isRunning: boolean
   readonly isRecoveryPending: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly isSelectedForTerminalGroup: boolean
   readonly canSelectForTerminalGroup: boolean
-  readonly sessionStatus: TerminalViewState['status']
   readonly sessionKind: TerminalViewState['sessionKind']
   readonly retentionPolicy: NonNullable<TerminalViewState['retentionPolicy']>
-  readonly recoveryKind: NonNullable<TerminalViewState['recoveryKind']>
   readonly workflowStatus: TerminalFlowNode['data']['workflowStatus']
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
@@ -299,16 +287,13 @@ function TerminalHeader({
   blockName,
   blockDescription,
   blockLaunchCommand,
-  terminalStateClassName,
   isRunning,
   isRecoveryPending,
   isTerminalGroupSelectionMode,
   isSelectedForTerminalGroup,
   canSelectForTerminalGroup,
-  sessionStatus,
   sessionKind,
   retentionPolicy,
-  recoveryKind,
   workflowStatus,
   isActiveWorkflowRoot,
   isStoppingWorkflow,
@@ -379,20 +364,6 @@ function TerminalHeader({
         <strong>{blockName}</strong>
         <div className="terminal-node__meta">
           <span className="terminal-node__description">{blockDescription}</span>
-          <span className={terminalStateClassName}>
-            {isRunning
-              ? t('terminal.status.running')
-              : sessionStatus === 'stopping'
-                ? t('terminal.status.stopping')
-                : sessionStatus === 'failed'
-                  ? t('terminal.status.failed')
-                  : sessionStatus === 'exited'
-                    ? t('terminal.status.exited')
-                    : t('terminal.status.idle')}
-          </span>
-          <span className={`terminal-recovery-state terminal-recovery-state--${recoveryKind}`}>
-            {t(`terminal.recovery.${recoveryKind}`)}
-          </span>
           {workflowStatus ? (
             <span className={`workflow-state workflow-state--${workflowStatus}`}>
               {t(`workflow.status.${workflowStatus}`)}
