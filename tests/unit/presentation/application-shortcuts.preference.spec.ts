@@ -114,7 +114,7 @@ describe('application shortcut preference', () => {
     const v2Bindings = {
       openSettings: defaultApplicationShortcutBindings.openSettings,
       toggleSidebar: defaultApplicationShortcutBindings.toggleSidebar,
-      createTerminal: { alt: false, key: '=', primary: true, shift: false },
+      createTerminal: { alt: false, key: ']', primary: true, shift: false },
       createAgent: defaultApplicationShortcutBindings.createAgent,
       groupTerminals: defaultApplicationShortcutBindings.groupTerminals
     }
@@ -157,12 +157,66 @@ describe('application shortcut preference', () => {
     })
   })
 
-  it('writes the complete catalog with preference schema v5', () => {
+  it('migrates v5 default canvas zoom bindings to the non-conflicting defaults', () => {
+    const v5Bindings = {
+      ...defaultApplicationShortcutBindings,
+      zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
+      zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
+      fitCanvas: { alt: false, key: '0', primary: true, shift: false }
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v5Bindings, version: 5 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
+  })
+
+  it('preserves v5 customized and cleared canvas zoom bindings', () => {
+    const v5Bindings = {
+      ...defaultApplicationShortcutBindings,
+      zoomCanvasIn: null,
+      zoomCanvasOut: { alt: true, key: 'Z', primary: true, shift: false },
+      fitCanvas: { alt: false, key: '0', primary: true, shift: false }
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v5Bindings, version: 5 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
+      zoomCanvasIn: null,
+      zoomCanvasOut: v5Bindings.zoomCanvasOut
+    })
+  })
+
+  it('leaves a migrated v5 default unassigned when the new binding is already customized', () => {
+    const v5Bindings = {
+      ...defaultApplicationShortcutBindings,
+      createAgent: defaultApplicationShortcutBindings.zoomCanvasIn,
+      zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
+      zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
+      fitCanvas: { alt: false, key: '0', primary: true, shift: false }
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings: v5Bindings, version: 5 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
+      createAgent: defaultApplicationShortcutBindings.zoomCanvasIn,
+      zoomCanvasIn: null
+    })
+  })
+
+  it('writes the complete catalog with preference schema v6', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 5
+      version: 6
     })
   })
 

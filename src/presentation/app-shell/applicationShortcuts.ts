@@ -47,9 +47,9 @@ export const defaultApplicationShortcutBindings = {
   selectCanvasNodeRight: { alt: false, key: 'ArrowRight', primary: true, shift: false },
   selectCanvasNodeUp: { alt: false, key: 'ArrowUp', primary: true, shift: false },
   selectCanvasNodeDown: { alt: false, key: 'ArrowDown', primary: true, shift: false },
-  zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
-  zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
-  fitCanvas: { alt: false, key: '0', primary: true, shift: false },
+  zoomCanvasIn: { alt: false, key: ']', primary: true, shift: false },
+  zoomCanvasOut: { alt: false, key: '[', primary: true, shift: false },
+  fitCanvas: { alt: false, key: '1', primary: true, shift: false },
   toggleMinimap: { alt: false, key: 'M', primary: true, shift: true }
 } as const satisfies ApplicationShortcutBindings
 

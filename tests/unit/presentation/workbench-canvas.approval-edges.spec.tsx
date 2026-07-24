@@ -53,9 +53,9 @@ describe('workbench canvas Agent approval edges', () => {
           selectCanvasNodeRight: '选择右侧节点 (⌘→)',
           selectCanvasNodeUp: '选择上方节点 (⌘↑)',
           selectCanvasNodeDown: '选择下方节点 (⌘↓)',
-          zoomCanvasIn: '放大画布 (⌘=)',
-          zoomCanvasOut: '缩小画布 (⌘-)',
-          fitCanvas: '适应画布 (⌘0)',
+          zoomCanvasIn: '放大画布 (⌘])',
+          zoomCanvasOut: '缩小画布 (⌘[)',
+          fitCanvas: '适应画布 (⌘1)',
           toggleMinimap: '收起或展开小地图 (⌘⇧M)'
         }}
         approvalIntents={[approval]}

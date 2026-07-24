@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron'
 import { join } from 'node:path'
 
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
+import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
 import { resolveWindowFrameOptions } from './windowFrameOptions'
 import { bindWindowFullScreenState } from './windowFullScreenState'
 
@@ -34,6 +35,7 @@ export function createMainWindow(input: {
     }
   })
   bindWindowFullScreenState(mainWindow)
+  bindElectronPageZoomStartup(mainWindow.webContents)
 
   if (input.policy.mode === 'offscreen-inactive') {
     const { position } = input.policy

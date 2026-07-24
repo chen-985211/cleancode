@@ -217,7 +217,7 @@ describe('canvas minimap', () => {
       pointerType: 'mouse'
     })
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('放大画布 (⌘=)')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('放大画布 (⌘])')
   })
 
   it('shows the configured minimap toggle shortcut in both states', async () => {
@@ -376,10 +376,10 @@ function createCanvasMinimapProps() {
 }
 
 const canvasShortcutTooltips = {
-  fitCanvas: '适应画布 (⌘0)',
+  fitCanvas: '适应画布 (⌘1)',
   toggleMinimap: '收起或展开小地图 (⌘⇧M)',
-  zoomCanvasIn: '放大画布 (⌘=)',
-  zoomCanvasOut: '缩小画布 (⌘-)'
+  zoomCanvasIn: '放大画布 (⌘])',
+  zoomCanvasOut: '缩小画布 (⌘[)'
 } as const
 
 function createMinimapNodeInteraction(): MinimapNodeInteractionContextValue {

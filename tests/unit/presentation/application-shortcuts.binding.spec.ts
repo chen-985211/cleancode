@@ -45,15 +45,15 @@ describe('application shortcut bindings', () => {
     )
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.zoomCanvasIn, 'mac')).toEqual([
       '⌘',
-      '='
+      ']'
     ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.zoomCanvasOut, 'mac')).toEqual([
       '⌘',
-      '-'
+      '['
     ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.fitCanvas, 'mac')).toEqual([
       '⌘',
-      '0'
+      '1'
     ])
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeLeft, 'mac')

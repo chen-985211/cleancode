@@ -15,10 +15,10 @@ describe('Agent minimap navigation', () => {
         canvasSize={{ width: 960, height: 640 }}
         viewportZoom={1}
         shortcutTooltips={{
-          fitCanvas: '适应画布 (⌘0)',
+          fitCanvas: '适应画布 (⌘1)',
           toggleMinimap: '收起或展开小地图 (⌘⇧M)',
-          zoomCanvasIn: '放大画布 (⌘=)',
-          zoomCanvasOut: '缩小画布 (⌘-)'
+          zoomCanvasIn: '放大画布 (⌘])',
+          zoomCanvasOut: '缩小画布 (⌘[)'
         }}
         minimapNodeInteraction={createMinimapNodeInteraction()}
         onToggleCollapsed={vi.fn()}
