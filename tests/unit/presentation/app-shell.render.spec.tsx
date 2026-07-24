@@ -57,9 +57,9 @@ describe('app shell', () => {
     expect(screen.queryByRole('complementary', { name: 'Agent 面板' })).not.toBeInTheDocument()
     expect(
       screen.getByLabelText('积木画布').querySelector('[data-agent-console-node]')
-    ).toBeInTheDocument()
+    ).not.toBeInTheDocument()
     expect(screen.queryByText('Codex CLI')).not.toBeInTheDocument()
-    expect(screen.getByText('桌面运行时未连接')).toBeInTheDocument()
+    expect(screen.queryByText('桌面运行时未连接')).not.toBeInTheDocument()
     expect(screen.queryByText('未接入')).not.toBeInTheDocument()
     expect(screen.getByText('浏览器预览模式')).toBeInTheDocument()
     expect(screen.queryByText('cleancode-demo')).not.toBeInTheDocument()
@@ -78,41 +78,20 @@ describe('app shell', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('enables project actions only when the desktop runtime API exists', () => {
+  it('guides desktop users to open a project from the empty workspace', async () => {
+    const addProject = vi.fn(async () => null)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: {
-        appName: 'cleancode',
-        listWorkbenches: vi.fn(async () => []),
-        addProject: vi.fn(),
-        removeProject: vi.fn(),
-        createTerminalBlock: vi.fn(),
-        createTerminalGroup: vi.fn(),
-        updateTerminalBlockMetadata: vi.fn(),
-        updateTerminalGroupMetadata: vi.fn(),
-        setTerminalGroupCollapsed: vi.fn(),
-        addTerminalToGroup: vi.fn(),
-        removeTerminalFromGroup: vi.fn(),
-        dissolveTerminalGroup: vi.fn(),
-        resizeTerminalBlock: vi.fn(),
-        updateGraphViewport: vi.fn(),
-        moveBlock: vi.fn(),
-        moveTerminalGroup: vi.fn(),
-        deleteBlock: vi.fn(),
-        startTerminal: vi.fn(),
-        writeTerminal: vi.fn(),
-        resizeTerminal: vi.fn(),
-        interruptTerminal: vi.fn(),
-        terminateTerminal: vi.fn(),
-        onTerminalOutput: vi.fn(() => vi.fn()),
-        onTerminalExit: vi.fn(() => vi.fn())
-      }
+      value: createRuntimeApi({ addProject })
     })
 
     render(<AppShell />)
     const toolbar = within(screen.getByLabelText('工作台工具栏'))
 
-    expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '打开项目开始使用' })).toBeInTheDocument()
+    expect(screen.getByText('选择一个本地项目目录，进入工作台。')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '打开项目' }))
+    await waitFor(() => expect(addProject).toHaveBeenCalledOnce())
     expect(screen.getByRole('button', { name: '添加项目' })).toBeEnabled()
     expect(toolbar.getAllByRole('button')).toHaveLength(4)
     expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
@@ -122,6 +101,27 @@ describe('app shell', () => {
     expect(toolbar.queryByRole('button', { name: '停止流程' })).not.toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '组合终端' })).toBeDisabled()
     expect(screen.queryByText('浏览器预览模式')).not.toBeInTheDocument()
+  })
+
+  it('does not synthesize an Agent for an open workbench without loaded Agent data', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    await screen.findByText('alpha-project')
+    await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
+    expect(
+      screen.getByLabelText('积木画布').querySelector('[data-agent-console-node]')
+    ).not.toBeInTheDocument()
+    expect(runtimeApi.attachAgentSession).not.toHaveBeenCalled()
   })
 
   it('allows entering terminal group editing whenever a workbench is open', async () => {

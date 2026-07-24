@@ -668,6 +668,7 @@ export function AppShell({
             onZoomCanvasIn={zoomCanvasIn}
             onZoomCanvasOut={zoomCanvasOut}
             onFitCanvas={fitCanvas}
+            onOpenProject={addProject}
             onCreateTerminalBlock={createTerminalBlock}
             onCreateWorkspaceAgent={createWorkspaceAgent}
             onOpenAgentSettings={applicationSettings.openAgents}

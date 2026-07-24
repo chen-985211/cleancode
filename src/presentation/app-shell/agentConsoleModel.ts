@@ -55,28 +55,6 @@ export function createFallbackAgent(
   }
 }
 
-export function createLegacyAgentSnapshot(
-  currentWorkbench: WorkbenchSnapshot | null,
-  currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null
-): WorkspaceAgentSnapshot | null {
-  return {
-    agentId: 'default-agent',
-    cleancodeMcpEnabled: true,
-    layout: {
-      position: { x: resolveDefaultAgentConsoleX(), y: 120 },
-      size: defaultAgentLayoutSize
-    },
-    name: 'Agent 1',
-    projectId: currentWorkbench?.project.id ?? 'unselected-project',
-    providerId: rendererLegacyDefaultProviderId,
-    workspaceName: currentWorkspace?.name ?? 'unselected-workspace'
-  }
-}
-
-function resolveDefaultAgentConsoleX(): number {
-  return globalThis.innerWidth <= 1080 ? 300 : 540
-}
-
 export function isTestRuntime(): boolean {
   return typeof navigator !== 'undefined' && navigator.userAgent.includes('jsdom')
 }

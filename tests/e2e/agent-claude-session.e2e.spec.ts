@@ -63,12 +63,12 @@ describe('Claude Code Agent session e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
-      await waitForAgentCount(page, 1)
+      await waitForAgentCount(page, 0)
       await expectAgentProviderInstalled(page, 'claude-code')
       await waitForClaudeInspection(fakeClaude.reportPath)
       await selectDefaultAgentProvider(page, 'Claude Code')
       await page.getByRole('button', { name: '新建 Agent' }).click()
-      await waitForAgentCount(page, 2)
+      await waitForAgentCount(page, 1)
       const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
       await claudeIdentity.waitFor()
       expect(await claudeIdentity.locator('.agent-console__activity-indicator').count()).toBe(0)
@@ -112,8 +112,8 @@ describe('Claude Code Agent session e2e', () => {
         page = await electronApp.firstWindow()
         resources.page = page
         await page.waitForLoadState('domcontentloaded')
-        await waitForAgentCount(page, 2)
-        await waitForAgentTerminals(page, 2)
+        await waitForAgentCount(page, 1)
+        await waitForAgentTerminals(page, 1)
       }
     },
     electronScenarioTimeoutMs

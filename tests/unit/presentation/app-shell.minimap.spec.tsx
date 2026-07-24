@@ -46,7 +46,24 @@ describe('app shell minimap', () => {
   })
 
   it('keeps the Agent console visible and selectable from the minimap', async () => {
-    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const baseWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const workbench = {
+      ...baseWorkbench,
+      agents: [
+        {
+          agentId: 'agent-1',
+          cleancodeMcpEnabled: true,
+          layout: {
+            position: { x: 540, y: 120 },
+            size: { width: 720, height: 460 }
+          },
+          name: 'Agent 1',
+          projectId: baseWorkbench.project.id,
+          providerId: 'codex',
+          workspaceName: 'main'
+        }
+      ]
+    }
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,

@@ -138,9 +138,9 @@ describe('project workspaces e2e', () => {
     { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       await expectDesktopRuntime(page)
-      await expectNoBrowserPreviewData(page)
+      await expectEmptyProjectStateWithoutPreviewData(page)
 
-      await page.getByRole('button', { name: '添加项目' }).click()
+      await page.getByRole('button', { name: '打开项目' }).click()
       await page.getByRole('button', { name: '新建终端积木' }).click()
       await page.getByText('Terminal 1').waitFor()
 
@@ -245,8 +245,9 @@ async function readSidebarTitlebarGeometry(page: Page): Promise<{
   })
 }
 
-async function expectNoBrowserPreviewData(page: Page): Promise<void> {
-  expect(await page.getByRole('button', { name: '打开项目' }).count()).toBe(0)
+async function expectEmptyProjectStateWithoutPreviewData(page: Page): Promise<void> {
+  await page.getByRole('heading', { name: '打开项目开始使用' }).waitFor()
+  expect(await page.getByRole('button', { name: '打开项目' }).count()).toBe(1)
   expect(await page.getByText('添加数据库终端').count()).toBe(0)
   expect(await page.getByText('添加测试终端').count()).toBe(0)
 }

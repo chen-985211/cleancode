@@ -201,11 +201,7 @@ const agentWorkspaceCreationScope = new AgentWorkspaceCreationScopeAdapter(
 )
 const listWorkspaceAgentsUseCase = new ListWorkspaceAgentsUseCase(
   agentSessionRepository,
-  agentProviderRegistry,
-  defaultAgentProviderId,
-  agentProviderAvailability,
-  agentWorkspaceTransactions,
-  agentProviderPreferencesRepository
+  agentWorkspaceTransactions
 )
 const createWorkspaceAgentUseCase = new CreateWorkspaceAgentUseCase(
   agentSessionRepository,

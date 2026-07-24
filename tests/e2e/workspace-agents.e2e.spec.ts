@@ -69,6 +69,10 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCreationReady(page)
+      await waitForAgentCount(page, 0)
+
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
@@ -92,6 +96,7 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
@@ -129,6 +134,7 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
@@ -138,6 +144,7 @@ describe('workspace Agents e2e', () => {
       const terminal = agent.locator('.agent-terminal-viewport')
 
       await ensureTerminalDomRenderer(terminal)
+      await waitForTerminalDomText(terminal, 'CC_E2E_CODEX_READY')
       await terminal.click()
       await page.keyboard.press('Control+C')
       await page.getByText('Codex 会话已结束').waitFor()
@@ -165,6 +172,7 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
@@ -208,6 +216,7 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 2)
@@ -345,6 +354,7 @@ describe('workspace Agents e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
 
@@ -396,6 +406,19 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
       document.querySelectorAll('[data-agent-console-node]').length === expectedCount,
     count
   )
+}
+
+async function waitForAgentCreationReady(page: Page): Promise<void> {
+  await page.waitForFunction(() => {
+    const button = document.querySelector<HTMLButtonElement>('button[aria-label="新建 Agent"]')
+    return Boolean(button && !button.disabled)
+  })
+}
+
+async function createCodexAgent(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '选择默认 Agent' }).click()
+  await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
+  await page.getByRole('button', { name: '新建 Agent' }).click()
 }
 
 async function waitForAgentTerminals(page: Page, count: number): Promise<void> {

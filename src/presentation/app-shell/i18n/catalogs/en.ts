@@ -154,7 +154,9 @@ export const enMessages = {
   'sidebar.archiveWorkspace': 'Archive workspace',
   'sidebar.reorderFailed': 'Could not reorder projects. Try again.',
   'canvas.label': 'Block canvas',
-  'canvas.emptyDesktop': 'Choose or add a project to enter the main workspace',
+  'canvas.emptyTitle': 'Open a project to get started',
+  'canvas.emptyDescription': 'Choose a local project folder to enter the workspace.',
+  'canvas.openProject': 'Open project',
   'canvas.emptyPreview':
     'This is browser preview mode. Use the Electron desktop app for live projects and terminals.',
   'canvas.statusPreview': 'Browser preview',

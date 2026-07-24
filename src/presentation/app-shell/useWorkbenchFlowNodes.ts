@@ -5,7 +5,6 @@ import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/age
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 
 import { createAgentConsoleFlowNode } from './agentConsoleFlowNode'
-import { createLegacyAgentSnapshot } from './agentConsoleModel'
 import { createAgentApprovalNodeIntents } from './agentApprovalPresentation'
 import { preserveWorkbenchNodeTransientLayout } from './preserveWorkbenchNodeTransientLayout'
 import { createTerminalFlowNodes } from './terminalFlowNodes'
@@ -107,7 +106,7 @@ export function useWorkbenchFlowNodes({
         terminalStates,
         workflowNodeStatuses
       })
-      const agents = resolveWorkspaceAgents(currentWorkbench, currentWorkspace ?? null)
+      const agents = resolveWorkspaceAgents(currentWorkbench)
       const nextNodes = [
         ...agents.map((agent) =>
           createAgentConsoleFlowNode({
@@ -185,10 +184,7 @@ function projectAgentApprovalsOntoNodes(
 }
 
 function resolveWorkspaceAgents(
-  workbench: WorkbenchSnapshot | null,
-  workspace: WorkbenchSnapshot['project']['workspaces'][number] | null
+  workbench: WorkbenchSnapshot | null
 ): readonly WorkspaceAgentSnapshot[] {
-  if (workbench?.agents) return workbench.agents
-  const legacyAgent = createLegacyAgentSnapshot(workbench, workspace)
-  return legacyAgent ? [legacyAgent] : []
+  return workbench?.agents ?? []
 }

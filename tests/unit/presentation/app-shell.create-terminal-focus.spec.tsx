@@ -205,15 +205,7 @@ describe('app shell create terminal focus', () => {
       ? { metaKey: true }
       : { ctrlKey: true }
     reactFlowSpies.setViewport.mockClear()
-    fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
-
-    await waitFor(() =>
-      expect(screen.getByTestId('mock-node-agent:default-agent')).toHaveAttribute(
-        'data-selected',
-        'true'
-      )
-    )
-
+    expect(screen.queryByTestId('mock-node-agent:default-agent')).not.toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'ArrowRight', ...primaryModifier })
 
     await waitFor(() =>
@@ -224,7 +216,6 @@ describe('app shell create terminal focus', () => {
     )
     expect(reactFlowSpies.setViewport).not.toHaveBeenCalled()
 
-    fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
     fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
 
     await waitFor(() =>

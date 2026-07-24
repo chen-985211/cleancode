@@ -148,95 +148,62 @@ describe('manage workspace Agents', () => {
     ])
   })
 
-  it('creates one default Agent only when a workspace is first initialized', async () => {
+  it('initializes a workspace without creating an Agent and preserves the empty state', async () => {
     const repository = new MemoryAgentRepository()
-    const useCase = new ListWorkspaceAgentsUseCase(repository, createProviderRegistry(), 'codex')
+    const useCase = new ListWorkspaceAgentsUseCase(repository)
 
     const first = await useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
-    await repository.deleteAgent('project-1', 'main', first[0]!.agentId)
     const reopened = await useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
 
-    expect(first).toHaveLength(1)
-    expect(first[0]?.name).toBe('Agent 1')
-    expect(first[0]?.layout).toEqual({
-      position: { x: 540, y: 120 },
-      size: { width: 720, height: 460 }
-    })
-    expect(reopened).toEqual([])
-  })
-
-  it('uses the configured registered Provider for a workspace default Agent', async () => {
-    const repository = new MemoryAgentRepository()
-    const useCase = new ListWorkspaceAgentsUseCase(
-      repository,
-      createProviderRegistry(),
-      'claude-code'
-    )
-
-    await expect(
-      useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
-    ).resolves.toEqual([expect.objectContaining({ providerId: 'claude-code' })])
-  })
-
-  it('initializes an empty workspace when the preferred Provider is unavailable', async () => {
-    const repository = new MemoryAgentRepository()
-    const providers = createProviderRegistry({
-      codex: 'missing',
-      'claude-code': 'installed'
-    })
-    const useCase = new ListWorkspaceAgentsUseCase(repository, providers, 'codex')
-
-    const initialized = await useCase.execute({
-      projectId: 'project-1',
-      workspaceName: 'main'
-    })
-    const reopened = await useCase.execute({
-      projectId: 'project-1',
-      workspaceName: 'main'
-    })
-
-    expect(initialized).toEqual([])
+    expect(first).toEqual([])
     expect(reopened).toEqual([])
     expect(repository.initializeWorkspace).toHaveBeenCalledOnce()
   })
 
-  it('refreshes a cached preferred Provider result before initializing a new workspace', async () => {
+  it('allocates Agent 1 only after an explicit creation command', async () => {
     const repository = new MemoryAgentRepository()
-    const codex = createProviderContribution('codex')
-    const inspect = vi
-      .spyOn(codex.detector, 'inspect')
-      .mockResolvedValueOnce({
-        installCommand: 'install codex',
-        providerId: 'codex',
-        reason: 'not_found',
-        status: 'missing',
-        version: null
-      })
-      .mockResolvedValueOnce({
-        providerId: 'codex',
-        status: 'installed',
-        version: 'test'
-      })
-    const providers = new AgentProviderRegistry([codex])
-    const availability = new AgentProviderAvailabilityService(providers)
-    await availability.inspect('codex')
-    const useCase = new ListWorkspaceAgentsUseCase(repository, providers, 'codex', availability)
+    const providers = createProviderRegistry()
+    const list = new ListWorkspaceAgentsUseCase(repository)
+    const create = new CreateWorkspaceAgentUseCase(repository, providers)
 
+    await expect(list.execute({ projectId: 'project-1', workspaceName: 'main' })).resolves.toEqual(
+      []
+    )
     await expect(
-      useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
-    ).resolves.toEqual([expect.objectContaining({ providerId: 'codex' })])
-    expect(inspect).toHaveBeenCalledTimes(2)
+      create.execute({
+        agentId: 'agent-create-1',
+        gitBranch: null,
+        projectDirectory: '/work/app',
+        projectId: 'project-1',
+        providerId: 'codex',
+        workspaceDirectory: '/work/app',
+        workspaceName: 'main'
+      })
+    ).resolves.toMatchObject({
+      name: 'Agent 1',
+      providerId: 'codex'
+    })
   })
 
   it('creates, renames, lays out, and removes one Agent without affecting its sibling', async () => {
     const repository = new MemoryAgentRepository()
     const runtime = new RecordingWorkspaceAgentRuntime()
-    const list = new ListWorkspaceAgentsUseCase(repository, createProviderRegistry(), 'codex')
-    const create = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
+    const providers = createProviderRegistry()
+    const list = new ListWorkspaceAgentsUseCase(repository)
+    const create = new CreateWorkspaceAgentUseCase(repository, providers)
     const rename = new RenameWorkspaceAgentUseCase(repository)
     const updateLayout = new UpdateWorkspaceAgentLayoutUseCase(repository)
     const remove = new RemoveWorkspaceAgentUseCase(repository, runtime)
-    const [first] = await list.execute({ projectId: 'project-1', workspaceName: 'main' })
+    await list.execute({ projectId: 'project-1', workspaceName: 'main' })
+    const first = await create.execute({
+      agentId: 'agent-1',
+      gitBranch: null,
+      projectDirectory: '/work/app',
+      projectId: 'project-1',
+      providerId: 'codex',
+      workspaceDirectory: '/work/app',
+      workspaceName: 'main'
+    })
     const second = await create.execute({
       agentId: 'agent-2',
       gitBranch: null,
@@ -260,13 +227,13 @@ describe('manage workspace Agents', () => {
       workspaceName: 'main'
     })
     const remaining = await remove.execute({
-      agentId: first!.agentId,
+      agentId: first.agentId,
       projectId: 'project-1',
       workspaceName: 'main'
     })
 
-    expect(runtime.disposed).toEqual([first!.agentId])
-    expect(runtime.released).toEqual([first!.agentId])
+    expect(runtime.disposed).toEqual([first.agentId])
+    expect(runtime.released).toEqual([first.agentId])
     expect(remaining).toEqual([
       expect.objectContaining({
         agentId: 'agent-2',

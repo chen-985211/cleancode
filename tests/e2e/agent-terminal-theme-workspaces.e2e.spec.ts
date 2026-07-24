@@ -92,6 +92,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForPersistedAgent(page)
 
       const projectCard = page.getByRole('group', {
@@ -122,6 +123,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const canonicalFeatureDirectory = await realpath(featureWorktreeDirectory)
       await expectCurrentGitBranch(featureWorktreeDirectory, featureBranchName)
 
+      await page.getByRole('button', { name: '新建 Agent' }).click()
       const featureSession = await waitForAgentTerminal(page, featureBranchName, 'dark')
 
       await expectFakeCodexSession(featureSession, canonicalFeatureDirectory, fakeCodex.reportPath)
@@ -165,6 +167,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
       await waitForPersistedAgent(page)
       await page.getByRole('button', { name: '新建终端积木' }).click()
 
@@ -523,6 +526,12 @@ async function waitForPersistedAgent(page: Page): Promise<void> {
 
     return Boolean(agentId && agentId !== 'default-agent')
   })
+}
+
+async function createCodexAgent(page: Page): Promise<void> {
+  await page.getByRole('button', { name: '选择默认 Agent' }).click()
+  await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
+  await page.getByRole('button', { name: '新建 Agent' }).click()
 }
 
 async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {

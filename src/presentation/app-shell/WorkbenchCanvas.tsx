@@ -9,7 +9,7 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Box } from 'lucide-react'
+import { Box, FolderOpen } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
@@ -56,6 +56,7 @@ interface WorkbenchCanvasProps {
   readonly onZoomCanvasIn: () => void
   readonly onZoomCanvasOut: () => void
   readonly onFitCanvas: () => void
+  readonly onOpenProject?: () => void
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: () => void
   readonly onOpenAgentSettings?: () => void
@@ -108,6 +109,7 @@ export function WorkbenchCanvas({
   onZoomCanvasIn,
   onZoomCanvasOut,
   onFitCanvas,
+  onOpenProject,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
   onOpenAgentSettings,
@@ -347,7 +349,9 @@ export function WorkbenchCanvas({
             />
           </Panel>
         </ReactFlow>
-        {!currentWorkbench ? <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} /> : null}
+        {!currentWorkbench ? (
+          <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} onOpenProject={onOpenProject} />
+        ) : null}
       </div>
       <CanvasStatusbar
         isDesktopRuntime={isDesktopRuntime}
@@ -451,12 +455,32 @@ function resolveCanvasDimension(value: number, fallback: number): number {
   return value > 0 ? value : fallback
 }
 
-function CanvasEmptyState({ isDesktopRuntime }: { readonly isDesktopRuntime: boolean }) {
+function CanvasEmptyState({
+  isDesktopRuntime,
+  onOpenProject
+}: {
+  readonly isDesktopRuntime: boolean
+  readonly onOpenProject?: () => void
+}) {
   const { t } = useI18n()
+
   return (
     <div className="canvas-empty">
-      <Box size={24} aria-hidden="true" />
-      <span>{isDesktopRuntime ? t('canvas.emptyDesktop') : t('canvas.emptyPreview')}</span>
+      <span className="canvas-empty__icon" aria-hidden="true">
+        <Box size={22} />
+      </span>
+      {isDesktopRuntime ? (
+        <>
+          <h2>{t('canvas.emptyTitle')}</h2>
+          <p>{t('canvas.emptyDescription')}</p>
+          <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
+            <FolderOpen size={15} aria-hidden="true" />
+            {t('canvas.openProject')}
+          </button>
+        </>
+      ) : (
+        <p>{t('canvas.emptyPreview')}</p>
+      )}
     </div>
   )
 }
