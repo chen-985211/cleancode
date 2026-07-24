@@ -401,14 +401,21 @@ async function waitForTerminalShellOutcome(
 }
 
 async function crashElectronMainProcess(electronApp: ElectronApplication): Promise<void> {
-  const applicationClosed = electronApp.waitForEvent('close')
+  const mainProcessId = await electronApp.evaluate(() => process.pid)
+  const launcherProcess = electronApp.process()
+  const launcherProcessId = launcherProcess.pid
 
   await electronApp
     .evaluate(() => {
       setImmediate(() => process.kill(process.pid, 'SIGKILL'))
     })
     .catch(() => undefined)
-  await applicationClosed
+  await waitForProcessIdExit(mainProcessId, 10_000)
+
+  if (launcherProcessId && launcherProcessId !== mainProcessId) {
+    launcherProcess.kill('SIGKILL')
+    await waitForProcessIdExit(launcherProcessId, 10_000)
+  }
 }
 
 async function waitForTerminalStopActionDisabled(page: Page): Promise<void> {
