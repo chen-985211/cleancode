@@ -313,7 +313,9 @@ async function launchWorkbench(workbench: E2eWorkbench) {
 
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
+  const createTerminal = page.getByRole('button', { name: '新建终端积木' })
+  await expect.poll(() => createTerminal.isEnabled(), { timeout: 10_000 }).toBe(true)
+  await createTerminal.click()
   await waitForTerminalShellReady(page, 'Terminal 1')
 }
 

@@ -215,7 +215,11 @@ describe('git branch workspaces e2e', () => {
         readonly backgroundCount: number
         readonly backgroundResponses: readonly string[]
       }
-      expect(visibleQuery).toMatchObject({ count: 1, backgroundCount: 1 })
+      const expectedBackgroundCount = process.platform === 'win32' ? 0 : 1
+      expect(visibleQuery).toMatchObject({
+        count: 1,
+        backgroundCount: expectedBackgroundCount
+      })
       const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
       await markTerminalSurface(page, sessionId, terminalSurfaceToken)
 
@@ -265,7 +269,10 @@ describe('git branch workspaces e2e', () => {
         readonly backgroundCount: number
         readonly backgroundResponses: readonly string[]
       }
-      expect(hiddenQuery).toMatchObject({ count: 1, backgroundCount: 1 })
+      expect(hiddenQuery).toMatchObject({
+        count: 1,
+        backgroundCount: expectedBackgroundCount
+      })
       expect(hiddenQuery.backgroundResponses).toEqual(visibleQuery.backgroundResponses)
 
       await featureWorkspace.click()

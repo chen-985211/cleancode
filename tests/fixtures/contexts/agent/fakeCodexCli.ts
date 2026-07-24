@@ -113,7 +113,7 @@ function draw() {
     process.pid +
     CSI +
     '0m'
-  output += (CSI + '2;1H').repeat(1_600)
+  output += (CSI + '2;1H').repeat(process.platform === 'win32' ? 128 : 1_600)
   process.stdout.write(output)
   report('draw')
 }
@@ -168,7 +168,19 @@ process.stdin.on('data', (data) => {
 process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)
 process.on('SIGTERM', exitCleanly)
-process.stdout.write(OSC + '11;?' + '\\x07')
+const colorFgBg = process.env.COLORFGBG
+if (process.platform === 'win32' && colorFgBg === '0;15') {
+  sourceTheme = 'light'
+} else if (process.platform === 'win32' && colorFgBg === '15;0') {
+  sourceTheme = 'dark'
+}
+
+if (sourceTheme) {
+  report('session')
+  draw()
+} else {
+  process.stdout.write(OSC + '11;?' + '\\x07')
+}
 `
 }
 

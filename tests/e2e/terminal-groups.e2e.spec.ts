@@ -121,7 +121,7 @@ async function dragTerminalHeader(
   await page.mouse.move(
     headerBox.x + headerBox.width / 2 + deltaX,
     headerBox.y + headerBox.height / 2 + deltaY,
-    { steps: 18 }
+    { steps: process.platform === 'win32' ? 1 : 18 }
   )
   await page.mouse.up()
 }

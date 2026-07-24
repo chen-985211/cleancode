@@ -36,7 +36,14 @@ const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
 const TERMINATION_GRACE_MS = 500
 const TERMINATION_FORCE_MS = 1_500
-const WINDOWS_AGENT_SHELL_READY_COMMAND = "[Console]::Write(([char]27) + '[0m')"
+const WINDOWS_AGENT_SHELL_READY_TIMEOUT_MS = 5_000
+const WINDOWS_AGENT_SHELL_READY_MARKER = '\x1b]633;CLEANCODE_SHELL_READY\x07'
+const WINDOWS_AGENT_SHELL_READY_COMMAND = [
+  'function global:prompt {',
+  "[Console]::Write(([char]27) + ']633;CLEANCODE_SHELL_READY' + ([char]7));",
+  "return 'PS ' + $executionContext.SessionState.Path.CurrentLocation + '> '",
+  '}'
+].join(' ')
 
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
@@ -45,13 +52,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     ensureNodePtySpawnHelperIsExecutable()
 
     const shell = command.shell || getDefaultShell()
-    const launch =
+    const shouldWaitForWindowsAgentShell =
       platform() === 'win32' &&
       command.scope.owner?.kind === 'agent' &&
       !command.launchCommand &&
       supportsForegroundJobShell('win32', shell)
-        ? createTerminalProcessLaunch(shell, WINDOWS_AGENT_SHELL_READY_COMMAND, 'interactive')
-        : createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
+    const launch = shouldWaitForWindowsAgentShell
+      ? createTerminalProcessLaunch(shell, WINDOWS_AGENT_SHELL_READY_COMMAND, 'interactive')
+      : createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
     const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
       name: terminalEmulationName,
       cols: command.columns,
@@ -64,6 +72,16 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const exited = new Promise<void>((resolve) => {
       resolveExit = resolve
     })
+    let resolveWindowsAgentShellReady: () => void = () => undefined
+    let rejectWindowsAgentShellReady: (error: Error) => void = () => undefined
+    const windowsAgentShellReady = shouldWaitForWindowsAgentShell
+      ? new Promise<void>((resolve, reject) => {
+          resolveWindowsAgentShellReady = resolve
+          rejectWindowsAgentShellReady = reject
+        })
+      : null
+    let windowsAgentShellStartupOutput = ''
+    let hasWindowsAgentShellBecomeReady = !shouldWaitForWindowsAgentShell
     const managedProcess: ManagedTerminalProcess = {
       foregroundJob: null,
       foregroundJobInterruptPromise: null,
@@ -79,6 +97,16 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     }
     this.processes.set(command.scope.sessionId, managedProcess)
     ptyProcess.onData((data) => {
+      if (windowsAgentShellReady && !hasWindowsAgentShellBecomeReady) {
+        const startupOutput = windowsAgentShellStartupOutput + data
+        if (startupOutput.includes(WINDOWS_AGENT_SHELL_READY_MARKER)) {
+          hasWindowsAgentShellBecomeReady = true
+          resolveWindowsAgentShellReady()
+        }
+        windowsAgentShellStartupOutput = startupOutput.slice(
+          -(WINDOWS_AGENT_SHELL_READY_MARKER.length - 1)
+        )
+      }
       managedProcess.hasObservedShellOutput = true
       const pendingForegroundProbe = managedProcess.pendingForegroundProbe
       managedProcess.pendingForegroundProbe = null
@@ -105,6 +133,11 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       }
     })
     ptyProcess.onExit((event) => {
+      if (!hasWindowsAgentShellBecomeReady) {
+        rejectWindowsAgentShellReady(
+          new Error('Windows Agent shell exited before its interactive prompt became ready.')
+        )
+      }
       if (this.processes.get(command.scope.sessionId) === managedProcess) {
         this.processes.delete(command.scope.sessionId)
       }
@@ -122,6 +155,19 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         exitCode: event.exitCode
       })
     })
+
+    if (windowsAgentShellReady) {
+      try {
+        await waitForPromise(
+          windowsAgentShellReady,
+          WINDOWS_AGENT_SHELL_READY_TIMEOUT_MS,
+          'Windows Agent shell did not become ready for interactive input.'
+        )
+      } catch (error) {
+        await stopManagedProcess(managedProcess).catch(() => undefined)
+        throw error
+      }
+    }
 
     return {
       processId: ptyProcess.pid
@@ -385,16 +431,17 @@ function isProcessGroupAlive(processGroupId: number): boolean {
   }
 }
 
-async function waitForPromise(promise: Promise<void>, timeoutMs: number): Promise<void> {
+async function waitForPromise(
+  promise: Promise<void>,
+  timeoutMs: number,
+  timeoutMessage = 'Terminal process did not report its exit.'
+): Promise<void> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(
-          () => reject(new Error('Terminal process did not report its exit.')),
-          timeoutMs
-        )
+        timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
       })
     ])
   } finally {

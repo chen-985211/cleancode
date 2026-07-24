@@ -86,6 +86,12 @@ export function TerminalMetadataForm({
         event.preventDefault()
         void save()
       }}
+      onClickCapture={(event) => {
+        if (event.target instanceof Element && event.target.closest('button[type="submit"]')) {
+          event.preventDefault()
+          void save()
+        }
+      }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>
@@ -170,10 +176,6 @@ export function TerminalMetadataForm({
               aria-label={t('terminalForm.save')}
               aria-busy={isSaving}
               disabled={!canSave}
-              onClick={(event) => {
-                event.preventDefault()
-                void save()
-              }}
             >
               <Check size={15} aria-hidden="true" />
             </button>

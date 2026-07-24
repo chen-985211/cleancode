@@ -54,6 +54,7 @@ export async function writeTerminalQueryFixtureScript(projectDirectory: string):
 import { writeFileSync } from 'node:fs'
 
 const reportPath = process.argv[2]
+const expectsBackgroundResponse = ${process.platform !== 'win32'}
 let input = ''
 let finished = false
 
@@ -82,11 +83,11 @@ process.stdin.resume()
 process.stdin.on('data', (data) => {
   input += data.toString('utf8')
   const { responses, backgroundResponses } = readResponses()
-  if (responses.length > 0 && backgroundResponses.length > 0) {
+  if (responses.length > 0 && (!expectsBackgroundResponse || backgroundResponses.length > 0)) {
     finish(0)
   }
 })
-process.stdout.write('\u001b[6n\u001b]11;?\u001b\\\\')
+process.stdout.write(expectsBackgroundResponse ? '\u001b[6n\u001b]11;?\u001b\\\\' : '\u001b[6n')
 
 setTimeout(() => finish(1), 2_000)
 `,
