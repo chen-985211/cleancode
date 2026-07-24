@@ -191,99 +191,91 @@ describe('local port infrastructure', () => {
     })
   })
 
-  it.runIf(process.platform === 'darwin')(
-    'distinguishes a listener in the managed PTY process group from an external listener',
-    async () => {
-      const reservations = new NodeLocalPortReservationAdapter()
-      const held = await reservations.tryReserve({ host: '127.0.0.1' })
-      expect(held).not.toBeNull()
-      const port = held?.port ?? 0
-      await held?.release()
+  it('distinguishes a listener in the managed PTY process group from an external listener', async () => {
+    const reservations = new NodeLocalPortReservationAdapter()
+    const held = await reservations.tryReserve({ host: '127.0.0.1' })
+    expect(held).not.toBeNull()
+    const port = held?.port ?? 0
+    await held?.release()
 
-      const processes = new NodePtyTerminalProcessAdapter()
-      let output = ''
-      const program = [
-        'const net = require("node:net")',
-        `net.createServer().listen(${port}, "127.0.0.1", () => console.log("OWNED_READY"))`
-      ].join(';')
-      const handle = await processes.start({
-        scope: runScope('owned-listener'),
-        workingDirectory: process.cwd(),
-        shell: '/bin/sh',
-        launchCommand: `${shellQuote(process.execPath)} -e ${shellQuote(program)}`,
-        columns: 80,
-        rows: 24,
-        onOutput: (event) => {
-          output += event.data
-        },
-        onExit: () => undefined
-      })
-      await waitUntil(() => output.includes('OWNED_READY'))
+    const processes = new NodePtyTerminalProcessAdapter()
+    let output = ''
+    const program = [
+      'const net = require("node:net")',
+      `net.createServer().listen(${port}, "127.0.0.1", () => console.log("OWNED_READY"))`
+    ].join(';')
+    const handle = await processes.start({
+      scope: runScope('owned-listener'),
+      workingDirectory: process.cwd(),
+      shell: process.platform === 'win32' ? 'powershell.exe' : '/bin/sh',
+      launchCommand: createNodeEvalCommand(program),
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    await waitUntil(() => output.includes('OWNED_READY'))
 
+    const inspector = new NodeTcpListenerInspectionAdapter()
+    await expect(
+      inspector.inspect({ host: '127.0.0.1', port, rootProcessId: handle.processId })
+    ).resolves.toMatchObject({ ownership: 'owned' })
+    await processes.stop('owned-listener')
+
+    const externalServer = createServer()
+    await new Promise<void>((resolve) => externalServer.listen(port, '127.0.0.1', resolve))
+    const unrelatedRoot = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      stdio: 'ignore'
+    })
+    await new Promise<void>((resolve, reject) => {
+      unrelatedRoot.once('spawn', resolve)
+      unrelatedRoot.once('error', reject)
+    })
+    try {
+      await expect(
+        inspector.inspect({
+          host: '127.0.0.1',
+          port,
+          rootProcessId: unrelatedRoot.pid ?? 0
+        })
+      ).resolves.toMatchObject({ ownership: 'external' })
+    } finally {
+      unrelatedRoot.kill('SIGKILL')
+      await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
+      await new Promise<void>((resolve) => externalServer.close(() => resolve()))
+    }
+  }, 10_000)
+
+  it('does not treat an unrelated listener in the same process group as owned', async () => {
+    const server = createServer()
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    const port = typeof address === 'object' && address ? address.port : 0
+    const unrelatedRoot = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      stdio: 'ignore'
+    })
+    await new Promise<void>((resolve, reject) => {
+      unrelatedRoot.once('spawn', resolve)
+      unrelatedRoot.once('error', reject)
+    })
+
+    try {
       const inspector = new NodeTcpListenerInspectionAdapter()
       await expect(
-        inspector.inspect({ host: '127.0.0.1', port, rootProcessId: handle.processId })
-      ).resolves.toMatchObject({ ownership: 'owned' })
-      await processes.stop('owned-listener')
-
-      const externalServer = createServer()
-      await new Promise<void>((resolve) => externalServer.listen(port, '127.0.0.1', resolve))
-      const unrelatedRoot = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
-        stdio: 'ignore'
-      })
-      await new Promise<void>((resolve, reject) => {
-        unrelatedRoot.once('spawn', resolve)
-        unrelatedRoot.once('error', reject)
-      })
-      try {
-        await expect(
-          inspector.inspect({
-            host: '127.0.0.1',
-            port,
-            rootProcessId: unrelatedRoot.pid ?? 0
-          })
-        ).resolves.toMatchObject({ ownership: 'external' })
-      } finally {
-        unrelatedRoot.kill('SIGKILL')
-        await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
-        await new Promise<void>((resolve) => externalServer.close(() => resolve()))
-      }
-    },
-    10_000
-  )
-
-  it.runIf(process.platform === 'darwin')(
-    'does not treat an unrelated listener in the same process group as owned',
-    async () => {
-      const server = createServer()
-      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-      const address = server.address()
-      const port = typeof address === 'object' && address ? address.port : 0
-      const unrelatedRoot = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
-        stdio: 'ignore'
-      })
-      await new Promise<void>((resolve, reject) => {
-        unrelatedRoot.once('spawn', resolve)
-        unrelatedRoot.once('error', reject)
-      })
-
-      try {
-        const inspector = new NodeTcpListenerInspectionAdapter()
-        await expect(
-          inspector.inspect({
-            host: '127.0.0.1',
-            port,
-            rootProcessId: unrelatedRoot.pid ?? 0
-          })
-        ).resolves.toMatchObject({ ownership: 'external' })
-      } finally {
-        unrelatedRoot.kill('SIGKILL')
-        await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
-        await new Promise<void>((resolve) => server.close(() => resolve()))
-      }
-    },
-    10_000
-  )
+        inspector.inspect({
+          host: '127.0.0.1',
+          port,
+          rootProcessId: unrelatedRoot.pid ?? 0
+        })
+      ).resolves.toMatchObject({ ownership: 'external' })
+    } finally {
+      unrelatedRoot.kill('SIGKILL')
+      await new Promise<void>((resolve) => unrelatedRoot.once('exit', () => resolve()))
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }, 10_000)
 })
 
 function runScope(sessionId: string) {
@@ -368,8 +360,17 @@ function createReservationAdapter(serverFactory: () => Server): NodeLocalPortRes
   return new NodeLocalPortReservationAdapter(serverFactory)
 }
 
+function createNodeEvalCommand(source: string): string {
+  const encodedSource = Buffer.from(source, 'utf8').toString('base64')
+  const bootstrap = `eval(Buffer.from('${encodedSource}','base64').toString('utf8'))`
+  const invocation = [process.execPath, '-e', bootstrap].map(shellQuote).join(' ')
+  return process.platform === 'win32' ? `& ${invocation}` : invocation
+}
+
 function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`
+  return process.platform === 'win32'
+    ? `'${value.replaceAll("'", "''")}'`
+    : `'${value.replaceAll("'", `'"'"'`)}'`
 }
 
 async function waitUntil(assertion: () => boolean): Promise<void> {

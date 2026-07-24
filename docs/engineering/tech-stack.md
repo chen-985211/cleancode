@@ -56,7 +56,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 受管本地服务使用 Node.js `net.Server` 在 `127.0.0.1` 上预留固定、首选或操作系统动态端口，并在启动 PTY 前通过显式环境变量或安全命令参数后缀注入实际端口。预留句柄不能移交给任意项目进程，因此释放预留到目标进程监听之间仍存在竞争；Run 使用有限分配/激活重试和监听所有权校验收束该窗口，不引入新的第三方依赖。
 
-当前监听所有权验证只在 macOS 上使用系统 `/usr/sbin/lsof` 和 `/bin/ps`，通过两次监听 PID 快照、受管根进程存活检查和进程祖先关系证明监听者属于本次 PTY。Linux 和 Windows 保留 Run 应用端口边界，但当前适配器不能证明所有权时按 `unknown` 失败关闭，不把 TCP 可连接误判为服务就绪。进程清理在 POSIX 上等待异步 PTY/进程组退出；Provider metadata 和 checkpoint 中的进程信息不能脱离认证 instance、live session 与完整运行身份单独证明恢复或授权终止，也不根据 cold restore 的陈旧 PID 自动终止进程。
+监听所有权验证在三个桌面平台都执行两次监听 PID 快照、受管根进程存活检查和进程祖先关系复核：macOS 使用 `/usr/sbin/lsof` 与 `/bin/ps`，Linux 使用 `/proc/net/tcp*`、进程 fd 和 `/proc/<pid>/stat`，Windows 使用 `netstat.exe` 与 PowerShell CIM。任一系统工具不可用、监听集合变化或祖先关系无法证明时仍按 `unknown` 失败关闭，不把 TCP 可连接误判为服务就绪。进程清理在 POSIX 上等待异步 PTY/进程组退出；Provider metadata 和 checkpoint 中的进程信息不能脱离认证 instance、live session 与完整运行身份单独证明恢复或授权终止，也不根据 cold restore 的陈旧 PID 自动终止进程。
 
 ## Agent 集成
 
@@ -85,7 +85,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行，CI 由独立 build job 上传同一份 `out` artifact，再分到三个相互隔离的 macOS runner，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。
@@ -97,7 +97,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
-本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖上述自定义检查、格式、Lint、类型检查、全部 unit/integration/contract、关键 E2E smoke、依赖方向和未使用代码检查。完整 Electron E2E 由 CI workflow 和显式 `pnpm test:full` 覆盖。
+本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和关键 E2E smoke。完整 Electron E2E 由 CI workflow 和显式 `pnpm test:full` 覆盖；CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
 
 ## 候选技术与触发条件
 

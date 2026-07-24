@@ -1,19 +1,7 @@
-name: Agent terminal platforms
+name: Full cross-platform quality
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/agent-terminal-platform.yml'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'src/contexts/agent/**'
-      - 'src/contexts/run/**'
-      - 'src/platform/**'
-      - 'tests/fixtures/**'
-      - 'tests/integration/contexts/agent/**'
-      - 'tests/integration/contexts/run/**'
-      - 'tests/unit/contexts/agent/**'
-      - 'tests/unit/contexts/run/**'
   push:
     branches: [main]
   workflow_dispatch:
@@ -22,48 +10,35 @@ permissions:
   contents: read
 
 jobs:
-  agent-terminal:
-    name: Agent terminal / ${{ matrix.os }}
+  quality:
+    name: Full quality / ${{ matrix.id }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - id: linux
+            os: ubuntu-24.04
+          - id: macos
+            os: macos-15
+          - id: windows
+            os: windows-2025
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           cache: pnpm
           node-version: 24
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - name: Verify Provider contracts and foreground runtime
-        run: >-
-          pnpm exec vitest run
-          tests/unit/contexts/agent/agent.provider-registry.spec.ts
-          tests/unit/contexts/agent/agent.provider-installation.spec.ts
-          tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts
-          tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts
-          tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts
-          tests/unit/contexts/agent/agent.launch-artifact-scope.spec.ts
-          tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts
-          tests/integration/contexts/agent/agent.provider-cli-detector.spec.ts
-          tests/integration/contexts/agent/agent.claude-hook-runtime.spec.ts
-          tests/unit/contexts/run/run.foreground-job-shell-control.spec.ts
-
-      - if: runner.os != 'Windows'
-        run: pnpm exec vitest run tests/integration/contexts/run/run.pty-terminal.spec.ts -t "reports foreground job exit without exiting the Agent terminal"
-
-      - if: runner.os != 'Windows'
-        run: pnpm exec vitest run tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts
-
-      - if: runner.os == 'Windows'
-        run: pnpm exec vitest run tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts tests/integration/contexts/run/run.windows-agent-pty.spec.ts
-
+      - name: Run every static and structural quality gate
+        run: pnpm check:quality
+      - name: Run all unit, integration, and contract tests
+        run: pnpm test:core:ci
       - run: pnpm build

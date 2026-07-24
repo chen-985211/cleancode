@@ -21,14 +21,18 @@ export async function installFakeClaudeCli(
   const fixtureDirectory = join(appStateDirectory, 'fake-claude-cli')
   const binDirectory = join(fixtureDirectory, 'bin')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
-  const executablePath = join(binDirectory, 'claude')
-  const shellPath = join(fixtureDirectory, 'sh')
+  const executablePath = join(binDirectory, process.platform === 'win32' ? 'claude.cmd' : 'claude')
+  const programPath = join(fixtureDirectory, 'claude.mjs')
+  const shellPath = process.platform === 'win32' ? 'powershell.exe' : join(fixtureDirectory, 'sh')
 
   await mkdir(binDirectory, { recursive: true })
-  await writeFile(executablePath, createFakeClaudeProgram(), 'utf8')
-  await writeFile(shellPath, createDeterministicShellProgram(), 'utf8')
-  await chmod(executablePath, 0o755)
-  await chmod(shellPath, 0o755)
+  await writeFile(programPath, createFakeClaudeProgram(), 'utf8')
+  await writeFile(executablePath, createNodeCliLauncher(programPath), 'utf8')
+  if (process.platform !== 'win32') {
+    await writeFile(shellPath, createDeterministicShellProgram(), 'utf8')
+    await chmod(executablePath, 0o755)
+    await chmod(shellPath, 0o755)
+  }
 
   return { binDirectory, reportPath, shellPath }
 }
@@ -50,8 +54,7 @@ export async function readFakeClaudeCliReports(
 }
 
 function createFakeClaudeProgram(): string {
-  return `#!${process.execPath}
-import { appendFileSync } from 'node:fs'
+  return `import { appendFileSync } from 'node:fs'
 
 const args = process.argv.slice(2)
 const cwd = process.cwd()
@@ -108,6 +111,16 @@ process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)
 process.on('SIGTERM', exitCleanly)
 `
+}
+
+function createNodeCliLauncher(programPath: string): string {
+  return process.platform === 'win32'
+    ? `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
+    : `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
+}
+
+function quotePosixWord(value: string): string {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`
 }
 
 function createDeterministicShellProgram(): string {

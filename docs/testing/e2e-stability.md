@@ -117,12 +117,13 @@ await expectAuthoritativeResult(currentIdentity)
 - 能报告真实执行次数、收到的参数或协议事件。
 - 只实现当前场景需要的外部行为，不复制生产业务规则。
 - 文件位于 `tests/fixtures/<owner>/`，名称表达它模拟的角色。
+- 通用 fixture 必须同时提供 POSIX executable 与 Windows `.cmd` 入口，或通过平台 shell 中立的 Node 命令生成器启动；只有被测目标本身是特定 shell 时才允许 shell 方言。
 
 终端选区测试可以让 fixture 直接输出固定行；快速启动测试可以同时输出可见 marker 并向报告文件追加一次记录。前者证明渲染，后者证明执行次数，两种证据互不冒充。
 
 ## 共享不可变成本，隔离可变状态
 
-单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 分片可以共享独立 build job 上传的同一份不可变 `out` artifact；只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
+单次本地 E2E 调用可以在 global setup 中共享一次构建产物，因为构建产物在场景间不可变且创建昂贵。CI 在每个操作系统分别构建；同一系统的分片可以共享对应 build job 上传的不可变 `out` artifact，但 Electron/node-pty 产物不能跨系统复用。只有显式预构建模式且 main、preload、renderer 三个入口校验通过时才能跳过构建。以下资源默认不能跨场景共享：
 
 - Electron 应用进程和 PTY。
 - 项目目录、应用状态目录、Electron `userData` profile 和持久化 fixture。
@@ -191,7 +192,7 @@ E2E 失败诊断至少要回答：
 
 压力复跑通过后仍要执行统一门禁。若完整套件失败而单测稳定，应优先检查重复构建、资源残留、共享状态和运行顺序，不应直接扩大 timeout。
 
-日常本地反馈使用 `pnpm test`，其 Electron 部分只执行标记为 `smoke` 的关键跨上下文路径；完整回归使用 `pnpm test:full`。相关 Pull Request 和 `main` 分支必须由 CI 的独立 macOS runners 分片运行完整 `pnpm test:e2e`，每个 shard 内仍关闭文件并行和自动重试。不能用增加 smoke 数量替代低层测试，也不能因为完整套件进入 CI 就降低首次失败的诊断要求。
+日常本地反馈使用 `pnpm test`，其 Electron 部分只执行标记为 `smoke` 的关键跨上下文路径；完整回归使用 `pnpm test:full`。每个 Pull Request 和 `main` 分支必须由 CI 在 macOS、Linux 和 Windows 的独立 runners 上分片运行完整 `pnpm test:e2e`，每个 shard 内仍关闭文件并行和自动重试。不能用增加 smoke 数量替代低层测试，也不能因为完整套件进入 CI 就降低首次失败的诊断要求。
 
 ## 何时提取测试支撑代码
 

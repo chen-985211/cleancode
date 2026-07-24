@@ -21,6 +21,7 @@ export interface ForegroundJobShellControl {
   readonly shellFamily: 'posix' | 'powershell'
   readonly scriptDirectory: string
   readonly scriptPath: string
+  readonly statusPath: string | null
 }
 
 export interface ForegroundJobShellControlOptions {
@@ -42,18 +43,19 @@ export function createForegroundJobShellControl(
   }
   const token = options.token ?? randomUUID().replaceAll('-', '')
   if (!/^[A-Za-z0-9]+$/.test(token)) throw new Error('Invalid foreground job token.')
-  const scriptContents =
-    shellFamily === 'powershell'
-      ? createPowerShellLaunchScript(command, token)
-      : createPosixLaunchScript(command, token)
   const scriptDirectory = mkdtempSync(
     join(options.temporaryRoot ?? tmpdir(), 'cleancode-agent-job-')
   )
+  const statusPath = shellFamily === 'posix' ? join(scriptDirectory, 'exit-status') : null
   const scriptPath = join(
     scriptDirectory,
     shellFamily === 'powershell' ? 'launch.ps1' : 'launch.sh'
   )
   try {
+    const scriptContents =
+      shellFamily === 'powershell'
+        ? createPowerShellLaunchScript(command, token)
+        : createPosixLaunchScript(command, token, statusPath as string)
     writeFileSync(scriptPath, scriptContents, { encoding: 'utf8', mode: 0o700 })
     if (shellFamily === 'posix') chmodSync(scriptPath, 0o700)
   } catch (error) {
@@ -68,6 +70,7 @@ export function createForegroundJobShellControl(
     shellFamily,
     scriptDirectory,
     scriptPath,
+    statusPath,
     token
   }
 }
@@ -87,10 +90,11 @@ export function createForegroundJobProbe(control: ForegroundJobShellControl): st
       ].join(' ') + '\r'
     )
   }
+  if (!control.statusPath) throw new Error('POSIX foreground job status path is unavailable.')
   return (
     [
       quotePosixShellWord(control.scriptPath),
-      'cleancode_job_status=$?',
+      `IFS= read -r cleancode_job_status < ${quotePosixShellWord(control.statusPath)}`,
       `printf '\\036CLEANCODE_JOB:${control.token}:exit:%s\\037' "$cleancode_job_status"`
     ].join('; ') + '\n'
   )
@@ -116,7 +120,8 @@ export function supportsForegroundJobShell(
 
 function createPosixLaunchScript(
   command: LaunchForegroundJobProcessCommand,
-  token: string
+  token: string,
+  statusPath: string
 ): string {
   const environment = Object.entries(command.environment).map(([name, value]) => {
     if (!environmentNamePattern.test(name)) throw new Error(`Invalid environment name: ${name}`)
@@ -129,9 +134,15 @@ function createPosixLaunchScript(
     ...command.args.map(quotePosixShellWord)
   ].join(' ')
   return (
-    ['#!/bin/sh', `printf '\\036CLEANCODE_JOB:${token}:started\\037'`, `exec ${invocation}`].join(
-      '\n'
-    ) + '\n'
+    [
+      '#!/bin/sh',
+      "trap ':' INT",
+      `printf '\\036CLEANCODE_JOB:${token}:started\\037'`,
+      invocation,
+      'cleancode_job_status=$?',
+      `printf '%s\\n' "$cleancode_job_status" > ${quotePosixShellWord(statusPath)}`,
+      'exit 0'
+    ].join('\n') + '\n'
   )
 }
 

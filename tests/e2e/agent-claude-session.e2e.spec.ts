@@ -1,7 +1,5 @@
 // @vitest-environment node
 
-import { delimiter } from 'node:path'
-
 import type { ElectronApplication, Page } from 'playwright'
 
 import {
@@ -26,6 +24,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Claude Code Agent session e2e', () => {
   let electronApp: ElectronApplication
@@ -67,7 +66,6 @@ describe('Claude Code Agent session e2e', () => {
       await expectAgentProviderInstalled(page, 'claude-code')
       await waitForClaudeInspection(fakeClaude.reportPath)
       await selectDefaultAgentProvider(page, 'Claude Code')
-      await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 1)
       const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
       await claudeIdentity.waitFor()
@@ -124,19 +122,15 @@ function createAgentProviderEnvironment(
   fakeCodex: FakeCodexCliFixture,
   fakeClaude: FakeClaudeCliFixture
 ): NodeJS.ProcessEnv {
+  const terminalEnvironment = createE2eTerminalEnvironment()
+
   return {
+    ...terminalEnvironment,
     CLEANCODE_FAKE_CLAUDE_REPORT_PATH: fakeClaude.reportPath,
     CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
     CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-    PATH: [
-      fakeCodex.binDirectory,
-      fakeClaude.binDirectory,
-      '/usr/bin',
-      '/bin',
-      '/usr/sbin',
-      '/sbin'
-    ].join(delimiter),
-    SHELL: fakeClaude.shellPath
+    PATH: prependE2ePath(fakeCodex.binDirectory, fakeClaude.binDirectory),
+    SHELL: process.platform === 'win32' ? terminalEnvironment.SHELL : fakeClaude.shellPath
   }
 }
 

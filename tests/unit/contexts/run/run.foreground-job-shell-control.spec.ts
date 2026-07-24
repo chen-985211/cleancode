@@ -55,6 +55,34 @@ describe('foreground job shell control', () => {
     expect(existsSync(control.scriptDirectory)).toBe(false)
   })
 
+  it('creates a POSIX supervisor that lets the interactive shell report the child exit', () => {
+    const control = createForegroundJobShellControl(
+      createCommand({
+        args: ['--prompt', "quote ' argument"],
+        environment: { CLEANCODE_TEST_VALUE: '中文 value' },
+        executable: '/opt/Agent CLI/agent'
+      }),
+      {
+        platform: 'linux',
+        shellExecutable: '/bin/sh',
+        temporaryRoot,
+        token: 'fixedtoken'
+      }
+    )
+    const script = readFileSync(control.scriptPath, 'utf8')
+    const probe = createForegroundJobProbe(control)
+
+    expect(probe).toContain(`'${control.scriptPath.replaceAll("'", "'\"'\"'")}'`)
+    expect(probe).toContain('IFS= read -r cleancode_job_status')
+    expect(probe).toContain('CLEANCODE_JOB:fixedtoken:exit:%s')
+    expect(script).toContain("trap ':' INT")
+    expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
+    expect(script).toContain(`> '${control.statusPath?.replaceAll("'", "'\"'\"'")}'`)
+    expect(script).toContain('exit 0')
+
+    disposeForegroundJobShellControl(control)
+  })
+
   it('rejects Windows foreground jobs for shells that cannot run PowerShell scripts', () => {
     expect(() =>
       createForegroundJobShellControl(createCommand(), {

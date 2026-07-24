@@ -18,11 +18,13 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   const fixtureDirectory = join(appStateDirectory, 'fake-codex-cli')
   const binDirectory = join(fixtureDirectory, 'bin')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
-  const executablePath = join(binDirectory, 'codex')
+  const executablePath = join(binDirectory, process.platform === 'win32' ? 'codex.cmd' : 'codex')
+  const programPath = join(fixtureDirectory, 'codex.mjs')
 
   await mkdir(binDirectory, { recursive: true })
-  await writeFile(executablePath, createFakeCodexProgram(), 'utf8')
-  await chmod(executablePath, 0o755)
+  await writeFile(programPath, createFakeCodexProgram(), 'utf8')
+  await writeFile(executablePath, createNodeCliLauncher(programPath), 'utf8')
+  if (process.platform !== 'win32') await chmod(executablePath, 0o755)
 
   return { binDirectory, reportPath }
 }
@@ -47,8 +49,7 @@ export async function readFakeCodexCliReports(
 }
 
 function createFakeCodexProgram(): string {
-  return `#!${process.execPath}
-import { appendFileSync } from 'node:fs'
+  return `import { appendFileSync } from 'node:fs'
 
 const CSI = '\\x1b['
 const OSC = '\\x1b]'
@@ -158,6 +159,16 @@ process.on('SIGINT', exitCleanly)
 process.on('SIGTERM', exitCleanly)
 process.stdout.write(OSC + '11;?' + '\\x07')
 `
+}
+
+function createNodeCliLauncher(programPath: string): string {
+  return process.platform === 'win32'
+    ? `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
+    : `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
+}
+
+function quotePosixWord(value: string): string {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`
 }
 
 function isMissingFileError(error: unknown): boolean {

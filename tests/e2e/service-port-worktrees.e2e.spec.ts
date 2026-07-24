@@ -17,7 +17,11 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { readTerminalSessionId } from '../support/e2eTerminal'
+import {
+  createE2eTerminalEnvironment,
+  createE2eNodeScriptCommand,
+  readTerminalSessionId
+} from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
 const gitLocalEnvironmentVariables = [
@@ -49,7 +53,9 @@ describe('service port management across worktrees e2e', () => {
     workbench = await createE2eWorkbench('cleancode-service-port-worktrees-e2e')
     resources.workbench = workbench
     await initializeGitProjectWithHttpService(workbench.projectDirectory)
-    electronApp = await launchApp(workbench, { environment: { SHELL: '/bin/sh' } })
+    electronApp = await launchApp(workbench, {
+      environment: createE2eTerminalEnvironment()
+    })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
     resources.page = page
@@ -70,7 +76,7 @@ describe('service port management across worktrees e2e', () => {
     })
   }, electronScenarioTimeoutMs)
 
-  it.runIf(process.platform === 'darwin')(
+  it(
     'keeps authoritative endpoints when two worktrees share one preferred port',
     async () => {
       await expectDesktopRuntime(page)
@@ -121,7 +127,7 @@ describe('service port management across worktrees e2e', () => {
     electronScenarioTimeoutMs
   )
 
-  it.runIf(process.platform === 'darwin')(
+  it(
     'reuses a fixed port after the stopped worktree run settles while switching workspaces',
     async () => {
       await expectDesktopRuntime(page)
@@ -163,8 +169,17 @@ describe('service port management across worktrees e2e', () => {
         .toBe('page')
       await mainTerminal.waitFor({ state: 'detached' })
 
-      await branchTerminal.getByRole('button', { name: 'Terminal 1 停止当前命令' }).click()
-      await branchTerminal.getByText('已退出', { exact: true }).waitFor()
+      const stopAction = branchTerminal.getByRole('button', {
+        name: 'Terminal 1 停止当前命令'
+      })
+      await stopAction.click()
+      await expect.poll(() => stopAction.isDisabled(), { interval: 50, timeout: 10_000 }).toBe(true)
+      await expect
+        .poll(() => branchTerminal.getByLabel('实际服务地址', { exact: true }).count(), {
+          interval: 50,
+          timeout: 10_000
+        })
+        .toBe(0)
 
       await mainWorkspace.click()
       await expect
@@ -217,7 +232,9 @@ async function createHttpServiceTerminal(
 
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   await terminal.getByRole('button', { name: 'Terminal 1 编辑终端信息' }).click()
-  await terminal.getByRole('textbox', { name: '启动命令' }).fill('node service-fixture.mjs')
+  await terminal
+    .getByRole('textbox', { name: '启动命令' })
+    .fill(createE2eNodeScriptCommand('service-fixture.mjs', [], { replaceShell: true }))
   await terminal.getByText('工作流高级配置', { exact: true }).click()
   await terminal.getByLabel('运行模式').selectOption('service')
   await terminal.getByLabel('服务就绪方式').selectOption('tcp')
@@ -347,10 +364,19 @@ server.listen(port, '127.0.0.1', () => {
   process.stdout.write(\`CLEANCODE_E2E_HTTP_READY:\${port}\\n\`)
 })
 
+let stopping = false
 function stop() {
+  if (stopping) return
+  stopping = true
+  server.closeAllConnections?.()
   server.close(() => process.exit(0))
 }
 
+process.stdin.setRawMode?.(true)
+process.stdin.resume()
+process.stdin.on('data', (data) => {
+  if (data.includes(3)) stop()
+})
 process.on('SIGINT', stop)
 process.on('SIGTERM', stop)
 `

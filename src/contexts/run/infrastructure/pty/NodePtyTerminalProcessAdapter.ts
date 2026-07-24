@@ -73,9 +73,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
             onExit: (event) => {
               const control = managedProcess.foregroundJob
               if (!control) return
-              managedProcess.foregroundJob = null
-              disposeForegroundJobShellControl(control)
-              control.command.onExit(event)
+              setImmediate(() => {
+                if (managedProcess.foregroundJob !== control) return
+                managedProcess.foregroundJob = null
+                disposeForegroundJobShellControl(control)
+                control.command.onExit(event)
+              })
             }
           })
         : data

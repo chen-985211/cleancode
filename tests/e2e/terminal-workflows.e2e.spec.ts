@@ -15,7 +15,8 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import {
-  e2eShellReadyMarker,
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
@@ -33,7 +34,7 @@ describe('terminal workflows e2e', () => {
     workbench = await createE2eWorkbench('cleancode-terminal-workflow-e2e')
     resources.workbench = workbench
     electronApp = await launchApp(workbench, {
-      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+      environment: createE2eTerminalEnvironment()
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -55,8 +56,16 @@ describe('terminal workflows e2e', () => {
     async () => {
       const initialSessions = await createTwoRunningTerminals(page)
 
-      await configureLaunchCommand(page, 'Terminal 1', 'printf "workflow-install-complete\\n"')
-      await configureLaunchCommand(page, 'Terminal 2', 'printf "workflow-build-complete\\n"')
+      await configureLaunchCommand(
+        page,
+        'Terminal 1',
+        createE2ePrintCommand('workflow-install-complete')
+      )
+      await configureLaunchCommand(
+        page,
+        'Terminal 2',
+        createE2ePrintCommand('workflow-build-complete')
+      )
       await connectTerminalNodes(page)
 
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()

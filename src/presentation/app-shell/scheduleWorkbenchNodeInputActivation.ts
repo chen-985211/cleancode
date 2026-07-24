@@ -4,6 +4,7 @@ interface ScheduleWorkbenchNodeInputActivationInput {
 }
 
 const inputProjectionRetryInterval = 50
+const inputProjectionStabilityInterval = 100
 const inputProjectionTimeout = 2_000
 const postTransitionFocusDelay = 20
 
@@ -13,7 +14,19 @@ export function scheduleWorkbenchNodeInputActivation({
 }: ScheduleWorkbenchNodeInputActivationInput): () => void {
   let isPending = true
   let remainingRetryTime = inputProjectionTimeout
+  let stableActivationCount = 0
   let timeoutId = 0
+
+  const scheduleRetry = (delay: number): void => {
+    if (remainingRetryTime <= 0) {
+      isPending = false
+      return
+    }
+
+    const boundedDelay = Math.min(delay, remainingRetryTime)
+    remainingRetryTime -= boundedDelay
+    timeoutId = window.setTimeout(tryActivation, boundedDelay)
+  }
 
   const tryActivation = (): void => {
     if (!isPending) {
@@ -21,17 +34,17 @@ export function scheduleWorkbenchNodeInputActivation({
     }
 
     if (activate()) {
-      isPending = false
+      stableActivationCount += 1
+      if (stableActivationCount >= 2) {
+        isPending = false
+        return
+      }
+      scheduleRetry(inputProjectionStabilityInterval)
       return
     }
 
-    if (remainingRetryTime <= 0) {
-      isPending = false
-      return
-    }
-
-    remainingRetryTime -= inputProjectionRetryInterval
-    timeoutId = window.setTimeout(tryActivation, inputProjectionRetryInterval)
+    stableActivationCount = 0
+    scheduleRetry(inputProjectionRetryInterval)
   }
 
   timeoutId = window.setTimeout(

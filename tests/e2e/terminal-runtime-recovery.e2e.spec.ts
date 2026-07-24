@@ -18,10 +18,14 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eProcessOutput } from '../support/e2eDiagnostics'
 import {
+  asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
-  e2eShellReadyMarker,
+  createE2ePrintCommand,
+  createE2eStreamingCommand,
+  createE2eTerminalEnvironment,
   readTerminalSessionId,
   waitForTerminalOutput,
+  waitForTerminalShellPrompt,
   waitForTerminalShellReady,
   writeTerminalCommand
 } from '../support/e2eTerminal'
@@ -58,7 +62,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'WARM_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('WARM_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
 
@@ -67,8 +71,12 @@ describe('terminal runtime recovery e2e', () => {
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
-      await waitForTerminalTail(page, 'Terminal 1', e2eShellReadyMarker)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_WARM\\n'\r")
+      await waitForTerminalShellPrompt(page, 'Terminal 1')
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('AFTER_WARM'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_WARM')
       await retireCurrentTerminal()
     }
@@ -118,7 +126,7 @@ describe('terminal runtime recovery e2e', () => {
       await configureAndStartTerminalLaunchCommand(
         page,
         'Terminal 1',
-        "printf 'INHERITED_LAUNCH\\n'"
+        createE2ePrintCommand('INHERITED_LAUNCH')
       )
 
       const inheritedSessionId = await readTerminalSessionId(page, 'Terminal 1')
@@ -127,7 +135,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'INHERITED_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('INHERITED_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
 
@@ -147,7 +155,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'RENDERER_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('RENDERER_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'RENDERER_TICK')
       const recoveredWindow = electronApp.waitForEvent('window')
@@ -169,7 +177,11 @@ describe('terminal runtime recovery e2e', () => {
     'warm-attaches a retained session after the Electron main process crashes',
     async () => {
       const sessionId = await retainTerminal(page)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'BEFORE_MAIN_CRASH\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('BEFORE_MAIN_CRASH'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'BEFORE_MAIN_CRASH')
 
       const mainProcess = electronApp.process()
@@ -182,7 +194,11 @@ describe('terminal runtime recovery e2e', () => {
       resources.page = page
 
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_MAIN_CRASH\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('AFTER_MAIN_CRASH'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_MAIN_CRASH')
       await retireCurrentTerminal()
     },
@@ -193,7 +209,11 @@ describe('terminal runtime recovery e2e', () => {
     'falls back to read-only normal-buffer history after the Provider crashes',
     async () => {
       const sessionId = await retainTerminal(page)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'DURABLE_PROVIDER_HISTORY\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('DURABLE_PROVIDER_HISTORY'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'DURABLE_PROVIDER_HISTORY')
       const metadata = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
       expect(metadata).not.toBeNull()
@@ -231,7 +251,7 @@ describe('terminal runtime recovery e2e', () => {
 
 async function launchWorkbench(workbench: E2eWorkbench) {
   const electronApp = await launchApp(workbench, {
-    environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+    environment: createE2eTerminalEnvironment()
   })
   const page = await electronApp.firstWindow()
   await page.waitForLoadState('domcontentloaded')
@@ -255,18 +275,6 @@ async function retainTerminal(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' }).click()
   await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
   return sessionId
-}
-
-async function waitForTerminalTail(page: Page, terminalName: string, tail: string): Promise<void> {
-  const sessionId = await readTerminalSessionId(page, terminalName)
-  await page.waitForFunction(
-    ({ sessionId, tail }) =>
-      Array.from(document.querySelectorAll<HTMLElement>('[data-terminal-session-id]'))
-        .find((element) => element.dataset.terminalSessionId === sessionId)
-        ?.textContent?.trimEnd()
-        .endsWith(tail) ?? false,
-    { sessionId, tail }
-  )
 }
 
 async function readTerminalProcessId(page: Page, sessionId: string): Promise<number> {

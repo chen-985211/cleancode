@@ -3,6 +3,8 @@
 import type { Page } from 'playwright'
 
 import {
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
   e2eShellReadyMarker,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
@@ -18,8 +20,18 @@ describe('E2E terminal support', () => {
     await expect(waitForTerminalShellReady(page, 'Terminal 1')).resolves.toBe('terminal-session-1')
     expect(waitForFunction).toHaveBeenCalledWith(expect.any(Function), {
       marker: e2eShellReadyMarker,
-      terminalName: 'Terminal 1'
+      terminalName: 'Terminal 1',
+      windows: process.platform === 'win32'
     })
+  })
+
+  it('uses the native shell and a Node command instead of a shell-specific print primitive', () => {
+    const environment = createE2eTerminalEnvironment()
+    const command = createE2ePrintCommand('portable-output')
+
+    expect(environment.SHELL).toBe(process.platform === 'win32' ? 'powershell.exe' : '/bin/sh')
+    expect(command).toContain(process.execPath)
+    expect(command).not.toContain('printf')
   })
 
   it('waits for output and a replacement session as one observation', async () => {
