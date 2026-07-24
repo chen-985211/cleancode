@@ -43,6 +43,7 @@ export async function selectExactXtermText(
   await ensureTerminalDomRenderer(terminal)
   await terminal.locator('.xterm-helper-textarea').focus()
   await terminal.locator('.xterm-rows > div').filter({ hasText: targetText }).last().waitFor()
+  await waitForCanvasViewportToSettle(page)
   const selection = await terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.findLast((candidate) => candidate.textContent?.includes(target))
@@ -108,6 +109,41 @@ export async function selectExactXtermText(
   await page.mouse.down()
   await page.mouse.move(selection.endX, selection.y, { steps: 12 })
   await page.mouse.up()
+}
+
+async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
+  await page.locator('.react-flow__viewport').evaluate(
+    (viewport) =>
+      new Promise<void>((resolve, reject) => {
+        let quietTimeout = 0
+        let deadlineTimeout = 0
+        const observer = new MutationObserver(scheduleQuietWindow)
+
+        function cleanup(): void {
+          observer.disconnect()
+          window.clearTimeout(quietTimeout)
+          window.clearTimeout(deadlineTimeout)
+        }
+
+        function scheduleQuietWindow(): void {
+          window.clearTimeout(quietTimeout)
+          quietTimeout = window.setTimeout(() => {
+            cleanup()
+            resolve()
+          }, 150)
+        }
+
+        observer.observe(viewport, {
+          attributeFilter: ['style'],
+          attributes: true
+        })
+        deadlineTimeout = window.setTimeout(() => {
+          cleanup()
+          reject(new Error('Canvas viewport did not settle before xterm text selection.'))
+        }, 3_000)
+        scheduleQuietWindow()
+      })
+  )
 }
 
 export async function readXtermAsciiCellCenter(
