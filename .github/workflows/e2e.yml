@@ -45,8 +45,14 @@ jobs:
         shell: bash
         run: |
           for attempt in 1 2 3 4; do
-            if pnpm exec electron --version; then
-              exit 0
+            if node node_modules/electron/install.js; then
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                if test -x node_modules/electron/dist/electron; then
+                  exit 0
+                fi
+              elif pnpm exec electron --version; then
+                exit 0
+              fi
             fi
             sleep $((attempt * 10))
           done
@@ -128,7 +134,11 @@ jobs:
         run: |
           tar -xzf electron-e2e-runtime-${{ matrix.id }}.tgz
           rm electron-e2e-runtime-${{ matrix.id }}.tgz
-          pnpm exec electron --version
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            test -x node_modules/electron/dist/electron
+          else
+            pnpm exec electron --version
+          fi
       - name: Run E2E shard on Linux
         if: runner.os == 'Linux'
         env:

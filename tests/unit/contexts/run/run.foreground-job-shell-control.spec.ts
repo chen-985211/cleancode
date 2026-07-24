@@ -7,7 +7,8 @@ import {
   acceptForegroundJobOutput,
   createForegroundJobProbe,
   createForegroundJobShellControl,
-  disposeForegroundJobShellControl
+  disposeForegroundJobShellControl,
+  escapeWindowsPowerShellLegacyNativeArgument
 } from '../../../../src/contexts/run/infrastructure/pty/ForegroundJobShellControl'
 import { createWindowsForegroundJobInterruptInvocation } from '../../../../src/contexts/run/infrastructure/pty/WindowsForegroundJobInterrupt'
 
@@ -44,7 +45,7 @@ describe('foreground job shell control', () => {
     expect(probe.endsWith('\r')).toBe(true)
     expect(script).toContain('$cleancodeJobExitCode = 130')
     expect(script).toContain('$PSVersionTable.PSEdition -eq "Desktop"')
-    expect(script).toContain('$_.Replace([string][char]34, ([string][char]92) + [char]34)')
+    expect(script).toContain('$cleancodeJobArguments = @(')
     expect(script).toContain('finally {')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:exit:')
@@ -56,6 +57,14 @@ describe('foreground job shell control', () => {
 
     disposeForegroundJobShellControl(control)
     expect(existsSync(control.scriptDirectory)).toBe(false)
+  })
+
+  it('preserves nested JSON quote escapes for Windows PowerShell legacy argument passing', () => {
+    const argument = String.raw`notify=["node","console.log(\"ok\")"]`
+
+    expect(escapeWindowsPowerShellLegacyNativeArgument(argument)).toBe(
+      String.raw`notify=[\"node\",\"console.log(\\\"ok\\\")\"]`
+    )
   })
 
   it('creates an injection-safe Windows child-tree interrupt command', () => {

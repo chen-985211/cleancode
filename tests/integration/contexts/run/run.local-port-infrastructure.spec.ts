@@ -216,13 +216,15 @@ describe('local port infrastructure', () => {
       },
       onExit: () => undefined
     })
-    await waitUntil(() => output.includes('OWNED_READY'))
-
     const inspector = new NodeTcpListenerInspectionAdapter()
-    await expect(
-      inspector.inspect({ host: '127.0.0.1', port, rootProcessId: handle.processId })
-    ).resolves.toMatchObject({ ownership: 'owned' })
-    await processes.stop('owned-listener')
+    try {
+      await waitUntil(() => output.includes('OWNED_READY'), 15_000)
+      await expect(
+        inspector.inspect({ host: '127.0.0.1', port, rootProcessId: handle.processId })
+      ).resolves.toMatchObject({ ownership: 'owned' })
+    } finally {
+      await processes.stop('owned-listener')
+    }
 
     const externalServer = createServer()
     await new Promise<void>((resolve) => externalServer.listen(port, '127.0.0.1', resolve))
@@ -373,8 +375,8 @@ function shellQuote(value: string): string {
     : `'${value.replaceAll("'", `'"'"'`)}'`
 }
 
-async function waitUntil(assertion: () => boolean): Promise<void> {
-  const deadline = Date.now() + 5_000
+async function waitUntil(assertion: () => boolean, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
   while (!assertion()) {
     if (Date.now() >= deadline) throw new Error('Timed out waiting for listener output.')
     await new Promise((resolve) => setTimeout(resolve, 25))

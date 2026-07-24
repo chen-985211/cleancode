@@ -159,6 +159,10 @@ function createPowerShellLaunchScript(
   const arguments_ = command.args.map(
     (argument) => `  (Decode-CleancodeJobValue '${encodePowerShellValue(argument)}')`
   )
+  const legacyArguments = command.args.map(
+    (argument) =>
+      `    (Decode-CleancodeJobValue '${encodePowerShellValue(escapeWindowsPowerShellLegacyNativeArgument(argument))}')`
+  )
   return (
     [
       '$cleancodeJobEncoding = [System.Text.Encoding]::UTF8',
@@ -170,9 +174,9 @@ function createPowerShellLaunchScript(
       arguments_.join('\n'),
       ')',
       'if ($PSVersionTable.PSEdition -eq "Desktop") {',
-      '  $cleancodeJobArguments = @($cleancodeJobArguments | ForEach-Object {',
-      '    $_.Replace([string][char]34, ([string][char]92) + [char]34)',
-      '  })',
+      '  $cleancodeJobArguments = @(',
+      legacyArguments.join('\n'),
+      '  )',
       '}',
       ...environment,
       '$cleancodeJobExitCode = 130',
@@ -205,6 +209,12 @@ function defaultShellExecutable(shellFamily: ForegroundJobShellControl['shellFam
 
 function encodePowerShellValue(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64')
+}
+
+export function escapeWindowsPowerShellLegacyNativeArgument(value: string): string {
+  return value.replace(/(\\*)"/g, (_match, backslashes: string) => {
+    return `${'\\'.repeat(backslashes.length * 2 + 1)}"`
+  })
 }
 
 export function acceptForegroundJobOutput(

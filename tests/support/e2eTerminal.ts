@@ -228,10 +228,14 @@ export async function configureAndStartTerminalLaunchCommand(
   const previousSessionId = await readTerminalSessionId(page, terminalName)
 
   await page.getByRole('button', { name: launchButtonName }).click()
-  const launchCommandInput = page.getByRole('textbox', { name: '启动命令' })
+  const metadataForm = page.getByRole('form', { name: '编辑终端信息' })
+  const launchCommandInput = metadataForm.getByRole('textbox', { name: '启动命令' })
 
   await launchCommandInput.fill(launchCommand)
-  await launchCommandInput.press('Enter')
+  const saveAction = metadataForm.getByRole('button', { name: '保存终端信息' })
+  await expect.poll(() => saveAction.isEnabled(), { interval: 50, timeout: 10_000 }).toBe(true)
+  await saveAction.click()
+  await metadataForm.waitFor({ state: 'detached' })
   await page.waitForFunction(
     (buttonName) =>
       document
