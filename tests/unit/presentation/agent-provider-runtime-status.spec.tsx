@@ -4,12 +4,31 @@ import type { AgentRuntimeSnapshot } from '../../../src/contexts/agent/applicati
 import { AgentProviderStatusView } from '../../../src/presentation/app-shell/AgentProviderStatusView'
 
 describe('Agent Provider runtime status', () => {
+  it.each(['initial', 'new', 'retry'] as const)(
+    'keeps a normal %s Agent attachment quiet',
+    (mode) => {
+      render(
+        <AgentProviderStatusView
+          attachment={{ mode, status: 'pending' }}
+          onRetryInspection={vi.fn()}
+          providerName="Codex"
+          runtime={null}
+          state={{
+            availability: {
+              providerId: 'codex',
+              status: 'installed',
+              version: '1.0.0'
+            },
+            status: 'ready'
+          }}
+        />
+      )
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    }
+  )
+
   it.each([
-    [
-      'MCP initialization',
-      runtime({ launch: 'launching', mcp: 'initializing' }),
-      '正在初始化 CleanCode MCP…'
-    ],
     [
       'MCP failure',
       runtime({ launch: 'running', mcp: 'failed' }),
@@ -33,18 +52,21 @@ describe('Agent Provider runtime status', () => {
     expect(screen.getByRole('status')).toHaveTextContent(message)
   })
 
-  it('does not block a running best-effort Provider while MCP is still initializing', () => {
-    render(
-      <AgentProviderStatusView
-        onRetryInspection={vi.fn()}
-        providerName="Claude Code"
-        runtime={runtime({ launch: 'running', mcp: 'initializing' })}
-        state={{ status: 'unavailable' }}
-      />
-    )
+  it.each(['launching', 'running'] as const)(
+    'keeps normal MCP initialization quiet while the Provider launch is %s',
+    (launch) => {
+      render(
+        <AgentProviderStatusView
+          onRetryInspection={vi.fn()}
+          providerName="Claude Code"
+          runtime={runtime({ launch, mcp: 'initializing' })}
+          state={{ status: 'unavailable' }}
+        />
+      )
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
-  })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    }
+  )
 
   it.each([
     [null, '请将 Claude Code CLI 更新到 2.1.119 或更高版本'],

@@ -469,7 +469,6 @@ async function waitForAgentCreationReady(page: Page): Promise<void> {
 async function createCodexAgent(page: Page): Promise<void> {
   await page.getByRole('button', { name: '选择默认 Agent' }).click()
   await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
-  await page.getByRole('button', { name: '新建 Agent' }).click()
 }
 
 async function waitForAgentTerminals(page: Page, count: number): Promise<void> {

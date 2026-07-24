@@ -19,7 +19,7 @@ interface AgentCreateSplitButtonProps {
   readonly isCreating: boolean
   readonly providers: readonly CreatableAgentProviderSnapshot[]
   readonly shortcutTooltip: string
-  readonly onCreate: () => void
+  readonly onCreate: (providerId?: string) => void
   readonly onOpenAgentSettings: () => void
   readonly onSelectDefault: (providerId: string) => void
 }
@@ -137,6 +137,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
               const select = (): void => {
                 props.onSelectDefault(providerId)
                 closeMenu()
+                props.onCreate(providerId)
               }
               return (
                 <button

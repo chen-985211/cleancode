@@ -311,7 +311,7 @@ Agent 控制台必须：
 
 注册 Provider 目录与“本次可创建”列表是两个不同事实。注册目录是应用支持的完整 catalog，持续为既有 Agent 提供名称、图标、恢复动作、活动状态、MCP 开关和画布指令能力；本机 CLI 后来缺失、版本不足或暂时不可用时，已经持久化的 Agent 仍必须留在工作区并展示相应状态，不能从画布或列表中消失。“本次可创建”列表则是对注册目录执行当前环境检测后的易失结果，只包含状态为 `installed` 的 Provider。
 
-“新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 且没有被用户禁用的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 只修改后续创建使用的默认值，不在同一步创建 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
+“新建 Agent”使用分段按钮：主按钮直接用应用级默认 Provider 创建，箭头按钮只打开默认 Provider 菜单。菜单仅列出本机当前状态为 `installed` 且没有被用户禁用的 Provider，以图标、名称和单一选中标记表达选择，不展示版本、能力徽章或解释性小字；点击 Provider 会修改后续创建使用的默认值，并在同一步立即用该 Provider 创建一个 Agent。菜单末尾必须提供 Agent 设置入口，用于查看完整注册 catalog、重新检测、设置默认值和进入未安装 Provider 的配置文档。
 
 用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
 
@@ -327,7 +327,7 @@ Agent 设置必须用单一页面展示应用级默认值和完整目录，不�
 
 Agent terminal 使用 Run 的长期 shell、权威终端模型、单调 sequence、snapshot 和 attach/detach 协议，但保持 Agent 自己的画布外观与动作。Provider CLI 自然退出或把 `Ctrl+C` 解释为退出时，只结束当前 Agent launch；Agent 节点、终端屏幕、对话绑定和底层可输入 shell 必须保留。会话结束状态提供“重新启动 Agent”和“新对话”：前者在同一 terminal 中恢复当前对话，后者清除当前分支绑定后启动新对话。两者都不得替换 Agent 身份或影响其他 Agent。
 
-首次连接 Agent terminal、重新启动或新对话 attach 失败时，Agent 控制台必须保留明确错误和同一作用域的重试动作，不得静默显示成空白终端。重复点击重试只能提交一个在途请求；已有 terminal 绑定在替代 attach 失败时继续可输入。用户切换项目或工作区后，旧作用域迟到的 attach 结果不得替换当前 Agent 状态。
+首次连接 Agent terminal、重新启动或新对话的正常 attach 中间态保持静默，不显示解释性状态条；attach 失败时，Agent 控制台必须保留明确错误和同一作用域的重试动作，不得静默显示成空白终端。重复点击重试只能提交一个在途请求；已有 terminal 绑定在替代 attach 失败时继续可输入。用户切换项目或工作区后，旧作用域迟到的 attach 结果不得替换当前 Agent 状态。
 
 Provider-session binding 是独立于 terminal、launch 和 activity 的恢复持久化状态。正式会话引用保存失败时必须提示本次对话仍可继续、但不能承诺下次恢复；不得把仍在运行的 launch 或活动改写为失败，也不得回退到最近会话、其他 Agent 或其他分支的引用。
 

@@ -13,7 +13,7 @@ const providers = [
 ] as const
 
 describe('Agent create split button', () => {
-  it('creates immediately from the main segment and changes the default from the menu', () => {
+  it('creates immediately from the main segment and the selected Provider menu item', () => {
     const onCreate = vi.fn()
     const onSelectDefault = vi.fn()
 
@@ -44,11 +44,12 @@ describe('Agent create split button', () => {
 
     fireEvent.click(claude)
     expect(onSelectDefault).toHaveBeenCalledWith('claude-code')
-    expect(onCreate).toHaveBeenCalledOnce()
+    expect(onCreate.mock.calls).toEqual([[], ['claude-code']])
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('supports roving keyboard focus and restores focus when the menu closes', () => {
+    const onCreate = vi.fn()
     const onSelectDefault = vi.fn()
     render(
       <AgentCreateSplitButton
@@ -57,7 +58,7 @@ describe('Agent create split button', () => {
         isCreating={false}
         providers={providers}
         shortcutTooltip="新建 Agent (⌘⇧A)"
-        onCreate={vi.fn()}
+        onCreate={onCreate}
         onOpenAgentSettings={vi.fn()}
         onSelectDefault={onSelectDefault}
       />
@@ -74,6 +75,7 @@ describe('Agent create split button', () => {
     fireEvent.keyDown(claude, { key: 'Enter' })
 
     expect(onSelectDefault).toHaveBeenCalledWith('claude-code')
+    expect(onCreate).toHaveBeenCalledExactlyOnceWith('claude-code')
     expect(trigger).toHaveFocus()
   })
 

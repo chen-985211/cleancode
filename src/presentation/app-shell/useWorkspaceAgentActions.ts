@@ -79,93 +79,100 @@ export function useWorkspaceAgentActions({
     [setCurrentWorkbench, setSelectedAgentId, setWorkbenches]
   )
 
-  const createWorkspaceAgent = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || isCreatingAgent) return
-    if (!defaultProviderId) {
-      onConfigureAgentProviders()
-      return
-    }
-    const reservation = reserveWorkbenchNodeCreation(defaultAgentLayoutSize)
-
-    if (!reservation) {
-      return
-    }
-
-    const generation = ++creationGenerationRef.current
-    const scopeKey = workspaceScopeKey
-    let isCommitted = false
-    setIsCreatingAgent(true)
-    if (
-      (currentWorkbench.agents?.length ?? 0) > 0 &&
-      scopeKey &&
-      !warnedWorkspaceScopesRef.current.has(scopeKey)
-    ) {
-      warnedWorkspaceScopesRef.current.add(scopeKey)
-      notify({
-        autoDismissMs: 6_000,
-        kind: 'info',
-        message: t('agent.multipleNotice'),
-        title: t('agent.multipleNoticeTitle')
-      })
-    }
-    try {
-      const created =
-        (await window.cleancode?.createWorkspaceAgent({
-          agentId: createAgentId(),
-          gitBranch: currentWorkspace.gitBranch,
-          projectDirectory: currentWorkbench.project.directory,
-          projectId: currentWorkbench.project.id,
-          providerId: defaultProviderId,
-          initialPosition: reservation.position,
-          workspaceDirectory: currentWorkspace.directory,
-          workspaceName: currentWorkspace.name
-        })) ?? null
-      if (
-        generation !== creationGenerationRef.current ||
-        workspaceScopeKeyRef.current !== scopeKey
-      ) {
+  const createWorkspaceAgent = useCallback(
+    async (providerId?: string) => {
+      if (!currentWorkbench || !currentWorkspace || isCreatingAgent) return
+      const selectedProviderId = providerId ?? defaultProviderId
+      if (!selectedProviderId) {
+        onConfigureAgentProviders()
         return
       }
-      if (!created) throw new Error('Agent creation returned no snapshot.')
-      nodeCreationCoordinator.commit(reservation.reservationId, toAgentFlowNodeId(created.agentId))
-      isCommitted = true
-      updateWorkspaceAgentState(setCurrentWorkbench, created)
-      setWorkbenches((entries) =>
-        entries.map((workbench) => updateWorkbenchAgent(workbench, created))
-      )
-      onWorkspaceAgentCreated(created)
-    } catch {
+      const reservation = reserveWorkbenchNodeCreation(defaultAgentLayoutSize)
+
+      if (!reservation) {
+        return
+      }
+
+      const generation = ++creationGenerationRef.current
+      const scopeKey = workspaceScopeKey
+      let isCommitted = false
+      setIsCreatingAgent(true)
       if (
-        generation === creationGenerationRef.current &&
-        workspaceScopeKeyRef.current === scopeKey
+        (currentWorkbench.agents?.length ?? 0) > 0 &&
+        scopeKey &&
+        !warnedWorkspaceScopesRef.current.has(scopeKey)
       ) {
+        warnedWorkspaceScopesRef.current.add(scopeKey)
         notify({
-          kind: 'error',
-          message: t('agent.creationFailedDescription'),
-          title: t('agent.creationFailed')
+          autoDismissMs: 6_000,
+          kind: 'info',
+          message: t('agent.multipleNotice'),
+          title: t('agent.multipleNoticeTitle')
         })
       }
-    } finally {
-      if (!isCommitted) {
-        nodeCreationCoordinator.release(reservation.reservationId)
+      try {
+        const created =
+          (await window.cleancode?.createWorkspaceAgent({
+            agentId: createAgentId(),
+            gitBranch: currentWorkspace.gitBranch,
+            projectDirectory: currentWorkbench.project.directory,
+            projectId: currentWorkbench.project.id,
+            providerId: selectedProviderId,
+            initialPosition: reservation.position,
+            workspaceDirectory: currentWorkspace.directory,
+            workspaceName: currentWorkspace.name
+          })) ?? null
+        if (
+          generation !== creationGenerationRef.current ||
+          workspaceScopeKeyRef.current !== scopeKey
+        ) {
+          return
+        }
+        if (!created) throw new Error('Agent creation returned no snapshot.')
+        nodeCreationCoordinator.commit(
+          reservation.reservationId,
+          toAgentFlowNodeId(created.agentId)
+        )
+        isCommitted = true
+        updateWorkspaceAgentState(setCurrentWorkbench, created)
+        setWorkbenches((entries) =>
+          entries.map((workbench) => updateWorkbenchAgent(workbench, created))
+        )
+        onWorkspaceAgentCreated(created)
+      } catch {
+        if (
+          generation === creationGenerationRef.current &&
+          workspaceScopeKeyRef.current === scopeKey
+        ) {
+          notify({
+            kind: 'error',
+            message: t('agent.creationFailedDescription'),
+            title: t('agent.creationFailed')
+          })
+        }
+      } finally {
+        if (!isCommitted) {
+          nodeCreationCoordinator.release(reservation.reservationId)
+        }
+        if (generation === creationGenerationRef.current) setIsCreatingAgent(false)
       }
-      if (generation === creationGenerationRef.current) setIsCreatingAgent(false)
-    }
-  }, [
-    currentWorkbench,
-    currentWorkspace,
-    defaultProviderId,
-    isCreatingAgent,
-    nodeCreationCoordinator,
-    notify,
-    onConfigureAgentProviders,
-    onWorkspaceAgentCreated,
-    reserveWorkbenchNodeCreation,
-    setCurrentWorkbench,
-    setWorkbenches,
-    t,
-    workspaceScopeKey
-  ])
+    },
+    [
+      currentWorkbench,
+      currentWorkspace,
+      defaultProviderId,
+      isCreatingAgent,
+      nodeCreationCoordinator,
+      notify,
+      onConfigureAgentProviders,
+      onWorkspaceAgentCreated,
+      reserveWorkbenchNodeCreation,
+      setCurrentWorkbench,
+      setWorkbenches,
+      t,
+      workspaceScopeKey
+    ]
+  )
 
   const updateAgentInWorkspace = useCallback(
     (updated: WorkspaceAgentSnapshot): void => {

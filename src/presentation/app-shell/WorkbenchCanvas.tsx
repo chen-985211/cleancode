@@ -58,7 +58,7 @@ interface WorkbenchCanvasProps {
   readonly onFitCanvas: () => void
   readonly onOpenProject?: () => void
   readonly onCreateTerminalBlock: () => void
-  readonly onCreateWorkspaceAgent: () => void
+  readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
   readonly onSelectDefaultAgentProvider?: (providerId: string) => void
   readonly onBeginTerminalGroupSelection: () => void

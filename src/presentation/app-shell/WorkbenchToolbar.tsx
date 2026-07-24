@@ -21,7 +21,7 @@ interface WorkbenchToolbarProps {
     'createAgent' | 'createTerminal' | 'groupTerminals'
   >
   readonly onCreateTerminalBlock: () => void
-  readonly onCreateWorkspaceAgent: () => void
+  readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
   readonly onSelectDefaultAgentProvider?: (providerId: string) => void
   readonly onBeginTerminalGroupSelection: () => void

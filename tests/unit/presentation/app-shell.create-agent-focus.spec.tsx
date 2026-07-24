@@ -123,7 +123,7 @@ describe('app shell create Agent focus', () => {
     expect(window.confirm).not.toHaveBeenCalled()
   })
 
-  it('changes the default from the arrow menu without creating until the main segment is used', async () => {
+  it('creates with the Provider selected from the arrow menu without a second click', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({
       discoverCreatableAgentProviders: vi.fn(async () => [
@@ -151,21 +151,20 @@ describe('app shell create Agent focus', () => {
 
     render(<AppShell />)
 
-    const createButton = await screen.findByRole('button', { name: '新建 Agent' })
+    await screen.findByRole('button', { name: '新建 Agent' })
     const menuButton = screen.getByRole('button', { name: '选择默认 Agent' })
     await waitFor(() => expect(menuButton).toBeEnabled())
     fireEvent.click(menuButton)
     expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Claude Code' }))
-    expect(runtimeApi.createWorkspaceAgent).not.toHaveBeenCalled()
-    fireEvent.click(createButton)
 
     await waitFor(() =>
       expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledWith(
         expect.objectContaining({ providerId: 'claude-code' })
       )
     )
+    expect(runtimeApi.createWorkspaceAgent).toHaveBeenCalledOnce()
   })
 
   it('keeps both split-button segments disabled until creatable Provider discovery completes', async () => {

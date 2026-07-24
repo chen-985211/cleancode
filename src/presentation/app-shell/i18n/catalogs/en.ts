@@ -398,7 +398,6 @@ export const enMessages = {
   'agent.noWorkspace': 'No workspace selected',
   'provider.restoreFailed': 'Could not restore the previous conversation',
   'provider.bindingSaveFailed': 'The conversation can continue, but its resume data was not saved',
-  'provider.mcpInitializing': 'Initializing CleanCode MCP…',
   'provider.mcpUnavailable': 'CleanCode MCP is unavailable; the Agent can still use its terminal',
   'provider.upgradeRequired': 'Update {provider} CLI to {minimumVersion} or later',
   'provider.startFailedUpgrade':
@@ -410,7 +409,6 @@ export const enMessages = {
   'provider.startFailedMissing': '{provider} session failed to start; CLI not detected',
   'provider.startFailed': '{provider} session failed to start',
   'provider.preparingTerminal': 'Preparing terminal…',
-  'provider.connecting': 'Connecting {provider} session…',
   'provider.attachFailed': 'Could not connect to the {provider} session',
   'provider.retryAttach': 'Retry connecting to the {provider} session',
   'provider.runtimeUnavailable': 'Desktop runtime is not connected',

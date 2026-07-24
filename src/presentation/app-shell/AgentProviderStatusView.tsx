@@ -45,15 +45,6 @@ export function AgentProviderStatusView({
       </RuntimeNotice>
     )
   }
-  if (attachment.status === 'pending') {
-    return (
-      <RuntimeNotice
-        label={t('provider.connecting', { provider: providerName })}
-        tone="neutral"
-        icon="checking"
-      />
-    )
-  }
   if (attachment.status === 'measuring' && !runtime) {
     return <RuntimeNotice label={t('provider.preparingTerminal')} tone="neutral" icon="checking" />
   }
@@ -130,9 +121,6 @@ export function AgentProviderStatusView({
   }
   if (runtime?.binding.status === 'persistence_failed') {
     return <RuntimeNotice label={t('provider.bindingSaveFailed')} tone="warning" />
-  }
-  if (runtime?.mcp.status === 'initializing' && runtime.launch.status === 'launching') {
-    return <RuntimeNotice label={t('provider.mcpInitializing')} tone="neutral" icon="checking" />
   }
   if (runtime) return null
   if (state.status === 'unavailable') {
