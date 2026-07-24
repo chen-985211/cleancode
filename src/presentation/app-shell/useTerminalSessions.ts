@@ -75,6 +75,7 @@ export function useTerminalSessions({
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
+  const terminalStartsRef = useRef<Set<string>>(new Set())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
   const delayedFocusTimersRef = useRef<Set<number>>(new Set())
   const isMountedRef = useRef(true)
@@ -246,6 +247,7 @@ export function useTerminalSessions({
       inputBuffersRef.current.clear()
       inputWriteQueuesRef.current.clear()
       terminalStartupOutputsRef.current.clear()
+      terminalStartsRef.current.clear()
       quickLaunchesRef.current.clear()
       terminalSurfaceRegistry.disposeAll()
     }
@@ -288,7 +290,11 @@ export function useTerminalSessions({
         currentWorkspace.name,
         block.id
       )
+      if (terminalStartsRef.current.has(terminalStateKey)) {
+        return undefined
+      }
 
+      terminalStartsRef.current.add(terminalStateKey)
       clearPendingTerminalInput(terminalStateKey)
       try {
         const session = await startTerminalRuntimeSession({
@@ -308,6 +314,8 @@ export function useTerminalSessions({
       } catch (error) {
         notifyTerminalLaunchFailure(notify, error, t)
         return undefined
+      } finally {
+        terminalStartsRef.current.delete(terminalStateKey)
       }
     },
     [

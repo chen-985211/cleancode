@@ -10,6 +10,7 @@ import type {
 } from '../../application/ports/TcpListenerInspectionPort'
 
 const execFileAsync = promisify(execFile)
+const windowsProcessInspectionTimeoutMs = 5_000
 
 interface NodeTcpListenerInspectionSystem {
   platform(): NodeJS.Platform
@@ -295,7 +296,7 @@ async function readWindowsProcessParentId(processId: number): Promise<number | n
     const { stdout } = await execFileAsync(
       'powershell.exe',
       ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
-      { timeout: 2_000 }
+      { timeout: windowsProcessInspectionTimeoutMs }
     )
     const parentProcessId = Number.parseInt(stdout.trim(), 10)
     return Number.isSafeInteger(parentProcessId) && parentProcessId > 0 ? parentProcessId : null

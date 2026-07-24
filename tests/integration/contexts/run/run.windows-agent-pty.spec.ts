@@ -19,6 +19,38 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     await rm(workingDirectory, { force: true, recursive: true })
   })
 
+  it('starts an Agent job requested immediately after creating the PowerShell pty', async () => {
+    let output = ''
+    const started = createDeferred<void>()
+    const exited = createDeferred<number | null>()
+
+    await adapter.start({
+      scope: agentRunScope('immediate-windows-agent-session'),
+      workingDirectory,
+      shell: 'powershell.exe',
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    adapter.launchForegroundJob({
+      args: ['-NoLogo', '-NoProfile', '-Command', "Write-Output 'immediate-agent-ready'"],
+      environment: {},
+      executable: 'powershell.exe',
+      generation: 1,
+      launchId: 'immediate-launch',
+      onExit: (event) => exited.resolve(event.exitCode),
+      onStarted: () => started.resolve(),
+      sessionId: 'immediate-windows-agent-session'
+    })
+
+    await started.promise
+    await waitUntil(() => output.includes('immediate-agent-ready'))
+    await expect(exited.promise).resolves.toBe(0)
+  }, 20_000)
+
   it('interrupts only the Agent job, reports exit, and keeps PowerShell writable', async () => {
     let output = ''
     let terminalExited = false

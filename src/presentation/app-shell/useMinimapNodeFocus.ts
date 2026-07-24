@@ -55,6 +55,24 @@ export function useMinimapNodeFocus({
   }, [])
 
   useEffect(() => () => cancelPendingWorkbenchInputFocus(), [cancelPendingWorkbenchInputFocus])
+  useEffect(() => {
+    const cancelAfterExternalPointer = (): void => cancelPendingWorkbenchInputFocus()
+    const cancelAfterExternalFocus = (event: FocusEvent): void => {
+      const target = event.target
+
+      if (target instanceof Element && target.classList.contains('xterm-helper-textarea')) {
+        return
+      }
+      cancelPendingWorkbenchInputFocus()
+    }
+
+    document.addEventListener('focusin', cancelAfterExternalFocus, true)
+    document.addEventListener('pointerdown', cancelAfterExternalPointer, true)
+    return () => {
+      document.removeEventListener('focusin', cancelAfterExternalFocus, true)
+      document.removeEventListener('pointerdown', cancelAfterExternalPointer, true)
+    }
+  }, [cancelPendingWorkbenchInputFocus])
 
   const revealTerminalBlock = useCallback(
     (blockId: string, options: RevealTerminalBlockOptions) => {

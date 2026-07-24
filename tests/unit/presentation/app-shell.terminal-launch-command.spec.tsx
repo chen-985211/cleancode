@@ -489,6 +489,34 @@ describe('app shell terminal launch command', () => {
     )
   })
 
+  it('ignores duplicate empty-session restarts while the terminal is starting', async () => {
+    const workbench = createWorkbenchWithTerminal({ launchCommand: '' })
+    const replacementSession = createDeferred<TerminalSessionSnapshot>()
+    const startTerminal = vi.fn(() => replacementSession.promise)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench]),
+        startTerminal
+      })
+    })
+
+    render(<AppShell />)
+
+    const restartButton = await screen.findByRole('button', {
+      name: 'Terminal 1 重开空终端会话'
+    })
+    fireEvent.click(restartButton)
+    fireEvent.click(restartButton)
+
+    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
+
+    replacementSession.resolve(createTerminalSessionSnapshot('session-1'))
+
+    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
+  })
+
   it('ignores duplicate quick launch clicks while the replacement session is starting', async () => {
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-once'

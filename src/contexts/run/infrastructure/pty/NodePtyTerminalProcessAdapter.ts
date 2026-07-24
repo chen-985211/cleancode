@@ -60,6 +60,8 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const managedProcess: ManagedTerminalProcess = {
       foregroundJob: null,
       foregroundJobInterruptPromise: null,
+      hasObservedShellOutput: false,
+      pendingForegroundProbe: null,
       process: ptyProcess,
       shell,
       scope: command.scope,
@@ -70,6 +72,9 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     }
     this.processes.set(command.scope.sessionId, managedProcess)
     ptyProcess.onData((data) => {
+      managedProcess.hasObservedShellOutput = true
+      const pendingForegroundProbe = managedProcess.pendingForegroundProbe
+      managedProcess.pendingForegroundProbe = null
       const output = managedProcess.foregroundJob
         ? acceptForegroundJobOutput(managedProcess.foregroundJob, data, {
             onStarted: (identity) => managedProcess.foregroundJob?.command.onStarted(identity),
@@ -87,6 +92,9 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         : data
       if (output) {
         command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data: output })
+      }
+      if (pendingForegroundProbe && managedProcess.foregroundJob) {
+        managedProcess.process.write(pendingForegroundProbe)
       }
     })
     ptyProcess.onExit((event) => {
@@ -152,7 +160,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       }
     )
     terminalProcess.foregroundJob = control
-    terminalProcess.process.write(createForegroundJobProbe(control))
+    const probe = createForegroundJobProbe(control)
+    if (platform() === 'win32' && !terminalProcess.hasObservedShellOutput) {
+      terminalProcess.pendingForegroundProbe = probe
+    } else {
+      terminalProcess.process.write(probe)
+    }
   }
 
   resize(sessionId: string, columns: number, rows: number): void {
@@ -222,6 +235,8 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 interface ManagedTerminalProcess {
   foregroundJob: ForegroundJobShellControl | null
   foregroundJobInterruptPromise: Promise<void> | null
+  hasObservedShellOutput: boolean
+  pendingForegroundProbe: string | null
   readonly process: IPty
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
