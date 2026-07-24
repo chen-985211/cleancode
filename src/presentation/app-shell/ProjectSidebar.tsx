@@ -1,14 +1,5 @@
-import {
-  Archive,
-  ChevronDown,
-  Folders,
-  GitBranch,
-  MoreHorizontal,
-  Plus,
-  Trash2,
-  X
-} from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, Folders, GitBranch, Plus, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
@@ -19,6 +10,7 @@ import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchW
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
 import { TooltipLabel } from './Tooltip'
+import { WorkspaceRowMenu } from './WorkspaceRowMenu'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 
 export interface ProjectSidebarIntent {
@@ -214,7 +206,6 @@ function ProjectCard({
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
   const removeProjectButtonRef = useRef<HTMLButtonElement>(null)
-  const workspaceMenuRootRef = useRef<HTMLDivElement>(null)
   const {
     branchName,
     close: closeBranchWorkspaceForm,
@@ -271,6 +262,12 @@ function ProjectCard({
     setIsExpanded((expanded) => !expanded)
   }
   const workspaceListId = `project-${workbench.project.id}-workspaces`
+  const closeWorkspaceMenu = useCallback(() => {
+    setOpenWorkspaceMenuName(null)
+  }, [])
+  const toggleWorkspaceMenu = useCallback((workspaceName: string) => {
+    setOpenWorkspaceMenuName((menuName) => (menuName === workspaceName ? null : workspaceName))
+  }, [])
 
   useEffect(() => {
     if (!isBranchSelectorOpen) {
@@ -293,28 +290,6 @@ function ProjectCard({
       document.removeEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
     }
   }, [isBranchSelectorOpen])
-
-  useEffect(() => {
-    if (!openWorkspaceMenuName) {
-      return undefined
-    }
-
-    const closeWorkspaceMenuWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (target instanceof Node && workspaceMenuRootRef.current?.contains(target)) {
-        return
-      }
-
-      setOpenWorkspaceMenuName(null)
-    }
-
-    document.addEventListener('pointerdown', closeWorkspaceMenuWhenClickingOutside)
-
-    return () => {
-      document.removeEventListener('pointerdown', closeWorkspaceMenuWhenClickingOutside)
-    }
-  }, [openWorkspaceMenuName])
 
   return (
     <section
@@ -413,13 +388,7 @@ function ProjectCard({
                 <div
                   className="workspace-group"
                   key={workspace.name}
-                  ref={
-                    workspace.name === 'main'
-                      ? branchSelectorRootRef
-                      : openWorkspaceMenuName === workspace.name
-                        ? workspaceMenuRootRef
-                        : undefined
-                  }
+                  ref={workspace.name === 'main' ? branchSelectorRootRef : undefined}
                 >
                   {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
                     <>
@@ -534,42 +503,15 @@ function ProjectCard({
                           </button>
                         </TooltipLabel>
                         {isWorktreeWorkspace ? (
-                          <TooltipLabel content={t('sidebar.more')}>
-                            <button
-                              className="workspace-row__menu-button"
-                              type="button"
-                              aria-label={t('sidebar.openWorkspaceMenu', {
-                                workspaceName: workspace.name
-                              })}
-                              aria-haspopup="menu"
-                              aria-expanded={openWorkspaceMenuName === workspace.name}
-                              onClick={() =>
-                                setOpenWorkspaceMenuName((menuName) =>
-                                  menuName === workspace.name ? null : workspace.name
-                                )
-                              }
-                            >
-                              <MoreHorizontal size={15} aria-hidden="true" />
-                            </button>
-                          </TooltipLabel>
+                          <WorkspaceRowMenu
+                            isOpen={openWorkspaceMenuName === workspace.name}
+                            workspaceName={workspace.name}
+                            onArchive={() => setArchiveWorkspaceName(workspace.name)}
+                            onClose={closeWorkspaceMenu}
+                            onToggle={() => toggleWorkspaceMenu(workspace.name)}
+                          />
                         ) : null}
                       </div>
-                      {openWorkspaceMenuName === workspace.name ? (
-                        <div className="workspace-row-menu" role="menu">
-                          <button
-                            className="workspace-row-menu__item workspace-row-menu__item--danger"
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setArchiveWorkspaceName(workspace.name)
-                              setOpenWorkspaceMenuName(null)
-                            }}
-                          >
-                            <Archive size={14} aria-hidden="true" />
-                            {t('sidebar.archiveWorkspace')}
-                          </button>
-                        </div>
-                      ) : null}
                     </>
                   )}
                   {workspace.name !== 'main' && workspace.gitBranch ? (

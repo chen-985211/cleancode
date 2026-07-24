@@ -117,46 +117,80 @@
 }
 
 .workspace-row-menu {
-  position: absolute;
-  top: 34px;
-  right: 0;
-  z-index: 45;
-  min-width: 148px;
-  border: 1px solid var(--cc-border);
-  border-radius: 9px;
-  background: var(--cc-surface-raised);
-  padding: 5px;
+  --workspace-menu-enter-y: -3px;
+
+  position: fixed;
+  z-index: 200;
+  display: grid;
+  min-width: 160px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  gap: 1px;
+  overflow-y: auto;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 12px;
+  background: var(--cc-surface-overlay);
+  padding: 6px;
   box-shadow: var(--cc-shadow-floating);
+  transform-origin: left top;
+  animation: workspace-row-menu-in 160ms ease-out;
+}
+
+.workspace-row-menu[data-side='top'] {
+  --workspace-menu-enter-y: 3px;
+
+  transform-origin: left bottom;
 }
 
 .workspace-row-menu__item {
   display: flex;
   width: 100%;
-  height: 32px;
+  height: 28px;
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   padding: 0 8px;
-  color: var(--cc-muted-strong);
+  color: var(--cc-foreground);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   text-align: left;
 }
 
-.workspace-row-menu__item:hover {
-  background: var(--cc-surface-subtle);
+.workspace-row-menu__item svg {
+  flex: 0 0 auto;
+  color: var(--cc-muted-strong);
+}
+
+.workspace-row-menu__item:hover,
+.workspace-row-menu__item:focus-visible {
+  background: var(--cc-neutral-overlay);
   color: var(--cc-foreground);
+  outline: none;
 }
 
-.workspace-row-menu__item--danger {
-  color: var(--cc-danger);
+.workspace-row-menu__item:focus-visible {
+  box-shadow: 0 0 0 1px var(--cc-border-strong) inset;
 }
 
-.workspace-row-menu__item--danger:hover {
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
+@keyframes workspace-row-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--workspace-menu-enter-y)) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-row-menu {
+    animation: none;
+  }
 }
 
 .project-sidebar-confirmation-dialog__backdrop {

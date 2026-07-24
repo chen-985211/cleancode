@@ -15,6 +15,66 @@ describe('app shell worktree archive', () => {
     })
   })
 
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('opens the workspace action menu beside the row and supports keyboard dismissal', async () => {
+    const workbench = createWorkbenchWithTestWorktree(false)
+
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        listWorkbenches: vi.fn(async () => [workbench])
+      })
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.getAttribute('aria-label') === '打开 test 工作区菜单'
+        ? new DOMRect(174, 100, 28, 28)
+        : new DOMRect()
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.getAttribute('role') === 'menu' ? 160 : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.getAttribute('role') === 'menu' ? 120 : 0
+    })
+
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+    const trigger = within(projectCard).getByRole('button', {
+      name: '打开 test 工作区菜单'
+    })
+
+    fireEvent.click(trigger)
+
+    const menu = screen.getByRole('menu')
+    const archive = screen.getByRole('menuitem', { name: '归档工作区' })
+    expect(menu.parentElement).toBe(document.body)
+    await waitFor(() => expect(menu).toHaveStyle({ left: '170px', top: '134px' }))
+    expect(menu).toHaveAttribute('data-side', 'bottom')
+    expect(archive).toHaveFocus()
+
+    fireEvent.keyDown(archive, { key: 'ArrowDown' })
+    expect(archive).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitem', { name: '归档工作区' })).toHaveFocus()
+    fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
   it('archives a worktree through the row menu after confirmation', async () => {
     const workbench = createWorkbenchWithTestWorktree(true)
     const archivedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
@@ -54,7 +114,7 @@ describe('app shell worktree archive', () => {
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
-    fireEvent.click(within(projectCard).getByRole('menuitem', { name: '归档工作区' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
 
     const dialog = await screen.findByRole('dialog', { name: '归档工作区 test' })
     expect(
@@ -96,7 +156,7 @@ describe('app shell worktree archive', () => {
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
-    fireEvent.click(within(projectCard).getByRole('menuitem', { name: '归档工作区' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
     fireEvent.click(
       within(await screen.findByRole('dialog', { name: '归档工作区 test' })).getByRole('button', {
         name: '归档工作区'
@@ -127,7 +187,7 @@ describe('app shell worktree archive', () => {
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
-    fireEvent.click(within(projectCard).getByRole('menuitem', { name: '归档工作区' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
 
     const dialog = await screen.findByRole('dialog', { name: '解除锁并归档工作区 test' })
     expect(within(dialog).getByText(/external agent session/)).toBeInTheDocument()
