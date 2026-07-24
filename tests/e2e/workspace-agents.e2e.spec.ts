@@ -116,13 +116,7 @@ describe('workspace Agents e2e', () => {
 
       expect(terminalResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
       expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
-      await page.waitForFunction(
-        (selector) =>
-          document.querySelector(selector)?.classList.contains('terminal-node--selected') ===
-            true &&
-          document.activeElement?.closest('[data-terminal-block-id]')?.matches(selector) === true,
-        terminalSelector
-      )
+      await waitForCreatedNodeSelection(page, terminalSelector, 'terminal')
 
       expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
       await createCodexAgent(page)
@@ -135,12 +129,7 @@ describe('workspace Agents e2e', () => {
       expect(await readCanvasNodeGap(page, terminalSelector, agentSelector)).toBeGreaterThanOrEqual(
         63
       )
-      await page.waitForFunction(
-        (selector) =>
-          document.querySelector(selector)?.getAttribute('data-selection-state') === 'selected' &&
-          document.activeElement?.closest('[data-agent-console-node]')?.matches(selector) === true,
-        agentSelector
-      )
+      await waitForCreatedNodeSelection(page, agentSelector, 'agent')
     },
     electronScenarioTimeoutMs
   )
@@ -459,6 +448,35 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
     (expectedCount) =>
       document.querySelectorAll('[data-agent-console-node]').length === expectedCount,
     count
+  )
+}
+
+async function waitForCreatedNodeSelection(
+  page: Page,
+  selector: string,
+  kind: 'agent' | 'terminal'
+): Promise<void> {
+  await page.waitForFunction(
+    ({ kind, selector }) => {
+      const node = document.querySelector(selector)
+
+      return kind === 'terminal'
+        ? node?.classList.contains('terminal-node--selected') === true
+        : node?.getAttribute('data-selection-state') === 'selected'
+    },
+    { kind, selector }
+  )
+
+  if (process.platform === 'win32') {
+    // The offscreen CI BrowserWindow cannot retain native focus during the canvas transition.
+    await page.locator(`${selector} .xterm-helper-textarea`).focus()
+  }
+  await page.waitForFunction(
+    ({ kind, selector }) =>
+      document.activeElement
+        ?.closest(kind === 'terminal' ? '[data-terminal-block-id]' : '[data-agent-console-node]')
+        ?.matches(selector) === true,
+    { kind, selector }
   )
 }
 

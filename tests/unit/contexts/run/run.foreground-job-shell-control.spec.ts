@@ -9,6 +9,7 @@ import {
   createForegroundJobShellControl,
   disposeForegroundJobShellControl
 } from '../../../../src/contexts/run/infrastructure/pty/ForegroundJobShellControl'
+import { createWindowsForegroundJobInterruptInvocation } from '../../../../src/contexts/run/infrastructure/pty/WindowsForegroundJobInterrupt'
 
 describe('foreground job shell control', () => {
   let temporaryRoot: string
@@ -42,6 +43,8 @@ describe('foreground job shell control', () => {
     expect(probe).toContain("cleancode-foreground-''")
     expect(probe.endsWith('\r')).toBe(true)
     expect(script).toContain('$cleancodeJobExitCode = 130')
+    expect(script).toContain('$PSVersionTable.PSEdition -eq "Desktop"')
+    expect(script).toContain('$_.Replace([string][char]34, ([string][char]92) + [char]34)')
     expect(script).toContain('finally {')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:exit:')
@@ -53,6 +56,20 @@ describe('foreground job shell control', () => {
 
     disposeForegroundJobShellControl(control)
     expect(existsSync(control.scriptDirectory)).toBe(false)
+  })
+
+  it('creates an injection-safe Windows child-tree interrupt command', () => {
+    const scriptPath = String.raw`C:\Temp\launch'; Write-Output injected.ps1`
+    const invocation = createWindowsForegroundJobInterruptInvocation(4321, scriptPath)
+    const script = Buffer.from(invocation.args.at(-1)!, 'base64').toString('utf16le')
+
+    expect(invocation.executable).toBe('powershell.exe')
+    expect(invocation.args).toEqual(
+      expect.arrayContaining(['-NoProfile', '-NonInteractive', '-EncodedCommand'])
+    )
+    expect(script).toContain('ParentProcessId = $cleancodeTerminalProcessId')
+    expect(script).toContain('taskkill.exe /PID $cleancodeForegroundProcess.ProcessId /T /F')
+    expect(script).not.toContain(scriptPath)
   })
 
   it('creates a POSIX supervisor that lets the interactive shell report the child exit', () => {

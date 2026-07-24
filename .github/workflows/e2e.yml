@@ -41,12 +41,30 @@ jobs:
           node-version: 24
 
       - run: pnpm install --frozen-lockfile
+      - name: Install Electron binary with retry
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if pnpm exec electron --version; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
       - run: pnpm exec electron-vite build
+      - name: Package Electron binary
+        shell: bash
+        run: >-
+          tar -czf electron-e2e-runtime-${{ matrix.id }}.tgz
+          node_modules/electron/dist
+          node_modules/electron/path.txt
       - uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
           name: electron-e2e-application-${{ matrix.id }}
-          path: out
+          path: |
+            out
+            electron-e2e-runtime-${{ matrix.id }}.tgz
           retention-days: 1
 
   e2e:
@@ -97,11 +115,20 @@ jobs:
           cache: pnpm
           node-version: 24
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies without downloading Electron again
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
         with:
           name: electron-e2e-application-${{ matrix.id }}
-          path: out
+          path: .
+      - name: Restore prebuilt Electron binary
+        shell: bash
+        run: |
+          tar -xzf electron-e2e-runtime-${{ matrix.id }}.tgz
+          rm electron-e2e-runtime-${{ matrix.id }}.tgz
+          pnpm exec electron --version
       - name: Run E2E shard on Linux
         if: runner.os == 'Linux'
         env:

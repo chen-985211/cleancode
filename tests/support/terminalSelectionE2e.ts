@@ -6,15 +6,10 @@ export async function setCanvasZoomFromDefault(
   page: Page,
   direction: CanvasZoomDirection
 ): Promise<number> {
-  const expectedZoom = direction === 'in' ? 1.2 : 1 / 1.2
   const buttonName = direction === 'in' ? '放大画布' : '缩小画布'
+  const initialZoom = await readCanvasZoom(page)
+  const expectedZoom = direction === 'in' ? initialZoom * 1.2 : initialZoom / 1.2
 
-  await page.waitForFunction(() => {
-    const viewport = document.querySelector('.react-flow__viewport')
-
-    if (!viewport) return false
-    return Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - 1) <= 0.001
-  })
   await page.getByRole('button', { name: buttonName }).click()
   await page.waitForFunction((expected) => {
     const viewport = document.querySelector('.react-flow__viewport')
@@ -194,6 +189,12 @@ export async function ensureTerminalDomRenderer(terminal: Locator): Promise<void
       })
     })
   })
+  await terminal.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+  )
 }
 
 export async function readXtermSelection(terminal: Locator): Promise<string> {

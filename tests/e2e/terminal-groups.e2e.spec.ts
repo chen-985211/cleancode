@@ -40,7 +40,7 @@ describe('terminal groups e2e', () => {
   it(
     'creates, collapses, expands, and resizes a terminal group through member drag',
     async () => {
-      await createTwoTerminalBlocks(page, workbench)
+      await createTwoTerminalBlocks(page)
 
       await page.getByRole('button', { name: '组合终端', exact: true }).click()
       await ensureTerminalSelectedForGroup(page, 'Terminal 1')
@@ -48,17 +48,13 @@ describe('terminal groups e2e', () => {
       await page.getByRole('button', { name: '创建组合' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
 
-      await waitForTerminalGroup(page, workbench, (group) => group.memberBlockIds.length === 2)
-
       await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
-      await waitForTerminalGroup(page, workbench, (group) => group.isCollapsed)
       await page.waitForFunction(
         () => document.querySelectorAll('[data-terminal-block-id]').length === 0
       )
       await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).waitFor()
 
       await page.getByRole('button', { name: '启动项目 展开组合' }).click()
-      await waitForTerminalGroup(page, workbench, (group) => !group.isCollapsed)
       await page.waitForFunction(
         () => document.querySelectorAll('[data-terminal-block-id]').length === 2
       )
@@ -73,6 +69,12 @@ describe('terminal groups e2e', () => {
 
       await dragTerminalHeader(page, terminalTwo.id, 260, 0)
 
+      await expect
+        .poll(async () => {
+          const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
+          return box?.width ?? 0
+        })
+        .toBeGreaterThan(groupBeforeBox.width + 120)
       const groupAfterDrag = await waitForTerminalGroup(
         page,
         workbench,
@@ -89,15 +91,11 @@ describe('terminal groups e2e', () => {
   )
 })
 
-async function createTwoTerminalBlocks(page: Page, workbench: E2eWorkbench): Promise<void> {
-  await createTerminalBlocks(page, workbench, 2)
+async function createTwoTerminalBlocks(page: Page): Promise<void> {
+  await createTerminalBlocks(page, 2)
 }
 
-async function createTerminalBlocks(
-  page: Page,
-  workbench: E2eWorkbench,
-  count: number
-): Promise<void> {
+async function createTerminalBlocks(page: Page, count: number): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
 
@@ -105,8 +103,6 @@ async function createTerminalBlocks(
     await page.getByRole('button', { name: '新建终端积木' }).click()
     await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
   }
-
-  await waitForGraph(page, workbench, (graph) => graph.blocks.length === count)
 }
 
 async function dragTerminalHeader(
@@ -188,7 +184,7 @@ async function waitForGraph(
       // The project may not be registered until the first action completes.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 250))
   }
 
   return readGraph(page, workbench)

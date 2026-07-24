@@ -26,7 +26,8 @@ interface NodeAgentProviderCliDetectorOptions {
   readonly versionArgs?: readonly string[]
 }
 
-const inspectionTimeoutMs = 2_000
+const standardInspectionTimeoutMs = 2_000
+const windowsInspectionTimeoutMs = 10_000
 
 export class NodeAgentProviderCliDetector implements AgentProviderDetector {
   private readonly runCommand: AgentProviderCliCommandRunner
@@ -40,7 +41,7 @@ export class NodeAgentProviderCliDetector implements AgentProviderDetector {
       const result = await this.runCommand(
         this.options.executable,
         this.options.versionArgs ?? ['--version'],
-        { timeoutMs: inspectionTimeoutMs }
+        { timeoutMs: resolveAgentProviderInspectionTimeout() }
       )
       const version = `${result.stdout}\n${result.stderr}`.trim()
       if (!version) return this.unavailable('invalid_output')
@@ -97,6 +98,12 @@ export class NodeAgentProviderCliDetector implements AgentProviderDetector {
       version: null
     }
   }
+}
+
+export function resolveAgentProviderInspectionTimeout(
+  runtimePlatform: NodeJS.Platform = process.platform
+): number {
+  return runtimePlatform === 'win32' ? windowsInspectionTimeoutMs : standardInspectionTimeoutMs
 }
 
 type SemanticVersion = readonly [major: number, minor: number, patch: number]

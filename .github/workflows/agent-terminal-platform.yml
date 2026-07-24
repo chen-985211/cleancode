@@ -37,6 +37,16 @@ jobs:
           node-version: 24
 
       - run: pnpm install --frozen-lockfile
+      - name: Install Electron binary with retry
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if pnpm exec electron --version; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Run every static and structural quality gate
         run: pnpm check:quality
       - name: Run all unit, integration, and contract tests

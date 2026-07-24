@@ -14,7 +14,8 @@ describe('terminal renderer controller', () => {
     const states: string[] = []
     const controller = new TerminalRendererController({
       loadAddon: async () => addon,
-      onStateChange: (state) => states.push(state)
+      onStateChange: (state) => states.push(state),
+      scheduleRefresh: (refresh) => refresh()
     })
 
     await controller.activate(terminal)
@@ -22,7 +23,8 @@ describe('terminal renderer controller', () => {
 
     expect(terminal.loadAddon).toHaveBeenCalledWith(addon)
     expect(addon.dispose).toHaveBeenCalledTimes(1)
-    expect(terminal.refresh).toHaveBeenCalledWith(0, 23)
+    expect(terminal.refresh).toHaveBeenCalledTimes(2)
+    expect(terminal.refresh).toHaveBeenLastCalledWith(0, 23)
     expect(states).toEqual(['webgl', 'dom'])
     expect(controller.state).toBe('dom')
   })

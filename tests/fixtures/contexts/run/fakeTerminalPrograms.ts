@@ -103,7 +103,7 @@ export async function writeTerminalSelectionFixtureScript(
   }
 ): Promise<string> {
   const scriptPath = join(projectDirectory, 'terminal-selection-fixture.mjs')
-  const outputLines = [`left-${input.controlText}-right`, '', '', '', input.outputLine]
+  const outputLines = ['', '', '', `left-${input.controlText}-right`, '', input.outputLine]
 
   await writeFile(
     scriptPath,

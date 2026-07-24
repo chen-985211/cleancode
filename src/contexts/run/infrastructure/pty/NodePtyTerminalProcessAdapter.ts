@@ -30,6 +30,7 @@ import {
   supportsForegroundJobShell,
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
+import { interruptWindowsForegroundJob } from './WindowsForegroundJobInterrupt'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -58,12 +59,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     })
     const managedProcess: ManagedTerminalProcess = {
       foregroundJob: null,
+      foregroundJobInterruptPromise: null,
       process: ptyProcess,
       shell,
       scope: command.scope,
       terminalSourceTheme: command.terminalSourceTheme ?? 'dark',
       exited,
-      stopPromise: null
+      stopPromise: null,
+      workingDirectory: command.workingDirectory
     }
     this.processes.set(command.scope.sessionId, managedProcess)
     ptyProcess.onData((data) => {
@@ -113,6 +116,10 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   write(sessionId: string, input: string): void {
     const terminalProcess = this.requireProcess(sessionId)
 
+    if (platform() === 'win32' && input === '\x03' && terminalProcess.foregroundJob) {
+      interruptManagedWindowsForegroundJob(terminalProcess, terminalProcess.foregroundJob)
+      return
+    }
     terminalProcess.process.write(input)
   }
 
@@ -169,6 +176,10 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       return null
     }
 
+    if (platform() === 'win32') {
+      return normalizeExistingDirectory(terminalProcess.workingDirectory)
+    }
+
     return readProcessWorkingDirectory(terminalProcess.process.pid)
   }
 
@@ -210,12 +221,37 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
 interface ManagedTerminalProcess {
   foregroundJob: ForegroundJobShellControl | null
+  foregroundJobInterruptPromise: Promise<void> | null
   readonly process: IPty
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
   readonly terminalSourceTheme: TerminalSourceTheme
   readonly exited: Promise<void>
   stopPromise: Promise<void> | null
+  readonly workingDirectory: string
+}
+
+function interruptManagedWindowsForegroundJob(
+  managedProcess: ManagedTerminalProcess,
+  control: ForegroundJobShellControl
+): void {
+  managedProcess.foregroundJobInterruptPromise ??= interruptWindowsForegroundJob(
+    managedProcess.process.pid,
+    control.scriptPath
+  )
+    .catch(async () => {
+      managedProcess.process.write('\x03')
+      await delay(500)
+    })
+    .then(() => {
+      if (managedProcess.foregroundJob !== control) return
+      managedProcess.foregroundJob = null
+      disposeForegroundJobShellControl(control)
+      control.command.onExit({ ...control.command, exitCode: 130 })
+    })
+    .finally(() => {
+      managedProcess.foregroundJobInterruptPromise = null
+    })
 }
 
 function getDefaultShell(): string {

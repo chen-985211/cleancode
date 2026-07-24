@@ -11,7 +11,8 @@ import { PiAgentProviderContribution } from '../../../../src/contexts/agent/infr
 import { openCodeProviderIcon } from '../../../../src/contexts/agent/infrastructure/providers/shared/AgentProviderBrandIcons'
 import {
   createAgentProviderCliProcessInvocation,
-  NodeAgentProviderCliDetector
+  NodeAgentProviderCliDetector,
+  resolveAgentProviderInspectionTimeout
 } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCliDetector'
 import { NodeAgentProviderCommandDetector } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCommandDetector'
 
@@ -96,6 +97,12 @@ describe('additional Agent Provider contributions', () => {
     expect(script).toContain('CLEANCODE_PROVIDER_CLI_NOT_FOUND')
     expect(script).not.toContain(executable)
     expect(script).not.toContain(argument)
+  })
+
+  it('allows native Windows command shims a bounded startup window', () => {
+    expect(resolveAgentProviderInspectionTimeout('win32')).toBe(10_000)
+    expect(resolveAgentProviderInspectionTimeout('darwin')).toBe(2_000)
+    expect(resolveAgentProviderInspectionTimeout('linux')).toBe(2_000)
   })
 
   it('detects baseline terminal Providers without executing their CLI', async () => {

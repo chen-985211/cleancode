@@ -16,6 +16,7 @@ interface TerminalRendererHost {
 interface TerminalRendererControllerOptions {
   readonly loadAddon?: () => Promise<TerminalRendererAddon>
   readonly onStateChange?: (state: TerminalRendererState) => void
+  readonly scheduleRefresh?: (refresh: () => void) => void
 }
 
 export class TerminalRendererController {
@@ -27,10 +28,12 @@ export class TerminalRendererController {
   private currentState: TerminalRendererState = 'dom'
   private readonly loadAddon: () => Promise<TerminalRendererAddon>
   private readonly onStateChange: (state: TerminalRendererState) => void
+  private readonly scheduleRefresh: (refresh: () => void) => void
 
   constructor(options: TerminalRendererControllerOptions = {}) {
     this.loadAddon = options.loadAddon ?? loadWebglAddon
     this.onStateChange = options.onStateChange ?? (() => undefined)
+    this.scheduleRefresh = options.scheduleRefresh ?? scheduleRendererRefresh
   }
 
   get state(): TerminalRendererState {
@@ -87,7 +90,13 @@ export class TerminalRendererController {
     this.terminal = null
     addon?.dispose()
     this.setState('dom')
-    if (terminal) terminal.refresh(0, Math.max(0, terminal.rows - 1))
+    if (!terminal) return
+    terminal.refresh(0, Math.max(0, terminal.rows - 1))
+    this.scheduleRefresh(() => {
+      if (!this.isDisposed && this.currentState === 'dom') {
+        terminal.refresh(0, Math.max(0, terminal.rows - 1))
+      }
+    })
   }
 
   private setState(state: TerminalRendererState): void {
@@ -95,6 +104,15 @@ export class TerminalRendererController {
     this.currentState = state
     this.onStateChange(state)
   }
+}
+
+function scheduleRendererRefresh(refresh: () => void): void {
+  if (typeof requestAnimationFrame !== 'function') {
+    setTimeout(refresh, 0)
+    return
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(refresh))
 }
 
 async function loadWebglAddon(): Promise<TerminalRendererAddon> {

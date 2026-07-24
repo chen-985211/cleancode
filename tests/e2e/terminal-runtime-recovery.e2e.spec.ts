@@ -1,5 +1,8 @@
 // @vitest-environment node
 
+import { readFile, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
 import type { ElectronApplication, Page } from 'playwright'
 import { expect, vi } from 'vitest'
 
@@ -215,6 +218,7 @@ describe('terminal runtime recovery e2e', () => {
         asE2eTerminalInput(createE2ePrintCommand('DURABLE_PROVIDER_HISTORY'))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'DURABLE_PROVIDER_HISTORY')
+      await waitForPersistedTerminalHistory(workbench, 'DURABLE_PROVIDER_HISTORY')
       const metadata = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
       expect(metadata).not.toBeNull()
       process.kill(metadata!.processId, 'SIGKILL')
@@ -249,10 +253,53 @@ describe('terminal runtime recovery e2e', () => {
   }
 })
 
+async function waitForPersistedTerminalHistory(
+  workbench: E2eWorkbench,
+  expectedText: string
+): Promise<void> {
+  const recoveryDirectory = join(
+    workbench.appStateDirectory,
+    'terminal-runtime-provider',
+    'recovery'
+  )
+
+  await expect
+    .poll(
+      async () => {
+        const entries = await readdir(recoveryDirectory, { recursive: true }).catch(() => [])
+
+        for (const entry of entries) {
+          const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
+          if (contents.includes(expectedText)) return true
+        }
+        return false
+      },
+      { interval: 100, timeout: 10_000 }
+    )
+    .toBe(true)
+}
+
 async function launchWorkbench(workbench: E2eWorkbench) {
-  const electronApp = await launchApp(workbench, {
-    environment: createE2eTerminalEnvironment()
-  })
+  const launch = () =>
+    launchApp(workbench, {
+      environment: createE2eTerminalEnvironment()
+    })
+  let electronApp: ElectronApplication
+
+  try {
+    electronApp = await launch()
+  } catch (error) {
+    if (process.platform !== 'win32') throw error
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    try {
+      electronApp = await launch()
+    } catch (retryError) {
+      throw new AggregateError(
+        [error, retryError],
+        'Electron failed to relaunch after the Windows process handoff.'
+      )
+    }
+  }
   const page = await electronApp.firstWindow()
   await page.waitForLoadState('domcontentloaded')
   await expectDesktopRuntime(page)
