@@ -14,6 +14,7 @@ import {
 
 const graphFileName = 'default-graph.json'
 const graphMutationQueues = new Map<string, Promise<unknown>>()
+const windowsRenameRetryDelaysMs = [10, 20, 40, 80, 160] as const
 
 function getLegacyDefaultGraphPath(projectDirectory: string, workspaceName: string): string {
   return join(projectDirectory, '.cleancode', 'workspaces', workspaceName, graphFileName)
@@ -189,7 +190,7 @@ async function writeFileAtomically(filePath: string, contents: string): Promise<
     await temporaryFile.sync()
     await temporaryFile.close()
     temporaryFile = null
-    await rename(temporaryPath, filePath)
+    await replaceFile(temporaryPath, filePath)
     await syncDirectory(directory)
   } catch (error) {
     if (temporaryFile) {
@@ -198,6 +199,25 @@ async function writeFileAtomically(filePath: string, contents: string): Promise<
 
     await unlink(temporaryPath).catch(() => undefined)
     throw error
+  }
+}
+
+async function replaceFile(sourcePath: string, targetPath: string): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(sourcePath, targetPath)
+      return
+    } catch (error) {
+      const retryDelay = windowsRenameRetryDelaysMs[attempt]
+      if (
+        process.platform !== 'win32' ||
+        retryDelay === undefined ||
+        !isTransientRenameError(error)
+      ) {
+        throw error
+      }
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, retryDelay))
+    }
   }
 }
 
@@ -216,6 +236,14 @@ async function syncDirectory(directory: string): Promise<void> {
   } finally {
     await directoryHandle?.close().catch(() => undefined)
   }
+}
+
+function isTransientRenameError(error: unknown): boolean {
+  if (!(error instanceof Error) || !('code' in error)) {
+    return false
+  }
+
+  return ['EACCES', 'EBUSY', 'EPERM'].includes((error as NodeJS.ErrnoException).code ?? '')
 }
 
 function isMissingFileError(error: unknown): boolean {

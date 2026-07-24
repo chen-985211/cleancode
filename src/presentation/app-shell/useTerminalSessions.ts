@@ -290,7 +290,11 @@ export function useTerminalSessions({
         currentWorkspace.name,
         block.id
       )
-      if (terminalStartsRef.current.has(terminalStateKey)) {
+      const currentState = terminalStatesRef.current[terminalStateKey]
+      if (
+        terminalStartsRef.current.has(terminalStateKey) ||
+        (currentState?.status === 'running' && Boolean(currentState.sessionId))
+      ) {
         return undefined
       }
 

@@ -86,7 +86,7 @@ process.stdin.on('data', (data) => {
     finish(0)
   }
 })
-process.stdout.write('\u001b[6n\u001b]11;?\u0007')
+process.stdout.write('\u001b[6n\u001b]11;?\u001b\\\\')
 
 setTimeout(() => finish(1), 2_000)
 `,

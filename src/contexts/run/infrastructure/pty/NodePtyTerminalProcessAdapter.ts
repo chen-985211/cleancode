@@ -36,6 +36,7 @@ const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
 const TERMINATION_GRACE_MS = 500
 const TERMINATION_FORCE_MS = 1_500
+const WINDOWS_AGENT_SHELL_READY_COMMAND = "[Console]::Write(([char]27) + '[0m')"
 
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
@@ -44,7 +45,13 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     ensureNodePtySpawnHelperIsExecutable()
 
     const shell = command.shell || getDefaultShell()
-    const launch = createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
+    const launch =
+      platform() === 'win32' &&
+      command.scope.owner?.kind === 'agent' &&
+      !command.launchCommand &&
+      supportsForegroundJobShell('win32', shell)
+        ? createTerminalProcessLaunch(shell, WINDOWS_AGENT_SHELL_READY_COMMAND, 'interactive')
+        : createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
     const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
       name: terminalEmulationName,
       cols: command.columns,

@@ -45,7 +45,11 @@ export class TerminalProviderControllerLifecycle {
       if (this.stateValue.socket === socket && this.stateValue.controllerId === controllerId) {
         return { controllerLeaseId: this.stateValue.controllerLeaseId }
       }
-      if (!this.options.isProcessAlive(this.stateValue.processId)) {
+      if (
+        this.stateValue.socket.destroyed ||
+        this.stateValue.processId === processId ||
+        !this.options.isProcessAlive(this.stateValue.processId)
+      ) {
         const release = this.beginRelease('unexpected-disconnect')
         if (release) this.completeAfterDisconnect(release)
       }

@@ -29,6 +29,7 @@ describe('terminal workflow advanced configuration', () => {
         readinessTimeoutMs: 45_000
       })
     )
+    expect(onSave).toHaveBeenCalledTimes(1)
   })
 
   it('saves a fixed TCP service with an explicit no-injection binding', async () => {
