@@ -149,7 +149,14 @@ describe('app shell terminal launch command', () => {
   })
 
   it('quick launches a configured terminal command in a replacement terminal session', async () => {
-    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+    const delayedFocusTimerId = 1_000_000 as unknown as ReturnType<typeof window.setTimeout>
+    const nativeSetTimeout = window.setTimeout.bind(window)
+    vi.spyOn(window, 'setTimeout').mockImplementation((handler, timeout, ...args) => {
+      if (timeout === 80) return delayedFocusTimerId
+      return nativeSetTimeout(handler, timeout, ...args) as unknown as ReturnType<
+        typeof window.setTimeout
+      >
+    })
     const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout')
     const workbench = createWorkbenchWithTerminal({
       launchCommand: 'printf quick-launch-ok'
@@ -207,10 +214,6 @@ describe('app shell terminal launch command', () => {
     expect(window.cleancode?.setTerminalRetention).not.toHaveBeenCalled()
     expect(writeTerminal).not.toHaveBeenCalled()
     expect(await screen.findByLabelText('实际服务地址')).toHaveTextContent('http://127.0.0.1:4317')
-
-    const delayedFocusTimerIndex = setTimeoutSpy.mock.calls.findIndex(([, delay]) => delay === 80)
-    expect(delayedFocusTimerIndex).toBeGreaterThanOrEqual(0)
-    const delayedFocusTimerId = setTimeoutSpy.mock.results[delayedFocusTimerIndex]?.value
 
     app.unmount()
 
