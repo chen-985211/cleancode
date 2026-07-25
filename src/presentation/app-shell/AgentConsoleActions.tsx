@@ -112,8 +112,7 @@ export function AgentConsoleActions({
     }
   }, [mode])
 
-  const submitRename = async (event: FormEvent): Promise<void> => {
-    event.preventDefault()
+  const commitRename = async (): Promise<void> => {
     const normalizedName = name.trim()
     if (!normalizedName || isSubmitting) return
     setIsSubmitting(true)
@@ -123,6 +122,10 @@ export function AgentConsoleActions({
     } finally {
       setIsSubmitting(false)
     }
+  }
+  const submitRename = (event: FormEvent): void => {
+    event.preventDefault()
+    void commitRename()
   }
   const removeAgent = async (): Promise<void> => {
     if (isSubmitting) return
@@ -152,15 +155,18 @@ export function AgentConsoleActions({
       <div className="agent-console-actions__start">
         {identityControl}
         {mode === 'rename' ? (
-          <form
-            className="agent-console-actions__editor nodrag"
-            onSubmit={(event) => void submitRename(event)}
-          >
+          <form className="agent-console-actions__editor nodrag" onSubmit={submitRename}>
             <input
               aria-label={t('agent.name')}
               autoFocus
               value={name}
-              onBlur={cancelRename}
+              onBlur={() => {
+                if (name.trim()) {
+                  void commitRename()
+                } else {
+                  cancelRename()
+                }
+              }}
               onChange={(event) => setName(event.target.value)}
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={handleEditorKeyDown}
