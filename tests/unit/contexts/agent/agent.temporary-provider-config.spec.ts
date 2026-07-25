@@ -7,6 +7,8 @@ const fileSystem = vi.hoisted(() => ({
 
 vi.mock('node:fs/promises', () => ({ ...fileSystem, default: fileSystem }))
 
+import { join } from 'node:path'
+
 import { createTemporaryProviderConfig } from '../../../../src/contexts/agent/infrastructure/providers/shared/TemporaryProviderConfig'
 
 describe('temporary Agent Provider config', () => {
@@ -27,7 +29,7 @@ describe('temporary Agent Provider config', () => {
 
     expect(fileSystem.chmod).toHaveBeenCalledWith('/tmp/cleancode-provider-config', 0o700)
     expect(fileSystem.writeFile).toHaveBeenCalledWith(
-      '/tmp/cleancode-provider-config/provider.json',
+      join('/tmp/cleancode-provider-config', 'provider.json'),
       '{"enabled":true}',
       { encoding: 'utf8', mode: 0o600 }
     )

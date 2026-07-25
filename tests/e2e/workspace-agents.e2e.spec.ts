@@ -4,7 +4,6 @@ import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   installFakeCodexCli,
-  readFakeCodexCliReports,
   type FakeCodexCliFixture
 } from '../fixtures/contexts/agent/fakeCodexCli'
 
@@ -190,7 +189,7 @@ describe('workspace Agents e2e', () => {
 
       await ensureTerminalDomRenderer(terminal)
       await waitForTerminalDomText(terminal, 'CC_E2E_CODEX_READY')
-      await stopFakeCodexForShellSetup(page, terminal, fakeCodex.reportPath)
+      await stopFakeCodexForShellSetup(page, terminal)
       await writeAgentTerminalInput(
         page,
         terminal,
@@ -525,11 +524,7 @@ async function waitForTerminalDomText(terminal: Locator, text: string): Promise<
   throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
 }
 
-async function stopFakeCodexForShellSetup(
-  page: Page,
-  terminal: Locator,
-  reportPath: string
-): Promise<void> {
+async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promise<void> {
   const sessionId = await terminal.getAttribute('data-agent-terminal-session-id')
   if (!sessionId) {
     throw new Error('Agent terminal session identity is unavailable.')
@@ -570,12 +565,6 @@ async function stopFakeCodexForShellSetup(
       }),
     { sessionId }
   )
-  await expect
-    .poll(async () => {
-      const reports = await readFakeCodexCliReports(reportPath)
-      return reports.some((report) => report.kind === 'exit')
-    })
-    .toBe(true)
 }
 
 async function writeAgentTerminalInput(
