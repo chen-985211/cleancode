@@ -1,0 +1,64 @@
+name: 缺陷报告
+description: 报告可以稳定复现的 cleancode 异常行为
+title: '[缺陷]: '
+body:
+  - type: checkboxes
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已经搜索过现有 Issue，确认没有相同问题。
+          required: true
+        - label: 我已经移除凭据、私有源代码和敏感终端输出。
+          required: true
+  - type: textarea
+    attributes:
+      label: 发生了什么？
+      description: 请描述你观察到的行为及其影响。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 复现步骤
+      description: 请提供能够稳定复现问题的最短操作步骤。
+      placeholder: |
+        1. 打开……
+        2. 创建……
+        3. 运行……
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 预期行为
+      description: 正确情况下应该发生什么？
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: cleancode 提交或版本
+      placeholder: Commit SHA 或发布版本
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: 操作系统
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 环境信息
+      description: 请按实际情况填写操作系统版本、Node.js、pnpm、shell 和 Agent Provider。
+  - type: textarea
+    attributes:
+      label: 补充材料
+      description: 如有帮助，请附上已经脱敏的日志、截图或最小复现仓库。
+  - type: checkboxes
+    attributes:
+      label: 安全检查
+      options:
+        - label: 这不是安全漏洞；安全问题应通过 GitHub 私有安全公告提交。
+          required: true

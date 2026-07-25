@@ -2,6 +2,7 @@
   "name": "cleancode",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "AI-driven block-based desktop workbench.",
   "type": "module",
   "main": "out/main/main.js",
