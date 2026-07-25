@@ -3,61 +3,57 @@
 
   <h1>cleancode</h1>
 
-  <p><strong>让每个代码库拥有一个人类与 Agent 共享的开发世界。</strong></p>
+  <p><strong>像搭积木一样，DIY 你的 AI 开发工作流。</strong></p>
+
+  <p>组合你的工具，带上你的 Agent，运行属于你的开发现场。</p>
+
+  <p><em>Compose your tools. Bring your agents. Run your workflow.</em></p>
 
   <p>
-    <a href="https://github.com/chen-985211/cleancode/actions/workflows/agent-terminal-platform.yml"><img src="https://github.com/chen-985211/cleancode/actions/workflows/agent-terminal-platform.yml/badge.svg" alt="跨平台质量门禁" /></a>
-    <a href="https://github.com/chen-985211/cleancode/actions/workflows/e2e.yml"><img src="https://github.com/chen-985211/cleancode/actions/workflows/e2e.yml/badge.svg" alt="Electron 端到端测试" /></a>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
-    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" />
+    <a href="#环境要求"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
+    <a href="#带上你喜欢的-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+    <a href="#画出来也运行起来"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
   </p>
 </div>
 
+<p align="center">
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="cleancode 使用 Agent 搭建并运行项目启动工作流" />
+</p>
+
 ---
 
-编码 Agent 已经会修改代码，但它仍然很难看见完整的开发现场：
+你的开发方式不应该被某一个 Agent、IDE 或固定脚本定义。
 
-- 这个任务属于哪个分支和 worktree？
-- 哪些服务需要先启动，哪些命令只是一次性任务？
-- 当前实际监听的是哪个端口，它属于哪个工作区？
-- 哪个终端可以恢复，哪个 Agent 会话可以继续？
-- 一次停止、重启或清理会影响哪些对象？
+**cleancode 是一个画布优先、本地优先的可执行开发工作空间。** 你可以把终端、服务、依赖关系、Git 分支工作区和喜欢的 Coding Agent 组合到同一个开发现场，再按自己的方式运行它、调整它、继续它。
 
-**cleancode 是一个本地优先、可执行的开发工作空间。** 它把项目、分支、终端、服务、依赖、端口和编码 Agent 组织成同一个可见、可操作、可恢复的开发世界，让人和 Agent 面对同一份运行事实。
+```txt
+feature/auth
+├── Agent：Codex
+└── Workflow
+    ├── Build shared
+    └── API server ──> Web app
+                   └─> Tests
+```
 
-它不是把终端平铺到无限画布上。画布只是开发模型的投影；真正的价值在于，开发环境第一次成为了可以被理解、执行和治理的对象。
+画布不是一张静态流程图。你搭出来的工作流拥有真实命令、启动顺序、就绪条件、运行状态和作用范围。
 
-## 一次典型的开发流程
+## 按你的方式搭建
 
-1. 为一个需求创建独立分支工作区，项目与 worktree 生命周期保持对应。
-2. 把开发服务器、测试、构建和辅助进程组织成终端任务或长驻服务。
-3. 用依赖关系表达启动顺序，由 cleancode 管理端口、就绪状态和停止顺序。
-4. Agent 在同一工作空间中读取计划、创建和编排终端积木；需要破坏性操作时，由人确认。
-5. 人通过画布查看真实运行状态、实际端点和失败原因，并在中断后继续现场。
+从一块终端开始，也可以搭出一整套开发工作台：
 
-在这里，Agent 不只是“替你敲命令”，而是开始进入一个有边界、有状态、有事实来源的开发环境。
+- 用终端积木承载构建、测试、开发服务器和日常命令。
+- 把有限任务与长驻服务配置成不同的执行模式。
+- 用终端组合整理属于同一部分的工具。
+- 用有向连接声明真实依赖，而不只是画一条装饰线。
+- 在同一张画布上放置多个固定 Provider 的 Agent 控制台。
+- 保存每个分支工作区自己的画布、终端定义和 Agent 身份。
 
-## 核心能力
+**你的工具、你的 Agent、你的工作流。**
 
-### 分支就是独立工作面
+## 带上你喜欢的 Agent
 
-一个项目可以同时维护多个分支工作区。cleancode 负责登记 worktree、同步分支状态，并把终端与 Agent 会话绑定到正确的工作目录，减少多个任务并行时的上下文串线。
-
-### 开发环境可以被执行
-
-普通终端、一次性任务和长驻服务都可以成为画布上的积木。积木之间的连线表达真实依赖，而不只是视觉关系；启动计划、就绪检查、失败传播和反向停止由运行模型统一处理。
-
-### 运行事实有唯一来源
-
-端口、进程、就绪状态和实际访问地址来自运行时，而不是画布上的静态标签。cleancode 会管理端口租约、校验监听归属，并把最终端点回写到工作空间。
-
-### Agent 有能力，也有边界
-
-Agent 可以检查画布、创建终端积木、连接依赖、查看执行计划并整理布局。改变进程或工作区状态的操作必须经过明确授权，所有工具调用都遵循同一套作用域与审批模型。
-
-## 支持的 Agent
-
-**你选择 Agent，不必围着 Agent 选择工作方式。**
+**换 Agent，不必换工作方式。** cleancode 让不同 Coding Agent 进入同一个可见开发现场；终端、服务、分支和运行状态不再围绕某个 Provider 重新组织。
 
 <!-- agent-provider-wall:start -->
 
@@ -103,16 +99,41 @@ cleancode 内建 **33 个 Coding Agent Provider**。它们都可以进入同一�
 
 <!-- agent-provider-wall:end -->
 
-## cleancode MCP
+## 一个分支，一个完整工作面
 
-内建 MCP 让 Agent 通过稳定工具操作同一个工作空间，而不是直接修改画布内部状态。当前工具覆盖：
+为需求创建分支工作区后，cleancode 用独立 Git worktree 隔离它的目录，并让画布、终端、运行作用域和 Agent 会话跟随工作区一起切换。
 
-- 读取画布、终端积木和连接；
-- 创建、更新、删除和连接终端积木；
-- 查看启动计划与依赖验证结果；
-- 对齐、分布和自动整理画布布局。
+你可以同时推进 `feature/auth`、`fix/search` 和 `experiment/new-ui`，而不必反复清空终端、确认工作目录或提醒 Agent“我们已经换分支了”。
 
-启动与停止工作流仍由人通过应用界面控制。这是当前有意保留的权限边界。
+## 画出来，也运行起来
+
+连接代表真实依赖，配置代表真实执行意图。cleancode 会把当前终端图转换成一次不可变的执行计划：
+
+- 没有上游的任务可以并行启动，下游等待全部直接依赖完成或就绪。
+- 有限任务按真实退出码判断成功，长驻服务按输出文本或 TCP 监听判断就绪。
+- 服务可以声明固定、优选或自动端口，由运行时分配并注入最终端点。
+- 上游失败会明确阻塞后代；停止时按反向依赖顺序清理活动进程。
+
+节点状态、失败原因和实际访问地址都来自运行时。画布展示发生了什么，但不会用静态标签冒充事实。
+
+## 让 Agent 参与搭建
+
+支持原生 cleancode MCP 的 Agent 可以通过稳定工具理解和整理同一个工作空间，而不是直接修改画布内部数据。当前工具覆盖：
+
+- 读取画布、终端积木、连接和执行计划。
+- 创建、更新、删除和连接终端积木。
+- 验证依赖并检查启动计划。
+- 对齐、分布和自动整理终端布局。
+
+删除积木、解散组合和断开依赖需要在 cleancode 界面中审批；启动与停止工作流仍由人控制。这让 Agent 能够参与搭建，同时让改变开发现场的动作保持可见。
+
+## 从一个需求开始
+
+1. 为需求创建独立分支工作区。
+2. 加入你常用的 Coding Agent。
+3. 把构建、测试、开发服务器和辅助命令做成终端积木。
+4. 配置任务、服务、端口和依赖关系。
+5. 从任意终端运行它和全部后代，在同一张画布上查看结果。
 
 ## 快速开始
 
