@@ -20,6 +20,11 @@ import type {
   AgentRuntimeScopeValidationPort
 } from '../ports/AgentRuntimeScopeValidationPort'
 import {
+  haveSameLaunchIdentity,
+  haveSameLaunchRuntime,
+  haveSameTerminalRuntime
+} from './AgentRuntimeFacetEquality'
+import {
   AgentConversationScope,
   type AgentConversationScopeSnapshot
 } from '../../domain/value-objects/AgentConversationScope'
@@ -112,6 +117,7 @@ export function createInitialAgentRuntime(
       exitCode: null,
       processId: null,
       status: 'not_started',
+      stopReason: null,
       viewIdentity: null
     }
   }
@@ -200,6 +206,7 @@ export function beginAgentTerminalRuntime(session: ManagedAgentSession): void {
       exitCode: null,
       processId: null,
       status: 'starting',
+      stopReason: null,
       viewIdentity: null
     }
   })
@@ -219,6 +226,7 @@ export function recordAgentTerminalRunning(
     terminal: {
       processId: handle.processId,
       status: 'running',
+      stopReason: null,
       viewIdentity: handle.viewIdentity ?? null
     }
   })
@@ -236,7 +244,13 @@ export function recordAgentTerminalExit(
   transitionAgentRuntime(session, {
     activity: 'unavailable',
     launch: isActiveAgentLaunch(session) ? { status: 'stopped' } : undefined,
-    terminal: { exitCode, processId: null, status: 'exited', viewIdentity: null }
+    terminal: {
+      exitCode,
+      processId: null,
+      status: 'exited',
+      stopReason: shouldCloseTools ? 'unexpected' : 'requested',
+      viewIdentity: null
+    }
   })
   void disposeAgentLaunchArtifacts(session).catch(() => undefined)
   return shouldCloseTools
@@ -246,7 +260,7 @@ export function recordAgentTerminalStartFailure(session: ManagedAgentSession): v
   session.isTerminalRunning = false
   transitionAgentRuntime(session, {
     activity: 'unavailable',
-    terminal: { processId: null, status: 'failed', viewIdentity: null }
+    terminal: { processId: null, status: 'failed', stopReason: null, viewIdentity: null }
   })
 }
 
@@ -258,7 +272,13 @@ export function recordAgentTerminalStopped(
   transitionAgentRuntime(session, {
     activity: 'unavailable',
     launch: isActiveAgentLaunch(session) ? { status: 'stopped' } : undefined,
-    terminal: { exitCode: null, processId: null, status, viewIdentity: null }
+    terminal: {
+      exitCode: null,
+      processId: null,
+      status,
+      stopReason: 'requested',
+      viewIdentity: null
+    }
   })
 }
 
@@ -538,7 +558,7 @@ export function recordAgentSessionStartFailure(session: ManagedAgentSession): vo
   if (session.runtime.terminal.processId === null) {
     transitionAgentRuntime(session, {
       activity: 'unavailable',
-      terminal: { status: 'failed', viewIdentity: null }
+      terminal: { status: 'failed', stopReason: null, viewIdentity: null }
     })
   } else {
     transitionAgentRuntime(session, {
@@ -556,7 +576,7 @@ export function recordAgentSessionStopFailure(session: ManagedAgentSession): voi
   session.isStopping = false
   const terminalFailed = session.runtime.terminal.processId === null
   transitionAgentRuntime(session, {
-    terminal: { status: terminalFailed ? 'failed' : 'running' }
+    terminal: { status: terminalFailed ? 'failed' : 'running', stopReason: null }
   })
   if (terminalFailed) unregisterAgentMcpEndpoint(session)
 }
@@ -631,56 +651,7 @@ export function createAgentRuntimeSessionId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `agent-session-${Date.now()}-${Math.random()}`
 }
 
-function haveSameLaunchRuntime(
-  first: AgentRuntimeSnapshot['launch'],
-  second: AgentRuntimeSnapshot['launch']
-): boolean {
-  return (
-    first.exitCode === second.exitCode &&
-    first.failureKind === second.failureKind &&
-    first.generation === second.generation &&
-    first.launchId === second.launchId &&
-    first.status === second.status
-  )
-}
-
 function inactiveAgentMcpStatus(session: ManagedAgentSession): AgentMcpRuntimeStatus {
   if (!session.cleancodeMcpEnabled) return 'disabled'
   return session.mcpSupported ? 'inactive' : 'unsupported'
-}
-
-function haveSameLaunchIdentity(
-  first: { readonly generation: number; readonly launchId: string },
-  second: { readonly generation: number; readonly launchId: string }
-): boolean {
-  return first.generation === second.generation && first.launchId === second.launchId
-}
-
-function haveSameTerminalRuntime(
-  first: AgentRuntimeSnapshot['terminal'],
-  second: AgentRuntimeSnapshot['terminal']
-): boolean {
-  return (
-    first.exitCode === second.exitCode &&
-    first.processId === second.processId &&
-    first.status === second.status &&
-    haveSameTerminalViewIdentity(first.viewIdentity, second.viewIdentity)
-  )
-}
-
-function haveSameTerminalViewIdentity(
-  first: AgentRuntimeSnapshot['terminal']['viewIdentity'],
-  second: AgentRuntimeSnapshot['terminal']['viewIdentity']
-): boolean {
-  if (first === null || second === null) return first === second
-  return (
-    first.blockId === second.blockId &&
-    first.generation === second.generation &&
-    first.owner.id === second.owner.id &&
-    first.owner.kind === second.owner.kind &&
-    first.projectId === second.projectId &&
-    first.runId === second.runId &&
-    first.sessionId === second.sessionId &&
-    first.workspaceName === second.workspaceName
-  )
 }

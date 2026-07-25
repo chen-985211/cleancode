@@ -20,6 +20,13 @@ export interface AgentTerminalViewIdentity {
 export type AgentTerminalRuntimeStatus =
   'not_started' | 'starting' | 'running' | 'suspended' | 'exited' | 'failed'
 
+/**
+ * Why an Agent terminal left the running state. `requested` covers every stop the
+ * application asked for; `unexpected` covers a PTY that ended on its own. Only
+ * `exited` and `suspended` carry a reason: `failed` means nothing ever ran to stop.
+ */
+export type AgentTerminalStopReason = 'requested' | 'unexpected'
+
 export type AgentLaunchRuntimeStatus =
   'not_started' | 'launching' | 'running' | 'exited' | 'stopped' | 'failed'
 
@@ -45,6 +52,7 @@ export interface AgentRuntimeSnapshot {
     readonly exitCode: number | null
     readonly processId: number | null
     readonly status: AgentTerminalRuntimeStatus
+    readonly stopReason: AgentTerminalStopReason | null
     readonly viewIdentity: AgentTerminalViewIdentity | null
   }
 }

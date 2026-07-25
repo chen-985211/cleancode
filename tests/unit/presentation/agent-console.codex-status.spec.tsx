@@ -451,6 +451,7 @@ function createRuntime(
       exitCode: null,
       processId: terminalStatus === 'running' ? 42 : null,
       status: terminalStatus,
+      stopReason: null,
       viewIdentity: null
     }
   }

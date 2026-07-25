@@ -46,18 +46,16 @@ describe('Agent Provider feedback policy', () => {
   })
 
   it.each([
-    ['agent removal', 'stopped', 'exited'],
-    ['MCP capability toggle', 'stopped', 'exited'],
-    ['application quit', 'stopped', 'exited'],
-    ['Provider CLI exit', 'exited', 'running'],
-    ['terminal start failure', 'not_started', 'failed'],
-    ['launch failure', 'failed', 'running']
+    ['Provider CLI exit', 'exited', 'running', null],
+    ['terminal start failure', 'not_started', 'failed', null],
+    ['launch failure', 'failed', 'running', null],
+    ['unexpected PTY termination', 'stopped', 'exited', 'unexpected']
   ] as const)(
     'never notifies about %s because the header status entry already owns it',
-    (_scenario, launch, terminal) => {
+    (_scenario, launch, terminal, stopReason) => {
       const feedback = deriveAgentProviderFeedback({
         attachment: { status: 'idle' },
-        runtime: runtime({ launch, mcp: 'inactive', terminal }),
+        runtime: runtime({ launch, mcp: 'inactive', stopReason, terminal }),
         state: installedState
       })
 
@@ -65,6 +63,26 @@ describe('Agent Provider feedback policy', () => {
       expect(feedback.issues).not.toEqual([])
     }
   )
+
+  it.each([
+    ['Agent removal'],
+    ['CleanCode MCP capability toggle'],
+    ['workspace ownership handover'],
+    ['application quit']
+  ] as const)('stays completely quiet after a stop the user requested for %s', () => {
+    const feedback = deriveAgentProviderFeedback({
+      attachment: { status: 'idle' },
+      runtime: runtime({
+        launch: 'stopped',
+        mcp: 'inactive',
+        stopReason: 'requested',
+        terminal: 'exited'
+      }),
+      state: installedState
+    })
+
+    expect(feedback).toEqual({ blocking: null, events: [], issues: [], mcpStatus: 'connecting' })
+  })
 
   it('notifies only about facts the user cannot see anywhere else', () => {
     expect(
@@ -88,7 +106,12 @@ describe('Agent Provider feedback policy', () => {
     expect(
       deriveAgentProviderFeedback({
         attachment: { status: 'idle' },
-        runtime: runtime({ launch: 'stopped', mcp: 'inactive', terminal: 'exited' }),
+        runtime: runtime({
+          launch: 'stopped',
+          mcp: 'inactive',
+          stopReason: 'unexpected',
+          terminal: 'exited'
+        }),
         state: installedState
       }).issues
     ).toEqual(['session_interrupted'])
@@ -160,6 +183,7 @@ function runtime(input: {
   readonly binding?: AgentRuntimeSnapshot['binding']['status']
   readonly launch?: AgentRuntimeSnapshot['launch']['status']
   readonly mcp: AgentRuntimeSnapshot['mcp']['status']
+  readonly stopReason?: AgentRuntimeSnapshot['terminal']['stopReason']
   readonly terminal?: AgentRuntimeSnapshot['terminal']['status']
 }): AgentRuntimeSnapshot {
   return {
@@ -178,6 +202,7 @@ function runtime(input: {
       exitCode: null,
       processId: input.terminal && input.terminal !== 'running' ? null : 42,
       status: input.terminal ?? 'running',
+      stopReason: input.stopReason ?? null,
       viewIdentity: null
     }
   }

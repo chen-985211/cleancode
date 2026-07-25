@@ -212,6 +212,7 @@ export function createAgentSessionSnapshot(
       terminal: {
         exitCode: null,
         processId: 1,
+        stopReason: null,
         status: 'running',
         viewIdentity: null
       }

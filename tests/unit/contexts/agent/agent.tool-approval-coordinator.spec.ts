@@ -313,6 +313,7 @@ function createManagedSession(): ManagedAgentSession {
         exitCode: null,
         processId: 1,
         status: 'running',
+        stopReason: null,
         viewIdentity: null
       }
     },

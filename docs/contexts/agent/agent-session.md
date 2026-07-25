@@ -114,11 +114,13 @@ Provider CLI 自然退出或处理 `Ctrl+C` 后，Agent launch 状态变为 `exi
 
 应用层只发布带单调 `revision` 的 `AgentRuntimeSnapshot`，不再维护互相竞争的扁平状态。它包含五条独立事实轴：
 
-- `terminal`：长期 PTY/shell 的 starting、running、suspended、exited 或 failed，以及 process/view identity。
+- `terminal`：长期 PTY/shell 的 starting、running、suspended、exited 或 failed，以及 process/view identity 和停止原因。
 - `launch`：当前 Provider 前台任务的 generation、launchId、not_started、launching、running、stopped、exited 或 failed。
 - `mcp`：disabled、unsupported、inactive、initializing、ready 或 failed。
 - `binding`：unbound、persisting、persisted 或 persistence_failed；保存恢复引用失败不能把仍在工作的 launch 误报为失败。
 - `activity`：idle、working、waiting_input、waiting_approval 或 unavailable；不支持结构化 telemetry 的 Provider 必须使用 unavailable，不能按输出频率猜测。
+
+terminal 停止原因是与状态并列的独立事实，不能从状态反推。应用层在离开 running 时同时写入 `stopReason`：应用自己请求的停止记为 `requested`，PTY 自行结束记为 `unexpected`；在途停止请求期间到达的 PTY 退出归因于该请求。只有 `exited` 和 `suspended` 携带原因，`starting`、`running` 与 `failed` 必须为空——`failed` 表示从未运行成功，没有可被停止的进程。恢复或清理失败时必须清空过期原因，不得让上一轮的停止原因继续描述当前事实。停止原因变化本身就是运行时变化，必须推进 `revision` 并发布事件。
 
 renderer 只按完整 runtime identity、generation 和 revision 对账。attach 响应、迟到事件、旧 launch 退出或旧 registration 回调都不得覆盖更高 revision 或更新 generation。
 

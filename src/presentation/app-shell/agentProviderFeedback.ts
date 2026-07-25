@@ -109,7 +109,9 @@ function projectRuntimeIssue(runtime: AgentRuntimeSnapshot): AgentFeedbackIssue 
     return 'session_ended'
   }
   if (runtime.terminal.status === 'exited') {
-    return 'session_interrupted'
+    // A stop the application asked for is already the user's own intent; only an
+    // unexpected termination is worth keeping on the header status entry.
+    return runtime.terminal.stopReason === 'requested' ? null : 'session_interrupted'
   }
   if (runtime.terminal.status === 'failed') {
     return 'terminal_failed'
