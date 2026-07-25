@@ -91,7 +91,7 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 应用开发测试必须纳入本地统一质量门禁。
 
-`pnpm pre-commit` 必须执行 `pnpm test`，确保 AI 或开发者每次修改生产代码、测试代码、构建配置、工具配置或依赖后都会运行全部低层测试和关键 E2E smoke。
+`pnpm pre-commit` 必须执行 `pnpm test:full`，确保 AI 或开发者每次修改生产代码、测试代码、构建配置、工具配置或依赖后都会运行全部低层测试和完整 Electron E2E。
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
@@ -117,7 +117,7 @@ pnpm test:e2e:smoke
 
 底层测试必须先失败先反馈。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
 
-`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`。完整 Electron E2E 由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时也必须使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
+`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`，并由本地统一门禁 `pnpm pre-commit` 调用。完整 Electron E2E 也由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时可以单独使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
 
 任何新增测试类型、调整测试目录或改变快速/完整门禁时，都必须同步维护 `package.json`、对应 CI workflow 和本文档。
 

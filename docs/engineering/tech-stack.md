@@ -97,7 +97,7 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
-本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和关键 E2E smoke。完整 Electron E2E 由 CI workflow 和显式 `pnpm test:full` 覆盖；CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
+本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和完整 Electron E2E。CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
 
 ## 候选技术与触发条件
 

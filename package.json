@@ -26,7 +26,7 @@
     "lint": "eslint . --max-warnings=0",
     "lint:staged": "lint-staged",
     "prepare": "husky",
-    "pre-commit": "pnpm check:quality && pnpm test",
+    "pre-commit": "pnpm check:quality && pnpm test:full",
     "typecheck": "tsc --noEmit",
     "test": "pnpm test:core && pnpm test:e2e:smoke",
     "test:core": "pnpm test:unit && pnpm test:integration && pnpm test:contract",
