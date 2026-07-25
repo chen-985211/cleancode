@@ -1,0 +1,52 @@
+appId: io.github.chen-985211.cleancode
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+
+asar: true
+asarUnpack:
+  - node_modules/node-pty/**/*
+
+mac:
+  category: public.app-category.developer-tools
+  hardenedRuntime: false
+  icon: public/app-icon.png
+  identity: '-'
+  x64ArchFiles: '**/node-pty/prebuilds/darwin-*/**/*'
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
+
+win:
+  icon: public/app-icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+linux:
+  category: Development
+  executableName: cleancode
+  icon: public/app-icon.png
+  maintainer: chen-985211
+  synopsis: A local-first executable development workspace
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+
+nsis:
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  oneClick: false

@@ -1,7 +1,14 @@
 {
   "name": "cleancode",
+  "productName": "CleanCode",
   "version": "0.1.0",
   "private": true,
+  "author": "chen-985211",
+  "homepage": "https://github.com/chen-985211/cleancode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chen-985211/cleancode.git"
+  },
   "license": "MIT",
   "description": "A local-first executable development workspace for humans and coding agents.",
   "type": "module",
@@ -10,6 +17,12 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
+    "package": "pnpm build && pnpm prepare:packaging && electron-builder --dir --publish never",
+    "dist": "pnpm build && pnpm prepare:packaging && electron-builder --publish never",
+    "dist:mac": "pnpm build && pnpm prepare:packaging && electron-builder --mac --publish never",
+    "dist:win": "pnpm build && pnpm prepare:packaging && electron-builder --win --publish never",
+    "dist:linux": "pnpm build && pnpm prepare:packaging && electron-builder --linux --publish never",
+    "prepare:packaging": "node scripts/prepare-packaging.mjs",
     "check:agent-provider-boundary": "node scripts/check-agent-provider-boundary.mjs",
     "check:deps": "node scripts/check-exact-deps.mjs",
     "check:docs": "node scripts/check-docs.mjs && node scripts/generate-agent-readme-assets.mjs --check",
@@ -67,6 +80,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "dependency-cruiser": "17.4.3",
     "electron": "43.0.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "eslint": "9.39.4",
     "eslint-plugin-react-hooks": "7.1.1",

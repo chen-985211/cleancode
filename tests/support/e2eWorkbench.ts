@@ -276,9 +276,10 @@ export async function launchApp(
   options: LaunchAppOptions = {}
 ): Promise<ElectronApplication> {
   const runElectronInBackground = process.env.CLEANCODE_E2E_VISIBLE !== '1'
+  const packagedExecutablePath = process.env.CLEANCODE_E2E_EXECUTABLE_PATH?.trim()
   const electronApplication = await electron.launch({
     args: [
-      '.',
+      ...(packagedExecutablePath ? [] : ['.']),
       '--lang=zh-CN',
       `--user-data-dir=${join(workbench.appStateDirectory, 'electron-user-data')}`
     ],
@@ -299,7 +300,8 @@ export async function launchApp(
         ...options.environment,
         CLEANCODE_TEST_BACKGROUND_E2E: runElectronInBackground ? '1' : '0'
       }
-    )
+    ),
+    ...(packagedExecutablePath ? { executablePath: packagedExecutablePath } : {})
   })
   initializeE2eDiagnostics(electronApplication)
   try {

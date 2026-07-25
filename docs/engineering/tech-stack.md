@@ -14,7 +14,7 @@
 | 桌面壳         | Electron                                                                            |
 | 前端框架       | React                                                                               |
 | 类型系统       | TypeScript                                                                          |
-| 构建与开发     | electron-vite、Vite                                                                 |
+| 构建与开发     | electron-vite、Vite、electron-builder                                               |
 | 积木画布       | React Flow（`@xyflow/react`）                                                       |
 | 终端渲染与模型 | xterm.js、fit/search/serialize/Unicode 11/web-links/WebGL addons、`@xterm/headless` |
 | 伪终端         | node-pty                                                                            |
@@ -26,7 +26,7 @@
 | Agent 工具协议 | 本机 HTTP JSON-RPC 上的 MCP                                                         |
 | 测试           | Vitest、Testing Library、Playwright                                                 |
 
-当前没有 Monaco Editor、SQLite、Drizzle ORM、Zustand、WebSocket、electron-builder 或 Electron Forge 依赖，也没有基于这些技术的现有产品能力。
+当前没有 Monaco Editor、SQLite、Drizzle ORM、Zustand、WebSocket 或 Electron Forge 依赖，也没有基于这些技术的现有产品能力。
 
 ## 包管理和版本策略
 
@@ -35,6 +35,25 @@
 依赖版本必须使用精确版本号，不得使用 `^`、`~`、范围版本或通配版本。`.npmrc` 必须保持 `save-exact=true`。
 
 依赖版本门禁由 `pnpm check:deps` 执行；可执行脚本以根目录 `package.json` 为唯一事实来源。
+
+## 打包与 Preview 发布
+
+electron-vite 负责生成 `out` 中的 main、preload、renderer 和独立 Terminal Provider 入口；
+electron-builder 负责把这些入口、生产依赖和 Electron runtime 组装为安装包。用户可见产品名由
+`package.json` 的 `productName` 统一定义为 `CleanCode`，内部包名保持 `cleancode`，稳定应用标识
+为 `io.github.chen-985211.cleancode`。打包配置的唯一事实来源是根目录
+`electron-builder.yml`，产物写入被 Git 忽略的 `release/`。
+
+当前目标矩阵为 macOS Universal DMG/ZIP、Windows x64 NSIS 和 Linux x64 AppImage/DEB。
+`node-pty` 是生产原生依赖，必须在目标操作系统安装并由 electron-builder 按目标 Electron
+版本处理；其原生模块、helper 和 Windows 辅助文件显式位于 `app.asar.unpacked`。macOS
+打包前同时校验 arm64/x64 `spawn-helper` 的执行权限，避免 Universal 应用只修正构建宿主架构。
+
+`.github/workflows/release.yml` 在三个目标系统分别构建 unpacked 应用，使用打包后的真实可执行
+文件运行最小终端 E2E，再生成发行格式。与 `package.json` 版本一致的 `v*` tag 会汇总产物和
+SHA-256 校验文件并创建公开 GitHub Pre-release；手工触发只保留 Actions artifacts。当前
+Preview 的 macOS 应用使用 ad-hoc 签名且不 notarize，Windows 安装程序未签名，发布说明必须明确
+系统安全警告，且不得标记为 Latest。自动更新、正式签名和公证仍未接入。
 
 ## 选择 Electron 的原因
 
@@ -86,6 +105,7 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
 - Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。
 - Husky：保留 Git hook 运行基础；当前不启用仓库级 pre-commit hook。
@@ -103,15 +123,14 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 
 以下技术都未采用，只有满足触发条件并完成独立 Spec 后才可进入当前技术栈：
 
-| 候选                     | 评估触发条件                                     |
-| ------------------------ | ------------------------------------------------ |
-| Monaco Editor            | 产品确认需要内嵌代码编辑器                       |
-| SQLite + Drizzle ORM     | JSON 无法满足数据规模、查询、事务或迁移需求      |
-| Zustand                  | React 本地状态导致可证明的跨组件一致性或性能问题 |
-| WebSocket                | IPC 无法覆盖明确的跨进程/远程实时事件需求        |
-| electron-builder / Forge | 确认安装包、签名、更新与发布流水线               |
-| Tauri                    | 包体、内存或安全边界成为主要约束                 |
-| tldraw                   | 产品从流程图明确转向自由画布或白板               |
-| Yjs                      | 确认多人协作或离线冲突合并需求                   |
+| 候选                 | 评估触发条件                                     |
+| -------------------- | ------------------------------------------------ |
+| Monaco Editor        | 产品确认需要内嵌代码编辑器                       |
+| SQLite + Drizzle ORM | JSON 无法满足数据规模、查询、事务或迁移需求      |
+| Zustand              | React 本地状态导致可证明的跨组件一致性或性能问题 |
+| WebSocket            | IPC 无法覆盖明确的跨进程/远程实时事件需求        |
+| Tauri                | 包体、内存或安全边界成为主要约束                 |
+| tldraw               | 产品从流程图明确转向自由画布或白板               |
+| Yjs                  | 确认多人协作或离线冲突合并需求                   |
 
 候选技术不得仅因“常见”而引入；必须说明它解决的当前问题、替代范围、迁移成本和验证方式。
