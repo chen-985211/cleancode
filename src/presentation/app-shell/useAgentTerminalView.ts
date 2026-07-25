@@ -2,6 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
+import { attachTerminalViewWithRetry } from './terminalViewAttachment'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import type { TerminalDimensions } from './types'
 import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
@@ -95,8 +96,11 @@ export function useAgentTerminalView({
         .catch(() => undefined)
         .then(async () => {
           if (isReleased) return
-          const snapshot = await api.attachTerminalView({ ...identity, viewId: lease.viewId })
-          if (isReleased || snapshot.restoreMarker.viewId !== lease.viewId) return
+          const snapshot = await attachTerminalViewWithRetry({
+            attach: () => api.attachTerminalView({ ...identity, viewId: lease.viewId }),
+            isCancelled: () => isReleased
+          })
+          if (isReleased || !snapshot || snapshot.restoreMarker.viewId !== lease.viewId) return
           const result = await surface.restore(snapshot)
           if (result === 'retry' && attempt < 1) requestRestore(attempt + 1)
         })

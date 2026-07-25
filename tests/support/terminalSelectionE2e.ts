@@ -6,15 +6,10 @@ export async function setCanvasZoomFromDefault(
   page: Page,
   direction: CanvasZoomDirection
 ): Promise<number> {
-  const expectedZoom = direction === 'in' ? 1.2 : 1 / 1.2
   const buttonName = direction === 'in' ? '放大画布' : '缩小画布'
+  const initialZoom = await readCanvasZoom(page)
+  const expectedZoom = direction === 'in' ? initialZoom * 1.2 : initialZoom / 1.2
 
-  await page.waitForFunction(() => {
-    const viewport = document.querySelector('.react-flow__viewport')
-
-    if (!viewport) return false
-    return Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - 1) <= 0.001
-  })
   await page.getByRole('button', { name: buttonName }).click()
   await page.waitForFunction((expected) => {
     const viewport = document.querySelector('.react-flow__viewport')
@@ -46,7 +41,9 @@ export async function selectExactXtermText(
   targetText: string
 ): Promise<void> {
   await ensureTerminalDomRenderer(terminal)
+  await terminal.locator('.xterm-helper-textarea').focus()
   await terminal.locator('.xterm-rows > div').filter({ hasText: targetText }).last().waitFor()
+  await waitForCanvasViewportToSettle(page)
   const selection = await terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.findLast((candidate) => candidate.textContent?.includes(target))
@@ -114,11 +111,47 @@ export async function selectExactXtermText(
   await page.mouse.up()
 }
 
+async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
+  await page.locator('.react-flow__viewport').evaluate(
+    (viewport) =>
+      new Promise<void>((resolve, reject) => {
+        let quietTimeout = 0
+        let deadlineTimeout = 0
+        const observer = new MutationObserver(scheduleQuietWindow)
+
+        function cleanup(): void {
+          observer.disconnect()
+          window.clearTimeout(quietTimeout)
+          window.clearTimeout(deadlineTimeout)
+        }
+
+        function scheduleQuietWindow(): void {
+          window.clearTimeout(quietTimeout)
+          quietTimeout = window.setTimeout(() => {
+            cleanup()
+            resolve()
+          }, 150)
+        }
+
+        observer.observe(viewport, {
+          attributeFilter: ['style'],
+          attributes: true
+        })
+        deadlineTimeout = window.setTimeout(() => {
+          cleanup()
+          reject(new Error('Canvas viewport did not settle before xterm text selection.'))
+        }, 3_000)
+        scheduleQuietWindow()
+      })
+  )
+}
+
 export async function readXtermAsciiCellCenter(
   terminal: Locator,
   input: { readonly column: number; readonly rowMarker: string }
 ): Promise<{ readonly row: number; readonly x: number; readonly y: number }> {
   await ensureTerminalDomRenderer(terminal)
+  await terminal.locator('.xterm-rows > div').filter({ hasText: input.rowMarker }).first().waitFor()
   return terminal.evaluate((element, target) => {
     const rows = Array.from(element.querySelectorAll('.xterm-rows > div'))
     const row = rows.find((candidate) => candidate.textContent?.includes(target.rowMarker))
@@ -193,6 +226,12 @@ export async function ensureTerminalDomRenderer(terminal: Locator): Promise<void
       })
     })
   })
+  await terminal.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+  )
 }
 
 export async function readXtermSelection(terminal: Locator): Promise<string> {

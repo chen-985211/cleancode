@@ -173,6 +173,40 @@ describe('minimap node focus', () => {
     }
   })
 
+  it('does not steal focus from an editor opened while terminal input projection is pending', () => {
+    vi.useFakeTimers()
+
+    try {
+      const setCenter = vi.fn(async () => true)
+      const terminal = createTerminalBlock()
+      const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+
+      render(
+        <>
+          <MinimapFocusHarness
+            action="activateTerminal"
+            instance={instance}
+            nodeId={terminal.id}
+            terminalBlocksById={new Map([[terminal.id, terminal]])}
+          />
+          <div data-terminal-block-id={terminal.id}>
+            <textarea className="xterm-helper-textarea" aria-label="终端输入" />
+          </div>
+          <input aria-label="分支名称" />
+        </>
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
+      screen.getByLabelText('分支名称').focus()
+      vi.advanceTimersByTime(2_000)
+
+      expect(screen.getByLabelText('分支名称')).toHaveFocus()
+      expect(screen.getByLabelText('终端输入')).not.toHaveFocus()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('replaces pending terminal input activation when the minimap locates an Agent', () => {
     vi.useFakeTimers()
 

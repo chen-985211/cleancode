@@ -76,7 +76,12 @@ export async function collectTerminalPaletteViolations({ cwd = process.cwd() } =
     ]
   }
 
-  if (existsSync(generatedPath) && readFileSync(generatedPath, 'utf8') === expected) return []
+  if (
+    existsSync(generatedPath) &&
+    normalizeLineEndings(readFileSync(generatedPath, 'utf8')) === expected
+  ) {
+    return []
+  }
 
   return [
     {
@@ -224,6 +229,10 @@ function findFileViolation(cwd, filePath) {
 
 function toPosixPath(filePath) {
   return filePath.split(sep).join('/')
+}
+
+function normalizeLineEndings(source) {
+  return source.replace(/\r\n?/g, '\n')
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

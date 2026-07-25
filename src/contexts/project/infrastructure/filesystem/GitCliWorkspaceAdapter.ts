@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import type {
@@ -156,7 +157,8 @@ function parseBranchInspectionLine(
     return null
   }
 
-  const directory = worktreeDirectory?.trim() || null
+  const rawDirectory = worktreeDirectory?.trim()
+  const directory = rawDirectory ? resolve(rawDirectory) : null
   const worktree = worktrees.find(
     (candidate) => candidate.directory === directory || candidate.branchName === name
   )
@@ -189,7 +191,7 @@ function parseWorktreePorcelain(output: string): GitWorktreeInspection[] {
       flush()
     } else if (field.startsWith('worktree ')) {
       if (directory) flush()
-      directory = field.slice('worktree '.length)
+      directory = resolve(field.slice('worktree '.length))
     } else if (field.startsWith('branch refs/heads/')) {
       branchName = field.slice('branch refs/heads/'.length)
     } else if (field === 'locked' || field.startsWith('locked ')) {

@@ -56,9 +56,7 @@ export function TerminalMetadataForm({
     setExecutionDraft(draft)
   }
 
-  const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault()
-
+  const save = async (): Promise<void> => {
     if (!canSave || !executionValidation.config) return
 
     setIsSaving(true)
@@ -84,7 +82,16 @@ export function TerminalMetadataForm({
       className="terminal-metadata-form nodrag"
       aria-label={t('terminalForm.edit')}
       aria-busy={isSaving}
-      onSubmit={(event) => void save(event)}
+      onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        void save()
+      }}
+      onClickCapture={(event) => {
+        if (event.target instanceof Element && event.target.closest('button[type="submit"]')) {
+          event.preventDefault()
+          void save()
+        }
+      }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>

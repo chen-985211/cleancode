@@ -267,16 +267,35 @@ async function atomicWrite(path: string, contents: string): Promise<void> {
   }
   try {
     await rename(temporaryPath, path)
-    const directoryHandle = await open(dirname(path), 'r').catch(() => null)
-    try {
-      await directoryHandle?.sync()
-    } finally {
-      await directoryHandle?.close()
-    }
+    await syncDirectory(dirname(path))
   } catch (error) {
     await rm(temporaryPath, { force: true })
     throw error
   }
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  const directoryHandle = await open(path, 'r').catch((error: unknown) => {
+    if (isUnsupportedDirectorySyncError(error)) return null
+    throw error
+  })
+
+  try {
+    await directoryHandle?.sync()
+  } catch (error) {
+    if (!isUnsupportedDirectorySyncError(error)) throw error
+  } finally {
+    await directoryHandle?.close().catch(() => undefined)
+  }
+}
+
+function isUnsupportedDirectorySyncError(error: unknown): boolean {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : null
+
+  return code !== null && ['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM'].includes(code)
 }
 
 async function readCheckpoint(

@@ -26,6 +26,7 @@ vi.mock('node:net', async (importOriginal) => ({
 import {
   closeElectronApp,
   launchApp,
+  mergeE2eProcessEnvironment,
   readAuthenticatedTerminalProviderMetadata,
   teardownE2eScenario,
   waitForTextFile,
@@ -100,6 +101,13 @@ describe('E2E workbench lifecycle', () => {
     launchElectron.mockResolvedValue(electronApp)
 
     await expect(launchApp(workbench)).rejects.toBe(launchError)
+    expect(launchElectron).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({
+          CLEANCODE_TEST_DISABLE_SINGLE_INSTANCE_LOCK: '1'
+        })
+      })
+    )
     expect(order).toEqual([
       'start tracing',
       'verify background window',
@@ -108,6 +116,29 @@ describe('E2E workbench lifecycle', () => {
     ])
     expect(tracing.stop).toHaveBeenCalledWith({
       path: join(process.cwd(), 'test-results', 'e2e', '123-electron-launch-failure.zip')
+    })
+  })
+
+  it('keeps one canonical Windows Path entry and gives launch overrides precedence', () => {
+    const environment = mergeE2eProcessEnvironment(
+      { Path: 'C:\\Windows', TEMP: 'C:\\Temp' },
+      { PATH: 'C:\\fake-cli;C:\\Windows' },
+      'win32'
+    )
+
+    expect(Object.keys(environment).filter((name) => name.toLowerCase() === 'path')).toEqual([
+      'Path'
+    ])
+    expect(environment.Path).toBe('C:\\fake-cli;C:\\Windows')
+    expect(environment.TEMP).toBe('C:\\Temp')
+  })
+
+  it('preserves case-sensitive path variables outside Windows', () => {
+    expect(
+      mergeE2eProcessEnvironment({ Path: '/base' }, { PATH: '/override' }, 'linux')
+    ).toMatchObject({
+      Path: '/base',
+      PATH: '/override'
     })
   })
 
@@ -120,6 +151,28 @@ describe('E2E workbench lifecycle', () => {
         taskName: 'failed before setup'
       })
     ).resolves.toBeUndefined()
+  })
+
+  it('accepts a normal process exit when Playwright close never settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const electronProcess = createElectronProcess()
+      const electronApp = {
+        close: vi.fn(() => new Promise<never>(() => undefined)),
+        process: () => electronProcess
+      } as unknown as ElectronApplication
+      const closing = expect(closeElectronApp(electronApp)).resolves.toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(0)
+      electronProcess.exitCode = 0
+      electronProcess.emit('exit', 0, null)
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      await closing
+      expect(electronProcess.kill).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('does not force-kill a process while asserting a natural exit', async () => {

@@ -6,6 +6,7 @@ import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import type { ForegroundJobProcessIdentity } from '../../application/ports/TerminalProcessPort'
 import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
 
 export interface TerminalProviderMetadata {
@@ -45,6 +46,29 @@ interface LegacyProviderLaunchLockRecord {
 const providerLaunchLockInitializationGraceMs = 250
 const providerLaunchLockStaleAfterMs = 15_000
 
+export function matchesForegroundJob(
+  expected: ForegroundJobProcessIdentity,
+  actual: ForegroundJobProcessIdentity
+): boolean {
+  return (
+    expected.sessionId === actual.sessionId &&
+    expected.launchId === actual.launchId &&
+    expected.generation === actual.generation
+  )
+}
+
+export function isApplicationDetachReceipt(
+  value: unknown
+): value is { readonly releaseId: string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'releaseId' in value &&
+    typeof value.releaseId === 'string' &&
+    value.releaseId.length > 0
+  )
+}
+
 export async function readProviderMetadata(path: string): Promise<TerminalProviderMetadata | null> {
   try {
     const value: unknown = JSON.parse(await readFile(path, 'utf8'))
@@ -69,12 +93,7 @@ export async function atomicWriteProviderMetadata(
       await handle.close()
     }
     await rename(temporary, path)
-    const directoryHandle = await open(dirname(path), 'r').catch(() => null)
-    try {
-      await directoryHandle?.sync()
-    } finally {
-      await directoryHandle?.close()
-    }
+    await syncDirectory(dirname(path))
   } catch (error) {
     await rm(temporary, { force: true })
     throw error
@@ -193,6 +212,24 @@ function getNodeErrorCode(error: unknown): string | null {
     typeof error.code === 'string'
     ? error.code
     : null
+}
+
+async function syncDirectory(path: string): Promise<void> {
+  let directoryHandle: FileHandle | null = null
+
+  try {
+    directoryHandle = await open(path, 'r')
+    await directoryHandle.sync()
+  } catch (error) {
+    if (!isUnsupportedDirectorySyncError(error)) throw error
+  } finally {
+    await directoryHandle?.close().catch(() => undefined)
+  }
+}
+
+function isUnsupportedDirectorySyncError(error: unknown): boolean {
+  const code = getNodeErrorCode(error)
+  return code !== null && ['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM'].includes(code)
 }
 
 async function createLaunchLock(path: string): Promise<ProviderLaunchLockLease> {

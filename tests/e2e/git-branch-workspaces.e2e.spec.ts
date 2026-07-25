@@ -28,7 +28,10 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
-  e2eShellReadyMarker,
+  asE2eTerminalInput,
+  createE2eFileCommand,
+  createE2eNodeScriptCommand,
+  createE2eTerminalEnvironment,
   expectTerminalWorkingDirectory,
   readTerminalSessionId,
   waitForTerminalOutput,
@@ -68,7 +71,7 @@ describe('git branch workspaces e2e', () => {
     resources.workbench = workbench
     await initializeGitProject(workbench.projectDirectory)
     electronApp = await launchApp(workbench, {
-      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+      environment: createE2eTerminalEnvironment()
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -188,7 +191,11 @@ describe('git branch workspaces e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${terminalWorkspaceRetentionFixtureFileName}\r`
+        asE2eTerminalInput(
+          createE2eNodeScriptCommand(
+            join(featureWorktreeDirectory, terminalWorkspaceRetentionFixtureFileName)
+          )
+        )
       )
       await waitForTerminalOutput(page, 'Terminal 1', terminalWorkspaceRetentionLateMarker)
       const sessionId = await readTerminalSessionId(page, 'Terminal 1')
@@ -197,14 +204,22 @@ describe('git branch workspaces e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${terminalQueryFixtureFileName} ${visibleQueryReport}\r`
+        asE2eTerminalInput(
+          createE2eNodeScriptCommand(join(featureWorktreeDirectory, terminalQueryFixtureFileName), [
+            visibleQueryReport
+          ])
+        )
       )
       const visibleQuery = JSON.parse(await waitForTextFile(visibleQueryReport)) as {
         readonly count: number
         readonly backgroundCount: number
         readonly backgroundResponses: readonly string[]
       }
-      expect(visibleQuery).toMatchObject({ count: 1, backgroundCount: 1 })
+      const expectedBackgroundCount = process.platform === 'win32' ? 0 : 1
+      expect(visibleQuery).toMatchObject({
+        count: 1,
+        backgroundCount: expectedBackgroundCount
+      })
       const terminalSurfaceToken = '__TERMINAL_SURFACE_INSTANCE__'
       await markTerminalSurface(page, sessionId, terminalSurfaceToken)
 
@@ -220,30 +235,44 @@ describe('git branch workspaces e2e', () => {
 
       const hiddenOutputMarker = '__TERMINAL_HIDDEN_WORKSPACE_OUTPUT__'
       const hiddenOutputReport = join(featureWorktreeDirectory, 'hidden-output-report.txt')
+      const hiddenOutputInput = asE2eTerminalInput(
+        createE2eFileCommand({
+          files: { [hiddenOutputReport]: 'done' },
+          output: hiddenOutputMarker
+        })
+      )
       await page.evaluate(
-        ({ hiddenOutputMarker, sessionId }) =>
+        ({ hiddenOutputInput, sessionId }) =>
           window.cleancode?.writeTerminal({
             sessionId,
-            input: `printf '${hiddenOutputMarker}\\n'; printf done > hidden-output-report.txt\r`
+            input: hiddenOutputInput
           }),
-        { hiddenOutputMarker, sessionId }
+        { hiddenOutputInput, sessionId }
       )
       expect(await waitForTextFile(hiddenOutputReport)).toBe('done')
       const hiddenQueryReport = join(featureWorktreeDirectory, 'hidden-query-report.json')
+      const hiddenQueryInput = asE2eTerminalInput(
+        createE2eNodeScriptCommand(join(featureWorktreeDirectory, terminalQueryFixtureFileName), [
+          hiddenQueryReport
+        ])
+      )
       await page.evaluate(
-        ({ hiddenQueryReport, queryFixtureFileName, sessionId }) =>
+        ({ hiddenQueryInput, sessionId }) =>
           window.cleancode?.writeTerminal({
             sessionId,
-            input: `node ${queryFixtureFileName} ${hiddenQueryReport}\r`
+            input: hiddenQueryInput
           }),
-        { hiddenQueryReport, queryFixtureFileName: terminalQueryFixtureFileName, sessionId }
+        { hiddenQueryInput, sessionId }
       )
       const hiddenQuery = JSON.parse(await waitForTextFile(hiddenQueryReport)) as {
         readonly count: number
         readonly backgroundCount: number
         readonly backgroundResponses: readonly string[]
       }
-      expect(hiddenQuery).toMatchObject({ count: 1, backgroundCount: 1 })
+      expect(hiddenQuery).toMatchObject({
+        count: 1,
+        backgroundCount: expectedBackgroundCount
+      })
       expect(hiddenQuery.backgroundResponses).toEqual(visibleQuery.backgroundResponses)
 
       await featureWorkspace.click()

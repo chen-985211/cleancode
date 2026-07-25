@@ -175,6 +175,39 @@ describe('Agent shared terminal view', () => {
     }
   })
 
+  it('retries a transient stale-scope failure while attaching an Agent terminal view', async () => {
+    const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
+    const attachTerminalView = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Terminal view scope is still starting.'), {
+          code: 'RUN_SCOPE_STALE',
+          isExpected: true
+        })
+      )
+      .mockImplementationOnce(async (command) => createSnapshot(command.viewId))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi(),
+        attachTerminalView,
+        detachTerminalView: vi.fn(async () => undefined)
+      }
+    })
+
+    const view = render(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness session={createSession()} />
+      </TerminalSurfaceRegistryProvider>
+    )
+
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
+    expect(terminalViewMockState.surfaces[0]?.restore).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'restored output' })
+    )
+    view.unmount()
+  })
+
   it('measures the visible grid before an Agent terminal identity exists', () => {
     const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
     const onDimensionsChange = vi.fn()

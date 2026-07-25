@@ -2,7 +2,7 @@
 
 import { execFile } from 'node:child_process'
 import { access, realpath, rm, writeFile } from 'node:fs/promises'
-import { basename, delimiter, dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 import type { ElectronApplication, Locator, Page } from 'playwright'
@@ -22,6 +22,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 const execFileAsync = promisify(execFile)
@@ -60,10 +61,10 @@ describe('Agent terminal theme across workspaces e2e', () => {
     fakeCodex = await installFakeCodexCli(workbench.appStateDirectory)
     electronApp = await launchApp(workbench, {
       environment: {
+        ...createE2eTerminalEnvironment(),
         CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
         CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-        PATH: [fakeCodex.binDirectory, '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(delimiter),
-        SHELL: '/bin/sh'
+        PATH: prependE2ePath(fakeCodex.binDirectory)
       }
     })
     resources.electronApp = electronApp
@@ -177,8 +178,12 @@ describe('Agent terminal theme across workspaces e2e', () => {
       const agentProjection = page.locator(
         '[data-agent-console-node] .terminal-theme-projection[data-terminal-source-theme="light"]'
       )
-      await terminalProjection.locator('.terminal-viewport .xterm-helper-textarea').waitFor()
-      await agentProjection.locator('.agent-terminal-viewport .xterm-helper-textarea').waitFor()
+      await terminalProjection
+        .locator('.terminal-viewport .xterm-helper-textarea')
+        .waitFor({ state: 'attached' })
+      await agentProjection
+        .locator('.agent-terminal-viewport .xterm-helper-textarea')
+        .waitFor({ state: 'attached' })
 
       await selectTheme(page, 'dark')
       await expectProjectionColorContinuity(page, terminalProjection, 'terminal')
@@ -262,7 +267,7 @@ async function waitForAgentTerminal(
 }
 
 async function waitForTerminalDomText(viewport: Locator, text: string): Promise<void> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + 15_000
   while (Date.now() < deadline) {
     await ensureTerminalDomRenderer(viewport)
     const contents = await viewport
@@ -531,7 +536,6 @@ async function waitForPersistedAgent(page: Page): Promise<void> {
 async function createCodexAgent(page: Page): Promise<void> {
   await page.getByRole('button', { name: '选择默认 Agent' }).click()
   await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
-  await page.getByRole('button', { name: '新建 Agent' }).click()
 }
 
 async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {

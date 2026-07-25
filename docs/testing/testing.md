@@ -95,6 +95,8 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
+`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、国际化、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争，但不减少任何测试文件。
+
 国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
 
 主题静态门禁必须通过 `pnpm check:theme` 执行。除禁止生产 UI 在集中主题文件外写入颜色字面量外，它还必须校验由主题 CSS 确定性生成、供 Run 与 Presentation 共用的 canonical terminal palette，并拒绝缺失或陈旧生成物；显式生成入口是 `node scripts/check-theme.mjs --write-terminal-palette`，`tests/unit/support/check-theme.spec.ts` 使用生成、陈旧和合法 fixture 锁定边界。
@@ -115,23 +117,23 @@ pnpm test:e2e:smoke
 
 底层测试必须先失败先反馈。`smoke` 标签只允许用于少量关键跨上下文主路径，不能把边界分支、视觉细节或历史重复测试重新带回本地快速门禁。
 
-`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`。完整 Electron E2E 由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在相关 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时也必须使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
+`pnpm test:full` 按相同顺序运行 unit、integration、contract 和完整 `pnpm test:e2e`。完整 Electron E2E 由 [Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个 Pull Request 和 `main` 分支上执行；发布前或排查整套交互时也必须使用 `pnpm test:full`。CI 可以把完整 E2E 分到独立 runner，但每个 runner 内仍必须串行执行，不能让系统剪贴板、端口或 Electron profile 在同一环境中竞争。
 
 任何新增测试类型、调整测试目录或改变快速/完整门禁时，都必须同步维护 `package.json`、对应 CI workflow 和本文档。
 
 开发协作 AI 在最终说明中必须说明新增或更新了哪些测试、运行了哪些测试，以及是否存在未覆盖风险。
 
-### Agent terminal 跨平台门禁
+### 全量跨平台门禁
 
-Agent 基础终端能力的支持矩阵是 macOS、Linux 和 Windows，平台条件分支或在其他系统上生成 PowerShell 文本不算 Windows 验收。修改 Agent Provider 检测、前台任务 shell 控制、node-pty、`Ctrl+C`、launch/terminal 退出边界或相关临时资源时，[Agent terminal platforms workflow](../../.github/workflows/agent-terminal-platform.yml)必须在三个原生 runner 上通过：
+桌面应用的支持矩阵是 macOS、Linux 和 Windows，平台条件分支或在其他系统上生成 PowerShell 文本不算 Windows 验收。[Full cross-platform quality workflow](../../.github/workflows/agent-terminal-platform.yml) 不使用路径过滤，每个 Pull Request 和 `main` 都必须在三个原生 runner 上执行 `pnpm check:quality`、全部 unit/integration/contract 和 `pnpm build`：
 
-| Runner         | 原生边界                     | 必须证明                                                                |
-| -------------- | ---------------------------- | ----------------------------------------------------------------------- |
-| macOS latest   | node-pty + POSIX PTY/shell   | 结构化 argv/environment、`Ctrl+C`、launch 退出、第二次启动和 shell 可写 |
-| Ubuntu latest  | node-pty + POSIX PTY/shell   | 与 macOS 相同，防止实现隐式依赖 Darwin                                  |
-| Windows latest | node-pty + ConPTY/PowerShell | npm `.cmd` CLI 检测、`Ctrl+C`、退出码、第二次启动和外层 PowerShell 可写 |
+| Runner       | 原生边界                     | 必须证明                                                                                     |
+| ------------ | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| macOS 15     | node-pty + POSIX PTY/shell   | 全量静态与低层测试、构建、前台任务、端口所有权和 Electron 主路径                             |
+| Ubuntu 24.04 | node-pty + POSIX PTY/shell   | 与 macOS 相同，并使用 Linux `/proc` 证明监听 PID 和进程祖先关系                              |
+| Windows 2025 | node-pty + ConPTY/PowerShell | 全量静态与低层测试、构建、npm `.cmd` CLI、`Ctrl+C`、退出码、端口所有权和外层 PowerShell 可写 |
 
-三条 runner 都必须执行相关 unit 回归、TypeScript 检查和 `pnpm build`；Windows 还必须真实运行 `tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts` 和 `tests/integration/contexts/run/run.windows-agent-pty.spec.ts`。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
+[Electron E2E workflow](../../.github/workflows/e2e.yml) 在每个平台分别构建原生产物，再运行三个独立 shard，共九个 E2E 任务。Linux 通过 Xvfb 提供真实显示服务器；Windows 使用 PowerShell/ConPTY 和 `.cmd` fixture；每个 shard 内关闭文件并行和自动重试。某个平台 runner 未执行或失败时，最终报告必须写为“该平台未验收”，不得以模拟测试或另外两个平台通过宣告跨平台完成。
 
 ## 标准目录结构
 
@@ -254,9 +256,9 @@ Electron E2E 必须使用确定性同步条件，不得以固定时长的 `waitF
 
 普通终端跨应用恢复主路径由 `terminal-runtime-recovery.e2e.spec.ts` 代表性覆盖正常退出重开、renderer/main/Provider 故障和多终端自然退出。它必须保留在真实 Electron E2E，因为低层测试不能证明 detached Provider、Electron 生命周期、preload/renderer 对账、真实 PTY 连续输入、精确会话身份和可写 live/只读 history 交互的组合；永久关闭、项目清理、工作流保留限制、启动锁回收、checkpoint 边界、协议、损坏数据、监听所有权和容量分支继续下沉到 unit/integration。
 
-单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 分片必须由独立 build job 生成同一份不可变 `out` artifact；分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
+单次本地 Electron E2E 调用只允许在全局 setup 中构建一次产物，测试文件不得各自重复构建。CI 必须在 macOS、Linux 和 Windows 分别生成该系统的不可变 `out` artifact；同一系统的三个 shard 共享对应 artifact，不能跨系统复用 Electron 或 node-pty 产物。分片仅可在显式预构建模式下跳过构建，并在启动测试前 fail closed 校验 main、preload 和 renderer 入口均存在。场景之间仍必须使用独立 Electron 进程、项目目录和应用状态目录，并在清理时等待 Electron 进程退出。跨应用终端场景还必须通过认证 health/instance 证据定位并停止该场景的 Provider；不得只凭 metadata PID 清理，也不得把 Provider 留给后续场景。
 
-`pnpm test:e2e:smoke` 只运行带 `smoke` 标签的关键路径；`pnpm test:e2e` 运行完整套件。两者默认使用屏幕外非激活的真实 Electron `BrowserWindow`，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux 仍需要可用的显示服务器。
+`pnpm test:e2e:smoke` 只运行带 `smoke` 标签的关键路径；`pnpm test:e2e` 运行完整套件。两者默认使用屏幕外非激活的真实 Electron `BrowserWindow`，并校验窗口已经显示、未获得焦点且不与任何显示器边界相交。窗口必须在 renderer 就绪后通过 `showInactive()` 显示，E2E 模式必须关闭 renderer 后台节流；macOS 保持正常应用激活策略和 Dock 图标行为。该模式必须保留真实 renderer、GPU、IPC、PTY、页面几何、截图和 trace，不得替换为纯 Chromium headless 或通过禁用 GPU 改变被测运行时。Linux CI 使用 Xvfb 提供显示服务器。跨平台终端场景必须使用 `tests/support/e2eTerminal.ts` 的平台 shell、PATH 和 Node 命令生成器，不得在通用 spec 中直接写 `/bin/sh`、`printf`、`pwd` 或 Unix shebang 假设。
 
 `pnpm test:e2e:visible` 使用相同构建产物、启动支撑和测试套件，仅显式显示 Electron 窗口用于诊断。只有必须验证系统焦点、原生对话框、原生菜单或操作系统级输入的个别场景，才应通过该入口定向运行；这类场景不得迫使默认套件切回前台。系统剪贴板不要求窗口可见，但测试必须在 `finally` 中恢复原值，且不得与其他剪贴板写入场景并行执行。
 

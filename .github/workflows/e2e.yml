@@ -2,30 +2,8 @@ name: Electron E2E
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/e2e.yml'
-      - 'electron.vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'src/**'
-      - 'tests/e2e/**'
-      - 'tests/fixtures/**'
-      - 'tests/support/**'
-      - 'tsconfig.json'
-      - 'vitest.e2e.config.ts'
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/e2e.yml'
-      - 'electron.vite.config.ts'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'src/**'
-      - 'tests/e2e/**'
-      - 'tests/fixtures/**'
-      - 'tests/support/**'
-      - 'tsconfig.json'
-      - 'vitest.e2e.config.ts'
   workflow_dispatch:
 
 permissions:
@@ -37,9 +15,19 @@ concurrency:
 
 jobs:
   build:
-    name: Build Electron application
-    runs-on: macos-latest
+    name: Build Electron / ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            os: ubuntu-24.04
+          - id: macos
+            os: macos-15
+          - id: windows
+            os: windows-2025
 
     steps:
       - uses: actions/checkout@v6
@@ -53,23 +41,82 @@ jobs:
           node-version: 24
 
       - run: pnpm install --frozen-lockfile
+      - name: Install Electron binary with retry
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js; then
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                if test -x node_modules/electron/dist/electron; then
+                  exit 0
+                fi
+              elif pnpm exec electron --version; then
+                exit 0
+              fi
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
       - run: pnpm exec electron-vite build
+      - name: Package Electron binary
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -c -k --sequesterRsrc --keepParent \
+              node_modules/electron/dist electron-e2e-runtime-${{ matrix.id }}.zip
+            cp node_modules/electron/path.txt electron-e2e-path-${{ matrix.id }}.txt
+          else
+            tar -czf electron-e2e-runtime-${{ matrix.id }}.tgz \
+              -C node_modules/electron \
+              dist \
+              path.txt
+          fi
       - uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
-          name: electron-e2e-application
-          path: out
+          name: electron-e2e-application-${{ matrix.id }}
+          path: |
+            out
+            electron-e2e-runtime-${{ matrix.id }}.*
+            electron-e2e-path-${{ matrix.id }}.txt
           retention-days: 1
 
   e2e:
-    name: Electron E2E / shard ${{ matrix.shard }}
+    name: Electron E2E / ${{ matrix.id }} / shard ${{ matrix.shard }}
     needs: build
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        include:
+          - id: linux
+            os: ubuntu-24.04
+            shard: 1
+          - id: macos
+            os: macos-15
+            shard: 1
+          - id: windows
+            os: windows-2025
+            shard: 1
+          - id: linux
+            os: ubuntu-24.04
+            shard: 2
+          - id: macos
+            os: macos-15
+            shard: 2
+          - id: windows
+            os: windows-2025
+            shard: 2
+          - id: linux
+            os: ubuntu-24.04
+            shard: 3
+          - id: macos
+            os: macos-15
+            shard: 3
+          - id: windows
+            os: windows-2025
+            shard: 3
 
     steps:
       - uses: actions/checkout@v6
@@ -82,12 +129,42 @@ jobs:
           cache: pnpm
           node-version: 24
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies without downloading Electron again
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v8
         with:
-          name: electron-e2e-application
-          path: out
+          name: electron-e2e-application-${{ matrix.id }}
+          path: .
+      - name: Restore prebuilt Electron binary
+        shell: bash
+        run: |
+          electron_package_directory=$(cd node_modules/electron && pwd -P)
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -x -k \
+              electron-e2e-runtime-${{ matrix.id }}.zip "$electron_package_directory"
+            cp electron-e2e-path-${{ matrix.id }}.txt "$electron_package_directory/path.txt"
+            rm electron-e2e-runtime-${{ matrix.id }}.zip
+            rm electron-e2e-path-${{ matrix.id }}.txt
+            pnpm exec electron --version
+          else
+            tar -C "$electron_package_directory" \
+              -xzf electron-e2e-runtime-${{ matrix.id }}.tgz
+            rm electron-e2e-runtime-${{ matrix.id }}.tgz
+          fi
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            test -x node_modules/electron/dist/electron
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            pnpm exec electron --version
+          fi
+      - name: Run E2E shard on Linux
+        if: runner.os == 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: xvfb-run --auto-servernum pnpm test:e2e --shard=${{ matrix.shard }}/3
       - name: Run E2E shard
+        if: runner.os != 'Linux'
         env:
           CLEANCODE_E2E_PREBUILT: '1'
         run: pnpm test:e2e --shard=${{ matrix.shard }}/3
@@ -97,6 +174,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           if-no-files-found: ignore
-          name: electron-e2e-diagnostics-${{ matrix.shard }}
+          name: electron-e2e-diagnostics-${{ matrix.id }}-${{ matrix.shard }}
           path: test-results/e2e
           retention-days: 7

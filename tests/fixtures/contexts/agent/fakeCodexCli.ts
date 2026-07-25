@@ -18,11 +18,24 @@ export async function installFakeCodexCli(appStateDirectory: string): Promise<Fa
   const fixtureDirectory = join(appStateDirectory, 'fake-codex-cli')
   const binDirectory = join(fixtureDirectory, 'bin')
   const reportPath = join(fixtureDirectory, 'reports.jsonl')
-  const executablePath = join(binDirectory, 'codex')
+  const programPath = join(fixtureDirectory, 'codex.mjs')
 
   await mkdir(binDirectory, { recursive: true })
-  await writeFile(executablePath, createFakeCodexProgram(), 'utf8')
-  await chmod(executablePath, 0o755)
+  await writeFile(programPath, createFakeCodexProgram(), 'utf8')
+  if (process.platform === 'win32') {
+    await Promise.all([
+      writeFile(join(binDirectory, 'codex.cmd'), createWindowsCmdLauncher(programPath), 'utf8'),
+      writeFile(
+        join(binDirectory, 'codex.ps1'),
+        createWindowsPowerShellLauncher(programPath),
+        'utf8'
+      )
+    ])
+  } else {
+    const executablePath = join(binDirectory, 'codex')
+    await writeFile(executablePath, createPosixNodeCliLauncher(programPath), 'utf8')
+    await chmod(executablePath, 0o755)
+  }
 
   return { binDirectory, reportPath }
 }
@@ -47,8 +60,7 @@ export async function readFakeCodexCliReports(
 }
 
 function createFakeCodexProgram(): string {
-  return `#!${process.execPath}
-import { appendFileSync } from 'node:fs'
+  return `import { appendFileSync } from 'node:fs'
 
 const CSI = '\\x1b['
 const OSC = '\\x1b]'
@@ -101,7 +113,7 @@ function draw() {
     process.pid +
     CSI +
     '0m'
-  output += (CSI + '2;1H').repeat(1_600)
+  output += (CSI + '2;1H').repeat(process.platform === 'win32' ? 128 : 1_600)
   process.stdout.write(output)
   report('draw')
 }
@@ -156,8 +168,40 @@ process.stdin.on('data', (data) => {
 process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)
 process.on('SIGTERM', exitCleanly)
-process.stdout.write(OSC + '11;?' + '\\x07')
+const colorFgBg = process.env.COLORFGBG
+if (process.platform === 'win32' && colorFgBg === '0;15') {
+  sourceTheme = 'light'
+} else if (process.platform === 'win32' && colorFgBg === '15;0') {
+  sourceTheme = 'dark'
+}
+
+if (sourceTheme) {
+  report('session')
+  draw()
+} else {
+  process.stdout.write(OSC + '11;?' + '\\x07')
+}
 `
+}
+
+function createWindowsCmdLauncher(programPath: string): string {
+  return `@echo off\r\n"${process.execPath}" "${programPath}" %*\r\n`
+}
+
+function createWindowsPowerShellLauncher(programPath: string): string {
+  return `& ${quotePowerShellWord(process.execPath)} ${quotePowerShellWord(programPath)} @args\nexit $LASTEXITCODE\n`
+}
+
+function createPosixNodeCliLauncher(programPath: string): string {
+  return `#!/bin/sh\nexec ${quotePosixWord(process.execPath)} ${quotePosixWord(programPath)} "$@"\n`
+}
+
+function quotePosixWord(value: string): string {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`
+}
+
+function quotePowerShellWord(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
 }
 
 function isMissingFileError(error: unknown): boolean {

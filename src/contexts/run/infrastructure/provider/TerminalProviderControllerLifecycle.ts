@@ -13,6 +13,7 @@ interface TerminalProviderControllerLifecycleOptions {
   readonly createRelease: (releaseId: string) => Promise<TerminalProviderApplicationDetachResult>
   readonly hasLiveSessions: () => boolean
   readonly hasUnsafeLiveSessions: () => boolean
+  readonly isProcessAlive: (processId: number) => boolean
   readonly log?: (message: string, details?: Readonly<Record<string, unknown>>) => void
   readonly onClaim: () => void
   readonly onIdleWithoutLiveSessions: () => void
@@ -43,6 +44,14 @@ export class TerminalProviderControllerLifecycle {
     if (this.stateValue.kind === 'active') {
       if (this.stateValue.socket === socket && this.stateValue.controllerId === controllerId) {
         return { controllerLeaseId: this.stateValue.controllerLeaseId }
+      }
+      if (
+        this.stateValue.socket.destroyed ||
+        this.stateValue.processId === processId ||
+        !this.options.isProcessAlive(this.stateValue.processId)
+      ) {
+        const release = this.beginRelease('unexpected-disconnect')
+        if (release) this.completeAfterDisconnect(release)
       }
       throw controllerBusy()
     }

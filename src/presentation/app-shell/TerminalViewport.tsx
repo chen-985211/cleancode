@@ -21,6 +21,7 @@ import {
 } from './terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
 import { readTerminalSourceTheme } from './terminalTheme'
+import { attachTerminalViewWithRetry } from './terminalViewAttachment'
 import type { TerminalDimensions, TerminalViewState } from './types'
 import { useI18n } from './i18n/useI18n'
 import {
@@ -288,9 +289,12 @@ export function TerminalViewport({
           if (isReleased) return
           const snapshot =
             runIdentity && lease && api?.attachTerminalView
-              ? await api.attachTerminalView({ ...runIdentity, viewId: lease.viewId })
+              ? await attachTerminalViewWithRetry({
+                  attach: () => api.attachTerminalView!({ ...runIdentity, viewId: lease.viewId }),
+                  isCancelled: () => isReleased
+                })
               : createFallbackSnapshot(runIdentity, outputTailRef.current)
-          if (isReleased) return
+          if (isReleased || !snapshot) return
           if (lease && api?.attachTerminalView && snapshot.restoreMarker.viewId !== lease.viewId) {
             return
           }

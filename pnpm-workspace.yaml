@@ -3,3 +3,4 @@ allowBuilds:
   node-pty: true
 patchedDependencies:
   '@xterm/xterm@6.0.0': patches/@xterm__xterm@6.0.0.patch
+  node-pty@1.1.0: patches/node-pty@1.1.0.patch

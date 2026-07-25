@@ -110,6 +110,7 @@ export class TerminalProviderServer {
       },
       hasLiveSessions: () => hasLiveProviderSessions(this.sessions.values()),
       hasUnsafeLiveSessions: () => hasUnsafeLiveProviderSessions(this.sessions.values()),
+      isProcessAlive: isControllerProcessAlive,
       log: (message, details) => this.log(message, details),
       onClaim: () => this.prepareControllerClaim(),
       onIdleWithoutLiveSessions: () => this.scheduleExit()
@@ -606,5 +607,14 @@ export class TerminalProviderServer {
 
   private log(message: string, details: Readonly<Record<string, unknown>> = {}): void {
     this.options.log?.(message, details)
+  }
+}
+
+function isControllerProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0)
+    return true
+  } catch {
+    return false
   }
 }

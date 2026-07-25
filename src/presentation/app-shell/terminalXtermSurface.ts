@@ -288,6 +288,9 @@ class XtermTerminalSurface implements TerminalSurface {
       this.isWriteInFlight = false
       this.expectedSequence = output.sequence
       this.resolveIdleWaiters()
+      if (this.pendingOutputs.length === 0 && this.searchQuery) {
+        this.find(this.searchQuery, 'incremental')
+      }
       this.drainPendingOutputs()
     })
   }

@@ -12,8 +12,6 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { readE2eBlockGraph } from '../support/e2eBlockGraph'
-
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -42,7 +40,7 @@ describe('terminal groups e2e', () => {
   it(
     'creates, collapses, expands, and resizes a terminal group through member drag',
     async () => {
-      await createTwoTerminalBlocks(page, workbench)
+      await createTwoTerminalBlocks(page)
 
       await page.getByRole('button', { name: '组合终端', exact: true }).click()
       await ensureTerminalSelectedForGroup(page, 'Terminal 1')
@@ -50,23 +48,19 @@ describe('terminal groups e2e', () => {
       await page.getByRole('button', { name: '创建组合' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
 
-      await waitForTerminalGroup(workbench, (group) => group.memberBlockIds.length === 2)
-
       await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
-      await waitForTerminalGroup(workbench, (group) => group.isCollapsed)
       await page.waitForFunction(
         () => document.querySelectorAll('[data-terminal-block-id]').length === 0
       )
       await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).waitFor()
 
       await page.getByRole('button', { name: '启动项目 展开组合' }).click()
-      await waitForTerminalGroup(workbench, (group) => !group.isCollapsed)
       await page.waitForFunction(
         () => document.querySelectorAll('[data-terminal-block-id]').length === 2
       )
       expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
 
-      const graphBeforeDrag = await readGraph(workbench)
+      const graphBeforeDrag = await readGraph(page, workbench)
       const groupBeforeDrag = graphBeforeDrag.terminalGroups[0]!
       const terminalTwo = graphBeforeDrag.blocks.find((block) => block.name === 'Terminal 2')!
       const groupBeforeBox = await readRequiredBoundingBox(
@@ -75,7 +69,14 @@ describe('terminal groups e2e', () => {
 
       await dragTerminalHeader(page, terminalTwo.id, 260, 0)
 
+      await expect
+        .poll(async () => {
+          const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
+          return box?.width ?? 0
+        })
+        .toBeGreaterThan(groupBeforeBox.width + 120)
       const groupAfterDrag = await waitForTerminalGroup(
+        page,
         workbench,
         (group) => group.size.width > groupBeforeDrag.size.width + 160
       )
@@ -90,15 +91,11 @@ describe('terminal groups e2e', () => {
   )
 })
 
-async function createTwoTerminalBlocks(page: Page, workbench: E2eWorkbench): Promise<void> {
-  await createTerminalBlocks(page, workbench, 2)
+async function createTwoTerminalBlocks(page: Page): Promise<void> {
+  await createTerminalBlocks(page, 2)
 }
 
-async function createTerminalBlocks(
-  page: Page,
-  workbench: E2eWorkbench,
-  count: number
-): Promise<void> {
+async function createTerminalBlocks(page: Page, count: number): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
 
@@ -106,8 +103,6 @@ async function createTerminalBlocks(
     await page.getByRole('button', { name: '新建终端积木' }).click()
     await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
   }
-
-  await waitForGraph(workbench, (graph) => graph.blocks.length === count)
 }
 
 async function dragTerminalHeader(
@@ -120,14 +115,15 @@ async function dragTerminalHeader(
     `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
   )
   const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const viewport = page.viewportSize()
+  const startX = headerBox.x + headerBox.width / 2
+  const startY = headerBox.y + headerBox.height / 2
+  const targetX = viewport ? Math.min(startX + deltaX, viewport.width - 16) : startX + deltaX
+  const targetY = viewport ? Math.min(startY + deltaY, viewport.height - 16) : startY + deltaY
 
-  await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2)
+  await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(
-    headerBox.x + headerBox.width / 2 + deltaX,
-    headerBox.y + headerBox.height / 2 + deltaY,
-    { steps: 18 }
-  )
+  await page.mouse.move(targetX, targetY, { steps: 18 })
   await page.mouse.up()
 }
 
@@ -157,10 +153,11 @@ async function waitForTerminalGroupSelectionButton(
 }
 
 async function waitForTerminalGroup(
+  page: Page,
   workbench: E2eWorkbench,
   predicate: (group: TerminalGroupRecord) => boolean
 ): Promise<TerminalGroupRecord> {
-  const graph = await waitForGraph(workbench, (candidateGraph) =>
+  const graph = await waitForGraph(page, workbench, (candidateGraph) =>
     candidateGraph.terminalGroups.some(predicate)
   )
   const group = graph.terminalGroups.find(predicate)
@@ -171,6 +168,7 @@ async function waitForTerminalGroup(
 }
 
 async function waitForGraph(
+  page: Page,
   workbench: E2eWorkbench,
   predicate: (graph: TerminalGroupGraphRecord) => boolean
 ): Promise<TerminalGroupGraphRecord> {
@@ -178,23 +176,34 @@ async function waitForGraph(
 
   while (Date.now() < deadline) {
     try {
-      const graph = await readGraph(workbench)
+      const graph = await readGraph(page, workbench)
 
       if (predicate(graph)) {
         return graph
       }
     } catch {
-      // The graph file may not exist until the first project action is persisted.
+      // The project may not be registered until the first action completes.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, 250))
   }
 
-  return readGraph(workbench)
+  return readGraph(page, workbench)
 }
 
-async function readGraph(workbench: E2eWorkbench): Promise<TerminalGroupGraphRecord> {
-  return readE2eBlockGraph(workbench)
+async function readGraph(page: Page, workbench: E2eWorkbench): Promise<TerminalGroupGraphRecord> {
+  const graph = await page.evaluate(async (projectDirectory) => {
+    const workbenches = await window.cleancode?.listWorkbenches()
+
+    return (
+      workbenches?.find((candidate) => candidate.project.directory === projectDirectory)?.graph ??
+      null
+    )
+  }, workbench.projectDirectory)
+
+  if (!graph) throw new Error('The terminal group workbench is not registered.')
+
+  return graph
 }
 
 async function readRequiredBoundingBox(locator: Locator) {

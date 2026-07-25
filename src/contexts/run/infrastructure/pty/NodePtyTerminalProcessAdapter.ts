@@ -30,11 +30,20 @@ import {
   supportsForegroundJobShell,
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
+import { interruptWindowsForegroundJob } from './WindowsForegroundJobInterrupt'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
 const TERMINATION_GRACE_MS = 500
 const TERMINATION_FORCE_MS = 1_500
+const WINDOWS_AGENT_SHELL_READY_TIMEOUT_MS = 5_000
+const WINDOWS_AGENT_SHELL_READY_MARKER = '\x1b]633;CLEANCODE_SHELL_READY\x07'
+const WINDOWS_AGENT_SHELL_READY_COMMAND = [
+  'function global:prompt {',
+  "[Console]::Write(([char]27) + ']633;CLEANCODE_SHELL_READY' + ([char]7));",
+  "return 'PS ' + $executionContext.SessionState.Path.CurrentLocation + '> '",
+  '}'
+].join(' ')
 
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
@@ -43,7 +52,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     ensureNodePtySpawnHelperIsExecutable()
 
     const shell = command.shell || getDefaultShell()
-    const launch = createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
+    const shouldWaitForWindowsAgentShell =
+      platform() === 'win32' &&
+      command.scope.owner?.kind === 'agent' &&
+      !command.launchCommand &&
+      supportsForegroundJobShell('win32', shell)
+    const launch = shouldWaitForWindowsAgentShell
+      ? createTerminalProcessLaunch(shell, WINDOWS_AGENT_SHELL_READY_COMMAND, 'interactive')
+      : createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
     const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
       name: terminalEmulationName,
       cols: command.columns,
@@ -56,34 +72,72 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     const exited = new Promise<void>((resolve) => {
       resolveExit = resolve
     })
+    let resolveWindowsAgentShellReady: () => void = () => undefined
+    let rejectWindowsAgentShellReady: (error: Error) => void = () => undefined
+    const windowsAgentShellReady = shouldWaitForWindowsAgentShell
+      ? new Promise<void>((resolve, reject) => {
+          resolveWindowsAgentShellReady = resolve
+          rejectWindowsAgentShellReady = reject
+        })
+      : null
+    let windowsAgentShellStartupOutput = ''
+    let hasWindowsAgentShellBecomeReady = !shouldWaitForWindowsAgentShell
     const managedProcess: ManagedTerminalProcess = {
       foregroundJob: null,
+      foregroundJobInterruptPromise: null,
+      hasObservedShellOutput: false,
+      pendingForegroundProbe: null,
       process: ptyProcess,
       shell,
       scope: command.scope,
       terminalSourceTheme: command.terminalSourceTheme ?? 'dark',
       exited,
-      stopPromise: null
+      stopPromise: null,
+      workingDirectory: command.workingDirectory
     }
     this.processes.set(command.scope.sessionId, managedProcess)
     ptyProcess.onData((data) => {
+      if (windowsAgentShellReady && !hasWindowsAgentShellBecomeReady) {
+        const startupOutput = windowsAgentShellStartupOutput + data
+        if (startupOutput.includes(WINDOWS_AGENT_SHELL_READY_MARKER)) {
+          hasWindowsAgentShellBecomeReady = true
+          resolveWindowsAgentShellReady()
+        }
+        windowsAgentShellStartupOutput = startupOutput.slice(
+          -(WINDOWS_AGENT_SHELL_READY_MARKER.length - 1)
+        )
+      }
+      managedProcess.hasObservedShellOutput = true
+      const pendingForegroundProbe = managedProcess.pendingForegroundProbe
+      managedProcess.pendingForegroundProbe = null
       const output = managedProcess.foregroundJob
         ? acceptForegroundJobOutput(managedProcess.foregroundJob, data, {
             onStarted: (identity) => managedProcess.foregroundJob?.command.onStarted(identity),
             onExit: (event) => {
               const control = managedProcess.foregroundJob
               if (!control) return
-              managedProcess.foregroundJob = null
-              disposeForegroundJobShellControl(control)
-              control.command.onExit(event)
+              setImmediate(() => {
+                if (managedProcess.foregroundJob !== control) return
+                managedProcess.foregroundJob = null
+                disposeForegroundJobShellControl(control)
+                control.command.onExit(event)
+              })
             }
           })
         : data
       if (output) {
         command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data: output })
       }
+      if (pendingForegroundProbe && managedProcess.foregroundJob) {
+        managedProcess.process.write(pendingForegroundProbe)
+      }
     })
     ptyProcess.onExit((event) => {
+      if (!hasWindowsAgentShellBecomeReady) {
+        rejectWindowsAgentShellReady(
+          new Error('Windows Agent shell exited before its interactive prompt became ready.')
+        )
+      }
       if (this.processes.get(command.scope.sessionId) === managedProcess) {
         this.processes.delete(command.scope.sessionId)
       }
@@ -102,6 +156,19 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       })
     })
 
+    if (windowsAgentShellReady) {
+      try {
+        await waitForPromise(
+          windowsAgentShellReady,
+          WINDOWS_AGENT_SHELL_READY_TIMEOUT_MS,
+          'Windows Agent shell did not become ready for interactive input.'
+        )
+      } catch (error) {
+        await stopManagedProcess(managedProcess).catch(() => undefined)
+        throw error
+      }
+    }
+
     return {
       processId: ptyProcess.pid
     }
@@ -110,6 +177,10 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   write(sessionId: string, input: string): void {
     const terminalProcess = this.requireProcess(sessionId)
 
+    if (platform() === 'win32' && input === '\x03' && terminalProcess.foregroundJob) {
+      interruptManagedWindowsForegroundJob(terminalProcess, terminalProcess.foregroundJob)
+      return
+    }
     terminalProcess.process.write(input)
   }
 
@@ -142,7 +213,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       }
     )
     terminalProcess.foregroundJob = control
-    terminalProcess.process.write(createForegroundJobProbe(control))
+    const probe = createForegroundJobProbe(control)
+    if (platform() === 'win32' && !terminalProcess.hasObservedShellOutput) {
+      terminalProcess.pendingForegroundProbe = probe
+    } else {
+      terminalProcess.process.write(probe)
+    }
   }
 
   resize(sessionId: string, columns: number, rows: number): void {
@@ -164,6 +240,10 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
     if (!terminalProcess) {
       return null
+    }
+
+    if (platform() === 'win32') {
+      return normalizeExistingDirectory(terminalProcess.workingDirectory)
     }
 
     return readProcessWorkingDirectory(terminalProcess.process.pid)
@@ -207,12 +287,39 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
 interface ManagedTerminalProcess {
   foregroundJob: ForegroundJobShellControl | null
+  foregroundJobInterruptPromise: Promise<void> | null
+  hasObservedShellOutput: boolean
+  pendingForegroundProbe: string | null
   readonly process: IPty
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
   readonly terminalSourceTheme: TerminalSourceTheme
   readonly exited: Promise<void>
   stopPromise: Promise<void> | null
+  readonly workingDirectory: string
+}
+
+function interruptManagedWindowsForegroundJob(
+  managedProcess: ManagedTerminalProcess,
+  control: ForegroundJobShellControl
+): void {
+  managedProcess.foregroundJobInterruptPromise ??= interruptWindowsForegroundJob(
+    managedProcess.process.pid,
+    control.scriptPath
+  )
+    .catch(async () => {
+      managedProcess.process.write('\x03')
+      await delay(500)
+    })
+    .then(() => {
+      if (managedProcess.foregroundJob !== control) return
+      managedProcess.foregroundJob = null
+      disposeForegroundJobShellControl(control)
+      control.command.onExit({ ...control.command, exitCode: 130 })
+    })
+    .finally(() => {
+      managedProcess.foregroundJobInterruptPromise = null
+    })
 }
 
 function getDefaultShell(): string {
@@ -324,16 +431,17 @@ function isProcessGroupAlive(processGroupId: number): boolean {
   }
 }
 
-async function waitForPromise(promise: Promise<void>, timeoutMs: number): Promise<void> {
+async function waitForPromise(
+  promise: Promise<void>,
+  timeoutMs: number,
+  timeoutMessage = 'Terminal process did not report its exit.'
+): Promise<void> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(
-          () => reject(new Error('Terminal process did not report its exit.')),
-          timeoutMs
-        )
+        timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
       })
     ])
   } finally {

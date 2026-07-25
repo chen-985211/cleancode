@@ -8,10 +8,11 @@ describe('Electron page zoom policy', () => {
 
     expect(webContents.zoomLevel).toBe(0)
     expect(webContents.setZoomLevel).toHaveBeenLastCalledWith(0)
+    expect(webContents.setZoomLevel).toHaveBeenCalledTimes(1)
 
-    webContents.zoomLevel = 4
     webContents.emitDidFinishLoad()
     expect(webContents.zoomLevel).toBe(0)
+    expect(webContents.setZoomLevel).toHaveBeenCalledTimes(1)
 
     webContents.zoomLevel = 2
     webContents.emitDidFinishLoad()
@@ -26,6 +27,10 @@ class FakePageZoomWebContents {
   private didFinishLoadListener: (() => void) | null = null
 
   constructor(public zoomLevel: number) {}
+
+  getZoomLevel(): number {
+    return this.zoomLevel
+  }
 
   emitDidFinishLoad(): void {
     const listener = this.didFinishLoadListener

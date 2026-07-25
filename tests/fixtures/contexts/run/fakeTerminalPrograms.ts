@@ -23,7 +23,7 @@ export interface FakeAgentFixture {
 export const terminalWorkspaceRetentionFixtureFileName = 'terminal-workspace-retention-fixture.mjs'
 export const terminalWorkspaceRetentionEarlyMarker = '__TERMINAL_SCROLLBACK_EARLY_MARKER__'
 export const terminalWorkspaceRetentionLateMarker = '__TERMINAL_SCROLLBACK_LATE_MARKER__'
-export const terminalWorkspaceRetentionInvisiblePadding = '\u001b[0m'.repeat(2_200)
+export const terminalWorkspaceRetentionInvisiblePadding = '\u0000'.repeat(8_193)
 export const terminalQueryFixtureFileName = 'terminal-query-fixture.mjs'
 
 export async function writeTerminalWorkspaceRetentionFixtureScript(
@@ -54,6 +54,7 @@ export async function writeTerminalQueryFixtureScript(projectDirectory: string):
 import { writeFileSync } from 'node:fs'
 
 const reportPath = process.argv[2]
+const expectsBackgroundResponse = ${process.platform !== 'win32'}
 let input = ''
 let finished = false
 
@@ -82,11 +83,11 @@ process.stdin.resume()
 process.stdin.on('data', (data) => {
   input += data.toString('utf8')
   const { responses, backgroundResponses } = readResponses()
-  if (responses.length > 0 && backgroundResponses.length > 0) {
+  if (responses.length > 0 && (!expectsBackgroundResponse || backgroundResponses.length > 0)) {
     finish(0)
   }
 })
-process.stdout.write('\u001b[6n\u001b]11;?\u0007')
+process.stdout.write(expectsBackgroundResponse ? '\u001b[6n\u001b]11;?\u001b\\\\' : '\u001b[6n')
 
 setTimeout(() => finish(1), 2_000)
 `,
@@ -103,7 +104,7 @@ export async function writeTerminalSelectionFixtureScript(
   }
 ): Promise<string> {
   const scriptPath = join(projectDirectory, 'terminal-selection-fixture.mjs')
-  const outputLines = [`left-${input.controlText}-right`, '', '', '', input.outputLine]
+  const outputLines = ['', '', '', `left-${input.controlText}-right`, '', input.outputLine]
 
   await writeFile(
     scriptPath,

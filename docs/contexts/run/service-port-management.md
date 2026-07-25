@@ -131,16 +131,16 @@ Run 通过 `LocalPortReservationPort` 在回环地址创建临时 TCP Server：
 
 ## 监听所有权与就绪
 
-TCP 可连接只证明某个进程在监听，不能证明它属于本次运行。当前 macOS 适配器按以下顺序验证：
+TCP 可连接只证明某个进程在监听，不能证明它属于本次运行。macOS、Linux 和 Windows 适配器按以下顺序验证：
 
 1. 确认受管 PTY 根进程仍存活。
-2. 用 `/usr/sbin/lsof` 读取实际端口的监听 PID 集合。
-3. 用 `/bin/ps` 沿父进程链确认每个监听者是受管根进程或其后代。
+2. 用平台端口表读取实际端口的监听 PID 集合。
+3. 沿平台进程父链确认每个监听者是受管根进程或其后代。
 4. 再次读取监听集合、确认根进程存活并复核祖先关系，拒绝检查期间发生的监听者替换。
 
 全部监听者属于本次进程树时为 `owned`；明确没有任何监听者属于本次进程树时为 `external`；工具不可用、平台不支持、进程消失、集合变化或所有权混合时为 `unknown`。
 
-`preferred`/`auto` 遇到明确外部监听者时会先清理本次尝试并有限重试；`fixed` 失败。`unknown` 不能安全重试或释放为普通可用状态：Run 停止本次 PTY 并隔离租约，以 `SERVICE_LISTENER_OWNERSHIP_UNVERIFIED` 失败关闭。Linux 和 Windows 当前没有所有权适配器，因此受管端口启动会得到 `unknown`；应用端口已保留，后续平台实现不能降低“必须证明所有权”的不变量。
+平台取证入口分别为 macOS `lsof/ps`、Linux `/proc/net/tcp*`＋进程 fd/父链和 Windows `netstat`＋PowerShell CIM。`preferred`/`auto` 遇到明确外部监听者时会先清理本次尝试并有限重试；`fixed` 失败。`unknown` 不能安全重试或释放为普通可用状态：Run 停止本次 PTY 并隔离租约，以 `SERVICE_LISTENER_OWNERSHIP_UNVERIFIED` 失败关闭。任一平台工具不可用或证据不稳定时都不能降低“必须证明所有权”的不变量。
 
 服务自守护、double-fork 后脱离受管进程树，或在所有权证明前把监听转交给无祖先关系进程，不属于当前支持范围。
 
@@ -256,7 +256,7 @@ Electron 的 complete 阶段只注销 workflow/managed lifecycle 与 managed ter
 
 ## 平台限制与剩余风险
 
-- 当前监听所有权只在 macOS 上可证明；Linux/Windows 受管端口会安全失败，等待平台适配器与真实系统集成测试。
+- 监听所有权依赖操作系统进程表和端口表；macOS、Linux 或 Windows runner 缺失对应系统工具、权限不足或检查期间证据变化时会安全失败。
 - 预留释放到项目进程监听的竞争只能通过有限重试收束，不能完全消除。
 - 当前租约表只协调当前 cleancode 应用 controller；持久 Provider 拒绝第二个 controller，外部工具仍表现为操作系统外部监听者。
 - POSIX 进程组清理覆盖正常受管子进程；主动脱离进程树的 daemon 不受支持，清理后监听仍存在时租约会隔离。

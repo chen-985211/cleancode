@@ -8,8 +8,10 @@ import type {
   LaunchForegroundJobProcessCommand
 } from '../../application/ports/TerminalProcessPort'
 
-const markerStart = '\x1eCLEANCODE_JOB:'
-const markerEnd = '\x1f'
+const posixMarkerStart = '\x1eCLEANCODE_JOB:'
+const posixMarkerEnd = '\x1f'
+const powershellMarkerStart = '\x1b]633;CLEANCODE_JOB:'
+const powershellMarkerEnd = '\x07'
 const environmentNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
 export interface ForegroundJobShellControl {
@@ -21,6 +23,7 @@ export interface ForegroundJobShellControl {
   readonly shellFamily: 'posix' | 'powershell'
   readonly scriptDirectory: string
   readonly scriptPath: string
+  readonly statusPath: string | null
 }
 
 export interface ForegroundJobShellControlOptions {
@@ -42,18 +45,19 @@ export function createForegroundJobShellControl(
   }
   const token = options.token ?? randomUUID().replaceAll('-', '')
   if (!/^[A-Za-z0-9]+$/.test(token)) throw new Error('Invalid foreground job token.')
-  const scriptContents =
-    shellFamily === 'powershell'
-      ? createPowerShellLaunchScript(command, token)
-      : createPosixLaunchScript(command, token)
   const scriptDirectory = mkdtempSync(
     join(options.temporaryRoot ?? tmpdir(), 'cleancode-agent-job-')
   )
+  const statusPath = shellFamily === 'posix' ? join(scriptDirectory, 'exit-status') : null
   const scriptPath = join(
     scriptDirectory,
     shellFamily === 'powershell' ? 'launch.ps1' : 'launch.sh'
   )
   try {
+    const scriptContents =
+      shellFamily === 'powershell'
+        ? createPowerShellLaunchScript(command, token)
+        : createPosixLaunchScript(command, token, statusPath as string)
     writeFileSync(scriptPath, scriptContents, { encoding: 'utf8', mode: 0o700 })
     if (shellFamily === 'posix') chmodSync(scriptPath, 0o700)
   } catch (error) {
@@ -68,6 +72,7 @@ export function createForegroundJobShellControl(
     shellFamily,
     scriptDirectory,
     scriptPath,
+    statusPath,
     token
   }
 }
@@ -87,10 +92,11 @@ export function createForegroundJobProbe(control: ForegroundJobShellControl): st
       ].join(' ') + '\r'
     )
   }
+  if (!control.statusPath) throw new Error('POSIX foreground job status path is unavailable.')
   return (
     [
       quotePosixShellWord(control.scriptPath),
-      'cleancode_job_status=$?',
+      `IFS= read -r cleancode_job_status < ${quotePosixShellWord(control.statusPath)}`,
       `printf '\\036CLEANCODE_JOB:${control.token}:exit:%s\\037' "$cleancode_job_status"`
     ].join('; ') + '\n'
   )
@@ -116,7 +122,8 @@ export function supportsForegroundJobShell(
 
 function createPosixLaunchScript(
   command: LaunchForegroundJobProcessCommand,
-  token: string
+  token: string,
+  statusPath: string
 ): string {
   const environment = Object.entries(command.environment).map(([name, value]) => {
     if (!environmentNamePattern.test(name)) throw new Error(`Invalid environment name: ${name}`)
@@ -129,9 +136,15 @@ function createPosixLaunchScript(
     ...command.args.map(quotePosixShellWord)
   ].join(' ')
   return (
-    ['#!/bin/sh', `printf '\\036CLEANCODE_JOB:${token}:started\\037'`, `exec ${invocation}`].join(
-      '\n'
-    ) + '\n'
+    [
+      '#!/bin/sh',
+      "trap ':' INT",
+      `printf '\\036CLEANCODE_JOB:${token}:started\\037'`,
+      invocation,
+      'cleancode_job_status=$?',
+      `printf '%s\\n' "$cleancode_job_status" > ${quotePosixShellWord(statusPath)}`,
+      'exit 0'
+    ].join('\n') + '\n'
   )
 }
 
@@ -146,6 +159,7 @@ function createPowerShellLaunchScript(
   const arguments_ = command.args.map(
     (argument) => `  (Decode-CleancodeJobValue '${encodePowerShellValue(argument)}')`
   )
+  const nativeArguments = encodePowerShellValue(createWindowsProcessArguments(command.args))
   return (
     [
       '$cleancodeJobEncoding = [System.Text.Encoding]::UTF8',
@@ -156,25 +170,54 @@ function createPowerShellLaunchScript(
       '$cleancodeJobArguments = @(',
       arguments_.join('\n'),
       ')',
+      `$cleancodeJobNativeArguments = Decode-CleancodeJobValue '${nativeArguments}'`,
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
-      `  [Console]::Write(([char]30) + 'CLEANCODE_JOB:${token}:started' + ([char]31))`,
-      '  & $cleancodeJobExecutable @cleancodeJobArguments',
-      '  $cleancodeJobSucceeded = $?',
-      '  $cleancodeJobNativeExitCode = $LASTEXITCODE',
-      '  if ($null -ne $cleancodeJobNativeExitCode) {',
-      '    $cleancodeJobExitCode = [int]$cleancodeJobNativeExitCode',
-      '  } elseif ($cleancodeJobSucceeded) {',
-      '    $cleancodeJobExitCode = 0',
+      `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
+      '  $cleancodeJobCommand = Get-Command -Name $cleancodeJobExecutable -ErrorAction Stop | Select-Object -First 1',
+      '  $cleancodeJobInvocation = $cleancodeJobCommand.Path',
+      '  $cleancodeJobUsesPowerShellShim = $false',
+      '  $cleancodeJobExtension = [System.IO.Path]::GetExtension($cleancodeJobCommand.Path).ToLowerInvariant()',
+      "  if ($cleancodeJobExtension -eq '.cmd') {",
+      "    $cleancodeJobPowerShellShim = [System.IO.Path]::ChangeExtension($cleancodeJobCommand.Path, '.ps1')",
+      '    if (Test-Path -LiteralPath $cleancodeJobPowerShellShim -PathType Leaf) {',
+      '      $cleancodeJobInvocation = $cleancodeJobPowerShellShim',
+      '      $cleancodeJobUsesPowerShellShim = $true',
+      '    }',
+      '  }',
+      "  $cleancodeJobIsNativeApplication = (-not $cleancodeJobUsesPowerShellShim) -and ([string]$cleancodeJobCommand.CommandType -eq 'Application') -and (@('.cmd', '.bat') -notcontains $cleancodeJobExtension)",
+      '  if ($cleancodeJobIsNativeApplication) {',
+      '    $cleancodeJobStartInfo = New-Object System.Diagnostics.ProcessStartInfo',
+      '    $cleancodeJobStartInfo.FileName = $cleancodeJobCommand.Path',
+      '    $cleancodeJobStartInfo.UseShellExecute = $false',
+      '    $cleancodeJobStartInfo.Arguments = $cleancodeJobNativeArguments',
+      '    $cleancodeJobProcess = New-Object System.Diagnostics.Process',
+      '    $cleancodeJobProcess.StartInfo = $cleancodeJobStartInfo',
+      '    if (-not $cleancodeJobProcess.Start()) {',
+      "      throw 'Unable to start the foreground job process.'",
+      '    }',
+      '    $cleancodeJobProcess.WaitForExit()',
+      '    $cleancodeJobExitCode = [int]$cleancodeJobProcess.ExitCode',
+      '    $cleancodeJobProcess.Dispose()',
       '  } else {',
-      '    $cleancodeJobExitCode = 1',
+      '    $global:LASTEXITCODE = $null',
+      '    & $cleancodeJobInvocation @cleancodeJobArguments',
+      '    $cleancodeJobSucceeded = $?',
+      '    $cleancodeJobNativeExitCode = $LASTEXITCODE',
+      '    if ($null -ne $cleancodeJobNativeExitCode) {',
+      '      $cleancodeJobExitCode = [int]$cleancodeJobNativeExitCode',
+      '    } elseif ($cleancodeJobSucceeded) {',
+      '      $cleancodeJobExitCode = 0',
+      '    } else {',
+      '      $cleancodeJobExitCode = 1',
+      '    }',
       '  }',
       '} catch {',
       '  $cleancodeJobExitCode = 1',
       '  [Console]::Error.WriteLine($_.Exception.Message)',
       '} finally {',
-      `  [Console]::Write(([char]30) + 'CLEANCODE_JOB:${token}:exit:' + [string]$cleancodeJobExitCode + ([char]31))`,
+      `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:exit:' + [string]$cleancodeJobExitCode + ([char]7))`,
       '}',
       'exit $cleancodeJobExitCode'
     ].join('\n') + '\n'
@@ -189,6 +232,33 @@ function encodePowerShellValue(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64')
 }
 
+export function createWindowsProcessArguments(args: readonly string[]): string {
+  return args.map(quoteWindowsProcessArgument).join(' ')
+}
+
+function quoteWindowsProcessArgument(value: string): string {
+  if (value && !/[\s"]/.test(value)) return value
+
+  let quoted = '"'
+  let backslashCount = 0
+
+  for (const character of value) {
+    if (character === '\\') {
+      backslashCount += 1
+      continue
+    }
+    if (character === '"') {
+      quoted += `${'\\'.repeat(backslashCount * 2 + 1)}"`
+      backslashCount = 0
+      continue
+    }
+    quoted += `${'\\'.repeat(backslashCount)}${character}`
+    backslashCount = 0
+  }
+
+  return `${quoted}${'\\'.repeat(backslashCount * 2)}"`
+}
+
 export function acceptForegroundJobOutput(
   control: ForegroundJobShellControl,
   data: string,
@@ -200,6 +270,9 @@ export function acceptForegroundJobOutput(
   }
 ): string {
   control.buffer += data
+  const markerStart =
+    control.shellFamily === 'powershell' ? powershellMarkerStart : posixMarkerStart
+  const markerEnd = control.shellFamily === 'powershell' ? powershellMarkerEnd : posixMarkerEnd
   const exactPrefix = `${markerStart}${control.token}:`
   let output = ''
 

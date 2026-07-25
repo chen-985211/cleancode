@@ -16,7 +16,9 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
-  e2eShellReadyMarker,
+  asE2eTerminalInput,
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
   readTerminalSessionId,
   waitForTerminalOutput,
   waitForTerminalShellReady,
@@ -34,7 +36,7 @@ describe('terminal daily interactions e2e', () => {
     workbench = await createE2eWorkbench('cleancode-terminal-daily-e2e')
     resources.workbench = workbench
     electronApp = await launchApp(workbench, {
-      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+      environment: createE2eTerminalEnvironment()
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -58,7 +60,9 @@ describe('terminal daily interactions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "printf 'SEARCH_''TARGET one\\n中文，🙂，é\\nSEARCH_''TARGET two\\n'\r"
+        asE2eTerminalInput(
+          createE2ePrintCommand('SEARCH_TARGET one\n中文，🙂，é\nSEARCH_TARGET two')
+        )
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'SEARCH_TARGET two')
 
@@ -91,7 +95,9 @@ describe('terminal daily interactions e2e', () => {
           .toBe('dom')
       }
 
-      const clipboardText = "printf '__PASTE_AFTER_RENDERER_FALLBACK__\\n'\r"
+      const clipboardText = asE2eTerminalInput(
+        createE2ePrintCommand('__PASTE_AFTER_RENDERER_FALLBACK__')
+      )
       await terminalViewport.evaluate((element, text) => {
         const clipboardData = new DataTransfer()
         clipboardData.setData('text/plain', text)
@@ -115,7 +121,9 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
-  await page.waitForFunction(() =>
-    document.activeElement?.classList.contains('xterm-helper-textarea')
-  )
+  const terminalInput = page.getByLabel('Terminal input')
+  await terminalInput.focus()
+  await expect
+    .poll(() => terminalInput.evaluate((element) => element === document.activeElement))
+    .toBe(true)
 }

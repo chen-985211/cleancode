@@ -1,9 +1,67 @@
 import { realpath } from 'node:fs/promises'
+import { delimiter } from 'node:path'
 
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
 
 export const e2eShellReadyMarker = '__CLEANCODE_E2E_SHELL_READY__'
+
+export function createE2eTerminalEnvironment(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return process.platform === 'win32'
+    ? { SHELL: 'powershell.exe', ...overrides }
+    : { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh', ...overrides }
+}
+
+export function prependE2ePath(...directories: readonly string[]): string {
+  return [...directories, process.env.PATH].filter(Boolean).join(delimiter)
+}
+
+export function createE2ePrintCommand(output: string): string {
+  return createE2eNodeCommand(`process.stdout.write(${JSON.stringify(`${output}\n`)})`)
+}
+
+export function createE2eStreamingCommand(output: string, intervalMs: number): string {
+  return createE2eNodeCommand(
+    `setInterval(() => process.stdout.write(${JSON.stringify(`${output}\n`)}), ${intervalMs})`
+  )
+}
+
+export function createE2eFileCommand(input: {
+  readonly files: Readonly<Record<string, string>>
+  readonly output?: string
+}): string {
+  return createE2eNodeCommand(
+    [
+      "const { writeFileSync } = require('node:fs')",
+      ...Object.entries(input.files).map(
+        ([path, contents]) =>
+          `writeFileSync(${JSON.stringify(path)}, ${JSON.stringify(contents)}, 'utf8')`
+      ),
+      input.output ? `process.stdout.write(${JSON.stringify(`${input.output}\n`)})` : undefined
+    ]
+      .filter(Boolean)
+      .join(';')
+  )
+}
+
+export function createE2eNodeCommand(source: string): string {
+  const encodedSource = Buffer.from(source, 'utf8').toString('base64')
+  const bootstrap = `eval(Buffer.from('${encodedSource}','base64').toString('utf8'))`
+
+  return createTerminalInvocation(process.execPath, ['-e', bootstrap])
+}
+
+export function createE2eNodeScriptCommand(
+  scriptPath: string,
+  args: readonly string[] = [],
+  options: { readonly replaceShell?: boolean } = {}
+): string {
+  return createTerminalInvocation(process.execPath, [scriptPath, ...args], options)
+}
+
+export function asE2eTerminalInput(command: string): string {
+  return `${command}\r`
+}
 
 export async function readTerminalSessionId(page: Page, terminalName: string): Promise<string> {
   const sessionIdHandle = await page.waitForFunction((label) => {
@@ -19,18 +77,26 @@ export async function readTerminalSessionId(page: Page, terminalName: string): P
 
 export async function waitForTerminalShellReady(page: Page, terminalName: string): Promise<string> {
   const sessionIdHandle = await page.waitForFunction(
-    ({ marker, terminalName }) => {
+    ({ marker, terminalName, windows }) => {
       const output = Array.from(
         document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
       ).find((element) => element.getAttribute('aria-label') === `${terminalName} 文本输出`)
       const sessionId = output?.dataset.terminalSessionId
+      const terminalText = output?.textContent?.trimEnd() ?? ''
+      const promptReady = windows
+        ? /PS [^\r\n>]*>/u.test(terminalText.slice(-4_096))
+        : terminalText.endsWith(marker)
 
-      return sessionId && output?.textContent?.includes(marker) ? sessionId : ''
+      return sessionId && promptReady ? sessionId : ''
     },
-    { marker: e2eShellReadyMarker, terminalName }
+    { marker: e2eShellReadyMarker, terminalName, windows: process.platform === 'win32' }
   )
 
   return sessionIdHandle.jsonValue()
+}
+
+export async function waitForTerminalShellPrompt(page: Page, terminalName: string): Promise<void> {
+  await waitForTerminalShellReady(page, terminalName)
 }
 
 export async function waitForTerminalOutput(
@@ -162,10 +228,14 @@ export async function configureAndStartTerminalLaunchCommand(
   const previousSessionId = await readTerminalSessionId(page, terminalName)
 
   await page.getByRole('button', { name: launchButtonName }).click()
-  const launchCommandInput = page.getByRole('textbox', { name: '启动命令' })
+  const metadataForm = page.getByRole('form', { name: '编辑终端信息' })
+  const launchCommandInput = metadataForm.getByRole('textbox', { name: '启动命令' })
 
   await launchCommandInput.fill(launchCommand)
-  await launchCommandInput.press('Enter')
+  const saveAction = metadataForm.getByRole('button', { name: '保存终端信息' })
+  await expect.poll(() => saveAction.isEnabled(), { interval: 50, timeout: 10_000 }).toBe(true)
+  await saveAction.click()
+  await metadataForm.waitFor({ state: 'detached' })
   await page.waitForFunction(
     (buttonName) =>
       document
@@ -276,4 +346,20 @@ async function readTerminalViewportGeometry(
       ] as const
     }
   }, sessionId)
+}
+
+function quoteTerminalShellWord(value: string): string {
+  return process.platform === 'win32'
+    ? `'${value.replaceAll("'", "''")}'`
+    : `'${value.replaceAll("'", "'\"'\"'")}'`
+}
+
+function createTerminalInvocation(
+  executable: string,
+  args: readonly string[],
+  options: { readonly replaceShell?: boolean } = {}
+): string {
+  const invocation = [executable, ...args].map(quoteTerminalShellWord).join(' ')
+  if (process.platform === 'win32') return `& ${invocation}`
+  return options.replaceShell ? `exec ${invocation}` : invocation
 }

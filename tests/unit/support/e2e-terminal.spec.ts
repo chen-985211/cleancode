@@ -3,6 +3,8 @@
 import type { Page } from 'playwright'
 
 import {
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
   e2eShellReadyMarker,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
@@ -18,8 +20,55 @@ describe('E2E terminal support', () => {
     await expect(waitForTerminalShellReady(page, 'Terminal 1')).resolves.toBe('terminal-session-1')
     expect(waitForFunction).toHaveBeenCalledWith(expect.any(Function), {
       marker: e2eShellReadyMarker,
-      terminalName: 'Terminal 1'
+      terminalName: 'Terminal 1',
+      windows: process.platform === 'win32'
     })
+  })
+
+  it('recognizes a Windows prompt even when ConPTY appends redraw controls', async () => {
+    const jsonValue = vi.fn(async () => 'terminal-session-1')
+    type ShellReadyPredicate = (input: {
+      readonly marker: string
+      readonly terminalName: string
+      readonly windows: boolean
+    }) => string
+    let predicate: ShellReadyPredicate | undefined
+    const waitForFunction = vi.fn(async (candidate: ShellReadyPredicate) => {
+      predicate = candidate
+      return { jsonValue }
+    })
+    const page = { waitForFunction } as unknown as Page
+    await waitForTerminalShellReady(page, 'Terminal 1')
+    const evaluateShellReady = predicate as unknown as ShellReadyPredicate
+    const terminalOutput = {
+      dataset: { terminalSessionId: 'terminal-session-1' },
+      getAttribute: (name: string) => (name === 'aria-label' ? 'Terminal 1 文本输出' : null),
+      textContent: 'PS C:\\work\\app> \u001b[K\r\n\u001b[K\u001b[6;20H\u001b[?25h'
+    }
+    vi.stubGlobal('document', {
+      querySelectorAll: () => [terminalOutput]
+    })
+
+    try {
+      expect(
+        evaluateShellReady({
+          marker: e2eShellReadyMarker,
+          terminalName: 'Terminal 1',
+          windows: true
+        })
+      ).toBe('terminal-session-1')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('uses the native shell and a Node command instead of a shell-specific print primitive', () => {
+    const environment = createE2eTerminalEnvironment()
+    const command = createE2ePrintCommand('portable-output')
+
+    expect(environment.SHELL).toBe(process.platform === 'win32' ? 'powershell.exe' : '/bin/sh')
+    expect(command).toContain(process.execPath)
+    expect(command).not.toContain('printf')
   })
 
   it('waits for output and a replacement session as one observation', async () => {

@@ -51,11 +51,12 @@ describe('project workspaces e2e', () => {
       const titlebarNavigation = page.getByRole('navigation', { name: '窗口导航' })
       const sidebar = page.locator('#project-sidebar')
       const collapseSidebar = titlebarNavigation.getByRole('button', { name: '收起侧边栏' })
+      const windowedTitlebarInset = process.platform === 'darwin' ? 80 : 12
 
       await expect
         .poll(() => readSidebarTitlebarGeometry(page))
         .toMatchObject({
-          button: { height: 24, width: 32, x: 80, y: 6 },
+          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
           buttonOwnsHitTarget: true,
           navigationBoundary: {
             backgroundColor: 'rgba(0, 0, 0, 0)',
@@ -78,14 +79,14 @@ describe('project workspaces e2e', () => {
       await expect
         .poll(() => readSidebarTitlebarGeometry(page))
         .toMatchObject({
-          button: { height: 24, width: 32, x: 80, y: 6 },
+          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
           buttonOwnsHitTarget: true,
           navigationBoundary: {
             backgroundColor: 'rgba(0, 0, 0, 0)',
             borderRightWidth: '0px',
             boxShadow: 'none'
           },
-          navigation: { height: 36, width: 112, x: 0, y: 0 },
+          navigation: { height: 36, width: windowedTitlebarInset + 32, x: 0, y: 0 },
           sidebar: {
             backgroundColor: 'rgba(0, 0, 0, 0)',
             borderRightWidth: '0px'
@@ -125,7 +126,7 @@ describe('project workspaces e2e', () => {
       await expect
         .poll(() => readSidebarTitlebarGeometry(page))
         .toMatchObject({
-          button: { height: 24, width: 32, x: 80, y: 6 },
+          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
           buttonOwnsHitTarget: true,
           navigation: { height: 36, x: 0, y: 0 }
         })

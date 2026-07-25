@@ -245,6 +245,32 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
+  it('defers fast process output and exit events until the start request resolves', async () => {
+    const client = createClient(rootDirectory)
+    const scope = outputIdentity('block')
+    const lifecycle: string[] = []
+    await client.initialize()
+    provider.emitProcessLifecycleBeforeStartResponse(scope)
+
+    const handle = await client.start({
+      scope,
+      workingDirectory: scope.workspaceDirectory,
+      shell: process.platform === 'win32' ? 'powershell.exe' : '/bin/sh',
+      launchCommand: 'fast-command',
+      sessionKind: 'workflow',
+      columns: 80,
+      rows: 24,
+      onOutput: () => lifecycle.push('output'),
+      onExit: () => lifecycle.push('exit')
+    })
+    lifecycle.push('start-resolved')
+
+    expect(handle).toEqual({ processId: 4242 })
+    expect(lifecycle).toEqual(['start-resolved'])
+    await vi.waitFor(() => expect(lifecycle).toEqual(['start-resolved', 'output', 'exit']))
+    await client.detachApplication()
+  })
+
   it('releases application callbacks after the Provider connection is already absent', async () => {
     const client = createClient(rootDirectory)
     const identity = outputIdentity('agent')
@@ -352,6 +378,7 @@ class ControllableProvider {
   private healthResponses: Deferred | null = null
   private applicationDetachCompletion: Deferred | null = null
   private rejectedControllerClaims = 0
+  private processLifecycleBeforeStartResponse: ReturnType<typeof outputIdentity> | null = null
 
   constructor(
     readonly endpoint: string,
@@ -412,6 +439,10 @@ class ControllableProvider {
     }
   }
 
+  emitProcessLifecycleBeforeStartResponse(scope: ReturnType<typeof outputIdentity>): void {
+    this.processLifecycleBeforeStartResponse = scope
+  }
+
   async waitForRequests(method: string, count: number): Promise<void> {
     await vi.waitFor(() => {
       expect(
@@ -456,6 +487,33 @@ class ControllableProvider {
       )
       return
     }
+    if (request.method === 'startProcess' && this.processLifecycleBeforeStartResponse) {
+      const scope = this.processLifecycleBeforeStartResponse
+      this.processLifecycleBeforeStartResponse = null
+      socket.write(
+        encodeTerminalProviderFrame({
+          event: 'terminal-output',
+          payload: {
+            data: 'fast-output',
+            scope,
+            sequence: 1,
+            sessionId: scope.sessionId
+          },
+          type: 'event'
+        })
+      )
+      socket.write(
+        encodeTerminalProviderFrame({
+          event: 'terminal-exit',
+          payload: {
+            exitCode: 0,
+            scope,
+            sessionId: scope.sessionId
+          },
+          type: 'event'
+        })
+      )
+    }
     const result = this.resultFor(request.method, socket)
     socket.write(
       encodeTerminalProviderFrame({
@@ -482,6 +540,7 @@ class ControllableProvider {
     if (method === 'beginApplicationDetach') {
       return { releaseId: 'application-release-1' }
     }
+    if (method === 'startProcess') return { processId: 4242 }
     if (method === 'awaitApplicationDetach') setTimeout(() => socket.end(), 0)
     if (method === 'detachApplication') setTimeout(() => socket.end(), 0)
     return undefined

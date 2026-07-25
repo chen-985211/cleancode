@@ -127,27 +127,31 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     }
   }, 10_000)
 
-  it('preserves a complete input write in the default macOS shell', async () => {
-    let output = ''
+  it.runIf(process.platform === 'darwin')(
+    'preserves a complete input write in the default macOS shell',
+    async () => {
+      let output = ''
 
-    await adapter.start({
-      scope: runScope('zsh-session'),
-      workingDirectory,
-      shell: '/bin/zsh',
-      columns: 88,
-      rows: 24,
-      onOutput: (event) => {
-        output += event.data
-      },
-      onExit: () => undefined
-    })
+      await adapter.start({
+        scope: runScope('zsh-session'),
+        workingDirectory,
+        shell: '/bin/zsh',
+        columns: 88,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => undefined
+      })
 
-    adapter.write('zsh-session', 'pwd\r')
+      adapter.write('zsh-session', 'pwd\r')
 
-    await waitUntil(() => output.includes(workingDirectory))
+      await waitUntil(() => output.includes(workingDirectory))
 
-    expect(output).toContain(workingDirectory)
-  }, 10_000)
+      expect(output).toContain(workingDirectory)
+    },
+    10_000
+  )
 
   it('keeps an interactive launch session writable after Ctrl+C', async () => {
     let output = ''

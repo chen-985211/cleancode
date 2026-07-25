@@ -13,6 +13,7 @@ import type { TerminalSessionSnapshot } from '../../../../src/contexts/run/appli
 import type { TerminalSnapshot } from '../../../../src/contexts/run/application/dto/TerminalModelSnapshot'
 import { FileTerminalRecoveryStore } from '../../../../src/contexts/run/infrastructure/persistence/FileTerminalRecoveryStore'
 import { TerminalProviderServer } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderServer'
+import { createProviderEndpoint } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
 import {
   encodeTerminalProviderFrame,
   type TerminalProviderEvent,
@@ -28,7 +29,7 @@ describe('terminal provider server', () => {
 
   beforeEach(async () => {
     rootDirectory = await mkdtemp(join(tmpdir(), 'cc-provider-'))
-    endpoint = join(rootDirectory, 'provider.sock')
+    endpoint = createProviderEndpoint(rootDirectory)
   })
 
   afterEach(async () => {

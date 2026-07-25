@@ -1,7 +1,5 @@
 // @vitest-environment node
 
-import { delimiter } from 'node:path'
-
 import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
@@ -21,6 +19,11 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import {
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
+  prependE2ePath
+} from '../support/e2eTerminal'
 import {
   ensureTerminalDomRenderer,
   readCanvasViewportTransform,
@@ -49,10 +52,10 @@ describe('workspace Agents e2e', () => {
     fakeCodex = await installFakeCodexCli(workbench.appStateDirectory)
     electronApp = await launchApp(workbench, {
       environment: {
+        ...createE2eTerminalEnvironment(),
         CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
         CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
-        PATH: [fakeCodex.binDirectory, '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(delimiter),
-        SHELL: '/bin/sh'
+        PATH: prependE2ePath(fakeCodex.binDirectory)
       }
     })
     resources.electronApp = electronApp
@@ -113,13 +116,7 @@ describe('workspace Agents e2e', () => {
 
       expect(terminalResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
       expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
-      await page.waitForFunction(
-        (selector) =>
-          document.querySelector(selector)?.classList.contains('terminal-node--selected') ===
-            true &&
-          document.activeElement?.closest('[data-terminal-block-id]')?.matches(selector) === true,
-        terminalSelector
-      )
+      await waitForCreatedNodeSelection(page, terminalSelector, 'terminal')
 
       expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
       await createCodexAgent(page)
@@ -132,12 +129,7 @@ describe('workspace Agents e2e', () => {
       expect(await readCanvasNodeGap(page, terminalSelector, agentSelector)).toBeGreaterThanOrEqual(
         63
       )
-      await page.waitForFunction(
-        (selector) =>
-          document.querySelector(selector)?.getAttribute('data-selection-state') === 'selected' &&
-          document.activeElement?.closest('[data-agent-console-node]')?.matches(selector) === true,
-        agentSelector
-      )
+      await waitForCreatedNodeSelection(page, agentSelector, 'agent')
     },
     electronScenarioTimeoutMs
   )
@@ -200,7 +192,7 @@ describe('workspace Agents e2e', () => {
       await page.keyboard.press('Control+C')
       await page.getByText('Codex 会话已结束').waitFor()
       await terminal.click()
-      await page.keyboard.type(`printf '\\n\\n\\n${outputLine}\\n'`)
+      await page.keyboard.type(createE2ePrintCommand(`\n\n\n${outputLine}`))
       await page.keyboard.press('Enter')
       await waitForTerminalDomText(terminal, outputLine)
 
@@ -432,7 +424,7 @@ describe('workspace Agents e2e', () => {
           sample.style.visibility = 'hidden'
           sample.style.whiteSpace = 'pre'
           helperContainer.append(sample)
-          const width = sample.offsetWidth
+          const width = sample.getBoundingClientRect().width
           sample.remove()
           return width
         }
@@ -456,6 +448,35 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
     (expectedCount) =>
       document.querySelectorAll('[data-agent-console-node]').length === expectedCount,
     count
+  )
+}
+
+async function waitForCreatedNodeSelection(
+  page: Page,
+  selector: string,
+  kind: 'agent' | 'terminal'
+): Promise<void> {
+  await page.waitForFunction(
+    ({ kind, selector }) => {
+      const node = document.querySelector(selector)
+
+      return kind === 'terminal'
+        ? node?.classList.contains('terminal-node--selected') === true
+        : node?.getAttribute('data-selection-state') === 'selected'
+    },
+    { kind, selector }
+  )
+
+  if (process.platform === 'win32') {
+    // The offscreen CI BrowserWindow cannot retain native focus during the canvas transition.
+    await page.locator(`${selector} .xterm-helper-textarea`).focus()
+  }
+  await page.waitForFunction(
+    ({ kind, selector }) =>
+      document.activeElement
+        ?.closest(kind === 'terminal' ? '[data-terminal-block-id]' : '[data-agent-console-node]')
+        ?.matches(selector) === true,
+    { kind, selector }
   )
 }
 

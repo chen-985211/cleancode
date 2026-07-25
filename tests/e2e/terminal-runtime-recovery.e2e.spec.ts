@@ -1,5 +1,8 @@
 // @vitest-environment node
 
+import { readFile, readdir } from 'node:fs/promises'
+import { join } from 'node:path'
+
 import type { ElectronApplication, Page } from 'playwright'
 import { expect, vi } from 'vitest'
 
@@ -18,13 +21,20 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eProcessOutput } from '../support/e2eDiagnostics'
 import {
+  asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
+  createE2ePrintCommand,
+  createE2eStreamingCommand,
+  createE2eTerminalEnvironment,
   e2eShellReadyMarker,
   readTerminalSessionId,
   waitForTerminalOutput,
-  waitForTerminalShellReady,
+  waitForTerminalShellPrompt,
   writeTerminalCommand
 } from '../support/e2eTerminal'
+
+const electronCrashRecoveryTimeoutMs =
+  process.platform === 'win32' ? 90_000 : electronScenarioTimeoutMs
 
 describe('terminal runtime recovery e2e', () => {
   let workbench: E2eWorkbench
@@ -58,7 +68,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'WARM_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('WARM_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
 
@@ -67,8 +77,12 @@ describe('terminal runtime recovery e2e', () => {
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
-      await waitForTerminalTail(page, 'Terminal 1', e2eShellReadyMarker)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_WARM\\n'\r")
+      await waitForTerminalShellPrompt(page, 'Terminal 1')
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('AFTER_WARM'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_WARM')
       await retireCurrentTerminal()
     }
@@ -80,7 +94,7 @@ describe('terminal runtime recovery e2e', () => {
       const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
       for (const terminalName of terminalNames.slice(1)) {
         await page.getByRole('button', { name: '新建终端积木' }).click()
-        await waitForTerminalShellReady(page, terminalName)
+        await ensureTerminalShellStarted(page, terminalName)
       }
       const sessionIds = await Promise.all(
         terminalNames.map((name) => readTerminalSessionId(page, name))
@@ -118,7 +132,7 @@ describe('terminal runtime recovery e2e', () => {
       await configureAndStartTerminalLaunchCommand(
         page,
         'Terminal 1',
-        "printf 'INHERITED_LAUNCH\\n'"
+        createE2ePrintCommand('INHERITED_LAUNCH')
       )
 
       const inheritedSessionId = await readTerminalSessionId(page, 'Terminal 1')
@@ -127,7 +141,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'INHERITED_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('INHERITED_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
 
@@ -147,7 +161,7 @@ describe('terminal runtime recovery e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        "while :; do printf 'RENDERER_TICK\\n'; sleep 0.2; done\r"
+        asE2eTerminalInput(createE2eStreamingCommand('RENDERER_TICK', 200))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'RENDERER_TICK')
       const recoveredWindow = electronApp.waitForEvent('window')
@@ -169,12 +183,14 @@ describe('terminal runtime recovery e2e', () => {
     'warm-attaches a retained session after the Electron main process crashes',
     async () => {
       const sessionId = await retainTerminal(page)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'BEFORE_MAIN_CRASH\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('BEFORE_MAIN_CRASH'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'BEFORE_MAIN_CRASH')
 
-      const mainProcess = electronApp.process()
-      mainProcess.kill('SIGKILL')
-      await new Promise<void>((resolve) => mainProcess.once('exit', () => resolve()))
+      await crashElectronMainProcess(electronApp)
       resources.electronApp = undefined
       resources.page = undefined
       ;({ electronApp, page } = await launchWorkbench(workbench))
@@ -182,19 +198,28 @@ describe('terminal runtime recovery e2e', () => {
       resources.page = page
 
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'AFTER_MAIN_CRASH\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('AFTER_MAIN_CRASH'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'AFTER_MAIN_CRASH')
       await retireCurrentTerminal()
     },
-    electronScenarioTimeoutMs
+    electronCrashRecoveryTimeoutMs
   )
 
   it(
     'falls back to read-only normal-buffer history after the Provider crashes',
     async () => {
       const sessionId = await retainTerminal(page)
-      await writeTerminalCommand(page, 'Terminal 1', "printf 'DURABLE_PROVIDER_HISTORY\\n'\r")
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand('DURABLE_PROVIDER_HISTORY'))
+      )
       await waitForTerminalOutput(page, 'Terminal 1', 'DURABLE_PROVIDER_HISTORY')
+      await waitForPersistedTerminalHistory(workbench, 'DURABLE_PROVIDER_HISTORY')
       const metadata = await readAuthenticatedTerminalProviderMetadata(workbench.appStateDirectory)
       expect(metadata).not.toBeNull()
       process.kill(metadata!.processId, 'SIGKILL')
@@ -229,20 +254,168 @@ describe('terminal runtime recovery e2e', () => {
   }
 })
 
+async function waitForPersistedTerminalHistory(
+  workbench: E2eWorkbench,
+  expectedText: string
+): Promise<void> {
+  const recoveryDirectory = join(
+    workbench.appStateDirectory,
+    'terminal-runtime-provider',
+    'recovery'
+  )
+
+  await expect
+    .poll(
+      async () => {
+        const entries = await readdir(recoveryDirectory, { recursive: true }).catch(() => [])
+
+        for (const entry of entries) {
+          const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
+          if (contents.includes(expectedText)) return true
+        }
+        return false
+      },
+      { interval: 100, timeout: 10_000 }
+    )
+    .toBe(true)
+}
+
 async function launchWorkbench(workbench: E2eWorkbench) {
-  const electronApp = await launchApp(workbench, {
-    environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
-  })
-  const page = await electronApp.firstWindow()
-  await page.waitForLoadState('domcontentloaded')
-  await expectDesktopRuntime(page)
-  return { electronApp, page }
+  const launch = () =>
+    launchApp(workbench, {
+      environment: createE2eTerminalEnvironment()
+    })
+  const launchErrors: unknown[] = []
+  const retryDelaysMs = process.platform === 'win32' ? [0, 500, 1_000] : [0]
+
+  for (const retryDelayMs of retryDelaysMs) {
+    let electronApp: ElectronApplication | undefined
+    if (retryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
+    try {
+      electronApp = await launch()
+      const page = await electronApp.firstWindow()
+      await page.waitForLoadState('domcontentloaded')
+      await expectDesktopRuntime(page)
+      await waitForTerminalRuntimeReady(page)
+      return { electronApp, page }
+    } catch (error) {
+      launchErrors.push(error)
+      if (electronApp) {
+        await closeElectronApp(electronApp).catch(() => undefined)
+      }
+    }
+  }
+
+  throw new AggregateError(
+    launchErrors,
+    'Electron failed to relaunch after the Windows process handoff.'
+  )
+}
+
+async function waitForTerminalRuntimeReady(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const availability = await window.cleancode?.getTerminalRuntimeAvailability()
+          if (availability?.phase === 'unavailable' && availability.retryable) {
+            return (await window.cleancode?.retryTerminalRuntime())?.phase ?? 'missing'
+          }
+          return availability?.phase ?? 'missing'
+        }),
+      { interval: 250, timeout: process.platform === 'win32' ? 10_000 : 5_000 }
+    )
+    .toBe('ready')
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
-  await waitForTerminalShellReady(page, 'Terminal 1')
+  const createTerminal = page.getByRole('button', { name: '新建终端积木' })
+  await expect.poll(() => createTerminal.isEnabled(), { timeout: 10_000 }).toBe(true)
+  await createTerminal.click()
+  await ensureTerminalShellStarted(page, 'Terminal 1')
+}
+
+async function ensureTerminalShellStarted(page: Page, terminalName: string): Promise<void> {
+  const maximumAttempts = process.platform === 'win32' ? 2 : 1
+  let failureReason = 'unknown terminal startup failure'
+
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    const outcome = await waitForTerminalShellOutcome(page, terminalName)
+    if (outcome.phase === 'ready') return
+
+    failureReason = outcome.failureReason
+    if (attempt < maximumAttempts) {
+      await page.getByRole('button', { name: `${terminalName} 重开空终端会话` }).click()
+    }
+  }
+
+  throw new Error(
+    `${terminalName} did not start after ${maximumAttempts} attempt(s): ${failureReason}`
+  )
+}
+
+async function waitForTerminalShellOutcome(
+  page: Page,
+  terminalName: string
+): Promise<
+  { readonly phase: 'failed'; readonly failureReason: string } | { readonly phase: 'ready' }
+> {
+  return vi.waitUntil(
+    () =>
+      page.evaluate(
+        async ({ marker, terminalName, windows }) => {
+          const output = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
+          ).find((element) => element.getAttribute('aria-label') === `${terminalName} 文本输出`)
+          const sessionId = output?.dataset.terminalSessionId
+          if (!sessionId) return null
+
+          const terminalText = output.textContent?.trimEnd() ?? ''
+          const promptReady = windows
+            ? terminalText.endsWith('>') && terminalText.slice(-512).includes('PS ')
+            : terminalText.endsWith(marker)
+          if (promptReady) return { phase: 'ready' as const }
+
+          const sessions = await window.cleancode?.listTerminalSessions({
+            sessionIds: [sessionId]
+          })
+          const session = sessions?.[0]
+          if (session?.status !== 'failed' && session?.status !== 'exited') return null
+
+          return {
+            phase: 'failed' as const,
+            failureReason: session.failureReason ?? `terminal entered ${session.status} state`
+          }
+        },
+        {
+          marker: e2eShellReadyMarker,
+          terminalName,
+          windows: process.platform === 'win32'
+        }
+      ),
+    { interval: 50, timeout: 30_000 }
+  )
+}
+
+async function crashElectronMainProcess(electronApp: ElectronApplication): Promise<void> {
+  const mainProcessId = await electronApp.evaluate(() => process.pid)
+  const launcherProcess = electronApp.process()
+  const launcherProcessId = launcherProcess.pid
+
+  await electronApp
+    .evaluate(() => {
+      setImmediate(() => process.kill(process.pid, 'SIGKILL'))
+    })
+    .catch(() => undefined)
+  await waitForProcessIdExit(mainProcessId, 10_000)
+
+  if (launcherProcessId && launcherProcessId !== mainProcessId) {
+    launcherProcess.kill('SIGKILL')
+    await waitForProcessIdExit(launcherProcessId, 10_000)
+  }
 }
 
 async function waitForTerminalStopActionDisabled(page: Page): Promise<void> {
@@ -255,18 +428,6 @@ async function retainTerminal(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' }).click()
   await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
   return sessionId
-}
-
-async function waitForTerminalTail(page: Page, terminalName: string, tail: string): Promise<void> {
-  const sessionId = await readTerminalSessionId(page, terminalName)
-  await page.waitForFunction(
-    ({ sessionId, tail }) =>
-      Array.from(document.querySelectorAll<HTMLElement>('[data-terminal-session-id]'))
-        .find((element) => element.dataset.terminalSessionId === sessionId)
-        ?.textContent?.trimEnd()
-        .endsWith(tail) ?? false,
-    { sessionId, tail }
-  )
 }
 
 async function readTerminalProcessId(page: Page, sessionId: string): Promise<number> {

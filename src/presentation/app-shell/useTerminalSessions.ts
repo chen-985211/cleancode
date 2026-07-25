@@ -75,7 +75,10 @@ export function useTerminalSessions({
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
+  const terminalStartsRef = useRef<Set<string>>(new Set())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
+  const delayedFocusTimersRef = useRef<Set<number>>(new Set())
+  const isMountedRef = useRef(true)
   const currentProjectId = currentProject?.id ?? null
   const currentWorkspaceName = currentWorkspace?.name ?? null
   const isRuntimeReady = runtimeAvailability.phase === 'ready'
@@ -212,8 +215,29 @@ export function useTerminalSessions({
     [enqueueTerminalInputWrite]
   )
 
-  useEffect(
-    () => () => {
+  const scheduleTerminalFocus = useCallback(
+    (blockId: string) => {
+      if (!isMountedRef.current) return
+
+      const timerId = window.setTimeout(() => {
+        delayedFocusTimersRef.current.delete(timerId)
+        if (isMountedRef.current) focusTerminalBlock(blockId)
+      }, 80)
+      delayedFocusTimersRef.current.add(timerId)
+    },
+    [focusTerminalBlock]
+  )
+
+  useEffect(() => {
+    isMountedRef.current = true
+
+    return () => {
+      isMountedRef.current = false
+      for (const timerId of delayedFocusTimersRef.current) {
+        window.clearTimeout(timerId)
+      }
+      delayedFocusTimersRef.current.clear()
+
       for (const buffer of inputBuffersRef.current.values()) {
         if (buffer.timerId !== null) {
           window.clearTimeout(buffer.timerId)
@@ -223,11 +247,11 @@ export function useTerminalSessions({
       inputBuffersRef.current.clear()
       inputWriteQueuesRef.current.clear()
       terminalStartupOutputsRef.current.clear()
+      terminalStartsRef.current.clear()
       quickLaunchesRef.current.clear()
       terminalSurfaceRegistry.disposeAll()
-    },
-    [terminalSurfaceRegistry]
-  )
+    }
+  }, [terminalSurfaceRegistry])
 
   useTerminalSessionEvents({
     clearPendingTerminalInput,
@@ -266,7 +290,15 @@ export function useTerminalSessions({
         currentWorkspace.name,
         block.id
       )
+      const currentState = terminalStatesRef.current[terminalStateKey]
+      if (
+        terminalStartsRef.current.has(terminalStateKey) ||
+        (currentState?.status === 'running' && Boolean(currentState.sessionId))
+      ) {
+        return undefined
+      }
 
+      terminalStartsRef.current.add(terminalStateKey)
       clearPendingTerminalInput(terminalStateKey)
       try {
         const session = await startTerminalRuntimeSession({
@@ -286,6 +318,8 @@ export function useTerminalSessions({
       } catch (error) {
         notifyTerminalLaunchFailure(notify, error, t)
         return undefined
+      } finally {
+        terminalStartsRef.current.delete(terminalStateKey)
       }
     },
     [
@@ -359,10 +393,10 @@ export function useTerminalSessions({
       await startTerminal(block, defaultTerminalDimensions)
 
       if (shouldFocusTerminalAfterAction(options)) {
-        window.setTimeout(() => focusTerminalBlock(block.id), 80)
+        scheduleTerminalFocus(block.id)
       }
     },
-    [focusTerminalBlock, startTerminal, terminateTerminalSession]
+    [scheduleTerminalFocus, startTerminal, terminateTerminalSession]
   )
 
   const toggleTerminalRetention = useCallback(
@@ -526,7 +560,7 @@ export function useTerminalSessions({
         }
 
         if (shouldFocusTerminalAfterAction(options)) {
-          window.setTimeout(() => focusTerminalBlock(block.id), 80)
+          scheduleTerminalFocus(block.id)
         }
       } catch (error) {
         notifyTerminalLaunchFailure(notify, error, t)
@@ -540,9 +574,9 @@ export function useTerminalSessions({
       bindTerminalSession,
       currentProject,
       currentWorkspace,
-      focusTerminalBlock,
       isRuntimeReady,
       notify,
+      scheduleTerminalFocus,
       t,
       terminateTerminalSession
     ]

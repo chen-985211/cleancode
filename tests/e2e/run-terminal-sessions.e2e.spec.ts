@@ -42,8 +42,13 @@ import {
   setCanvasZoomFromDefault
 } from '../support/terminalSelectionE2e'
 import {
+  asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
-  e2eShellReadyMarker,
+  createE2eNodeCommand,
+  createE2eNodeScriptCommand,
+  createE2ePrintCommand,
+  createE2eStreamingCommand,
+  createE2eTerminalEnvironment,
   readTerminalSessionId,
   waitForTerminalOutput,
   waitForTerminalShellReady,
@@ -61,7 +66,7 @@ describe('run terminal sessions e2e', () => {
     workbench = await createE2eWorkbench('cleancode-run-terminal-e2e')
     resources.workbench = workbench
     electronApp = await launchApp(workbench, {
-      environment: { PS1: `${e2eShellReadyMarker} `, SHELL: '/bin/sh' }
+      environment: createE2eTerminalEnvironment()
     })
     resources.electronApp = electronApp
     page = await electronApp.firstWindow()
@@ -91,7 +96,15 @@ describe('run terminal sessions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        'printf cleancode-e2e-ok > terminal-command-output.txt; pwd > terminal-working-directory.txt\r'
+        asE2eTerminalInput(
+          createE2eNodeCommand(
+            [
+              "const { writeFileSync } = require('node:fs')",
+              "writeFileSync('terminal-command-output.txt', 'cleancode-e2e-ok')",
+              "writeFileSync('terminal-working-directory.txt', process.cwd())"
+            ].join(';')
+          )
+        )
       )
 
       expect(await waitForTextFile(commandOutputPath)).toBe('cleancode-e2e-ok')
@@ -122,7 +135,7 @@ describe('run terminal sessions e2e', () => {
       await configureAndStartTerminalLaunchCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(selectionFixturePath)}`
+        createE2eNodeScriptCommand(selectionFixturePath)
       )
       await waitForTerminalOutput(page, 'Terminal 1', controlText)
       await selectExactXtermText(page, terminal, controlText)
@@ -169,7 +182,7 @@ describe('run terminal sessions e2e', () => {
         workbench.projectDirectory,
         launchOutput
       )
-      const launchCommand = `node ${JSON.stringify(scriptPath)} ${JSON.stringify(reportPath)}`
+      const launchCommand = createE2eNodeScriptCommand(scriptPath, [reportPath])
 
       await configureAndStartTerminalLaunchCommand(page, 'Terminal 1', launchCommand)
       await waitForTerminalOutput(page, 'Terminal 1', launchOutput)
@@ -189,7 +202,7 @@ describe('run terminal sessions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        'while :; do printf streaming-output; sleep 0.02; done\r'
+        asE2eTerminalInput(createE2eStreamingCommand('streaming-output', 20))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'streaming-output')
 
@@ -272,7 +285,7 @@ describe('run terminal sessions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(fakeAgent.scriptPath)}\r`
+        asE2eTerminalInput(createE2eNodeScriptCommand(fakeAgent.scriptPath))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'FAKE_AGENT_READY')
       const started = await waitForFakeAgentReport(
@@ -330,11 +343,11 @@ describe('run terminal sessions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(fakeAgent.scriptPath)}\r`
+        asE2eTerminalInput(createE2eNodeScriptCommand(fakeAgent.scriptPath))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'FAKE_AGENT_READY')
       await page.locator('[data-terminal-block-id]').nth(1).locator('.terminal-viewport').click()
-      await page.keyboard.type('printf second-terminal-focus-ok', { delay: 10 })
+      await page.keyboard.type(createE2ePrintCommand('second-terminal-focus-ok'), { delay: 10 })
       await page.keyboard.press('Enter')
 
       await waitForTerminalOutput(page, 'Terminal 2', 'second-terminal-focus-ok')
@@ -351,7 +364,7 @@ describe('run terminal sessions e2e', () => {
       await writeTerminalCommand(
         page,
         'Terminal 1',
-        `node ${JSON.stringify(scriptPath)} ${JSON.stringify(reportPath)}\r`
+        asE2eTerminalInput(createE2eNodeScriptCommand(scriptPath, [reportPath]))
       )
       await waitForTerminalOutput(page, 'Terminal 1', 'MOUSE_REPORTER_READY')
       const zoom = await setCanvasZoomFromDefault(page, 'out')
@@ -414,7 +427,9 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '新建终端积木' }).click()
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
-  await page.waitForFunction(() =>
-    document.activeElement?.classList.contains('xterm-helper-textarea')
-  )
+  const terminalInput = page.getByLabel('Terminal input')
+  await terminalInput.focus()
+  await expect
+    .poll(() => terminalInput.evaluate((element) => element === document.activeElement))
+    .toBe(true)
 }
