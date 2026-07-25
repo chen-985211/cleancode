@@ -369,7 +369,7 @@ CleanCode MCP 继续由 Agent 上下文拥有，Provider 只负责把当前 laun
 2. 如果 Agent 启用 CleanCode MCP，创建本 launch 独立的 URL、Bearer Token 和审批作用域。
 3. Provider capability injector 生成仅作用于本次进程的 MCP 配置和追加指令。
 4. 启动 Agent CLI；Provider launch 启动后独立进入 running，MCP 继续等待当前 registration 完成认证 `initialize` 与 `notifications/initialized` 握手。
-5. MCP 注册失败或 10 秒内未完成握手时，独立投影 failed、清理失效端点并保留基础 terminal/launch；提示保持在当前 Agent 内，不得伪装为 ready 或升级成全局噪音。
+5. MCP 注册失败或 10 秒内未完成握手时，独立投影 failed、清理失效端点并保留基础 terminal/launch；当前 Agent 的 MCP 控件持续显示黄色状态点，失败转换只发送一次可自动关闭的应用警告通知，不得伪装为 ready、重复通知或使用整行提示制造噪音。
 6. Agent CLI 退出时立即关闭新调用准入、取消等待审批、排空已准入调用、注销端点并清理临时配置；Agent terminal 继续运行。
 
 Provider 的预批准范围只能匹配当前 `cleancode` Server。即使 Provider 已预批准，删除积木、解散组合和断开依赖仍由 cleancode 自己的审批策略决定。

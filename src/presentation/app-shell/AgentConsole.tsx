@@ -4,10 +4,11 @@ import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../con
 import { AgentConsoleActions } from './AgentConsoleActions'
 import { AgentMcpCapabilityToggle } from './AgentMcpCapabilityToggle'
 import { AgentProviderIcon } from './AgentProviderIcon'
-import { AgentProviderStatusView } from './AgentProviderStatusView'
+import { AgentProviderBlockingState, AgentProviderStatusControl } from './AgentProviderStatusView'
 import { AgentTerminalSurface } from './AgentTerminalSurface'
 import { AgentToolApprovalCard } from './AgentToolApprovalCard'
 import { resolveAgentApprovalPresentation } from './agentApprovalPresentation'
+import { deriveAgentProviderFeedback } from './agentProviderFeedback'
 import {
   createFallbackAgent,
   createWorkspaceKey,
@@ -18,9 +19,11 @@ import {
 } from './agentConsoleModel'
 import { formatProviderDisplayName, useAgentProviderDescriptor } from './useAgentProviderCatalog'
 import { useAgentProviderState } from './useAgentProviderState'
+import { useAgentProviderNotifications } from './useAgentProviderNotifications'
 import { useAgentSessionAttachment } from './useAgentSessionAttachment'
 import { useAgentTerminalView } from './useAgentTerminalView'
 import { useI18n } from './i18n/useI18n'
+import { useOptionalNotifications } from './useNotifications'
 
 export function AgentConsole({
   agent,
@@ -34,6 +37,7 @@ export function AgentConsole({
   onSelect
 }: AgentConsoleProps) {
   const { t } = useI18n()
+  const notifications = useOptionalNotifications()
   const activeAgent = agent ?? createFallbackAgent(currentWorkbench, currentWorkspace)
   const providerController = useAgentProviderState(activeAgent.providerId)
   const providerCatalog = useAgentProviderDescriptor(activeAgent.providerId)
@@ -43,7 +47,6 @@ export function AgentConsole({
     providerCatalog.descriptor !== null && providerCatalog.descriptor.capabilities.cleancodeMcp
   const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
   const [isMcpCapabilityUpdating, setIsMcpCapabilityUpdating] = useState(false)
-  const [mcpCapabilityError, setMcpCapabilityError] = useState<string | null>(null)
   const currentWorkspaceKey = createWorkspaceKey(
     currentWorkbench,
     currentWorkspace,
@@ -80,6 +83,15 @@ export function AgentConsole({
     currentWorkspaceKey,
     dimensionsRef,
     measuredTerminalKey
+  })
+  const providerFeedback = deriveAgentProviderFeedback({
+    attachment: attachOperation,
+    runtime: session?.runtime ?? null,
+    state: providerController.state
+  })
+  useAgentProviderNotifications({
+    events: providerFeedback.events,
+    scopeKey: currentWorkspaceKey
   })
   useAgentTerminalView({
     dimensionsRef,
@@ -143,7 +155,6 @@ export function AgentConsole({
     const requestGeneration = workspaceGenerationRef.current
     const requestWorkspaceKey = currentWorkspaceKey
     setIsMcpCapabilityUpdating(true)
-    setMcpCapabilityError(null)
     try {
       const result = await onMcpCapabilityChange(agent, enabled)
       if (!result) return
@@ -160,7 +171,11 @@ export function AgentConsole({
       }
     } catch {
       if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
-        setMcpCapabilityError(t('agent.mcpUpdateFailed'))
+        notifications.notify({
+          autoDismissMs: 6_000,
+          kind: 'warning',
+          title: t('agent.mcpUpdateFailed')
+        })
       }
     } finally {
       if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
@@ -193,15 +208,30 @@ export function AgentConsole({
                 onMcpCapabilityChange && supportsMcp ? (
                   <AgentMcpCapabilityToggle
                     enabled={agent.cleancodeMcpEnabled}
-                    error={mcpCapabilityError}
                     onChange={(enabled) => void updateMcpCapability(enabled)}
                     pending={isMcpCapabilityUpdating || isAttachPending}
+                    status={providerFeedback.mcpStatus}
                   />
                 ) : null
               }
               onRemove={onRemove}
               onRename={onRename}
               onSelect={onSelect ?? noop}
+              statusControl={
+                <AgentProviderStatusControl
+                  agentName={activeAgent.name}
+                  issues={providerFeedback.issues}
+                  onNewConversation={() => requestRestart('new')}
+                  onRestart={
+                    providerCatalog.descriptor?.capabilities.resume === true
+                      ? () => requestRestart('retry')
+                      : undefined
+                  }
+                  onRetryAttachment={retryAttachment}
+                  providerName={providerName}
+                  state={providerController.state}
+                />
+              }
             />
           ) : (
             <div className="agent-console-actions">
@@ -213,24 +243,24 @@ export function AgentConsole({
                 <strong className="agent-console__title">{activeAgent.name}</strong>
               </div>
               <div className="agent-console-actions__center" />
-              <div className="agent-console-actions__end" />
+              <div className="agent-console-actions__end">
+                <AgentProviderStatusControl
+                  agentName={activeAgent.name}
+                  issues={providerFeedback.issues}
+                  onNewConversation={() => requestRestart('new')}
+                  onRestart={
+                    providerCatalog.descriptor?.capabilities.resume === true
+                      ? () => requestRestart('retry')
+                      : undefined
+                  }
+                  onRetryAttachment={retryAttachment}
+                  providerName={providerName}
+                  state={providerController.state}
+                />
+              </div>
             </div>
           )}
         </div>
-        <AgentProviderStatusView
-          attachment={attachOperation}
-          onRetryAttachment={retryAttachment}
-          providerName={providerName}
-          runtime={session?.runtime ?? null}
-          state={providerController.state}
-          onNewConversation={() => requestRestart('new')}
-          onRetryInspection={providerController.retry}
-          onRetryRestore={
-            providerCatalog.descriptor?.capabilities.resume === true
-              ? () => requestRestart('retry')
-              : undefined
-          }
-        />
       </div>
       {activeApproval && activeApprovalPresentation && approvalController ? (
         <AgentToolApprovalCard
@@ -248,7 +278,15 @@ export function AgentConsole({
         role="region"
         aria-label={t('agent.cliSession', { provider: providerName })}
       >
-        {currentWorkspaceKey ? (
+        {providerFeedback.blocking ? (
+          <AgentProviderBlockingState
+            blocking={providerFeedback.blocking}
+            onRetryAttachment={retryAttachment}
+            onRetryInspection={providerController.retry}
+            providerName={providerName}
+            state={providerController.state}
+          />
+        ) : currentWorkspaceKey ? (
           <AgentTerminalSurface
             activeOutput=""
             providerName={providerName}

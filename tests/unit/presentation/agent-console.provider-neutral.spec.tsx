@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -219,7 +219,12 @@ describe('Agent console provider-neutral presentation', () => {
       />
     )
 
-    expect(await screen.findByRole('button', { name: '新对话' })).toBeInTheDocument()
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /^Future Agent 有 \d+ 个状态需要处理$/
+      })
+    )
+    expect(screen.getByRole('button', { name: '新对话' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重新启动 Agent' })).not.toBeInTheDocument()
   })
 })

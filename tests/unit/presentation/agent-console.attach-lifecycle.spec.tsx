@@ -94,8 +94,10 @@ describe('Agent console attach lifecycle', () => {
       />
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: '重新启动 Agent' }))
-    expect(await screen.findByText('无法连接 Codex 会话')).toBeInTheDocument()
+    await openAgentStatus('Agent 1')
+    fireEvent.click(screen.getByRole('button', { name: '重新启动 Agent' }))
+    await openAgentStatus('Agent 1')
+    expect(screen.getByText('无法连接 Codex 会话')).toBeInTheDocument()
     fireEvent.change(screen.getByRole('textbox', { name: 'Codex CLI 输入' }), {
       target: { value: 'still connected' }
     })
@@ -163,4 +165,12 @@ function deferred<T>() {
     resolve = resolvePromise
   })
   return { promise, resolve }
+}
+
+async function openAgentStatus(agentName: string): Promise<void> {
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: new RegExp(`^${agentName} 有 \\d+ 个状态需要处理$`)
+    })
+  )
 }

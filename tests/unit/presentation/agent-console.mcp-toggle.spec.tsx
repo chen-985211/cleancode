@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../../src/contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import { AgentConsole } from '../../../src/presentation/app-shell/AgentConsole'
+import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
 import type { AgentToolApprovalController } from '../../../src/presentation/app-shell/agentToolApprovalTypes'
 import {
   createAgentSessionSnapshot,
@@ -201,6 +202,37 @@ describe('Agent console CleanCode MCP toggle', () => {
       input: 'feature input',
       sessionId: 'agent-feature'
     })
+  })
+
+  it('reports an MCP switch failure through the notification center without inline text', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const agent = createAgent(workbench.project.id, currentWorkspace.name)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi()
+    })
+
+    const { container } = render(
+      <NotificationProvider>
+        <AgentConsole
+          agent={agent}
+          currentWorkbench={workbench}
+          currentWorkspace={currentWorkspace}
+          onMcpCapabilityChange={vi.fn(async () => {
+            throw new Error('restart failed')
+          })}
+          onRemove={vi.fn(async () => undefined)}
+          onRename={vi.fn(async () => undefined)}
+        />
+      </NotificationProvider>
+    )
+
+    await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('switch', { name: 'CleanCode MCP' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('未能切换 CleanCode MCP，请重试。')
+    expect(container.querySelector('.agent-mcp-capability__error')).toBeNull()
   })
 })
 
