@@ -26,7 +26,8 @@ export function AgentConsoleActions({
   identityControl,
   onRemove,
   onRename,
-  onSelect
+  onSelect,
+  statusControl
 }: {
   readonly agent: WorkspaceAgentSnapshot
   readonly capabilityControl?: ReactNode
@@ -34,6 +35,7 @@ export function AgentConsoleActions({
   readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   readonly onSelect?: () => void
+  readonly statusControl?: ReactNode
 }) {
   const { t } = useI18n()
   const [mode, setMode] = useState<'closed' | 'menu' | 'rename'>('closed')
@@ -197,6 +199,7 @@ export function AgentConsoleActions({
       </div>
       <div className="agent-console-actions__center">{capabilityControl}</div>
       <div className="agent-console-actions__end">
+        {mode !== 'rename' ? statusControl : null}
         {mode !== 'rename' ? (
           <span className="agent-console-actions__menu-anchor">
             <TooltipLabel content={t('sidebar.more')}>

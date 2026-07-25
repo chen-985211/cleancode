@@ -43,7 +43,7 @@ export class OpenCodeAgentProviderContribution implements AgentProviderContribut
   readonly descriptor = {
     capabilities: {
       activityTracking: true,
-      cleancodeMcp: 'best_effort',
+      cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
       sessionIdentityCapture: true,

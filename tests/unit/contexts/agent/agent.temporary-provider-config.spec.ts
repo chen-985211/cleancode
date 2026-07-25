@@ -7,6 +7,8 @@ const fileSystem = vi.hoisted(() => ({
 
 vi.mock('node:fs/promises', () => ({ ...fileSystem, default: fileSystem }))
 
+import { join } from 'node:path'
+
 import { createTemporaryProviderConfig } from '../../../../src/contexts/agent/infrastructure/providers/shared/TemporaryProviderConfig'
 
 describe('temporary Agent Provider config', () => {
@@ -16,6 +18,23 @@ describe('temporary Agent Provider config', () => {
     fileSystem.chmod.mockResolvedValue(undefined)
     fileSystem.writeFile.mockResolvedValue(undefined)
     fileSystem.rm.mockResolvedValue(undefined)
+  })
+
+  it('creates the temporary directory and config with private permissions', async () => {
+    const config = await createTemporaryProviderConfig(
+      'cleancode-provider-',
+      'provider.json',
+      '{"enabled":true}'
+    )
+
+    expect(fileSystem.chmod).toHaveBeenCalledWith('/tmp/cleancode-provider-config', 0o700)
+    expect(fileSystem.writeFile).toHaveBeenCalledWith(
+      join('/tmp/cleancode-provider-config', 'provider.json'),
+      '{"enabled":true}',
+      { encoding: 'utf8', mode: 0o600 }
+    )
+
+    await config.dispose()
   })
 
   it('removes its directory when config creation fails after allocation', async () => {

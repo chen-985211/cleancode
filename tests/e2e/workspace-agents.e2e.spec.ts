@@ -20,6 +20,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import {
+  asE2eTerminalInput,
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
   prependE2ePath
@@ -188,12 +189,12 @@ describe('workspace Agents e2e', () => {
 
       await ensureTerminalDomRenderer(terminal)
       await waitForTerminalDomText(terminal, 'CC_E2E_CODEX_READY')
-      await terminal.click()
-      await page.keyboard.press('Control+C')
-      await page.getByText('Codex 会话已结束').waitFor()
-      await terminal.click()
-      await page.keyboard.type(createE2ePrintCommand(`\n\n\n${outputLine}`))
-      await page.keyboard.press('Enter')
+      await stopFakeCodexForShellSetup(page, terminal)
+      await writeAgentTerminalInput(
+        page,
+        terminal,
+        asE2eTerminalInput(createE2ePrintCommand(`\n\n\n${outputLine}`))
+      )
       await waitForTerminalDomText(terminal, outputLine)
 
       const zoom = await setCanvasZoomFromDefault(page, 'in')
@@ -521,6 +522,71 @@ async function waitForTerminalDomText(terminal: Locator, text: string): Promise<
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
+}
+
+async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promise<void> {
+  const sessionId = await terminal.getAttribute('data-agent-terminal-session-id')
+  if (!sessionId) {
+    throw new Error('Agent terminal session identity is unavailable.')
+  }
+
+  await page.evaluate(
+    ({ sessionId }) =>
+      new Promise<void>((resolve, reject) => {
+        const api = window.cleancode
+        if (!api) {
+          reject(new Error('CleanCode desktop API is unavailable.'))
+          return
+        }
+
+        let unsubscribe = (): void => undefined
+        const timeout = window.setTimeout(() => {
+          unsubscribe()
+          reject(new Error('Timed out waiting for the fake Codex launch to exit.'))
+        }, 5_000)
+        unsubscribe = api.onAgentRuntimeChanged((event) => {
+          if (
+            event.sessionId !== sessionId ||
+            event.runtime.terminal.status !== 'running' ||
+            (event.runtime.launch.status !== 'exited' && event.runtime.launch.status !== 'stopped')
+          ) {
+            return
+          }
+
+          window.clearTimeout(timeout)
+          unsubscribe()
+          resolve()
+        })
+        void api.writeAgentSession({ input: '\x03', sessionId }).catch((error: unknown) => {
+          window.clearTimeout(timeout)
+          unsubscribe()
+          reject(error)
+        })
+      }),
+    { sessionId }
+  )
+}
+
+async function writeAgentTerminalInput(
+  page: Page,
+  terminal: Locator,
+  input: string
+): Promise<void> {
+  const sessionId = await terminal.getAttribute('data-agent-terminal-session-id')
+  if (!sessionId) {
+    throw new Error('Agent terminal session identity is unavailable.')
+  }
+
+  await page.evaluate(
+    async ({ input, sessionId }) => {
+      const api = window.cleancode
+      if (!api) {
+        throw new Error('CleanCode desktop API is unavailable.')
+      }
+      await api.writeAgentSession({ input, sessionId })
+    },
+    { input, sessionId }
+  )
 }
 
 async function waitForAgentSelectionState(

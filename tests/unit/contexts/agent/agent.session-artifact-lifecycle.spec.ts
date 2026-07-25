@@ -113,7 +113,7 @@ describe('Agent session launch artifact lifecycle', () => {
 
 class ArtifactProviderRegistry extends RecordingAgentProviderRegistry {
   constructor(disposals: readonly (() => Promise<void>)[]) {
-    super('codex', { cleancodeMcp: 'unsupported' })
+    super('codex', { cleancodeMcp: false })
     let launchIndex = 0
     this.contribution.launcher.createLaunchPlan = async (command) => {
       this.launchCommands.push(command)

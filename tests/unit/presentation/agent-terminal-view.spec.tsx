@@ -280,6 +280,7 @@ function createSession(): AgentSessionSnapshot {
         exitCode: null,
         processId: 42,
         status: 'running',
+        stopReason: null,
         viewIdentity: {
           blockId: 'agent-1',
           generation: 3,

@@ -290,7 +290,7 @@ function createManagedSession(): ManagedAgentSession {
     isTerminalRunning: true,
     isStopping: false,
     launchArtifacts: null,
-    mcpSupport: 'required',
+    mcpSupported: true,
     projectDirectory: '/repo/app',
     projectId: 'project-1',
     providerId: 'codex',
@@ -313,6 +313,7 @@ function createManagedSession(): ManagedAgentSession {
         exitCode: null,
         processId: 1,
         status: 'running',
+        stopReason: null,
         viewIdentity: null
       }
     },

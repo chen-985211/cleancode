@@ -1,0 +1,36 @@
+name: 功能建议
+description: 提议一种用户结果或产品能力
+title: '[功能]: '
+body:
+  - type: checkboxes
+    attributes:
+      label: 提交前检查
+      options:
+        - label: 我已经搜索过现有 Issue 和路线图文档，确认没有相同提议。
+          required: true
+  - type: textarea
+    attributes:
+      label: 问题
+      description: 你希望解决什么用户问题或工作流限制？
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 期望结果
+      description: 请描述用户可以观察到的结果，不必限定具体实现方式。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 使用示例
+      description: 请说明开发者或编码 Agent 会如何使用这项能力。
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: 考虑过的替代方案
+      description: 目前在 cleancode 内部或外部如何处理这个问题？
+  - type: textarea
+    attributes:
+      label: 范围与风险
+      description: 请说明你能识别出的运行时、数据、权限、兼容性或迁移风险。

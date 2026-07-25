@@ -68,6 +68,7 @@
 
 .agent-console-actions__end {
   justify-self: end;
+  gap: 2px;
 }
 
 .agent-console-actions__menu-anchor {
@@ -205,8 +206,7 @@
   padding: 0 7px;
 }
 
-.agent-console__title-row,
-.agent-runtime-notice {
+.agent-console__title-row {
   display: flex;
   align-items: center;
 }
@@ -340,106 +340,252 @@ img.agent-provider-icon {
   font-size: 12px;
 }
 
-.agent-runtime-notice {
-  min-width: 0;
-  min-height: 26px;
-  flex-wrap: wrap;
-  gap: 7px;
-  border-radius: 7px;
-  background: var(--cc-surface-subtle);
-  color: var(--cc-muted);
-  margin-bottom: 6px;
-  padding: 4px 7px;
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.agent-runtime-notice[data-tone='warning'] {
-  background: var(--cc-warning-soft);
-  color: var(--cc-warning-strong);
-}
-
-.agent-runtime-notice svg {
+.agent-provider-status-control {
+  display: inline-flex;
   flex: 0 0 auto;
 }
 
-.agent-runtime-notice--checking svg {
-  animation: agent-spin 900ms linear infinite;
-}
-
-.agent-runtime-notice__actions {
+.agent-provider-status-control__trigger {
+  position: relative;
   display: inline-flex;
-  margin-left: auto;
-  gap: 4px;
-}
-
-.agent-runtime-notice__actions button {
-  display: inline-flex;
+  width: 28px;
+  height: 28px;
   align-items: center;
-  height: 22px;
-  gap: 3px;
-  border: 1px solid var(--cc-border);
-  border-radius: 5px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  color: inherit;
-  font: inherit;
-  padding: 0 6px;
+  color: var(--cc-warning-strong);
 }
 
-.agent-runtime-notice__actions button:hover {
-  background: var(--cc-surface-hover);
+.agent-provider-status-control__trigger[data-tone='neutral'] {
+  color: var(--cc-muted-strong);
 }
 
-.agent-runtime-notice[data-tone='warning'] .agent-runtime-notice__actions button {
+.agent-provider-status-control__trigger:hover,
+.agent-provider-status-control__trigger[aria-expanded='true'] {
   border-color: var(--cc-warning-border);
+  background: var(--cc-warning-soft);
 }
 
-.agent-runtime-notice__actions button:focus-visible,
-.agent-runtime-notice__install-help button:focus-visible {
+.agent-provider-status-control__trigger:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 1px;
 }
 
-.agent-runtime-notice__install-help {
-  display: flex;
-  min-width: 0;
-  flex: 1 0 100%;
-  align-items: center;
-  gap: 5px;
-  padding-left: 21px;
+.agent-provider-status-control__count {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  min-width: 10px;
+  height: 10px;
+  place-items: center;
+  border: 1px solid var(--cc-surface);
+  border-radius: 999px;
+  background: var(--cc-warning-strong);
+  color: var(--cc-surface);
+  font-size: 7px;
+  font-weight: 750;
+  line-height: 1;
 }
 
-.agent-runtime-notice__install-help code {
+.agent-provider-status-control__trigger[data-tone='neutral'] .agent-provider-status-control__count {
+  background: var(--cc-muted-strong);
+}
+
+.agent-provider-status-panel {
+  --agent-status-enter-y: -3px;
+
+  position: fixed;
+  z-index: 200;
+  display: grid;
+  width: min(300px, calc(100vw - 16px));
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  border-radius: 10px;
+  background: var(--cc-surface-overlay);
+  box-shadow: var(--cc-shadow-floating);
+  padding: 8px;
+  transform-origin: top right;
+  animation: agent-console-menu-in 160ms ease-out;
+}
+
+.agent-provider-status-panel[data-side='top'] {
+  --agent-status-enter-y: 3px;
+
+  transform-origin: bottom right;
+}
+
+.agent-provider-status-panel__header {
+  display: flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 3px;
+}
+
+.agent-provider-status-panel__header strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.agent-provider-status-panel__header button {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cc-muted);
+}
+
+.agent-provider-status-panel__header button:hover {
+  border-color: var(--cc-border);
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.agent-provider-status-panel__issues {
+  display: grid;
+  gap: 4px;
+}
+
+.agent-provider-status-panel__issue {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border-radius: 7px;
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning-strong);
+  padding: 8px;
+}
+
+.agent-provider-status-panel__issue[data-tone='neutral'] {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-muted-strong);
+}
+
+.agent-provider-status-panel__issue > svg {
+  margin-top: 1px;
+}
+
+.agent-provider-status-panel__issue p {
+  margin: 0;
+  color: var(--cc-foreground);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agent-provider-status-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.agent-provider-status-panel__actions button,
+.agent-provider-empty-state__actions button,
+.agent-provider-empty-state__install-help button {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 10px;
+  padding: 0 8px;
+}
+
+.agent-provider-status-panel__actions button:hover,
+.agent-provider-empty-state__actions button:hover,
+.agent-provider-empty-state__install-help button:hover {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-hover);
+}
+
+.agent-provider-status-panel button:focus-visible,
+.agent-provider-empty-state button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
+}
+
+.agent-provider-empty-state {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  align-content: center;
+  justify-items: center;
+  gap: 9px;
+  color: var(--cc-muted-strong);
+  padding: 24px;
+  text-align: center;
+}
+
+.agent-provider-empty-state[data-tone='warning'] .agent-provider-empty-state__icon {
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning-strong);
+}
+
+.agent-provider-empty-state__icon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--cc-surface-subtle);
+  color: var(--cc-muted-strong);
+}
+
+.agent-provider-empty-state p {
+  max-width: 360px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.agent-provider-empty-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.agent-provider-empty-state__install-help {
+  display: flex;
+  width: min(420px, 100%);
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  background: var(--cc-surface-subtle);
+  padding: 5px 6px 5px 9px;
+}
+
+.agent-provider-empty-state__install-help code {
   overflow: hidden;
   min-width: 0;
   flex: 1;
-  color: currentcolor;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
   font-size: 9px;
-  opacity: 0.82;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agent-runtime-notice__install-help button {
-  display: inline-flex;
-  min-width: 51px;
-  height: 22px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-}
-
-.agent-runtime-notice__install-help button:hover {
-  background: var(--cc-warning-border);
+.agent-provider-empty-state__spinner {
+  animation: agent-spin 900ms linear infinite;
 }
 
 @keyframes agent-spin {
@@ -451,7 +597,7 @@ img.agent-provider-icon {
 @keyframes agent-console-menu-in {
   from {
     opacity: 0;
-    transform: translateY(var(--agent-menu-enter-y)) scale(0.98);
+    transform: translateY(var(--agent-menu-enter-y, var(--agent-status-enter-y))) scale(0.98);
   }
 
   to {

@@ -48,7 +48,7 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   readonly descriptor = {
     capabilities: {
       activityTracking: false,
-      cleancodeMcp: 'required',
+      cleancodeMcp: true,
       launchInstructions: true,
       resume: true,
       sessionIdentityCapture: true,
@@ -144,7 +144,7 @@ class CodexCleancodeCapabilityInjector implements AgentCapabilityInjector {
     return {
       args: [
         '--config',
-        `mcp_servers.cleancode={url=${JSON.stringify(command.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true,required=true,default_tools_approval_mode="approve"}`,
+        `mcp_servers.cleancode={url=${JSON.stringify(command.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true,default_tools_approval_mode="approve"}`,
         '--config',
         `developer_instructions=${JSON.stringify(cleancodeMcpDeveloperInstructions)}`
       ],

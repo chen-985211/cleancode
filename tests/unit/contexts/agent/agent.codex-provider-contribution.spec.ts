@@ -47,7 +47,7 @@ describe('Codex Agent Provider contribution', () => {
       expect(contribution.descriptor).toMatchObject({
         capabilities: {
           activityTracking: false,
-          cleancodeMcp: 'required',
+          cleancodeMcp: true,
           launchInstructions: true,
           resume: true,
           sessionIdentityCapture: true,
@@ -96,7 +96,7 @@ describe('Codex Agent Provider contribution', () => {
         ])
       )
       expect(plan.args.join('\n')).toContain('mcp_servers.cleancode=')
-      expect(plan.args.join('\n')).toContain('required=true')
+      expect(plan.args.join('\n')).not.toContain('required=true')
       expect(plan.args.join('\n')).toContain('developer_instructions=')
       expect(plan.args.join('\n')).toContain('notify=')
       expect(plan.env).toMatchObject({

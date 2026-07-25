@@ -40,4 +40,38 @@ describe('Agent CleanCode MCP capability toggle', () => {
     fireEvent.click(toggle)
     expect(onChange).not.toHaveBeenCalled()
   })
+
+  it.each([
+    ['ready', 'ready'],
+    ['initializing', 'connecting'],
+    ['failed', 'degraded']
+  ] as const)('shows the %s runtime as a %s status dot', (_runtimeStatus, status) => {
+    const { container } = render(
+      <AgentMcpCapabilityToggle enabled onChange={vi.fn()} pending={false} status={status} />
+    )
+
+    expect(container.querySelector('.agent-mcp-capability__status-dot')).toHaveAttribute(
+      'data-state',
+      status
+    )
+  })
+
+  it.each([
+    ['disabled', 'ready'],
+    ['unsupported', null]
+  ] as const)(
+    'keeps the MCP status dot hidden when runtime status is %s',
+    (_runtimeStatus, status) => {
+      const { container } = render(
+        <AgentMcpCapabilityToggle
+          enabled={false}
+          onChange={vi.fn()}
+          pending={false}
+          status={status}
+        />
+      )
+
+      expect(container.querySelector('.agent-mcp-capability__status-dot')).toBeNull()
+    }
+  )
 })

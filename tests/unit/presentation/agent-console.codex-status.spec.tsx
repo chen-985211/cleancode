@@ -208,7 +208,8 @@ describe('agent console Codex status', () => {
 
     render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
-    expect(await screen.findByText('Codex 会话启动失败')).toBeInTheDocument()
+    await openAgentStatus()
+    expect(screen.getByText('Codex 会话启动失败')).toBeInTheDocument()
     expect(screen.queryByText('未检测到 Codex CLI')).not.toBeInTheDocument()
   })
 
@@ -242,7 +243,8 @@ describe('agent console Codex status', () => {
 
     render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
-    expect(await screen.findByText('无法恢复上次对话')).toBeInTheDocument()
+    await openAgentStatus()
+    expect(screen.getByText('无法恢复上次对话')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
     await waitFor(() =>
       expect(attachAgentSession).toHaveBeenLastCalledWith(
@@ -253,6 +255,7 @@ describe('agent console Codex status', () => {
         })
       )
     )
+    await openAgentStatus()
     fireEvent.click(screen.getByRole('button', { name: '新对话' }))
     await waitFor(() =>
       expect(attachAgentSession).toHaveBeenLastCalledWith(
@@ -288,7 +291,8 @@ describe('agent console Codex status', () => {
 
     render(<AgentConsole currentWorkbench={workbench} currentWorkspace={currentWorkspace} />)
 
-    expect(await screen.findByText('Codex 会话已结束')).toBeInTheDocument()
+    await openAgentStatus()
+    expect(screen.getByText('Codex 会话已结束')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '重新启动 Agent' }))
     await waitFor(() =>
       expect(attachAgentSession).toHaveBeenLastCalledWith(
@@ -330,7 +334,8 @@ describe('agent console Codex status', () => {
       resolveInitialAttach?.(createRuntimeSession(1, 1, 'running'))
     })
 
-    expect(await screen.findByText('Codex 会话已结束')).toBeInTheDocument()
+    await openAgentStatus()
+    expect(screen.getByText('Codex 会话已结束')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '重新启动 Agent' }))
     await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('Codex 会话已结束')).not.toBeInTheDocument())
@@ -378,6 +383,14 @@ async function flushMicrotasks(): Promise<void> {
   await act(async () => {
     await Promise.resolve()
   })
+}
+
+async function openAgentStatus(): Promise<void> {
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: /^Agent 1 有 \d+ 个状态需要处理$/
+    })
+  )
 }
 
 function createRuntimeSession(
@@ -438,6 +451,7 @@ function createRuntime(
       exitCode: null,
       processId: terminalStatus === 'running' ? 42 : null,
       status: terminalStatus,
+      stopReason: null,
       viewIdentity: null
     }
   }

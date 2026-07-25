@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
 
 import type { AppNotificationController } from './appNotifications'
+import { ignoreAppNotifications } from './appNotifications'
 
 export type NotificationContextValue = AppNotificationController
 
@@ -14,4 +15,8 @@ export function useNotifications(): NotificationContextValue {
   }
 
   return context
+}
+
+export function useOptionalNotifications(): NotificationContextValue {
+  return useContext(NotificationContext) ?? ignoreAppNotifications
 }

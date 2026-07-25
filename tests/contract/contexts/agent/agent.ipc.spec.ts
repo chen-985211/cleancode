@@ -206,6 +206,14 @@ describe('agent IPC contract', () => {
       sessionId: 'agent-session-1'
     })
     expect(sender.send).toHaveBeenCalledWith(
+      'cleancode:agent-runtime-changed',
+      expect.objectContaining({
+        runtime: expect.objectContaining({
+          terminal: expect.objectContaining({ stopReason: null })
+        })
+      })
+    )
+    expect(sender.send).toHaveBeenCalledWith(
       'cleancode:agent-tool-approval-requested',
       expect.objectContaining({ approvalId: 'approval-1' })
     )
@@ -349,7 +357,7 @@ describe('agent IPC contract', () => {
         descriptor: {
           capabilities: {
             activityTracking: true,
-            cleancodeMcp: 'best_effort' as const,
+            cleancodeMcp: true,
             launchInstructions: true,
             resume: true,
             sessionIdentityCapture: true,
@@ -555,7 +563,7 @@ function createAgentIpcHandlersInput(input: {
         {
           capabilities: {
             activityTracking: false,
-            cleancodeMcp: 'required',
+            cleancodeMcp: true,
             launchInstructions: true,
             resume: true,
             sessionIdentityCapture: true,
@@ -632,6 +640,7 @@ function createRuntime(
       exitCode: null,
       processId: 42,
       status: 'running' as const,
+      stopReason: null,
       viewIdentity: {
         blockId: agentId,
         generation: 1,

@@ -18,6 +18,7 @@ import {
 } from '../ports/AgentProviderPreferencesRepository'
 import type { AgentLaunchPlan } from '../ports/AgentProviderContribution'
 import type { AgentSession } from '../../domain/aggregates/AgentSession'
+import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
@@ -210,9 +211,9 @@ export class AgentSessionService {
       )
     }
     const providerId = workspaceAgent?.providerId ?? command.providerId ?? this.defaultProviderId
-    const mcpSupport = this.providers.require(providerId).descriptor.capabilities.cleancodeMcp
+    const mcpSupported = this.providers.require(providerId).descriptor.capabilities.cleancodeMcp
     const providerSessionRef = persistedSession?.boundProviderSessionRef?.toSnapshot() ?? null
-    const cleancodeMcpEnabled = workspaceAgent?.cleancodeMcpEnabled ?? mcpSupport !== 'unsupported'
+    const cleancodeMcpEnabled = workspaceAgent?.cleancodeMcpEnabled ?? mcpSupported
     const session: ManagedAgentSession = {
       agentId: command.agentId,
       callbacks: createAgentSessionCallbacks(command),
@@ -222,7 +223,7 @@ export class AgentSessionService {
       isTerminalRunning: false,
       isStopping: false,
       launchArtifacts: null,
-      mcpSupport,
+      mcpSupported,
       shouldPersist,
       projectDirectory: command.projectDirectory,
       projectId: scope.toSnapshot().projectId,
@@ -232,11 +233,7 @@ export class AgentSessionService {
       rows: command.rows ?? 24,
       runtime: createInitialAgentRuntime({
         binding: providerSessionRef ? 'persisted' : 'unbound',
-        mcp: !cleancodeMcpEnabled
-          ? 'disabled'
-          : mcpSupport === 'unsupported'
-            ? 'unsupported'
-            : 'inactive'
+        mcp: !cleancodeMcpEnabled ? 'disabled' : !mcpSupported ? 'unsupported' : 'inactive'
       }),
       scope,
       sessionId: createAgentRuntimeSessionId(),
@@ -484,11 +481,7 @@ export class AgentSessionService {
     session.sessionId = createAgentRuntimeSessionId()
     session.runtime = createInitialAgentRuntime({
       binding: session.providerSessionRef ? 'persisted' : 'unbound',
-      mcp: cleancodeMcpEnabled
-        ? session.mcpSupport === 'unsupported'
-          ? 'unsupported'
-          : 'inactive'
-        : 'disabled'
+      mcp: cleancodeMcpEnabled ? (!session.mcpSupported ? 'unsupported' : 'inactive') : 'disabled'
     })
     this.toolInvocations.forgetSession(replacedSessionId)
     try {
@@ -572,6 +565,14 @@ export class AgentSessionService {
     })
     const artifacts = new AgentLaunchArtifactScope()
     session.launchArtifacts = artifacts
+    const isCurrentProviderLaunch = (): boolean =>
+      session.sessionId === processSessionId &&
+      session.providerLaunchGeneration === providerLaunchGeneration &&
+      !session.isStopping
+    const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot): void => {
+      if (!isCurrentProviderLaunch()) return
+      this.persistence.persist(session, sessionRef, providerLaunchGeneration)
+    }
     let plan: AgentLaunchPlan
     try {
       plan = await provider.launcher.createLaunchPlan({
@@ -583,22 +584,9 @@ export class AgentSessionService {
             }
           : undefined,
         ...(launchProfile ? { launchProfile } : {}),
-        onProviderSessionIdentified: (sessionRef) => {
-          if (
-            session.sessionId !== processSessionId ||
-            session.providerLaunchGeneration !== providerLaunchGeneration ||
-            session.isStopping
-          )
-            return
-          this.persistence.persist(session, sessionRef, providerLaunchGeneration)
-        },
+        onProviderSessionIdentified: persistProviderSessionRef,
         onActivityChanged: (activity) => {
-          if (
-            session.sessionId !== processSessionId ||
-            session.providerLaunchGeneration !== providerLaunchGeneration ||
-            session.isStopping
-          )
-            return
+          if (!isCurrentProviderLaunch()) return
           transitionAgentRuntime(session, { activity })
         },
         providerSessionRef: session.providerSessionRef ?? undefined,
@@ -624,6 +612,9 @@ export class AgentSessionService {
     try {
       const lifecycle = createAgentLaunchRuntimeController({
         attempt: providerLaunchGeneration,
+        onStartedAccepted: plan.providerSessionRefOnStarted
+          ? () => persistProviderSessionRef(plan.providerSessionRefOnStarted!)
+          : undefined,
         onUnexpectedExit: () => {
           this.beginSessionToolClosing(session)
           void this.settleSessionToolCalls(session)
@@ -649,7 +640,7 @@ export class AgentSessionService {
       this.beginSessionToolClosing(session)
       return
     }
-    if (!session.cleancodeMcpEnabled || session.mcpSupport === 'unsupported') {
+    if (!session.cleancodeMcpEnabled || !session.mcpSupported) {
       await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
         this.executeMcpTool(toolCommand)
       )
@@ -661,10 +652,9 @@ export class AgentSessionService {
       await registerAgentMcpEndpoint(session, this.mcpServerPort, (toolCommand) =>
         this.executeMcpTool(toolCommand)
       )
-    } catch (error) {
+    } catch {
       recordAgentMcpRegistrationFailure(session)
       this.toolInvocations.beginSessionClosing(session.sessionId)
-      if (session.mcpSupport === 'required') throw error
     }
   }
 

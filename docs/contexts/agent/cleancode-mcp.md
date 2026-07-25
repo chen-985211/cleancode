@@ -94,9 +94,9 @@ Agent 基础设施不得直接修改 BlockGraph 聚合、持久化文件或 Reac
 - 并发会话注册只共享一次 HTTP Server 监听初始化；监听失败必须显式结束注册并清理失败实例，畸形路径和请求不得把原始异常文本返回调用方。
 - `registerSession` 返回精确 registration handle；替代注册会使旧注册失效，但旧 handle 后续 `dispose` 只能释放自身，不能删除同 sessionId 的新注册。
 
-启用能力时，顺序固定为：先注册 MCP 端点，再由当前 Provider contribution 生成 launch 级配置，最后在 Agent terminal 中启动 Provider CLI。Codex 使用进程级 `--config` 注入 `mcp_servers.cleancode`、Token 环境变量、`required = true`、默认批准模式和 developer instructions；Claude Code 使用 mode `0600` 的会话临时 MCP 文件、环境变量展开的 Authorization header、`--mcp-config`、`--allowedTools mcp__cleancode__*` 和追加 system prompt；OpenCode 合并用户已有的 `OPENCODE_CONFIG_CONTENT`，用 `{env:...}` header 引用 launch token，并注入临时 instructions 与 `file://` reporter 插件。三者都不得覆盖用户其他 MCP 或写入工作区/全局配置。
+启用能力时，顺序固定为：先注册 MCP 端点，再由当前 Provider contribution 生成 launch 级配置，最后在 Agent terminal 中启动 Provider CLI。Codex 使用进程级 `--config` 注入 `mcp_servers.cleancode`、Token 环境变量、默认批准模式和 developer instructions；Claude Code 使用 mode `0600` 的会话临时 MCP 文件、环境变量展开的 Authorization header、`--mcp-config`、`--allowedTools mcp__cleancode__*` 和追加 system prompt；OpenCode 合并用户已有的 `OPENCODE_CONFIG_CONTENT`，用 `{env:...}` header 引用 launch token，并注入临时 instructions 与 `file://` reporter 插件；Gemini 使用 mode `0600` 的 launch 临时 system settings，通过 `GEMINI_CLI_SYSTEM_SETTINGS_PATH` 注入 `mcpServers.cleancode.httpUrl`、引用 `${CLEANCODE_MCP_TOKEN}` 的 Authorization header 与 `trust: true`。Gemini 依赖官方 settings 层的对象合并语义保留用户和项目中的其他 MCP；四者都不得覆盖用户其他 MCP 或写入工作区/全局配置。
 
-Provider 对 MCP readiness 的声明分为三类：`required` 必须在认证后的 `initialize` 请求与随后 `notifications/initialized` 通知都完成后才把 launch 投影为 running；`best_effort` 可以在 MCP initializing 时运行，但注册或握手失败必须单独显示 capability unavailable；`unsupported` 不注册端点且 UI 不提供开关。未鉴权通知、只发 initialized 通知、旧 registration 回调或已注销回调都不能发布 ready。
+Provider 只声明是否支持安全的 launch 级 CleanCode MCP 注入，不声明失败策略。支持时，Provider launch 与 MCP readiness 独立投影：launch 启动后即可进入 running；认证后的 `initialize` 请求与随后 `notifications/initialized` 通知完成后，MCP 才进入 ready。端点注册失败或注册后 10 秒内未完成握手时，只把 MCP 投影为 failed 并释放失效端点，不中断 terminal 或 Provider launch。不支持时不注册端点且 UI 不提供开关。未鉴权通知、只发 initialized 通知、旧 registration 回调、已注销回调或迟到超时都不能发布 ready 或覆盖新 registration。
 
 关闭能力或 Provider 不支持该能力时，不注册端点，也不注入配置、Token 或画布路由 instructions。UI 对不支持的 Provider 隐藏开关，不能伪装成已启用。开启时，配置只约束画布意图路由，不改变 Provider 的 sandbox、全局 approval policy、Shell、文件、Git、网络或其他 MCP Server 权限。画布工具说明同时由 launch 级指令和 MCP `initialize` 响应提供。
 
@@ -209,7 +209,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 - Token 只用于当前子进程环境和 HTTP 鉴权，不得写入持久化会话、审计输入或用户全局配置。
 - 未通过鉴权的请求不得进入 JSON-RPC 桥接层或应用层用例。
 - 超过 1 MiB 的请求体必须在 HTTP 边界拒绝，不得通过无界缓冲消耗主进程内存。
-- Provider 的 MCP 配置必须是 launch scoped；Provider 支持 required 契约时必须启用，初始化或策略失败不得被界面伪装成可用。
+- Provider 的 MCP 配置必须是 launch scoped；注册、初始化或策略失败不得被界面伪装成可用，也不得连带阻断仍可用的 Provider launch。
 - Token 进入 Provider 配置时必须通过官方支持的环境变量引用；临时配置文件不得包含 token 明文。
 - ready 只能来自当前精确 registration 的已鉴权完整初始化握手；替代注册后旧 handle、旧通知和旧回调不得改变当前 runtime。
 - Provider 原生允许范围只能匹配当前 `cleancode` Server 工具，不得扩展到全局权限或其他 MCP Server。
@@ -247,7 +247,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 | Contract / JSON-RPC      | `0.3.1` 初始化、自描述端口策略、工具列表、稳定调用 ID、结构化/净化错误                                                             | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Contract / HTTP          | 本机端点、Bearer 鉴权、1 MiB 请求体上限、完整初始化握手、精确替代注册、监听失败/并发初始化、净化请求错误和业务错误的 HTTP 200 通道 | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Integration / BlockGraph | 四个工作流工具复用真实 BlockGraph 用例、持久化与领域错误透传                                                                       | [`agent.block-graph-tool-adapter.spec.ts`](../../../tests/integration/contexts/agent/agent.block-graph-tool-adapter.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Unit / Provider          | Codex/Claude/OpenCode 条件注入、环境变量 Token、精确工具允许范围、用户配置合并和可重试 launch-scope 清理                           | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts)                                                                                                                                                                   |
+| Unit / Provider          | Codex/Claude/OpenCode/Gemini 条件注入、环境变量 Token、精确工具允许范围、用户配置合并和可重试 launch-scope 清理                    | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.gemini-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.gemini-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts)                                    |
 
 手工验收至少覆盖：
 
@@ -258,7 +258,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 5. 移除 Agent 或退出应用后，旧端点和待审批调用不可继续使用。
 6. 同一工作区的多个 Agent 使用不同会话端点，审批和调用不串线；同时发起图工具时按工作区串行执行且不丢失已完成变更。
 7. 在没有更高优先级组织受管策略覆盖时，CleanCode MCP 工具不触发 Provider 的重复审批；破坏性工具仍只等待 cleancode UI 审批。
-8. 支持 required MCP 契约的 Provider 在 Server 无法初始化时启动或恢复失败并展示异常；任何 Provider 都不得把策略阻止伪装成 MCP 已可用。
+8. 任一支持 MCP 的 Provider 在 Server 无法注册或认证初始化握手超时时，Agent 仍可使用，MCP 图标以黄色状态点持续显示不可用，并在失败首次被当前作用域观察到时发送一次可自动关闭的应用警告通知；不得使用整行内联提示或把失败伪装成 MCP 已可用。
 9. Agent 完成终端工作流后只排列精确相关终端；布局位于发起 Agent 附近并避开其他 Agent/无关对象，用户同时拖动的终端或组合不被迟到布局覆盖，实际变化最多触发一次画布聚焦。
 10. 为两个可能并行运行的项目或 worktree 搭建本地服务工作流时，Agent 对已有惯用端口默认写入 `preferred` 与经仓库确认的环境变量或参数注入；没有惯用端口时使用 `auto`；只有明确不可变端口约束时才写入 `fixed`，并在最终说明中报告策略和注入方式而不是声称已经获得实际端点。
 

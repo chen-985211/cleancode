@@ -317,7 +317,7 @@ Agent 控制台必须：
 
 用户尚未设置默认值时，首个已安装 Provider 可以作为本次会话的有效默认值；用户明确设置的 Provider 后来不可用时不得静默切换到其他 Provider。没有有效默认值或没有可创建 Provider 时，主按钮必须打开 Agent 设置完成引导，不得创建猜测的 Provider。Provider 发现期间分段按钮保持尺寸稳定并防止提交；创建动作必须在持久化前重新验证当前 Provider 可用性和完整 Project 工作区作用域并阻止重复提交。名称由 Agent 后端在工作区事务中原子分配；初始位置由主画布统一创建协调策略预留并提交，后端负责校验、组合默认尺寸并持久化完整布局。旧项目或工作区迟到的成功/失败结果不得插入、聚焦或覆盖当前工作面。创建失败使用应用级错误反馈，不重新打开 Provider 选择流程。创建后不得出现切换 Provider 的入口；需要其他 Provider 时新建 Agent。
 
-Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code 和 OpenCode 提供正式会话引用、恢复、launch instructions 与 CleanCode MCP；Claude Code 和 OpenCode 提供精确活动跟踪，Codex 不声明该能力。其余目录项当前只声明基础终端能力，不展示虚假的恢复、活动状态或 MCP 承诺。
+Provider catalog、图标和能力必须从 registry descriptor 投影，Presentation 不得按 Provider ID 分支。任意新注册且通过 contribution 校验的 Provider 必须无需修改 Presentation 即可进入同一检测、默认选择、设置状态和 Agent 控制台流程，并且只在其 CLI 检测为已安装时成为创建候选；未注册 Provider 必须在应用边界被拒绝，不能由 UI 猜测能力。当前 Codex、Claude Code、OpenCode 和 Gemini 提供正式会话引用与恢复；四者都支持 CleanCode MCP。Codex、Claude Code 和 OpenCode 还提供 launch instructions；Claude Code 和 OpenCode 提供精确活动跟踪。其他目录项当前只声明基础终端能力；各 Provider 未声明的可选能力不得由 UI 猜测或展示。
 
 Agent 设置必须用单一页面展示应用级默认值和完整目录，不提供模型选择。页面顶部提供 `Yolo / 手动` 权限选择与“新 Agent 默认启用 CleanCode MCP”开关；默认值分别为 `Yolo` 和开启。MCP 默认开关只初始化之后新建的 Agent，不能批量改写已有 Agent，且不支持 MCP 的 Provider 最终仍保持关闭。权限模式和 Provider 启动覆盖在下次启动或重启时生效。
 
@@ -329,11 +329,11 @@ Agent 设置必须用单一页面展示应用级默认值和完整目录，不�
 
 Agent terminal 使用 Run 的长期 shell、权威终端模型、单调 sequence、snapshot 和 attach/detach 协议，但保持 Agent 自己的画布外观与动作。Provider CLI 自然退出或把 `Ctrl+C` 解释为退出时，只结束当前 Agent launch；Agent 节点、终端屏幕、对话绑定和底层可输入 shell 必须保留。会话结束状态提供“重新启动 Agent”和“新对话”：前者在同一 terminal 中恢复当前对话，后者清除当前分支绑定后启动新对话。两者都不得替换 Agent 身份或影响其他 Agent。
 
-首次连接 Agent terminal、重新启动或新对话的正常 attach 中间态保持静默，不显示解释性状态条；attach 失败时，Agent 控制台必须保留明确错误和同一作用域的重试动作，不得静默显示成空白终端。重复点击重试只能提交一个在途请求；已有 terminal 绑定在替代 attach 失败时继续可输入。用户切换项目或工作区后，旧作用域迟到的 attach 结果不得替换当前 Agent 状态。
+首次连接 Agent terminal、重新启动或新对话的正常 attach 中间态保持静默，不显示解释性状态条；attach 失败时，Agent 控制台必须保留明确错误和同一作用域的重试动作，不得静默显示成空白终端。没有可用 runtime 时在终端区域使用局部空状态；已有 terminal 绑定时聚合进头部单一 Agent 状态入口，terminal 内容与输入保持原位，不使用会挤压终端的整行提示。重复点击重试只能提交一个在途请求；已有 terminal 绑定在替代 attach 失败时继续可输入。用户切换项目或工作区后，旧作用域迟到的 attach 结果不得替换当前 Agent 状态。
 
-Provider-session binding 是独立于 terminal、launch 和 activity 的恢复持久化状态。正式会话引用保存失败时必须提示本次对话仍可继续、但不能承诺下次恢复；不得把仍在运行的 launch 或活动改写为失败，也不得回退到最近会话、其他 Agent 或其他分支的引用。
+Provider-session binding 是独立于 terminal、launch 和 activity 的恢复持久化状态。正式会话引用保存失败时必须通过头部 Agent 状态入口持续提示本次对话仍可继续、但不能承诺下次恢复，并在本次失败首次被当前作用域观察到时发送一次应用警告通知；不得把仍在运行的 launch 或活动改写为失败，也不得回退到最近会话、其他 Agent 或其他分支的引用。
 
-CleanCode MCP 开关只控制 cleancode 内建画布 MCP。Provider 不支持该能力时不显示开关；支持时只注入本 launch 的 URL、Token、精确工具允许范围和画布语义，不修改用户全局配置或扩大 Shell、文件、Git、网络和其他 MCP 权限。当前 Codex 的 MCP 为 `required`：开启后，当前 registration 完成认证初始化握手前 launch 不得进入 running，失败时本次 launch 失败。Claude Code 和 OpenCode 为 `best_effort`：launch 可以在 MCP 初始化时运行，MCP 失败必须独立告警并保留基础 terminal/launch。切换能力可以替换当前 runtime session/launch 并继续受支持的原对话，必须释放旧端点、临时配置和待审批请求。删除画布对象、解散组合和断开终端依赖始终经过 cleancode 独立审批，不能被 Provider 原生允许范围绕过。
+CleanCode MCP 开关只控制 cleancode 内建画布 MCP。Provider 不支持该能力时不显示开关；支持时只注入本 launch 的 URL、Token、精确工具允许范围和已声明的画布语义，不修改用户全局配置或扩大 Shell、文件、Git、网络和其他 MCP 权限。Codex、Claude Code、OpenCode 和 Gemini 使用统一失败语义：Provider launch 不等待 MCP readiness；注册失败或认证初始化握手超时只把 MCP 标记为不可用，terminal 和 launch 保持可用。MCP 图标右下角投影独立 readiness：连接中使用中性点、ready 使用绿色点、不可用但 Agent 仍可运行时使用黄色点，关闭时不显示状态点；颜色必须同时配有 Tooltip 和可访问状态文本。MCP 失败首次被当前作用域观察到时发送一次可自动关闭的应用警告通知，持续事实仍由状态点表达；不得使用整行内联提示、红色阻塞语义、弹窗或遮挡终端正文。切换工作区或重新挂载时，已存在的失败只作为当前状态基线，不重复通知。Provider 是否同时提供 launch instructions 由独立 capability 决定，不能从 MCP 支持推断。切换能力可以替换当前 runtime session/launch 并继续受支持的原对话，必须释放旧端点、临时配置和待审批请求。删除画布对象、解散组合和断开终端依赖始终经过 cleancode 独立审批，不能被 Provider 原生允许范围绕过。
 
 删除终端或解散组合的审批必须明确展示动作、目标名称、目标 ID、影响范围和保留/执行动作，不得只展示机器 ID。断开依赖的审批必须显示上游名称/ID、下游名称/ID、精确连接 ID，并说明只断开这一条依赖，保留两端终端、启动命令、执行配置和组合。审批出现时，画布必须用临时“审批意图连线”连接发起请求的 Agent 与目标对象，并为目标提供区别于普通选择态的审批高亮；折叠组合中的目标终端由组合节点作为可见代理并标明对应待处理内容。断开依赖时，展开端点高亮真实依赖边，折叠端点使用不可交互的临时代理边；两端位于同一折叠组合时不得画自环，只标明组合“包含待断开依赖”。这些投影不得持久化、参与选择、删除或重连。用户可以通过“在画布中查看”同时聚焦 Agent 与所有可见目标，但不得因此改写现有选择。批准后卡片保持执行中状态直到收到实际结果；拒绝、成功或会话取消后移除，执行失败时保留明确错误，目标已不存在时禁用破坏性动作并提示 AI 重新检查画布。多个请求按到达顺序展示，并提示剩余请求数量。
 
@@ -363,6 +363,12 @@ Agent 控制台不得展示终端端口，不得加入终端组合，也不得�
 - 浏览器预览、桌面运行时不可用和真实桌面能力必须清楚区分。
 
 应用级通知属于表现层易失状态，用于反馈已经发生或正在进行且不应占用常驻操作区域的事件。通知必须从窗口右上角弹出，支持信息、成功、警告、错误和活动语义，多条通知可以堆叠并分别关闭；同一事件可以原地更新内容和语义，也可以携带一个与事件作用域一致的上下文动作。异步动作进行中必须显示进行中文案、禁用重复提交，并在完成后恢复或随事件更新。错误通知默认保留到用户关闭，其他通知可以按事件需要自动关闭。通知关闭只移除界面反馈，不得修改事件所属上下文的业务状态、终端输出或诊断事实。通知不跨应用重启恢复，也不得替代节点、连线或对象自身需要长期保留的状态表达。
+
+Agent 运行反馈由单一 Provider-neutral 策略按影响范围投影：仍然存在且需要处理的 Agent 问题聚合进头部单一状态入口，只有没有可用 runtime 的状态才占用终端区域，只有用户在界面上无从察觉的事实才进入应用通知。MCP readiness 只投影在 MCP 控件；多个独立 Agent 问题不得因条件分支优先级互相覆盖。
+
+当前只有 Provider-session binding 保存失败和 CleanCode MCP 不可用具备通知资格，理由是两者都不改变用户看得见的会话表现。attach 失败、Provider 启动失败、terminal 启动失败、会话结束和会话中断一律只使用状态入口或终端区域：用户此刻正看着该对象，或者结果正是他自己的动作所要求的，重复打断不增加信息。删除 Agent、切换 CleanCode MCP 能力、恢复工作目录所有权和应用退出属于用户主动请求的停止，不得因为运行时随之进入 exited 而产生失败通知或失败文案。terminal 从未启动成功才表述为启动失败；已经运行过再意外结束表述为会话中断。是否属于意外只按运行时给出的停止原因判断，不得从状态自行推断：停止原因为用户请求时，该次结束不产生任何待处理提示，头部状态入口保持安静；只有意外结束和原因缺失才保留会话中断提示与重试入口。
+
+同一作用域的同一事件只在从正常状态进入异常状态时通知一次，恢复后再次失败可以重新通知；首次挂载和工作区切换后的现存状态作为安静基线。
 
 ## 关键验收不变量
 

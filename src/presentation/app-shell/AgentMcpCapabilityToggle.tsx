@@ -1,28 +1,47 @@
+import { useId } from 'react'
+
+import type { AgentMcpPresentationStatus } from './agentProviderFeedback'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 
 export function AgentMcpCapabilityToggle({
   enabled,
-  error,
   onChange,
-  pending
+  pending,
+  status = null
 }: {
   readonly enabled: boolean
-  readonly error?: string | null
   readonly onChange: (enabled: boolean) => void
   readonly pending: boolean
+  readonly status?: AgentMcpPresentationStatus | null
 }) {
   const { t } = useI18n()
+  const statusDescriptionId = useId()
   const capabilityTooltip = t('agent.mcpTooltip')
+  const visibleStatus = enabled ? status : null
+  const statusLabel = visibleStatus ? t(`agent.mcpStatus.${visibleStatus}`) : null
   return (
     <span className="agent-mcp-capability nodrag">
-      <TooltipLabel content={capabilityTooltip} side="bottom">
+      <TooltipLabel
+        content={
+          statusLabel ? (
+            <span className="agent-mcp-capability__tooltip">
+              <strong>{statusLabel}</strong>
+              <span>{capabilityTooltip}</span>
+            </span>
+          ) : (
+            capabilityTooltip
+          )
+        }
+        side="bottom"
+      >
         <button
           className="agent-mcp-capability__switch nodrag"
           type="button"
           role="switch"
           aria-busy={pending}
           aria-checked={enabled}
+          aria-describedby={statusLabel ? statusDescriptionId : undefined}
           aria-label={t('agent.mcpName')}
           disabled={pending}
           onClick={(event) => {
@@ -30,16 +49,21 @@ export function AgentMcpCapabilityToggle({
             onChange(!enabled)
           }}
         >
-          <McpGlyph />
+          <span className="agent-mcp-capability__icon-wrap" aria-hidden="true">
+            <McpGlyph />
+            {visibleStatus ? (
+              <span className="agent-mcp-capability__status-dot" data-state={visibleStatus} />
+            ) : null}
+          </span>
           <span className="agent-mcp-capability__label">{t('agent.mcpName')}</span>
           <span className="agent-mcp-capability__track" aria-hidden="true">
             <span className="agent-mcp-capability__thumb" />
           </span>
         </button>
       </TooltipLabel>
-      {error ? (
-        <span className="agent-mcp-capability__error" role="alert">
-          {t('agent.mcpToggleFailed')}
+      {statusLabel ? (
+        <span className="sr-only" id={statusDescriptionId}>
+          {statusLabel}
         </span>
       ) : null}
     </span>

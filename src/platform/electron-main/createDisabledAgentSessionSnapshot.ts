@@ -36,6 +36,7 @@ export function createDisabledAgentSessionSnapshot(command: {
         exitCode: null,
         processId: null,
         status: 'exited',
+        stopReason: 'requested',
         viewIdentity: null
       }
     },

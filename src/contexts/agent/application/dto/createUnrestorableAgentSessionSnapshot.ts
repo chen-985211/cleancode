@@ -34,6 +34,7 @@ export function createUnrestorableAgentSessionSnapshot(input: {
         exitCode: null,
         processId: null,
         status: 'not_started',
+        stopReason: null,
         viewIdentity: null
       }
     },

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -13,7 +13,7 @@ import {
 const futureProvider = {
   capabilities: {
     activityTracking: false,
-    cleancodeMcp: 'unsupported',
+    cleancodeMcp: false,
     launchInstructions: true,
     resume: false,
     sessionIdentityCapture: false,
@@ -82,7 +82,7 @@ describe('Agent console provider-neutral presentation', () => {
     const agent = createAgent(futureProvider.id, workbench.project.id)
     const mcpProvider = {
       ...futureProvider,
-      capabilities: { ...futureProvider.capabilities, cleancodeMcp: 'best_effort' as const }
+      capabilities: { ...futureProvider.capabilities, cleancodeMcp: true }
     }
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -219,7 +219,12 @@ describe('Agent console provider-neutral presentation', () => {
       />
     )
 
-    expect(await screen.findByRole('button', { name: '新对话' })).toBeInTheDocument()
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /^Future Agent 有 \d+ 个状态需要处理$/
+      })
+    )
+    expect(screen.getByRole('button', { name: '新对话' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '重新启动 Agent' })).not.toBeInTheDocument()
   })
 })

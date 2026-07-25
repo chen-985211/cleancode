@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<style>:root{color:#24292f}@media(prefers-color-scheme:dark){:root{color:#f0f6fc}}</style>
+
+<path d="M0 0H512V512H0Z" fill="#131010"/><path d="M320 224V352H192V224H320Z" fill="#5A5858"/><path d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="#FFFFFF" fill-rule="evenodd"/>
+</svg>

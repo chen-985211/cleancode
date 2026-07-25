@@ -91,7 +91,7 @@ export function TooltipLabel({
   children,
   content,
   ...contentProps
-}: Omit<ComponentProps<typeof TooltipContent>, 'children'> & {
+}: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
 }) {
@@ -119,7 +119,7 @@ function TooltipLabelWithInputMode({
   content,
   inputModeRef,
   ...contentProps
-}: Omit<ComponentProps<typeof TooltipContent>, 'children'> & {
+}: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
   readonly inputModeRef?: MutableRefObject<TooltipInputMode>

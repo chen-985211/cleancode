@@ -60,7 +60,7 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 ## Agent 集成
 
-当前 registry 内建 33 个 Agent Provider。Codex、Claude Code 和 OpenCode 提供增强 contribution；其余项目以数据驱动的基础终端 contribution 提供 PATH 检测、交互启动命令、离线品牌图标与官方文档。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry 中的 descriptor、detector 和 launcher；session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 `required / best_effort / unsupported` CleanCode MCP 均由 Provider 如实声明并提供对应 contribution。
+当前 registry 内建 33 个 Agent Provider。Codex、Claude Code 和 OpenCode 提供专用增强 contribution；Gemini 在数据驱动的基础终端 contribution 上组合声明式 session 与 MCP 配方；其余项目提供 PATH 检测、交互启动命令、离线品牌图标与官方文档。每个稳定 Agent 在创建时固定一个 Provider；同一工作区可以同时运行多个 Agent，不提供 Provider 切换。通用 Agent 流程只依赖 registry contribution；fresh session、session-ref codec、恢复、身份捕获、活动跟踪、launch instructions 与 CleanCode MCP 支持均由 Provider 如实声明并提供对应实现。
 
 registry descriptor 集合是完整的受支持 Provider catalog；专用 discovery 用例通过共享 `AgentProviderAvailabilityService` 检查该 catalog，只把 `installed` Provider 投影为可创建结果。共享服务合并并发检查、缓存易失快照并支持显式刷新；Agent 创建在持久化前执行新的可用性检查，已有持久化 Agent 则不因当前 CLI 不可用而从工作区消失。新工作区始终原子初始化为空 Agent 列表，只有用户明确执行新建操作后才检查 Provider 并创建 Agent。
 
@@ -68,9 +68,9 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 
 共享 CLI detector 可以区分 `installed`、`missing`、`upgrade_required` 和 `temporarily_unavailable`。基础终端目录只检查 PATH 上的主命令、别名和必需伴随命令，不执行第三方 CLI。只有声明最低版本的 Provider 才进行语义版本比较；当前 Claude Code 要求 `2.1.119` 或更高版本，其他 Provider 不得虚构 `upgrade_required`。版本与安装结果是应用级易失快照，不是 Agent 或对话的持久化事实。
 
-每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume` 和进程级 `notify` 报告 thread UUID，不声明精确活动跟踪，CleanCode MCP 为 `required`；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动，MCP 为 `best_effort`；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入 `best_effort` 远程 MCP 与临时 instructions。三者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
+每个运行时 Agent 拥有独立 `sessionId`、Run `agent` owner terminal、前台 launch 和审批队列，并分别投影 terminal、launch、activity、MCP readiness 与 Provider-session binding。Codex 通过正式 `resume` 和进程级 `notify` 报告 thread UUID，不声明精确活动跟踪；Claude Code 通过正式 session ID、resume 参数和带随机令牌的 Hook relay 报告会话与活动；OpenCode 通过 `opencode-session`、`--session` 和 launch 级 `file://` 插件事件报告会话与活动，并以合并后的 `OPENCODE_CONFIG_CONTENT` 注入远程 MCP 与临时 instructions；Gemini 通过正式 `--session-id` 接受 cleancode 预分配 UUID，在 launch 启动后确认绑定并以 `--resume` 恢复，同时通过临时 system settings 注入 MCP。四者的 Token 都只经进程环境传递，配置不得写入用户工作区或全局目录。
 
-`required` MCP 必须完成当前 registration 的认证初始化握手后 launch 才能进入 running；`best_effort` Provider 可以在 MCP 初始化或失败时继续使用终端，但必须独立投影能力状态。Provider session ref 保存失败只把 binding 标记为 `persistence_failed`，不得把仍在运行的 launch 或活动误报为失败。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
+CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Provider 在 MCP 初始化或失败时仍可正常运行；注册失败或认证握手超时只把 MCP 投影为 `failed`。Provider session ref 保存失败只把 binding 标记为 `persistence_failed`，不得把仍在运行的 launch 或活动误报为失败。稳定身份、能力开关与 Provider session ref 见 [Agent 与会话生命周期](../contexts/agent/agent-session.md)；协议面与工具目录见 [cleancode 原生 MCP](../contexts/agent/cleancode-mcp.md)。
 
 ## 存储层
 
@@ -97,7 +97,7 @@ macOS/Linux 上的 `NodeAgentProviderShellPathHydrator` 在检测前通过当前
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
-本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和关键 E2E smoke。完整 Electron E2E 由 CI workflow 和显式 `pnpm test:full` 覆盖；CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
+本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和完整 Electron E2E。CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。
 
 ## 候选技术与触发条件
 

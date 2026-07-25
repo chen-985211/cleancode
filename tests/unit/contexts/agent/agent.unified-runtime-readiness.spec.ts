@@ -18,15 +18,13 @@ import {
 } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 import { RecordingAgentTerminalRuntime } from '../../../fixtures/agentTerminalRuntime'
 
-type DesiredMcpCapability = 'required' | 'best_effort' | 'unsupported'
-
 describe('Agent unified runtime readiness contract', () => {
-  it('keeps a required-MCP launch gated until the exact registration handshakes', async () => {
-    const harness = createHarness('required')
+  it('keeps the Provider launch usable while its supported MCP is initializing', async () => {
+    const harness = createHarness()
 
     const beforeHandshake = await harness.service.attach(attachCommand())
 
-    expect(beforeHandshake.runtime.launch.status).toBe('launching')
+    expect(beforeHandshake.runtime.launch.status).toBe('running')
     expect(beforeHandshake.runtime.mcp.status).toBe('initializing')
     expect(harness.terminal.launches).toHaveLength(1)
 
@@ -37,17 +35,53 @@ describe('Agent unified runtime readiness contract', () => {
     expect(ready.runtime.launch.status).toBe('running')
   })
 
-  it('allows a best-effort MCP Provider to run while MCP is still initializing', async () => {
-    const harness = createHarness('best_effort')
+  it('projects MCP registration failure without blocking the Provider launch', async () => {
+    const harness = createHarness({
+      registrationError: new Error('MCP registration failed')
+    })
 
     const session = await harness.service.attach(attachCommand())
 
-    expect(session.runtime.mcp.status).toBe('initializing')
     expect(session.runtime.launch.status).toBe('running')
+    expect(session.runtime.mcp.status).toBe('failed')
+    expect(harness.terminal.launches).toHaveLength(1)
+  })
+
+  it('times out an unanswered MCP handshake without interrupting the Provider launch', async () => {
+    vi.useFakeTimers()
+    try {
+      const harness = createHarness()
+      await harness.service.attach(attachCommand())
+
+      await vi.advanceTimersByTimeAsync(10_000)
+      const session = await harness.service.attach(attachCommand())
+
+      expect(session.runtime.launch.status).toBe('running')
+      expect(session.runtime.mcp.status).toBe('failed')
+      expect(harness.terminal.launches).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not let an early MCP handshake report the Provider launch as started', async () => {
+    const terminal = new DeferredStartedAgentTerminalRuntime()
+    const harness = createHarness({ terminal })
+    await harness.service.attach(attachCommand())
+
+    harness.mcp.initialize(0)
+    const beforeProviderStart = await harness.service.attach(attachCommand())
+
+    expect(beforeProviderStart.runtime.mcp.status).toBe('ready')
+    expect(beforeProviderStart.runtime.launch.status).toBe('launching')
+
+    terminal.start()
+    const afterProviderStart = await harness.service.attach(attachCommand())
+    expect(afterProviderStart.runtime.launch.status).toBe('running')
   })
 
   it('projects Provider-session persistence failure only onto binding readiness', async () => {
-    const harness = createHarness('best_effort', { saveError: new Error('disk full') })
+    const harness = createHarness({ saveError: new Error('disk full') })
     await harness.service.attach(attachCommand())
     const providerLaunch = harness.providers.launchCommands[0]
 
@@ -67,7 +101,7 @@ describe('Agent unified runtime readiness contract', () => {
   })
 
   it('disposes each registration handle and ignores initialization from a replaced launch', async () => {
-    const harness = createHarness('required')
+    const harness = createHarness()
     await harness.service.attach(attachCommand())
     const firstRegistration = harness.mcp.registrations[0]!
 
@@ -82,12 +116,12 @@ describe('Agent unified runtime readiness contract', () => {
     expect(firstRegistration.dispose).toHaveBeenCalledOnce()
     expect(secondRegistration.dispose).not.toHaveBeenCalled()
     expect(replacement?.runtime.mcp.status).toBe('initializing')
-    expect(replacement?.runtime.launch.status).toBe('launching')
+    expect(replacement?.runtime.launch.status).toBe('running')
 
     firstRegistration.command.onInitialized?.()
     const afterStaleHandshake = await harness.service.attach(attachCommand())
     expect(afterStaleHandshake.runtime.mcp.status).toBe('initializing')
-    expect(afterStaleHandshake.runtime.launch.status).toBe('launching')
+    expect(afterStaleHandshake.runtime.launch.status).toBe('running')
 
     secondRegistration.command.onInitialized?.()
     const afterCurrentHandshake = await harness.service.attach(attachCommand())
@@ -108,11 +142,11 @@ class DesiredProviderRegistry {
   readonly launchCommands: CreateAgentLaunchPlanCommand[] = []
   readonly registry: AgentProviderRegistryPort
 
-  constructor(cleancodeMcp: DesiredMcpCapability) {
+  constructor() {
     const descriptor = {
       capabilities: {
         activityTracking: true,
-        cleancodeMcp,
+        cleancodeMcp: true,
         launchInstructions: true,
         resume: true,
         sessionIdentityCapture: true,
@@ -158,7 +192,10 @@ class RecordingMcpRegistrations implements AgentMcpServerPort {
     readonly dispose: ReturnType<typeof vi.fn>
   }> = []
 
+  constructor(private readonly registrationError?: Error) {}
+
   async registerSession(command: RegisteredAgentMcpSession): Promise<AgentMcpRegistration> {
+    if (this.registrationError) throw this.registrationError
     const dispose = vi.fn()
     this.registrations.push({ command, dispose })
     return {
@@ -210,13 +247,16 @@ class RecordingRepository implements AgentSessionRepository {
 }
 
 function createHarness(
-  capability: DesiredMcpCapability,
-  input: { readonly saveError?: Error } = {}
+  input: {
+    readonly registrationError?: Error
+    readonly saveError?: Error
+    readonly terminal?: RecordingAgentTerminalRuntime
+  } = {}
 ) {
-  const providers = new DesiredProviderRegistry(capability)
-  const mcp = new RecordingMcpRegistrations()
+  const providers = new DesiredProviderRegistry()
+  const mcp = new RecordingMcpRegistrations(input.registrationError)
   const repository = new RecordingRepository(input.saveError)
-  const terminal = new RecordingAgentTerminalRuntime()
+  const terminal = input.terminal ?? new RecordingAgentTerminalRuntime()
   const service = new AgentSessionService(
     terminal,
     mcp,
@@ -226,6 +266,17 @@ function createHarness(
     'codex'
   )
   return { mcp, providers, repository, service, terminal }
+}
+
+class DeferredStartedAgentTerminalRuntime extends RecordingAgentTerminalRuntime {
+  override launch(command: Parameters<RecordingAgentTerminalRuntime['launch']>[0]) {
+    this.launches.push(command)
+    return { generation: 1, launchId: 'launch-1' }
+  }
+
+  start(): void {
+    this.launches[0]?.onStarted?.({ generation: 1, launchId: 'launch-1' })
+  }
 }
 
 function attachCommand() {

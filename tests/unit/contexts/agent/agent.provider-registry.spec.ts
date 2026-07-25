@@ -319,7 +319,7 @@ function createContribution(id: string, displayName = id): AgentProviderContribu
     descriptor: {
       capabilities: {
         activityTracking: false,
-        cleancodeMcp: 'unsupported',
+        cleancodeMcp: false,
         launchInstructions: false,
         resume: false,
         sessionIdentityCapture: false,
