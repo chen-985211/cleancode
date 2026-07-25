@@ -54,6 +54,32 @@ describe('Agent console actions', () => {
     expect(screen.getByRole('textbox', { name: 'Agent 名称' })).toHaveFocus()
   })
 
+  it('commits a normalized inline rename when the editor loses focus', async () => {
+    const onRename = vi.fn(async () => undefined)
+    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Agent 2，双击重命名' }))
+    const input = screen.getByRole('textbox', { name: 'Agent 名称' })
+    fireEvent.change(input, { target: { value: '  实现 Agent  ' } })
+    fireEvent.blur(input)
+
+    await waitFor(() => expect(onRename).toHaveBeenCalledWith(agent, '实现 Agent'))
+    expect(onRename).toHaveBeenCalledOnce()
+  })
+
+  it('treats Escape as an explicit cancellation of inline rename', () => {
+    const onRename = vi.fn(async () => undefined)
+    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
+
+    fireEvent.doubleClick(screen.getByRole('button', { name: 'Agent 2，双击重命名' }))
+    const input = screen.getByRole('textbox', { name: 'Agent 名称' })
+    fireEvent.change(input, { target: { value: '不保存的名称' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    expect(screen.queryByRole('textbox', { name: 'Agent 名称' })).not.toBeInTheDocument()
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
   it('supports roving keyboard focus in the action menu', () => {
     render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
