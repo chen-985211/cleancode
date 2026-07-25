@@ -179,7 +179,7 @@ describe('additional Agent Provider contributions', () => {
       expect(contribution.descriptor).toMatchObject({
         capabilities: {
           activityTracking: false,
-          cleancodeMcp: 'unsupported',
+          cleancodeMcp: false,
           launchInstructions: false,
           resume: false,
           sessionIdentityCapture: false,
@@ -396,7 +396,7 @@ describe('additional Agent Provider contributions', () => {
       expect(contribution.descriptor).toEqual({
         capabilities: {
           activityTracking: true,
-          cleancodeMcp: 'best_effort',
+          cleancodeMcp: true,
           launchInstructions: true,
           resume: true,
           sessionIdentityCapture: true,

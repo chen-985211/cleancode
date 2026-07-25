@@ -16,21 +16,21 @@
 
 ## 统一语言
 
-| 术语                  | 含义                                                                                           |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| 工作区 Agent          | 画布中的稳定 Agent 对象，可创建、重命名、移动、缩放和删除                                      |
-| Agent Provider        | CLI 的 detector、launcher、resume、telemetry 和能力注入 contribution                           |
-| 注册 Provider catalog | registry 中应用支持的完整 Provider descriptor 集合，不表示本机 CLI 当前可创建                  |
-| 可创建 Provider       | 注册 catalog 中经当前环境检测为 `installed`、可用于一次新建操作的 Provider                     |
-| 对话作用域            | `projectId + workspaceName + gitBranch + agentId` 形成的隔离键                                 |
-| Provider session ref  | Provider 正式报告的版本化对话引用，例如 `codex-thread`、`claude-session` 或 `opencode-session` |
-| Agent terminal        | Run 按 `owner.kind = agent` 承载的长期 shell、PTY、终端模型和视图                              |
-| Agent launch          | Agent terminal 中一次带 generation 的 Provider CLI 前台任务                                    |
-| Agent activity        | Provider 结构化事件投影的 `idle/working/waiting_input/waiting_approval/unavailable`            |
-| 终端源主题            | Agent terminal generation 创建时采用的浅色或深色 palette；该 generation 内保持不变             |
-| 持久恢复              | 通过当前 Provider 的正式 resume 参数恢复已保存的 session ref                                   |
-| 易失会话              | 不保存或复用对话绑定的运行方式，例如 detached HEAD                                             |
-| 生命周期隔离          | 外部所有权事务部分提交后保留的 attach blocker；同步完成后显式解除                              |
+| 术语                  | 含义                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| 工作区 Agent          | 画布中的稳定 Agent 对象，可创建、重命名、移动、缩放和删除                           |
+| Agent Provider        | CLI 的 detector、launcher、resume、telemetry 和能力注入 contribution                |
+| 注册 Provider catalog | registry 中应用支持的完整 Provider descriptor 集合，不表示本机 CLI 当前可创建       |
+| 可创建 Provider       | 注册 catalog 中经当前环境检测为 `installed`、可用于一次新建操作的 Provider          |
+| 对话作用域            | `projectId + workspaceName + gitBranch + agentId` 形成的隔离键                      |
+| Provider session ref  | Provider 正式报告或由正式 session 参数分配的版本化对话引用                          |
+| Agent terminal        | Run 按 `owner.kind = agent` 承载的长期 shell、PTY、终端模型和视图                   |
+| Agent launch          | Agent terminal 中一次带 generation 的 Provider CLI 前台任务                         |
+| Agent activity        | Provider 结构化事件投影的 `idle/working/waiting_input/waiting_approval/unavailable` |
+| 终端源主题            | Agent terminal generation 创建时采用的浅色或深色 palette；该 generation 内保持不变  |
+| 持久恢复              | 通过当前 Provider 的正式 resume 参数恢复已保存的 session ref                        |
+| 易失会话              | 不保存或复用对话绑定的运行方式，例如 detached HEAD                                  |
+| 生命周期隔离          | 外部所有权事务部分提交后保留的 attach blocker；同步完成后显式解除                   |
 
 ## 聚合、Provider 与持久化
 
@@ -45,7 +45,7 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。
 2. `providerId` 在创建时确定，没有领域方法、用例或 IPC 可以切换；attach 携带的 Provider 与持久化事实不一致时必须拒绝。
 3. 同一个 Agent 可以为不同 Git 分支保存不同 Provider session ref；引用只能绑定到该 Agent、项目和工作区的当前作用域。
-4. session ref 必须由固定 Provider 的 codec 校验 kind、版本和值。Codex 使用正式 thread UUID；Claude Code 使用正式 session UUID；OpenCode 使用正式 `ses_` session ID。系统不扫描历史目录、终端输出或“最近会话”。Claude Code 的 `SessionStart` 只证明进程启动，空会话尚不可恢复；只有首次 `UserPromptSubmit` Hook 才确认并持久化该 session ref。
+4. session ref 必须由固定 Provider 的 codec 校验 kind、版本和值。Codex 使用正式 thread UUID；Claude Code 使用正式 session UUID；OpenCode 使用正式 `ses_` session ID；Gemini 使用 cleancode 通过正式 `--session-id` 参数预分配的 UUID，并只在本次前台 launch 确认启动后持久化，再通过正式 `--resume` 恢复。系统不扫描历史目录、终端输出或“最近会话”。Claude Code 的 `SessionStart` 只证明进程启动，空会话尚不可恢复；只有首次 `UserPromptSubmit` Hook 才确认并持久化该 session ref。
 5. 同一工作区的多个相同或不同 Provider Agent 拥有独立 terminal、launch、对话、MCP、审批和审计，但共享工作目录。
 6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；URL、Token、Hook、活动状态、终端和 launch 都不持久化。
 7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
@@ -56,10 +56,10 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 
 `AgentProviderRegistry` 按唯一 Provider ID 注册小型 contribution：
 
-- `descriptor` 明确声明显示名称、经过约束的矢量图标、session-ref codec、resume、身份捕获、activity、launch instructions 和 `required / best_effort / unsupported` CleanCode MCP 能力。图标只允许有限 `viewBox`、路径数量、路径语法、填充和 fill rule；registry 在 composition root 注册时统一校验。
+- `descriptor` 明确声明显示名称、经过约束的矢量图标、session-ref codec、resume、身份捕获、activity、launch instructions 和是否支持 CleanCode MCP。图标只允许有限 `viewBox`、路径数量、路径语法、填充和 fill rule；registry 在 composition root 注册时统一校验。
 - `detector` 返回 `installed`、`missing`、`upgrade_required` 或 `temporarily_unavailable` 的结构化诊断。
-- `launcher` 只返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本。
-- `resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
+- `launcher` 只返回经过校验的 executable、argv 和 environment，不把参数拼成用户可控 shell 文本；使用 Provider 正式 session 参数时，可以同时返回待本次 launch 启动后确认的候选 session ref。
+- `freshSession`、`resume`、`telemetry` 与 `cleancodeCapability` 是能力对应的可选 contribution；descriptor 与实现必须一致。
 - `AgentLaunchArtifactScope` 在资源创建后立即接管 reporter、临时配置和插件，按 LIFO 清理；并发清理合并为同一操作，成功项只清理一次，失败项保留给下次重试。
 
 Provider contribution 只拥有对应 CLI 的检测、结构化启动参数、进程级环境、正式恢复入口、结构化 telemetry 和本次 launch 的临时配置。它不得修改用户的全局 CLI 配置，也不得取得 Agent terminal 的 source palette、xterm surface 或视图生命周期所有权。终端宿主能力由 Run 统一提供；CLI 自己选择的 ANSI/真彩色语义、品牌色、TUI 布局和用户保存的 CLI 主题仍由对应 Provider 与用户拥有。共享同一个宿主终端不等于三方 CLI 必须生成相同像素。
@@ -68,9 +68,10 @@ Provider contribution 只拥有对应 CLI 的检测、结构化启动参数、�
 
 | Provider    | 恢复 | 身份捕获 | 活动状态 | CleanCode MCP | 注入与回报方式                                                                                  |
 | ----------- | ---- | -------- | -------- | ------------- | ----------------------------------------------------------------------------------------------- |
-| Codex       | 是   | 是       | 否       | `required`    | 正式 thread notify、`resume`、进程级 MCP config 与 developer instructions                       |
-| Claude Code | 是   | 是       | 是       | `best_effort` | 首次用户输入确认 session ID、Hooks、环境变量 token 和 launch 临时 MCP/settings                  |
-| OpenCode    | 是   | 是       | 是       | `best_effort` | `--session`、插件事件、合并 `OPENCODE_CONFIG_CONTENT`、远程 MCP 环境变量引用和临时 instructions |
+| Codex       | 是   | 是       | 否       | 是            | 正式 thread notify、`resume`、进程级 MCP config 与 developer instructions                       |
+| Claude Code | 是   | 是       | 是       | 是            | 首次用户输入确认 session ID、Hooks、环境变量 token 和 launch 临时 MCP/settings                  |
+| OpenCode    | 是   | 是       | 是       | 是            | `--session`、插件事件、合并 `OPENCODE_CONFIG_CONTENT`、远程 MCP 环境变量引用和临时 instructions |
+| Gemini      | 是   | 是       | 否       | 是            | `--session-id` 预分配、launch 启动确认、`--resume` 与 launch 临时 MCP settings                  |
 
 ### 注册 catalog、可用性与可创建发现
 
@@ -102,8 +103,8 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 4. 需要创建新 terminal 时，先通过共享可用性服务刷新固定 Provider 的检测环境并取得预检快照，保证 POSIX login-shell PATH 在 PTY 快照主进程环境之前完成水合；然后创建或复用 Run 的 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸。
 5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域；registration handle 精确拥有这一代注册，旧 handle 的释放或回调不能影响替代注册。
 6. 在生成 Provider 启动计划前验证固定 Provider；新 terminal 消费第 4 步的预检快照，既有 terminal 上的重新启动则刷新共享可用性结果。不可用时保留稳定 Agent 和既有 terminal 事实，但拒绝创建新的 Provider launch。
-7. Provider 生成启动计划；Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`。
-8. Provider 正式报告 session ref 或 activity 时，只接受仍匹配当前 Agent runtime session 和 Provider launch generation 的回调；尚未产生可恢复对话的启动事件不得提前建立稳定绑定。`required` MCP 还要完成认证后的 `initialize` + `notifications/initialized` 握手才进入 running；`best_effort` Provider 可以在 MCP 仍初始化时运行，但失败必须单独投影。
+7. Provider 生成启动计划；使用正式 session 参数的 Provider 可以同时给出候选 fresh session ref。Run 在长期 shell 中启动带 `launchId + generation` 的 `ForegroundJob`，候选引用在此之前不得持久化。
+8. session ref 只能由 Provider 正式结构化报告，或在仍匹配当前 Agent runtime session 与 Provider launch generation 的 `ForegroundJob` 启动回调中确认候选引用；迟到、重复和旧 generation 事件必须忽略。尚未产生可恢复对话的 Provider 启动事件不得提前建立稳定绑定。activity 同样只接受匹配当前 generation 的结构化回调。Provider launch 启动后独立进入 `running`；CleanCode MCP 继续等待认证后的 `initialize` + `notifications/initialized` 握手，注册失败或 10 秒内未完成握手只把 MCP 投影为 `failed`，不得中断 Provider launch。
 
 Renderer 将首次 attach、重新启动和新对话请求投影为独立的 `measuring / pending / failed` 操作状态，不用 `null session` 冒充失败含义。失败必须保留可重试提示；同一作用域的重复重试只能形成一个在途 attach。已有 terminal binding 在重新启动或新对话 attach 失败时继续可用，旧工作区迟到的成功或失败结果不得覆盖当前作用域。该操作状态是 Presentation 的易失事实，不进入 `AgentRuntimeSnapshot`、持久化 schema 或 Provider capability。
 
@@ -156,7 +157,7 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 | 层级        | 证明内容                                                                                                                           | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit        | 固定 Provider、session ref、registry、共享可用性、创建重验、空工作区初始化、统一 runtime、绑定降级与应用退出交接                   | [`agent.workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.workspace-agents.spec.ts)、[`agent.provider-registry.spec.ts`](../../../tests/unit/contexts/agent/agent.provider-registry.spec.ts)、[`agent.provider-availability-service.spec.ts`](../../../tests/unit/contexts/agent/agent.provider-availability-service.spec.ts)、[`agent.create-workspace-agent-availability.spec.ts`](../../../tests/unit/contexts/agent/agent.create-workspace-agent-availability.spec.ts)、[`agent.manage-workspace-agents.spec.ts`](../../../tests/unit/contexts/agent/agent.manage-workspace-agents.spec.ts)、[`agent.unified-runtime-readiness.spec.ts`](../../../tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts)、[`agent.application-shutdown.spec.ts`](../../../tests/unit/contexts/agent/agent.application-shutdown.spec.ts) |
-| Unit        | Codex、Claude Code 和 OpenCode 启动参数、Hook/插件、MCP、平台安装配方与 launch artifact 重试清理                                   | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts)                                                                                                                                                                                                                                                                                                                        |
+| Unit        | Codex、Claude Code、OpenCode 和 Gemini 启动参数、session、Hook/插件、MCP、平台安装配方与 launch artifact 重试清理                  | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.gemini-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.gemini-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts)                                                                                                                                                                                         |
 | Unit / UI   | 未知 Provider descriptor 的通用投影、默认 Provider、分段创建、capability 降级、attach 失败保留、single-flight 重试和迟到作用域隔离 | [`agent-console.provider-neutral.spec.tsx`](../../../tests/unit/presentation/agent-console.provider-neutral.spec.tsx)、[`agent-create-split-button.spec.tsx`](../../../tests/unit/presentation/agent-create-split-button.spec.tsx)、[`agent-provider-preference.spec.ts`](../../../tests/unit/presentation/agent-provider-preference.spec.ts)、[`agent-settings-pane.spec.tsx`](../../../tests/unit/presentation/agent-settings-pane.spec.tsx)、[`agent-console.attach-lifecycle.spec.tsx`](../../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx)                                                                                                                                                                                                                                                                                     |
 | Unit / Gate | 自动发现内建 Provider，并拒绝 Presentation 中的具体 Provider infrastructure 引用或品牌 ID                                          | [`check-agent-provider-boundary.spec.ts`](../../../tests/unit/support/check-agent-provider-boundary.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Integration | schema 迁移、真实 Agent terminal、CLI 退出回 shell 与重复 launch                                                                   | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.run-terminal-provider.spec.ts`](../../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

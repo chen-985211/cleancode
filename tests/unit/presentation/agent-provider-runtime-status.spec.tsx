@@ -50,6 +50,7 @@ describe('Agent Provider runtime status', () => {
     )
 
     expect(screen.getByRole('status')).toHaveTextContent(message)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it.each(['launching', 'running'] as const)(

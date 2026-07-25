@@ -465,7 +465,7 @@ function createProviderDescriptor(id: string, displayName: string, cleancodeMcp:
   return {
     capabilities: {
       activityTracking: false,
-      cleancodeMcp: cleancodeMcp ? ('best_effort' as const) : ('unsupported' as const),
+      cleancodeMcp,
       launchInstructions: cleancodeMcp,
       resume: id === 'codex',
       sessionIdentityCapture: id === 'codex',

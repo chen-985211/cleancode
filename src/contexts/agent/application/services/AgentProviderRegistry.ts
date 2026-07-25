@@ -67,7 +67,9 @@ function validateContribution(contribution: AgentProviderContribution): void {
     activity: false,
     sessionIdentity: false
   }
-  const supportsMcp = capabilities.cleancodeMcp !== 'unsupported'
+  const capturesSessionIdentity =
+    telemetrySignals.sessionIdentity || Boolean(contribution.freshSession)
+  const supportsMcp = capabilities.cleancodeMcp
   const invalid =
     !id ||
     id !== id.trim() ||
@@ -75,11 +77,12 @@ function validateContribution(contribution: AgentProviderContribution): void {
     !isValidProviderIcon(icon) ||
     capabilities.resume !== Boolean(contribution.resume) ||
     telemetrySignals.activity !== capabilities.activityTracking ||
-    telemetrySignals.sessionIdentity !== capabilities.sessionIdentityCapture ||
+    capturesSessionIdentity !== capabilities.sessionIdentityCapture ||
     supportsMcp !== Boolean(contribution.cleancodeCapability) ||
     capabilities.sessionRefCodec !== Boolean(contribution.sessionRefCodec) ||
     (capabilities.resume && !capabilities.sessionRefCodec) ||
     (capabilities.sessionIdentityCapture && !capabilities.sessionRefCodec) ||
+    (contribution.freshSession && !contribution.sessionRefCodec) ||
     (capabilities.launchInstructions && !contribution.cleancodeCapability)
 
   if (invalid) {

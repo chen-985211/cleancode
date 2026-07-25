@@ -85,8 +85,7 @@ export class CreateWorkspaceAgentUseCase {
         const agent = AgentSession.create({
           agentId,
           cleancodeMcpEnabled:
-            preferences.defaultCleancodeMcpEnabled &&
-            provider.descriptor.capabilities.cleancodeMcp !== 'unsupported',
+            preferences.defaultCleancodeMcpEnabled && provider.descriptor.capabilities.cleancodeMcp,
           layout: {
             position: { ...command.initialPosition },
             size: { ...defaultAgentLayoutSize }

@@ -1,11 +1,9 @@
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentActivityStatus } from '../dto/AgentSessionProtocol'
 
-export type AgentProviderMcpSupport = 'unsupported' | 'best_effort' | 'required'
-
 interface AgentProviderCapabilities {
   readonly activityTracking: boolean
-  readonly cleancodeMcp: AgentProviderMcpSupport
+  readonly cleancodeMcp: boolean
   readonly launchInstructions: boolean
   readonly resume: boolean
   readonly sessionIdentityCapture: boolean
@@ -114,6 +112,7 @@ export interface AgentLaunchPlan {
   readonly args: readonly string[]
   readonly env: Readonly<Record<string, string>>
   readonly executable: string
+  readonly providerSessionRefOnStarted?: ProviderSessionRefSnapshot
 }
 
 export interface CreateAgentLaunchPlanCommand {
@@ -135,6 +134,13 @@ export interface AgentLaunchPlanner {
 
 export interface AgentResumeStrategy {
   createResumeArgs(sessionRef: ProviderSessionRefSnapshot): readonly string[]
+}
+
+export interface AgentFreshSessionStrategy {
+  createFreshSession(): {
+    readonly args: readonly string[]
+    readonly sessionRef: ProviderSessionRefSnapshot
+  }
 }
 
 export interface AgentProviderSessionRefCodec {
@@ -177,6 +183,7 @@ export interface AgentProviderContribution {
   readonly cleancodeCapability?: AgentCapabilityInjector
   readonly descriptor: AgentProviderDescriptor
   readonly detector: AgentProviderDetector
+  readonly freshSession?: AgentFreshSessionStrategy
   readonly launcher: AgentLaunchPlanner
   readonly resume?: AgentResumeStrategy
   readonly sessionRefCodec?: AgentProviderSessionRefCodec

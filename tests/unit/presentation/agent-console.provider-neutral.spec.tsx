@@ -13,7 +13,7 @@ import {
 const futureProvider = {
   capabilities: {
     activityTracking: false,
-    cleancodeMcp: 'unsupported',
+    cleancodeMcp: false,
     launchInstructions: true,
     resume: false,
     sessionIdentityCapture: false,
@@ -82,7 +82,7 @@ describe('Agent console provider-neutral presentation', () => {
     const agent = createAgent(futureProvider.id, workbench.project.id)
     const mcpProvider = {
       ...futureProvider,
-      capabilities: { ...futureProvider.capabilities, cleancodeMcp: 'best_effort' as const }
+      capabilities: { ...futureProvider.capabilities, cleancodeMcp: true }
     }
     Object.defineProperty(window, 'cleancode', {
       configurable: true,

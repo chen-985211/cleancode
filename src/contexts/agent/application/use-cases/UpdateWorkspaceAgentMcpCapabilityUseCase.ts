@@ -34,10 +34,7 @@ export class UpdateWorkspaceAgentMcpCapabilityUseCase {
     }
 
     const provider = this.providers.require(agent.providerId)
-    if (
-      command.cleancodeMcpEnabled &&
-      provider.descriptor.capabilities.cleancodeMcp === 'unsupported'
-    ) {
+    if (command.cleancodeMcpEnabled && !provider.descriptor.capabilities.cleancodeMcp) {
       throw createExpectedAppError(
         'AGENT_TOOL_UNAVAILABLE',
         'CleanCode MCP is unavailable for this Agent Provider.',

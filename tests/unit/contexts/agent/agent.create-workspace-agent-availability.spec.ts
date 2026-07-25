@@ -54,7 +54,7 @@ describe('create workspace Agent availability', () => {
         status: 'installed',
         version: 'test'
       }),
-      'best_effort'
+      true
     )
     const providers = new AgentProviderRegistry([contribution])
     const repository = new RecordingAgentRepository()
@@ -132,7 +132,7 @@ describe('create workspace Agent availability', () => {
 function createContribution(
   id: string,
   inspect: () => Promise<AgentProviderAvailability>,
-  cleancodeMcp: AgentProviderContribution['descriptor']['capabilities']['cleancodeMcp'] = 'unsupported'
+  cleancodeMcp: AgentProviderContribution['descriptor']['capabilities']['cleancodeMcp'] = false
 ): AgentProviderContribution & {
   readonly detector: { readonly inspect: ReturnType<typeof vi.fn> }
 } {
@@ -154,7 +154,7 @@ function createContribution(
       id
     },
     detector: { inspect: vi.fn(inspect) },
-    ...(cleancodeMcp === 'unsupported'
+    ...(!cleancodeMcp
       ? {}
       : {
           cleancodeCapability: {

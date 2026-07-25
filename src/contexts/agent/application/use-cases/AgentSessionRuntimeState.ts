@@ -24,10 +24,7 @@ import {
   type AgentConversationScopeSnapshot
 } from '../../domain/value-objects/AgentConversationScope'
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
-import type {
-  AgentProviderContribution,
-  AgentProviderMcpSupport
-} from '../ports/AgentProviderContribution'
+import type { AgentProviderContribution } from '../ports/AgentProviderContribution'
 import type { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
 import type { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
@@ -35,6 +32,8 @@ import {
   isOwnedAgentSession,
   type AgentSessionRuntimeOwner
 } from './AgentSessionRuntimeCoordinator'
+
+const agentMcpInitializationTimeoutMs = 10_000
 
 export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
   readonly agentId: string
@@ -67,7 +66,7 @@ export interface ManagedAgentSession {
   isStopping: boolean
   launchArtifacts: AgentLaunchArtifactScope | null
   mcpRegistration?: AgentMcpRegistration
-  readonly mcpSupport: AgentProviderMcpSupport
+  readonly mcpSupported: boolean
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
@@ -268,6 +267,7 @@ type AgentLaunchExit = AgentLaunchIdentity & { readonly exitCode: number | null 
 
 export function createAgentLaunchRuntimeController(command: {
   readonly attempt: number
+  readonly onStartedAccepted?: () => void
   readonly onUnexpectedExit: () => void
   readonly session: ManagedAgentSession
   readonly sessionId: string
@@ -277,6 +277,7 @@ export function createAgentLaunchRuntimeController(command: {
   readonly onStarted: (event: AgentLaunchIdentity) => void
 } {
   let identity: AgentLaunchIdentity | null = null
+  let hasAcceptedStarted = false
   const deferred: Array<
     | { readonly event: AgentLaunchExit; readonly type: 'exit' }
     | {
@@ -295,20 +296,23 @@ export function createAgentLaunchRuntimeController(command: {
     }
     if (
       !isCurrentAttempt() ||
+      hasAcceptedStarted ||
       command.session.isStopping ||
       command.session.runtime.launch.status !== 'launching' ||
       !haveSameLaunchIdentity(identity, event) ||
       !matchesAgentLaunch(command.session, event)
     )
       return
+    hasAcceptedStarted = true
     transitionAgentRuntime(command.session, {
       launch: {
         exitCode: null,
         failureKind: null,
         ...event,
-        status: isRequiredAgentMcpPending(command.session) ? 'launching' : 'running'
+        status: 'running'
       }
     })
+    command.onStartedAccepted?.()
   }
 
   const acceptExit = (event: AgentLaunchExit): void => {
@@ -470,7 +474,7 @@ export async function registerAgentMcpEndpoint(
   mcpServerPort: AgentMcpServerPort,
   executeTool: (command: AgentMcpToolCallCommand) => Promise<AgentToolExecutionResult>
 ): Promise<void> {
-  if (!session.cleancodeMcpEnabled || session.mcpSupport === 'unsupported') {
+  if (!session.cleancodeMcpEnabled || !session.mcpSupported) {
     transitionAgentRuntime(session, {
       mcp: session.cleancodeMcpEnabled ? 'unsupported' : 'disabled'
     })
@@ -480,18 +484,21 @@ export async function registerAgentMcpEndpoint(
   unregisterAgentMcpEndpoint(session)
   transitionAgentRuntime(session, { mcp: 'initializing' })
   let registration: AgentMcpRegistration | null = null
+  let initializationTimeout: ReturnType<typeof setTimeout> | null = null
   let initialized = false
+  const clearInitializationTimeout = (): void => {
+    if (initializationTimeout === null) return
+    clearTimeout(initializationTimeout)
+    initializationTimeout = null
+  }
   const publishInitialized = (): void => {
     if (!registration || session.mcpRegistration !== registration) return
+    clearInitializationTimeout()
     transitionAgentRuntime(session, {
-      launch:
-        session.runtime.launch.status === 'launching' && session.runtime.launch.launchId !== null
-          ? { status: 'running' }
-          : undefined,
       mcp: 'ready'
     })
   }
-  registration = await mcpServerPort.registerSession({
+  const providerRegistration = await mcpServerPort.registerSession({
     executeTool,
     onInitialized: () => {
       initialized = true
@@ -501,8 +508,23 @@ export async function registerAgentMcpEndpoint(
     sessionId: session.sessionId,
     workspaceName: session.workspaceName
   })
+  registration = {
+    bearerToken: providerRegistration.bearerToken,
+    dispose() {
+      clearInitializationTimeout()
+      providerRegistration.dispose()
+    },
+    url: providerRegistration.url
+  }
   session.mcpRegistration = registration
-  if (initialized) publishInitialized()
+  if (initialized) {
+    publishInitialized()
+  } else {
+    initializationTimeout = setTimeout(() => {
+      if (session.mcpRegistration !== registration) return
+      recordAgentMcpRegistrationFailure(session)
+    }, agentMcpInitializationTimeoutMs)
+  }
 }
 
 export function unregisterAgentMcpEndpoint(session: ManagedAgentSession): void {
@@ -622,17 +644,9 @@ function haveSameLaunchRuntime(
   )
 }
 
-function isRequiredAgentMcpPending(session: ManagedAgentSession): boolean {
-  return (
-    session.cleancodeMcpEnabled &&
-    session.mcpSupport === 'required' &&
-    session.runtime.mcp.status !== 'ready'
-  )
-}
-
 function inactiveAgentMcpStatus(session: ManagedAgentSession): AgentMcpRuntimeStatus {
   if (!session.cleancodeMcpEnabled) return 'disabled'
-  return session.mcpSupport === 'unsupported' ? 'unsupported' : 'inactive'
+  return session.mcpSupported ? 'inactive' : 'unsupported'
 }
 
 function haveSameLaunchIdentity(

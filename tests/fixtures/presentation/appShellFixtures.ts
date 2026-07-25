@@ -19,7 +19,7 @@ const defaultAgentProviderPreferences: AgentProviderPreferencesSnapshot = {
 const defaultAgentProviderDescriptor: AgentProviderDescriptor = {
   capabilities: {
     activityTracking: false,
-    cleancodeMcp: 'required',
+    cleancodeMcp: true,
     launchInstructions: true,
     resume: true,
     sessionIdentityCapture: true,

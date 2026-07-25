@@ -40,8 +40,7 @@ export function AgentConsole({
   const providerName =
     providerCatalog.descriptor?.displayName ?? formatProviderDisplayName(activeAgent.providerId)
   const supportsMcp =
-    providerCatalog.descriptor !== null &&
-    providerCatalog.descriptor.capabilities.cleancodeMcp !== 'unsupported'
+    providerCatalog.descriptor !== null && providerCatalog.descriptor.capabilities.cleancodeMcp
   const [measuredTerminalKey, setMeasuredTerminalKey] = useState<string | null>(null)
   const [isMcpCapabilityUpdating, setIsMcpCapabilityUpdating] = useState(false)
   const [mcpCapabilityError, setMcpCapabilityError] = useState<string | null>(null)

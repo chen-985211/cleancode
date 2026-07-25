@@ -1,4 +1,5 @@
 import type {
+  AgentCapabilityInjector,
   AgentProviderContribution,
   AgentProviderLaunchConfiguration,
   AgentProviderPermissionConfiguration
@@ -14,6 +15,11 @@ import {
   type CatalogTerminalCliProviderConfig
 } from './CatalogTerminalCliProvider'
 import { createCatalogProviderIcon } from './CatalogProviderIcons'
+import { createTemporaryJsonMcpCapabilityInjector } from '../shared/TemporaryJsonMcpCapabilityInjector'
+import {
+  createClientAssignedTerminalCliSession,
+  type DeclarativeTerminalCliSession
+} from '../terminal-cli/DeclarativeTerminalCliSession'
 
 export const builtinAgentProviderIds = [
   'claude-code',
@@ -60,7 +66,12 @@ interface CatalogEntry {
   readonly executable: string
   readonly executableAliases?: readonly string[]
   readonly id: (typeof builtinAgentProviderIds)[number]
+  readonly mcp?: {
+    readonly injector: AgentCapabilityInjector
+    readonly launchInstructions?: boolean
+  }
   readonly permission?: AgentProviderPermissionConfiguration
+  readonly session?: DeclarativeTerminalCliSession
 }
 
 const genericCatalogEntries: readonly CatalogEntry[] = [
@@ -83,7 +94,30 @@ const genericCatalogEntries: readonly CatalogEntry[] = [
   }),
   entry('omp', 'OMP', 'omp', 'https://omp.sh'),
   entry('gemini', 'Gemini', 'gemini', 'https://github.com/google-gemini/gemini-cli', {
-    permission: { arguments: ['--approval-mode=yolo'] }
+    mcp: {
+      injector: createTemporaryJsonMcpCapabilityInjector({
+        artifactLabel: 'gemini-mcp-settings',
+        createSettings: (serverUrl) => ({
+          mcpServers: {
+            cleancode: {
+              headers: { Authorization: 'Bearer ${CLEANCODE_MCP_TOKEN}' },
+              httpUrl: serverUrl,
+              trust: true
+            }
+          }
+        }),
+        pathEnvironment: 'GEMINI_CLI_SYSTEM_SETTINGS_PATH',
+        prefix: 'cleancode-gemini-mcp-'
+      })
+    },
+    permission: { arguments: ['--approval-mode=yolo'] },
+    session: createClientAssignedTerminalCliSession({
+      createArgs: (sessionId) => ['--session-id', sessionId],
+      providerId: 'gemini',
+      resumeArgs: (sessionId) => ['--resume', sessionId],
+      sessionKind: 'gemini-session',
+      validateSessionId: isUuid
+    })
   }),
   entry('antigravity', 'Antigravity', 'agy', 'https://antigravity.google/docs/cli-overview', {
     permission: { arguments: ['--dangerously-skip-permissions'] }
@@ -201,6 +235,12 @@ function toContributionConfig(catalogEntry: CatalogEntry): CatalogTerminalCliPro
     executableAliases: catalogEntry.executableAliases,
     icon: createCatalogProviderIcon(catalogEntry.id),
     id: catalogEntry.id,
-    launch
+    launch,
+    mcp: catalogEntry.mcp,
+    session: catalogEntry.session
   }
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }

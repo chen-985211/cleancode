@@ -349,7 +349,7 @@ describe('agent IPC contract', () => {
         descriptor: {
           capabilities: {
             activityTracking: true,
-            cleancodeMcp: 'best_effort' as const,
+            cleancodeMcp: true,
             launchInstructions: true,
             resume: true,
             sessionIdentityCapture: true,
@@ -555,7 +555,7 @@ function createAgentIpcHandlersInput(input: {
         {
           capabilities: {
             activityTracking: false,
-            cleancodeMcp: 'required',
+            cleancodeMcp: true,
             launchInstructions: true,
             resume: true,
             sessionIdentityCapture: true,

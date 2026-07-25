@@ -267,6 +267,39 @@ describe('agent session service', () => {
     })
   })
 
+  it('persists a client-assigned Provider session only after its launch starts', async () => {
+    const repository = new RecordingAgentSessionRepository()
+    const save = vi.spyOn(repository, 'save')
+    const processPort = new DeferredStartedAgentTerminalRuntime()
+    const providers = new RecordingAgentProviderRegistry('gemini')
+    vi.spyOn(providers.contribution.launcher, 'createLaunchPlan').mockResolvedValue({
+      args: ['--session-id', '550e8400-e29b-41d4-a716-446655440000'],
+      env: {},
+      executable: 'gemini',
+      providerSessionRefOnStarted: {
+        formatVersion: 1,
+        kind: 'gemini-session',
+        value: '550e8400-e29b-41d4-a716-446655440000'
+      }
+    })
+    const service = createSessionService({ processPort, providers, repository })
+
+    await attachMainSession(service, { providerId: 'gemini' })
+
+    expect(repository.sessions.size).toBe(0)
+    processPort.startLatestLaunch()
+    await vi.waitFor(() => expect(repository.sessions.size).toBe(1))
+    processPort.startLatestLaunch()
+
+    const persisted = await repository.findAgent('project-1', 'main', 'agent-1')
+    expect(persisted?.findProviderSessionRef(null)?.toSnapshot()).toEqual({
+      formatVersion: 1,
+      kind: 'gemini-session',
+      value: '550e8400-e29b-41d4-a716-446655440000'
+    })
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
   it('passes user input and terminal resize to the bound Codex PTY', async () => {
     const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
@@ -513,6 +546,17 @@ class NonSequentialLaunchIdentityRuntime extends RecordingAgentTerminalRuntime {
     const identity = { generation: 41, launchId: 'run-launch-41' }
     command.onStarted?.(identity)
     return identity
+  }
+}
+
+class DeferredStartedAgentTerminalRuntime extends RecordingAgentTerminalRuntime {
+  override launch(command: Parameters<RecordingAgentTerminalRuntime['launch']>[0]) {
+    this.launches.push(command)
+    return { generation: 1, launchId: 'launch-1' }
+  }
+
+  startLatestLaunch(): void {
+    this.launches.at(-1)?.onStarted?.({ generation: 1, launchId: 'launch-1' })
   }
 }
 

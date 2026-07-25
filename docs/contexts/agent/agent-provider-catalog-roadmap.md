@@ -36,14 +36,14 @@ Claude Code、Codex、OpenCode、Gemini、Cursor、GitHub Copilot、OpenClaw、H
 
 ## 当前能力矩阵
 
-| 能力                                       | Provider                           | 当前保证                                                                                          |
-| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 基础终端运行                               | 全部 33 个 Provider                | 启动、输入、输出、resize、`Ctrl+C`、CLI 退出后保留 shell，以及重新启动                            |
-| 正式 session ref、身份捕获、恢复与启动指令 | Codex、Claude Code、OpenCode       | 只使用 Provider 正式协议建立和恢复对话，不扫描历史目录或从终端文本猜测                            |
-| 结构化活动状态                             | Claude Code、OpenCode              | 由正式 Hook 或插件事件投影；Codex 和其他 Provider 不从输出频率猜测活动                            |
-| CleanCode MCP                              | Codex                              | `required`；启用后必须完成认证初始化握手，本次 launch 才能进入 `running`                          |
-| CleanCode MCP                              | Claude Code、OpenCode              | `best_effort`；MCP 初始化或失败不阻止基础终端运行，但能力状态必须独立呈现                         |
-| 暂未声明上述增强能力                       | 除 Codex、Claude Code、OpenCode 外 | 保持诚实的基础终端降级，不展示虚假的会话恢复、活动状态、launch instructions 或 CleanCode MCP 承诺 |
+| 能力                             | Provider                             | 当前保证                                                                                                               |
+| -------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| 基础终端运行                     | 全部 33 个 Provider                  | 启动、输入、输出、resize、`Ctrl+C`、CLI 退出后保留 shell，以及重新启动                                                 |
+| 正式 session ref、身份捕获与恢复 | Codex、Claude Code、OpenCode、Gemini | 只使用 Provider 正式协议建立和恢复对话；Gemini 的预分配 ref 只在本次 launch 启动后确认；不扫描历史目录或从终端文本猜测 |
+| launch instructions              | Codex、Claude Code、OpenCode         | 只向当前 launch 注入经过维护的画布路由语义，不修改用户全局配置                                                         |
+| 结构化活动状态                   | Claude Code、OpenCode                | 由正式 Hook 或插件事件投影；其他 Provider 不从输出频率猜测活动                                                         |
+| CleanCode MCP                    | Codex、Claude Code、OpenCode、Gemini | 共用同一 Server、鉴权、工具、审批与失败语义；MCP 初始化或失败不阻止 Provider launch，能力状态独立呈现                  |
+| 其他未声明的可选能力             | 各 Provider 按 descriptor 独立声明   | 保持诚实降级；不能因为已经支持基础终端、会话或 MCP 中的一项，就展示未实现的 activity、instructions 或其他 capability   |
 
 该矩阵描述的是可选 capability，不是产品支持层级。无论是否具有增强 capability，catalog 中的 33 个 Provider 都属于 cleancode 当前正式支持的 Agent。
 
@@ -92,11 +92,13 @@ cleancode 不主动执行第三方安装、升级、登录或配置迁移命令�
 3. 覆盖检测、参数、会话隔离、失败降级和资源清理测试。
 4. 在支持的原生平台验证启动、PTY 中断、退出回 shell；涉及会话能力时继续验证恢复。
 
+只需要正式 session 参数和 MCP 配置注入的 Provider，应优先复用声明式 `freshSession / resume / sessionRefCodec` 与 launch-scoped MCP injector；只有需要 Hook、插件、结构化 reporter 或特殊握手的 Provider 才增加专用适配器。共同的绑定持久化、MCP Server、鉴权、审批、runtime 状态和 UI 投影保持 Provider-neutral。
+
 可继续逐个 Provider 评估的能力包括：
 
 - 正式 session ref、身份捕获与恢复。
 - 结构化活动状态和审批状态。
 - launch instructions。
-- CleanCode MCP；没有验证和实现前必须保持 `unsupported`。
+- CleanCode MCP；没有验证和实现前必须声明为不支持。
 
 任何增强都不得依赖终端文本猜测会话身份或活动，不得修改用户全局 CLI 配置，也不得在通用 Agent、Run、IPC 或 Presentation 路径中按 Provider ID 写品牌分支。

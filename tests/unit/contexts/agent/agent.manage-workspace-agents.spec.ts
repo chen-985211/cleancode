@@ -380,7 +380,7 @@ function createProviderContribution(
     descriptor: {
       capabilities: {
         activityTracking: false,
-        cleancodeMcp: 'unsupported',
+        cleancodeMcp: false,
         launchInstructions: false,
         resume: false,
         sessionIdentityCapture: false,

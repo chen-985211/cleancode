@@ -18,6 +18,23 @@ describe('temporary Agent Provider config', () => {
     fileSystem.rm.mockResolvedValue(undefined)
   })
 
+  it('creates the temporary directory and config with private permissions', async () => {
+    const config = await createTemporaryProviderConfig(
+      'cleancode-provider-',
+      'provider.json',
+      '{"enabled":true}'
+    )
+
+    expect(fileSystem.chmod).toHaveBeenCalledWith('/tmp/cleancode-provider-config', 0o700)
+    expect(fileSystem.writeFile).toHaveBeenCalledWith(
+      '/tmp/cleancode-provider-config/provider.json',
+      '{"enabled":true}',
+      { encoding: 'utf8', mode: 0o600 }
+    )
+
+    await config.dispose()
+  })
+
   it('removes its directory when config creation fails after allocation', async () => {
     const writeFailure = new Error('config write failed')
     fileSystem.writeFile.mockRejectedValueOnce(writeFailure)

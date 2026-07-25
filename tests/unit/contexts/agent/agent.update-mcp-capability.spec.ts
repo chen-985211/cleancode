@@ -129,7 +129,7 @@ function createProviderContribution(id: string, cleancodeMcp: boolean): AgentPro
     descriptor: {
       capabilities: {
         activityTracking: false,
-        cleancodeMcp: cleancodeMcp ? 'best_effort' : 'unsupported',
+        cleancodeMcp,
         launchInstructions: cleancodeMcp,
         resume: false,
         sessionIdentityCapture: false,

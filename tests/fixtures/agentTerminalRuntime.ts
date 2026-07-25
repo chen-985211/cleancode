@@ -26,7 +26,7 @@ export class RecordingAgentProviderRegistry implements AgentProviderRegistryPort
     this.descriptor = {
       capabilities: {
         activityTracking: false,
-        cleancodeMcp: 'best_effort',
+        cleancodeMcp: true,
         launchInstructions: true,
         resume: true,
         sessionIdentityCapture: true,
