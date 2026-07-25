@@ -1,0 +1,176 @@
+name: CleanCode Preview
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cleancode-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Preview / ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            os: ubuntu-24.04
+            dist_script: dist:linux
+          - id: macos
+            os: macos-15
+            dist_script: dist:mac
+          - id: windows
+            os: windows-2025
+            dist_script: dist:win
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libopenjp2-tools
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm package
+
+      - name: Resolve packaged executable
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            packaged_relative_path=$(find release \
+              -path '*/CleanCode.app/Contents/MacOS/CleanCode' \
+              -type f -print -quit)
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            packaged_relative_path=$(find release \
+              -path '*unpacked/CleanCode.exe' \
+              -type f -print -quit)
+          else
+            packaged_relative_path=$(find release \
+              -path '*unpacked/cleancode' \
+              -type f -print -quit)
+          fi
+
+          if [ -z "$packaged_relative_path" ]; then
+            echo "Packaged executable was not found." >&2
+            exit 1
+          fi
+
+          packaged_executable_path=$(node -e \
+            "process.stdout.write(require('node:path').resolve(process.argv[1]))" \
+            "$packaged_relative_path")
+          echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
+
+      - name: Run packaged terminal smoke test on Linux
+        if: runner.os == 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: |
+          xvfb-run --auto-servernum pnpm test:e2e \
+            tests/e2e/run-terminal-sessions.e2e.spec.ts \
+            -t "runs shell commands from the active project workspace"
+
+      - name: Run packaged terminal smoke test
+        if: runner.os != 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: |
+          pnpm test:e2e \
+            tests/e2e/run-terminal-sessions.e2e.spec.ts \
+            -t "runs shell commands from the active project workspace"
+
+      - run: pnpm ${{ matrix.dist_script }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: error
+          name: CleanCode-preview-${{ matrix.id }}-${{ github.run_id }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.dmg
+            release/*.exe
+            release/*.zip
+          retention-days: 14
+
+  publish:
+    name: Publish Preview
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          merge-multiple: true
+          path: release-artifacts
+          pattern: CleanCode-preview-*-${{ github.run_id }}
+
+      - name: Verify release version
+        run: |
+          node -e "
+            const packageMetadata = require('./package.json')
+            const expectedTag = 'v' + packageMetadata.version
+            if (process.env.GITHUB_REF_NAME !== expectedTag) {
+              throw new Error(
+                'Release tag ' + process.env.GITHUB_REF_NAME +
+                ' does not match package version ' + expectedTag
+              )
+            }
+          "
+
+      - name: Generate checksums
+        run: |
+          cd release-artifacts
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | sed 's#  \./#  #' > SHA256SUMS.txt
+
+      - name: Publish GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > preview-release-notes.md <<'EOF'
+          ## Preview 安全提示
+
+          这是公开测试用的 **Preview / Pre-release**，尚未使用正式开发者证书签名。
+
+          - macOS：应用使用 ad-hoc 签名，未完成 Apple notarization，Gatekeeper 可能阻止首次打开。
+          - Windows：安装程序未签名，SmartScreen 会显示“未知发布者”警告。
+          - Linux：请使用 `SHA256SUMS.txt` 校验下载文件。
+
+          请只从本仓库的 GitHub Releases 下载，并在安装前核对校验值。
+          EOF
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-artifacts/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-artifacts/* \
+              --generate-notes \
+              --latest=false \
+              --notes-file preview-release-notes.md \
+              --prerelease \
+              --title "CleanCode $GITHUB_REF_NAME Preview" \
+              --verify-tag
+          fi

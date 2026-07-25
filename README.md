@@ -160,6 +160,30 @@ pnpm test
 pnpm pre-commit
 ```
 
+### 本地打包
+
+```bash
+# 当前平台的 unpacked 应用，用于本地验证
+pnpm package
+
+# 当前平台的发行安装包
+pnpm dist
+
+# 也可以在对应操作系统上显式选择平台
+pnpm dist:mac
+pnpm dist:win
+pnpm dist:linux
+```
+
+产物统一写入 `release/`。macOS 生成 Universal DMG/ZIP，Windows 生成 x64 NSIS
+安装程序，Linux 生成 x64 AppImage/DEB。应用的用户可见名称为 **CleanCode**，内部包名仍为
+`cleancode`。
+
+推送与 `package.json` 版本一致的 `v*` tag 后，GitHub Actions 会在三个目标系统分别构建、
+运行打包后终端冒烟测试，并创建公开的 Preview Pre-release。Preview 尚未使用正式开发者证书：
+macOS 使用 ad-hoc 签名且未 notarize，Windows 安装程序未签名，因此操作系统可能显示安全警告。
+正式签名完成前，这些产物只作为公开测试版本。
+
 ## 当前边界
 
 cleancode 正在积极开发，当前版本需要注意：
@@ -168,7 +192,7 @@ cleancode 正在积极开发，当前版本需要注意：
 - Agent 可以编排和检查终端依赖，但暂不能通过 MCP 启动、查询或停止工作流。
 - 应用退出后，活动工作流和 Agent 终端进程不会自动继续运行；可恢复的终端与上游对话会按各自能力重新连接。
 - 插件扩展体系尚未公开，暂不承诺第三方插件兼容性。
-- 当前需要从源码运行，预构建安装包仍在准备中。
+- GitHub Releases 中的预构建安装包当前属于未正式签名的 Preview，不是已签名正式发行版。
 
 ## 设计原则
 
