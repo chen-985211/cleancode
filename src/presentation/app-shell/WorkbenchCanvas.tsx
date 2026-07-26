@@ -488,25 +488,33 @@ function CanvasInitialWorkbenchState({
 
     return (
       <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
-        <span className="canvas-empty__icon" aria-hidden="true">
-          <LoaderCircle className="canvas-empty__spinner" size={22} />
-        </span>
-        <p>{label}</p>
+        <div className="canvas-empty__panel">
+          <span className="canvas-empty__icon" aria-hidden="true">
+            <LoaderCircle className="canvas-empty__spinner" size={20} />
+          </span>
+          <div className="canvas-empty__copy">
+            <p>{label}</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="canvas-empty" role="alert" data-tone="danger">
-      <span className="canvas-empty__icon" aria-hidden="true">
-        <CircleAlert size={22} />
-      </span>
-      <h2>{t('canvas.restoreFailedTitle')}</h2>
-      <p>{t('canvas.restoreFailedDescription')}</p>
-      <button className="canvas-empty__action" type="button" onClick={onRetry}>
-        <RefreshCw size={15} aria-hidden="true" />
-        {t('canvas.retryRestore')}
-      </button>
+      <div className="canvas-empty__panel">
+        <span className="canvas-empty__icon" aria-hidden="true">
+          <CircleAlert size={20} />
+        </span>
+        <div className="canvas-empty__copy">
+          <h2>{t('canvas.restoreFailedTitle')}</h2>
+          <p>{t('canvas.restoreFailedDescription')}</p>
+        </div>
+        <button className="canvas-empty__action" type="button" onClick={onRetry}>
+          <RefreshCw size={14} aria-hidden="true" />
+          {t('canvas.retryRestore')}
+        </button>
+      </div>
     </div>
   )
 }
@@ -522,21 +530,27 @@ function CanvasEmptyState({
 
   return (
     <div className="canvas-empty">
-      <span className="canvas-empty__icon" aria-hidden="true">
-        <Box size={22} />
-      </span>
-      {isDesktopRuntime ? (
-        <>
-          <h2>{t('canvas.emptyTitle')}</h2>
-          <p>{t('canvas.emptyDescription')}</p>
+      <div className="canvas-empty__panel">
+        <span className="canvas-empty__icon" aria-hidden="true">
+          <Box size={21} />
+        </span>
+        <div className="canvas-empty__copy">
+          {isDesktopRuntime ? (
+            <>
+              <h2>{t('canvas.emptyTitle')}</h2>
+              <p>{t('canvas.emptyDescription')}</p>
+            </>
+          ) : (
+            <p>{t('canvas.emptyPreview')}</p>
+          )}
+        </div>
+        {isDesktopRuntime ? (
           <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
-            <FolderOpen size={15} aria-hidden="true" />
+            <FolderOpen size={14} aria-hidden="true" />
             {t('canvas.openProject')}
           </button>
-        </>
-      ) : (
-        <p>{t('canvas.emptyPreview')}</p>
-      )}
+        ) : null}
+      </div>
     </div>
   )
 }
