@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 import { BrowserWindow, shell } from 'electron'
 
 import type { RunRuntimeScopeValidationPort } from '../../contexts/run/application/ports/RunRuntimeScopeValidationPort'
@@ -38,8 +40,8 @@ export function createRunRuntime(input: {
 }) {
   const lifecycle = new RunLifecycleService({ initialRuntimePhase: 'initializing' })
   const terminalProvider = new PersistentTerminalProviderClient({
-    stateDirectory: `${input.appStateDirectory}/terminal-runtime-provider`,
-    providerEntryPath: `${__dirname}/terminal-runtime-provider.js`,
+    stateDirectory: join(input.appStateDirectory, 'terminal-runtime-provider'),
+    providerEntryPath: join(__dirname, 'terminal-runtime-provider.js'),
     onBackgroundError: logProviderError,
     onRuntimeUnavailable: () =>
       lifecycle.markRuntimeUnavailable('TERMINAL_PROVIDER_UNAVAILABLE', true),

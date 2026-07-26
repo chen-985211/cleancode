@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 import {
   configureRuntimeDataDirectories,
@@ -52,19 +52,51 @@ describe('runtime data directory policy', () => {
     }
   )
 
-  it('isolates different development worktrees without exposing their paths', () => {
-    const firstDirectory = resolveDevelopmentDirectory('/worktrees/feature-a', 'linux')
-    const secondDirectory = resolveDevelopmentDirectory('/worktrees/feature-b', 'linux')
-    const developmentProfilesDirectory = join('/application-data', 'CleanCode-Dev-Profiles')
+  it.each([
+    {
+      appDataDirectory: '/application-data',
+      firstApplicationDirectory: '/worktrees/feature-a',
+      secondApplicationDirectory: '/worktrees/feature-b',
+      pathApi: posix,
+      platform: 'linux' as const
+    },
+    {
+      appDataDirectory: String.raw`C:\ApplicationData`,
+      firstApplicationDirectory: String.raw`C:\Worktrees\feature-a`,
+      secondApplicationDirectory: String.raw`C:\Worktrees\feature-b`,
+      pathApi: win32,
+      platform: 'win32' as const
+    }
+  ])(
+    'isolates different $platform development worktrees without exposing their paths',
+    ({
+      appDataDirectory,
+      firstApplicationDirectory,
+      pathApi,
+      platform,
+      secondApplicationDirectory
+    }) => {
+      const firstDirectory = resolveDevelopmentDirectory(
+        firstApplicationDirectory,
+        platform,
+        appDataDirectory
+      )
+      const secondDirectory = resolveDevelopmentDirectory(
+        secondApplicationDirectory,
+        platform,
+        appDataDirectory
+      )
+      const developmentProfilesDirectory = pathApi.join(appDataDirectory, 'CleanCode-Dev-Profiles')
 
-    expect(firstDirectory).not.toBe(secondDirectory)
-    expect(firstDirectory.startsWith(`${developmentProfilesDirectory}/`)).toBe(true)
-    expect(secondDirectory.startsWith(`${developmentProfilesDirectory}/`)).toBe(true)
-    expect(firstDirectory).not.toContain('feature-a')
-    expect(secondDirectory).not.toContain('feature-b')
-    expect(firstDirectory.slice(developmentProfilesDirectory.length + 1)).toMatch(/^[a-f0-9]{24}$/)
-    expect(secondDirectory.slice(developmentProfilesDirectory.length + 1)).toMatch(/^[a-f0-9]{24}$/)
-  })
+      expect(firstDirectory).not.toBe(secondDirectory)
+      expect(pathApi.dirname(firstDirectory)).toBe(developmentProfilesDirectory)
+      expect(pathApi.dirname(secondDirectory)).toBe(developmentProfilesDirectory)
+      expect(firstDirectory).not.toContain('feature-a')
+      expect(secondDirectory).not.toContain('feature-b')
+      expect(pathApi.basename(firstDirectory)).toMatch(/^[a-f0-9]{24}$/)
+      expect(pathApi.basename(secondDirectory)).toMatch(/^[a-f0-9]{24}$/)
+    }
+  )
 
   it('creates and applies both Electron data paths for an automatic development profile', () => {
     const calls: string[] = []
@@ -115,19 +147,21 @@ describe('runtime data directory policy', () => {
 
 function resolveDevelopmentDirectory(
   developmentApplicationDirectory: string,
-  platform: 'linux' | 'win32'
+  platform: 'linux' | 'win32',
+  appDataDirectory = '/application-data'
 ): string {
   return resolveRuntimeDataDirectory(
-    createDevelopmentPolicyInput(developmentApplicationDirectory, platform)
+    createDevelopmentPolicyInput(developmentApplicationDirectory, platform, appDataDirectory)
   )
 }
 
 function createDevelopmentPolicyInput(
   developmentApplicationDirectory: string,
-  platform: 'linux' | 'win32'
+  platform: 'linux' | 'win32',
+  appDataDirectory = '/application-data'
 ) {
   return {
-    appDataDirectory: '/application-data',
+    appDataDirectory,
     currentUserDataDirectory: '/application-data/cleancode',
     developmentApplicationDirectory,
     hasExplicitUserDataDirectory: false,

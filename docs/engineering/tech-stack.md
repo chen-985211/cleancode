@@ -122,6 +122,7 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
 - `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
+- `check:portable-paths`：使用 TypeScript AST 阻止生产代码和测试手工拼接文件系统分隔符，以及用单平台绝对路径正则断言平台中立路径。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
 本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和完整 Electron E2E。CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。

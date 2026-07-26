@@ -95,9 +95,11 @@ E2E 测试只允许作为测试金字塔顶端的少量关键路径验证。新�
 
 测试命令和门禁顺序的可执行事实来源是根目录 `package.json`。
 
-`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、国际化、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争，但不减少任何测试文件。
+`pnpm check:quality` 聚合依赖、文档、文件规模、日志、Provider 边界、主题、国际化、可移植路径、格式、Lint、类型、依赖方向和未使用代码门禁；`pnpm test:core` 聚合全部 unit、integration 和 contract。CI 使用 `pnpm test:core:ci` 串行运行 integration 文件，避免原生 PTY、端口和系统进程在同一 runner 内竞争，但不减少任何测试文件。
 
 国际化静态门禁必须通过 `pnpm check:i18n` 执行，并在 `tests/unit/support/check-i18n.spec.ts` 使用违规与合法 fixture 锁定检测边界。文案归属、不可翻译内容和 AI 修改要求以 [国际化规范](../i18n/README.md) 为准。
+
+可移植文件系统路径门禁必须通过 `pnpm check:portable-paths` 执行，并由 `pnpm check:quality` 自动进入本地和三平台 CI。它检查 `src` 与 `tests` 中高置信度的手工路径分隔符拼接，以及对平台中立路径使用单平台绝对路径正则的断言；文件系统路径必须使用 `node:path` 的 `join`、`resolve`、`dirname`、`basename` 或显式 `posix` / `win32` API。URL、路由、静态路径 fixture 和已经明确规范化为 POSIX 的内部表示不属于违规。`tests/unit/support/check-portable-paths.spec.ts` 必须使用违规与合法 fixture 锁定这些检测边界。
 
 主题静态门禁必须通过 `pnpm check:theme` 执行。除禁止生产 UI 在集中主题文件外写入颜色字面量外，它还必须校验由主题 CSS 确定性生成、供 Run 与 Presentation 共用的 canonical terminal palette，并拒绝缺失或陈旧生成物；显式生成入口是 `node scripts/check-theme.mjs --write-terminal-palette`，`tests/unit/support/check-theme.spec.ts` 使用生成、陈旧和合法 fixture 锁定边界。
 

@@ -1,3 +1,5 @@
+import { posix } from 'node:path'
+
 import { configureElectronRuntimeDataDirectories } from '../../../src/platform/electron-main/runtimeDataDirectoryBootstrap'
 
 describe('runtime data directory bootstrap', () => {
@@ -18,9 +20,10 @@ describe('runtime data directory bootstrap', () => {
       platform: 'linux'
     })
 
-    expect(runtimeDataDirectory).toMatch(
-      /^\/application-data\/CleanCode-Dev-Profiles\/[a-f0-9]{24}$/
+    expect(posix.dirname(runtimeDataDirectory)).toBe(
+      posix.join('/application-data', 'CleanCode-Dev-Profiles')
     )
+    expect(posix.basename(runtimeDataDirectory)).toMatch(/^[a-f0-9]{24}$/)
     expect(calls).toEqual([
       'realpath:/aliases/feature-a',
       `mkdir:${runtimeDataDirectory}`,

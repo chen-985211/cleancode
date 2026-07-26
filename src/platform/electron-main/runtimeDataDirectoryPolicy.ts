@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { join, posix, win32 } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 const developmentProfileDirectoryName = 'CleanCode-Dev-Profiles'
 
@@ -26,7 +26,11 @@ export function resolveRuntimeDataDirectory(input: RuntimeDataDirectoryPolicyInp
     input.developmentApplicationDirectory,
     input.platform
   )
-  return join(input.appDataDirectory, developmentProfileDirectoryName, profileId)
+  return resolvePathApi(input.platform).join(
+    input.appDataDirectory,
+    developmentProfileDirectoryName,
+    profileId
+  )
 }
 
 export function configureRuntimeDataDirectories(
@@ -50,7 +54,7 @@ function createDevelopmentProfileId(
   applicationDirectory: string,
   platform: NodeJS.Platform
 ): string {
-  const pathApi = platform === 'win32' ? win32 : posix
+  const pathApi = resolvePathApi(platform)
   const normalizedDirectory = trimTrailingSeparators(
     pathApi.normalize(applicationDirectory),
     pathApi.parse(applicationDirectory).root,
@@ -60,6 +64,10 @@ function createDevelopmentProfileId(
     platform === 'win32' ? normalizedDirectory.toLowerCase() : normalizedDirectory
 
   return createHash('sha256').update(canonicalIdentity).digest('hex').slice(0, 24)
+}
+
+function resolvePathApi(platform: NodeJS.Platform): typeof posix | typeof win32 {
+  return platform === 'win32' ? win32 : posix
 }
 
 function trimTrailingSeparators(path: string, root: string, separator: string): string {
