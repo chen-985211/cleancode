@@ -11,9 +11,14 @@
 
   <p>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+    <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
     <a href="#环境要求"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
     <a href="#带上你喜欢的-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
     <a href="#画出来也运行起来"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+  </p>
+
+  <p>
+    <strong><a href="https://github.com/chen-985211/cleancode/releases">下载 CleanCode Preview（macOS / Windows / Linux）</a></strong>
   </p>
 </div>
 
@@ -136,6 +141,32 @@ cleancode 内建 **33 个 Coding Agent Provider**。它们都可以进入同一�
 5. 从任意终端运行它和全部后代，在同一张画布上查看结果。
 
 ## 快速开始
+
+### 下载 Preview
+
+从 [GitHub Releases](https://github.com/chen-985211/cleancode/releases) 下载对应平台的安装包：
+
+- macOS：Universal DMG/ZIP，同时支持 Apple Silicon 和 Intel。
+- Windows：x64 NSIS 安装程序。
+- Linux：x64 AppImage/DEB。
+
+> [!WARNING]
+> 当前 Preview 尚未使用正式开发者证书签名。请只从本仓库的 GitHub Releases 下载，并先使用
+> 同一 Release 中的 `SHA256SUMS.txt` 核对安装包。
+
+macOS 会因为应用尚未完成 Developer ID 签名和 Apple notarization 而阻止首次打开。把
+`CleanCode.app` 拖入 `/Applications`，确认安装包来源和 SHA-256 校验值无误后，可以只为这个
+应用移除下载隔离属性并启动：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/CleanCode.app
+open /Applications/CleanCode.app
+```
+
+这条命令会绕过该应用的首次 Gatekeeper 检查。不要把目标路径替换为 `/Applications`、下载目录或
+用户目录等宽泛范围。也可以按照
+[Apple 官方说明](https://support.apple.com/en-asia/102445)，在“系统设置 → 隐私与安全性”中选择
+“仍要打开”。
 
 ### 环境要求
 
