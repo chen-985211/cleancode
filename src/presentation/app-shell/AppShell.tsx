@@ -135,7 +135,10 @@ export function AppShell({
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
   })
-  useInitialWorkbenchLoad({ setCurrentWorkbench, setWorkbenches })
+  const initialWorkbenchLoad = useInitialWorkbenchLoad({
+    setCurrentWorkbench,
+    setWorkbenches
+  })
 
   const {
     cancelPendingWorkbenchInputFocus,
@@ -639,6 +642,7 @@ export function AppShell({
             agentProviders={enabledCreatableAgentProviders}
             defaultAgentProviderId={effectiveAgentProviderId}
             isDesktopRuntime={isDesktopRuntime}
+            initialWorkbenchLoadPhase={initialWorkbenchLoad.phase}
             isCreatingAgent={isCreatingAgent}
             isAgentProviderDiscoveryPending={creatableAgentProviders.state.status === 'loading'}
             terminalRuntimeAvailability={terminalRuntimeAvailability}
@@ -657,6 +661,7 @@ export function AppShell({
             onZoomCanvasOut={zoomCanvasOut}
             onFitCanvas={fitCanvas}
             onOpenProject={addProject}
+            onRetryInitialWorkbenchLoad={initialWorkbenchLoad.retry}
             onCreateTerminalBlock={createTerminalBlock}
             onCreateWorkspaceAgent={createWorkspaceAgent}
             onOpenAgentSettings={applicationSettings.openAgents}

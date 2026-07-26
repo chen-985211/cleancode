@@ -9,7 +9,7 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Box, FolderOpen } from 'lucide-react'
+import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
@@ -31,6 +31,7 @@ import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
+import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -38,6 +39,7 @@ interface WorkbenchCanvasProps {
   readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]
   readonly approvalIntents?: readonly AgentToolApprovalViewState[]
   readonly isDesktopRuntime: boolean
+  readonly initialWorkbenchLoadPhase?: InitialWorkbenchLoadPhase
   readonly isCreatingAgent?: boolean
   readonly isAgentProviderDiscoveryPending?: boolean
   readonly defaultAgentProviderId?: string | null
@@ -57,6 +59,7 @@ interface WorkbenchCanvasProps {
   readonly onZoomCanvasOut: () => void
   readonly onFitCanvas: () => void
   readonly onOpenProject?: () => void
+  readonly onRetryInitialWorkbenchLoad?: () => void
   readonly onCreateTerminalBlock: () => void
   readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
@@ -91,6 +94,7 @@ export function WorkbenchCanvas({
   approvalIntents = [],
   agentProviders = [],
   isDesktopRuntime,
+  initialWorkbenchLoadPhase = 'ready',
   isCreatingAgent = false,
   isAgentProviderDiscoveryPending = false,
   defaultAgentProviderId = null,
@@ -110,6 +114,7 @@ export function WorkbenchCanvas({
   onZoomCanvasOut,
   onFitCanvas,
   onOpenProject,
+  onRetryInitialWorkbenchLoad,
   onCreateTerminalBlock,
   onCreateWorkspaceAgent,
   onOpenAgentSettings,
@@ -350,12 +355,18 @@ export function WorkbenchCanvas({
           </Panel>
         </ReactFlow>
         {!currentWorkbench ? (
-          <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} onOpenProject={onOpenProject} />
+          <CanvasInitialWorkbenchState
+            isDesktopRuntime={isDesktopRuntime}
+            phase={initialWorkbenchLoadPhase}
+            onOpenProject={onOpenProject}
+            onRetry={onRetryInitialWorkbenchLoad}
+          />
         ) : null}
       </div>
       <CanvasStatusbar
         isDesktopRuntime={isDesktopRuntime}
         terminalRuntimeAvailability={terminalRuntimeAvailability}
+        initialWorkbenchLoadPhase={initialWorkbenchLoadPhase}
         currentWorkbench={currentWorkbench}
         currentWorkspace={currentWorkspace}
       />
@@ -455,6 +466,51 @@ function resolveCanvasDimension(value: number, fallback: number): number {
   return value > 0 ? value : fallback
 }
 
+function CanvasInitialWorkbenchState({
+  isDesktopRuntime,
+  phase,
+  onOpenProject,
+  onRetry
+}: {
+  readonly isDesktopRuntime: boolean
+  readonly phase: InitialWorkbenchLoadPhase
+  readonly onOpenProject?: () => void
+  readonly onRetry?: () => void
+}) {
+  const { t } = useI18n()
+
+  if (!isDesktopRuntime || phase === 'ready') {
+    return <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} onOpenProject={onOpenProject} />
+  }
+
+  if (phase === 'loading') {
+    const label = t('canvas.restoringProject')
+
+    return (
+      <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
+        <span className="canvas-empty__icon" aria-hidden="true">
+          <LoaderCircle className="canvas-empty__spinner" size={22} />
+        </span>
+        <p>{label}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="canvas-empty" role="alert" data-tone="danger">
+      <span className="canvas-empty__icon" aria-hidden="true">
+        <CircleAlert size={22} />
+      </span>
+      <h2>{t('canvas.restoreFailedTitle')}</h2>
+      <p>{t('canvas.restoreFailedDescription')}</p>
+      <button className="canvas-empty__action" type="button" onClick={onRetry}>
+        <RefreshCw size={15} aria-hidden="true" />
+        {t('canvas.retryRestore')}
+      </button>
+    </div>
+  )
+}
+
 function CanvasEmptyState({
   isDesktopRuntime,
   onOpenProject
@@ -488,6 +544,7 @@ function CanvasEmptyState({
 interface CanvasStatusbarProps {
   readonly isDesktopRuntime: boolean
   readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
+  readonly initialWorkbenchLoadPhase: InitialWorkbenchLoadPhase
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
 }
@@ -495,6 +552,7 @@ interface CanvasStatusbarProps {
 function CanvasStatusbar({
   isDesktopRuntime,
   terminalRuntimeAvailability,
+  initialWorkbenchLoadPhase,
   currentWorkbench,
   currentWorkspace
 }: CanvasStatusbarProps) {
@@ -507,13 +565,17 @@ function CanvasStatusbar({
       <span>
         {!isDesktopRuntime
           ? t('canvas.statusPreview')
-          : terminalRuntimeAvailability.phase === 'initializing'
-            ? t('canvas.statusRuntimeInitializing')
-            : terminalRuntimeAvailability.phase === 'unavailable'
-              ? t('canvas.statusRuntimeUnavailable')
-              : currentWorkbench
-                ? t('canvas.statusConnected')
-                : t('canvas.statusWaiting')}
+          : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
+            ? t('canvas.statusProjectRestoring')
+            : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
+              ? t('canvas.statusProjectRestoreFailed')
+              : terminalRuntimeAvailability.phase === 'initializing'
+                ? t('canvas.statusRuntimeInitializing')
+                : terminalRuntimeAvailability.phase === 'unavailable'
+                  ? t('canvas.statusRuntimeUnavailable')
+                  : currentWorkbench
+                    ? t('canvas.statusConnected')
+                    : t('canvas.statusWaiting')}
       </span>
       {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
     </footer>

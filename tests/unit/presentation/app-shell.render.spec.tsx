@@ -88,7 +88,7 @@ describe('app shell', () => {
     render(<AppShell />)
     const toolbar = within(screen.getByLabelText('工作台工具栏'))
 
-    expect(screen.getByRole('heading', { name: '打开项目开始使用' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '打开项目开始使用' })).toBeInTheDocument()
     expect(screen.getByText('选择一个本地项目目录，进入工作台。')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '打开项目' }))
     await waitFor(() => expect(addProject).toHaveBeenCalledOnce())

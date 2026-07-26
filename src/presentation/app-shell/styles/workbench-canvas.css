@@ -452,6 +452,20 @@
   box-shadow: 0 4px 14px var(--cc-shadow-color);
 }
 
+.canvas-empty[data-tone='danger'] .canvas-empty__icon {
+  border-color: var(--cc-danger-border);
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.canvas-empty--loading {
+  animation: canvas-empty-reveal 160ms ease 180ms both;
+}
+
+.canvas-empty__spinner {
+  animation: canvas-empty-spin 900ms linear infinite;
+}
+
 .canvas-empty h2 {
   margin: 16px 0 0;
   color: var(--cc-foreground);
@@ -491,6 +505,32 @@
 
 .canvas-empty__action:hover {
   background: var(--cc-primary-hover);
+}
+
+@keyframes canvas-empty-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes canvas-empty-reveal {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-empty--loading {
+    animation: none;
+  }
+
+  .canvas-empty__spinner {
+    animation: none;
+  }
 }
 
 .app-shell__statusbar {
