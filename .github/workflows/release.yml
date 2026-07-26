@@ -89,12 +89,10 @@ jobs:
 
       - name: Run packaged terminal smoke test
         if: runner.os != 'Linux'
+        shell: bash
         env:
           CLEANCODE_E2E_PREBUILT: '1'
-        run: |
-          pnpm test:e2e \
-            tests/e2e/run-terminal-sessions.e2e.spec.ts \
-            -t "runs shell commands from the active project workspace"
+        run: pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts -t "runs shell commands from the active project workspace"
 
       - run: pnpm ${{ matrix.dist_script }}
 
