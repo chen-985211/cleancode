@@ -86,6 +86,7 @@ import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
+import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
 
 interface WorkbenchSnapshot {
@@ -94,6 +95,8 @@ interface WorkbenchSnapshot {
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
   readonly graph: BlockGraphSnapshot
 }
+
+configureElectronRuntimeDataDirectories(app)
 
 const acquiresSingleInstanceLock = shouldAcquireSingleInstanceLock(process.env)
 const isPrimaryAppInstance = !acquiresSingleInstanceLock || app.requestSingleInstanceLock()

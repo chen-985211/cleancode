@@ -42,6 +42,7 @@ import {
 import {
   type TerminalProviderEvent,
   terminalProviderApplicationDetachProtocolVersion,
+  terminalProviderMinimumCompatibleProtocolVersion,
   terminalProviderProtocolVersion
 } from './TerminalProviderProtocol'
 import { TerminalProviderRpcConnection } from './TerminalProviderRpcConnection'
@@ -495,7 +496,7 @@ export class PersistentTerminalProviderClient
       }
       if (
         health.protocolVersion !== metadata.protocolVersion ||
-        health.protocolVersion < terminalProviderProtocolVersion - 1 ||
+        health.protocolVersion < terminalProviderMinimumCompatibleProtocolVersion ||
         health.protocolVersion > terminalProviderProtocolVersion
       ) {
         throw createExpectedAppError(

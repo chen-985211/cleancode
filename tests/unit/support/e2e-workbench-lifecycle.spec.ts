@@ -142,6 +142,21 @@ describe('E2E workbench lifecycle', () => {
     })
   })
 
+  it.each(['linux', 'win32'] as const)(
+    'removes inherited Electron Node mode before launching Electron on %s',
+    (platform) => {
+      const environment = mergeE2eProcessEnvironment(
+        { ELECTRON_RUN_AS_NODE: '1', PATH: '/base' },
+        {},
+        platform
+      )
+
+      expect(
+        Object.keys(environment).filter((name) => name.toLowerCase() === 'electron_run_as_node')
+      ).toEqual([])
+    }
+  )
+
   it('does not fail when no Electron application was assigned', async () => {
     await expect(closeElectronApp(undefined)).resolves.toBeUndefined()
     await expect(

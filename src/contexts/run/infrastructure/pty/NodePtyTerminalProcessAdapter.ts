@@ -30,6 +30,7 @@ import {
   supportsForegroundJobShell,
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
+import { createTerminalProcessEnvironment } from './TerminalProcessEnvironment'
 import { interruptWindowsForegroundJob } from './WindowsForegroundJobInterrupt'
 
 const nodeRequire = createRequire(import.meta.url)
@@ -65,7 +66,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       cols: command.columns,
       rows: command.rows,
       cwd: command.workingDirectory,
-      env: createProcessEnvironment(command.environment, command.terminalSourceTheme)
+      env: createTerminalProcessEnvironment({
+        explicit: command.environment,
+        inherited: process.env,
+        platform: platform(),
+        terminalSourceTheme: command.terminalSourceTheme
+      })
     })
 
     let resolveExit: () => void = () => undefined
@@ -324,33 +330,6 @@ function interruptManagedWindowsForegroundJob(
 
 function getDefaultShell(): string {
   return platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/sh'
-}
-
-function createProcessEnvironment(
-  environment: Readonly<Record<string, string>> | undefined,
-  terminalSourceTheme: TerminalSourceTheme = 'dark'
-): Record<string, string> {
-  const inheritedEnvironment = Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => {
-      return typeof entry[1] === 'string'
-    })
-  )
-
-  const terminalEnvironment = createTerminalCapabilityEnvironment(environment, terminalSourceTheme)
-  for (const [name, value] of Object.entries(terminalEnvironment)) {
-    if (platform() === 'win32') {
-      const inheritedName = Object.keys(inheritedEnvironment).find(
-        (candidate) => candidate.toLowerCase() === name.toLowerCase()
-      )
-      if (inheritedName) {
-        delete inheritedEnvironment[inheritedName]
-      }
-    }
-    inheritedEnvironment[name] = value
-  }
-
-  inheritedEnvironment.PROMPT_EOL_MARK = ''
-  return inheritedEnvironment
 }
 
 async function stopManagedProcess(managedProcess: ManagedTerminalProcess): Promise<void> {

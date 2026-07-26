@@ -336,6 +336,48 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
     expect(output).not.toContain('54321:\r\n')
   })
 
+  it.each([
+    {
+      environment: undefined,
+      expected: 'electron-mode:unset',
+      name: 'removes an inherited Electron Node-mode marker'
+    },
+    {
+      environment: { ELECTRON_RUN_AS_NODE: '1' },
+      expected: 'electron-mode:1',
+      name: 'preserves an explicit Electron Node-mode request'
+    }
+  ])('$name', async ({ environment, expected }) => {
+    const previousRunAsNode = process.env.ELECTRON_RUN_AS_NODE
+    process.env.ELECTRON_RUN_AS_NODE = '1'
+    let output = ''
+    const exited = createDeferred<void>()
+
+    try {
+      await adapter.start({
+        scope: runScope(`electron-environment-${expected}`),
+        workingDirectory,
+        shell: '/bin/sh',
+        launchCommand:
+          'if [ -z "${ELECTRON_RUN_AS_NODE+x}" ]; then printf "electron-mode:unset\\n"; else printf "electron-mode:%s\\n" "$ELECTRON_RUN_AS_NODE"; fi',
+        environment,
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => exited.resolve()
+      })
+
+      await exited.promise
+
+      expect(output).toContain(expected)
+    } finally {
+      if (previousRunAsNode === undefined) delete process.env.ELECTRON_RUN_AS_NODE
+      else process.env.ELECTRON_RUN_AS_NODE = previousRunAsNode
+    }
+  })
+
   it('publishes the source-theme capability profile and preserves inherited NO_COLOR', async () => {
     const previousNoColor = process.env.NO_COLOR
     process.env.NO_COLOR = 'respect-no-color'
