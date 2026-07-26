@@ -75,7 +75,7 @@ describe('archive locked branch worktree', () => {
     await expect(
       archive.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'test-c',
+        workspaceId: 'test-c',
         lockedWorktreeConfirmation: { lockReason: 'claude session test-c' }
       })
     ).rejects.toMatchObject({ code: 'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES' })
@@ -93,7 +93,7 @@ describe('archive locked branch worktree', () => {
     const archive = new ArchiveBranchWorkspaceUseCase(repository, git, lifecycle.port)
 
     await expect(
-      archive.execute({ projectDirectory: '/work/app', workspaceName: 'test-c' })
+      archive.execute({ projectDirectory: '/work/app', workspaceId: 'test-c' })
     ).rejects.toMatchObject({
       code: 'GIT_WORKTREE_LOCKED',
       details: { lockReason: 'claude session test-c' },
@@ -116,7 +116,7 @@ describe('archive locked branch worktree', () => {
 
     await archive.execute({
       projectDirectory: '/work/app',
-      workspaceName: 'test-c',
+      workspaceId: 'test-c',
       lockedWorktreeConfirmation: { lockReason: 'claude session test-c' }
     })
 
@@ -149,7 +149,7 @@ describe('archive locked branch worktree', () => {
     await expect(
       archive.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'test-c',
+        workspaceId: 'test-c',
         lockedWorktreeConfirmation: { lockReason: 'claude session test-c' }
       })
     ).rejects.toMatchObject({
@@ -174,7 +174,7 @@ describe('archive locked branch worktree', () => {
     await expect(
       archive.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'test-c',
+        workspaceId: 'test-c',
         lockedWorktreeConfirmation: { lockReason: 'claude session test-c' }
       })
     ).rejects.toThrow('remove failed')
@@ -258,13 +258,17 @@ function createProjectSnapshot(): ProjectSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
       },
       {
-        name: 'test-c',
+        workspaceId: 'test-c',
+        workspaceKind: 'linked-worktree',
+        displayName: 'test-c',
         directory: '/work/app/.claude/worktrees/test-c',
         gitBranch: 'worktree-test-c',
         isCurrent: false

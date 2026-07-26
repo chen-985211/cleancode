@@ -24,23 +24,27 @@ export function createManagedServiceOwnerResolver(
       return null
     }
 
-    const graph = await graphs.findDefaultGraphSnapshot(owner.projectDirectory, owner.workspaceName)
+    const graph = await graphs.findDefaultGraphSnapshot(owner.projectDirectory, owner.workspaceId)
+    const workspace = project.workspaces.find(
+      (candidate) => candidate.workspaceId === owner.workspaceId
+    )
     const terminalName =
-      graph?.projectId === owner.projectId && graph.workspaceName === owner.workspaceName
+      graph?.projectId === owner.projectId && graph.workspaceId === owner.workspaceId
         ? graph.blocks.find((block) => block.id === owner.blockId)?.name
         : undefined
 
     return {
       identity: {
         projectId: owner.projectId,
-        workspaceName: owner.workspaceName,
+        workspaceId: owner.workspaceId,
         blockId: owner.blockId,
         sessionId: owner.sessionId,
         runId: owner.runId,
         generation: owner.generation
       },
       projectName: project.name,
-      workspaceName: owner.workspaceName,
+      workspaceId: owner.workspaceId,
+      workspaceDisplayName: workspace?.displayName ?? owner.workspaceId,
       terminalName: terminalName ?? owner.blockId
     }
   }

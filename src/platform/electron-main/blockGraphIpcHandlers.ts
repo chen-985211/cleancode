@@ -10,7 +10,7 @@ import type { Logger } from '../logging/Logger'
 
 interface TerminalDefinitionIpcCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly name: string
   readonly description: string
@@ -23,43 +23,43 @@ export interface BlockGraphIpcHandlersInput {
   readonly logger: Logger
   readonly createTerminalBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly name: string
     readonly description: string
     readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly createTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly name: string
     readonly memberBlockIds: readonly string[]
   }) => Promise<BlockGraphSnapshot>
   readonly connectTerminalBlocks: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly sourceBlockId: string
     readonly targetBlockId: string
   }) => Promise<BlockGraphSnapshot>
   readonly disconnectTerminalBlocks: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly connectionId: string
   }) => Promise<BlockGraphSnapshot>
   readonly moveBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly moveTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalBlockMetadata: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly name: string
     readonly description: string
@@ -67,13 +67,13 @@ export interface BlockGraphIpcHandlersInput {
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalExecutionConfig: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly executionConfig: TerminalExecutionConfigSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalDefinition: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly name: string
     readonly description: string
@@ -82,48 +82,48 @@ export interface BlockGraphIpcHandlersInput {
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly name: string
   }) => Promise<BlockGraphSnapshot>
   readonly setTerminalGroupCollapsed: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly isCollapsed: boolean
   }) => Promise<BlockGraphSnapshot>
   readonly addTerminalToGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
   readonly removeTerminalFromGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
   readonly dissolveTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
   }) => Promise<BlockGraphSnapshot>
   readonly resizeTerminalBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly position: { readonly x: number; readonly y: number }
     readonly size: { readonly width: number; readonly height: number }
   }) => Promise<BlockGraphSnapshot>
   readonly updateGraphViewport: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly viewport: CanvasViewportSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly deleteBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
 }
@@ -132,7 +132,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly sourceBlockId: string
       readonly targetBlockId: string
     },
@@ -150,7 +150,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly connectionId: string
     },
     BlockGraphSnapshot
@@ -167,7 +167,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly name: string
       readonly description: string
       readonly position: { readonly x: number; readonly y: number }
@@ -186,7 +186,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly name: string
       readonly memberBlockIds: readonly string[]
     },
@@ -204,7 +204,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly blockId: string
       readonly position: { readonly x: number; readonly y: number }
     },
@@ -221,7 +221,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
       readonly position: { readonly x: number; readonly y: number }
     },
@@ -238,7 +238,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly blockId: string
       readonly name: string
       readonly description: string
@@ -257,7 +257,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly blockId: string
       readonly executionConfig: TerminalExecutionConfigSnapshot
     },
@@ -283,7 +283,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
       readonly name: string
     },
@@ -300,7 +300,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
       readonly isCollapsed: boolean
     },
@@ -317,7 +317,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
       readonly blockId: string
     },
@@ -334,7 +334,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
       readonly blockId: string
     },
@@ -351,7 +351,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly terminalGroupId: string
     },
     BlockGraphSnapshot
@@ -368,7 +368,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly blockId: string
       readonly position: { readonly x: number; readonly y: number }
       readonly size: { readonly width: number; readonly height: number }
@@ -386,7 +386,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly viewport: CanvasViewportSnapshot
     },
     BlockGraphSnapshot
@@ -402,7 +402,7 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
   registerIpcHandler<
     {
       readonly projectDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
       readonly blockId: string
     },
     BlockGraphSnapshot
@@ -421,7 +421,7 @@ function readTerminalDefinitionCommand(command: unknown): TerminalDefinitionIpcC
   if (
     !isRecord(command) ||
     typeof command.projectDirectory !== 'string' ||
-    typeof command.workspaceName !== 'string' ||
+    typeof command.workspaceId !== 'string' ||
     typeof command.blockId !== 'string' ||
     typeof command.name !== 'string' ||
     typeof command.description !== 'string' ||

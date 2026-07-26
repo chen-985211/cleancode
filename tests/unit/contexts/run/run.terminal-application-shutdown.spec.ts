@@ -91,7 +91,7 @@ function runOwner(blockId: string) {
     projectId: 'project-1',
     terminalBlockId: blockId,
     workspaceDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/project'
   }
 }

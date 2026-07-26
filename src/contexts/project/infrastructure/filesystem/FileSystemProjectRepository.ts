@@ -4,19 +4,14 @@ import { basename, dirname, join, resolve } from 'node:path'
 
 import type { ProjectSnapshot } from '../../application/dto/ProjectSnapshot'
 import type { ProjectRepository } from '../../application/ports/ProjectRepository'
-import { Project } from '../../domain/aggregates/Project'
+import type { Project } from '../../domain/aggregates/Project'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const projectsDirectoryName = 'projects'
-const legacyMetadataDirectoryName = '.cleancode'
 const metadataFileName = 'project.json'
 
 function getProjectMetadataPath(storageDirectory: string, projectDirectory: string): string {
   return join(getProjectStateDirectory(storageDirectory, projectDirectory), metadataFileName)
-}
-
-function getLegacyProjectMetadataPath(projectDirectory: string): string {
-  return join(projectDirectory, legacyMetadataDirectoryName, metadataFileName)
 }
 
 function getProjectStateDirectory(storageDirectory: string, projectDirectory: string): string {
@@ -42,27 +37,7 @@ export class FileSystemProjectRepository implements ProjectRepository {
   }
 
   async findByDirectory(directory: string): Promise<ProjectSnapshot | null> {
-    const project = await readProjectSnapshot(
-      getProjectMetadataPath(this.storageDirectory, directory),
-      directory
-    )
-
-    if (project) {
-      return project
-    }
-
-    const legacyProject = await readProjectSnapshot(
-      getLegacyProjectMetadataPath(directory),
-      directory
-    )
-
-    if (!legacyProject) {
-      return null
-    }
-
-    await this.save(Project.fromSnapshot(legacyProject))
-
-    return legacyProject
+    return readProjectSnapshot(getProjectMetadataPath(this.storageDirectory, directory), directory)
   }
 }
 
@@ -85,7 +60,9 @@ function parseProjectSnapshot(metadata: string, directory: string): ProjectSnaps
     name: parsed.name,
     directory,
     workspaces: parsed.workspaces.map((workspace) => ({
-      name: workspace.name,
+      workspaceId: workspace.workspaceId,
+      workspaceKind: workspace.workspaceKind,
+      displayName: workspace.displayName,
       directory: workspace.directory,
       gitBranch: workspace.gitBranch,
       isCurrent: workspace.isCurrent

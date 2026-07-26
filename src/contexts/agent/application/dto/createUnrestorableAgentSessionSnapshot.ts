@@ -9,7 +9,7 @@ export function createUnrestorableAgentSessionSnapshot(input: {
   readonly sessionId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): AgentSessionSnapshot {
   return {
     agentId: input.agentId,
@@ -41,6 +41,6 @@ export function createUnrestorableAgentSessionSnapshot(input: {
     sessionId: input.sessionId,
     terminalSourceTheme: input.terminalSourceTheme,
     workspaceDirectory: input.workspaceDirectory,
-    workspaceName: input.workspaceName
+    workspaceId: input.workspaceId
   }
 }

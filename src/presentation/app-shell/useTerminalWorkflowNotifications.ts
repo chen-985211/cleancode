@@ -11,7 +11,7 @@ interface UseTerminalWorkflowNotificationsInput {
   readonly onStop: () => Promise<void> | void
   readonly projectDirectory: string | null
   readonly run: WorkflowRunSnapshot | null
-  readonly workspaceName: string | null
+  readonly workspaceId: string | null
 }
 
 interface PublishedWorkflowNotification {
@@ -27,12 +27,12 @@ export function useTerminalWorkflowNotifications({
   onStop,
   projectDirectory,
   run,
-  workspaceName
+  workspaceId
 }: UseTerminalWorkflowNotificationsInput): void {
   const { t } = useI18n()
   const publishedByScope = useRef(new Map<string, PublishedWorkflowNotification>())
   const { dismiss, notify, update } = notifications
-  const scopeKey = createWorkflowScopeKey(projectDirectory, workspaceName)
+  const scopeKey = createWorkflowScopeKey(projectDirectory, workspaceId)
 
   useEffect(
     () => () => {
@@ -50,7 +50,7 @@ export function useTerminalWorkflowNotifications({
   )
 
   useEffect(() => {
-    if (!run || !scopeKey || !workspaceName || run.workspaceName !== workspaceName) {
+    if (!run || !scopeKey || !workspaceId || run.workspaceId !== workspaceId) {
       return
     }
 
@@ -83,14 +83,12 @@ export function useTerminalWorkflowNotifications({
       existing.notificationId = notify(notification)
     }
     existing.hiddenByScopeChange = false
-  }, [isStopping, notify, onStop, run, scopeKey, t, update, workspaceName])
+  }, [isStopping, notify, onStop, run, scopeKey, t, update, workspaceId])
 }
 
 function createWorkflowScopeKey(
   projectDirectory: string | null,
-  workspaceName: string | null
+  workspaceId: string | null
 ): string | null {
-  return projectDirectory && workspaceName
-    ? JSON.stringify([projectDirectory, workspaceName])
-    : null
+  return projectDirectory && workspaceId ? JSON.stringify([projectDirectory, workspaceId]) : null
 }

@@ -61,14 +61,17 @@ export function useTerminalGroupActions({
     async (
       mutate: (
         projectDirectory: string,
-        workspaceName: string
+        workspaceId: string
       ) => Promise<WorkbenchSnapshot['graph'] | undefined>
     ) => {
       if (!currentWorkbench || !currentWorkspace) {
         return
       }
 
-      const graphSnapshot = await mutate(currentWorkbench.project.directory, currentWorkspace.name)
+      const graphSnapshot = await mutate(
+        currentWorkbench.project.directory,
+        currentWorkspace.workspaceId
+      )
 
       if (graphSnapshot) {
         setCurrentGraph(graphSnapshot)
@@ -100,31 +103,31 @@ export function useTerminalGroupActions({
         }
       },
       onUpdateGroupMetadata: (group: TerminalGroupSnapshot, metadata: TerminalGroupMetadataInput) =>
-        runGraphMutation(async (projectDirectory, workspaceName) =>
+        runGraphMutation(async (projectDirectory, workspaceId) =>
           window.cleancode?.updateTerminalGroupMetadata({
             projectDirectory,
-            workspaceName,
+            workspaceId,
             terminalGroupId: group.id,
             name: metadata.name
           })
         ),
       onToggleGroupCollapsed: (group: TerminalGroupSnapshot, isCollapsed: boolean) =>
-        runGraphMutation(async (projectDirectory, workspaceName) =>
+        runGraphMutation(async (projectDirectory, workspaceId) =>
           window.cleancode?.setTerminalGroupCollapsed({
             projectDirectory,
-            workspaceName,
+            workspaceId,
             terminalGroupId: group.id,
             isCollapsed
           })
         ),
       onAddSelectedTerminalsToGroup: async (group: TerminalGroupSnapshot) => {
-        await runGraphMutation(async (projectDirectory, workspaceName) => {
+        await runGraphMutation(async (projectDirectory, workspaceId) => {
           let graphSnapshot: WorkbenchSnapshot['graph'] | undefined
 
           for (const blockId of selectedUngroupedTerminalBlockIds) {
             graphSnapshot = await window.cleancode?.addTerminalToGroup({
               projectDirectory,
-              workspaceName,
+              workspaceId,
               terminalGroupId: group.id,
               blockId
             })
@@ -139,14 +142,14 @@ export function useTerminalGroupActions({
           group.memberBlockIds.includes(blockId)
         )
 
-        await runGraphMutation(async (projectDirectory, workspaceName) => {
+        await runGraphMutation(async (projectDirectory, workspaceId) => {
           let graphSnapshot: WorkbenchSnapshot['graph'] | undefined
           let remainingMemberCount = group.memberBlockIds.length
 
           for (const blockId of selectedMemberBlockIds) {
             graphSnapshot = await window.cleancode?.removeTerminalFromGroup({
               projectDirectory,
-              workspaceName,
+              workspaceId,
               terminalGroupId: group.id,
               blockId
             })
@@ -162,19 +165,19 @@ export function useTerminalGroupActions({
         setSelectedTerminalBlockIds([])
       },
       onRemoveTerminalFromGroup: (group: TerminalGroupSnapshot, block: TerminalBlockSnapshot) =>
-        runGraphMutation(async (projectDirectory, workspaceName) =>
+        runGraphMutation(async (projectDirectory, workspaceId) =>
           window.cleancode?.removeTerminalFromGroup({
             projectDirectory,
-            workspaceName,
+            workspaceId,
             terminalGroupId: group.id,
             blockId: block.id
           })
         ),
       onDissolveGroup: async (group: TerminalGroupSnapshot) => {
-        await runGraphMutation(async (projectDirectory, workspaceName) =>
+        await runGraphMutation(async (projectDirectory, workspaceId) =>
           window.cleancode?.dissolveTerminalGroup({
             projectDirectory,
-            workspaceName,
+            workspaceId,
             terminalGroupId: group.id
           })
         )

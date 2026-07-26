@@ -118,7 +118,7 @@ export class RecordingAgentTerminalRuntime implements AgentTerminalRuntimePort {
         projectId: command.projectId,
         runId: `run-${generation}`,
         sessionId: `terminal-${generation}`,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       }
     }
   }

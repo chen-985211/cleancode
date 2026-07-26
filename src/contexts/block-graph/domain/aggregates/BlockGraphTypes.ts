@@ -93,7 +93,7 @@ export interface TerminalGroupSnapshot {
 export interface BlockGraphSnapshot {
   readonly id: string
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly viewport: CanvasViewportSnapshot
   readonly blocks: readonly TerminalBlockSnapshot[]
   readonly connections?: readonly TerminalConnectionSnapshot[]
@@ -122,7 +122,7 @@ export type RestorableBlockGraphSnapshot = Omit<
 export interface CreateDefaultGraphInput {
   readonly id?: string
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface CreateTerminalBlockInput {

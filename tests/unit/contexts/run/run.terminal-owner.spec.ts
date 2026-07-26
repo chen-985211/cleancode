@@ -12,7 +12,7 @@ describe('typed terminal owner', () => {
     projectDirectory: '/repo/app',
     projectId: 'project-1',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 
   it('keeps block and Agent terminal slots separate even when their ids match', () => {

@@ -224,7 +224,7 @@ describe('app shell terminal group edit mode', () => {
     await waitFor(() =>
       expect(runtimeApi.moveBlock).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         blockId: 'worker-terminal',
         position: { x: 420, y: 260 }
       })
@@ -232,7 +232,7 @@ describe('app shell terminal group edit mode', () => {
     await waitFor(() =>
       expect(runtimeApi.addTerminalToGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         terminalGroupId: 'development-group',
         blockId: 'worker-terminal'
       })
@@ -288,7 +288,7 @@ describe('app shell terminal group edit mode', () => {
     await waitFor(() =>
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         name: '启动项目',
         memberBlockIds: ['backend-terminal', 'frontend-terminal']
       })
@@ -425,7 +425,7 @@ describe('app shell terminal group edit mode', () => {
     await waitFor(() =>
       expect(runtimeApi.removeTerminalFromGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         terminalGroupId: 'development-group',
         blockId: 'backend-terminal'
       })

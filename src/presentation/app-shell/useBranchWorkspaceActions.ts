@@ -12,9 +12,9 @@ interface UseBranchWorkspaceActionsInput {
   readonly setSelectedTerminalBlockId: Dispatch<SetStateAction<string | null>>
   readonly terminateWorkspaceTerminalSessions: (
     workbench: WorkbenchSnapshot,
-    workspaceName: string
+    workspaceId: string
   ) => Promise<void>
-  readonly forgetWorkspaceTerminalStates: (projectId: string, workspaceName: string) => void
+  readonly forgetWorkspaceTerminalStates: (projectId: string, workspaceId: string) => void
 }
 
 export function useBranchWorkspaceActions({
@@ -36,10 +36,10 @@ export function useBranchWorkspaceActions({
   }, [])
 
   const selectWorkspace = useCallback(
-    async (workbench: WorkbenchSnapshot, workspaceName: string): Promise<void> => {
+    async (workbench: WorkbenchSnapshot, workspaceId: string): Promise<void> => {
       if (currentWorkbench?.project.id === workbench.project.id) {
         const selectedWorkspace = currentWorkbench.project.workspaces.find(
-          (workspace) => workspace.name === workspaceName
+          (workspace) => workspace.workspaceId === workspaceId
         )
 
         if (selectedWorkspace?.isCurrent) {
@@ -49,7 +49,7 @@ export function useBranchWorkspaceActions({
 
       const switchedWorkbench = await window.cleancode?.switchBranchWorkspace({
         projectDirectory: workbench.project.directory,
-        workspaceName
+        workspaceId
       })
 
       if (switchedWorkbench) {
@@ -89,31 +89,31 @@ export function useBranchWorkspaceActions({
   const archiveBranchWorkspace = useCallback(
     async (
       workbench: WorkbenchSnapshot,
-      workspaceName: string,
+      workspaceId: string,
       lockedWorktreeConfirmation?: { readonly lockReason: string | null }
     ): Promise<void> => {
       setBranchWorkspaceActionError(null)
 
       try {
         const selectedWorkspace = currentWorkbench?.project.workspaces.find(
-          (workspace) => workspace.name === workspaceName
+          (workspace) => workspace.workspaceId === workspaceId
         )
         const shouldTerminateCurrentWorkspace =
           currentWorkbench?.project.id === workbench.project.id &&
           Boolean(selectedWorkspace?.isCurrent)
 
         if (shouldTerminateCurrentWorkspace && currentWorkbench) {
-          await terminateWorkspaceTerminalSessions(currentWorkbench, workspaceName)
+          await terminateWorkspaceTerminalSessions(currentWorkbench, workspaceId)
         }
 
         const archivedWorkbench = await window.cleancode?.archiveBranchWorkspace({
           projectDirectory: workbench.project.directory,
-          workspaceName,
+          workspaceId,
           ...(lockedWorktreeConfirmation ? { lockedWorktreeConfirmation } : {})
         })
 
         if (archivedWorkbench) {
-          forgetWorkspaceTerminalStates(workbench.project.id, workspaceName)
+          forgetWorkspaceTerminalStates(workbench.project.id, workspaceId)
           clearCurrentBlockSelection()
           replaceWorkbench(archivedWorkbench)
         }
@@ -135,18 +135,24 @@ export function useBranchWorkspaceActions({
 
   const checkoutMainBranch = useCallback(
     async (workbench: WorkbenchSnapshot, branchName: string): Promise<void> => {
-      const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
-        projectDirectory: workbench.project.directory,
-        branchName
-      })
+      setBranchWorkspaceActionError(null)
 
-      if (checkedOutWorkbench) {
-        forgetWorkspaceTerminalStates(workbench.project.id, 'main')
-        clearCurrentBlockSelection()
-        replaceWorkbench(checkedOutWorkbench)
+      try {
+        const checkedOutWorkbench = await window.cleancode?.checkoutMainWorkspaceBranch({
+          projectDirectory: workbench.project.directory,
+          branchName
+        })
+
+        if (checkedOutWorkbench) {
+          replaceWorkbench(checkedOutWorkbench)
+        }
+      } catch (error) {
+        setBranchWorkspaceActionError(
+          resolveUserFacingErrorMessage(error, 'workspace.operationFailed', t)
+        )
       }
     },
-    [clearCurrentBlockSelection, forgetWorkspaceTerminalStates, replaceWorkbench]
+    [replaceWorkbench, t]
   )
 
   return {

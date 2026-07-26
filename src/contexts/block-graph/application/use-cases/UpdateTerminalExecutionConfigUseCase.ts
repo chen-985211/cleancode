@@ -5,7 +5,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface UpdateTerminalExecutionConfigCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly executionConfig: TerminalExecutionConfigSnapshot
 }

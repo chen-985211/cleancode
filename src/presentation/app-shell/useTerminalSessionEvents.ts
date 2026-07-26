@@ -109,7 +109,7 @@ export function useTerminalSessionEvents({
         if (event.type === 'terminal-session-started' && nextStates !== states) {
           acceptedSessionKey = createTerminalStateKey(
             event.session.projectId,
-            event.session.workspaceName,
+            event.session.workspaceId,
             event.blockId
           )
         }

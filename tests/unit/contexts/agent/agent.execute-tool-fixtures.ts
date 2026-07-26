@@ -46,7 +46,7 @@ export function createAgent(
     name: agentId,
     projectId: 'project-1',
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 }
 

@@ -137,10 +137,10 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
           projectDirectory: command.projectDirectory,
           projectId: command.projectId,
           providerId: command.providerId ?? 'codex',
-          sessionId: `agent-${command.workspaceName}`,
+          sessionId: `agent-${command.workspaceId}`,
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: command.workspaceDirectory,
-          workspaceName: command.workspaceName
+          workspaceId: command.workspaceId
         })
       ),
     createWorkspaceAgent: overrides.createWorkspaceAgent ?? vi.fn(),
@@ -220,12 +220,12 @@ export function createAgentSessionSnapshot(
     sessionId: input.sessionId ?? 'agent-session-1',
     terminalSourceTheme: input.terminalSourceTheme ?? 'dark',
     workspaceDirectory: input.workspaceDirectory ?? '/repo/app',
-    workspaceName: input.workspaceName ?? 'main'
+    workspaceId: input.workspaceId ?? 'main'
   }
 }
 
 export interface CreateWorkbenchOptions {
-  readonly workspaceName?: string
+  readonly workspaceId?: string
   readonly workspaceDirectory?: string
   readonly gitBranch?: string | null
   readonly workspaces?: WorkbenchSnapshot['project']['workspaces']
@@ -237,7 +237,7 @@ export function createWorkbenchSnapshot(
   name: string,
   options: CreateWorkbenchOptions = {}
 ): WorkbenchSnapshot {
-  const workspaceName = options.workspaceName ?? 'main'
+  const workspaceId = options.workspaceId ?? 'main'
   const workspaceDirectory = options.workspaceDirectory ?? directory
   const gitBranch = options.gitBranch ?? null
 
@@ -248,7 +248,9 @@ export function createWorkbenchSnapshot(
       directory,
       workspaces: options.workspaces ?? [
         {
-          name: workspaceName,
+          workspaceId,
+          workspaceKind: workspaceDirectory === directory ? 'default' : 'linked-worktree',
+          displayName: workspaceId,
           directory: workspaceDirectory,
           gitBranch,
           isCurrent: true
@@ -273,7 +275,7 @@ export function createWorkbenchSnapshot(
     graph: {
       id: `graph-${name}`,
       projectId: `project-${name}`,
-      workspaceName,
+      workspaceId,
       viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [],
       terminalGroups: []

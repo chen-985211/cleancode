@@ -20,7 +20,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-1'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await fetch(endpoint.url, {
@@ -38,7 +38,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -111,7 +111,7 @@ describe('cleancode HTTP MCP server', () => {
       onInitialized,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -135,7 +135,7 @@ describe('cleancode HTTP MCP server', () => {
       onInitialized,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await postMcp(registration, { id: 1, jsonrpc: '2.0', method: 'initialize' })
@@ -156,7 +156,7 @@ describe('cleancode HTTP MCP server', () => {
       onInitialized: firstInitialized,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const currentInitialized = vi.fn()
     const currentRegistration = await server.registerSession({
@@ -164,7 +164,7 @@ describe('cleancode HTTP MCP server', () => {
       onInitialized: currentInitialized,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     firstRegistration.dispose()
@@ -192,7 +192,7 @@ describe('cleancode HTTP MCP server', () => {
       },
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await fetch(endpoint.url, {
@@ -235,13 +235,13 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-1'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const secondRegistration = server.registerSession({
       executeTool: async () => completedToolResult('tool-call-2'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-2',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await Promise.resolve()
@@ -269,7 +269,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-1'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await Promise.resolve()
@@ -284,7 +284,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-2'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-2',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await Promise.resolve()
@@ -300,7 +300,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-1'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const origin = new URL(endpoint.url).origin
 
@@ -323,7 +323,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool: async () => completedToolResult('tool-call-1'),
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await fetch(endpoint.url, {
@@ -345,7 +345,7 @@ describe('cleancode HTTP MCP server', () => {
       executeTool,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await fetch(endpoint.url, {
@@ -408,7 +408,7 @@ function completedToolResult(toolCallId: string): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: true,
     output: { type: 'block_graph' },

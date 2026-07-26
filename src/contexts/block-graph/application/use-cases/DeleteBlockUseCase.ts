@@ -9,7 +9,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface DeleteBlockCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
 }
 
@@ -34,7 +34,7 @@ export class DeleteBlockUseCase {
             blockId: command.blockId,
             projectDirectory: command.projectDirectory,
             projectId: graph.projectId,
-            workspaceName: command.workspaceName
+            workspaceId: command.workspaceId
           })
           await leaseState.current.hardDispose()
           disposalConfirmed = true

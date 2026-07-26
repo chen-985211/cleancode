@@ -38,7 +38,7 @@ export function useWorkbenchNodeCreationActions({
   const [nodeCreationCoordinator] = useState(createWorkbenchNodeCreationCoordinator)
   const workspaceScopeKey =
     currentWorkbench && currentWorkspace
-      ? `${currentWorkbench.project.id}\0${currentWorkspace.name}`
+      ? `${currentWorkbench.project.id}\0${currentWorkspace.workspaceId}`
       : null
   const workspaceScopeKeyRef = useRef(workspaceScopeKey)
 
@@ -86,7 +86,7 @@ export function useWorkbenchNodeCreationActions({
     try {
       const graphSnapshot = await window.cleancode?.createTerminalBlock({
         projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
+        workspaceId: currentWorkspace.workspaceId,
         name: t('terminal.defaultName', { index: currentWorkbench.graph.blocks.length + 1 }),
         description: t('terminal.defaultDescription'),
         position: reservation.position

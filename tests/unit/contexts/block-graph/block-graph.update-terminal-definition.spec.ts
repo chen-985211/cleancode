@@ -23,7 +23,7 @@ describe('update terminal definition', () => {
       launchCommand: ' pnpm dev ',
       name: ' API Server ',
       projectDirectory: '/project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(graph.blocks[0]).toMatchObject({
@@ -65,7 +65,7 @@ describe('update terminal definition', () => {
         launchCommand: 'must-not-persist',
         name: 'Must Not Persist',
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ code: 'TERMINAL_EXECUTION_CONFIG_INVALID' })
 
@@ -80,21 +80,21 @@ class TransactionalInMemoryRepository implements BlockGraphRepository {
     return this.graph.toSnapshot()
   }
 
-  async findDefaultGraph(_projectDirectory: string, _workspaceName: string) {
+  async findDefaultGraph(_projectDirectory: string, _workspaceId: string) {
     void _projectDirectory
-    void _workspaceName
+    void _workspaceId
     return BlockGraph.fromSnapshot(this.graph.toSnapshot())
   }
 
-  async findDefaultGraphSnapshot(_projectDirectory: string, _workspaceName: string) {
+  async findDefaultGraphSnapshot(_projectDirectory: string, _workspaceId: string) {
     void _projectDirectory
-    void _workspaceName
+    void _workspaceId
     return this.graph.toSnapshot()
   }
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const candidate = BlockGraph.fromSnapshot(this.graph.toSnapshot())
@@ -108,7 +108,7 @@ function createGraph(): BlockGraph {
   const graph = BlockGraph.createDefault({
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
   graph.createTerminalBlock({
     id: 'server',

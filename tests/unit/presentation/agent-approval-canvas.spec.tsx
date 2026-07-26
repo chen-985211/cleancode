@@ -65,7 +65,7 @@ describe('Agent destructive approval canvas', () => {
           name: 'Agent 1',
           projectId: baseWorkbench.project.id,
           providerId: 'codex',
-          workspaceName: 'main'
+          workspaceId: 'main'
         }
       ],
       graph: {
@@ -121,7 +121,7 @@ describe('Agent destructive approval canvas', () => {
             sessionId: 'agent-session-1',
             terminalSourceTheme: command.terminalSourceTheme,
             workspaceDirectory: '/repo/app',
-            workspaceName: 'main'
+            workspaceId: 'main'
           })
         ),
         inspectCodexCli: vi.fn(async () => ({
@@ -159,7 +159,7 @@ describe('Agent destructive approval canvas', () => {
         summary: '删除终端积木 terminal-1',
         target: { blockId: 'terminal-1', kind: 'terminal_block' },
         toolName: 'delete_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     })
 
@@ -187,7 +187,7 @@ describe('Agent destructive approval canvas', () => {
         summary: '删除组合终端 group-1',
         target: { kind: 'terminal_group', terminalGroupId: 'group-1' },
         toolName: 'delete_terminal_group',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     })
     fireEvent.click(await screen.findByText('保留组合', { selector: 'button' }))

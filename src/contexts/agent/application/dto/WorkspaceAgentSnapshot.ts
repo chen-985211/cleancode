@@ -9,7 +9,7 @@ export interface WorkspaceAgentSnapshot {
   readonly name: string
   readonly projectId: string
   readonly providerId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export function toWorkspaceAgentSnapshot(agent: AgentSession): WorkspaceAgentSnapshot {
@@ -20,6 +20,6 @@ export function toWorkspaceAgentSnapshot(agent: AgentSession): WorkspaceAgentSna
     name: agent.name,
     projectId: agent.projectId,
     providerId: agent.providerId,
-    workspaceName: agent.workspaceName
+    workspaceId: agent.workspaceId
   }
 }

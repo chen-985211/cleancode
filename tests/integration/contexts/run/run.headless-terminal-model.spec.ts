@@ -293,7 +293,7 @@ function createIdentity() {
   return {
     projectId: 'project-app',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     blockId: 'block-1',

@@ -16,7 +16,7 @@ interface UseTerminalWorkspaceSynchronizationInput {
   readonly findTerminalBlockIdForSession: (sessionId: string) => string | null
   readonly moveTerminalSessionToWorkspace: (
     sessionId: string,
-    targetWorkspaceName: string,
+    targetWorkspaceId: string,
     targetBlockId?: string
   ) => boolean
   readonly replaceWorkbench: (workbench: WorkbenchSnapshot) => void
@@ -32,8 +32,9 @@ export function useTerminalWorkspaceSynchronization({
 }: UseTerminalWorkspaceSynchronizationInput): void {
   const runningSessionIdsKey = runningSessionIds.join('\0')
   const projectDirectory = currentWorkbench?.project.directory ?? null
-  const currentWorkspaceName =
-    currentWorkbench?.project.workspaces.find((workspace) => workspace.isCurrent)?.name ?? null
+  const currentWorkspaceId =
+    currentWorkbench?.project.workspaces.find((workspace) => workspace.isCurrent)?.workspaceId ??
+    null
   const manualWorkspaceSelectionRevisionRef = useRef(0)
   const observedManualWorkspaceSelectionRevisionRef = useRef(0)
   const suppressedWorkingDirectoriesRef = useRef<Map<string, string>>(new Map())
@@ -116,7 +117,9 @@ export function useTerminalWorkspaceSynchronization({
               entry.workingDirectory
             )
           }))
-          .find(({ workspace }) => workspace && workspace.name !== currentWorkspace.name)
+          .find(
+            ({ workspace }) => workspace && workspace.workspaceId !== currentWorkspace.workspaceId
+          )
 
         if (!matchedTerminalWorkspace?.workspace || isDisposed) {
           return
@@ -130,18 +133,18 @@ export function useTerminalWorkspaceSynchronization({
 
         const switchedWorkbench = await api.switchBranchWorkspace({
           projectDirectory,
-          workspaceName: workspace.name
+          workspaceId: workspace.workspaceId
         })
         const ensured = await ensureTerminalBlockForMigratedSession({
           projectDirectory,
           sourceBlock,
           switchedWorkbench,
-          workspaceName: workspace.name
+          workspaceId: workspace.workspaceId
         })
 
         moveTerminalSessionToWorkspace(
           entry.sessionId,
-          workspace.name,
+          workspace.workspaceId,
           ensured.targetBlockId ?? undefined
         )
 
@@ -167,7 +170,7 @@ export function useTerminalWorkspaceSynchronization({
     }
   }, [
     currentWorkbench,
-    currentWorkspaceName,
+    currentWorkspaceId,
     findTerminalBlockIdForSession,
     moveTerminalSessionToWorkspace,
     projectDirectory,
@@ -181,12 +184,12 @@ async function ensureTerminalBlockForMigratedSession({
   projectDirectory,
   sourceBlock,
   switchedWorkbench,
-  workspaceName
+  workspaceId
 }: {
   readonly projectDirectory: string
   readonly sourceBlock: TerminalBlockSnapshot | null
   readonly switchedWorkbench: WorkbenchSnapshot
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): Promise<{ readonly targetBlockId: string | null; readonly workbench: WorkbenchSnapshot }> {
   const api = window.cleancode
 
@@ -196,7 +199,7 @@ async function ensureTerminalBlockForMigratedSession({
 
   const createdGraph = await api?.createTerminalBlock({
     projectDirectory,
-    workspaceName,
+    workspaceId,
     name: sourceBlock.name,
     description: sourceBlock.description,
     position: sourceBlock.position
@@ -211,7 +214,7 @@ async function ensureTerminalBlockForMigratedSession({
 
   const resizedGraph = await api?.resizeTerminalBlock({
     projectDirectory,
-    workspaceName,
+    workspaceId,
     blockId: createdBlock.id,
     position: sourceBlock.position,
     size: sourceBlock.size
@@ -222,7 +225,7 @@ async function ensureTerminalBlockForMigratedSession({
   }
   const updatedGraph = await definitionApi.updateTerminalDefinition({
     projectDirectory,
-    workspaceName,
+    workspaceId,
     blockId: createdBlock.id,
     name: sourceBlock.name,
     description: sourceBlock.description,

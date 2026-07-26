@@ -5,7 +5,7 @@ import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 export interface GetDefaultGraphQuery {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class GetDefaultGraphUseCase {
@@ -14,7 +14,7 @@ export class GetDefaultGraphUseCase {
   async execute(query: GetDefaultGraphQuery): Promise<BlockGraphSnapshot> {
     const graph = BlockGraph.createDefault({
       projectId: query.projectId,
-      workspaceName: query.workspaceName
+      workspaceId: query.workspaceId
     })
 
     return this.graphRepository.initializeDefaultGraph(query.projectDirectory, graph)

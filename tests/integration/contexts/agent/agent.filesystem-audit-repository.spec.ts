@@ -19,7 +19,7 @@ describe('filesystem agent audit repository', () => {
       sessionId: 'agent-session-1',
       status: 'awaiting_approval',
       toolName: 'delete_block',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await repository.append({
       createdAt: '2026-07-09T00:00:01.000Z',
@@ -30,7 +30,7 @@ describe('filesystem agent audit repository', () => {
       sessionId: 'agent-session-1',
       status: 'canceled',
       toolName: 'delete_block',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const lines = (await readFile(auditFilePath, 'utf8')).trim().split('\n')
@@ -45,7 +45,7 @@ describe('filesystem agent audit repository', () => {
         sessionId: 'agent-session-1',
         status: 'awaiting_approval',
         toolName: 'delete_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       {
         createdAt: '2026-07-09T00:00:01.000Z',
@@ -56,7 +56,7 @@ describe('filesystem agent audit repository', () => {
         sessionId: 'agent-session-1',
         status: 'canceled',
         toolName: 'delete_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }
     ])
   })

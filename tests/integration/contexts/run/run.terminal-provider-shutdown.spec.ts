@@ -262,7 +262,7 @@ function identity(sessionId: string) {
   return {
     projectId: 'project-1',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     blockId: `block-${sessionId}`,

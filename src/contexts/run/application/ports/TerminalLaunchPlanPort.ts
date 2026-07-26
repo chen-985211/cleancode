@@ -9,7 +9,7 @@ export interface TerminalLaunchPlanPort {
   getPlan(query: {
     readonly projectId: string
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
   }): Promise<TerminalLaunchPlanSnapshot>
 }

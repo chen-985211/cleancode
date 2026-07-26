@@ -30,7 +30,7 @@ describe('Agent connection approval location', () => {
         projectDirectory: '/repo/app',
         reactFlowInstanceRef: { current: reactFlowInstance },
         setCurrentGraph: vi.fn(),
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
 
@@ -78,7 +78,7 @@ describe('Agent connection approval location', () => {
         projectDirectory: '/repo/app',
         reactFlowInstanceRef: { current: null },
         setCurrentGraph: vi.fn(),
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
 
@@ -108,7 +108,7 @@ const connectionApproval: AgentToolApprovalPresentationRequest = {
   summary: '断开终端依赖 connection-a-b',
   target: { connectionId: 'connection-a-b', kind: 'terminal_connection' },
   toolName: 'disconnect_terminal_blocks',
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 const graph: BlockGraphSnapshot = {
@@ -151,5 +151,5 @@ const graph: BlockGraphSnapshot = {
     }
   ],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }

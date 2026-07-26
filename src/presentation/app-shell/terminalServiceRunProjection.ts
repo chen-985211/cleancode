@@ -10,7 +10,7 @@ export function applyTerminalServiceRunEvent(
 ): Record<string, TerminalViewState> {
   const key = createTerminalStateKey(
     event.scope.projectId,
-    event.scope.workspaceName,
+    event.scope.workspaceId,
     event.scope.blockId
   )
   const existing = states[key]
@@ -102,7 +102,7 @@ export function dismissTerminalPortConflict(
   states: Record<string, TerminalViewState>,
   identity: TerminalRunIdentity
 ): Record<string, TerminalViewState> {
-  const key = createTerminalStateKey(identity.projectId, identity.workspaceName, identity.blockId)
+  const key = createTerminalStateKey(identity.projectId, identity.workspaceId, identity.blockId)
   const current = states[key]
 
   if (!current || !isSameRun(current.runIdentity, identity) || !current.portConflict) {

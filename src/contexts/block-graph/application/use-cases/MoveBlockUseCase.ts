@@ -4,7 +4,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface MoveBlockCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly position: BlockPositionSnapshot
 }

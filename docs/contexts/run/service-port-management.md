@@ -21,7 +21,7 @@
 - 实际地址在终端节点中持续可见、可复制；HTTP/HTTPS 可以按精确 Run identity 安全打开。
 - 固定冲突可以识别当前应用内的受管 owner，并区分受管、外部与未知监听者反馈。
 - 明确保留的非工作流直接启动服务在应用重开后，只有重新证明同一 live session、根进程和监听所有权，才恢复实际端点与已绑定租约。
-- 删除终端、checkout、归档 worktree、同步失效工作区和移除项目都会进入 Run 硬清理；应用退出则关闭新启动准入并把默认策略、工作流和 Agent 会话一次性交给 Provider 停止，只有明确保留的普通/直接启动会话可以继续存活。
+- 删除终端、归档 worktree、同步失效或目录重绑定的物理工作区和移除项目都会进入 Run 硬清理；默认工作区分支 checkout 不清理运行态。应用退出则关闭新启动准入并把默认策略、工作流和 Agent 会话一次性交给 Provider 停止，只有明确保留的普通/直接启动会话可以继续存活。
 
 当前只治理 cleancode 通过终端“启动命令”、组合启动或终端工作流启动的服务。用户在交互式 shell 中手工输入的任意命令不自动获得端口意图、租约或实际端点。
 
@@ -87,10 +87,8 @@
 BlockGraph 文件仓储以版本 `1` 保存规范执行配置：
 
 - 无版本旧快照中的 TCP 固定就绪端口迁移为 `fixed(port) + none + tcp`。
-- 旧输出就绪服务保持无端口意图，不猜测 `PORT`。
-- 旧终端缺失执行配置时继续使用默认任务配置。
-- 迁移成功后立即按版本 `1` 原子回写。
-- 未知版本、畸形联合结构、无端口的 TCP 就绪或动态策略搭配 `none` 必须拒绝读取，不能静默变成任务。
+- 当前 BlockGraph v2 必须包含规范执行配置和端口意图。
+- 无版本、旧版本、未知版本、畸形联合结构、无端口的 TCP 就绪或动态策略搭配 `none` 必须拒绝读取，不迁移、回写或静默变成任务。
 
 终端名称、描述、启动命令和执行配置通过一个 BlockGraph 用例原子保存，避免端口意图与命令部分提交。
 
@@ -100,15 +98,15 @@ BlockGraph 文件仓储以版本 `1` 保存规范执行配置：
 
 ```txt
 projectId + projectDirectory
-  + workspaceName + workspaceDirectory + gitBranch
-  + blockId
+  + workspaceId + workspaceDirectory + gitBranch(metadata)
+  + ownerKind + ownerId
   + sessionId + runId + generation
 ```
 
-同一个精确 owner 的启动在 Run 内串行；启动新 generation 前等待旧会话异步终止。Run 在创建 PTY 前同时经过：
+画布 owner 的稳定身份是 `projectId + workspaceId + objectKind + objectId`；目录、分支和运行实例字段是启动元数据或精确 generation 证据，不进入 owner slot key。同一个精确 owner 的启动在 Run 内串行；启动新 generation 前等待旧会话异步终止。Run 在创建 PTY 前同时经过：
 
-1. `RunLifecycleService` 的启动闸门，防止 checkout、归档、删除或应用退出期间重启。
-2. `RunRuntimeScopeValidationPort` 对 Project 权威项目/工作区/目录/Git 分支身份的校验。
+1. `RunLifecycleService` 的启动闸门，防止物理工作区归档/移除、删除终端或应用退出期间重启。
+2. `RunRuntimeScopeValidationPort` 对 Project 权威项目、`workspaceId` 和物理目录的校验；Git 分支不参与 owner 身份。
 3. BlockGraph 不可变启动计划，确保命令和端口意图来自同一次已提交定义。
 
 直接启动由 `LaunchTerminalCommandUseCase` 进入；组合启动逐成员调用该用例；工作流服务节点由 `TerminalWorkflowService` 进入。三条路径最终复用 `ManagedServiceLauncher`，普通任务和无端口的输出就绪服务继续使用常规 PTY 路径。
@@ -178,7 +176,7 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 
 以下外部生命周期通过调用方拥有的端口进入同一个 `RunLifecycleService`：
 
-- Project 的主工作区 checkout、worktree 归档、外部 Git 同步清理失效工作区和移除项目使用 `WorkspaceRunLifecyclePort`。
+- Project 的 worktree 归档、外部 Git 同步清理失效或目录重绑定的物理工作区和移除项目使用 `WorkspaceRunLifecyclePort`；默认工作区分支 checkout 不调用该端口。
 - BlockGraph 删除终端使用 `TerminalRunLifecyclePort`。
 - Platform 应用退出先阻止新 Run、工作流和受管服务启动，abort 就绪/激活等待并排空退出前已经接纳的启动；随后由 `TerminalSessionService` 通过一次 application detach 把 PTY 停止职责交给 Provider。只有用户明确保留、Provider checkpoint 可靠且非 workflow/Agent 的普通或直接启动会话可以继续存活，应用重开后仍按监听所有权规则重建端点租约。
 
@@ -188,7 +186,7 @@ TCP 可连接只证明某个进程在监听，不能证明它属于本次运行�
 
 Electron 的 complete 阶段只注销 workflow/managed lifecycle 与 managed terminator，清空当前 main 进程中的 active service、activation controller、易失租约和 endpoint 引用，并以 `null` 结束仅属于该进程的租约等待。它不会把仍为 `bound`/`releasing` 的租约伪造为 `released`，也不表示 main 已确认监听关闭；若 Provider 清理越过 Electron deadline，Provider 仍继续持有并完成物理清理。
 
-普通工作流显式停止在端口租约确认释放后可以把终端交还为空交互式 shell；删除、checkout、归档和移除项目仍是硬清理，不执行交还，但继续等待监听关闭并落到 `released` 或 `quarantined`。这些既有路径不改走应用退出的轻量交接。
+普通工作流显式停止在端口租约确认释放后可以把终端交还为空交互式 shell；删除终端、物理工作区归档/移除和移除项目仍是硬清理，不执行交还，但继续等待监听关闭并落到 `released` 或 `quarantined`。默认工作区分支 checkout 保留现有服务运行态。这些既有路径不改走应用退出的轻量交接。
 
 ## 稳定错误
 
@@ -233,7 +231,7 @@ Electron 的 complete 阶段只注销 workflow/managed lifecycle 与 managed ter
 | ------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit / BlockGraph   | 端口意图不变量、原子定义、单终端计划和删除清理                              | [`block-graph.service-port-intent.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.service-port-intent.spec.ts)、[`block-graph.update-terminal-definition.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.update-terminal-definition.spec.ts)、[`block-graph.get-terminal-launch-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.get-terminal-launch-plan.spec.ts)、[`block-graph.delete-terminal-lifecycle.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.delete-terminal-lifecycle.spec.ts)                                                                                                                                                 |
 | Unit / Run          | 策略/注入、租约状态、有限分配、受管启动、精确身份、硬生命周期和应用退出交接 | [`run.service-port-intent.spec.ts`](../../../tests/unit/contexts/run/run.service-port-intent.spec.ts)、[`run.service-port-lease-registry.spec.ts`](../../../tests/unit/contexts/run/run.service-port-lease-registry.spec.ts)、[`run.local-port-allocator.spec.ts`](../../../tests/unit/contexts/run/run.local-port-allocator.spec.ts)、[`run.managed-service-launcher.spec.ts`](../../../tests/unit/contexts/run/run.managed-service-launcher.spec.ts)、[`run.terminal-workflow-application-shutdown.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-application-shutdown.spec.ts)、[`run.run-lifecycle-service.spec.ts`](../../../tests/unit/contexts/run/run.run-lifecycle-service.spec.ts) |
-| Unit / Project      | checkout、归档、同步和移除项目的 Run lease 语义                             | [`project.run-lifecycle.spec.ts`](../../../tests/unit/contexts/project/project.run-lifecycle.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Unit / Project      | checkout 保留运行态，以及归档、同步和移除项目的 Run lease 语义              | [`project.run-lifecycle.spec.ts`](../../../tests/unit/contexts/project/project.run-lifecycle.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Unit / Presentation | 端口表单、实际端点、回退、冲突 owner 与迟到事件                             | [`terminal-metadata-workflow-config.spec.tsx`](../../../tests/unit/presentation/terminal-metadata-workflow-config.spec.tsx)、[`terminal-service-runtime-bar.spec.tsx`](../../../tests/unit/presentation/terminal-service-runtime-bar.spec.tsx)、[`terminal-service-runtime-projection.spec.ts`](../../../tests/unit/presentation/terminal-service-runtime-projection.spec.ts)                                                                                                                                                                                                                                                                                                                                  |
 | Integration         | 版本迁移、真实端口预留/监听、Provider 应用退出、PTY 注入和计划适配          | [`block-graph.store-versioning.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.store-versioning.spec.ts)、[`run.local-port-infrastructure.spec.ts`](../../../tests/integration/contexts/run/run.local-port-infrastructure.spec.ts)、[`run.terminal-provider-shutdown.spec.ts`](../../../tests/integration/contexts/run/run.terminal-provider-shutdown.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`run.terminal-launch-plan-adapter.spec.ts`](../../../tests/integration/contexts/run/run.terminal-launch-plan-adapter.spec.ts)                                                                                           |
 | Contract            | 原子终端定义、Run IPC/事件和 MCP `0.3.1` 自描述 Schema                      | [`block-graph.resize-terminal-layout-ipc.spec.ts`](../../../tests/contract/contexts/block-graph/block-graph.resize-terminal-layout-ipc.spec.ts)、[`run.service-port-ipc.spec.ts`](../../../tests/contract/contexts/run/run.service-port-ipc.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                      |

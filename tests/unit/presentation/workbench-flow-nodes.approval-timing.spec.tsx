@@ -72,6 +72,6 @@ const approval: AgentToolApprovalViewState = {
     summary: '删除终端积木 terminal-1',
     target: { blockId: 'terminal-1', kind: 'terminal_block' },
     toolName: 'delete_block',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }

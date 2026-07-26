@@ -32,7 +32,7 @@ export interface WorkflowRunPlanNodeSnapshot {
 
 export interface WorkflowRunPlanSnapshot {
   readonly graphId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly nodes: readonly WorkflowRunPlanNodeSnapshot[]
 }
 
@@ -53,7 +53,7 @@ export interface WorkflowRunNodeSnapshot extends WorkflowRunPlanNodeSnapshot {
 export interface WorkflowRunScopeSnapshot {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
 }

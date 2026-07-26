@@ -348,7 +348,7 @@ function startCommand() {
     projectId: 'project-app',
     projectDirectory: '/work/app',
     terminalBlockId: 'block-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     workingDirectory: '/work/app',
@@ -361,7 +361,7 @@ function startCommand() {
 function toViewIdentity(scope: TerminalRunScope) {
   return {
     projectId: scope.projectId,
-    workspaceName: scope.workspaceName,
+    workspaceId: scope.workspaceId,
     blockId: scope.blockId,
     sessionId: scope.sessionId,
     runId: scope.runId,

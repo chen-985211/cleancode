@@ -124,7 +124,9 @@ describe('project git workspace use cases', () => {
 
     expect(project.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: expect.any(String),
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'feature/current',
         isCurrent: true
@@ -157,7 +159,7 @@ describe('project git workspace use cases', () => {
     })
 
     expect(project.workspaces[0]).toMatchObject({
-      name: 'main',
+      displayName: 'main',
       gitBranch: 'trunk'
     })
   })
@@ -200,7 +202,7 @@ describe('project git workspace use cases', () => {
       }
     ])
     expect(project.workspaces.find((workspace) => workspace.isCurrent)).toMatchObject({
-      name: 'feature/sidebar',
+      displayName: 'feature/sidebar',
       directory: '/work/app/.worktrees/feature-sidebar',
       gitBranch: 'feature/sidebar'
     })
@@ -283,13 +285,17 @@ describe('project git workspace use cases', () => {
 
     expect(project.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: expect.any(String),
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
       },
       {
-        name: 'feature/worktree',
+        workspaceId: expect.any(String),
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/worktree',
         directory: '/work/app-feature-worktree',
         gitBranch: 'feature/worktree',
         isCurrent: false
@@ -297,7 +303,7 @@ describe('project git workspace use cases', () => {
     ])
   })
 
-  it('rejects checking out a main workspace branch when the main directory is dirty', async () => {
+  it('delegates dirty-tree checkout safety to Git without disposing workspace state', async () => {
     const repository = new InMemoryProjectRepository()
     const git = new FakeGitWorkspacePort()
     const checkoutMainWorkspaceBranch = new CheckoutMainWorkspaceBranchUseCase(repository, git)
@@ -307,7 +313,9 @@ describe('project git workspace use cases', () => {
       name: 'app',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/work/app',
           gitBranch: 'main',
           isCurrent: true
@@ -342,9 +350,13 @@ describe('project git workspace use cases', () => {
         projectDirectory: '/work/app',
         branchName: 'feature/free'
       })
-    ).rejects.toMatchObject({ code: 'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES' })
+    ).resolves.toMatchObject({
+      workspaces: [expect.objectContaining({ gitBranch: 'feature/free', workspaceId: 'main' })]
+    })
 
-    expect(git.checkoutBranchCalls).toEqual([])
+    expect(git.checkoutBranchCalls).toEqual([
+      { repositoryDirectory: '/work/app', branchName: 'feature/free' }
+    ])
   })
 
   it('rejects checking out a branch already attached to another worktree', async () => {
@@ -357,7 +369,9 @@ describe('project git workspace use cases', () => {
       name: 'app',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/work/app',
           gitBranch: 'main',
           isCurrent: true
@@ -406,13 +420,17 @@ describe('project git workspace use cases', () => {
       name: 'app',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/work/app',
           gitBranch: 'main',
           isCurrent: false
         },
         {
-          name: 'feature/worktree',
+          workspaceId: 'feature/worktree',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/worktree',
           directory: '/work/app-feature-worktree',
           gitBranch: 'feature/worktree',
           isCurrent: true
@@ -461,13 +479,17 @@ describe('project git workspace use cases', () => {
     ])
     expect(project.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'feature/free',
         isCurrent: true
       },
       {
-        name: 'feature/worktree',
+        workspaceId: 'feature/worktree',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/worktree',
         directory: '/work/app-feature-worktree',
         gitBranch: 'feature/worktree',
         isCurrent: false

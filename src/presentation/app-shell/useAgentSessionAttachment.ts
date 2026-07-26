@@ -97,7 +97,7 @@ export function useAgentSessionAttachment({
   const projectDirectory = currentWorkbench?.project.directory ?? null
   const projectId = currentWorkbench?.project.id ?? null
   const workspaceDirectory = currentWorkspace?.directory ?? null
-  const workspaceName = currentWorkspace?.name ?? null
+  const workspaceId = currentWorkspace?.workspaceId ?? null
   const gitBranch = currentWorkspace?.gitBranch ?? null
   const persistenceMode =
     currentWorkspace && currentWorkbench
@@ -114,7 +114,7 @@ export function useAgentSessionAttachment({
       !projectDirectory ||
       !projectId ||
       !workspaceDirectory ||
-      !workspaceName ||
+      !workspaceId ||
       !persistenceMode
     ) {
       setOperation({ status: 'idle' })
@@ -156,7 +156,7 @@ export function useAgentSessionAttachment({
         rows: measuredDimensions.rows,
         terminalSourceTheme: readTerminalSourceTheme(),
         workspaceDirectory,
-        workspaceName
+        workspaceId
       })
       .then((nextSession) => {
         if (!isCurrentRequest(requestId, currentWorkspaceKey)) return
@@ -210,7 +210,7 @@ export function useAgentSessionAttachment({
     projectId,
     setOperation,
     workspaceDirectory,
-    workspaceName
+    workspaceId
   ])
 
   const requestAttach = useCallback(

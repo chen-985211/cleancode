@@ -16,21 +16,17 @@ const graphFileName = 'default-graph.json'
 const graphMutationQueues = new Map<string, Promise<unknown>>()
 const windowsRenameRetryDelaysMs = [10, 20, 40, 80, 160] as const
 
-function getLegacyDefaultGraphPath(projectDirectory: string, workspaceName: string): string {
-  return join(projectDirectory, '.cleancode', 'workspaces', workspaceName, graphFileName)
-}
-
 function getDefaultGraphPath(
   storageDirectory: string,
   projectDirectory: string,
-  workspaceName: string
+  workspaceId: string
 ): string {
   return join(
     storageDirectory,
     'projects',
     createProjectStorageKey(projectDirectory),
     'workspaces',
-    encodeURIComponent(workspaceName),
+    encodeURIComponent(workspaceId),
     graphFileName
   )
 }
@@ -50,40 +46,30 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
     const graphPath = getDefaultGraphPath(
       this.storageDirectory,
       projectDirectory,
-      candidate.workspaceName
+      candidate.workspaceId
     )
 
     return enqueueGraphMutation(graphPath, async () => {
       const existing = await readGraphStore(graphPath)
 
       if (existing) {
-        if (existing.requiresMigration) {
-          await writeFileAtomically(graphPath, serializeBlockGraphStore(existing.graph))
-        }
         return existing.graph
       }
 
-      const legacy = await readGraphStore(
-        getLegacyDefaultGraphPath(projectDirectory, candidate.workspaceName)
-      )
-      const initialized = legacy?.graph ?? candidate
-
-      await writeFileAtomically(graphPath, serializeBlockGraphStore(initialized))
-      return initialized
+      await writeFileAtomically(graphPath, serializeBlockGraphStore(candidate))
+      return candidate
     })
   }
 
   async transactDefaultGraph<TResult>(
     projectDirectory: string,
-    workspaceName: string,
+    workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
-    const graphPath = getDefaultGraphPath(this.storageDirectory, projectDirectory, workspaceName)
+    const graphPath = getDefaultGraphPath(this.storageDirectory, projectDirectory, workspaceId)
 
     return enqueueGraphMutation(graphPath, async () => {
-      const snapshot =
-        (await readGraphStore(graphPath)) ??
-        (await readGraphStore(getLegacyDefaultGraphPath(projectDirectory, workspaceName)))
+      const snapshot = await readGraphStore(graphPath)
 
       if (!snapshot) {
         return null
@@ -101,48 +87,24 @@ export class FileSystemBlockGraphRepository implements BlockGraphRepository {
 
   async findDefaultGraph(
     projectDirectory: string,
-    workspaceName: string
+    workspaceId: string
   ): Promise<BlockGraph | null> {
-    const snapshot = await this.findDefaultGraphSnapshot(projectDirectory, workspaceName)
+    const snapshot = await this.findDefaultGraphSnapshot(projectDirectory, workspaceId)
 
     return snapshot ? BlockGraph.fromSnapshot(snapshot) : null
   }
 
   async findDefaultGraphSnapshot(
     projectDirectory: string,
-    workspaceName: string
+    workspaceId: string
   ): Promise<BlockGraphSnapshot | null> {
-    const graphPath = getDefaultGraphPath(this.storageDirectory, projectDirectory, workspaceName)
+    const graphPath = getDefaultGraphPath(this.storageDirectory, projectDirectory, workspaceId)
     const graph = await readGraphStore(graphPath)
 
-    if (graph && !graph.requiresMigration) {
+    if (graph) {
       return graph.graph
     }
-
-    return enqueueGraphMutation(graphPath, async () => {
-      const currentGraph = await readGraphStore(graphPath)
-
-      if (currentGraph) {
-        if (currentGraph.requiresMigration) {
-          await writeFileAtomically(graphPath, serializeBlockGraphStore(currentGraph.graph))
-        }
-        return currentGraph.graph
-      }
-
-      const legacyGraph = await readGraphStore(
-        getLegacyDefaultGraphPath(projectDirectory, workspaceName)
-      )
-
-      if (!legacyGraph) {
-        return null
-      }
-
-      const migratedGraph = legacyGraph.graph
-
-      await writeFileAtomically(graphPath, serializeBlockGraphStore(migratedGraph))
-
-      return migratedGraph
-    })
+    return null
   }
 }
 

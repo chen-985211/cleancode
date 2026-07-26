@@ -83,7 +83,7 @@ describe('app shell Agent console', () => {
       agentId: 'agent-1',
       name: '实现 Agent',
       projectId: baseWorkbench.project.id,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
   })
 
@@ -120,7 +120,7 @@ describe('app shell Agent console', () => {
       projectId: baseWorkbench.project.id,
       providerId: 'codex',
       workspaceDirectory: currentWorkspace.directory,
-      workspaceName: currentWorkspace.name
+      workspaceId: currentWorkspace.workspaceId
     })
     expect(document.querySelector('[aria-label="移除 Agent 2"]')).not.toBeInTheDocument()
     expect(document.querySelector('[aria-label="Agent 2 更多操作"]')).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('app shell Agent console', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: baseWorkbench.project.id,
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
     await waitFor(() =>
@@ -174,6 +174,6 @@ function createAgent(agentId: string, name: string, projectId: string, x = 320) 
     name,
     projectId,
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }

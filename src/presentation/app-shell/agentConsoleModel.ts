@@ -5,6 +5,7 @@ import {
   defaultAgentLayoutPosition,
   defaultAgentLayoutSize
 } from '../../contexts/agent/domain/aggregates/AgentSession'
+import { createCanvasObjectIdentityKey } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalDimensions, WorkbenchSnapshot } from './types'
 
@@ -36,7 +37,12 @@ export function createWorkspaceKey(
   agentId: string
 ): string | null {
   return workbench && workspace
-    ? `${workbench.project.id}\0${workspace.name}\0${workspace.gitBranch ?? ''}\0${agentId}`
+    ? createCanvasObjectIdentityKey({
+        projectId: workbench.project.id,
+        workspaceId: workspace.workspaceId,
+        objectKind: 'agent',
+        objectId: agentId
+      })
     : null
 }
 
@@ -51,7 +57,7 @@ export function createFallbackAgent(
     name: 'Agent 1',
     projectId: workbench?.project.id ?? 'unselected-project',
     providerId: rendererLegacyDefaultProviderId,
-    workspaceName: workspace?.name ?? 'unselected-workspace'
+    workspaceId: workspace?.workspaceId ?? 'unselected-workspace'
   }
 }
 

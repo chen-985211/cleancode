@@ -85,6 +85,12 @@ function createAgentConsoleNode(): AgentConsoleFlowNode {
     selected: false,
     style: { width: 440, height: 520 },
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'agent',
+        objectId: 'agent-1'
+      },
       agent: {
         agentId: 'agent-1',
         cleancodeMcpEnabled: true,
@@ -92,7 +98,7 @@ function createAgentConsoleNode(): AgentConsoleFlowNode {
         name: 'Agent 1',
         projectId: 'project-1',
         providerId: 'codex',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       currentWorkbench: null,
       currentWorkspace: null,
@@ -112,6 +118,12 @@ function createTerminalNode(input: { readonly selected: boolean }): TerminalFlow
     position: { x: 160, y: 220 },
     selected: input.selected,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal',
+        objectId: 'terminal-1'
+      },
       block: {
         id: 'terminal-1',
         type: 'terminal',

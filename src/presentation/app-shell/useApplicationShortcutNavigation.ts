@@ -24,7 +24,7 @@ interface UseApplicationShortcutNavigationInput {
   readonly getNodes: () => readonly WorkbenchFlowNode[]
   readonly onSelectWorkspace: (
     workbench: WorkbenchSnapshot,
-    workspaceName: string
+    workspaceId: string
   ) => void | Promise<void>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly revealProjectSidebar: () => void
@@ -128,7 +128,7 @@ export function useApplicationShortcutNavigation({
       isWorkspaceTransitionPendingRef.current = true
       revealProject(target.workbench.project.id, 'revealProject')
       try {
-        await onSelectWorkspace(target.workbench, target.workspaceName)
+        await onSelectWorkspace(target.workbench, target.workspaceId)
       } finally {
         isWorkspaceTransitionPendingRef.current = false
       }

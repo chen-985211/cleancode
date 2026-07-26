@@ -60,7 +60,7 @@ describe('app shell minimap', () => {
           name: 'Agent 1',
           projectId: baseWorkbench.project.id,
           providerId: 'codex',
-          workspaceName: 'main'
+          workspaceId: 'main'
         }
       ]
     }

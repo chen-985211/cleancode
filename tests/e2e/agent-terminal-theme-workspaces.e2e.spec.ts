@@ -18,11 +18,17 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  readOnlyJsonFile,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
+import {
+  createE2eTerminalEnvironment,
+  prependE2ePath,
+  readTerminalSessionId,
+  waitForTerminalShellReady
+} from '../support/e2eTerminal'
 import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 const execFileAsync = promisify(execFile)
@@ -195,6 +201,82 @@ describe('Agent terminal theme across workspaces e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'keeps the default workspace Agent, terminal, graph, and workspace identity across branch checkout',
+    async () => {
+      const branchName = 'feature/default-workspace-identity'
+      await execGit(workbench.projectDirectory, ['branch', branchName])
+      await expectDesktopRuntime(page)
+      await selectTheme(page, 'light')
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
+      await waitForPersistedAgent(page)
+      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await waitForTerminalShellReady(page, 'Terminal 1')
+
+      const agentBefore = await waitForAgentTerminal(page, 'main', 'light')
+      const terminalSessionId = await readTerminalSessionId(page, 'Terminal 1')
+      const terminalBefore = await readTerminalRuntime(page, terminalSessionId)
+      const metadataBefore = await readProjectMetadata(workbench)
+      const defaultWorkspaceBefore = metadataBefore.workspaces.find(
+        (workspace) => workspace.workspaceKind === 'default'
+      )
+      expect(defaultWorkspaceBefore).toMatchObject({
+        workspaceId: agentBefore.workspaceId,
+        gitBranch: 'main'
+      })
+
+      const projectCard = page.getByRole('group', {
+        name: `项目 ${basename(workbench.projectDirectory)}`
+      })
+      await projectCard.getByRole('button', { name: /选择默认工作区分支/ }).click()
+      await projectCard
+        .getByRole('dialog', { name: '选择默认工作区分支' })
+        .getByRole('button', {
+          name: branchName,
+          exact: true
+        })
+        .click()
+      await expectCurrentGitBranch(workbench.projectDirectory, branchName)
+
+      const agentAfter = await waitForAgentTerminal(page, 'main', 'light')
+      await waitForTerminalShellReady(page, 'Terminal 1')
+      const terminalAfterId = await readTerminalSessionId(page, 'Terminal 1')
+      const terminalAfter = await readTerminalRuntime(page, terminalAfterId)
+      const metadataAfter = await readProjectMetadata(workbench)
+      const defaultWorkspaceAfter = metadataAfter.workspaces.find(
+        (workspace) => workspace.workspaceKind === 'default'
+      )
+
+      expect(agentAfter).toMatchObject({
+        workspaceId: agentBefore.workspaceId,
+        sessionId: agentBefore.sessionId,
+        terminalProcessId: agentBefore.terminalProcessId,
+        providerProcessId: agentBefore.providerProcessId
+      })
+      expect(terminalAfterId).toBe(terminalSessionId)
+      expect(terminalAfter.processId).toBe(terminalBefore.processId)
+      expect(defaultWorkspaceAfter).toMatchObject({
+        workspaceId: defaultWorkspaceBefore?.workspaceId,
+        gitBranch: branchName
+      })
+      expect(await readFakeCodexCliReports(fakeCodex.reportPath)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'session',
+            pid: Number(agentBefore.providerProcessId)
+          })
+        ])
+      )
+      expect(
+        (await readFakeCodexCliReports(fakeCodex.reportPath)).filter(
+          (report) => report.kind === 'session'
+        )
+      ).toHaveLength(1)
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 interface AgentTerminalIdentity {
@@ -203,12 +285,12 @@ interface AgentTerminalIdentity {
   readonly sourceTheme: 'dark' | 'light'
   readonly terminalProcessId: string
   readonly viewport: Locator
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 async function waitForAgentTerminal(
   page: Page,
-  workspaceName: string,
+  workspaceDisplayName: string,
   sourceTheme: 'dark' | 'light'
 ): Promise<AgentTerminalIdentity> {
   await page.waitForFunction(
@@ -224,11 +306,11 @@ async function waitForAgentTerminal(
         viewport.querySelector('.xterm-helper-textarea')
       )
     },
-    { source: sourceTheme, workspace: workspaceName }
+    { source: sourceTheme, workspace: workspaceDisplayName }
   )
 
   const viewport = page.locator(
-    `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceName}"]`
+    `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceDisplayName}"]`
   )
   await waitForTerminalDomText(viewport, fakeCodexMarker)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
@@ -243,7 +325,7 @@ async function waitForAgentTerminal(
     processId: element.getAttribute('data-agent-terminal-process-id'),
     sessionId: element.getAttribute('data-agent-terminal-session-id'),
     sourceTheme: element.getAttribute('data-agent-terminal-source-theme'),
-    workspaceName: element.getAttribute('data-agent-terminal-workspace-name')
+    workspaceId: element.getAttribute('data-agent-terminal-workspace-id')
   }))
 
   if (
@@ -251,7 +333,7 @@ async function waitForAgentTerminal(
     !providerProcessId ||
     !attributes.sessionId ||
     (attributes.sourceTheme !== 'dark' && attributes.sourceTheme !== 'light') ||
-    !attributes.workspaceName
+    !attributes.workspaceId
   ) {
     throw new Error('Agent terminal stable identity attributes are incomplete.')
   }
@@ -262,7 +344,7 @@ async function waitForAgentTerminal(
     sourceTheme: attributes.sourceTheme,
     terminalProcessId: attributes.processId,
     viewport,
-    workspaceName: attributes.workspaceName
+    workspaceId: attributes.workspaceId
   }
 }
 
@@ -278,6 +360,30 @@ async function waitForTerminalDomText(viewport: Locator, text: string): Promise<
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
+}
+
+async function readTerminalRuntime(page: Page, sessionId: string) {
+  const runtime = await page.evaluate(async (targetSessionId) => {
+    const sessions =
+      (await window.cleancode?.listTerminalSessions({ sessionIds: [targetSessionId] })) ?? []
+    return sessions.find((session) => session.id === targetSessionId) ?? null
+  }, sessionId)
+
+  if (!runtime) {
+    throw new Error(`Terminal runtime ${sessionId} was not found.`)
+  }
+
+  return runtime
+}
+
+async function readProjectMetadata(workbench: E2eWorkbench): Promise<{
+  readonly workspaces: readonly {
+    readonly gitBranch: string | null
+    readonly workspaceId: string
+    readonly workspaceKind: 'default' | 'linked-worktree'
+  }[]
+}> {
+  return JSON.parse(await readOnlyJsonFile(workbench.appStateDirectory, 'project.json'))
 }
 
 async function expectTerminalPresentation(

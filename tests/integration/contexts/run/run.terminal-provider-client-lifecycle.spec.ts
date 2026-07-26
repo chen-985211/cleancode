@@ -333,7 +333,7 @@ function outputIdentity(ownerKind: 'agent' | 'block') {
     runId: `${ownerKind}-run-1`,
     sessionId: `${ownerKind}-session-1`,
     workspaceDirectory: '/work/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

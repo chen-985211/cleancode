@@ -19,7 +19,13 @@ Agent 控制台不是 BlockGraph 积木；Preview、HTTP、测试、文件节点
 
 ## 身份与事实所有权
 
-`BlockGraph` 是本上下文唯一聚合根。图通过 `projectId + workspaceName` 归属工作区，当前每个工作区只维护一个默认图。
+`BlockGraph` 是本上下文唯一聚合根。图通过稳定的 `projectId + workspaceId` 归属物理工作区，当前每个工作区只维护一个默认图。Git 分支、目录和显示名不参与图身份。
+
+所有画布对象共享由 Shared Kernel 定义的规范身份：
+
+`projectId + workspaceId + objectKind + objectId`
+
+其中 `objectKind` 当前包括 `terminal`、`terminal-group` 和 `agent`。React Flow 的本地 node ID、显示名、目录和分支都是投影或元数据，不能替代该身份，也不能进入持久化 owner key。
 
 聚合拥有以下已提交事实：
 
@@ -90,13 +96,13 @@ BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力
 
 ## 恢复与持久化
 
-当前文件系统仓储把工作区默认图保存为 Electron 应用数据目录中的版本 `1` JSON，并通过临时文件、同步和重命名原子替换。旧版项目内 `.cleancode/workspaces/.../default-graph.json` 会在读取时迁移到当前存储位置。
+当前文件系统仓储按 `projectId + workspaceId` 把工作区默认图保存为 Electron 当前状态根中的版本 `2` JSON，并通过临时文件、同步和重命名原子替换。项目目录不是应用状态 owner，仓储不会读取项目内 `.cleancode/workspaces/.../default-graph.json`。
 
 默认图初始化和所有图变更在同一个工作区级进程内队列中执行完整读取—修改—写入事务。初始化是幂等的：当前图或旧路径图已经存在时返回仓储权威快照，不用空图覆盖；事务回调完成后才生成并持久化快照，异步失败不得落盘，后续事务仍可继续。表现层没有保存任意完整图快照的 IPC 后门。
 
 当前互斥边界位于单个 Electron 主进程内；仓储尚未提供跨多个应用进程的文件锁。所有当前产品写入口必须经同一主进程和应用用例进入该事务边界。
 
-无版本旧快照在读取时确定性迁移：旧 TCP 就绪端口转为 `fixed + none + tcp`，旧输出就绪服务保持无端口意图，缺失执行配置的旧终端继续采用默认任务配置。迁移成功后立即按版本 `1` 原子回写。版本 `1` 必须具有规范的执行配置；未知版本、畸形端口意图或多余/缺失字段必须以稳定错误拒绝，不能静默变成任务。
+仓储只接受当前版本 `2` 的规范快照。无版本、旧版本、未知版本、畸形端口意图或多余/缺失字段必须以稳定错误拒绝，不能迁移、静默修复或回写。产品尚未公开期间采用全新状态代际，旧测试数据不构成兼容性契约。
 
 恢复仍会规范化兼容范围内的 viewport、尺寸、连接和组合：丢弃无效连接、重复连接、环、失效组合成员和重复归组。规范化是兼容输入的边界，不允许表现层自行修补聚合事实。
 
@@ -130,7 +136,7 @@ BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力
 | Unit        | 组合成员、边界、移动和解散                          | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)、[`block-graph.terminal-group-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-group-use-cases.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Unit        | 确定性布局、自动创建和拖动优先                      | [`block-graph.arrange-terminal-layout.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.arrange-terminal-layout.spec.ts)、[`block-graph.arrange-terminal-layout-use-case.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.arrange-terminal-layout-use-case.spec.ts)、[`block-graph.create-terminal-block-layout.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.create-terminal-block-layout.spec.ts)                                                                                                                                                                                                                                           |
 | Unit        | 连接、端口意图、原子定义、启动/工作流计划和删除清理 | [`block-graph.terminal-workflow.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-workflow.spec.ts)、[`block-graph.service-port-intent.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.service-port-intent.spec.ts)、[`block-graph.update-terminal-definition.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.update-terminal-definition.spec.ts)、[`block-graph.get-terminal-launch-plan.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.get-terminal-launch-plan.spec.ts)、[`block-graph.delete-terminal-lifecycle.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.delete-terminal-lifecycle.spec.ts) |
-| Integration | 初始化、RMW、回滚、版本迁移与旧路径迁移             | [`block-graph.filesystem-repository.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.filesystem-repository.spec.ts)、[`block-graph.store-versioning.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.store-versioning.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Integration | 初始化、RMW、回滚、v2 严格校验与旧路径隔离          | [`block-graph.filesystem-repository.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.filesystem-repository.spec.ts)、[`block-graph.store-versioning.spec.ts`](../../../tests/integration/contexts/block-graph/block-graph.store-versioning.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Contract    | Electron IPC 的图布局与原子终端定义契约             | [`block-graph.resize-terminal-layout-ipc.spec.ts`](../../../tests/contract/contexts/block-graph/block-graph.resize-terminal-layout-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## 维护规则

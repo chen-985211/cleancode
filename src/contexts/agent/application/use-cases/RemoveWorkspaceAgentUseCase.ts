@@ -12,13 +12,13 @@ export class RemoveWorkspaceAgentUseCase {
   async execute(command: {
     readonly agentId: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<readonly WorkspaceAgentSnapshot[]> {
     const runtimeLease = await this.runtime.disposeAgent(command)
     try {
       const workspaceAgents =
-        (await this.repository.findWorkspace(command.projectId, command.workspaceName)) ?? []
-      await this.repository.deleteAgent(command.projectId, command.workspaceName, command.agentId)
+        (await this.repository.findWorkspace(command.projectId, command.workspaceId)) ?? []
+      await this.repository.deleteAgent(command.projectId, command.workspaceId, command.agentId)
       return workspaceAgents
         .filter((agent) => agent.id !== command.agentId)
         .map(toWorkspaceAgentSnapshot)

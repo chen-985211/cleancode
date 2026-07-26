@@ -3,6 +3,7 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type { AgentConsoleFlowNode, WorkbenchNodeLayoutInput, WorkbenchSnapshot } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
+import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export const minimumAgentConsoleSize = {
   width: 420,
@@ -52,6 +53,12 @@ export function createAgentConsoleFlowNode({
     zIndex: 4,
     style: agent.layout.size,
     data: {
+      identity: createCanvasObjectIdentity({
+        projectId: agent.projectId,
+        workspaceId: agent.workspaceId,
+        objectKind: 'agent',
+        objectId: agent.agentId
+      }),
       agent,
       approvalController,
       currentWorkbench,

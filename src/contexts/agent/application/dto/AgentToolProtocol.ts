@@ -257,7 +257,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
 
 export interface AgentToolContext {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 interface InspectGraphAgentToolInput {

@@ -15,7 +15,7 @@ export function applyTerminalWorkflowEventToStates(
   if (event.type === 'terminal-session-started') {
     const key = createTerminalStateKey(
       event.session.projectId,
-      event.session.workspaceName,
+      event.session.workspaceId,
       event.blockId
     )
     const current = states[key]
@@ -32,7 +32,7 @@ export function applyTerminalWorkflowEventToStates(
         output: event.clearOutput ? '' : (states[key]?.output ?? ''),
         runIdentity: {
           projectId: event.session.projectId,
-          workspaceName: event.session.workspaceName,
+          workspaceId: event.session.workspaceId,
           blockId: event.session.blockId,
           sessionId: event.session.sessionId,
           runId: event.session.runId,

@@ -11,7 +11,7 @@ export function createDisabledAgentSessionSnapshot(command: {
   readonly providerId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): AgentSessionSnapshot {
   return {
     agentId: command.agentId,
@@ -40,9 +40,9 @@ export function createDisabledAgentSessionSnapshot(command: {
         viewIdentity: null
       }
     },
-    sessionId: `test-agent-${command.workspaceName}`,
+    sessionId: `test-agent-${command.workspaceId}`,
     terminalSourceTheme: command.terminalSourceTheme,
     workspaceDirectory: command.workspaceDirectory,
-    workspaceName: command.workspaceName
+    workspaceId: command.workspaceId
   }
 }

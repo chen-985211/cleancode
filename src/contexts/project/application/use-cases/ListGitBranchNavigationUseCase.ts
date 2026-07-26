@@ -26,7 +26,9 @@ export class ListGitBranchNavigationUseCase {
       return { branches: [] }
     }
 
-    const mainWorkspace = project.workspaces.find((workspace) => workspace.name === 'main')
+    const mainWorkspace = project.workspaces.find(
+      (workspace) => workspace.workspaceKind === 'default'
+    )
     const mainGitBranch = mainWorkspace?.gitBranch ?? inspection.currentBranch
 
     return {

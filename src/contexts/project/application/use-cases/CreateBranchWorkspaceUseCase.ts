@@ -57,8 +57,8 @@ export class CreateBranchWorkspaceUseCase {
       projectDirectory: project.directory,
       branchName
     })
-    const updatedProject = project.addBranchWorkspace({
-      name: branchName,
+    const updatedProject = project.addLinkedWorktreeWorkspace({
+      displayName: branchName,
       directory: worktreeDirectory,
       gitBranch: branchName
     })

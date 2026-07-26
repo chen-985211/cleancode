@@ -123,7 +123,7 @@ function createApproval(target: AgentToolApprovalRequest['target']): AgentToolAp
     summary: '删除画布对象',
     target,
     toolName: target.kind === 'terminal_block' ? 'delete_block' : 'delete_terminal_group',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -136,7 +136,7 @@ function createConnectionApproval(connectionId: string): AgentToolApprovalPresen
     summary: `断开终端依赖 ${connectionId}`,
     target: { connectionId, kind: 'terminal_connection' },
     toolName: 'disconnect_terminal_blocks',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -182,5 +182,5 @@ const graph: BlockGraphSnapshot = {
     }
   ],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }

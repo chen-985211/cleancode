@@ -1,5 +1,5 @@
-export const terminalProviderProtocolVersion = 6
-export const terminalProviderMinimumCompatibleProtocolVersion = 6
+export const terminalProviderProtocolVersion = 7
+export const terminalProviderMinimumCompatibleProtocolVersion = 7
 export const terminalProviderApplicationDetachProtocolVersion = 5
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
 export const terminalProviderMaxOutputChunkBytes = 256 * 1024

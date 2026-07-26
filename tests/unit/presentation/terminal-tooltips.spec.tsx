@@ -384,6 +384,12 @@ function createTerminalNodeData(): TerminalFlowNode['data'] {
   }
 
   return {
+    identity: {
+      projectId: 'project-1',
+      workspaceId: 'main',
+      objectKind: 'terminal',
+      objectId: 'terminal-1'
+    },
     block,
     session: { sessionId: null, status: 'idle', output: '' },
     isSelected: false,

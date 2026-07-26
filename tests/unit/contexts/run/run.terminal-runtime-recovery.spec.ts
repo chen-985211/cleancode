@@ -150,7 +150,7 @@ function warmSession(): TerminalSessionSnapshot {
   return {
     projectId: 'project-1',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     blockId: 'block-1',

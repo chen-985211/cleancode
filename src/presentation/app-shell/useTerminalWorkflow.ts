@@ -37,7 +37,7 @@ export function useTerminalWorkflow({
   const isStoppingRef = useRef(false)
   const graphId = currentWorkbench?.graph.id ?? null
   const projectDirectory = currentWorkbench?.project.directory ?? null
-  const workspaceName = currentWorkspace?.name ?? null
+  const workspaceId = currentWorkspace?.workspaceId ?? null
   const { notify } = notifications
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function useTerminalWorkflow({
       !api ||
       !graphId ||
       !projectDirectory ||
-      !workspaceName ||
+      !workspaceId ||
       typeof api.onTerminalWorkflowEvent !== 'function' ||
       typeof api.getTerminalWorkflow !== 'function'
     ) {
@@ -62,13 +62,13 @@ export function useTerminalWorkflow({
       if (
         event.type === 'run-updated' &&
         event.run.graphId === graphId &&
-        event.run.workspaceName === workspaceName
+        event.run.workspaceId === workspaceId
       ) {
         setRun(event.run)
       }
     })
 
-    void api.getTerminalWorkflow({ projectDirectory, workspaceName }).then((activeRun) => {
+    void api.getTerminalWorkflow({ projectDirectory, workspaceId }).then((activeRun) => {
       if (isActive) {
         setRun(activeRun)
       }
@@ -78,7 +78,7 @@ export function useTerminalWorkflow({
       isActive = false
       unsubscribe()
     }
-  }, [graphId, projectDirectory, workspaceName])
+  }, [graphId, projectDirectory, workspaceId])
 
   const nodeStatuses = useMemo(
     () =>
@@ -109,7 +109,7 @@ export function useTerminalWorkflow({
       await performAction(notify, t, async () => {
         const graph = await window.cleancode?.connectTerminalBlocks({
           projectDirectory: currentWorkbench.project.directory,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           sourceBlockId: connection.source ?? '',
           targetBlockId: connection.target ?? ''
         })
@@ -128,7 +128,7 @@ export function useTerminalWorkflow({
         for (const edge of deletedEdges) {
           const graph = await window.cleancode?.disconnectTerminalBlocks({
             projectDirectory: currentWorkbench.project.directory,
-            workspaceName: currentWorkspace.name,
+            workspaceId: currentWorkspace.workspaceId,
             connectionId: edge.id
           })
 
@@ -146,7 +146,7 @@ export function useTerminalWorkflow({
       await performAction(notify, t, async () => {
         const graph = await window.cleancode?.updateTerminalExecutionConfig({
           projectDirectory: currentWorkbench.project.directory,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           blockId: block.id,
           executionConfig
         })
@@ -165,7 +165,7 @@ export function useTerminalWorkflow({
         const nextRun = await window.cleancode?.startTerminalWorkflow({
           projectId: currentWorkbench.project.id,
           projectDirectory: currentWorkbench.project.directory,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           terminalSourceTheme: readTerminalSourceTheme(),
@@ -188,7 +188,7 @@ export function useTerminalWorkflow({
         setRun(
           (await window.cleancode?.stopTerminalWorkflow({
             projectDirectory: currentWorkbench.project.directory,
-            workspaceName: currentWorkspace.name
+            workspaceId: currentWorkspace.workspaceId
           })) ?? null
         )
       })
@@ -204,7 +204,7 @@ export function useTerminalWorkflow({
     onStop: stop,
     projectDirectory,
     run,
-    workspaceName
+    workspaceId
   })
 
   const isActive = run?.status === 'running' || run?.status === 'ready'

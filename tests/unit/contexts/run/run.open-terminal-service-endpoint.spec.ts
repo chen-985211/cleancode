@@ -58,7 +58,7 @@ function createManagedRun(
   const scope = {
     projectId: 'project-1',
     projectDirectory: '/repo/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/repo/app',
     gitBranch: 'main',
     blockId: 'api',

@@ -37,7 +37,7 @@ type ManagedServiceReadiness =
 export interface LaunchManagedServiceCommand {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly blockId: string
@@ -181,7 +181,7 @@ export class ManagedServiceLauncher {
         port: 0,
         attemptedProjectId: command.projectId,
         attemptedProjectDirectory: command.projectDirectory,
-        attemptedWorkspaceName: command.workspaceName,
+        attemptedWorkspaceId: command.workspaceId,
         attemptedWorkspaceDirectory: command.workspaceDirectory,
         attemptedGitBranch: command.gitBranch,
         attemptedBlockId: command.blockId,
@@ -309,7 +309,7 @@ export class ManagedServiceLauncher {
       session = await this.sessions.start({
         projectId: command.projectId,
         projectDirectory: command.projectDirectory,
-        workspaceName: command.workspaceName,
+        workspaceId: command.workspaceId,
         workspaceDirectory: command.workspaceDirectory,
         gitBranch: command.gitBranch,
         terminalBlockId: command.blockId,

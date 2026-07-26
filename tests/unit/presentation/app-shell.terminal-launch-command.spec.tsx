@@ -136,7 +136,7 @@ describe('app shell terminal launch command', () => {
     await waitFor(() =>
       expect(updateTerminalDefinition).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         blockId: 'terminal-1',
         name: 'Terminal 1',
         description: '本地终端',
@@ -203,7 +203,7 @@ describe('app shell terminal launch command', () => {
         projectId: 'project-alpha-project',
         projectDirectory: '/tmp/alpha-project',
         terminalBlockId: 'terminal-1',
-        workspaceName: 'main',
+        workspaceId: 'main',
         workspaceDirectory: '/tmp/alpha-project',
         gitBranch: null,
         terminalSourceTheme: 'light',
@@ -643,7 +643,7 @@ function createTerminalSessionSnapshot(sessionId: string, generation = 1): Termi
     id: sessionId,
     ...createTerminalRunScope(sessionId, generation),
     terminalBlockId: 'terminal-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/tmp/alpha-project',
     processId: 1001,
     status: 'running',
@@ -661,7 +661,7 @@ function createTerminalRunScope(sessionId: string, generation = 1) {
   return {
     projectId: 'project-alpha-project',
     projectDirectory: '/tmp/alpha-project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/tmp/alpha-project',
     gitBranch: null,
     blockId: 'terminal-1',

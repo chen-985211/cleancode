@@ -11,7 +11,7 @@ describe('terminal session', () => {
 
     expect(session.status).toBe('running')
     expect(session.terminalBlockId).toBe('block-1')
-    expect(session.workspaceName).toBe('main')
+    expect(session.workspaceId).toBe('main')
     expect(session.workingDirectory).toBe('/tmp/cleancode-demo')
   })
 
@@ -162,7 +162,7 @@ function runScope() {
   return {
     projectId: 'project-1',
     projectDirectory: '/tmp/cleancode-demo',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/tmp/cleancode-demo',
     gitBranch: 'main',
     blockId: 'block-1',

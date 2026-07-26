@@ -344,6 +344,12 @@ function createTerminalGroupNodeProps(input: {
     id: 'development-group',
     type: 'terminalGroup',
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal-group',
+        objectId: 'development-group'
+      },
       group: {
         id: 'development-group',
         type: 'terminal-group',

@@ -106,7 +106,7 @@ describe('app shell managed terminal launch', () => {
         type: 'service-run-started',
         scope: {
           projectId: 'project-alpha-project',
-          workspaceName: 'main',
+          workspaceId: 'main',
           blockId: 'terminal-1',
           sessionId: 'session-pending',
           runId: 'run-pending',
@@ -206,7 +206,7 @@ function createTerminalSessionSnapshot(sessionId: string, generation = 1): Termi
     id: sessionId,
     projectId: 'project-alpha-project',
     projectDirectory: '/tmp/alpha-project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/tmp/alpha-project',
     gitBranch: null,
     blockId: 'terminal-1',
@@ -230,7 +230,7 @@ function createTerminalSessionSnapshot(sessionId: string, generation = 1): Termi
 function runIdentity(sessionId: string, generation: number) {
   return {
     projectId: 'project-alpha-project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     blockId: 'terminal-1',
     sessionId,
     runId: `${sessionId}-run`,

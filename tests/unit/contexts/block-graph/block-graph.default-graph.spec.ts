@@ -8,11 +8,11 @@ describe('default block graph', () => {
   it('belongs to the current project main workspace', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(graph.projectId).toBe('project-1')
-    expect(graph.workspaceName).toBe('main')
+    expect(graph.workspaceId).toBe('main')
     expect(graph.blocks).toEqual([])
     expect(graph.toSnapshot().viewport).toEqual(defaultCanvasViewport)
   })
@@ -20,7 +20,7 @@ describe('default block graph', () => {
   it('creates, edits, moves, and deletes terminal blocks', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const terminalBlock = graph.createTerminalBlock({
@@ -55,7 +55,7 @@ describe('default block graph', () => {
   it('creates terminal blocks with a spacious landscape layout', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const terminalBlock = graph.createTerminalBlock({
@@ -71,7 +71,7 @@ describe('default block graph', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'legacy-graph',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: [
         {
           id: 'terminal-1',

@@ -6,7 +6,7 @@ export interface StartWorkflowRuntimeCommand {
   readonly projectId: string
   readonly projectDirectory: string
   readonly blockId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly workingDirectory: string

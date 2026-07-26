@@ -191,7 +191,7 @@ function startedEvent(
     type: 'service-run-started',
     scope: {
       projectId: 'project-alpha',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'api',
       runId: `run-${generation}`,
       sessionId: `session-${generation}`,

@@ -74,14 +74,14 @@ describe('Claude Code Agent session e2e', () => {
       const firstLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 1)
       expect(firstLaunch.args).toContain('--session-id')
       expect(firstLaunch.args).not.toContain('--resume')
-      expect(await readClaudeConversationBindings(workbench)).toEqual([])
+      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
 
       await restartElectronApp()
       const secondLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 2)
       expect(secondLaunch.args).toContain('--session-id')
       expect(secondLaunch.args).not.toContain('--resume')
       expect(secondLaunch.sessionId).not.toBe(firstLaunch.sessionId)
-      expect(await readClaudeConversationBindings(workbench)).toEqual([])
+      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
 
       const claudeTerminal = page
         .locator('[data-agent-console-node]')
@@ -213,21 +213,24 @@ async function waitForClaudeHook(reportPath: string): Promise<void> {
   throw new Error('Timed out waiting for the Claude user-prompt Hook.')
 }
 
-async function readClaudeConversationBindings(
+async function readClaudeProviderSessionRefs(
   workbench: E2eWorkbench
-): Promise<readonly ClaudeConversationBinding[]> {
+): Promise<readonly ClaudeProviderSessionRef[]> {
   const store = JSON.parse(
     await readOnlyJsonFile(workbench.appStateDirectory, 'agent-sessions.json')
   ) as {
     workspaces: Array<{
-      agents: Array<{ conversations: ClaudeConversationBinding[]; providerId: string }>
+      agents: Array<{
+        providerId: string
+        providerSessionRef: ClaudeProviderSessionRef | null
+      }>
     }>
   }
 
   return store.workspaces.flatMap((workspace) =>
     workspace.agents
       .filter((agent) => agent.providerId === 'claude-code')
-      .flatMap((agent) => agent.conversations)
+      .flatMap((agent) => (agent.providerSessionRef ? [agent.providerSessionRef] : []))
   )
 }
 
@@ -237,10 +240,10 @@ async function waitForClaudeConversationBinding(
 ): Promise<void> {
   const deadline = Date.now() + 5_000
   while (Date.now() < deadline) {
-    const bindings = await readClaudeConversationBindings(workbench)
+    const bindings = await readClaudeProviderSessionRefs(workbench)
     if (
       bindings.some(
-        ({ sessionRef }) =>
+        (sessionRef) =>
           sessionRef.value === sessionId && sessionRef.metadata?.confirmedBy === 'user-prompt-hook'
       )
     ) {
@@ -256,9 +259,7 @@ function requireSessionId(report: FakeClaudeCliReport): string {
   return report.sessionId
 }
 
-interface ClaudeConversationBinding {
-  readonly sessionRef: {
-    readonly metadata?: { readonly confirmedBy?: unknown }
-    readonly value: string
-  }
+interface ClaudeProviderSessionRef {
+  readonly metadata?: { readonly confirmedBy?: unknown }
+  readonly value: string
 }

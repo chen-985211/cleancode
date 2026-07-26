@@ -1,12 +1,11 @@
 import type { TerminalViewState } from './types'
-
-const terminalStateKeySeparator = '\0'
+import { createCanvasObjectIdentityKey } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export interface TerminalSessionWorkspaceMigration {
   readonly sessionId: string
   readonly targetProjectId: string
   readonly targetBlockId?: string
-  readonly targetWorkspaceName: string
+  readonly targetWorkspaceId: string
 }
 
 export interface TerminalSessionWorkspaceMigrationResult {
@@ -30,7 +29,7 @@ export function migrateTerminalSessionToWorkspace(
   const blockId = migration.targetBlockId ?? getBlockIdFromTerminalStateKey(sourceKey)
   const targetKey = createTerminalStateKey(
     migration.targetProjectId,
-    migration.targetWorkspaceName,
+    migration.targetWorkspaceId,
     blockId
   )
 
@@ -47,17 +46,22 @@ export function migrateTerminalSessionToWorkspace(
 
 export function createTerminalStateKey(
   projectId: string,
-  workspaceName: string,
+  workspaceId: string,
   blockId: string
 ): string {
-  return [projectId, workspaceName, blockId].join(terminalStateKeySeparator)
+  return createCanvasObjectIdentityKey({
+    projectId,
+    workspaceId,
+    objectKind: 'terminal',
+    objectId: blockId
+  })
 }
 
 export function getProjectIdFromTerminalStateKey(terminalStateKey: string): string {
   return splitTerminalStateKey(terminalStateKey)[0]
 }
 
-export function getWorkspaceNameFromTerminalStateKey(terminalStateKey: string): string {
+export function getWorkspaceIdFromTerminalStateKey(terminalStateKey: string): string {
   return splitTerminalStateKey(terminalStateKey)[1]
 }
 
@@ -66,8 +70,19 @@ export function getBlockIdFromTerminalStateKey(terminalStateKey: string): string
 }
 
 function splitTerminalStateKey(terminalStateKey: string): [string, string, string] {
-  const [projectId = '', workspaceName = '', ...blockIdParts] =
-    terminalStateKey.split(terminalStateKeySeparator)
+  try {
+    const value = JSON.parse(terminalStateKey) as unknown
+    if (
+      Array.isArray(value) &&
+      value.length === 4 &&
+      value[2] === 'terminal' &&
+      value.every((part) => typeof part === 'string')
+    ) {
+      return [value[0], value[1], value[3]]
+    }
+  } catch {
+    // Unknown renderer state keys are ignored by returning an empty identity.
+  }
 
-  return [projectId, workspaceName, blockIdParts.join(terminalStateKeySeparator)]
+  return ['', '', '']
 }

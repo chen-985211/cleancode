@@ -28,7 +28,7 @@ describe('terminal layout in the default block graph', () => {
   })
 
   it('keeps the arranged workflow below the agent while avoiding terminals, groups, and reserved regions', () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     graph.createTerminalBlock({
       id: 'selected-terminal',
       name: 'Selected',
@@ -71,7 +71,7 @@ describe('terminal layout in the default block graph', () => {
   })
 
   it('preserves same-layer unit order when an earlier cross-layer group is pushed by an obstacle', () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     createTerminal(graph, 'u-0', 40, 40)
     createTerminal(graph, 'u-1', 800, 40)
     createTerminal(graph, 'v-0', 40, 400)
@@ -191,7 +191,7 @@ describe('terminal layout in the default block graph', () => {
   })
 
   it('stabilizes a cross-layer group and same-layer terminals in one arrangement', () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     createTerminal(graph, 'terminal-a', 40, 40)
     createTerminal(graph, 'terminal-b', 40, 400)
     createTerminal(graph, 'terminal-d', 800, 40)
@@ -227,7 +227,7 @@ describe('terminal layout in the default block graph', () => {
   })
 
   it('stabilizes cyclic cross-layer group precedence alongside an independent group', () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     createTerminal(graph, 'a-root', 40, 40)
     createTerminal(graph, 'c-root', 40, 400)
     createTerminal(graph, 'c-child', 800, 40)
@@ -285,7 +285,7 @@ describe('terminal layout in the default block graph', () => {
   })
 
   it('stabilizes a multi-unit precedence cycle whose synthetic order is not observable in every layer', () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     const terminals = [
       ['z-0', 40, 40],
       ['a-0', 40, 400],
@@ -381,7 +381,7 @@ describe('terminal layout in the default block graph', () => {
 })
 
 function createGraphWithSizedWorkflow(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   graph.createTerminalBlock({
     id: 'install-terminal',
     name: 'Install',
@@ -418,7 +418,7 @@ function createGraphWithSizedWorkflow(): BlockGraph {
 }
 
 function createGraphWithFourSameLayerTerminals(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
 
   for (const [index, id] of ['terminal-a', 'terminal-b', 'terminal-c', 'terminal-d'].entries()) {
     graph.createTerminalBlock({

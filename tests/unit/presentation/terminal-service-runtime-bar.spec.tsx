@@ -81,11 +81,12 @@ describe('terminal service runtime bar', () => {
       identity: {
         ...createIdentity(),
         projectId: 'project-beta',
-        workspaceName: 'feature/auth',
+        workspaceId: 'feature/auth',
         blockId: 'web'
       },
       projectName: 'Storefront',
-      workspaceName: 'feature/auth',
+      workspaceId: 'feature/auth',
+      workspaceDisplayName: 'feature/auth',
       terminalName: 'Web Server'
     }
 
@@ -192,7 +193,8 @@ describe('terminal service runtime bar', () => {
     const owner: ManagedTerminalServiceOwner = {
       identity: createIdentity(),
       projectName: 'Storefront',
-      workspaceName: 'main',
+      workspaceId: 'main',
+      workspaceDisplayName: 'main',
       terminalName: 'API'
     }
     render(
@@ -224,7 +226,7 @@ describe('terminal service runtime bar', () => {
 function createIdentity(): TerminalRunIdentity {
   return {
     projectId: 'project-alpha',
-    workspaceName: 'main',
+    workspaceId: 'main',
     blockId: 'api',
     runId: 'run-2',
     sessionId: 'session-2',

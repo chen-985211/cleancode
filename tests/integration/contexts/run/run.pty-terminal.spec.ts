@@ -550,7 +550,7 @@ function runScope(sessionId: string) {
   return {
     projectId: 'project-test',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     blockId: 'block-test',

@@ -45,7 +45,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
       agentId: 'agent-1',
       cleancodeMcpEnabled: false,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(approval).resolves.toMatchObject({ status: 'canceled' })
@@ -72,7 +72,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
       agentId: 'agent-1',
       cleancodeMcpEnabled: false,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
@@ -98,7 +98,7 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toBeNull()
 
@@ -126,17 +126,16 @@ describe('reconfigure Agent CleanCode MCP capability', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ code: 'AGENT_SESSION_NOT_FOUND' })
 
     expect(scopeValidation.isValid).toHaveBeenLastCalledWith({
       agentId: 'agent-1',
-      gitBranch: null,
       projectDirectory: '/repo/app',
       projectId: 'project-1',
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     expect(processPort.stops).toEqual([])
     expect(processPort.launches).toHaveLength(1)
@@ -224,15 +223,14 @@ function createAgent(enabled: boolean, withThread = false): AgentSession {
     name: 'Agent 1',
     projectId: 'project-1',
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
   if (withThread) {
     agent.bindProviderSession(
       AgentConversationScope.create({
         agentId: 'agent-1',
-        gitBranch: null,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }),
       ProviderSessionRef.create({
         formatVersion: 1,
@@ -254,6 +252,6 @@ function attachCommand() {
     projectId: 'project-1',
     terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }

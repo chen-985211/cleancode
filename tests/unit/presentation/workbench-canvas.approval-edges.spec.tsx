@@ -157,7 +157,7 @@ const approval: AgentToolApprovalViewState = {
     summary: '断开终端依赖 connection-a-b',
     target: { connectionId: 'connection-a-b', kind: 'terminal_connection' },
     toolName: 'disconnect_terminal_blocks',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -179,7 +179,7 @@ const graph: BlockGraphSnapshot = {
     createGroup('group-target', ['terminal-b', 'terminal-helper-b'])
   ],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 function createGroup(id: string, memberBlockIds: readonly string[]) {

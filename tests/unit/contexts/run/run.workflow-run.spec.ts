@@ -135,7 +135,7 @@ describe('terminal workflow run', () => {
       id: 'run-1',
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main'
     })
@@ -149,7 +149,7 @@ describe('terminal workflow run', () => {
 function createPlan(): WorkflowRunPlanSnapshot {
   return {
     graphId: 'graph-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     nodes: [
       task('install-api', [], [0, 2]),
       task('install-web'),
@@ -163,7 +163,7 @@ function createPlan(): WorkflowRunPlanSnapshot {
 function createServicePlan(): WorkflowRunPlanSnapshot {
   return {
     graphId: 'graph-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     nodes: [service('api'), task('browser', ['api'])]
   }
 }
@@ -171,7 +171,7 @@ function createServicePlan(): WorkflowRunPlanSnapshot {
 function createServiceChainPlan(): WorkflowRunPlanSnapshot {
   return {
     graphId: 'graph-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     nodes: [service('database'), service('api', ['database']), service('web', ['api'])]
   }
 }
@@ -215,7 +215,7 @@ function workflowScope() {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main'
   }

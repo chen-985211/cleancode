@@ -31,7 +31,7 @@ describe('agent session service', () => {
       rows: 32,
       terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const reattachedSession = await service.attach({
       agentId: 'agent-1',
@@ -43,7 +43,7 @@ describe('agent session service', () => {
       rows: 40,
       terminalSourceTheme: 'dark',
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const branchSession = await service.attach({
       agentId: 'agent-2',
@@ -55,7 +55,7 @@ describe('agent session service', () => {
       rows: 24,
       terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app-worktrees/feature',
-      workspaceName: 'feature'
+      workspaceId: 'feature'
     })
 
     expect(reattachedSession.sessionId).toBe(firstSession.sessionId)
@@ -91,7 +91,7 @@ describe('agent session service', () => {
         name: 'Agent 1',
         projectId: 'project-1',
         providerId: 'claude-code',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
     const service = createSessionService({ repository })
@@ -186,7 +186,7 @@ describe('agent session service', () => {
     const lease = await service.disposeAgent({
       agentId: 'agent-1',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     lease.release()
     service.resize({ columns: 120, rows: 36, sessionId: session.sessionId })
@@ -194,7 +194,7 @@ describe('agent session service', () => {
     expect(processPort.resizes).toEqual([])
   })
 
-  it('keeps separate Codex sessions for different branches in the same workspace', async () => {
+  it('keeps the same Codex session when the Git branch changes in one physical workspace', async () => {
     const processPort = new RecordingAgentTerminalRuntime()
     const service = createSessionService({ processPort })
     const callbacks = {
@@ -210,7 +210,7 @@ describe('agent session service', () => {
       projectId: 'project-1',
       terminalSourceTheme: 'light' as const,
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
     const featureBranchCommand = {
       ...callbacks,
@@ -220,14 +220,14 @@ describe('agent session service', () => {
       projectId: 'project-1',
       terminalSourceTheme: 'light' as const,
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
 
     const mainSession = await service.attach(mainBranchCommand)
     const featureSession = await service.attach(featureBranchCommand)
 
-    expect(featureSession.sessionId).not.toBe(mainSession.sessionId)
-    expect(processPort.launches).toHaveLength(2)
+    expect(featureSession.sessionId).toBe(mainSession.sessionId)
+    expect(processPort.launches).toHaveLength(1)
   })
 
   it('resumes the persisted Codex thread after the application service is recreated', async () => {
@@ -292,7 +292,7 @@ describe('agent session service', () => {
     processPort.startLatestLaunch()
 
     const persisted = await repository.findAgent('project-1', 'main', 'agent-1')
-    expect(persisted?.findProviderSessionRef(null)?.toSnapshot()).toEqual({
+    expect(persisted?.providerSessionRef?.toSnapshot()).toEqual({
       formatVersion: 1,
       kind: 'gemini-session',
       value: '550e8400-e29b-41d4-a716-446655440000'
@@ -498,7 +498,7 @@ describe('agent session service', () => {
     await vi.waitFor(() => expect(service.listPendingApprovals()).toHaveLength(1))
     const lease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     lease.release()
 
@@ -595,39 +595,39 @@ class RecordingAgentSessionRepository implements AgentSessionRepository {
   async find(scope: AgentConversationScope): Promise<AgentSession | null> {
     const snapshot = scope.toSnapshot()
     const agent = this.sessions.get(
-      agentKey(snapshot.projectId, snapshot.workspaceName, snapshot.agentId)
+      agentKey(snapshot.projectId, snapshot.workspaceId, snapshot.agentId)
     )
     return agent ? AgentSession.fromSnapshot(agent.toSnapshot(), scope) : null
   }
 
   async findAgent(
     projectId: string,
-    workspaceName: string,
+    workspaceId: string,
     agentId: string
   ): Promise<AgentSession | null> {
-    return this.sessions.get(agentKey(projectId, workspaceName, agentId)) ?? null
+    return this.sessions.get(agentKey(projectId, workspaceId, agentId)) ?? null
   }
 
-  async findWorkspace(projectId: string, workspaceName: string): Promise<readonly AgentSession[]> {
+  async findWorkspace(projectId: string, workspaceId: string): Promise<readonly AgentSession[]> {
     return [...this.sessions.values()].filter(
-      (agent) => agent.projectId === projectId && agent.workspaceName === workspaceName
+      (agent) => agent.projectId === projectId && agent.workspaceId === workspaceId
     )
   }
 
   async save(session: AgentSession): Promise<void> {
-    this.sessions.set(agentKey(session.projectId, session.workspaceName, session.id), session)
+    this.sessions.set(agentKey(session.projectId, session.workspaceId, session.id), session)
   }
 
   async delete(scope: AgentConversationScope): Promise<void> {
     const session = await this.find(scope)
     if (session) {
-      session.clearProviderSession(scope.toSnapshot().gitBranch)
+      session.clearProviderSession()
       await this.save(session)
     }
   }
 
-  async deleteAgent(projectId: string, workspaceName: string, agentId: string): Promise<void> {
-    this.sessions.delete(agentKey(projectId, workspaceName, agentId))
+  async deleteAgent(projectId: string, workspaceId: string, agentId: string): Promise<void> {
+    this.sessions.delete(agentKey(projectId, workspaceId, agentId))
   }
 
   async deleteProject(projectId: string): Promise<void> {
@@ -654,13 +654,13 @@ async function attachMainSession(
     rows: 24,
     terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     ...input
   })
 }
 
-function agentKey(projectId: string, workspaceName: string, agentId: string): string {
-  return JSON.stringify([projectId, workspaceName, agentId])
+function agentKey(projectId: string, workspaceId: string, agentId: string): string {
+  return JSON.stringify([projectId, workspaceId, agentId])
 }
 
 function completedToolResult(
@@ -676,7 +676,7 @@ function completedToolResult(
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: true,
     output: { type: 'block_graph' },

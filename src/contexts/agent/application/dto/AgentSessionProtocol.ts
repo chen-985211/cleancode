@@ -14,7 +14,7 @@ export interface AgentTerminalViewIdentity {
   readonly projectId: string
   readonly runId: string
   readonly sessionId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export type AgentTerminalRuntimeStatus =
@@ -74,7 +74,7 @@ export interface AgentGraphUpdatedEvent {
   readonly graph: AgentBlockGraphSnapshot
   readonly projectDirectory: string
   readonly sessionId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export type AgentToolApprovalTarget =
@@ -112,7 +112,7 @@ export interface AgentToolApprovalRequest {
   readonly summary: string
   readonly target: AgentToolApprovalTarget
   readonly toolName: AgentToolName
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface AgentSessionSnapshot {
@@ -126,5 +126,5 @@ export interface AgentSessionSnapshot {
   readonly sessionId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }

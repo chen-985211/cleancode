@@ -7,7 +7,7 @@ import { BlockGraphTerminalWorkflowPlanAdapter } from '../../../../src/contexts/
 
 describe('BlockGraph terminal launch plan adapter', () => {
   it('maps the selected BlockGraph definition into an immutable Run-owned plan', async () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     graph.createTerminalBlock({
       id: 'api',
       name: 'API',
@@ -32,7 +32,7 @@ describe('BlockGraph terminal launch plan adapter', () => {
     const plan = await adapter.getPlan({
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'api'
     })
 
@@ -55,7 +55,7 @@ describe('BlockGraph terminal launch plan adapter', () => {
   })
 
   it('maps a workflow through an immutable Run-owned DTO boundary', async () => {
-    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     graph.createTerminalBlock({
       id: 'api',
       name: 'API',
@@ -77,7 +77,7 @@ describe('BlockGraph terminal launch plan adapter', () => {
 
     const workflow = await adapter.buildPlan({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       scope: { type: 'full' }
     })
 
@@ -106,7 +106,7 @@ class InMemoryRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const result = await transaction(this.graph)

@@ -152,7 +152,7 @@ function agentRunScope(sessionId: string) {
     runId: `run-${sessionId}`,
     sessionId,
     workspaceDirectory: 'C:\\project',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

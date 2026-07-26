@@ -28,7 +28,7 @@ describe('terminal session workspace migration', () => {
       {
         sessionId: 'session-main',
         targetProjectId: 'project-alpha',
-        targetWorkspaceName: 'feature/sidebar'
+        targetWorkspaceId: 'feature/sidebar'
       }
     )
 
@@ -54,7 +54,7 @@ describe('terminal session workspace migration', () => {
     const result = migrateTerminalSessionToWorkspace(states, {
       sessionId: 'session-feature',
       targetProjectId: 'project-alpha',
-      targetWorkspaceName: 'feature/sidebar'
+      targetWorkspaceId: 'feature/sidebar'
     })
 
     expect(result).toEqual({ migrated: false, states })
@@ -75,7 +75,7 @@ describe('terminal session workspace migration', () => {
         sessionId: 'session-main',
         targetProjectId: 'project-alpha',
         targetBlockId: 'terminal-worktree',
-        targetWorkspaceName: 'feature/sidebar'
+        targetWorkspaceId: 'feature/sidebar'
       }
     )
 

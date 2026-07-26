@@ -10,7 +10,7 @@ import {
 const owner: ManagedServiceOwnerReference = {
   projectId: 'project-1',
   projectDirectory: '/repo/cleancode',
-  workspaceName: 'feature/ports',
+  workspaceId: 'feature/ports',
   blockId: 'terminal-dev',
   sessionId: 'session-1',
   runId: 'run-1',
@@ -25,21 +25,22 @@ describe('Managed service owner resolver', () => {
     await expect(createManagedServiceOwnerResolver(projects, graphs)(owner)).resolves.toEqual({
       identity: {
         projectId: owner.projectId,
-        workspaceName: owner.workspaceName,
+        workspaceId: owner.workspaceId,
         blockId: owner.blockId,
         sessionId: owner.sessionId,
         runId: owner.runId,
         generation: owner.generation
       },
       projectName: 'CleanCode',
-      workspaceName: owner.workspaceName,
+      workspaceId: owner.workspaceId,
+      workspaceDisplayName: 'feature/ports',
       terminalName: 'Development server'
     })
 
     expect(projects.findByDirectory).toHaveBeenCalledWith(owner.projectDirectory)
     expect(graphs.findDefaultGraphSnapshot).toHaveBeenCalledWith(
       owner.projectDirectory,
-      owner.workspaceName
+      owner.workspaceId
     )
     expect(projects.save).not.toHaveBeenCalled()
     expect(graphs.initializeDefaultGraph).not.toHaveBeenCalled()
@@ -91,7 +92,7 @@ function createGraphSnapshot(overrides: Partial<BlockGraphSnapshot> = {}): Block
   return {
     id: 'graph-1',
     projectId: owner.projectId,
-    workspaceName: owner.workspaceName,
+    workspaceId: owner.workspaceId,
     viewport: { x: 0, y: 0, zoom: 1 },
     blocks: [
       {

@@ -20,7 +20,7 @@ describe('Agent layout coordination', () => {
       useAgentLayoutCoordination({
         clearTerminalGroupDropPreview: vi.fn(),
         currentProjectId: 'project-1',
-        currentWorkspaceName: 'main',
+        currentWorkspaceId: 'main',
         moveWorkbenchNode: vi.fn(() => moveCommit.promise),
         moveWorkspaceAgent: vi.fn(async () => undefined),
         nodeStore,
@@ -60,7 +60,7 @@ describe('Agent layout coordination', () => {
       useAgentLayoutCoordination({
         clearTerminalGroupDropPreview: vi.fn(),
         currentProjectId: 'project-1',
-        currentWorkspaceName: 'main',
+        currentWorkspaceId: 'main',
         moveWorkbenchNode: vi.fn(async () => undefined),
         moveWorkspaceAgent: vi.fn(async () => undefined),
         nodeStore,
@@ -88,7 +88,7 @@ describe('Agent layout coordination', () => {
       },
       name: 'Agent 1',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
     const movedAgentNode = {
       id: 'agent:agent-1',
@@ -102,7 +102,7 @@ describe('Agent layout coordination', () => {
       useAgentLayoutCoordination({
         clearTerminalGroupDropPreview: vi.fn(),
         currentProjectId: 'project-1',
-        currentWorkspaceName: 'main',
+        currentWorkspaceId: 'main',
         moveWorkbenchNode: vi.fn(async () => undefined),
         moveWorkspaceAgent: vi.fn(async () => {
           throw new Error('layout commit failed')
@@ -133,7 +133,7 @@ function createLayoutEvent(): AgentGraphUpdatedEvent {
     graph: createGraph(),
     projectDirectory: '/repo/app',
     sessionId: 'session-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -154,7 +154,7 @@ function createGraph(): BlockGraphSnapshot {
     projectId: 'project-1',
     terminalGroups: [],
     viewport: { x: 0, y: 0, zoom: 1 },
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

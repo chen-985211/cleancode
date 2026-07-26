@@ -19,7 +19,7 @@ describe('create terminal block layout', () => {
       projectDirectory: '/tmp/project',
       reservedRegions: [region(0, 0, 2000, 2000)],
       size: { width: 420, height: 260 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(graph.blocks.at(-1)).toMatchObject({
@@ -43,7 +43,7 @@ describe('create terminal block layout', () => {
       projectDirectory: '/tmp/project',
       reservedRegions: [region(300, 624, 720, 180)],
       size: { width: 420, height: 240 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(graph.blocks.at(-1)).toMatchObject({
@@ -64,7 +64,7 @@ describe('create terminal block layout', () => {
         description: '',
         name: 'Automatic',
         projectDirectory: '/tmp/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('Automatic terminal placement requires an anchor region.')
     expect(repository.graph?.toSnapshot()).toEqual(before)
@@ -81,7 +81,7 @@ class TransactionalBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ): Promise<BlockGraphTransactionResult<TResult> | null> {
     this.transactionCount += 1
@@ -108,7 +108,7 @@ class TransactionalBlockGraphRepository implements BlockGraphRepository {
 }
 
 function createGraph(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   graph.createTerminalBlock({
     id: 'existing-terminal',
     name: 'Existing',

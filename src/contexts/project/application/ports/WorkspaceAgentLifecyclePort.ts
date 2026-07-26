@@ -14,11 +14,11 @@ export interface WorkspaceAgentLifecyclePort {
   disposeProject(projectDirectory: string): Promise<WorkspaceAgentAttachmentLease>
   disposeWorkspace(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<WorkspaceAgentAttachmentLease>
   isWorkspaceQuarantined(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): boolean
   resolveProjectQuarantines(projectDirectory: string): void
   suspend(workspaceDirectory: string): Promise<WorkspaceAgentSuspensionLease>

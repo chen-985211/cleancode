@@ -247,7 +247,7 @@ function createTerminalSessionSnapshot(terminalBlockId: string): TerminalSession
     runId: `${sessionId}-run`,
     generation: 1,
     terminalBlockId,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/tmp/alpha-project',
     processId: 1001,
     status: 'running',

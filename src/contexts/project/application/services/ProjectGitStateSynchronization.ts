@@ -46,15 +46,15 @@ export async function saveSynchronizedProject(input: SaveSynchronizedProjectInpu
   try {
     if (input.currentSnapshot) {
       const synchronizedSnapshot = input.project.toSnapshot()
-      const affectedWorkspaceNames = findChangedRuntimeWorkspaceNames(
+      const affectedWorkspaceIds = findChangedRuntimeWorkspaceIds(
         input.currentSnapshot,
         synchronizedSnapshot
       )
 
-      if (affectedWorkspaceNames.length > 0) {
+      if (affectedWorkspaceIds.length > 0) {
         runLease = await input.workspaceRunLifecyclePort.disposeWorkspaces({
           projectDirectory: input.project.directory,
-          workspaceNames: affectedWorkspaceNames
+          workspaceIds: affectedWorkspaceIds
         })
       }
     }
@@ -79,7 +79,9 @@ export function areProjectSnapshotsEqual(left: ProjectSnapshot, right: ProjectSn
 
       return (
         rightWorkspace !== undefined &&
-        workspace.name === rightWorkspace.name &&
+        workspace.workspaceId === rightWorkspace.workspaceId &&
+        workspace.workspaceKind === rightWorkspace.workspaceKind &&
+        workspace.displayName === rightWorkspace.displayName &&
         workspace.directory === rightWorkspace.directory &&
         workspace.gitBranch === rightWorkspace.gitBranch &&
         workspace.isCurrent === rightWorkspace.isCurrent
@@ -88,21 +90,17 @@ export function areProjectSnapshotsEqual(left: ProjectSnapshot, right: ProjectSn
   )
 }
 
-function findChangedRuntimeWorkspaceNames(
+function findChangedRuntimeWorkspaceIds(
   current: ProjectSnapshot,
   synchronized: ProjectSnapshot
 ): readonly string[] {
   return current.workspaces
     .filter((workspace) => {
       const nextWorkspace = synchronized.workspaces.find(
-        (candidate) => candidate.name === workspace.name
+        (candidate) => candidate.workspaceId === workspace.workspaceId
       )
 
-      return (
-        !nextWorkspace ||
-        nextWorkspace.directory !== workspace.directory ||
-        nextWorkspace.gitBranch !== workspace.gitBranch
-      )
+      return !nextWorkspace || nextWorkspace.directory !== workspace.directory
     })
-    .map((workspace) => workspace.name)
+    .map((workspace) => workspace.workspaceId)
 }

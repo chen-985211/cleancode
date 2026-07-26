@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
@@ -11,74 +11,19 @@ import type {
 import type { AgentProviderRegistryPort } from '../../application/ports/AgentProviderRegistryPort'
 import {
   AgentSession,
-  type AgentLayoutSnapshot,
   type PersistedAgentSessionSnapshot
 } from '../../domain/aggregates/AgentSession'
-import { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
-import { ProviderSessionRef } from '../../domain/value-objects/ProviderSessionRef'
+import type { AgentConversationScope } from '../../domain/value-objects/AgentConversationScope'
 
 interface AgentWorkspaceSnapshot {
   readonly agents: readonly PersistedAgentSessionSnapshot[]
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 interface AgentSessionStore {
-  readonly version: 4
+  readonly version: 5
   readonly workspaces: readonly AgentWorkspaceSnapshot[]
-}
-
-interface Version3AgentConversationBindingSnapshot {
-  readonly codexThreadId: string
-  readonly gitBranch: string | null
-}
-
-interface Version3AgentSessionSnapshot {
-  readonly agentId: string
-  readonly cleancodeMcpEnabled: boolean
-  readonly conversations: readonly Version3AgentConversationBindingSnapshot[]
-  readonly layout: AgentLayoutSnapshot
-  readonly name: string
-  readonly projectId: string
-  readonly workspaceName: string
-}
-
-interface Version3AgentWorkspaceSnapshot {
-  readonly agents: readonly Version3AgentSessionSnapshot[]
-  readonly projectId: string
-  readonly workspaceName: string
-}
-
-interface Version3AgentSessionStore {
-  readonly version: 3
-  readonly workspaces: readonly Version3AgentWorkspaceSnapshot[]
-}
-
-type Version2AgentSessionSnapshot = Omit<Version3AgentSessionSnapshot, 'cleancodeMcpEnabled'>
-
-interface Version2AgentWorkspaceSnapshot {
-  readonly agents: readonly Version2AgentSessionSnapshot[]
-  readonly projectId: string
-  readonly workspaceName: string
-}
-
-interface Version2AgentSessionStore {
-  readonly version: 2
-  readonly workspaces: readonly Version2AgentWorkspaceSnapshot[]
-}
-
-interface LegacyAgentSessionSnapshot {
-  readonly codexThreadId: string
-  readonly scope: {
-    readonly gitBranch: string | null
-    readonly projectId: string
-    readonly workspaceName: string
-  }
-}
-
-interface LegacyAgentSessionStore {
-  readonly sessions: readonly LegacyAgentSessionSnapshot[]
-  readonly version: 1
 }
 
 export class FileSystemAgentSessionRepository
@@ -92,30 +37,28 @@ export class FileSystemAgentSessionRepository
   ) {}
 
   async find(scope: AgentConversationScope): Promise<AgentSession | null> {
-    const scopeSnapshot = scope.toSnapshot()
-    const agents = await this.findWorkspace(scopeSnapshot.projectId, scopeSnapshot.workspaceName)
-    const agent = agents?.find((candidate) => candidate.id === scopeSnapshot.agentId)
+    const target = scope.toSnapshot()
+    const agents = await this.findWorkspace(target.projectId, target.workspaceId)
+    const agent = agents?.find((candidate) => candidate.id === target.agentId)
 
     return agent ? AgentSession.fromSnapshot(agent.toSnapshot(), scope) : null
   }
 
   async findAgent(
     projectId: string,
-    workspaceName: string,
+    workspaceId: string,
     agentId: string
   ): Promise<AgentSession | null> {
-    const agents = await this.findWorkspace(projectId, workspaceName)
+    const agents = await this.findWorkspace(projectId, workspaceId)
     return agents?.find((candidate) => candidate.id === agentId) ?? null
   }
 
   async findWorkspace(
     projectId: string,
-    workspaceName: string
+    workspaceId: string
   ): Promise<readonly AgentSession[] | null> {
     const store = await this.readStore()
-    const workspace = store.workspaces.find(
-      (candidate) => candidate.projectId === projectId && candidate.workspaceName === workspaceName
-    )
+    const workspace = findWorkspace(store.workspaces, projectId, workspaceId)
 
     return workspace ? workspace.agents.map((snapshot) => this.hydrate(snapshot)) : null
   }
@@ -123,18 +66,12 @@ export class FileSystemAgentSessionRepository
   async save(session: AgentSession): Promise<void> {
     const snapshot = this.validateSnapshot(session.toSnapshot())
     await this.update((workspaces) => {
-      const existingWorkspace = findWorkspace(
-        workspaces,
-        snapshot.projectId,
-        snapshot.workspaceName
-      )
-      const nextWorkspace = {
-        agents: replaceAgentSnapshot(existingWorkspace?.agents ?? [], snapshot),
+      const existing = findWorkspace(workspaces, snapshot.projectId, snapshot.workspaceId)
+      return replaceWorkspace(workspaces, {
+        agents: replaceAgentSnapshot(existing?.agents ?? [], snapshot),
         projectId: snapshot.projectId,
-        workspaceName: snapshot.workspaceName
-      }
-
-      return replaceWorkspace(workspaces, nextWorkspace)
+        workspaceId: snapshot.workspaceId
+      })
     })
   }
 
@@ -145,7 +82,7 @@ export class FileSystemAgentSessionRepository
       const snapshot = this.validateSnapshot(agent.toSnapshot())
       if (
         snapshot.projectId !== command.projectId ||
-        snapshot.workspaceName !== command.workspaceName
+        snapshot.workspaceId !== command.workspaceId
       ) {
         throw new Error('Initial Agent does not belong to the target workspace.')
       }
@@ -154,7 +91,7 @@ export class FileSystemAgentSessionRepository
     let resolvedSnapshots: readonly PersistedAgentSessionSnapshot[] = initialSnapshots
 
     await this.update((workspaces) => {
-      const existing = findWorkspace(workspaces, command.projectId, command.workspaceName)
+      const existing = findWorkspace(workspaces, command.projectId, command.workspaceId)
       if (existing) {
         resolvedSnapshots = existing.agents
         return workspaces
@@ -163,7 +100,7 @@ export class FileSystemAgentSessionRepository
       return replaceWorkspace(workspaces, {
         agents: initialSnapshots,
         projectId: command.projectId,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
     })
 
@@ -173,7 +110,7 @@ export class FileSystemAgentSessionRepository
   async delete(scope: AgentConversationScope): Promise<void> {
     const target = scope.toSnapshot()
     await this.update((workspaces) => {
-      const workspace = findWorkspace(workspaces, target.projectId, target.workspaceName)
+      const workspace = findWorkspace(workspaces, target.projectId, target.workspaceId)
       if (!workspace) return workspaces
       const agent = workspace.agents.find((candidate) => candidate.agentId === target.agentId)
       if (!agent) return workspaces
@@ -182,21 +119,16 @@ export class FileSystemAgentSessionRepository
         ...workspace,
         agents: replaceAgentSnapshot(workspace.agents, {
           ...agent,
-          conversations: agent.conversations.filter(
-            (conversation) => branchKey(conversation.gitBranch) !== branchKey(target.gitBranch)
-          )
+          providerSessionRef: null
         })
       })
     })
   }
 
-  async deleteAgent(projectId: string, workspaceName: string, agentId: string): Promise<void> {
+  async deleteAgent(projectId: string, workspaceId: string, agentId: string): Promise<void> {
     await this.update((workspaces) => {
-      const workspace = findWorkspace(workspaces, projectId, workspaceName)
-
-      if (!workspace) {
-        return workspaces
-      }
+      const workspace = findWorkspace(workspaces, projectId, workspaceId)
+      if (!workspace) return workspaces
 
       return replaceWorkspace(workspaces, {
         ...workspace,
@@ -220,7 +152,7 @@ export class FileSystemAgentSessionRepository
       .catch(() => undefined)
       .then(async () => {
         const store = await this.readStore()
-        await this.writeStore({ version: 4, workspaces: updateWorkspaces(store.workspaces) })
+        await this.writeStore({ version: 5, workspaces: updateWorkspaces(store.workspaces) })
       })
 
     this.saveQueue = update
@@ -229,52 +161,27 @@ export class FileSystemAgentSessionRepository
 
   private async readStore(): Promise<AgentSessionStore> {
     try {
-      const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as
-        | Partial<AgentSessionStore>
-        | Partial<Version3AgentSessionStore>
-        | Partial<Version2AgentSessionStore>
-        | Partial<LegacyAgentSessionStore>
+      const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as Partial<AgentSessionStore>
 
-      if (parsed.version === 4 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        return { version: 4, workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[] }
+      if (parsed.version !== 5 || !Array.isArray(parsed.workspaces)) {
+        throw new Error('Persisted Agent session store is invalid.')
       }
 
-      if (parsed.version === 3 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        const migratedStore = this.validateStore(
-          migrateVersion3Store(parsed.workspaces as readonly Version3AgentWorkspaceSnapshot[])
-        )
-        await this.writeStore(migratedStore)
-        return migratedStore
-      }
-
-      if (parsed.version === 2 && 'workspaces' in parsed && Array.isArray(parsed.workspaces)) {
-        const migratedStore = this.validateStore(
-          migrateVersion2Store(parsed.workspaces as readonly Version2AgentWorkspaceSnapshot[])
-        )
-        await this.writeStore(migratedStore)
-        return migratedStore
-      }
-
-      if (parsed.version === 1 && 'sessions' in parsed && Array.isArray(parsed.sessions)) {
-        const migratedStore = this.validateStore(
-          migrateLegacyStore(parsed.sessions as readonly LegacyAgentSessionSnapshot[])
-        )
-        await this.writeStore(migratedStore)
-        return migratedStore
-      }
-
-      throw new Error('Persisted Agent session store is invalid.')
+      return this.validateStore({
+        version: 5,
+        workspaces: parsed.workspaces as readonly AgentWorkspaceSnapshot[]
+      })
     } catch (error) {
       if (isMissingFileError(error)) {
-        return { version: 4, workspaces: [] }
+        return { version: 5, workspaces: [] }
       }
 
       throw error
     }
   }
 
-  private async writeStore(store: AgentSessionStore): Promise<void> {
-    await writeFileAtomically(this.filePath, `${JSON.stringify(store, null, 2)}\n`)
+  private writeStore(store: AgentSessionStore): Promise<void> {
+    return writeFileAtomically(this.filePath, `${JSON.stringify(store, null, 2)}\n`)
   }
 
   private hydrate(snapshot: PersistedAgentSessionSnapshot): AgentSession {
@@ -283,7 +190,7 @@ export class FileSystemAgentSessionRepository
 
   private validateStore(store: AgentSessionStore): AgentSessionStore {
     return {
-      version: 4,
+      version: 5,
       workspaces: store.workspaces.map((workspace) => ({
         ...workspace,
         agents: workspace.agents.map((agent) => this.validateSnapshot(agent))
@@ -295,119 +202,22 @@ export class FileSystemAgentSessionRepository
     this.providers.require(snapshot.providerId)
     return {
       ...snapshot,
-      conversations: snapshot.conversations.map((conversation) => ({
-        ...conversation,
-        sessionRef: this.providers
-          .parseSessionRef(snapshot.providerId, conversation.sessionRef)
-          .toSnapshot()
-      }))
+      providerSessionRef: snapshot.providerSessionRef
+        ? this.providers
+            .parseSessionRef(snapshot.providerId, snapshot.providerSessionRef)
+            .toSnapshot()
+        : null
     }
   }
-}
-
-function migrateLegacyStore(sessions: readonly LegacyAgentSessionSnapshot[]): AgentSessionStore {
-  const workspaces = new Map<
-    string,
-    { agent: AgentSession; projectId: string; workspaceName: string }
-  >()
-
-  for (const session of sessions) {
-    const key = JSON.stringify([session.scope.projectId, session.scope.workspaceName])
-    let workspace = workspaces.get(key)
-
-    if (!workspace) {
-      const agent = AgentSession.create({
-        agentId: createLegacyAgentId(session.scope.projectId, session.scope.workspaceName),
-        layout: { position: { x: 540, y: 120 }, size: { width: 440, height: 520 } },
-        name: 'Agent 1',
-        projectId: session.scope.projectId,
-        providerId: 'codex',
-        workspaceName: session.scope.workspaceName
-      })
-      workspace = {
-        agent,
-        projectId: session.scope.projectId,
-        workspaceName: session.scope.workspaceName
-      }
-      workspaces.set(key, workspace)
-    }
-
-    workspace.agent.bindProviderSession(
-      createMigratedScope(workspace.agent.id, session.scope),
-      createCodexSessionRef(session.codexThreadId)
-    )
-  }
-
-  return {
-    version: 4,
-    workspaces: [...workspaces.values()].map((workspace) => ({
-      agents: [workspace.agent.toSnapshot()],
-      projectId: workspace.projectId,
-      workspaceName: workspace.workspaceName
-    }))
-  }
-}
-
-function migrateVersion2Store(
-  workspaces: readonly Version2AgentWorkspaceSnapshot[]
-): AgentSessionStore {
-  return migrateVersion3Store(
-    workspaces.map((workspace) => ({
-      ...workspace,
-      agents: workspace.agents.map((agent) => ({ ...agent, cleancodeMcpEnabled: true }))
-    }))
-  )
-}
-
-function migrateVersion3Store(
-  workspaces: readonly Version3AgentWorkspaceSnapshot[]
-): AgentSessionStore {
-  return {
-    version: 4,
-    workspaces: workspaces.map((workspace) => ({
-      ...workspace,
-      agents: workspace.agents.map((agent) => ({
-        ...agent,
-        conversations: agent.conversations.map((conversation) => ({
-          gitBranch: conversation.gitBranch,
-          sessionRef: createCodexSessionRef(conversation.codexThreadId).toSnapshot()
-        })),
-        providerId: 'codex'
-      }))
-    }))
-  }
-}
-
-function createCodexSessionRef(threadId: string): ProviderSessionRef {
-  return ProviderSessionRef.create({
-    formatVersion: 1,
-    kind: 'codex-thread',
-    value: threadId
-  })
-}
-
-function createMigratedScope(
-  agentId: string,
-  scope: LegacyAgentSessionSnapshot['scope']
-): AgentConversationScope {
-  return AgentConversationScope.create({ agentId, ...scope })
-}
-
-function createLegacyAgentId(projectId: string, workspaceName: string): string {
-  const digest = createHash('sha256')
-    .update(JSON.stringify([projectId, workspaceName]))
-    .digest('hex')
-    .slice(0, 24)
-  return `legacy-agent-${digest}`
 }
 
 function findWorkspace(
   workspaces: readonly AgentWorkspaceSnapshot[],
   projectId: string,
-  workspaceName: string
+  workspaceId: string
 ): AgentWorkspaceSnapshot | undefined {
   return workspaces.find(
-    (candidate) => candidate.projectId === projectId && candidate.workspaceName === workspaceName
+    (candidate) => candidate.projectId === projectId && candidate.workspaceId === workspaceId
   )
 }
 
@@ -419,7 +229,7 @@ function replaceWorkspace(
     ...workspaces.filter(
       (candidate) =>
         candidate.projectId !== workspace.projectId ||
-        candidate.workspaceName !== workspace.workspaceName
+        candidate.workspaceId !== workspace.workspaceId
     ),
     workspace
   ]
@@ -432,10 +242,6 @@ function replaceAgentSnapshot(
   return agents.some((candidate) => candidate.agentId === snapshot.agentId)
     ? agents.map((candidate) => (candidate.agentId === snapshot.agentId ? snapshot : candidate))
     : [...agents, snapshot]
-}
-
-function branchKey(gitBranch: string | null): string {
-  return gitBranch?.trim() || '\0no-branch'
 }
 
 async function writeFileAtomically(filePath: string, contents: string): Promise<void> {

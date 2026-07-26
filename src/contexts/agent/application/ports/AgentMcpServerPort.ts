@@ -13,7 +13,7 @@ export interface RegisteredAgentMcpSession {
   readonly onInitialized?: () => void
   readonly projectDirectory: string
   readonly sessionId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 interface AgentMcpEndpoint {

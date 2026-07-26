@@ -12,46 +12,25 @@ import type { Project } from '../../../../src/contexts/project/domain/aggregates
 import { ProjectRegistry } from '../../../../src/contexts/project/domain/aggregates/ProjectRegistry'
 
 describe('project Run lifecycle', () => {
-  it('hard-disposes the main workspace before checkout and releases the start gate on failure', async () => {
+  it('does not dispose the physical workspace Run before checkout failure', async () => {
     const fixture = createProjectFixture()
     fixture.git.checkoutError = new Error('checkout failed')
-    const checkout = new CheckoutMainWorkspaceBranchUseCase(
-      fixture.projects,
-      fixture.git,
-      undefined,
-      undefined,
-      fixture.runLifecycle
-    )
+    const checkout = new CheckoutMainWorkspaceBranchUseCase(fixture.projects, fixture.git)
 
     await expect(
       checkout.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
     ).rejects.toThrow('checkout failed')
 
-    expect(fixture.calls).toEqual([
-      'run:dispose-workspace:main',
-      'git:checkout:feature/free',
-      'run:release:main'
-    ])
+    expect(fixture.calls).toEqual(['git:checkout:feature/free'])
   })
 
-  it('resolves the main workspace start gate after checkout commits', async () => {
+  it('keeps the physical workspace Run intact after checkout commits', async () => {
     const fixture = createProjectFixture()
-    const checkout = new CheckoutMainWorkspaceBranchUseCase(
-      fixture.projects,
-      fixture.git,
-      undefined,
-      undefined,
-      fixture.runLifecycle
-    )
+    const checkout = new CheckoutMainWorkspaceBranchUseCase(fixture.projects, fixture.git)
 
     await checkout.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
 
-    expect(fixture.calls).toEqual([
-      'run:dispose-workspace:main',
-      'git:checkout:feature/free',
-      'project:save',
-      'run:resolve:main'
-    ])
+    expect(fixture.calls).toEqual(['git:checkout:feature/free', 'project:save'])
   })
 
   it('holds a worktree start gate until archive commits', async () => {
@@ -66,7 +45,7 @@ describe('project Run lifecycle', () => {
 
     await archive.execute({
       projectDirectory: '/work/app',
-      workspaceName: 'feature/sidebar'
+      workspaceId: 'feature/sidebar'
     })
 
     expect(fixture.calls).toContain('run:dispose-workspace:feature/sidebar')
@@ -106,7 +85,7 @@ describe('project Run lifecycle', () => {
     expect(fixture.calls).toEqual(['project:save', 'run:resolve-project-quarantines:/work/app'])
   })
 
-  it('hard-disposes rebound workspaces before reopening saves synchronized state', async () => {
+  it('disposes only a linked workspace whose physical directory was rebound', async () => {
     const fixture = createProjectFixture(createProjectWithWorktree())
     fixture.git.inspection = createReboundGitInspection()
     const openProject = new CreateOrOpenProjectUseCase(
@@ -120,10 +99,8 @@ describe('project Run lifecycle', () => {
     await openProject.execute({ directory: '/work/app', name: 'app' })
 
     expect(fixture.calls).toEqual([
-      'run:dispose-workspace:main',
       'run:dispose-workspace:feature/sidebar',
       'project:save',
-      'run:resolve:main',
       'run:resolve:feature/sidebar',
       'run:resolve-project-quarantines:/work/app'
     ])
@@ -266,14 +243,14 @@ function createRunLifecycle(calls: string[]): WorkspaceRunLifecyclePort {
       return createLease(calls, `project:${projectDirectory}`)
     },
     disposeWorkspace: async (scope) => {
-      calls.push(`run:dispose-workspace:${scope.workspaceName}`)
-      return createLease(calls, scope.workspaceName)
+      calls.push(`run:dispose-workspace:${scope.workspaceId}`)
+      return createLease(calls, scope.workspaceId)
     },
     disposeWorkspaces: async (scope) => {
-      for (const workspaceName of scope.workspaceNames) {
-        calls.push(`run:dispose-workspace:${workspaceName}`)
+      for (const workspaceId of scope.workspaceIds) {
+        calls.push(`run:dispose-workspace:${workspaceId}`)
       }
-      return createBatchLease(calls, scope.workspaceNames)
+      return createBatchLease(calls, scope.workspaceIds)
     },
     isWorkspaceQuarantined: () => false,
     resolveProjectQuarantines: (projectDirectory) => {
@@ -292,17 +269,17 @@ function createLease(calls: string[], scope: string) {
   }
 }
 
-function createBatchLease(calls: string[], workspaceNames: readonly string[]) {
+function createBatchLease(calls: string[], workspaceIds: readonly string[]) {
   return {
     wasQuarantined: false,
     quarantine: () => {
-      for (const workspaceName of workspaceNames) calls.push(`run:quarantine:${workspaceName}`)
+      for (const workspaceId of workspaceIds) calls.push(`run:quarantine:${workspaceId}`)
     },
     release: () => {
-      for (const workspaceName of workspaceNames) calls.push(`run:release:${workspaceName}`)
+      for (const workspaceId of workspaceIds) calls.push(`run:release:${workspaceId}`)
     },
     resolve: () => {
-      for (const workspaceName of workspaceNames) calls.push(`run:resolve:${workspaceName}`)
+      for (const workspaceId of workspaceIds) calls.push(`run:resolve:${workspaceId}`)
     }
   }
 }
@@ -331,7 +308,16 @@ function createMainProject(): ProjectSnapshot {
     id: 'project-1',
     directory: '/work/app',
     name: 'app',
-    workspaces: [{ name: 'main', directory: '/work/app', gitBranch: 'main', isCurrent: true }]
+    workspaces: [
+      {
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
+        directory: '/work/app',
+        gitBranch: 'main',
+        isCurrent: true
+      }
+    ]
   }
 }
 
@@ -339,9 +325,18 @@ function createProjectWithWorktree(): ProjectSnapshot {
   return {
     ...createMainProject(),
     workspaces: [
-      { name: 'main', directory: '/work/app', gitBranch: 'main', isCurrent: true },
       {
-        name: 'feature/sidebar',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
+        directory: '/work/app',
+        gitBranch: 'main',
+        isCurrent: true
+      },
+      {
+        workspaceId: 'feature/sidebar',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/sidebar',
         directory: '/work/app-sidebar',
         gitBranch: 'feature/sidebar',
         isCurrent: false

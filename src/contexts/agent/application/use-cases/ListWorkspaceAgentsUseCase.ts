@@ -6,7 +6,7 @@ import { AgentWorkspaceTransactionCoordinator } from '../services/AgentWorkspace
 
 export interface ListWorkspaceAgentsCommand {
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class ListWorkspaceAgentsUseCase {
@@ -16,8 +16,8 @@ export class ListWorkspaceAgentsUseCase {
   ) {}
 
   async execute(command: ListWorkspaceAgentsCommand): Promise<readonly WorkspaceAgentSnapshot[]> {
-    return this.transactions.run(command.projectId, command.workspaceName, async () => {
-      const agents = await this.repository.findWorkspace(command.projectId, command.workspaceName)
+    return this.transactions.run(command.projectId, command.workspaceId, async () => {
+      const agents = await this.repository.findWorkspace(command.projectId, command.workspaceId)
 
       if (agents) {
         return agents.map(toWorkspaceAgentSnapshot)
@@ -26,7 +26,7 @@ export class ListWorkspaceAgentsUseCase {
       const initialized = await this.repository.initializeWorkspace({
         agents: [],
         projectId: command.projectId,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
       return initialized.map(toWorkspaceAgentSnapshot)
     })

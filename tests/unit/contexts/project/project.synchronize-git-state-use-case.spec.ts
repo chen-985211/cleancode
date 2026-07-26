@@ -104,7 +104,9 @@ describe('project git state synchronization use case', () => {
 
     expect(project?.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'workspace-main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'feature/free',
         isCurrent: true
@@ -151,7 +153,9 @@ describe('project git state synchronization use case', () => {
 
     expect(project?.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'workspace-main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: null,
         isCurrent: true
@@ -198,13 +202,17 @@ describe('project git state synchronization use case', () => {
       name: 'app',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/work/app',
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/stale',
+          workspaceId: 'feature/stale',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/stale',
           directory: '/work/app-stale',
           gitBranch: 'feature/stale',
           isCurrent: false
@@ -244,13 +252,17 @@ describe('project git state synchronization use case', () => {
 
     expect(project?.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
       },
       {
-        name: 'feature/sidebar',
+        workspaceId: expect.any(String),
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/sidebar',
         directory: '/work/app-sidebar',
         gitBranch: 'feature/sidebar',
         isCurrent: false
@@ -269,13 +281,17 @@ describe('project git state synchronization use case', () => {
       name: 'app',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/work/app',
           gitBranch: 'main',
           isCurrent: false
         },
         {
-          name: 'feature/sidebar',
+          workspaceId: 'feature/sidebar',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/sidebar',
           directory: '/work/app-sidebar',
           gitBranch: 'feature/sidebar',
           isCurrent: true
@@ -308,7 +324,9 @@ describe('project git state synchronization use case', () => {
 
     expect(project?.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
@@ -324,7 +342,9 @@ function createProjectSnapshot(gitBranch: string): ProjectSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'workspace-main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch,
         isCurrent: true

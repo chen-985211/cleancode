@@ -44,7 +44,7 @@ describe('Agent console provider-neutral presentation', () => {
           activity: { status: 'working' }
         },
         workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
     )
     Object.defineProperty(window, 'cleancode', {
@@ -237,6 +237,6 @@ function createAgent(providerId: string, projectId: string) {
     name: 'Future Agent',
     projectId,
     providerId,
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }

@@ -10,7 +10,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface CreateTerminalBlockCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly name: string
   readonly description: string
   readonly launchCommand?: string

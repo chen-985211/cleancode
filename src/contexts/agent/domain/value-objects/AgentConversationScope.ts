@@ -1,8 +1,10 @@
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+
 export interface AgentConversationScopeSnapshot {
   readonly agentId: string
-  readonly gitBranch: string | null
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class AgentConversationScope {
@@ -11,19 +13,18 @@ export class AgentConversationScope {
   static create(input: AgentConversationScopeSnapshot): AgentConversationScope {
     return new AgentConversationScope({
       agentId: requireValue(input.agentId, 'agentId'),
-      gitBranch: normalizeOptionalValue(input.gitBranch),
       projectId: requireValue(input.projectId, 'projectId'),
-      workspaceName: requireValue(input.workspaceName, 'workspaceName')
+      workspaceId: requireValue(input.workspaceId, 'workspaceId')
     })
   }
 
   get key(): string {
-    return JSON.stringify([
-      this.snapshot.projectId,
-      this.snapshot.workspaceName,
-      this.snapshot.gitBranch,
-      this.snapshot.agentId
-    ])
+    return createCanvasObjectIdentityKey({
+      projectId: this.snapshot.projectId,
+      workspaceId: this.snapshot.workspaceId,
+      objectKind: 'agent',
+      objectId: this.snapshot.agentId
+    })
   }
 
   toSnapshot(): AgentConversationScopeSnapshot {
@@ -44,9 +45,3 @@ function requireValue(value: string, fieldName: string): string {
 
   return normalizedValue
 }
-
-function normalizeOptionalValue(value: string | null): string | null {
-  const normalizedValue = value?.trim()
-  return normalizedValue ? normalizedValue : null
-}
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'

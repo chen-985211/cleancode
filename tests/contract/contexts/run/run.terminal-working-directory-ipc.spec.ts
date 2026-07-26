@@ -281,7 +281,7 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited') {
     generation: 1,
     projectId: 'project-1',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     blockId: 'block-1',

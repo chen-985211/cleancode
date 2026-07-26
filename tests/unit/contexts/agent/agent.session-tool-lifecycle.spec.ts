@@ -42,7 +42,7 @@ describe('Agent session tool lifecycle', () => {
     const disposal = service.disposeAgent({
       agentId: 'agent-1',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await vi.waitFor(() => expect(mcpServer.disposedSessionIds).toContain(session.sessionId))
 
@@ -86,7 +86,7 @@ describe('Agent session tool lifecycle', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('PTY stop failed')
 
@@ -151,7 +151,7 @@ function attachCommand() {
     projectId: 'project-1',
     terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -197,7 +197,7 @@ function completedResult(toolCallId: string): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: true,
     output: { type: 'block_graph' },

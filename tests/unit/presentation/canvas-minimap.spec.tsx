@@ -413,6 +413,12 @@ function createTerminalFlowNode(
     position,
     selected,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal',
+        objectId: id
+      },
       block: {
         id,
         type: 'terminal',
@@ -456,6 +462,12 @@ function createCollapsedTerminalGroupFlowNode(
       height: 174
     },
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal-group',
+        objectId: 'development-group'
+      },
       group: {
         id: 'development-group',
         type: 'terminal-group',

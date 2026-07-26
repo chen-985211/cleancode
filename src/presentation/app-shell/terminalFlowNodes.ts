@@ -8,6 +8,7 @@ import {
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
+import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import {
   createIdleTerminalState,
   type TerminalDefinitionInput,
@@ -139,6 +140,8 @@ export function createTerminalFlowNodes({
       createTerminalFlowNode({
         approvalIntent: approvalNodeIntents.get(block.id),
         block,
+        projectId: graph!.projectId,
+        workspaceId: graph!.workspaceId,
         canSelectForTerminalGroup: isTerminalGroupSelectionMode || !groupedMemberIds.has(block.id),
         handlers,
         isNavigationHighlighted: hoveredTerminalBlockId === block.id,
@@ -157,6 +160,8 @@ export function createTerminalFlowNodes({
 interface CreateTerminalFlowNodeInput {
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
+  readonly projectId: string
+  readonly workspaceId: string
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers
   readonly isSelected: boolean
@@ -171,6 +176,8 @@ interface CreateTerminalFlowNodeInput {
 function createTerminalFlowNode({
   approvalIntent,
   block,
+  projectId,
+  workspaceId,
   terminalStates,
   handlers,
   isSelected,
@@ -193,6 +200,12 @@ function createTerminalFlowNode({
       height: block.size.height
     },
     data: {
+      identity: createCanvasObjectIdentity({
+        projectId,
+        workspaceId,
+        objectKind: 'terminal',
+        objectId: block.id
+      }),
       approvalIntent,
       block,
       session: terminalStates[block.id] ?? createIdleTerminalState(),
@@ -251,6 +264,12 @@ function createTerminalGroupFlowNode({
       height: size.height
     },
     data: {
+      identity: createCanvasObjectIdentity({
+        projectId: graph!.projectId,
+        workspaceId: graph!.workspaceId,
+        objectKind: 'terminal-group',
+        objectId: group.id
+      }),
       approvalIntent,
       group,
       memberBlocks,

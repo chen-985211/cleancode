@@ -91,11 +91,11 @@ export function useTerminalGroupDragActions({
               })
             : { type: 'none' as const }
           await layoutCommitQueue.enqueue(
-            `terminal:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+            `terminal:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:${node.id}`,
             async () => {
               let graphSnapshot = await window.cleancode?.moveBlock({
                 projectDirectory: currentWorkbench.project.directory,
-                workspaceName: currentWorkspace.name,
+                workspaceId: currentWorkspace.workspaceId,
                 blockId: node.id,
                 position: node.position
               })
@@ -118,11 +118,11 @@ export function useTerminalGroupDragActions({
         }
 
         await layoutCommitQueue.enqueue(
-          `terminal-group:${currentWorkbench.project.id}:${currentWorkspace.name}:${node.id}`,
+          `terminal-group:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:${node.id}`,
           () =>
             window.cleancode?.moveTerminalGroup({
               projectDirectory: currentWorkbench.project.directory,
-              workspaceName: currentWorkspace.name,
+              workspaceId: currentWorkspace.workspaceId,
               terminalGroupId: node.id,
               position: node.position
             }) ?? Promise.resolve(undefined),
@@ -172,7 +172,7 @@ async function applyTerminalGroupDropAction({
   if (action.type === 'join-group') {
     return window.cleancode?.addTerminalToGroup({
       projectDirectory: currentWorkbench.project.directory,
-      workspaceName: currentWorkspace.name,
+      workspaceId: currentWorkspace.workspaceId,
       terminalGroupId: action.terminalGroupId,
       blockId
     })
@@ -181,7 +181,7 @@ async function applyTerminalGroupDropAction({
   if (action.type === 'leave-group') {
     return window.cleancode?.removeTerminalFromGroup({
       projectDirectory: currentWorkbench.project.directory,
-      workspaceName: currentWorkspace.name,
+      workspaceId: currentWorkspace.workspaceId,
       terminalGroupId: action.terminalGroupId,
       blockId
     })

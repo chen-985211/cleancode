@@ -207,7 +207,7 @@ function createNodes(): {
     graph: {
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [
         {
@@ -233,7 +233,7 @@ function createNodes(): {
       name: 'Agent 1',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main',
+      workspaceId: 'main',
       layout: {
         position: { x: 560, y: 200 },
         size: { width: 440, height: 520 }

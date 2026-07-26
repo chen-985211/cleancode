@@ -2,11 +2,10 @@ import type { ProjectRegistryRepository } from '../ports/ProjectRegistryReposito
 import type { ProjectRepository } from '../ports/ProjectRepository'
 
 export interface ValidateProjectWorkspaceScopeCommand {
-  readonly gitBranch: string | null
   readonly projectDirectory: string
   readonly projectId: string
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class ValidateProjectWorkspaceScopeUseCase {
@@ -30,9 +29,8 @@ export class ValidateProjectWorkspaceScopeUseCase {
 
     return project.workspaces.some(
       (workspace) =>
-        workspace.name === command.workspaceName &&
-        workspace.directory === command.workspaceDirectory &&
-        workspace.gitBranch === command.gitBranch
+        workspace.workspaceId === command.workspaceId &&
+        workspace.directory === command.workspaceDirectory
     )
   }
 }

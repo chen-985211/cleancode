@@ -324,7 +324,7 @@ describe('app shell create Agent focus', () => {
       projectId: workbench.project.id,
       providerId: 'codex',
       workspaceDirectory: currentWorkspace.directory,
-      workspaceName: currentWorkspace.name
+      workspaceId: currentWorkspace.workspaceId
     })
   })
 
@@ -332,35 +332,43 @@ describe('app shell create Agent focus', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
+          workspaceId: 'workspace-main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
-          isCurrent: true,
-          name: 'main'
+          isCurrent: true
         },
         {
+          workspaceId: 'workspace-feature-agent',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/agent',
           directory: '/tmp/alpha-feature',
           gitBranch: 'feature/agent',
-          isCurrent: false,
-          name: 'feature/agent'
+          isCurrent: false
         }
       ]
     })
     const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       gitBranch: 'feature/agent',
       workspaceDirectory: '/tmp/alpha-feature',
-      workspaceName: 'feature/agent',
+      workspaceId: 'feature/agent',
       workspaces: [
         {
+          workspaceId: 'workspace-main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
-          isCurrent: false,
-          name: 'main'
+          isCurrent: false
         },
         {
+          workspaceId: 'workspace-feature-agent',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/agent',
           directory: '/tmp/alpha-feature',
           gitBranch: 'feature/agent',
-          isCurrent: true,
-          name: 'feature/agent'
+          isCurrent: true
         }
       ]
     })
@@ -457,7 +465,7 @@ function createAgent(
     name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
     projectId,
     providerId,
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

@@ -13,7 +13,7 @@ describe('Agent console flow node', () => {
         name: '实现 Agent',
         projectId: workbench.project.id,
         providerId: 'codex',
-        workspaceName: currentWorkspace.name
+        workspaceId: currentWorkspace.workspaceId
       },
       currentWorkbench: workbench,
       currentWorkspace,

@@ -2,26 +2,24 @@ import {
   createTerminalStateKey,
   getBlockIdFromTerminalStateKey,
   getProjectIdFromTerminalStateKey,
-  getWorkspaceNameFromTerminalStateKey
+  getWorkspaceIdFromTerminalStateKey
 } from './terminalSessionWorkspaceMigration'
 import type { TerminalViewState } from './types'
 
 export function resolveCurrentTerminalStateKey(
   projectId: string | null,
-  workspaceName: string | null,
+  workspaceId: string | null,
   blockId: string
 ): string | null {
-  return projectId && workspaceName
-    ? createTerminalStateKey(projectId, workspaceName, blockId)
-    : null
+  return projectId && workspaceId ? createTerminalStateKey(projectId, workspaceId, blockId) : null
 }
 
 export function selectTerminalStatesForWorkspace(
   states: Record<string, TerminalViewState>,
   projectId: string | null,
-  workspaceName: string | null
+  workspaceId: string | null
 ): Record<string, TerminalViewState> {
-  if (!projectId || !workspaceName) {
+  if (!projectId || !workspaceId) {
     return {}
   }
 
@@ -30,7 +28,7 @@ export function selectTerminalStatesForWorkspace(
       .filter(
         ([terminalStateKey]) =>
           getProjectIdFromTerminalStateKey(terminalStateKey) === projectId &&
-          getWorkspaceNameFromTerminalStateKey(terminalStateKey) === workspaceName
+          getWorkspaceIdFromTerminalStateKey(terminalStateKey) === workspaceId
       )
       .map(([terminalStateKey, state]) => [getBlockIdFromTerminalStateKey(terminalStateKey), state])
   )

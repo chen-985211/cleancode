@@ -3,22 +3,21 @@ import { AgentConversationScope } from '../../../../src/contexts/agent/domain/va
 import { ProviderSessionRef } from '../../../../src/contexts/agent/domain/value-objects/ProviderSessionRef'
 
 describe('workspace Agents', () => {
-  it('keeps identity, layout, and branch conversations independent for every Agent', () => {
+  it('keeps one stable Provider conversation for each canvas Agent identity', () => {
     const agent = AgentSession.create({
       agentId: 'agent-1',
       layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
       name: '实现 Agent',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     agent.bindProviderSession(
       AgentConversationScope.create({
         agentId: 'agent-1',
-        gitBranch: 'main',
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }),
       ProviderSessionRef.create({
         formatVersion: 1,
@@ -26,31 +25,14 @@ describe('workspace Agents', () => {
         value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
       })
     )
-    agent.bindProviderSession(
-      AgentConversationScope.create({
-        agentId: 'agent-1',
-        gitBranch: 'feature/login',
-        projectId: 'project-1',
-        workspaceName: 'main'
-      }),
-      ProviderSessionRef.create({
-        formatVersion: 1,
-        kind: 'codex-thread',
-        value: '0190d8a2-4f13-7e17-a0c1-64c303571909'
-      })
-    )
-
-    expect(agent.findProviderSessionRef('main')?.value).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
-    expect(agent.findProviderSessionRef('feature/login')?.value).toBe(
-      '0190d8a2-4f13-7e17-a0c1-64c303571909'
-    )
+    expect(agent.providerSessionRef?.value).toBe('0190d8a1-8b7d-7d75-9f62-7a663ef87e33')
     expect(agent.toSnapshot()).toMatchObject({
       agentId: 'agent-1',
       layout: { position: { x: 320, y: 140 }, size: { width: 440, height: 520 } },
       name: '实现 Agent',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
   })
 
@@ -61,7 +43,7 @@ describe('workspace Agents', () => {
       name: 'Claude Agent',
       projectId: 'project-1',
       providerId: 'claude-code',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(agent.providerId).toBe('claude-code')
@@ -75,15 +57,14 @@ describe('workspace Agents', () => {
       name: 'Codex Agent',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     expect(() =>
       agent.bindProviderSession(
         AgentConversationScope.create({
           agentId: 'agent-codex',
-          gitBranch: 'main',
           projectId: 'project-1',
-          workspaceName: 'main'
+          workspaceId: 'main'
         }),
         ProviderSessionRef.create(
           {
@@ -104,7 +85,7 @@ describe('workspace Agents', () => {
       name: 'Agent 2',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     agent.rename('测试 Agent')
@@ -112,7 +93,7 @@ describe('workspace Agents', () => {
 
     expect(agent.toSnapshot()).toMatchObject({
       cleancodeMcpEnabled: true,
-      conversations: [],
+      providerSessionRef: null,
       name: '测试 Agent',
       layout: { position: { x: 620, y: 220 }, size: { width: 520, height: 460 } }
     })
@@ -125,7 +106,7 @@ describe('workspace Agents', () => {
       name: 'Agent 3',
       projectId: 'project-1',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     agent.setCleancodeMcpEnabled(false)

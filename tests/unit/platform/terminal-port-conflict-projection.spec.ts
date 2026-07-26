@@ -14,7 +14,7 @@ describe('terminal port conflict projection', () => {
             port: 3_000,
             managedProjectId: 'project-owner',
             managedProjectDirectory: '/repo/owner',
-            managedWorkspaceName: 'feature/api',
+            managedWorkspaceId: 'feature/api',
             managedBlockId: 'api',
             managedSessionId: 'owner-session',
             managedRunId: 'owner-run',
@@ -66,7 +66,7 @@ describe('terminal port conflict projection', () => {
 
 const attemptedIdentity = {
   projectId: 'project-attempt',
-  workspaceName: 'main',
+  workspaceId: 'main',
   blockId: 'web',
   sessionId: 'attempt-session',
   runId: 'attempt-run',
@@ -76,7 +76,7 @@ const attemptedIdentity = {
 const attemptedDetails = {
   attemptedProjectId: attemptedIdentity.projectId,
   attemptedProjectDirectory: '/repo/attempt',
-  attemptedWorkspaceName: attemptedIdentity.workspaceName,
+  attemptedWorkspaceId: attemptedIdentity.workspaceId,
   attemptedWorkspaceDirectory: '/repo/attempt',
   attemptedGitBranch: 'main',
   attemptedBlockId: attemptedIdentity.blockId,

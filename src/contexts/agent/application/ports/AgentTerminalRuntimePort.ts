@@ -18,7 +18,7 @@ export interface OpenAgentTerminalCommand {
   readonly sessionId: string
   readonly terminalSourceTheme: 'dark' | 'light'
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 interface AgentTerminalLaunchEvent {

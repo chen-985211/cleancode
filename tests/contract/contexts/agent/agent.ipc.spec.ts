@@ -109,7 +109,7 @@ describe('agent IPC contract', () => {
       async (command) => {
         command.onRuntimeChanged({
           agentId: command.agentId,
-          runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 2),
+          runtime: createRuntime(command.agentId, command.projectId, command.workspaceId, 2),
           sessionId: 'agent-session-1'
         })
         command.onToolApprovalRequested({
@@ -120,7 +120,7 @@ describe('agent IPC contract', () => {
           summary: '删除终端积木 terminal-1',
           target: { blockId: 'terminal-1', kind: 'terminal_block' },
           toolName: 'delete_block',
-          workspaceName: command.workspaceName
+          workspaceId: command.workspaceId
         })
         command.onGraphUpdated({
           agentId: command.agentId,
@@ -130,11 +130,11 @@ describe('agent IPC contract', () => {
             projectId: 'project-1',
             terminalGroups: [],
             viewport: { x: 0, y: 0, zoom: 1 },
-            workspaceName: command.workspaceName
+            workspaceId: command.workspaceId
           },
           projectDirectory: command.projectDirectory,
           sessionId: 'agent-session-1',
-          workspaceName: command.workspaceName
+          workspaceId: command.workspaceId
         })
 
         return {
@@ -144,11 +144,11 @@ describe('agent IPC contract', () => {
           projectId: command.projectId,
           providerId: 'codex',
           providerSessionRef: null,
-          runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 2),
+          runtime: createRuntime(command.agentId, command.projectId, command.workspaceId, 2),
           sessionId: 'agent-session-1',
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: command.workspaceDirectory,
-          workspaceName: command.workspaceName
+          workspaceId: command.workspaceId
         }
       }
     )
@@ -167,7 +167,7 @@ describe('agent IPC contract', () => {
           rows: 32,
           terminalSourceTheme: 'light',
           workspaceDirectory: '/repo/app-worktrees/feature',
-          workspaceName: 'feature'
+          workspaceId: 'feature'
         },
         { sender }
       )
@@ -184,7 +184,7 @@ describe('agent IPC contract', () => {
         sessionId: 'agent-session-1',
         terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
-        workspaceName: 'feature'
+        workspaceId: 'feature'
       }
     })
     expect(attachAgentSession).toHaveBeenCalledWith(
@@ -197,7 +197,7 @@ describe('agent IPC contract', () => {
         rows: 32,
         terminalSourceTheme: 'light',
         workspaceDirectory: '/repo/app-worktrees/feature',
-        workspaceName: 'feature'
+        workspaceId: 'feature'
       })
     )
     expect(sender.send).toHaveBeenCalledWith('cleancode:agent-runtime-changed', {
@@ -236,7 +236,7 @@ describe('agent IPC contract', () => {
         projectId: 'project-1',
         terminalSourceTheme: 'sepia',
         workspaceDirectory: '/repo/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
@@ -276,24 +276,24 @@ describe('agent IPC contract', () => {
       projectId: 'project-1',
       providerId: 'claude-code',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await ipcMain.invoke('cleancode:rename-workspace-agent', {
       agentId: 'agent-2',
       name: 'Review Agent',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await ipcMain.invoke('cleancode:update-workspace-agent-layout', {
       agentId: 'agent-2',
       layout: { position: { x: 720, y: 240 }, size: { width: 520, height: 460 } },
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await ipcMain.invoke('cleancode:remove-workspace-agent', {
       agentId: 'agent-2',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(createWorkspaceAgent).toHaveBeenCalledWith({
@@ -304,7 +304,7 @@ describe('agent IPC contract', () => {
       projectId: 'project-1',
       providerId: 'claude-code',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     expect(renameWorkspaceAgent).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'agent-2', name: 'Review Agent' })
@@ -336,7 +336,7 @@ describe('agent IPC contract', () => {
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
@@ -418,7 +418,7 @@ describe('agent IPC contract', () => {
         agentId: 'agent-2',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       ok: true,
@@ -428,7 +428,7 @@ describe('agent IPC contract', () => {
       agentId: 'agent-2',
       cleancodeMcpEnabled: false,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -436,7 +436,7 @@ describe('agent IPC contract', () => {
         agentId: 'agent-2',
         cleancodeMcpEnabled: 'disabled',
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
@@ -482,7 +482,7 @@ describe('agent IPC contract', () => {
     await expect(
       ipcMain.invoke('cleancode:dispose-agent-workspace-session', {
         projectDirectory: '/repo/app',
-        workspaceName: 'feature'
+        workspaceId: 'feature'
       })
     ).resolves.toEqual({ ok: true, value: undefined })
     await expect(
@@ -501,7 +501,7 @@ describe('agent IPC contract', () => {
     expect(resizeAgentSession).toHaveBeenCalledWith('agent-session-1', 120, 36)
     expect(disposeAgentWorkspaceSession).toHaveBeenCalledWith({
       projectDirectory: '/repo/app',
-      workspaceName: 'feature'
+      workspaceId: 'feature'
     })
     expect(disposeProjectAgentSessions).toHaveBeenCalledWith('/repo/app')
     expect(approveAgentTool).toHaveBeenCalledWith('approval-1')
@@ -540,11 +540,11 @@ function createAgentIpcHandlersInput(input: {
         projectId: command.projectId,
         providerId: 'codex',
         providerSessionRef: null,
-        runtime: createRuntime(command.agentId, command.projectId, command.workspaceName, 1),
+        runtime: createRuntime(command.agentId, command.projectId, command.workspaceId, 1),
         sessionId: 'agent-session-1',
         terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })),
     createWorkspaceAgent:
       input.createWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-2')),
@@ -614,16 +614,11 @@ function createWorkspaceAgentSnapshot(agentId: string) {
     name: agentId === 'agent-1' ? 'Agent 1' : 'Agent 2',
     projectId: 'project-1',
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
-function createRuntime(
-  agentId: string,
-  projectId: string,
-  workspaceName: string,
-  revision: number
-) {
+function createRuntime(agentId: string, projectId: string, workspaceId: string, revision: number) {
   return {
     activity: { status: 'working' as const },
     binding: { status: 'unbound' as const },
@@ -648,7 +643,7 @@ function createRuntime(
         projectId,
         runId: 'agent-terminal:agent-session-1',
         sessionId: 'run-session-1',
-        workspaceName
+        workspaceId
       }
     }
   }

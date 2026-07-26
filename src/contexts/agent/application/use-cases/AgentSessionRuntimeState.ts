@@ -52,7 +52,7 @@ export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
   readonly rows?: number
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface AgentSessionCallbacks {
@@ -84,7 +84,7 @@ export interface ManagedAgentSession {
   sessionId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export function createAgentSessionCallbacks(command: AgentSessionCallbacks): AgentSessionCallbacks {
@@ -429,11 +429,10 @@ export async function validateAgentRuntimeScope(
   await assertAgentRuntimeScope(
     {
       agentId: command.agentId,
-      gitBranch: snapshot.gitBranch,
       projectDirectory: command.projectDirectory,
       projectId: snapshot.projectId,
       workspaceDirectory: command.workspaceDirectory,
-      workspaceName: command.workspaceName
+      workspaceId: command.workspaceId
     },
     validation
   )
@@ -466,11 +465,10 @@ export function validateManagedAgentRuntimeScope(
   return assertAgentRuntimeScope(
     {
       agentId: session.agentId,
-      gitBranch: session.gitBranch,
       projectDirectory: session.projectDirectory,
       projectId: session.projectId,
       workspaceDirectory: session.workspaceDirectory,
-      workspaceName: session.workspaceName
+      workspaceId: session.workspaceId
     },
     validation
   )
@@ -526,7 +524,7 @@ export async function registerAgentMcpEndpoint(
     },
     projectDirectory: session.projectDirectory,
     sessionId: session.sessionId,
-    workspaceName: session.workspaceName
+    workspaceId: session.workspaceId
   })
   registration = {
     bearerToken: providerRegistration.bearerToken,
@@ -615,7 +613,7 @@ export function toAgentSessionSnapshot(session: {
   readonly sessionId: string
   readonly terminalSourceTheme: AgentTerminalSourceTheme
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): AgentSessionSnapshot {
   return {
     agentId: session.agentId,
@@ -628,22 +626,20 @@ export function toAgentSessionSnapshot(session: {
     sessionId: session.sessionId,
     terminalSourceTheme: session.terminalSourceTheme,
     workspaceDirectory: session.workspaceDirectory,
-    workspaceName: session.workspaceName
+    workspaceId: session.workspaceId
   }
 }
 
 export function createAgentConversationScope(command: {
   readonly agentId: string
-  readonly gitBranch?: string | null
   readonly projectDirectory: string
   readonly projectId?: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): AgentConversationScope {
   return AgentConversationScope.create({
     agentId: command.agentId,
-    gitBranch: command.gitBranch ?? null,
     projectId: command.projectId ?? command.projectDirectory,
-    workspaceName: command.workspaceName
+    workspaceId: command.workspaceId
   })
 }
 

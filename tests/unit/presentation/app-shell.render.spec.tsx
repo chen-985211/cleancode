@@ -268,7 +268,7 @@ describe('app shell', () => {
       expect.objectContaining({
         name: 'Terminal 1',
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
   })
@@ -306,24 +306,34 @@ describe('app shell', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'workspace-main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/sidebar',
+          workspaceId: 'workspace-feature-sidebar',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/sidebar',
           directory: '/tmp/alpha-project-worktrees/feature-sidebar',
           gitBranch: 'feature/sidebar',
           isCurrent: false
         }
       ]
     })
-    const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-      workspaceName: 'feature/sidebar',
-      workspaceDirectory: '/tmp/alpha-project-worktrees/feature-sidebar',
-      gitBranch: 'feature/sidebar'
-    })
+    const switchedWorkbench = {
+      ...workbench,
+      project: {
+        ...workbench.project,
+        workspaces: workbench.project.workspaces.map((workspace) => ({
+          ...workspace,
+          isCurrent: workspace.workspaceId === 'workspace-feature-sidebar'
+        }))
+      },
+      graph: { ...workbench.graph, workspaceId: 'workspace-feature-sidebar' }
+    }
     const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
 
     Object.defineProperty(window, 'cleancode', {
@@ -342,7 +352,7 @@ describe('app shell', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'workspace-feature-sidebar'
       })
     )
     await screen.findByText('/tmp/alpha-project-worktrees/feature-sidebar')
@@ -352,13 +362,17 @@ describe('app shell', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'workspace-main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/worktree',
+          workspaceId: 'feature/worktree',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/worktree',
           directory: '/tmp/alpha-project-worktrees/feature-worktree',
           gitBranch: 'feature/worktree',
           isCurrent: false
@@ -446,18 +460,22 @@ describe('app shell', () => {
 
   it('switches to main when clicking the default workspace row body', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-      workspaceName: 'test',
+      workspaceId: 'test',
       workspaceDirectory: '/tmp/alpha-project-worktrees/test',
       gitBranch: 'test',
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'workspace-main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
           isCurrent: false
         },
         {
-          name: 'test',
+          workspaceId: 'test',
+          workspaceKind: 'linked-worktree',
+          displayName: 'test',
           directory: '/tmp/alpha-project-worktrees/test',
           gitBranch: 'test',
           isCurrent: true
@@ -484,9 +502,16 @@ describe('app shell', () => {
         }
       ]
     })
-    const switchedWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-      gitBranch: 'main'
-    })
+    const switchedWorkbench = {
+      ...workbench,
+      project: {
+        ...workbench.project,
+        workspaces: workbench.project.workspaces.map((workspace) => ({
+          ...workspace,
+          gitBranch: 'main'
+        }))
+      }
+    }
     const switchBranchWorkspace = vi.fn(async () => switchedWorkbench)
 
     Object.defineProperty(window, 'cleancode', {
@@ -505,7 +530,7 @@ describe('app shell', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main'
+        workspaceId: 'workspace-main'
       })
     )
     expect(screen.queryByRole('dialog', { name: '选择默认工作区分支' })).not.toBeInTheDocument()
@@ -515,13 +540,17 @@ describe('app shell', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
           isCurrent: false
         },
         {
-          name: 'test',
+          workspaceId: 'test',
+          workspaceKind: 'linked-worktree',
+          displayName: 'test',
           directory: '/tmp/alpha-project-worktrees/test',
           gitBranch: 'test',
           isCurrent: true

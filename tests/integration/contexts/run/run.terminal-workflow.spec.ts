@@ -31,7 +31,7 @@ describe('terminal workflow with real PTYs', () => {
       await workflow.start({
         projectId: 'project-integration',
         projectDirectory: workingDirectory,
-        workspaceName: 'main',
+        workspaceId: 'main',
         workspaceDirectory: workingDirectory,
         gitBranch: 'main',
         workingDirectory,
@@ -41,7 +41,7 @@ describe('terminal workflow with real PTYs', () => {
 
       await waitUntil(
         () =>
-          workflow.getActiveRun({ projectDirectory: workingDirectory, workspaceName: 'main' })
+          workflow.getActiveRun({ projectDirectory: workingDirectory, workspaceId: 'main' })
             ?.status === 'succeeded'
       )
 
@@ -78,7 +78,7 @@ class RecordingEvents implements TerminalWorkflowEventPublisherPort {
 function createPlan(): WorkflowRunPlanSnapshot {
   return {
     graphId: 'graph-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     nodes: [
       task('install', createE2ePrintCommand('install-complete')),
       task('build', createE2ePrintCommand('build-complete'), ['install'])

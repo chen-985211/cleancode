@@ -6,7 +6,7 @@ describe('terminal workflow configuration in a block graph', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: [
         {
           id: 'install',
@@ -215,7 +215,7 @@ describe('terminal workflow configuration in a block graph', () => {
 function createWorkflowGraph(): BlockGraph {
   const graph = BlockGraph.createDefault({
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 
   for (const [id, name] of [

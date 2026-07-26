@@ -182,24 +182,24 @@ export function resolveAdjacentWorkspaceTarget(
   workbenches: readonly WorkbenchSnapshot[],
   currentWorkbench: WorkbenchSnapshot | null,
   direction: WorkspaceNavigationDirection
-): { readonly workbench: WorkbenchSnapshot; readonly workspaceName: string } | null {
+): { readonly workbench: WorkbenchSnapshot; readonly workspaceId: string } | null {
   const targets = workbenches.flatMap((workbench) =>
     workbench.project.workspaces.map((workspace) => ({
       workbench,
-      workspaceName: workspace.name
+      workspaceId: workspace.workspaceId
     }))
   )
   if (targets.length === 0) {
     return null
   }
 
-  const currentWorkspaceName = currentWorkbench?.project.workspaces.find(
+  const currentWorkspaceId = currentWorkbench?.project.workspaces.find(
     (workspace) => workspace.isCurrent
-  )?.name
+  )?.workspaceId
   const currentIndex = targets.findIndex(
     (target) =>
       target.workbench.project.id === currentWorkbench?.project.id &&
-      target.workspaceName === currentWorkspaceName
+      target.workspaceId === currentWorkspaceId
   )
   const offset = direction === 'next' ? 1 : -1
   const nextIndex =

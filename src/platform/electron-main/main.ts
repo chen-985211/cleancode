@@ -445,11 +445,11 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
   const graph = await getDefaultGraphUseCase.execute({
     projectId: project.id,
     projectDirectory: project.directory,
-    workspaceName: currentWorkspace.name
+    workspaceId: currentWorkspace.workspaceId
   })
   const agents = await listWorkspaceAgentsUseCase.execute({
     projectId: project.id,
-    workspaceName: currentWorkspace.name
+    workspaceId: currentWorkspace.workspaceId
   })
   const gitBranches = (
     await listGitBranchNavigationUseCase.execute({
@@ -462,14 +462,14 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
 
 async function getDefaultGraphForAgent(command: {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }): Promise<BlockGraphSnapshot> {
   const project = await projectRepository.findByDirectory(command.projectDirectory)
 
   return getDefaultGraphUseCase.execute({
     projectDirectory: command.projectDirectory,
     projectId: project?.id ?? command.projectDirectory,
-    workspaceName: command.workspaceName
+    workspaceId: command.workspaceId
   })
 }
 
@@ -507,7 +507,8 @@ function getProjectRegistryPath(): string {
 
 function getAppStateDirectoryPath(): string {
   return (
-    process.env.CLEANCODE_TEST_APP_STATE_DIRECTORY ?? join(app.getPath('userData'), 'project-state')
+    process.env.CLEANCODE_TEST_APP_STATE_DIRECTORY ??
+    join(app.getPath('userData'), 'project-state-v2')
   )
 }
 

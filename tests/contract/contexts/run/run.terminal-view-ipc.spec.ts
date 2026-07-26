@@ -381,7 +381,7 @@ function createRecordingLogger() {
 function viewCommand(viewId = 'view-1') {
   return {
     projectId: 'project-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     blockId: 'block-1',
     sessionId: 'session-1',
     runId: 'run-1',

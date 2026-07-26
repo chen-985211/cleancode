@@ -13,7 +13,7 @@ export class BlockGraphTerminalWorkflowPlanAdapter implements TerminalWorkflowPl
     const source = await this.buildWorkflowPlan.execute(query)
     return Object.freeze({
       graphId: source.graphId,
-      workspaceName: source.workspaceName,
+      workspaceId: source.workspaceId,
       nodes: Object.freeze(
         source.nodes.map((node) =>
           Object.freeze({

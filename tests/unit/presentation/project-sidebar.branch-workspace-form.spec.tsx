@@ -17,7 +17,7 @@ describe('project sidebar branch workspace form', () => {
   it('creates a git branch and its independent worktree through the desktop runtime API', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const featureWorkbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-      workspaceName: 'feature/sidebar',
+      workspaceId: 'feature/sidebar',
       workspaceDirectory: '/tmp/alpha-project-worktrees/feature-sidebar',
       gitBranch: 'feature/sidebar'
     })
@@ -162,13 +162,17 @@ describe('project sidebar branch workspace form', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha-project',
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/alpha',
+          workspaceId: 'feature/alpha',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/alpha',
           directory: '/tmp/alpha-feature',
           gitBranch: 'feature/alpha',
           isCurrent: false
@@ -202,7 +206,7 @@ describe('project sidebar branch workspace form', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/alpha'
+        workspaceId: 'feature/alpha'
       })
     )
     expect(switchBranchWorkspace).toHaveBeenCalledTimes(1)

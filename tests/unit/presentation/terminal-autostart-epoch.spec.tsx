@@ -79,6 +79,12 @@ function createTerminalNodeData(
   onStart: TerminalFlowNode['data']['onStart']
 ): TerminalFlowNode['data'] {
   return {
+    identity: {
+      projectId: 'project-1',
+      workspaceId: 'main',
+      objectKind: 'terminal',
+      objectId: 'terminal-1'
+    },
     block: {
       id: 'terminal-1',
       type: 'terminal',

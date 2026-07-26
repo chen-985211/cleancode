@@ -1,165 +1,89 @@
 import { Project } from '../../../../src/contexts/project/domain/aggregates/Project'
 
-describe('project branch workspaces', () => {
-  it('binds the main workspace to a real git branch while keeping the user-facing main name', () => {
-    const project = Project.create({
-      id: 'project-1',
+describe('project physical workspaces', () => {
+  it('keeps the default workspace identity across git initialization and branch changes', () => {
+    const created = createProject()
+    const initialized = created.bindDefaultWorkspaceToGit({
       directory: '/work/app',
-      name: 'app'
-    }).bindMainWorkspaceToGit({
+      gitBranch: 'main'
+    })
+    const switched = initialized.bindDefaultWorkspaceToGit({
       directory: '/work/app',
-      gitBranch: 'trunk'
+      gitBranch: 'feature/identity'
     })
 
-    expect(project.currentWorkspace).toEqual({
-      name: 'main',
-      directory: '/work/app',
-      gitBranch: 'trunk',
-      isCurrent: true
-    })
+    expect(created.currentWorkspace.workspaceId).toBe('workspace-default')
+    expect(initialized.currentWorkspace.workspaceId).toBe('workspace-default')
+    expect(switched.currentWorkspace).toEqual(defaultWorkspace({ gitBranch: 'feature/identity' }))
   })
 
-  it('adds a git branch workspace and makes it the only current workspace', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    })
-      .bindMainWorkspaceToGit({
+  it('adds a linked worktree and makes it the only current workspace', () => {
+    const project = createProject()
+      .bindDefaultWorkspaceToGit({
         directory: '/work/app',
         gitBranch: 'main'
       })
-      .addBranchWorkspace({
-        name: 'feature/sidebar',
+      .addLinkedWorktreeWorkspace({
+        workspaceId: 'workspace-feature',
+        displayName: 'feature/sidebar',
         directory: '/state/worktrees/feature-sidebar',
         gitBranch: 'feature/sidebar'
       })
 
-    expect(project.currentWorkspace.name).toBe('feature/sidebar')
+    expect(project.currentWorkspace.workspaceId).toBe('workspace-feature')
     expect(project.workspaces).toEqual([
-      {
-        name: 'main',
-        directory: '/work/app',
-        gitBranch: 'main',
-        isCurrent: false
-      },
-      {
-        name: 'feature/sidebar',
-        directory: '/state/worktrees/feature-sidebar',
-        gitBranch: 'feature/sidebar',
-        isCurrent: true
-      }
+      defaultWorkspace({ gitBranch: 'main', isCurrent: false }),
+      featureWorkspace()
     ])
   })
 
-  it('switches the current workspace without changing git bindings', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    })
-      .bindMainWorkspaceToGit({
-        directory: '/work/app',
-        gitBranch: 'main'
-      })
-      .addBranchWorkspace({
-        name: 'feature/sidebar',
+  it('switches workspaces by stable id without changing git metadata', () => {
+    const project = createProject()
+      .addLinkedWorktreeWorkspace({
+        workspaceId: 'workspace-feature',
+        displayName: 'feature/sidebar',
         directory: '/state/worktrees/feature-sidebar',
         gitBranch: 'feature/sidebar'
       })
-      .switchCurrentWorkspace('main')
+      .switchCurrentWorkspace('workspace-default')
 
-    expect(project.currentWorkspace.name).toBe('main')
-    expect(project.workspaces.filter((workspace) => workspace.isCurrent)).toHaveLength(1)
+    expect(project.currentWorkspace.workspaceId).toBe('workspace-default')
     expect(
-      project.workspaces.find((workspace) => workspace.name === 'feature/sidebar')
-    ).toMatchObject({
-      gitBranch: 'feature/sidebar',
-      isCurrent: false
-    })
+      project.workspaces.find(({ workspaceId }) => workspaceId === 'workspace-feature')
+    ).toEqual(featureWorkspace({ isCurrent: false }))
   })
 
-  it('archives a non-current git branch workspace while keeping the current workspace', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    })
-      .bindMainWorkspaceToGit({
-        directory: '/work/app',
-        gitBranch: 'main'
-      })
-      .addBranchWorkspace({
-        name: 'feature/sidebar',
+  it('archives a linked worktree by id and falls back to the default workspace', () => {
+    const project = createProject()
+      .addLinkedWorktreeWorkspace({
+        workspaceId: 'workspace-feature',
+        displayName: 'feature/sidebar',
         directory: '/state/worktrees/feature-sidebar',
         gitBranch: 'feature/sidebar'
       })
-      .switchCurrentWorkspace('main')
-      .archiveBranchWorkspace('feature/sidebar')
+      .archiveLinkedWorktreeWorkspace('workspace-feature')
 
-    expect(project.currentWorkspace.name).toBe('main')
-    expect(project.workspaces).toEqual([
-      {
-        name: 'main',
-        directory: '/work/app',
-        gitBranch: 'main',
-        isCurrent: true
-      }
-    ])
+    expect(project.workspaces).toEqual([defaultWorkspace()])
   })
 
-  it('archives the current git branch workspace by selecting main as the fallback workspace', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    })
-      .bindMainWorkspaceToGit({
-        directory: '/work/app',
-        gitBranch: 'main'
-      })
-      .addBranchWorkspace({
-        name: 'feature/sidebar',
-        directory: '/state/worktrees/feature-sidebar',
-        gitBranch: 'feature/sidebar'
-      })
-      .archiveBranchWorkspace('feature/sidebar')
-
-    expect(project.currentWorkspace).toEqual({
-      name: 'main',
-      directory: '/work/app',
-      gitBranch: 'main',
-      isCurrent: true
-    })
-    expect(project.workspaces.map((workspace) => workspace.name)).toEqual(['main'])
-  })
-
-  it('rejects archiving the main workspace', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    })
-
-    expect(() => project.archiveBranchWorkspace('main')).toThrow(
+  it('rejects archiving the default workspace', () => {
+    expect(() => createProject().archiveLinkedWorktreeWorkspace('workspace-default')).toThrow(
       'Main workspace cannot be archived.'
     )
   })
 
-  it('rejects duplicate branch workspaces', () => {
-    const project = Project.create({
-      id: 'project-1',
-      directory: '/work/app',
-      name: 'app'
-    }).addBranchWorkspace({
-      name: 'feature/sidebar',
+  it('rejects duplicate linked-worktree display names and git bindings', () => {
+    const project = createProject().addLinkedWorktreeWorkspace({
+      workspaceId: 'workspace-feature',
+      displayName: 'feature/sidebar',
       directory: '/state/worktrees/feature-sidebar',
       gitBranch: 'feature/sidebar'
     })
 
     expect(() =>
-      project.addBranchWorkspace({
-        name: 'feature/sidebar',
+      project.addLinkedWorktreeWorkspace({
+        workspaceId: 'workspace-other',
+        displayName: 'feature/sidebar',
         directory: '/state/worktrees/feature-sidebar-2',
         gitBranch: 'feature/sidebar'
       })
@@ -171,85 +95,81 @@ describe('project branch workspaces', () => {
       id: 'project-1',
       directory: '/work/app',
       name: 'app',
-      workspaces: [
-        {
-          name: 'main',
-          directory: '/work/app',
-          gitBranch: 'main',
-          isCurrent: true
-        },
-        {
-          name: 'feature/sidebar',
-          directory: '/state/worktrees/feature-sidebar',
-          gitBranch: 'feature/sidebar',
-          isCurrent: true
-        }
-      ]
+      workspaces: [defaultWorkspace(), featureWorkspace()]
     })
 
-    expect(project.workspaces.filter((workspace) => workspace.isCurrent)).toEqual([
-      {
-        name: 'main',
-        directory: '/work/app',
-        gitBranch: 'main',
-        isCurrent: true
-      }
-    ])
+    expect(project.workspaces.filter(({ isCurrent }) => isCurrent)).toEqual([defaultWorkspace()])
   })
 
-  it('syncs existing git worktrees without selecting them over the current workspace', () => {
-    const project = Project.fromSnapshot({
+  it('preserves linked-worktree ids when either its branch or directory changes', () => {
+    const moved = Project.fromSnapshot({
       id: 'project-1',
       directory: '/work/app',
       name: 'app',
-      workspaces: [
-        {
-          name: 'main',
-          directory: '/work/app',
-          gitBranch: 'main',
-          isCurrent: false
-        },
-        {
-          name: 'feature/sidebar',
-          directory: '/old/worktree',
-          gitBranch: 'feature/sidebar',
-          isCurrent: true
-        }
-      ]
+      workspaces: [defaultWorkspace({ isCurrent: false }), featureWorkspace()]
     }).syncGitBranchWorkspaces({
       mainDirectory: '/work/app',
       mainGitBranch: 'trunk',
       worktrees: [
         {
           branchName: 'feature/sidebar',
-          directory: '/state/worktrees/feature-sidebar'
-        },
+          directory: '/state/worktrees/feature-sidebar-moved'
+        }
+      ]
+    })
+    const switched = moved.syncGitBranchWorkspaces({
+      mainDirectory: '/work/app',
+      mainGitBranch: 'trunk',
+      worktrees: [
         {
-          branchName: 'feature/api',
-          directory: '/state/worktrees/feature-api'
+          branchName: 'feature/sidebar-v2',
+          directory: '/state/worktrees/feature-sidebar-moved'
         }
       ]
     })
 
-    expect(project.workspaces).toEqual([
-      {
-        name: 'main',
-        directory: '/work/app',
-        gitBranch: 'trunk',
-        isCurrent: false
-      },
-      {
-        name: 'feature/sidebar',
-        directory: '/state/worktrees/feature-sidebar',
-        gitBranch: 'feature/sidebar',
-        isCurrent: true
-      },
-      {
-        name: 'feature/api',
-        directory: '/state/worktrees/feature-api',
-        gitBranch: 'feature/api',
-        isCurrent: false
-      }
-    ])
+    expect(moved.currentWorkspace.workspaceId).toBe('workspace-feature')
+    expect(switched.currentWorkspace).toMatchObject({
+      workspaceId: 'workspace-feature',
+      directory: '/state/worktrees/feature-sidebar-moved',
+      gitBranch: 'feature/sidebar-v2'
+    })
   })
 })
+
+function createProject(): Project {
+  return Project.create({
+    id: 'project-1',
+    defaultWorkspaceId: 'workspace-default',
+    directory: '/work/app',
+    name: 'app'
+  })
+}
+
+function defaultWorkspace(
+  overrides: Partial<ReturnType<Project['toSnapshot']>['workspaces'][number]> = {}
+) {
+  return {
+    workspaceId: 'workspace-default',
+    workspaceKind: 'default' as const,
+    displayName: 'main',
+    directory: '/work/app',
+    gitBranch: null,
+    isCurrent: true,
+    ...overrides
+  }
+}
+
+function featureWorkspace(
+  overrides: Partial<ReturnType<Project['toSnapshot']>['workspaces'][number]> = {}
+) {
+  return {
+    workspaceId: 'workspace-feature',
+    workspaceKind: 'linked-worktree' as const,
+    displayName: 'feature/sidebar',
+    directory: '/state/worktrees/feature-sidebar',
+    gitBranch: 'feature/sidebar',
+    isCurrent: true,
+    ...overrides
+  }
+}

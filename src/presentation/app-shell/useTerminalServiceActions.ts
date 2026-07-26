@@ -39,7 +39,7 @@ export function useTerminalServiceActions({
       setCurrentGraph(
         await api.updateTerminalDefinition({
           projectDirectory: currentWorkbench.project.directory,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           blockId: block.id,
           name: definition.name,
           description: definition.description,
@@ -72,11 +72,11 @@ export function useTerminalServiceActions({
       if (!targetWorkbench) return
 
       const resolvedWorkbench =
-        targetWorkbench.graph.workspaceName === owner.identity.workspaceName
+        targetWorkbench.graph.workspaceId === owner.identity.workspaceId
           ? targetWorkbench
           : await window.cleancode?.switchBranchWorkspace({
               projectDirectory: targetWorkbench.project.directory,
-              workspaceName: owner.identity.workspaceName
+              workspaceId: owner.identity.workspaceId
             })
 
       if (!resolvedWorkbench) return

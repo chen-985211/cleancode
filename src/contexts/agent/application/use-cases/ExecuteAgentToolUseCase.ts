@@ -29,7 +29,7 @@ export interface ExecuteAgentToolCommand {
   readonly sessionId: string
   readonly toolCallId: string
   readonly toolName: AgentToolName
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 type AwaitingAgentToolApprovalResult = {
@@ -127,7 +127,7 @@ export class ExecuteAgentToolUseCase {
   ): Promise<Extract<AgentToolStructuredContent, { readonly status: 'completed' }>> {
     const context: AgentToolContext = {
       projectDirectory: command.projectDirectory,
-      workspaceName: command.workspaceName
+      workspaceId: command.workspaceId
     }
 
     switch (invocation.toolName) {
@@ -241,7 +241,7 @@ export class ExecuteAgentToolUseCase {
     readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
   }> {
     const agents =
-      (await this.agentSessionRepository.findWorkspace(command.projectId, command.workspaceName)) ??
+      (await this.agentSessionRepository.findWorkspace(command.projectId, command.workspaceId)) ??
       []
     const activeAgent = agents.find((agent) => agent.id === command.agentId)
 
@@ -296,7 +296,7 @@ export class ExecuteAgentToolUseCase {
       sessionId: command.sessionId,
       status,
       toolName: command.toolName,
-      workspaceName: command.workspaceName
+      workspaceId: command.workspaceId
     })
   }
 }

@@ -29,7 +29,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/tmp/cleancode-demo', 'project-demo'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/tmp/cleancode-demo',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -50,7 +50,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/tmp/cleancode-demo', 'project-demo'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/tmp/cleancode-demo',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -119,7 +119,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/tmp/cleancode-demo', 'project-demo'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/tmp/cleancode-demo',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -137,7 +137,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -160,7 +160,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -180,7 +180,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -201,7 +201,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -234,7 +234,7 @@ describe('terminal session service', () => {
     const session = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -288,7 +288,7 @@ describe('terminal session service', () => {
     const mainSession = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workingDirectory: '/work/app',
       shell: '/bin/sh',
       onOutput: () => undefined,
@@ -297,7 +297,7 @@ describe('terminal session service', () => {
     const featureSession = await service.start({
       ...runOwner('/work/app', 'project-app'),
       terminalBlockId: 'block-1',
-      workspaceName: 'feature/sidebar',
+      workspaceId: 'feature/sidebar',
       workspaceDirectory: '/work/app-sidebar',
       workingDirectory: '/work/app-sidebar',
       shell: '/bin/sh',
@@ -414,7 +414,7 @@ describe('terminal session service', () => {
       {
         projectId: 'project-app',
         projectDirectory: '/work/app',
-        workspaceName: 'main',
+        workspaceId: 'main',
         workspaceDirectory: '/work/app',
         gitBranch: 'main'
       }
@@ -582,7 +582,7 @@ function runOwner(projectDirectory: string, projectId: string) {
   return {
     projectId,
     projectDirectory,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: projectDirectory,
     gitBranch: 'main',
     workingDirectory: projectDirectory,

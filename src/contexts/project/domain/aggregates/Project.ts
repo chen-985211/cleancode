@@ -1,7 +1,11 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
-export interface BranchWorkspaceSnapshot {
-  readonly name: string
+type ProjectWorkspaceKind = 'default' | 'linked-worktree'
+
+export interface ProjectWorkspaceSnapshot {
+  readonly workspaceId: string
+  readonly workspaceKind: ProjectWorkspaceKind
+  readonly displayName: string
   readonly directory: string
   readonly gitBranch: string | null
   readonly isCurrent: boolean
@@ -11,11 +15,12 @@ export interface ProjectSnapshot {
   readonly id: string
   readonly name: string
   readonly directory: string
-  readonly workspaces: readonly BranchWorkspaceSnapshot[]
+  readonly workspaces: readonly ProjectWorkspaceSnapshot[]
 }
 
 export interface CreateProjectInput {
   readonly id?: string
+  readonly defaultWorkspaceId?: string
   readonly name: string
   readonly directory: string
 }
@@ -30,7 +35,7 @@ export class Project {
     public readonly id: string,
     public readonly name: string,
     public readonly directory: string,
-    private readonly workspaceSnapshots: readonly BranchWorkspaceSnapshot[]
+    private readonly workspaceSnapshots: readonly ProjectWorkspaceSnapshot[]
   ) {}
 
   static create(input: CreateProjectInput): Project {
@@ -38,7 +43,9 @@ export class Project {
 
     return new Project(projectId, input.name, input.directory, [
       {
-        name: 'main',
+        workspaceId: input.defaultWorkspaceId ?? createWorkspaceId(),
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: input.directory,
         gitBranch: null,
         isCurrent: true
@@ -55,11 +62,11 @@ export class Project {
     )
   }
 
-  get workspaces(): readonly BranchWorkspaceSnapshot[] {
+  get workspaces(): readonly ProjectWorkspaceSnapshot[] {
     return this.workspaceSnapshots
   }
 
-  get currentWorkspace(): BranchWorkspaceSnapshot {
+  get currentWorkspace(): ProjectWorkspaceSnapshot {
     const currentWorkspace = this.workspaceSnapshots.find((workspace) => workspace.isCurrent)
 
     if (!currentWorkspace) {
@@ -72,7 +79,7 @@ export class Project {
     return currentWorkspace
   }
 
-  bindMainWorkspaceToGit(input: {
+  bindDefaultWorkspaceToGit(input: {
     readonly directory: string
     readonly gitBranch: string | null
   }): Project {
@@ -81,7 +88,7 @@ export class Project {
       this.name,
       this.directory,
       this.workspaceSnapshots.map((workspace) =>
-        workspace.name === 'main'
+        workspace.workspaceKind === 'default'
           ? {
               ...workspace,
               directory: input.directory,
@@ -92,13 +99,18 @@ export class Project {
     )
   }
 
-  addBranchWorkspace(input: {
-    readonly name: string
+  addLinkedWorktreeWorkspace(input: {
+    readonly workspaceId?: string
+    readonly displayName: string
     readonly directory: string
     readonly gitBranch: string
   }): Project {
-    const workspaceName = normalizeRequiredText(
-      input.name,
+    const workspaceId = normalizeRequiredText(
+      input.workspaceId ?? createWorkspaceId(),
+      'Workspace id cannot be empty.'
+    )
+    const displayName = normalizeRequiredText(
+      input.displayName,
       'Branch workspace name cannot be empty.'
     )
     const gitBranch = normalizeRequiredText(input.gitBranch, 'Git branch cannot be empty.')
@@ -107,7 +119,14 @@ export class Project {
       'Branch workspace directory cannot be empty.'
     )
 
-    if (this.workspaceSnapshots.some((workspace) => workspace.name === workspaceName)) {
+    if (this.workspaceSnapshots.some((workspace) => workspace.workspaceId === workspaceId)) {
+      throw createExpectedAppError(
+        'BRANCH_WORKSPACE_ALREADY_EXISTS',
+        'Branch workspace already exists.'
+      )
+    }
+
+    if (this.workspaceSnapshots.some((workspace) => workspace.displayName === displayName)) {
       throw createExpectedAppError(
         'BRANCH_WORKSPACE_ALREADY_EXISTS',
         'Branch workspace already exists.'
@@ -124,7 +143,9 @@ export class Project {
     return new Project(this.id, this.name, this.directory, [
       ...this.workspaceSnapshots.map((workspace) => ({ ...workspace, isCurrent: false })),
       {
-        name: workspaceName,
+        workspaceId,
+        workspaceKind: 'linked-worktree',
+        displayName,
         directory,
         gitBranch,
         isCurrent: true
@@ -137,8 +158,10 @@ export class Project {
     readonly mainGitBranch: string | null
     readonly worktrees: readonly GitBranchWorktreeInput[]
   }): Project {
-    const mainWorkspace = this.workspaceSnapshots.find((workspace) => workspace.name === 'main')
-    const currentWorkspaceName = this.currentWorkspace.name
+    const defaultWorkspace = this.workspaceSnapshots.find(
+      (workspace) => workspace.workspaceKind === 'default'
+    )
+    const currentWorkspaceId = this.currentWorkspace.workspaceId
     const worktreeWorkspaces = input.worktrees.map((worktree) => {
       const branchName = normalizeRequiredText(worktree.branchName, 'Git branch cannot be empty.')
       const directory = normalizeRequiredText(
@@ -146,25 +169,31 @@ export class Project {
         'Branch workspace directory cannot be empty.'
       )
       const existingWorkspace = this.workspaceSnapshots.find(
-        (workspace) => workspace.name === branchName || workspace.gitBranch === branchName
+        (workspace) =>
+          workspace.workspaceKind === 'linked-worktree' &&
+          (workspace.directory === directory || workspace.gitBranch === branchName)
       )
 
       return {
-        name: branchName,
+        workspaceId: existingWorkspace?.workspaceId ?? createWorkspaceId(),
+        workspaceKind: 'linked-worktree' as const,
+        displayName: existingWorkspace?.displayName ?? branchName,
         directory,
         gitBranch: branchName,
-        isCurrent: existingWorkspace?.isCurrent ?? currentWorkspaceName === branchName
+        isCurrent: existingWorkspace?.workspaceId === currentWorkspaceId
       }
     })
     const synchronizedWorkspaces = [
       {
-        name: 'main',
+        workspaceId: defaultWorkspace?.workspaceId ?? createWorkspaceId(),
+        workspaceKind: 'default' as const,
+        displayName: defaultWorkspace?.displayName ?? 'main',
         directory: normalizeRequiredText(
           input.mainDirectory,
           'Branch workspace directory cannot be empty.'
         ),
         gitBranch: normalizeOptionalBranchName(input.mainGitBranch),
-        isCurrent: mainWorkspace?.isCurrent ?? currentWorkspaceName === 'main'
+        isCurrent: defaultWorkspace?.workspaceId === currentWorkspaceId
       },
       ...deduplicateBranchWorkspaces(worktreeWorkspaces)
     ]
@@ -180,21 +209,21 @@ export class Project {
           ? synchronizedWorkspaces
           : synchronizedWorkspaces.map((workspace) => ({
               ...workspace,
-              isCurrent: workspace.name === 'main'
+              isCurrent: workspace.workspaceKind === 'default'
             }))
       )
     )
   }
 
-  switchCurrentWorkspace(workspaceName: string): Project {
-    const normalizedWorkspaceName = normalizeRequiredText(
-      workspaceName,
-      'Branch workspace name cannot be empty.'
+  switchCurrentWorkspace(workspaceId: string): Project {
+    const normalizedWorkspaceId = normalizeRequiredText(
+      workspaceId,
+      'Workspace id cannot be empty.'
     )
     let hasWorkspace = false
 
     const workspaces = this.workspaceSnapshots.map((workspace) => {
-      const isCurrent = workspace.name === normalizedWorkspaceName
+      const isCurrent = workspace.workspaceId === normalizedWorkspaceId
 
       if (isCurrent) {
         hasWorkspace = true
@@ -213,25 +242,25 @@ export class Project {
     return new Project(this.id, this.name, this.directory, workspaces)
   }
 
-  archiveBranchWorkspace(workspaceName: string): Project {
-    const normalizedWorkspaceName = normalizeRequiredText(
-      workspaceName,
-      'Branch workspace name cannot be empty.'
+  archiveLinkedWorktreeWorkspace(workspaceId: string): Project {
+    const normalizedWorkspaceId = normalizeRequiredText(
+      workspaceId,
+      'Workspace id cannot be empty.'
     )
 
-    if (normalizedWorkspaceName === 'main') {
-      throw createExpectedAppError(
-        'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED',
-        'Main workspace cannot be archived.'
-      )
-    }
-
     const archivedWorkspace = this.workspaceSnapshots.find(
-      (workspace) => workspace.name === normalizedWorkspaceName
+      (workspace) => workspace.workspaceId === normalizedWorkspaceId
     )
 
     if (!archivedWorkspace) {
       throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
+    }
+
+    if (archivedWorkspace.workspaceKind === 'default') {
+      throw createExpectedAppError(
+        'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED',
+        'Main workspace cannot be archived.'
+      )
     }
 
     if (!archivedWorkspace.gitBranch) {
@@ -242,10 +271,12 @@ export class Project {
     }
 
     const workspaces = this.workspaceSnapshots
-      .filter((workspace) => workspace.name !== normalizedWorkspaceName)
+      .filter((workspace) => workspace.workspaceId !== normalizedWorkspaceId)
       .map((workspace) => ({
         ...workspace,
-        isCurrent: archivedWorkspace.isCurrent ? workspace.name === 'main' : workspace.isCurrent
+        isCurrent: archivedWorkspace.isCurrent
+          ? workspace.workspaceKind === 'default'
+          : workspace.isCurrent
       }))
 
     return new Project(
@@ -267,10 +298,10 @@ export class Project {
 }
 
 function deduplicateBranchWorkspaces(
-  workspaces: readonly BranchWorkspaceSnapshot[]
-): readonly BranchWorkspaceSnapshot[] {
+  workspaces: readonly ProjectWorkspaceSnapshot[]
+): readonly ProjectWorkspaceSnapshot[] {
   const seenBranches = new Set<string>()
-  const uniqueWorkspaces: BranchWorkspaceSnapshot[] = []
+  const uniqueWorkspaces: ProjectWorkspaceSnapshot[] = []
 
   for (const workspace of workspaces) {
     if (!workspace.gitBranch || seenBranches.has(workspace.gitBranch)) {
@@ -288,10 +319,14 @@ function createProjectId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `project-${Date.now()}-${Math.random()}`
 }
 
+function createWorkspaceId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `workspace-${Date.now()}-${Math.random()}`
+}
+
 function normalizeBranchWorkspaces(
   projectDirectory: string,
-  workspaces: readonly BranchWorkspaceSnapshot[]
-): readonly BranchWorkspaceSnapshot[] {
+  workspaces: readonly ProjectWorkspaceSnapshot[]
+): readonly ProjectWorkspaceSnapshot[] {
   const normalizedWorkspaces =
     workspaces.length > 0 ? workspaces : createDefaultWorkspaces(projectDirectory)
   const hasCurrentWorkspace = normalizedWorkspaces.some((workspace) => workspace.isCurrent)
@@ -307,7 +342,12 @@ function normalizeBranchWorkspaces(
     }
 
     return {
-      name: normalizeRequiredText(workspace.name, 'Branch workspace name cannot be empty.'),
+      workspaceId: normalizeRequiredText(workspace.workspaceId, 'Workspace id cannot be empty.'),
+      workspaceKind: workspace.workspaceKind,
+      displayName: normalizeRequiredText(
+        workspace.displayName,
+        'Branch workspace name cannot be empty.'
+      ),
       directory: normalizeRequiredText(
         workspace.directory,
         'Branch workspace directory cannot be empty.'
@@ -318,10 +358,12 @@ function normalizeBranchWorkspaces(
   })
 }
 
-function createDefaultWorkspaces(projectDirectory: string): readonly BranchWorkspaceSnapshot[] {
+function createDefaultWorkspaces(projectDirectory: string): readonly ProjectWorkspaceSnapshot[] {
   return [
     {
-      name: 'main',
+      workspaceId: createWorkspaceId(),
+      workspaceKind: 'default',
+      displayName: 'main',
       directory: projectDirectory,
       gitBranch: null,
       isCurrent: true

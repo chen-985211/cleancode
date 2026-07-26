@@ -26,13 +26,12 @@ describe('manage workspace Agents', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-unknown',
-        gitBranch: null,
         initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'unknown-provider',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrowError(expect.objectContaining({ code: 'AGENT_PROVIDER_NOT_FOUND' }))
 
@@ -45,13 +44,12 @@ describe('manage workspace Agents', () => {
     const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
     const command = {
       agentId: 'agent-create-1',
-      gitBranch: null,
       initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
 
     const [first, repeated] = await Promise.all([
@@ -68,13 +66,12 @@ describe('manage workspace Agents', () => {
     const useCase = new CreateWorkspaceAgentUseCase(repository, createProviderRegistry())
     const command = {
       agentId: 'agent-create-1',
-      gitBranch: null,
       initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
 
     await useCase.execute(command)
@@ -111,13 +108,12 @@ describe('manage workspace Agents', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-stale',
-        gitBranch: null,
         initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ code: 'AGENT_WORKSPACE_SCOPE_STALE' })
     expect(save).not.toHaveBeenCalled()
@@ -129,13 +125,12 @@ describe('manage workspace Agents', () => {
     const create = (agentId: string, initialPosition: { readonly x: number; readonly y: number }) =>
       useCase.execute({
         agentId,
-        gitBranch: null,
         initialPosition,
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
 
     const created = await Promise.all([
@@ -160,8 +155,8 @@ describe('manage workspace Agents', () => {
     const repository = new MemoryAgentRepository()
     const useCase = new ListWorkspaceAgentsUseCase(repository)
 
-    const first = await useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
-    const reopened = await useCase.execute({ projectId: 'project-1', workspaceName: 'main' })
+    const first = await useCase.execute({ projectId: 'project-1', workspaceId: 'main' })
+    const reopened = await useCase.execute({ projectId: 'project-1', workspaceId: 'main' })
 
     expect(first).toEqual([])
     expect(reopened).toEqual([])
@@ -174,19 +169,16 @@ describe('manage workspace Agents', () => {
     const list = new ListWorkspaceAgentsUseCase(repository)
     const create = new CreateWorkspaceAgentUseCase(repository, providers)
 
-    await expect(list.execute({ projectId: 'project-1', workspaceName: 'main' })).resolves.toEqual(
-      []
-    )
+    await expect(list.execute({ projectId: 'project-1', workspaceId: 'main' })).resolves.toEqual([])
     await expect(
       create.execute({
         agentId: 'agent-create-1',
-        gitBranch: null,
         initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       name: 'Agent 1',
@@ -203,44 +195,42 @@ describe('manage workspace Agents', () => {
     const rename = new RenameWorkspaceAgentUseCase(repository)
     const updateLayout = new UpdateWorkspaceAgentLayoutUseCase(repository)
     const remove = new RemoveWorkspaceAgentUseCase(repository, runtime)
-    await list.execute({ projectId: 'project-1', workspaceName: 'main' })
+    await list.execute({ projectId: 'project-1', workspaceId: 'main' })
     const first = await create.execute({
       agentId: 'agent-1',
-      gitBranch: null,
       initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const second = await create.execute({
       agentId: 'agent-2',
-      gitBranch: null,
       initialPosition: { x: 1_024, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'claude-code',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await rename.execute({
       agentId: second.agentId,
       name: 'Review Agent',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await updateLayout.execute({
       agentId: second.agentId,
       layout: { position: { x: 700, y: 220 }, size: { width: 520, height: 460 } },
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const remaining = await remove.execute({
       agentId: first.agentId,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(runtime.disposed).toEqual([first.agentId])
@@ -266,7 +256,7 @@ describe('manage workspace Agents', () => {
       remove.execute({
         agentId: 'agent-1',
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('read failed')
 
@@ -282,7 +272,7 @@ class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
   async disposeAgent(command: {
     readonly agentId: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) {
     this.disposed.push(command.agentId)
     return Promise.resolve({ release: () => this.released.push(command.agentId) })
@@ -297,7 +287,7 @@ class MemoryAgentRepository implements AgentSessionRepository, AgentWorkspaceIni
   private readonly workspaces = new Map<string, AgentSession[]>()
   readonly initializeWorkspace = vi.fn(
     async (command: InitializeAgentWorkspaceCommand): Promise<readonly AgentSession[]> => {
-      const key = workspaceKey(command.projectId, command.workspaceName)
+      const key = workspaceKey(command.projectId, command.workspaceId)
       const existing = this.workspaces.get(key)
       if (existing) return existing
       const initialized = [...command.agents]
@@ -312,25 +302,25 @@ class MemoryAgentRepository implements AgentSessionRepository, AgentWorkspaceIni
 
   async findAgent(
     projectId: string,
-    workspaceName: string,
+    workspaceId: string,
     agentId: string
   ): Promise<AgentSession | null> {
     return (
       this.workspaces
-        .get(workspaceKey(projectId, workspaceName))
+        .get(workspaceKey(projectId, workspaceId))
         ?.find((agent) => agent.id === agentId) ?? null
     )
   }
 
   async findWorkspace(
     projectId: string,
-    workspaceName: string
+    workspaceId: string
   ): Promise<readonly AgentSession[] | null> {
-    return this.workspaces.get(workspaceKey(projectId, workspaceName)) ?? null
+    return this.workspaces.get(workspaceKey(projectId, workspaceId)) ?? null
   }
 
   async save(agent: AgentSession): Promise<void> {
-    const key = workspaceKey(agent.projectId, agent.workspaceName)
+    const key = workspaceKey(agent.projectId, agent.workspaceId)
     const agents = this.workspaces.get(key) ?? []
     this.workspaces.set(key, [...agents.filter((candidate) => candidate.id !== agent.id), agent])
   }
@@ -339,8 +329,8 @@ class MemoryAgentRepository implements AgentSessionRepository, AgentWorkspaceIni
     void scope
   }
 
-  async deleteAgent(projectId: string, workspaceName: string, agentId: string): Promise<void> {
-    const key = workspaceKey(projectId, workspaceName)
+  async deleteAgent(projectId: string, workspaceId: string, agentId: string): Promise<void> {
+    const key = workspaceKey(projectId, workspaceId)
     const agents = this.workspaces.get(key)
     if (agents) {
       this.workspaces.set(
@@ -359,8 +349,8 @@ class MemoryAgentRepository implements AgentSessionRepository, AgentWorkspaceIni
   }
 }
 
-function workspaceKey(projectId: string, workspaceName: string): string {
-  return JSON.stringify([projectId, workspaceName])
+function workspaceKey(projectId: string, workspaceId: string): string {
+  return JSON.stringify([projectId, workspaceId])
 }
 
 function createProviderRegistry(

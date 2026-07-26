@@ -15,7 +15,7 @@ describe('arrange terminal layout use case', () => {
       blockIds: ['downstream-terminal', 'upstream-terminal'],
       projectDirectory: '/tmp/project',
       reservedRegions: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual({
@@ -40,7 +40,7 @@ describe('arrange terminal layout use case', () => {
       blockIds: ['upstream-terminal', 'downstream-terminal'],
       projectDirectory: '/tmp/project',
       reservedRegions: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
 
     await arrangeTerminalLayout.execute(command)
@@ -63,7 +63,7 @@ describe('arrange terminal layout use case', () => {
       blockIds: ['upstream-terminal', 'downstream-terminal'],
       projectDirectory: '/tmp/project',
       reservedRegions: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result.arrangedBlockIds).toEqual(['downstream-terminal'])
@@ -88,7 +88,7 @@ describe('arrange terminal layout use case', () => {
       blockIds: ['upstream-terminal', 'downstream-terminal'],
       projectDirectory: '/tmp/project',
       reservedRegions: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toMatchObject({
@@ -113,7 +113,7 @@ describe('arrange terminal layout use case', () => {
         blockIds: ['missing-terminal'],
         projectDirectory: '/tmp/project',
         reservedRegions: [],
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('Default block graph was not created.')
   })
@@ -132,7 +132,7 @@ class TransactionalBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ): Promise<BlockGraphTransactionResult<TResult> | null> {
     this.transactionCount += 1
@@ -162,7 +162,7 @@ class TransactionalBlockGraphRepository implements BlockGraphRepository {
 }
 
 function createWorkflowGraph(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   graph.createTerminalBlock({
     id: 'upstream-terminal',
     name: 'Upstream',

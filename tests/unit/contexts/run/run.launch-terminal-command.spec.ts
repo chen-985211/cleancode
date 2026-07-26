@@ -20,7 +20,7 @@ describe('launch terminal command', () => {
     const result = await useCase.execute({
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
       blockId: 'api',
@@ -37,7 +37,7 @@ describe('launch terminal command', () => {
       {
         projectId: 'project-1',
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         blockId: 'api'
       }
     ])
@@ -88,7 +88,7 @@ describe('launch terminal command', () => {
     await useCase.execute({
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
       blockId: 'api',
@@ -135,7 +135,7 @@ class RecordingManagedLauncher {
     const session = {
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
       blockId: 'api',
@@ -184,7 +184,7 @@ function createSession() {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     blockId: 'api',

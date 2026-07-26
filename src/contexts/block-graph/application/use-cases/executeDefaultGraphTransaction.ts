@@ -7,7 +7,7 @@ import type {
 
 interface DefaultGraphTransactionScope {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export async function executeDefaultGraphTransaction<TResult>(
@@ -17,7 +17,7 @@ export async function executeDefaultGraphTransaction<TResult>(
 ): Promise<BlockGraphTransactionResult<TResult>> {
   const result = await repository.transactDefaultGraph(
     scope.projectDirectory,
-    scope.workspaceName,
+    scope.workspaceId,
     transaction
   )
 

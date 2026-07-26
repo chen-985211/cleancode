@@ -19,7 +19,7 @@ describe('terminal session output buffer', () => {
         runId: 'agent-run-1',
         sessionId: 'agent-session-1',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       sequence: 1,
       sessionId: 'agent-session-1'
@@ -38,7 +38,7 @@ function createTerminalState(): TerminalViewState {
       projectId: 'project-1',
       runId: 'block-run-1',
       sessionId: 'block-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     sessionId: 'block-session-1',
     status: 'running'

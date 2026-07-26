@@ -23,7 +23,7 @@ export type TerminalLaunchPlanSnapshot = Pick<
 
 export interface TerminalWorkflowPlanSnapshot {
   readonly graphId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly nodes: readonly TerminalWorkflowPlanNodeSnapshot[]
 }
 
@@ -106,7 +106,7 @@ export function buildTerminalWorkflowPlan(
 
   return Object.freeze({
     graphId: graph.id,
-    workspaceName: graph.workspaceName,
+    workspaceId: graph.workspaceId,
     nodes: Object.freeze(nodes)
   })
 }

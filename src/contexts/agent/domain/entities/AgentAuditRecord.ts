@@ -4,7 +4,7 @@ export interface AgentAuditRecord {
   readonly id: string
   readonly sessionId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly toolName: AgentToolName
   readonly input: unknown
   readonly requiresApproval: boolean

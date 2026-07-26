@@ -13,7 +13,7 @@ export interface CleancodeAgentJsonRpcToolBridgeInput {
   readonly onInitialized?: () => void
   readonly projectDirectory: string
   readonly sessionId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 interface JsonRpcRequest {
@@ -122,7 +122,7 @@ function createToolResultText(toolName: AgentToolName, result: AgentToolExecutio
       graphId: result.output.plan.graphId,
       nodeCount: result.output.plan.nodes.length,
       toolCallId: result.toolCallId,
-      workspaceName: result.output.plan.workspaceName
+      workspaceId: result.output.plan.workspaceId
     })}`
   }
 
@@ -134,7 +134,7 @@ function createToolResultText(toolName: AgentToolName, result: AgentToolExecutio
     graph: {
       blockCount: result.graph.blocks.length,
       terminalGroupCount: result.graph.terminalGroups.length,
-      workspaceName: result.graph.workspaceName
+      workspaceId: result.graph.workspaceId
     },
     output: result.output,
     toolCallId: result.toolCallId

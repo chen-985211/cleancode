@@ -287,7 +287,7 @@ function runningState() {
     output: '',
     runIdentity: {
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1',
       sessionId: 'session-1',
       runId: 'run-1',

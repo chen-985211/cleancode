@@ -160,20 +160,20 @@ function startCommand() {
     projectId: 'project-1',
     scope: { type: 'full' as const },
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/repo/app'
   }
 }
 
 function workflowScope() {
-  return { projectDirectory: '/repo/app', workspaceName: 'main' }
+  return { projectDirectory: '/repo/app', workspaceId: 'main' }
 }
 
 function singleTaskPlan(): WorkflowRunPlanSnapshot {
   return {
     graphId: 'graph-1',
     nodes: [task('task')],
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -186,7 +186,7 @@ function timeoutPlan(): WorkflowRunPlanSnapshot {
         executionConfig: { mode: 'task', successExitCodes: [0], timeoutMs: 1_000 }
       }
     ],
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -211,7 +211,7 @@ function managedServicePlan(): WorkflowRunPlanSnapshot {
         name: 'service'
       }
     ],
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -246,7 +246,7 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
     terminalBlockId,
     terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/repo/app'
   }
 }

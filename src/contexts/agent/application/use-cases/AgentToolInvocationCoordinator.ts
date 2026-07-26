@@ -73,7 +73,7 @@ export class AgentToolInvocationCoordinator implements AgentToolExecutionOperati
     command: ExecuteAgentToolCommand,
     operation: () => Promise<Result>
   ): Promise<Result> {
-    const workspaceKey = JSON.stringify([command.projectDirectory, command.workspaceName])
+    const workspaceKey = JSON.stringify([command.projectDirectory, command.workspaceId])
     const previous = this.workspaceTails.get(workspaceKey) ?? Promise.resolve()
     const result = previous.then(operation)
     const tail = result.then(

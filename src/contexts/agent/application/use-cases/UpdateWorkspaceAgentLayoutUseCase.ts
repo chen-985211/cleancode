@@ -11,11 +11,11 @@ export class UpdateWorkspaceAgentLayoutUseCase {
     readonly agentId: string
     readonly layout: AgentLayoutSnapshot
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<WorkspaceAgentSnapshot> {
     const agent = await this.repository.findAgent(
       command.projectId,
-      command.workspaceName,
+      command.workspaceId,
       command.agentId
     )
     if (!agent) {

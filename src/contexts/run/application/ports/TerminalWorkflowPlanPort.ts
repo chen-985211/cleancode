@@ -5,7 +5,7 @@ export type TerminalWorkflowPlanScope =
 
 export interface BuildTerminalWorkflowPlanQuery {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly scope: TerminalWorkflowPlanScope
 }
 

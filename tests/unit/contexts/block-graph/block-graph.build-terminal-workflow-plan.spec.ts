@@ -10,7 +10,7 @@ describe('build terminal workflow plan', () => {
 
     const plan = await buildPlan.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       scope: { type: 'full' }
     })
 
@@ -36,7 +36,7 @@ describe('build terminal workflow plan', () => {
 
     const plan = await buildPlan.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       scope: { type: 'from-block', blockId: 'build' }
     })
 
@@ -62,7 +62,7 @@ describe('build terminal workflow plan', () => {
 
     const plan = await buildPlan.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       scope: { type: 'from-block', blockId: 'build' }
     })
     const config = plan.nodes[0]?.executionConfig
@@ -95,7 +95,7 @@ describe('build terminal workflow plan', () => {
 
     const plan = await buildPlan.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       scope: { type: 'full' }
     })
 
@@ -114,7 +114,7 @@ describe('build terminal workflow plan', () => {
     await expect(
       buildPlan.execute({
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         scope: { type: 'full' }
       })
     ).rejects.toSatisfy(
@@ -140,7 +140,7 @@ class InMemoryRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const result = await transaction(this.graph)
@@ -152,7 +152,7 @@ function createBuildGraph(): BlockGraph {
   const graph = BlockGraph.createDefault({
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 
   createConfiguredTerminal(graph, 'install-api', 'Install API', 'pnpm install --filter api')

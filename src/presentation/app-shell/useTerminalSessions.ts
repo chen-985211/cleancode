@@ -80,7 +80,7 @@ export function useTerminalSessions({
   const delayedFocusTimersRef = useRef<Set<number>>(new Set())
   const isMountedRef = useRef(true)
   const currentProjectId = currentProject?.id ?? null
-  const currentWorkspaceName = currentWorkspace?.name ?? null
+  const currentWorkspaceId = currentWorkspace?.workspaceId ?? null
   const isRuntimeReady = runtimeAvailability.phase === 'ready'
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export function useTerminalSessions({
   const terminalStates = useTerminalRuntimeRecovery({
     currentProjectId,
     currentTerminalBlockIds,
-    currentWorkspaceName,
+    currentWorkspaceId,
     runtimeAvailability,
     terminalStatesByKey,
     updateTerminalStates
@@ -126,12 +126,12 @@ export function useTerminalSessions({
 
   useEffect(() => {
     const api = window.cleancode
-    if (!api?.listTerminalSessions || !currentProjectId || !currentWorkspaceName) return undefined
+    if (!api?.listTerminalSessions || !currentProjectId || !currentWorkspaceId) return undefined
 
     const requestedRuns = Object.values(terminalStatesRef.current).flatMap((state) =>
       state.status === 'running' &&
       state.runIdentity?.projectId === currentProjectId &&
-      state.runIdentity.workspaceName === currentWorkspaceName
+      state.runIdentity.workspaceId === currentWorkspaceId
         ? [state.runIdentity]
         : []
     )
@@ -151,7 +151,7 @@ export function useTerminalSessions({
     return () => {
       isCurrentRequest = false
     }
-  }, [currentProjectId, currentWorkspaceName, updateTerminalStates])
+  }, [currentProjectId, currentWorkspaceId, updateTerminalStates])
 
   const clearPendingTerminalInput = useCallback((terminalStateKey: string) => {
     const buffer = inputBuffersRef.current.get(terminalStateKey)
@@ -167,7 +167,7 @@ export function useTerminalSessions({
     clearPendingTerminalInput,
     currentProject,
     currentTerminalBlockIds,
-    currentWorkspaceName,
+    currentWorkspaceId,
     terminalStatesRef,
     updateTerminalStates
   })
@@ -287,7 +287,7 @@ export function useTerminalSessions({
 
       const terminalStateKey = createTerminalStateKey(
         currentProject.id,
-        currentWorkspace.name,
+        currentWorkspace.workspaceId,
         block.id
       )
       const currentState = terminalStatesRef.current[terminalStateKey]
@@ -305,7 +305,7 @@ export function useTerminalSessions({
           projectId: currentProject.id,
           projectDirectory: currentProject.directory,
           terminalBlockId: block.id,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           columns: dimensions.columns,
@@ -337,7 +337,7 @@ export function useTerminalSessions({
     async (block: TerminalBlockSnapshot) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const terminalState = terminalStateKey
@@ -355,7 +355,7 @@ export function useTerminalSessions({
     [
       clearPendingTerminalInput,
       currentProjectId,
-      currentWorkspaceName,
+      currentWorkspaceId,
       reconcileTerminalActionSnapshot
     ]
   )
@@ -364,7 +364,7 @@ export function useTerminalSessions({
     async (block: TerminalBlockSnapshot) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const terminalState = terminalStateKey
@@ -384,7 +384,7 @@ export function useTerminalSessions({
         await window.cleancode.terminateTerminal({ sessionId: terminalState.sessionId })
       }
     },
-    [clearPendingTerminalInput, currentProjectId, currentWorkspaceName, updateTerminalStates]
+    [clearPendingTerminalInput, currentProjectId, currentWorkspaceId, updateTerminalStates]
   )
 
   const restartTerminal = useCallback(
@@ -403,7 +403,7 @@ export function useTerminalSessions({
     async (block: TerminalBlockSnapshot) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const state = terminalStateKey ? terminalStatesRef.current[terminalStateKey] : undefined
@@ -434,14 +434,14 @@ export function useTerminalSessions({
         })
       }
     },
-    [currentProjectId, currentWorkspaceName, notify, reconcileTerminalActionSnapshot, t]
+    [currentProjectId, currentWorkspaceId, notify, reconcileTerminalActionSnapshot, t]
   )
 
   const writeTerminal = useCallback(
     async (block: TerminalBlockSnapshot, input: string) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const terminalState = terminalStateKey
@@ -480,14 +480,14 @@ export function useTerminalSessions({
         inputBuffersRef.current.set(terminalStateKey, nextBuffer)
       }
     },
-    [clearPendingTerminalInput, currentProjectId, currentWorkspaceName, flushTerminalInput]
+    [clearPendingTerminalInput, currentProjectId, currentWorkspaceId, flushTerminalInput]
   )
 
   const writeTerminalImmediately = useCallback(
     async (block: TerminalBlockSnapshot, input: string): Promise<void> => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const terminalState = terminalStateKey
@@ -505,7 +505,7 @@ export function useTerminalSessions({
       }
       await enqueueTerminalInputWrite(terminalStateKey, terminalState.sessionId, input)
     },
-    [currentProjectId, currentWorkspaceName, enqueueTerminalInputWrite]
+    [currentProjectId, currentWorkspaceId, enqueueTerminalInputWrite]
   )
 
   const quickLaunchTerminal = useCallback(
@@ -516,7 +516,7 @@ export function useTerminalSessions({
 
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
 
@@ -536,7 +536,7 @@ export function useTerminalSessions({
           projectId: currentProject.id,
           projectDirectory: currentProject.directory,
           terminalBlockId: block.id,
-          workspaceName: currentWorkspace.name,
+          workspaceId: currentWorkspace.workspaceId,
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           columns: defaultTerminalDimensions.columns,
@@ -570,7 +570,7 @@ export function useTerminalSessions({
     },
     [
       currentProjectId,
-      currentWorkspaceName,
+      currentWorkspaceId,
       bindTerminalSession,
       currentProject,
       currentWorkspace,
@@ -586,7 +586,7 @@ export function useTerminalSessions({
     async (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => {
       const terminalStateKey = resolveCurrentTerminalStateKey(
         currentProjectId,
-        currentWorkspaceName,
+        currentWorkspaceId,
         block.id
       )
       const terminalState = terminalStateKey
@@ -604,7 +604,7 @@ export function useTerminalSessions({
         }
       }
     },
-    [currentProjectId, currentWorkspaceName, reconcileTerminalActionSnapshot]
+    [currentProjectId, currentWorkspaceId, reconcileTerminalActionSnapshot]
   )
 
   const findTerminalBlockIdForSession = useCallback((sessionId: string): string | null => {
@@ -614,7 +614,7 @@ export function useTerminalSessions({
   }, [])
 
   const moveTerminalSessionToWorkspace = useCallback(
-    (sessionId: string, targetWorkspaceName: string, targetBlockId?: string): boolean => {
+    (sessionId: string, targetWorkspaceId: string, targetBlockId?: string): boolean => {
       const sourceTerminalStateKey = findTerminalStateKeyBySession(
         terminalStatesRef.current,
         sessionId
@@ -626,7 +626,7 @@ export function useTerminalSessions({
 
       const targetTerminalStateKey = createTerminalStateKey(
         getProjectIdFromTerminalStateKey(sourceTerminalStateKey),
-        targetWorkspaceName,
+        targetWorkspaceId,
         getBlockIdFromTerminalStateKey(sourceTerminalStateKey)
       )
       let hasMigrated = false
@@ -638,7 +638,7 @@ export function useTerminalSessions({
           sessionId,
           targetProjectId: getProjectIdFromTerminalStateKey(sourceTerminalStateKey),
           targetBlockId,
-          targetWorkspaceName
+          targetWorkspaceId
         })
 
         hasMigrated = result.migrated

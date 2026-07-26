@@ -40,7 +40,7 @@ describe('Agent console graph update event', () => {
       graph: workbench.graph,
       projectDirectory: workbench.project.directory,
       sessionId: 'agent-main',
-      workspaceName: currentWorkspace.name
+      workspaceId: currentWorkspace.workspaceId
     }
 
     act(() => graphListener?.(event))

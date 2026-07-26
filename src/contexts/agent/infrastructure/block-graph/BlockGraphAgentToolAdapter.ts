@@ -61,22 +61,22 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly projectDirectory: string
     readonly reservedRegions?: AgentCreateTerminalBlockInput['reservedRegions']
     readonly size?: TerminalBlockSizeSnapshot
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<BlockGraphSnapshot>
   readonly createTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly name: string
     readonly memberBlockIds: readonly string[]
   }) => Promise<BlockGraphSnapshot>
   readonly deleteBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
   readonly dissolveTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
   }) => Promise<BlockGraphSnapshot>
   readonly disconnectTerminalBlocks: (
@@ -84,36 +84,36 @@ export interface BlockGraphAgentToolAdapterInput {
   ) => Promise<BlockGraphSnapshot>
   readonly getDefaultGraph: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<BlockGraphSnapshot>
   readonly moveBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly position: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly moveTerminalGroup: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly position: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly resizeTerminalBlock: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly position: BlockPositionSnapshot
     readonly size: TerminalBlockSizeSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly setTerminalGroupCollapsed: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly isCollapsed: boolean
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalBlockMetadata: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly name: string
     readonly description: string
@@ -121,13 +121,13 @@ export interface BlockGraphAgentToolAdapterInput {
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalExecutionConfig: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly executionConfig: TerminalExecutionConfigSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly updateTerminalGroupMetadata: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly terminalGroupId: string
     readonly name: string
   }) => Promise<BlockGraphSnapshot>
@@ -375,7 +375,7 @@ function toAgentBlockGraphSnapshot(graph: BlockGraphSnapshot): AgentBlockGraphSn
       size: { ...group.size }
     })),
     viewport: { ...graph.viewport },
-    workspaceName: graph.workspaceName
+    workspaceId: graph.workspaceId
   }
 }
 
@@ -391,7 +391,7 @@ function toAgentTerminalWorkflowPlan(
       launchCommand: node.launchCommand,
       name: node.name
     })),
-    workspaceName: plan.workspaceName
+    workspaceId: plan.workspaceId
   }
 }
 

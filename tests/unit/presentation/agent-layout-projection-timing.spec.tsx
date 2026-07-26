@@ -59,7 +59,7 @@ function Harness({
   const coordination = useAgentLayoutCoordination({
     clearTerminalGroupDropPreview: noop,
     currentProjectId: workbench.project.id,
-    currentWorkspaceName: currentWorkspace.name,
+    currentWorkspaceId: currentWorkspace.workspaceId,
     moveWorkbenchNode: noopAsync,
     moveWorkspaceAgent: noopAsync,
     nodeStore,
@@ -110,7 +110,7 @@ function createLayoutEvent(): AgentGraphUpdatedEvent {
     graph: createGraph({ x: 320, y: 720 }),
     projectDirectory: workbench.project.directory,
     sessionId: 'session-1',
-    workspaceName: currentWorkspace.name
+    workspaceId: currentWorkspace.workspaceId
   }
 }
 
@@ -131,7 +131,7 @@ function createGraph(position: { readonly x: number; readonly y: number }): Bloc
     projectId: 'project-alpha-project',
     terminalGroups: [],
     viewport: { x: 0, y: 0, zoom: 1 },
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -148,7 +148,7 @@ const workbench: WorkbenchSnapshot = {
       name: 'Agent 1',
       projectId: 'project-alpha-project',
       providerId: 'codex',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
   ],
   graph: createGraph({ x: 80, y: 80 })

@@ -29,7 +29,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminalBlock = graph.createTerminalBlock({
       name: 'Terminal',
@@ -66,11 +66,11 @@ describe('block graph filesystem repository', () => {
     ) as { graph: { id: string }; version: number }
 
     expect(await pathExists(join(projectDirectory, '.cleancode'))).toBe(false)
-    expect(graphMetadata).toMatchObject({ graph: { id: graph.id }, version: 1 })
+    expect(graphMetadata).toMatchObject({ graph: { id: graph.id }, version: 2 })
     expect(openedGraph?.toSnapshot()).toEqual({
       id: graph.id,
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       viewport: defaultCanvasViewport,
       blocks: [
         {
@@ -110,11 +110,11 @@ describe('block graph filesystem repository', () => {
     expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
   })
 
-  it('migrates a legacy default graph from the opened project directory', async () => {
+  it('ignores a legacy default graph inside the opened project directory', async () => {
     const legacyGraph = {
       id: 'legacy-graph',
       projectId: 'legacy-project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: [
         {
           id: 'legacy-terminal',
@@ -141,50 +141,18 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const openedGraph = await repository.findDefaultGraph(projectDirectory, 'main')
     const openedSnapshot = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
-    const migratedGraph = JSON.parse(
-      await readOnlyJsonFile(appStateDirectory, 'default-graph.json')
-    ) as { graph: { id: string; blocks: Array<{ name: string }> }; version: number }
 
-    expect(openedGraph?.toSnapshot()).toEqual({
-      ...legacyGraph,
-      viewport: defaultCanvasViewport,
-      blocks: [
-        {
-          ...legacyGraph.blocks[0],
-          launchCommand: '',
-          executionConfig: defaultTerminalExecutionConfig,
-          size: defaultTerminalBlockSize
-        }
-      ],
-      terminalGroups: [],
-      connections: []
-    })
-    expect(openedSnapshot).toEqual(openedGraph?.toSnapshot())
+    expect(openedGraph).toBeNull()
+    expect(openedSnapshot).toBeNull()
     await expect(readFile(legacyGraphPath, 'utf8')).resolves.toBe(legacyGraphContents)
-    expect(migratedGraph.version).toBe(1)
-    expect(migratedGraph.graph.id).toBe(legacyGraph.id)
-    expect(migratedGraph.graph).toEqual(
-      expect.objectContaining({
-        viewport: defaultCanvasViewport,
-        terminalGroups: [],
-        connections: []
-      })
-    )
-    expect(migratedGraph.graph.blocks).toEqual([
-      expect.objectContaining({
-        name: 'Legacy Terminal',
-        launchCommand: '',
-        executionConfig: defaultTerminalExecutionConfig,
-        size: defaultTerminalBlockSize
-      })
-    ])
+    await expect(findFilesNamed(appStateDirectory, 'default-graph.json')).resolves.toEqual([])
   })
 
-  it('migrates a legacy graph during initialization instead of shadowing it with an empty graph', async () => {
+  it('initializes fresh app state without loading a legacy project-local graph', async () => {
     const legacyGraph = {
       id: 'legacy-before-initialization',
       projectId: 'legacy-project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: []
     }
     const legacyDirectory = join(projectDirectory, '.cleancode', 'workspaces', 'main')
@@ -195,14 +163,12 @@ describe('block graph filesystem repository', () => {
     )
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
 
-    const initialized = await repository.initializeDefaultGraph(
-      projectDirectory,
-      BlockGraph.createDefault({ projectId: 'new-project', workspaceName: 'main' })
-    )
+    const freshGraph = BlockGraph.createDefault({ projectId: 'new-project', workspaceId: 'main' })
+    const initialized = await repository.initializeDefaultGraph(projectDirectory, freshGraph)
 
-    expect(initialized.id).toBe('legacy-before-initialization')
+    expect(initialized.id).toBe(freshGraph.id)
     expect((await repository.findDefaultGraphSnapshot(projectDirectory, 'main'))?.id).toBe(
-      'legacy-before-initialization'
+      freshGraph.id
     )
   })
 
@@ -210,7 +176,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await repository.initializeDefaultGraph(projectDirectory, graph)
 
@@ -248,7 +214,7 @@ describe('block graph filesystem repository', () => {
     const graph = BlockGraph.createDefault({
       id: 'initial-graph',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const initialization = repository.initializeDefaultGraph(projectDirectory, graph)
@@ -276,12 +242,12 @@ describe('block graph filesystem repository', () => {
     const firstGraph = BlockGraph.createDefault({
       id: 'first-graph',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const secondGraph = BlockGraph.createDefault({
       id: 'second-graph',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const [first, second] = await Promise.all([
@@ -300,7 +266,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await repository.initializeDefaultGraph(projectDirectory, graph)
 
@@ -340,7 +306,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     await repository.initializeDefaultGraph(
       projectDirectory,
-      BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+      BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     )
 
     const committed = await repository.transactDefaultGraph(
@@ -366,7 +332,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     await repository.initializeDefaultGraph(
       projectDirectory,
-      BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+      BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     )
 
     await expect(
@@ -401,7 +367,7 @@ describe('block graph filesystem repository', () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await repository.initializeDefaultGraph(projectDirectory, graph)

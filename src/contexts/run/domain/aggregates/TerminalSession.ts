@@ -108,8 +108,8 @@ export class TerminalSession {
     return this.scope.blockId
   }
 
-  get workspaceName(): string {
-    return this.scope.workspaceName
+  get workspaceId(): string {
+    return this.scope.workspaceId
   }
 
   get processId(): number | null {
@@ -186,7 +186,7 @@ export class TerminalSession {
       ...this.scope,
       id: this.id,
       terminalBlockId: this.terminalBlockId,
-      workspaceName: this.workspaceName,
+      workspaceId: this.workspaceId,
       workingDirectory: this.workingDirectory,
       processId: this.processIdValue,
       status: this.statusValue,

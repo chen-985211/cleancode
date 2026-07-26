@@ -74,7 +74,9 @@ function createProject(directory: string, name: string): ProjectSnapshot {
     name,
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'workspace-main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory,
         gitBranch: null,
         isCurrent: true

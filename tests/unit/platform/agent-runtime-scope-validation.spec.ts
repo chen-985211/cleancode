@@ -11,11 +11,10 @@ import {
 
 const command: AgentRuntimeScopeValidationCommand = {
   agentId: 'agent-1',
-  gitBranch: 'main',
   projectDirectory: '/repo/app',
   projectId: 'project-1',
   workspaceDirectory: '/repo/app',
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 describe('Agent runtime scope validation adapter', () => {
@@ -24,7 +23,6 @@ describe('Agent runtime scope validation adapter', () => {
 
     for (const invalidState of [
       { agentExists: false },
-      { gitBranch: 'feature/theme' },
       { projectRemembered: false },
       { workspaceDirectory: '/repo/other' }
     ]) {
@@ -41,9 +39,8 @@ function createAdapter(input: {
 }): AgentRuntimeScopeValidationAdapter {
   const scope = AgentConversationScope.create({
     agentId: command.agentId,
-    gitBranch: command.gitBranch,
     projectId: command.projectId,
-    workspaceName: command.workspaceName
+    workspaceId: command.workspaceId
   })
   const agent = AgentSession.start(scope, 'codex')
   const agents = {
@@ -62,10 +59,12 @@ function createAdapter(input: {
       name: 'app',
       workspaces: [
         {
+          workspaceId: command.workspaceId,
+          workspaceKind: 'default' as const,
+          displayName: 'main',
           directory: input.workspaceDirectory ?? command.workspaceDirectory,
-          gitBranch: input.gitBranch ?? command.gitBranch,
-          isCurrent: true,
-          name: command.workspaceName
+          gitBranch: input.gitBranch ?? 'main',
+          isCurrent: true
         }
       ]
     })),

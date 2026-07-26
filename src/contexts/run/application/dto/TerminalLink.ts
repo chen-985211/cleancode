@@ -2,7 +2,7 @@ import type { TerminalOwnerRef } from '../../domain/value-objects/TerminalRunSco
 
 export interface TerminalLinkIdentity {
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly sessionId: string
   readonly runId: string

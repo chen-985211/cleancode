@@ -22,25 +22,25 @@ export interface ActiveWorkflowRun {
 export class ActiveWorkflowRunRegistry {
   private readonly runsByProject = new Map<string, Map<string, ActiveWorkflowRun>>()
 
-  find(scope: { readonly projectDirectory: string; readonly workspaceName: string }) {
-    return this.runsByProject.get(scope.projectDirectory)?.get(scope.workspaceName)
+  find(scope: { readonly projectDirectory: string; readonly workspaceId: string }) {
+    return this.runsByProject.get(scope.projectDirectory)?.get(scope.workspaceId)
   }
 
   store(activeRun: ActiveWorkflowRun): void {
-    const { projectDirectory, workspaceName } = activeRun.command
+    const { projectDirectory, workspaceId } = activeRun.command
     let projectRuns = this.runsByProject.get(projectDirectory)
     if (!projectRuns) {
       projectRuns = new Map()
       this.runsByProject.set(projectDirectory, projectRuns)
     }
-    projectRuns.set(workspaceName, activeRun)
+    projectRuns.set(workspaceId, activeRun)
   }
 
   remove(activeRun: ActiveWorkflowRun): void {
-    const { projectDirectory, workspaceName } = activeRun.command
+    const { projectDirectory, workspaceId } = activeRun.command
     const projectRuns = this.runsByProject.get(projectDirectory)
-    if (projectRuns?.get(workspaceName) !== activeRun) return
-    projectRuns.delete(workspaceName)
+    if (projectRuns?.get(workspaceId) !== activeRun) return
+    projectRuns.delete(workspaceId)
     if (projectRuns.size === 0) this.runsByProject.delete(projectDirectory)
   }
 
@@ -53,7 +53,7 @@ export function createWorkflowRunOwners(activeRun: ActiveWorkflowRun): readonly 
   return activeRun.plan.nodes.map((node) => ({
     projectId: activeRun.command.projectId,
     projectDirectory: activeRun.command.projectDirectory,
-    workspaceName: activeRun.command.workspaceName,
+    workspaceId: activeRun.command.workspaceId,
     workspaceDirectory: activeRun.command.workspaceDirectory,
     gitBranch: activeRun.command.gitBranch,
     blockId: node.blockId

@@ -16,7 +16,7 @@ import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'
 interface UseAgentLayoutCoordinationInput {
   readonly clearTerminalGroupDropPreview: () => void
   readonly currentProjectId: string | null
-  readonly currentWorkspaceName: string | null
+  readonly currentWorkspaceId: string | null
   readonly moveWorkbenchNode: (
     event: globalThis.MouseEvent | TouchEvent,
     node: WorkbenchFlowNode
@@ -34,7 +34,7 @@ interface UseAgentLayoutCoordinationInput {
 export function useAgentLayoutCoordination({
   clearTerminalGroupDropPreview,
   currentProjectId,
-  currentWorkspaceName,
+  currentWorkspaceId,
   moveWorkbenchNode,
   moveWorkspaceAgent,
   nodeStore,
@@ -108,7 +108,7 @@ export function useAgentLayoutCoordination({
     dragProtectionByNodeIdRef.current.clear()
     setLayoutFocusRequest(null)
     setProtectedLayoutNodeIds(new Set())
-  }, [currentProjectId, currentWorkspaceName])
+  }, [currentProjectId, currentWorkspaceId])
 
   useWorkbenchLayoutFocus({
     nodeStore,

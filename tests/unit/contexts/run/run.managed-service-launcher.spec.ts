@@ -138,7 +138,7 @@ describe('managed service launcher', () => {
       details: {
         port: 41_001,
         attemptedProjectId: 'project-1',
-        attemptedWorkspaceName: 'main',
+        attemptedWorkspaceId: 'main',
         attemptedBlockId: 'api',
         attemptedSessionId: expect.any(String),
         attemptedRunId: expect.any(String),
@@ -169,7 +169,7 @@ describe('managed service launcher', () => {
         port: 3_000,
         attemptedProjectId: 'project-1',
         attemptedProjectDirectory: '/project',
-        attemptedWorkspaceName: 'main',
+        attemptedWorkspaceId: 'main',
         attemptedWorkspaceDirectory: '/project',
         attemptedGitBranch: 'main',
         attemptedBlockId: 'api',
@@ -343,7 +343,7 @@ describe('managed service launcher', () => {
     await vi.waitFor(() => expect(fixture.processes.starts).toHaveLength(1))
     const disposing = fixture.lifecycle.hardDisposeWorkspace({
       projectDirectory: '/project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     startGate.resolve()
 
@@ -607,7 +607,7 @@ function launchCommand() {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     blockId: 'api',
@@ -634,7 +634,7 @@ async function startDirectSession(sessions: TerminalSessionService) {
   return sessions.start({
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     terminalBlockId: 'api',

@@ -109,7 +109,7 @@ describe('Agent unified runtime readiness contract', () => {
       agentId: 'agent-1',
       cleancodeMcpEnabled: true,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const secondRegistration = harness.mcp.registrations[1]!
 
@@ -131,7 +131,7 @@ describe('Agent unified runtime readiness contract', () => {
     const lease = await harness.service.disposeAgent({
       agentId: 'agent-1',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     lease.release()
     expect(secondRegistration.dispose).toHaveBeenCalledOnce()
@@ -290,7 +290,7 @@ function attachCommand() {
     providerId: 'codex',
     terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -302,7 +302,7 @@ function completedToolResult(): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: false,
     output: { type: 'block_graph' },

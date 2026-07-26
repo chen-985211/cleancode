@@ -118,7 +118,7 @@ export class TerminalSessionService {
         await this.scopeValidation.validate({
           projectId: snapshot.projectId,
           projectDirectory: snapshot.projectDirectory,
-          workspaceName: snapshot.workspaceName,
+          workspaceId: snapshot.workspaceId,
           workspaceDirectory: snapshot.workspaceDirectory,
           gitBranch: snapshot.gitBranch
         })
@@ -270,7 +270,7 @@ export class TerminalSessionService {
       await this.scopeValidation.validate({
         projectId: owner.projectId,
         projectDirectory: owner.projectDirectory,
-        workspaceName: owner.workspaceName,
+        workspaceId: owner.workspaceId,
         workspaceDirectory: owner.workspaceDirectory,
         gitBranch: owner.gitBranch
       })
@@ -466,7 +466,7 @@ export class TerminalSessionService {
       await this.scopeValidation.validate({
         projectId: session.scope.projectId,
         projectDirectory: session.scope.projectDirectory,
-        workspaceName: session.scope.workspaceName,
+        workspaceId: session.scope.workspaceId,
         workspaceDirectory: session.scope.workspaceDirectory,
         gitBranch: session.scope.gitBranch
       })

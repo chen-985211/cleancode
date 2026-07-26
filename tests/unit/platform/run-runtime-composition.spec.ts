@@ -59,14 +59,15 @@ describe('Run runtime composition', () => {
     const managedOwner = {
       identity: {
         projectId: 'project-owner',
-        workspaceName: 'feature/api',
+        workspaceId: 'feature/api',
         blockId: 'api',
         sessionId: 'owner-session',
         runId: 'owner-run',
         generation: 3
       },
       projectName: 'Storefront',
-      workspaceName: 'feature/api',
+      workspaceId: 'feature/api',
+      workspaceDisplayName: 'feature/api',
       terminalName: 'API'
     }
     const resolveManagedServiceOwner: ManagedServiceOwnerResolver = vi.fn(async () => managedOwner)
@@ -78,7 +79,7 @@ describe('Run runtime composition', () => {
     expect(resolveManagedServiceOwner).toHaveBeenCalledWith({
       projectId: managedOwner.identity.projectId,
       projectDirectory: '/repo/storefront',
-      workspaceName: managedOwner.identity.workspaceName,
+      workspaceId: managedOwner.identity.workspaceId,
       blockId: managedOwner.identity.blockId,
       sessionId: managedOwner.identity.sessionId,
       runId: managedOwner.identity.runId,
@@ -137,7 +138,7 @@ const unusedWorkflowPlans: TerminalWorkflowPlanPort = {
 
 const attemptedIdentity = {
   projectId: 'project-attempt',
-  workspaceName: 'main',
+  workspaceId: 'main',
   blockId: 'web',
   sessionId: 'attempt-session',
   runId: 'attempt-run',
@@ -153,7 +154,7 @@ const managedConflictEvent: TerminalWorkflowEvent = {
       port: 3_000,
       attemptedProjectId: attemptedIdentity.projectId,
       attemptedProjectDirectory: '/repo/attempt',
-      attemptedWorkspaceName: attemptedIdentity.workspaceName,
+      attemptedWorkspaceId: attemptedIdentity.workspaceId,
       attemptedWorkspaceDirectory: '/repo/attempt',
       attemptedGitBranch: 'main',
       attemptedBlockId: attemptedIdentity.blockId,
@@ -162,7 +163,7 @@ const managedConflictEvent: TerminalWorkflowEvent = {
       attemptedGeneration: attemptedIdentity.generation,
       managedProjectId: 'project-owner',
       managedProjectDirectory: '/repo/storefront',
-      managedWorkspaceName: 'feature/api',
+      managedWorkspaceId: 'feature/api',
       managedWorkspaceDirectory: '/repo/storefront-api',
       managedGitBranch: 'feature/api',
       managedBlockId: 'api',

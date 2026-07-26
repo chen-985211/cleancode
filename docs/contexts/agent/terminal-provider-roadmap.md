@@ -34,7 +34,7 @@
 改造开始前，Agent 已经具备以下有价值且必须保留的 cleancode 产品能力：
 
 - 工作区内零个或多个稳定 Agent，拥有独立身份、名称和画布布局。
-- 按项目、工作区、Git 分支和 `agentId` 隔离的 Codex thread 绑定。
+- 按项目、稳定物理工作区和 `agentId` 隔离的 Codex thread 绑定。
 - 真实 Codex CLI PTY、独立输入输出和主题化 xterm 控制台。
 - 每个 Agent 独立的 CleanCode MCP 开关、URL、Bearer Token、审批队列和审计。
 - 对破坏性画布工具调用的 cleancode UI 审批、目标高亮和审批意图连线。
@@ -117,7 +117,7 @@ Run 当前已经具备可复用的技术基础：
 11. Provider 原生权限配置最多预批准当前 Agent 的 CleanCode MCP 工具，不得扩大 Shell、文件、Git、网络或其他 MCP 的权限。
 12. 所有破坏性画布工具继续进入 cleancode 领域策略、UI 审批和审计，不依赖 Provider 是否提示审批。
 13. Agent 不获得普通终端积木的组合、端口、连接、批量运行或工作流动作。
-14. Project 的 checkout、归档和删除生命周期继续通过稳定端口协调 Agent；Agent 再通过自己的终端端口使用 Run，不形成 Run 到 Agent 的反向依赖。
+14. Project 的物理工作区归档和删除生命周期继续通过稳定端口协调 Agent；默认工作区 checkout 保留同一 Agent 运行态。Agent 再通过自己的终端端口使用 Run，不形成 Run 到 Agent 的反向依赖。
 15. 新增 Provider 不得要求修改 Agent domain、Run domain、通用 Agent IPC 或通用 AgentConsole 的控制流。
 
 ## 目标架构
@@ -149,7 +149,7 @@ flowchart LR
 | ------------ | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | Agent        | 工作区 Agent、Provider、对话绑定、Agent launch、活动状态、MCP、审批、审计                   | PTY 实现、ANSI 模型、BlockGraph 内部模型                       |
 | Run          | Agent terminal、PTY、shell、前台任务技术生命周期、输入输出、resize、snapshot、attach/detach | Provider session、Agent 活动语义、MCP 审批                     |
-| Project      | 项目、工作区、Git 分支和 checkout/归档事务                                                  | Agent 或 Run 内部运行状态                                      |
+| Project      | 项目、稳定工作区、Git 分支元数据和 checkout/归档事务                                        | Agent 或 Run 内部运行状态                                      |
 | BlockGraph   | 终端积木、组合、连接、布局和执行意图                                                        | Agent terminal 和 Provider                                     |
 | Presentation | 画布投影、xterm 视图、创建 Agent 交互、状态反馈和审批交互                                   | 稳定 Agent、PTY、Provider session 或审批结果的权威状态         |
 | Platform     | Electron IPC 注册、进程入口和依赖装配                                                       | Provider 分支业务规则、Agent 生命周期规则或 Run 的终端模型实现 |
@@ -180,17 +180,12 @@ Run 不导入 Agent 聚合、Provider descriptor 或 MCP 类型。Agent 不直�
 interface PersistedWorkspaceAgentSnapshot {
   readonly agentId: string
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly providerId: string
   readonly name: string
   readonly layout: AgentLayoutSnapshot
   readonly cleancodeMcpEnabled: boolean
-  readonly conversations: readonly AgentConversationBindingSnapshot[]
-}
-
-interface AgentConversationBindingSnapshot {
-  readonly gitBranch: string | null
-  readonly sessionRef: ProviderSessionRef
+  readonly providerSessionRef: ProviderSessionRef | null
 }
 
 interface ProviderSessionRef {
@@ -201,7 +196,7 @@ interface ProviderSessionRef {
 }
 ```
 
-`providerId` 属于工作区 Agent，而不是分支绑定。由于 Agent 不支持切换 Provider，对话作用域继续使用 `projectId + workspaceName + gitBranch + agentId`；仓储和 Provider driver 必须校验 session ref 与当前 Agent Provider 一致。
+`providerId` 和单一 `providerSessionRef` 属于稳定工作区 Agent。对话作用域使用 `projectId + workspaceId + agentId`；Git 分支和目录只是 launch 元数据。仓储和 Provider driver 必须校验 session ref 与当前 Agent Provider 一致。
 
 ### 易失运行时
 
@@ -353,10 +348,11 @@ Run 生成的前台任务 started/exit 控制事件必须带当前运行身份�
 | `Ctrl+C` 取消当前 turn   | Provider 决定 | 保留            | 保留       | 保留                   |
 | Agent CLI 自然退出       | 结束          | 保留并回到shell | 保留       | 保留                   |
 | 重新启动 Agent           | 新 generation | 复用终端        | 保留       | 支持时恢复             |
-| 新对话                   | 替换          | 复用终端        | 保留       | 清除当前分支后重新绑定 |
+| 新对话                   | 替换          | 复用终端        | 保留       | 清除单一引用后重新绑定 |
 | 关闭 CleanCode MCP       | 替换          | 复用终端        | 保存偏好   | 支持时继续原对话       |
-| 删除 Agent               | 结束          | 终止并清理      | 删除       | 删除全部分支绑定       |
-| checkout/归档/移除项目   | 结束          | 按生命周期清理  | 按现有规则 | 按现有持久化规则       |
+| 删除 Agent               | 结束          | 终止并清理      | 删除       | 删除单一引用           |
+| 默认工作区 checkout      | 保留          | 保留            | 保留       | 保留                   |
+| 归档物理工作区/移除项目  | 结束          | 按生命周期清理  | 按现有规则 | 按现有持久化规则       |
 | 应用退出（本路线第一版） | 结束          | 终止            | 保留       | 保留                   |
 
 ## CleanCode MCP、审批与审计
@@ -365,7 +361,7 @@ CleanCode MCP 继续由 Agent 上下文拥有，Provider 只负责把当前 laun
 
 每次 Agent launch 的顺序：
 
-1. 重新校验项目、工作区、分支、Agent 身份和 Provider 可用性。
+1. 重新校验项目、稳定 `workspaceId`、物理目录、Agent 身份和 Provider 可用性；分支只作为 launch 元数据。
 2. 如果 Agent 启用 CleanCode MCP，创建本 launch 独立的 URL、Bearer Token 和审批作用域。
 3. Provider capability injector 生成仅作用于本次进程的 MCP 配置和追加指令。
 4. 启动 Agent CLI；Provider launch 启动后独立进入 running，MCP 继续等待当前 registration 完成认证 `initialize` 与 `notifications/initialized` 握手。
@@ -378,19 +374,21 @@ Provider 不支持安全的会话级 MCP 注入时，Agent 仍可使用基础终
 
 ## 工作区和应用生命周期
 
-### 工作区切换与 Git checkout
+### 物理工作区生命周期与 Git checkout
 
-Project 继续通过 Agent 生命周期端口协调物理工作目录：
+Project 只在物理工作区归档、移除或目录重绑定时通过 Agent 生命周期端口协调工作目录：
 
 1. 安装阻止迟到 attach/launch 的 lifecycle lease。
 2. 等待在途 Agent attach 和 launch 收束。
 3. Agent 关闭目标目录全部 launch 的 MCP 与审批准入。
 4. Agent 通过 `AgentTerminalRuntimePort` 停止并清理对应 Agent terminal。
-5. Project 执行 checkout、归档或删除并提交持久化状态。
-6. checkout 失败时恢复旧作用域 Agent；成功时由新分支作用域按各自 Provider session ref 恢复。
+5. Project 执行归档、删除或目录重绑定并提交持久化状态。
+6. 失败时按稳定 Provider session ref 恢复原物理工作区 Agent。
 7. 只有外部事实和持久化事实收束后才能 release、resolve 或 quarantine lease。
 
 Run 不直接读取 Agent 仓储；Agent 不绕过 Project 的生命周期事务直接决定分支归属。
+
+默认工作区的普通 Git checkout 不安装 lifecycle lease，不停止 Agent terminal，也不替换 Provider session ref；成功后只更新分支启动与显示元数据。
 
 ### 应用退出与恢复
 
@@ -431,7 +429,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 完成结果
 
-- 稳定 Agent 已持久化不可变 `providerId` 和版本化 `ProviderSessionRef`；schema v4 会把旧 Codex UUID 确定性迁移为 `codex-thread` 引用。
+- 稳定 Agent 已持久化不可变 `providerId` 和单一版本化 `ProviderSessionRef`；schema v5 只接受当前格式，不迁移旧 Codex UUID 或分支绑定。
 - `AgentProviderRegistry` 只组合 descriptor、detector、launcher、fresh session、session-ref codec、resume、telemetry 和 capability injector，并校验 capability 与实际 contribution 一致；通用 Agent service、IPC 和 UI 不按 Provider ID 分支。
 - Agent terminal 已成为 Run 的 `agent` owner，会话内的 Agent CLI 是可重复启动的 `ForegroundJob`。macOS/Linux 使用 POSIX 控制脚本，Windows 使用 ConPTY/PowerShell 控制脚本；CLI 退出只结束本次 launch，shell、终端模型和视图继续存在。
 - Agent Console 已删除独立 xterm registry、输出尾部缓存和原始输出 IPC，复用 Run 的 snapshot、sequence、attach/detach 与共享 xterm surface。
@@ -467,7 +465,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 ### TDD 与验证计划
 
 - Unit：有选区复制、无选区 `Ctrl+C` 进入 Agent 输入端口、Agent 控制台选择与终端输入隔离。
-- Unit：多 Agent 的 session、MCP、审批和分支绑定互不污染。
+- Unit：多 Agent 的 session、MCP、审批和稳定工作区绑定互不污染。
 - Integration：现有 Codex PTY 启动参数、thread reporter、MCP/default approval 和清理顺序。
 - Integration：Run interactive launch 在 `Ctrl+C` 和命令自然结束后继续接受 shell 输入。
 - Contract：Agent IPC 的 attach、write、resize、restart、MCP 重配和退出事件基线。
@@ -498,14 +496,14 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - 引入 `AgentProviderId` 和版本化 `ProviderSessionRef`。
 - Agent 创建命令要求一个 Provider；旧入口和旧数据确定性使用 `codex`。
 - `providerId` 创建后不可修改，不新增 update/switch 用例。
-- 分支绑定继续按 `projectId + workspaceName + gitBranch + agentId` 隔离。
-- 仓储 schema 升级；旧 `codexThreadId` 无损迁移为 `codex-thread` session ref。
+- Agent 绑定按 `projectId + workspaceId + agentId` 隔离，每个 Agent 只保留一个 Provider session ref。
+- 仓储使用 schema v5；产品未公开期间不迁移旧 `codexThreadId` 或旧分支绑定。
 - 未知 Provider、未知 session ref 版本或畸形值必须拒绝恢复，不得回退到其他 Provider 或最近会话。
 
 ### TDD 与验证计划
 
-- Unit：Provider 不变量、分支绑定、创建多个不同 Provider Agent、无切换入口。
-- Integration：旧存储各版本到新 schema 的确定性迁移、原 Codex UUID 保留、原子写入和损坏拒绝。
+- Unit：Provider 不变量、稳定工作区绑定、创建多个不同 Provider Agent、无切换入口。
+- Integration：schema v5 严格读取、单一 session ref、原子写入和旧/损坏版本拒绝。
 - Contract：创建/list Agent DTO 增加 Provider 后的向前一致性。
 
 ### 阶段验收
@@ -571,7 +569,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - CLI 退出后回到同一 shell；新的 launch 使用新 `launchId + generation`。
 - Run 生成并消费带 Token 的控制事件，不扫描 Provider TUI 文本或普通 shell prompt。
 - `Ctrl+C` 继续沿原始输入通道进入当前前台程序。
-- 删除、checkout、归档和项目移除可以按 agent owner 精确清理终端、模型、订阅和恢复资料。
+- 删除 Agent、物理工作区归档/移除和项目移除可以按 agent owner 精确清理终端、模型、订阅和恢复资料；默认工作区 checkout 保留它们。
 
 ### TDD 与验证计划
 
@@ -628,8 +626,8 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 1. Codex 所有现有用户能力和样式保持不变。
 2. 无选区 `Ctrl+C` 仍由 Codex TUI 原生处理；有选区仍复制。
-3. Codex CLI 退出后 Agent 节点、terminal、xterm 屏幕和分支绑定保留。
-4. 删除 Agent、checkout、归档和应用退出仍能精确清理全部资源。
+3. Codex CLI 退出后 Agent 节点、terminal、xterm 屏幕和 Provider session ref 保留。
+4. 删除 Agent、物理工作区归档/移除和应用退出仍能精确清理全部资源；默认工作区 checkout 保留运行态。
 5. 旧 Codex PTY 主路径不再接收新会话。
 
 ### 阶段退出条件
@@ -775,7 +773,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 | 层级        | 证明内容                                                                                  |
 | ----------- | ----------------------------------------------------------------------------------------- |
-| Domain Unit | 固定 Provider、分支绑定、Provider session ref、Agent 删除和多 Agent 隔离                  |
+| Domain Unit | 固定 Provider、稳定工作区绑定、Provider session ref、Agent 删除和多 Agent 隔离            |
 | App Unit    | attach/launch/restart/new conversation、MCP 重配、活动状态、迟到事件和生命周期 lease      |
 | Run Unit    | typed owner、foreground job、generation、terminal/job 退出分离和幂等清理                  |
 | Integration | 真实 PTY/shell、`Ctrl+C`、CLI 退出到 shell、重复 launch、Provider 参数、MCP、Hook 和迁移  |
@@ -794,7 +792,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 | `Ctrl+C` 被误映射成关闭 Agent     | 保留 raw input 路径；选区复制单独判断；真实 PTY 集成和 E2E 验证                    |
 | Agent CLI 退出误杀终端            | 独立 ForegroundJob 状态和退出事件；TerminalSession 只响应 shell/PTY 退出           |
 | 旧 launch 事件污染新会话          | 全部 Hook、MCP、退出和输出携带并校验 launchId、generation 和 Token                 |
-| Provider session 串用             | Provider 固定在 Agent；分支绑定归属校验；禁止最近会话和跨 Agent 回退               |
+| Provider session 串用             | Provider 固定在 Agent；稳定工作区归属校验；禁止最近会话和跨 Agent 回退             |
 | MCP 被静默禁用                    | 认证握手失败或超时时独立显示 unavailable，保留仍可用的 Provider launch             |
 | Provider 预批准扩大用户权限       | 只允许匹配 cleancode Server；破坏性动作继续走 cleancode 审批                       |
 | shell 命令注入或参数损坏          | 内建 Provider 使用结构化 executable/argv；平台编码集中在 Run；session ref 严格校验 |

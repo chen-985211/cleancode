@@ -6,7 +6,7 @@ import type {
 export interface TerminalDefinitionRuntimeApi {
   readonly updateTerminalDefinition?: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
     readonly name: string
     readonly description: string
