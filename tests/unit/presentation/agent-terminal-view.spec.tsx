@@ -48,6 +48,10 @@ describe('Agent shared terminal view', () => {
     const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
     const attachTerminalView = vi.fn(async (command) => createSnapshot(command.viewId))
     const detachTerminalView = vi.fn(async () => undefined)
+    const openTerminalLink = vi.fn(async () => ({
+      kind: 'external' as const,
+      target: 'https://example.com/agent'
+    }))
     const resizeAgentSession = vi.fn(async () => undefined)
     const writeAgentSession = vi.fn(async () => undefined)
     Object.defineProperty(window, 'cleancode', {
@@ -55,7 +59,8 @@ describe('Agent shared terminal view', () => {
       value: {
         ...createRuntimeApi({ resizeAgentSession, writeAgentSession }),
         attachTerminalView,
-        detachTerminalView
+        detachTerminalView,
+        openTerminalLink
       }
     })
 
@@ -85,6 +90,7 @@ describe('Agent shared terminal view', () => {
     act(() => {
       attachment.onInput('\x03')
       attachment.onDimensionsChange({ columns: 104, rows: 31 })
+      attachment.onOpenLink('https://example.com/agent')
       registry.write({
         output: { data: 'live output', sequence: 5 },
         scope: createSnapshotIdentity(),
@@ -103,6 +109,17 @@ describe('Agent shared terminal view', () => {
       columns: 104,
       rows: 31,
       sessionId: 'agent-session-1'
+    })
+    expect(openTerminalLink).toHaveBeenCalledWith({
+      blockId: 'agent-1',
+      generation: 3,
+      owner: { id: 'agent-1', kind: 'agent' },
+      projectId: 'project-1',
+      rawTarget: 'https://example.com/agent',
+      runId: 'agent-terminal:agent-session-1',
+      sessionId: 'terminal-session-1',
+      viewId: 'agent-view-1',
+      workspaceId: 'main'
     })
     expect(surface.write).toHaveBeenCalledWith({ data: 'live output', sequence: 5 })
 
