@@ -13,7 +13,7 @@ describe('terminal session workflow runtime adapter', () => {
       projectId: 'project-1',
       projectDirectory: '/project',
       blockId: 'install',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
       runId: 'workflow-run-1',

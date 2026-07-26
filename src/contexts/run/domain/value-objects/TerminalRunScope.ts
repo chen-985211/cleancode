@@ -1,4 +1,9 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import {
+  createCanvasObjectIdentity,
+  createCanvasObjectIdentityKey,
+  type CanvasObjectIdentity
+} from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export type TerminalOwnerRef =
   { readonly id: string; readonly kind: 'block' } | { readonly id: string; readonly kind: 'agent' }
@@ -6,7 +11,7 @@ export type TerminalOwnerRef =
 export interface TerminalRunOwner {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly blockId: string
@@ -25,15 +30,18 @@ export function createTerminalRunScope(input: TerminalRunScope): TerminalRunScop
 }
 
 export function createTerminalRunSlotKey(owner: TerminalRunOwner): string {
+  return createCanvasObjectIdentityKey(toTerminalCanvasObjectIdentity(owner))
+}
+
+function toTerminalCanvasObjectIdentity(owner: TerminalRunOwner): CanvasObjectIdentity {
   const ownerRef = resolveTerminalOwnerRef(owner)
-  return [
-    owner.projectId,
-    owner.projectDirectory,
-    owner.workspaceName,
-    owner.workspaceDirectory,
-    ownerRef.kind,
-    ownerRef.id
-  ].join('\0')
+
+  return createCanvasObjectIdentity({
+    projectId: owner.projectId,
+    workspaceId: owner.workspaceId,
+    objectKind: ownerRef.kind === 'block' ? 'terminal' : 'agent',
+    objectId: ownerRef.id
+  })
 }
 
 export function resolveTerminalOwnerRef(owner: TerminalRunOwner): TerminalOwnerRef {

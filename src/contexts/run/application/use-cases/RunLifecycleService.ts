@@ -147,26 +147,26 @@ export class RunLifecycleService {
 
   hardDisposeWorkspace(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<RunStartGateLease> {
     return this.hardDisposeWorkspaces({
       projectDirectory: command.projectDirectory,
-      workspaceNames: [command.workspaceName]
+      workspaceIds: [command.workspaceId]
     })
   }
 
   hardDisposeWorkspaces(command: {
     readonly projectDirectory: string
-    readonly workspaceNames: readonly string[]
+    readonly workspaceIds: readonly string[]
   }): Promise<RunStartGateLease> {
-    const workspaceNames = [...new Set(command.workspaceNames)]
-    if (workspaceNames.length === 0) return Promise.resolve(createInactiveRunStartGateLease())
+    const workspaceIds = [...new Set(command.workspaceIds)]
+    if (workspaceIds.length === 0) return Promise.resolve(createInactiveRunStartGateLease())
 
-    const blockers = workspaceNames.map((workspaceName): RunGateBlockerSpec => ({
-      quarantineKey: workspaceQuarantineKey(command.projectDirectory, workspaceName),
+    const blockers = workspaceIds.map((workspaceId): RunGateBlockerSpec => ({
+      quarantineKey: workspaceQuarantineKey(command.projectDirectory, workspaceId),
       resolvesPrefix: false,
       predicate: (owner) =>
-        owner.projectDirectory === command.projectDirectory && owner.workspaceName === workspaceName
+        owner.projectDirectory === command.projectDirectory && owner.workspaceId === workspaceId
     }))
 
     return this.runWithGate(`project:${command.projectDirectory}`, blockers)
@@ -185,17 +185,17 @@ export class RunLifecycleService {
   hardDisposeTerminal(command: {
     readonly projectId: string
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly blockId: string
   }): Promise<RunStartGateLease> {
     return this.runWithGate(`project:${command.projectDirectory}`, [
       {
-        quarantineKey: `${workspaceQuarantineKey(command.projectDirectory, command.workspaceName)}\0block:${command.blockId}`,
+        quarantineKey: `${workspaceQuarantineKey(command.projectDirectory, command.workspaceId)}\0block:${command.blockId}`,
         resolvesPrefix: false,
         predicate: (owner) =>
           owner.projectId === command.projectId &&
           owner.projectDirectory === command.projectDirectory &&
-          owner.workspaceName === command.workspaceName &&
+          owner.workspaceId === command.workspaceId &&
           owner.blockId === command.blockId
       }
     ])
@@ -203,10 +203,10 @@ export class RunLifecycleService {
 
   isWorkspaceQuarantined(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): boolean {
     const projectKey = projectQuarantinePrefix(command.projectDirectory)
-    const key = workspaceQuarantineKey(command.projectDirectory, command.workspaceName)
+    const key = workspaceQuarantineKey(command.projectDirectory, command.workspaceId)
     return [...this.quarantinedBlockers.keys()].some(
       (candidate) =>
         candidate === projectKey || candidate === key || candidate.startsWith(`${key}\0`)
@@ -434,6 +434,6 @@ function projectQuarantinePrefix(projectDirectory: string): string {
   return `project:${projectDirectory}\0`
 }
 
-function workspaceQuarantineKey(projectDirectory: string, workspaceName: string): string {
-  return `${projectQuarantinePrefix(projectDirectory)}workspace:${workspaceName}`
+function workspaceQuarantineKey(projectDirectory: string, workspaceId: string): string {
+  return `${projectQuarantinePrefix(projectDirectory)}workspace:${workspaceId}`
 }

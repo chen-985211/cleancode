@@ -6,7 +6,7 @@ export function createAgentLifecycle(service: AgentSessionService): WorkspaceAge
     disposeProject: (projectDirectory) => service.disposeProject(projectDirectory),
     disposeWorkspace: (command) => service.disposeSession(command),
     isWorkspaceQuarantined: (command) =>
-      service.isWorkspaceQuarantined(command.projectDirectory, command.workspaceName),
+      service.isWorkspaceQuarantined(command.projectDirectory, command.workspaceId),
     resolveProjectQuarantines: (projectDirectory) =>
       service.resolveProjectQuarantines(projectDirectory),
     suspend: (workspaceDirectory) => service.suspendWorkspaceDirectory(workspaceDirectory)

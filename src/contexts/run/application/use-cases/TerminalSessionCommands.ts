@@ -14,7 +14,7 @@ import type { TerminalViewOutputEvent } from '../ports/TerminalModelPort'
 
 export interface TerminalViewIdentityCommand {
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly sessionId: string
   readonly runId: string
@@ -32,7 +32,7 @@ export interface StartTerminalSessionCommand {
   readonly projectDirectory: string
   readonly terminalBlockId: string
   readonly owner?: TerminalOwnerRef
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly workingDirectory: string

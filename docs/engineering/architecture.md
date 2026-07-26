@@ -34,6 +34,7 @@ Clean Architecture 用于定义代码分层、依赖方向、用例入口、端�
 - 运行期 Agent 只能通过应用层用例操作系统，不得直接修改领域对象、数据库、文件存储或 UI 状态。
 - 所有运行期 Agent 工具调用都必须形成可审计记录。回放和撤销尚未实现，不得把审计记录表述为可执行操作历史。
 - 新增积木能力时必须先明确所属上下文与分层职责，不得把业务规则硬编码在 UI 组件或基础设施适配器里。
+- 所有画布对象必须使用 Shared Kernel 的规范身份 `projectId + workspaceId + objectKind + objectId`。Git 分支、Git 初始化状态、目录、显示名和运行实例 ID 都是元数据或其他事实，不得改变画布对象身份。
 
 ## 分层规则
 
@@ -165,7 +166,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - `TerminalSession`：运行上下文的类型化 owner PTY 会话聚合根。
 - `ForegroundJob`：长期交互 shell 中一次受管前台任务的技术聚合。
 - `WorkflowRun`：运行上下文的终端依赖工作流聚合根。
-- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、固定 Provider、名称、画布布局、CleanCode MCP 开关和各 Git 分支的 Provider session ref。
+- `AgentSession`：Agent 上下文的聚合根，负责工作区 Agent 的稳定身份、固定 Provider、名称、画布布局、CleanCode MCP 开关和单一 Provider session ref。
 
 聚合外部只能通过聚合根修改聚合内部状态。任何代码不得绕过聚合根直接修改聚合内部实体或集合。
 
@@ -188,7 +189,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 业务规则的唯一事实来源：领域层。
 - 业务动作入口的唯一事实来源：应用层用例。
 - 已提交业务状态的唯一事实来源：应用层仓储端口背后的持久化实现。
-- 项目、项目目录、分支工作区和 Git 分支绑定的唯一事实来源：`Project` 聚合。
+- 项目、项目目录、稳定工作区 ID、工作区类型/目录/显示名和 Git 分支绑定的唯一事实来源：`Project` 聚合。
 - 最近项目目录列表与当前项目选择的唯一事实来源：`ProjectRegistry` 聚合。
 - 积木图结构的唯一事实来源：`BlockGraph` 聚合。
 - 普通终端和 Agent terminal 的 PTY 会话生命周期、类型化 owner 与终端运行身份的唯一事实来源：Run 上下文的 `TerminalSession` 聚合。
@@ -196,7 +197,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 当前终端运行的 `sessionId + runId + generation` 与退出保留/恢复资格由 Run 上下文解释。live PTY 与权威终端模型可由独立 Provider 跨 Electron 应用进程持有；版本化 checkpoint 和有界输出记录是 Run 基础设施恢复资料，不是已提交业务状态。端口租约与实际端点仍是易失运行时事实，warm attach 后必须重新验证监听所有权；端口策略和注入方式仍是 BlockGraph 持久化的服务意图。
 - 运行期 Agent 操作历史的唯一事实来源：Agent 上下文的审计记录。
 - 工作区 Agent 的稳定身份、固定 Provider、名称、已提交画布布局和 CleanCode MCP 开关的唯一事实来源：`AgentSession` 聚合及其仓储。
-- Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、工作区、Git 分支和 `agentId` 组成，绑定值是版本化 Provider session ref。
+- Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、稳定工作区 ID 和 `agentId` 组成，绑定值是版本化 Provider session ref。
 - Provider 对话正文的唯一事实来源：对应 CLI 自身；cleancode 不复制或解析对话正文。
 - Agent terminal 的 PTY、权威屏幕、sequence 和视图由 Run 拥有；当前 Provider launch、activity、MCP URL/Token、Hook 和审批属于 Agent 易失状态。
 - 选择、悬停、拖动中尺寸等临时交互状态的唯一事实来源：表现层状态。已经提交的积木图布局由 `BlockGraph` 聚合拥有，已经提交的 Agent 画布布局由 `AgentSession` 聚合拥有。
@@ -210,7 +211,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 
 运行期 Agent 工具调用进入系统的唯一入口是应用层用例。运行期 Agent 桥接层属于基础设施层入站适配器，负责把 Codex、Claude Code、Gemini CLI 或其他本地 CLI Agent 的输入转换为应用层命令。
 
-Agent 会话必须按项目、工作区、Git 分支和 `agentId` 隔离。Provider 在 Agent 创建时确定且不可切换；一个工作区允许同时拥有多个相同或不同 Provider Agent。每个 Agent 通过应用层端口取得独立 agent-owned Run terminal、Provider launch、MCP 与审批，但共享工作目录，应用不得把这种共享误表示为文件级隔离。同一物理工作目录在同一时刻最多只能由一个 Git 分支作用域接管；项目上下文切换该目录的 Git 分支前，必须通过应用层端口等待该目录的全部 Agent terminal 挂起。Git 检出失败时必须恢复全部旧作用域 Agent，检出成功后由新分支作用域接管。非 Git 项目使用显式的无分支持久化作用域；Git detached HEAD 的 Agent 对话必须是易失的。
+Agent 会话必须按项目、稳定 `workspaceId` 和 `agentId` 隔离。Provider 在 Agent 创建时确定且不可切换；一个工作区允许同时拥有多个相同或不同 Provider Agent。每个 Agent 通过应用层端口取得独立 agent-owned Run terminal、Provider launch、MCP 与审批，但共享工作目录，应用不得把这种共享误表示为文件级隔离。默认物理工作区执行普通 Git checkout 时，分支只更新 launch 与显示元数据，不得替换 Agent 身份、terminal、PTY 或 Provider session ref。非 Git 状态、普通分支和 detached HEAD 都不创造新的工作区或 Agent 身份。
 
 cleancode 只持久化版本化 Provider session ref，并通过该 Provider 的正式恢复入口恢复。引用只能来自仍匹配当前 Agent runtime session 与 launch generation 的结构化通知，或由 cleancode 通过 Provider 正式 session 参数预分配并在本次前台 launch 确认启动后接受；预分配引用不得在启动前持久化。系统不能扫描历史目录、解析终端输出、猜测最近会话或跨 Agent 回退。Provider registry 负责差异；Agent domain、Run domain、通用 IPC 和 UI 不得按 Provider ID 分支。
 
@@ -260,7 +261,7 @@ BlockGraph 领域层负责校验终端依赖图并生成不可变计划；Run �
 
 BlockGraph 持久化服务对端口的意图：`fixed`、`preferred` 或 `auto` 策略，`none`、环境变量或安全参数后缀注入，以及 `http`、`https` 或 `tcp` 协议。Run 在每次启动时产生唯一实际端点；直接启动、组合批量启动和依赖工作流中的受管服务必须复用同一 Run 启动语义。服务就绪、运行事件、界面地址和安全打开都以该实际端点为准，不能把“某个进程可连接配置端口”当成本次服务已经就绪。
 
-Project 在主工作区 checkout、worktree 归档、项目移除和权威 Git 同步清理失效工作区时，通过自己拥有的 `WorkspaceRunLifecyclePort` 排空并阻止旧 Run 作用域重启；BlockGraph 删除终端时通过自己拥有的 `TerminalRunLifecyclePort` 完成同一终端的硬清理。Run 每次启动还通过自己拥有的 `RunRuntimeScopeValidationPort` 向 Project 的公开用例校验项目、工作区目录和 Git 分支身份。跨上下文契约及失败恢复见[上下文地图](context-map.md)。
+Project 在 worktree 归档、项目移除和权威 Git 同步清理失效或目录重绑定的物理工作区时，通过自己拥有的 `WorkspaceRunLifecyclePort` 排空并阻止旧 Run 作用域重启；默认工作区 checkout 不触发清理。BlockGraph 删除终端时通过自己拥有的 `TerminalRunLifecyclePort` 完成同一终端的硬清理。Run 每次启动还通过自己拥有的 `RunRuntimeScopeValidationPort` 向 Project 的公开用例校验项目、稳定工作区 ID 和物理目录；Git 分支不参与 owner 身份。跨上下文契约及失败恢复见[上下文地图](context-map.md)。
 
 ### 终端依赖工作流
 
@@ -466,6 +467,6 @@ Run 应用层 TerminalSession / ForegroundJob
 
 ## 项目数据
 
-当前持久化实现位于 Electron 应用数据目录：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储以版本 `1` 保存服务端口意图，并把旧版 TCP 固定端口确定性迁移为 `fixed + none + tcp`；未知版本或畸形配置必须拒绝读取。工作区 Agent 仓储使用 schema v4，支持旧版单 Agent/分支绑定迁移，并把原 Codex thread UUID 保留为版本化 `codex-thread` 引用。Run 终端恢复目录另存 checkpoint 和有界追加输出；它只用于技术恢复，不得被 Project、BlockGraph、UI 或 Agent 当作可编辑业务仓储。写入持久化业务状态必须通过应用层仓储端口。
+当前持久化实现位于 Electron 应用数据目录的当前状态代际：项目及当前项目选择、积木图、工作区 Agent 定义及其会话绑定使用版本化 JSON，Agent 审计记录使用 JSONL。积木图仓储只接受版本 `2`，工作区 Agent 仓储只接受 schema v5；旧版本和项目内 `.cleancode` 状态不迁移、不回写。产品尚未公开期间通过新的状态根生成全新当前数据。Run 终端恢复目录另存 checkpoint 和有界追加输出；它只用于技术恢复，不得被 Project、BlockGraph、UI 或 Agent 当作可编辑业务仓储。写入持久化业务状态必须通过应用层仓储端口。
 
 当前没有工作流导入、导出、运行实例恢复、审计回放或撤销能力。这些方向只有在领域语义、用例和测试落地后才能迁入本文的当前事实。

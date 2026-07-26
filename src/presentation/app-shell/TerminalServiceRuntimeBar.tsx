@@ -202,14 +202,14 @@ function createConflictMessage(
       return t('service.conflictStarting', {
         port: conflict.port,
         projectName: owner.projectName,
-        workspaceName: owner.workspaceName,
+        workspaceName: owner.workspaceDisplayName,
         terminalName: owner.terminalName
       })
     }
     return t('service.conflictManaged', {
       port: conflict.port,
       projectName: owner.projectName,
-      workspaceName: owner.workspaceName,
+      workspaceName: owner.workspaceDisplayName,
       terminalName: owner.terminalName
     })
   }

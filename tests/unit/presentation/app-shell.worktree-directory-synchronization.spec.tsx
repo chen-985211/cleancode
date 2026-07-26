@@ -111,7 +111,7 @@ describe('app shell worktree directory synchronization', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     )
     expect(terminateTerminal).not.toHaveBeenCalled()
@@ -169,7 +169,7 @@ describe('app shell worktree directory synchronization', () => {
     await waitFor(() =>
       expect(createTerminalBlock).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/sidebar',
+        workspaceId: 'feature/sidebar',
         name: 'Terminal 1',
         description: '本地终端',
         position: { x: 160, y: 220 }
@@ -178,7 +178,7 @@ describe('app shell worktree directory synchronization', () => {
     await waitFor(() =>
       expect(updateTerminalDefinition).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/sidebar',
+        workspaceId: 'feature/sidebar',
         blockId: 'terminal-worktree',
         name: 'Terminal 1',
         description: '本地终端',
@@ -212,7 +212,7 @@ describe('app shell worktree directory synchronization', () => {
         )
     )
     const switchBranchWorkspace = vi.fn(async (command) =>
-      createWorkbenchWithTerminal(command.workspaceName)
+      createWorkbenchWithTerminal(command.workspaceId)
     )
 
     Object.defineProperty(window, 'cleancode', {
@@ -232,7 +232,7 @@ describe('app shell worktree directory synchronization', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     )
 
@@ -241,12 +241,12 @@ describe('app shell worktree directory synchronization', () => {
     await waitFor(() =>
       expect(switchBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
     await waitForStableWorkspaceSelectionWindow()
     expect(listTerminalWorkingDirectories).toHaveBeenCalled()
-    expect(switchBranchWorkspace.mock.calls.map(([command]) => command.workspaceName)).toEqual([
+    expect(switchBranchWorkspace.mock.calls.map(([command]) => command.workspaceId)).toEqual([
       'feature/sidebar',
       'main'
     ])
@@ -305,25 +305,29 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
 }
 
 function createWorkbenchWithTerminal(
-  currentWorkspaceName: string,
+  currentWorkspaceId: string,
   options: { readonly withoutTerminal?: boolean } = {}
 ): WorkbenchSnapshot {
-  const isMainWorkspace = currentWorkspaceName === 'main'
+  const isMainWorkspace = currentWorkspaceId === 'main'
   const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-    workspaceName: currentWorkspaceName,
+    workspaceId: currentWorkspaceId,
     workspaceDirectory: isMainWorkspace
       ? '/tmp/alpha-project'
       : '/tmp/alpha-project-worktrees/feature-sidebar',
     gitBranch: isMainWorkspace ? 'main' : 'feature/sidebar',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/tmp/alpha-project',
         gitBranch: 'main',
         isCurrent: isMainWorkspace
       },
       {
-        name: 'feature/sidebar',
+        workspaceId: 'feature/sidebar',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/sidebar',
         directory: '/tmp/alpha-project-worktrees/feature-sidebar',
         gitBranch: 'feature/sidebar',
         isCurrent: !isMainWorkspace
@@ -354,24 +358,24 @@ function createWorkbenchWithTerminal(
 
 function createTerminalSessionSnapshot(
   sessionId: string,
-  workspaceName: string,
+  workspaceId: string,
   workingDirectory: string
 ): TerminalSessionSnapshot {
   const workspaceDirectory =
-    workspaceName === 'main' ? '/tmp/alpha-project' : '/tmp/alpha-project-worktrees/feature-sidebar'
+    workspaceId === 'main' ? '/tmp/alpha-project' : '/tmp/alpha-project-worktrees/feature-sidebar'
 
   return {
     id: sessionId,
     projectId: 'project-alpha-project',
     projectDirectory: '/tmp/alpha-project',
     workspaceDirectory,
-    gitBranch: workspaceName === 'main' ? 'main' : 'feature/sidebar',
+    gitBranch: workspaceId === 'main' ? 'main' : 'feature/sidebar',
     blockId: 'terminal-1',
     sessionId,
     runId: `${sessionId}-run`,
     generation: 1,
     terminalBlockId: 'terminal-1',
-    workspaceName,
+    workspaceId,
     workingDirectory,
     processId: 1001,
     status: 'running',

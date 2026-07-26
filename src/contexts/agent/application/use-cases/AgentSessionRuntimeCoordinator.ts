@@ -1,11 +1,12 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { createCanvasObjectIdentityKey } from '../../../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export interface AgentSessionRuntimeOwner {
   readonly agentId: string
   readonly projectDirectory: string
   readonly projectId: string
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface AgentRuntimeAttachmentLease {
@@ -80,8 +81,8 @@ export class AgentSessionRuntimeCoordinator {
     this.releaseQuarantinedBlockers(key, prefix)
   }
 
-  isWorkspaceQuarantined(projectDirectory: string, workspaceName: string): boolean {
-    return this.isQuarantined(`project:${projectDirectory}\0workspace:${workspaceName}`)
+  isWorkspaceQuarantined(projectDirectory: string, workspaceId: string): boolean {
+    return this.isQuarantined(`project:${projectDirectory}\0workspace:${workspaceId}`)
   }
 
   resolveProjectQuarantines(projectDirectory: string): void {
@@ -185,13 +186,13 @@ export class AgentSessionRuntimeCoordinator {
 
   runWithWorkspaceLease(
     projectDirectory: string,
-    workspaceName: string,
+    workspaceId: string,
     predicate: OwnerPredicate,
     operation: (owner: AgentSessionRuntimeOwner) => Promise<void>
   ): Promise<AgentRuntimeAttachmentLease> {
     return this.runWithAttachmentLease(
       `project:${projectDirectory}`,
-      `project:${projectDirectory}\0workspace:${workspaceName}`,
+      `project:${projectDirectory}\0workspace:${workspaceId}`,
       false,
       predicate,
       operation
@@ -200,14 +201,14 @@ export class AgentSessionRuntimeCoordinator {
 
   runWithAgentLease(
     projectId: string,
-    workspaceName: string,
+    workspaceId: string,
     agentId: string,
     predicate: OwnerPredicate,
     operation: (owner: AgentSessionRuntimeOwner) => Promise<void>
   ): Promise<AgentRuntimeAttachmentLease> {
     return this.runWithAttachmentLease(
       `project-id:${projectId}`,
-      `project-id:${projectId}\0agent:${workspaceName}:${agentId}`,
+      `project-id:${projectId}\0agent:${workspaceId}:${agentId}`,
       false,
       predicate,
       operation
@@ -317,21 +318,26 @@ export function createAgentSessionRuntimeOwner(
     projectDirectory: input.projectDirectory,
     projectId: input.projectId,
     workspaceDirectory: input.workspaceDirectory,
-    workspaceName: input.workspaceName
+    workspaceId: input.workspaceId
   }
 }
 
 export function isOwnedAgentSession(
   owner: AgentSessionRuntimeOwner,
-  session: Pick<AgentSessionRuntimeOwner, 'agentId' | 'projectId' | 'workspaceDirectory'>
+  session: Pick<AgentSessionRuntimeOwner, 'agentId' | 'projectId' | 'workspaceId'>
 ): boolean {
   return (
     session.agentId === owner.agentId &&
     session.projectId === owner.projectId &&
-    session.workspaceDirectory === owner.workspaceDirectory
+    session.workspaceId === owner.workspaceId
   )
 }
 
 function createAgentSessionRuntimeOwnerKey(owner: AgentSessionRuntimeOwner): string {
-  return `${owner.projectId}\0${owner.workspaceDirectory}\0${owner.agentId}`
+  return createCanvasObjectIdentityKey({
+    projectId: owner.projectId,
+    workspaceId: owner.workspaceId,
+    objectKind: 'agent',
+    objectId: owner.agentId
+  })
 }

@@ -206,7 +206,7 @@ function renderNavigationHook({
       currentWorkbench: null,
       getNodes: () => nodes,
       onSelectWorkspace:
-        vi.fn<(workbench: WorkbenchSnapshot, workspaceName: string) => Promise<void>>(),
+        vi.fn<(workbench: WorkbenchSnapshot, workspaceId: string) => Promise<void>>(),
       reactFlowInstanceRef,
       revealProjectSidebar: vi.fn(),
       selectedNodeId,

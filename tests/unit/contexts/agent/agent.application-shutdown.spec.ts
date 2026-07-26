@@ -218,7 +218,7 @@ function attachCommand() {
     projectId: 'project-1',
     terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -250,7 +250,7 @@ function completedResult(toolCallId: string): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: false,
     output: { type: 'block_graph' },

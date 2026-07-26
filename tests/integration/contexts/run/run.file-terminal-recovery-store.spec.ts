@@ -306,7 +306,7 @@ function identityShape() {
   return {
     projectId: 'project-app',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main' as string | null,
     blockId: 'block-1',

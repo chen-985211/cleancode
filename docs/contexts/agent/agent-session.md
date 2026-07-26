@@ -8,7 +8,7 @@
 
 ## 三类对象必须区分
 
-- 工作区 Agent 是可持久化的稳定对象：`agentId`、固定 `providerId`、名称、画布布局、CleanCode MCP 偏好和各 Git 分支的 Provider 对话绑定。
+- 工作区 Agent 是可持久化的稳定对象：`agentId`、固定 `providerId`、名称、画布布局、CleanCode MCP 偏好和一个 Provider 对话绑定。
 - Agent terminal 是 Run 上下文拥有的长期 shell/PTY、权威终端模型和可丢弃视图。它使用类型化 `agent` owner，但不是 TerminalBlock，也不参与组合、连线、端口治理或终端工作流。
 - Agent launch 是 Agent terminal 内一次 Provider CLI 前台任务。CLI 退出只结束 launch，底层 shell 和 Agent terminal 继续运行；删除 Agent 或工作区生命周期清理才终止 terminal。
 
@@ -22,14 +22,13 @@
 | Agent Provider        | CLI 的 detector、launcher、resume、telemetry 和能力注入 contribution                |
 | 注册 Provider catalog | registry 中应用支持的完整 Provider descriptor 集合，不表示本机 CLI 当前可创建       |
 | 可创建 Provider       | 注册 catalog 中经当前环境检测为 `installed`、可用于一次新建操作的 Provider          |
-| 对话作用域            | `projectId + workspaceName + gitBranch + agentId` 形成的隔离键                      |
+| 对话作用域            | `projectId + workspaceId + agentId` 形成的稳定画布对象身份                          |
 | Provider session ref  | Provider 正式报告或由正式 session 参数分配的版本化对话引用                          |
 | Agent terminal        | Run 按 `owner.kind = agent` 承载的长期 shell、PTY、终端模型和视图                   |
 | Agent launch          | Agent terminal 中一次带 generation 的 Provider CLI 前台任务                         |
 | Agent activity        | Provider 结构化事件投影的 `idle/working/waiting_input/waiting_approval/unavailable` |
 | 终端源主题            | Agent terminal generation 创建时采用的浅色或深色 palette；该 generation 内保持不变  |
 | 持久恢复              | 通过当前 Provider 的正式 resume 参数恢复已保存的 session ref                        |
-| 易失会话              | 不保存或复用对话绑定的运行方式，例如 detached HEAD                                  |
 | 生命周期隔离          | 外部所有权事务部分提交后保留的 attach blocker；同步完成后显式解除                   |
 
 ## 聚合、Provider 与持久化
@@ -38,19 +37,19 @@
 
 Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加载时按空列表处理，不得合成 `default-agent`、默认 Codex 身份或启动任何 Provider。
 
-手动创建由 Presentation 生成稳定 `agentId`，同一次选择流程的失败重试必须复用该 ID。Presentation 还必须通过主画布统一创建协调器，依据终端、终端组合与 Agent 的当前投影以及在途创建预留一个有限 `initialPosition`；该坐标是跨节点类型的用户可见布局意图，不是 Agent domain 私有落位策略。应用层按 `projectId + workspaceName` 串行检查和保存；相同 ID 与 Provider 的重复请求返回已提交 Agent，相同 ID 请求其他 Provider 以 `AGENT_CREATION_CONFLICT` 拒绝。Agent domain 根据事务内重新读取的工作区 Agent 原子分配唯一名称，校验 `initialPosition`，组合领域默认尺寸并持久化完整布局。Presentation 的预留阻止跨终端与 Agent 的并发重叠，Agent 事务阻止重名和重复身份；任一创建失败都必须由 Presentation 释放对应预留。保存前还必须在 Project 写事务内验证项目仍被记住且项目 ID、工作区名称、目录和 Git 分支完整匹配；失效作用域以 `AGENT_WORKSPACE_SCOPE_STALE` 拒绝且不保存。
+手动创建由 Presentation 生成稳定 `agentId`，同一次选择流程的失败重试必须复用该 ID。Presentation 还必须通过主画布统一创建协调器，依据终端、终端组合与 Agent 的当前投影以及在途创建预留一个有限 `initialPosition`；该坐标是跨节点类型的用户可见布局意图，不是 Agent domain 私有落位策略。应用层按 `projectId + workspaceId` 串行检查和保存；相同 ID 与 Provider 的重复请求返回已提交 Agent，相同 ID 请求其他 Provider 以 `AGENT_CREATION_CONFLICT` 拒绝。Agent domain 根据事务内重新读取的工作区 Agent 原子分配唯一名称，校验 `initialPosition`，组合领域默认尺寸并持久化完整布局。Presentation 的预留阻止跨终端与 Agent 的并发重叠，Agent 事务阻止重名和重复身份；任一创建失败都必须由 Presentation 释放对应预留。保存前还必须在 Project 写事务内验证项目仍被记住且项目 ID、`workspaceId`、目录和 Agent 定义完整匹配；分支只作为 launch 元数据。失效作用域以 `AGENT_WORKSPACE_SCOPE_STALE` 拒绝且不保存。
 
 `AgentSession` 保持以下不变量：
 
 1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。
 2. `providerId` 在创建时确定，没有领域方法、用例或 IPC 可以切换；attach 携带的 Provider 与持久化事实不一致时必须拒绝。
-3. 同一个 Agent 可以为不同 Git 分支保存不同 Provider session ref；引用只能绑定到该 Agent、项目和工作区的当前作用域。
+3. 同一个 Agent 只保存一个 Provider session ref；引用绑定到该 Agent、项目和稳定物理工作区，不因 Git 分支 checkout 改变。
 4. session ref 必须由固定 Provider 的 codec 校验 kind、版本和值。Codex 使用正式 thread UUID；Claude Code 使用正式 session UUID；OpenCode 使用正式 `ses_` session ID；Gemini 使用 cleancode 通过正式 `--session-id` 参数预分配的 UUID，并只在本次前台 launch 确认启动后持久化，再通过正式 `--resume` 恢复。系统不扫描历史目录、终端输出或“最近会话”。Claude Code 的 `SessionStart` 只证明进程启动，空会话尚不可恢复；只有首次 `UserPromptSubmit` Hook 才确认并持久化该 session ref。
 5. 同一工作区的多个相同或不同 Provider Agent 拥有独立 terminal、launch、对话、MCP、审批和审计，但共享工作目录。
 6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；URL、Token、Hook、活动状态、终端和 launch 都不持久化。
 7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
 
-文件系统仓储当前使用 schema v4。旧版 Codex `codexThreadId` 会无损迁移为 `{ kind: "codex-thread", formatVersion: 1 }`；未知 schema、未知 session ref 版本或畸形数据必须拒绝读取。cleancode 不复制或解析 Provider 对话正文。
+文件系统仓储当前只接受 schema v5，每个 Agent 只有一个 `providerSessionRef`。旧 schema、未知 session ref 版本或畸形数据必须拒绝读取，不迁移或回写；产品尚未公开期间由新的应用状态代际生成全新数据。cleancode 不复制或解析 Provider 对话正文。
 
 ## Provider contribution
 
@@ -85,21 +84,20 @@ macOS/Linux 的桌面进程可能没有用户交互 shell 的完整 `PATH`。首
 
 增加基础 Agent CLI 时，只需在 Provider 模块实现包含图标的 descriptor、detector 和 launcher，补充 contract/参数/清理测试，并在 composition root 注册。任意已注册 descriptor 都必须沿同一 Provider-neutral IPC 和 Presentation 投影；安装后会自动进入可创建发现，未安装时仍只存在于支持 catalog。新增 Provider 不得要求修改 `AgentConsole`、选择器或其他表现层组件。可选能力通过 contribution 增加；确需新的通用用户能力时，必须先扩展 capability 契约，并让所有现有 Provider 明确声明支持或诚实降级，不得在 Agent domain、Run domain、通用 IPC 或 Presentation 中按 Provider ID 分支。
 
-## 分支与目录隔离
+## 工作区身份与 Git 元数据
 
-- 普通 Git 分支使用稳定分支名，可以在应用重启后恢复。
-- 非 Git 项目使用显式 `null` 分支作用域并允许持久化。
-- detached HEAD 没有稳定分支身份，必须使用易失模式，不得复用非 Git 的 `null` 绑定。
-- 同一个 Agent 在同一物理目录切换到另一个分支作用域前，旧作用域运行时必须先释放。
-- Project 通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
+- Agent 画布身份遵循 `projectId + workspaceId + agent + agentId`，其中对象类型使用 Shared Kernel 的规范值。
+- 工作区目录和 Git 分支是启动与显示元数据，不参与 Agent、terminal owner 或 Provider 对话身份。
+- 默认工作区在普通分支、非 Git 状态或 detached HEAD 之间变化时，必须复用同一个 Agent terminal、PTY 和 Provider session ref。
+- 物理工作区被归档、移除或目录重绑定时，Project 才通过 `WorkspaceAgentLifecyclePort` 协调目录内全部 Agent；详情见[项目与分支工作区生命周期](../project/workspace-lifecycle.md)。
 
 ## 运行时生命周期
 
 附加 Agent 时，应用层依次：
 
-1. 建立对话作用域，并重新确认项目、工作区目录、Git 分支和 Agent 定义仍有效。
-2. 按 `projectId + workspaceDirectory + agentId` 串行 attach、挂起、恢复、重配和释放，阻止迟到 renderer 命令穿过生命周期 lease。
-3. 读取稳定 Agent 的固定 Provider 和当前分支 session ref；“新对话”先等待在途绑定保存，再清除当前作用域引用。
+1. 建立 `projectId + workspaceId + agentId` 对话作用域，并重新确认项目、物理工作区目录和 Agent 定义仍有效。
+2. 按该稳定身份串行 attach、挂起、恢复、重配和释放，阻止迟到 renderer 命令穿过生命周期 lease。
+3. 读取稳定 Agent 的固定 Provider 和唯一 session ref；“新对话”先等待在途绑定保存，再清除该引用。
 4. 需要创建新 terminal 时，先通过共享可用性服务刷新固定 Provider 的检测环境并取得预检快照，保证 POSIX login-shell PATH 在 PTY 快照主进程环境之前完成水合；然后创建或复用 Run 的 agent-owned terminal。新 terminal 取得唯一 `sessionId` 和 `terminalViewIdentity`，复用时只更新回调与尺寸。
 5. 能力开启时注册本 launch 独立的 CleanCode MCP URL、Bearer Token 和审批作用域；registration handle 精确拥有这一代注册，旧 handle 的释放或回调不能影响替代注册。
 6. 在生成 Provider 启动计划前验证固定 Provider；新 terminal 消费第 4 步的预检快照，既有 terminal 上的重新启动则刷新共享可用性结果。不可用时保留稳定 Agent 和既有 terminal 事实，但拒绝创建新的 Provider launch。
@@ -130,9 +128,9 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 - 创建：从可创建发现结果中选择一次，并在保存前刷新验证 Provider 仍为 `installed` 且没有被用户禁用；MCP 初始值读取应用级新建默认并受 Provider capability 限制。失败不保存 Agent 且保留选择流程，不提供 Provider 切换。
 - 列出：工作区从未初始化时原子建立空工作区；既有 Agent 不按 CLI 可用性或启用偏好过滤，只有显式创建命令会加入 Agent。
 - 重命名/布局：只修改目标 Agent 的稳定事实。
-- 删除：停止目标 launch 和 terminal，取消审批、注销 MCP、删除定义和全部分支绑定；其他 Agent 不受影响。
-- 重新启动：在同一 Agent terminal 创建新 generation；Provider 支持恢复时使用当前分支 session ref。
-- 新对话：清除当前分支 session ref，在同一 Agent terminal 创建新 launch。
+- 删除：停止目标 launch 和 terminal，取消审批、注销 MCP、删除定义和对话绑定；其他 Agent 不受影响。
+- 重新启动：在同一 Agent terminal 创建新 generation；Provider 支持恢复时使用该 Agent 的 session ref。
+- 新对话：清除该 Agent 的 session ref，在同一 Agent terminal 创建新 launch。
 - 切换 MCP：先保存偏好；活动运行时会关闭旧审批和端点并建立新 session/launch，其他 Agent 不受影响。
 - 修改 Provider 启动偏好：应用级保存权限模式、默认 Provider、启用集合、MCP 新建默认和逐 Provider 启动覆盖；只影响之后的创建或下一次 launch，不批量重启、不改写已有 Agent 的 MCP 开关。
 - 挂起/恢复：工作目录所有权变化时停止整个 Agent terminal；失败补偿可以按稳定 Provider session ref 恢复。
@@ -140,7 +138,7 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 
 挂起、重配和删除仍将 PTY stop 与 launch artifact cleanup 分开提交：PTY 一旦确认停止，后续临时资源清理失败不得把 terminal 补偿回 running；失败 scope 保留并在下一次清理重试。应用退出则由 Run/Provider 作为唯一 PTY shutdown authority 批量终止 Agent terminal；Agent 的 `prepare/complete` 只拥有上述本地资源交接，不能把清除本地引用表述成 PTY 已物理退出。全局退出会尝试全部 scope、工具、审批、持久化、artifact 与 MCP 清理并聚合报告错误，不能因一个资源失败跳过其他 Agent；Electron 停止等待后，Provider 仍负责持有并安全清理未完成的 PTY。
 
-生命周期 lease 的 `release`、`resolve` 和 `quarantine` 语义继续由 Project 协调：清理返回不代表外部 checkout、归档或仓储提交已经完成。任何可能启动 terminal 或 launch 的操作都必须服从 blocker 并在启动前重新校验作用域。
+生命周期 lease 的 `release`、`resolve` 和 `quarantine` 语义继续由 Project 协调：清理返回不代表物理工作区归档、移除或仓储提交已经完成。默认工作区的分支 checkout 不创建 blocker。任何可能启动 terminal 或 launch 的操作都必须服从已有 blocker 并在启动前重新校验作用域。
 
 ## 实现入口
 
@@ -162,11 +160,11 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 | Unit        | Codex、Claude Code、OpenCode 和 Gemini 启动参数、session、Hook/插件、MCP、平台安装配方与 launch artifact 重试清理                  | [`agent.codex-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.codex-provider-contribution.spec.ts)、[`agent.additional-provider-contributions.spec.ts`](../../../tests/unit/contexts/agent/agent.additional-provider-contributions.spec.ts)、[`agent.opencode-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.opencode-provider-contribution.spec.ts)、[`agent.gemini-provider-contribution.spec.ts`](../../../tests/unit/contexts/agent/agent.gemini-provider-contribution.spec.ts)、[`agent.session-artifact-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-artifact-lifecycle.spec.ts)                                                                                                                                                                                         |
 | Unit / UI   | 未知 Provider descriptor 的通用投影、默认 Provider、分段创建、capability 降级、attach 失败保留、single-flight 重试和迟到作用域隔离 | [`agent-console.provider-neutral.spec.tsx`](../../../tests/unit/presentation/agent-console.provider-neutral.spec.tsx)、[`agent-create-split-button.spec.tsx`](../../../tests/unit/presentation/agent-create-split-button.spec.tsx)、[`agent-provider-preference.spec.ts`](../../../tests/unit/presentation/agent-provider-preference.spec.ts)、[`agent-settings-pane.spec.tsx`](../../../tests/unit/presentation/agent-settings-pane.spec.tsx)、[`agent-console.attach-lifecycle.spec.tsx`](../../../tests/unit/presentation/agent-console.attach-lifecycle.spec.tsx)                                                                                                                                                                                                                                                                                     |
 | Unit / Gate | 自动发现内建 Provider，并拒绝 Presentation 中的具体 Provider infrastructure 引用或品牌 ID                                          | [`check-agent-provider-boundary.spec.ts`](../../../tests/unit/support/check-agent-provider-boundary.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Integration | schema 迁移、真实 Agent terminal、CLI 退出回 shell 与重复 launch                                                                   | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.run-terminal-provider.spec.ts`](../../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Integration | schema v5 严格校验、真实 Agent terminal、CLI 退出回 shell 与重复 launch                                                            | [`agent.session-persistence.spec.ts`](../../../tests/integration/contexts/agent/agent.session-persistence.spec.ts)、[`agent.run-terminal-provider.spec.ts`](../../../tests/integration/contexts/agent/agent.run-terminal-provider.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Platform    | POSIX login-shell PATH 在 Agent PTY 前水合、macOS/Linux PTY 与 Windows `.cmd`/ConPTY 的检测、退出码和 shell 存活                   | [`agent.provider-shell-path-hydrator.spec.ts`](../../../tests/unit/contexts/agent/agent.provider-shell-path-hydrator.spec.ts)、[`agent.session-provider-environment.spec.ts`](../../../tests/unit/contexts/agent/agent.session-provider-environment.spec.ts)、[`run.pty-terminal.spec.ts`](../../../tests/integration/contexts/run/run.pty-terminal.spec.ts)、[`agent.windows-provider-cli.spec.ts`](../../../tests/integration/contexts/agent/agent.windows-provider-cli.spec.ts)、[`run.windows-agent-pty.spec.ts`](../../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts)                                                                                                                                                                                                                                                              |
 | Contract    | Provider-neutral Agent IPC 与共享终端视图身份                                                                                      | [`agent.ipc.spec.ts`](../../../tests/contract/contexts/agent/agent.ipc.spec.ts)、[`run.terminal-view-ipc.spec.ts`](../../../tests/contract/contexts/run/run.terminal-view-ipc.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | E2E         | 多 Agent、工作区往返、主题、审批、创建/删除和共享 xterm 交互                                                                       | [`workspace-agents.e2e.spec.ts`](../../../tests/e2e/workspace-agents.e2e.spec.ts)、[`agent-terminal-theme-workspaces.e2e.spec.ts`](../../../tests/e2e/agent-terminal-theme-workspaces.e2e.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## 维护规则
 
-改变 Agent 身份、Provider、session ref、launch generation、attach/retry、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、migration、Provider contract、测试和本文。新增 Provider 不得修改核心控制流；如果需要新通用能力，应先扩展 capability 契约并证明现有 Provider 的诚实降级。
+改变 Agent 身份、Provider、session ref、launch generation、attach/retry、持久化 schema、挂起恢复或删除语义时，必须同步聚合、用例、Provider contract、测试和本文。新增 Provider 不得修改核心控制流；如果需要新通用能力，应先扩展 capability 契约并证明现有 Provider 的诚实降级。

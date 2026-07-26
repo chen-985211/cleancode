@@ -284,7 +284,7 @@ function runScope(sessionId: string) {
   return {
     projectId: 'project-test',
     projectDirectory: process.cwd(),
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: process.cwd(),
     gitBranch: 'main',
     blockId: 'api',

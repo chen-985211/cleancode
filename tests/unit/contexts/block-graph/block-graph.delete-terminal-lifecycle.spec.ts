@@ -13,7 +13,7 @@ describe('delete terminal Run lifecycle', () => {
     await fixture.deleteBlock.execute({
       blockId: 'server',
       projectDirectory: '/project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(fixture.calls).toEqual([
@@ -32,7 +32,7 @@ describe('delete terminal Run lifecycle', () => {
       fixture.deleteBlock.execute({
         blockId: 'server',
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('save failed')
 
@@ -51,7 +51,7 @@ describe('delete terminal Run lifecycle', () => {
       fixture.deleteBlock.execute({
         blockId: 'missing',
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ code: 'TERMINAL_BLOCK_NOT_FOUND' })
 
@@ -65,7 +65,7 @@ describe('delete terminal Run lifecycle', () => {
       fixture.deleteBlock.execute({
         blockId: 'server',
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrow('cleanup uncertain')
 
@@ -79,7 +79,7 @@ describe('delete terminal Run lifecycle', () => {
 
 function createFixture(input: { readonly hardDisposeError?: Error } = {}) {
   const calls: string[] = []
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   graph.createTerminalBlock({
     id: 'server',
     description: '',
@@ -90,7 +90,7 @@ function createFixture(input: { readonly hardDisposeError?: Error } = {}) {
   const lifecycle: TerminalRunLifecyclePort = {
     acquireTerminalDeletion: async (scope) => {
       calls.push(
-        `run:acquire:${scope.projectId}:${scope.projectDirectory}:${scope.workspaceName}:${scope.blockId}`
+        `run:acquire:${scope.projectId}:${scope.projectDirectory}:${scope.workspaceId}:${scope.blockId}`
       )
       return createLease(calls, input.hardDisposeError)
     }
@@ -137,7 +137,7 @@ class LifecycleRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const candidate = BlockGraph.fromSnapshot(this.graph.toSnapshot())

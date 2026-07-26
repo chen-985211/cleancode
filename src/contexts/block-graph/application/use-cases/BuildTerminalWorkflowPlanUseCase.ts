@@ -8,7 +8,7 @@ import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 
 export interface BuildTerminalWorkflowPlanQuery {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly scope: TerminalWorkflowPlanScope
 }
 
@@ -18,7 +18,7 @@ export class BuildTerminalWorkflowPlanUseCase {
   async execute(query: BuildTerminalWorkflowPlanQuery): Promise<TerminalWorkflowPlanSnapshot> {
     const graph = await this.graphRepository.findDefaultGraph(
       query.projectDirectory,
-      query.workspaceName
+      query.workspaceId
     )
 
     if (!graph) {

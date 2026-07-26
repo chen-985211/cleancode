@@ -1,10 +1,9 @@
 export interface AgentRuntimeScopeValidationCommand {
   readonly agentId: string
-  readonly gitBranch: string | null
   readonly projectDirectory: string
   readonly projectId: string
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface AgentRuntimeScopeValidationPort {

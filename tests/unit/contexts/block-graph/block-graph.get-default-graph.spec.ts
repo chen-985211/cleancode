@@ -10,7 +10,7 @@ describe('get default block graph', () => {
     const authoritativeGraph = BlockGraph.createDefault({
       id: 'persisted-graph',
       projectId: 'persisted-project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }).toSnapshot()
     const repository = new InitializingRepository(authoritativeGraph)
     const getDefaultGraph = new GetDefaultGraphUseCase(repository)
@@ -18,14 +18,14 @@ describe('get default block graph', () => {
     const result = await getDefaultGraph.execute({
       projectDirectory: '/repo/app',
       projectId: 'requested-project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual(authoritativeGraph)
     expect(repository.initialization).toEqual({
       graph: expect.objectContaining({
         projectId: 'requested-project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }),
       projectDirectory: '/repo/app'
     })

@@ -12,7 +12,6 @@ import { validateTerminalExecutionConfig } from '../../domain/services/TerminalW
 
 export interface ParsedBlockGraphStore {
   readonly graph: BlockGraphSnapshot
-  readonly requiresMigration: boolean
 }
 
 export function parseBlockGraphStore(contents: string, path: string): ParsedBlockGraphStore {
@@ -27,34 +26,26 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
 
   if (!isRecord(parsed)) throwCorruptedStore(path)
 
-  if ('version' in parsed) {
-    if (parsed.version !== 1) {
-      throw createExpectedAppError(
-        'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED',
-        'Persisted block graph snapshot version is unsupported.',
-        { path }
-      )
-    }
-
-    return {
-      graph: restoreGraph(parsed.graph, path, false),
-      requiresMigration: false
-    }
+  if (parsed.version !== 2) {
+    throw createExpectedAppError(
+      'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED',
+      'Persisted block graph snapshot version is unsupported.',
+      { path }
+    )
   }
 
   return {
-    graph: restoreGraph(parsed, path, true),
-    requiresMigration: true
+    graph: restoreGraph(parsed.graph, path)
   }
 }
 
 export function serializeBlockGraphStore(graph: BlockGraphSnapshot): string {
-  return `${JSON.stringify({ version: 1, graph }, null, 2)}\n`
+  return `${JSON.stringify({ version: 2, graph }, null, 2)}\n`
 }
 
-function restoreGraph(rawGraph: unknown, path: string, isLegacy: boolean): BlockGraphSnapshot {
+function restoreGraph(rawGraph: unknown, path: string): BlockGraphSnapshot {
   try {
-    const snapshot = migrateGraphSnapshot(rawGraph, isLegacy)
+    const snapshot = validateGraphSnapshot(rawGraph)
     return BlockGraph.fromSnapshot(snapshot).toSnapshot()
   } catch (error) {
     if (getAppErrorCode(error) === 'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED') throw error
@@ -62,18 +53,18 @@ function restoreGraph(rawGraph: unknown, path: string, isLegacy: boolean): Block
   }
 }
 
-function migrateGraphSnapshot(rawGraph: unknown, isLegacy: boolean): RestorableBlockGraphSnapshot {
+function validateGraphSnapshot(rawGraph: unknown): RestorableBlockGraphSnapshot {
   if (
     !isRecord(rawGraph) ||
     typeof rawGraph.id !== 'string' ||
     typeof rawGraph.projectId !== 'string' ||
-    typeof rawGraph.workspaceName !== 'string' ||
+    typeof rawGraph.workspaceId !== 'string' ||
     !Array.isArray(rawGraph.blocks)
   ) {
     throw new TypeError('Invalid block graph snapshot.')
   }
 
-  const blocks = rawGraph.blocks.map((rawBlock) => migrateTerminalBlock(rawBlock, isLegacy))
+  const blocks = rawGraph.blocks.map(validateTerminalBlock)
 
   return {
     ...(rawGraph as unknown as RestorableBlockGraphSnapshot),
@@ -81,7 +72,7 @@ function migrateGraphSnapshot(rawGraph: unknown, isLegacy: boolean): RestorableB
   }
 }
 
-function migrateTerminalBlock(rawBlock: unknown, isLegacy: boolean) {
+function validateTerminalBlock(rawBlock: unknown) {
   if (
     !isRecord(rawBlock) ||
     rawBlock.type !== 'terminal' ||
@@ -93,11 +84,11 @@ function migrateTerminalBlock(rawBlock: unknown, isLegacy: boolean) {
     throw new TypeError('Invalid terminal block snapshot.')
   }
 
-  if (!isLegacy && rawBlock.executionConfig === undefined) {
-    throw new TypeError('Version 1 terminal execution config is missing.')
+  if (rawBlock.executionConfig === undefined) {
+    throw new TypeError('Terminal execution config is missing.')
   }
 
-  const executionConfig = migrateTerminalExecutionConfig(rawBlock.executionConfig, isLegacy)
+  const executionConfig = validateExecutionConfig(rawBlock.executionConfig)
 
   return {
     ...(rawBlock as Record<string, unknown>),
@@ -105,43 +96,14 @@ function migrateTerminalBlock(rawBlock: unknown, isLegacy: boolean) {
   } as RestorableBlockGraphSnapshot['blocks'][number]
 }
 
-function migrateTerminalExecutionConfig(
-  rawConfig: unknown,
-  isLegacy: boolean
-): TerminalExecutionConfigSnapshot | undefined {
-  if (rawConfig === undefined && isLegacy) return undefined
+function validateExecutionConfig(rawConfig: unknown): TerminalExecutionConfigSnapshot {
   if (!isRecord(rawConfig)) throw new TypeError('Invalid terminal execution config.')
 
-  const migrated = isLegacy ? migrateLegacyTcpReadiness(rawConfig) : rawConfig
-
-  if (!hasCanonicalExecutionConfigShape(migrated)) {
+  if (!hasCanonicalExecutionConfigShape(rawConfig)) {
     throw new TypeError('Invalid terminal execution config shape.')
   }
 
-  return validateTerminalExecutionConfig(migrated as unknown as TerminalExecutionConfigSnapshot)
-}
-
-function migrateLegacyTcpReadiness(config: Record<string, unknown>): Record<string, unknown> {
-  if (
-    config.mode !== 'service' ||
-    'port' in config ||
-    !isRecord(config.readiness) ||
-    config.readiness.type !== 'tcp' ||
-    typeof config.readiness.port !== 'number'
-  ) {
-    return config
-  }
-
-  return {
-    mode: 'service',
-    port: {
-      binding: { type: 'none' },
-      policy: { port: config.readiness.port, type: 'fixed' },
-      protocol: 'tcp'
-    },
-    readiness: { type: 'tcp' },
-    readinessTimeoutMs: config.readinessTimeoutMs
-  }
+  return validateTerminalExecutionConfig(rawConfig as unknown as TerminalExecutionConfigSnapshot)
 }
 
 function hasCanonicalExecutionConfigShape(config: Record<string, unknown>): boolean {

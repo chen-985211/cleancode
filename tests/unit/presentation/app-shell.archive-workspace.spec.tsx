@@ -126,7 +126,7 @@ describe('app shell worktree archive', () => {
     await waitFor(() =>
       expect(archiveBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'test'
+        workspaceId: 'test'
       })
     )
     await screen.findByRole('button', { name: '切换到默认工作区 main' })
@@ -198,7 +198,7 @@ describe('app shell worktree archive', () => {
     await waitFor(() =>
       expect(archiveBranchWorkspace).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
-        workspaceName: 'test',
+        workspaceId: 'test',
         lockedWorktreeConfirmation: { lockReason: 'external agent session' }
       })
     )
@@ -207,18 +207,22 @@ describe('app shell worktree archive', () => {
 
 function createWorkbenchWithTestWorktree(testIsCurrent: boolean, lockReason: string | null = null) {
   return createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-    workspaceName: testIsCurrent ? 'test' : 'main',
+    workspaceId: testIsCurrent ? 'test' : 'main',
     workspaceDirectory: testIsCurrent ? '/tmp/alpha-project-worktrees/test' : '/tmp/alpha-project',
     gitBranch: testIsCurrent ? 'test' : 'main',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/tmp/alpha-project',
         gitBranch: 'main',
         isCurrent: !testIsCurrent
       },
       {
-        name: 'test',
+        workspaceId: 'test',
+        workspaceKind: 'linked-worktree',
+        displayName: 'test',
         directory: '/tmp/alpha-project-worktrees/test',
         gitBranch: 'test',
         isCurrent: testIsCurrent

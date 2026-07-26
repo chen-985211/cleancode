@@ -77,7 +77,7 @@ export class BlockGraph {
   private constructor(
     public readonly id: string,
     public readonly projectId: string,
-    public readonly workspaceName: string,
+    public readonly workspaceId: string,
     private viewportSnapshot: CanvasViewportSnapshot,
     private blockSnapshots: TerminalBlockSnapshot[],
     private terminalConnectionSnapshots: TerminalConnectionSnapshot[],
@@ -88,7 +88,7 @@ export class BlockGraph {
     return new BlockGraph(
       input.id ?? createGraphId(),
       input.projectId,
-      input.workspaceName,
+      input.workspaceId,
       defaultCanvasViewport,
       [],
       [],
@@ -102,7 +102,7 @@ export class BlockGraph {
     return new BlockGraph(
       snapshot.id,
       snapshot.projectId,
-      snapshot.workspaceName,
+      snapshot.workspaceId,
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
       blocks,
       normalizeRestoredTerminalConnections(snapshot.connections, blocks),
@@ -428,7 +428,7 @@ export class BlockGraph {
     return {
       id: this.id,
       projectId: this.projectId,
-      workspaceName: this.workspaceName,
+      workspaceId: this.workspaceId,
       viewport: this.viewportSnapshot,
       blocks: this.blockSnapshots,
       connections: this.terminalConnectionSnapshots,

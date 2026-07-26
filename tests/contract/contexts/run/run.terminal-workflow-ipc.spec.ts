@@ -15,7 +15,7 @@ describe('terminal workflow IPC contract', () => {
     const command = {
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       workspaceDirectory: '/project',
       gitBranch: 'main',
       terminalSourceTheme: 'dark' as const,
@@ -40,7 +40,7 @@ describe('terminal workflow IPC contract', () => {
     await expect(
       ipcMain.invoke('cleancode:start-terminal-workflow', {
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         workspaceDirectory: '/project',
         gitBranch: 'main',
         scope: { type: 'full' }
@@ -65,7 +65,7 @@ describe('terminal workflow IPC contract', () => {
       ipcMain.invoke('cleancode:start-terminal-workflow', {
         projectId: 'project-1',
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         workspaceDirectory: '/project',
         gitBranch: 'main',
         terminalSourceTheme: 'sepia',
@@ -87,7 +87,7 @@ describe('terminal workflow IPC contract', () => {
       workflowService: { start: vi.fn(), stop, getActiveRun: vi.fn() }
     })
 
-    const command = { projectDirectory: '/project', workspaceName: 'main' }
+    const command = { projectDirectory: '/project', workspaceId: 'main' }
     await ipcMain.invoke('cleancode:stop-terminal-workflow', command)
 
     expect(stop).toHaveBeenCalledWith(command)
@@ -101,7 +101,7 @@ describe('terminal workflow IPC contract', () => {
       logger: silentLogger,
       workflowService: { start: vi.fn(), stop: vi.fn(), getActiveRun }
     })
-    const command = { projectDirectory: '/project', workspaceName: 'main' }
+    const command = { projectDirectory: '/project', workspaceId: 'main' }
 
     await ipcMain.invoke('cleancode:get-terminal-workflow', command)
 
@@ -142,7 +142,7 @@ function createRun(): WorkflowRunSnapshot {
     graphId: 'graph-1',
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     status: 'running',

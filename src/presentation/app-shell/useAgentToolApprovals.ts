@@ -26,7 +26,7 @@ interface UseAgentToolApprovalsInput {
   readonly projectDirectory: string | null
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly setCurrentGraph: (graph: BlockGraphSnapshot) => void
-  readonly workspaceName: string | null
+  readonly workspaceId: string | null
 }
 
 export function useAgentToolApprovals({
@@ -34,11 +34,11 @@ export function useAgentToolApprovals({
   projectDirectory,
   reactFlowInstanceRef,
   setCurrentGraph,
-  workspaceName
+  workspaceId
 }: UseAgentToolApprovalsInput): AgentToolApprovalController {
   const { t } = useI18n()
   const [approvals, setApprovals] = useState<AgentToolApprovalViewState[]>([])
-  const scopeRef = useRef({ projectDirectory, workspaceName })
+  const scopeRef = useRef({ projectDirectory, workspaceId })
   const graphRef = useRef(graph)
 
   useLayoutEffect(() => {
@@ -46,9 +46,9 @@ export function useAgentToolApprovals({
   }, [graph])
 
   useLayoutEffect(() => {
-    scopeRef.current = { projectDirectory, workspaceName }
+    scopeRef.current = { projectDirectory, workspaceId }
     setApprovals((current) => (current.length === 0 ? current : []))
-  }, [projectDirectory, workspaceName])
+  }, [projectDirectory, workspaceId])
 
   useLayoutEffect(() => {
     const api = window.cleancode
@@ -60,7 +60,7 @@ export function useAgentToolApprovals({
 
       if (
         request.projectDirectory !== scope.projectDirectory ||
-        request.workspaceName !== scope.workspaceName
+        request.workspaceId !== scope.workspaceId
       ) {
         return
       }

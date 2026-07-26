@@ -29,7 +29,7 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     if (!this.savedGraph) return null
@@ -42,7 +42,7 @@ describe('update graph viewport', () => {
   it('persists the canvas viewport without changing existing blocks', async () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminalBlock = graph.createTerminalBlock({
       name: 'Terminal 1',
@@ -54,7 +54,7 @@ describe('update graph viewport', () => {
 
     const updatedGraph = await updateGraphViewport.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       viewport: { x: -312.5, y: 144.25, zoom: 1.25 }
     })
 
@@ -70,7 +70,7 @@ describe('update graph viewport', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: []
     })
 
@@ -80,7 +80,7 @@ describe('update graph viewport', () => {
   it('keeps persisted zoom inside the supported canvas range', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     graph.updateViewport({ x: 80, y: -90, zoom: 99 })

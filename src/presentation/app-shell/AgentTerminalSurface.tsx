@@ -10,7 +10,8 @@ export function AgentTerminalSurface({
   terminalElementRef,
   onFallbackInput,
   session,
-  useFallback
+  useFallback,
+  workspaceDisplayName
 }: {
   readonly activeOutput: string
   readonly providerName: string
@@ -18,6 +19,7 @@ export function AgentTerminalSurface({
   readonly onFallbackInput: (input: string) => void
   readonly session: AgentSessionSnapshot | null
   readonly useFallback: boolean
+  readonly workspaceDisplayName?: string
 }) {
   const { t } = useI18n()
   if (useFallback) {
@@ -47,7 +49,8 @@ export function AgentTerminalSurface({
         data-agent-terminal-process-id={session?.runtime.terminal.processId ?? undefined}
         data-agent-terminal-session-id={session?.sessionId}
         data-agent-terminal-source-theme={session?.terminalSourceTheme}
-        data-agent-terminal-workspace-name={session?.workspaceName}
+        data-agent-terminal-workspace-id={session?.workspaceId}
+        data-agent-terminal-workspace-name={workspaceDisplayName}
         ref={terminalElementRef}
       />
     </TerminalThemeProjection>

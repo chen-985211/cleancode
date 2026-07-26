@@ -53,5 +53,5 @@ interface AgentTerminalWorkflowPlanNodeSnapshot {
 export interface AgentTerminalWorkflowPlanSnapshot {
   readonly graphId: string
   readonly nodes: readonly AgentTerminalWorkflowPlanNodeSnapshot[]
-  readonly workspaceName: string
+  readonly workspaceId: string
 }

@@ -22,11 +22,11 @@ export class UpdateWorkspaceAgentMcpCapabilityUseCase {
     readonly agentId: string
     readonly cleancodeMcpEnabled: boolean
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<UpdateWorkspaceAgentMcpCapabilityResult> {
     const agent = await this.repository.findAgent(
       command.projectId,
-      command.workspaceName,
+      command.workspaceId,
       command.agentId
     )
     if (!agent) {

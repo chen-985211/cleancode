@@ -4,7 +4,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface DissolveTerminalGroupCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly terminalGroupId: string
 }
 

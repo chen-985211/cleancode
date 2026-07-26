@@ -4,7 +4,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface CreateTerminalGroupCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly name: string
   readonly memberBlockIds: readonly string[]
 }

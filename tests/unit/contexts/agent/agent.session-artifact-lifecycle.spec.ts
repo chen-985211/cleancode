@@ -45,7 +45,7 @@ describe('Agent session launch artifact lifecycle', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ failures: [{ error: cleanupFailure, label: 'launch-1' }] })
 
@@ -207,12 +207,12 @@ function attachCommand(
     providerId: 'codex',
     terminalSourceTheme: 'light' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
 function disposeCommand(agentId: string) {
-  return { agentId, projectId: 'project-1', workspaceName: 'main' }
+  return { agentId, projectId: 'project-1', workspaceId: 'main' }
 }
 
 function completedToolResult(): AgentToolExecutionResult {
@@ -223,7 +223,7 @@ function completedToolResult(): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: false,
     output: { type: 'block_graph' },

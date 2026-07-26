@@ -353,6 +353,9 @@ export function mergeE2eProcessEnvironment(
       (entry): entry is [string, string] => entry[1] !== undefined
     )
   )
+  for (const name of Object.keys(environment)) {
+    if (name.toLowerCase() === 'electron_run_as_node') delete environment[name]
+  }
   if (platform !== 'win32') return environment
 
   const path =

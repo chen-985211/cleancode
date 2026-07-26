@@ -200,7 +200,7 @@ describe('agent console Codex status', () => {
           sessionId: 'agent-session-failed',
           terminalSourceTheme: command.terminalSourceTheme,
           workspaceDirectory: '/repo/app',
-          workspaceName: 'main'
+          workspaceId: 'main'
         })),
         inspectCodexCli: vi.fn(async () => createMissingSnapshot())
       })
@@ -230,7 +230,7 @@ describe('agent console Codex status', () => {
       sessionId: 'agent-session-failed',
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }))
 
     Object.defineProperty(window, 'cleancode', {
@@ -282,7 +282,7 @@ describe('agent console Codex status', () => {
       sessionId: 'agent-session-exited',
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }))
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -409,7 +409,7 @@ function createRuntimeSession(
     sessionId: 'agent-session-race',
     terminalSourceTheme: 'dark' as const,
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

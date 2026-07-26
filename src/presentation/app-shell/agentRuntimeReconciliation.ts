@@ -61,6 +61,6 @@ function haveSameTerminalIdentity(
     first.projectId === second.projectId &&
     first.runId === second.runId &&
     first.sessionId === second.sessionId &&
-    first.workspaceName === second.workspaceName
+    first.workspaceId === second.workspaceId
   )
 }

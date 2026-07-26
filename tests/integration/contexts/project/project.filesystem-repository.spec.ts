@@ -31,18 +31,18 @@ describe('project filesystem repository', () => {
     const metadata = JSON.parse(await readOnlyJsonFile(appStateDirectory, 'project.json')) as {
       id: string
       name: string
-      workspaces: Array<{ name: string }>
+      workspaces: Array<{ displayName: string }>
     }
     const storedProject = await repository.findByDirectory(projectDirectory)
 
     expect(await pathExists(join(projectDirectory, '.cleancode'))).toBe(false)
     expect(metadata.id).toBe(createdProject.id)
     expect(metadata.name).toBe('Local Workbench')
-    expect(metadata.workspaces.map((workspace) => workspace.name)).toEqual(['main'])
+    expect(metadata.workspaces.map((workspace) => workspace.displayName)).toEqual(['main'])
     expect(storedProject).toEqual(createdProject)
   })
 
-  it('migrates legacy project metadata from the opened project directory', async () => {
+  it('ignores legacy project metadata inside the opened project directory', async () => {
     await mkdir(join(projectDirectory, '.cleancode'), { recursive: true })
     await writeFile(
       join(projectDirectory, '.cleancode', 'project.json'),
@@ -53,7 +53,9 @@ describe('project filesystem repository', () => {
           directory: projectDirectory,
           workspaces: [
             {
-              name: 'main',
+              workspaceId: 'main',
+              workspaceKind: 'default',
+              displayName: 'main',
               directory: projectDirectory,
               gitBranch: null,
               isCurrent: true
@@ -67,16 +69,9 @@ describe('project filesystem repository', () => {
     const repository = new FileSystemProjectRepository(appStateDirectory)
 
     const migratedProject = await repository.findByDirectory(projectDirectory)
-    const migratedMetadata = JSON.parse(
-      await readOnlyJsonFile(appStateDirectory, 'project.json')
-    ) as { id: string; name: string }
 
-    expect(migratedProject?.id).toBe('legacy-project')
-    expect(migratedProject?.name).toBe('Legacy Project')
-    expect(migratedMetadata).toMatchObject({
-      id: 'legacy-project',
-      name: 'Legacy Project'
-    })
+    expect(migratedProject).toBeNull()
+    await expect(findFilesNamed(appStateDirectory, 'project.json')).resolves.toEqual([])
   })
 })
 

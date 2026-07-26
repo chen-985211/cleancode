@@ -257,7 +257,7 @@ export function AppShell({
     projectDirectory: currentWorkbench?.project.directory ?? null,
     reactFlowInstanceRef,
     setCurrentGraph,
-    workspaceName: currentWorkspace?.name ?? null
+    workspaceId: currentWorkspace?.workspaceId ?? null
   })
   const terminalWorkflow = useTerminalWorkflow({
     currentWorkbench,
@@ -313,7 +313,7 @@ export function AppShell({
     const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
     const graphSnapshot = await window.cleancode?.createTerminalGroup({
       projectDirectory: currentWorkbench.project.directory,
-      workspaceName: currentWorkspace.name,
+      workspaceId: currentWorkspace.workspaceId,
       name:
         currentWorkbench.graph.terminalGroups.length === 0
           ? t('group.defaultFirstName')
@@ -377,7 +377,7 @@ export function AppShell({
     useAgentLayoutCoordination({
       clearTerminalGroupDropPreview,
       currentProjectId: currentWorkbench?.project.id ?? null,
-      currentWorkspaceName: currentWorkspace?.name ?? null,
+      currentWorkspaceId: currentWorkspace?.workspaceId ?? null,
       moveWorkbenchNode,
       moveWorkspaceAgent,
       nodeStore,
@@ -406,7 +406,7 @@ export function AppShell({
 
       const graphSnapshot = await window.cleancode?.deleteBlock({
         projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
+        workspaceId: currentWorkspace.workspaceId,
         blockId: block.id
       })
 

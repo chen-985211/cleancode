@@ -176,7 +176,7 @@ async function readRendererState(page: Page): Promise<unknown> {
           processId: element.dataset.agentTerminalProcessId,
           sessionId: element.dataset.agentTerminalSessionId,
           sourceTheme: element.dataset.agentTerminalSourceTheme,
-          workspaceName: element.dataset.agentTerminalWorkspaceName
+          workspaceId: element.dataset.agentTerminalWorkspaceId
         })),
         terminalOutputs: Array.from(
           document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')

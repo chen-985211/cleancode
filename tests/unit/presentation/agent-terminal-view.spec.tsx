@@ -76,7 +76,7 @@ describe('Agent shared terminal view', () => {
       runId: 'agent-terminal:agent-session-1',
       sessionId: 'terminal-session-1',
       viewId: 'agent-view-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     expect(surface.restore).toHaveBeenCalledWith(
       expect.objectContaining({ content: 'restored output', sequence: 4 })
@@ -288,14 +288,14 @@ function createSession(): AgentSessionSnapshot {
           projectId: 'project-1',
           runId: 'agent-terminal:agent-session-1',
           sessionId: 'terminal-session-1',
-          workspaceName: 'main'
+          workspaceId: 'main'
         }
       }
     },
     sessionId: 'agent-session-1',
     terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -338,6 +338,6 @@ function createSnapshotIdentity() {
     runId: 'agent-terminal:agent-session-1',
     sessionId: 'terminal-session-1',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }

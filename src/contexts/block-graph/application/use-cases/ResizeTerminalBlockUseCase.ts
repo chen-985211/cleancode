@@ -8,7 +8,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface ResizeTerminalBlockCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly position: BlockPositionSnapshot
   readonly size: TerminalBlockSizeSnapshot

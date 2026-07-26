@@ -18,13 +18,13 @@ describe('Run lifecycle platform adapters', () => {
     await expect(
       workspaceRuns.disposeWorkspace({
         projectDirectory: '/work/app',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).resolves.toBe(workspaceLease)
     await expect(
       workspaceRuns.disposeWorkspaces({
         projectDirectory: '/work/app',
-        workspaceNames: ['main', 'feature/sidebar']
+        workspaceIds: ['main', 'feature/sidebar']
       })
     ).resolves.toBe(workspacesLease)
     await expect(workspaceRuns.disposeProject('/work/app')).resolves.toBe(projectLease)
@@ -32,18 +32,18 @@ describe('Run lifecycle platform adapters', () => {
     expect(
       workspaceRuns.isWorkspaceQuarantined({
         projectDirectory: '/work/app',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(true)
     workspaceRuns.resolveProjectQuarantines('/work/app')
 
     expect(service.hardDisposeWorkspace).toHaveBeenCalledWith({
       projectDirectory: '/work/app',
-      workspaceName: 'feature/sidebar'
+      workspaceId: 'feature/sidebar'
     })
     expect(service.hardDisposeWorkspaces).toHaveBeenCalledWith({
       projectDirectory: '/work/app',
-      workspaceNames: ['main', 'feature/sidebar']
+      workspaceIds: ['main', 'feature/sidebar']
     })
     expect(service.hardDisposeProject).toHaveBeenCalledWith('/work/app')
     expect(service.resolveProjectQuarantines).toHaveBeenCalledWith('/work/app')
@@ -64,7 +64,7 @@ describe('Run lifecycle platform adapters', () => {
     const lease = await terminalRuns.acquireTerminalDeletion({
       projectId: 'project-1',
       projectDirectory: '/work/app',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1'
     })
     await lease.hardDispose()
@@ -76,7 +76,7 @@ describe('Run lifecycle platform adapters', () => {
     expect(service.hardDisposeTerminal).toHaveBeenCalledWith({
       projectId: 'project-1',
       projectDirectory: '/work/app',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1'
     })
     expect(runLease.release).toHaveBeenCalledTimes(1)

@@ -3,7 +3,7 @@ import { OpenTerminalLinkUseCase } from '../../../../src/contexts/run/applicatio
 describe('open terminal link use case', () => {
   const command = {
     projectId: 'project-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     blockId: 'block-1',
     sessionId: 'session-1',
     runId: 'run-1',

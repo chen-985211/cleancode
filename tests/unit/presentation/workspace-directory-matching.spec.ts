@@ -5,13 +5,17 @@ describe('workspace directory matching', () => {
   it('matches the deepest workspace containing the terminal working directory', () => {
     const workspaces: WorkbenchSnapshot['project']['workspaces'] = [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
       },
       {
-        name: 'feature/sidebar',
+        workspaceId: 'feature/sidebar',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/sidebar',
         directory: '/work/app/worktrees/feature-sidebar',
         gitBranch: 'feature/sidebar',
         isCurrent: false
@@ -26,7 +30,9 @@ describe('workspace directory matching', () => {
   it('does not match sibling directories with the same prefix', () => {
     const workspaces: WorkbenchSnapshot['project']['workspaces'] = [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true

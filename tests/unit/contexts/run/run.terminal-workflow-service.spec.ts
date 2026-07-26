@@ -203,7 +203,7 @@ describe('terminal workflow service', () => {
     await service.start(createStartCommand())
     const lease = await lifecycle.hardDisposeWorkspace({
       projectDirectory: '/project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(runtime.stops).toEqual(expect.arrayContaining(['slow-session', 'independent-session']))
@@ -241,7 +241,7 @@ describe('terminal workflow service', () => {
 
     let disposed = false
     const disposing = lifecycle
-      .hardDisposeWorkspace({ projectDirectory: '/project', workspaceName: 'main' })
+      .hardDisposeWorkspace({ projectDirectory: '/project', workspaceId: 'main' })
       .then((lease) => {
         disposed = true
         return lease
@@ -317,7 +317,7 @@ class ProjectScopedPlanPort implements TerminalWorkflowPlanPort {
     const projectName = command.projectDirectory.slice(1)
     return {
       graphId: `graph-${projectName}`,
-      workspaceName: 'main',
+      workspaceId: 'main',
       nodes: [task(`${projectName}-task`)]
     }
   }
@@ -352,7 +352,7 @@ function createStartCommand(projectDirectory = '/project') {
   return {
     projectId: `project-${projectDirectory.slice(1)}`,
     projectDirectory,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: projectDirectory,
     gitBranch: 'main',
     workingDirectory: projectDirectory,
@@ -380,7 +380,7 @@ function createManagedServicePlan(): WorkflowRunPlanSnapshot {
 }
 
 function createWorkflowScope(projectDirectory = '/project') {
-  return { projectDirectory, workspaceName: 'main' }
+  return { projectDirectory, workspaceId: 'main' }
 }
 
 function createTaskPlan(): WorkflowRunPlanSnapshot {
@@ -410,7 +410,7 @@ function createTimeoutPlan(): WorkflowRunPlanSnapshot {
 }
 
 function plan(nodes: WorkflowRunPlanSnapshot['nodes']): WorkflowRunPlanSnapshot {
-  return { graphId: 'graph-1', workspaceName: 'main', nodes }
+  return { graphId: 'graph-1', workspaceId: 'main', nodes }
 }
 
 function task(blockId: string, dependencyBlockIds: readonly string[] = []) {
@@ -435,7 +435,7 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
     generation: 1,
     id,
     terminalBlockId,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workingDirectory: '/project',
     processId: 1,
     status: 'running',

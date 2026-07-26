@@ -97,7 +97,7 @@ describe('archive branch workspace use case', () => {
     await expectAppErrorCode(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       }),
       'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES'
     )
@@ -121,12 +121,12 @@ describe('archive branch workspace use case', () => {
         resolve: () => undefined
       })),
       disposeWorkspace: vi.fn(async (command) => {
-        lifecycleCalls.push(`dispose:${command.workspaceName}`)
+        lifecycleCalls.push(`dispose:${command.workspaceId}`)
         return {
           wasQuarantined: false,
-          quarantine: () => lifecycleCalls.push(`quarantine:${command.workspaceName}`),
-          release: () => lifecycleCalls.push(`release:${command.workspaceName}`),
-          resolve: () => lifecycleCalls.push(`resolve:${command.workspaceName}`)
+          quarantine: () => lifecycleCalls.push(`quarantine:${command.workspaceId}`),
+          release: () => lifecycleCalls.push(`release:${command.workspaceId}`),
+          resolve: () => lifecycleCalls.push(`resolve:${command.workspaceId}`)
         }
       }),
       isWorkspaceQuarantined: vi.fn(() => false),
@@ -145,7 +145,7 @@ describe('archive branch workspace use case', () => {
 
     const project = await archiveBranchWorkspace.execute({
       projectDirectory: '/work/app',
-      workspaceName: 'feature/sidebar'
+      workspaceId: 'feature/sidebar'
     })
 
     expect(git.cleanChecks).toEqual([
@@ -161,7 +161,9 @@ describe('archive branch workspace use case', () => {
     expect(git.pruneWorktreesCalls).toEqual([{ repositoryDirectory: '/work/app' }])
     expect(project.workspaces).toEqual([
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
@@ -184,18 +186,18 @@ describe('archive branch workspace use case', () => {
         resolve: () => undefined
       })),
       disposeWorkspace: vi.fn(async (command) => {
-        lifecycleCalls.push(`dispose:${command.workspaceName}`)
+        lifecycleCalls.push(`dispose:${command.workspaceId}`)
         const wasQuarantined = isQuarantined
         return {
           wasQuarantined,
           quarantine: () => {
             isQuarantined = true
-            lifecycleCalls.push(`quarantine:${command.workspaceName}`)
+            lifecycleCalls.push(`quarantine:${command.workspaceId}`)
           },
-          release: () => lifecycleCalls.push(`release:${command.workspaceName}`),
+          release: () => lifecycleCalls.push(`release:${command.workspaceId}`),
           resolve: () => {
             isQuarantined = false
-            lifecycleCalls.push(`resolve:${command.workspaceName}`)
+            lifecycleCalls.push(`resolve:${command.workspaceId}`)
           }
         }
       }),
@@ -217,7 +219,7 @@ describe('archive branch workspace use case', () => {
     await expect(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).rejects.toThrow('save failed')
 
@@ -227,7 +229,7 @@ describe('archive branch workspace use case', () => {
     repository.saveError = null
     await archiveBranchWorkspace.execute({
       projectDirectory: '/work/app',
-      workspaceName: 'feature/sidebar'
+      workspaceId: 'feature/sidebar'
     })
 
     expect(git.cleanChecks).toHaveLength(2)
@@ -275,7 +277,7 @@ describe('archive branch workspace use case', () => {
     await expectAppErrorCode(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       }),
       'BRANCH_WORKSPACE_HAS_UNCOMMITTED_CHANGES'
     )
@@ -302,7 +304,7 @@ describe('archive branch workspace use case', () => {
     await expectAppErrorCode(
       archiveBranchWorkspace.execute({
         projectDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }),
       'MAIN_WORKSPACE_CANNOT_BE_ARCHIVED'
     )
@@ -319,13 +321,17 @@ function createProjectWithFeatureWorkspace(featureIsCurrent: boolean): ProjectSn
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: !featureIsCurrent
       },
       {
-        name: 'feature/sidebar',
+        workspaceId: 'feature/sidebar',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/sidebar',
         directory: '/work/worktrees/app/feature/sidebar',
         gitBranch: 'feature/sidebar',
         isCurrent: featureIsCurrent

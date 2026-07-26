@@ -70,13 +70,17 @@ describe('application shortcut navigation', () => {
     const alpha = createWorkbenchSnapshot('/tmp/alpha', 'alpha', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/alpha',
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/alpha',
+          workspaceId: 'feature/alpha',
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/alpha',
           directory: '/tmp/alpha-feature',
           gitBranch: 'feature/alpha',
           isCurrent: false
@@ -86,7 +90,9 @@ describe('application shortcut navigation', () => {
     const beta = createWorkbenchSnapshot('/tmp/beta', 'beta', {
       workspaces: [
         {
-          name: 'main',
+          workspaceId: 'main',
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: '/tmp/beta',
           gitBranch: 'main',
           isCurrent: true
@@ -96,11 +102,11 @@ describe('application shortcut navigation', () => {
 
     expect(resolveAdjacentWorkspaceTarget([alpha, beta], alpha, 'next')).toEqual({
       workbench: alpha,
-      workspaceName: 'feature/alpha'
+      workspaceId: 'feature/alpha'
     })
     expect(resolveAdjacentWorkspaceTarget([alpha, beta], alpha, 'previous')).toEqual({
       workbench: beta,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const alphaFeature = {
@@ -109,13 +115,13 @@ describe('application shortcut navigation', () => {
         ...alpha.project,
         workspaces: alpha.project.workspaces.map((workspace) => ({
           ...workspace,
-          isCurrent: workspace.name === 'feature/alpha'
+          isCurrent: workspace.displayName === 'feature/alpha'
         }))
       }
     }
     expect(resolveAdjacentWorkspaceTarget([alpha, beta], alphaFeature, 'next')).toEqual({
       workbench: beta,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
   })
 

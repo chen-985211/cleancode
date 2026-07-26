@@ -127,7 +127,7 @@ describe('managed terminal service IPC contract', () => {
     expect(launchTerminal).toHaveBeenCalledWith({
       projectId: launchCommand.projectId,
       projectDirectory: launchCommand.projectDirectory,
-      workspaceName: launchCommand.workspaceName,
+      workspaceId: launchCommand.workspaceId,
       workspaceDirectory: launchCommand.workspaceDirectory,
       gitBranch: launchCommand.gitBranch,
       terminalSourceTheme: launchCommand.terminalSourceTheme,
@@ -208,7 +208,8 @@ describe('managed terminal service IPC contract', () => {
     const managedOwner = {
       identity: { ...runIdentity, projectId: 'project-2', runId: 'owner-run' },
       projectName: 'Storefront',
-      workspaceName: 'feature/cart',
+      workspaceId: 'feature/cart',
+      workspaceDisplayName: 'feature/cart',
       terminalName: 'API'
     }
     const launchTerminal = vi.fn(async () => {
@@ -218,14 +219,14 @@ describe('managed terminal service IPC contract', () => {
         {
           port: 3_000,
           attemptedProjectId: runIdentity.projectId,
-          attemptedWorkspaceName: runIdentity.workspaceName,
+          attemptedWorkspaceId: runIdentity.workspaceId,
           attemptedBlockId: runIdentity.blockId,
           attemptedSessionId: runIdentity.sessionId,
           attemptedRunId: runIdentity.runId,
           attemptedGeneration: runIdentity.generation,
           managedProjectId: managedOwner.identity.projectId,
           managedProjectDirectory: '/repo/storefront',
-          managedWorkspaceName: managedOwner.identity.workspaceName,
+          managedWorkspaceId: managedOwner.identity.workspaceId,
           managedBlockId: managedOwner.identity.blockId,
           managedSessionId: managedOwner.identity.sessionId,
           managedRunId: managedOwner.identity.runId,
@@ -270,7 +271,7 @@ describe('managed terminal service IPC contract', () => {
 const launchCommand = {
   projectId: 'project-1',
   projectDirectory: '/repo/app',
-  workspaceName: 'main',
+  workspaceId: 'main',
   workspaceDirectory: '/repo/app',
   gitBranch: 'main',
   terminalSourceTheme: 'dark' as const,
@@ -309,7 +310,7 @@ const launchResult = {
 
 const runIdentity = {
   projectId: launchCommand.projectId,
-  workspaceName: launchCommand.workspaceName,
+  workspaceId: launchCommand.workspaceId,
   blockId: launchCommand.terminalBlockId,
   sessionId: session.sessionId,
   runId: session.runId,

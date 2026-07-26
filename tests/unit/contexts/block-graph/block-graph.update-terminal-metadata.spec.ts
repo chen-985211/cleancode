@@ -24,7 +24,7 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     if (!this.savedGraph) return null
@@ -37,7 +37,7 @@ describe('update terminal block metadata', () => {
   it('renames a terminal block and persists the description', async () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminalBlock = graph.createTerminalBlock({
       name: 'Terminal 1',
@@ -49,7 +49,7 @@ describe('update terminal block metadata', () => {
 
     const updatedGraph = await updateMetadata.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: terminalBlock.id,
       name: 'API Server',
       description: 'Runs backend tasks',

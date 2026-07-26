@@ -64,7 +64,7 @@ describe('Agent console terminal sizing', () => {
         sessionId: 'agent-session-1',
         terminalSourceTheme: command.terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
     )
     Object.defineProperty(window, 'cleancode', {

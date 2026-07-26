@@ -53,7 +53,7 @@ export interface TerminalIpcHandlersInput {
     readonly projectId: string
     readonly projectDirectory: string
     readonly terminalBlockId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly workspaceDirectory: string
     readonly gitBranch: string | null
     readonly workingDirectory: string
@@ -67,7 +67,7 @@ export interface TerminalIpcHandlersInput {
   readonly launchTerminal: (command: {
     readonly projectId: string
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly workspaceDirectory: string
     readonly gitBranch: string | null
     readonly blockId: string
@@ -135,7 +135,7 @@ interface StartTerminalIpcCommand {
   readonly projectId: string
   readonly projectDirectory: string
   readonly terminalBlockId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly terminalSourceTheme: TerminalSourceTheme
@@ -206,7 +206,7 @@ export function registerTerminalIpcHandlers(
         return await input.launchTerminal({
           projectId: launchCommand.projectId,
           projectDirectory: launchCommand.projectDirectory,
-          workspaceName: launchCommand.workspaceName,
+          workspaceId: launchCommand.workspaceId,
           workspaceDirectory: launchCommand.workspaceDirectory,
           gitBranch: launchCommand.gitBranch,
           blockId: launchCommand.terminalBlockId,
@@ -472,7 +472,7 @@ function sendRendererEvent(sender: IpcSender, channel: string, event: unknown): 
 
 function toRunIdentity(scope: {
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly sessionId: string
   readonly runId: string
@@ -480,7 +480,7 @@ function toRunIdentity(scope: {
 }): TerminalRunIdentity {
   return {
     projectId: scope.projectId,
-    workspaceName: scope.workspaceName,
+    workspaceId: scope.workspaceId,
     blockId: scope.blockId,
     sessionId: scope.sessionId,
     runId: scope.runId,
@@ -564,7 +564,7 @@ function readTerminalViewCommand(command: unknown): TerminalViewIdentityCommand 
   if (
     !isRecord(command) ||
     !isNonEmptyString(command.projectId) ||
-    !isNonEmptyString(command.workspaceName) ||
+    !isNonEmptyString(command.workspaceId) ||
     !isNonEmptyString(command.blockId) ||
     !isNonEmptyString(command.sessionId) ||
     !isNonEmptyString(command.runId) ||
@@ -604,7 +604,7 @@ function readStartTerminalCommand(command: unknown): StartTerminalIpcCommand {
     !isNonEmptyString(command.projectId) ||
     !isNonEmptyString(command.projectDirectory) ||
     !isNonEmptyString(command.terminalBlockId) ||
-    !isNonEmptyString(command.workspaceName) ||
+    !isNonEmptyString(command.workspaceId) ||
     !isNonEmptyString(command.workspaceDirectory) ||
     !(command.gitBranch === null || typeof command.gitBranch === 'string') ||
     !isTerminalSourceTheme(command.terminalSourceTheme) ||

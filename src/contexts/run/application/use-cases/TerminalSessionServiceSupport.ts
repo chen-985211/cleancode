@@ -61,7 +61,7 @@ export function readTerminalModelDiagnostics(
 export function createTerminalSessionOwner(command: {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly terminalBlockId: string
@@ -70,7 +70,7 @@ export function createTerminalSessionOwner(command: {
   return {
     projectId: command.projectId,
     projectDirectory: command.projectDirectory,
-    workspaceName: command.workspaceName,
+    workspaceId: command.workspaceId,
     workspaceDirectory: command.workspaceDirectory,
     gitBranch: command.gitBranch,
     blockId: command.terminalBlockId,
@@ -95,7 +95,7 @@ export function assertCurrentTerminalViewIdentity(
   const sessionOwner = resolveTerminalOwnerRef(session.scope)
   const matchesIdentity =
     session.scope.projectId === command.projectId &&
-    session.scope.workspaceName === command.workspaceName &&
+    session.scope.workspaceId === command.workspaceId &&
     session.scope.blockId === command.blockId &&
     session.scope.sessionId === command.sessionId &&
     session.scope.runId === command.runId &&

@@ -27,7 +27,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-create',
       toolName: 'create_block',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual({
@@ -40,7 +40,7 @@ describe('execute agent tool', () => {
     expect(blockGraphTools.createTerminalBlock).toHaveBeenCalledWith(
       {
         projectDirectory: '/tmp/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       {
         description: 'Runs the API server',
@@ -59,7 +59,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         status: 'started',
         toolName: 'create_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }),
       expect.objectContaining({
         id: 'tool-call-create',
@@ -68,7 +68,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         status: 'completed',
         toolName: 'create_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ])
   })
@@ -88,7 +88,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-group-create',
       toolName: 'create_terminal_group',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual({
@@ -111,7 +111,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-delete',
       toolName: 'delete_block',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual({
@@ -145,7 +145,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-group-delete',
       toolName: 'delete_terminal_group',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toMatchObject({
@@ -169,7 +169,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-group-delete',
       toolName: 'delete_terminal_group',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toEqual({
@@ -182,7 +182,7 @@ describe('execute agent tool', () => {
     expect(blockGraphTools.deleteTerminalGroup).toHaveBeenCalledWith(
       {
         projectDirectory: '/tmp/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       { terminalGroupId: 'group-1' }
     )
@@ -209,7 +209,7 @@ describe('execute agent tool', () => {
     vi.mocked(blockGraphTools.inspectTerminalWorkflowPlan).mockResolvedValue({
       graphId: 'graph-1',
       nodes: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const executeTool = createExecuteTool(blockGraphTools, new RecordingAgentAuditRepository())
 
@@ -223,7 +223,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         toolCallId: 'tool-config',
         toolName: 'update_terminal_execution_config',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       graph: fakeGraph,
@@ -240,7 +240,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         toolCallId: 'tool-connect',
         toolName: 'connect_terminal_blocks',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       graphChanged: true,
@@ -255,12 +255,12 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         toolCallId: 'tool-plan',
         toolName: 'inspect_terminal_workflow_plan',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toEqual({
       graphChanged: false,
       output: {
-        plan: { graphId: 'graph-1', nodes: [], workspaceName: 'main' },
+        plan: { graphId: 'graph-1', nodes: [], workspaceId: 'main' },
         type: 'terminal_workflow_plan'
       },
       status: 'completed',
@@ -278,7 +278,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-disconnect',
       toolName: 'disconnect_terminal_blocks',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toMatchObject({
@@ -305,7 +305,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         toolCallId: 'tool-invalid',
         toolName: 'connect_terminal_blocks',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toMatchObject({
       error: {
@@ -342,7 +342,7 @@ describe('execute agent tool', () => {
         sessionId: 'agent-session-1',
         toolCallId: 'tool-committed-audit-failed',
         toolName: 'update_block',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toEqual({
       graph: fakeGraphWithApiBlock,
@@ -363,7 +363,7 @@ describe('execute agent tool', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-canceled',
       toolName: 'disconnect_terminal_blocks' as const,
-      workspaceName: 'main'
+      workspaceId: 'main'
     }
 
     await executeTool.execute(command)
@@ -385,7 +385,7 @@ const fakeGraph: BlockGraphSnapshot = {
   projectId: 'project-1',
   terminalGroups: [],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 const fakeGraphWithApiBlock: BlockGraphSnapshot = {
@@ -456,7 +456,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
     inspectTerminalWorkflowPlan: vi.fn(async () => ({
       graphId: 'graph-1',
       nodes: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })),
     updateTerminalBlock: vi.fn(async () => fakeGraph),
     updateTerminalExecutionConfig: vi.fn(async () => fakeGraph),

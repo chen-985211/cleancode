@@ -119,7 +119,7 @@ describe('terminal service port intent', () => {
 })
 
 function createGraph(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   graph.createTerminalBlock({
     id: 'server',
     description: 'Local server',

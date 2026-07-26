@@ -3,7 +3,7 @@ import type { ServicePortLeaseState } from '../../domain/services/ServicePortLea
 
 export interface TerminalRunIdentity {
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
   readonly sessionId: string
   readonly runId: string
@@ -15,7 +15,8 @@ export type TerminalServiceEndpoint = ActualServiceEndpoint
 export interface ManagedTerminalServiceOwner {
   readonly identity: TerminalRunIdentity
   readonly projectName: string
-  readonly workspaceName: string
+  readonly workspaceId: string
+  readonly workspaceDisplayName: string
   readonly terminalName: string
 }
 

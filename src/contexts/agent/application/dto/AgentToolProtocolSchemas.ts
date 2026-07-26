@@ -368,9 +368,9 @@ function blockGraphSnapshotSchema(): AgentToolJsonSchema {
         { x: finiteNumberSchema, y: finiteNumberSchema, zoom: finiteNumberSchema },
         ['x', 'y', 'zoom']
       ),
-      workspaceName: stringSchema
+      workspaceId: stringSchema
     },
-    ['id', 'projectId', 'workspaceName', 'viewport', 'blocks', 'terminalGroups']
+    ['id', 'projectId', 'workspaceId', 'viewport', 'blocks', 'terminalGroups']
   )
 }
 
@@ -391,9 +391,9 @@ function terminalWorkflowPlanSnapshotSchema(): AgentToolJsonSchema {
         ),
         type: 'array'
       },
-      workspaceName: stringSchema
+      workspaceId: stringSchema
     },
-    ['graphId', 'workspaceName', 'nodes']
+    ['graphId', 'workspaceId', 'nodes']
   )
 }
 

@@ -43,7 +43,7 @@ export interface AgentIpcHandlersInput {
     readonly rows?: number
     readonly terminalSourceTheme: AgentTerminalSourceTheme
     readonly workspaceDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<AgentSessionSnapshot>
   readonly createWorkspaceAgent: (command: {
     readonly agentId: string
@@ -53,14 +53,14 @@ export interface AgentIpcHandlersInput {
     readonly projectId: string
     readonly providerId: string
     readonly workspaceDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly discoverCreatableAgentProviders: (options: {
     readonly refresh?: boolean
   }) => Promise<readonly CreatableAgentProviderSnapshot[]>
   readonly disposeAgentWorkspaceSession: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<void>
   readonly disposeProjectAgentSessions: (projectDirectory: string) => Promise<void>
   readonly inspectAgentProvider: (providerId: string) => Promise<AgentProviderAvailability>
@@ -72,13 +72,13 @@ export interface AgentIpcHandlersInput {
   readonly removeWorkspaceAgent: (command: {
     readonly agentId: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<readonly WorkspaceAgentSnapshot[]>
   readonly renameWorkspaceAgent: (command: {
     readonly agentId: string
     readonly name: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly resizeAgentSession: (sessionId: string, columns: number, rows: number) => void
   readonly writeAgentSession: (sessionId: string, input: string) => void
@@ -86,13 +86,13 @@ export interface AgentIpcHandlersInput {
     readonly agentId: string
     readonly layout: AgentLayoutSnapshot
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly updateWorkspaceAgentMcpCapability: (command: {
     readonly agentId: string
     readonly cleancodeMcpEnabled: boolean
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<UpdateWorkspaceAgentMcpCapabilityResult>
   readonly updateAgentProviderPreferences: (
     command: UpdateAgentProviderPreferencesCommand
@@ -163,7 +163,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly rows?: number
       readonly terminalSourceTheme: AgentTerminalSourceTheme
       readonly workspaceDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     AgentSessionSnapshot
   >({
@@ -190,7 +190,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
         rows: command.rows,
         terminalSourceTheme,
         workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
     },
     ipcMain: input.ipcMain,
@@ -208,7 +208,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly projectId: string
       readonly providerId: string
       readonly workspaceDirectory: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     WorkspaceAgentSnapshot
   >({
@@ -226,7 +226,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly agentId: string
       readonly name: string
       readonly projectId: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     WorkspaceAgentSnapshot
   >({
@@ -244,7 +244,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly agentId: string
       readonly layout: AgentLayoutSnapshot
       readonly projectId: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     WorkspaceAgentSnapshot
   >({
@@ -261,7 +261,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
       readonly agentId: string
       readonly cleancodeMcpEnabled: boolean
       readonly projectId: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     UpdateWorkspaceAgentMcpCapabilityResult
   >({
@@ -286,7 +286,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     {
       readonly agentId: string
       readonly projectId: string
-      readonly workspaceName: string
+      readonly workspaceId: string
     },
     readonly WorkspaceAgentSnapshot[]
   >({
@@ -321,7 +321,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     scope: 'agent'
   })
 
-  registerIpcHandler<{ readonly projectDirectory: string; readonly workspaceName: string }, void>({
+  registerIpcHandler<{ readonly projectDirectory: string; readonly workspaceId: string }, void>({
     channel: 'cleancode:dispose-agent-workspace-session',
     handler: (command) => input.disposeAgentWorkspaceSession(command),
     ipcMain: input.ipcMain,
@@ -386,7 +386,7 @@ function readCreateWorkspaceAgentCommand(command: unknown): {
   readonly projectId: string
   readonly providerId: string
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 } {
   if (!isRecord(command)) {
     throw createExpectedAppError('INVALID_IPC_COMMAND', 'Invalid Agent creation command.')
@@ -400,7 +400,7 @@ function readCreateWorkspaceAgentCommand(command: unknown): {
     projectId: readRequiredString(command.projectId, 'projectId'),
     providerId: readProviderId(command.providerId),
     workspaceDirectory: readRequiredString(command.workspaceDirectory, 'workspaceDirectory'),
-    workspaceName: readRequiredString(command.workspaceName, 'workspaceName')
+    workspaceId: readRequiredString(command.workspaceId, 'workspaceId')
   }
 }
 

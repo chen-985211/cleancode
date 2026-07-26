@@ -1,27 +1,27 @@
 import {
   getBlockIdFromTerminalStateKey,
   getProjectIdFromTerminalStateKey,
-  getWorkspaceNameFromTerminalStateKey
+  getWorkspaceIdFromTerminalStateKey
 } from './terminalSessionWorkspaceMigration'
 import type { TerminalViewState } from './types'
 
 export interface TerminalStateReconciliationInput {
   readonly projectId: string
-  readonly workspaceNames: readonly string[]
-  readonly currentWorkspaceName: string
+  readonly workspaceIds: readonly string[]
+  readonly currentWorkspaceId: string
   readonly currentTerminalBlockIds: readonly string[]
 }
 
 export function removeWorkspaceTerminalStates(
   states: Record<string, TerminalViewState>,
   projectId: string,
-  workspaceName: string
+  workspaceId: string
 ): Record<string, TerminalViewState> {
   return filterTerminalStates(
     states,
     (key) =>
       getProjectIdFromTerminalStateKey(key) !== projectId ||
-      getWorkspaceNameFromTerminalStateKey(key) !== workspaceName
+      getWorkspaceIdFromTerminalStateKey(key) !== workspaceId
   )
 }
 
@@ -29,7 +29,7 @@ export function reconcileTerminalStates(
   states: Record<string, TerminalViewState>,
   input: TerminalStateReconciliationInput
 ): Record<string, TerminalViewState> {
-  const workspaceNames = new Set(input.workspaceNames)
+  const workspaceIds = new Set(input.workspaceIds)
   const currentTerminalBlockIds = new Set(input.currentTerminalBlockIds)
 
   return filterTerminalStates(states, (key) => {
@@ -37,13 +37,13 @@ export function reconcileTerminalStates(
       return true
     }
 
-    const workspaceName = getWorkspaceNameFromTerminalStateKey(key)
-    if (!workspaceNames.has(workspaceName)) {
+    const workspaceId = getWorkspaceIdFromTerminalStateKey(key)
+    if (!workspaceIds.has(workspaceId)) {
       return false
     }
 
     return (
-      workspaceName !== input.currentWorkspaceName ||
+      workspaceId !== input.currentWorkspaceId ||
       currentTerminalBlockIds.has(getBlockIdFromTerminalStateKey(key))
     )
   })

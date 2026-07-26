@@ -72,11 +72,11 @@ declare global {
       }): Promise<WorkbenchSnapshot>
       switchBranchWorkspace(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkbenchSnapshot>
       archiveBranchWorkspace(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly lockedWorktreeConfirmation?: { readonly lockReason: string | null }
       }): Promise<WorkbenchSnapshot>
       checkoutMainWorkspaceBranch(command: {
@@ -109,7 +109,7 @@ declare global {
         readonly rows?: number
         readonly terminalSourceTheme: AgentTerminalSourceTheme
         readonly workspaceDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<AgentSessionSnapshot>
       createWorkspaceAgent(command: {
         readonly agentId: string
@@ -119,30 +119,30 @@ declare global {
         readonly projectId: string
         readonly providerId: string
         readonly workspaceDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkspaceAgentSnapshot>
       renameWorkspaceAgent(command: {
         readonly agentId: string
         readonly name: string
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkspaceAgentSnapshot>
       updateWorkspaceAgentLayout(command: {
         readonly agentId: string
         readonly layout: AgentLayoutSnapshot
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkspaceAgentSnapshot>
       updateWorkspaceAgentMcpCapability(command: {
         readonly agentId: string
         readonly cleancodeMcpEnabled: boolean
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<UpdateWorkspaceAgentMcpCapabilityResult>
       removeWorkspaceAgent(command: {
         readonly agentId: string
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<readonly WorkspaceAgentSnapshot[]>
       writeAgentSession(command: {
         readonly input: string
@@ -155,7 +155,7 @@ declare global {
       }): Promise<void>
       disposeAgentWorkspaceSession(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<void>
       disposeProjectAgentSessions(command: { readonly projectDirectory: string }): Promise<void>
       approveAgentTool(command: {
@@ -167,31 +167,31 @@ declare global {
       onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void
       createTerminalBlock(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly name: string
         readonly description: string
         readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       createTerminalGroup(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly name: string
         readonly memberBlockIds: readonly string[]
       }): Promise<BlockGraphSnapshot>
       connectTerminalBlocks(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly sourceBlockId: string
         readonly targetBlockId: string
       }): Promise<BlockGraphSnapshot>
       disconnectTerminalBlocks(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly connectionId: string
       }): Promise<BlockGraphSnapshot>
       updateTerminalBlockMetadata(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly name: string
         readonly description: string
@@ -199,13 +199,13 @@ declare global {
       }): Promise<BlockGraphSnapshot>
       updateTerminalExecutionConfig(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly executionConfig: TerminalExecutionConfigSnapshot
       }): Promise<BlockGraphSnapshot>
       updateTerminalDefinition(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly name: string
         readonly description: string
@@ -214,67 +214,67 @@ declare global {
       }): Promise<BlockGraphSnapshot>
       updateTerminalGroupMetadata(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
         readonly name: string
       }): Promise<BlockGraphSnapshot>
       setTerminalGroupCollapsed(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
         readonly isCollapsed: boolean
       }): Promise<BlockGraphSnapshot>
       addTerminalToGroup(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
       removeTerminalFromGroup(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
       dissolveTerminalGroup(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
       }): Promise<BlockGraphSnapshot>
       resizeTerminalBlock(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly position: BlockPositionSnapshot
         readonly size: TerminalBlockSizeSnapshot
       }): Promise<BlockGraphSnapshot>
       updateGraphViewport(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly viewport: CanvasViewportSnapshot
       }): Promise<BlockGraphSnapshot>
       moveBlock(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       moveTerminalGroup(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly terminalGroupId: string
         readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       deleteBlock(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
       startTerminal(command: {
         readonly projectId: string
         readonly projectDirectory: string
         readonly terminalBlockId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
         readonly terminalSourceTheme: TerminalSourceTheme
@@ -286,7 +286,7 @@ declare global {
         readonly projectId: string
         readonly projectDirectory: string
         readonly terminalBlockId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
         readonly terminalSourceTheme: TerminalSourceTheme
@@ -304,7 +304,7 @@ declare global {
       }): Promise<void>
       openTerminalLink(command: {
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly sessionId: string
         readonly runId: string
@@ -352,7 +352,7 @@ declare global {
       }): Promise<TerminalSessionSnapshot | null>
       attachTerminalView(command: {
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly sessionId: string
         readonly runId: string
@@ -362,7 +362,7 @@ declare global {
       }): Promise<TerminalSnapshot>
       detachTerminalView(command: {
         readonly projectId: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly blockId: string
         readonly sessionId: string
         readonly runId: string
@@ -375,7 +375,7 @@ declare global {
       startTerminalWorkflow(command: {
         readonly projectId: string
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
         readonly workspaceDirectory: string
         readonly gitBranch: string | null
         readonly terminalSourceTheme: TerminalSourceTheme
@@ -387,11 +387,11 @@ declare global {
       }): Promise<WorkflowRunSnapshot>
       stopTerminalWorkflow(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkflowRunSnapshot | null>
       getTerminalWorkflow(command: {
         readonly projectDirectory: string
-        readonly workspaceName: string
+        readonly workspaceId: string
       }): Promise<WorkflowRunSnapshot | null>
       onTerminalWorkflowEvent(listener: (event: TerminalWorkflowEvent) => void): () => void
       onTerminalRunEvent(listener: (event: TerminalRunEvent) => void): () => void

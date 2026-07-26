@@ -34,7 +34,7 @@ interface ProjectSidebarProps {
   readonly onAddProject: () => void
   readonly onArchiveBranchWorkspace: (
     workbench: WorkbenchSnapshot,
-    workspaceName: string,
+    workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
@@ -45,7 +45,7 @@ interface ProjectSidebarProps {
     workbench: WorkbenchSnapshot,
     beforeProjectDirectory: string | null
   ) => void
-  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
+  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
 }
 
 export function ProjectSidebar({
@@ -164,7 +164,7 @@ interface ProjectCardProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly onArchiveBranchWorkspace: (
     workbench: WorkbenchSnapshot,
-    workspaceName: string,
+    workspaceId: string,
     lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   ) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
@@ -178,7 +178,7 @@ interface ProjectCardProps {
     event: React.PointerEvent<HTMLElement>,
     workbench: WorkbenchSnapshot
   ) => void
-  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceName: string) => void
+  readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
 }
 
 function ProjectCard({
@@ -200,8 +200,8 @@ function ProjectCard({
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
-  const [openWorkspaceMenuName, setOpenWorkspaceMenuName] = useState<string | null>(null)
-  const [archiveWorkspaceName, setArchiveWorkspaceName] = useState<string | null>(null)
+  const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null)
+  const [archiveWorkspaceId, setArchiveWorkspaceId] = useState<string | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
@@ -224,14 +224,14 @@ function ProjectCard({
     setIsExpanded(true)
     setIsBranchSelectorOpen(false)
     setBranchSearchQuery('')
-    setOpenWorkspaceMenuName(null)
+    setOpenWorkspaceMenuId(null)
     setIsRemoveProjectDialogOpen(false)
     if (intent.type === 'createBranchWorkspace') {
       openBranchWorkspaceForm()
     }
   }
-  const archiveWorkspace = archiveWorkspaceName
-    ? workbench.project.workspaces.find((workspace) => workspace.name === archiveWorkspaceName)
+  const archiveWorkspace = archiveWorkspaceId
+    ? workbench.project.workspaces.find((workspace) => workspace.workspaceId === archiveWorkspaceId)
     : null
   const archiveWorkspaceGitBranch = archiveWorkspace
     ? workbench.gitBranches.find(
@@ -256,17 +256,17 @@ function ProjectCard({
     if (isExpanded) {
       closeBranchSelector()
       closeBranchWorkspaceForm()
-      setOpenWorkspaceMenuName(null)
+      setOpenWorkspaceMenuId(null)
     }
 
     setIsExpanded((expanded) => !expanded)
   }
   const workspaceListId = `project-${workbench.project.id}-workspaces`
   const closeWorkspaceMenu = useCallback(() => {
-    setOpenWorkspaceMenuName(null)
+    setOpenWorkspaceMenuId(null)
   }, [])
-  const toggleWorkspaceMenu = useCallback((workspaceName: string) => {
-    setOpenWorkspaceMenuName((menuName) => (menuName === workspaceName ? null : workspaceName))
+  const toggleWorkspaceMenu = useCallback((workspaceId: string) => {
+    setOpenWorkspaceMenuId((menuId) => (menuId === workspaceId ? null : workspaceId))
   }, [])
 
   useEffect(() => {
@@ -363,18 +363,18 @@ function ProjectCard({
           <div id={workspaceListId} className="workspace-list">
             {workbench.project.workspaces.map((workspace) => {
               const isActiveWorkspace = workspace.isCurrent && isCurrentProject
-              const boundBranchName = workspace.gitBranch ?? workspace.name
-              const isDefaultWorkspace = workspace.name === 'main'
+              const boundBranchName = workspace.gitBranch ?? workspace.displayName
+              const isDefaultWorkspace = workspace.workspaceKind === 'default'
               const isGitUninitialized =
                 isDefaultWorkspace && !workspace.gitBranch && workbench.gitBranches.length === 0
               const isWorktreeWorkspace = !isDefaultWorkspace && Boolean(workspace.gitBranch)
               const workspaceDisplayName = isGitUninitialized
                 ? t('sidebar.gitUninitialized')
-                : workspace.name
+                : workspace.displayName
               const shouldShowDefaultWorkspaceBadge =
                 isDefaultWorkspace && (!workspace.gitBranch || workspace.gitBranch === 'main')
               const shouldShowGitBranchBadge =
-                Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.name
+                Boolean(workspace.gitBranch) && workspace.gitBranch !== workspace.displayName
               const workspaceButtonLabel = [
                 workspaceDisplayName,
                 shouldShowDefaultWorkspaceBadge ? t('sidebar.defaultWorkspace') : null,
@@ -387,8 +387,8 @@ function ProjectCard({
               return (
                 <div
                   className="workspace-group"
-                  key={workspace.name}
-                  ref={workspace.name === 'main' ? branchSelectorRootRef : undefined}
+                  key={workspace.workspaceId}
+                  ref={isDefaultWorkspace ? branchSelectorRootRef : undefined}
                 >
                   {isDefaultWorkspace && workbench.gitBranches.length > 0 ? (
                     <>
@@ -407,7 +407,7 @@ function ProjectCard({
                             aria-current={isActiveWorkspace ? 'page' : undefined}
                             className="default-branch-selector__select"
                             type="button"
-                            onClick={() => onSelectWorkspace(workbench, 'main')}
+                            onClick={() => onSelectWorkspace(workbench, workspace.workspaceId)}
                           >
                             <span className="workspace-row__branch-icon" aria-hidden="true">
                               <GitBranch size={14} />
@@ -444,7 +444,7 @@ function ProjectCard({
                             closeBranchSelector()
 
                             if (branch.isMainWorkspaceBranch) {
-                              onSelectWorkspace(workbench, 'main')
+                              onSelectWorkspace(workbench, workspace.workspaceId)
                               return
                             }
 
@@ -473,7 +473,7 @@ function ProjectCard({
                             aria-current={isActiveWorkspace ? 'page' : undefined}
                             className="workspace-row__select"
                             type="button"
-                            onClick={() => onSelectWorkspace(workbench, workspace.name)}
+                            onClick={() => onSelectWorkspace(workbench, workspace.workspaceId)}
                           >
                             <span className="workspace-row__branch-icon" aria-hidden="true">
                               <GitBranch size={14} />
@@ -504,17 +504,17 @@ function ProjectCard({
                         </TooltipLabel>
                         {isWorktreeWorkspace ? (
                           <WorkspaceRowMenu
-                            isOpen={openWorkspaceMenuName === workspace.name}
-                            workspaceName={workspace.name}
-                            onArchive={() => setArchiveWorkspaceName(workspace.name)}
+                            isOpen={openWorkspaceMenuId === workspace.workspaceId}
+                            workspaceName={workspace.displayName}
+                            onArchive={() => setArchiveWorkspaceId(workspace.workspaceId)}
                             onClose={closeWorkspaceMenu}
-                            onToggle={() => toggleWorkspaceMenu(workspace.name)}
+                            onToggle={() => toggleWorkspaceMenu(workspace.workspaceId)}
                           />
                         ) : null}
                       </div>
                     </>
                   )}
-                  {workspace.name !== 'main' && workspace.gitBranch ? (
+                  {!isDefaultWorkspace && workspace.gitBranch ? (
                     <span className="workspace-git-branch sr-only">{workspace.gitBranch}</span>
                   ) : null}
                 </div>
@@ -545,20 +545,20 @@ function ProjectCard({
       ) : null}
       {archiveWorkspace ? (
         <ArchiveWorkspaceDialog
-          workspaceName={archiveWorkspace.name}
+          workspaceName={archiveWorkspace.displayName}
           isCurrentWorkspace={archiveWorkspace.isCurrent && isCurrentProject}
           isLocked={archiveWorkspaceGitBranch?.isLocked ?? false}
           lockReason={archiveWorkspaceGitBranch?.lockReason ?? null}
-          onCancel={() => setArchiveWorkspaceName(null)}
+          onCancel={() => setArchiveWorkspaceId(null)}
           onConfirm={() => {
             onArchiveBranchWorkspace(
               workbench,
-              archiveWorkspace.name,
+              archiveWorkspace.workspaceId,
               archiveWorkspaceGitBranch?.isLocked
                 ? { lockReason: archiveWorkspaceGitBranch.lockReason }
                 : undefined
             )
-            setArchiveWorkspaceName(null)
+            setArchiveWorkspaceId(null)
           }}
         />
       ) : null}

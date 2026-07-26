@@ -58,13 +58,13 @@ function useGraphStateHarness(initialWorkbench: WorkbenchSnapshot) {
   )
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([initialWorkbench])
   const [selectedTerminalBlockIds, setSelectedTerminalBlockIds] = useState([
-    `${initialWorkbench.graph.workspaceName}-block`
+    `${initialWorkbench.graph.workspaceId}-block`
   ])
   const [selectedTerminalGroupId, setSelectedTerminalGroupId] = useState<string | null>(
-    `${initialWorkbench.graph.workspaceName}-group`
+    `${initialWorkbench.graph.workspaceId}-group`
   )
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(
-    `${initialWorkbench.graph.workspaceName}-block`
+    `${initialWorkbench.graph.workspaceId}-block`
   )
   const setCurrentGraph = useCurrentGraphState({
     currentWorkbench,
@@ -77,9 +77,9 @@ function useGraphStateHarness(initialWorkbench: WorkbenchSnapshot) {
   const switchWorkbench = useCallback((workbench: WorkbenchSnapshot) => {
     setCurrentWorkbench(workbench)
     setWorkbenches([workbench])
-    setSelectedTerminalBlockIds([`${workbench.graph.workspaceName}-block`])
-    setSelectedTerminalGroupId(`${workbench.graph.workspaceName}-group`)
-    setHoveredTerminalBlockId(`${workbench.graph.workspaceName}-block`)
+    setSelectedTerminalBlockIds([`${workbench.graph.workspaceId}-block`])
+    setSelectedTerminalGroupId(`${workbench.graph.workspaceId}-group`)
+    setHoveredTerminalBlockId(`${workbench.graph.workspaceId}-block`)
   }, [])
 
   return {
@@ -94,26 +94,30 @@ function useGraphStateHarness(initialWorkbench: WorkbenchSnapshot) {
 }
 
 function createWorkspaceWorkbench(
-  workspaceName: 'main' | 'feature/search',
+  workspaceId: 'main' | 'feature/search',
   isCurrent: boolean
 ): WorkbenchSnapshot {
   const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
-    workspaceName,
+    workspaceId,
     workspaceDirectory:
-      workspaceName === 'main' ? '/tmp/alpha-project' : '/tmp/alpha-project-feature-search',
-    gitBranch: workspaceName,
+      workspaceId === 'main' ? '/tmp/alpha-project' : '/tmp/alpha-project-feature-search',
+    gitBranch: workspaceId,
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/tmp/alpha-project',
         gitBranch: 'main',
-        isCurrent: workspaceName === 'main' && isCurrent
+        isCurrent: workspaceId === 'main' && isCurrent
       },
       {
-        name: 'feature/search',
+        workspaceId: 'feature/search',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/search',
         directory: '/tmp/alpha-project-feature-search',
         gitBranch: 'feature/search',
-        isCurrent: workspaceName === 'feature/search' && isCurrent
+        isCurrent: workspaceId === 'feature/search' && isCurrent
       }
     ]
   })
@@ -124,9 +128,9 @@ function createWorkspaceWorkbench(
       ...workbench.graph,
       blocks: [
         {
-          id: `${workspaceName}-block`,
+          id: `${workspaceId}-block`,
           type: 'terminal',
-          name: `${workspaceName} terminal`,
+          name: `${workspaceId} terminal`,
           description: '本地终端',
           launchCommand: '',
           position: { x: 160, y: 220 },
@@ -135,13 +139,13 @@ function createWorkspaceWorkbench(
       ],
       terminalGroups: [
         {
-          id: `${workspaceName}-group`,
+          id: `${workspaceId}-group`,
           type: 'terminal-group',
-          name: `${workspaceName} group`,
+          name: `${workspaceId} group`,
           position: { x: 128, y: 144 },
           size: { width: 484, height: 458 },
           isCollapsed: false,
-          memberBlockIds: [`${workspaceName}-block`]
+          memberBlockIds: [`${workspaceId}-block`]
         }
       ]
     }

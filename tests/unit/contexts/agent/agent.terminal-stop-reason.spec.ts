@@ -130,9 +130,8 @@ function createSession(): {
   const events: AgentRuntimeChangedEvent[] = []
   const scope = AgentConversationScope.create({
     agentId: 'agent-1',
-    gitBranch: null,
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
   const session: ManagedAgentSession = {
     agentId: 'agent-1',
@@ -160,7 +159,7 @@ function createSession(): {
     shouldPersist: true,
     terminalSourceTheme: 'dark',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
   return { events, session }
 }

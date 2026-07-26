@@ -108,7 +108,7 @@ describe('Agent tool approval coordinator', () => {
       graph: fakeGraph,
       projectDirectory: '/repo/app',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
   })
 
@@ -319,15 +319,14 @@ function createManagedSession(): ManagedAgentSession {
     },
     scope: AgentConversationScope.create({
       agentId: 'agent-1',
-      gitBranch: null,
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     }),
     sessionId: 'agent-session-1',
     shouldPersist: true,
     terminalSourceTheme: 'light',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -385,5 +384,5 @@ const fakeGraph: BlockGraphSnapshot = {
   projectId: 'project-1',
   terminalGroups: [],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }

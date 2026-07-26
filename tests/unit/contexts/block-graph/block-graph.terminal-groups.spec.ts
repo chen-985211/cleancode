@@ -7,7 +7,7 @@ describe('terminal groups in the default block graph', () => {
   it('binds multiple terminals into a persistent terminal group', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const backend = graph.createTerminalBlock({
       id: 'backend-terminal',
@@ -92,7 +92,7 @@ describe('terminal groups in the default block graph', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: [
         {
           id: 'backend-terminal',
@@ -160,7 +160,7 @@ describe('terminal groups in the default block graph', () => {
 function createGraphWithGroupedTerminals(): BlockGraph {
   const graph = BlockGraph.createDefault({
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 
   graph.createTerminalBlock({

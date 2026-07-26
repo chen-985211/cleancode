@@ -88,7 +88,7 @@ function runScope(runId: string) {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     blockId: 'api',

@@ -9,7 +9,7 @@ import { createIdleTerminalState, type TerminalViewState } from './types'
 interface TerminalRuntimeRecoveryInput {
   readonly currentProjectId: string | null
   readonly currentTerminalBlockIds: readonly string[] | undefined
-  readonly currentWorkspaceName: string | null
+  readonly currentWorkspaceId: string | null
   readonly runtimeAvailability: TerminalRuntimeAvailabilitySnapshot
   readonly terminalStatesByKey: Record<string, TerminalViewState>
   readonly updateTerminalStates: Dispatch<SetStateAction<Record<string, TerminalViewState>>>
@@ -18,7 +18,7 @@ interface TerminalRuntimeRecoveryInput {
 export function useTerminalRuntimeRecovery({
   currentProjectId,
   currentTerminalBlockIds,
-  currentWorkspaceName,
+  currentWorkspaceId,
   runtimeAvailability,
   terminalStatesByKey,
   updateTerminalStates
@@ -29,14 +29,14 @@ export function useTerminalRuntimeRecovery({
     window.cleancode && typeof window.cleancode.listRecoveredTerminalSessions === 'function'
   )
   const recoveryKey =
-    isRuntimeReady && currentProjectId && currentWorkspaceName
-      ? `${currentProjectId}\0${currentWorkspaceName}\0${runtimeAvailability.epoch}`
+    isRuntimeReady && currentProjectId && currentWorkspaceId
+      ? `${currentProjectId}\0${currentWorkspaceId}\0${runtimeAvailability.epoch}`
       : null
   const terminalStates = useMemo(() => {
     const selected = selectTerminalStatesForWorkspace(
       terminalStatesByKey,
       currentProjectId,
-      currentWorkspaceName
+      currentWorkspaceId
     )
     if (
       (isRuntimeReady &&
@@ -58,7 +58,7 @@ export function useTerminalRuntimeRecovery({
   }, [
     currentProjectId,
     currentTerminalBlockIds,
-    currentWorkspaceName,
+    currentWorkspaceId,
     canReconcileRecoveredSessions,
     isRuntimeReady,
     reconciledRecoveryKey,
@@ -73,7 +73,7 @@ export function useTerminalRuntimeRecovery({
       !recoveryKey ||
       !api?.listRecoveredTerminalSessions ||
       !currentProjectId ||
-      !currentWorkspaceName
+      !currentWorkspaceId
     ) {
       return undefined
     }
@@ -90,7 +90,7 @@ export function useTerminalRuntimeRecovery({
         const visible = sessions.filter(
           (session) =>
             session.projectId === currentProjectId &&
-            session.workspaceName === currentWorkspaceName &&
+            session.workspaceId === currentWorkspaceId &&
             (!currentTerminalBlockIds || currentTerminalBlockIds.includes(session.blockId))
         )
         updateTerminalStates((states) =>
@@ -98,7 +98,7 @@ export function useTerminalRuntimeRecovery({
             (nextStates, session) =>
               applyRecoveredTerminalSessionSnapshot(
                 nextStates,
-                createTerminalStateKey(session.projectId, session.workspaceName, session.blockId),
+                createTerminalStateKey(session.projectId, session.workspaceId, session.blockId),
                 session,
                 '',
                 endpointsBySession.get(session.id) ?? null
@@ -115,7 +115,7 @@ export function useTerminalRuntimeRecovery({
   }, [
     currentProjectId,
     currentTerminalBlockIds,
-    currentWorkspaceName,
+    currentWorkspaceId,
     isRuntimeReady,
     recoveryKey,
     updateTerminalStates

@@ -4,7 +4,7 @@ import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction
 
 export interface ConnectTerminalBlocksCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly sourceBlockId: string
   readonly targetBlockId: string
 }

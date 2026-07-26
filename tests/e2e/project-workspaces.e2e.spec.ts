@@ -147,12 +147,12 @@ describe('project workspaces e2e', () => {
 
       const projectMetadata = JSON.parse(
         await waitForJsonFile(workbench.appStateDirectory, 'project.json')
-      ) as { name: string; workspaces: Array<{ name: string }> }
+      ) as { name: string; workspaces: Array<{ displayName: string }> }
       const graph = await waitForE2eBlockGraph(workbench)
 
       expect(await pathExists(join(workbench.projectDirectory, '.cleancode'))).toBe(false)
       expect(projectMetadata.name).toBe(basename(workbench.projectDirectory))
-      expect(projectMetadata.workspaces.map((workspace) => workspace.name)).toEqual(['main'])
+      expect(projectMetadata.workspaces.map((workspace) => workspace.displayName)).toEqual(['main'])
       expect(graph.blocks).toEqual([
         expect.objectContaining({ type: 'terminal', name: 'Terminal 1' })
       ])

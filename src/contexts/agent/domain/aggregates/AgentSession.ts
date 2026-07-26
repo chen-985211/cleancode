@@ -3,6 +3,7 @@ import {
   ProviderSessionRef,
   type ProviderSessionRefSnapshot
 } from '../value-objects/ProviderSessionRef'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 export interface AgentLayoutSnapshot {
   readonly position: { readonly x: number; readonly y: number }
@@ -12,20 +13,15 @@ export interface AgentLayoutSnapshot {
 export const defaultAgentLayoutPosition = { x: 540, y: 120 } as const
 export const defaultAgentLayoutSize = { width: 720, height: 460 } as const
 
-interface AgentConversationBindingSnapshot {
-  readonly gitBranch: string | null
-  readonly sessionRef: ProviderSessionRefSnapshot
-}
-
 export interface PersistedAgentSessionSnapshot {
   readonly agentId: string
   readonly cleancodeMcpEnabled: boolean
-  readonly conversations: readonly AgentConversationBindingSnapshot[]
   readonly layout: AgentLayoutSnapshot
   readonly name: string
   readonly projectId: string
   readonly providerId: string
-  readonly workspaceName: string
+  readonly providerSessionRef: ProviderSessionRefSnapshot | null
+  readonly workspaceId: string
 }
 
 export interface CreateAgentSessionInput {
@@ -35,24 +31,19 @@ export interface CreateAgentSessionInput {
   readonly name: string
   readonly projectId: string
   readonly providerId: string
-  readonly workspaceName: string
-}
-
-interface AgentConversationBinding {
-  readonly gitBranch: string | null
-  readonly sessionRef: ProviderSessionRef
+  readonly workspaceId: string
 }
 
 export class AgentSession {
   private constructor(
     readonly id: string,
     readonly projectId: string,
-    readonly workspaceName: string,
+    readonly workspaceId: string,
     readonly providerId: string,
     private agentName: string,
     private agentLayout: AgentLayoutSnapshot,
     private isCleancodeMcpEnabled: boolean,
-    private readonly conversations: Map<string, AgentConversationBinding>,
+    private providerSession: ProviderSessionRef | null,
     private activeScope: AgentConversationScope | null = null
   ) {}
 
@@ -60,12 +51,12 @@ export class AgentSession {
     return new AgentSession(
       requireValue(input.agentId, 'agentId'),
       requireValue(input.projectId, 'projectId'),
-      requireValue(input.workspaceName, 'workspaceName'),
+      requireValue(input.workspaceId, 'workspaceId'),
       requireValue(input.providerId, 'providerId'),
       normalizeName(input.name),
       normalizeLayout(input.layout),
       input.cleancodeMcpEnabled ?? true,
-      new Map()
+      null
     )
   }
 
@@ -80,7 +71,7 @@ export class AgentSession {
       name: 'Agent 1',
       projectId: snapshot.projectId,
       providerId,
-      workspaceName: snapshot.workspaceName
+      workspaceId: snapshot.workspaceId
     })
     session.activeScope = scope
     return session
@@ -90,26 +81,19 @@ export class AgentSession {
     snapshot: PersistedAgentSessionSnapshot,
     activeScope: AgentConversationScope | null = null
   ): AgentSession {
-    const session = new AgentSession(
+    return new AgentSession(
       requireValue(snapshot.agentId, 'agentId'),
       requireValue(snapshot.projectId, 'projectId'),
-      requireValue(snapshot.workspaceName, 'workspaceName'),
+      requireValue(snapshot.workspaceId, 'workspaceId'),
       requireValue(snapshot.providerId, 'providerId'),
       normalizeName(snapshot.name),
       normalizeLayout(snapshot.layout),
       snapshot.cleancodeMcpEnabled,
-      new Map(
-        snapshot.conversations.map((conversation) => [
-          branchKey(conversation.gitBranch),
-          {
-            gitBranch: normalizeBranch(conversation.gitBranch),
-            sessionRef: ProviderSessionRef.create(conversation.sessionRef, snapshot.providerId)
-          }
-        ])
-      ),
+      snapshot.providerSessionRef
+        ? ProviderSessionRef.create(snapshot.providerSessionRef, snapshot.providerId)
+        : null,
       activeScope
     )
-    return session
   }
 
   bindProviderSession(sessionRef: ProviderSessionRef): void
@@ -131,17 +115,15 @@ export class AgentSession {
     }
 
     this.assertOwnsScope(scope)
-    const gitBranch = scope.toSnapshot().gitBranch
-    this.conversations.set(branchKey(gitBranch), {
-      gitBranch,
-      sessionRef: sessionRef.forProvider(this.providerId)
-    })
+    this.providerSession = sessionRef.forProvider(this.providerId)
   }
 
   get boundProviderSessionRef(): ProviderSessionRef | null {
-    return this.activeScope
-      ? this.findProviderSessionRef(this.activeScope.toSnapshot().gitBranch)
-      : null
+    return this.activeScope ? this.providerSession : null
+  }
+
+  get providerSessionRef(): ProviderSessionRef | null {
+    return this.providerSession
   }
 
   get name(): string {
@@ -156,10 +138,6 @@ export class AgentSession {
     return this.isCleancodeMcpEnabled
   }
 
-  findProviderSessionRef(gitBranch: string | null): ProviderSessionRef | null {
-    return this.conversations.get(branchKey(gitBranch))?.sessionRef ?? null
-  }
-
   rename(name: string): void {
     this.agentName = normalizeName(name)
   }
@@ -172,23 +150,20 @@ export class AgentSession {
     this.isCleancodeMcpEnabled = enabled
   }
 
-  clearProviderSession(gitBranch: string | null): void {
-    this.conversations.delete(branchKey(gitBranch))
+  clearProviderSession(): void {
+    this.providerSession = null
   }
 
   toSnapshot(): PersistedAgentSessionSnapshot {
     return {
       agentId: this.id,
       cleancodeMcpEnabled: this.isCleancodeMcpEnabled,
-      conversations: [...this.conversations.values()].map((conversation) => ({
-        gitBranch: conversation.gitBranch,
-        sessionRef: conversation.sessionRef.toSnapshot()
-      })),
       layout: copyLayout(this.agentLayout),
       name: this.agentName,
       projectId: this.projectId,
       providerId: this.providerId,
-      workspaceName: this.workspaceName
+      providerSessionRef: this.providerSession?.toSnapshot() ?? null,
+      workspaceId: this.workspaceId
     }
   }
 
@@ -198,7 +173,7 @@ export class AgentSession {
     if (
       snapshot.agentId !== this.id ||
       snapshot.projectId !== this.projectId ||
-      snapshot.workspaceName !== this.workspaceName
+      snapshot.workspaceId !== this.workspaceId
     ) {
       throw createExpectedAppError(
         'AGENT_SESSION_INVALID',
@@ -207,7 +182,6 @@ export class AgentSession {
     }
   }
 }
-import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 function requireValue(value: string, fieldName: string): string {
   const normalized = value.trim()
@@ -240,13 +214,4 @@ function copyLayout(layout: AgentLayoutSnapshot): AgentLayoutSnapshot {
     position: { ...layout.position },
     size: { ...layout.size }
   }
-}
-
-function normalizeBranch(gitBranch: string | null): string | null {
-  const normalized = gitBranch?.trim()
-  return normalized ? normalized : null
-}
-
-function branchKey(gitBranch: string | null): string {
-  return normalizeBranch(gitBranch) ?? '\0no-branch'
 }

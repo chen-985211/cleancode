@@ -55,6 +55,13 @@ SHA-256 校验文件并创建公开 GitHub Pre-release；手工触发只保留 A
 Preview 的 macOS 应用使用 ad-hoc 签名且不 notarize，Windows 安装程序未签名，发布说明必须明确
 系统安全警告，且不得标记为 Latest。自动更新、正式签名和公证仍未接入。
 
+打包版与人工测试的发布包继续使用稳定的 `CleanCode` 用户数据目录。未打包的开发运行先规范化
+Electron 实际加载的源码 worktree 目录，再使用不暴露本地路径的稳定摘要选择
+`CleanCode-Dev-Profiles/<profile-id>`；同一物理 worktree 重启后复用 profile，不同 worktree 的
+应用状态、Chromium session 数据和单实例锁相互隔离。`userData` 与 `sessionData` 必须在 Electron
+ready 和单实例锁之前一起切换。显式 `--user-data-dir` 覆盖优先，供 E2E 等隔离运行继续使用各自
+的临时目录；旧 `CleanCode-Dev` 目录保留但不自动复制到新 profile。
+
 ## 选择 Electron 的原因
 
 cleancode 需要深度集成本地 CLI、伪终端、文件系统和多进程运行。Electron 的 Node.js 能力可以在保持浏览器渲染层的同时，通过主进程适配这些本地能力。
@@ -69,7 +76,7 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 使用 ConPTY，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 使用 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。两种可见终端都通过共享 React `TerminalThemeProjection` 协调源主题与当前应用主题：wrapper 使用当前应用主题的终端背景并承载上、左、下阅读留白，直接子 viewport 使用源 palette，并且只在源主题与当前主题不一致时应用 mismatch filter。搜索、粘贴、错误、节点边框和其他第一方 chrome 均位于被过滤子树之外。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 使用 ConPTY，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 通过 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。两种可见终端都通过共享 React `TerminalThemeProjection` 协调源主题与当前应用主题：wrapper 使用当前应用主题的终端背景并承载上、左、下阅读留白，直接子 viewport 使用源 palette，并且只在源主题与当前主题不一致时应用 mismatch filter。搜索、粘贴、错误、节点边框和其他第一方 chrome 均位于被过滤子树之外。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖；普通 PTY 在合并显式命令环境前移除这一 Provider 私有标记，避免把下游 Electron 项目切换为 Node 模式。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
@@ -93,7 +100,7 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 
 ## 存储层
 
-当前桌面应用在 Electron 应用数据目录中使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。Run 终端恢复目录使用独立 schema v2 JSON checkpoint 与 schema v1 有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
+当前桌面应用在按运行渠道和开发源码 worktree 隔离的 Electron 应用数据目录中，以 `project-state-v2` 作为当前业务状态根，使用版本化 JSON 保存项目、积木图、工作区 Agent 定义和 Agent 会话绑定，使用 JSONL 追加 Agent 工具审计记录。积木图只接受 v2，Agent 定义只接受 schema v5；二者都以稳定 `workspaceId` 定位，项目内 `.cleancode` 和旧应用状态根不会被读取、迁移或回写。产品尚未公开期间旧测试数据不构成兼容性约束，旧状态保留在原位置但不加载。发布包与人工发布测试共享正式目录，每个未打包源码 worktree 使用稳定独立的开发 profile，自动化测试通过显式临时目录隔离。Run 终端恢复目录使用独立 schema v2 JSON checkpoint 与 schema v1 有界 JSONL 输出记录；单文件和全局容量、冷历史数量及保留时间均有限制，损坏 session 隔离处理。
 
 需要原子替换的 JSON 仓储采用临时文件、同步和重命名流程。所有读写必须通过应用层仓储端口完成；存储文件不是供 UI、Agent 或其他上下文直接修改的共享接口。
 
@@ -115,6 +122,7 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - `check:agent-provider-boundary`：自动发现内建 Provider，并阻止生产表现层依赖具体 Provider infrastructure 或品牌 ID。
 - `check:theme`：检查集中主题、语义颜色 token 与由主题 CSS 生成的 canonical terminal palette。
 - `check:i18n`：使用 TypeScript AST 检查生产表现层中的硬编码第一方 UI 文案。
+- `check:portable-paths`：使用 TypeScript AST 阻止生产代码和测试手工拼接文件系统分隔符，以及用单平台绝对路径正则断言平台中立路径。
 - `check:docs`：检查本地文档链接、Markdown 锚点、`docs` 目录归属和文档中心索引覆盖。
 
 本地完整门禁统一通过 `pnpm pre-commit` 执行。执行顺序以根目录 `package.json` 为准，当前必须覆盖 `pnpm check:quality`、全部 unit/integration/contract 和完整 Electron E2E。CI 对每个 Pull Request 和 `main` 同时运行三平台全量质量矩阵与三平台 E2E 分片，不使用路径过滤。

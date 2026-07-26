@@ -100,10 +100,10 @@ describe('terminal workflow notification publishing', () => {
     const mainWorkbench = createWorkbenchSnapshot('/project', 'Project')
     const featureWorkbench = createWorkbenchSnapshot('/project', 'Project', {
       workspaceDirectory: '/project-feature',
-      workspaceName: 'feature'
+      workspaceId: 'feature'
     })
-    const get = vi.fn(async (command: { readonly workspaceName: string }) =>
-      command.workspaceName === 'main' ? failedRun('run-1', 1) : null
+    const get = vi.fn(async (command: { readonly workspaceId: string }) =>
+      command.workspaceId === 'main' ? failedRun('run-1', 1) : null
     )
     window.cleancode = createWorkflowRuntime({ get })
 
@@ -124,7 +124,7 @@ describe('terminal workflow notification publishing', () => {
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith({
         projectDirectory: '/project',
-        workspaceName: 'feature'
+        workspaceId: 'feature'
       })
     )
 
@@ -139,10 +139,10 @@ describe('terminal workflow notification publishing', () => {
     const mainWorkbench = createWorkbenchSnapshot('/project', 'Project')
     const featureWorkbench = createWorkbenchSnapshot('/project', 'Project', {
       workspaceDirectory: '/project-feature',
-      workspaceName: 'feature'
+      workspaceId: 'feature'
     })
-    const get = vi.fn(async (command: { readonly workspaceName: string }) =>
-      command.workspaceName === 'main' ? workflowRun('run-1', 'running') : null
+    const get = vi.fn(async (command: { readonly workspaceId: string }) =>
+      command.workspaceId === 'main' ? workflowRun('run-1', 'running') : null
     )
     window.cleancode = createWorkflowRuntime({ get })
 
@@ -195,7 +195,7 @@ describe('terminal workflow notification publishing', () => {
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith({
         projectDirectory: '/first-project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
 
@@ -204,7 +204,7 @@ describe('terminal workflow notification publishing', () => {
     await waitFor(() =>
       expect(get).toHaveBeenCalledWith({
         projectDirectory: '/second-project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     )
 
@@ -355,7 +355,7 @@ function workflowRun(id: string, status: WorkflowRunSnapshot['status']): Workflo
     graphId: 'graph-Project',
     projectId: 'project-Project',
     projectDirectory: '/tmp/Project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/tmp/Project',
     gitBranch: null,
     status,
@@ -382,7 +382,7 @@ function failedRun(id: string, exitCode: number): WorkflowRunSnapshot {
     graphId: 'graph-Project',
     projectId: 'project-Project',
     projectDirectory: '/tmp/Project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/tmp/Project',
     gitBranch: null,
     status: 'failed',

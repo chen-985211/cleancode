@@ -146,7 +146,7 @@ function createGraph(
   return {
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     viewport: { x: 0, y: 0, zoom: 1 },
     blocks: [
       createBlock('backend-terminal', { x: 320, y: 240 }),
@@ -191,6 +191,12 @@ function createTerminalNode(input: {
     position: input.position,
     style: block.size,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal',
+        objectId: input.id
+      },
       block,
       session: createIdleTerminalState(),
       isSelected: false,
@@ -223,6 +229,12 @@ function createGroupNode(input: {
     position: input.position,
     style: input.size,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal-group',
+        objectId: input.id
+      },
       group: {
         id: input.id,
         type: 'terminal-group',

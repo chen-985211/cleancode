@@ -1,4 +1,4 @@
-export interface WorkspaceRunStartGateLease {
+interface WorkspaceRunStartGateLease {
   readonly wasQuarantined: boolean
   quarantine(): void
   release(): void
@@ -9,15 +9,15 @@ export interface WorkspaceRunLifecyclePort {
   disposeProject(projectDirectory: string): Promise<WorkspaceRunStartGateLease>
   disposeWorkspace(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<WorkspaceRunStartGateLease>
   disposeWorkspaces(command: {
     readonly projectDirectory: string
-    readonly workspaceNames: readonly string[]
+    readonly workspaceIds: readonly string[]
   }): Promise<WorkspaceRunStartGateLease>
   isWorkspaceQuarantined(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): boolean
   resolveProjectQuarantines(projectDirectory: string): void
 }

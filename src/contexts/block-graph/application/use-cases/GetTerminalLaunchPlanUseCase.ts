@@ -5,7 +5,7 @@ import type { BlockGraphRepository } from '../ports/BlockGraphRepository'
 
 export interface GetTerminalLaunchPlanQuery {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly blockId: string
 }
 
@@ -15,7 +15,7 @@ export class GetTerminalLaunchPlanUseCase {
   async execute(query: GetTerminalLaunchPlanQuery): Promise<TerminalLaunchPlanSnapshot> {
     const graph = await this.graphRepository.findDefaultGraph(
       query.projectDirectory,
-      query.workspaceName
+      query.workspaceId
     )
 
     if (!graph) {

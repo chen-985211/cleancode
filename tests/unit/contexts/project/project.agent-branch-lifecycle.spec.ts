@@ -7,44 +7,40 @@ import { ProjectWorkspaceTransactionCoordinator } from '../../../../src/contexts
 import { SynchronizeProjectGitStateUseCase } from '../../../../src/contexts/project/application/use-cases/SynchronizeProjectGitStateUseCase'
 
 describe('project Agent branch lifecycle', () => {
-  it('suspends the main workspace Agent before checkout and resumes it if Git fails', async () => {
-    const { lifecycleCalls, useCase } = createFixture({ checkoutError: 'checkout failed' })
+  it('does not suspend the physical workspace Agent when Git checkout fails', async () => {
+    const { useCase } = createFixture({ checkoutError: 'checkout failed' })
 
     await expect(
       useCase.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
     ).rejects.toThrow('checkout failed')
-
-    expect(lifecycleCalls).toEqual(['suspend:/work/app', 'resume:/work/app', 'release:/work/app'])
   })
 
-  it('does not checkout if the workspace becomes dirty while its Agents drain', async () => {
-    const { checkoutBranches, lifecycleCalls, useCase } = createFixture({
+  it('does not preemptively stop checkout based on an application-level dirty-tree check', async () => {
+    const { checkoutBranches, useCase } = createFixture({
       workingTreeCleanResults: [true, false]
     })
 
     await expect(
       useCase.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
-    ).rejects.toMatchObject({ code: 'MAIN_WORKSPACE_HAS_UNCOMMITTED_CHANGES' })
+    ).resolves.toMatchObject({
+      workspaces: [expect.objectContaining({ gitBranch: 'feature/free' })]
+    })
 
-    expect(checkoutBranches).toEqual([])
-    expect(lifecycleCalls).toEqual(['suspend:/work/app', 'resume:/work/app', 'release:/work/app'])
+    expect(checkoutBranches).toEqual(['feature/free'])
   })
 
-  it('rolls Git back before resuming the old Agent scope if project saving fails', async () => {
-    const { checkoutBranches, lifecycleCalls, useCase } = createFixture({
-      saveError: 'save failed'
-    })
+  it('rolls Git back if project saving fails', async () => {
+    const { checkoutBranches, useCase } = createFixture({ saveError: 'save failed' })
 
     await expect(
       useCase.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
     ).rejects.toThrow('save failed')
 
     expect(checkoutBranches).toEqual(['feature/free', 'main'])
-    expect(lifecycleCalls).toEqual(['suspend:/work/app', 'resume:/work/app', 'resolve:/work/app'])
   })
 
-  it('keeps old-scope attaches blocked if post-checkout rollback fails', async () => {
-    const { checkoutBranches, lifecycleCalls, useCase } = createFixture({
+  it('preserves the save error if post-checkout rollback fails', async () => {
+    const { checkoutBranches, useCase } = createFixture({
       rollbackError: 'rollback failed',
       saveError: 'save failed'
     })
@@ -54,20 +50,14 @@ describe('project Agent branch lifecycle', () => {
     ).rejects.toThrow('save failed')
 
     expect(checkoutBranches).toEqual(['feature/free', 'main'])
-    expect(lifecycleCalls).toEqual(['suspend:/work/app', 'quarantine:/work/app'])
   })
 
-  it('preserves the Git error if restoring the old Agent scope also fails', async () => {
-    const { lifecycleCalls, useCase } = createFixture({
-      checkoutError: 'checkout failed',
-      resumeError: 'resume failed'
-    })
+  it('preserves the Git checkout error', async () => {
+    const { useCase } = createFixture({ checkoutError: 'checkout failed' })
 
     await expect(
       useCase.execute({ projectDirectory: '/work/app', branchName: 'feature/free' })
     ).rejects.toThrow('checkout failed')
-
-    expect(lifecycleCalls).toEqual(['suspend:/work/app', 'resume:/work/app', 'release:/work/app'])
   })
 
   it('serializes checkout with automatic Git synchronization from the first repository read', async () => {
@@ -127,7 +117,6 @@ describe('project Agent branch lifecycle', () => {
     const checkout = new CheckoutMainWorkspaceBranchUseCase(
       projectRepository,
       gitWorkspacePort,
-      lifecycle,
       transactions
     )
     const synchronize = new SynchronizeProjectGitStateUseCase(
@@ -156,13 +145,11 @@ describe('project Agent branch lifecycle', () => {
 
 function createFixture(input: {
   checkoutError?: string
-  resumeError?: string
   rollbackError?: string
   saveError?: string
   workingTreeCleanResults?: boolean[]
 }): {
   readonly checkoutBranches: string[]
-  readonly lifecycleCalls: string[]
   readonly useCase: CheckoutMainWorkspaceBranchUseCase
 } {
   const project: ProjectSnapshot = {
@@ -171,7 +158,9 @@ function createFixture(input: {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
@@ -223,46 +212,9 @@ function createFixture(input: {
     removeBranchWorktree: vi.fn(),
     unlockBranchWorktree: vi.fn()
   } satisfies GitWorkspacePort
-  const lifecycleCalls: string[] = []
-  const workspaceAgentLifecyclePort = {
-    disposeProject: vi.fn(async () => ({
-      wasQuarantined: false,
-      quarantine: () => undefined,
-      release: () => undefined,
-      resolve: () => undefined
-    })),
-    disposeWorkspace: vi.fn(async () => ({
-      wasQuarantined: false,
-      quarantine: () => undefined,
-      release: () => undefined,
-      resolve: () => undefined
-    })),
-    isWorkspaceQuarantined: vi.fn(() => false),
-    resolveProjectQuarantines: vi.fn(),
-    suspend: vi.fn(async (directory) => {
-      lifecycleCalls.push(`suspend:${directory}`)
-      return {
-        wasQuarantined: false,
-        quarantine: () => lifecycleCalls.push(`quarantine:${directory}`),
-        release: () => lifecycleCalls.push(`release:${directory}`),
-        resolve: () => lifecycleCalls.push(`resolve:${directory}`),
-        resume: async () => {
-          lifecycleCalls.push(`resume:${directory}`)
-          if (input.resumeError) throw new Error(input.resumeError)
-        },
-        wasSuspended: true
-      }
-    })
-  } satisfies WorkspaceAgentLifecyclePort
-
   return {
     checkoutBranches,
-    lifecycleCalls,
-    useCase: new CheckoutMainWorkspaceBranchUseCase(
-      projectRepository,
-      gitWorkspacePort,
-      workspaceAgentLifecyclePort
-    )
+    useCase: new CheckoutMainWorkspaceBranchUseCase(projectRepository, gitWorkspacePort)
   }
 }
 
@@ -273,7 +225,9 @@ function createProjectSnapshot(): ProjectSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true

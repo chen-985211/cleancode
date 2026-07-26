@@ -40,9 +40,7 @@ export function createProjectLifecycleUseCases(input: {
     checkoutMainWorkspaceBranchUseCase: new CheckoutMainWorkspaceBranchUseCase(
       input.projects,
       input.gitWorkspace,
-      input.agentLifecycle,
-      workspaceTransactions,
-      input.runLifecycle
+      workspaceTransactions
     ),
     createBranchWorkspaceUseCase: new CreateBranchWorkspaceUseCase(
       input.projects,

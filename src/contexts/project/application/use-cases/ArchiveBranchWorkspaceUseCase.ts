@@ -19,7 +19,7 @@ import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransa
 
 export interface ArchiveBranchWorkspaceCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly lockedWorktreeConfirmation?: LockedWorktreeConfirmation
 }
 
@@ -56,15 +56,15 @@ export class ArchiveBranchWorkspaceUseCase {
     }
 
     const project = Project.fromSnapshot(projectSnapshot)
-    const workspaceName = command.workspaceName.trim()
-    const workspace = project.workspaces.find((entry) => entry.name === workspaceName)
+    const workspaceId = command.workspaceId.trim()
+    const workspace = project.workspaces.find((entry) => entry.workspaceId === workspaceId)
 
     if (!workspace) {
       throw createExpectedAppError('BRANCH_WORKSPACE_NOT_FOUND', 'Branch workspace was not found.')
     }
 
-    const archivedProject = project.archiveBranchWorkspace(workspaceName)
-    const workspaceScope = { projectDirectory: project.directory, workspaceName }
+    const archivedProject = project.archiveLinkedWorktreeWorkspace(workspaceId)
+    const workspaceScope = { projectDirectory: project.directory, workspaceId }
     const isRecoveringQuarantine =
       this.workspaceAgentLifecyclePort.isWorkspaceQuarantined(workspaceScope) ||
       this.workspaceRunLifecyclePort.isWorkspaceQuarantined(workspaceScope)
@@ -82,7 +82,7 @@ export class ArchiveBranchWorkspaceUseCase {
       ? {
           agentLease: await this.workspaceAgentLifecyclePort.disposeWorkspace({
             projectDirectory: project.directory,
-            workspaceName
+            workspaceId
           }),
           worktreeLock: null
         }
@@ -90,7 +90,7 @@ export class ArchiveBranchWorkspaceUseCase {
           project.directory,
           workspace.directory,
           workspace.gitBranch,
-          workspaceName,
+          workspaceId,
           command.lockedWorktreeConfirmation
         )
     const { agentLease, worktreeLock } = preparation
@@ -132,7 +132,7 @@ export class ArchiveBranchWorkspaceUseCase {
     projectDirectory: string,
     workspaceDirectory: string,
     gitBranch: string | null,
-    workspaceName: string,
+    workspaceId: string,
     lockedWorktreeConfirmation: LockedWorktreeConfirmation | undefined
   ): Promise<{
     readonly agentLease: WorkspaceAgentAttachmentLease
@@ -151,7 +151,7 @@ export class ArchiveBranchWorkspaceUseCase {
       assertWorktreeLockConfirmed(worktreeLock, lockedWorktreeConfirmation)
       const agentLease = await this.workspaceAgentLifecyclePort.disposeWorkspace({
         projectDirectory,
-        workspaceName
+        workspaceId
       })
       return { agentLease, worktreeLock }
     } catch (error) {

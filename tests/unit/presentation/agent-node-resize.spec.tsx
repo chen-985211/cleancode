@@ -108,6 +108,12 @@ function renderAgentNode(
       id="agent-1"
       type="agentConsole"
       data={{
+        identity: {
+          projectId: 'project-1',
+          workspaceId: 'main',
+          objectKind: 'agent',
+          objectId: 'agent-1'
+        },
         agent: {
           agentId: 'agent-1',
           cleancodeMcpEnabled: true,
@@ -118,7 +124,7 @@ function renderAgentNode(
           name: 'Agent 1',
           projectId: 'project-1',
           providerId: 'codex',
-          workspaceName: 'main'
+          workspaceId: 'main'
         },
         currentWorkbench: null,
         currentWorkspace: null,

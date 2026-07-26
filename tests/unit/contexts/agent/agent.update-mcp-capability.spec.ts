@@ -20,7 +20,7 @@ describe('update workspace Agent MCP capability', () => {
       agentId: agent.id,
       cleancodeMcpEnabled: false,
       projectId: agent.projectId,
-      workspaceName: agent.workspaceName
+      workspaceId: agent.workspaceId
     })
 
     expect(runtime.reconfigured).toEqual([
@@ -28,7 +28,7 @@ describe('update workspace Agent MCP capability', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       }
     ])
     expect(runtime.persistedValuesAtReconfigure).toEqual([false])
@@ -52,7 +52,7 @@ describe('update workspace Agent MCP capability', () => {
         agentId: agent.id,
         cleancodeMcpEnabled: true,
         projectId: agent.projectId,
-        workspaceName: agent.workspaceName
+        workspaceId: agent.workspaceId
       })
     ).rejects.toMatchObject({ code: 'AGENT_TOOL_UNAVAILABLE' })
 
@@ -77,7 +77,7 @@ class RecordingWorkspaceAgentRuntime implements WorkspaceAgentRuntimePort {
     this.reconfigured.push(command)
     const persisted = await this.repository.findAgent(
       command.projectId,
-      command.workspaceName,
+      command.workspaceId,
       command.agentId
     )
     this.persistedValuesAtReconfigure.push(persisted?.cleancodeMcpEnabled ?? true)
@@ -119,7 +119,7 @@ function createAgent(
     name: 'Agent 1',
     projectId: 'project-1',
     providerId: input.providerId ?? 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 }
 

@@ -62,6 +62,12 @@ function createAgentConsoleFlowNode(): AgentConsoleFlowNode {
     selected: false,
     style: { width: 440, height: 520 },
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'agent',
+        objectId: 'agent-1'
+      },
       agent: {
         agentId: 'agent-1',
         cleancodeMcpEnabled: true,
@@ -69,7 +75,7 @@ function createAgentConsoleFlowNode(): AgentConsoleFlowNode {
         name: 'Agent 1',
         projectId: 'project-1',
         providerId: 'codex',
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       currentWorkbench: null,
       currentWorkspace: null,

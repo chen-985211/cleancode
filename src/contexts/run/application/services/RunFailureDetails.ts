@@ -8,7 +8,7 @@ export function createRunAttemptDetails(
     port,
     attemptedProjectId: scope.projectId,
     attemptedProjectDirectory: scope.projectDirectory,
-    attemptedWorkspaceName: scope.workspaceName,
+    attemptedWorkspaceId: scope.workspaceId,
     attemptedWorkspaceDirectory: scope.workspaceDirectory,
     attemptedGitBranch: scope.gitBranch,
     attemptedBlockId: scope.blockId,

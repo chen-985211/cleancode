@@ -13,7 +13,7 @@ describe('terminal workflow graph commands', () => {
 
     const connected = await connect.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       sourceBlockId: 'install',
       targetBlockId: 'build'
     })
@@ -21,7 +21,7 @@ describe('terminal workflow graph commands', () => {
 
     await updateConfig.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'build',
       executionConfig: {
         mode: 'service',
@@ -36,7 +36,7 @@ describe('terminal workflow graph commands', () => {
     })
     const disconnected = await disconnect.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       connectionId: connectionId ?? ''
     })
 
@@ -62,7 +62,7 @@ class TrackingRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _directory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const result = await transaction(this.graph)
@@ -84,7 +84,7 @@ class TrackingRepository implements BlockGraphRepository {
 }
 
 function createGraph(): BlockGraph {
-  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+  const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
 
   for (const id of ['install', 'build']) {
     graph.createTerminalBlock({

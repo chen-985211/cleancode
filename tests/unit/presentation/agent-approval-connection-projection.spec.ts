@@ -103,7 +103,7 @@ function createApproval(
     summary: `断开终端依赖 ${connectionId}`,
     target: { connectionId, kind: 'terminal_connection' },
     toolName: 'disconnect_terminal_blocks',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 
   return { phase, request }
@@ -142,5 +142,5 @@ const graph: BlockGraphSnapshot = {
   projectId: 'project-1',
   terminalGroups: [],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }

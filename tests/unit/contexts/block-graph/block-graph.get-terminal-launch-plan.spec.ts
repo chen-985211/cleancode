@@ -9,7 +9,7 @@ describe('get terminal launch plan', () => {
 
     const plan = await useCase.execute({
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'api'
     })
 
@@ -40,14 +40,14 @@ describe('get terminal launch plan', () => {
     await expect(
       useCase.execute({
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         blockId: 'missing'
       })
     ).rejects.toMatchObject({ code: 'TERMINAL_BLOCK_NOT_FOUND' })
     await expect(
       useCase.execute({
         projectDirectory: '/project',
-        workspaceName: 'main',
+        workspaceId: 'main',
         blockId: 'web'
       })
     ).rejects.toMatchObject({ code: 'TERMINAL_WORKFLOW_COMMAND_MISSING' })
@@ -58,7 +58,7 @@ function createGraph(): BlockGraph {
   const graph = BlockGraph.createDefault({
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
   graph.createTerminalBlock({
     id: 'api',
@@ -104,7 +104,7 @@ class InMemoryRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     const result = await transaction(this.graph)

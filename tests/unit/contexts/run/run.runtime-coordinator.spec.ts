@@ -43,7 +43,7 @@ describe('run runtime coordinator', () => {
 const owner = {
   projectId: 'project-1',
   projectDirectory: '/work/app',
-  workspaceName: 'main',
+  workspaceId: 'main',
   workspaceDirectory: '/work/app',
   gitBranch: 'main',
   blockId: 'terminal-1'

@@ -79,7 +79,7 @@ describe('Agent session Provider environment', () => {
       projectId: 'project-1',
       terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     await vi.waitFor(() => expect(environment.prepare).toHaveBeenCalledOnce())
 
@@ -135,7 +135,7 @@ describe('Agent session Provider environment', () => {
       projectId: 'project-1',
       terminalSourceTheme: 'light',
       workspaceDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(contribution.launcher.createLaunchPlan).toHaveBeenCalledWith(
@@ -156,7 +156,7 @@ const restoredAgent = AgentSession.create({
   name: 'Agent 1',
   projectId: 'project-1',
   providerId: 'codex',
-  workspaceName: 'main'
+  workspaceId: 'main'
 })
 
 const restoredAgentRepository: AgentSessionRepository = {

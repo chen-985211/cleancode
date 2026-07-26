@@ -1,8 +1,8 @@
 export class AgentWorkspaceTransactionCoordinator {
   private readonly operationTails = new Map<string, Promise<void>>()
 
-  run<T>(projectId: string, workspaceName: string, operation: () => Promise<T>): Promise<T> {
-    const key = JSON.stringify([projectId, workspaceName])
+  run<T>(projectId: string, workspaceId: string, operation: () => Promise<T>): Promise<T> {
+    const key = JSON.stringify([projectId, workspaceId])
     const previousOperation = this.operationTails.get(key) ?? Promise.resolve()
     const result = previousOperation.catch(() => undefined).then(operation)
     const operationTail = result.then(

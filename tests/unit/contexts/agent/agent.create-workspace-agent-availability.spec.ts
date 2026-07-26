@@ -27,13 +27,12 @@ describe('create workspace Agent availability', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-1',
-        gitBranch: null,
         initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrowError(
       expect.objectContaining({
@@ -74,13 +73,12 @@ describe('create workspace Agent availability', () => {
 
     const snapshot = await useCase.execute({
       agentId: 'agent-1',
-      gitBranch: null,
       initialPosition: { x: 240, y: 320 },
       projectDirectory: '/work/app',
       projectId: 'project-1',
       providerId: 'codex',
       workspaceDirectory: '/work/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(snapshot.cleancodeMcpEnabled).toBe(false)
@@ -111,13 +109,12 @@ describe('create workspace Agent availability', () => {
     await expect(
       useCase.execute({
         agentId: 'agent-1',
-        gitBranch: null,
         initialPosition: { x: 240, y: 320 },
         projectDirectory: '/work/app',
         projectId: 'project-1',
         providerId: 'codex',
         workspaceDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toThrowError(
       expect.objectContaining({

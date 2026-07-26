@@ -1,3 +1,5 @@
+import { posix } from 'node:path'
+
 import { CreateBranchWorkspaceUseCase } from '../../../../src/contexts/project/application/use-cases/CreateBranchWorkspaceUseCase'
 import { CreateOrOpenProjectUseCase } from '../../../../src/contexts/project/application/use-cases/CreateOrOpenProjectUseCase'
 import type { BranchWorkspaceDirectoryPort } from '../../../../src/contexts/project/application/ports/BranchWorkspaceDirectoryPort'
@@ -61,7 +63,7 @@ class FakeBranchWorkspaceDirectoryPort implements BranchWorkspaceDirectoryPort {
     readonly projectDirectory: string
     readonly branchName: string
   }): string {
-    return `${input.projectDirectory}/.worktrees/${input.branchName.replaceAll('/', '-')}`
+    return posix.join(input.projectDirectory, '.worktrees', input.branchName.replaceAll('/', '-'))
   }
 }
 

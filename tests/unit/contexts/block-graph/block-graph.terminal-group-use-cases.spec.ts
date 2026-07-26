@@ -30,7 +30,7 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     if (!this.savedGraph) return null
@@ -47,7 +47,7 @@ describe('terminal group use cases', () => {
 
     const updatedGraph = await createTerminalGroup.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       name: '启动项目',
       memberBlockIds: ['backend-terminal', 'frontend-terminal']
     })
@@ -72,31 +72,31 @@ describe('terminal group use cases', () => {
 
     await updateMetadata.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group',
       name: '开发环境'
     })
     await setCollapsed.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group',
       isCollapsed: true
     })
     await addTerminal.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group',
       blockId: 'worker-terminal'
     })
     await removeTerminal.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group',
       blockId: 'frontend-terminal'
     })
     const updatedGraph = await moveTerminalGroup.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group',
       position: { x: 360, y: 300 }
     })
@@ -120,7 +120,7 @@ describe('terminal group use cases', () => {
 
     const updatedGraph = await dissolveTerminalGroup.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       terminalGroupId: 'development-group'
     })
 
@@ -149,7 +149,7 @@ function createGraphWithGroupedTerminals(): BlockGraph {
 function createGraphWithThreeTerminals(): BlockGraph {
   const graph = BlockGraph.createDefault({
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   })
 
   graph.createTerminalBlock({

@@ -6,7 +6,7 @@ import { ProjectWorkspaceTransactionCoordinator } from './ProjectWorkspaceTransa
 
 export interface SwitchBranchWorkspaceCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class SwitchBranchWorkspaceUseCase {
@@ -31,7 +31,7 @@ export class SwitchBranchWorkspaceUseCase {
     }
 
     const project = Project.fromSnapshot(projectSnapshot).switchCurrentWorkspace(
-      command.workspaceName
+      command.workspaceId
     )
 
     await this.projectRepository.save(project)

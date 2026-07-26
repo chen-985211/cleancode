@@ -4,7 +4,7 @@ describe('terminal workflow session events', () => {
   it('clears output for command sessions and preserves it for interactive handoff sessions', () => {
     const commandStates = applyTerminalWorkflowEventToStates(
       {
-        'project-alpha\0main\0install': {
+        '["project-alpha","main","terminal","install"]': {
           sessionId: 'old',
           status: 'running',
           output: 'old output'
@@ -26,11 +26,11 @@ describe('terminal workflow session events', () => {
       session: session('interactive', 2)
     })
 
-    expect(commandStates['project-alpha\0main\0install']).toMatchObject({
+    expect(commandStates['["project-alpha","main","terminal","install"]']).toMatchObject({
       sessionId: 'command',
       output: ''
     })
-    expect(handoffStates['project-alpha\0main\0install']).toMatchObject({
+    expect(handoffStates['["project-alpha","main","terminal","install"]']).toMatchObject({
       sessionId: 'interactive',
       output: ''
     })
@@ -39,13 +39,13 @@ describe('terminal workflow session events', () => {
   it('appends workflow output to the matching session only', () => {
     const states = applyTerminalWorkflowEventToStates(
       {
-        'project-alpha\0main\0install': {
+        '["project-alpha","main","terminal","install"]': {
           sessionId: 'command',
           status: 'running',
           output: 'installing ',
           runIdentity: runIdentity('command')
         },
-        'project-alpha\0main\0build': {
+        '["project-alpha","main","terminal","build"]': {
           sessionId: 'build',
           status: 'running',
           output: '',
@@ -59,12 +59,12 @@ describe('terminal workflow session events', () => {
       }
     )
 
-    expect(states['project-alpha\0main\0install']?.output).toBe('installing done')
-    expect(states['project-alpha\0main\0build']?.output).toBe('')
+    expect(states['["project-alpha","main","terminal","install"]']?.output).toBe('installing done')
+    expect(states['["project-alpha","main","terminal","build"]']?.output).toBe('')
   })
 
   it('ignores a stale workflow session start after a newer run owns the block', () => {
-    const key = 'project-alpha\0main\0install'
+    const key = '["project-alpha","main","terminal","install"]'
     const current = {
       [key]: {
         sessionId: 'new-session',
@@ -110,7 +110,7 @@ function session(id: string, generation = 1) {
     projectId: 'project-alpha',
     projectDirectory: '/project',
     gitBranch: null,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     workingDirectory: '/project',
     processId: 1,
@@ -130,7 +130,7 @@ function runIdentity(sessionId: string) {
 
   return {
     projectId: scope.projectId,
-    workspaceName: scope.workspaceName,
+    workspaceId: scope.workspaceId,
     blockId: scope.blockId,
     runId: scope.runId,
     sessionId: scope.sessionId,
@@ -143,7 +143,7 @@ function runScope(sessionId: string) {
     projectId: 'project-alpha',
     projectDirectory: '/project',
     gitBranch: null,
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     blockId: sessionId === 'build' ? 'build' : 'install',
     runId: `run-${sessionId}`,

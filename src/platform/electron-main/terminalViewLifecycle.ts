@@ -169,7 +169,7 @@ async function settleViewReleases(releases: readonly Promise<void>[]): Promise<v
 function createViewReleaseKey(command: TerminalViewIdentityCommand): string {
   return [
     command.projectId,
-    command.workspaceName,
+    command.workspaceId,
     command.blockId,
     command.sessionId,
     command.runId,

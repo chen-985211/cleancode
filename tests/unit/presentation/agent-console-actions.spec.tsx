@@ -12,7 +12,7 @@ const agent = {
   name: 'Agent 2',
   projectId: 'project-1',
   providerId: 'codex',
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 describe('Agent console actions', () => {

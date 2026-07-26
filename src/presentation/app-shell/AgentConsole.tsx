@@ -53,7 +53,7 @@ export function AgentConsole({
     activeAgent.agentId
   )
   const currentProjectDirectory = currentWorkbench?.project.directory ?? null
-  const currentWorkspaceName = currentWorkspace?.name ?? null
+  const currentWorkspaceId = currentWorkspace?.workspaceId ?? null
   const dimensionsRef = useRef<AgentTerminalMeasurement | null>(null)
   const isMountedRef = useRef(true)
   const terminalElementRef = useRef<HTMLDivElement | null>(null)
@@ -112,7 +112,7 @@ export function AgentConsole({
 
   useEffect(() => {
     const api = window.cleancode
-    if (!api || !currentProjectDirectory || !currentWorkspaceName) return undefined
+    if (!api || !currentProjectDirectory || !currentWorkspaceId) return undefined
 
     const unsubscribeRuntime =
       api.onAgentRuntimeChanged?.((event) => {
@@ -124,7 +124,7 @@ export function AgentConsole({
         if (
           (!event.agentId || event.agentId === activeAgent.agentId) &&
           currentProjectDirectory === event.projectDirectory &&
-          currentWorkspaceName === event.workspaceName
+          currentWorkspaceId === event.workspaceId
         ) {
           onGraphUpdated?.(event)
         }
@@ -137,7 +137,7 @@ export function AgentConsole({
     activeAgent.agentId,
     applyRuntimeChange,
     currentProjectDirectory,
-    currentWorkspaceName,
+    currentWorkspaceId,
     onGraphUpdated
   ])
 
@@ -294,6 +294,7 @@ export function AgentConsole({
             onFallbackInput={writeAgentInput}
             session={session}
             useFallback={isTestRuntime()}
+            workspaceDisplayName={currentWorkspace?.displayName}
           />
         ) : (
           <div className="agent-console__empty">{t('agent.noWorkspace')}</div>

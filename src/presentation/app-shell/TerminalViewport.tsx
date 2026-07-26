@@ -479,7 +479,7 @@ function createFallbackSnapshot(
       : ({
           projectId: '',
           projectDirectory: '',
-          workspaceName: '',
+          workspaceId: '',
           workspaceDirectory: '',
           gitBranch: null,
           blockId: '',

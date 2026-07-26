@@ -8,14 +8,14 @@ export interface BlockGraphTransactionResult<TResult> {
 
 export interface BlockGraphRepository {
   initializeDefaultGraph(projectDirectory: string, graph: BlockGraph): Promise<BlockGraphSnapshot>
-  findDefaultGraph(projectDirectory: string, workspaceName: string): Promise<BlockGraph | null>
+  findDefaultGraph(projectDirectory: string, workspaceId: string): Promise<BlockGraph | null>
   findDefaultGraphSnapshot(
     projectDirectory: string,
-    workspaceName: string
+    workspaceId: string
   ): Promise<BlockGraphSnapshot | null>
   transactDefaultGraph<TResult>(
     projectDirectory: string,
-    workspaceName: string,
+    workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ): Promise<BlockGraphTransactionResult<TResult> | null>
 }

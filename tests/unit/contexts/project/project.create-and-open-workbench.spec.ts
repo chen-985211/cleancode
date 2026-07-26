@@ -29,12 +29,14 @@ describe('project workbench', () => {
     expect(project.directory).toBe('/tmp/cleancode-demo')
     expect(project.workspaces).toHaveLength(1)
     expect(project.workspaces[0]).toMatchObject({
-      name: 'main',
+      workspaceId: expect.any(String),
+      workspaceKind: 'default',
+      displayName: 'main',
       directory: '/tmp/cleancode-demo',
       gitBranch: null,
       isCurrent: true
     })
-    expect(project.workspaces.map((workspace) => workspace.name)).not.toContain('default')
+    expect(project.workspaces.map((workspace) => workspace.displayName)).not.toContain('default')
   })
 
   it('persists a created cleancode project through the project repository', async () => {
@@ -50,13 +52,6 @@ describe('project workbench', () => {
 
     expect(storedProject?.id).toBe(createdProject.id)
     expect(storedProject?.name).toBe('cleancode-demo')
-    expect(storedProject?.workspaces).toEqual([
-      {
-        name: 'main',
-        directory: '/tmp/cleancode-demo',
-        gitBranch: null,
-        isCurrent: true
-      }
-    ])
+    expect(storedProject?.workspaces).toEqual(createdProject.workspaces)
   })
 })

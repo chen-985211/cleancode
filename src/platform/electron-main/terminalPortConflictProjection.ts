@@ -65,7 +65,7 @@ function readAttemptedRunIdentity(
 ): TerminalRunIdentity | null {
   const identity = {
     projectId: readString(details, 'attemptedProjectId'),
-    workspaceName: readString(details, 'attemptedWorkspaceName'),
+    workspaceId: readString(details, 'attemptedWorkspaceId'),
     blockId: readString(details, 'attemptedBlockId'),
     sessionId: readString(details, 'attemptedSessionId'),
     runId: readString(details, 'attemptedRunId'),
@@ -82,7 +82,7 @@ function readManagedOwnerReference(
   const identity = {
     projectId: readString(details, 'managedProjectId'),
     projectDirectory: readString(details, 'managedProjectDirectory'),
-    workspaceName: readString(details, 'managedWorkspaceName'),
+    workspaceId: readString(details, 'managedWorkspaceId'),
     blockId: readString(details, 'managedBlockId'),
     sessionId: readString(details, 'managedSessionId'),
     runId: readString(details, 'managedRunId'),

@@ -34,7 +34,7 @@ describe('execute Agent layout tools', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-auto-create',
       toolName: 'create_block',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(result).toMatchObject({
@@ -44,7 +44,7 @@ describe('execute Agent layout tools', () => {
     })
     expect(agentRepository.findWorkspace).toHaveBeenCalledWith('project-1', 'main')
     expect(blockGraphTools.createTerminalBlock).toHaveBeenCalledWith(
-      { projectDirectory: '/tmp/project', workspaceName: 'main' },
+      { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
         anchorRegion: {
           position: { x: 980, y: 180 },
@@ -90,11 +90,11 @@ describe('execute Agent layout tools', () => {
       sessionId: 'agent-session-1',
       toolCallId: 'tool-call-arrange',
       toolName: 'arrange_terminal_layout',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     expect(blockGraphTools.arrangeTerminalLayout).toHaveBeenCalledWith(
-      { projectDirectory: '/tmp/project', workspaceName: 'main' },
+      { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
         anchorRegion: {
           position: { x: 980, y: 180 },
@@ -147,7 +147,7 @@ const fakeGraph: BlockGraphSnapshot = {
   projectId: 'project-1',
   terminalGroups: [],
   viewport: { x: 0, y: 0, zoom: 1 },
-  workspaceName: 'main'
+  workspaceId: 'main'
 }
 
 const fakeGraphWithApiBlock: BlockGraphSnapshot = {
@@ -183,7 +183,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
     inspectTerminalWorkflowPlan: vi.fn(async () => ({
       graphId: 'graph-1',
       nodes: [],
-      workspaceName: 'main'
+      workspaceId: 'main'
     })),
     updateTerminalBlock: vi.fn(async () => fakeGraph),
     updateTerminalExecutionConfig: vi.fn(async () => fakeGraph),

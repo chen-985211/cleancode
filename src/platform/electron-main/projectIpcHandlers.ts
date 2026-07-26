@@ -27,11 +27,11 @@ export interface ProjectIpcHandlersInput {
   }) => Promise<ProjectSnapshot>
   readonly switchBranchWorkspace: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }) => Promise<ProjectSnapshot>
   readonly archiveBranchWorkspace: (command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
     readonly lockedWorktreeConfirmation?: { readonly lockReason: string | null }
   }) => Promise<ProjectSnapshot>
   readonly checkoutMainWorkspaceBranch: (command: {
@@ -109,7 +109,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
     handler: async (command) => {
       const project = await input.switchBranchWorkspace({
         projectDirectory: readStringField(command, 'projectDirectory'),
-        workspaceName: readStringField(command, 'workspaceName')
+        workspaceId: readStringField(command, 'workspaceId')
       })
 
       return loadAndSelectWorkbench(input, project)
@@ -127,7 +127,7 @@ export function registerProjectIpcHandlers(input: ProjectIpcHandlersInput): void
       const lockedWorktreeConfirmation = readLockedWorktreeConfirmation(command)
       const project = await input.archiveBranchWorkspace({
         projectDirectory: readStringField(command, 'projectDirectory'),
-        workspaceName: readStringField(command, 'workspaceName'),
+        workspaceId: readStringField(command, 'workspaceId'),
         ...(lockedWorktreeConfirmation ? { lockedWorktreeConfirmation } : {})
       })
 

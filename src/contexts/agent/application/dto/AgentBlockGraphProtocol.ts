@@ -46,7 +46,7 @@ interface AgentTerminalGroupSnapshot {
 export interface AgentBlockGraphSnapshot {
   readonly id: string
   readonly projectId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly viewport: AgentCanvasViewportSnapshot
   readonly blocks: readonly AgentTerminalBlockSnapshot[]
   readonly connections?: readonly AgentTerminalConnectionSnapshot[]

@@ -35,7 +35,7 @@ describe('Agent console CleanCode MCP toggle', () => {
     render(
       <AgentConsole
         agent={{
-          ...createAgent(workbench.project.id, currentWorkspace.name),
+          ...createAgent(workbench.project.id, currentWorkspace.workspaceId),
           providerId: 'opencode'
         }}
         currentWorkbench={workbench}
@@ -62,7 +62,7 @@ describe('Agent console CleanCode MCP toggle', () => {
       name: 'Agent 1',
       projectId: workbench.project.id,
       providerId: 'codex',
-      workspaceName: currentWorkspace.name
+      workspaceId: currentWorkspace.workspaceId
     }
     const clearForAgent = vi.fn()
     const approvalController: AgentToolApprovalController = {
@@ -77,7 +77,7 @@ describe('Agent console CleanCode MCP toggle', () => {
             summary: '删除终端积木 terminal-1',
             target: { blockId: 'terminal-1', kind: 'terminal_block' },
             toolName: 'delete_block',
-            workspaceName: currentWorkspace.name
+            workspaceId: currentWorkspace.workspaceId
           }
         }
       ],
@@ -98,7 +98,7 @@ describe('Agent console CleanCode MCP toggle', () => {
         sessionId: 'agent-session-restarted',
         terminalSourceTheme: 'light' as const,
         workspaceDirectory: currentWorkspace.directory,
-        workspaceName: currentWorkspace.name
+        workspaceId: currentWorkspace.workspaceId
       })
     }))
     Object.defineProperty(window, 'cleancode', {
@@ -133,7 +133,7 @@ describe('Agent console CleanCode MCP toggle', () => {
     const featureWorkbench = createWorkbenchSnapshot('/repo/app', 'app', {
       gitBranch: 'feature',
       workspaceDirectory: '/repo/app-worktrees/feature',
-      workspaceName: 'feature'
+      workspaceId: 'feature'
     })
     const mainWorkspace = mainWorkbench.project.workspaces[0]!
     const featureWorkspace = featureWorkbench.project.workspaces[0]!
@@ -174,7 +174,7 @@ describe('Agent console CleanCode MCP toggle', () => {
     )
     await waitFor(() =>
       expect(window.cleancode?.attachAgentSession).toHaveBeenLastCalledWith(
-        expect.objectContaining({ workspaceName: 'feature' })
+        expect.objectContaining({ workspaceId: 'feature' })
       )
     )
 
@@ -190,7 +190,7 @@ describe('Agent console CleanCode MCP toggle', () => {
           sessionId: 'agent-main-restarted',
           terminalSourceTheme: 'light',
           workspaceDirectory: '/repo/app',
-          workspaceName: 'main'
+          workspaceId: 'main'
         })
       })
     })
@@ -207,7 +207,7 @@ describe('Agent console CleanCode MCP toggle', () => {
   it('reports an MCP switch failure through the notification center without inline text', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
     const currentWorkspace = workbench.project.workspaces[0]!
-    const agent = createAgent(workbench.project.id, currentWorkspace.name)
+    const agent = createAgent(workbench.project.id, currentWorkspace.workspaceId)
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: createRuntimeApi()
@@ -236,7 +236,7 @@ describe('Agent console CleanCode MCP toggle', () => {
   })
 })
 
-function createAgent(projectId: string, workspaceName: string) {
+function createAgent(projectId: string, workspaceId: string) {
   return {
     agentId: 'agent-1',
     cleancodeMcpEnabled: true,
@@ -244,7 +244,7 @@ function createAgent(projectId: string, workspaceName: string) {
     name: 'Agent 1',
     projectId,
     providerId: 'codex',
-    workspaceName
+    workspaceId
   }
 }
 

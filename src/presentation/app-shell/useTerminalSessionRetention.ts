@@ -2,7 +2,7 @@ import { useCallback, useEffect, type SetStateAction } from 'react'
 
 import {
   getProjectIdFromTerminalStateKey,
-  getWorkspaceNameFromTerminalStateKey
+  getWorkspaceIdFromTerminalStateKey
 } from './terminalSessionWorkspaceMigration'
 import {
   reconcileTerminalStates,
@@ -14,7 +14,7 @@ interface UseTerminalSessionRetentionInput {
   readonly clearPendingTerminalInput: (terminalStateKey: string) => void
   readonly currentProject: WorkbenchSnapshot['project'] | undefined
   readonly currentTerminalBlockIds: readonly string[] | undefined
-  readonly currentWorkspaceName: string | null
+  readonly currentWorkspaceId: string | null
   readonly terminalStatesRef: { readonly current: Record<string, TerminalViewState> }
   readonly updateTerminalStates: (
     stateAction: SetStateAction<Record<string, TerminalViewState>>
@@ -25,24 +25,24 @@ export function useTerminalSessionRetention({
   clearPendingTerminalInput,
   currentProject,
   currentTerminalBlockIds,
-  currentWorkspaceName,
+  currentWorkspaceId,
   terminalStatesRef,
   updateTerminalStates
 }: UseTerminalSessionRetentionInput) {
   useEffect(() => {
-    if (!currentProject || !currentWorkspaceName || !currentTerminalBlockIds) {
+    if (!currentProject || !currentWorkspaceId || !currentTerminalBlockIds) {
       return
     }
 
     updateTerminalStates((states) =>
       reconcileTerminalStates(states, {
         projectId: currentProject.id,
-        workspaceNames: currentProject.workspaces.map((workspace) => workspace.name),
-        currentWorkspaceName,
+        workspaceIds: currentProject.workspaces.map((workspace) => workspace.workspaceId),
+        currentWorkspaceId,
         currentTerminalBlockIds
       })
     )
-  }, [currentProject, currentTerminalBlockIds, currentWorkspaceName, updateTerminalStates])
+  }, [currentProject, currentTerminalBlockIds, currentWorkspaceId, updateTerminalStates])
 
   const terminateTerminalStateKeys = useCallback(
     async (terminalStateKeys: readonly string[]): Promise<void> => {
@@ -69,13 +69,13 @@ export function useTerminalSessionRetention({
 
   const terminateWorkbenchTerminalSessions = useCallback(
     async (workbench: WorkbenchSnapshot) => {
-      const workspaceNames = new Set(
-        workbench.project.workspaces.map((workspace) => workspace.name)
+      const workspaceIds = new Set(
+        workbench.project.workspaces.map((workspace) => workspace.workspaceId)
       )
       const terminalStateKeys = Object.keys(terminalStatesRef.current).filter(
         (terminalStateKey) =>
           getProjectIdFromTerminalStateKey(terminalStateKey) === workbench.project.id &&
-          workspaceNames.has(getWorkspaceNameFromTerminalStateKey(terminalStateKey))
+          workspaceIds.has(getWorkspaceIdFromTerminalStateKey(terminalStateKey))
       )
 
       await terminateTerminalStateKeys(terminalStateKeys)
@@ -84,11 +84,11 @@ export function useTerminalSessionRetention({
   )
 
   const terminateWorkspaceTerminalSessions = useCallback(
-    async (workbench: WorkbenchSnapshot, workspaceName: string) => {
+    async (workbench: WorkbenchSnapshot, workspaceId: string) => {
       const terminalStateKeys = Object.keys(terminalStatesRef.current).filter(
         (terminalStateKey) =>
           getProjectIdFromTerminalStateKey(terminalStateKey) === workbench.project.id &&
-          getWorkspaceNameFromTerminalStateKey(terminalStateKey) === workspaceName
+          getWorkspaceIdFromTerminalStateKey(terminalStateKey) === workspaceId
       )
 
       await terminateTerminalStateKeys(terminalStateKeys)
@@ -97,9 +97,9 @@ export function useTerminalSessionRetention({
   )
 
   const forgetWorkspaceTerminalStates = useCallback(
-    (projectId: string, workspaceName: string) =>
+    (projectId: string, workspaceId: string) =>
       updateTerminalStates((states) =>
-        removeWorkspaceTerminalStates(states, projectId, workspaceName)
+        removeWorkspaceTerminalStates(states, projectId, workspaceId)
       ),
     [updateTerminalStates]
   )

@@ -8,7 +8,7 @@ export interface StartTerminalRuntimeCommand {
   readonly projectId: string
   readonly projectDirectory: string
   readonly terminalBlockId: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly columns: number
@@ -40,12 +40,12 @@ export async function launchTerminalRuntimeSession(
 function toTerminalRunIdentity(
   session: Pick<
     TerminalSessionSnapshot,
-    'projectId' | 'workspaceName' | 'blockId' | 'sessionId' | 'runId' | 'generation'
+    'projectId' | 'workspaceId' | 'blockId' | 'sessionId' | 'runId' | 'generation'
   >
 ): TerminalRunIdentity {
   return {
     projectId: session.projectId,
-    workspaceName: session.workspaceName,
+    workspaceId: session.workspaceId,
     blockId: session.blockId,
     sessionId: session.sessionId,
     runId: session.runId,
@@ -148,7 +148,7 @@ export function applyTerminalExitEvent(
 ): Record<string, TerminalViewState> {
   const terminalStateKey = createTerminalStateKey(
     event.scope.projectId,
-    event.scope.workspaceName,
+    event.scope.workspaceId,
     event.scope.blockId
   )
   const identity = toTerminalRunIdentity(event.scope)
@@ -216,7 +216,7 @@ export function reconcileTerminalSessionSnapshots(
   for (const requested of requestedRuns) {
     const terminalStateKey = createTerminalStateKey(
       requested.projectId,
-      requested.workspaceName,
+      requested.workspaceId,
       requested.blockId
     )
     const current = nextStates[terminalStateKey]
@@ -237,7 +237,7 @@ export function reconcileTerminalSessionSnapshots(
 function isSameRunIdentity(left: TerminalRunIdentity, right: TerminalRunIdentity): boolean {
   return (
     left.projectId === right.projectId &&
-    left.workspaceName === right.workspaceName &&
+    left.workspaceId === right.workspaceId &&
     left.blockId === right.blockId &&
     left.sessionId === right.sessionId &&
     left.runId === right.runId &&

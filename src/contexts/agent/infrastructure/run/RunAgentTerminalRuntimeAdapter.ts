@@ -33,7 +33,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
       terminalBlockId: command.agentId,
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: command.workspaceDirectory,
-      workspaceName: command.workspaceName,
+      workspaceId: command.workspaceId,
       workingDirectory: command.workspaceDirectory
     })
     if (terminal.status !== 'running' || terminal.processId === null) {
@@ -53,7 +53,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
         projectId: terminal.projectId,
         runId: terminal.runId,
         sessionId: terminal.sessionId,
-        workspaceName: terminal.workspaceName
+        workspaceId: terminal.workspaceId
       }
     }
   }

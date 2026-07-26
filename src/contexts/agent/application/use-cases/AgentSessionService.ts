@@ -183,20 +183,20 @@ export class AgentSessionService {
         persistedSession ??
         (await this.sessionRepository.findAgent(
           scope.toSnapshot().projectId,
-          command.workspaceName,
+          command.workspaceId,
           command.agentId
         ))
     } catch {
       return createUnrestorableAgentSessionSnapshot({
         agentId: command.agentId,
-        gitBranch: scopeSnapshot.gitBranch,
+        gitBranch: command.gitBranch ?? null,
         projectDirectory: command.projectDirectory,
         projectId: scopeSnapshot.projectId,
         sessionId: createAgentRuntimeSessionId(),
         terminalSourceTheme: command.terminalSourceTheme,
         providerId: command.providerId ?? this.defaultProviderId,
         workspaceDirectory: command.workspaceDirectory,
-        workspaceName: command.workspaceName
+        workspaceId: command.workspaceId
       })
     }
     if (workspaceAgent && command.providerId && workspaceAgent.providerId !== command.providerId) {
@@ -219,7 +219,7 @@ export class AgentSessionService {
       callbacks: createAgentSessionCallbacks(command),
       cleancodeMcpEnabled,
       columns: command.columns ?? 88,
-      gitBranch: scope.toSnapshot().gitBranch,
+      gitBranch: command.gitBranch ?? null,
       isTerminalRunning: false,
       isStopping: false,
       launchArtifacts: null,
@@ -239,7 +239,7 @@ export class AgentSessionService {
       sessionId: createAgentRuntimeSessionId(),
       terminalSourceTheme: command.terminalSourceTheme,
       workspaceDirectory: command.workspaceDirectory,
-      workspaceName: command.workspaceName
+      workspaceId: command.workspaceId
     }
     this.sessions.set(sessionKey, session)
     try {
@@ -296,8 +296,8 @@ export class AgentSessionService {
       (owner) => this.resumeRuntimeOwner(owner)
     )
   }
-  isWorkspaceQuarantined(projectDirectory: string, workspaceName: string): boolean {
-    return this.runtimeCoordinator.isWorkspaceQuarantined(projectDirectory, workspaceName)
+  isWorkspaceQuarantined(projectDirectory: string, workspaceId: string): boolean {
+    return this.runtimeCoordinator.isWorkspaceQuarantined(projectDirectory, workspaceId)
   }
   resolveProjectQuarantines(projectDirectory: string): void {
     this.runtimeCoordinator.resolveProjectQuarantines(projectDirectory)
@@ -330,14 +330,14 @@ export class AgentSessionService {
 
   async disposeSession(command: {
     readonly projectDirectory: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<AgentRuntimeAttachmentLease> {
     const matches = (owner: AgentSessionRuntimeOwner): boolean =>
       owner.projectDirectory === command.projectDirectory &&
-      owner.workspaceName === command.workspaceName
+      owner.workspaceId === command.workspaceId
     return this.runtimeCoordinator.runWithWorkspaceLease(
       command.projectDirectory,
-      command.workspaceName,
+      command.workspaceId,
       matches,
       (owner) => this.disposeRuntimeOwner(owner)
     )
@@ -346,15 +346,15 @@ export class AgentSessionService {
   async disposeAgent(command: {
     readonly agentId: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<AgentRuntimeAttachmentLease> {
     const matches = (owner: AgentSessionRuntimeOwner): boolean =>
       owner.agentId === command.agentId &&
       owner.projectId === command.projectId &&
-      owner.workspaceName === command.workspaceName
+      owner.workspaceId === command.workspaceId
     return this.runtimeCoordinator.runWithAgentLease(
       command.projectId,
-      command.workspaceName,
+      command.workspaceId,
       command.agentId,
       matches,
       (owner) => this.disposeRuntimeOwner(owner)
@@ -365,13 +365,13 @@ export class AgentSessionService {
     readonly agentId: string
     readonly cleancodeMcpEnabled: boolean
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<AgentSessionSnapshot | null> {
     const results = await this.runtimeCoordinator.runStartForOwners(
       (owner) =>
         owner.agentId === command.agentId &&
         owner.projectId === command.projectId &&
-        owner.workspaceName === command.workspaceName,
+        owner.workspaceId === command.workspaceId,
       (owner) => this.reconfigureRuntimeOwner(owner, command.cleancodeMcpEnabled)
     )
     return results.find((result) => result !== null) ?? null
@@ -532,7 +532,7 @@ export class AgentSessionService {
         sessionId: processSessionId,
         terminalSourceTheme: session.terminalSourceTheme,
         workspaceDirectory: session.workspaceDirectory,
-        workspaceName: session.workspaceName
+        workspaceId: session.workspaceId
       })
       if (exitObserved || !recordAgentTerminalRunning(session, processSessionId, handle)) return
       if (this.isApplicationShuttingDown) {

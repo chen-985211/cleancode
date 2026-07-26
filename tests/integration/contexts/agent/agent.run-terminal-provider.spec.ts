@@ -84,7 +84,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       sessionId: 'agent-session-1',
       terminalSourceTheme: 'dark',
       workspaceDirectory: directory,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const viewId = 'agent-view-1'
     const snapshot = await sessions.attachView({
@@ -161,7 +161,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       sessionId: 'agent-session-opencode',
       terminalSourceTheme: 'dark',
       workspaceDirectory: directory,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const viewId = 'agent-view-opencode'
     const snapshot = await sessions.attachView({
@@ -241,7 +241,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       sessionId: 'agent-session-claude',
       terminalSourceTheme: 'dark',
       workspaceDirectory: directory,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const viewId = 'agent-view-claude'
     const snapshot = await sessions.attachView({
@@ -294,7 +294,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
       sessionId,
       terminalSourceTheme: 'dark',
       workspaceDirectory: directory,
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminationFailure = new Error('simulated Agent terminal termination failure')
     const terminate = vi.spyOn(sessions, 'terminate').mockRejectedValueOnce(terminationFailure)

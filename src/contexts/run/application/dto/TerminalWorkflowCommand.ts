@@ -3,7 +3,7 @@ import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSessio
 
 export interface TerminalWorkflowScopeCommand {
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface StartTerminalWorkflowCommand extends TerminalWorkflowScopeCommand {

@@ -15,7 +15,7 @@ export class AgentRuntimeScopeValidationAdapter implements AgentRuntimeScopeVali
 
   async isValid(command: AgentRuntimeScopeValidationCommand): Promise<boolean> {
     const [agent, projectScopeIsValid] = await Promise.all([
-      this.agents.findAgent(command.projectId, command.workspaceName, command.agentId),
+      this.agents.findAgent(command.projectId, command.workspaceId, command.agentId),
       this.validateProjectScope.execute(command)
     ])
     return Boolean(agent && projectScopeIsValid)

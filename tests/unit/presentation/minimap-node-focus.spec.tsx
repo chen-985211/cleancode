@@ -358,7 +358,7 @@ function createAgentNode(): WorkbenchFlowNode {
     name: 'Oversized Agent',
     projectId: 'project-1',
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 
   return {

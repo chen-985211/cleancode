@@ -69,7 +69,7 @@ describe('agent session terminal source theme', () => {
     expect(secondExit).toEqual([0])
   })
 
-  it('serializes different branch scopes that share one physical Agent runtime owner', async () => {
+  it('coalesces different Git branch metadata onto one physical Agent runtime owner', async () => {
     const processPort = new RecordingCodexAgentProcessPort()
     const repository = new GatedEmptyAgentSessionRepository()
     const service = createSessionService(processPort, repository)
@@ -87,16 +87,16 @@ describe('agent session terminal source theme', () => {
 
     const [mainSession, featureSession] = await Promise.all([mainAttach, featureAttach])
 
-    expect(featureSession.sessionId).not.toBe(mainSession.sessionId)
-    expect(processPort.starts).toHaveLength(2)
-    expect(processPort.stops).toEqual([mainSession.sessionId])
+    expect(featureSession.sessionId).toBe(mainSession.sessionId)
+    expect(processPort.starts).toHaveLength(1)
+    expect(processPort.stops).toEqual([])
 
     const reattachedFeature = await attachSession(service, {
       gitBranch: 'feature/theme',
       terminalSourceTheme: 'light'
     })
     expect(reattachedFeature.sessionId).toBe(featureSession.sessionId)
-    expect(processPort.starts).toHaveLength(2)
+    expect(processPort.starts).toHaveLength(1)
   })
 
   it('disposes an attach that was still reading its persisted session', async () => {
@@ -108,7 +108,7 @@ describe('agent session terminal source theme', () => {
     await repository.lookupStarted.promise
     const pendingDispose = service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const staleAttach = attachSession(service, { terminalSourceTheme: 'dark' })
     await expect(staleAttach).rejects.toMatchObject({ code: 'AGENT_SESSION_NOT_FOUND' })
@@ -161,7 +161,7 @@ describe('agent session terminal source theme', () => {
         agentId: 'agent-1',
         cleancodeMcpEnabled: false,
         projectId: 'project-1',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).rejects.toMatchObject({ code: 'AGENT_SESSION_NOT_FOUND' })
     expect(processPort.starts).toHaveLength(1)
@@ -197,17 +197,17 @@ describe('agent session terminal source theme', () => {
     await attachSession(service, {
       terminalSourceTheme: 'dark',
       workspaceDirectory: '/repo/feature',
-      workspaceName: 'feature/theme'
+      workspaceId: 'feature/theme'
     })
 
     const mainLease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     mainLease.quarantine()
     const featureLease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'feature/theme'
+      workspaceId: 'feature/theme'
     })
     featureLease.release()
 
@@ -216,13 +216,13 @@ describe('agent session terminal source theme', () => {
     })
     const recoveryLease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     expect(recoveryLease.wasQuarantined).toBe(true)
     recoveryLease.resolve()
 
     await expect(attachSession(service, { terminalSourceTheme: 'dark' })).resolves.toMatchObject({
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
   })
 
@@ -233,17 +233,17 @@ describe('agent session terminal source theme', () => {
     await attachSession(service, {
       terminalSourceTheme: 'dark',
       workspaceDirectory: '/repo/feature',
-      workspaceName: 'feature/theme'
+      workspaceId: 'feature/theme'
     })
 
     const mainLease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     mainLease.quarantine()
     const featureLease = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'feature/theme'
+      workspaceId: 'feature/theme'
     })
     featureLease.quarantine()
 
@@ -256,7 +256,7 @@ describe('agent session terminal source theme', () => {
       attachSession(service, {
         terminalSourceTheme: 'dark',
         workspaceDirectory: '/repo/feature',
-        workspaceName: 'feature/theme'
+        workspaceId: 'feature/theme'
       })
     ).resolves.toBeDefined()
   })
@@ -267,16 +267,16 @@ describe('agent session terminal source theme', () => {
     await attachSession(service, { terminalSourceTheme: 'light' })
     const quarantined = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     quarantined.quarantine()
     const held = await service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const waiting = service.disposeSession({
       projectDirectory: '/repo/app',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const shutdown = service.disposeAll()
@@ -364,7 +364,7 @@ function attachSession(
     readonly onRuntimeChanged?: Parameters<AgentSessionService['attach']>[0]['onRuntimeChanged']
     readonly terminalSourceTheme: AgentTerminalSourceTheme
     readonly workspaceDirectory?: string
-    readonly workspaceName?: string
+    readonly workspaceId?: string
   }
 ): ReturnType<AgentSessionService['attach']> {
   const command = {
@@ -379,7 +379,7 @@ function attachSession(
     rows: 24,
     terminalSourceTheme: input.terminalSourceTheme,
     workspaceDirectory: input.workspaceDirectory ?? '/repo/app',
-    workspaceName: input.workspaceName ?? 'main'
+    workspaceId: input.workspaceId ?? 'main'
   } satisfies Parameters<AgentSessionService['attach']>[0] & {
     readonly terminalSourceTheme: AgentTerminalSourceTheme
   }

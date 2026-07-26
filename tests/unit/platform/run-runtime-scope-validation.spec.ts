@@ -9,7 +9,7 @@ import {
 const command: ValidateRunRuntimeScopeCommand = {
   projectId: 'project-1',
   projectDirectory: '/repo/app',
-  workspaceName: 'main',
+  workspaceId: 'main',
   workspaceDirectory: '/repo/app',
   gitBranch: 'main'
 }
@@ -17,9 +17,11 @@ const command: ValidateRunRuntimeScopeCommand = {
 describe('Run runtime scope validation adapter', () => {
   it('accepts only the remembered Project workspace with the exact runtime identity', async () => {
     await expect(createAdapter({}).validate(command)).resolves.toBeUndefined()
+    await expect(
+      createAdapter({ gitBranch: 'feature/theme' }).validate(command)
+    ).resolves.toBeUndefined()
 
     for (const invalidState of [
-      { gitBranch: 'feature/theme' },
       { projectRemembered: false },
       { workspaceDirectory: '/repo/other' }
     ]) {
@@ -43,10 +45,12 @@ function createAdapter(input: {
       name: 'app',
       workspaces: [
         {
+          workspaceId: command.workspaceId,
+          workspaceKind: 'default' as const,
+          displayName: 'main',
           directory: input.workspaceDirectory ?? command.workspaceDirectory,
           gitBranch: input.gitBranch ?? command.gitBranch,
-          isCurrent: true,
-          name: command.workspaceName
+          isCurrent: true
         }
       ]
     })),

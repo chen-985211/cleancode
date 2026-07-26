@@ -41,7 +41,7 @@ export class CleancodeMcpHttpServer implements AgentMcpServerPort {
         },
         projectDirectory: session.projectDirectory,
         sessionId: session.sessionId,
-        workspaceName: session.workspaceName
+        workspaceId: session.workspaceId
       }),
       session
     }

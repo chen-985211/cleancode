@@ -20,23 +20,23 @@ describe('block graph versioned store', () => {
     await rm(projectDirectory, { force: true, recursive: true })
   })
 
-  it('writes new graphs in the version 1 envelope', async () => {
+  it('writes new graphs in the version 2 envelope', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await repository.initializeDefaultGraph(projectDirectory, graph)
 
     await expect(readStore(appStateDirectory)).resolves.toEqual({
       graph: graph.toSnapshot(),
-      version: 1
+      version: 2
     })
   })
 
-  it('deterministically migrates raw legacy TCP readiness and keeps output services portless', async () => {
+  it('rejects a raw legacy graph without migrating or rewriting it', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graphPath = await initializeAndFindGraphPath(
       repository,
@@ -61,32 +61,13 @@ describe('block graph versioned store', () => {
         id: 'output-server'
       }
     ])
-    await writeFile(graphPath, `${JSON.stringify(legacyGraph, null, 2)}\n`)
+    const legacyContents = `${JSON.stringify(legacyGraph, null, 2)}\n`
+    await writeFile(graphPath, legacyContents)
 
-    const [first, second] = await Promise.all([
-      repository.findDefaultGraphSnapshot(projectDirectory, 'main'),
-      repository.findDefaultGraphSnapshot(projectDirectory, 'main')
-    ])
-
-    expect(first).toEqual(second)
-    expect(first?.blocks.map((block) => block.executionConfig)).toEqual([
-      {
-        mode: 'service',
-        port: {
-          binding: { type: 'none' },
-          policy: { port: 4_173, type: 'fixed' },
-          protocol: 'tcp'
-        },
-        readiness: { type: 'tcp' },
-        readinessTimeoutMs: 30_000
-      },
-      {
-        mode: 'service',
-        readiness: { text: 'ready', type: 'output' },
-        readinessTimeoutMs: 30_000
-      }
-    ])
-    await expect(readStore(appStateDirectory)).resolves.toEqual({ graph: first, version: 1 })
+    await expect(repository.findDefaultGraphSnapshot(projectDirectory, 'main')).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED'
+    )
+    await expect(readFile(graphPath, 'utf8')).resolves.toBe(legacyContents)
   })
 
   it('rejects an unsupported store version without rewriting it', async () => {
@@ -122,7 +103,7 @@ describe('block graph versioned store', () => {
         id: 'invalid-server'
       }
     ])
-    const originalStore = `${JSON.stringify(malformedGraph, null, 2)}\n`
+    const originalStore = `${JSON.stringify({ graph: malformedGraph, version: 2 }, null, 2)}\n`
     await writeFile(graphPath, originalStore)
 
     await expect(repository.findDefaultGraphSnapshot(projectDirectory, 'main')).rejects.toSatisfy(
@@ -147,7 +128,7 @@ function createRawGraph(
     })),
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -158,7 +139,7 @@ async function initializeAndFindGraphPath(
 ): Promise<string> {
   await repository.initializeDefaultGraph(
     projectDirectory,
-    BlockGraph.createDefault({ projectId: 'project-1', workspaceName: 'main' })
+    BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
   )
   return findOnlyFileNamed(appStateDirectory, 'default-graph.json')
 }

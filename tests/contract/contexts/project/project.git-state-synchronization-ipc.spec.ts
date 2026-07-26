@@ -78,13 +78,13 @@ describe('project git state synchronization IPC contract', () => {
     await expect(
       ipcMain.invoke<WorkbenchSnapshot>('cleancode:archive-branch-workspace', {
         projectDirectory: '/work/app',
-        workspaceName: 'test-c',
+        workspaceId: 'test-c',
         lockedWorktreeConfirmation: { lockReason: 'external agent session' }
       })
     ).resolves.toMatchObject({ ok: true })
     expect(archiveBranchWorkspace).toHaveBeenCalledWith({
       projectDirectory: '/work/app',
-      workspaceName: 'test-c',
+      workspaceId: 'test-c',
       lockedWorktreeConfirmation: { lockReason: 'external agent session' }
     })
   })
@@ -104,7 +104,7 @@ describe('project git state synchronization IPC contract', () => {
     await expect(
       ipcMain.invoke('cleancode:archive-branch-workspace', {
         projectDirectory: '/work/app',
-        workspaceName: 'test-c',
+        workspaceId: 'test-c',
         lockedWorktreeConfirmation: { lockReason: 42 }
       })
     ).resolves.toMatchObject({
@@ -134,7 +134,7 @@ describe('project git state synchronization IPC contract', () => {
     await expect(
       ipcMain.invoke<WorkbenchSnapshot>('cleancode:switch-branch-workspace', {
         projectDirectory: '/work/app',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).resolves.toEqual({
       ok: true,
@@ -233,7 +233,9 @@ function createProjectSnapshot(gitBranch: string): ProjectSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'workspace-main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch,
         isCurrent: true
@@ -259,7 +261,7 @@ function createWorkbenchSnapshot(project: ProjectSnapshot): WorkbenchSnapshot {
     graph: {
       id: 'graph-1',
       projectId: project.id,
-      workspaceName: 'main',
+      workspaceId: 'main',
       viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [],
       terminalGroups: []

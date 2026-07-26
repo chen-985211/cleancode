@@ -154,6 +154,12 @@ function createTerminalNode({
     height,
     measured,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal',
+        objectId: 'terminal-1'
+      },
       block: {
         id: 'terminal-1',
         type: 'terminal',
@@ -193,7 +199,7 @@ function createAgentNode(
     name: 'Agent 1',
     projectId: 'project-1',
     providerId: 'codex',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
   return {
     id: 'agent:agent-1',
@@ -201,6 +207,12 @@ function createAgentNode(
     position,
     style: size,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'agent',
+        objectId: 'agent-1'
+      },
       agent,
       currentWorkbench: null,
       currentWorkspace: null,
@@ -232,6 +244,12 @@ function createTerminalGroupNode({
     zIndex: 1,
     style,
     data: {
+      identity: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        objectKind: 'terminal-group',
+        objectId: 'development-group'
+      },
       group: {
         id: 'development-group',
         type: 'terminal-group',

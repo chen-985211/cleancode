@@ -137,12 +137,12 @@ export class TerminalSurfaceRegistry {
 export function createTerminalSurfaceKey(
   identity: Pick<
     TerminalRunIdentity,
-    'projectId' | 'workspaceName' | 'blockId' | 'sessionId' | 'runId' | 'generation'
+    'projectId' | 'workspaceId' | 'blockId' | 'sessionId' | 'runId' | 'generation'
   >
 ): string {
   return [
     identity.projectId,
-    identity.workspaceName,
+    identity.workspaceId,
     identity.blockId,
     identity.sessionId,
     identity.runId,

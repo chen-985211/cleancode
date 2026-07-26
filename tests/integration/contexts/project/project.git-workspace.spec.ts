@@ -195,7 +195,9 @@ describe('project git workspace adapter', () => {
     const project = await synchronizeProjectGitState.execute({ projectDirectory })
 
     expect(project?.workspaces[0]).toMatchObject({
-      name: 'main',
+      workspaceId: expect.any(String),
+      workspaceKind: 'default',
+      displayName: 'main',
       directory: projectDirectory,
       gitBranch: 'feature/free',
       isCurrent: true
@@ -203,7 +205,9 @@ describe('project git workspace adapter', () => {
     await expect(repository.findByDirectory(projectDirectory)).resolves.toMatchObject({
       workspaces: [
         {
-          name: 'main',
+          workspaceId: project?.workspaces[0]?.workspaceId,
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: projectDirectory,
           gitBranch: 'feature/free',
           isCurrent: true

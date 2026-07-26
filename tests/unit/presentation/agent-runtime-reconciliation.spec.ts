@@ -54,7 +54,7 @@ function createSession(
     sessionId,
     terminalSourceTheme: 'dark',
     workspaceDirectory: '/repo/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 
@@ -90,7 +90,7 @@ function createEvent(
           projectId: 'project-1',
           runId: `run-${terminalGeneration}`,
           sessionId: `terminal-${terminalGeneration}`,
-          workspaceName: 'main'
+          workspaceId: 'main'
         }
       }
     },

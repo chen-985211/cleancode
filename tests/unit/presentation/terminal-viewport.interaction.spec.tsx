@@ -605,7 +605,7 @@ function createRunningTerminalState(output = '') {
     terminalSourceTheme: 'dark' as const,
     runIdentity: {
       projectId: 'project-alpha',
-      workspaceName: 'feature/sidebar',
+      workspaceId: 'feature/sidebar',
       blockId: 'terminal-1',
       sessionId: 'terminal-session-1',
       runId: 'run-1',
@@ -622,7 +622,7 @@ function createOutputEvent(viewId: string, sequence: number, data: string) {
     scope: {
       projectId: 'project-alpha',
       projectDirectory: '/tmp/project-alpha',
-      workspaceName: 'feature/sidebar',
+      workspaceId: 'feature/sidebar',
       workspaceDirectory: '/tmp/project-alpha-worktrees/feature-sidebar',
       gitBranch: 'feature/sidebar',
       blockId: 'terminal-1',
@@ -649,7 +649,7 @@ function createSnapshot(
     identity: {
       projectId: command.projectId,
       projectDirectory: '/tmp/project-alpha',
-      workspaceName: command.workspaceName,
+      workspaceId: command.workspaceId,
       workspaceDirectory: '/tmp/project-alpha-worktrees/feature-sidebar',
       gitBranch: 'feature/sidebar',
       blockId: command.blockId,

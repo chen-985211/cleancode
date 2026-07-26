@@ -134,6 +134,8 @@ await expectAuthoritativeResult(currentIdentity)
 
 E2E 启动器必须把每个场景的 Electron `userData` 指向该场景独立的临时目录，不能复用开发实例的默认 profile。否则 Electron 单实例锁会把测试进程路由到已运行的应用，导致新进程在页面创建前正常退出；测试会统一表现为 `Target page, context or browser has been closed`，也无法证明任何产品行为。
 
+启动器还必须从继承环境中移除 `ELECTRON_RUN_AS_NODE`，不能让承载测试命令的 CleanCode 或其他 Electron 宿主把自己的 Node 模式标记传给被测 Electron。测试场景需要的其他环境变量继续由场景级覆盖显式提供。
+
 ## 后台与可见运行模式
 
 默认 `pnpm test:e2e:smoke` 和完整 `pnpm test:e2e` 都启动屏幕外非激活的真实 Electron 窗口。启动支撑向应用传入精确的测试标记，应用以远离所有显示器的坐标创建 `BrowserWindow`，允许测试窗口超出屏幕边界，并在 renderer 就绪后再次校正坐标、调用 `showInactive()`。E2E 启动后必须从主进程读取窗口可见性、焦点和边界，验证窗口已经显示、没有获得焦点且不与任何显示器相交；不得只根据创建参数推断窗口管理器接受了屏幕外坐标。

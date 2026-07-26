@@ -72,7 +72,7 @@ describe('Agent tool invocation coordinator', () => {
   })
 })
 
-function command(toolCallId: string, sessionId: string, workspaceName: string) {
+function command(toolCallId: string, sessionId: string, workspaceId: string) {
   return {
     agentId: 'agent-1',
     input: {},
@@ -81,7 +81,7 @@ function command(toolCallId: string, sessionId: string, workspaceName: string) {
     sessionId,
     toolCallId,
     toolName: 'inspect_graph' as const,
-    workspaceName
+    workspaceId
   }
 }
 
@@ -93,7 +93,7 @@ function completedResult(toolCallId: string): AgentToolExecutionResult {
       projectId: 'project-1',
       terminalGroups: [],
       viewport: { x: 0, y: 0, zoom: 1 },
-      workspaceName: 'main'
+      workspaceId: 'main'
     },
     graphChanged: false,
     output: { type: 'block_graph' },

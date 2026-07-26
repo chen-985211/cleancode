@@ -1,7 +1,7 @@
 export interface ValidateRunRuntimeScopeCommand {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
 }

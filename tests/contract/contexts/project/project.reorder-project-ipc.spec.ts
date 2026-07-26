@@ -108,7 +108,9 @@ function createWorkbenchSnapshot(): WorkbenchSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
@@ -122,7 +124,7 @@ function createWorkbenchSnapshot(): WorkbenchSnapshot {
     graph: {
       id: 'graph-1',
       projectId: project.id,
-      workspaceName: 'main',
+      workspaceId: 'main',
       viewport: { x: 0, y: 0, zoom: 1 },
       blocks: [],
       terminalGroups: []

@@ -41,7 +41,7 @@ export class AgentToolApprovalCoordinator {
       sessionId: session.sessionId,
       toolCallId: command.toolCallId,
       toolName: command.toolName,
-      workspaceName: session.workspaceName
+      workspaceId: session.workspaceId
     }
     const firstResult = await this.executeSafely(toolCommand)
 
@@ -127,7 +127,7 @@ export class AgentToolApprovalCoordinator {
       summary: result.approval.summary,
       target: result.approval.target,
       toolName: result.approval.toolName,
-      workspaceName: session.workspaceName
+      workspaceId: session.workspaceId
     }
     let resolveCompletion!: (result: AgentToolExecutionResult) => void
     const completion = new Promise<AgentToolExecutionResult>((resolve) => {
@@ -182,7 +182,7 @@ export class AgentToolApprovalCoordinator {
         graph: result.graph,
         projectDirectory: session.projectDirectory,
         sessionId: session.sessionId,
-        workspaceName: session.workspaceName
+        workspaceId: session.workspaceId
       })
     } catch {
       // A presentation projection failure must not rewrite an already committed tool result.

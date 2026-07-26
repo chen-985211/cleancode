@@ -59,7 +59,7 @@ export class TerminalWorkflowService {
 
     const plan = await this.planPort.buildPlan({
       projectDirectory: command.projectDirectory,
-      workspaceName: command.workspaceName,
+      workspaceId: command.workspaceId,
       scope: command.scope
     })
 
@@ -74,7 +74,7 @@ export class TerminalWorkflowService {
       run: WorkflowRun.create(plan, {
         projectId: command.projectId,
         projectDirectory: command.projectDirectory,
-        workspaceName: command.workspaceName,
+        workspaceId: command.workspaceId,
         workspaceDirectory: command.workspaceDirectory,
         gitBranch: command.gitBranch
       }),
@@ -260,7 +260,7 @@ export class TerminalWorkflowService {
     const managedRun = await this.managedServices.launch({
       projectId: activeRun.command.projectId,
       projectDirectory: activeRun.command.projectDirectory,
-      workspaceName: activeRun.command.workspaceName,
+      workspaceId: activeRun.command.workspaceId,
       workspaceDirectory: activeRun.command.workspaceDirectory,
       gitBranch: activeRun.command.gitBranch,
       blockId: node.blockId,
@@ -333,7 +333,7 @@ export class TerminalWorkflowService {
       blockId,
       projectId: activeRun.command.projectId,
       projectDirectory: activeRun.command.projectDirectory,
-      workspaceName: activeRun.command.workspaceName,
+      workspaceId: activeRun.command.workspaceId,
       workspaceDirectory: activeRun.command.workspaceDirectory,
       gitBranch: activeRun.command.gitBranch,
       workingDirectory: activeRun.command.workingDirectory,

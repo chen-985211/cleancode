@@ -9,7 +9,7 @@ import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSessio
 export interface LaunchTerminalCommand {
   readonly projectId: string
   readonly projectDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
   readonly workspaceDirectory: string
   readonly gitBranch: string | null
   readonly blockId: string
@@ -54,7 +54,7 @@ export class LaunchTerminalCommandUseCase {
     const plan = await this.plans.getPlan({
       projectId: command.projectId,
       projectDirectory: command.projectDirectory,
-      workspaceName: command.workspaceName,
+      workspaceId: command.workspaceId,
       blockId: command.blockId
     })
 
@@ -62,7 +62,7 @@ export class LaunchTerminalCommandUseCase {
       const run = await this.managedServices.launch({
         projectId: command.projectId,
         projectDirectory: command.projectDirectory,
-        workspaceName: command.workspaceName,
+        workspaceId: command.workspaceId,
         workspaceDirectory: command.workspaceDirectory,
         gitBranch: command.gitBranch,
         blockId: command.blockId,
@@ -89,7 +89,7 @@ export class LaunchTerminalCommandUseCase {
     const session = await this.sessions.start({
       projectId: command.projectId,
       projectDirectory: command.projectDirectory,
-      workspaceName: command.workspaceName,
+      workspaceId: command.workspaceId,
       workspaceDirectory: command.workspaceDirectory,
       gitBranch: command.gitBranch,
       terminalBlockId: command.blockId,

@@ -39,8 +39,8 @@ describe('terminal session state retention', () => {
         },
         {
           projectId: 'project-alpha',
-          workspaceNames: ['main', 'feature/sidebar'],
-          currentWorkspaceName: 'main',
+          workspaceIds: ['main', 'feature/sidebar'],
+          currentWorkspaceId: 'main',
           currentTerminalBlockIds: ['terminal-main']
         }
       )
@@ -52,7 +52,7 @@ describe('terminal session state retention', () => {
 })
 
 function createState(
-  workspaceName: string,
+  workspaceId: string,
   blockId: string,
   generation: number,
   projectId = 'project-alpha'
@@ -63,7 +63,7 @@ function createState(
     output: '',
     runIdentity: {
       projectId,
-      workspaceName,
+      workspaceId,
       blockId,
       sessionId: `session-${blockId}`,
       runId: `run-${blockId}`,

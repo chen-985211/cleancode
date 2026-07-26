@@ -17,13 +17,12 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 
 export interface CreateWorkspaceAgentCommand {
   readonly agentId: string
-  readonly gitBranch: string | null
   readonly initialPosition: { readonly x: number; readonly y: number }
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
   readonly workspaceDirectory: string
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export class CreateWorkspaceAgentUseCase {
@@ -39,10 +38,10 @@ export class CreateWorkspaceAgentUseCase {
   async execute(command: CreateWorkspaceAgentCommand): Promise<WorkspaceAgentSnapshot> {
     const provider = this.providers.require(command.providerId)
     const agentId = command.agentId
-    return this.transactions.run(command.projectId, command.workspaceName, async () => {
+    return this.transactions.run(command.projectId, command.workspaceId, async () => {
       const existing = await this.repository.findAgent(
         command.projectId,
-        command.workspaceName,
+        command.workspaceId,
         agentId
       )
       if (existing) {
@@ -81,7 +80,7 @@ export class CreateWorkspaceAgentUseCase {
       }
       return this.creationScope.run(command, async () => {
         const agents =
-          (await this.repository.findWorkspace(command.projectId, command.workspaceName)) ?? []
+          (await this.repository.findWorkspace(command.projectId, command.workspaceId)) ?? []
         const agent = AgentSession.create({
           agentId,
           cleancodeMcpEnabled:
@@ -93,7 +92,7 @@ export class CreateWorkspaceAgentUseCase {
           name: nextAgentName(agents.map((candidate) => candidate.name)),
           projectId: command.projectId,
           providerId: command.providerId,
-          workspaceName: command.workspaceName
+          workspaceId: command.workspaceId
         })
         await this.repository.save(agent)
         return toWorkspaceAgentSnapshot(agent)

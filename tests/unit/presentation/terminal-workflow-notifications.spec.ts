@@ -102,7 +102,7 @@ function workflowRun(
     graphId: 'graph-1',
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: null,
     status,

@@ -138,7 +138,9 @@ describe('git branch workspaces e2e', () => {
         await readOnlyJsonFile(workbench.appStateDirectory, 'project.json')
       ) as {
         workspaces: Array<{
-          name: string
+          workspaceId: string
+          workspaceKind: 'default' | 'linked-worktree'
+          displayName: string
           directory: string
           gitBranch: string | null
           isCurrent: boolean
@@ -147,13 +149,17 @@ describe('git branch workspaces e2e', () => {
 
       expect(projectMetadata.workspaces).toEqual([
         {
-          name: 'main',
+          workspaceId: expect.any(String),
+          workspaceKind: 'default',
+          displayName: 'main',
           directory: workbench.projectDirectory,
           gitBranch: 'main',
           isCurrent: true
         },
         {
-          name: 'feature/sidebar',
+          workspaceId: expect.any(String),
+          workspaceKind: 'linked-worktree',
+          displayName: 'feature/sidebar',
           directory: canonicalFeatureWorktreeDirectory,
           gitBranch: 'feature/sidebar',
           isCurrent: false

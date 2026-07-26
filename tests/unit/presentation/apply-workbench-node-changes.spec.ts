@@ -103,7 +103,7 @@ function createGraph(): BlockGraphSnapshot {
   return {
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     viewport: { x: 0, y: 0, zoom: 1 },
     blocks: [
       {

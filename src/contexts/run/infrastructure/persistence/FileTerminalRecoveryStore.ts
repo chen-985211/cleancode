@@ -473,7 +473,7 @@ function isTerminalRunScope(value: unknown): value is TerminalRunScope {
   return (
     typeof value.projectId === 'string' &&
     typeof value.projectDirectory === 'string' &&
-    typeof value.workspaceName === 'string' &&
+    typeof value.workspaceId === 'string' &&
     typeof value.workspaceDirectory === 'string' &&
     (typeof value.gitBranch === 'string' || value.gitBranch === null) &&
     typeof value.blockId === 'string' &&
@@ -514,10 +514,9 @@ function createStorageKey(identity: TerminalRunScope): string {
     .update(
       JSON.stringify([
         identity.projectId,
-        identity.projectDirectory,
-        identity.workspaceName,
-        identity.workspaceDirectory,
-        ...(owner.kind === 'block' ? [identity.blockId] : [owner.kind, owner.id]),
+        identity.workspaceId,
+        owner.kind,
+        owner.id,
         identity.sessionId,
         identity.runId,
         identity.generation

@@ -27,6 +27,7 @@ import type {
 import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export type {
   ManagedTerminalServiceOwner,
@@ -84,6 +85,7 @@ export interface WorkbenchNodeLayoutInput {
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 interface TerminalNodeData extends Record<string, unknown> {
+  readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
@@ -126,6 +128,7 @@ interface TerminalNodeData extends Record<string, unknown> {
 export type TerminalFlowNode = Node<TerminalNodeData, 'terminal'>
 
 interface TerminalGroupNodeData extends Record<string, unknown> {
+  readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly group: TerminalGroupSnapshot
   readonly memberBlocks: readonly TerminalBlockSnapshot[]
@@ -156,6 +159,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
 interface AgentConsoleNodeData extends Record<string, unknown> {
+  readonly identity: CanvasObjectIdentity
   readonly agent: WorkspaceAgentSnapshot
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null

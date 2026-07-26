@@ -8,12 +8,12 @@ export interface WorkspaceAgentRuntimePort {
   disposeAgent(command: {
     readonly agentId: string
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<WorkspaceAgentRuntimeLease>
   reconfigureAgent(command: {
     readonly agentId: string
     readonly cleancodeMcpEnabled: boolean
     readonly projectId: string
-    readonly workspaceName: string
+    readonly workspaceId: string
   }): Promise<AgentSessionSnapshot | null>
 }

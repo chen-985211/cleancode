@@ -7,7 +7,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       executeMcpTool: vi.fn(),
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -31,7 +31,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       executeMcpTool: vi.fn(),
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -127,7 +127,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
         projectId: 'project-1',
         terminalGroups: [],
         viewport: { x: 0, y: 0, zoom: 1 },
-        workspaceName: 'main'
+        workspaceId: 'main'
       },
       graphChanged: true,
       output: {
@@ -140,7 +140,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       executeMcpTool,
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await bridge.handle({
@@ -196,7 +196,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       executeMcpTool,
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     await expect(
@@ -225,7 +225,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       executeMcpTool,
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await bridge.handle({
@@ -268,7 +268,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       }),
       projectDirectory: '/tmp/project',
       sessionId: 'agent-session-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
 
     const response = await bridge.handle({

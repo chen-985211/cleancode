@@ -83,13 +83,17 @@ function createProjectSnapshot(): ProjectSnapshot {
     name: 'app',
     workspaces: [
       {
-        name: 'main',
+        workspaceId: 'main',
+        workspaceKind: 'default',
+        displayName: 'main',
         directory: '/work/app',
         gitBranch: 'main',
         isCurrent: true
       },
       {
-        name: 'feature/worktree',
+        workspaceId: 'feature/worktree',
+        workspaceKind: 'linked-worktree',
+        displayName: 'feature/worktree',
         directory: '/work/app-feature-worktree',
         gitBranch: 'feature/worktree',
         isCurrent: false

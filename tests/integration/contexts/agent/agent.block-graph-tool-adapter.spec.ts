@@ -15,7 +15,7 @@ import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/ap
 import { FileSystemBlockGraphRepository } from '../../../../src/contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
 import { getAppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
 
-const context = { projectDirectory: '/repo/project', workspaceName: 'main' }
+const context = { projectDirectory: '/repo/project', workspaceId: 'main' }
 
 describe('agent block graph workflow tool adapter', () => {
   let adapter: BlockGraphAgentToolAdapter
@@ -107,7 +107,7 @@ describe('agent block graph workflow tool adapter', () => {
     })
     const persisted = await repository.findDefaultGraphSnapshot(
       context.projectDirectory,
-      context.workspaceName
+      context.workspaceId
     )
 
     if (!persisted) throw new Error('Expected the configured graph to be persisted.')

@@ -47,7 +47,7 @@ describe('run lifecycle service', () => {
 
     let leaseSettled = false
     const acquiring = lifecycle
-      .hardDisposeWorkspace({ projectDirectory: '/project', workspaceName: 'main' })
+      .hardDisposeWorkspace({ projectDirectory: '/project', workspaceId: 'main' })
       .then((lease) => {
         leaseSettled = true
         return lease
@@ -74,7 +74,7 @@ describe('run lifecycle service', () => {
     const owner = runOwner('api')
     const lease = await lifecycle.hardDisposeWorkspace({
       projectDirectory: owner.projectDirectory,
-      workspaceName: owner.workspaceName
+      workspaceId: owner.workspaceId
     })
 
     lease.quarantine()
@@ -82,7 +82,7 @@ describe('run lifecycle service', () => {
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: owner.projectDirectory,
-        workspaceName: owner.workspaceName
+        workspaceId: owner.workspaceId
       })
     ).toBe(true)
     await expect(lifecycle.runStart(owner, async () => undefined)).rejects.toMatchObject({
@@ -93,7 +93,7 @@ describe('run lifecycle service', () => {
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: owner.projectDirectory,
-        workspaceName: owner.workspaceName
+        workspaceId: owner.workspaceId
       })
     ).toBe(false)
     await expect(lifecycle.runStart(owner, async () => 'recovered')).resolves.toBe('recovered')
@@ -108,13 +108,13 @@ describe('run lifecycle service', () => {
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).toBe(true)
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(true)
 
@@ -122,13 +122,13 @@ describe('run lifecycle service', () => {
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).toBe(false)
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(false)
   })
@@ -138,7 +138,7 @@ describe('run lifecycle service', () => {
     const mainOwner = runOwner('api')
     const worktreeOwner = {
       ...runOwner('web'),
-      workspaceName: 'feature/sidebar',
+      workspaceId: 'feature/sidebar',
       workspaceDirectory: '/project-sidebar',
       gitBranch: 'feature/sidebar'
     }
@@ -149,7 +149,7 @@ describe('run lifecycle service', () => {
 
     const lease = await lifecycle.hardDisposeWorkspaces({
       projectDirectory: '/project',
-      workspaceNames: ['main', 'feature/sidebar']
+      workspaceIds: ['main', 'feature/sidebar']
     })
 
     expect(mainDispose).toHaveBeenCalledOnce()
@@ -158,31 +158,31 @@ describe('run lifecycle service', () => {
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).toBe(true)
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(true)
 
     const mainRecovery = await lifecycle.hardDisposeWorkspace({
       projectDirectory: '/project',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     mainRecovery.resolve()
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).toBe(false)
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(true)
     await expect(lifecycle.runStart(mainOwner, async () => 'main')).resolves.toBe('main')
@@ -192,14 +192,14 @@ describe('run lifecycle service', () => {
 
     const worktreeRecovery = await lifecycle.hardDisposeWorkspaces({
       projectDirectory: '/project',
-      workspaceNames: ['feature/sidebar']
+      workspaceIds: ['feature/sidebar']
     })
     expect(worktreeRecovery.wasQuarantined).toBe(true)
     worktreeRecovery.resolve()
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(false)
     await expect(lifecycle.runStart(worktreeOwner, async () => 'worktree')).resolves.toBe(
@@ -208,25 +208,25 @@ describe('run lifecycle service', () => {
 
     const repeatedBatch = await lifecycle.hardDisposeWorkspaces({
       projectDirectory: '/project',
-      workspaceNames: ['main', 'feature/sidebar']
+      workspaceIds: ['main', 'feature/sidebar']
     })
     repeatedBatch.quarantine()
     const batchRecovery = await lifecycle.hardDisposeWorkspaces({
       projectDirectory: '/project',
-      workspaceNames: ['main', 'feature/sidebar']
+      workspaceIds: ['main', 'feature/sidebar']
     })
     expect(batchRecovery.wasQuarantined).toBe(true)
     batchRecovery.resolve()
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'main'
+        workspaceId: 'main'
       })
     ).toBe(false)
     expect(
       lifecycle.isWorkspaceQuarantined({
         projectDirectory: '/project',
-        workspaceName: 'feature/sidebar'
+        workspaceId: 'feature/sidebar'
       })
     ).toBe(false)
   })
@@ -241,7 +241,7 @@ describe('run lifecycle service', () => {
     const lease = await lifecycle.hardDisposeTerminal({
       projectId: 'project-1',
       projectDirectory: '/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'api'
     })
 
@@ -299,7 +299,7 @@ function runOwner(blockId: string) {
   return {
     projectId: 'project-1',
     projectDirectory: '/project',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/project',
     gitBranch: 'main',
     blockId

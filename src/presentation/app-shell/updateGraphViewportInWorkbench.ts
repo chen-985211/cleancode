@@ -22,7 +22,7 @@ export async function updateGraphViewportInWorkbench({
 
   const graphSnapshot = await window.cleancode?.updateGraphViewport({
     projectDirectory: currentWorkbench.project.directory,
-    workspaceName: currentWorkspace.name,
+    workspaceId: currentWorkspace.workspaceId,
     viewport
   })
 

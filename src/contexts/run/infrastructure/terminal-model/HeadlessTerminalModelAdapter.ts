@@ -435,13 +435,7 @@ function readOscWorkingDirectory(data: string): string | null {
 
 function createModelKey(identity: TerminalRunScope): string {
   const owner = resolveTerminalOwnerRef(identity)
-  return [
-    identity.projectId,
-    identity.projectDirectory,
-    identity.workspaceName,
-    identity.workspaceDirectory,
-    owner.kind,
-    owner.id,
-    identity.sessionId
-  ].join('\0')
+  return [identity.projectId, identity.workspaceId, owner.kind, owner.id, identity.sessionId].join(
+    '\0'
+  )
 }

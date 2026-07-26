@@ -66,5 +66,5 @@ function replaceOwnedGraph(
 
   const currentWorkspace = workbench.project.workspaces.find((workspace) => workspace.isCurrent)
 
-  return currentWorkspace?.name === graph.workspaceName ? { ...workbench, graph } : workbench
+  return currentWorkspace?.workspaceId === graph.workspaceId ? { ...workbench, graph } : workbench
 }

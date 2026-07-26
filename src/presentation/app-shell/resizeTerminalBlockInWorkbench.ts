@@ -26,11 +26,11 @@ export async function resizeTerminalBlockInWorkbench({
   }
 
   await layoutCommitQueue.enqueue(
-    `terminal:${currentWorkbench.project.id}:${currentWorkspace.name}:${block.id}`,
+    `terminal:${currentWorkbench.project.id}:${currentWorkspace.workspaceId}:${block.id}`,
     () =>
       window.cleancode?.resizeTerminalBlock({
         projectDirectory: currentWorkbench.project.directory,
-        workspaceName: currentWorkspace.name,
+        workspaceId: currentWorkspace.workspaceId,
         blockId: block.id,
         position: layout.position,
         size: layout.size

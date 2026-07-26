@@ -8,7 +8,7 @@ export interface ArrangeTerminalLayoutCommand {
   readonly blockIds: readonly string[]
   readonly projectDirectory: string
   readonly reservedRegions: readonly TerminalLayoutRegion[]
-  readonly workspaceName: string
+  readonly workspaceId: string
 }
 
 export interface ArrangeTerminalLayoutResult {
@@ -24,7 +24,7 @@ export class ArrangeTerminalLayoutUseCase {
   async execute(command: ArrangeTerminalLayoutCommand): Promise<ArrangeTerminalLayoutResult> {
     const observedGraph = await this.graphRepository.findDefaultGraphSnapshot(
       command.projectDirectory,
-      command.workspaceName
+      command.workspaceId
     )
     const transaction = await executeDefaultGraphTransaction(
       this.graphRepository,

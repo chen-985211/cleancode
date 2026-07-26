@@ -19,7 +19,7 @@ describe('terminal session runtime reconciliation', () => {
       }
     )
 
-    expect(states['project-1\0main\0block-1']).toMatchObject({
+    expect(states['["project-1","main","terminal","block-1"]']).toMatchObject({
       sessionId: session.id,
       status: 'exited',
       runIdentity: identity(session)
@@ -39,13 +39,13 @@ describe('terminal session runtime reconciliation', () => {
 
     const states = applyTerminalSessionSnapshot(
       exited,
-      'project-1\0main\0block-1',
+      '["project-1","main","terminal","block-1"]',
       session,
       'complete startup output',
       endpoint()
     )
 
-    expect(states['project-1\0main\0block-1']).toMatchObject({
+    expect(states['["project-1","main","terminal","block-1"]']).toMatchObject({
       sessionId: session.id,
       status: 'exited',
       output: 'complete startup output',
@@ -59,14 +59,14 @@ describe('terminal session runtime reconciliation', () => {
     const current = viewState(session, 'live output')
 
     const states = applyTerminalSessionSnapshot(
-      { 'project-1\0main\0block-1': current },
-      'project-1\0main\0block-1',
+      { '["project-1","main","terminal","block-1"]': current },
+      '["project-1","main","terminal","block-1"]',
       session,
       '',
       null
     )
 
-    expect(states['project-1\0main\0block-1']?.output).toBe('live output')
+    expect(states['["project-1","main","terminal","block-1"]']?.output).toBe('live output')
   })
 
   it('accepts an authoritative recovered running state after a Provider reconnect', () => {
@@ -78,13 +78,13 @@ describe('terminal session runtime reconciliation', () => {
 
     const states = applyRecoveredTerminalSessionSnapshot(
       exited,
-      'project-1\0main\0block-1',
+      '["project-1","main","terminal","block-1"]',
       { ...session, recoveryKind: 'warm' },
       '',
       null
     )
 
-    expect(states['project-1\0main\0block-1']).toMatchObject({
+    expect(states['["project-1","main","terminal","block-1"]']).toMatchObject({
       sessionId: session.id,
       status: 'running',
       recoveryKind: 'warm'
@@ -95,17 +95,17 @@ describe('terminal session runtime reconciliation', () => {
     const requested = sessionSnapshot('session-old', 'running')
     const replacement = sessionSnapshot('session-new', 'running', 2)
     const states: Record<string, TerminalViewState> = {
-      'project-1\0main\0block-1': viewState(replacement)
+      '["project-1","main","terminal","block-1"]': viewState(replacement)
     }
 
     expect(reconcileTerminalSessionSnapshots(states, [identity(requested)], [])).toBe(states)
 
     const staleStates: Record<string, TerminalViewState> = {
-      'project-1\0main\0block-1': viewState(requested)
+      '["project-1","main","terminal","block-1"]': viewState(requested)
     }
     expect(
       reconcileTerminalSessionSnapshots(staleStates, [identity(requested)], [])[
-        'project-1\0main\0block-1'
+        '["project-1","main","terminal","block-1"]'
       ]?.status
     ).toBe('exited')
   })
@@ -119,7 +119,7 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited', genera
     generation,
     projectId: 'project-1',
     projectDirectory: '/work/app',
-    workspaceName: 'main',
+    workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
     blockId: 'block-1',
@@ -140,7 +140,7 @@ function sessionSnapshot(sessionId: string, status: 'running' | 'exited', genera
 function identity(session: ReturnType<typeof sessionSnapshot>) {
   return {
     projectId: session.projectId,
-    workspaceName: session.workspaceName,
+    workspaceId: session.workspaceId,
     blockId: session.blockId,
     sessionId: session.sessionId,
     runId: session.runId,

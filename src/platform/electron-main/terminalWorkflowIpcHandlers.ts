@@ -60,7 +60,7 @@ function readStartWorkflowCommand(command: unknown): StartTerminalWorkflowIpcCom
     !isRecord(command) ||
     !isNonEmptyString(command.projectId) ||
     !isNonEmptyString(command.projectDirectory) ||
-    !isNonEmptyString(command.workspaceName) ||
+    !isNonEmptyString(command.workspaceId) ||
     !isNonEmptyString(command.workspaceDirectory) ||
     !(command.gitBranch === null || typeof command.gitBranch === 'string') ||
     !isTerminalSourceTheme(command.terminalSourceTheme) ||

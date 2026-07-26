@@ -63,7 +63,7 @@ describe('block graph terminal resize IPC contract', () => {
 
     const command = {
       projectDirectory: '/repo/app',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1',
       position: { x: 180, y: 140 },
       size: { width: 760, height: 420 }
@@ -87,7 +87,7 @@ describe('block graph terminal resize IPC contract', () => {
     } as unknown as BlockGraphIpcHandlersInput)
     const command = {
       projectDirectory: '/repo/app',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1',
       name: 'Web',
       description: 'Development server',
@@ -122,7 +122,7 @@ describe('block graph terminal resize IPC contract', () => {
 
     const result = await ipcMain.invoke('cleancode:update-terminal-definition', {
       projectDirectory: '/repo/app',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: 'terminal-1',
       name: 'Web'
     })
@@ -139,7 +139,7 @@ function createGraphSnapshot(): BlockGraphSnapshot {
   return {
     id: 'graph-1',
     projectId: 'project-1',
-    workspaceName: 'main',
+    workspaceId: 'main',
     viewport: { x: 0, y: 0, zoom: 1 },
     terminalGroups: [],
     blocks: [

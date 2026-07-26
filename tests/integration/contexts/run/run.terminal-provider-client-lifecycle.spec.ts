@@ -84,7 +84,7 @@ describe('persistent terminal provider client lifecycle', () => {
     await client.detachApplication()
   })
 
-  it('keeps one-version compatibility while the previous provider owns live sessions', async () => {
+  it('refuses to reuse a Provider from before the terminal environment boundary', async () => {
     await provider.close()
     provider = new ControllableProvider(
       createProviderEndpoint(rootDirectory),
@@ -102,16 +102,10 @@ describe('persistent terminal provider client lifecycle', () => {
     })
     const client = createClient(rootDirectory)
 
-    await client.initialize()
-
-    expect(provider.requests.map(({ method }) => method)).toEqual([
-      'health',
-      'claimController',
-      'setScrollbackRows',
-      'listSessions'
-    ])
-    await client.detachApplication()
-    expect(provider.requests.at(-1)?.method).toBe('detachApplication')
+    await expect(client.initialize()).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED'
+    })
+    expect(provider.requests.map(({ method }) => method)).toEqual(['health'])
   })
 
   it('receives a shutdown handoff before waiting for the current Provider to finish', async () => {
@@ -339,7 +333,7 @@ function outputIdentity(ownerKind: 'agent' | 'block') {
     runId: `${ownerKind}-run-1`,
     sessionId: `${ownerKind}-session-1`,
     workspaceDirectory: '/work/app',
-    workspaceName: 'main'
+    workspaceId: 'main'
   }
 }
 

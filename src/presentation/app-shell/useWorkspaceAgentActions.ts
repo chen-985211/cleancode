@@ -53,7 +53,7 @@ export function useWorkspaceAgentActions({
   const warnedWorkspaceScopesRef = useRef(new Set<string>())
   const workspaceScopeKey =
     currentWorkbench && currentWorkspace
-      ? `${currentWorkbench.project.id}\0${currentWorkspace.name}`
+      ? `${currentWorkbench.project.id}\0${currentWorkspace.workspaceId}`
       : null
   const workspaceScopeKeyRef = useRef(workspaceScopeKey)
   workspaceScopeKeyRef.current = workspaceScopeKey
@@ -64,10 +64,10 @@ export function useWorkspaceAgentActions({
   }, [workspaceScopeKey])
 
   const setWorkspaceAgents = useCallback(
-    (projectId: string, workspaceName: string, agents: readonly WorkspaceAgentSnapshot[]): void => {
+    (projectId: string, workspaceId: string, agents: readonly WorkspaceAgentSnapshot[]): void => {
       const update = (workbench: WorkbenchSnapshot): WorkbenchSnapshot =>
         workbench.project.id === projectId &&
-        findCurrentWorkspace(workbench)?.name === workspaceName
+        findCurrentWorkspace(workbench)?.workspaceId === workspaceId
           ? { ...workbench, agents }
           : workbench
       setCurrentWorkbench((workbench) => (workbench ? update(workbench) : workbench))
@@ -120,7 +120,7 @@ export function useWorkspaceAgentActions({
             providerId: selectedProviderId,
             initialPosition: reservation.position,
             workspaceDirectory: currentWorkspace.directory,
-            workspaceName: currentWorkspace.name
+            workspaceId: currentWorkspace.workspaceId
           })) ?? null
         if (
           generation !== creationGenerationRef.current ||
@@ -179,7 +179,7 @@ export function useWorkspaceAgentActions({
       const update = (workbench: WorkbenchSnapshot): WorkbenchSnapshot => {
         if (
           workbench.project.id !== updated.projectId ||
-          findCurrentWorkspace(workbench)?.name !== updated.workspaceName
+          findCurrentWorkspace(workbench)?.workspaceId !== updated.workspaceId
         ) {
           return workbench
         }
@@ -202,7 +202,7 @@ export function useWorkspaceAgentActions({
         agentId: agent.agentId,
         name,
         projectId: agent.projectId,
-        workspaceName: agent.workspaceName
+        workspaceId: agent.workspaceId
       })
       if (updated) updateAgentInWorkspace(updated)
     },
@@ -215,7 +215,7 @@ export function useWorkspaceAgentActions({
         agentId: agent.agentId,
         cleancodeMcpEnabled,
         projectId: agent.projectId,
-        workspaceName: agent.workspaceName
+        workspaceId: agent.workspaceId
       })
       if (result) updateAgentInWorkspace(result.agent)
       return result
@@ -230,13 +230,13 @@ export function useWorkspaceAgentActions({
       size: { readonly width: number; readonly height: number }
     ): Promise<void> => {
       await layoutCommitQueue.enqueue(
-        `agent:${agent.projectId}:${agent.workspaceName}:${agent.agentId}`,
+        `agent:${agent.projectId}:${agent.workspaceId}:${agent.agentId}`,
         () =>
           window.cleancode?.updateWorkspaceAgentLayout({
             agentId: agent.agentId,
             layout: { position, size },
             projectId: agent.projectId,
-            workspaceName: agent.workspaceName
+            workspaceId: agent.workspaceId
           }) ?? Promise.resolve(undefined),
         (updated) => {
           if (updated) updateAgentInWorkspace(updated)
@@ -267,10 +267,10 @@ export function useWorkspaceAgentActions({
       const remaining = await window.cleancode?.removeWorkspaceAgent({
         agentId: agent.agentId,
         projectId: agent.projectId,
-        workspaceName: agent.workspaceName
+        workspaceId: agent.workspaceId
       })
       if (remaining) {
-        setWorkspaceAgents(agent.projectId, agent.workspaceName, remaining)
+        setWorkspaceAgents(agent.projectId, agent.workspaceId, remaining)
       }
     },
     [setWorkspaceAgents]
@@ -308,7 +308,7 @@ function updateWorkbenchAgent(
   updated: WorkspaceAgentSnapshot
 ): WorkbenchSnapshot {
   return workbench.project.id === updated.projectId &&
-    findCurrentWorkspace(workbench)?.name === updated.workspaceName
+    findCurrentWorkspace(workbench)?.workspaceId === updated.workspaceId
     ? { ...workbench, agents: upsertAgent(workbench.agents ?? [], updated) }
     : workbench
 }

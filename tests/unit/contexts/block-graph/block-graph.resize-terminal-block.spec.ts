@@ -28,7 +28,7 @@ class InMemoryBlockGraphRepository implements BlockGraphRepository {
 
   async transactDefaultGraph<TResult>(
     _projectDirectory: string,
-    _workspaceName: string,
+    _workspaceId: string,
     transaction: (graph: BlockGraph) => TResult | Promise<TResult>
   ) {
     if (!this.savedGraph) return null
@@ -41,7 +41,7 @@ describe('resize terminal block', () => {
   it('persists the terminal final rectangle through the resize use case', async () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminalBlock = graph.createTerminalBlock({
       name: 'Terminal 1',
@@ -53,7 +53,7 @@ describe('resize terminal block', () => {
 
     const updatedGraph = await resizeTerminalBlock.execute({
       projectDirectory: '/tmp/project',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blockId: terminalBlock.id,
       position: { x: 180, y: 140 },
       size: { width: 760, height: 420 }
@@ -70,7 +70,7 @@ describe('resize terminal block', () => {
   it('keeps resized terminal blocks large enough to remain readable', () => {
     const graph = BlockGraph.createDefault({
       projectId: 'project-1',
-      workspaceName: 'main'
+      workspaceId: 'main'
     })
     const terminalBlock = graph.createTerminalBlock({
       name: 'Terminal 1',
@@ -93,7 +93,7 @@ describe('resize terminal block', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
-      workspaceName: 'main',
+      workspaceId: 'main',
       blocks: [
         {
           id: 'terminal-1',
