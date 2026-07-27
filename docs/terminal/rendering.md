@@ -147,7 +147,9 @@ Codex 等 TUI 可以通过终端协议查询背景色，并据此输出真彩色
 
 Run 为普通 terminal 和 Agent foreground launch 都固定 `TERM=xterm-256color`、`COLORTERM=truecolor`、`TERM_PROGRAM=cleancode`，并根据 `terminalSourceTheme` 设置 `COLORFGBG`；Provider launch 环境中的同名键会被宿主值替换，`NO_COLOR` 则原样保留。出现同一个 CLI 在 shell 启动与应用启动时颜色能力不同的问题时，先记录这组最终子进程环境，再检查 CLI 自己的主题配置，不要只比较宿主进程继承到的环境。
 
-完整 canonical terminal palette 的手写来源只有 [`theme.css`](../../src/presentation/app-shell/styles/theme.css)。`node scripts/check-theme.mjs --write-terminal-palette` 生成 [`TerminalPalette.generated.ts`](../../src/contexts/run/application/dto/TerminalPalette.generated.ts)，renderer xterm 和隐藏 headless model 都消费这一产物；`pnpm check:theme` 在生成文件缺失、手改或落后于 CSS 时失败。这样 OSC 10/11 回答与可见 xterm 不再各自维护一组近似色值。
+完整 canonical terminal palette 的手写来源只有 [`theme.css`](../../src/presentation/app-shell/styles/theme.css)。`node scripts/check-theme.mjs --write-terminal-palette` 生成 [`TerminalPalette.generated.ts`](../../src/contexts/run/application/dto/TerminalPalette.generated.ts)，renderer xterm、隐藏 headless model 和 Windows ConPTY 颜色查询桥都消费这一产物；`pnpm check:theme` 在生成文件缺失、手改或落后于 CSS 时失败。这样 OSC 10/11 回答与可见 xterm 不再各自维护一组近似色值。
+
+Windows 原生 TUI 可以直接通过 Console handle 发出 OSC 10/11，并在很短的等待后回退读取 screen buffer 属性；这个回退值不一定与 xterm 的 canonical source palette 相同。Windows node-pty/ConPTY 因此由 Run 的 PTY adapter 在输出边界流式识别完整的 OSC 10/11 `?` 查询，立即按当前 generation 固定源主题回复，并从送往模型与 renderer 的输出中移除已回答查询。该桥是 Windows 默认颜色查询的唯一响应者，不能再让可见 xterm 或隐藏模型二次回答；未知 OSC、颜色赋值和普通输出仍原样进入既有模型/视图链路。macOS/Linux 不启用该桥，继续使用 attach/detach 的查询响应权交接。
 
 可见 renderer 的 source-theme token 由共享 `.terminal-theme-projection[data-terminal-source-theme]` 建立作用域；mismatch filter 则有意只匹配其直接子 `.terminal-viewport` 或 `.agent-terminal-viewport`。wrapper 的当前主题背景和阅读留白保持未过滤，第一方覆盖层也继续使用当前应用主题。
 
@@ -169,7 +171,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 普通终端的 PTY 和权威屏幕模型由 Run 上下文按完整运行身份持有，React 画布只负责当前工作区的可见投影。工作区切换可以卸载 `TerminalViewport` 并最终销毁 renderer xterm；隐藏期间的 ANSI 解析、滚动历史、终端模式和输出序号继续由主进程模型维护。
 
-普通终端内手动启动的 Codex CLI 与 Agent 一样会通过 OSC 10/11 查询默认颜色并缓存主题判断，但普通终端还存在 renderer 未挂载的隐藏阶段。每个 terminal generation 因此固定创建时的 `terminalSourceTheme`：headless 模型隐藏时按 canonical palette 回答查询，可见 xterm 接管后使用同一 palette；attach/detach 交接保证两者不会同时响应。应用主题变化只通过 source dataset 的统一视觉转换投影，不修改运行中 CLI 已识别的 palette。新 generation 可以采用新的当前主题，恢复的同一 generation 必须沿用 checkpoint record 中的原主题。
+普通终端内手动启动的 Codex CLI 与 Agent 一样会通过 OSC 10/11 查询默认颜色并缓存主题判断，但普通终端还存在 renderer 未挂载的隐藏阶段。每个 terminal generation 因此固定创建时的 `terminalSourceTheme`：macOS/Linux 由 headless 模型在隐藏时按 canonical palette 回答查询，可见 xterm 接管后使用同一 palette，attach/detach 交接保证两者不会同时响应；Windows 则始终由 ConPTY 颜色查询桥回答并剥离这两类查询。应用主题变化只通过 source dataset 的统一视觉转换投影，不修改运行中 CLI 已识别的 palette。新 generation 可以采用新的当前主题，恢复的同一 generation 必须沿用 checkpoint record 中的原主题。
 
 普通终端必须保持以下恢复顺序：
 
@@ -180,7 +182,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 5. worktree 切走时先从 DOM detach，但在主进程确认响应权已经交回隐藏模型前暂不 dispose xterm；确认后释放 surface。该动作不终止 PTY，也不撤销自然退出模型的进程内恢复资格。
 6. session replacement、显式终止、终端删除、工作区归档、项目移除、默认工作区 checkout 成功和应用退出必须释放对应 PTY、模型、视图租约和缓冲。
 
-隐藏普通终端不再持续接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见视图取得定向租约后才接收带 sequence 的低延迟事件。隐藏时模型响应 terminal query，可见时 renderer xterm 响应；attach/detach 使用 PTY pause、模型 flush 和确认后销毁，保证同一查询不会由两端重复响应。
+隐藏普通终端不再持续接收逐字节 IPC 输出。PTY 输出通过当前运行身份检查后只进入主进程模型一次；可见视图取得定向租约后才接收带 sequence 的低延迟事件。macOS/Linux 隐藏时由模型响应 terminal query、可见时由 renderer xterm 响应，attach/detach 使用 PTY pause、模型 flush 和确认后销毁，保证同一查询不会由两端重复响应；Windows 的 OSC 10/11 已在 PTY 边界唯一回答并移除，其他查询仍遵守相同交接。
 
 8192 字符尾部仍用于无障碍文本、诊断和非 xterm 回退，不是屏幕恢复来源。新 snapshot 额外提供由模型 buffer 导出的有界 transcript，表现层可以用它更新无障碍投影；不得把裁剪后的文本重新送入 xterm parser。
 
@@ -188,7 +190,7 @@ Provider launch replacement 不会重置 surface 或终端模型。只有 Agent 
 
 xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model 承担；`.xterm-viewport` 不再是可用 `scrollTop` 判断历史是否存在的原生滚动容器。自动化验证优先使用 xterm 支持的 `Shift+PageUp` 用户交互和可见行结果，不得用旧 DOM 元素的 `scrollHeight` 作为 buffer oracle。
 
-[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`terminal-viewport.interaction.spec.tsx`](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
+[`terminal-surface-registry.preserves-workspace-output.spec.ts`](../../tests/unit/presentation/terminal-surface-registry.preserves-workspace-output.spec.ts) 证明精确 `viewId` 路由和每次挂载创建新 surface；[`terminal-viewport.interaction.spec.tsx`](../../tests/unit/presentation/terminal-viewport.interaction.spec.tsx) 证明 snapshot 优先、sequence 缺口恢复、1 MiB 队列上限和 detach 确认后销毁；[`run.headless-terminal-model.spec.ts`](../../tests/integration/contexts/run/run.headless-terminal-model.spec.ts) 证明 ANSI、alternate buffer、模式、query 所有权和模型背压；[`run.windows-terminal-color-query-bridge.spec.ts`](../../tests/unit/contexts/run/run.windows-terminal-color-query-bridge.spec.ts) 覆盖 Windows 颜色查询的主题、结束符、拆包和透传矩阵，[`run.windows-agent-pty.spec.ts`](../../tests/integration/contexts/run/run.windows-agent-pty.spec.ts) 在 Windows 原生 ConPTY 中验证短等待窗口内的成对响应；[`git-branch-workspaces.e2e.spec.ts`](../../tests/e2e/git-branch-workspaces.e2e.spec.ts) 使用真实 Electron、node-pty、IPC、xterm 和超过 8192 字符的确定性输出，证明 worktree 往返后创建新 surface、保持同一 session、恢复隐藏输出与早期 scrollback，并且可见和隐藏查询都只收到一次响应。
 
 ## 普通终端的 Unicode 与 renderer 降级
 

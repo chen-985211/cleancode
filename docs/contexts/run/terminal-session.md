@@ -47,7 +47,7 @@ idle -> running -> stopping -> exited
 
 会话还记录 `kind`、退出保留策略、恢复类型和不可变的 `terminalSourceTheme`。新 generation 从当前有效应用主题取得 `dark` 或 `light`；同一 generation 的普通启动、快速启动、受管服务、工作流、可见重挂载和恢复都必须沿用该值，应用主题切换不得改写它。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行的 block-owned 会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 和 agent-owned terminal 永远不能启用退出保留；领域聚合必须同时拒绝新设置与携带非法策略的 live 恢复资料。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
-终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
+终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型、Windows ConPTY 颜色查询桥与 Presentation 的 xterm 都消费该生成模块，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
 
 ## 会话身份与隔离
 
@@ -111,7 +111,9 @@ Provider Client 的全局普通终端输出投影只接收 block-owned terminal�
 
 应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Terminal Provider 处理，再让两个上下文 complete 并清除本地引用。Agent prepare 中可先请求当前 Agent Provider 前台 launch 正常结束，并在身份 reporter 仍存活时排空最终持久化；超时只结束这次 launch 级等待，之后仍进入统一 PTY handoff。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Terminal Provider release，也不证明全部 PTY 已物理退出。Terminal Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Terminal Provider 或形成不可用告警；正常运行期的同类失败仍必须向外传播。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
-因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
+因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
+
+Windows node-pty/ConPTY 是 OSC 10/11 的明确平台例外。部分原生 TUI 只给默认颜色查询很短的响应窗口，而 renderer 往返可能使它们回退到与 canonical palette 不一致的 Console screen buffer 属性。`NodePtyTerminalProcessAdapter` 因此为每个 Windows PTY 建立基于固定 `terminalSourceTheme` 的流式颜色查询桥：只消费完整的 OSC 10/11 `?` 查询，兼容 BEL 与 ST 结束符并立即向同一 PTY 写回 canonical RGB；已经回答的查询不再进入权威模型或当前视图，从而保持唯一响应者。未知 OSC、颜色赋值、普通输出和不完整序列必须原样保留，macOS/Linux 继续使用既有模型/视图交接规则。
 
 ## 输入与安全打开边界
 
