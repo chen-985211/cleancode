@@ -2,7 +2,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createTerminalOscColorResponse } from '../../../../src/contexts/run/infrastructure/terminal-model/terminalSourcePalette'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { createDeferred } from '../../../fixtures/deferred'
 
@@ -52,45 +51,56 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     await expect(exited.promise).resolves.toBe(0)
   }, 20_000)
 
-  it('answers OSC 10/11 within the Codex startup deadline through ConPTY', async () => {
-    let output = ''
-    const exited = createDeferred<number | null>()
+  it.each([
+    { terminalSourceTheme: 'light' as const, expectedConsoleColors: 'Black|White' },
+    { terminalSourceTheme: 'dark' as const, expectedConsoleColors: 'Gray|Black' }
+  ])(
+    'pins the $terminalSourceTheme Windows console fallback before the Agent process starts',
+    async ({ terminalSourceTheme, expectedConsoleColors }) => {
+      let output = ''
+      let exitCode: number | null | undefined
+      const exited = createDeferred<number | null>()
 
-    await adapter.start({
-      scope: agentRunScope('windows-agent-color-query'),
-      workingDirectory,
-      shell: 'powershell.exe',
-      terminalSourceTheme: 'light',
-      columns: 80,
-      rows: 24,
-      onOutput: (event) => {
-        output += event.data
-      },
-      onExit: () => undefined
-    })
-    adapter.launchForegroundJob({
-      args: ['-e', createWindowsColorProbeScript()],
-      environment: {},
-      executable: process.execPath,
-      generation: 1,
-      launchId: 'color-query-launch',
-      onExit: (event) => exited.resolve(event.exitCode),
-      onStarted: () => undefined,
-      sessionId: 'windows-agent-color-query'
-    })
+      await adapter.start({
+        scope: agentRunScope(`windows-agent-${terminalSourceTheme}-console-colors`),
+        workingDirectory,
+        shell: 'powershell.exe',
+        terminalSourceTheme,
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => undefined
+      })
+      adapter.launchForegroundJob({
+        args: [
+          '-NoLogo',
+          '-NoProfile',
+          '-Command',
+          "[Console]::WriteLine(('CLEANCODE_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))"
+        ],
+        environment: {},
+        executable: 'powershell.exe',
+        generation: 1,
+        launchId: `${terminalSourceTheme}-console-colors-launch`,
+        onExit: (event) => {
+          exitCode = event.exitCode
+          exited.resolve(event.exitCode)
+        },
+        onStarted: () => undefined,
+        sessionId: `windows-agent-${terminalSourceTheme}-console-colors`
+      })
 
-    await waitUntil(() => output.includes('CLEANCODE_COLOR_PROBE:'))
-    await expect(exited.promise).resolves.toBe(0)
-
-    const response = Buffer.from(
-      output.match(/CLEANCODE_COLOR_PROBE:([A-Za-z0-9+/=]+)/)?.[1] ?? '',
-      'base64'
-    ).toString('utf8')
-    expect(response).toContain(createTerminalOscColorResponse(10, 'light'))
-    expect(response).toContain(createTerminalOscColorResponse(11, 'light'))
-    expect(output).not.toContain('\u001b]10;?')
-    expect(output).not.toContain('\u001b]11;?')
-  }, 20_000)
+      await waitUntil(() => output.includes('CLEANCODE_CONSOLE_COLORS:') || exitCode !== undefined)
+      expect(
+        output,
+        `Windows console color probe exited with ${String(exitCode)} and output ${JSON.stringify(output.slice(-1_000))}`
+      ).toContain(`CLEANCODE_CONSOLE_COLORS:${expectedConsoleColors}`)
+      await expect(exited.promise).resolves.toBe(0)
+    },
+    20_000
+  )
 
   it('interrupts only the Agent job, reports exit, and keeps PowerShell writable', async () => {
     let output = ''
@@ -195,28 +205,6 @@ function agentRunScope(sessionId: string) {
     workspaceDirectory: 'C:\\project',
     workspaceId: 'main'
   }
-}
-
-function createWindowsColorProbeScript(): string {
-  return [
-    'process.stdin.setRawMode(true)',
-    'process.stdin.resume()',
-    'const chunks = []',
-    'let completed = false',
-    "const timeout = setTimeout(() => process.stdout.write('CLEANCODE_COLOR_PROBE_TIMEOUT\\n', () => process.exit(2)), 100)",
-    'process.stdin.on("data", (chunk) => {',
-    '  if (completed) return',
-    '  chunks.push(chunk)',
-    '  const response = Buffer.concat(chunks)',
-    '  const text = response.toString("utf8")',
-    '  if (!text.includes("\\x1b]10;rgb:") || !text.includes("\\x1b]11;rgb:")) return',
-    '  completed = true',
-    '  clearTimeout(timeout)',
-    '  process.stdin.pause()',
-    '  process.stdout.write(`CLEANCODE_COLOR_PROBE:${response.toString("base64")}\\n`, () => process.exit(0))',
-    '})',
-    'process.stdout.write("\\x1b]10;?\\x1b\\\\\\x1b]11;?\\x1b\\\\")'
-  ].join(';')
 }
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {

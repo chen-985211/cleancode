@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -214,17 +214,21 @@ describe('Agent Providers on the Run Agent terminal', () => {
 
   it('runs Claude Code through the same foreground launch and terminal contracts', async () => {
     const fakeClaude = join(directory, 'fake-claude.mjs')
+    const reportFile = join(directory, 'fake-claude-report.json')
     await writeFile(
       fakeClaude,
       [
+        'import { writeFileSync } from "node:fs"',
         'const sessionIndex = process.argv.indexOf("--session-id")',
         'const sessionId = process.argv[sessionIndex + 1]',
-        'process.stdout.write(`claude:${sessionId}:${process.cwd()}\\n`)',
+        'const reportIndex = process.argv.indexOf("--report-file")',
+        'writeFileSync(process.argv[reportIndex + 1], JSON.stringify({ cwd: process.cwd(), sessionId }))',
+        'process.stdout.write("claude-through-run\\n")',
         'process.exit(5)'
       ].join('\n')
     )
     const provider = new ClaudeCodeAgentProviderContribution({
-      baseArgs: [fakeClaude],
+      baseArgs: [fakeClaude, '--report-file', reportFile],
       command: process.execPath,
       createSessionId: () => '550e8400-e29b-41d4-a716-446655440000',
       detector: {
@@ -282,9 +286,11 @@ describe('Agent Providers on the Run Agent terminal', () => {
     ).resolves.toBe(5)
     writeShellCommand(runtime, 'agent-session-claude', createE2ePrintCommand('claude-same-shell'))
     await waitUntil(() => output.includes('claude-same-shell'))
-    expect(output).toContain(
-      `claude:550e8400-e29b-41d4-a716-446655440000:${await realpath(directory)}`
-    )
+    expect(JSON.parse(await readFile(reportFile, 'utf8'))).toEqual({
+      cwd: await realpath(directory),
+      sessionId: '550e8400-e29b-41d4-a716-446655440000'
+    })
+    expect(output).toContain('claude-through-run')
     expect(terminalExited).toBe(false)
     await sessions.detachView({ ...terminal.viewIdentity, viewId })
     await artifacts.dispose()

@@ -32,7 +32,6 @@ import {
 } from './ForegroundJobShellControl'
 import { createTerminalProcessEnvironment } from './TerminalProcessEnvironment'
 import { interruptWindowsForegroundJob } from './WindowsForegroundJobInterrupt'
-import { WindowsTerminalColorQueryBridge } from './WindowsTerminalColorQueryBridge'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -98,10 +97,6 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       shell,
       scope: command.scope,
       terminalSourceTheme: command.terminalSourceTheme ?? 'dark',
-      windowsColorQueryBridge:
-        platform() === 'win32'
-          ? new WindowsTerminalColorQueryBridge(command.terminalSourceTheme ?? 'dark')
-          : null,
       exited,
       stopPromise: null,
       workingDirectory: command.workingDirectory
@@ -136,16 +131,11 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
             }
           })
         : data
-      const bridgedOutput = managedProcess.windowsColorQueryBridge?.accept(output)
-      for (const response of bridgedOutput?.responses ?? []) {
-        managedProcess.process.write(response)
-      }
-      const visibleOutput = bridgedOutput?.output ?? output
-      if (visibleOutput) {
+      if (output) {
         command.onOutput({
           scope: command.scope,
           sessionId: command.scope.sessionId,
-          data: visibleOutput
+          data: output
         })
       }
       if (pendingForegroundProbe && managedProcess.foregroundJob) {
@@ -157,14 +147,6 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         rejectWindowsAgentShellReady(
           new Error('Windows Agent shell exited before its interactive prompt became ready.')
         )
-      }
-      const trailingOutput = managedProcess.windowsColorQueryBridge?.flush()
-      if (trailingOutput) {
-        command.onOutput({
-          scope: command.scope,
-          sessionId: command.scope.sessionId,
-          data: trailingOutput
-        })
       }
       if (this.processes.get(command.scope.sessionId) === managedProcess) {
         this.processes.delete(command.scope.sessionId)
@@ -237,7 +219,8 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       },
       {
         platform: platform(),
-        shellExecutable: terminalProcess.shell
+        shellExecutable: terminalProcess.shell,
+        terminalSourceTheme: terminalProcess.terminalSourceTheme
       }
     )
     terminalProcess.foregroundJob = control
@@ -322,7 +305,6 @@ interface ManagedTerminalProcess {
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']
   readonly terminalSourceTheme: TerminalSourceTheme
-  readonly windowsColorQueryBridge: WindowsTerminalColorQueryBridge | null
   readonly exited: Promise<void>
   stopPromise: Promise<void> | null
   readonly workingDirectory: string

@@ -47,7 +47,7 @@ idle -> running -> stopping -> exited
 
 会话还记录 `kind`、退出保留策略、恢复类型和不可变的 `terminalSourceTheme`。新 generation 从当前有效应用主题取得 `dark` 或 `light`；同一 generation 的普通启动、快速启动、受管服务、工作流、可见重挂载和恢复都必须沿用该值，应用主题切换不得改写它。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行的 block-owned 会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 和 agent-owned terminal 永远不能启用退出保留；领域聚合必须同时拒绝新设置与携带非法策略的 live 恢复资料。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
-终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型、Windows ConPTY 颜色查询桥与 Presentation 的 xterm 都消费该生成模块，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
+终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，Windows Agent 前台启动则只选择会被同一 xterm palette 映射的 ConsoleColor 索引，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
 
 ## 会话身份与隔离
 
@@ -71,7 +71,7 @@ Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层�
 
 `owner.kind = agent` 只开放基础终端和前台任务能力。它不能进入 BlockGraph 组合、依赖工作流、受管服务端口或普通终端批量动作；Agent 通过自己拥有的 `AgentTerminalRuntimePort` 和基础设施 adapter 调用 Run 应用层，Run 不反向依赖 Agent 类型。
 
-`launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
+`launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。Windows 脚本还必须在 started 控制帧之前按固定 `terminalSourceTheme` 设置 ConsoleColor：浅色使用 `Black`/`White`，深色使用 `Gray`/`Black`。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、颜色准备、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
 
 前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。
 
@@ -113,7 +113,7 @@ Provider Client 的全局普通终端输出投影只接收 block-owned terminal�
 
 因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 
-Windows node-pty/ConPTY 是 OSC 10/11 的明确平台例外。部分原生 TUI 只给默认颜色查询很短的响应窗口，而 renderer 往返可能使它们回退到与 canonical palette 不一致的 Console screen buffer 属性。`NodePtyTerminalProcessAdapter` 因此为每个 Windows PTY 建立基于固定 `terminalSourceTheme` 的流式颜色查询桥：只消费完整的 OSC 10/11 `?` 查询，兼容 BEL 与 ST 结束符并立即向同一 PTY 写回 canonical RGB；已经回答的查询不再进入权威模型或当前视图，从而保持唯一响应者。未知 OSC、颜色赋值、普通输出和不完整序列必须原样保留，macOS/Linux 继续使用既有模型/视图交接规则。
+Windows node-pty/ConPTY 是 OSC 10/11 的明确平台例外。ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的查询，因此 Run 不能在输出流中可靠识别并回答；Codex 等客户端会在短查询窗口结束后通过 `GetConsoleScreenBufferInfoEx` 读取当前 ConsoleColor 和颜色表。Windows Agent foreground transport 必须在 Provider 进程 started 之前把 ConsoleColor 固定到 generation 的源主题，让该同步 fallback 立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。颜色准备发生在 `awaiting_started` 内，不得进入模型或视图；不得再向 PTY 输入注入无请求的合成 OSC 响应。macOS/Linux 继续使用既有模型/视图交接规则。
 
 ## 输入与安全打开边界
 
