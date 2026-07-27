@@ -343,10 +343,6 @@ async function createCodexTelemetryRuntime(
     throw error
   }
   const sessionEndHook = createCodexSessionEndHook(runtimeExecutable, relay.path, runtimePlatform)
-  const notifyCommand =
-    runtimePlatform === 'win32'
-      ? createWindowsRelayInvocation(runtimeExecutable, relay.path)
-      : [runtimeExecutable, relay.path]
   return {
     dispose: async () => {
       try {
@@ -360,7 +356,7 @@ async function createCodexTelemetryRuntime(
       CLEANCODE_CODEX_NOTIFY_URL: reporter.url,
       ELECTRON_RUN_AS_NODE: '1'
     },
-    notifyCommand,
+    notifyCommand: [runtimeExecutable, relay.path],
     onTerminalTitleChanged: (title) => reporter.acceptTerminalTitle(title),
     sessionEndHook
   }

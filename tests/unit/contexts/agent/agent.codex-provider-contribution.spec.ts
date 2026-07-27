@@ -220,7 +220,9 @@ describe('Codex Agent Provider contribution', () => {
       expect(configurations).toContain("tui.terminal_title=['thread-title','thread-id']")
       expect(configurations).toEqual(
         expect.arrayContaining([
-          expect.stringMatching(/^notify=\['powershell\.exe'/),
+          expect.stringMatching(
+            /^notify=\['C:\\Program Files\\CleanCode\\node\.exe','[^']+relay\.mjs'\]$/
+          ),
           expect.stringContaining("mcp_servers.cleancode={url='http://127.0.0.1:43123/mcp'"),
           expect.stringMatching(/^developer_instructions='''/)
         ])
