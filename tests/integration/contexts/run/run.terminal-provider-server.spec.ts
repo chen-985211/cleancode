@@ -172,6 +172,24 @@ describe('terminal provider server', () => {
     client.close()
   })
 
+  it('publishes parsed terminal title metadata separately from terminal output', async () => {
+    const processes = new RecordingProcessPort()
+    server = createServer(processes)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    await createAndStart(client, 'interactive')
+
+    processes.emitOutput('session-1', '\u001b]0;structured-title\u0007')
+
+    expect((await client.waitForEvent('terminal-title')).payload).toEqual({
+      scope: identity(),
+      sessionId: 'session-1',
+      title: 'structured-title'
+    })
+    client.close()
+  })
+
   it('persists a burst of PTY output through one ordered batch append', async () => {
     const processes = new RecordingProcessPort()
     const store = new FileTerminalRecoveryStore({

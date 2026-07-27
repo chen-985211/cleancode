@@ -15,6 +15,7 @@ import {
   encodeTerminalProviderFrame,
   TerminalProviderFrameDecoder,
   type TerminalProviderRequest,
+  terminalProviderMinimumCompatibleProtocolVersion,
   terminalProviderProtocolVersion
 } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
 
@@ -88,12 +89,12 @@ describe('persistent terminal provider client lifecycle', () => {
     await provider.close()
     provider = new ControllableProvider(
       createProviderEndpoint(rootDirectory),
-      terminalProviderProtocolVersion - 1
+      terminalProviderMinimumCompatibleProtocolVersion - 1
     )
     await provider.start()
     await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
       schemaVersion: 1,
-      protocolVersion: terminalProviderProtocolVersion - 1,
+      protocolVersion: terminalProviderMinimumCompatibleProtocolVersion - 1,
       instanceId: provider.instanceId,
       authToken: provider.authToken,
       endpoint: provider.endpoint,
@@ -103,9 +104,9 @@ describe('persistent terminal provider client lifecycle', () => {
     const client = createClient(rootDirectory)
 
     await expect(client.initialize()).rejects.toMatchObject({
-      code: 'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED'
+      code: 'TERMINAL_PROVIDER_UNAVAILABLE'
     })
-    expect(provider.requests.map(({ method }) => method)).toEqual(['health'])
+    expect(provider.requests).toEqual([])
   })
 
   it('receives a shutdown handoff before waiting for the current Provider to finish', async () => {
@@ -236,6 +237,57 @@ describe('persistent terminal provider client lifecycle', () => {
     expect(onOutput).toHaveBeenCalledWith(
       expect.objectContaining({ data: 'block output', sessionId: blockScope.sessionId })
     )
+    await client.detachApplication()
+  })
+
+  it('routes terminal title metadata to the model callback without treating it as output', async () => {
+    await provider.close()
+    provider = new ControllableProvider(
+      createProviderEndpoint(rootDirectory),
+      terminalProviderProtocolVersion - 1
+    )
+    await provider.start()
+    await atomicWriteProviderMetadata(join(rootDirectory, 'provider.json'), {
+      schemaVersion: 1,
+      protocolVersion: terminalProviderProtocolVersion - 1,
+      instanceId: provider.instanceId,
+      authToken: provider.authToken,
+      endpoint: provider.endpoint,
+      processId: process.pid,
+      startedAt: new Date().toISOString()
+    })
+    const onTitleChanged = vi.fn()
+    const onOutput = vi.fn()
+    const client = createClient(rootDirectory, undefined, undefined, onOutput)
+    const scope = outputIdentity('agent')
+    await client.initialize()
+
+    client.create({
+      identity: scope,
+      columns: 80,
+      rows: 24,
+      workingDirectory: scope.workspaceDirectory,
+      onFlowControlChange: () => undefined,
+      onQueryResponse: () => undefined,
+      onTitleChanged
+    })
+    await provider.waitForRequests('createModel', 1)
+    provider.emitEvent('terminal-output', {
+      data: '\u001b]0;structured-',
+      scope,
+      sequence: 1,
+      sessionId: scope.sessionId
+    })
+    provider.emitEvent('terminal-output', {
+      data: 'title\u0007',
+      scope,
+      sequence: 2,
+      sessionId: scope.sessionId
+    })
+
+    await vi.waitFor(() => expect(onTitleChanged).toHaveBeenCalledWith('structured-title'))
+    expect(onTitleChanged).toHaveBeenCalledTimes(1)
+    expect(onOutput).not.toHaveBeenCalled()
     await client.detachApplication()
   })
 

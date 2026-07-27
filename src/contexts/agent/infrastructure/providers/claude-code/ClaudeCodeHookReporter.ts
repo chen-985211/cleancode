@@ -27,7 +27,7 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
   }): Promise<ClaudeCodeHookReporter> {
     const token = randomBytes(24).toString('hex')
     const expectedDirectory = await resolveRealPath(input.workspaceDirectory)
-    const reportedSessionIds = new Set<string>()
+    let lastReportedSessionId: string | null = null
     const server = createServer((request, response) => {
       if (request.method !== 'POST' || request.headers.authorization !== `Bearer ${token}`) {
         response.writeHead(401).end()
@@ -44,8 +44,8 @@ export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
           await acceptPayload(payload, expectedDirectory, {
             ...input,
             onSessionIdentified: (sessionId) => {
-              if (reportedSessionIds.has(sessionId)) return
-              reportedSessionIds.add(sessionId)
+              if (lastReportedSessionId === sessionId) return
+              lastReportedSessionId = sessionId
               input.onSessionIdentified(sessionId)
             }
           })
@@ -96,6 +96,7 @@ async function acceptPayload(
     return
   }
   if (payload.hook_event_name === 'SessionStart') {
+    if (isUuid(payload.session_id)) input.onSessionIdentified(payload.session_id)
     input.onActivityChanged('idle')
     return
   }

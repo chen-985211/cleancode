@@ -385,6 +385,7 @@ export async function disposeAllAgentSessionRuntimeResources(command: {
   readonly beginClosing: (session: ManagedAgentSession) => void
   readonly disposeMcpServer: () => void
   readonly disposeTerminalRuntime: () => Promise<void>
+  readonly requestProviderShutdown: (session: ManagedAgentSession) => Promise<void>
   readonly sessions: readonly ManagedAgentSession[]
   readonly settleTools: (session: ManagedAgentSession) => Promise<void>
   readonly waitForPersistence: () => Promise<void>
@@ -396,6 +397,11 @@ export async function disposeAllAgentSessionRuntimeResources(command: {
     )),
     ...(await Promise.allSettled(
       command.sessions.map((session) => Promise.resolve().then(() => command.settleTools(session)))
+    )),
+    ...(await Promise.allSettled(
+      command.sessions.map((session) =>
+        Promise.resolve().then(() => command.requestProviderShutdown(session))
+      )
     ))
   )
   const terminalResult = await Promise.allSettled([

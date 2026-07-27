@@ -4,6 +4,7 @@ describe('headless terminal model', () => {
   it('restores screen state, alternate buffer, modes and monotonic output sequence', async () => {
     const queryResponses: string[] = []
     const flowControl: boolean[] = []
+    const titleChanges: string[] = []
     const adapter = new HeadlessTerminalModelAdapter()
     const identity = createIdentity()
 
@@ -13,7 +14,8 @@ describe('headless terminal model', () => {
       rows: 8,
       workingDirectory: '/work/app',
       onQueryResponse: (response) => queryResponses.push(response),
-      onFlowControlChange: (isPaused) => flowControl.push(isPaused)
+      onFlowControlChange: (isPaused) => flowControl.push(isPaused),
+      onTitleChanged: (title) => titleChanges.push(title)
     })
 
     expect(
@@ -44,6 +46,7 @@ describe('headless terminal model', () => {
     expect(snapshot.modes.bracketedPasteMode).toBe(true)
     expect(snapshot.dimensions).toEqual({ columns: 40, rows: 8 })
     expect(snapshot.title).toBe('Build Logs')
+    expect(titleChanges).toEqual(['Build Logs'])
     expect(snapshot.workingDirectory).toBe('/work/app/src')
 
     adapter.acceptOutput(identity, '\r\nlive')

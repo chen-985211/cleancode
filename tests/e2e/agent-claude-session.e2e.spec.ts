@@ -58,7 +58,7 @@ describe('Claude Code Agent session e2e', () => {
   })
 
   it(
-    'resumes only after the first user prompt confirms a durable conversation',
+    'restores the last Claude session selected through /resume',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -74,29 +74,23 @@ describe('Claude Code Agent session e2e', () => {
       const firstLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 1)
       expect(firstLaunch.args).toContain('--session-id')
       expect(firstLaunch.args).not.toContain('--resume')
-      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
-
-      await restartElectronApp()
-      const secondLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 2)
-      expect(secondLaunch.args).toContain('--session-id')
-      expect(secondLaunch.args).not.toContain('--resume')
-      expect(secondLaunch.sessionId).not.toBe(firstLaunch.sessionId)
-      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
+      await waitForClaudeSessionStart(fakeClaude.reportPath, requireSessionId(firstLaunch))
+      await waitForClaudeConversationBinding(workbench, requireSessionId(firstLaunch))
 
       const claudeTerminal = page
         .locator('[data-agent-console-node]')
         .filter({ has: page.getByRole('img', { name: 'Claude Code' }) })
         .locator('.agent-terminal-viewport')
       await claudeTerminal.click()
-      await page.keyboard.type('confirm durable Claude conversation')
+      await page.keyboard.type('/resume')
       await page.keyboard.press('Enter')
-      await waitForClaudeHook(fakeClaude.reportPath)
-      await waitForClaudeConversationBinding(workbench, requireSessionId(secondLaunch))
+      await waitForClaudeSessionStart(fakeClaude.reportPath, fakeClaude.switchSessionId)
+      await waitForClaudeConversationBinding(workbench, fakeClaude.switchSessionId)
 
       await restartElectronApp()
-      const restoredLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 3)
+      const restoredLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 2)
       expect(restoredLaunch.args).toEqual(
-        expect.arrayContaining(['--resume', secondLaunch.sessionId])
+        expect.arrayContaining(['--resume', fakeClaude.switchSessionId])
       )
 
       async function restartElectronApp(): Promise<void> {
@@ -127,6 +121,7 @@ function createAgentProviderEnvironment(
   return {
     ...terminalEnvironment,
     CLEANCODE_FAKE_CLAUDE_REPORT_PATH: fakeClaude.reportPath,
+    CLEANCODE_FAKE_CLAUDE_SWITCH_SESSION_ID: fakeClaude.switchSessionId,
     CLEANCODE_FAKE_CODEX_REPORT_PATH: fakeCodex.reportPath,
     CLEANCODE_TEST_DISABLE_AGENT_AUTOSTART: '0',
     PATH: prependE2ePath(fakeCodex.binDirectory, fakeClaude.binDirectory),
@@ -203,14 +198,20 @@ async function waitForClaudeLaunch(
   throw new Error(`Timed out waiting for Claude launch ${expectedCount}.`)
 }
 
-async function waitForClaudeHook(reportPath: string): Promise<void> {
+async function waitForClaudeSessionStart(reportPath: string, sessionId: string): Promise<void> {
   const deadline = Date.now() + 5_000
   while (Date.now() < deadline) {
     const reports = await readFakeClaudeCliReports(reportPath)
-    if (reports.some((report) => report.kind === 'user-prompt-hook')) return
+    if (
+      reports.some(
+        (report) => report.kind === 'session-start-hook' && report.sessionId === sessionId
+      )
+    ) {
+      return
+    }
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
-  throw new Error('Timed out waiting for the Claude user-prompt Hook.')
+  throw new Error(`Timed out waiting for Claude SessionStart Hook ${sessionId}.`)
 }
 
 async function readClaudeProviderSessionRefs(
@@ -244,7 +245,7 @@ async function waitForClaudeConversationBinding(
     if (
       bindings.some(
         (sessionRef) =>
-          sessionRef.value === sessionId && sessionRef.metadata?.confirmedBy === 'user-prompt-hook'
+          sessionRef.value === sessionId && sessionRef.metadata?.confirmedBy === 'session-hook'
       )
     ) {
       return

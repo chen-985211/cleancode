@@ -264,6 +264,17 @@ export class TerminalProviderServer {
             if (this.sessions.get(sessionId)?.snapshot.status !== 'running') return
             if (isPaused) this.processes.pauseOutput(sessionId)
             else this.processes.resumeOutput(sessionId)
+          },
+          onTitleChanged: (title) => {
+            this.broadcast({
+              type: 'event',
+              event: 'terminal-title',
+              payload: {
+                scope: input.command.identity,
+                sessionId: input.command.identity.sessionId,
+                title
+              }
+            })
           }
         })
         return null

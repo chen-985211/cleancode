@@ -62,6 +62,7 @@ import {
   type TerminalProviderMetadata
 } from './PersistentTerminalProviderClientSupport'
 import { TerminalProviderProcessEventGate } from './TerminalProviderProcessEventGate'
+import { TerminalProviderTitleEventBridge } from './TerminalProviderTitleEventBridge'
 
 const providerStartupTimeoutMs = 5_000
 const providerControllerClaimTimeoutMs = 5_000
@@ -88,6 +89,7 @@ export class PersistentTerminalProviderClient
   >()
   private readonly foregroundJobCallbacks = new Map<string, LaunchForegroundJobProcessCommand>()
   private readonly viewCallbacks = new Map<string, AttachTerminalViewCommand>()
+  private readonly titleEvents = new TerminalProviderTitleEventBridge()
   private readonly pendingModelCreates = new Map<string, Promise<unknown>>()
   private readonly processEventGate = new TerminalProviderProcessEventGate()
   private readonly workingDirectories = new Map<string, string>()
@@ -135,6 +137,7 @@ export class PersistentTerminalProviderClient
   create(command: CreateTerminalModelCommand): void {
     this.identities.set(command.identity.sessionId, command.identity)
     this.workingDirectories.set(command.identity.sessionId, command.workingDirectory)
+    this.titleEvents.bind(command.identity.sessionId, command.onTitleChanged)
     const request = this.request('createModel', {
       command: {
         identity: command.identity,
@@ -310,6 +313,7 @@ export class PersistentTerminalProviderClient
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
     this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.titleEvents.forget(identity.sessionId)
     this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
@@ -320,6 +324,7 @@ export class PersistentTerminalProviderClient
     this.viewCallbacks.delete(identity.sessionId)
     this.processCallbacks.delete(identity.sessionId)
     this.foregroundJobCallbacks.delete(identity.sessionId)
+    this.titleEvents.forget(identity.sessionId)
     this.processEventGate.forget(identity.sessionId)
     this.identities.delete(identity.sessionId)
     this.workingDirectories.delete(identity.sessionId)
@@ -571,6 +576,7 @@ export class PersistentTerminalProviderClient
 
     if (event.event === 'terminal-output') {
       const output = event.payload as TerminalProcessOutputEvent & { readonly sequence: number }
+      this.titleEvents.acceptOutput(output.sessionId, output.data)
       if (isBlockTerminalOwner(output.scope)) this.options.onOutput?.(output)
       this.processCallbacks.get(output.sessionId)?.onOutput(output)
       const view = this.viewCallbacks.get(output.sessionId)
@@ -582,6 +588,14 @@ export class PersistentTerminalProviderClient
           output: { data: output.data, sequence: output.sequence }
         })
       }
+      return
+    }
+    if (event.event === 'terminal-title') {
+      const update = event.payload as {
+        readonly sessionId: string
+        readonly title: string
+      }
+      this.titleEvents.acceptTitle(update.sessionId, update.title)
       return
     }
     if (event.event === 'terminal-exit') {
@@ -671,6 +685,7 @@ export class PersistentTerminalProviderClient
     this.processCallbacks.clear()
     this.foregroundJobCallbacks.clear()
     this.viewCallbacks.clear()
+    this.titleEvents.clear()
     this.pendingModelCreates.clear()
     this.processEventGate.clear()
     this.workingDirectories.clear()

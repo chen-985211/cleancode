@@ -53,6 +53,11 @@ describe('Agent Providers on the Run Agent terminal', () => {
         '  "thread-id": "0190d8a1-8b7d-7d75-9f62-7a663ef87e33",',
         '  cwd: process.cwd()',
         '})], { env: process.env })',
+        'spawnSync(notify[0], [...notify.slice(1), JSON.stringify({',
+        '  type: "agent-turn-complete",',
+        '  "thread-id": "0290d8a1-8b7d-7d75-9f62-7a663ef87e44",',
+        '  cwd: process.cwd()',
+        '})], { env: process.env })',
         'process.exit(7)'
       ].join('\n')
     )
@@ -123,7 +128,7 @@ describe('Agent Providers on the Run Agent terminal', () => {
     expect(sessionRef).toEqual({
       formatVersion: 1,
       kind: 'codex-thread',
-      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+      value: '0290d8a1-8b7d-7d75-9f62-7a663ef87e44'
     })
     await sessions.detachView({ ...terminal.viewIdentity, viewId })
     await artifacts.dispose()

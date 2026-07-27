@@ -155,7 +155,7 @@ class ClaudeCodeTelemetryContribution implements AgentTelemetryContribution {
         command.onProviderSessionIdentified({
           formatVersion: 1,
           kind: 'claude-session',
-          metadata: { confirmedBy: 'user-prompt-hook' },
+          metadata: { confirmedBy: 'session-hook' },
           value: sessionId
         }),
       workspaceDirectory: command.workspaceDirectory

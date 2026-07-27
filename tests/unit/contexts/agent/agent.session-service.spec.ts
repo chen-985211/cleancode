@@ -230,43 +230,6 @@ describe('agent session service', () => {
     expect(processPort.launches).toHaveLength(1)
   })
 
-  it('resumes the persisted Codex thread after the application service is recreated', async () => {
-    const repository = new RecordingAgentSessionRepository()
-    const firstProcessPort = new RecordingAgentTerminalRuntime()
-    const firstProviders = new RecordingAgentProviderRegistry()
-    const firstService = createSessionService({
-      processPort: firstProcessPort,
-      providers: firstProviders,
-      repository
-    })
-    const command = {
-      gitBranch: 'main',
-      projectId: 'project-1'
-    }
-
-    await attachMainSession(firstService, command)
-    firstProviders.launchCommands[0]?.onProviderSessionIdentified({
-      formatVersion: 1,
-      kind: 'codex-thread',
-      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
-    })
-    await vi.waitFor(() => expect(repository.sessions.size).toBe(1))
-
-    const restartedProcessPort = new RecordingAgentTerminalRuntime()
-    const restartedProviders = new RecordingAgentProviderRegistry()
-    const restartedService = createSessionService({
-      processPort: restartedProcessPort,
-      providers: restartedProviders,
-      repository
-    })
-    await attachMainSession(restartedService, command)
-
-    expect(restartedProviders.launchCommands[0]?.providerSessionRef).toMatchObject({
-      kind: 'codex-thread',
-      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
-    })
-  })
-
   it('persists a client-assigned Provider session only after its launch starts', async () => {
     const repository = new RecordingAgentSessionRepository()
     const save = vi.spyOn(repository, 'save')
@@ -380,8 +343,11 @@ describe('agent session service', () => {
 
   it('keeps the Agent terminal after Provider exit and relaunches in the same shell', async () => {
     const processPort = new RecordingAgentTerminalRuntime()
-    const service = createSessionService({ processPort })
+    const providers = new RecordingAgentProviderRegistry()
+    const repository = new RecordingAgentSessionRepository()
+    const service = createSessionService({ processPort, providers, repository })
     const first = await attachMainSession(service)
+    const firstLaunch = providers.launchCommands[0]!
 
     processPort.launches[0]?.onExit({ exitCode: 0, generation: 1, launchId: 'launch-1' })
     const shellAttachment = await attachMainSession(service)
@@ -411,6 +377,27 @@ describe('agent session service', () => {
     })
     expect(processPort.opens).toHaveLength(1)
     expect(processPort.launches).toHaveLength(2)
+
+    providers.launchCommands[1]?.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0290d8a1-8b7d-7d75-9f62-7a663ef87e44'
+    })
+    await vi.waitFor(async () =>
+      expect(
+        (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef?.value
+      ).toBe('0290d8a1-8b7d-7d75-9f62-7a663ef87e44')
+    )
+    firstLaunch.onProviderSessionIdentified({
+      formatVersion: 1,
+      kind: 'codex-thread',
+      value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
+    })
+    await Promise.resolve()
+
+    expect(
+      (await repository.findAgent('project-1', 'main', 'agent-1'))?.providerSessionRef?.value
+    ).toBe('0290d8a1-8b7d-7d75-9f62-7a663ef87e44')
   })
 
   it('waits for UI approval before executing destructive MCP tools', async () => {

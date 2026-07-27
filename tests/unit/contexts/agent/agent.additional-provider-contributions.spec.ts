@@ -212,7 +212,7 @@ describe('additional Agent Provider contributions', () => {
     expect(registry.listDescriptors().map(({ id }) => id)).toEqual(['pi', 'hermes', 'openclaw'])
   })
 
-  it('waits for a durable Claude Code hook before publishing resumable identity', async () => {
+  it('publishes resumable identity from durable Claude Code session hooks', async () => {
     const identified = vi.fn()
     const contribution = new ClaudeCodeAgentProviderContribution({
       createSessionId: () => '550e8400-e29b-41d4-a716-446655440000',
@@ -270,7 +270,7 @@ describe('additional Agent Provider contributions', () => {
       expect(identified).toHaveBeenCalledWith({
         formatVersion: 1,
         kind: 'claude-session',
-        metadata: { confirmedBy: 'user-prompt-hook' },
+        metadata: { confirmedBy: 'session-hook' },
         value: '550e8400-e29b-41d4-a716-446655440000'
       })
     )
@@ -325,7 +325,7 @@ describe('additional Agent Provider contributions', () => {
     await artifacts.dispose()
   })
 
-  it('accepts authenticated Claude Hooks only from the launch workspace', async () => {
+  it('accepts resumed Claude session identities immediately and deduplicates later prompts', async () => {
     const onActivityChanged = vi.fn()
     const onSessionIdentified = vi.fn()
     const reporter = await ClaudeCodeHookReporter.start({
@@ -338,7 +338,18 @@ describe('additional Agent Provider contributions', () => {
         body: JSON.stringify({
           cwd: process.cwd(),
           hook_event_name: 'SessionStart',
-          session_id: '550e8400-e29b-41d4-a716-446655440000'
+          session_id: '550e8400-e29b-41d4-a716-446655440000',
+          source: 'startup'
+        }),
+        headers: { Authorization: `Bearer ${reporter.token}` },
+        method: 'POST'
+      })
+      await fetch(reporter.url, {
+        body: JSON.stringify({
+          cwd: process.cwd(),
+          hook_event_name: 'SessionStart',
+          session_id: '660e8400-e29b-41d4-a716-446655440001',
+          source: 'resume'
         }),
         headers: { Authorization: `Bearer ${reporter.token}` },
         method: 'POST'
@@ -353,19 +364,35 @@ describe('additional Agent Provider contributions', () => {
         method: 'POST'
       })
       await vi.waitFor(() => expect(onActivityChanged).toHaveBeenCalledWith('idle'))
-      expect(onSessionIdentified).not.toHaveBeenCalled()
+      expect(onSessionIdentified).toHaveBeenNthCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
+      expect(onSessionIdentified).toHaveBeenNthCalledWith(2, '660e8400-e29b-41d4-a716-446655440001')
       await fetch(reporter.url, {
         body: JSON.stringify({
           cwd: process.cwd(),
           hook_event_name: 'UserPromptSubmit',
-          session_id: '550e8400-e29b-41d4-a716-446655440000'
+          session_id: '660e8400-e29b-41d4-a716-446655440001'
         }),
         headers: { Authorization: `Bearer ${reporter.token}` },
         method: 'POST'
       })
       await vi.waitFor(() =>
-        expect(onSessionIdentified).toHaveBeenCalledWith('550e8400-e29b-41d4-a716-446655440000')
+        expect(onSessionIdentified).toHaveBeenCalledWith('660e8400-e29b-41d4-a716-446655440001')
       )
+      expect(onSessionIdentified).toHaveBeenCalledTimes(2)
+      await fetch(reporter.url, {
+        body: JSON.stringify({
+          cwd: process.cwd(),
+          hook_event_name: 'SessionStart',
+          session_id: '550e8400-e29b-41d4-a716-446655440000',
+          source: 'resume'
+        }),
+        headers: { Authorization: `Bearer ${reporter.token}` },
+        method: 'POST'
+      })
+      await vi.waitFor(() =>
+        expect(onSessionIdentified).toHaveBeenLastCalledWith('550e8400-e29b-41d4-a716-446655440000')
+      )
+      expect(onSessionIdentified).toHaveBeenCalledTimes(3)
       expect(onActivityChanged).toHaveBeenCalledWith('idle')
       expect(onActivityChanged).toHaveBeenCalledWith('working')
       expect(onActivityChanged).toHaveBeenCalledWith('waiting_approval')

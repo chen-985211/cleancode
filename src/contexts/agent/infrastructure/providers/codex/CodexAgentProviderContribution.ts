@@ -20,6 +20,15 @@ import { resolveAgentProviderInstallCommand } from '../shared/AgentProviderInsta
 import { createAgentProviderLoopbackEnvironment } from '../shared/AgentProviderLoopbackEnvironment'
 import { codexProviderIcon } from '../shared/AgentProviderBrandIcons'
 import { NodeAgentProviderCliDetector } from '../shared/NodeAgentProviderCliDetector'
+import { createTemporaryProviderConfig } from '../shared/TemporaryProviderConfig'
+import {
+  resolveCodexSessionEndHookTrust,
+  type CodexSessionEndHookTrustResolver
+} from './CodexSessionEndHookTrustResolver'
+import {
+  resolveCodexThreadIdPrefix,
+  type CodexThreadPrefixResolver
+} from './CodexThreadPrefixResolver'
 
 export const codexInstallCommands = {
   linux: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
@@ -30,9 +39,17 @@ export const codexInstallCommands = {
 interface CodexTelemetryRuntime extends AgentRuntimeArtifact {
   readonly env: Readonly<Record<string, string>>
   readonly notifyCommand: readonly string[]
+  readonly onTerminalTitleChanged?: (title: string) => void
+  readonly sessionEndHook?: {
+    readonly command: string
+    readonly configuration: string
+  }
 }
 
 type CodexTelemetryFactory = (command: {
+  readonly appServerArgs: readonly string[]
+  readonly environment: Readonly<Record<string, string>>
+  readonly executable: string
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
   readonly workspaceDirectory: string
 }) => Promise<CodexTelemetryRuntime>
@@ -41,7 +58,10 @@ export interface CodexAgentProviderContributionOptions {
   readonly baseArgs?: readonly string[]
   readonly command?: string
   readonly detector?: AgentProviderDetector
+  readonly hookTrustResolver?: CodexSessionEndHookTrustResolver
+  readonly runtimeExecutable?: string
   readonly telemetryFactory?: CodexTelemetryFactory
+  readonly threadPrefixResolver?: CodexThreadPrefixResolver
 }
 
 export class CodexAgentProviderContribution implements AgentProviderContribution {
@@ -68,25 +88,37 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   readonly detector: AgentProviderDetector
   readonly sessionRefCodec: AgentProviderSessionRefCodec = new CodexSessionRefCodec()
   readonly resume: AgentResumeStrategy = new CodexResumeStrategy(this.sessionRefCodec)
-  readonly telemetry: AgentTelemetryContribution
+  readonly telemetry: CodexTelemetryContribution
   readonly cleancodeCapability: AgentCapabilityInjector = new CodexCleancodeCapabilityInjector()
   readonly launcher: AgentLaunchPlanner
 
   constructor(options: CodexAgentProviderContributionOptions = {}) {
+    const command = options.command ?? 'codex'
+    const baseArgs = options.baseArgs ?? []
+    const runtimeExecutable = options.runtimeExecutable ?? process.execPath
     this.detector =
       options.detector ??
       new NodeAgentProviderCliDetector({
-        executable: options.command ?? 'codex',
+        executable: command,
         installCommand: resolveAgentProviderInstallCommand(codexInstallCommands),
         providerId: this.descriptor.id
       })
     this.telemetry = new CodexTelemetryContribution(
-      options.telemetryFactory ?? createCodexTelemetryRuntime
+      options.telemetryFactory ??
+        ((telemetryCommand) =>
+          createCodexTelemetryRuntime(
+            telemetryCommand,
+            runtimeExecutable,
+            options.threadPrefixResolver ?? resolveCodexThreadIdPrefix
+          )),
+      command,
+      options.hookTrustResolver ?? resolveCodexSessionEndHookTrust,
+      baseArgs
     )
     this.launcher = new CodexLaunchPlanner({
-      baseArgs: options.baseArgs ?? [],
+      baseArgs,
       cleancodeCapability: this.cleancodeCapability,
-      command: options.command ?? 'codex',
+      command,
       resume: this.resume,
       telemetry: this.telemetry
     })
@@ -127,14 +159,67 @@ function isCodexThreadUuid(value: string): boolean {
 class CodexTelemetryContribution implements AgentTelemetryContribution {
   readonly signals = { activity: false, sessionIdentity: true } as const
 
-  constructor(private readonly factory: CodexTelemetryFactory) {}
+  constructor(
+    private readonly factory: CodexTelemetryFactory,
+    private readonly defaultExecutable: string,
+    private readonly resolveHookTrust: CodexSessionEndHookTrustResolver,
+    private readonly baseArgs: readonly string[]
+  ) {}
 
   async prepare(command: Parameters<AgentTelemetryContribution['prepare']>[0]) {
-    const runtime = await this.factory(command)
+    return this.prepareForExecutable(command, this.defaultExecutable)
+  }
+
+  async prepareForExecutable(command: CreateAgentLaunchPlanCommand, executable: string) {
+    const runtime = await this.factory({
+      appServerArgs: [...this.baseArgs, ...(command.launchProfile?.arguments ?? [])],
+      environment: command.launchProfile?.environment ?? {},
+      executable,
+      onProviderSessionIdentified: command.onProviderSessionIdentified,
+      workspaceDirectory: command.workspaceDirectory
+    })
     command.artifacts.track('codex-notify-reporter', runtime)
+    const telemetryArgs = [
+      '--config',
+      'tui.terminal_title=["thread-title","thread-id"]',
+      '--config',
+      `notify=${JSON.stringify(runtime.notifyCommand)}`
+    ]
+    if (!runtime.sessionEndHook) {
+      return {
+        args: telemetryArgs,
+        env: runtime.env,
+        onTerminalTitleChanged: runtime.onTerminalTitleChanged
+      }
+    }
+    let hookTrustConfiguration: string | null = null
+    try {
+      hookTrustConfiguration = await this.resolveHookTrust({
+        executable,
+        hookCommand: runtime.sessionEndHook.command,
+        hookConfiguration: runtime.sessionEndHook.configuration,
+        workspaceDirectory: command.workspaceDirectory
+      })
+    } catch {
+      // Older Codex versions still retain their legacy notify integration.
+    }
+    if (!hookTrustConfiguration) {
+      return {
+        args: telemetryArgs,
+        env: runtime.env,
+        onTerminalTitleChanged: runtime.onTerminalTitleChanged
+      }
+    }
     return {
-      args: ['--config', `notify=${JSON.stringify(runtime.notifyCommand)}`],
-      env: runtime.env
+      args: [
+        '--config',
+        runtime.sessionEndHook.configuration,
+        '--config',
+        hookTrustConfiguration,
+        ...telemetryArgs
+      ],
+      env: runtime.env,
+      onTerminalTitleChanged: runtime.onTerminalTitleChanged
     }
   }
 }
@@ -160,12 +245,13 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
       readonly cleancodeCapability: AgentCapabilityInjector
       readonly command: string
       readonly resume: AgentResumeStrategy
-      readonly telemetry: AgentTelemetryContribution
+      readonly telemetry: CodexTelemetryContribution
     }
   ) {}
 
   async createLaunchPlan(command: CreateAgentLaunchPlanCommand) {
-    const telemetry = await this.options.telemetry.prepare(command)
+    const executable = command.launchProfile?.executable ?? this.options.command
+    const telemetry = await this.options.telemetry.prepareForExecutable(command, executable)
     const capability = command.cleancodeMcp
       ? await this.options.cleancodeCapability.inject({
           ...command.cleancodeMcp,
@@ -193,15 +279,28 @@ class CodexLaunchPlanner implements AgentLaunchPlanner {
         ...telemetry.env,
         ...createAgentProviderLoopbackEnvironment()
       },
-      executable: command.launchProfile?.executable ?? this.options.command
+      executable,
+      gracefulShutdown: {
+        inputIntervalMs: 100,
+        inputs: ['\x1b[27;1u', '\x15/quit', '\r', '\r'],
+        timeoutMs: 1_800
+      },
+      onTerminalTitleChanged: telemetry.onTerminalTitleChanged
     }
   }
 }
 
-async function createCodexTelemetryRuntime(command: {
-  readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
-  readonly workspaceDirectory: string
-}): Promise<CodexTelemetryRuntime> {
+async function createCodexTelemetryRuntime(
+  command: {
+    readonly appServerArgs: readonly string[]
+    readonly environment: Readonly<Record<string, string>>
+    readonly executable: string
+    readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+    readonly workspaceDirectory: string
+  },
+  runtimeExecutable: string,
+  resolveThreadPrefix: CodexThreadPrefixResolver
+): Promise<CodexTelemetryRuntime> {
   const reporter = await CodexThreadIdentityReporter.start({
     onThreadIdentified: (threadId) =>
       command.onProviderSessionIdentified({
@@ -209,15 +308,43 @@ async function createCodexTelemetryRuntime(command: {
         kind: 'codex-thread',
         value: threadId
       }),
-    workspaceDirectory: command.workspaceDirectory
+    resolveThreadIdPrefix: (prefix) =>
+      resolveThreadPrefix({
+        appServerArgs: command.appServerArgs,
+        environment: command.environment,
+        executable: command.executable,
+        prefix,
+        workspaceDirectory: command.workspaceDirectory
+      })
   })
+  let relay: AgentRuntimeArtifact & { readonly path: string }
+  try {
+    relay = await createTemporaryProviderConfig(
+      'cleancode-codex-hook-',
+      'relay.mjs',
+      codexHookRelayScript
+    )
+  } catch (error) {
+    await reporter.close()
+    throw error
+  }
+  const sessionEndHook = createCodexSessionEndHook(runtimeExecutable, relay.path)
   return {
-    dispose: () => reporter.close(),
+    dispose: async () => {
+      try {
+        await reporter.close()
+      } finally {
+        await relay.dispose()
+      }
+    },
     env: {
       CLEANCODE_CODEX_NOTIFY_TOKEN: reporter.token,
-      CLEANCODE_CODEX_NOTIFY_URL: reporter.url
+      CLEANCODE_CODEX_NOTIFY_URL: reporter.url,
+      ELECTRON_RUN_AS_NODE: '1'
     },
-    notifyCommand: [process.execPath, '-e', codexNotifyReporterScript]
+    notifyCommand: [runtimeExecutable, relay.path],
+    onTerminalTitleChanged: (title) => reporter.acceptTerminalTitle(title),
+    sessionEndHook
   }
 }
 
@@ -225,11 +352,49 @@ function createMcpEnvironment(bearerToken: string): Record<string, string> {
   return { CLEANCODE_MCP_TOKEN: bearerToken }
 }
 
-const codexNotifyReporterScript = [
-  'const body=process.argv.at(-1);',
-  'fetch(process.env.CLEANCODE_CODEX_NOTIFY_URL,{',
+const codexHookRelayScript = [
+  "let body=process.argv.length>2?process.argv.at(-1):'';",
+  'if(!body) for await (const chunk of process.stdin) body+=chunk;',
+  'await fetch(process.env.CLEANCODE_CODEX_NOTIFY_URL,{',
   'method:"POST",',
   'headers:{authorization:`Bearer ${process.env.CLEANCODE_CODEX_NOTIFY_TOKEN}`},',
   'body',
   '}).catch(()=>{});'
 ].join('')
+
+function createCodexSessionEndHook(runtimeExecutable: string, relayPath: string) {
+  const command = [runtimeExecutable, relayPath].map(quotePosixShellArgument).join(' ')
+  const commandWindows = createWindowsRelayCommand(runtimeExecutable, relayPath)
+  return {
+    command: process.platform === 'win32' ? commandWindows : command,
+    configuration: [
+      'hooks.SessionEnd=[{hooks=[{type="command",command=',
+      JSON.stringify(command),
+      ',commandWindows=',
+      JSON.stringify(commandWindows),
+      ',timeout=3}]}]'
+    ].join('')
+  }
+}
+
+function quotePosixShellArgument(value: string): string {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`
+}
+
+function createWindowsRelayCommand(runtimeExecutable: string, relayPath: string): string {
+  const encodedScript = Buffer.from(
+    [
+      '$encoding = [System.Text.Encoding]::UTF8',
+      `$runtime = $encoding.GetString([System.Convert]::FromBase64String('${encodeUtf8(runtimeExecutable)}'))`,
+      `$relay = $encoding.GetString([System.Convert]::FromBase64String('${encodeUtf8(relayPath)}'))`,
+      '& $runtime $relay',
+      'exit $LASTEXITCODE'
+    ].join('\n'),
+    'utf16le'
+  ).toString('base64')
+  return `powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encodedScript}`
+}
+
+function encodeUtf8(value: string): string {
+  return Buffer.from(value, 'utf8').toString('base64')
+}

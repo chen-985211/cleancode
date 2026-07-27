@@ -216,6 +216,7 @@ class ManagedTerminalModel {
     this.terminal.onData((response) => this.onQueryResponse(response))
     this.terminal.onTitleChange((title) => {
       this.title = title
+      command.onTitleChanged?.(title)
     })
     this.terminal.parser.registerOscHandler(7, (data) => {
       this.workingDirectory = readOscWorkingDirectory(data) ?? this.workingDirectory

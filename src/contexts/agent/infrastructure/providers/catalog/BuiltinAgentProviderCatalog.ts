@@ -6,6 +6,7 @@ import type {
 } from '../../../application/ports/AgentProviderContribution'
 import { ClaudeCodeAgentProviderContribution } from '../claude-code/ClaudeCodeAgentProviderContribution'
 import { CodexAgentProviderContribution } from '../codex/CodexAgentProviderContribution'
+import { GeminiAgentProviderContribution } from '../gemini/GeminiAgentProviderContribution'
 import { HermesAgentProviderContribution } from '../hermes/HermesAgentProviderContribution'
 import { OpenClawAgentProviderContribution } from '../openclaw/OpenClawAgentProviderContribution'
 import { OpenCodeAgentProviderContribution } from '../opencode/OpenCodeAgentProviderContribution'
@@ -15,11 +16,7 @@ import {
   type CatalogTerminalCliProviderConfig
 } from './CatalogTerminalCliProvider'
 import { createCatalogProviderIcon } from './CatalogProviderIcons'
-import { createTemporaryJsonMcpCapabilityInjector } from '../shared/TemporaryJsonMcpCapabilityInjector'
-import {
-  createClientAssignedTerminalCliSession,
-  type DeclarativeTerminalCliSession
-} from '../terminal-cli/DeclarativeTerminalCliSession'
+import type { DeclarativeTerminalCliSession } from '../terminal-cli/DeclarativeTerminalCliSession'
 
 export const builtinAgentProviderIds = [
   'claude-code',
@@ -93,32 +90,6 @@ const genericCatalogEntries: readonly CatalogEntry[] = [
     permission: { arguments: ['--yolo'] }
   }),
   entry('omp', 'OMP', 'omp', 'https://omp.sh'),
-  entry('gemini', 'Gemini', 'gemini', 'https://github.com/google-gemini/gemini-cli', {
-    mcp: {
-      injector: createTemporaryJsonMcpCapabilityInjector({
-        artifactLabel: 'gemini-mcp-settings',
-        createSettings: (serverUrl) => ({
-          mcpServers: {
-            cleancode: {
-              headers: { Authorization: 'Bearer ${CLEANCODE_MCP_TOKEN}' },
-              httpUrl: serverUrl,
-              trust: true
-            }
-          }
-        }),
-        pathEnvironment: 'GEMINI_CLI_SYSTEM_SETTINGS_PATH',
-        prefix: 'cleancode-gemini-mcp-'
-      })
-    },
-    permission: { arguments: ['--approval-mode=yolo'] },
-    session: createClientAssignedTerminalCliSession({
-      createArgs: (sessionId) => ['--session-id', sessionId],
-      providerId: 'gemini',
-      resumeArgs: (sessionId) => ['--resume', sessionId],
-      sessionKind: 'gemini-session',
-      validateSessionId: isUuid
-    })
-  }),
   entry('antigravity', 'Antigravity', 'agy', 'https://antigravity.google/docs/cli-overview', {
     permission: { arguments: ['--dangerously-skip-permissions'] }
   }),
@@ -191,6 +162,7 @@ export function createBuiltinAgentProviderContributions(): readonly AgentProvide
   const formal = new Map<string, AgentProviderContribution>([
     ['claude-code', new ClaudeCodeAgentProviderContribution()],
     ['codex', new CodexAgentProviderContribution()],
+    ['gemini', new GeminiAgentProviderContribution()],
     ['opencode', new OpenCodeAgentProviderContribution()],
     ['pi', new PiAgentProviderContribution()],
     ['hermes', new HermesAgentProviderContribution()],
@@ -239,8 +211,4 @@ function toContributionConfig(catalogEntry: CatalogEntry): CatalogTerminalCliPro
     mcp: catalogEntry.mcp,
     session: catalogEntry.session
   }
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }

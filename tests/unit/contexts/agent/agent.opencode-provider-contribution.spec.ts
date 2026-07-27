@@ -6,6 +6,8 @@ import { AgentLaunchArtifactScope } from '../../../../src/contexts/agent/applica
 import { OpenCodeAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/opencode/OpenCodeAgentProviderContribution'
 
 const openCodeSessionId = 'ses_0123456789abCDEFGHIJKLMNOP'
+const resumedOpenCodeSessionId = 'ses_fedcba987654QRSTUVWXYZabcd'
+const childOpenCodeSessionId = 'ses_abcdef012345abcdefghijklmn'
 
 describe('OpenCode Agent Provider contribution', () => {
   afterEach(() => {
@@ -132,11 +134,26 @@ describe('OpenCode Agent Provider contribution', () => {
         unknown
       >
       const plugin = Object.values(pluginModule).find(
-        (entry): entry is (input: { directory: string }) => Promise<OpenCodePluginHooks> =>
-          typeof entry === 'function'
+        (
+          entry
+        ): entry is (input: {
+          client: OpenCodePluginClient
+          directory: string
+        }) => Promise<OpenCodePluginHooks> => typeof entry === 'function'
       )
       expect(plugin).toBeDefined()
-      const hooks = await plugin!({ directory: process.cwd() })
+      const client: OpenCodePluginClient = {
+        session: {
+          get: vi.fn(async ({ path }) => ({
+            data: {
+              directory: process.cwd(),
+              id: path.id,
+              ...(path.id === childOpenCodeSessionId ? { parentID: openCodeSessionId } : {})
+            }
+          }))
+        }
+      }
+      const hooks = await plugin!({ client, directory: process.cwd() })
 
       await hooks.event({
         event: {
@@ -241,6 +258,28 @@ describe('OpenCode Agent Provider contribution', () => {
         })
       )
       expect(onProviderSessionIdentified).toHaveBeenCalledTimes(1)
+
+      await hooks['chat.message']({ sessionID: resumedOpenCodeSessionId })
+      await hooks['chat.message']({ sessionID: childOpenCodeSessionId })
+      await vi.waitFor(() =>
+        expect(onProviderSessionIdentified).toHaveBeenCalledWith({
+          formatVersion: 1,
+          kind: 'opencode-session',
+          metadata: { confirmedBy: 'chat-message-hook' },
+          value: resumedOpenCodeSessionId
+        })
+      )
+      expect(onProviderSessionIdentified).toHaveBeenCalledTimes(2)
+      await hooks['chat.message']({ sessionID: openCodeSessionId })
+      await vi.waitFor(() =>
+        expect(onProviderSessionIdentified).toHaveBeenLastCalledWith({
+          formatVersion: 1,
+          kind: 'opencode-session',
+          metadata: { confirmedBy: 'chat-message-hook' },
+          value: openCodeSessionId
+        })
+      )
+      expect(onProviderSessionIdentified).toHaveBeenCalledTimes(3)
       expect(onActivityChanged).toHaveBeenCalledWith('waiting_approval')
       expect(
         onActivityChanged.mock.calls.filter(([status]) => status === 'waiting_approval')
@@ -290,6 +329,7 @@ describe('OpenCode Agent Provider contribution', () => {
 })
 
 interface OpenCodePluginHooks {
+  'chat.message'(input: { readonly sessionID: string }): Promise<void>
   event(input: {
     readonly event: {
       readonly id: string
@@ -297,6 +337,21 @@ interface OpenCodePluginHooks {
       readonly type: string
     }
   }): Promise<void>
+}
+
+interface OpenCodePluginClient {
+  readonly session: {
+    readonly get: (input: {
+      readonly path: { readonly id: string }
+      readonly query?: { readonly directory?: string }
+    }) => Promise<{
+      readonly data?: {
+        readonly directory: string
+        readonly id: string
+        readonly parentID?: string
+      }
+    }>
+  }
 }
 
 interface OpenCodeInlineConfig {

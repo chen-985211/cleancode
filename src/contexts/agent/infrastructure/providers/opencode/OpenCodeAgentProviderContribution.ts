@@ -142,11 +142,11 @@ class OpenCodeTelemetryContribution implements AgentTelemetryContribution {
     const reporter = await OpenCodeEventReporter.start({
       expectedSessionId,
       onActivityChanged: command.onActivityChanged ?? (() => undefined),
-      onSessionIdentified: (sessionId) =>
+      onSessionIdentified: (sessionId, confirmedBy) =>
         command.onProviderSessionIdentified({
           formatVersion: 1,
           kind: 'opencode-session',
-          metadata: { confirmedBy: 'session-created-event' },
+          metadata: { confirmedBy },
           value: sessionId
         }),
       workspaceDirectory: command.workspaceDirectory
@@ -234,14 +234,25 @@ const openCodeReporterPluginScript = [
   '"permission.asked","permission.updated","permission.replied",',
   '"question.asked","question.replied","question.rejected"',
   ']);',
-  'export const CleanCodeOpenCodeReporterPlugin=async({directory})=>({',
-  'event:async({event})=>{',
-  'if(!reportedEvents.has(event?.type))return;',
+  'export const CleanCodeOpenCodeReporterPlugin=async({client,directory})=>{',
+  'const report=async(event)=>{',
   'const url=process.env.CLEANCODE_OPENCODE_REPORTER_URL;',
   'const token=process.env.CLEANCODE_OPENCODE_REPORTER_TOKEN;',
   'if(!url||!token)return;',
   'await fetch(url,{method:"POST",headers:{authorization:`Bearer ${token}`,',
   '"content-type":"application/json"},body:JSON.stringify({directory,event})}).catch(()=>{});',
+  '};',
+  'return {',
+  'event:async({event})=>{',
+  'if(!reportedEvents.has(event?.type))return;',
+  'await report(event);',
+  '},',
+  '"chat.message":async({sessionID})=>{',
+  'const result=await client.session.get({path:{id:sessionID},query:{directory}}).catch(()=>null);',
+  'const info=result?.data;',
+  'if(!info||info.parentID!==undefined)return;',
+  'await report({type:"cleancode.session.activated",properties:{info}});',
   '}',
-  '});'
+  '};',
+  '};'
 ].join('')

@@ -27,7 +27,19 @@ describe('Gemini Agent Provider launch integration', () => {
       expect(settingsPath).toBeDefined()
 
       const contents = await readFile(settingsPath!, 'utf8')
-      expect(JSON.parse(contents)).toEqual({
+      expect(JSON.parse(contents)).toMatchObject({
+        hooks: {
+          SessionStart: [
+            {
+              hooks: [
+                {
+                  command: expect.stringContaining('relay.mjs'),
+                  type: 'command'
+                }
+              ]
+            }
+          ]
+        },
         mcpServers: {
           cleancode: {
             headers: { Authorization: 'Bearer ${CLEANCODE_MCP_TOKEN}' },

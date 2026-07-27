@@ -58,7 +58,7 @@ idle -> running -> stopping -> exited
 - 进程自然退出后移除活动槽位映射，但保留最新 generation 的会话快照和有界终端模型；显式终止或后续 replacement 撤销该恢复资格。
 - 输出、退出、视图、快照和服务端点事件必须同时匹配当前槽位的完整运行身份；旧运行的迟到回调不能覆盖新会话。
 - 每次启动在取得 PTY 前通过 `RunRuntimeScopeValidationPort` 校验 Project 的权威项目、`workspaceId` 与目录，并受 `RunLifecycleService` 启动闸门保护；分支不参与稳定身份校验。
-- 应用退出时先关闭新启动准入并等待在途启动；Agent 与工作流上下文只排空自己的在途操作、关闭本地资源并在 Provider handoff 后释放本地引用，不逐会话发起 PTY stop。Run application 只向独立 Provider 提交一次应用级 detach，Run/Provider 是该流程唯一的 PTY shutdown authority。Provider 终止全部 Agent、工作流和默认策略会话；只有可靠 checkpoint 的明确保留普通会话从应用 detach。应用断连或 Electron 停止等待不等于 Provider shutdown。
+- 应用退出时先关闭新启动准入并等待在途启动；Agent 与工作流上下文只排空自己的在途操作，并在 Provider handoff 后释放本地引用，不逐会话发起 PTY stop。Agent 可以在 handoff 前按自身 contribution 的有界协议向当前前台任务写入正常退出输入并等待 launch 退出，以便对应 CLI 发布最终结构化事实；该动作不停止 shell/PTY，也不改变 Run 的所有权。Run application 只向独立 Terminal Provider 提交一次应用级 detach，Run/Terminal Provider 是该流程唯一的 PTY shutdown authority。Terminal Provider 终止全部 Agent、工作流和默认策略会话；只有可靠 checkpoint 的明确保留普通会话从应用 detach。应用断连或 Electron 停止等待不等于 Provider shutdown。
 - 显式关闭、replacement、删除积木、归档/移除物理工作区、目录重绑定和移除项目始终是硬清理：终止精确 PTY、撤销恢复资格并删除 checkpoint，覆盖退出保留策略。分支 checkout 不是硬清理条件。
 
 Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层已经接受的会话，并只按完整运行身份收敛状态。应用完整重开时，Run 先完成 Provider 对账再允许终端节点自动启动，避免新 shell 抢占 warm/historical identity。退出事件先于启动响应抵达时，表现层先用事件中的项目、工作区、终端和运行身份建立 `exited` 投影；同一运行迟到的 `running` 启动响应不得把它降级。已经保留但不再运行的 session 收到迟到 `write`、Ctrl+C 或 resize 时，应用层不再访问 PTY，而是幂等返回当前权威快照；这些交互动作指向未知 session 时仍返回 `TERMINAL_SESSION_NOT_FOUND`。终止动作表达“确保该 session 不再存在”，因此未知 session 视为已经完成并返回空结果，不能阻断随后启动新会话。
@@ -73,7 +73,7 @@ Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层�
 
 `launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
 
-前台任务自然结束或被 `Ctrl+C` 中断后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job。
+前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。
 
 ## PTY 端口语义
 
@@ -107,7 +107,9 @@ Run application 统一拥有终端能力环境。普通终端启动和 Agent for
 
 Provider Client 的全局普通终端输出投影只接收 block-owned terminal；agent-owned terminal 输出只进入其精确绑定的 view 和进程回调。表现层对找不到匹配运行身份的普通终端输出必须保持状态引用不变，不能把 Agent 全屏重绘暂存为普通终端启动输出，也不能触发画布节点重投影。
 
-应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Provider 处理，再让两个上下文 complete 并清除本地引用。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Provider release，也不证明全部 PTY 已物理退出。Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Provider 或形成不可用告警；正常运行期的同类失败仍必须向外传播。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
+权威 headless terminal model 同时解析标准 OSC 0/2 terminal title，并通过可选的结构化 metadata 回调交给调用方；title 不是可见屏幕文本，也不赋予 Run 解释 Provider session 的职责。Terminal Provider 协议 v8 以独立 `terminal-title` 事件传递该 metadata；应用仍兼容已认证的 v7 Provider，并在既有 `terminal-output` 帧上使用有界增量解析器只提取 OSC title 控制序列，直到 Provider 自然升级。该兼容路径不得匹配普通输出内容、不得记录 title 或把它作为 Run 会话恢复事实；具体 Provider 只能在自己的 contribution 内校验其正式 title 格式。
+
+应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Terminal Provider 处理，再让两个上下文 complete 并清除本地引用。Agent prepare 中可先请求当前 Agent Provider 前台 launch 正常结束，并在身份 reporter 仍存活时排空最终持久化；超时只结束这次 launch 级等待，之后仍进入统一 PTY handoff。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Terminal Provider release，也不证明全部 PTY 已物理退出。Terminal Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Terminal Provider 或形成不可用告警；正常运行期的同类失败仍必须向外传播。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
 因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 

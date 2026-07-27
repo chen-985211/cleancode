@@ -27,6 +27,7 @@ export interface CreateTerminalModelCommand {
   readonly terminalSourceTheme?: TerminalSourceTheme
   readonly onQueryResponse: (response: string) => void
   readonly onFlowControlChange: (isPaused: boolean) => void
+  readonly onTitleChanged?: (title: string) => void
 }
 
 export interface AttachTerminalViewCommand {
