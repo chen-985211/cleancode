@@ -11,6 +11,19 @@ export const E2E_BUILD_ARTIFACTS = [
   'out/renderer/index.html'
 ] as const
 
+export function createE2eBuildInvocation(
+  platform: NodeJS.Platform = process.platform,
+  commandInterpreter: string | undefined = process.env.ComSpec
+): { readonly executable: string; readonly args: string[] } {
+  const buildArgs = ['exec', 'electron-vite', 'build']
+  if (platform !== 'win32') return { executable: 'pnpm', args: buildArgs }
+
+  return {
+    executable: commandInterpreter || 'cmd.exe',
+    args: ['/d', '/s', '/c', 'pnpm.cmd', ...buildArgs]
+  }
+}
+
 export async function assertPrebuiltE2eApplication(rootDirectory: string): Promise<void> {
   const missingArtifacts: string[] = []
 
@@ -36,7 +49,8 @@ export async function setup(): Promise<void> {
     return
   }
 
-  await execFileAsync('pnpm', ['exec', 'electron-vite', 'build'], {
+  const invocation = createE2eBuildInvocation()
+  await execFileAsync(invocation.executable, invocation.args, {
     cwd: process.cwd()
   })
 }
