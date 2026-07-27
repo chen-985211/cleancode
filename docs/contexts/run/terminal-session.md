@@ -87,7 +87,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 - `readWorkingDirectory`：在 macOS 通过 `lsof`、Linux 通过 `/proc/<pid>/cwd` 尽力读取；不支持或进程消失时返回 `null`。
 - `stop` / `disposeAll`：异步终止一个或全部受管 PTY，并等待适配器确认退出。
 
-基础设施默认在 macOS/Linux 使用用户 shell，在 Windows 使用 `powershell.exe` 和 node-pty ConPTY。有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell；Windows Agent 前台任务由子 PowerShell 执行，`Ctrl+C` 结束子任务后回到同一个外层 PowerShell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理；Provider 自身用于 Node 模式启动的 `ELECTRON_RUN_AS_NODE` 必须先从继承环境移除，只有调用方在本次命令环境中显式提供时才能重新注入。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，Windows 关闭 ConPTY 并等待退出，避免把 Agent launch 退出误判为 terminal 退出；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
+基础设施默认在 macOS/Linux 使用用户 shell，在 Windows 使用 `powershell.exe` 和 node-pty 随包的 ConPTY DLL。有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell；Windows Agent 前台任务由子 PowerShell 执行，`Ctrl+C` 结束子任务后回到同一个外层 PowerShell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理；Provider 自身用于 Node 模式启动的 `ELECTRON_RUN_AS_NODE` 必须先从继承环境移除，只有调用方在本次命令环境中显式提供时才能重新注入。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，Windows 关闭 ConPTY 并等待退出，避免把 Agent launch 退出误判为 terminal 退出；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
 
 Run application 统一拥有终端能力环境。普通终端启动和 Agent foreground launch 都必须按会话固定源主题保留 `TERM=xterm-256color`、`COLORTERM=truecolor`、`TERM_PROGRAM=cleancode` 和对应明暗语义的 `COLORFGBG`；调用方或 Provider 以任意大小写提供的同名值都不能覆盖它们。其他 launch 环境继续透传，`NO_COLOR` 不由 Run 合成、清除或重命名，从而保留用户和上游明确选择的无色输出偏好。Provider contribution 不得把这些宿主能力变量变成自己的主题配置入口。
 
@@ -113,7 +113,7 @@ Provider Client 的全局普通终端输出投影只接收 block-owned terminal�
 
 因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
 
-Windows node-pty/ConPTY 是 OSC 10/11 的明确平台例外。ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的查询，因此 Run 不能在输出流中可靠识别并回答；Codex 等客户端会在短查询窗口结束后通过 `GetConsoleScreenBufferInfoEx` 读取当前 ConsoleColor 和颜色表。Windows Agent foreground transport 必须在 Provider 进程 started 之前把 ConsoleColor 固定到 generation 的源主题，让该同步 fallback 立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。颜色准备发生在 `awaiting_started` 内，不得进入模型或视图；不得再向 PTY 输入注入无请求的合成 OSC 响应。macOS/Linux 继续使用既有模型/视图交接规则。
+Windows 系统 ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的 OSC 查询和鼠标模式，只输出 screen buffer 差异；这会同时破坏默认颜色查询和可见 xterm 的鼠标输入。Run 因此固定启用 node-pty 随包的 ConPTY DLL，使完整 VT 序列进入既有模型/视图交接链路，并由隐藏 headless 模型或当前 renderer xterm 唯一响应查询。Windows Agent foreground transport 仍必须在 Provider 进程 started 之前把 ConsoleColor 固定到 generation 的源主题：Codex 等客户端只有很短的查询窗口，若响应未及时返回，会通过 `GetConsoleScreenBufferInfoEx` 同步读取 ConsoleColor。该 fallback 必须立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。颜色准备发生在 `awaiting_started` 内，不得进入模型或视图；不得向尚未查询的进程输入预置 OSC 响应。
 
 ## 输入与安全打开边界
 
