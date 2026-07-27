@@ -9,7 +9,13 @@ export class TerminalProviderProcessEventGate {
   }
 
   defer(event: TerminalProviderEvent): boolean {
-    if (event.event !== 'terminal-output' && event.event !== 'terminal-exit') return false
+    if (
+      event.event !== 'terminal-output' &&
+      event.event !== 'terminal-title' &&
+      event.event !== 'terminal-exit'
+    ) {
+      return false
+    }
     const sessionId = (event.payload as { readonly sessionId?: unknown }).sessionId
     if (typeof sessionId !== 'string' || !this.pendingStarts.has(sessionId)) return false
 

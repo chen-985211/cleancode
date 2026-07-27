@@ -9,6 +9,7 @@ interface AgentApplicationShutdownOperations {
   readonly forgetSession: (sessionId: string) => void
   readonly listSessions: () => readonly ManagedAgentSession[]
   readonly releaseTerminalReferences: () => void
+  readonly requestProviderShutdown: (session: ManagedAgentSession) => Promise<void>
   readonly settleTools: (session: ManagedAgentSession) => Promise<void>
   readonly stopAdmission: () => void
   readonly waitForAdmissionIdle: () => Promise<void>
@@ -45,6 +46,13 @@ export class AgentApplicationShutdownCoordinator {
     }
 
     const sessions = this.operations.listSessions()
+    const finalizationResults = await Promise.all(
+      sessions.map((session) => settle(() => disposeAgentLaunchArtifacts(session)))
+    )
+    finalizationResults.push(await settle(this.operations.waitForPersistence))
+    const finalizationFailures = finalizationResults.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    )
     let releaseFailure: unknown
     try {
       this.operations.releaseTerminalReferences()
@@ -55,14 +63,18 @@ export class AgentApplicationShutdownCoordinator {
       this.operations.clearRuntime()
       for (const session of sessions) this.operations.forgetSession(session.sessionId)
     }
-    if (preparationFailure !== undefined && releaseFailure !== undefined) {
+    const failures = [
+      ...(preparationFailure === undefined ? [] : [preparationFailure]),
+      ...finalizationFailures,
+      ...(releaseFailure === undefined ? [] : [releaseFailure])
+    ]
+    if (failures.length > 1) {
       throw new AggregateError(
-        [preparationFailure, releaseFailure],
-        'Agent application shutdown preparation and completion both failed.'
+        failures,
+        'One or more Agent application shutdown resources failed to complete.'
       )
     }
-    if (preparationFailure !== undefined) throw preparationFailure
-    if (releaseFailure !== undefined) throw releaseFailure
+    if (failures[0] !== undefined) throw failures[0]
   }
 
   private async prepareResources(
@@ -79,7 +91,7 @@ export class AgentApplicationShutdownCoordinator {
         sessions.map((session) => settle(() => this.operations.settleTools(session)))
       )),
       ...(await Promise.all(
-        sessions.map((session) => settle(() => disposeAgentLaunchArtifacts(session)))
+        sessions.map((session) => settle(() => this.operations.requestProviderShutdown(session)))
       )),
       await settle(this.operations.waitForPersistence),
       await settle(this.operations.disposeMcpServer)

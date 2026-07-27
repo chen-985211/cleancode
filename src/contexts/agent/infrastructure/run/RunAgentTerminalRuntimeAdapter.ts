@@ -8,6 +8,7 @@ import type { TerminalSessionSnapshot } from '../../../run/application/dto/Termi
 
 export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort {
   private readonly terminals = new Map<string, TerminalSessionSnapshot>()
+  private readonly titleObservers = new Map<string, { readonly accept: (title: string) => void }>()
 
   constructor(private readonly terminalSessions: TerminalSessionService) {}
 
@@ -24,6 +25,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
         command.onTerminalExit(event.exitCode)
       },
       onOutput: () => undefined,
+      onTitleChanged: (title) => this.titleObservers.get(command.sessionId)?.accept(title),
       owner: { id: command.agentId, kind: 'agent' },
       projectDirectory: command.projectDirectory,
       projectId: command.projectId,
@@ -60,15 +62,32 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
 
   launch(command: Parameters<AgentTerminalRuntimePort['launch']>[0]) {
     const terminal = this.requireTerminal(command.sessionId)
-    const job = this.terminalSessions.launchForegroundJob({
-      args: command.plan.args,
-      environment: command.plan.env,
-      executable: command.plan.executable,
-      onExit: (event) => command.onExit(event),
-      onStarted: (event) => command.onStarted?.(event),
-      sessionId: terminal.sessionId
-    })
-    return { generation: job.generation, launchId: job.launchId }
+    const observer = command.plan.onTerminalTitleChanged
+      ? { accept: command.plan.onTerminalTitleChanged }
+      : null
+    if (observer) this.titleObservers.set(command.sessionId, observer)
+    else this.titleObservers.delete(command.sessionId)
+    try {
+      const job = this.terminalSessions.launchForegroundJob({
+        args: command.plan.args,
+        environment: command.plan.env,
+        executable: command.plan.executable,
+        onExit: (event) => {
+          if (observer && this.titleObservers.get(command.sessionId) === observer) {
+            this.titleObservers.delete(command.sessionId)
+          }
+          command.onExit(event)
+        },
+        onStarted: (event) => command.onStarted?.(event),
+        sessionId: terminal.sessionId
+      })
+      return { generation: job.generation, launchId: job.launchId }
+    } catch (error) {
+      if (observer && this.titleObservers.get(command.sessionId) === observer) {
+        this.titleObservers.delete(command.sessionId)
+      }
+      throw error
+    }
   }
 
   write(sessionId: string, input: string): void {
@@ -80,6 +99,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
   }
 
   async stop(sessionId: string): Promise<void> {
+    this.titleObservers.delete(sessionId)
     const terminal = this.terminals.get(sessionId)
     if (!terminal) return
     await this.terminalSessions.terminate(terminal.sessionId)
@@ -94,6 +114,7 @@ export class RunAgentTerminalRuntimeAdapter implements AgentTerminalRuntimePort 
 
   releaseApplicationShutdown(): void {
     this.terminals.clear()
+    this.titleObservers.clear()
   }
 
   private requireTerminal(sessionId: string): TerminalSessionSnapshot {

@@ -29,7 +29,10 @@ export class OpenCodeEventReporter implements AgentRuntimeArtifact {
   static async start(input: {
     readonly expectedSessionId?: string
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
-    readonly onSessionIdentified: (sessionId: string) => void
+    readonly onSessionIdentified: (
+      sessionId: string,
+      confirmedBy: OpenCodeSessionConfirmation
+    ) => void
     readonly workspaceDirectory: string
   }): Promise<OpenCodeEventReporter> {
     const token = randomBytes(24).toString('hex')
@@ -108,16 +111,18 @@ export class OpenCodeEventReporter implements AgentRuntimeArtifact {
 
 interface ReporterState {
   activeSessionId: string | null
-  readonly reportedSessionIds: Set<string>
+  lastReportedSessionId: string | null
 }
 
 function createReporterState(expectedSessionId: string | undefined): ReporterState {
   const activeSessionId = isOpenCodeSessionId(expectedSessionId) ? expectedSessionId : null
   return {
     activeSessionId,
-    reportedSessionIds: new Set(activeSessionId ? [activeSessionId] : [])
+    lastReportedSessionId: activeSessionId
   }
 }
+
+type OpenCodeSessionConfirmation = 'chat-message-hook' | 'session-created-event'
 
 async function acceptPayload(
   payload: OpenCodeEventPayload,
@@ -125,12 +130,18 @@ async function acceptPayload(
   state: ReporterState,
   callbacks: {
     readonly onActivityChanged: (activity: AgentActivityStatus) => void
-    readonly onSessionIdentified: (sessionId: string) => void
+    readonly onSessionIdentified: (
+      sessionId: string,
+      confirmedBy: OpenCodeSessionConfirmation
+    ) => void
   }
 ): Promise<void> {
   if ((await resolveRealPath(payload.directory)) !== expectedDirectory) return
 
-  if (payload.event.type === 'session.created') {
+  if (
+    payload.event.type === 'session.created' ||
+    payload.event.type === 'cleancode.session.activated'
+  ) {
     const info = payload.event.properties.info
     if (!isRecord(info) || info.parentID !== undefined || !isOpenCodeSessionId(info.id)) return
     if (
@@ -140,11 +151,14 @@ async function acceptPayload(
       return
     }
     state.activeSessionId = info.id
-    if (!state.reportedSessionIds.has(info.id)) {
-      state.reportedSessionIds.add(info.id)
-      callbacks.onSessionIdentified(info.id)
+    if (state.lastReportedSessionId !== info.id) {
+      state.lastReportedSessionId = info.id
+      callbacks.onSessionIdentified(
+        info.id,
+        payload.event.type === 'session.created' ? 'session-created-event' : 'chat-message-hook'
+      )
     }
-    callbacks.onActivityChanged('idle')
+    if (payload.event.type === 'session.created') callbacks.onActivityChanged('idle')
     return
   }
 

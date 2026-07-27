@@ -335,7 +335,8 @@ export class TerminalSessionService {
           if (!this.isCurrentRunningSession(slotKey, session)) return
           if (isPaused) this.terminalProcessPort.pauseOutput(session.id)
           else this.terminalProcessPort.resumeOutput(session.id)
-        }
+        },
+        onTitleChanged: command.onTitleChanged
       })
       processHandle = await this.terminalProcessPort.start({
         scope: session.scope,

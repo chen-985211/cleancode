@@ -35,8 +35,7 @@ describe('Agent Provider reporter setup cleanup', () => {
 
     await expect(
       CodexThreadIdentityReporter.start({
-        onThreadIdentified: () => undefined,
-        workspaceDirectory: '/repo/app'
+        onThreadIdentified: () => undefined
       })
     ).rejects.toBe(listenFailure)
 

@@ -213,7 +213,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 
 Agent 会话必须按项目、稳定 `workspaceId` 和 `agentId` 隔离。Provider 在 Agent 创建时确定且不可切换；一个工作区允许同时拥有多个相同或不同 Provider Agent。每个 Agent 通过应用层端口取得独立 agent-owned Run terminal、Provider launch、MCP 与审批，但共享工作目录，应用不得把这种共享误表示为文件级隔离。默认物理工作区执行普通 Git checkout 时，分支只更新 launch 与显示元数据，不得替换 Agent 身份、terminal、PTY 或 Provider session ref。非 Git 状态、普通分支和 detached HEAD 都不创造新的工作区或 Agent 身份。
 
-cleancode 只持久化版本化 Provider session ref，并通过该 Provider 的正式恢复入口恢复。引用只能来自仍匹配当前 Agent runtime session 与 launch generation 的结构化通知，或由 cleancode 通过 Provider 正式 session 参数预分配并在本次前台 launch 确认启动后接受；预分配引用不得在启动前持久化。系统不能扫描历史目录、解析终端输出、猜测最近会话或跨 Agent 回退。Provider registry 负责差异；Agent domain、Run domain、通用 IPC 和 UI 不得按 Provider ID 分支。
+cleancode 只持久化版本化 Provider session ref，并通过该 Provider 的正式恢复入口恢复。引用只能来自仍匹配当前 Agent runtime session 与 launch generation 的结构化通知、由 Run 通过 Provider 无关端口交付且经对应 contribution 校验的标准终端 metadata，或由 cleancode 通过 Provider 正式 session 参数预分配并在本次前台 launch 确认启动后接受；预分配引用不得在启动前持久化。系统不能扫描 Provider 历史目录、解析可见终端文本、猜测最近会话或跨 Agent 回退。Provider registry 负责差异；Agent domain、Run domain、通用 IPC 和 UI 不得按 Provider ID 分支。
 
 运行期 Agent 不得直接执行以下操作：
 

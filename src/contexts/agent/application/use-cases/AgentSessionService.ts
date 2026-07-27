@@ -16,12 +16,10 @@ import {
   defaultAgentProviderPreferencesRepository,
   type AgentProviderPreferencesRepository
 } from '../ports/AgentProviderPreferencesRepository'
-import type { AgentLaunchPlan } from '../ports/AgentProviderContribution'
 import type { AgentSession } from '../../domain/aggregates/AgentSession'
 import type { ProviderSessionRefSnapshot } from '../../domain/value-objects/ProviderSessionRef'
 import type { AgentToolExecutionResult } from './ExecuteAgentToolUseCase'
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
-import { AgentLaunchArtifactScope } from '../services/AgentLaunchArtifactScope'
 import { AgentProviderAvailabilityService } from '../services/AgentProviderAvailabilityService'
 import { resolvePersistedAgentProviderLaunchProfile } from '../services/AgentProviderLaunchProfileResolver'
 import {
@@ -29,6 +27,8 @@ import {
   type AgentToolExecutionOperations
 } from './AgentToolApprovalCoordinator'
 import { AgentApplicationShutdownCoordinator } from './AgentApplicationShutdownCoordinator'
+import { AgentProviderLaunchShutdownCoordinator } from './AgentProviderLaunchShutdownCoordinator'
+import { createManagedAgentLaunchPlan } from './AgentProviderLaunchPlanFactory'
 import { AgentProviderSessionPersistenceCoordinator } from './AgentProviderSessionPersistenceCoordinator'
 import { disposeOtherAgentSessionScopes } from './AgentSessionCollection'
 import { AgentToolInvocationCoordinator } from './AgentToolInvocationCoordinator'
@@ -75,6 +75,7 @@ export class AgentSessionService {
   private readonly approvalCoordinator: AgentToolApprovalCoordinator
   private readonly applicationShutdown: AgentApplicationShutdownCoordinator
   private readonly persistence: AgentProviderSessionPersistenceCoordinator
+  private readonly providerLaunchShutdown: AgentProviderLaunchShutdownCoordinator
   private readonly toolInvocations: AgentToolInvocationCoordinator
   private readonly runtimeCoordinator = new AgentSessionRuntimeCoordinator()
   private isApplicationShuttingDown = false
@@ -95,6 +96,7 @@ export class AgentSessionService {
       this.findSessionById(sessionId)
     )
     this.persistence = new AgentProviderSessionPersistenceCoordinator(sessionRepository, providers)
+    this.providerLaunchShutdown = new AgentProviderLaunchShutdownCoordinator(terminalRuntime)
     this.applicationShutdown = new AgentApplicationShutdownCoordinator({
       beginClosing: (session) => this.beginSessionToolClosing(session),
       clearRuntime: () => this.runtimeCoordinator.clear(),
@@ -103,6 +105,7 @@ export class AgentSessionService {
       forgetSession: (sessionId) => this.toolInvocations.forgetSession(sessionId),
       listSessions: () => [...this.sessions.values()],
       releaseTerminalReferences: () => this.terminalRuntime.releaseApplicationShutdown(),
+      requestProviderShutdown: (session) => this.providerLaunchShutdown.request(session),
       settleTools: (session) => this.settleSessionToolCalls(session),
       stopAdmission: () => {
         this.isApplicationShuttingDown = true
@@ -393,6 +396,7 @@ export class AgentSessionService {
       beginClosing: (session) => this.beginSessionToolClosing(session),
       disposeMcpServer: () => this.mcpServerPort.dispose(),
       disposeTerminalRuntime: () => this.terminalRuntime.disposeAll(),
+      requestProviderShutdown: (session) => this.providerLaunchShutdown.request(session),
       sessions,
       settleTools: (session) => this.settleSessionToolCalls(session),
       waitForPersistence: () => this.persistence.waitForIdle()
@@ -417,6 +421,7 @@ export class AgentSessionService {
     this.toolInvocations.beginSessionClosing(session.sessionId)
     try {
       await this.settleSessionToolCalls(session)
+      await this.providerLaunchShutdown.request(session)
       await this.terminalRuntime.stop(session.sessionId)
     } catch (error) {
       this.toolInvocations.reopenSession(session.sessionId)
@@ -466,6 +471,7 @@ export class AgentSessionService {
     this.toolInvocations.beginSessionClosing(replacedSessionId)
     try {
       await this.settleSessionToolCalls(session)
+      await this.providerLaunchShutdown.request(session)
       await this.terminalRuntime.stop(replacedSessionId)
     } catch (error) {
       this.toolInvocations.reopenSession(replacedSessionId)
@@ -475,6 +481,7 @@ export class AgentSessionService {
     recordAgentTerminalStopped(session, 'exited')
     unregisterAgentMcpEndpoint(session)
     await disposeAgentLaunchArtifacts(session)
+    await this.persistence.waitForIdle()
     session.cleancodeMcpEnabled = cleancodeMcpEnabled
     session.isStopping = false
     session.isTerminalRunning = false
@@ -563,48 +570,23 @@ export class AgentSessionService {
       activity: 'unavailable',
       launch: { exitCode: null, failureKind: null, launchId: null, status: 'launching' }
     })
-    const artifacts = new AgentLaunchArtifactScope()
-    session.launchArtifacts = artifacts
     const isCurrentProviderLaunch = (): boolean =>
       session.sessionId === processSessionId &&
-      session.providerLaunchGeneration === providerLaunchGeneration &&
-      !session.isStopping
+      session.providerLaunchGeneration === providerLaunchGeneration
     const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot): void => {
       if (!isCurrentProviderLaunch()) return
       this.persistence.persist(session, sessionRef, providerLaunchGeneration)
     }
-    let plan: AgentLaunchPlan
-    try {
-      plan = await provider.launcher.createLaunchPlan({
-        artifacts,
-        cleancodeMcp: session.mcpRegistration
-          ? {
-              bearerToken: session.mcpRegistration.bearerToken,
-              serverUrl: session.mcpRegistration.url
-            }
-          : undefined,
-        ...(launchProfile ? { launchProfile } : {}),
-        onProviderSessionIdentified: persistProviderSessionRef,
-        onActivityChanged: (activity) => {
-          if (!isCurrentProviderLaunch()) return
-          transitionAgentRuntime(session, { activity })
-        },
-        providerSessionRef: session.providerSessionRef ?? undefined,
-        workspaceDirectory: session.workspaceDirectory
-      })
-      artifacts.seal()
-    } catch (error) {
-      artifacts.seal()
-      try {
-        await disposeAgentLaunchArtifacts(session)
-      } catch (cleanupError) {
-        throw new AggregateError(
-          [error, cleanupError],
-          'Agent launch setup and artifact cleanup both failed.'
-        )
-      }
-      throw error
-    }
+    const plan = await createManagedAgentLaunchPlan({
+      ...(launchProfile ? { launchProfile } : {}),
+      onActivityChanged: (activity) => {
+        if (!isCurrentProviderLaunch()) return
+        transitionAgentRuntime(session, { activity })
+      },
+      onProviderSessionIdentified: persistProviderSessionRef,
+      provider,
+      session
+    })
     if (!canLaunchAgentProvider(session, processSessionId)) {
       await disposeAgentLaunchArtifacts(session)
       return
@@ -622,14 +604,23 @@ export class AgentSessionService {
         session,
         sessionId: processSessionId
       })
+      const markProviderLaunchExited = this.providerLaunchShutdown.trackLaunch(
+        session,
+        providerLaunchGeneration,
+        plan.gracefulShutdown
+      )
       const launch = this.terminalRuntime.launch({
-        onExit: lifecycle.onExit,
+        onExit: (event) => {
+          markProviderLaunchExited()
+          lifecycle.onExit(event)
+        },
         onStarted: lifecycle.onStarted,
         plan,
         sessionId: processSessionId
       })
       lifecycle.bind(launch)
     } catch (error) {
+      this.providerLaunchShutdown.forget(session)
       await disposeAgentLaunchArtifacts(session)
       throw error
     }
@@ -665,10 +656,12 @@ export class AgentSessionService {
     this.beginSessionToolClosing(session)
     await this.settleSessionToolCalls(session)
     if (session.isTerminalRunning) {
+      await this.providerLaunchShutdown.request(session)
       await this.terminalRuntime.stop(session.sessionId)
       recordAgentTerminalStopped(session, 'exited')
     }
     await disposeAgentLaunchArtifacts(session)
+    await this.persistence.waitForIdle()
     this.sessions.delete(sessionKey)
     this.toolInvocations.forgetSession(session.sessionId)
   }

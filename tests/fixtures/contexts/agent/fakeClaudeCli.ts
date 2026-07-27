@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -5,12 +6,13 @@ export interface FakeClaudeCliFixture {
   readonly binDirectory: string
   readonly reportPath: string
   readonly shellPath: string
+  readonly switchSessionId: string
 }
 
 export interface FakeClaudeCliReport {
   readonly args: readonly string[]
   readonly cwd: string
-  readonly kind: 'exit' | 'inspection' | 'session' | 'user-prompt-hook'
+  readonly kind: 'exit' | 'inspection' | 'session' | 'session-start-hook'
   readonly pid: number
   readonly sessionId?: string
 }
@@ -24,6 +26,7 @@ export async function installFakeClaudeCli(
   const executablePath = join(binDirectory, process.platform === 'win32' ? 'claude.cmd' : 'claude')
   const programPath = join(fixtureDirectory, 'claude.mjs')
   const shellPath = process.platform === 'win32' ? 'powershell.exe' : join(fixtureDirectory, 'sh')
+  const switchSessionId = randomUUID()
 
   await mkdir(binDirectory, { recursive: true })
   await writeFile(programPath, createFakeClaudeProgram(), 'utf8')
@@ -34,7 +37,7 @@ export async function installFakeClaudeCli(
     await chmod(shellPath, 0o755)
   }
 
-  return { binDirectory, reportPath, shellPath }
+  return { binDirectory, reportPath, shellPath, switchSessionId }
 }
 
 export async function readFakeClaudeCliReports(
@@ -62,9 +65,12 @@ const reportPath = process.env.CLEANCODE_FAKE_CLAUDE_REPORT_PATH
 const sessionFlagIndex = args.findIndex((arg) => arg === '--session-id' || arg === '--resume')
 const sessionId = sessionFlagIndex >= 0 ? args[sessionFlagIndex + 1] : undefined
 
-function report(kind) {
+function report(kind, reportedSessionId = sessionId) {
   if (!reportPath) return
-  appendFileSync(reportPath, JSON.stringify({ args, cwd, kind, pid: process.pid, sessionId }) + '\\n')
+  appendFileSync(
+    reportPath,
+    JSON.stringify({ args, cwd, kind, pid: process.pid, sessionId: reportedSessionId }) + '\\n'
+  )
 }
 
 if (args.includes('--version')) {
@@ -78,14 +84,19 @@ process.stdout.write('CC_E2E_CLAUDE_READY:' + sessionId + ':' + process.pid + '\
 
 let input = ''
 let exiting = false
-async function publishUserPrompt() {
-  if (!sessionId || !process.env.CLEANCODE_CLAUDE_HOOK_URL) return
+async function publishSessionStart(activeSessionId, source) {
+  if (!activeSessionId || !process.env.CLEANCODE_CLAUDE_HOOK_URL) return
   await fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL, {
-    body: JSON.stringify({ cwd, hook_event_name: 'UserPromptSubmit', session_id: sessionId }),
+    body: JSON.stringify({
+      cwd,
+      hook_event_name: 'SessionStart',
+      session_id: activeSessionId,
+      source
+    }),
     headers: { authorization: 'Bearer ' + process.env.CLEANCODE_CLAUDE_HOOK_TOKEN },
     method: 'POST'
   })
-  report('user-prompt-hook')
+  report('session-start-hook', activeSessionId)
 }
 
 function exitCleanly() {
@@ -94,6 +105,8 @@ function exitCleanly() {
   report('exit')
   process.exit(0)
 }
+
+await publishSessionStart(sessionId, args.includes('--resume') ? 'resume' : 'startup')
 
 process.stdin.setRawMode?.(true)
 process.stdin.resume()
@@ -104,8 +117,13 @@ process.stdin.on('data', (data) => {
   }
   input += data.toString('utf8')
   if (!input.includes('\\r') && !input.includes('\\n')) return
+  const command = input.trim()
   input = ''
-  void publishUserPrompt().catch(() => undefined)
+  if (command === '/resume') {
+    void publishSessionStart(process.env.CLEANCODE_FAKE_CLAUDE_SWITCH_SESSION_ID, 'resume').catch(
+      () => undefined
+    )
+  }
 })
 process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)

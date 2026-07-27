@@ -112,6 +112,12 @@ export interface AgentLaunchPlan {
   readonly args: readonly string[]
   readonly env: Readonly<Record<string, string>>
   readonly executable: string
+  readonly gracefulShutdown?: {
+    readonly inputIntervalMs: number
+    readonly inputs: readonly string[]
+    readonly timeoutMs: number
+  }
+  readonly onTerminalTitleChanged?: (title: string) => void
   readonly providerSessionRefOnStarted?: ProviderSessionRefSnapshot
 }
 
@@ -160,6 +166,7 @@ export interface AgentTelemetryContribution {
   }): Promise<{
     readonly args: readonly string[]
     readonly env: Readonly<Record<string, string>>
+    readonly onTerminalTitleChanged?: (title: string) => void
   }>
 }
 

@@ -53,4 +53,5 @@ export interface StartTerminalSessionCommand {
   readonly rows?: number
   readonly onOutput: (event: TerminalOutputEvent) => void
   readonly onExit: (event: TerminalExitEvent) => void
+  readonly onTitleChanged?: (title: string) => void
 }
