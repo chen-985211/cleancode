@@ -101,8 +101,10 @@ const hookCommand = sessionEndConfiguration
 const sessionEndHookTrusted = Boolean(
   hookCommand && configs.some(isPreciseSessionEndTrustConfiguration)
 )
-const terminalTitleConfigured = configs.includes(
-  'tui.terminal_title=["thread-title","thread-id"]'
+const terminalTitleConfigured = configs.some(
+  (configuration) =>
+    configuration === 'tui.terminal_title=["thread-title","thread-id"]' ||
+    configuration === "tui.terminal_title=['thread-title','thread-id']"
 )
 const resumeIndex = args.indexOf('resume')
 let activeSessionId =
@@ -207,6 +209,10 @@ function readConfigurationString(configuration, key) {
   const keyIndex = configuration.indexOf(key)
   if (keyIndex < 0) return null
   const valueStart = keyIndex + key.length
+  if (configuration[valueStart] === "'") {
+    const valueEnd = configuration.indexOf("'", valueStart + 1)
+    return valueEnd < 0 ? null : configuration.slice(valueStart + 1, valueEnd)
+  }
   if (configuration[valueStart] !== '"') return null
 
   let escaped = false
@@ -231,14 +237,11 @@ function readConfigurationString(configuration, key) {
 }
 
 function isPreciseSessionEndTrustConfiguration(configuration) {
-  const prefix = 'hooks.state={' + JSON.stringify(hookKey) + '={trusted_hash='
+  const prefix = 'hooks.state={'
   if (!configuration.startsWith(prefix) || !configuration.endsWith('}}')) return false
-  try {
-    const trustedHash = JSON.parse(configuration.slice(prefix.length, -2))
-    return trustedHash === hookHash
-  } catch {
-    return false
-  }
+  const configuredKey = readConfigurationString(configuration, prefix)
+  const configuredHash = readConfigurationString(configuration, 'trusted_hash=')
+  return configuredKey === hookKey && configuredHash === hookHash
 }
 
 function draw() {

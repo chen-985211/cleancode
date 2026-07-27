@@ -2,7 +2,10 @@ import { spawn } from 'node:child_process'
 
 import { AgentLaunchArtifactScope } from '../../../../src/contexts/agent/application/services/AgentLaunchArtifactScope'
 import { CodexAgentProviderContribution } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexAgentProviderContribution'
-import { createCodexSessionEndHookTrustConfiguration } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexSessionEndHookTrustResolver'
+import {
+  createCodexSessionEndHookTrustConfiguration,
+  type CodexSessionEndHookTrustInput
+} from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexSessionEndHookTrustResolver'
 import { findUniqueCodexThreadIdByPrefix } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexThreadPrefixResolver'
 import { CodexThreadIdentityReporter } from '../../../../src/contexts/agent/infrastructure/pty/CodexThreadIdentityReporter'
 import { NodeAgentProviderCliDetector } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCliDetector'
@@ -110,7 +113,12 @@ describe('Codex Agent Provider contribution', () => {
       expect(plan.args.join('\n')).toContain('developer_instructions=')
       expect(plan.args.join('\n')).toContain('notify=')
       expect(plan.args).toEqual(
-        expect.arrayContaining(['--config', 'tui.terminal_title=["thread-title","thread-id"]'])
+        expect.arrayContaining([
+          '--config',
+          process.platform === 'win32'
+            ? "tui.terminal_title=['thread-title','thread-id']"
+            : 'tui.terminal_title=["thread-title","thread-id"]'
+        ])
       )
       expect(plan.env).toMatchObject({
         CLEANCODE_CODEX_NOTIFY_TOKEN: 'notify-token',
@@ -180,6 +188,53 @@ describe('Codex Agent Provider contribution', () => {
     }
   })
 
+  it('uses TOML literal strings so Windows shims preserve Codex config values', async () => {
+    const resolveHookTrust = vi.fn(async (input: CodexSessionEndHookTrustInput) => {
+      void input
+      return null
+    })
+    const contribution = new CodexAgentProviderContribution({
+      hookTrustResolver: resolveHookTrust,
+      runtimeExecutable: String.raw`C:\Program Files\CleanCode\node.exe`,
+      runtimePlatform: 'win32',
+      threadPrefixResolver: async () => null
+    })
+    const artifacts = new AgentLaunchArtifactScope()
+    const plan = await contribution.launcher.createLaunchPlan({
+      artifacts,
+      cleancodeMcp: {
+        bearerToken: 'mcp-token',
+        serverUrl: 'http://127.0.0.1:43123/mcp'
+      },
+      onProviderSessionIdentified: () => undefined,
+      workspaceDirectory: String.raw`C:\repo\app`
+    })
+    artifacts.seal()
+
+    try {
+      const configurations = plan.args.flatMap((argument, index) =>
+        argument === '--config' ? [plan.args[index + 1]!] : []
+      )
+      const hookConfiguration = resolveHookTrust.mock.calls[0]?.[0].hookConfiguration
+
+      expect(configurations).toContain("tui.terminal_title=['thread-title','thread-id']")
+      expect(configurations).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/^notify=\['powershell\.exe'/),
+          expect.stringContaining("mcp_servers.cleancode={url='http://127.0.0.1:43123/mcp'"),
+          expect.stringMatching(/^developer_instructions='''/)
+        ])
+      )
+      expect(hookConfiguration).toMatch(/^hooks\.SessionEnd=\[\{hooks=\[\{type='command'/)
+      expect(hookConfiguration).not.toContain('"')
+      expect(resolveHookTrust.mock.calls[0]?.[0].hookCommand).toMatch(
+        /^powershell\.exe .* -EncodedCommand /
+      )
+    } finally {
+      await artifacts.dispose()
+    }
+  })
+
   it('falls back to legacy notify when Codex cannot identify the temporary hook', async () => {
     const contribution = new CodexAgentProviderContribution({
       hookTrustResolver: async () => {
@@ -226,7 +281,7 @@ describe('Codex Agent Provider contribution', () => {
     expect(
       createCodexSessionEndHookTrustConfiguration({ data: [{ hooks: [hook] }] }, hook.command)
     ).toBe(
-      'hooks.state={"/<session-flags>/config.toml:session_end:0:0"={trusted_hash="sha256:abc123"}}'
+      "hooks.state={'/<session-flags>/config.toml:session_end:0:0'={trusted_hash='sha256:abc123'}}"
     )
     expect(
       createCodexSessionEndHookTrustConfiguration(
@@ -244,7 +299,10 @@ describe('Codex Agent Provider contribution', () => {
 
   it('relays both legacy argv notifications and SessionEnd stdin before the relay exits', async () => {
     const identified = vi.fn()
-    const resolveHookTrust = vi.fn(async () => null)
+    const resolveHookTrust = vi.fn(async (input: CodexSessionEndHookTrustInput) => {
+      void input
+      return null
+    })
     const contribution = new CodexAgentProviderContribution({
       hookTrustResolver: resolveHookTrust,
       runtimeExecutable: process.execPath
@@ -258,16 +316,17 @@ describe('Codex Agent Provider contribution', () => {
     artifacts.seal()
     const notifyConfiguration = plan.args.find((argument) => argument.startsWith('notify='))
     expect(notifyConfiguration).toBeDefined()
-    const notifyCommand = JSON.parse(notifyConfiguration!.slice('notify='.length)) as string[]
-    expect(resolveHookTrust).toHaveBeenCalledWith(
+    const notifyCommand = parseCodexStringArray(notifyConfiguration!.slice('notify='.length))
+    const hookTrustInput = resolveHookTrust.mock.calls[0]?.[0]
+    expect(hookTrustInput).toEqual(
       expect.objectContaining({
         executable: 'codex',
-        hookCommand: expect.stringContaining(process.execPath),
         hookConfiguration: expect.stringMatching(
-          /^hooks\.SessionEnd=\[\{hooks=\[\{type="command",command=/
+          /^hooks\.SessionEnd=\[\{hooks=\[\{type=["']command["'],command=/
         )
       })
     )
+    expectRelayCommandContainsRuntime(hookTrustInput!.hookCommand, process.execPath)
 
     try {
       await runRelay(notifyCommand, plan.env, {
@@ -392,6 +451,26 @@ describe('Codex Agent Provider contribution', () => {
     ).toBeNull()
   })
 })
+
+function parseCodexStringArray(value: string): string[] {
+  if (value.startsWith('["')) return JSON.parse(value) as string[]
+  const values = [...value.matchAll(/'([^']*)'/g)].map((match) => match[1]!)
+  if (!value.startsWith('[') || !value.endsWith(']') || values.length === 0) {
+    throw new Error(`Unsupported Codex string array: ${value}`)
+  }
+  return values
+}
+
+function expectRelayCommandContainsRuntime(command: string, runtimeExecutable: string): void {
+  if (process.platform !== 'win32') {
+    expect(command).toContain(runtimeExecutable)
+    return
+  }
+  const encodedScript = command.trim().split(/\s+/).at(-1)
+  expect(encodedScript).toBeDefined()
+  const script = Buffer.from(encodedScript!, 'base64').toString('utf16le')
+  expect(script).toContain(Buffer.from(runtimeExecutable, 'utf8').toString('base64'))
+}
 
 async function runRelay(
   command: readonly string[],

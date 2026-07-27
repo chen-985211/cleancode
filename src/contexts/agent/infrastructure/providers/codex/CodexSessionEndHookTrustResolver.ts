@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 
 import { createAgentProviderCliProcessInvocation } from '../shared/NodeAgentProviderCliDetector'
+import { serializeCodexTomlLiteralString } from './CodexTomlConfiguration'
 
 export interface CodexSessionEndHookTrustInput {
   readonly executable: string
@@ -46,7 +47,10 @@ export function createCodexSessionEndHookTrustConfiguration(
   )
   if (matches.length !== 1) return null
   const [hook] = matches
-  return `hooks.state={${JSON.stringify(hook!.key)}={trusted_hash=${JSON.stringify(hook!.currentHash)}}}`
+  const key = serializeCodexTomlLiteralString(hook!.key as string)
+  const trustedHash = serializeCodexTomlLiteralString(hook!.currentHash as string)
+  if (!key || !trustedHash) return null
+  return `hooks.state={${key}={trusted_hash=${trustedHash}}}`
 }
 
 function requestHooksList(input: CodexSessionEndHookTrustInput): Promise<unknown> {

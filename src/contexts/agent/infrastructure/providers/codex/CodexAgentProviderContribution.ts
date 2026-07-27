@@ -29,6 +29,7 @@ import {
   resolveCodexThreadIdPrefix,
   type CodexThreadPrefixResolver
 } from './CodexThreadPrefixResolver'
+import { serializeCodexTomlString, serializeCodexTomlStringArray } from './CodexTomlConfiguration'
 
 export const codexInstallCommands = {
   linux: 'curl -fsSL https://chatgpt.com/codex/install.sh | sh',
@@ -60,6 +61,7 @@ export interface CodexAgentProviderContributionOptions {
   readonly detector?: AgentProviderDetector
   readonly hookTrustResolver?: CodexSessionEndHookTrustResolver
   readonly runtimeExecutable?: string
+  readonly runtimePlatform?: NodeJS.Platform
   readonly telemetryFactory?: CodexTelemetryFactory
   readonly threadPrefixResolver?: CodexThreadPrefixResolver
 }
@@ -89,13 +91,14 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
   readonly sessionRefCodec: AgentProviderSessionRefCodec = new CodexSessionRefCodec()
   readonly resume: AgentResumeStrategy = new CodexResumeStrategy(this.sessionRefCodec)
   readonly telemetry: CodexTelemetryContribution
-  readonly cleancodeCapability: AgentCapabilityInjector = new CodexCleancodeCapabilityInjector()
+  readonly cleancodeCapability: AgentCapabilityInjector
   readonly launcher: AgentLaunchPlanner
 
   constructor(options: CodexAgentProviderContributionOptions = {}) {
     const command = options.command ?? 'codex'
     const baseArgs = options.baseArgs ?? []
     const runtimeExecutable = options.runtimeExecutable ?? process.execPath
+    const runtimePlatform = options.runtimePlatform ?? process.platform
     this.detector =
       options.detector ??
       new NodeAgentProviderCliDetector({
@@ -109,12 +112,15 @@ export class CodexAgentProviderContribution implements AgentProviderContribution
           createCodexTelemetryRuntime(
             telemetryCommand,
             runtimeExecutable,
-            options.threadPrefixResolver ?? resolveCodexThreadIdPrefix
+            options.threadPrefixResolver ?? resolveCodexThreadIdPrefix,
+            runtimePlatform
           )),
       command,
       options.hookTrustResolver ?? resolveCodexSessionEndHookTrust,
-      baseArgs
+      baseArgs,
+      runtimePlatform
     )
+    this.cleancodeCapability = new CodexCleancodeCapabilityInjector(runtimePlatform)
     this.launcher = new CodexLaunchPlanner({
       baseArgs,
       cleancodeCapability: this.cleancodeCapability,
@@ -163,7 +169,8 @@ class CodexTelemetryContribution implements AgentTelemetryContribution {
     private readonly factory: CodexTelemetryFactory,
     private readonly defaultExecutable: string,
     private readonly resolveHookTrust: CodexSessionEndHookTrustResolver,
-    private readonly baseArgs: readonly string[]
+    private readonly baseArgs: readonly string[],
+    private readonly runtimePlatform: NodeJS.Platform
   ) {}
 
   async prepare(command: Parameters<AgentTelemetryContribution['prepare']>[0]) {
@@ -181,9 +188,12 @@ class CodexTelemetryContribution implements AgentTelemetryContribution {
     command.artifacts.track('codex-notify-reporter', runtime)
     const telemetryArgs = [
       '--config',
-      'tui.terminal_title=["thread-title","thread-id"]',
+      `tui.terminal_title=${serializeCodexTomlStringArray(
+        ['thread-title', 'thread-id'],
+        this.runtimePlatform
+      )}`,
       '--config',
-      `notify=${JSON.stringify(runtime.notifyCommand)}`
+      `notify=${serializeCodexTomlStringArray(runtime.notifyCommand, this.runtimePlatform)}`
     ]
     if (!runtime.sessionEndHook) {
       return {
@@ -225,13 +235,16 @@ class CodexTelemetryContribution implements AgentTelemetryContribution {
 }
 
 class CodexCleancodeCapabilityInjector implements AgentCapabilityInjector {
+  constructor(private readonly runtimePlatform: NodeJS.Platform) {}
+
   inject(command: Parameters<AgentCapabilityInjector['inject']>[0]) {
+    const serialize = (value: string) => serializeCodexTomlString(value, this.runtimePlatform)
     return {
       args: [
         '--config',
-        `mcp_servers.cleancode={url=${JSON.stringify(command.serverUrl)},bearer_token_env_var="CLEANCODE_MCP_TOKEN",enabled=true,default_tools_approval_mode="approve"}`,
+        `mcp_servers.cleancode={url=${serialize(command.serverUrl)},bearer_token_env_var=${serialize('CLEANCODE_MCP_TOKEN')},enabled=true,default_tools_approval_mode=${serialize('approve')}}`,
         '--config',
-        `developer_instructions=${JSON.stringify(cleancodeMcpDeveloperInstructions)}`
+        `developer_instructions=${serialize(cleancodeMcpDeveloperInstructions)}`
       ],
       env: createMcpEnvironment(command.bearerToken)
     }
@@ -299,7 +312,8 @@ async function createCodexTelemetryRuntime(
     readonly workspaceDirectory: string
   },
   runtimeExecutable: string,
-  resolveThreadPrefix: CodexThreadPrefixResolver
+  resolveThreadPrefix: CodexThreadPrefixResolver,
+  runtimePlatform: NodeJS.Platform
 ): Promise<CodexTelemetryRuntime> {
   const reporter = await CodexThreadIdentityReporter.start({
     onThreadIdentified: (threadId) =>
@@ -328,7 +342,11 @@ async function createCodexTelemetryRuntime(
     await reporter.close()
     throw error
   }
-  const sessionEndHook = createCodexSessionEndHook(runtimeExecutable, relay.path)
+  const sessionEndHook = createCodexSessionEndHook(runtimeExecutable, relay.path, runtimePlatform)
+  const notifyCommand =
+    runtimePlatform === 'win32'
+      ? createWindowsRelayInvocation(runtimeExecutable, relay.path)
+      : [runtimeExecutable, relay.path]
   return {
     dispose: async () => {
       try {
@@ -342,7 +360,7 @@ async function createCodexTelemetryRuntime(
       CLEANCODE_CODEX_NOTIFY_URL: reporter.url,
       ELECTRON_RUN_AS_NODE: '1'
     },
-    notifyCommand: [runtimeExecutable, relay.path],
+    notifyCommand,
     onTerminalTitleChanged: (title) => reporter.acceptTerminalTitle(title),
     sessionEndHook
   }
@@ -362,16 +380,27 @@ const codexHookRelayScript = [
   '}).catch(()=>{});'
 ].join('')
 
-function createCodexSessionEndHook(runtimeExecutable: string, relayPath: string) {
-  const command = [runtimeExecutable, relayPath].map(quotePosixShellArgument).join(' ')
-  const commandWindows = createWindowsRelayCommand(runtimeExecutable, relayPath)
+function createCodexSessionEndHook(
+  runtimeExecutable: string,
+  relayPath: string,
+  runtimePlatform: NodeJS.Platform
+) {
+  const command =
+    runtimePlatform === 'win32'
+      ? createWindowsRelayInvocation(runtimeExecutable, relayPath).join(' ')
+      : [runtimeExecutable, relayPath].map(quotePosixShellArgument).join(' ')
+  const commandWindows =
+    runtimePlatform === 'win32'
+      ? command
+      : createWindowsRelayInvocation(runtimeExecutable, relayPath).join(' ')
+  const serialize = (value: string) => serializeCodexTomlString(value, runtimePlatform)
   return {
-    command: process.platform === 'win32' ? commandWindows : command,
+    command: runtimePlatform === 'win32' ? commandWindows : command,
     configuration: [
-      'hooks.SessionEnd=[{hooks=[{type="command",command=',
-      JSON.stringify(command),
+      `hooks.SessionEnd=[{hooks=[{type=${serialize('command')},command=`,
+      serialize(command),
       ',commandWindows=',
-      JSON.stringify(commandWindows),
+      serialize(commandWindows),
       ',timeout=3}]}]'
     ].join('')
   }
@@ -381,7 +410,10 @@ function quotePosixShellArgument(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`
 }
 
-function createWindowsRelayCommand(runtimeExecutable: string, relayPath: string): string {
+function createWindowsRelayInvocation(
+  runtimeExecutable: string,
+  relayPath: string
+): readonly string[] {
   const encodedScript = Buffer.from(
     [
       '$encoding = [System.Text.Encoding]::UTF8',
@@ -392,7 +424,16 @@ function createWindowsRelayCommand(runtimeExecutable: string, relayPath: string)
     ].join('\n'),
     'utf16le'
   ).toString('base64')
-  return `powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ${encodedScript}`
+  return [
+    'powershell.exe',
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-EncodedCommand',
+    encodedScript
+  ]
 }
 
 function encodeUtf8(value: string): string {
