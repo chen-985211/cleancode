@@ -1,6 +1,8 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 
+import { consoleLogger } from '../logging/ConsoleLogSink'
+import { bindElectronExternalNavigationPolicy } from './electronExternalNavigationPolicy'
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
 import { resolveWindowFrameOptions } from './windowFrameOptions'
@@ -36,6 +38,11 @@ export function createMainWindow(input: {
   })
   bindWindowFullScreenState(mainWindow)
   bindElectronPageZoomStartup(mainWindow.webContents)
+  bindElectronExternalNavigationPolicy({
+    onOpenError: logExternalNavigationError,
+    openExternal: (address) => shell.openExternal(address),
+    webContents: mainWindow.webContents
+  })
 
   if (input.policy.mode === 'offscreen-inactive') {
     const { position } = input.policy
@@ -61,4 +68,13 @@ export function createMainWindow(input: {
     mainWindow.destroy()
   })
   loadRenderer()
+}
+
+function logExternalNavigationError(): void {
+  consoleLogger.warn({
+    scope: 'platform.window',
+    operation: 'openExternalNavigation',
+    outcome: 'failure',
+    error: { message: 'The system external-navigation request failed.' }
+  })
 }

@@ -21,6 +21,11 @@ interface FakeTerminal {
   customKeyEventHandler: ((event: KeyboardEvent) => boolean) | null
   focus: ReturnType<typeof vi.fn>
   linkProvider: { provideLinks(line: number, callback: (links: unknown[]) => void): void } | null
+  options: {
+    linkHandler?: {
+      activate(event: MouseEvent, target: string): void
+    }
+  }
 }
 
 interface FakeBufferLine {
@@ -224,6 +229,22 @@ describe('terminal viewport daily interactions', () => {
     await waitFor(() => expect(openTerminalLink).toHaveBeenCalledTimes(1))
     expect(openTerminalLink).toHaveBeenCalledWith(
       expect.objectContaining({ rawTarget: 'https://example.com/', viewId: expect.any(String) })
+    )
+  })
+
+  it('opens an explicit OSC 8 link without requiring a modifier', async () => {
+    renderViewport()
+    const terminal = await installedTerminal()
+    const linkHandler = terminal.options.linkHandler
+
+    expect(linkHandler).toBeDefined()
+    linkHandler?.activate(new MouseEvent('click'), 'https://example.com/osc-8')
+    await waitFor(() => expect(openTerminalLink).toHaveBeenCalledTimes(1))
+    expect(openTerminalLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawTarget: 'https://example.com/osc-8',
+        viewId: expect.any(String)
+      })
     )
   })
 

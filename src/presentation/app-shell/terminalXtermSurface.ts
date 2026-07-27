@@ -40,7 +40,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private readonly searchAddon = new SearchAddon({ highlightLimit: 1000 })
   private readonly unicodeAddon = new Unicode11Addon()
   private readonly webLinksAddon = new WebLinksAddon((event, target) => {
-    if (hasOpenModifier(event)) this.onOpenLink(target)
+    this.activateDetectedLink(event, target)
   })
   private readonly rendererController = new TerminalRendererController({
     onStateChange: (state) => {
@@ -84,6 +84,9 @@ class XtermTerminalSurface implements TerminalSurface {
       fontSize: 12,
       fontWeight: 500,
       lineHeight: 1.32,
+      linkHandler: {
+        activate: (_event, target) => this.onOpenLink(target)
+      },
       macOptionClickForcesSelection: true,
       rows: 9,
       scrollback: terminalSurfaceScrollbackRows,
@@ -97,6 +100,10 @@ class XtermTerminalSurface implements TerminalSurface {
     this.fileLinkProviderSubscription = this.terminal.registerLinkProvider(
       createTerminalFileLinkProvider(this.terminal, (target) => this.onOpenLink(target))
     )
+  }
+
+  private activateDetectedLink(event: MouseEvent, target: string): void {
+    if (hasOpenModifier(event)) this.onOpenLink(target)
   }
 
   attach(attachment: TerminalSurfaceAttachment): void {

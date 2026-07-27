@@ -116,7 +116,12 @@ export function useAgentTerminalView({
         void api.resizeAgentSession({ ...dimensions, sessionId: runtimeSessionId })
       },
       onInput: enqueueInput,
-      onOpenLink: () => undefined,
+      onOpenLink: (rawTarget) => {
+        if (isReleased || !api.openTerminalLink) return
+        void api
+          .openTerminalLink({ ...identity, viewId: lease.viewId, rawTarget })
+          .catch(() => undefined)
+      },
       onOpenSearch: () => undefined,
       onRestoreRequired: () => requestRestore(0),
       onSearchResultsChange: () => undefined
