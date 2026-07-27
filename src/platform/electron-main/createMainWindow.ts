@@ -5,7 +5,7 @@ import { consoleLogger } from '../logging/ConsoleLogSink'
 import { bindElectronExternalNavigationPolicy } from './electronExternalNavigationPolicy'
 import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
-import { resolveWindowFrameOptions } from './windowFrameOptions'
+import { resolveWindowFrameOptions, shouldRemoveDefaultWindowMenu } from './windowFrameOptions'
 import { bindWindowFullScreenState } from './windowFullScreenState'
 
 export function createMainWindow(input: {
@@ -36,6 +36,7 @@ export function createMainWindow(input: {
       sandbox: false
     }
   })
+  if (shouldRemoveDefaultWindowMenu(process.platform)) mainWindow.removeMenu()
   bindWindowFullScreenState(mainWindow)
   bindElectronPageZoomStartup(mainWindow.webContents)
   bindElectronExternalNavigationPolicy({

@@ -11,3 +11,7 @@ export function resolveWindowFrameOptions(platform: NodeJS.Platform): {
       }
     : {}
 }
+
+export function shouldRemoveDefaultWindowMenu(platform: NodeJS.Platform): boolean {
+  return platform === 'win32'
+}

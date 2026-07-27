@@ -48,6 +48,13 @@ describe('project workspaces e2e', () => {
     'keeps the titlebar sidebar control aligned and interactive across fullscreen and collapse states',
     async () => {
       await expectDesktopRuntime(page)
+      if (process.platform === 'win32') {
+        expect(
+          await electronApp.evaluate(({ BrowserWindow }) =>
+            BrowserWindow.getAllWindows()[0]?.isMenuBarVisible()
+          )
+        ).toBe(false)
+      }
       const titlebarNavigation = page.getByRole('navigation', { name: '窗口导航' })
       const sidebar = page.locator('#project-sidebar')
       const collapseSidebar = titlebarNavigation.getByRole('button', { name: '收起侧边栏' })
