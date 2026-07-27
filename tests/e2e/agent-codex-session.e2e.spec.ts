@@ -81,7 +81,7 @@ describe('Codex Agent session e2e', () => {
         .filter({ has: page.getByRole('img', { name: 'Codex' }) })
         .locator('.agent-terminal-viewport')
       await codexTerminal.click()
-      await page.keyboard.type('/resume')
+      await enterCodexResumeCommand(electronApp, page)
       await page.keyboard.press('Enter')
       await waitForCodexResumeSelection(fakeCodex.reportPath, fakeCodex.switchSessionId)
       expect(
@@ -126,6 +126,27 @@ describe('Codex Agent session e2e', () => {
     electronScenarioTimeoutMs
   )
 })
+
+async function enterCodexResumeCommand(
+  electronApp: ElectronApplication,
+  page: Page
+): Promise<void> {
+  if (process.platform !== 'win32') {
+    await page.keyboard.type('/resume')
+    return
+  }
+
+  const originalClipboard = await electronApp.evaluate(({ clipboard }) => clipboard.readText())
+  try {
+    await electronApp.evaluate(({ clipboard }) => clipboard.writeText('/resume'))
+    await page.keyboard.press('Control+V')
+  } finally {
+    await electronApp.evaluate(
+      ({ clipboard }, text) => clipboard.writeText(text),
+      originalClipboard
+    )
+  }
+}
 
 function createAgentProviderEnvironment(fakeCodex: FakeCodexCliFixture): NodeJS.ProcessEnv {
   return {

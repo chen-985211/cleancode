@@ -1,4 +1,4 @@
-import type { MutableRefObject } from 'react'
+import type { KeyboardEvent, MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { useI18n } from './i18n/useI18n'
@@ -51,8 +51,22 @@ export function AgentTerminalSurface({
         data-agent-terminal-source-theme={session?.terminalSourceTheme}
         data-agent-terminal-workspace-id={session?.workspaceId}
         data-agent-terminal-workspace-name={workspaceDisplayName}
+        onKeyDownCapture={preserveWindowsTextPaste}
         ref={terminalElementRef}
       />
     </TerminalThemeProjection>
   )
+}
+
+function preserveWindowsTextPaste(event: KeyboardEvent<HTMLDivElement>): void {
+  if (
+    /^Win/iu.test(navigator.platform) &&
+    event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === 'v'
+  ) {
+    event.stopPropagation()
+  }
 }
