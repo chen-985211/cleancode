@@ -47,7 +47,10 @@ describe('Agent Providers on the Run Agent terminal', () => {
         'import { spawnSync } from "node:child_process"',
         'process.stdout.write("codex-through-run\\n")',
         'const notifyArg = process.argv.find((arg) => arg.startsWith("notify="))',
-        'const notify = JSON.parse(notifyArg.slice("notify=".length))',
+        'const notifyValue = notifyArg.slice("notify=".length)',
+        "const notify = notifyValue.startsWith('[\"')",
+        '  ? JSON.parse(notifyValue)',
+        "  : [...notifyValue.matchAll(/'([^']*)'/g)].map((match) => match[1])",
         'spawnSync(notify[0], [...notify.slice(1), JSON.stringify({',
         '  type: "agent-turn-complete",',
         '  "thread-id": "0190d8a1-8b7d-7d75-9f62-7a663ef87e33",',
@@ -66,7 +69,8 @@ describe('Agent Providers on the Run Agent terminal', () => {
       command: process.execPath,
       detector: {
         inspect: async () => ({ providerId: 'codex', status: 'installed', version: 'test' })
-      }
+      },
+      runtimePlatform: 'win32'
     })
     let output = ''
     let terminalExited = false
