@@ -66,7 +66,6 @@ export class TerminalWorkflowApplicationShutdown {
       for (const node of activeRun.plan.nodes) {
         operations.clearNodeGuards(activeRun, node.blockId)
       }
-      activeRun.handoffStarted.clear()
       activeRun.outputTails.clear()
       activeRun.pendingNodeStarts.clear()
       activeRun.sessionIds.clear()

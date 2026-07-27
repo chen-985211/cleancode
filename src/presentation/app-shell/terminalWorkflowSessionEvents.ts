@@ -1,6 +1,7 @@
 import type { TerminalWorkflowEvent } from '../../contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import { appendTerminalOutputTail } from './terminalOutputTail'
 import { applyTerminalServiceRunEvent } from './terminalServiceRunProjection'
+import { applyTerminalExitEvent } from './terminalSessionRuntime'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
 import type { TerminalViewState } from './types'
 
@@ -43,6 +44,10 @@ export function applyTerminalWorkflowEventToStates(
         servicePortState: event.endpoint ? 'bound' : null
       }
     }
+  }
+
+  if (event.type === 'terminal-session-ended') {
+    return applyTerminalExitEvent(states, event.exit)
   }
 
   if (event.type === 'service-endpoint-updated' || event.type === 'service-port-state-changed') {

@@ -12,7 +12,6 @@ export interface ActiveWorkflowRun {
   readonly timeoutIds: Map<string, ReturnType<typeof setTimeout>>
   readonly readinessControllers: Map<string, AbortController>
   readonly outputTails: Map<string, string>
-  readonly handoffStarted: Set<string>
   readonly pendingNodeStarts: Set<Promise<void>>
   readonly lifecycleUnregisters: Array<() => void>
   hardDisposing: boolean

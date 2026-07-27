@@ -9,18 +9,22 @@ export class TerminalSessionWorkflowRuntimeAdapter implements TerminalWorkflowRu
     return this.startSession(command, command.launchCommand)
   }
 
-  async startInteractive(command: StartWorkflowRuntimeCommand) {
-    return this.startSession(command, undefined)
-  }
-
   async stop(sessionId: string): Promise<void> {
     await this.terminalSessions.terminate(sessionId)
   }
 
-  private async startSession(
-    command: StartWorkflowRuntimeCommand,
-    launchCommand: string | undefined
-  ) {
+  async stopPreservingHistory(sessionId: string) {
+    const session = await this.terminalSessions.stopPreservingHistory(sessionId)
+    return session
+      ? {
+          scope: session,
+          sessionId: session.id,
+          exitCode: session.exitCode
+        }
+      : null
+  }
+
+  private async startSession(command: StartWorkflowRuntimeCommand, launchCommand: string) {
     const session = await this.terminalSessions.start({
       projectId: command.projectId,
       projectDirectory: command.projectDirectory,

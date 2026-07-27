@@ -8,6 +8,30 @@ import type { TerminalModelDiagnosticsSnapshot } from '../dto/TerminalModelSnaps
 import type { TerminalLinkIdentity } from '../dto/TerminalLink'
 import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
+import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
+
+export interface TerminalSessionTerminationOperation {
+  readonly promise: Promise<TerminalSessionSnapshot>
+  readonly preserveHistory: boolean
+}
+
+export function enqueueTerminalSlotOperation<T>(
+  tails: Map<string, Promise<void>>,
+  slotKey: string,
+  operation: () => Promise<T>
+): Promise<T> {
+  const previous = tails.get(slotKey) ?? Promise.resolve()
+  const result = previous.catch(() => undefined).then(operation)
+  const tail = result.then(
+    () => undefined,
+    () => undefined
+  )
+  tails.set(slotKey, tail)
+  void tail.finally(() => {
+    if (tails.get(slotKey) === tail) tails.delete(slotKey)
+  })
+  return result
+}
 
 export function getTerminalSessionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

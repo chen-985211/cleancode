@@ -55,7 +55,7 @@ idle -> running -> stopping -> exited
 
 - 同一槽位启动新会话时，先异步终止并等待旧会话清理完成。
 - 相同 owner ID 在不同项目、物理工作区或 owner kind 中拥有独立会话，可以同时运行。工作区目录和 Git 分支是启动、校验与显示元数据，不进入槽位 key；默认工作区 checkout 后继续指向同一 session、PTY、模型和视图身份。
-- 进程自然退出后移除活动槽位映射，但保留最新 generation 的会话快照和有界终端模型；显式终止或后续 replacement 撤销该恢复资格。
+- 进程自然退出后移除活动槽位映射，但保留最新 generation 的会话快照和有界终端模型。工作流面向用户的停止、超时和失败清理采用相同的历史保留结果：终止 PTY、把原会话标记为已结束并继续保留其最终模型；显式关闭、后续 replacement 或统一硬清理才撤销该资格。
 - 输出、退出、视图、快照和服务端点事件必须同时匹配当前槽位的完整运行身份；旧运行的迟到回调不能覆盖新会话。
 - 每次启动在取得 PTY 前通过 `RunRuntimeScopeValidationPort` 校验 Project 的权威项目、`workspaceId` 与目录，并受 `RunLifecycleService` 启动闸门保护；分支不参与稳定身份校验。
 - 应用退出时先关闭新启动准入并等待在途启动；Agent 与工作流上下文只排空自己的在途操作，并在 Provider handoff 后释放本地引用，不逐会话发起 PTY stop。Agent 可以在 handoff 前按自身 contribution 的有界协议向当前前台任务写入正常退出输入并等待 launch 退出，以便对应 CLI 发布最终结构化事实；该动作不停止 shell/PTY，也不改变 Run 的所有权。Run application 只向独立 Terminal Provider 提交一次应用级 detach，Run/Terminal Provider 是该流程唯一的 PTY shutdown authority。Terminal Provider 终止全部 Agent、工作流和默认策略会话；只有可靠 checkpoint 的明确保留普通会话从应用 detach。应用断连或 Electron 停止等待不等于 Provider shutdown。
@@ -103,7 +103,7 @@ Run application 统一拥有终端能力环境。普通终端启动和 Agent for
 2. snapshot 生成和 IPC 返回期间的 live output 进入 renderer 的有界队列；renderer 先恢复 snapshot，再接续大于 snapshot sequence 的连续事件。
 3. `DetachView` 只暂停输出并把响应权交还模型，不终止 PTY。旧 xterm 在主进程确认 detach 前保持可用，确认后立即销毁。
 4. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
-5. `ReplaceSession`、显式终止和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出和 Provider 故障只保留有界最终模型，不伪造 live 状态。
+5. `ReplaceSession`、显式关闭和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出、工作流历史保留停止和 Provider 故障只保留有界最终模型，不伪造 live 状态。
 
 Provider Client 的全局普通终端输出投影只接收 block-owned terminal；agent-owned terminal 输出只进入其精确绑定的 view 和进程回调。表现层对找不到匹配运行身份的普通终端输出必须保持状态引用不变，不能把 Agent 全屏重绘暂存为普通终端启动输出，也不能触发画布节点重投影。
 

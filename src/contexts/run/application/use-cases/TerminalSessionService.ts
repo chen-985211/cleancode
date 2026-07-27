@@ -47,11 +47,13 @@ import {
   assertCurrentTerminalViewIdentity,
   createTerminalSessionId,
   createTerminalSessionOwner,
+  enqueueTerminalSlotOperation,
   getTerminalSessionErrorMessage,
   readTerminalModelDiagnostics,
   requireTerminalModelPort,
   settleTerminalViewRelease,
-  throwTerminalSessionCleanupFailures
+  throwTerminalSessionCleanupFailures,
+  type TerminalSessionTerminationOperation
 } from './TerminalSessionServiceSupport'
 
 export type {
@@ -65,7 +67,7 @@ export class TerminalSessionService {
   private readonly restorableSessionIdsBySlot = new Map<string, string>()
   private readonly generationsBySlot = new Map<string, number>()
   private readonly slotOperationTails = new Map<string, Promise<void>>()
-  private readonly terminationPromises = new Map<string, Promise<TerminalSessionSnapshot>>()
+  private readonly terminationOperations = new Map<string, TerminalSessionTerminationOperation>()
   private readonly resourceUntrackers = new Map<string, () => void>()
   private readonly managedTerminators = new Map<string, () => Promise<void>>()
   private readonly fallbackOutputSequences = new Map<string, number>()
@@ -198,7 +200,9 @@ export class TerminalSessionService {
     const slotKey = createTerminalRunSlotKey(owner)
 
     const operation = () =>
-      this.enqueueSlot(slotKey, () => this.startInSlot(command, owner, slotKey))
+      enqueueTerminalSlotOperation(this.slotOperationTails, slotKey, () =>
+        this.startInSlot(command, owner, slotKey)
+      )
     return this.lifecycle ? this.lifecycle.runStart(owner, operation) : operation()
   }
 
@@ -535,10 +539,11 @@ export class TerminalSessionService {
     return managedTerminator().then(() => this.sessions.get(sessionId)?.toSnapshot() ?? null)
   }
 
+  stopPreservingHistory = (sessionId: string): Promise<TerminalSessionSnapshot | null> =>
+    this.sessions.has(sessionId) ? this.terminateSession(sessionId, true) : Promise.resolve(null)
   terminateProcess(sessionId: string): Promise<TerminalSessionSnapshot> {
     return this.terminateSession(sessionId)
   }
-
   registerManagedTerminator(sessionId: string, terminate: () => Promise<void>): () => void {
     this.managedTerminators.set(sessionId, terminate)
     return () => {
@@ -595,11 +600,18 @@ export class TerminalSessionService {
     return session
   }
 
-  private terminateSession(sessionId: string): Promise<TerminalSessionSnapshot> {
-    const existing = this.terminationPromises.get(sessionId)
+  private async terminateSession(
+    sessionId: string,
+    preserveHistory = false
+  ): Promise<TerminalSessionSnapshot> {
+    const existing = this.terminationOperations.get(sessionId)
 
     if (existing) {
-      return existing
+      const snapshot = await existing.promise
+      if (!preserveHistory && existing.preserveHistory) {
+        return this.terminateSession(sessionId)
+      }
+      return snapshot
     }
 
     const session = this.requireSession(sessionId)
@@ -616,18 +628,25 @@ export class TerminalSessionService {
       if (this.sessionIdsBySlot.get(slotKey) === session.id) {
         this.sessionIdsBySlot.delete(slotKey)
       }
-      if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
-        this.restorableSessionIdsBySlot.delete(slotKey)
+      if (!preserveHistory) {
+        if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
+          this.restorableSessionIdsBySlot.delete(slotKey)
+        }
+        await this.retireTerminalModel(session.scope)
+        this.fallbackOutputSequences.delete(session.id)
       }
-      await this.retireTerminalModel(session.scope)
-      this.fallbackOutputSequences.delete(session.id)
       this.foregroundJobCoordinator.forget(session.id)
       this.untrackSession(session.id)
 
       return session.toSnapshot()
     })()
-    this.terminationPromises.set(sessionId, termination)
-    void termination.finally(() => this.terminationPromises.delete(sessionId))
+    const operation = { promise: termination, preserveHistory }
+    this.terminationOperations.set(sessionId, operation)
+    void termination.finally(() => {
+      if (this.terminationOperations.get(sessionId) === operation) {
+        this.terminationOperations.delete(sessionId)
+      }
+    })
     return termination
   }
 
@@ -677,21 +696,5 @@ export class TerminalSessionService {
       this.sessionIdsBySlot.get(slotKey) === session.id &&
       this.generationsBySlot.get(slotKey) === session.scope.generation
     )
-  }
-
-  private async enqueueSlot<T>(slotKey: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.slotOperationTails.get(slotKey) ?? Promise.resolve()
-    const result = previous.catch(() => undefined).then(operation)
-    const tail = result.then(
-      () => undefined,
-      () => undefined
-    )
-    this.slotOperationTails.set(slotKey, tail)
-    void tail.finally(() => {
-      if (this.slotOperationTails.get(slotKey) === tail) {
-        this.slotOperationTails.delete(slotKey)
-      }
-    })
-    return result
   }
 }

@@ -12,10 +12,19 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 vi.mock('../../../src/presentation/app-shell/TerminalViewport', () => ({
-  TerminalViewport: ({ onDimensionsChange }: { onDimensionsChange: (value: unknown) => void }) => (
-    <button type="button" onClick={() => onDimensionsChange({ columns: 100, rows: 30 })}>
-      measure terminal
-    </button>
+  TerminalViewport: ({
+    isInputDisabled,
+    onDimensionsChange
+  }: {
+    isInputDisabled: boolean
+    onDimensionsChange: (value: unknown) => void
+  }) => (
+    <>
+      <span data-testid="terminal-input-disabled">{String(isInputDisabled)}</span>
+      <button type="button" onClick={() => onDimensionsChange({ columns: 100, rows: 30 })}>
+        measure terminal
+      </button>
+    </>
   )
 }))
 
@@ -42,6 +51,21 @@ describe('terminal autostart runtime epoch', () => {
     })
     rerenderTerminal(rerender, baseData)
     await waitFor(() => expect(onStart).toHaveBeenCalledTimes(2))
+  })
+
+  it('disables terminal input after the current session has ended', () => {
+    const baseData = createTerminalNodeData(vi.fn())
+
+    renderTerminal({
+      ...baseData,
+      session: {
+        ...baseData.session,
+        sessionId: 'workflow-session',
+        status: 'exited'
+      }
+    })
+
+    expect(screen.getByTestId('terminal-input-disabled')).toHaveTextContent('true')
   })
 })
 

@@ -202,6 +202,29 @@ describe('managed service launcher', () => {
     expect(cleanupStates).toEqual(['releasing', 'released'])
   })
 
+  it('releases a bound workflow service while retaining its ended terminal history', async () => {
+    const fixture = createFixture({
+      reservations: [41_001],
+      inspections: [{ ownership: 'owned', listenerProcessId: 201 }]
+    })
+    const preserveHistory = vi.spyOn(fixture.sessions, 'stopPreservingHistory')
+    const run = await fixture.launcher.launch({
+      ...launchCommand(),
+      portIntent: preferredPort()
+    })
+    const historyPreservingLauncher = fixture.launcher as ManagedServiceLauncher & {
+      stopPreservingHistory(sessionId: string): Promise<void>
+    }
+
+    await historyPreservingLauncher.stopPreservingHistory(run.session.id)
+
+    expect(preserveHistory).toHaveBeenCalledWith(run.session.id)
+    expect(fixture.readiness.closedCommands).toEqual([
+      expect.objectContaining({ host: '127.0.0.1', port: 41_001 })
+    ])
+    expect(fixture.registry.findActiveByPort(41_001)).toBeNull()
+  })
+
   it('quarantines the lease when the managed listener does not close after process exit', async () => {
     const fixture = createFixture({
       reservations: [41_001],

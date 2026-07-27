@@ -14,19 +14,32 @@ import type {
 } from '../../../../src/contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import type { TerminalSessionSnapshot } from '../../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
 import type { WorkflowRunPlanSnapshot } from '../../../../src/contexts/run/application/dto/WorkflowRunSnapshot'
-import type { ManagedServiceLauncher } from '../../../../src/contexts/run/application/services/ManagedServiceLauncher'
+import type {
+  ManagedServiceLauncher,
+  ManagedServiceRunSnapshot
+} from '../../../../src/contexts/run/application/services/ManagedServiceLauncher'
 import { RunLifecycleService } from '../../../../src/contexts/run/application/use-cases/RunLifecycleService'
 
 describe('terminal workflow service', () => {
-  it('starts roots in parallel, schedules fan-in once, and hands completed tasks to interactive shells', async () => {
+  it('starts roots in parallel, schedules fan-in once, and retains completed task sessions', async () => {
     const runtime = new FakeRuntime()
-    const service = createService(createTaskPlan(), runtime)
+    const publisher = new RecordingPublisher()
+    const service = createService(createTaskPlan(), runtime, publisher)
 
     await service.start(createStartCommand())
     expect(runtime.commandStarts.map((start) => start.blockId)).toEqual(['install-a', 'install-b'])
 
     runtime.exit('install-a', 0)
-    await vi.waitFor(() => expect(runtime.interactiveStarts).toEqual(['install-a']))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(publisher.events).toContainEqual({
+      type: 'terminal-session-ended',
+      blockId: 'install-a',
+      exit: expect.objectContaining({
+        sessionId: 'install-a-session',
+        exitCode: 0
+      })
+    })
     expect(runtime.commandStarts.map((start) => start.blockId)).not.toContain('build')
 
     runtime.exit('install-b', 0)
@@ -38,7 +51,8 @@ describe('terminal workflow service', () => {
     await vi.waitFor(() =>
       expect(service.getActiveRun(createWorkflowScope())?.status).toBe('succeeded')
     )
-    expect(runtime.interactiveStarts).toEqual(['install-a', 'install-b', 'build'])
+    await Promise.resolve()
+    await Promise.resolve()
   })
 
   it('matches literal output across chunks and releases service dependents when ready', async () => {
@@ -58,12 +72,19 @@ describe('terminal workflow service', () => {
   it('fails timed-out tasks, blocks descendants, and lets independent branches finish', async () => {
     vi.useFakeTimers()
     const runtime = new FakeRuntime()
-    const service = createService(createTimeoutPlan(), runtime)
+    const publisher = new RecordingPublisher()
+    const service = createService(createTimeoutPlan(), runtime, publisher)
 
     await service.start(createStartCommand())
     await vi.advanceTimersByTimeAsync(1_000)
 
-    expect(runtime.stops).toEqual(['slow-session'])
+    expect(runtime.historyPreservingStops).toEqual(['slow-session'])
+    expect(runtime.stops).toEqual([])
+    expect(publisher.events).toContainEqual({
+      type: 'terminal-session-ended',
+      blockId: 'slow',
+      exit: expect.objectContaining({ sessionId: 'slow-session', exitCode: null })
+    })
     expect(service.getActiveRun(createWorkflowScope())).toMatchObject({
       nodes: [
         { blockId: 'slow', status: 'failed' },
@@ -100,7 +121,8 @@ describe('terminal workflow service', () => {
 
     await service.stop(createWorkflowScope('/first-project'))
 
-    expect(runtime.stops).toEqual(['first-project-task-session'])
+    expect(runtime.historyPreservingStops).toEqual(['first-project-task-session'])
+    expect(runtime.stops).toEqual([])
     expect(service.getActiveRun(createWorkflowScope('/second-project'))?.status).toBe('running')
   })
 
@@ -147,6 +169,30 @@ describe('terminal workflow service', () => {
       status: 'ready',
       endpoint: { port: 41_001 },
       error: null
+    })
+  })
+
+  it('stops a managed workflow service while retaining its terminal session', async () => {
+    const runtime = new FakeRuntime()
+    const publisher = new RecordingPublisher()
+    const managed = new FakeManagedServiceLauncher()
+    const service = new TerminalWorkflowService(
+      new FakePlanPort(createManagedServicePlan()),
+      runtime,
+      new FakeTcpReadiness(),
+      publisher,
+      managed as unknown as ManagedServiceLauncher
+    )
+
+    await service.start(createStartCommand())
+    await service.stop(createWorkflowScope())
+
+    expect(managed.historyPreservingStops).toEqual(['api-managed'])
+    expect(runtime.historyPreservingStops).toEqual(['browser-session'])
+    expect(publisher.events).toContainEqual({
+      type: 'terminal-session-ended',
+      blockId: 'api',
+      exit: expect.objectContaining({ sessionId: 'api-managed', exitCode: null })
     })
   })
 
@@ -207,7 +253,6 @@ describe('terminal workflow service', () => {
     })
 
     expect(runtime.stops).toEqual(expect.arrayContaining(['slow-session', 'independent-session']))
-    expect(runtime.interactiveStarts).toEqual([])
     expect(service.getActiveRun(createWorkflowScope())).toBeNull()
     const eventCount = publisher.events.length
 
@@ -215,7 +260,6 @@ describe('terminal workflow service', () => {
     runtime.exit('slow', 1)
     await Promise.resolve()
     expect(runtime.commandStarts.map((start) => start.blockId)).not.toContain('after-slow')
-    expect(runtime.interactiveStarts).toEqual([])
     expect(publisher.events).toHaveLength(eventCount)
     lease.release()
     vi.useRealTimers()
@@ -260,7 +304,7 @@ describe('terminal workflow service', () => {
 
 class FakeRuntime implements TerminalWorkflowRuntimePort {
   readonly commandStarts: StartWorkflowRuntimeCommand[] = []
-  readonly interactiveStarts: string[] = []
+  readonly historyPreservingStops: string[] = []
   readonly stops: string[] = []
   private readonly commands = new Map<string, StartWorkflowRuntimeCommand>()
 
@@ -273,13 +317,19 @@ class FakeRuntime implements TerminalWorkflowRuntimePort {
     return session(`${command.blockId}-session`, command.blockId)
   }
 
-  async startInteractive(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot> {
-    this.interactiveStarts.push(command.blockId)
-    return session(`${command.blockId}-interactive`, command.blockId)
-  }
-
   async stop(sessionId: string): Promise<void> {
     this.stops.push(sessionId)
+  }
+
+  async stopPreservingHistory(sessionId: string) {
+    this.historyPreservingStops.push(sessionId)
+    const blockId = sessionId.replace(/-session$/, '')
+    const runtimeSession = session(sessionId, blockId)
+    return {
+      scope: runtimeSession,
+      sessionId,
+      exitCode: null
+    }
   }
 
   output(blockId: string, data: string): void {
@@ -338,13 +388,14 @@ class RecordingPublisher implements TerminalWorkflowEventPublisherPort {
 
 function createService(
   plan: WorkflowRunPlanSnapshot,
-  runtime: TerminalWorkflowRuntimePort
+  runtime: TerminalWorkflowRuntimePort,
+  publisher: TerminalWorkflowEventPublisherPort = new RecordingPublisher()
 ): TerminalWorkflowService {
   return new TerminalWorkflowService(
     new FakePlanPort(plan),
     runtime,
     new FakeTcpReadiness(),
-    new RecordingPublisher()
+    publisher
   )
 }
 
@@ -451,10 +502,12 @@ function session(id: string, terminalBlockId: string): TerminalSessionSnapshot {
 
 class FakeManagedServiceLauncher {
   readonly launches: Array<Record<string, unknown>> = []
+  readonly historyPreservingStops: string[] = []
+  private activeRun: ManagedServiceRunSnapshot | null = null
 
   constructor(private readonly launchError?: Error) {}
 
-  async launch(command: Record<string, unknown>) {
+  async launch(command: Record<string, unknown>): Promise<ManagedServiceRunSnapshot> {
     this.launches.push(command)
     if (this.launchError) throw this.launchError
     const started = command.onSessionStarted as (session: TerminalSessionSnapshot) => void
@@ -465,7 +518,7 @@ class FakeManagedServiceLauncher {
     const terminalSession = session('api-managed', 'api')
     started(terminalSession)
     confirmed(terminalSession, endpoint())
-    return {
+    this.activeRun = {
       scope: terminalSession,
       session: terminalSession,
       endpoint: endpoint(),
@@ -477,13 +530,21 @@ class FakeManagedServiceLauncher {
         quarantineReason: null
       }
     }
+    return this.activeRun
   }
 
-  getActive(): null {
-    return null
+  getActive(sessionId: string): ManagedServiceRunSnapshot | null {
+    return this.activeRun?.session.id === sessionId ? this.activeRun : null
   }
 
-  async stop(): Promise<void> {}
+  async stop(sessionId: string): Promise<void> {
+    if (this.activeRun?.session.id === sessionId) this.activeRun = null
+  }
+
+  async stopPreservingHistory(sessionId: string): Promise<void> {
+    this.historyPreservingStops.push(sessionId)
+    if (this.activeRun?.session.id === sessionId) this.activeRun = null
+  }
 }
 
 function endpoint() {

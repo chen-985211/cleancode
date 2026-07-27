@@ -84,7 +84,6 @@ export class TerminalWorkflowService {
       timeoutIds: new Map(),
       readinessControllers: new Map(),
       outputTails: new Map(),
-      handoffStarted: new Set(),
       pendingNodeStarts: new Set(),
       lifecycleUnregisters: [],
       hardDisposing: false,
@@ -124,10 +123,9 @@ export class TerminalWorkflowService {
       const sessionId = activeRun.sessionIds.get(blockId)
 
       if (sessionId) {
-        await this.stopSession(sessionId)
+        await this.stopSessionPreservingHistory(blockId, sessionId)
       }
       activeRun.run.clearActualEndpoint(blockId)
-      await this.handoffToInteractive(activeRun, blockId)
     }
 
     this.publishRun(activeRun)
@@ -271,6 +269,7 @@ export class TerminalWorkflowService {
       columns: activeRun.command.columns,
       rows: activeRun.command.rows,
       runId: activeRun.run.id,
+      preserveTerminalHistory: true,
       portIntent: node.executionConfig.port,
       readiness: node.executionConfig.readiness,
       readinessTimeoutMs: node.executionConfig.readinessTimeoutMs,
@@ -428,7 +427,7 @@ export class TerminalWorkflowService {
     this.clearNodeGuards(activeRun, blockId)
     activeRun.run.recordProcessExit(blockId, event.exitCode)
     this.publishRun(activeRun)
-    await this.handoffToInteractive(activeRun, blockId)
+    this.eventPublisher.publish({ type: 'terminal-session-ended', blockId, exit: event })
     await this.schedule(activeRun)
   }
 
@@ -453,34 +452,10 @@ export class TerminalWorkflowService {
     const sessionId = activeRun.sessionIds.get(blockId)
 
     if (sessionId) {
-      await this.stopSession(sessionId)
+      await this.stopSessionPreservingHistory(blockId, sessionId)
     }
     this.publishRun(activeRun)
-    await this.handoffToInteractive(activeRun, blockId)
     await this.schedule(activeRun)
-  }
-
-  private async handoffToInteractive(activeRun: ActiveWorkflowRun, blockId: string): Promise<void> {
-    if (!this.isCurrent(activeRun) || activeRun.handoffStarted.has(blockId)) {
-      return
-    }
-
-    activeRun.handoffStarted.add(blockId)
-    const session = await this.runtimePort.startInteractive(
-      this.createRuntimeCommand(activeRun, blockId, '')
-    )
-    if (!this.isCurrent(activeRun)) {
-      if (!this.applicationShutdown.isShuttingDown) await this.runtimePort.stop(session.id)
-      return
-    }
-    activeRun.sessionIds.set(blockId, session.id)
-    this.eventPublisher.publish({
-      type: 'terminal-session-started',
-      blockId,
-      session,
-      clearOutput: false,
-      endpoint: null
-    })
   }
 
   private clearNodeGuards(activeRun: ActiveWorkflowRun, blockId: string): void {
@@ -545,6 +520,25 @@ export class TerminalWorkflowService {
       return
     }
     await this.runtimePort.stop(sessionId)
+  }
+
+  private async stopSessionPreservingHistory(blockId: string, sessionId: string): Promise<void> {
+    const managedServices = this.managedServices
+    const managed = managedServices?.getActive(sessionId)
+    if (managedServices && managed) {
+      await managedServices.stopPreservingHistory(sessionId)
+      this.eventPublisher.publish({
+        type: 'terminal-session-ended',
+        blockId,
+        exit: { scope: managed.scope, sessionId, exitCode: null }
+      })
+      return
+    }
+
+    const exit = await this.runtimePort.stopPreservingHistory(sessionId)
+    if (exit) {
+      this.eventPublisher.publish({ type: 'terminal-session-ended', blockId, exit })
+    }
   }
 
   private findActiveRun(scope: TerminalWorkflowScopeCommand): ActiveWorkflowRun | undefined {

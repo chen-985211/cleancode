@@ -47,11 +47,30 @@ describe('terminal workflow with real PTYs', () => {
 
       expect(readOutput(events.events)).toContain('install-complete')
       expect(readOutput(events.events)).toContain('build-complete')
-      expect(
-        events.events.flatMap((event) =>
-          event.type === 'terminal-session-started' && !event.clearOutput ? [event.blockId] : []
-        )
-      ).toEqual(['install', 'build'])
+      const startedSessions = events.events.flatMap((event) =>
+        event.type === 'terminal-session-started'
+          ? [
+              {
+                blockId: event.blockId,
+                sessionId: event.session.id,
+                clearOutput: event.clearOutput
+              }
+            ]
+          : []
+      )
+      const endedSessions = events.events.flatMap((event) =>
+        event.type === 'terminal-session-ended'
+          ? [{ blockId: event.blockId, sessionId: event.exit.sessionId }]
+          : []
+      )
+
+      expect(startedSessions).toEqual([
+        expect.objectContaining({ blockId: 'install', clearOutput: true }),
+        expect.objectContaining({ blockId: 'build', clearOutput: true })
+      ])
+      expect(endedSessions).toEqual(
+        startedSessions.map(({ blockId, sessionId }) => ({ blockId, sessionId }))
+      )
     } finally {
       await sessions.stopAll()
       await rm(workingDirectory, { recursive: true, force: true })

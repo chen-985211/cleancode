@@ -41,6 +41,34 @@ describe('file terminal recovery store', () => {
     expect(JSON.parse(checkpointContents)).toEqual(record)
   })
 
+  it('preserves an in-flight initial checkpoint while another session checks store capacity', async () => {
+    const store = new FileTerminalRecoveryStore({ rootDirectory })
+    const largeContent = 'x'.repeat(3_500_000)
+    const first = createRecord()
+    const firstWithLargeCheckpoint = {
+      ...first,
+      model: {
+        ...first.model,
+        content: largeContent,
+        normalContent: largeContent,
+        transcript: largeContent
+      }
+    }
+    const second = createRecord({ sessionId: 'session-2', runId: 'run-2' })
+
+    const firstWrite = store.writeCheckpoint(firstWithLargeCheckpoint)
+    await waitForTemporaryCheckpoint(rootDirectory)
+    const secondWrite = store.writeCheckpoint(second)
+
+    await expect(Promise.all([firstWrite, secondWrite])).resolves.toBeDefined()
+    const loaded = await store.load()
+    expect(loaded.issues).toEqual([])
+    expect(loaded.sessions.map(({ checkpoint }) => checkpoint.session.sessionId).sort()).toEqual([
+      'session-1',
+      'session-2'
+    ])
+  })
+
   it('appends an ordered output batch without changing the recovery log format', async () => {
     const store = new FileTerminalRecoveryStore({ rootDirectory })
     const record = createRecord()
@@ -245,6 +273,36 @@ describe('file terminal recovery store', () => {
       'session-2'
     ])
   })
+
+  it('evicts cold history when a new checkpoint would exceed the global byte budget', async () => {
+    const coldBase = createRecord()
+    const cold = {
+      ...coldBase,
+      session: {
+        ...coldBase.session,
+        processId: null,
+        status: 'exited' as const,
+        recoveryKind: 'ended' as const
+      }
+    }
+    const live = createRecord({ sessionId: 'session-2', runId: 'run-2' })
+    const store = new FileTerminalRecoveryStore({
+      rootDirectory,
+      now: () => Date.parse(cold.updatedAt),
+      limits: {
+        maxTotalBytes: Buffer.byteLength(`${JSON.stringify(cold)}\n`) + 100
+      }
+    })
+
+    await store.writeCheckpoint(cold)
+    await store.writeCheckpoint(live)
+
+    const loaded = await store.load()
+    expect(loaded.issues).toEqual([])
+    expect(loaded.sessions.map(({ checkpoint }) => checkpoint.session.sessionId)).toEqual([
+      'session-2'
+    ])
+  })
 })
 
 function createRecord(
@@ -319,4 +377,22 @@ function identityShape() {
 async function firstSessionDirectory(rootDirectory: string): Promise<string> {
   const directories = await readdir(join(rootDirectory, 'sessions'))
   return join(rootDirectory, 'sessions', directories[0] ?? '')
+}
+
+async function waitForTemporaryCheckpoint(rootDirectory: string): Promise<void> {
+  const sessionsDirectory = join(rootDirectory, 'sessions')
+  await vi.waitFor(
+    async () => {
+      const sessionDirectories = await readdir(sessionsDirectory).catch(() => [])
+      const files = await Promise.all(
+        sessionDirectories.map((directory) =>
+          readdir(join(sessionsDirectory, directory)).catch(() => [])
+        )
+      )
+      expect(
+        files.flat().some((file) => file.startsWith('checkpoint.json.') && file.endsWith('.tmp'))
+      ).toBe(true)
+    },
+    { interval: 1, timeout: 5_000 }
+  )
 }

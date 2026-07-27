@@ -22,6 +22,6 @@ export interface StartWorkflowRuntimeCommand {
 
 export interface TerminalWorkflowRuntimePort {
   startCommand(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot>
-  startInteractive(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot>
   stop(sessionId: string): Promise<void>
+  stopPreservingHistory(sessionId: string): Promise<TerminalExitEvent | null>
 }

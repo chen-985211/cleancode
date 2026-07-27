@@ -49,6 +49,7 @@ export interface LaunchManagedServiceCommand {
   readonly columns?: number
   readonly rows?: number
   readonly runId?: string
+  readonly preserveTerminalHistory?: boolean
   readonly portIntent: ServicePortIntent
   readonly readiness: ManagedServiceReadiness
   readonly readinessTimeoutMs: number
@@ -82,6 +83,7 @@ interface ActiveManagedService {
   unregisterLifecycle: () => void
   unregisterManagedTerminator: () => void
   stopPromise: Promise<void> | null
+  stopPreservesHistory: boolean | null
   readonly reportCleanupFailure: (error: unknown) => void
   readonly reportPortState: (state: 'releasing' | 'released' | 'quarantined') => void
 }
@@ -202,6 +204,16 @@ export class ManagedServiceLauncher {
     await this.ensureStopped(service)
   }
 
+  async stopPreservingHistory(sessionId: string): Promise<void> {
+    const service = this.activeServices.get(sessionId)
+    if (!service) {
+      await this.sessions.stopPreservingHistory(sessionId)
+      return
+    }
+
+    await this.ensureStopped(service, true)
+  }
+
   prepareApplicationShutdown(): Promise<void> {
     return this.applicationShutdown.prepare({
       abortInFlightWork: () => this.abortApplicationWork(),
@@ -259,6 +271,7 @@ export class ManagedServiceLauncher {
         unregisterLifecycle: () => undefined,
         unregisterManagedTerminator: () => undefined,
         stopPromise: null,
+        stopPreservesHistory: null,
         reportCleanupFailure: () => undefined,
         reportPortState: () => undefined
       }
@@ -360,7 +373,9 @@ export class ManagedServiceLauncher {
           command.onExit(event)
           const service = attemptState.service
           if (service && !this.shouldDelegateToProvider(service)) {
-            void this.ensureStopped(service).catch(service.reportCleanupFailure)
+            void this.ensureStopped(service, command.preserveTerminalHistory).catch(
+              service.reportCleanupFailure
+            )
           }
         },
         onStartedWithinGate: (startedSession) => {
@@ -378,6 +393,7 @@ export class ManagedServiceLauncher {
             unregisterLifecycle: () => undefined,
             unregisterManagedTerminator: () => undefined,
             stopPromise: null,
+            stopPreservesHistory: null,
             reportCleanupFailure: (error) => command.onCleanupFailed?.(error),
             reportPortState: (state) =>
               command.onPortStateChanged?.(startedSession, allocation.endpoint, state)
@@ -456,7 +472,7 @@ export class ManagedServiceLauncher {
     } catch (error) {
       if (!this.shouldDelegateToProvider(service)) {
         try {
-          await this.ensureStopped(service)
+          await this.ensureStopped(service, command.preserveTerminalHistory)
         } catch (cleanupError) {
           service.reportCleanupFailure(cleanupError)
         }
@@ -470,8 +486,21 @@ export class ManagedServiceLauncher {
     }
   }
 
-  private ensureStopped(service: ActiveManagedService): Promise<void> {
-    return this.runCleanup(service, () => this.stopAndRelease(service))
+  private async ensureStopped(
+    service: ActiveManagedService,
+    preserveHistory = false
+  ): Promise<void> {
+    if (!service.stopPromise) {
+      service.stopPreservesHistory = preserveHistory
+      service.stopPromise = this.stopAndRelease(service, preserveHistory)
+    }
+
+    await service.stopPromise
+
+    if (!preserveHistory && service.stopPreservesHistory === true) {
+      await this.sessions.terminateProcess(service.session.id)
+      service.stopPreservesHistory = false
+    }
   }
 
   private runCleanup(service: ActiveManagedService, cleanup: () => Promise<void>): Promise<void> {
@@ -479,13 +508,20 @@ export class ManagedServiceLauncher {
     return service.stopPromise
   }
 
-  private async stopAndRelease(service: ActiveManagedService): Promise<void> {
+  private async stopAndRelease(
+    service: ActiveManagedService,
+    preserveHistory: boolean
+  ): Promise<void> {
     service.readinessController.abort()
     markReleasing(service.allocation.lease)
     this.reportPortState(service, 'releasing')
 
     try {
-      await this.sessions.terminateProcess(service.session.id)
+      if (preserveHistory) {
+        await this.sessions.stopPreservingHistory(service.session.id)
+      } else {
+        await this.sessions.terminateProcess(service.session.id)
+      }
       await waitWithTimeout(
         (signal) =>
           this.readiness.waitUntilClosed({
