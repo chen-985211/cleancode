@@ -17,11 +17,13 @@ import { readE2eBlockGraph } from '../support/e2eBlockGraph'
 import {
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
+  readTerminalSessionId,
   waitForTerminalOutputInNewSession,
   waitForTerminalShellReady,
   waitForTerminalViewportGeometry
 } from '../support/e2eTerminal'
 import { readRequiredBoundingBox } from '../support/terminalResizeE2e'
+import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
 
 describe('terminal workflows e2e', () => {
   let workbench: E2eWorkbench
@@ -69,19 +71,24 @@ describe('terminal workflows e2e', () => {
       await connectTerminalNodes(page)
 
       await page.getByRole('button', { name: 'Terminal 1 从此处运行终端流程' }).click()
-      await waitForTerminalOutputInNewSession(
+      const firstTaskSession = await waitForTerminalOutputInNewSession(
         page,
         'Terminal 1',
         initialSessions.first,
         'workflow-install-complete'
       )
-      await waitForTerminalOutputInNewSession(
+      const secondTaskSession = await waitForTerminalOutputInNewSession(
         page,
         'Terminal 2',
         initialSessions.second,
         'workflow-build-complete'
       )
       await page.getByText('流程运行成功').waitFor()
+
+      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(firstTaskSession)
+      expect(await readTerminalSessionId(page, 'Terminal 2')).toBe(secondTaskSession)
+      await waitForVisibleXtermText(page, firstTaskSession, 'workflow-install-complete')
+      await waitForVisibleXtermText(page, secondTaskSession, 'workflow-build-complete')
 
       const graph = await readE2eBlockGraph(workbench)
 
@@ -149,6 +156,32 @@ function terminalNodeByTitle(page: Page, terminalName: string): Locator {
     hasText: new RegExp(`^${escapeRegularExpression(terminalName)}$`)
   })
   return page.locator('[data-terminal-block-id]').filter({ has: exactTitle })
+}
+
+async function waitForVisibleXtermText(
+  page: Page,
+  sessionId: string,
+  expectedText: string
+): Promise<void> {
+  const outputTail = page.locator(
+    `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+  )
+  const terminal = page
+    .locator('.terminal-output-shell')
+    .filter({ has: outputTail })
+    .locator('.terminal-viewport')
+  await ensureTerminalDomRenderer(terminal)
+  await page.waitForFunction(
+    ({ expectedText, sessionId }) =>
+      document
+        .querySelector<HTMLElement>(
+          `[data-terminal-output-tail][data-terminal-session-id="${sessionId}"]`
+        )
+        ?.closest('.terminal-output-shell')
+        ?.querySelector<HTMLElement>('.xterm-rows')
+        ?.textContent?.includes(expectedText) ?? false,
+    { expectedText, sessionId }
+  )
 }
 
 function escapeRegularExpression(value: string): string {

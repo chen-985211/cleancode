@@ -1,7 +1,7 @@
 import { applyTerminalWorkflowEventToStates } from '../../../src/presentation/app-shell/terminalWorkflowSessionEvents'
 
 describe('terminal workflow session events', () => {
-  it('clears output for command sessions and preserves it for interactive handoff sessions', () => {
+  it('clears output when a workflow command session starts', () => {
     const commandStates = applyTerminalWorkflowEventToStates(
       {
         '["project-alpha","main","terminal","install"]': {
@@ -18,21 +18,39 @@ describe('terminal workflow session events', () => {
         session: session('command')
       }
     )
-    const handoffStates = applyTerminalWorkflowEventToStates(commandStates, {
-      type: 'terminal-session-started',
-      blockId: 'install',
-      clearOutput: false,
-      endpoint: null,
-      session: session('interactive', 2)
-    })
 
     expect(commandStates['["project-alpha","main","terminal","install"]']).toMatchObject({
       sessionId: 'command',
       output: ''
     })
-    expect(handoffStates['["project-alpha","main","terminal","install"]']).toMatchObject({
-      sessionId: 'interactive',
-      output: ''
+  })
+
+  it('marks the exact workflow session ended without replacing its identity or output', () => {
+    const key = '["project-alpha","main","terminal","install"]'
+    const states = {
+      [key]: {
+        sessionId: 'command',
+        status: 'running' as const,
+        output: 'install complete',
+        runIdentity: runIdentity('command')
+      }
+    }
+
+    const projected = applyTerminalWorkflowEventToStates(states, {
+      type: 'terminal-session-ended',
+      blockId: 'install',
+      exit: {
+        scope: runScope('command'),
+        sessionId: 'command',
+        exitCode: 0
+      }
+    })
+
+    expect(projected[key]).toMatchObject({
+      sessionId: 'command',
+      status: 'exited',
+      output: 'install complete',
+      runIdentity: runIdentity('command')
     })
   })
 

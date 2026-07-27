@@ -234,7 +234,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           session={session}
           focusRequestId={focusRequestId}
           isResizeSuspended={isResizingBlock}
-          isInputDisabled={Boolean(session.isRecoveryPending)}
+          isInputDisabled={session.status !== 'running' || Boolean(session.isRecoveryPending)}
           onDimensionsChange={handleDimensionsChange}
           onInput={data.onInput}
           onPaste={data.onPaste}

@@ -163,6 +163,39 @@ describe('terminal session model lifecycle', () => {
     expect(models.disposeAllCalls).toBe(1)
   })
 
+  it('stops a workflow process while retaining its ended model until replacement', async () => {
+    const processes = new RecordingProcessPort()
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(processes, undefined, undefined, models)
+    const session = await service.start({ ...startCommand(), sessionKind: 'workflow' })
+
+    const stopped = await service.stopPreservingHistory(session.id)
+
+    expect(stopped?.status).toBe('exited')
+    expect(models.retired).toEqual([])
+    await expect(
+      service.attachView({
+        ...toViewIdentity(session),
+        viewId: 'ended-view',
+        onOutput: () => undefined
+      })
+    ).resolves.toMatchObject({ identity: expect.objectContaining({ sessionId: session.id }) })
+
+    await service.start({ ...startCommand(), sessionKind: 'workflow' })
+    expect(models.retired).toEqual([expect.objectContaining({ sessionId: session.id })])
+  })
+
+  it('keeps concurrent hard termination idempotent while resolving history-preserving stops', async () => {
+    const processes = new RecordingProcessPort()
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(processes, undefined, undefined, models)
+    const session = await service.start({ ...startCommand(), sessionKind: 'workflow' })
+
+    await Promise.all([service.terminateProcess(session.id), service.terminateProcess(session.id)])
+
+    expect(models.retired).toEqual([expect.objectContaining({ sessionId: session.id })])
+  })
+
   it('rejects a stale view identity before it can attach to a replacement model', async () => {
     const models = new RecordingModelPort()
     const service = new TerminalSessionService(

@@ -26,7 +26,6 @@ describe('terminal workflow application shutdown', () => {
     await vi.advanceTimersByTimeAsync(1_000)
 
     expect(runtime.stops).toEqual([])
-    expect(runtime.interactiveStarts).toEqual([])
     expect(service.getActiveRun(workflowScope())).not.toBeNull()
 
     await service.completeApplicationShutdown()
@@ -56,7 +55,6 @@ describe('terminal workflow application shutdown', () => {
     await Promise.all([starting, preparing, completion, service.completeApplicationShutdown()])
 
     expect(runtime.stops).toEqual([])
-    expect(runtime.interactiveStarts).toEqual([])
     expect(service.getActiveRun(workflowScope())).toBeNull()
   })
 
@@ -97,7 +95,6 @@ describe('terminal workflow application shutdown', () => {
 
 class GatedWorkflowRuntime implements TerminalWorkflowRuntimePort {
   readonly commandStarts: StartWorkflowRuntimeCommand[] = []
-  readonly interactiveStarts: string[] = []
   readonly stops: string[] = []
 
   constructor(private readonly startGate: Promise<void> = Promise.resolve()) {}
@@ -108,14 +105,13 @@ class GatedWorkflowRuntime implements TerminalWorkflowRuntimePort {
     return session(`${command.blockId}-session`, command.blockId)
   }
 
-  startInteractive(command: StartWorkflowRuntimeCommand): Promise<TerminalSessionSnapshot> {
-    this.interactiveStarts.push(command.blockId)
-    return Promise.resolve(session(`${command.blockId}-interactive`, command.blockId))
-  }
-
   stop(sessionId: string): Promise<void> {
     this.stops.push(sessionId)
     return Promise.resolve()
+  }
+
+  stopPreservingHistory(): Promise<null> {
+    return Promise.resolve(null)
   }
 }
 

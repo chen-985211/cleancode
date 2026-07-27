@@ -6,7 +6,7 @@ import type {
 } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 
 describe('terminal session workflow runtime adapter', () => {
-  it('starts command PTYs and then starts an empty interactive handoff shell', async () => {
+  it('starts one command PTY and can stop it without replacing its retained session', async () => {
     const processes = new RecordingProcessPort()
     const runtime = new TerminalSessionWorkflowRuntimeAdapter(new TerminalSessionService(processes))
     const common = {
@@ -24,14 +24,11 @@ describe('terminal session workflow runtime adapter', () => {
     }
 
     const taskSession = await runtime.startCommand(common)
-    const interactiveSession = await runtime.startInteractive(common)
+    const exit = await runtime.stopPreservingHistory(taskSession.id)
 
-    expect(processes.starts.map((start) => start.launchCommand)).toEqual([
-      'pnpm install',
-      undefined
-    ])
+    expect(processes.starts.map((start) => start.launchCommand)).toEqual(['pnpm install'])
     expect(processes.stops).toEqual([taskSession.id])
-    expect(interactiveSession.id).not.toBe(taskSession.id)
+    expect(exit).toMatchObject({ sessionId: taskSession.id, exitCode: null })
   })
 })
 
