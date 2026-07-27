@@ -63,6 +63,7 @@ const defaultTerminalRecoveryStoreLimits: TerminalRecoveryStoreLimits = {
 export class FileTerminalRecoveryStore {
   private readonly limits: TerminalRecoveryStoreLimits
   private readonly now: () => number
+  private operationTail: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly options: {
@@ -85,14 +86,20 @@ export class FileTerminalRecoveryStore {
       throw storageLimitError('checkpoint', byteLength, this.limits.maxCheckpointBytes)
     }
 
-    await this.ensureRootDirectory()
-    const sessionDirectory = this.sessionDirectory(record.session)
-    await this.ensureGlobalCapacity(record.session, byteLength, options.truncateOutputLog ?? false)
-    await mkdir(sessionDirectory, { mode: 0o700, recursive: true })
-    await atomicWrite(join(sessionDirectory, 'checkpoint.json'), contents)
-    if (options.truncateOutputLog) {
-      await truncateFileIfPresent(join(sessionDirectory, 'output.log'))
-    }
+    await this.runExclusive(async () => {
+      await this.ensureRootDirectory()
+      const sessionDirectory = this.sessionDirectory(record.session)
+      await this.ensureGlobalCapacity(
+        record.session,
+        byteLength,
+        options.truncateOutputLog ?? false
+      )
+      await mkdir(sessionDirectory, { mode: 0o700, recursive: true })
+      await atomicWrite(join(sessionDirectory, 'checkpoint.json'), contents)
+      if (options.truncateOutputLog) {
+        await truncateFileIfPresent(join(sessionDirectory, 'output.log'))
+      }
+    })
   }
 
   async appendOutput(
@@ -107,6 +114,25 @@ export class FileTerminalRecoveryStore {
     outputs: readonly SequencedTerminalOutput[]
   ): Promise<'appended' | 'checkpoint-required'> {
     if (outputs.length === 0) return 'appended'
+    return this.runExclusive(() => this.appendOutputsNow(identity, outputs))
+  }
+
+  async load(): Promise<TerminalRecoveryLoadResult> {
+    return this.runExclusive(() => this.loadNow())
+  }
+
+  async delete(identity: TerminalRunScope): Promise<void> {
+    await this.runExclusive(() => this.deleteNow(identity))
+  }
+
+  async pruneColdHistory(): Promise<readonly TerminalRecoveryLoadIssue[]> {
+    return this.runExclusive(() => this.pruneColdHistoryNow())
+  }
+
+  private async appendOutputsNow(
+    identity: TerminalRunScope,
+    outputs: readonly SequencedTerminalOutput[]
+  ): Promise<'appended' | 'checkpoint-required'> {
     const sessionDirectory = this.sessionDirectory(identity)
     const checkpointPath = join(sessionDirectory, 'checkpoint.json')
     if (!(await pathExists(checkpointPath))) {
@@ -140,7 +166,7 @@ export class FileTerminalRecoveryStore {
     return 'appended'
   }
 
-  async load(): Promise<TerminalRecoveryLoadResult> {
+  private async loadNow(): Promise<TerminalRecoveryLoadResult> {
     await this.ensureRootDirectory()
     const entries = await readdir(this.sessionsDirectory(), { withFileTypes: true })
     const sessions: TerminalRecoveryBundle[] = []
@@ -169,12 +195,12 @@ export class FileTerminalRecoveryStore {
     return { sessions, issues }
   }
 
-  async delete(identity: TerminalRunScope): Promise<void> {
+  private async deleteNow(identity: TerminalRunScope): Promise<void> {
     await rm(this.sessionDirectory(identity), { force: true, recursive: true })
   }
 
-  async pruneColdHistory(): Promise<readonly TerminalRecoveryLoadIssue[]> {
-    const loaded = await this.load()
+  private async pruneColdHistoryNow(): Promise<readonly TerminalRecoveryLoadIssue[]> {
+    const loaded = await this.loadNow()
     for (const issue of loaded.issues) {
       await rm(join(this.sessionsDirectory(), issue.storageKey), { force: true, recursive: true })
     }
@@ -194,7 +220,7 @@ export class FileTerminalRecoveryStore {
       [...expired, ...overflow].map((bundle) => [bundle.checkpoint.session.sessionId, bundle])
     )
     for (const { checkpoint } of removals.values()) {
-      await this.delete(checkpoint.session)
+      await this.deleteNow(checkpoint.session)
     }
     return loaded.issues
   }
@@ -208,7 +234,7 @@ export class FileTerminalRecoveryStore {
     replacementBytes: number,
     truncateOutputLog: boolean
   ) {
-    await this.pruneColdHistory()
+    await this.pruneColdHistoryNow()
     const currentCheckpointBytes = await fileSize(
       join(this.sessionDirectory(identity), 'checkpoint.json')
     )
@@ -222,7 +248,7 @@ export class FileTerminalRecoveryStore {
       replacementBytes
     if (projectedBytes <= this.limits.maxTotalBytes) return
 
-    const loaded = await this.load()
+    const loaded = await this.loadNow()
     const cold = loaded.sessions
       .filter(
         ({ checkpoint }) =>
@@ -235,12 +261,21 @@ export class FileTerminalRecoveryStore {
       )
     for (const { checkpoint } of cold) {
       const bytes = await directorySize(this.sessionDirectory(checkpoint.session))
-      await this.delete(checkpoint.session)
+      await this.deleteNow(checkpoint.session)
       projectedBytes -= bytes
       if (projectedBytes <= this.limits.maxTotalBytes) return
     }
 
     throw storageLimitError('store', projectedBytes, this.limits.maxTotalBytes)
+  }
+
+  private runExclusive<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operationTail.then(operation, operation)
+    this.operationTail = result.then(
+      () => undefined,
+      () => undefined
+    )
+    return result
   }
 
   private sessionsDirectory(): string {
