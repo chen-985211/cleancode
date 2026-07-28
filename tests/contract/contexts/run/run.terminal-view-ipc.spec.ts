@@ -208,6 +208,29 @@ describe('terminal view IPC contract', () => {
     expect(attachTerminalView).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['RUN_SCOPE_STALE', 'Terminal view no longer matches the current runtime scope.'] as const,
+    ['TERMINAL_RUNTIME_NOT_READY', 'Terminal runtime is still starting.'] as const
+  ])('returns %s without logging lifecycle noise', async (code, message) => {
+    const ipcMain = new FakeIpcMain()
+    const logger = createRecordingLogger()
+    const attachTerminalView = vi.fn(async () => {
+      throw createExpectedAppError(code, message)
+    })
+    registerTerminalIpcHandlers(createInput({ ipcMain, attachTerminalView, logger }))
+
+    await expect(
+      ipcMain.invoke('cleancode:attach-terminal-view', viewCommand(), new FakeSender())
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code, isExpected: true }
+    })
+    expect(logger.debug).not.toHaveBeenCalled()
+    expect(logger.info).not.toHaveBeenCalled()
+    expect(logger.warn).not.toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
   it('forwards a typed Agent owner through the shared terminal view protocol', async () => {
     const ipcMain = new FakeIpcMain()
     const attachTerminalView = vi.fn(async () => snapshot())

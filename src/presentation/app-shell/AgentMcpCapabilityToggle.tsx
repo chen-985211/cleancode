@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import { useId } from 'react'
 
 import type { AgentMcpPresentationStatus } from './agentProviderFeedback'
@@ -7,11 +8,13 @@ import { TooltipLabel } from './Tooltip'
 export function AgentMcpCapabilityToggle({
   enabled,
   onChange,
+  onReconnect,
   pending,
   status = null
 }: {
   readonly enabled: boolean
   readonly onChange: (enabled: boolean) => void
+  readonly onReconnect?: () => void
   readonly pending: boolean
   readonly status?: AgentMcpPresentationStatus | null
 }) {
@@ -61,6 +64,22 @@ export function AgentMcpCapabilityToggle({
           </span>
         </button>
       </TooltipLabel>
+      {enabled && (status === 'degraded' || status === 'unavailable') && onReconnect ? (
+        <TooltipLabel content={t('agent.mcpReconnect')} side="bottom">
+          <button
+            className="agent-mcp-capability__reconnect nodrag"
+            type="button"
+            aria-label={t('agent.mcpReconnect')}
+            disabled={pending}
+            onClick={(event) => {
+              event.stopPropagation()
+              onReconnect()
+            }}
+          >
+            <RefreshCw size={13} aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+      ) : null}
       {statusLabel ? (
         <span className="sr-only" id={statusDescriptionId}>
           {statusLabel}

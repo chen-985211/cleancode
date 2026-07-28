@@ -141,6 +141,44 @@ describe('terminal session model lifecycle', () => {
     ])
   })
 
+  it('reports a current view identity as not ready until its PTY finishes starting', async () => {
+    const processes = new DeferredStartProcessPort()
+    const models = new RecordingModelPort()
+    const service = new TerminalSessionService(processes, undefined, undefined, models)
+    const start = service.start(startCommand())
+    const identity = await processes.waitForStart()
+
+    try {
+      expect(service.getSession(identity.sessionId)?.status).toBe('idle')
+      await expect(
+        service.attachView({
+          ...toViewIdentity(identity),
+          viewId: 'starting-view',
+          onOutput: () => undefined
+        })
+      ).rejects.toMatchObject({ code: 'TERMINAL_RUNTIME_NOT_READY' })
+      expect(models.attaches).toEqual([])
+      await expect(
+        service.detachView({
+          ...toViewIdentity(identity),
+          viewId: 'starting-view'
+        })
+      ).resolves.toBeUndefined()
+      expect(models.detaches).toEqual([])
+    } finally {
+      processes.completeStart()
+      await start
+    }
+
+    await expect(
+      service.attachView({
+        ...toViewIdentity(identity),
+        viewId: 'started-view',
+        onOutput: () => undefined
+      })
+    ).resolves.toMatchObject({ identity })
+  })
+
   it('retires replaced and explicitly terminated models while retaining natural exits', async () => {
     const processes = new RecordingProcessPort()
     const models = new RecordingModelPort()
@@ -299,6 +337,32 @@ class RecordingProcessPort implements TerminalProcessPort {
     const command = this.starts.find((candidate) => candidate.scope.sessionId === sessionId)
     if (!command) throw new Error('Missing terminal process.')
     command.onExit({ scope: command.scope, sessionId, exitCode })
+  }
+}
+
+class DeferredStartProcessPort extends RecordingProcessPort {
+  private completeStartRequest: () => void = () => undefined
+  private reportStartRequest: (scope: TerminalRunScope) => void = () => undefined
+  private readonly startCompletion = new Promise<void>((resolve) => {
+    this.completeStartRequest = resolve
+  })
+  private readonly startRequest = new Promise<TerminalRunScope>((resolve) => {
+    this.reportStartRequest = resolve
+  })
+
+  async start(command: Parameters<TerminalProcessPort['start']>[0]) {
+    this.starts.push(command)
+    this.reportStartRequest(command.scope)
+    await this.startCompletion
+    return { processId: 101 }
+  }
+
+  waitForStart(): Promise<TerminalRunScope> {
+    return this.startRequest
+  }
+
+  completeStart(): void {
+    this.completeStartRequest()
   }
 }
 

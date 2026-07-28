@@ -150,7 +150,10 @@ export function AgentConsole({
     ? resolveAgentApprovalPresentation(activeApproval, currentWorkbench?.graph ?? null)
     : null
 
-  async function updateMcpCapability(enabled: boolean): Promise<void> {
+  async function updateMcpCapability(
+    enabled: boolean,
+    intent: 'reconnect' | 'toggle' = 'toggle'
+  ): Promise<void> {
     if (!agent || !onMcpCapabilityChange || isMcpCapabilityUpdating) return
     const requestGeneration = workspaceGenerationRef.current
     const requestWorkspaceKey = currentWorkspaceKey
@@ -169,12 +172,19 @@ export function AgentConsole({
       if (result.session) {
         replaceSession(result.session)
       }
+      if (result.session?.runtime.mcp.status === 'failed') {
+        notifications.notify({
+          autoDismissMs: 6_000,
+          kind: 'warning',
+          title: t(intent === 'reconnect' ? 'agent.mcpReconnectFailed' : 'agent.mcpUpdateFailed')
+        })
+      }
     } catch {
       if (isMountedRef.current && requestGeneration === workspaceGenerationRef.current) {
         notifications.notify({
           autoDismissMs: 6_000,
           kind: 'warning',
-          title: t('agent.mcpUpdateFailed')
+          title: t(intent === 'reconnect' ? 'agent.mcpReconnectFailed' : 'agent.mcpUpdateFailed')
         })
       }
     } finally {
@@ -209,6 +219,11 @@ export function AgentConsole({
                   <AgentMcpCapabilityToggle
                     enabled={agent.cleancodeMcpEnabled}
                     onChange={(enabled) => void updateMcpCapability(enabled)}
+                    onReconnect={
+                      providerCatalog.descriptor?.capabilities.resume === true
+                        ? () => void updateMcpCapability(true, 'reconnect')
+                        : undefined
+                    }
                     pending={isMcpCapabilityUpdating || isAttachPending}
                     status={providerFeedback.mcpStatus}
                   />

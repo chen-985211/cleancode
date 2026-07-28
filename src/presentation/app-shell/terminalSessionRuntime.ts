@@ -234,6 +234,39 @@ export function reconcileTerminalSessionSnapshots(
   return nextStates
 }
 
+export function reconcileStaleTerminalViewSnapshot(
+  states: Record<string, TerminalViewState>,
+  requested: TerminalRunIdentity,
+  sessions: readonly TerminalSessionSnapshot[]
+): Record<string, TerminalViewState> {
+  const terminalStateKey = createTerminalStateKey(
+    requested.projectId,
+    requested.workspaceId,
+    requested.blockId
+  )
+  const current = states[terminalStateKey]
+  if (!current?.runIdentity || !isSameRunIdentity(current.runIdentity, requested)) return states
+
+  const session = sessions.find((candidate) => candidate.id === requested.sessionId)
+  if (!session) return reconcileTerminalSessionSnapshots(states, [requested], sessions)
+
+  const refreshedIdentity = toTerminalRunIdentity(session)
+  if (
+    !isSameRunOwnerScope(refreshedIdentity, requested) ||
+    refreshedIdentity.generation <= requested.generation
+  ) {
+    return states
+  }
+
+  return applyTerminalSessionSnapshot(
+    states,
+    terminalStateKey,
+    session,
+    current.output,
+    current.actualEndpoint ?? null
+  )
+}
+
 function isSameRunIdentity(left: TerminalRunIdentity, right: TerminalRunIdentity): boolean {
   return (
     left.projectId === right.projectId &&
@@ -242,6 +275,15 @@ function isSameRunIdentity(left: TerminalRunIdentity, right: TerminalRunIdentity
     left.sessionId === right.sessionId &&
     left.runId === right.runId &&
     left.generation === right.generation
+  )
+}
+
+function isSameRunOwnerScope(left: TerminalRunIdentity, right: TerminalRunIdentity): boolean {
+  return (
+    left.projectId === right.projectId &&
+    left.workspaceId === right.workspaceId &&
+    left.blockId === right.blockId &&
+    left.sessionId === right.sessionId
   )
 }
 

@@ -114,6 +114,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly onDismissPortConflict?: (identity: TerminalRunIdentity) => void
   readonly onRunFromHere?: (block: TerminalBlockSnapshot) => void
   readonly onStopWorkflow?: () => void
+  readonly onViewIdentityStale?: (identity: TerminalRunIdentity) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void

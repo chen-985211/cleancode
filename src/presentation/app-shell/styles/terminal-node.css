@@ -460,6 +460,52 @@
   box-shadow: var(--cc-shadow-xs);
 }
 
+.terminal-restore-failure {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  max-width: calc(100% - 32px);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px 6px 10px;
+  border: 1px solid var(--cc-warning-border);
+  border-radius: 7px;
+  background: var(--cc-warning-soft);
+  color: var(--cc-warning-strong);
+  box-shadow: var(--cc-shadow-sm);
+  font-size: 11px;
+  transform: translate(-50%, -50%);
+}
+
+.terminal-restore-failure span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.terminal-restore-failure button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+
+.terminal-restore-failure button:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.terminal-restore-failure button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
+}
+
 .terminal-paste-confirmation,
 .terminal-paste-progress,
 .terminal-paste-notice {
