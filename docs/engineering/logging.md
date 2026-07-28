@@ -91,7 +91,7 @@
 
 应用正常退出时，各清理阶段成功必须保持静默；只有阶段超时或失败才记录包含阶段、耗时和关联 ID 的 `warn` 或 `error`。
 
-工作区重挂载对已退出 session 产生的迟到 write/resize/interrupt 属于可收敛生命周期竞态，应由 Run 幂等返回权威快照，不记录 `TERMINAL_SESSION_NOT_RUNNING` 警告。renderer 终止一个已经不存在的旧 session 同样属于已完成的幂等清理，不记录 `TERMINAL_SESSION_NOT_FOUND` 警告。受管服务监听关闭失败则必须以 `run.service-port`、`SERVICE_PORT_CLEANUP_FAILED` 和精确运行身份记录结构化清理失败。
+工作区重挂载对已退出 session 产生的迟到 write/resize/interrupt 属于可收敛生命周期竞态，应由 Run 幂等返回权威快照，不记录 `TERMINAL_SESSION_NOT_RUNNING` 警告。renderer 终止一个已经不存在的旧 session 同样属于已完成的幂等清理，不记录 `TERMINAL_SESSION_NOT_FOUND` 警告。终端视图使用已经过期的完整运行身份执行 `attachTerminalView` 并收到 `RUN_SCOPE_STALE` 时，renderer 必须停止重试该身份；IPC 仍返回结构化错误，但该预期作用域收敛不写 warning。受管服务监听关闭失败则必须以 `run.service-port`、`SERVICE_PORT_CLEANUP_FAILED` 和精确运行身份记录结构化清理失败。
 
 ## 错误码
 
@@ -128,7 +128,7 @@ Electron main 进程不得直接裸用 `ipcMain.handle`。
 - 将 `AppError` 包装为 `{ ok: false, error }`。
 - 将未知异常转换为 `UNEXPECTED_ERROR`。
 - 按 handler 显式配置记录成功日志。
-- 始终记录结构化失败日志。
+- 默认记录结构化失败日志；只有 handler 明确声明且 owner 文档列出的预期生命周期收敛可以保持静默，错误仍须结构化返回调用方。
 
 preload 层负责解包 IPC 结果，并把失败结果恢复成 renderer 可识别的 `AppError`。
 

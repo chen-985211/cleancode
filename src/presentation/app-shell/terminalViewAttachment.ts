@@ -12,6 +12,7 @@ export async function attachTerminalViewWithRetry<T>(input: {
     try {
       return await input.attach()
     } catch (error) {
+      if (isStaleTerminalViewIdentityError(error)) return null
       const retryDelay = terminalViewAttachRetryDelaysMs[attempt]
       if (
         retryDelay === undefined ||
@@ -29,13 +30,18 @@ function isTransientTerminalViewAttachError(error: unknown): boolean {
   const code = getAppErrorCode(error)
 
   if (
-    code === 'RUN_SCOPE_STALE' ||
     code === 'TERMINAL_MODEL_NOT_FOUND' ||
     code === 'TERMINAL_RUNTIME_NOT_READY' ||
     code === 'TERMINAL_SESSION_NOT_FOUND'
   ) {
     return true
   }
+
+  return false
+}
+
+function isStaleTerminalViewIdentityError(error: unknown): boolean {
+  if (getAppErrorCode(error) === 'RUN_SCOPE_STALE') return true
 
   const message = error instanceof Error ? error.message : String(error)
 

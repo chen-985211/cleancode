@@ -192,12 +192,13 @@ describe('Agent shared terminal view', () => {
     }
   })
 
-  it('retries a transient stale-scope failure while attaching an Agent terminal view', async () => {
-    const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
+  it('abandons a stale identity and attaches once when the next generation arrives', async () => {
+    let viewSequence = 0
+    const registry = new TerminalSurfaceRegistry(undefined, () => `agent-view-${++viewSequence}`)
     const attachTerminalView = vi
       .fn()
       .mockRejectedValueOnce(
-        Object.assign(new Error('Terminal view scope is still starting.'), {
+        Object.assign(new Error('Terminal view no longer matches the current runtime scope.'), {
           code: 'RUN_SCOPE_STALE',
           isExpected: true
         })
@@ -218,8 +219,40 @@ describe('Agent shared terminal view', () => {
       </TerminalSurfaceRegistryProvider>
     )
 
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledOnce())
+    expect(terminalViewMockState.surfaces[0]?.restore).not.toHaveBeenCalled()
+
+    const nextSession = createSession()
+    view.rerender(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness
+          session={{
+            ...nextSession,
+            runtime: {
+              ...nextSession.runtime,
+              revision: 2,
+              terminal: {
+                ...nextSession.runtime.terminal,
+                viewIdentity: {
+                  ...nextSession.runtime.terminal.viewIdentity!,
+                  generation: 4,
+                  runId: 'agent-terminal:agent-session-2',
+                  sessionId: 'terminal-session-2'
+                }
+              }
+            }
+          }}
+        />
+      </TerminalSurfaceRegistryProvider>
+    )
+
     await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
-    expect(terminalViewMockState.surfaces[0]?.restore).toHaveBeenCalledWith(
+    expect(attachTerminalView.mock.calls[1]?.[0]).toMatchObject({
+      generation: 4,
+      runId: 'agent-terminal:agent-session-2',
+      sessionId: 'terminal-session-2'
+    })
+    expect(terminalViewMockState.surfaces.at(-1)?.restore).toHaveBeenCalledWith(
       expect.objectContaining({ content: 'restored output' })
     )
     view.unmount()

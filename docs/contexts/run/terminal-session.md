@@ -104,6 +104,7 @@ Run application 统一拥有终端能力环境。普通终端启动和 Agent for
 3. `DetachView` 只暂停输出并把响应权交还模型，不终止 PTY。旧 xterm 在主进程确认 detach 前保持可用，确认后立即销毁。
 4. 缺失 sequence 或超过 1 MiB renderer 恢复队列时重新 attach；模型待解析输出达到 1 MiB 时暂停 PTY，降到 256 KiB 后恢复。
 5. `ReplaceSession`、显式关闭和统一硬清理同时释放 PTY、模型、视图租约、缓冲与恢复文件；自然退出、工作流历史保留停止和 Provider 故障只保留有界最终模型，不伪造 live 状态。
+6. `AttachView` 返回 `RUN_SCOPE_STALE` 表示请求携带的完整运行身份已经终局失效；renderer 必须立即结束本次 attach，不得用同一身份定时重试。只有 React 接收到新的 `viewIdentity` 或 generation 后才允许发起下一次 attach。该结果仍通过结构化 IPC 错误返回调用方，但属于预期的作用域收敛，不记录 warning。
 
 Provider Client 的全局普通终端输出投影只接收 block-owned terminal；agent-owned terminal 输出只进入其精确绑定的 view 和进程回调。表现层对找不到匹配运行身份的普通终端输出必须保持状态引用不变，不能把 Agent 全屏重绘暂存为普通终端启动输出，也不能触发画布节点重投影。
 

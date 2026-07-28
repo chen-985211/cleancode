@@ -42,6 +42,7 @@ import {
 } from './AgentSessionRuntimeCoordinator'
 import {
   beginAgentTerminalRuntime,
+  beginAgentMcpInitializationTimeout,
   canLaunchAgentProvider,
   createAgentLaunchRuntimeController,
   createAgentSessionCallbacks,
@@ -594,9 +595,12 @@ export class AgentSessionService {
     try {
       const lifecycle = createAgentLaunchRuntimeController({
         attempt: providerLaunchGeneration,
-        onStartedAccepted: plan.providerSessionRefOnStarted
-          ? () => persistProviderSessionRef(plan.providerSessionRefOnStarted!)
-          : undefined,
+        onStartedAccepted: () => {
+          if (plan.providerSessionRefOnStarted) {
+            persistProviderSessionRef(plan.providerSessionRefOnStarted)
+          }
+          beginAgentMcpInitializationTimeout(session)
+        },
         onUnexpectedExit: () => {
           this.beginSessionToolClosing(session)
           void this.settleSessionToolCalls(session)

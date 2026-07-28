@@ -8,7 +8,8 @@ describe('Agent Provider feedback policy', () => {
     ['inactive', 'connecting'],
     ['initializing', 'connecting'],
     ['ready', 'ready'],
-    ['failed', 'degraded']
+    ['degraded', 'degraded'],
+    ['failed', 'unavailable']
   ] as const)('projects MCP %s as %s', (mcp, expected) => {
     const feedback = deriveAgentProviderFeedback({
       attachment: { status: 'idle' },
@@ -19,15 +20,14 @@ describe('Agent Provider feedback policy', () => {
     expect(feedback.mcpStatus).toBe(expected)
   })
 
-  it('keeps an MCP failure on the MCP control while notifying the transition', () => {
+  it('keeps a passive MCP failure on the MCP control without interrupting the user', () => {
     const feedback = deriveAgentProviderFeedback({
       attachment: { status: 'idle' },
       runtime: runtime({ mcp: 'failed' }),
       state: installedState
     })
 
-    expect(feedback.issues).not.toContain('mcp_unavailable')
-    expect(feedback.events).toContain('mcp_unavailable')
+    expect(feedback.events).toEqual([])
     expect(feedback.blocking).toBeNull()
   })
 
@@ -84,14 +84,14 @@ describe('Agent Provider feedback policy', () => {
     expect(feedback).toEqual({ blocking: null, events: [], issues: [], mcpStatus: 'connecting' })
   })
 
-  it('notifies only about facts the user cannot see anywhere else', () => {
+  it('notifies about binding persistence but keeps MCP readiness on its own control', () => {
     expect(
       deriveAgentProviderFeedback({
         attachment: { status: 'idle' },
         runtime: runtime({ binding: 'persistence_failed', mcp: 'failed' }),
         state: installedState
       }).events
-    ).toEqual(['binding_save_failed', 'mcp_unavailable'])
+    ).toEqual(['binding_save_failed'])
   })
 
   it('separates a terminal that never started from a session that was interrupted', () => {

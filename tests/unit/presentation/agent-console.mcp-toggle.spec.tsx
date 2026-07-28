@@ -234,6 +234,82 @@ describe('Agent console CleanCode MCP toggle', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('未能切换 CleanCode MCP，请重试。')
     expect(container.querySelector('.agent-mcp-capability__error')).toBeNull()
   })
+
+  it('reconnects a degraded MCP through the existing capability reconfiguration path', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const agent = createAgent(workbench.project.id, currentWorkspace.workspaceId)
+    const degradedSession = createAgentSessionSnapshot()
+    const onMcpCapabilityChange = vi.fn(async () => ({
+      agent,
+      session: createAgentSessionSnapshot()
+    }))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession: vi.fn(async () => ({
+          ...degradedSession,
+          runtime: {
+            ...degradedSession.runtime,
+            mcp: { status: 'degraded' as const }
+          }
+        }))
+      })
+    })
+
+    render(
+      <AgentConsole
+        agent={agent}
+        currentWorkbench={workbench}
+        currentWorkspace={currentWorkspace}
+        onMcpCapabilityChange={onMcpCapabilityChange}
+        onRemove={vi.fn(async () => undefined)}
+        onRename={vi.fn(async () => undefined)}
+      />
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '重新连接 CleanCode MCP' }))
+    await waitFor(() => expect(onMcpCapabilityChange).toHaveBeenCalledWith(agent, true))
+  })
+
+  it('notifies only after an explicit degraded MCP reconnect fails', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const currentWorkspace = workbench.project.workspaces[0]!
+    const agent = createAgent(workbench.project.id, currentWorkspace.workspaceId)
+    const degradedSession = createAgentSessionSnapshot()
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({
+        attachAgentSession: vi.fn(async () => ({
+          ...degradedSession,
+          runtime: {
+            ...degradedSession.runtime,
+            mcp: { status: 'degraded' as const }
+          }
+        }))
+      })
+    })
+
+    render(
+      <NotificationProvider>
+        <AgentConsole
+          agent={agent}
+          currentWorkbench={workbench}
+          currentWorkspace={currentWorkspace}
+          onMcpCapabilityChange={vi.fn(async () => {
+            throw new Error('reconnect failed')
+          })}
+          onRemove={vi.fn(async () => undefined)}
+          onRename={vi.fn(async () => undefined)}
+        />
+      </NotificationProvider>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '重新连接 CleanCode MCP' }))
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '未能重新连接 CleanCode MCP，请重试。'
+    )
+  })
 })
 
 function createAgent(projectId: string, workspaceId: string) {

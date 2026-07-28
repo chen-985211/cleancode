@@ -34,7 +34,7 @@ export type AgentBindingRuntimeStatus =
   'unbound' | 'persisting' | 'persisted' | 'persistence_failed'
 
 export type AgentMcpRuntimeStatus =
-  'disabled' | 'unsupported' | 'inactive' | 'initializing' | 'ready' | 'failed'
+  'disabled' | 'unsupported' | 'inactive' | 'initializing' | 'ready' | 'degraded' | 'failed'
 
 export interface AgentRuntimeSnapshot {
   readonly activity: { readonly status: AgentActivityStatus }

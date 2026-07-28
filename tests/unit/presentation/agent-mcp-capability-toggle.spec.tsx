@@ -41,10 +41,32 @@ describe('Agent CleanCode MCP capability toggle', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it.each(['degraded', 'unavailable'] as const)(
+    'offers a separate reconnect action when an enabled MCP is %s',
+    (status) => {
+      const onChange = vi.fn()
+      const onReconnect = vi.fn()
+      render(
+        <AgentMcpCapabilityToggle
+          enabled
+          onChange={onChange}
+          onReconnect={onReconnect}
+          pending={false}
+          status={status}
+        />
+      )
+
+      fireEvent.click(screen.getByRole('button', { name: '重新连接 CleanCode MCP' }))
+      expect(onReconnect).toHaveBeenCalledOnce()
+      expect(onChange).not.toHaveBeenCalled()
+    }
+  )
+
   it.each([
     ['ready', 'ready'],
     ['initializing', 'connecting'],
-    ['failed', 'degraded']
+    ['degraded', 'degraded'],
+    ['failed', 'unavailable']
   ] as const)('shows the %s runtime as a %s status dot', (_runtimeStatus, status) => {
     const { container } = render(
       <AgentMcpCapabilityToggle enabled onChange={vi.fn()} pending={false} status={status} />

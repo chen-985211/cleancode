@@ -43,7 +43,5 @@ function feedbackEventLabel(event: AgentFeedbackEvent, t: Translate): string {
   switch (event) {
     case 'binding_save_failed':
       return t('provider.bindingSaveFailed')
-    case 'mcp_unavailable':
-      return t('provider.mcpUnavailable')
   }
 }
