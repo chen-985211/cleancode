@@ -312,6 +312,8 @@ export const enMessages = {
   'workflow.status.blocked': 'Blocked',
   'workflow.status.stopped': 'Stopped',
   'terminal.output': '{blockName} text output',
+  'terminal.view.restoreFailed': 'Terminal display is temporarily unavailable',
+  'terminal.view.retry': 'Retry terminal display',
   'terminal.search.controls': 'Terminal search controls',
   'terminal.search.input': 'Search terminal output',
   'terminal.search.placeholder': 'Search',

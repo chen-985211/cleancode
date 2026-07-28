@@ -1,7 +1,11 @@
-import { attachTerminalViewWithRetry } from '../../../src/presentation/app-shell/terminalViewAttachment'
+import {
+  attachTerminalViewWithRetry,
+  restoreTerminalViewWithRetry
+} from '../../../src/presentation/app-shell/terminalViewAttachment'
 
 describe('terminal view attachment', () => {
   it('abandons a stale identity without retrying it', async () => {
+    const onStale = vi.fn()
     const attach = vi.fn().mockRejectedValue(
       Object.assign(new Error('Terminal view no longer matches the current runtime scope.'), {
         code: 'RUN_SCOPE_STALE',
@@ -12,10 +16,12 @@ describe('terminal view attachment', () => {
     await expect(
       attachTerminalViewWithRetry({
         attach,
-        isCancelled: () => false
+        isCancelled: () => false,
+        onStale
       })
     ).resolves.toBeNull()
     expect(attach).toHaveBeenCalledOnce()
+    expect(onStale).toHaveBeenCalledOnce()
   })
 
   it('abandons a stale identity after contextBridge strips custom fields', async () => {
@@ -67,5 +73,24 @@ describe('terminal view attachment', () => {
       })
     ).rejects.toBe(failure)
     expect(attach).toHaveBeenCalledOnce()
+  })
+
+  it('keeps loading snapshots until terminal restoration converges', async () => {
+    const loadSnapshot = vi.fn(async () => 'snapshot')
+    const restore = vi
+      .fn()
+      .mockResolvedValueOnce('retry')
+      .mockResolvedValueOnce('retry')
+      .mockResolvedValueOnce('ready')
+
+    await expect(
+      restoreTerminalViewWithRetry({
+        isCancelled: () => false,
+        loadSnapshot,
+        restore
+      })
+    ).resolves.toBe('ready')
+    expect(loadSnapshot).toHaveBeenCalledTimes(3)
+    expect(restore).toHaveBeenCalledTimes(3)
   })
 })

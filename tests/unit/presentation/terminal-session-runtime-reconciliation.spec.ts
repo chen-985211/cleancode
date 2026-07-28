@@ -2,6 +2,7 @@ import {
   applyTerminalExitEvent,
   applyRecoveredTerminalSessionSnapshot,
   applyTerminalSessionSnapshot,
+  reconcileStaleTerminalViewSnapshot,
   reconcileTerminalSessionSnapshots
 } from '../../../src/presentation/app-shell/terminalSessionRuntime'
 import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
@@ -108,6 +109,35 @@ describe('terminal session runtime reconciliation', () => {
         '["project-1","main","terminal","block-1"]'
       ]?.status
     ).toBe('exited')
+  })
+
+  it('reconciles a stale terminal view to a newer authoritative generation', () => {
+    const requested = sessionSnapshot('session-1', 'running')
+    const refreshed = sessionSnapshot('session-1', 'running', 2)
+    const terminalStateKey = '["project-1","main","terminal","block-1"]'
+    const states: Record<string, TerminalViewState> = {
+      [terminalStateKey]: viewState(requested, 'live output')
+    }
+
+    const reconciled = reconcileStaleTerminalViewSnapshot(states, identity(requested), [refreshed])
+
+    expect(reconciled[terminalStateKey]).toMatchObject({
+      output: 'live output',
+      runIdentity: identity(refreshed)
+    })
+  })
+
+  it('ignores a stale-view reconciliation response after the identity was replaced', () => {
+    const requested = sessionSnapshot('session-1', 'running')
+    const refreshed = sessionSnapshot('session-1', 'running', 2)
+    const replacement = sessionSnapshot('session-1', 'running', 3)
+    const states: Record<string, TerminalViewState> = {
+      '["project-1","main","terminal","block-1"]': viewState(replacement)
+    }
+
+    expect(reconcileStaleTerminalViewSnapshot(states, identity(requested), [refreshed])).toBe(
+      states
+    )
   })
 })
 
