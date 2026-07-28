@@ -17,7 +17,7 @@ jobs:
   build:
     name: Build Electron / ${{ matrix.id }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -58,6 +58,43 @@ jobs:
           done
           exit 1
       - run: pnpm exec electron-vite build
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          pnpm prepare:packaging
+          pnpm exec electron-builder --dir --win --x64 --publish never
+      - name: Resolve packaged Windows executable
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          packaged_relative_path=$(find release \
+            -path '*unpacked/CleanCode.exe' \
+            -type f -print -quit)
+
+          if [ -z "$packaged_relative_path" ]; then
+            echo "Packaged Windows executable was not found." >&2
+            exit 1
+          fi
+
+          packaged_executable_path=$(node -e \
+            "process.stdout.write(require('node:path').resolve(process.argv[1]))" \
+            "$packaged_relative_path")
+          echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
+      - name: Run packaged Windows terminal smoke test
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts -t "runs shell commands from the active project workspace"
+      - name: Upload packaged Windows smoke diagnostics
+        if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: ignore
+          name: electron-e2e-packaged-diagnostics-windows
+          path: test-results/e2e
+          retention-days: 7
       - name: Package Electron binary
         shell: bash
         run: |
