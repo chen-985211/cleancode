@@ -1,12 +1,53 @@
-import { attachTerminalViewWithRetry } from '../../../src/presentation/app-shell/terminalViewAttachment'
+import {
+  attachTerminalViewWithRetry,
+  restoreTerminalViewWithRetry
+} from '../../../src/presentation/app-shell/terminalViewAttachment'
 
 describe('terminal view attachment', () => {
-  it('retries a transient stale-scope failure', async () => {
+  it('abandons a stale identity without retrying it', async () => {
+    const onStale = vi.fn()
+    const attach = vi.fn().mockRejectedValue(
+      Object.assign(new Error('Terminal view no longer matches the current runtime scope.'), {
+        code: 'RUN_SCOPE_STALE',
+        isExpected: true
+      })
+    )
+
+    await expect(
+      attachTerminalViewWithRetry({
+        attach,
+        isCancelled: () => false,
+        onStale
+      })
+    ).resolves.toBeNull()
+    expect(attach).toHaveBeenCalledOnce()
+    expect(onStale).toHaveBeenCalledOnce()
+  })
+
+  it('abandons a stale identity after contextBridge strips custom fields', async () => {
+    const attach = vi
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'Error invoking remote method: Terminal view no longer matches the current runtime scope.'
+        )
+      )
+
+    await expect(
+      attachTerminalViewWithRetry({
+        attach,
+        isCancelled: () => false
+      })
+    ).resolves.toBeNull()
+    expect(attach).toHaveBeenCalledOnce()
+  })
+
+  it('retries a runtime that is not ready yet', async () => {
     const attach = vi
       .fn()
       .mockRejectedValueOnce(
-        Object.assign(new Error('Terminal view scope is still starting.'), {
-          code: 'RUN_SCOPE_STALE',
+        Object.assign(new Error('Terminal runtime is still starting.'), {
+          code: 'TERMINAL_RUNTIME_NOT_READY',
           isExpected: true
         })
       )
@@ -21,13 +62,11 @@ describe('terminal view attachment', () => {
     expect(attach).toHaveBeenCalledTimes(2)
   })
 
-  it('recognizes a stale-scope error after contextBridge strips custom fields', async () => {
+  it('retries a runtime that is not ready after contextBridge strips custom fields', async () => {
     const attach = vi
       .fn()
       .mockRejectedValueOnce(
-        new Error(
-          'Error invoking remote method: Terminal view no longer matches the current runtime scope.'
-        )
+        new Error('Error invoking remote method: Terminal runtime is still starting.')
       )
       .mockResolvedValueOnce('attached')
 
@@ -51,5 +90,24 @@ describe('terminal view attachment', () => {
       })
     ).rejects.toBe(failure)
     expect(attach).toHaveBeenCalledOnce()
+  })
+
+  it('keeps loading snapshots until terminal restoration converges', async () => {
+    const loadSnapshot = vi.fn(async () => 'snapshot')
+    const restore = vi
+      .fn()
+      .mockResolvedValueOnce('retry')
+      .mockResolvedValueOnce('retry')
+      .mockResolvedValueOnce('ready')
+
+    await expect(
+      restoreTerminalViewWithRetry({
+        isCancelled: () => false,
+        loadSnapshot,
+        restore
+      })
+    ).resolves.toBe('ready')
+    expect(loadSnapshot).toHaveBeenCalledTimes(3)
+    expect(restore).toHaveBeenCalledTimes(3)
   })
 })

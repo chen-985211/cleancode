@@ -427,7 +427,9 @@ export function registerTerminalIpcHandlers(
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'attachTerminalView',
-    scope: 'run.terminal-view'
+    scope: 'run.terminal-view',
+    shouldLogFailure: (error) =>
+      error.code !== 'RUN_SCOPE_STALE' && error.code !== 'TERMINAL_RUNTIME_NOT_READY'
   })
 
   registerIpcHandler<{ readonly scrollbackRows: TerminalScrollbackRows }, void>({

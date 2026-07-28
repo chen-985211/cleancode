@@ -44,6 +44,7 @@ interface TerminalFlowNodeHandlers {
   readonly onDismissPortConflict?: TerminalFlowNode['data']['onDismissPortConflict']
   readonly onRunFromHere?: TerminalFlowNode['data']['onRunFromHere']
   readonly onStopWorkflow?: TerminalFlowNode['data']['onStopWorkflow']
+  readonly onViewIdentityStale?: TerminalFlowNode['data']['onViewIdentityStale']
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
   readonly onResize: (block: TerminalBlockSnapshot, dimensions: TerminalDimensions) => void

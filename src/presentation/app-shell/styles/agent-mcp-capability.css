@@ -39,6 +39,32 @@
   opacity: 0.68;
 }
 
+.agent-mcp-capability__reconnect {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cc-warning-strong);
+}
+
+.agent-mcp-capability__reconnect:hover:not(:disabled) {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.agent-mcp-capability__reconnect:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cc-primary) 62%, transparent);
+  outline-offset: 1px;
+}
+
+.agent-mcp-capability__reconnect:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .agent-mcp-capability__icon-wrap {
   position: relative;
   display: inline-flex;
@@ -70,6 +96,10 @@
 
 .agent-mcp-capability__status-dot[data-state='degraded'] {
   background: var(--cc-warning-strong);
+}
+
+.agent-mcp-capability__status-dot[data-state='unavailable'] {
+  background: var(--cc-danger-strong);
 }
 
 .agent-mcp-capability__tooltip {

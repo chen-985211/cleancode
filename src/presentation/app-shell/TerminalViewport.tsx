@@ -9,6 +9,7 @@ import {
   type FocusEvent,
   type KeyboardEvent
 } from 'react'
+import { RefreshCw } from 'lucide-react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
@@ -21,8 +22,8 @@ import {
 } from './terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
 import { readTerminalSourceTheme } from './terminalTheme'
-import { attachTerminalViewWithRetry } from './terminalViewAttachment'
-import type { TerminalDimensions, TerminalViewState } from './types'
+import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
+import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
 import { useI18n } from './i18n/useI18n'
 import {
   TerminalPasteController,
@@ -38,6 +39,7 @@ interface TerminalViewportProps {
   readonly focusRequestId: number
   readonly isResizeSuspended?: boolean
   readonly isInputDisabled?: boolean
+  readonly onViewIdentityStale?: (identity: TerminalRunIdentity) => void
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
@@ -63,6 +65,7 @@ export function TerminalViewport({
   focusRequestId,
   isResizeSuspended = false,
   isInputDisabled = false,
+  onViewIdentityStale = () => undefined,
   onDimensionsChange,
   onInput,
   onPaste = async () => undefined
@@ -73,10 +76,12 @@ export function TerminalViewport({
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const outputTailElementRef = useRef<HTMLPreElement | null>(null)
   const surfaceRef = useRef<TerminalSurface | null>(null)
+  const requestRestoreRef = useRef<() => void>(() => undefined)
   const outputTailRef = useRef(appendTerminalOutputTail('', session.output))
   const blockRef = useRef(block)
   const runIdentityRef = useRef(session.runIdentity ?? null)
   const onDimensionsChangeRef = useRef(onDimensionsChange)
+  const onViewIdentityStaleRef = useRef(onViewIdentityStale)
   const onInputRef = useRef(onInput)
   const onPasteRef = useRef(onPaste)
   const isResizeSuspendedRef = useRef(isResizeSuspended)
@@ -91,6 +96,7 @@ export function TerminalViewport({
     resultCount: 0,
     resultIndex: 0
   })
+  const [restoreStatus, setRestoreStatus] = useState<'failed' | 'ready' | 'restoring'>('restoring')
   const terminalSourceTheme = session.terminalSourceTheme ?? readTerminalSourceTheme()
   const surfaceIdentityKey = session.runIdentity
     ? createTerminalSurfaceKey(session.runIdentity)
@@ -102,9 +108,19 @@ export function TerminalViewport({
     onInputRef.current = onInput
     onPasteRef.current = onPaste
     onDimensionsChangeRef.current = onDimensionsChange
+    onViewIdentityStaleRef.current = onViewIdentityStale
     isResizeSuspendedRef.current = isResizeSuspended
     isInputDisabledRef.current = isInputDisabled
-  }, [block, isInputDisabled, isResizeSuspended, onDimensionsChange, onInput, onPaste, session])
+  }, [
+    block,
+    isInputDisabled,
+    isResizeSuspended,
+    onDimensionsChange,
+    onInput,
+    onPaste,
+    onViewIdentityStale,
+    session
+  ])
 
   const pasteControllerRef = useRef<TerminalPasteController | null>(null)
   useEffect(() => {
@@ -278,44 +294,69 @@ export function TerminalViewport({
           .catch(() => setHasLinkError(true))
       },
       onOpenSearch: openSearch,
-      onRestoreRequired: () => requestRestore(0),
+      onRestoreRequired: () => requestRestore(),
       onSearchResultsChange: setSearchResults
     })
 
-    const requestRestore = (attempt: number): void => {
+    const requestRestore = (): void => {
+      setRestoreStatus('restoring')
       restoreTail = restoreTail
         .catch(() => undefined)
         .then(async () => {
           if (isReleased) return
-          const snapshot =
-            runIdentity && lease && api?.attachTerminalView
-              ? await attachTerminalViewWithRetry({
-                  attach: () => api.attachTerminalView!({ ...runIdentity, viewId: lease.viewId }),
-                  isCancelled: () => isReleased
-                })
-              : createFallbackSnapshot(runIdentity, outputTailRef.current)
-          if (isReleased || !snapshot) return
-          if (lease && api?.attachTerminalView && snapshot.restoreMarker.viewId !== lease.viewId) {
-            return
+          try {
+            const result = await restoreTerminalViewWithRetry({
+              isCancelled: () => isReleased,
+              loadSnapshot: async () => {
+                const snapshot =
+                  runIdentity && lease && api?.attachTerminalView
+                    ? await attachTerminalViewWithRetry({
+                        attach: () =>
+                          api.attachTerminalView!({ ...runIdentity, viewId: lease.viewId }),
+                        isCancelled: () => isReleased,
+                        onStale: () => onViewIdentityStaleRef.current(runIdentity)
+                      })
+                    : createFallbackSnapshot(runIdentity, outputTailRef.current)
+
+                if (
+                  snapshot &&
+                  lease &&
+                  api?.attachTerminalView &&
+                  snapshot.restoreMarker.viewId !== lease.viewId
+                ) {
+                  return null
+                }
+                return snapshot
+              },
+              restore: async (snapshot) => {
+                const restoreResult = await surface.restore(snapshot)
+                if (isReleased) return restoreResult
+                outputTailRef.current = appendTerminalOutputTail(
+                  '',
+                  outputTailRef.current || snapshot.transcript
+                )
+                if (outputTailElementRef.current) {
+                  outputTailElementRef.current.textContent = outputTailRef.current
+                }
+                return restoreResult
+              }
+            })
+            if (!isReleased) setRestoreStatus(result === 'ready' ? 'ready' : 'failed')
+          } catch {
+            if (!isReleased) setRestoreStatus('failed')
           }
-          const result = await surface.restore(snapshot)
-          if (isReleased) return
-          outputTailRef.current = appendTerminalOutputTail(
-            '',
-            outputTailRef.current || snapshot.transcript
-          )
-          if (outputTailElementRef.current) {
-            outputTailElementRef.current.textContent = outputTailRef.current
-          }
-          if (result === 'retry' && attempt < 1) requestRestore(attempt + 1)
         })
       void restoreTail.catch(() => undefined)
     }
 
-    requestRestore(0)
+    requestRestoreRef.current = requestRestore
+    requestRestore()
 
     return () => {
       isReleased = true
+      if (requestRestoreRef.current === requestRestore) {
+        requestRestoreRef.current = () => undefined
+      }
       surface.detach(element)
       if (runIdentity && lease && api?.detachTerminalView) {
         void api
@@ -395,6 +436,19 @@ export function TerminalViewport({
       {hasLinkError ? (
         <div className="terminal-link-feedback" role="status">
           {t('terminal.link.openFailed')}
+        </div>
+      ) : null}
+      {restoreStatus === 'failed' ? (
+        <div className="terminal-restore-failure" role="alert">
+          <span>{t('terminal.view.restoreFailed')}</span>
+          <button
+            type="button"
+            aria-label={t('terminal.view.retry')}
+            title={t('terminal.view.retry')}
+            onClick={() => requestRestoreRef.current()}
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+          </button>
         </div>
       ) : null}
       {pendingPaste ? (

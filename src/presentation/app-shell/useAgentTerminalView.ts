@@ -2,7 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
-import { attachTerminalViewWithRetry } from './terminalViewAttachment'
+import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import type { TerminalDimensions } from './types'
 import { useTerminalSurfaceRegistry } from './useTerminalSurfaceRegistry'
@@ -91,18 +91,22 @@ export function useAgentTerminalView({
       pendingInput += input
       inputTimer ??= window.setTimeout(flushInput, terminalInputBatchWindowMs)
     }
-    const requestRestore = (attempt: number): void => {
+    const requestRestore = (): void => {
       restoreTail = restoreTail
         .catch(() => undefined)
         .then(async () => {
           if (isReleased) return
-          const snapshot = await attachTerminalViewWithRetry({
-            attach: () => api.attachTerminalView({ ...identity, viewId: lease.viewId }),
-            isCancelled: () => isReleased
+          await restoreTerminalViewWithRetry({
+            isCancelled: () => isReleased,
+            loadSnapshot: async () => {
+              const snapshot = await attachTerminalViewWithRetry({
+                attach: () => api.attachTerminalView({ ...identity, viewId: lease.viewId }),
+                isCancelled: () => isReleased
+              })
+              return snapshot?.restoreMarker.viewId === lease.viewId ? snapshot : null
+            },
+            restore: (snapshot) => surface.restore(snapshot)
           })
-          if (isReleased || !snapshot || snapshot.restoreMarker.viewId !== lease.viewId) return
-          const result = await surface.restore(snapshot)
-          if (result === 'retry' && attempt < 1) requestRestore(attempt + 1)
         })
       void restoreTail.catch(() => undefined)
     }
@@ -123,10 +127,10 @@ export function useAgentTerminalView({
           .catch(() => undefined)
       },
       onOpenSearch: () => undefined,
-      onRestoreRequired: () => requestRestore(0),
+      onRestoreRequired: requestRestore,
       onSearchResultsChange: () => undefined
     })
-    requestRestore(0)
+    requestRestore()
 
     return () => {
       isReleased = true

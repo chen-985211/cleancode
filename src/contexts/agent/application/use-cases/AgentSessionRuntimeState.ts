@@ -38,7 +38,11 @@ import {
   type AgentSessionRuntimeOwner
 } from './AgentSessionRuntimeCoordinator'
 
-const agentMcpInitializationTimeoutMs = 10_000
+const agentMcpInitializationTimeoutMs = 30_000
+
+interface ManagedAgentMcpRegistration extends AgentMcpRegistration {
+  beginInitializationTimeout(): void
+}
 
 export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
   readonly agentId: string
@@ -70,7 +74,7 @@ export interface ManagedAgentSession {
   isTerminalRunning: boolean
   isStopping: boolean
   launchArtifacts: AgentLaunchArtifactScope | null
-  mcpRegistration?: AgentMcpRegistration
+  mcpRegistration?: ManagedAgentMcpRegistration
   readonly mcpSupported: boolean
   readonly projectDirectory: string
   readonly projectId: string
@@ -507,7 +511,7 @@ export async function registerAgentMcpEndpoint(
 
   unregisterAgentMcpEndpoint(session)
   transitionAgentRuntime(session, { mcp: 'initializing' })
-  let registration: AgentMcpRegistration | null = null
+  let registration: ManagedAgentMcpRegistration | null = null
   let initializationTimeout: ReturnType<typeof setTimeout> | null = null
   let initialized = false
   const clearInitializationTimeout = (): void => {
@@ -533,6 +537,20 @@ export async function registerAgentMcpEndpoint(
     workspaceId: session.workspaceId
   })
   registration = {
+    beginInitializationTimeout() {
+      if (
+        initialized ||
+        initializationTimeout !== null ||
+        session.mcpRegistration !== registration
+      ) {
+        return
+      }
+      initializationTimeout = setTimeout(() => {
+        initializationTimeout = null
+        if (initialized || session.mcpRegistration !== registration) return
+        transitionAgentRuntime(session, { mcp: 'degraded' })
+      }, agentMcpInitializationTimeoutMs)
+    },
     bearerToken: providerRegistration.bearerToken,
     dispose() {
       clearInitializationTimeout()
@@ -543,12 +561,11 @@ export async function registerAgentMcpEndpoint(
   session.mcpRegistration = registration
   if (initialized) {
     publishInitialized()
-  } else {
-    initializationTimeout = setTimeout(() => {
-      if (session.mcpRegistration !== registration) return
-      recordAgentMcpRegistrationFailure(session)
-    }, agentMcpInitializationTimeoutMs)
   }
+}
+
+export function beginAgentMcpInitializationTimeout(session: ManagedAgentSession): void {
+  session.mcpRegistration?.beginInitializationTimeout()
 }
 
 export function unregisterAgentMcpEndpoint(session: ManagedAgentSession): void {

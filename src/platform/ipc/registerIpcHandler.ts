@@ -30,6 +30,7 @@ export interface RegisterIpcHandlerInput<TCommand, TResult> {
   readonly channel: string
   readonly scope: string
   readonly operation: string
+  readonly shouldLogFailure?: (error: SerializedAppError) => boolean
   readonly successLogLevel?: Extract<LogLevel, 'debug' | 'info'> | 'silent'
   readonly handler: (
     command: TCommand,
@@ -45,6 +46,7 @@ export function registerIpcHandler<TCommand = unknown, TResult = unknown>({
   logger,
   operation,
   scope,
+  shouldLogFailure,
   successLogLevel = 'silent'
 }: RegisterIpcHandlerInput<TCommand, TResult>): void {
   ipcMain.handle(channel, async (event, command) => {
@@ -71,14 +73,16 @@ export function registerIpcHandler<TCommand = unknown, TResult = unknown>({
       const serializedError = serializeAppError(appError, { correlationId })
       const logError = resolveLogError(error, serializedError)
 
-      logger[serializedError.isExpected ? 'warn' : 'error']({
-        correlationId,
-        durationMs: resolveDurationMs(startedAt),
-        error: logError,
-        operation,
-        outcome: 'failure',
-        scope
-      })
+      if (shouldLogFailure?.(serializedError) !== false) {
+        logger[serializedError.isExpected ? 'warn' : 'error']({
+          correlationId,
+          durationMs: resolveDurationMs(startedAt),
+          error: logError,
+          operation,
+          outcome: 'failure',
+          scope
+        })
+      }
 
       return { ok: false, error: serializedError }
     }

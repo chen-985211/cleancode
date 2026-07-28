@@ -36,6 +36,7 @@ import {
 } from './terminalSessionRuntime'
 import { readTerminalSourceTheme } from './terminalTheme'
 import { useTerminalRuntimeRecovery } from './useTerminalRuntimeRecovery'
+import { useTerminalViewIdentityReconciliation } from './useTerminalViewIdentityReconciliation'
 import {
   defaultTerminalDimensions,
   type TerminalDimensions,
@@ -123,6 +124,8 @@ export function useTerminalSessions({
     },
     [updateTerminalStates]
   )
+
+  const reconcileStaleTerminalView = useTerminalViewIdentityReconciliation(updateTerminalStates)
 
   useEffect(() => {
     const api = window.cleancode
@@ -662,6 +665,7 @@ export function useTerminalSessions({
     findTerminalBlockIdForSession,
     interruptTerminal,
     quickLaunchTerminal,
+    reconcileStaleTerminalView,
     resizeTerminal,
     restartTerminal,
     runningSessionIds,

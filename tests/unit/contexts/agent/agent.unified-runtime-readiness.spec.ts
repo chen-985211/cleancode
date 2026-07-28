@@ -47,18 +47,51 @@ describe('Agent unified runtime readiness contract', () => {
     expect(harness.terminal.launches).toHaveLength(1)
   })
 
-  it('times out an unanswered MCP handshake without interrupting the Provider launch', async () => {
+  it('keeps a slow MCP registration available for a late handshake', async () => {
     vi.useFakeTimers()
     try {
       const harness = createHarness()
       await harness.service.attach(attachCommand())
+      const registration = harness.mcp.registrations[0]!
 
-      await vi.advanceTimersByTimeAsync(10_000)
-      const session = await harness.service.attach(attachCommand())
+      await vi.advanceTimersByTimeAsync(30_000)
+      const degraded = await harness.service.attach(attachCommand())
 
-      expect(session.runtime.launch.status).toBe('running')
-      expect(session.runtime.mcp.status).toBe('failed')
+      expect(degraded.runtime.launch.status).toBe('running')
+      expect(degraded.runtime.mcp.status).toBe('degraded')
+      expect(registration.dispose).not.toHaveBeenCalled()
       expect(harness.terminal.launches).toHaveLength(1)
+
+      harness.mcp.initialize(0)
+      const recovered = await harness.service.attach(attachCommand())
+      expect(recovered.runtime.mcp.status).toBe('ready')
+      expect(registration.dispose).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('starts the MCP slow-handshake deadline only after the Provider launch starts', async () => {
+    vi.useFakeTimers()
+    try {
+      const terminal = new DeferredStartedAgentTerminalRuntime()
+      const harness = createHarness({ terminal })
+      await harness.service.attach(attachCommand())
+
+      await vi.advanceTimersByTimeAsync(60_000)
+      const beforeProviderStart = await harness.service.attach(attachCommand())
+      expect(beforeProviderStart.runtime.mcp.status).toBe('initializing')
+      expect(harness.mcp.registrations[0]?.dispose).not.toHaveBeenCalled()
+
+      terminal.start()
+      await vi.advanceTimersByTimeAsync(29_999)
+      expect((await harness.service.attach(attachCommand())).runtime.mcp.status).toBe(
+        'initializing'
+      )
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect((await harness.service.attach(attachCommand())).runtime.mcp.status).toBe('degraded')
+      expect(harness.mcp.registrations[0]?.dispose).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }

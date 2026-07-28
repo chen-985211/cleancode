@@ -5,7 +5,7 @@ import type {
 import type { AgentAttachOperation } from './useAgentSessionAttachment'
 import type { AgentProviderPanelState } from './useAgentProviderState'
 
-export type AgentMcpPresentationStatus = 'connecting' | 'degraded' | 'ready'
+export type AgentMcpPresentationStatus = 'connecting' | 'degraded' | 'ready' | 'unavailable'
 
 export type AgentFeedbackIssue =
   | 'attachment_failed'
@@ -28,7 +28,7 @@ export type AgentBlockingFeedback =
  * Only facts the user cannot observe anywhere else may interrupt with a notification.
  * Everything else stays on the header status entry, which owns the persistent projection.
  */
-export type AgentFeedbackEvent = 'binding_save_failed' | 'mcp_unavailable'
+export type AgentFeedbackEvent = 'binding_save_failed'
 
 export interface AgentProviderFeedback {
   readonly blocking: AgentBlockingFeedback | null
@@ -68,9 +68,6 @@ export function deriveAgentProviderFeedback(input: {
       issues.push('binding_save_failed')
       events.push('binding_save_failed')
     }
-    if (input.runtime.mcp.status === 'failed') {
-      events.push('mcp_unavailable')
-    }
   } else if (
     blocking === null &&
     input.attachment.status !== 'measuring' &&
@@ -91,8 +88,10 @@ function projectMcpStatus(
       return 'connecting'
     case 'ready':
       return 'ready'
-    case 'failed':
+    case 'degraded':
       return 'degraded'
+    case 'failed':
+      return 'unavailable'
     default:
       return null
   }

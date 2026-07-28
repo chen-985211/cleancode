@@ -154,6 +154,7 @@ vi.mock('@xterm/addon-web-links', () => ({
 }))
 
 describe('terminal viewport daily interactions', () => {
+  let attachTerminalView: ReturnType<typeof vi.fn>
   let originalUserAgent: string
   let openTerminalLink: ReturnType<typeof vi.fn>
 
@@ -166,11 +167,12 @@ describe('terminal viewport daily interactions', () => {
     phaseTwoMockState.searchAddons = []
     phaseTwoMockState.terminals = []
     phaseTwoMockState.webLinksAddons = []
+    attachTerminalView = vi.fn(async (command) => snapshot(command.viewId))
     openTerminalLink = vi.fn(async () => ({ kind: 'external', target: 'https://example.com/' }))
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: {
-        attachTerminalView: vi.fn(async (command) => snapshot(command.viewId)),
+        attachTerminalView,
         detachTerminalView: vi.fn(async () => undefined),
         getPathForFile: vi.fn(() => ''),
         openTerminalLink
@@ -267,15 +269,46 @@ describe('terminal viewport daily interactions', () => {
     fireEvent.paste(shell, { clipboardData: { files: [image], getData: () => '' } })
     expect(await workspace.findByRole('status')).toHaveTextContent('终端不接受图片数据')
   })
+
+  it('offers a view-only retry after terminal restoration fails', async () => {
+    attachTerminalView
+      .mockRejectedValueOnce(new Error('Unexpected attachment failure.'))
+      .mockImplementation(async (command) => snapshot(command.viewId))
+    const workspace = renderViewport()
+
+    expect(await workspace.findByRole('alert')).toHaveTextContent('终端显示暂时不可用')
+    fireEvent.click(workspace.getByRole('button', { name: '重试终端显示' }))
+
+    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(workspace.queryByRole('alert')).toBeNull())
+  })
+
+  it('reports a stale identity without retrying the same terminal view', async () => {
+    const onViewIdentityStale = vi.fn()
+    attachTerminalView.mockRejectedValue(
+      Object.assign(new Error('Terminal view no longer matches the current runtime scope.'), {
+        code: 'RUN_SCOPE_STALE',
+        isExpected: true
+      })
+    )
+    const workspace = renderViewport(undefined, onViewIdentityStale)
+
+    await waitFor(() =>
+      expect(onViewIdentityStale).toHaveBeenCalledWith(runningState().runIdentity)
+    )
+    expect(attachTerminalView).toHaveBeenCalledOnce()
+    expect(await workspace.findByRole('alert')).toHaveTextContent('终端显示暂时不可用')
+  })
 })
 
-function renderViewport(onPaste = vi.fn(async () => undefined)) {
+function renderViewport(onPaste = vi.fn(async () => undefined), onViewIdentityStale = vi.fn()) {
   return render(
     <TerminalSurfaceRegistryProvider registry={new TerminalSurfaceRegistry()}>
       <TerminalViewport
         block={terminalBlock()}
         session={runningState()}
         focusRequestId={0}
+        onViewIdentityStale={onViewIdentityStale}
         onDimensionsChange={vi.fn()}
         onInput={vi.fn()}
         onPaste={onPaste}
