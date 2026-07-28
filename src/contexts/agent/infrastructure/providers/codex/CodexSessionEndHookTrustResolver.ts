@@ -16,7 +16,7 @@ export type CodexSessionEndHookTrustResolver = (
 
 const initializeRequestId = 1
 const hooksListRequestId = 2
-const appServerTimeoutMs = process.platform === 'win32' ? 7_500 : 2_500
+const appServerTimeoutMs = 7_500
 
 export async function resolveCodexSessionEndHookTrust(
   input: CodexSessionEndHookTrustInput

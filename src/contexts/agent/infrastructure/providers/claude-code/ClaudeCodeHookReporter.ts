@@ -11,6 +11,7 @@ interface ClaudeCodeHookPayload {
   readonly hook_event_name?: unknown
   readonly notification_type?: unknown
   readonly session_id?: unknown
+  readonly source?: unknown
 }
 
 export class ClaudeCodeHookReporter implements AgentRuntimeArtifact {
@@ -96,7 +97,9 @@ async function acceptPayload(
     return
   }
   if (payload.hook_event_name === 'SessionStart') {
-    if (isUuid(payload.session_id)) input.onSessionIdentified(payload.session_id)
+    if (isUuid(payload.session_id) && isResumableSessionStartSource(payload.source)) {
+      input.onSessionIdentified(payload.session_id)
+    }
     input.onActivityChanged('idle')
     return
   }
@@ -116,6 +119,10 @@ function mapActivity(payload: ClaudeCodeHookPayload): AgentActivityStatus | null
   if (payload.notification_type === 'permission_prompt') return 'waiting_approval'
   if (payload.notification_type === 'idle_prompt') return 'waiting_input'
   return null
+}
+
+function isResumableSessionStartSource(value: unknown): boolean {
+  return value === 'resume' || value === 'compact'
 }
 
 function parsePayload(body: string): ClaudeCodeHookPayload | null {

@@ -44,7 +44,7 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 1. 身份、项目、工作区、名称和 `providerId` 都不能为空；布局必须使用有限坐标和正尺寸。
 2. `providerId` 在创建时确定，没有领域方法、用例或 IPC 可以切换；attach 携带的 Provider 与持久化事实不一致时必须拒绝。
 3. 同一个 Agent 只保存最后一次由当前 Provider launch 正式确认的 session ref；新的不同引用覆盖旧引用，不维护切换历史。引用绑定到该 Agent、项目和稳定物理工作区，不因 Git 分支 checkout 改变。
-4. session ref 必须由固定 Provider 的 codec 校验 kind、版本和值。Codex 注入正式 `tui.terminal_title` 配置，并把 Run 解析出的结构化 OSC title metadata 作为当前 thread 事实：未命名 thread 直接报告完整 UUID；命名 thread 的截断 UUID 只能由同一 executable 和环境下的正式 `app-server thread/list` 唯一前缀匹配补全，零命中或多命中都不得持久化。完成回合 notify 与精确信任的 `SessionEnd` Hook 只作兼容补报；已经观察到当前 title 后，其他 thread 的退出事件不得覆盖它。Claude Code 使用 `SessionStart` 或 `UserPromptSubmit` Hook 中的正式 session UUID；OpenCode 使用顶层 `session.created` 或 `chat.message` Hook 确认的正式 `ses_` session ID，并排除带 `parentID` 的子会话；Gemini 使用 cleancode 通过正式 `--session-id` 参数预分配的 UUID，并通过 `SessionStart` Hook 跟进 CLI 内部恢复后的当前 session UUID。四者都只通过正式 resume 参数恢复。系统不扫描 Provider 历史目录、可见终端文本或“最近会话”。
+4. session ref 必须由固定 Provider 的 codec 校验 kind、版本和值。Codex 注入正式 `tui.terminal_title` 配置，并把 Run 解析出的结构化 OSC title metadata 作为当前 thread 事实：未命名 thread 直接报告完整 UUID；命名 thread 的截断 UUID 只能由同一 executable 和环境下的正式 `app-server thread/list` 唯一前缀匹配补全，零命中或多命中都不得持久化。完成回合 notify 与精确信任的 `SessionEnd` Hook 只作兼容补报；已经观察到当前 title 后，其他 thread 的退出事件不得覆盖它。Claude Code 的 fresh `SessionStart(source=startup)` 和 `/clear` 后的 `SessionStart(source=clear)` 只表示 CLI 已分配 UUID，不证明本地 transcript 已形成，因此必须等 `UserPromptSubmit` 后才确认 session ref；`SessionStart(source=resume)` 与 `SessionStart(source=compact)` 指向已有可恢复对话，可以立即确认。缺失或未知 `source` 必须失败关闭，不能建立绑定。OpenCode 使用顶层 `session.created` 或 `chat.message` Hook 确认的正式 `ses_` session ID，并排除带 `parentID` 的子会话；Gemini 使用 cleancode 通过正式 `--session-id` 参数预分配的 UUID，并通过 `SessionStart` Hook 跟进 CLI 内部恢复后的当前 session UUID。四者都只通过正式 resume 参数恢复。系统不扫描 Provider 历史目录、可见终端文本或“最近会话”。
 5. 同一工作区的多个相同或不同 Provider Agent 拥有独立 terminal、launch、对话、MCP、审批和审计，但共享工作目录。
 6. CleanCode MCP 开关和 Agent 布局随稳定 Agent 持久化；URL、Token、Hook、活动状态、终端和 launch 都不持久化。
 7. 当前 Agent 布局是其画布工具自动落位的权威锚点，其他 Agent 是保留区域；模型不能提供或伪造这些身份事实。
@@ -68,7 +68,7 @@ Provider contribution 只拥有对应 CLI 的检测、结构化启动参数、�
 | Provider    | 恢复 | 身份捕获 | 活动状态 | CleanCode MCP | 注入与回报方式                                                                                                   |
 | ----------- | ---- | -------- | -------- | ------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Codex       | 是   | 是       | 否       | 是            | 结构化 terminal title、正式 `thread/list`/notify、精确信任的 `SessionEnd` Hook、`resume`、进程级 MCP config      |
-| Claude Code | 是   | 是       | 是       | 是            | `SessionStart`/`UserPromptSubmit` session ID、Hooks、环境变量 token 和 launch 临时 MCP/settings                  |
+| Claude Code | 是   | 是       | 是       | 是            | 可恢复 `SessionStart` 或首次 `UserPromptSubmit` session ID、Hooks、环境变量 token 和 launch 临时 MCP/settings    |
 | OpenCode    | 是   | 是       | 是       | 是            | `--session`、顶层 session/plugin chat Hook、合并 `OPENCODE_CONFIG_CONTENT`、远程 MCP 环境变量和临时 instructions |
 | Gemini      | 是   | 是       | 否       | 是            | `--session-id` 预分配、`SessionStart` session ID、`--resume` 与合并 Hook/MCP 的 launch 临时 settings             |
 

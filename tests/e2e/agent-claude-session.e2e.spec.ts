@@ -88,7 +88,7 @@ describe('Claude Code Agent session e2e', () => {
           .getAttribute('data-agent-terminal-session-id')
       ).toBe(firstLaunchRuntime.sessionId)
       await waitForClaudeSessionStart(fakeClaude.reportPath, requireSessionId(firstLaunch))
-      await waitForClaudeConversationBinding(workbench, requireSessionId(firstLaunch))
+      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
 
       const claudeTerminal = page
         .locator('[data-agent-console-node]')
@@ -114,26 +114,80 @@ describe('Claude Code Agent session e2e', () => {
           .locator('[data-agent-console-node] .agent-terminal-viewport')
           .getAttribute('data-agent-terminal-session-id')
       ).toBe(restoredLaunchRuntime.sessionId)
-
-      async function restartElectronApp() {
-        await closeElectronApp(electronApp)
-        resources.electronApp = undefined
-        resources.page = undefined
-        electronApp = await launchApp(workbench, {
-          environment: createAgentProviderEnvironment(fakeCodex, fakeClaude)
-        })
-        resources.electronApp = electronApp
-        page = await electronApp.firstWindow()
-        resources.page = page
-        await page.waitForLoadState('domcontentloaded')
-        const launchReady = waitForAgentLaunchReady(page)
-        await waitForAgentCount(page, 1)
-        await waitForAgentTerminals(page, 1)
-        return launchReady
-      }
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'persists a fresh Claude session only after the first user prompt',
+    async () => {
+      await expectDesktopRuntime(page)
+      const firstLaunchReady = waitForAgentLaunchReady(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 0)
+      await expectAgentProviderInstalled(page, 'claude-code')
+      await waitForClaudeInspection(fakeClaude.reportPath)
+      await selectDefaultAgentProvider(page, 'Claude Code')
+      await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
+      await firstLaunchReady
+
+      const firstLaunch = await waitForClaudeLaunch(
+        fakeClaude.reportPath,
+        1,
+        agentLaunchReadyTimeoutMs
+      )
+      const firstSessionId = requireSessionId(firstLaunch)
+      await waitForClaudeSessionStart(fakeClaude.reportPath, firstSessionId)
+      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
+
+      await restartElectronApp()
+      const secondLaunch = await waitForClaudeLaunch(
+        fakeClaude.reportPath,
+        2,
+        agentLaunchReadyTimeoutMs
+      )
+      const secondSessionId = requireSessionId(secondLaunch)
+      expect(secondLaunch.args).toContain('--session-id')
+      expect(secondLaunch.args).not.toContain('--resume')
+      expect(secondSessionId).not.toBe(firstSessionId)
+      await waitForClaudeSessionStart(fakeClaude.reportPath, secondSessionId)
+      expect(await readClaudeProviderSessionRefs(workbench)).toEqual([])
+
+      const claudeTerminal = page.locator('[data-agent-console-node] .agent-terminal-viewport')
+      await claudeTerminal.click()
+      await page.keyboard.type('create a durable conversation')
+      await page.keyboard.press('Enter')
+      await waitForClaudeUserPrompt(fakeClaude.reportPath, secondSessionId)
+      await waitForClaudeConversationBinding(workbench, secondSessionId)
+
+      await restartElectronApp()
+      const restoredLaunch = await waitForClaudeLaunch(
+        fakeClaude.reportPath,
+        3,
+        agentLaunchReadyTimeoutMs
+      )
+      expect(restoredLaunch.args).toEqual(expect.arrayContaining(['--resume', secondSessionId]))
+    },
+    electronScenarioTimeoutMs
+  )
+
+  async function restartElectronApp() {
+    await closeElectronApp(electronApp)
+    resources.electronApp = undefined
+    resources.page = undefined
+    electronApp = await launchApp(workbench, {
+      environment: createAgentProviderEnvironment(fakeCodex, fakeClaude)
+    })
+    resources.electronApp = electronApp
+    page = await electronApp.firstWindow()
+    resources.page = page
+    await page.waitForLoadState('domcontentloaded')
+    const launchReady = waitForAgentLaunchReady(page)
+    await waitForAgentCount(page, 1)
+    await waitForAgentTerminals(page, 1)
+    return launchReady
+  }
 })
 
 function createAgentProviderEnvironment(
@@ -241,6 +295,24 @@ async function waitForClaudeSessionStart(
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   throw new Error(`Timed out waiting for Claude SessionStart Hook ${sessionId}.`)
+}
+
+async function waitForClaudeUserPrompt(
+  reportPath: string,
+  sessionId: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const reports = await readFakeClaudeCliReports(reportPath)
+    if (
+      reports.some((report) => report.kind === 'user-prompt-hook' && report.sessionId === sessionId)
+    ) {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`Timed out waiting for Claude UserPromptSubmit Hook ${sessionId}.`)
 }
 
 async function readClaudeProviderSessionRefs(

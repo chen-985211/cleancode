@@ -78,9 +78,6 @@ describe('Codex Agent session e2e', () => {
           .locator('[data-agent-console-node] .agent-terminal-viewport')
           .getAttribute('data-agent-terminal-session-id')
       ).toBe(firstLaunchRuntime.sessionId)
-      expect(await readFakeCodexCliReports(fakeCodex.reportPath)).toEqual(
-        expect.arrayContaining([expect.objectContaining({ kind: 'app-server' })])
-      )
       if (!firstLaunch.sessionEndHookTrusted) {
         throw new Error(
           `Codex session started without its precisely trusted SessionEnd Hook: ${JSON.stringify(
@@ -97,6 +94,11 @@ describe('Codex Agent session e2e', () => {
       await enterCodexResumeCommand(electronApp, page)
       await page.keyboard.press('Enter')
       await waitForCodexResumeSelection(fakeCodex.reportPath, fakeCodex.switchSessionId)
+      await waitForCodexReport(
+        fakeCodex.reportPath,
+        (reports) => reports.find((report) => report.kind === 'app-server'),
+        'Codex app-server thread resolution'
+      )
       expect(
         (await readFakeCodexCliReports(fakeCodex.reportPath)).filter(
           (report) => report.kind === 'session-end-hook'

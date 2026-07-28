@@ -12,7 +12,7 @@ export interface FakeClaudeCliFixture {
 export interface FakeClaudeCliReport {
   readonly args: readonly string[]
   readonly cwd: string
-  readonly kind: 'exit' | 'inspection' | 'session' | 'session-start-hook'
+  readonly kind: 'exit' | 'inspection' | 'session' | 'session-start-hook' | 'user-prompt-hook'
   readonly pid: number
   readonly sessionId?: string
 }
@@ -99,6 +99,20 @@ async function publishSessionStart(activeSessionId, source) {
   report('session-start-hook', activeSessionId)
 }
 
+async function publishUserPrompt(activeSessionId) {
+  if (!activeSessionId || !process.env.CLEANCODE_CLAUDE_HOOK_URL) return
+  await fetch(process.env.CLEANCODE_CLAUDE_HOOK_URL, {
+    body: JSON.stringify({
+      cwd,
+      hook_event_name: 'UserPromptSubmit',
+      session_id: activeSessionId
+    }),
+    headers: { authorization: 'Bearer ' + process.env.CLEANCODE_CLAUDE_HOOK_TOKEN },
+    method: 'POST'
+  })
+  report('user-prompt-hook', activeSessionId)
+}
+
 function exitCleanly() {
   if (exiting) return
   exiting = true
@@ -123,7 +137,9 @@ process.stdin.on('data', (data) => {
     void publishSessionStart(process.env.CLEANCODE_FAKE_CLAUDE_SWITCH_SESSION_ID, 'resume').catch(
       () => undefined
     )
+    return
   }
+  if (command) void publishUserPrompt(sessionId).catch(() => undefined)
 })
 process.on('SIGHUP', exitCleanly)
 process.on('SIGINT', exitCleanly)

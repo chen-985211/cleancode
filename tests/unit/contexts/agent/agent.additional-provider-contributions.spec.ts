@@ -325,7 +325,7 @@ describe('additional Agent Provider contributions', () => {
     await artifacts.dispose()
   })
 
-  it('accepts resumed Claude session identities immediately and deduplicates later prompts', async () => {
+  it('keeps fresh Claude sessions unbound until the first user prompt', async () => {
     const onActivityChanged = vi.fn()
     const onSessionIdentified = vi.fn()
     const reporter = await ClaudeCodeHookReporter.start({
@@ -334,64 +334,93 @@ describe('additional Agent Provider contributions', () => {
       workspaceDirectory: process.cwd()
     })
     try {
-      await fetch(reporter.url, {
-        body: JSON.stringify({
+      for (const [source, sessionId] of [
+        ['startup', '550e8400-e29b-41d4-a716-446655440000'],
+        ['clear', '660e8400-e29b-41d4-a716-446655440001'],
+        ['unknown', '770e8400-e29b-41d4-a716-446655440002'],
+        [undefined, '880e8400-e29b-41d4-a716-446655440003']
+      ] as const) {
+        await publishClaudeHook(reporter, {
           cwd: process.cwd(),
           hook_event_name: 'SessionStart',
-          session_id: '550e8400-e29b-41d4-a716-446655440000',
-          source: 'startup'
-        }),
-        headers: { Authorization: `Bearer ${reporter.token}` },
-        method: 'POST'
+          session_id: sessionId,
+          ...(source ? { source } : {})
+        })
+      }
+
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'SessionStart',
+        session_id: 'not-a-uuid',
+        source: 'resume'
       })
-      await fetch(reporter.url, {
-        body: JSON.stringify({
-          cwd: process.cwd(),
-          hook_event_name: 'SessionStart',
-          session_id: '660e8400-e29b-41d4-a716-446655440001',
-          source: 'resume'
-        }),
-        headers: { Authorization: `Bearer ${reporter.token}` },
-        method: 'POST'
+      await publishClaudeHook(reporter, {
+        cwd: `${process.cwd()}-other`,
+        hook_event_name: 'UserPromptSubmit',
+        session_id: '550e8400-e29b-41d4-a716-446655440000'
       })
-      await fetch(reporter.url, {
-        body: JSON.stringify({
-          cwd: process.cwd(),
-          hook_event_name: 'PermissionRequest',
-          session_id: '550e8400-e29b-41d4-a716-446655440000'
-        }),
-        headers: { Authorization: `Bearer ${reporter.token}` },
-        method: 'POST'
+
+      expect(onSessionIdentified).not.toHaveBeenCalled()
+      expect(onActivityChanged).toHaveBeenCalledTimes(5)
+      expect(onActivityChanged).toHaveBeenLastCalledWith('idle')
+
+      const prompt = {
+        cwd: process.cwd(),
+        hook_event_name: 'UserPromptSubmit',
+        session_id: '660e8400-e29b-41d4-a716-446655440001'
+      }
+      await publishClaudeHook(reporter, prompt)
+      await publishClaudeHook(reporter, prompt)
+
+      expect(onSessionIdentified).toHaveBeenCalledTimes(1)
+      expect(onSessionIdentified).toHaveBeenCalledWith('660e8400-e29b-41d4-a716-446655440001')
+      expect(onActivityChanged).toHaveBeenCalledWith('working')
+    } finally {
+      await reporter.dispose()
+    }
+  })
+
+  it('accepts resumable Claude session starts immediately and deduplicates later prompts', async () => {
+    const onActivityChanged = vi.fn()
+    const onSessionIdentified = vi.fn()
+    const reporter = await ClaudeCodeHookReporter.start({
+      onActivityChanged,
+      onSessionIdentified,
+      workspaceDirectory: process.cwd()
+    })
+    try {
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'SessionStart',
+        session_id: '550e8400-e29b-41d4-a716-446655440000',
+        source: 'resume'
       })
-      await vi.waitFor(() => expect(onActivityChanged).toHaveBeenCalledWith('idle'))
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'SessionStart',
+        session_id: '660e8400-e29b-41d4-a716-446655440001',
+        source: 'compact'
+      })
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'PermissionRequest',
+        session_id: '550e8400-e29b-41d4-a716-446655440000'
+      })
       expect(onSessionIdentified).toHaveBeenNthCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
       expect(onSessionIdentified).toHaveBeenNthCalledWith(2, '660e8400-e29b-41d4-a716-446655440001')
-      await fetch(reporter.url, {
-        body: JSON.stringify({
-          cwd: process.cwd(),
-          hook_event_name: 'UserPromptSubmit',
-          session_id: '660e8400-e29b-41d4-a716-446655440001'
-        }),
-        headers: { Authorization: `Bearer ${reporter.token}` },
-        method: 'POST'
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'UserPromptSubmit',
+        session_id: '660e8400-e29b-41d4-a716-446655440001'
       })
-      await vi.waitFor(() =>
-        expect(onSessionIdentified).toHaveBeenCalledWith('660e8400-e29b-41d4-a716-446655440001')
-      )
       expect(onSessionIdentified).toHaveBeenCalledTimes(2)
-      await fetch(reporter.url, {
-        body: JSON.stringify({
-          cwd: process.cwd(),
-          hook_event_name: 'SessionStart',
-          session_id: '550e8400-e29b-41d4-a716-446655440000',
-          source: 'resume'
-        }),
-        headers: { Authorization: `Bearer ${reporter.token}` },
-        method: 'POST'
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'SessionStart',
+        session_id: '550e8400-e29b-41d4-a716-446655440000',
+        source: 'resume'
       })
-      await vi.waitFor(() =>
-        expect(onSessionIdentified).toHaveBeenLastCalledWith('550e8400-e29b-41d4-a716-446655440000')
-      )
+      expect(onSessionIdentified).toHaveBeenLastCalledWith('550e8400-e29b-41d4-a716-446655440000')
       expect(onSessionIdentified).toHaveBeenCalledTimes(3)
       expect(onActivityChanged).toHaveBeenCalledWith('idle')
       expect(onActivityChanged).toHaveBeenCalledWith('working')
@@ -467,6 +496,18 @@ function createInstalledDetector(providerId: string) {
       version: 'test'
     })
   }
+}
+
+async function publishClaudeHook(
+  reporter: ClaudeCodeHookReporter,
+  payload: Readonly<Record<string, unknown>>
+): Promise<void> {
+  const response = await fetch(reporter.url, {
+    body: JSON.stringify(payload),
+    headers: { Authorization: `Bearer ${reporter.token}` },
+    method: 'POST'
+  })
+  expect(response.status).toBe(204)
 }
 
 function createLaunchArtifactScope(): AgentLaunchArtifactScope {
