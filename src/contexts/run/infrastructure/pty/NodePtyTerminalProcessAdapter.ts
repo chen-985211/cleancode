@@ -52,9 +52,10 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     ensureNodePtySpawnHelperIsExecutable()
 
+    const runtimePlatform = platform()
     const shell = command.shell || getDefaultShell()
     const shouldWaitForWindowsAgentShell =
-      platform() === 'win32' &&
+      runtimePlatform === 'win32' &&
       command.scope.owner?.kind === 'agent' &&
       !command.launchCommand &&
       supportsForegroundJobShell('win32', shell)
@@ -66,10 +67,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       cols: command.columns,
       rows: command.rows,
       cwd: command.workingDirectory,
+      // The bundled ConPTY preserves VT queries and mouse modes on supported Windows 10 builds.
+      ...(runtimePlatform === 'win32' ? { useConpty: true, useConptyDll: true } : {}),
       env: createTerminalProcessEnvironment({
         explicit: command.environment,
         inherited: process.env,
-        platform: platform(),
+        platform: runtimePlatform,
         terminalSourceTheme: command.terminalSourceTheme
       })
     })
@@ -132,7 +135,11 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
           })
         : data
       if (output) {
-        command.onOutput({ scope: command.scope, sessionId: command.scope.sessionId, data: output })
+        command.onOutput({
+          scope: command.scope,
+          sessionId: command.scope.sessionId,
+          data: output
+        })
       }
       if (pendingForegroundProbe && managedProcess.foregroundJob) {
         managedProcess.process.write(pendingForegroundProbe)
@@ -215,7 +222,8 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       },
       {
         platform: platform(),
-        shellExecutable: terminalProcess.shell
+        shellExecutable: terminalProcess.shell,
+        terminalSourceTheme: terminalProcess.terminalSourceTheme
       }
     )
     terminalProcess.foregroundJob = control

@@ -7,6 +7,7 @@ import type {
   ForegroundJobProcessIdentity,
   LaunchForegroundJobProcessCommand
 } from '../../application/ports/TerminalProcessPort'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 
 const posixMarkerStart = '\x1eCLEANCODE_JOB:'
 const posixMarkerEnd = '\x1f'
@@ -29,6 +30,7 @@ export interface ForegroundJobShellControl {
 export interface ForegroundJobShellControlOptions {
   readonly platform?: NodeJS.Platform
   readonly shellExecutable?: string
+  readonly terminalSourceTheme?: TerminalSourceTheme
   readonly temporaryRoot?: string
   readonly token?: string
 }
@@ -56,7 +58,7 @@ export function createForegroundJobShellControl(
   try {
     const scriptContents =
       shellFamily === 'powershell'
-        ? createPowerShellLaunchScript(command, token)
+        ? createPowerShellLaunchScript(command, token, options.terminalSourceTheme ?? 'dark')
         : createPosixLaunchScript(command, token, statusPath as string)
     writeFileSync(scriptPath, scriptContents, { encoding: 'utf8', mode: 0o700 })
     if (shellFamily === 'posix') chmodSync(scriptPath, 0o700)
@@ -150,7 +152,8 @@ function createPosixLaunchScript(
 
 function createPowerShellLaunchScript(
   command: LaunchForegroundJobProcessCommand,
-  token: string
+  token: string,
+  terminalSourceTheme: TerminalSourceTheme
 ): string {
   const environment = Object.entries(command.environment).map(([name, value]) => {
     if (!environmentNamePattern.test(name)) throw new Error(`Invalid environment name: ${name}`)
@@ -160,6 +163,10 @@ function createPowerShellLaunchScript(
     (argument) => `  (Decode-CleancodeJobValue '${encodePowerShellValue(argument)}')`
   )
   const nativeArguments = encodePowerShellValue(createWindowsProcessArguments(command.args))
+  const consoleColors =
+    terminalSourceTheme === 'light'
+      ? { background: 'White', foreground: 'Black' }
+      : { background: 'Black', foreground: 'Gray' }
   return (
     [
       '$cleancodeJobEncoding = [System.Text.Encoding]::UTF8',
@@ -174,6 +181,8 @@ function createPowerShellLaunchScript(
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
+      `  [Console]::ForegroundColor = [ConsoleColor]::${consoleColors.foreground}`,
+      `  [Console]::BackgroundColor = [ConsoleColor]::${consoleColors.background}`,
       `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
       '  $cleancodeJobCommand = Get-Command -Name $cleancodeJobExecutable -ErrorAction Stop | Select-Object -First 1',
       '  $cleancodeJobInvocation = $cleancodeJobCommand.Path',

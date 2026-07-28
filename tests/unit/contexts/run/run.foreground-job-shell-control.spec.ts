@@ -49,6 +49,8 @@ describe('foreground job shell control', () => {
     expect(script).toContain("@('.cmd', '.bat') -notcontains $cleancodeJobExtension")
     expect(script).toContain("ChangeExtension($cleancodeJobCommand.Path, '.ps1')")
     expect(script).toContain('finally {')
+    expect(script).toContain('[Console]::ForegroundColor = [ConsoleColor]::Gray')
+    expect(script).toContain('[Console]::BackgroundColor = [ConsoleColor]::Black')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:started')
     expect(script).toContain('CLEANCODE_JOB:fixedtoken:exit:')
     expect(script).toContain('& $cleancodeJobInvocation @cleancodeJobArguments')
@@ -60,6 +62,44 @@ describe('foreground job shell control', () => {
     disposeForegroundJobShellControl(control)
     expect(existsSync(control.scriptDirectory)).toBe(false)
   })
+
+  it.each([
+    {
+      terminalSourceTheme: 'light' as const,
+      expectedForeground: 'Black',
+      expectedBackground: 'White'
+    },
+    {
+      terminalSourceTheme: 'dark' as const,
+      expectedForeground: 'Gray',
+      expectedBackground: 'Black'
+    }
+  ])(
+    'pins $terminalSourceTheme Windows console colors before reporting the Agent started',
+    ({ terminalSourceTheme, expectedForeground, expectedBackground }) => {
+      const control = createForegroundJobShellControl(createCommand(), {
+        platform: 'win32',
+        shellExecutable: 'powershell.exe',
+        terminalSourceTheme,
+        temporaryRoot,
+        token: 'fixedtoken'
+      })
+      const script = readFileSync(control.scriptPath, 'utf8')
+      const foregroundIndex = script.indexOf(
+        `[Console]::ForegroundColor = [ConsoleColor]::${expectedForeground}`
+      )
+      const backgroundIndex = script.indexOf(
+        `[Console]::BackgroundColor = [ConsoleColor]::${expectedBackground}`
+      )
+      const startedIndex = script.indexOf('CLEANCODE_JOB:fixedtoken:started')
+
+      expect(foregroundIndex).toBeGreaterThan(-1)
+      expect(backgroundIndex).toBeGreaterThan(foregroundIndex)
+      expect(startedIndex).toBeGreaterThan(backgroundIndex)
+
+      disposeForegroundJobShellControl(control)
+    }
+  )
 
   it('creates one exact Windows native command line for nested quotes and trailing slashes', () => {
     const argument = String.raw`notify=["node","console.log(\"ok\")"]`

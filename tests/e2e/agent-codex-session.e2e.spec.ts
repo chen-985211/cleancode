@@ -20,6 +20,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { agentLaunchReadyTimeoutMs, waitForAgentLaunchReady } from '../support/e2eAgentRuntime'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Codex Agent session e2e', () => {
@@ -55,16 +56,28 @@ describe('Codex Agent session e2e', () => {
     'restores a Codex session selected through /resume even when no later turn completes',
     async () => {
       await expectDesktopRuntime(page)
+      const firstLaunchReady = waitForAgentLaunchReady(page)
       await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await expectAgentProviderInstalled(page, 'codex')
       await selectDefaultAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
+      const firstLaunchRuntime = await firstLaunchReady
 
-      const firstLaunch = await waitForCodexLaunch(fakeCodex.reportPath, 1)
+      const firstLaunch = await waitForCodexLaunch(
+        fakeCodex.reportPath,
+        1,
+        agentLaunchReadyTimeoutMs
+      )
       expect(firstLaunch.sessionId).toBe(fakeCodex.sessionId)
       expect(firstLaunch.args).not.toContain('resume')
+      expect(
+        await page
+          .locator('[data-agent-console-node] .agent-terminal-viewport')
+          .getAttribute('data-agent-terminal-session-id')
+      ).toBe(firstLaunchRuntime.sessionId)
       expect(await readFakeCodexCliReports(fakeCodex.reportPath)).toEqual(
         expect.arrayContaining([expect.objectContaining({ kind: 'app-server' })])
       )
@@ -81,7 +94,7 @@ describe('Codex Agent session e2e', () => {
         .filter({ has: page.getByRole('img', { name: 'Codex' }) })
         .locator('.agent-terminal-viewport')
       await codexTerminal.click()
-      await page.keyboard.type('/resume')
+      await enterCodexResumeCommand(electronApp, page)
       await page.keyboard.press('Enter')
       await waitForCodexResumeSelection(fakeCodex.reportPath, fakeCodex.switchSessionId)
       expect(
@@ -107,25 +120,60 @@ describe('Codex Agent session e2e', () => {
       )
       expect(firstExit?.exitReason).toBe('quit')
 
-      electronApp = await launchApp(workbench, {
-        environment: createAgentProviderEnvironment(fakeCodex)
-      })
-      resources.electronApp = electronApp
-      page = await electronApp.firstWindow()
-      resources.page = page
-      await page.waitForLoadState('domcontentloaded')
-      await waitForAgentCount(page, 1)
-      await waitForAgentTerminals(page, 1)
-
-      const restoredLaunch = await waitForCodexLaunch(fakeCodex.reportPath, 2)
+      const restoredLaunchRuntime = await launchRestoredElectronApp()
+      const restoredLaunch = await waitForCodexLaunch(
+        fakeCodex.reportPath,
+        2,
+        agentLaunchReadyTimeoutMs
+      )
       expect(restoredLaunch.args).toEqual(
         expect.arrayContaining(['resume', fakeCodex.switchSessionId])
       )
       expect(restoredLaunch.sessionId).toBe(fakeCodex.switchSessionId)
+      expect(
+        await page
+          .locator('[data-agent-console-node] .agent-terminal-viewport')
+          .getAttribute('data-agent-terminal-session-id')
+      ).toBe(restoredLaunchRuntime.sessionId)
+
+      async function launchRestoredElectronApp() {
+        electronApp = await launchApp(workbench, {
+          environment: createAgentProviderEnvironment(fakeCodex)
+        })
+        resources.electronApp = electronApp
+        page = await electronApp.firstWindow()
+        resources.page = page
+        await page.waitForLoadState('domcontentloaded')
+        const launchReady = waitForAgentLaunchReady(page)
+        await waitForAgentCount(page, 1)
+        await waitForAgentTerminals(page, 1)
+        return launchReady
+      }
     },
     electronScenarioTimeoutMs
   )
 })
+
+async function enterCodexResumeCommand(
+  electronApp: ElectronApplication,
+  page: Page
+): Promise<void> {
+  if (process.platform !== 'win32') {
+    await page.keyboard.type('/resume')
+    return
+  }
+
+  const originalClipboard = await electronApp.evaluate(({ clipboard }) => clipboard.readText())
+  try {
+    await electronApp.evaluate(({ clipboard }) => clipboard.writeText('/resume'))
+    await page.keyboard.press('Control+V')
+  } finally {
+    await electronApp.evaluate(
+      ({ clipboard }, text) => clipboard.writeText(text),
+      originalClipboard
+    )
+  }
+}
 
 function createAgentProviderEnvironment(fakeCodex: FakeCodexCliFixture): NodeJS.ProcessEnv {
   return {
@@ -202,7 +250,8 @@ async function expectAgentProviderInstalled(page: Page, providerId: string): Pro
 
 async function waitForCodexLaunch(
   reportPath: string,
-  expectedCount: number
+  expectedCount: number,
+  timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
   return waitForCodexReport(
     reportPath,
@@ -210,7 +259,8 @@ async function waitForCodexLaunch(
       const launches = reports.filter((report) => report.kind === 'session')
       return launches.length >= expectedCount ? launches[expectedCount - 1] : undefined
     },
-    `Codex launch ${expectedCount}`
+    `Codex launch ${expectedCount}`,
+    timeoutMs
   )
 }
 
@@ -237,9 +287,10 @@ async function waitForCodexSessionEnd(reportPath: string, sessionId: string): Pr
 async function waitForCodexReport(
   reportPath: string,
   select: (reports: readonly FakeCodexCliReport[]) => FakeCodexCliReport | undefined,
-  description: string
+  description: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const reports = await readFakeCodexCliReports(reportPath)
     const selected = select(reports)
@@ -272,9 +323,10 @@ async function readCodexProviderSessionRefs(
 
 async function waitForCodexConversationBinding(
   workbench: E2eWorkbench,
-  sessionId: string
+  sessionId: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const bindings = await readCodexProviderSessionRefs(workbench)
     if (

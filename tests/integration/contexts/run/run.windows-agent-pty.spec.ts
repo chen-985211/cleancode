@@ -2,20 +2,25 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { StartTerminalProcessCommand } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
+import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 import { createDeferred } from '../../../fixtures/deferred'
 
 describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process adapter', () => {
   let adapter: NodePtyTerminalProcessAdapter
+  let model: HeadlessTerminalModelAdapter
   let workingDirectory: string
 
   beforeEach(async () => {
     adapter = new NodePtyTerminalProcessAdapter()
+    model = new HeadlessTerminalModelAdapter()
     workingDirectory = await mkdtemp(join(tmpdir(), 'cleancode-windows-agent-pty-'))
   })
 
   afterEach(async () => {
     await adapter.disposeAll()
+    model.disposeAll()
     await rm(workingDirectory, { force: true, recursive: true })
   })
 
@@ -24,7 +29,7 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     const started = createDeferred<void>()
     const exited = createDeferred<number | null>()
 
-    await adapter.start({
+    await startTerminal({
       scope: agentRunScope('immediate-windows-agent-session'),
       workingDirectory,
       shell: 'powershell.exe',
@@ -51,6 +56,100 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     await expect(exited.promise).resolves.toBe(0)
   }, 20_000)
 
+  it.each([
+    { terminalSourceTheme: 'light' as const, expectedConsoleColors: 'Black|White' },
+    { terminalSourceTheme: 'dark' as const, expectedConsoleColors: 'Gray|Black' }
+  ])(
+    'pins the $terminalSourceTheme Windows console fallback before the Agent process starts',
+    async ({ terminalSourceTheme, expectedConsoleColors }) => {
+      let output = ''
+      let exitCode: number | null | undefined
+      const exited = createDeferred<number | null>()
+
+      await startTerminal({
+        scope: agentRunScope(`windows-agent-${terminalSourceTheme}-console-colors`),
+        workingDirectory,
+        shell: 'powershell.exe',
+        terminalSourceTheme,
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => undefined
+      })
+      adapter.launchForegroundJob({
+        args: [
+          '-NoLogo',
+          '-NoProfile',
+          '-Command',
+          "[Console]::WriteLine(('CLEANCODE_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))"
+        ],
+        environment: {},
+        executable: 'powershell.exe',
+        generation: 1,
+        launchId: `${terminalSourceTheme}-console-colors-launch`,
+        onExit: (event) => {
+          exitCode = event.exitCode
+          exited.resolve(event.exitCode)
+        },
+        onStarted: () => undefined,
+        sessionId: `windows-agent-${terminalSourceTheme}-console-colors`
+      })
+
+      await waitUntil(() => output.includes('CLEANCODE_CONSOLE_COLORS:') || exitCode !== undefined)
+      expect(
+        output,
+        `Windows console color probe exited with ${String(exitCode)} and output ${JSON.stringify(output.slice(-1_000))}`
+      ).toContain(`CLEANCODE_CONSOLE_COLORS:${expectedConsoleColors}`)
+      await expect(exited.promise).resolves.toBe(0)
+    },
+    20_000
+  )
+
+  it('preserves terminal mouse modes through ConPTY output', async () => {
+    const sessionId = 'windows-agent-mouse-modes'
+    const scope = agentRunScope(sessionId)
+    let output = ''
+
+    try {
+      await startTerminal({
+        scope,
+        workingDirectory,
+        shell: 'powershell.exe',
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => undefined
+      })
+      const exited = createDeferred<number | null>()
+      adapter.launchForegroundJob({
+        args: ['-e', createWindowsMouseModeProbeScript()],
+        environment: {},
+        executable: process.execPath,
+        generation: 1,
+        launchId: 'mouse-mode-launch',
+        onExit: (event) => exited.resolve(event.exitCode),
+        onStarted: () => undefined,
+        sessionId
+      })
+
+      await waitUntil(() => output.includes('CLEANCODE_MOUSE_MODE_READY'))
+      await expect(exited.promise).resolves.toBe(0)
+      await model.flush(scope)
+
+      expect(output).toContain('\u001b[?1002h')
+      expect(output).toContain('\u001b[?1006h')
+      await expect(model.captureCheckpoint(scope)).resolves.toMatchObject({
+        modes: { mouseTrackingMode: 'drag' }
+      })
+    } finally {
+      await adapter.stop(sessionId)
+    }
+  }, 20_000)
+
   it('interrupts only the Agent job, reports exit, and keeps PowerShell writable', async () => {
     let output = ''
     let terminalExited = false
@@ -58,7 +157,7 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     const firstExit = createDeferred<number | null>()
     const secondExit = createDeferred<number | null>()
 
-    await adapter.start({
+    await startTerminal({
       scope: agentRunScope('windows-agent-session'),
       workingDirectory,
       shell: 'powershell.exe',
@@ -139,6 +238,26 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     expect(output).not.toContain('cleancode-agent-job-')
     expect(output).not.toContain('launch.ps1')
   }, 20_000)
+
+  async function startTerminal(command: StartTerminalProcessCommand) {
+    model.create({
+      identity: command.scope,
+      columns: command.columns,
+      rows: command.rows,
+      workingDirectory: command.workingDirectory,
+      terminalSourceTheme: command.terminalSourceTheme,
+      onQueryResponse: (response) => adapter.write(command.scope.sessionId, response),
+      onFlowControlChange: () => undefined
+    })
+
+    return adapter.start({
+      ...command,
+      onOutput: (event) => {
+        model.acceptOutput(command.scope, event.data)
+        command.onOutput(event)
+      }
+    })
+  }
 })
 
 function agentRunScope(sessionId: string) {
@@ -154,6 +273,15 @@ function agentRunScope(sessionId: string) {
     workspaceDirectory: 'C:\\project',
     workspaceId: 'main'
   }
+}
+
+function createWindowsMouseModeProbeScript(): string {
+  return [
+    'process.stdout.write(',
+    '  "\\x1b[?1000h\\x1b[?1002h\\x1b[?1006hCLEANCODE_MOUSE_MODE_READY\\r\\n",',
+    '  () => process.exit(0)',
+    ')'
+  ].join('')
 }
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {

@@ -24,6 +24,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { agentLaunchReadyTimeoutMs, waitForAgentLaunchReady } from '../support/e2eAgentRuntime'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Claude Code Agent session e2e', () => {
@@ -61,6 +62,7 @@ describe('Claude Code Agent session e2e', () => {
     'restores the last Claude session selected through /resume',
     async () => {
       await expectDesktopRuntime(page)
+      const firstLaunchReady = waitForAgentLaunchReady(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
       await expectAgentProviderInstalled(page, 'claude-code')
@@ -70,10 +72,21 @@ describe('Claude Code Agent session e2e', () => {
       const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
       await claudeIdentity.waitFor()
       expect(await claudeIdentity.locator('.agent-console__activity-indicator').count()).toBe(0)
+      await waitForAgentTerminals(page, 1)
+      const firstLaunchRuntime = await firstLaunchReady
 
-      const firstLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 1)
+      const firstLaunch = await waitForClaudeLaunch(
+        fakeClaude.reportPath,
+        1,
+        agentLaunchReadyTimeoutMs
+      )
       expect(firstLaunch.args).toContain('--session-id')
       expect(firstLaunch.args).not.toContain('--resume')
+      expect(
+        await page
+          .locator('[data-agent-console-node] .agent-terminal-viewport')
+          .getAttribute('data-agent-terminal-session-id')
+      ).toBe(firstLaunchRuntime.sessionId)
       await waitForClaudeSessionStart(fakeClaude.reportPath, requireSessionId(firstLaunch))
       await waitForClaudeConversationBinding(workbench, requireSessionId(firstLaunch))
 
@@ -87,13 +100,22 @@ describe('Claude Code Agent session e2e', () => {
       await waitForClaudeSessionStart(fakeClaude.reportPath, fakeClaude.switchSessionId)
       await waitForClaudeConversationBinding(workbench, fakeClaude.switchSessionId)
 
-      await restartElectronApp()
-      const restoredLaunch = await waitForClaudeLaunch(fakeClaude.reportPath, 2)
+      const restoredLaunchRuntime = await restartElectronApp()
+      const restoredLaunch = await waitForClaudeLaunch(
+        fakeClaude.reportPath,
+        2,
+        agentLaunchReadyTimeoutMs
+      )
       expect(restoredLaunch.args).toEqual(
         expect.arrayContaining(['--resume', fakeClaude.switchSessionId])
       )
+      expect(
+        await page
+          .locator('[data-agent-console-node] .agent-terminal-viewport')
+          .getAttribute('data-agent-terminal-session-id')
+      ).toBe(restoredLaunchRuntime.sessionId)
 
-      async function restartElectronApp(): Promise<void> {
+      async function restartElectronApp() {
         await closeElectronApp(electronApp)
         resources.electronApp = undefined
         resources.page = undefined
@@ -104,8 +126,10 @@ describe('Claude Code Agent session e2e', () => {
         page = await electronApp.firstWindow()
         resources.page = page
         await page.waitForLoadState('domcontentloaded')
+        const launchReady = waitForAgentLaunchReady(page)
         await waitForAgentCount(page, 1)
         await waitForAgentTerminals(page, 1)
+        return launchReady
       }
     },
     electronScenarioTimeoutMs
@@ -185,9 +209,10 @@ async function waitForClaudeInspection(reportPath: string): Promise<void> {
 
 async function waitForClaudeLaunch(
   reportPath: string,
-  expectedCount: number
+  expectedCount: number,
+  timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeClaudeCliReport> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const launches = (await readFakeClaudeCliReports(reportPath)).filter(
       (report) => report.kind === 'session'
@@ -198,8 +223,12 @@ async function waitForClaudeLaunch(
   throw new Error(`Timed out waiting for Claude launch ${expectedCount}.`)
 }
 
-async function waitForClaudeSessionStart(reportPath: string, sessionId: string): Promise<void> {
-  const deadline = Date.now() + 5_000
+async function waitForClaudeSessionStart(
+  reportPath: string,
+  sessionId: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const reports = await readFakeClaudeCliReports(reportPath)
     if (
@@ -237,9 +266,10 @@ async function readClaudeProviderSessionRefs(
 
 async function waitForClaudeConversationBinding(
   workbench: E2eWorkbench,
-  sessionId: string
+  sessionId: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + 5_000
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const bindings = await readClaudeProviderSessionRefs(workbench)
     if (

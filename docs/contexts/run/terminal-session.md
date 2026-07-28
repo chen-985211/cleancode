@@ -47,7 +47,7 @@ idle -> running -> stopping -> exited
 
 会话还记录 `kind`、退出保留策略、恢复类型和不可变的 `terminalSourceTheme`。新 generation 从当前有效应用主题取得 `dark` 或 `light`；同一 generation 的普通启动、快速启动、受管服务、工作流、可见重挂载和恢复都必须沿用该值，应用主题切换不得改写它。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行的 block-owned 会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 和 agent-owned terminal 永远不能启用退出保留；领域聚合必须同时拒绝新设置与携带非法策略的 live 恢复资料。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
-终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
+终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，Windows Agent 前台启动则只选择会被同一 xterm palette 映射的 ConsoleColor 索引，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
 
 ## 会话身份与隔离
 
@@ -71,7 +71,7 @@ Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层�
 
 `owner.kind = agent` 只开放基础终端和前台任务能力。它不能进入 BlockGraph 组合、依赖工作流、受管服务端口或普通终端批量动作；Agent 通过自己拥有的 `AgentTerminalRuntimePort` 和基础设施 adapter 调用 Run 应用层，Run 不反向依赖 Agent 类型。
 
-`launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
+`launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。Windows 脚本还必须在 started 控制帧之前按固定 `terminalSourceTheme` 设置 ConsoleColor：浅色使用 `Black`/`White`，深色使用 `Gray`/`Black`。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、颜色准备、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
 
 前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。
 
@@ -87,7 +87,7 @@ Run 应用层只依赖 `TerminalProcessPort`：
 - `readWorkingDirectory`：在 macOS 通过 `lsof`、Linux 通过 `/proc/<pid>/cwd` 尽力读取；不支持或进程消失时返回 `null`。
 - `stop` / `disposeAll`：异步终止一个或全部受管 PTY，并等待适配器确认退出。
 
-基础设施默认在 macOS/Linux 使用用户 shell，在 Windows 使用 `powershell.exe` 和 node-pty ConPTY。有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell；Windows Agent 前台任务由子 PowerShell 执行，`Ctrl+C` 结束子任务后回到同一个外层 PowerShell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理；Provider 自身用于 Node 模式启动的 `ELECTRON_RUN_AS_NODE` 必须先从继承环境移除，只有调用方在本次命令环境中显式提供时才能重新注入。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，Windows 关闭 ConPTY 并等待退出，避免把 Agent launch 退出误判为 terminal 退出；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
+基础设施默认在 macOS/Linux 使用用户 shell，在 Windows 使用 `powershell.exe` 和 node-pty 随包的 ConPTY DLL。有限任务和受管端口服务的启动命令通过 shell 参数执行，普通直接启动则使用明确的交互模式：POSIX 包装进程忽略发送给整个 PTY 前台进程组的 SIGINT，命令子进程恢复默认 SIGINT，命令结束后包装进程替换为用户 shell；Windows Agent 前台任务由子 PowerShell 执行，`Ctrl+C` 结束子任务后回到同一个外层 PowerShell。该模式不解析 shell 提示符、不延迟注入输入，并且只执行一次启动命令。环境变量覆盖在子进程边界注入，Windows 环境键按大小写不敏感规则处理；Provider 自身用于 Node 模式启动的 `ELECTRON_RUN_AS_NODE` 必须先从继承环境移除，只有调用方在本次命令环境中显式提供时才能重新注入。POSIX 清理向 PTY 进程组发送终止信号、等待退出并在超时后升级，Windows 关闭 ConPTY 并等待退出，避免把 Agent launch 退出误判为 terminal 退出；端口监听关闭仍由受管服务清理流程单独确认。xterm 的行列同步与视觉排障见[终端渲染排障指南](../../terminal/rendering.md)。
 
 Run application 统一拥有终端能力环境。普通终端启动和 Agent foreground launch 都必须按会话固定源主题保留 `TERM=xterm-256color`、`COLORTERM=truecolor`、`TERM_PROGRAM=cleancode` 和对应明暗语义的 `COLORFGBG`；调用方或 Provider 以任意大小写提供的同名值都不能覆盖它们。其他 launch 环境继续透传，`NO_COLOR` 不由 Run 合成、清除或重命名，从而保留用户和上游明确选择的无色输出偏好。Provider contribution 不得把这些宿主能力变量变成自己的主题配置入口。
 
@@ -111,7 +111,9 @@ Provider Client 的全局普通终端输出投影只接收 block-owned terminal�
 
 应用正常退出时，Electron main 必须依次关闭 Run 启动准入、释放当前视图租约、让 Agent 与工作流进入 prepare、把全部 PTY 一次性交给 Terminal Provider 处理，再让两个上下文 complete 并清除本地引用。Agent prepare 中可先请求当前 Agent Provider 前台 launch 正常结束，并在身份 reporter 仍存活时排空最终持久化；超时只结束这次 launch 级等待，之后仍进入统一 PTY handoff。整个 Electron runtime 清理使用默认 5 秒单调等待预算；预算只限制 Electron 为清理阻塞退出的时间，不取消已经提交的 Terminal Provider release，也不证明全部 PTY 已物理退出。Terminal Provider 必须在独立进程中继续安全清理并保留尚未完成会话的 owner 与诊断证据。正常完成的清理阶段保持静默，只有超时或失败才形成结构化诊断。Run 进入 `shutting-down` 后，新的或在途的终端工作目录同步查询收敛为空结果，不再访问已关闭的 Terminal Provider 或形成不可用告警；正常运行期的同类失败仍必须向外传播。renderer 销毁监听只负责异常退出兜底；同一个已认证 sender 只持有一个 `destroyed` 监听器并向其全部精确视图登记扇出，最后一个视图 detach 后必须移除该监听器。显式 detach、renderer 销毁和应用退出并发时，同一精确视图租约最多执行一次有效释放。已释放、已退休或未知视图的迟到 detach 是幂等清理，不得访问新 generation 的模型或记录生命周期噪声；attach、链接和其他业务动作仍严格校验完整运行身份。
 
-因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
+因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能由隐藏模型或当前视图中的一个响应。隐藏模型必须用固定源主题回答 OSC 10/11 默认前景色和背景色查询；视图接管期间模型消费查询但不响应，由使用同一 canonical palette 的 renderer xterm 唯一响应。
+
+Windows 系统 ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的 OSC 查询和鼠标模式，只输出 screen buffer 差异；这会同时破坏默认颜色查询和可见 xterm 的鼠标输入。Run 因此固定启用 node-pty 随包的 ConPTY DLL，使完整 VT 序列进入既有模型/视图交接链路，并由隐藏 headless 模型或当前 renderer xterm 唯一响应查询。Windows Agent foreground transport 仍必须在 Provider 进程 started 之前把 ConsoleColor 固定到 generation 的源主题：Codex 等客户端只有很短的查询窗口，若响应未及时返回，会通过 `GetConsoleScreenBufferInfoEx` 同步读取 ConsoleColor。该 fallback 必须立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。颜色准备发生在 `awaiting_started` 内，不得进入模型或视图；不得向尚未查询的进程输入预置 OSC 响应。
 
 ## 输入与安全打开边界
 

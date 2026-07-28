@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -11,24 +11,29 @@ describe('terminal link filesystem adapter', () => {
     const outside = join(root, 'outside')
     await mkdir(workspace)
     await mkdir(outside)
-    await writeFile(join(workspace, 'inside.ts'), 'inside')
-    await writeFile(join(outside, 'secret.ts'), 'outside')
-    await symlink(join(outside, 'secret.ts'), join(workspace, 'escaped.ts'))
-    const adapter = new NodeTerminalLinkFileSystemAdapter()
 
-    await expect(
-      adapter.resolve({
-        rawPath: './inside.ts',
-        workingDirectory: workspace,
-        workspaceDirectory: workspace
-      })
-    ).resolves.toMatchObject({ kind: 'file', relativeSegments: ['inside.ts'] })
-    await expect(
-      adapter.resolve({
-        rawPath: './escaped.ts',
-        workingDirectory: workspace,
-        workspaceDirectory: workspace
-      })
-    ).resolves.toMatchObject({ relativeSegments: ['..', 'outside', 'secret.ts'] })
+    try {
+      await writeFile(join(workspace, 'inside.ts'), 'inside')
+      await writeFile(join(outside, 'secret.ts'), 'outside')
+      await symlink(outside, join(workspace, 'escaped'), 'junction')
+      const adapter = new NodeTerminalLinkFileSystemAdapter()
+
+      await expect(
+        adapter.resolve({
+          rawPath: './inside.ts',
+          workingDirectory: workspace,
+          workspaceDirectory: workspace
+        })
+      ).resolves.toMatchObject({ kind: 'file', relativeSegments: ['inside.ts'] })
+      await expect(
+        adapter.resolve({
+          rawPath: './escaped/secret.ts',
+          workingDirectory: workspace,
+          workspaceDirectory: workspace
+        })
+      ).resolves.toMatchObject({ relativeSegments: ['..', 'outside', 'secret.ts'] })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })
