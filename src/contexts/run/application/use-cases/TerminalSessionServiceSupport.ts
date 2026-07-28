@@ -54,7 +54,9 @@ export async function settleTerminalViewRelease(operation: () => Promise<void>):
   } catch (error) {
     if (
       isAppError(error) &&
-      (error.code === 'RUN_SCOPE_STALE' || error.code === 'TERMINAL_SESSION_NOT_FOUND')
+      (error.code === 'RUN_SCOPE_STALE' ||
+        error.code === 'TERMINAL_RUNTIME_NOT_READY' ||
+        error.code === 'TERMINAL_SESSION_NOT_FOUND')
     ) {
       return
     }
@@ -129,18 +131,27 @@ export function assertCurrentTerminalViewIdentity(
     (state.currentSessionId === undefined &&
       session.status === 'exited' &&
       state.restorableSessionId === session.id)
+  const matchesCurrentRuntime =
+    matchesIdentity &&
+    commandOwner.kind === sessionOwner.kind &&
+    commandOwner.id === sessionOwner.id &&
+    state.latestGeneration === command.generation &&
+    isCurrentOrNaturallyExited
 
   if (
-    !matchesIdentity ||
-    commandOwner.kind !== sessionOwner.kind ||
-    commandOwner.id !== sessionOwner.id ||
-    state.latestGeneration !== command.generation ||
-    !isCurrentOrNaturallyExited ||
-    (session.status !== 'running' && session.status !== 'exited')
+    !matchesCurrentRuntime ||
+    (session.status !== 'idle' && session.status !== 'running' && session.status !== 'exited')
   ) {
     throw createExpectedAppError(
       'RUN_SCOPE_STALE',
       'Terminal view no longer matches the current runtime scope.'
+    )
+  }
+
+  if (session.status === 'idle') {
+    throw createExpectedAppError(
+      'TERMINAL_RUNTIME_NOT_READY',
+      'Terminal runtime is still starting.'
     )
   }
 }

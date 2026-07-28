@@ -65,7 +65,12 @@ function isTransientTerminalViewAttachError(error: unknown): boolean {
     return true
   }
 
-  return false
+  const message = error instanceof Error ? error.message : String(error)
+
+  return (
+    message.includes('TERMINAL_RUNTIME_NOT_READY') ||
+    message.includes('Terminal runtime is still starting.')
+  )
 }
 
 function isStaleTerminalViewIdentityError(error: unknown): boolean {
