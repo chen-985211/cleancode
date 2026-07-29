@@ -1,5 +1,9 @@
 import type { AgentRuntimeChangedEvent } from '../../../src/contexts/agent/application/dto/AgentSessionProtocol'
-import { getAgentLaunchReadySnapshot, getAgentRuntimeFailure } from '../../support/e2eAgentRuntime'
+import {
+  getAgentLaunchReadySnapshot,
+  getAgentRuntimeFailure,
+  getAgentTerminalReadySnapshot
+} from '../../support/e2eAgentRuntime'
 
 describe('E2E Agent runtime readiness', () => {
   it('requires a running terminal and launch with a complete launch identity', () => {
@@ -48,6 +52,35 @@ describe('E2E Agent runtime readiness', () => {
         createRuntimeEvent({ terminal: { status: 'running' }, launch: { status: 'failed' } })
       )
     ).toContain('launch status is failed')
+  })
+
+  it('accepts the current rendered Agent terminal only with a complete stable identity', () => {
+    expect(
+      getAgentTerminalReadySnapshot({
+        agentId: 'agent-1',
+        processId: '1234',
+        sessionId: 'runtime-session-1'
+      })
+    ).toEqual({
+      agentId: 'agent-1',
+      processId: 1234,
+      sessionId: 'runtime-session-1'
+    })
+
+    expect(
+      getAgentTerminalReadySnapshot({
+        agentId: 'agent-1',
+        sessionId: 'runtime-session-1'
+      })
+    ).toBeNull()
+    expect(
+      getAgentTerminalReadySnapshot({
+        agentId: 'agent-1',
+        processId: 'not-a-process',
+        sessionId: 'runtime-session-1'
+      })
+    ).toBeNull()
+    expect(getAgentTerminalReadySnapshot(null)).toBeNull()
   })
 })
 

@@ -84,7 +84,7 @@ describe('workspace Agents e2e', () => {
 
       await createCodexAgent(page)
       await waitForAgentCount(page, 1)
-      await waitForAgentTerminals(page, 1)
+      await waitForAgentTerminalSurfaces(page, 1)
 
       await page.getByRole('button', { name: '新建 Agent' }).click()
       await waitForAgentCount(page, 2)
@@ -502,6 +502,22 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
         (terminal) =>
           terminal.querySelector('.xterm-helper-textarea') &&
           terminal.dataset.agentTerminalProcessId &&
+          terminal.dataset.agentTerminalSessionId &&
+          (terminal.dataset.agentTerminalSourceTheme === 'light' ||
+            terminal.dataset.agentTerminalSourceTheme === 'dark')
+      )
+    )
+  }, count)
+}
+
+async function waitForAgentTerminalSurfaces(page: Page, count: number): Promise<void> {
+  await page.waitForFunction((expectedCount) => {
+    const terminals = Array.from(document.querySelectorAll<HTMLElement>('.agent-terminal-viewport'))
+    return (
+      terminals.length === expectedCount &&
+      terminals.every(
+        (terminal) =>
+          terminal.querySelector('.xterm-helper-textarea') &&
           terminal.dataset.agentTerminalSessionId &&
           (terminal.dataset.agentTerminalSourceTheme === 'light' ||
             terminal.dataset.agentTerminalSourceTheme === 'dark')
