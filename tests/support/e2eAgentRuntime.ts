@@ -12,6 +12,18 @@ export interface AgentLaunchReadySnapshot {
   readonly sessionId: string
 }
 
+export interface AgentTerminalReadySnapshot {
+  readonly agentId: string
+  readonly processId: number
+  readonly sessionId: string
+}
+
+interface AgentTerminalReadyAttributes {
+  readonly agentId?: string
+  readonly processId?: string
+  readonly sessionId?: string
+}
+
 export function getAgentLaunchReadySnapshot(
   event: AgentRuntimeChangedEvent
 ): AgentLaunchReadySnapshot | null {
@@ -44,6 +56,28 @@ export function getAgentRuntimeFailure(event: AgentRuntimeChangedEvent): string 
     return `launch status is ${launch.status}`
   }
   return null
+}
+
+export function getAgentTerminalReadySnapshot(
+  attributes: AgentTerminalReadyAttributes | null
+): AgentTerminalReadySnapshot | null {
+  if (!attributes) return null
+
+  const processId = Number(attributes.processId)
+  if (
+    !attributes.agentId ||
+    !attributes.sessionId ||
+    !Number.isSafeInteger(processId) ||
+    processId <= 0
+  ) {
+    return null
+  }
+
+  return {
+    agentId: attributes.agentId,
+    processId,
+    sessionId: attributes.sessionId
+  }
 }
 
 export async function waitForAgentLaunchReady(
@@ -132,4 +166,48 @@ export async function waitForAgentLaunchReady(
       if (settled) unsubscribe()
     })
   }, timeoutMs)
+}
+
+export async function waitForAgentTerminalReady(
+  page: Page,
+  timeoutMs = agentLaunchReadyTimeoutMs
+): Promise<AgentTerminalReadySnapshot> {
+  const snapshotHandle = await page.waitForFunction(
+    () => {
+      const terminals = Array.from(
+        document.querySelectorAll<HTMLElement>('.agent-terminal-viewport')
+      )
+      if (terminals.length !== 1) return null
+
+      const terminal = terminals[0]!
+      const processId = Number(terminal.dataset.agentTerminalProcessId)
+      if (
+        !terminal.querySelector('.xterm-helper-textarea') ||
+        !terminal.dataset.agentTerminalAgentId ||
+        !terminal.dataset.agentTerminalSessionId ||
+        !Number.isSafeInteger(processId) ||
+        processId <= 0
+      ) {
+        return null
+      }
+
+      return {
+        agentId: terminal.dataset.agentTerminalAgentId,
+        processId: terminal.dataset.agentTerminalProcessId,
+        sessionId: terminal.dataset.agentTerminalSessionId
+      }
+    },
+    undefined,
+    { timeout: timeoutMs }
+  )
+
+  try {
+    const snapshot = getAgentTerminalReadySnapshot(await snapshotHandle.jsonValue())
+    if (!snapshot) {
+      throw new Error('Agent terminal became ready without a complete runtime identity.')
+    }
+    return snapshot
+  } finally {
+    await snapshotHandle.dispose()
+  }
 }

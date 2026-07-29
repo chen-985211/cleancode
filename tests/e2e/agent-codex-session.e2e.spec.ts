@@ -20,7 +20,11 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
-import { agentLaunchReadyTimeoutMs, waitForAgentLaunchReady } from '../support/e2eAgentRuntime'
+import {
+  agentLaunchReadyTimeoutMs,
+  waitForAgentLaunchReady,
+  waitForAgentTerminalReady
+} from '../support/e2eAgentRuntime'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Codex Agent session e2e', () => {
@@ -146,10 +150,8 @@ describe('Codex Agent session e2e', () => {
         page = await electronApp.firstWindow()
         resources.page = page
         await page.waitForLoadState('domcontentloaded')
-        const launchReady = waitForAgentLaunchReady(page)
         await waitForAgentCount(page, 1)
-        await waitForAgentTerminals(page, 1)
-        return launchReady
+        return waitForAgentTerminalReady(page)
       }
     },
     electronScenarioTimeoutMs
