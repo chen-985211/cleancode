@@ -1,3 +1,7 @@
+<p align="right">
+  <strong>简体中文</strong> · <a href="./README_EN.md">English</a>
+</p>
+
 <div align="center">
   <img src="./public/app-icon.png" alt="cleancode" width="112" />
 
@@ -251,3 +255,18 @@ cleancode 正在积极开发，当前版本需要注意：
 ## 许可证
 
 [MIT](./LICENSE)
+
+---
+
+<div align="center">
+  <h2>加入 CleanCode 社区</h2>
+
+  <p>交流工作流搭建、Agent 使用和开发体验，也欢迎分享反馈与建议。</p>
+
+  <img src="./docs/assets/cleancode-qq-group.png" alt="扫码加入 CleanCode QQ 群（群号：186885114）" width="320" />
+
+  <p>
+    <strong>QQ 群：186885114</strong><br />
+    <sub>打开 QQ 扫码，或搜索群号加入</sub>
+  </p>
+</div>
