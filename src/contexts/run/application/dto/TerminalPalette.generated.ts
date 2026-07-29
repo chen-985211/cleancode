@@ -15,7 +15,7 @@ export const canonicalTerminalPalettes = {
     blue: '#2864c7',
     magenta: '#8c4cb3',
     cyan: '#0f758c',
-    white: '#d9e0e9',
+    white: '#4b5563',
     brightBlack: '#697586',
     brightRed: '#d24d5d',
     brightGreen: '#249865',
@@ -23,7 +23,7 @@ export const canonicalTerminalPalettes = {
     brightBlue: '#3f7dde',
     brightMagenta: '#a565cb',
     brightCyan: '#188fa8',
-    brightWhite: '#ffffff'
+    brightWhite: '#243142'
   },
   dark: {
     background: '#000000',
