@@ -36,6 +36,7 @@ import type { BlockTemplateSnapshot } from '../../contexts/block-graph/applicati
 import type { ShortcutPlatform } from './applicationShortcuts'
 import { BlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
+import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -173,6 +174,12 @@ export function WorkbenchCanvas({
     [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
+  const objectContextMenu = useCanvasObjectContextMenu({
+    edges,
+    graph: currentWorkbench?.graph ?? null,
+    nodes,
+    onRequestSaveBlockTemplate
+  })
   const [viewportZoom, setViewportZoom] = useState(1)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
@@ -301,8 +308,8 @@ export function WorkbenchCanvas({
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
         />
         <ReactFlow<WorkbenchFlowNode, Edge>
-          nodes={nodes}
-          edges={edges}
+          nodes={objectContextMenu.nodes}
+          edges={objectContextMenu.edges}
           edgeTypes={workbenchEdgeTypes}
           onConnect={(connection) => void workflow.connect(connection)}
           onEdgesDelete={(edges) =>
@@ -334,7 +341,9 @@ export function WorkbenchCanvas({
             onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
           }
           onNodeClick={onNodeClick}
+          onNodeContextMenu={objectContextMenu.onNodeContextMenu}
           onPaneClick={() => {
+            objectContextMenu.close()
             if (placementTemplate) return
             templateInteraction.clearSelection()
             onPaneClick()
@@ -394,6 +403,7 @@ export function WorkbenchCanvas({
             />
           </Panel>
         </ReactFlow>
+        {objectContextMenu.menu}
         {templateInteraction.templateSelection ? (
           <div
             className="block-template-selection"

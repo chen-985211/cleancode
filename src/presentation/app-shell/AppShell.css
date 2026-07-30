@@ -18,6 +18,7 @@
 @import './styles/terminal-group-toolbar.css';
 @import './styles/terminal-theme-projection.css';
 @import './styles/terminal-node.css';
+@import './styles/canvas-object-context-menu.css';
 @import './styles/terminal-service-runtime.css';
 @import './styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';

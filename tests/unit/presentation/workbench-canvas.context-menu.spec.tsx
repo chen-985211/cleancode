@@ -1,0 +1,425 @@
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import type * as ReactFlowModule from '@xyflow/react'
+import type { ReactNode } from 'react'
+
+import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
+import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
+import type {
+  WorkbenchFlowNode,
+  WorkbenchSnapshot
+} from '../../../src/presentation/app-shell/types'
+import type { useTerminalWorkflow } from '../../../src/presentation/app-shell/useTerminalWorkflow'
+import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
+
+const reactFlowProps = vi.hoisted(() => ({
+  latest: null as MockReactFlowProps | null
+}))
+
+vi.mock('@xyflow/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactFlowModule>()
+  const React = await import('react')
+
+  return {
+    ...actual,
+    Background: () => null,
+    Panel: ({ children }: { readonly children?: ReactNode }) =>
+      React.createElement('div', null, children),
+    ReactFlow: (props: MockReactFlowProps) => {
+      reactFlowProps.latest = props
+      const { onInit } = props
+      React.useEffect(() => {
+        onInit?.({
+          getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+          setViewport: async () => undefined
+        })
+      }, [onInit])
+      return React.createElement(
+        'div',
+        { className: 'react-flow__pane', 'data-testid': 'pane' },
+        props.children
+      )
+    }
+  }
+})
+
+describe('workbench canvas object context menu', () => {
+  beforeEach(() => {
+    reactFlowProps.latest = null
+  })
+
+  it('selects an independent terminal and favorites only that terminal', () => {
+    const onRequestSaveBlockTemplate = vi.fn()
+    renderCanvas({ onRequestSaveBlockTemplate })
+
+    openNodeContextMenu('standalone')
+
+    expect(screen.getByRole('menu', { name: '终端操作' })).toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual(['standalone'])
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '收藏终端' }))
+
+    expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['standalone'])
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual([])
+  })
+
+  it.each(['workflow-a', 'workflow-b', 'workflow-c'])(
+    'selects and favorites the complete workflow from %s',
+    (nodeId) => {
+      const onRequestSaveBlockTemplate = vi.fn()
+      renderCanvas({ onRequestSaveBlockTemplate })
+
+      openNodeContextMenu(nodeId)
+
+      expect(screen.getByRole('menu', { name: '流程操作' })).toBeInTheDocument()
+      expect(contextSelectedNodeIds()).toEqual(['workflow-a', 'workflow-b', 'workflow-c'])
+      expect(contextSelectedConnectionIds()).toEqual(['connection-a-b', 'connection-b-c'])
+
+      fireEvent.click(screen.getByRole('menuitem', { name: '收藏流程' }))
+
+      expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith([
+        'workflow-a',
+        'workflow-b',
+        'workflow-c'
+      ])
+    }
+  )
+
+  it('selects a combination from the group node and favorites all exact members', () => {
+    const onRequestSaveBlockTemplate = vi.fn()
+    renderCanvas({ onRequestSaveBlockTemplate })
+    const groupHeader = document.createElement('div')
+    groupHeader.className = 'terminal-group-node__header'
+    const groupTitle = document.createElement('strong')
+    groupHeader.append(groupTitle)
+
+    openNodeContextMenu('combination', groupTitle)
+
+    expect(screen.getByRole('menu', { name: '组合操作' })).toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual(['combination'])
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '收藏组合' }))
+
+    expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['combination-a', 'combination-b'])
+  })
+
+  it('does not treat collapsed combination member content as the combination frame or title', () => {
+    renderCanvas()
+    const groupSurface = document.createElement('section')
+    groupSurface.className = 'terminal-group-node'
+    const memberContent = document.createElement('div')
+    memberContent.className = 'terminal-group-node__member'
+    groupSurface.append(memberContent)
+    const preventDefault = vi.fn()
+
+    act(() => {
+      reactFlowProps.latest?.onNodeContextMenu?.(
+        {
+          clientX: 320,
+          clientY: 240,
+          preventDefault,
+          target: memberContent
+        },
+        findProjectedNode('combination')
+      )
+    })
+
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('clears only the temporary context selection on Escape, outside press, and pane click', () => {
+    const onNodeClick = vi.fn()
+    const onPaneClick = vi.fn()
+    renderCanvas({
+      onNodeClick,
+      onPaneClick,
+      selectedTerminalBlockIds: ['standalone']
+    })
+
+    openNodeContextMenu('workflow-b')
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual([])
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+
+    openNodeContextMenu('workflow-b')
+    fireEvent.pointerDown(document.body)
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+
+    openNodeContextMenu('workflow-b')
+    act(() => {
+      reactFlowProps.latest?.onPaneClick?.()
+    })
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(onPaneClick).toHaveBeenCalledOnce()
+
+    act(() => {
+      const node = findProjectedNode('standalone')
+      reactFlowProps.latest?.onNodeClick?.({}, node)
+    })
+    expect(onNodeClick).toHaveBeenCalledOnce()
+  })
+})
+
+interface MockReactFlowProps {
+  readonly children?: ReactNode
+  readonly edges?: readonly { readonly id: string; readonly className?: string }[]
+  readonly nodes?: readonly WorkbenchFlowNode[]
+  readonly onInit?: (instance: {
+    readonly getViewport: () => { readonly x: number; readonly y: number; readonly zoom: number }
+    readonly setViewport: () => Promise<void>
+  }) => void
+  readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
+  readonly onNodeContextMenu?: (
+    event: {
+      readonly clientX: number
+      readonly clientY: number
+      preventDefault: () => void
+      readonly target?: EventTarget | null
+    },
+    node: WorkbenchFlowNode
+  ) => void
+  readonly onPaneClick?: () => void
+}
+
+function renderCanvas({
+  onNodeClick = vi.fn(),
+  onPaneClick = vi.fn(),
+  onRequestSaveBlockTemplate = vi.fn(),
+  selectedTerminalBlockIds = []
+}: {
+  readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
+  readonly onPaneClick?: () => void
+  readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
+  readonly selectedTerminalBlockIds?: readonly string[]
+} = {}): void {
+  const graph = createGraph()
+  const nodes = createTerminalFlowNodes({
+    graph,
+    handlers: {
+      onDelete: vi.fn(),
+      onInput: vi.fn(),
+      onQuickLaunch: vi.fn(),
+      onResize: vi.fn(),
+      onResizeBlock: vi.fn(async () => undefined),
+      onRestart: vi.fn(),
+      onStart: vi.fn(),
+      onStop: vi.fn(),
+      onToggleTerminalGroupCandidate: vi.fn(),
+      onUpdateDefinition: vi.fn(async () => undefined)
+    },
+    hoveredTerminalBlockId: null,
+    selectedTerminalBlockIds,
+    terminalStates: {}
+  })
+
+  render(
+    <WorkbenchCanvas
+      shortcutTooltips={{
+        addProject: '',
+        createAgent: '',
+        createBranchWorkspace: '',
+        createTerminal: '',
+        fitCanvas: '',
+        groupTerminals: '',
+        nextWorkspace: '',
+        openSettings: '',
+        previousWorkspace: '',
+        selectCanvasNodeDown: '',
+        selectCanvasNodeLeft: '',
+        selectCanvasNodeRight: '',
+        selectCanvasNodeUp: '',
+        toggleMinimap: '',
+        toggleSidebar: '',
+        zoomCanvasIn: '',
+        zoomCanvasOut: ''
+      }}
+      isDesktopRuntime
+      terminalRuntimeAvailability={{
+        phase: 'ready',
+        epoch: 1,
+        errorCode: null,
+        retryable: false
+      }}
+      isMinimapCollapsed={false}
+      currentWorkbench={createWorkbench(graph)}
+      currentWorkspace={{
+        workspaceId: 'main',
+        directory: '/repo',
+        gitBranch: null,
+        workspaceKind: 'default',
+        displayName: 'main',
+        isCurrent: true
+      }}
+      nodeStore={createWorkbenchNodeStore(nodes)}
+      nodeTypes={{}}
+      reactFlowInstanceRef={{ current: null }}
+      minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
+      terminalWorkflow={createTerminalWorkflow(graph)}
+      onRequestSaveBlockTemplate={onRequestSaveBlockTemplate}
+      onCreateTerminalBlock={vi.fn()}
+      onCreateWorkspaceAgent={vi.fn()}
+      onZoomCanvasIn={vi.fn()}
+      onZoomCanvasOut={vi.fn()}
+      onFitCanvas={vi.fn()}
+      onBeginTerminalGroupSelection={vi.fn()}
+      onCreateTerminalGroup={vi.fn()}
+      onCancelTerminalGroupSelection={vi.fn()}
+      isTerminalGroupSelectionMode={false}
+      selectedTerminalGroupCandidateCount={0}
+      canBeginTerminalGroupSelection
+      canCreateTerminalGroup={false}
+      onNodesChange={vi.fn()}
+      onNodeClick={onNodeClick}
+      onPaneClick={onPaneClick}
+      onNodeDrag={vi.fn()}
+      onNodeDragStart={vi.fn()}
+      onNodeDragStop={vi.fn()}
+      onViewportChange={vi.fn()}
+      onMinimapNodeClick={vi.fn()}
+      onToggleMinimap={vi.fn()}
+      getMiniMapNodeColor={() => '#fff'}
+      getMiniMapNodeStrokeColor={() => '#000'}
+      getMiniMapNodeClassName={() => ''}
+    />
+  )
+}
+
+function openNodeContextMenu(nodeId: string, target?: EventTarget): void {
+  const preventDefault = vi.fn()
+  act(() => {
+    reactFlowProps.latest?.onNodeContextMenu?.(
+      {
+        clientX: 320,
+        clientY: 240,
+        preventDefault,
+        target
+      },
+      findProjectedNode(nodeId)
+    )
+  })
+  expect(preventDefault).toHaveBeenCalledOnce()
+}
+
+function findProjectedNode(nodeId: string): WorkbenchFlowNode {
+  const node = reactFlowProps.latest?.nodes?.find((candidate) => candidate.id === nodeId)
+  if (!node) throw new Error(`Missing projected node ${nodeId}`)
+  return node
+}
+
+function contextSelectedNodeIds(): string[] {
+  return (
+    reactFlowProps.latest?.nodes
+      ?.filter((node) => Boolean(node.data.isContextSelected))
+      .map((node) => node.id) ?? []
+  )
+}
+
+function normallySelectedNodeIds(): string[] {
+  return reactFlowProps.latest?.nodes?.filter((node) => node.selected).map((node) => node.id) ?? []
+}
+
+function contextSelectedConnectionIds(): string[] {
+  return (
+    reactFlowProps.latest?.edges
+      ?.filter((edge) => edge.className?.includes('terminal-workflow-edge--context-selected'))
+      .map((edge) => edge.id) ?? []
+  )
+}
+
+function createWorkbench(graph: BlockGraphSnapshot): WorkbenchSnapshot {
+  return {
+    agents: [],
+    gitBranches: [],
+    graph,
+    project: {
+      id: 'project-1',
+      name: 'Project',
+      directory: '/repo',
+      workspaces: [
+        {
+          workspaceId: 'main',
+          directory: '/repo',
+          gitBranch: null,
+          workspaceKind: 'default',
+          displayName: 'main',
+          isCurrent: true
+        }
+      ]
+    }
+  }
+}
+
+function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof useTerminalWorkflow> {
+  return {
+    activeRootBlockIds: [],
+    connect: vi.fn(async () => undefined),
+    deleteEdges: vi.fn(async () => undefined),
+    edges: createTerminalWorkflowEdges(graph, {}),
+    isActive: false,
+    isStopping: false,
+    nodeStatuses: {},
+    run: null,
+    start: vi.fn(async () => undefined),
+    startScope: vi.fn(async () => undefined),
+    startTerminalCombination: vi.fn(async () => undefined),
+    stop: vi.fn(async () => undefined),
+    updateExecutionConfig: vi.fn(async () => undefined)
+  }
+}
+
+function createGraph(): BlockGraphSnapshot {
+  return {
+    id: 'graph-1',
+    projectId: 'project-1',
+    workspaceId: 'main',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    blocks: [
+      createBlock('workflow-a', 0),
+      createBlock('workflow-b', 400),
+      createBlock('workflow-c', 800),
+      createBlock('standalone', 1200),
+      createBlock('combination-a', 1600),
+      createBlock('combination-b', 2000)
+    ],
+    connections: [
+      {
+        id: 'connection-a-b',
+        sourceBlockId: 'workflow-a',
+        targetBlockId: 'workflow-b'
+      },
+      {
+        id: 'connection-b-c',
+        sourceBlockId: 'workflow-b',
+        targetBlockId: 'workflow-c'
+      }
+    ],
+    terminalGroups: [
+      {
+        id: 'combination',
+        type: 'terminal-group',
+        name: 'Combination',
+        position: { x: 1580, y: -20 },
+        size: { width: 760, height: 340 },
+        isCollapsed: false,
+        memberBlockIds: ['combination-a', 'combination-b']
+      }
+    ]
+  }
+}
+
+function createBlock(id: string, x: number): BlockGraphSnapshot['blocks'][number] {
+  return {
+    id,
+    type: 'terminal',
+    name: id,
+    description: '',
+    launchCommand: `pnpm ${id}`,
+    position: { x, y: 0 },
+    size: { width: 320, height: 240 }
+  }
+}

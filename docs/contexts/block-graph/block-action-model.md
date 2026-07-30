@@ -56,6 +56,9 @@
 | 重开组合终端会话 | 批量重建运行环境 | 组合内全部终端成员     | terminal group |
 | 编辑组合         | 编辑组合元数据   | 一个终端组合           | terminal group |
 | 解散组合         | 修改图结构       | 组合本身，保留成员终端 | terminal group |
+| 收藏终端         | 保存可复用快照   | 右键命中的独立终端     | terminal       |
+| 收藏流程         | 保存可复用快照   | 右键终端所在完整流程   | workflow       |
+| 收藏组合         | 保存可复用快照   | 右键命中的组合全部成员 | terminal group |
 | 收藏             | 保存可复用快照   | 框选终端及内部依赖     | block template |
 | 放置             | 实例化快照       | 当前项目的目标工作区   | block template |
 | 放置并运行       | 实例化后运行计划 | 本次新建的精确终端集合 | block template |
@@ -88,6 +91,8 @@
 
 收藏动作保存配置快照，不与来源终端或工作区保持引用。模板类型由选中内容自动推导；项目/全局作用域属于模板库元数据，不改变图对象身份。
 
+右键收藏只从节点进入。独立终端直接使用单终端作用域；流程中任意终端必须通过共享画布语义契约扩展为完整流程；组合外框或标题使用组合已经提交的精确成员。三种右键入口最终都调用同一个模板保存用例，不从依赖连线进入，也不复制模板分类或保存规则。右键选择属于 Presentation 临时状态，关闭菜单不得改变已提交图事实或既有左键选择。
+
 “放置”通过 BlockGraph 实例化用例在一个图事务中生成全部新终端、内部连接和可选组合。“放置并运行”必须先完成同一原子实例化，再把返回的精确作用域交给现有工作流计划与 Run 调度器；表现层不得按模板类型复制启动规则，也不得逐终端并行启动流程模板。Agent 不是当前模板类型，Agent 控制台和对话不得进入模板快照。
 
 ## UI 与架构边界
@@ -116,13 +121,13 @@
 
 ## 验证入口
 
-| 语义                 | 主要测试                                                                                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 单终端启动/停止/重开 | [`app-shell.terminal-launch-command.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-launch-command.spec.tsx)、[`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts)     |
-| 终端组合批量动作     | [`app-shell.terminal-group-actions.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-group-actions.spec.tsx)                                                                                                                        |
-| 从节点运行与停止流程 | [`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                         |
-| 组合结构边界         | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)                                                                                                                            |
-| 收藏、放置与运行     | [`block-graph.block-template-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.block-template-use-cases.spec.ts)、[`block-template-placement.spec.ts`](../../../tests/unit/presentation/block-template-placement.spec.ts) |
+| 语义                 | 主要测试                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 单终端启动/停止/重开 | [`app-shell.terminal-launch-command.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-launch-command.spec.tsx)、[`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts)                                                                                                                                                                                                                                           |
+| 终端组合批量动作     | [`app-shell.terminal-group-actions.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-group-actions.spec.tsx)                                                                                                                                                                                                                                                                                                                                                              |
+| 从节点运行与停止流程 | [`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                                                                                                                                                                                                                                                               |
+| 组合结构边界         | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)                                                                                                                                                                                                                                                                                                                                                                  |
+| 收藏、放置与运行     | [`block-graph.block-template-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.block-template-use-cases.spec.ts)、[`block-template-placement.spec.ts`](../../../tests/unit/presentation/block-template-placement.spec.ts)、[`canvas-object-context-target.spec.ts`](../../../tests/unit/presentation/canvas-object-context-target.spec.ts)、[`workbench-canvas.context-menu.spec.tsx`](../../../tests/unit/presentation/workbench-canvas.context-menu.spec.tsx) |
 
 ## 维护规则
 
