@@ -289,12 +289,12 @@ function createCombinationGraph(): BlockGraph {
   createConfiguredTerminal(graph, 'build', 'Build', 'pnpm build')
   createConfiguredTerminal(graph, 'outside', 'Outside', 'pnpm outside')
   graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
-  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
   graph.createTerminalGroup({
     id: 'development',
     name: 'Development',
     memberBlockIds: ['standalone', 'install', 'build']
   })
+  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
 
   return graph
 }

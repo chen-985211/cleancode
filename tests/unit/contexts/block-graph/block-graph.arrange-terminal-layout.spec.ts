@@ -234,6 +234,21 @@ describe('terminal layout in the default block graph', () => {
     createTerminal(graph, 'a-child', 800, 400)
     createTerminal(graph, 'b-one', 1560, 40)
     createTerminal(graph, 'b-two', 1560, 400)
+    graph.createTerminalGroup({
+      id: 'group-a',
+      name: 'Group A',
+      memberBlockIds: ['a-root', 'a-child']
+    })
+    graph.createTerminalGroup({
+      id: 'group-c',
+      name: 'Group C',
+      memberBlockIds: ['c-root', 'c-child']
+    })
+    graph.createTerminalGroup({
+      id: 'group-b',
+      name: 'Group B',
+      memberBlockIds: ['b-one', 'b-two']
+    })
     graph.connectTerminalBlocks({
       id: 'a-root-to-child',
       sourceBlockId: 'a-root',
@@ -253,21 +268,6 @@ describe('terminal layout in the default block graph', () => {
       id: 'c-child-to-b-two',
       sourceBlockId: 'c-child',
       targetBlockId: 'b-two'
-    })
-    graph.createTerminalGroup({
-      id: 'group-a',
-      name: 'Group A',
-      memberBlockIds: ['a-root', 'a-child']
-    })
-    graph.createTerminalGroup({
-      id: 'group-c',
-      name: 'Group C',
-      memberBlockIds: ['c-root', 'c-child']
-    })
-    graph.createTerminalGroup({
-      id: 'group-b',
-      name: 'Group B',
-      memberBlockIds: ['b-one', 'b-two']
     })
     const input = {
       anchorRegion: region(500, 100, 600, 400),
@@ -318,11 +318,11 @@ describe('terminal layout in the default block graph', () => {
     ] as const
 
     for (const [id, x, y] of terminals) createTerminal(graph, id, x, y)
-    for (const [id, sourceBlockId, targetBlockId] of connections) {
-      graph.connectTerminalBlocks({ id, sourceBlockId, targetBlockId })
-    }
     for (const [id, memberBlockIds] of groups) {
       graph.createTerminalGroup({ id, memberBlockIds, name: id })
+    }
+    for (const [id, sourceBlockId, targetBlockId] of connections) {
+      graph.connectTerminalBlocks({ id, sourceBlockId, targetBlockId })
     }
 
     const input = {

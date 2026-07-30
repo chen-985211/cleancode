@@ -295,6 +295,63 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
+  it('allows creating a group from one selected terminal when it belongs to a workflow', async () => {
+    const baseWorkbench = createWorkbenchWithTerminalBlocks()
+    const workbench = {
+      ...baseWorkbench,
+      graph: {
+        ...baseWorkbench.graph,
+        connections: [
+          {
+            id: 'backend-frontend',
+            sourceBlockId: 'backend-terminal',
+            targetBlockId: 'frontend-terminal'
+          }
+        ]
+      }
+    }
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.createTerminalGroup.mockResolvedValue({
+      ...workbench.graph,
+      terminalGroups: [
+        {
+          id: 'new-group',
+          type: 'terminal-group',
+          name: '启动项目',
+          position: { x: 288, y: 164 },
+          size: { width: 984, height: 458 },
+          isCollapsed: false,
+          memberBlockIds: ['backend-terminal', 'frontend-terminal']
+        }
+      ]
+    })
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThanOrEqual(2))
+    const backendNode = reactFlowProps.latest?.nodes.find(
+      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
+    )
+
+    backendNode?.data.onSelect?.(false)
+    fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
+    fireEvent.click(await screen.findByRole('button', { name: '创建组合' }))
+
+    await waitFor(() =>
+      expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
+        projectDirectory: '/tmp/alpha-project',
+        workspaceId: 'main',
+        name: '启动项目',
+        memberBlockIds: ['backend-terminal']
+      })
+    )
+  })
+
   it('selects grouped member terminals while editing group membership', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const runtimeApi = createRuntimeApi({

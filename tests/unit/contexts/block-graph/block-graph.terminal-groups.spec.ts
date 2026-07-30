@@ -42,6 +42,74 @@ describe('terminal groups in the default block graph', () => {
     expect(terminalGroup.size).not.toEqual(defaultTerminalGroupSize)
   })
 
+  it('expands every selected workflow terminal to its complete dependency component', () => {
+    const graph = createGraphWithWorkflowComponents()
+
+    graph.createTerminalGroup({
+      id: 'release-group',
+      name: 'Release',
+      memberBlockIds: ['build-terminal', 'deploy-terminal', 'shell-terminal']
+    })
+
+    expect(graph.toSnapshot().terminalGroups[0]?.memberBlockIds).toEqual([
+      'install-terminal',
+      'build-terminal',
+      'test-terminal',
+      'package-terminal',
+      'deploy-terminal',
+      'shell-terminal'
+    ])
+  })
+
+  it('adds a terminal workflow to an existing group as one complete unit', () => {
+    const graph = createGraphWithWorkflowComponents()
+    graph.createTerminalGroup({
+      id: 'development-group',
+      name: 'Development',
+      memberBlockIds: ['shell-terminal', 'docs-terminal']
+    })
+
+    graph.addTerminalToGroup('development-group', 'build-terminal')
+
+    expect(graph.toSnapshot().terminalGroups[0]?.memberBlockIds).toEqual([
+      'shell-terminal',
+      'docs-terminal',
+      'install-terminal',
+      'build-terminal',
+      'test-terminal'
+    ])
+  })
+
+  it('rejects adding a partial workflow when another group owns one of its terminals', () => {
+    const graph = createGraphWithWorkflowComponents(false)
+    graph.createTerminalGroup({
+      id: 'release-group',
+      name: 'Release',
+      memberBlockIds: ['test-terminal', 'package-terminal']
+    })
+    graph.createTerminalGroup({
+      id: 'development-group',
+      name: 'Development',
+      memberBlockIds: ['shell-terminal', 'docs-terminal']
+    })
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'install-terminal',
+      targetBlockId: 'build-terminal'
+    })
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'build-terminal',
+      targetBlockId: 'test-terminal'
+    })
+
+    expect(() => graph.addTerminalToGroup('development-group', 'build-terminal')).toThrow(
+      'Terminal block already belongs to a group.'
+    )
+    expect(
+      graph.toSnapshot().terminalGroups.find((group) => group.id === 'development-group')
+        ?.memberBlockIds
+    ).toEqual(['shell-terminal', 'docs-terminal'])
+  })
+
   it('moves grouped terminals together when the group moves', () => {
     const graph = createGraphWithGroupedTerminals()
 
@@ -180,6 +248,45 @@ function createGraphWithGroupedTerminals(): BlockGraph {
     name: '启动项目',
     memberBlockIds: ['backend-terminal', 'frontend-terminal']
   })
+
+  return graph
+}
+
+function createGraphWithWorkflowComponents(includeConnections = true): BlockGraph {
+  const graph = BlockGraph.createDefault({
+    projectId: 'project-1',
+    workspaceId: 'main'
+  })
+  for (const [id, x, y] of [
+    ['install-terminal', 0, 0],
+    ['build-terminal', 500, 0],
+    ['test-terminal', 1_000, 0],
+    ['package-terminal', 0, 600],
+    ['deploy-terminal', 500, 600],
+    ['shell-terminal', 0, 1_200],
+    ['docs-terminal', 500, 1_200]
+  ] as const) {
+    graph.createTerminalBlock({
+      id,
+      name: id,
+      description: '',
+      position: { x, y }
+    })
+  }
+  if (includeConnections) {
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'install-terminal',
+      targetBlockId: 'build-terminal'
+    })
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'build-terminal',
+      targetBlockId: 'test-terminal'
+    })
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'package-terminal',
+      targetBlockId: 'deploy-terminal'
+    })
+  }
 
   return graph
 }

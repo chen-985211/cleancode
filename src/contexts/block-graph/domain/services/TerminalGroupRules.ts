@@ -1,6 +1,7 @@
 import type {
   BlockPositionSnapshot,
   TerminalBlockSnapshot,
+  TerminalConnectionSnapshot,
   TerminalGroupSizeSnapshot,
   TerminalGroupSnapshot
 } from '../aggregates/BlockGraphTypes'
@@ -57,8 +58,44 @@ export function normalizeTerminalGroups(
   return validGroups
 }
 
-export function normalizeTerminalGroupMemberIds(memberBlockIds: readonly string[]): string[] {
+function normalizeTerminalGroupMemberIds(memberBlockIds: readonly string[]): string[] {
   return Array.from(new Set(memberBlockIds))
+}
+
+export function expandTerminalGroupMemberIdsToCompleteWorkflows(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly TerminalConnectionSnapshot[],
+  requestedMemberBlockIds: readonly string[]
+): string[] {
+  const requestedIds = normalizeTerminalGroupMemberIds(requestedMemberBlockIds)
+  const blockIds = new Set(blocks.map((block) => block.id))
+  const adjacentBlockIds = new Map(blocks.map((block) => [block.id, new Set<string>()]))
+
+  for (const connection of connections) {
+    if (!blockIds.has(connection.sourceBlockId) || !blockIds.has(connection.targetBlockId)) {
+      continue
+    }
+    adjacentBlockIds.get(connection.sourceBlockId)?.add(connection.targetBlockId)
+    adjacentBlockIds.get(connection.targetBlockId)?.add(connection.sourceBlockId)
+  }
+
+  const expandedIds = new Set(requestedIds)
+  const pendingIds = requestedIds.filter((blockId) => blockIds.has(blockId))
+  while (pendingIds.length > 0) {
+    const blockId = pendingIds.shift()
+    if (!blockId) continue
+
+    for (const adjacentBlockId of adjacentBlockIds.get(blockId) ?? []) {
+      if (expandedIds.has(adjacentBlockId)) continue
+      expandedIds.add(adjacentBlockId)
+      pendingIds.push(adjacentBlockId)
+    }
+  }
+
+  return [
+    ...blocks.filter((block) => expandedIds.has(block.id)).map((block) => block.id),
+    ...requestedIds.filter((blockId) => !blockIds.has(blockId))
+  ]
 }
 
 export function hasEnoughTerminalGroupMembers(group: {

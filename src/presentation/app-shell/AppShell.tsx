@@ -122,6 +122,7 @@ export function AppShell({
   }, [])
   const {
     beginTerminalGroupSelection,
+    canCreateTerminalGroup,
     cancelTerminalGroupSelection,
     completeTerminalGroupSelection,
     isTerminalGroupSelectionMode,
@@ -307,9 +308,7 @@ export function AppShell({
     terminateWorkbenchTerminalSessions
   })
   const createTerminalGroup = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
-      return
-    }
+    if (!currentWorkbench || !currentWorkspace || !canCreateTerminalGroup) return
 
     const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
     const graphSnapshot = await window.cleancode?.createTerminalGroup({
@@ -332,6 +331,7 @@ export function AppShell({
   }, [
     currentWorkbench,
     currentWorkspace,
+    canCreateTerminalGroup,
     completeTerminalGroupSelection,
     selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
@@ -679,7 +679,7 @@ export function AppShell({
             isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
             selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
             canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
-            canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
+            canCreateTerminalGroup={canCreateTerminalGroup}
             onNodesChange={workbenchNodeSelection.onNodesChange}
             onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
             onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 
+import { expandTerminalGroupMemberIdsToCompleteWorkflows } from '../../contexts/block-graph/domain/services/TerminalGroupRules'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseTerminalGroupSelectionModeInput {
@@ -27,6 +28,17 @@ export function useTerminalGroupSelectionMode({
   const selectedUngroupedTerminalBlockIds = useMemo(
     () => selectedTerminalBlockIds.filter((blockId) => !groupedTerminalBlockIds.has(blockId)),
     [groupedTerminalBlockIds, selectedTerminalBlockIds]
+  )
+  const canCreateTerminalGroup = useMemo(
+    () =>
+      graph
+        ? expandTerminalGroupMemberIdsToCompleteWorkflows(
+            graph.blocks,
+            graph.connections ?? [],
+            selectedUngroupedTerminalBlockIds
+          ).length >= 2
+        : false,
+    [graph, selectedUngroupedTerminalBlockIds]
   )
 
   const beginTerminalGroupSelection = useCallback(() => {
@@ -74,6 +86,7 @@ export function useTerminalGroupSelectionMode({
 
   return {
     beginTerminalGroupSelection,
+    canCreateTerminalGroup,
     cancelTerminalGroupSelection,
     completeTerminalGroupSelection,
     isTerminalGroupSelectionMode,
