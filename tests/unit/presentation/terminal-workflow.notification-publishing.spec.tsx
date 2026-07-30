@@ -276,6 +276,36 @@ describe('terminal workflow notification publishing', () => {
     })
   })
 
+  it('starts a placed template through the existing workflow executor with its exact block set', async () => {
+    const start = vi.fn(async () => null)
+    const workbench = createWorkbenchSnapshot('/project', 'Project')
+    window.cleancode = createWorkflowRuntime({ start })
+    const { result } = renderHook(() =>
+      useTerminalWorkflow({
+        currentWorkbench: workbench,
+        currentWorkspace: workbench.project.workspaces[0],
+        notifications: createNotificationController(),
+        setCurrentGraph: vi.fn()
+      })
+    )
+
+    await act(() =>
+      result.current.startScope({
+        type: 'block-set',
+        blockIds: ['new-terminal-a', 'new-terminal-b']
+      })
+    )
+
+    expect(start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: {
+          type: 'block-set',
+          blockIds: ['new-terminal-a', 'new-terminal-b']
+        }
+      })
+    )
+  })
+
   it('prevents duplicate stop requests while one is pending', async () => {
     let finishStop: ((run: WorkflowRunSnapshot) => void) | undefined
     const stop = vi.fn(

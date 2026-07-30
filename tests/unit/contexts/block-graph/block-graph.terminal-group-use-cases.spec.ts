@@ -61,6 +61,25 @@ describe('terminal group use cases', () => {
     expect(repository.savedGraph?.toSnapshot()).toEqual(updatedGraph)
   })
 
+  it('rejects creating a group from one complete workflow', async () => {
+    const graph = createGraphWithThreeTerminals()
+    graph.connectTerminalBlocks({
+      sourceBlockId: 'backend-terminal',
+      targetBlockId: 'frontend-terminal'
+    })
+    const repository = new InMemoryBlockGraphRepository(graph)
+
+    await expect(
+      new CreateTerminalGroupUseCase(repository).execute({
+        projectDirectory: '/tmp/project',
+        workspaceId: 'main',
+        name: 'Application',
+        memberBlockIds: ['frontend-terminal']
+      })
+    ).rejects.toThrow('Terminal group must contain at least two top-level execution units.')
+    expect(repository.savedGraph?.terminalGroups).toEqual([])
+  })
+
   it('updates terminal group metadata, collapsed state, members, and position', async () => {
     const graph = createGraphWithGroupedTerminals()
     const repository = new InMemoryBlockGraphRepository(graph)

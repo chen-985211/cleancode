@@ -25,6 +25,11 @@ import type {
   TerminalBlockSizeSnapshot,
   TerminalExecutionConfigSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  BlockTemplateScope,
+  BlockTemplateSnapshot
+} from './contexts/block-graph/application/dto/BlockTemplateSnapshot'
+import type { InstantiateBlockTemplateResult } from './contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
 import type { GitBranchNavigationItemSnapshot } from './contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from './contexts/project/application/dto/ProjectSnapshot'
 import type { TerminalSessionSnapshot } from './contexts/run/application/dto/TerminalSessionSnapshot'
@@ -270,6 +275,33 @@ declare global {
         readonly workspaceId: string
         readonly blockId: string
       }): Promise<BlockGraphSnapshot>
+      listBlockTemplates(command: {
+        readonly scope: BlockTemplateScope
+      }): Promise<readonly BlockTemplateSnapshot[]>
+      saveBlockTemplate(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly selectedBlockIds: readonly string[]
+        readonly name: string
+        readonly description: string
+        readonly scope: BlockTemplateScope
+      }): Promise<BlockTemplateSnapshot>
+      updateBlockTemplate(command: {
+        readonly templateId: string
+        readonly name: string
+        readonly description: string
+      }): Promise<BlockTemplateSnapshot>
+      moveBlockTemplate(command: {
+        readonly templateId: string
+        readonly scope: BlockTemplateScope
+      }): Promise<BlockTemplateSnapshot>
+      deleteBlockTemplate(command: { readonly templateId: string }): Promise<void>
+      instantiateBlockTemplate(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly templateId: string
+        readonly origin: BlockPositionSnapshot
+      }): Promise<InstantiateBlockTemplateResult>
       startTerminal(command: {
         readonly projectId: string
         readonly projectDirectory: string
@@ -383,6 +415,7 @@ declare global {
           | { readonly type: 'full' }
           | { readonly type: 'from-block'; readonly blockId: string }
           | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
+          | { readonly type: 'block-set'; readonly blockIds: readonly string[] }
         readonly shell?: string
         readonly columns?: number
         readonly rows?: number

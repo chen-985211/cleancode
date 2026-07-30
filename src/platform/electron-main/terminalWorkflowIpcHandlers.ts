@@ -84,7 +84,12 @@ function isWorkflowScope(value: unknown): boolean {
     isRecord(value) &&
     (value.type === 'full' ||
       (value.type === 'from-block' && isNonEmptyString(value.blockId)) ||
-      (value.type === 'terminal-group' && isNonEmptyString(value.terminalGroupId)))
+      (value.type === 'terminal-group' && isNonEmptyString(value.terminalGroupId)) ||
+      (value.type === 'block-set' &&
+        Array.isArray(value.blockIds) &&
+        value.blockIds.length > 0 &&
+        value.blockIds.every(isNonEmptyString) &&
+        new Set(value.blockIds).size === value.blockIds.length))
   )
 }
 

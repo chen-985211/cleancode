@@ -295,6 +295,44 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
+  it('does not create a group from one complete workflow', async () => {
+    const baseWorkbench = createWorkbenchWithTerminalBlocks()
+    const workbench = {
+      ...baseWorkbench,
+      graph: {
+        ...baseWorkbench.graph,
+        connections: [
+          {
+            id: 'backend-frontend',
+            sourceBlockId: 'backend-terminal',
+            targetBlockId: 'frontend-terminal'
+          }
+        ]
+      }
+    }
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThanOrEqual(2))
+    const backendNode = reactFlowProps.latest?.nodes.find(
+      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
+    )
+
+    backendNode?.data.onSelect?.(false)
+    fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
+    const createGroupButton = await screen.findByRole('button', { name: '创建组合' })
+
+    expect(createGroupButton).toBeDisabled()
+    fireEvent.click(createGroupButton)
+    expect(runtimeApi.createTerminalGroup).not.toHaveBeenCalled()
+  })
+
   it('selects grouped member terminals while editing group membership', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const runtimeApi = createRuntimeApi({

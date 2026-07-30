@@ -35,6 +35,7 @@ Clean Architecture 用于定义代码分层、依赖方向、用例入口、端�
 - 所有运行期 Agent 工具调用都必须形成可审计记录。回放和撤销尚未实现，不得把审计记录表述为可执行操作历史。
 - 新增积木能力时必须先明确所属上下文与分层职责，不得把业务规则硬编码在 UI 组件或基础设施适配器里。
 - 所有画布对象必须使用 Shared Kernel 的规范身份 `projectId + workspaceId + objectKind + objectId`。Git 分支、Git 初始化状态、目录、显示名和运行实例 ID 都是元数据或其他事实，不得改变画布对象身份。
+- 终端、完整流程、顶层执行单元和组合的稳定跨上下文定义必须使用 Shared Kernel 的画布执行语义契约；BlockGraph 继续拥有图结构与成员状态，Presentation、模板和 Agent 只能消费纯分析结果或生成的说明投影。
 
 ## 分层规则
 
@@ -390,6 +391,7 @@ src/
         components/
   shared-kernel/
     domain/
+      policies/
       value-objects/
       events/
       errors/
@@ -412,6 +414,8 @@ src/
 `src/contexts` 是业务代码的根目录。每个限界上下文必须在自己的目录内表达领域层、应用层、基础设施层和表现层。
 
 `src/shared-kernel` 只放多个上下文共同使用且稳定的领域概念和应用层契约。共享内核不得成为跨上下文复用杂物的目录。
+
+当前画布执行语义契约属于 Shared Kernel 的稳定领域策略：它只计算终端依赖的完整弱连通流程、顶层执行单元、组合资格和规范说明，不读取仓储或修改 BlockGraph。产品定义以[画布语义契约](../product/canvas-semantic-contract.md)为唯一维护入口。
 
 `src/platform` 只放应用启动、依赖装配、Electron 入口、IPC、配置和系统级连接代码。平台层不得包含业务规则。
 

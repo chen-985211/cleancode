@@ -3,6 +3,7 @@ import {
   cleancodeMcpDeveloperInstructions,
   cleancodeMcpInstructions
 } from '../../../../src/contexts/agent/application/dto/AgentToolProtocol'
+import { canvasExecutionSemanticInstructions } from '../../../../src/shared-kernel/domain/policies/CanvasExecutionSemantics'
 import {
   findAgentToolJsonSchemaIssue,
   type AgentToolJsonSchema
@@ -299,6 +300,18 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpDeveloperInstructions).toContain('cannot start it')
     expect(cleancodeMcpDeveloperInstructions).toContain('source-code implementation')
     expect(cleancodeMcpInstructions).toContain('not workflow nodes')
+  })
+
+  it('projects the canonical canvas execution semantics into MCP and Provider instructions', () => {
+    for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
+      expect(instructions).toContain(canvasExecutionSemanticInstructions)
+      expect(instructions).toContain('at least two top-level execution units')
+      expect(instructions).toContain('Never wrap a single complete workflow')
+    }
+
+    const createGroup = requireTool('create_terminal_group')
+    expect(createGroup.description).toContain('at least two top-level execution units')
+    expect(createGroup.description).toContain('complete workflows')
   })
 
   it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {

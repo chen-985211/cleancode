@@ -9,7 +9,7 @@
 | 上下文     | 状态   | 核心聚合                                          | 拥有的事实                                                                    |
 | ---------- | ------ | ------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Project    | 已实现 | `Project`、`ProjectRegistry`                      | 项目目录、稳定工作区身份、类型/目录/显示名/Git 绑定、当前工作区、最近项目目录 |
-| BlockGraph | 已实现 | `BlockGraph`                                      | 终端积木、组合、布局、执行配置和依赖连接                                      |
+| BlockGraph | 已实现 | `BlockGraph`、`BlockTemplateLibrary`              | 终端积木、组合、布局、执行配置、依赖连接和应用级模板快照                      |
 | Run        | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun` | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态             |
 | Agent      | 已实现 | `AgentSession`                                    | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计      |
 | Plugin     | 规划中 | 尚无                                              | 尚未形成当前领域模型、用例或持久化事实                                        |
@@ -54,6 +54,11 @@ Run application
   -> BlockGraph adapters
   -> GetTerminalLaunchPlanUseCase / BuildTerminalWorkflowPlanUseCase
 
+Presentation
+  -> BlockGraph template use cases
+  -> instantiate exact graph scope
+  -> Run TerminalWorkflowService (only for place-and-run)
+
 Agent application
   -> AgentBlockGraphToolPort
   -> BlockGraphAgentToolAdapter
@@ -61,6 +66,8 @@ Agent application
 ```
 
 端口由需要外部能力的调用方上下文拥有；适配器负责把该稳定契约连接到提供方公开的应用层用例。Platform 只装配对象，不重新定义业务规则。
+
+模板库虽然是应用级持久化数据，领域事实仍由 BlockGraph 上下文拥有。Platform 只提供独立 JSON 仓储和 IPC 装配；Presentation 只投影选择、放置与管理交互。Run 不读取模板，只接收模板实例化后由 BlockGraph 生成的既有工作流计划。
 
 ## Project 到 Agent：工作区所有权变更
 
@@ -171,7 +178,7 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 
 - Presentation 调用应用层用例、订阅 IPC 事件并形成派生视图，不是上下文之间的数据后门。
 - Platform 注册 IPC、创建仓储和适配器、连接端口，不拥有 Project、BlockGraph、Run 或 Agent 业务状态。
-- Shared Kernel 只容纳稳定且确实被多个上下文共同使用的错误/契约；当前由它拥有规范画布对象身份 `projectId + workspaceId + objectKind + objectId`，供 BlockGraph、Run、Agent 和 Presentation 共同构造 owner key。分支、目录和显示名不得进入该身份。除此之外不得用 Shared Kernel 规避端口边界。
+- Shared Kernel 只容纳稳定且确实被多个上下文共同使用的错误/契约；当前由它拥有规范画布对象身份 `projectId + workspaceId + objectKind + objectId`，以及供 BlockGraph、模板、Presentation 和 Agent 指引共同消费的纯[画布执行语义契约](../product/canvas-semantic-contract.md)。前者构造 owner key，后者只分析完整流程、顶层执行单元与组合资格；两者都不拥有 BlockGraph 状态，也不得被用于规避应用层端口边界。分支、目录和显示名不得进入规范身份。
 - JSON 文件、PTY、Git CLI、HTTP Server、Codex、Claude Code 和 OpenCode CLI 都是基础设施细节，不是新的限界上下文。
 
 ## 规划中的 Plugin

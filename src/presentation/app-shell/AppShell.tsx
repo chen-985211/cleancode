@@ -30,9 +30,7 @@ import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
-import { ThemeSettingsRoot } from './ThemeSettingsRoot'
 import { TooltipLabel } from './Tooltip'
-import { LanguageSettingsRoot } from './LanguageSettingsRoot'
 import { useI18n } from './i18n/useI18n'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
@@ -42,7 +40,6 @@ import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
 import { AgentProviderStateProvider } from './AgentProviderStateProvider'
-import { ApplicationSettingsRoot } from './ApplicationSettingsRoot'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
@@ -58,6 +55,8 @@ import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 import { useAgentCreationProviders } from './useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
+import { useBlockTemplateActions } from './useBlockTemplateActions'
+import { AppShellSettings } from './AppShellSettings'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -77,13 +76,13 @@ export function AppShell({
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
   const { bindings, changeBinding, resetAllBindings } = useApplicationShortcutPreference()
+  const agentCreation = useAgentCreationProviders()
   const {
-    agentProviderPreferences,
     changePreferredProvider,
     creatableAgentProviders,
     effectiveAgentProviderId,
     enabledCreatableAgentProviders
-  } = useAgentCreationProviders()
+  } = agentCreation
   const shortcutTooltips = createApplicationShortcutTooltipLabels(bindings, shortcutPlatform, t)
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
@@ -123,6 +122,7 @@ export function AppShell({
   }, [])
   const {
     beginTerminalGroupSelection,
+    canCreateTerminalGroup,
     cancelTerminalGroupSelection,
     completeTerminalGroupSelection,
     isTerminalGroupSelectionMode,
@@ -139,7 +139,6 @@ export function AppShell({
     setCurrentWorkbench,
     setWorkbenches
   })
-
   const {
     cancelPendingWorkbenchInputFocus,
     focusAgentConsole,
@@ -202,7 +201,6 @@ export function AppShell({
     setWorkbenches((entries) => putWorkbenchFirst(entries, workbench))
     setCurrentWorkbench(workbench)
   }, [])
-
   const replaceWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
     setWorkbenches((entries) =>
       entries.map((entry) => (entry.project.id === workbench.project.id ? workbench : entry))
@@ -310,9 +308,7 @@ export function AppShell({
     terminateWorkbenchTerminalSessions
   })
   const createTerminalGroup = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || selectedUngroupedTerminalBlockIds.length < 2) {
-      return
-    }
+    if (!currentWorkbench || !currentWorkspace || !canCreateTerminalGroup) return
 
     const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
     const graphSnapshot = await window.cleancode?.createTerminalGroup({
@@ -335,6 +331,7 @@ export function AppShell({
   }, [
     currentWorkbench,
     currentWorkspace,
+    canCreateTerminalGroup,
     completeTerminalGroupSelection,
     selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
@@ -526,6 +523,16 @@ export function AppShell({
     onResizeAgent: resizeWorkspaceAgent,
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
   })
+  const blockTemplates = useBlockTemplateActions({
+    currentWorkbench,
+    currentWorkspace,
+    nodeStore,
+    notifications,
+    protectedNodeIds: protectedLayoutNodeIds,
+    reactFlowInstanceRef,
+    setCurrentGraph,
+    terminalWorkflow
+  })
   const hasMultipleWorkspaces =
     workbenches.reduce((count, workbench) => count + workbench.project.workspaces.length, 0) > 1
   const applicationShortcutActions = useAppShellShortcutActions({
@@ -579,27 +586,20 @@ export function AppShell({
             .join(' ')}
           aria-label={t('app.workspace')}
         >
-          <div className="app-shell__settings" role="group" aria-label={t('app.settings')}>
-            <LanguageSettingsRoot />
-            <ThemeSettingsRoot />
-            <ApplicationSettingsRoot
-              agentProviderPreferences={agentProviderPreferences.state.preferences}
-              agentProviderPreferencesStatus={agentProviderPreferences.state.status}
-              bindings={bindings}
-              defaultAgentProviderId={effectiveAgentProviderId}
-              initialPane={applicationSettings.initialPane}
-              isOpen={applicationSettings.isOpen}
-              platform={shortcutPlatform}
-              onBindingChange={changeBinding}
-              onClose={applicationSettings.close}
-              onOpen={applicationSettings.open}
-              onAgentProviderPreferencesChange={agentProviderPreferences.update}
-              onAgentProvidersRefresh={() => creatableAgentProviders.refresh(true)}
-              onResetAll={resetAllBindings}
-              terminalScrollbackRows={terminalScrollbackRows}
-              onTerminalScrollbackChange={changeTerminalScrollback}
-            />
-          </div>
+          <AppShellSettings
+            agentCreation={agentCreation}
+            applicationSettings={applicationSettings}
+            bindings={bindings}
+            blockTemplates={blockTemplates}
+            changeBinding={changeBinding}
+            changeTerminalScrollback={changeTerminalScrollback}
+            currentWorkbench={currentWorkbench}
+            currentWorkspace={currentWorkspace}
+            isDesktopRuntime={isDesktopRuntime}
+            resetAllBindings={resetAllBindings}
+            shortcutPlatform={shortcutPlatform}
+            terminalScrollbackRows={terminalScrollbackRows}
+          />
           <div className="project-sidebar-column">
             <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
               <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
@@ -657,6 +657,11 @@ export function AppShell({
             minimapNodeInteraction={minimapNodeInteraction}
             terminalWorkflow={terminalWorkflow}
             shortcutTooltips={shortcutTooltips}
+            shortcutPlatform={shortcutPlatform}
+            placementTemplate={blockTemplates.placementTemplate}
+            onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
+            onPlaceBlockTemplate={blockTemplates.place}
+            onRequestSaveBlockTemplate={blockTemplates.requestSave}
             isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
             onToggleMinimap={shortcutNavigation.toggleMinimap}
             onZoomCanvasIn={zoomCanvasIn}
@@ -674,7 +679,7 @@ export function AppShell({
             isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
             selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
             canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
-            canCreateTerminalGroup={selectedUngroupedTerminalBlockIds.length >= 2}
+            canCreateTerminalGroup={canCreateTerminalGroup}
             onNodesChange={workbenchNodeSelection.onNodesChange}
             onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
             onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}

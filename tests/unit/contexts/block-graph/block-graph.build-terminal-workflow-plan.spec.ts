@@ -173,6 +173,24 @@ describe('build terminal workflow plan', () => {
     ])
   })
 
+  it('builds an exact block-set plan without expanding through outside connections', async () => {
+    const graph = createCombinationGraph()
+    const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+
+    const plan = await buildPlan.execute({
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      scope: { blockIds: ['install', 'build', 'standalone'], type: 'block-set' }
+    })
+
+    expect(plan.nodes.map((node) => [node.blockId, node.dependencyBlockIds])).toEqual([
+      ['standalone', []],
+      ['install', []],
+      ['build', ['install']]
+    ])
+    expect(plan.nodes.map((node) => node.blockId)).not.toContain('outside')
+  })
+
   it('rejects a terminal combination before execution when any member has no launch command', async () => {
     const graph = createCombinationGraph()
     graph.updateTerminalBlockMetadata('standalone', {
@@ -271,12 +289,12 @@ function createCombinationGraph(): BlockGraph {
   createConfiguredTerminal(graph, 'build', 'Build', 'pnpm build')
   createConfiguredTerminal(graph, 'outside', 'Outside', 'pnpm outside')
   graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
-  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
   graph.createTerminalGroup({
     id: 'development',
     name: 'Development',
     memberBlockIds: ['standalone', 'install', 'build']
   })
+  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
 
   return graph
 }

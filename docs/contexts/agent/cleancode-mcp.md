@@ -8,6 +8,7 @@
 
 - 限界上下文、依赖方向和事实来源以[架构文档](../../engineering/architecture.md)为准。
 - Agent 控制台的用户可见语义以[UI 契约](../../product/ui-contract.md)为准。
+- 终端、流程、顶层执行单元和组合的稳定定义以[画布语义契约](../../product/canvas-semantic-contract.md)为准。
 - 测试层级和组织以[测试规范](../../testing/testing.md)为准。
 - BlockGraph 的积木动作语义以[积木动作模型](../block-graph/block-action-model.md)为准。
 
@@ -64,6 +65,7 @@ cleancode 原生 MCP 已经实现。它是 cleancode 为声明支持该能力的
 | 工具执行、审计和跨上下文协调                | Agent application       | `ExecuteAgentToolUseCase`        |
 | 积木图结构与变更规则                        | BlockGraph              | BlockGraph 聚合与应用层用例      |
 | Agent 到 BlockGraph 的稳定边界              | Agent application port  | `AgentBlockGraphToolPort`        |
+| 画布执行对象定义与组合资格                  | Shared Kernel           | `CanvasExecutionSemantics`       |
 | Provider launch 和 MCP 配置注入             | Agent infrastructure    | `AgentProviderContribution`      |
 | UI 审批和图快照刷新                         | Presentation / Platform | Agent IPC 事件与应用外壳         |
 
@@ -98,7 +100,7 @@ Agent 基础设施不得直接修改 BlockGraph 聚合、持久化文件或 Reac
 
 Provider 只声明是否支持安全的 launch 级 CleanCode MCP 注入，不声明失败策略。支持时，Provider launch 与 MCP readiness 独立投影：launch 启动后即可进入 running；认证后的 `initialize` 请求与随后 `notifications/initialized` 通知完成后，MCP 才进入 ready。端点注册失败属于确定失败，只把 MCP 投影为 `failed`，不启动 Provider 级 MCP 配置；等待握手的 30 秒软期限只在当前 Provider launch 的 started 回调被接受后开始，期限到达时投影为 `degraded`，但不得释放仍属于当前 launch 的端点。迟到的当前 registration 握手仍可把 `degraded` 恢复为 `ready`。只有 launch 退出或替换、用户关闭能力、会话释放或应用退出才释放 registration。不支持时不注册端点且 UI 不提供开关。未鉴权通知、只发 initialized 通知、旧 registration 回调、已注销回调或旧期限回调都不能发布 ready 或覆盖新 registration。
 
-关闭能力或 Provider 不支持该能力时，不注册端点，也不注入配置、Token 或画布路由 instructions。UI 对不支持的 Provider 隐藏开关，不能伪装成已启用。开启时，配置只约束画布意图路由，不改变 Provider 的 sandbox、全局 approval policy、Shell、文件、Git、网络或其他 MCP Server 权限。画布工具说明同时由 launch 级指令和 MCP `initialize` 响应提供。
+关闭能力或 Provider 不支持该能力时，不注册端点，也不注入配置、Token 或画布路由 instructions。UI 对不支持的 Provider 隐藏开关，不能伪装成已启用。开启时，配置只约束画布意图路由，不改变 Provider 的 sandbox、全局 approval policy、Shell、文件、Git、网络或其他 MCP Server 权限。画布工具说明同时由 launch 级指令和 MCP `initialize` 响应提供；两者必须引用共享画布语义契约生成的同一段规范说明，不得分别手写对象定义或组合阈值。
 
 Agent launch 退出、替换或会话释放时，先同步关闭新工具调用准入并用精确 handle 注销对应端点，再取消仍在等待的审批、等待全部已经准入或开始执行的调用收束，最后由 `AgentLaunchArtifactScope` 按 LIFO 释放 Provider reporter、临时配置和插件；只有删除、挂起或上层生命周期清理才停止底层 Agent terminal。已经批准并开始的调用不能伪装成取消。首次检查返回待审批与登记审批之间也受同一关闭门控，不能在旧 launch 结束后补登记。成功清理的 artifact 不得重复执行，失败项必须保留供后续重试。应用退出时必须尝试全部会话的排空与 scope 清理并关闭 HTTP Server，再聚合报告错误。端点 URL、Token、待审批请求和进行中的 HTTP 调用都是易失状态。
 
@@ -112,7 +114,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 - MCP `protocolVersion`：`2025-06-18`。
 - Server 名称：`cleancode-agent-tools`。
-- Server 版本：`0.3.1`。
+- Server 版本：`0.3.2`。
 - Capability：`tools`，且 `listChanged` 为 `false`。
 
 当前只处理以下方法：
@@ -126,7 +128,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 未知方法返回 JSON-RPC `-32601`；未知工具名、非法调用外形或显式传入非对象 `arguments` 时返回 `-32602`。已识别工具的参数由 `tools/list` 暴露的同一份 Schema 在应用层递归校验，使用 `additionalProperties: false`、必填属性、联合类型、数值边界、数组长度和唯一性等约束；每个 MCP `outputSchema` 的根明确声明 `type: object`，再以严格分支描述完成、失败和可选取消结果。输入失败返回 `AGENT_TOOL_INPUT_INVALID`，不得触达 BlockGraph 端口。工具输入、领域规则或执行失败仍属于合法的 MCP 工具结果：HTTP 保持 `200`，`isError` 为 `true`，并返回结构化错误。未知异常统一净化为 `UNEXPECTED_ERROR`，不得暴露原始异常文本或堆栈。
 
-进程级 `developer_instructions` 与 `initialize.instructions` 共同承担开启 CleanCode MCP 时的画布语义消歧：用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”“终端工作流”“启动项目的终端组合”或同义请求时，Agent 必须先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布事实。Agent 可以在查看画布后读取仓库以确认启动命令，但必须继续通过画布工具创建终端、配置 task/service、建立依赖和组合，对精确相关终端调用 `arrange_terminal_layout`，再用 `inspect_terminal_workflow_plan` 校验计划；不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成替代品。当前工具目录只能创作和检查工作流，没有启动工具，因此 Agent 只能声明已经搭建，不能声称终端或工作流已经运行。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
+进程级 `developer_instructions` 与 `initialize.instructions` 共同承担开启 CleanCode MCP 时的画布语义消歧：二者先投影共享画布语义契约生成的同一规范说明，再追加各自的路由和能力边界。用户未加限定地说“终端”“整理终端”“终端布局”“终端组合”“终端工作流”“启动项目的终端组合”或同义请求时，Agent 必须先调用 `inspect_graph`，并默认把作用对象理解为 CleanCode 画布事实。Agent 可以在查看画布后读取仓库以确认启动命令，但必须继续通过画布工具创建终端、配置 task/service、建立依赖和组合，对精确相关终端调用 `arrange_terminal_layout`，再用 `inspect_terminal_workflow_plan` 校验计划；不得把直接运行 Shell 进程、创建 package script、`.vscode` task 或项目配置当成替代品。当前工具目录只能创作和检查工作流，没有启动工具，因此 Agent 只能声明已经搭建，不能声称终端或工作流已经运行。只有用户明确提到“终端源码”、`Terminal component`、xterm、PTY 或终端模块实现等源码限定词时，才把请求理解为项目代码工作。关闭 MCP 时不提供该 Server 及其 instructions，也不注入这层进程级画布语义。
 
 ## 当前工具目录
 
@@ -138,7 +140,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 | `create_block`                     | 创建终端；省略位置时在当前 Agent 附近智能落位 | `type: "terminal"`、`name`       | `description`、`launchCommand`、`position`、`size`         | 否      |
 | `update_block`                     | 更新终端积木元数据、位置或大小                | `blockId`                        | `name`、`description`、`launchCommand`、`position`、`size` | 否      |
 | `delete_block`                     | 删除终端积木                                  | `blockId`                        | 无                                                         | 是      |
-| `create_terminal_group`            | 用至少两个现有终端积木创建视觉组合            | `name`、`memberBlockIds`         | 无                                                         | 否      |
+| `create_terminal_group`            | 用至少两个顶层执行单元创建视觉组合            | `name`、`memberBlockIds`         | 无                                                         | 否      |
 | `update_terminal_group`            | 更新组合名称、位置或折叠状态                  | `terminalGroupId`                | `name`、`position`、`isCollapsed`                          | 否      |
 | `delete_terminal_group`            | 解散组合并保留成员终端                        | `terminalGroupId`                | 无                                                         | 是      |
 | `update_terminal_execution_config` | 替换 task/service 配置并声明服务端口意图      | `blockId`、`executionConfig`     | 无                                                         | 否      |
@@ -151,7 +153,9 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 `0.3.1` 不改变上述输入形状，而是把并行端口决策变成 Agent 可发现的协议事实。Developer Instructions、MCP 初始化说明、工具描述和嵌套 JSON Schema 统一要求：本地 HTTP/HTTPS/TCP 开发服务存在惯用端口时，默认使用 `preferred(port)` 与已经验证的注入；没有惯用端口时使用 `auto` 与已经验证的注入；只有用户或项目契约明确要求端口不可变化时才使用 `fixed`。环境变量注入只允许选择项目现有启动路径已经读取的变量，参数注入只允许选择现有 CLI 或任务包装器已经接受的安全 `{port}` 后缀；Agent 不得猜测 `PORT`、仅因日志出现 `8000` 就选择 `fixed + none`，也不得为支持动态端口擅自修改源码或项目配置。Schema 把推荐的 `preferred` 和 `auto` 分支放在 `fixed` 前，并提供可由同一 Schema 校验的结构化示例。
 
-工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点。
+`0.3.2` 不增加工具名称或运行能力，只同步共享画布语义契约：单个终端或单条完整流程不能创建组合，组合必须至少包含两个顶层执行单元，命中流程任意终端时 BlockGraph 以完整流程校验成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
+
+工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点；终端、流程和组合分类由共享画布语义契约定义。
 
 `create_block` 显式提供 `position` 时原样采用；省略时，应用层从当前受管 Agent 的持久化布局注入 anchor，并把同工作区其他 Agent 注入为 reserved regions，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
 
@@ -244,7 +248,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 | Unit / Agent application    | 输入校验、12 工具路由、身份注入、动态变更、稳定调用 ID、审计、审批收束、工作区串行、会话关闭排空和 MCP 软期限恢复                  | [`agent.tool-input-validation.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-input-validation.spec.ts)、[`agent.execute-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-tool.spec.ts)、[`agent.execute-layout-tool.spec.ts`](../../../tests/unit/contexts/agent/agent.execute-layout-tool.spec.ts)、[`agent.tool-approval-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-approval-coordinator.spec.ts)、[`agent.tool-invocation-coordinator.spec.ts`](../../../tests/unit/contexts/agent/agent.tool-invocation-coordinator.spec.ts)、[`agent.session-tool-lifecycle.spec.ts`](../../../tests/unit/contexts/agent/agent.session-tool-lifecycle.spec.ts)、[`agent.unified-runtime-readiness.spec.ts`](../../../tests/unit/contexts/agent/agent.unified-runtime-readiness.spec.ts) |
 | Unit / Presentation         | 审批投影、布局事件、整组拖动保护、真实几何投影等待和单次聚焦                                                                       | [`agent-approval-presentation.spec.ts`](../../../tests/unit/presentation/agent-approval-presentation.spec.ts)、[`use-agent-layout-coordination.spec.tsx`](../../../tests/unit/presentation/use-agent-layout-coordination.spec.tsx)、[`workbench-layout-focus.spec.tsx`](../../../tests/unit/presentation/workbench-layout-focus.spec.tsx)、[`agent-layout-projection-timing.spec.tsx`](../../../tests/unit/presentation/agent-layout-projection-timing.spec.tsx)、[`preserve-workbench-node-transient-layout.spec.ts`](../../../tests/unit/presentation/preserve-workbench-node-transient-layout.spec.ts)                                                                                                                                                                                                                     |
 | Contract / tool protocol    | 12 个工具、共源严格输入/输出 Schema、安全注解和排除的通用工具                                                                      | [`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Contract / JSON-RPC         | `0.3.1` 初始化、自描述端口策略、工具列表、稳定调用 ID、结构化/净化错误                                                             | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Contract / JSON-RPC         | `0.3.2` 初始化、同源画布语义、自描述端口策略、工具列表、稳定调用 ID、结构化/净化错误                                               | [`agent.json-rpc-tool-bridge.spec.ts`](../../../tests/contract/contexts/agent/agent.json-rpc-tool-bridge.spec.ts)、[`agent.tool-protocol.spec.ts`](../../../tests/contract/contexts/agent/agent.tool-protocol.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Contract / HTTP             | 本机端点、Bearer 鉴权、1 MiB 请求体上限、完整初始化握手、精确替代注册、监听失败/并发初始化、净化请求错误和业务错误的 HTTP 200 通道 | [`agent.http-mcp-server.spec.ts`](../../../tests/contract/contexts/agent/agent.http-mcp-server.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Integration / MCP lifecycle | 应用层软期限到达后真实 HTTP 端点仍接受迟到初始化并恢复 ready                                                                       | [`agent.mcp-soft-timeout-lifecycle.spec.ts`](../../../tests/integration/contexts/agent/agent.mcp-soft-timeout-lifecycle.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Integration / BlockGraph    | 四个工作流工具复用真实 BlockGraph 用例、持久化与领域错误透传                                                                       | [`agent.block-graph-tool-adapter.spec.ts`](../../../tests/integration/contexts/agent/agent.block-graph-tool-adapter.spec.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -296,7 +300,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 
 改变监听范围、Token 传递、会话注销或 Provider 注入方式时，必须同步安全不变量、Provider contract 和相关测试。改变用户可见审批或 Agent 控制台行为时，还必须同步 UI 契约和表现层测试。
 
-改变画布语义说明或工具安全注解时，必须同步 `AgentToolProtocol`、JSON-RPC 映射、工具协议契约测试和本文；安全注解必须描述真实副作用，不得用来替代 Agent 领域审批策略。
+改变画布对象语义时必须先修改共享[画布语义契约](../../product/canvas-semantic-contract.md)及其结构化代码投影，再由 `AgentToolProtocol` 生成 MCP/Provider 说明并同步 JSON-RPC、工具协议契约测试和本文；Agent 侧不得建立第二套分类规则。改变工具安全注解时仍须同步协议与测试；安全注解必须描述真实副作用，不得用来替代 Agent 领域审批策略。
 
 未来新增的 CleanCode MCP 工具自动进入当前 Server 的 Provider 精确允许范围。新增工具前仍必须明确业务事实 owner、真实安全注解、cleancode 内部审批策略和审计行为，不得把 Provider 原生允许范围当作业务授权。
 

@@ -37,6 +37,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const className = [
     'terminal-group-node',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
+    data.isContextSelected ? 'terminal-group-node--context-selected' : '',
     data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : '',
     data.approvalIntent ? 'terminal-group-node--approval-target' : ''
   ]
@@ -68,7 +69,11 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   }, [group.name])
 
   return (
-    <section className={className} data-terminal-group-id={group.id}>
+    <section
+      className={className}
+      data-terminal-group-id={group.id}
+      data-context-selected={data.isContextSelected || undefined}
+    >
       <Handle
         id={agentApprovalConnectionSourceHandleId}
         className="agent-approval-intent-handle agent-approval-connection-handle--source"

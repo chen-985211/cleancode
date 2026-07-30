@@ -49,6 +49,7 @@ docs/
 
 ## 产品文档
 
+- [画布语义契约](product/canvas-semantic-contract.md)：终端、流程、顶层执行单元与组合定义及统一分类规则的唯一产品事实来源。
 - [UI 契约](product/ui-contract.md)：当前长期有效的信息架构、对象语义、用户能力、交互不变量和反馈行为。
 - [UI Style Guide](product/ui-style-guide.md)：表现层共享的视觉角色、组件选择、状态呈现、动效方法和 UI 评审规则。
 - [UI 路线图](product/ui-roadmap.md)：尚未确认或尚未实现的产品方向，不是当前功能清单。

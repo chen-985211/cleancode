@@ -89,6 +89,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
+  readonly isContextSelected?: boolean
   readonly isSelected: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
@@ -132,6 +133,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
   readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly group: TerminalGroupSnapshot
+  readonly isContextSelected?: boolean
   readonly memberBlocks: readonly TerminalBlockSnapshot[]
   readonly memberStates: Record<string, TerminalViewState>
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
@@ -162,6 +164,7 @@ export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
 interface AgentConsoleNodeData extends Record<string, unknown> {
   readonly identity: CanvasObjectIdentity
   readonly agent: WorkspaceAgentSnapshot
+  readonly isContextSelected?: boolean
   readonly approvalController?: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | null

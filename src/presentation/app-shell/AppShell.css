@@ -1,6 +1,7 @@
 @import './styles/theme.css';
 @import './styles/base.css';
 @import './styles/theme-settings.css';
+@import './styles/block-template-library.css';
 @import './styles/application-settings.css';
 @import './styles/language-settings.css';
 @import './styles/notifications.css';
@@ -9,6 +10,7 @@
 @import './styles/project-sidebar-archive.css';
 @import './styles/project-sidebar-project-removal.css';
 @import './styles/workbench-canvas.css';
+@import './styles/block-template-canvas.css';
 @import './styles/workbench-node-selection.css';
 @import './styles/workbench-node-resizer.css';
 @import './styles/tooltips.css';
@@ -16,6 +18,7 @@
 @import './styles/terminal-group-toolbar.css';
 @import './styles/terminal-theme-projection.css';
 @import './styles/terminal-node.css';
+@import './styles/canvas-object-context-menu.css';
 @import './styles/terminal-service-runtime.css';
 @import './styles/terminal-metadata-form.css';
 @import './styles/agent-console.css';

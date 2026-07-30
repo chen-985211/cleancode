@@ -4,6 +4,7 @@ export type TerminalWorkflowPlanScope =
   | { readonly type: 'full' }
   | { readonly type: 'from-block'; readonly blockId: string }
   | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
+  | { readonly type: 'block-set'; readonly blockIds: readonly string[] }
 
 export interface BuildTerminalWorkflowPlanQuery {
   readonly projectDirectory: string

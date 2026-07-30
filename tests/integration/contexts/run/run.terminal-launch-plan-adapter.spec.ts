@@ -90,7 +90,7 @@ describe('BlockGraph terminal launch plan adapter', () => {
 
   it('maps a terminal combination as an exact member-scoped workflow plan', async () => {
     const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
-    for (const blockId of ['install', 'build', 'outside']) {
+    for (const blockId of ['install', 'build', 'companion', 'outside']) {
       graph.createTerminalBlock({
         id: blockId,
         name: blockId,
@@ -100,12 +100,12 @@ describe('BlockGraph terminal launch plan adapter', () => {
       })
     }
     graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
-    graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
     graph.createTerminalGroup({
       id: 'development',
       name: 'Development',
-      memberBlockIds: ['install', 'build']
+      memberBlockIds: ['install', 'build', 'companion']
     })
+    graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
     const adapter = new BlockGraphTerminalWorkflowPlanAdapter(
       new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
     )
@@ -118,7 +118,8 @@ describe('BlockGraph terminal launch plan adapter', () => {
 
     expect(workflow.nodes.map((node) => [node.blockId, node.dependencyBlockIds])).toEqual([
       ['install', []],
-      ['build', ['install']]
+      ['build', ['install']],
+      ['companion', []]
     ])
   })
 })

@@ -63,6 +63,8 @@ Renderer 只能投影应用层返回的 Agent 列表；列表缺失或仍在加�
 
 Provider contribution 只拥有对应 CLI 的检测、结构化启动参数、进程级环境、正式恢复入口、结构化 telemetry 和本次 launch 的临时配置。它不得修改用户的全局 CLI 配置，也不得取得 Agent terminal 的 source palette、xterm surface 或视图生命周期所有权。终端宿主能力由 Run 统一提供；CLI 自己选择的 ANSI/真彩色语义、品牌色、TUI 布局和用户保存的 CLI 主题仍由对应 Provider 与用户拥有。共享同一个宿主终端不等于三方 CLI 必须生成相同像素。
 
+支持 launch instructions 的 Provider 不拥有画布对象定义。CleanCode MCP 开启时，它们只能注入由共享[画布语义契约](../../product/canvas-semantic-contract.md)生成、并与 MCP `initialize.instructions` 相同的规范语义段落，再按 Provider 正式配置入口完成转义和传递；不得在 contribution 内复制终端、流程或组合判断。
+
 当前内建 Provider：
 
 | Provider    | 恢复 | 身份捕获 | 活动状态 | CleanCode MCP | 注入与回报方式                                                                                                   |

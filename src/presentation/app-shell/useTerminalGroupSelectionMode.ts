@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 
+import { analyzeCanvasExecutionSelection } from '../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseTerminalGroupSelectionModeInput {
@@ -28,6 +29,23 @@ export function useTerminalGroupSelectionMode({
     () => selectedTerminalBlockIds.filter((blockId) => !groupedTerminalBlockIds.has(blockId)),
     [groupedTerminalBlockIds, selectedTerminalBlockIds]
   )
+  const canCreateTerminalGroup = useMemo(() => {
+    if (!graph) return false
+
+    const analysis = analyzeCanvasExecutionSelection({
+      dependencies: (graph.connections ?? []).map((connection) => ({
+        sourceTerminalId: connection.sourceBlockId,
+        targetTerminalId: connection.targetBlockId
+      })),
+      selectedTerminalIds: selectedUngroupedTerminalBlockIds,
+      terminals: graph.blocks.map((block) => ({ terminalId: block.id }))
+    })
+
+    return (
+      analysis.canCreateCombination &&
+      analysis.expandedTerminalIds.every((blockId) => !groupedTerminalBlockIds.has(blockId))
+    )
+  }, [graph, groupedTerminalBlockIds, selectedUngroupedTerminalBlockIds])
 
   const beginTerminalGroupSelection = useCallback(() => {
     setSelectedTerminalGroupId(null)
@@ -74,6 +92,7 @@ export function useTerminalGroupSelectionMode({
 
   return {
     beginTerminalGroupSelection,
+    canCreateTerminalGroup,
     cancelTerminalGroupSelection,
     completeTerminalGroupSelection,
     isTerminalGroupSelectionMode,

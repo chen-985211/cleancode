@@ -41,6 +41,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     'terminal-node',
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
+    data.isContextSelected ? 'terminal-node--context-selected' : '',
     data.isTerminalGroupSelectionMode ? 'terminal-node--group-selection-mode' : '',
     data.isTerminalGroupSelectionMode && data.isSelected
       ? 'terminal-node--group-candidate-selected'
@@ -150,7 +151,11 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
 
   return (
-    <section className={terminalNodeClassName} data-terminal-block-id={block.id}>
+    <section
+      className={terminalNodeClassName}
+      data-terminal-block-id={block.id}
+      data-context-selected={data.isContextSelected || undefined}
+    >
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}
         minWidth={terminalNodeMinimumSize.width}

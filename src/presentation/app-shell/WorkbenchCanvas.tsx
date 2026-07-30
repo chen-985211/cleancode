@@ -9,7 +9,7 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
+import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw, Star } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
@@ -32,6 +32,11 @@ import { useI18n } from './i18n/useI18n'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
+import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
+import type { ShortcutPlatform } from './applicationShortcuts'
+import { BlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
+import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
+import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -53,6 +58,14 @@ interface WorkbenchCanvasProps {
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly shortcutTooltips: ApplicationShortcutTooltipLabels
+  readonly shortcutPlatform?: ShortcutPlatform
+  readonly placementTemplate?: BlockTemplateSnapshot
+  readonly onPlaceBlockTemplate?: (origin: {
+    readonly x: number
+    readonly y: number
+  }) => Promise<void> | void
+  readonly onCancelBlockTemplatePlacement?: () => void
+  readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
   readonly isMinimapCollapsed: boolean
   readonly onToggleMinimap: () => void
   readonly onZoomCanvasIn: () => void
@@ -108,6 +121,11 @@ export function WorkbenchCanvas({
   minimapNodeInteraction,
   terminalWorkflow,
   shortcutTooltips,
+  shortcutPlatform = 'mac',
+  placementTemplate,
+  onPlaceBlockTemplate,
+  onCancelBlockTemplatePlacement,
+  onRequestSaveBlockTemplate,
   isMinimapCollapsed,
   onToggleMinimap,
   onZoomCanvasIn,
@@ -156,6 +174,12 @@ export function WorkbenchCanvas({
     [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
+  const objectContextMenu = useCanvasObjectContextMenu({
+    edges,
+    graph: currentWorkbench?.graph ?? null,
+    nodes,
+    onRequestSaveBlockTemplate
+  })
   const [viewportZoom, setViewportZoom] = useState(1)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
@@ -163,6 +187,15 @@ export function WorkbenchCanvas({
   const activeDraggedNodeRef = useRef<WorkbenchFlowNode | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
+  const templateInteraction = useBlockTemplateCanvasInteraction({
+    graph: currentWorkbench?.graph ?? null,
+    nodes,
+    onCancelPlacement: onCancelBlockTemplatePlacement,
+    onPlace: onPlaceBlockTemplate,
+    placementTemplate,
+    reactFlowInstanceRef,
+    shortcutPlatform
+  })
   const moveCanvasViewportToMinimapCenter = (
     center: MinimapViewportCenter,
     persistViewport: boolean
@@ -243,7 +276,17 @@ export function WorkbenchCanvas({
 
   return (
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
-      <div ref={canvasSurfaceRef} className="canvas-surface">
+      <div
+        ref={canvasSurfaceRef}
+        className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
+          .filter(Boolean)
+          .join(' ')}
+        onPointerDownCapture={templateInteraction.beginSelection}
+        onPointerMoveCapture={templateInteraction.continueInteraction}
+        onPointerUpCapture={templateInteraction.completeSelection}
+        onPointerCancelCapture={templateInteraction.cancelSelection}
+        onClickCapture={templateInteraction.placeFromCanvasClick}
+      >
         <WorkbenchToolbar
           agentProviders={agentProviders}
           defaultAgentProviderId={defaultAgentProviderId}
@@ -265,8 +308,8 @@ export function WorkbenchCanvas({
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
         />
         <ReactFlow<WorkbenchFlowNode, Edge>
-          nodes={nodes}
-          edges={edges}
+          nodes={objectContextMenu.nodes}
+          edges={objectContextMenu.edges}
           edgeTypes={workbenchEdgeTypes}
           onConnect={(connection) => void workflow.connect(connection)}
           onEdgesDelete={(edges) =>
@@ -298,7 +341,13 @@ export function WorkbenchCanvas({
             onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
           }
           onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
+          onNodeContextMenu={objectContextMenu.onNodeContextMenu}
+          onPaneClick={() => {
+            objectContextMenu.close()
+            if (placementTemplate) return
+            templateInteraction.clearSelection()
+            onPaneClick()
+          }}
           onNodeDragStart={(event, node) => {
             activeDraggedNodeRef.current = node
             canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
@@ -354,6 +403,36 @@ export function WorkbenchCanvas({
             />
           </Panel>
         </ReactFlow>
+        {objectContextMenu.menu}
+        {templateInteraction.templateSelection ? (
+          <div
+            className="block-template-selection"
+            style={{
+              left: templateInteraction.templateSelection.rect.x,
+              top: templateInteraction.templateSelection.rect.y,
+              width: templateInteraction.templateSelection.rect.width,
+              height: templateInteraction.templateSelection.rect.height
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                onRequestSaveBlockTemplate?.(templateInteraction.templateSelection!.blockIds)
+                templateInteraction.clearSelection()
+              }}
+            >
+              <Star size={14} fill="currentColor" aria-hidden="true" />
+              {t('templates.saveSelection')}
+            </button>
+          </div>
+        ) : null}
+        {placementTemplate && templateInteraction.placementOrigin ? (
+          <BlockTemplatePlacementPreview
+            origin={templateInteraction.placementOrigin}
+            template={placementTemplate}
+            viewport={canvasViewport}
+          />
+        ) : null}
         {!currentWorkbench ? (
           <CanvasInitialWorkbenchState
             isDesktopRuntime={isDesktopRuntime}
@@ -384,6 +463,7 @@ const inactiveTerminalWorkflowController = {
   nodeStatuses: {},
   run: null,
   start: async () => undefined,
+  startScope: async () => undefined,
   startTerminalCombination: async () => undefined,
   stop: async () => undefined,
   updateExecutionConfig: async () => undefined
