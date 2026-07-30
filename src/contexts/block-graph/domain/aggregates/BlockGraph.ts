@@ -55,6 +55,8 @@ import {
   createTerminalConnectionId,
   createTerminalGroupId
 } from '../services/BlockGraphIdentifiers'
+import type { BlockTemplateSnapshot, InstantiatedBlockTemplateSnapshot } from './BlockTemplateTypes'
+import { normalizeBlockTemplate } from '../services/BlockTemplateProjection'
 
 export type * from './BlockGraphTypes'
 
@@ -144,6 +146,58 @@ export class BlockGraph {
     this.blockSnapshots = [...this.blockSnapshots, block]
 
     return block
+  }
+
+  instantiateBlockTemplate(
+    sourceTemplate: BlockTemplateSnapshot,
+    origin: BlockPositionSnapshot
+  ): InstantiatedBlockTemplateSnapshot {
+    const template = normalizeBlockTemplate(sourceTemplate)
+    const blockIdByTemplateNodeId = new Map<string, string>()
+
+    for (const node of template.nodes) {
+      const block = this.createTerminalBlock({
+        name: node.name,
+        description: node.description,
+        launchCommand: node.launchCommand,
+        position: {
+          x: origin.x + node.position.x,
+          y: origin.y + node.position.y
+        },
+        size: node.size
+      })
+      this.updateTerminalDefinition(block.id, {
+        name: node.name,
+        description: node.description,
+        launchCommand: node.launchCommand,
+        executionConfig: node.executionConfig
+      })
+      blockIdByTemplateNodeId.set(node.templateNodeId, block.id)
+    }
+
+    for (const connection of template.connections) {
+      this.connectTerminalBlocks({
+        sourceBlockId: blockIdByTemplateNodeId.get(connection.sourceTemplateNodeId)!,
+        targetBlockId: blockIdByTemplateNodeId.get(connection.targetTemplateNodeId)!
+      })
+    }
+
+    const blockIds = template.nodes.map((node) => blockIdByTemplateNodeId.get(node.templateNodeId)!)
+    const terminalGroup =
+      template.type === 'combination'
+        ? this.createTerminalGroup({ name: template.name, memberBlockIds: blockIds })
+        : null
+
+    return Object.freeze({
+      blockIds: Object.freeze(blockIds),
+      terminalGroupId: terminalGroup?.id ?? null,
+      executionScope: terminalGroup
+        ? Object.freeze({
+            terminalGroupId: terminalGroup.id,
+            type: 'terminal-group' as const
+          })
+        : Object.freeze({ blockIds: Object.freeze([...blockIds]), type: 'block-set' as const })
+    })
   }
 
   moveBlock(blockId: string, position: BlockPositionSnapshot): void {

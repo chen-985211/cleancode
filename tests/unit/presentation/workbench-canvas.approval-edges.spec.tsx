@@ -142,6 +142,7 @@ function createWorkflow(
     nodeStatuses: {},
     run: null,
     start: vi.fn(async () => undefined),
+    startScope: vi.fn(async () => undefined),
     startTerminalCombination: vi.fn(async () => undefined),
     stop: vi.fn(async () => undefined),
     updateExecutionConfig: vi.fn(async () => undefined)

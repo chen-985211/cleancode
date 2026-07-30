@@ -56,6 +56,9 @@
 | 重开组合终端会话 | 批量重建运行环境 | 组合内全部终端成员     | terminal group |
 | 编辑组合         | 编辑组合元数据   | 一个终端组合           | terminal group |
 | 解散组合         | 修改图结构       | 组合本身，保留成员终端 | terminal group |
+| 收藏             | 保存可复用快照   | 框选终端及内部依赖     | block template |
+| 放置             | 实例化快照       | 当前项目的目标工作区   | block template |
+| 放置并运行       | 实例化后运行计划 | 本次新建的精确终端集合 | block template |
 
 ## 单个终端与工作流
 
@@ -79,9 +82,16 @@
 
 组合移动、成员和边界属于 BlockGraph；成员 PTY 与批量运行结果属于 Run。
 
+## 收藏模板动作
+
+收藏动作保存配置快照，不与来源终端或工作区保持引用。模板类型由选中内容自动推导；项目/全局作用域属于模板库元数据，不改变图对象身份。
+
+“放置”通过 BlockGraph 实例化用例在一个图事务中生成全部新终端、内部连接和可选组合。“放置并运行”必须先完成同一原子实例化，再把返回的精确作用域交给现有工作流计划与 Run 调度器；表现层不得按模板类型复制启动规则，也不得逐终端并行启动流程模板。Agent 不是当前模板类型，Agent 控制台和对话不得进入模板快照。
+
 ## UI 与架构边界
 
 - 表现层负责展示按钮、tooltip、禁用态和临时反馈，不拥有动作规则。
+- 表现层负责框选、放置预览、最近可用位置和聚焦；它提交一次整体平移后的实例化原点，不修改模板内部结构。
 - 图结构动作进入 BlockGraph 应用层用例。
 - 普通空终端运行环境动作进入 Run 的 `TerminalSessionService`；执行已保存启动命令进入 `LaunchTerminalCommandUseCase`。
 - 依赖工作流与组合启动动作进入 Run 的 `TerminalWorkflowService`。
@@ -98,15 +108,18 @@
 5. 运行配置、停止当前执行和重建运行环境必须保持语义区分。
 6. UI 文案、tooltip、应用入口和测试名称必须使用一致的统一语言。
 7. 三种启动入口不得绕过同一受管服务端口与实际端点语义。
+8. 模板实例与原对象、模板记录及其他实例必须使用互不关联的新身份。
+9. 模板放置的自动避让只允许整体平移，不能改变内部相对布局、依赖连接或组合边界。
 
 ## 验证入口
 
-| 语义                 | 主要测试                                                                                                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 单终端启动/停止/重开 | [`app-shell.terminal-launch-command.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-launch-command.spec.tsx)、[`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts) |
-| 终端组合批量动作     | [`app-shell.terminal-group-actions.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-group-actions.spec.tsx)                                                                                                                    |
-| 从节点运行与停止流程 | [`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                     |
-| 组合结构边界         | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)                                                                                                                        |
+| 语义                 | 主要测试                                                                                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 单终端启动/停止/重开 | [`app-shell.terminal-launch-command.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-launch-command.spec.tsx)、[`run.terminal-session-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-session-service.spec.ts)     |
+| 终端组合批量动作     | [`app-shell.terminal-group-actions.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-group-actions.spec.tsx)                                                                                                                        |
+| 从节点运行与停止流程 | [`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                         |
+| 组合结构边界         | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)                                                                                                                            |
+| 收藏、放置与运行     | [`block-graph.block-template-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.block-template-use-cases.spec.ts)、[`block-template-placement.spec.ts`](../../../tests/unit/presentation/block-template-placement.spec.ts) |
 
 ## 维护规则
 

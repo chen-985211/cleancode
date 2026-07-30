@@ -232,6 +232,7 @@ export function useTerminalWorkflow({
     nodeStatuses,
     run,
     start,
+    startScope,
     startTerminalCombination,
     stop,
     updateExecutionConfig

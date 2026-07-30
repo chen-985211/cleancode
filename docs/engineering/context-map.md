@@ -9,7 +9,7 @@
 | 上下文     | 状态   | 核心聚合                                          | 拥有的事实                                                                    |
 | ---------- | ------ | ------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Project    | 已实现 | `Project`、`ProjectRegistry`                      | 项目目录、稳定工作区身份、类型/目录/显示名/Git 绑定、当前工作区、最近项目目录 |
-| BlockGraph | 已实现 | `BlockGraph`                                      | 终端积木、组合、布局、执行配置和依赖连接                                      |
+| BlockGraph | 已实现 | `BlockGraph`、`BlockTemplateLibrary`              | 终端积木、组合、布局、执行配置、依赖连接和应用级模板快照                      |
 | Run        | 已实现 | `TerminalSession`、`ForegroundJob`、`WorkflowRun` | 类型化终端 owner、PTY/模型/视图、前台任务、端口、工作流和节点状态             |
 | Agent      | 已实现 | `AgentSession`                                    | Agent 身份、固定 Provider、session ref、launch/activity、MCP、审批和审计      |
 | Plugin     | 规划中 | 尚无                                              | 尚未形成当前领域模型、用例或持久化事实                                        |
@@ -54,6 +54,11 @@ Run application
   -> BlockGraph adapters
   -> GetTerminalLaunchPlanUseCase / BuildTerminalWorkflowPlanUseCase
 
+Presentation
+  -> BlockGraph template use cases
+  -> instantiate exact graph scope
+  -> Run TerminalWorkflowService (only for place-and-run)
+
 Agent application
   -> AgentBlockGraphToolPort
   -> BlockGraphAgentToolAdapter
@@ -61,6 +66,8 @@ Agent application
 ```
 
 端口由需要外部能力的调用方上下文拥有；适配器负责把该稳定契约连接到提供方公开的应用层用例。Platform 只装配对象，不重新定义业务规则。
+
+模板库虽然是应用级持久化数据，领域事实仍由 BlockGraph 上下文拥有。Platform 只提供独立 JSON 仓储和 IPC 装配；Presentation 只投影选择、放置与管理交互。Run 不读取模板，只接收模板实例化后由 BlockGraph 生成的既有工作流计划。
 
 ## Project 到 Agent：工作区所有权变更
 

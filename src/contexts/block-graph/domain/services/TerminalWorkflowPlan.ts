@@ -9,6 +9,7 @@ export type TerminalWorkflowPlanScope =
   | { readonly type: 'full' }
   | { readonly type: 'from-block'; readonly blockId: string }
   | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
+  | { readonly type: 'block-set'; readonly blockIds: readonly string[] }
 
 interface TerminalWorkflowPlanNodeSnapshot {
   readonly blockId: string
@@ -142,6 +143,22 @@ function resolveIncludedBlockIds(
     }
 
     return new Set(terminalGroup.memberBlockIds)
+  }
+
+  if (scope.type === 'block-set') {
+    const blockIds = new Set(scope.blockIds)
+    if (blockIds.size === 0) {
+      throw createExpectedAppError(
+        'TERMINAL_WORKFLOW_EMPTY',
+        'Terminal workflow has no configured commands.'
+      )
+    }
+    for (const blockId of blockIds) {
+      if (!graph.blocks.some((block) => block.id === blockId)) {
+        throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+      }
+    }
+    return blockIds
   }
 
   if (!graph.blocks.some((block) => block.id === scope.blockId)) {

@@ -95,6 +95,18 @@ const cleancodeApi = {
   moveTerminalGroup: (command: unknown) =>
     invokeCleancode('cleancode:move-terminal-group', command),
   deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
+  listBlockTemplates: (command: unknown) =>
+    invokeCleancode('cleancode:list-block-templates', command),
+  saveBlockTemplate: (command: unknown) =>
+    invokeCleancode('cleancode:save-block-template', command),
+  updateBlockTemplate: (command: unknown) =>
+    invokeCleancode('cleancode:update-block-template', command),
+  moveBlockTemplate: (command: unknown) =>
+    invokeCleancode('cleancode:move-block-template', command),
+  deleteBlockTemplate: (command: unknown) =>
+    invokeCleancode('cleancode:delete-block-template', command),
+  instantiateBlockTemplate: (command: unknown) =>
+    invokeCleancode('cleancode:instantiate-block-template', command),
   startTerminal: (command: unknown) => invokeCleancode('cleancode:start-terminal', command),
   launchTerminal: (command: unknown) => invokeCleancode('cleancode:launch-terminal', command),
   openTerminalServiceEndpoint: (command: unknown) =>

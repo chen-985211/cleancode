@@ -34,22 +34,29 @@ import { ConnectTerminalBlocksUseCase } from '../../contexts/block-graph/applica
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
+import { DeleteBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockTemplateUseCase'
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { GetTerminalLaunchPlanUseCase } from '../../contexts/block-graph/application/use-cases/GetTerminalLaunchPlanUseCase'
+import { InstantiateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/InstantiateBlockTemplateUseCase'
+import { ListBlockTemplatesUseCase } from '../../contexts/block-graph/application/use-cases/ListBlockTemplatesUseCase'
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
+import { MoveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockTemplateUseCase'
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
 import { RemoveTerminalFromGroupUseCase } from '../../contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
+import { SaveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/SaveBlockTemplateUseCase'
 import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
 import { UpdateGraphViewportUseCase } from '../../contexts/block-graph/application/use-cases/UpdateGraphViewportUseCase'
+import { UpdateBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/UpdateBlockTemplateUseCase'
 import { UpdateTerminalGroupMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import { UpdateTerminalExecutionConfigUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
 import { UpdateTerminalDefinitionUseCase } from '../../contexts/block-graph/application/use-cases/UpdateTerminalDefinitionUseCase'
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { FileSystemBlockGraphRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockGraphRepository'
+import { FileSystemBlockTemplateRepository } from '../../contexts/block-graph/infrastructure/filesystem/FileSystemBlockTemplateRepository'
 import { ListGitBranchNavigationUseCase } from '../../contexts/project/application/use-cases/ListGitBranchNavigationUseCase'
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
@@ -79,6 +86,7 @@ import { createMainWindow } from './createMainWindow'
 import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
+import { registerBlockTemplateIpcHandlers } from './blockTemplateIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
@@ -116,6 +124,9 @@ const appStateDirectoryPath = getAppStateDirectoryPath()
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
+const blockTemplateRepository = new FileSystemBlockTemplateRepository(
+  join(appStateDirectoryPath, 'block-template-library.json')
+)
 const resolveManagedServiceOwner = createManagedServiceOwnerResolver(
   projectRepository,
   graphRepository
@@ -146,6 +157,18 @@ const updateTerminalExecutionConfigUseCase = new UpdateTerminalExecutionConfigUs
   graphRepository
 )
 const updateTerminalDefinitionUseCase = new UpdateTerminalDefinitionUseCase(graphRepository)
+const listBlockTemplatesUseCase = new ListBlockTemplatesUseCase(blockTemplateRepository)
+const saveBlockTemplateUseCase = new SaveBlockTemplateUseCase(
+  graphRepository,
+  blockTemplateRepository
+)
+const updateBlockTemplateUseCase = new UpdateBlockTemplateUseCase(blockTemplateRepository)
+const moveBlockTemplateUseCase = new MoveBlockTemplateUseCase(blockTemplateRepository)
+const deleteBlockTemplateUseCase = new DeleteBlockTemplateUseCase(blockTemplateRepository)
+const instantiateBlockTemplateUseCase = new InstantiateBlockTemplateUseCase(
+  graphRepository,
+  blockTemplateRepository
+)
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
 const {
@@ -338,6 +361,17 @@ registerBlockGraphIpcHandlers({
   updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),
   updateTerminalDefinition: (command) => updateTerminalDefinitionUseCase.execute(command),
   updateTerminalExecutionConfig: (command) => updateTerminalExecutionConfigUseCase.execute(command)
+})
+
+registerBlockTemplateIpcHandlers({
+  deleteBlockTemplate: (command) => deleteBlockTemplateUseCase.execute(command),
+  instantiateBlockTemplate: (command) => instantiateBlockTemplateUseCase.execute(command),
+  ipcMain,
+  listBlockTemplates: (query) => listBlockTemplatesUseCase.execute(query),
+  logger: consoleLogger,
+  moveBlockTemplate: (command) => moveBlockTemplateUseCase.execute(command),
+  saveBlockTemplate: (command) => saveBlockTemplateUseCase.execute(command),
+  updateBlockTemplate: (command) => updateBlockTemplateUseCase.execute(command)
 })
 
 const terminalViewLifecycle = registerTerminalIpcHandlers({

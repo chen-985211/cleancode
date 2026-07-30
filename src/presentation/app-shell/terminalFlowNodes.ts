@@ -311,7 +311,7 @@ async function noopToggleGroupCollapsed(): Promise<void> {}
 
 async function noopRemoveTerminalFromGroup(): Promise<void> {}
 
-function createCollapsedTerminalGroupSize(memberCount: number): {
+export function createCollapsedTerminalGroupSize(memberCount: number): {
   readonly width: number
   readonly height: number
 } {

@@ -1,0 +1,87 @@
+.canvas-surface--placing-template {
+  cursor: crosshair;
+}
+
+.block-template-selection {
+  position: absolute;
+  z-index: 35;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
+  pointer-events: none;
+}
+
+.block-template-selection button {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  border: 1px solid var(--cc-primary);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--cc-primary);
+  color: var(--cc-primary-contrast);
+  box-shadow: var(--cc-shadow-floating);
+  pointer-events: auto;
+}
+
+.block-template-placement-preview {
+  position: absolute;
+  z-index: 34;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.block-template-placement-preview svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.block-template-placement-preview line {
+  stroke: color-mix(in srgb, var(--cc-primary) 62%, transparent);
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+
+.block-template-placement-preview__group,
+.block-template-placement-preview__node {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.block-template-placement-preview__group {
+  border: 1px dashed color-mix(in srgb, var(--cc-primary) 58%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cc-primary) 4%, transparent);
+}
+
+.block-template-placement-preview__node {
+  display: flex;
+  min-width: 48px;
+  min-height: 32px;
+  align-items: flex-start;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 74%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cc-surface-raised) 78%, transparent);
+  box-shadow: var(--cc-shadow-xs);
+  opacity: 0.78;
+}
+
+.block-template-placement-preview__node > span {
+  width: 100%;
+  overflow: hidden;
+  border-bottom: 1px solid color-mix(in srgb, var(--cc-border) 65%, transparent);
+  padding: 7px 9px;
+  color: var(--cc-foreground);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

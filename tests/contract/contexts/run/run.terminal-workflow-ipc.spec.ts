@@ -133,6 +133,42 @@ describe('terminal workflow IPC contract', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('passes exact block-set workflow scopes and rejects empty sets', async () => {
+    const ipcMain = new FakeIpcMain()
+    const start = vi.fn(async () => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+    })
+    const command = {
+      projectId: 'project-1',
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      workspaceDirectory: '/project',
+      gitBranch: 'main',
+      terminalSourceTheme: 'dark' as const,
+      scope: { blockIds: ['install', 'build'], type: 'block-set' as const }
+    }
+
+    await ipcMain.invoke('cleancode:start-terminal-workflow', command)
+    await expect(
+      ipcMain.invoke('cleancode:start-terminal-workflow', {
+        ...command,
+        scope: { blockIds: [], type: 'block-set' }
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND' },
+      ok: false
+    })
+
+    expect(start).toHaveBeenCalledTimes(1)
+    expect(start).toHaveBeenCalledWith({
+      ...command,
+      workingDirectory: command.workspaceDirectory
+    })
+  })
+
   it('passes project-workspace-scoped stop commands', async () => {
     const ipcMain = new FakeIpcMain()
     const stop = vi.fn(async () => createRun())
