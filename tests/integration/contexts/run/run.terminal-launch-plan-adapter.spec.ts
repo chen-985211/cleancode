@@ -87,6 +87,40 @@ describe('BlockGraph terminal launch plan adapter', () => {
     expect(Object.isFrozen(workflow.nodes)).toBe(true)
     expect(Object.isFrozen(workflow.nodes[1]?.dependencyBlockIds)).toBe(true)
   })
+
+  it('maps a terminal combination as an exact member-scoped workflow plan', async () => {
+    const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
+    for (const blockId of ['install', 'build', 'outside']) {
+      graph.createTerminalBlock({
+        id: blockId,
+        name: blockId,
+        description: `${blockId} task`,
+        launchCommand: `run ${blockId}`,
+        position: { x: 0, y: 0 }
+      })
+    }
+    graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
+    graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
+    graph.createTerminalGroup({
+      id: 'development',
+      name: 'Development',
+      memberBlockIds: ['install', 'build']
+    })
+    const adapter = new BlockGraphTerminalWorkflowPlanAdapter(
+      new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+    )
+
+    const workflow = await adapter.buildPlan({
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      scope: { type: 'terminal-group', terminalGroupId: 'development' }
+    })
+
+    expect(workflow.nodes.map((node) => [node.blockId, node.dependencyBlockIds])).toEqual([
+      ['install', []],
+      ['build', ['install']]
+    ])
+  })
 })
 
 class InMemoryRepository implements BlockGraphRepository {

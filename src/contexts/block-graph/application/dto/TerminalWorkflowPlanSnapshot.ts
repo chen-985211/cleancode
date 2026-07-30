@@ -1,4 +1,1 @@
-export type {
-  TerminalWorkflowPlanScope,
-  TerminalWorkflowPlanSnapshot
-} from '../../domain/services/TerminalWorkflowPlan'
+export type { TerminalWorkflowPlanSnapshot } from '../../domain/services/TerminalWorkflowPlan'

@@ -78,6 +78,61 @@ describe('terminal workflow IPC contract', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('passes terminal combination workflow scopes', async () => {
+    const ipcMain = new FakeIpcMain()
+    const start = vi.fn(async () => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+    })
+    const command = {
+      projectId: 'project-1',
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      workspaceDirectory: '/project',
+      gitBranch: 'main',
+      terminalSourceTheme: 'dark' as const,
+      scope: {
+        type: 'terminal-group' as const,
+        terminalGroupId: 'development'
+      }
+    }
+
+    await ipcMain.invoke('cleancode:start-terminal-workflow', command)
+
+    expect(start).toHaveBeenCalledWith({
+      ...command,
+      workingDirectory: command.workspaceDirectory
+    })
+  })
+
+  it('rejects terminal combination scopes without an identity', async () => {
+    const ipcMain = new FakeIpcMain()
+    const start = vi.fn(async () => createRun())
+    registerTerminalWorkflowIpcHandlers({
+      ipcMain,
+      logger: silentLogger,
+      workflowService: { start, stop: vi.fn(), getActiveRun: vi.fn() }
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:start-terminal-workflow', {
+        projectId: 'project-1',
+        projectDirectory: '/project',
+        workspaceId: 'main',
+        workspaceDirectory: '/project',
+        gitBranch: 'main',
+        terminalSourceTheme: 'dark',
+        scope: { type: 'terminal-group', terminalGroupId: '  ' }
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true }
+    })
+    expect(start).not.toHaveBeenCalled()
+  })
+
   it('passes project-workspace-scoped stop commands', async () => {
     const ipcMain = new FakeIpcMain()
     const stop = vi.fn(async () => createRun())

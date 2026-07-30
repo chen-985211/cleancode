@@ -55,6 +55,47 @@ describe('terminal workflow service', () => {
     await Promise.resolve()
   })
 
+  it('runs independent terminal combination branches in parallel without flattening their flows', async () => {
+    const runtime = new FakeRuntime()
+    const service = createService(
+      plan([
+        task('standalone'),
+        task('install'),
+        task('build', ['install']),
+        task('api'),
+        task('browser', ['api'])
+      ]),
+      runtime
+    )
+
+    await service.start(createStartCommand())
+
+    expect(runtime.commandStarts.map((start) => start.blockId)).toEqual([
+      'standalone',
+      'install',
+      'api'
+    ])
+
+    runtime.exit('standalone', 0)
+    await Promise.resolve()
+    expect(runtime.commandStarts.map((start) => start.blockId)).toEqual([
+      'standalone',
+      'install',
+      'api'
+    ])
+
+    runtime.exit('install', 0)
+    await vi.waitFor(() =>
+      expect(runtime.commandStarts.map((start) => start.blockId)).toContain('build')
+    )
+    expect(runtime.commandStarts.map((start) => start.blockId)).not.toContain('browser')
+
+    runtime.exit('api', 0)
+    await vi.waitFor(() =>
+      expect(runtime.commandStarts.map((start) => start.blockId)).toContain('browser')
+    )
+  })
+
   it('matches literal output across chunks and releases service dependents when ready', async () => {
     const runtime = new FakeRuntime()
     const service = createService(createOutputServicePlan(), runtime)

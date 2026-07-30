@@ -380,7 +380,9 @@ declare global {
         readonly gitBranch: string | null
         readonly terminalSourceTheme: TerminalSourceTheme
         readonly scope:
-          { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
+          | { readonly type: 'full' }
+          | { readonly type: 'from-block'; readonly blockId: string }
+          | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
         readonly shell?: string
         readonly columns?: number
         readonly rows?: number

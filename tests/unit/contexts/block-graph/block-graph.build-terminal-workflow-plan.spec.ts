@@ -1,5 +1,6 @@
 import { getAppErrorCode } from '../../../../src/shared-kernel/application/errors/AppError'
 import { BlockGraph } from '../../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
+import { buildTerminalWorkflowPlan } from '../../../../src/contexts/block-graph/domain/services/TerminalWorkflowPlan'
 import { BuildTerminalWorkflowPlanUseCase } from '../../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
 import type { BlockGraphRepository } from '../../../../src/contexts/block-graph/application/ports/BlockGraphRepository'
 
@@ -121,6 +122,98 @@ describe('build terminal workflow plan', () => {
       (error: unknown) => getAppErrorCode(error) === 'TERMINAL_WORKFLOW_COMMAND_MISSING'
     )
   })
+
+  it('builds a terminal combination plan with parallel standalone roots and preserved flow order', async () => {
+    const graph = createCombinationGraph()
+    const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+
+    const plan = await buildPlan.execute({
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      scope: { type: 'terminal-group', terminalGroupId: 'development' }
+    })
+
+    expect(plan.nodes.map((node) => [node.blockId, node.dependencyBlockIds])).toEqual([
+      ['standalone', []],
+      ['install', []],
+      ['build', ['install']]
+    ])
+    expect(plan.nodes.map((node) => node.blockId)).not.toContain('outside')
+  })
+
+  it('keeps independent flows intact inside the same terminal combination plan', async () => {
+    const graph = BlockGraph.createDefault({
+      id: 'graph-1',
+      projectId: 'project-1',
+      workspaceId: 'main'
+    })
+    for (const blockId of ['install', 'build', 'api', 'browser']) {
+      createConfiguredTerminal(graph, blockId, blockId, `run ${blockId}`)
+    }
+    graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
+    graph.connectTerminalBlocks({ sourceBlockId: 'api', targetBlockId: 'browser' })
+    graph.createTerminalGroup({
+      id: 'development',
+      name: 'Development',
+      memberBlockIds: ['install', 'build', 'api', 'browser']
+    })
+    const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+
+    const plan = await buildPlan.execute({
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      scope: { type: 'terminal-group', terminalGroupId: 'development' }
+    })
+
+    expect(plan.nodes.map((node) => [node.blockId, node.dependencyBlockIds])).toEqual([
+      ['install', []],
+      ['build', ['install']],
+      ['api', []],
+      ['browser', ['api']]
+    ])
+  })
+
+  it('rejects a terminal combination before execution when any member has no launch command', async () => {
+    const graph = createCombinationGraph()
+    graph.updateTerminalBlockMetadata('standalone', {
+      name: 'Standalone',
+      description: 'Standalone.',
+      launchCommand: ''
+    })
+    const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
+
+    await expect(
+      buildPlan.execute({
+        projectDirectory: '/project',
+        workspaceId: 'main',
+        scope: { type: 'terminal-group', terminalGroupId: 'development' }
+      })
+    ).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'TERMINAL_WORKFLOW_COMMAND_MISSING'
+    )
+  })
+
+  it('defensively rejects a cyclic terminal combination snapshot', () => {
+    const graph = createCombinationGraph()
+    const snapshot = graph.toSnapshot()
+
+    expect(() =>
+      buildTerminalWorkflowPlan(
+        {
+          ...snapshot,
+          connections: [
+            { id: 'install-to-build', sourceBlockId: 'install', targetBlockId: 'build' },
+            { id: 'build-to-install', sourceBlockId: 'build', targetBlockId: 'install' }
+          ]
+        },
+        { type: 'terminal-group', terminalGroupId: 'development' }
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'TERMINAL_WORKFLOW_CYCLE'
+      })
+    )
+  })
 })
 
 class InMemoryRepository implements BlockGraphRepository {
@@ -162,6 +255,28 @@ function createBuildGraph(): BlockGraph {
   graph.connectTerminalBlocks({ sourceBlockId: 'install-api', targetBlockId: 'build' })
   graph.connectTerminalBlocks({ sourceBlockId: 'install-web', targetBlockId: 'build' })
   graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'test' })
+
+  return graph
+}
+
+function createCombinationGraph(): BlockGraph {
+  const graph = BlockGraph.createDefault({
+    id: 'graph-1',
+    projectId: 'project-1',
+    workspaceId: 'main'
+  })
+
+  createConfiguredTerminal(graph, 'standalone', 'Standalone', 'pnpm dev')
+  createConfiguredTerminal(graph, 'install', 'Install', 'pnpm install')
+  createConfiguredTerminal(graph, 'build', 'Build', 'pnpm build')
+  createConfiguredTerminal(graph, 'outside', 'Outside', 'pnpm outside')
+  graph.connectTerminalBlocks({ sourceBlockId: 'install', targetBlockId: 'build' })
+  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
+  graph.createTerminalGroup({
+    id: 'development',
+    name: 'Development',
+    memberBlockIds: ['standalone', 'install', 'build']
+  })
 
   return graph
 }
