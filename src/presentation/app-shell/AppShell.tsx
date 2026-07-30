@@ -269,7 +269,7 @@ export function AppShell({
     notifications,
     setCurrentGraph
   })
-  const { start: startWorkflow, stop: stopWorkflow } = terminalWorkflow
+  const { start: startWorkflow, startTerminalCombination, stop: stopWorkflow } = terminalWorkflow
   const {
     copyServiceEndpoint,
     locateManagedServiceOwner,
@@ -431,14 +431,13 @@ export function AppShell({
     currentWorkbench,
     currentWorkspace,
     interruptTerminal,
-    quickLaunchTerminal,
     restartTerminal,
     selectedTerminalBlockIds,
     selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId,
-    startTerminal,
+    startTerminalCombination,
     terminalBlocksById
   })
   const updateGraphViewport = useCallback(

@@ -384,6 +384,7 @@ const inactiveTerminalWorkflowController = {
   nodeStatuses: {},
   run: null,
   start: async () => undefined,
+  startTerminalCombination: async () => undefined,
   stop: async () => undefined,
   updateExecutionConfig: async () => undefined
 } satisfies ReturnType<typeof useTerminalWorkflow>

@@ -147,7 +147,7 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 | 发起方           | Run                                                                              |
 | 调用方拥有的端口 | `TerminalLaunchPlanPort`、`TerminalWorkflowPlanPort`                             |
 | 提供方           | BlockGraph 的 `GetTerminalLaunchPlanUseCase`、`BuildTerminalWorkflowPlanUseCase` |
-| 返回             | 单终端启动或工作流启动时不可变的命令、执行配置与拓扑计划 DTO                     |
+| 返回             | 单终端、指定依赖子图或精确终端组合启动时不可变的命令、执行配置与拓扑计划 DTO     |
 | 后续所有权       | Run 的 `WorkflowRun` 独立维护运行状态，不反写 BlockGraph                         |
 | 禁止             | Run 直接读取 BlockGraph 仓储、聚合或表现层图对象                                 |
 

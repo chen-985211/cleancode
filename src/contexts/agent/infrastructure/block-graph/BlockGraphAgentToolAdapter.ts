@@ -8,10 +8,7 @@ import type {
   TerminalBlockSizeSnapshot,
   TerminalExecutionConfigSnapshot
 } from '../../../block-graph/application/dto/BlockGraphSnapshot'
-import type {
-  TerminalWorkflowPlanScope,
-  TerminalWorkflowPlanSnapshot
-} from '../../../block-graph/application/dto/TerminalWorkflowPlanSnapshot'
+import type { TerminalWorkflowPlanSnapshot } from '../../../block-graph/application/dto/TerminalWorkflowPlanSnapshot'
 import type { AgentBlockGraphSnapshot } from '../../application/dto/AgentBlockGraphProtocol'
 import type {
   AgentArrangeTerminalLayoutInput,
@@ -47,7 +44,7 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly graphChanged: boolean
   }>
   readonly buildTerminalWorkflowPlan: (
-    query: AgentToolContext & { readonly scope: TerminalWorkflowPlanScope }
+    query: AgentToolContext & { readonly scope: AgentInspectTerminalWorkflowPlanInput['scope'] }
   ) => Promise<TerminalWorkflowPlanSnapshot>
   readonly connectTerminalBlocks: (
     command: AgentToolContext & AgentConnectTerminalBlocksInput

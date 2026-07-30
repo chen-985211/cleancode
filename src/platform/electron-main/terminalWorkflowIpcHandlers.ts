@@ -82,7 +82,9 @@ function isTerminalSourceTheme(value: unknown): value is TerminalSourceTheme {
 function isWorkflowScope(value: unknown): boolean {
   return (
     isRecord(value) &&
-    (value.type === 'full' || (value.type === 'from-block' && isNonEmptyString(value.blockId)))
+    (value.type === 'full' ||
+      (value.type === 'from-block' && isNonEmptyString(value.blockId)) ||
+      (value.type === 'terminal-group' && isNonEmptyString(value.terminalGroupId)))
   )
 }
 

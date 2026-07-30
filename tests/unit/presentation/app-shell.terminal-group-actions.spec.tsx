@@ -77,7 +77,7 @@ describe('app shell terminal group actions', () => {
     })
   })
 
-  it('starts configured group members through their launch commands', async () => {
+  it('starts a terminal combination through one dependency-aware workflow plan', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const startTerminal = vi.fn(async (command) =>
       createTerminalSessionSnapshot(command.terminalBlockId)
@@ -86,13 +86,20 @@ describe('app shell terminal group actions', () => {
       session: createTerminalSessionSnapshot('backend-terminal'),
       endpoint: null
     }))
+    const startTerminalWorkflow = vi.fn(async () => createWorkflowRunSnapshot())
     const writeTerminal = vi.fn()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench]),
       startTerminal,
       writeTerminal
     })
-    Object.assign(runtimeApi, { launchTerminal })
+    Object.assign(runtimeApi, {
+      getTerminalWorkflow: vi.fn(async () => null),
+      launchTerminal,
+      onTerminalWorkflowEvent: vi.fn(() => vi.fn()),
+      startTerminalWorkflow,
+      stopTerminalWorkflow: vi.fn(async () => null)
+    })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -103,13 +110,17 @@ describe('app shell terminal group actions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '启动项目 启动组合命令' }))
 
-    await waitFor(() => expect(startTerminal).toHaveBeenCalledTimes(1))
-    expect(startTerminal).toHaveBeenCalledWith(
-      expect.objectContaining({ terminalBlockId: 'frontend-terminal' })
+    await waitFor(() => expect(startTerminalWorkflow).toHaveBeenCalledTimes(1))
+    expect(startTerminalWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: {
+          type: 'terminal-group',
+          terminalGroupId: 'development-group'
+        }
+      })
     )
-    expect(launchTerminal).toHaveBeenCalledWith(
-      expect.objectContaining({ terminalBlockId: 'backend-terminal' })
-    )
+    expect(startTerminal).not.toHaveBeenCalled()
+    expect(launchTerminal).not.toHaveBeenCalled()
     expect(writeTerminal).not.toHaveBeenCalled()
   })
 
@@ -213,7 +224,7 @@ function createWorkbenchWithTerminalGroup(): WorkbenchSnapshot {
           type: 'terminal',
           name: 'Frontend',
           description: 'Web',
-          launchCommand: '',
+          launchCommand: 'pnpm dev:web',
           position: { x: 620, y: 220 },
           size: { width: 420, height: 306 }
         }
@@ -230,6 +241,20 @@ function createWorkbenchWithTerminalGroup(): WorkbenchSnapshot {
         }
       ]
     }
+  }
+}
+
+function createWorkflowRunSnapshot() {
+  return {
+    id: 'workflow-run-1',
+    graphId: 'graph-alpha-project',
+    projectId: 'project-alpha-project',
+    projectDirectory: '/tmp/alpha-project',
+    workspaceId: 'main',
+    workspaceDirectory: '/tmp/alpha-project',
+    gitBranch: null,
+    status: 'running' as const,
+    nodes: []
   }
 }
 

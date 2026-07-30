@@ -6,6 +6,7 @@ import type {
   TerminalExecutionConfigSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkflowRunSnapshot } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
+import type { TerminalWorkflowPlanScope } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
 import { createTerminalWorkflowEdges } from './terminalWorkflowEdges'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import type { AppNotificationController, NotifyApp } from './appNotifications'
@@ -157,8 +158,8 @@ export function useTerminalWorkflow({
     [currentWorkbench, currentWorkspace, notify, setCurrentGraph, t]
   )
 
-  const start = useCallback(
-    async (blockId?: string) => {
+  const startScope = useCallback(
+    async (scope: TerminalWorkflowPlanScope) => {
       if (!currentWorkbench || !currentWorkspace) return
 
       await performAction(notify, t, async () => {
@@ -169,13 +170,21 @@ export function useTerminalWorkflow({
           workspaceDirectory: currentWorkspace.directory,
           gitBranch: currentWorkspace.gitBranch,
           terminalSourceTheme: readTerminalSourceTheme(),
-          scope: blockId ? { type: 'from-block', blockId } : { type: 'full' }
+          scope
         })
 
         if (nextRun) setRun(nextRun)
       })
     },
     [currentWorkbench, currentWorkspace, notify, t]
+  )
+  const start = useCallback(
+    (blockId?: string) => startScope(blockId ? { type: 'from-block', blockId } : { type: 'full' }),
+    [startScope]
+  )
+  const startTerminalCombination = useCallback(
+    (terminalGroupId: string) => startScope({ type: 'terminal-group', terminalGroupId }),
+    [startScope]
   )
 
   const stop = useCallback(async () => {
@@ -223,6 +232,7 @@ export function useTerminalWorkflow({
     nodeStatuses,
     run,
     start,
+    startTerminalCombination,
     stop,
     updateExecutionConfig
   }

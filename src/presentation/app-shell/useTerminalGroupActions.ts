@@ -4,22 +4,13 @@ import type {
   TerminalBlockSnapshot,
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  defaultTerminalDimensions,
-  type TerminalDimensions,
-  type TerminalGroupMetadataInput,
-  type WorkbenchSnapshot
-} from './types'
+import type { TerminalGroupMetadataInput, WorkbenchSnapshot } from './types'
 import type { TerminalSessionActionOptions } from './useTerminalSessions'
 
 interface UseTerminalGroupActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly interruptTerminal: (block: TerminalBlockSnapshot) => Promise<void>
-  readonly quickLaunchTerminal: (
-    block: TerminalBlockSnapshot,
-    options?: TerminalSessionActionOptions
-  ) => Promise<void>
   readonly restartTerminal: (
     block: TerminalBlockSnapshot,
     options?: TerminalSessionActionOptions
@@ -29,10 +20,7 @@ interface UseTerminalGroupActionsInput {
   readonly setCurrentGraph: (graphSnapshot: WorkbenchSnapshot['graph']) => void
   readonly setSelectedTerminalBlockIds: (blockIds: string[]) => void
   readonly setSelectedTerminalGroupId: (groupId: string | null) => void
-  readonly startTerminal: (
-    block: TerminalBlockSnapshot,
-    dimensions: TerminalDimensions
-  ) => Promise<unknown>
+  readonly startTerminalCombination: (terminalGroupId: string) => Promise<void>
   readonly terminalBlocksById: ReadonlyMap<string, TerminalBlockSnapshot>
 }
 
@@ -40,14 +28,13 @@ export function useTerminalGroupActions({
   currentWorkbench,
   currentWorkspace,
   interruptTerminal,
-  quickLaunchTerminal,
   restartTerminal,
   selectedTerminalBlockIds,
   selectedUngroupedTerminalBlockIds,
   setCurrentGraph,
   setSelectedTerminalBlockIds,
   setSelectedTerminalGroupId,
-  startTerminal,
+  startTerminalCombination,
   terminalBlocksById
 }: UseTerminalGroupActionsInput) {
   const getGroupMemberBlocks = useCallback(
@@ -83,14 +70,7 @@ export function useTerminalGroupActions({
   return useMemo(
     () => ({
       onStartGroup: (group: TerminalGroupSnapshot) => {
-        for (const block of getGroupMemberBlocks(group)) {
-          if (block.launchCommand.trim()) {
-            void quickLaunchTerminal(block, { shouldFocus: false })
-            continue
-          }
-
-          void startTerminal(block, defaultTerminalDimensions)
-        }
+        void startTerminalCombination(group.id)
       },
       onStopGroup: (group: TerminalGroupSnapshot) => {
         for (const block of getGroupMemberBlocks(group)) {
@@ -187,14 +167,13 @@ export function useTerminalGroupActions({
     [
       getGroupMemberBlocks,
       interruptTerminal,
-      quickLaunchTerminal,
       restartTerminal,
       runGraphMutation,
       selectedTerminalBlockIds,
       selectedUngroupedTerminalBlockIds,
       setSelectedTerminalBlockIds,
       setSelectedTerminalGroupId,
-      startTerminal
+      startTerminalCombination
     ]
   )
 }

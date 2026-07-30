@@ -1,7 +1,9 @@
 import type { WorkflowRunPlanSnapshot } from '../dto/WorkflowRunSnapshot'
 
 export type TerminalWorkflowPlanScope =
-  { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
+  | { readonly type: 'full' }
+  | { readonly type: 'from-block'; readonly blockId: string }
+  | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
 
 export interface BuildTerminalWorkflowPlanQuery {
   readonly projectDirectory: string

@@ -6,7 +6,9 @@ import {
 } from '../aggregates/BlockGraphTypes'
 
 export type TerminalWorkflowPlanScope =
-  { readonly type: 'full' } | { readonly type: 'from-block'; readonly blockId: string }
+  | { readonly type: 'full' }
+  | { readonly type: 'from-block'; readonly blockId: string }
+  | { readonly type: 'terminal-group'; readonly terminalGroupId: string }
 
 interface TerminalWorkflowPlanNodeSnapshot {
   readonly blockId: string
@@ -69,7 +71,10 @@ export function buildTerminalWorkflowPlan(
   for (const blockId of includedBlockIds) {
     const block = blockById.get(blockId)
 
-    if (!block?.launchCommand) {
+    if (!block) {
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    }
+    if (!block.launchCommand) {
       throw createExpectedAppError(
         'TERMINAL_WORKFLOW_COMMAND_MISSING',
         'Every terminal in a workflow must have a launch command.',
@@ -127,6 +132,16 @@ function resolveIncludedBlockIds(
         .filter((block) => connectedIds.has(block.id) || Boolean(block.launchCommand))
         .map((block) => block.id)
     )
+  }
+
+  if (scope.type === 'terminal-group') {
+    const terminalGroup = graph.terminalGroups.find((group) => group.id === scope.terminalGroupId)
+
+    if (!terminalGroup) {
+      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+    }
+
+    return new Set(terminalGroup.memberBlockIds)
   }
 
   if (!graph.blocks.some((block) => block.id === scope.blockId)) {

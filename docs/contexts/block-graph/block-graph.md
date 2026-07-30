@@ -67,7 +67,7 @@ Agent 控制台不是 BlockGraph 积木；Preview、HTTP、测试、文件节点
 
 TCP 就绪必须配置端口意图；输出就绪可以不管理端口。新终端仍默认为任务配置，不从启动命令或框架名称猜测端口；实际分配端口绝不写回 BlockGraph。
 
-BlockGraph 负责连接和配置的结构事实，也负责生成不可变、拓扑有序的终端工作流计划；运行状态仍由 Run 上下文的 `WorkflowRun` 拥有。
+BlockGraph 负责连接和配置的结构事实，也负责按“全图”“指定终端及其后代”或“精确终端组合成员”生成不可变、拓扑有序的终端工作流计划；运行状态仍由 Run 上下文的 `WorkflowRun` 拥有。组合作用域只保留连接两端都属于该组合的内部依赖，不沿跨组合连接扩大动作范围。
 
 ## 终端组合规则
 
@@ -80,6 +80,8 @@ BlockGraph 负责连接和配置的结构事实，也负责生成不可变、拓
 5. 移除成员后少于两个成员，组合自动解散。
 6. 解散组合只删除组合，保留所有终端积木。
 7. 折叠只改变组合的已提交显示状态，不改变成员或工作流连接。
+8. 组合可以同时包含无内部依赖的独立终端和一个或多个互不相连的依赖子图；这些分类由启动时计划派生，不新增持久化流程实体或流程 ID。
+9. 启动组合前必须先为全部成员生成并校验一个不可变计划；缺少启动命令或存在环时整体拒绝，不能先启动部分成员。
 
 ## 确定性终端布局
 
@@ -108,7 +110,7 @@ BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力
 
 ## 跨上下文协作
 
-- Run 上下文拥有 `TerminalWorkflowPlanPort`，其 BlockGraph 适配器调用 `BuildTerminalWorkflowPlanUseCase` 获得 DTO；Run 不读取聚合内部状态。
+- Run 上下文拥有 `TerminalWorkflowPlanPort`，其 BlockGraph 适配器调用 `BuildTerminalWorkflowPlanUseCase` 获得单流程或组合作用域 DTO；Run 不读取聚合内部状态。
 - Run 上下文拥有 `TerminalLaunchPlanPort`，其 BlockGraph 适配器调用 `GetTerminalLaunchPlanUseCase` 获得单终端不可变启动计划；直接启动和组合启动不从表现层拼接命令或端口配置。
 - BlockGraph 拥有 `TerminalRunLifecyclePort`，删除终端时由 Platform 适配到 Run 的公开 lifecycle 服务；BlockGraph 不读取或操作 Run 内部进程和租约。
 - Agent 上下文拥有 `AgentBlockGraphToolPort`，其 BlockGraph 适配器把原生 MCP 工具转换为本上下文用例；Agent 不直接写 JSON 或调用聚合。
