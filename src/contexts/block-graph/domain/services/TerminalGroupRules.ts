@@ -5,6 +5,10 @@ import type {
   TerminalGroupSizeSnapshot,
   TerminalGroupSnapshot
 } from '../aggregates/BlockGraphTypes'
+import {
+  analyzeCanvasExecutionSelection,
+  type CanvasExecutionSelectionAnalysis
+} from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 
 export const defaultTerminalGroupSize: TerminalGroupSizeSnapshot = {
   width: 520,
@@ -19,6 +23,7 @@ const terminalGroupPadding = {
 export function normalizeTerminalGroups(
   groups: readonly Partial<TerminalGroupSnapshot>[] | undefined,
   blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly TerminalConnectionSnapshot[],
   createTerminalGroupId: () => string
 ): TerminalGroupSnapshot[] {
   const assignedBlockIds = new Set<string>()
@@ -31,7 +36,7 @@ export function normalizeTerminalGroups(
       assignedBlockIds
     )
 
-    if (!hasEnoughTerminalGroupMembers({ memberBlockIds })) {
+    if (!isValidTerminalGroupMembership(memberBlockIds, blocks, connections)) {
       continue
     }
 
@@ -67,41 +72,45 @@ export function expandTerminalGroupMemberIdsToCompleteWorkflows(
   connections: readonly TerminalConnectionSnapshot[],
   requestedMemberBlockIds: readonly string[]
 ): string[] {
-  const requestedIds = normalizeTerminalGroupMemberIds(requestedMemberBlockIds)
-  const blockIds = new Set(blocks.map((block) => block.id))
-  const adjacentBlockIds = new Map(blocks.map((block) => [block.id, new Set<string>()]))
-
-  for (const connection of connections) {
-    if (!blockIds.has(connection.sourceBlockId) || !blockIds.has(connection.targetBlockId)) {
-      continue
-    }
-    adjacentBlockIds.get(connection.sourceBlockId)?.add(connection.targetBlockId)
-    adjacentBlockIds.get(connection.targetBlockId)?.add(connection.sourceBlockId)
-  }
-
-  const expandedIds = new Set(requestedIds)
-  const pendingIds = requestedIds.filter((blockId) => blockIds.has(blockId))
-  while (pendingIds.length > 0) {
-    const blockId = pendingIds.shift()
-    if (!blockId) continue
-
-    for (const adjacentBlockId of adjacentBlockIds.get(blockId) ?? []) {
-      if (expandedIds.has(adjacentBlockId)) continue
-      expandedIds.add(adjacentBlockId)
-      pendingIds.push(adjacentBlockId)
-    }
-  }
-
   return [
-    ...blocks.filter((block) => expandedIds.has(block.id)).map((block) => block.id),
-    ...requestedIds.filter((blockId) => !blockIds.has(blockId))
+    ...analyzeTerminalGroupMemberSelection(blocks, connections, requestedMemberBlockIds)
+      .expandedTerminalIds
   ]
 }
 
-export function hasEnoughTerminalGroupMembers(group: {
-  readonly memberBlockIds: readonly string[]
-}): boolean {
-  return group.memberBlockIds.length >= 2
+export function analyzeTerminalGroupMemberSelection(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly TerminalConnectionSnapshot[],
+  requestedMemberBlockIds: readonly string[]
+): CanvasExecutionSelectionAnalysis {
+  return analyzeCanvasExecutionSelection({
+    dependencies: connections.map((connection) => ({
+      sourceTerminalId: connection.sourceBlockId,
+      targetTerminalId: connection.targetBlockId
+    })),
+    selectedTerminalIds: requestedMemberBlockIds,
+    terminals: blocks.map((block) => ({ terminalId: block.id }))
+  })
+}
+
+export function isValidTerminalGroupMembership(
+  memberBlockIds: readonly string[],
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly TerminalConnectionSnapshot[]
+): boolean {
+  const normalizedMemberBlockIds = normalizeTerminalGroupMemberIds(memberBlockIds)
+  const analysis = analyzeTerminalGroupMemberSelection(
+    blocks,
+    connections,
+    normalizedMemberBlockIds
+  )
+
+  return (
+    analysis.canCreateCombination &&
+    analysis.unknownTerminalIds.length === 0 &&
+    analysis.expandedTerminalIds.length === normalizedMemberBlockIds.length &&
+    analysis.expandedTerminalIds.every((blockId) => normalizedMemberBlockIds.includes(blockId))
+  )
 }
 
 export function normalizeTerminalGroupBounds(

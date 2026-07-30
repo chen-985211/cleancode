@@ -9,6 +9,7 @@ import type {
   AgentTerminalWorkflowPlanScope,
   AgentTerminalWorkflowPlanSnapshot
 } from './AgentTerminalWorkflowProtocol'
+import { canvasExecutionSemanticInstructions } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import { objectSchema, type AgentToolJsonSchema } from './AgentToolJsonSchema'
 import {
   blockGraphOutputSchema,
@@ -37,6 +38,7 @@ interface AgentToolAnnotations {
 
 export const cleancodeMcpDeveloperInstructions = [
   'CleanCode canvas routing is mandatory while the built-in cleancode MCP server is enabled. Treat unqualified requests about “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal dependencies, and specifically “启动项目的终端组合” as requests to create or modify persisted CleanCode canvas terminal blocks, groups, execution configuration, and dependency connections, not as requests to run project processes directly.',
+  canvasExecutionSemanticInstructions,
   'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands. Complete canvas authoring with create_block, update_terminal_execution_config, connect_terminal_blocks, and create_terminal_group as needed, call arrange_terminal_layout with the exact created or related terminal block IDs to place that terminal workflow around the active Agent without moving unrelated objects, then call inspect_terminal_workflow_plan to validate the dependency plan.',
   'When a terminal starts a local HTTP, HTTPS, or TCP development service, inspect its existing launch path before choosing a managed port. For parallel projects and worktrees, use preferred with the conventional port as the recommended default, or auto when no conventional port matters. Both require a verified binding: environment only when the existing project already reads that variable, or argument with a safe template such as --port {port} only when the existing CLI or task wrapper accepts it. Do not invent a variable or select fixed + none merely because logs or defaults mention a port; reserve fixed for an explicit immutable-port requirement. Run replaces the binding with the actual allocated port at launch, and readiness plus the displayed endpoint follow that actual port.',
   'The current CleanCode MCP can author and inspect a terminal workflow but cannot start it. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects, and do not claim that a created workflow or terminal was started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.'
@@ -44,6 +46,7 @@ export const cleancodeMcpDeveloperInstructions = [
 
 export const cleancodeMcpInstructions = [
   'CleanCode canvas scope / CleanCode 画布语义：while this MCP server is enabled, unqualified requests such as “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal organization, terminal layout, or terminal dependencies mean persisted CleanCode canvas objects, not repository code. Call inspect_graph before reading or searching repository files. Only treat explicit source-code terms such as “终端源码”, “Terminal component”, xterm, PTY, or terminal module implementation as project-code work.',
+  canvasExecutionSemanticInstructions,
   'For canvas work, inspect first, create or update terminal blocks, configure task/service execution with update_terminal_execution_config, connect upstream source terminals to downstream target terminals with connect_terminal_blocks, organize the exact related terminals with arrange_terminal_layout, and validate the result with inspect_terminal_workflow_plan. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
   'For a local HTTP, HTTPS, or TCP development service that may run in parallel projects or worktrees, prefer preferred with its conventional port and a verified environment or argument binding; use auto when no conventional port matters. Environment injection is valid only when the existing project already reads the named variable, and an argument template such as --port {port} is valid only when the existing CLI or wrapper accepts it. Use fixed, especially fixed + none, only for an explicit immutable-port contract. At runtime CleanCode injects the actual allocated port and validates readiness against that actual port.',
   'Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. The Provider launch integration may allow these CleanCode MCP tools directly when that Provider supports a tool allowlist. This does not change the Provider sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval, as does disconnecting a dependency.'
@@ -135,7 +138,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Create a visual terminal group on the cleancode canvas from two or more existing terminal blocks. A group is not a workflow node.',
+      'Create a visual terminal group on the cleancode canvas from existing terminal blocks that resolve to at least two top-level execution units: independent terminals or complete workflows. A group is not a workflow node, and one terminal or one complete workflow cannot be wrapped in a group.',
     graphChanged: true,
     inputSchema: objectSchema(
       {

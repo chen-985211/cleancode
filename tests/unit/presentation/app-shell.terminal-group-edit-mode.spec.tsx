@@ -295,7 +295,7 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
-  it('allows creating a group from one selected terminal when it belongs to a workflow', async () => {
+  it('does not create a group from one complete workflow', async () => {
     const baseWorkbench = createWorkbenchWithTerminalBlocks()
     const workbench = {
       ...baseWorkbench,
@@ -313,20 +313,6 @@ describe('app shell terminal group edit mode', () => {
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
     })
-    runtimeApi.createTerminalGroup.mockResolvedValue({
-      ...workbench.graph,
-      terminalGroups: [
-        {
-          id: 'new-group',
-          type: 'terminal-group',
-          name: '启动项目',
-          position: { x: 288, y: 164 },
-          size: { width: 984, height: 458 },
-          isCollapsed: false,
-          memberBlockIds: ['backend-terminal', 'frontend-terminal']
-        }
-      ]
-    })
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
       value: runtimeApi
@@ -340,16 +326,11 @@ describe('app shell terminal group edit mode', () => {
 
     backendNode?.data.onSelect?.(false)
     fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
-    fireEvent.click(await screen.findByRole('button', { name: '创建组合' }))
+    const createGroupButton = await screen.findByRole('button', { name: '创建组合' })
 
-    await waitFor(() =>
-      expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
-        projectDirectory: '/tmp/alpha-project',
-        workspaceId: 'main',
-        name: '启动项目',
-        memberBlockIds: ['backend-terminal']
-      })
-    )
+    expect(createGroupButton).toBeDisabled()
+    fireEvent.click(createGroupButton)
+    expect(runtimeApi.createTerminalGroup).not.toHaveBeenCalled()
   })
 
   it('selects grouped member terminals while editing group membership', async () => {

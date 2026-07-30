@@ -74,6 +74,7 @@ describe('terminal layout in the default block graph', () => {
     const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     createTerminal(graph, 'u-0', 40, 40)
     createTerminal(graph, 'u-1', 800, 40)
+    createTerminal(graph, 'u-companion', 40, 40)
     createTerminal(graph, 'v-0', 40, 400)
     createTerminal(graph, 'v-1', 40, 760)
     graph.connectTerminalBlocks({
@@ -83,7 +84,7 @@ describe('terminal layout in the default block graph', () => {
     })
     graph.createTerminalGroup({
       id: 'group-u',
-      memberBlockIds: ['u-0', 'u-1'],
+      memberBlockIds: ['u-0', 'u-1', 'u-companion'],
       name: 'Group U'
     })
     graph.createTerminalGroup({
@@ -93,7 +94,7 @@ describe('terminal layout in the default block graph', () => {
     })
     const input = {
       anchorRegion: region(500, 100, 600, 400),
-      blockIds: ['u-0', 'u-1', 'v-0', 'v-1'],
+      blockIds: ['u-0', 'u-1', 'u-companion', 'v-0', 'v-1'],
       reservedRegions: [region(1100, 500, 300, 1500)]
     }
 
@@ -110,14 +111,15 @@ describe('terminal layout in the default block graph', () => {
 
   it('recomputes complete terminal group bounds and is stable when the same layout is applied again', () => {
     const graph = createGraphWithSizedWorkflow()
+    createTerminal(graph, 'workflow-companion', 40, 40)
     graph.createTerminalGroup({
       id: 'workflow-group',
       name: 'Workflow',
-      memberBlockIds: ['install-terminal', 'api-terminal', 'test-terminal']
+      memberBlockIds: ['install-terminal', 'api-terminal', 'test-terminal', 'workflow-companion']
     })
     const input = {
       anchorRegion: region(500, 100, 600, 400),
-      blockIds: ['test-terminal', 'install-terminal', 'api-terminal'],
+      blockIds: ['test-terminal', 'install-terminal', 'api-terminal', 'workflow-companion'],
       reservedRegions: []
     }
 
@@ -126,7 +128,7 @@ describe('terminal layout in the default block graph', () => {
     const second = graph.arrangeTerminalLayout(input)
 
     expect(first).toEqual({
-      arrangedBlockIds: ['install-terminal', 'api-terminal', 'test-terminal'],
+      arrangedBlockIds: ['install-terminal', 'workflow-companion', 'api-terminal', 'test-terminal'],
       arrangedTerminalGroupIds: ['workflow-group'],
       graphChanged: true
     })
@@ -134,7 +136,7 @@ describe('terminal layout in the default block graph', () => {
       expect.objectContaining({
         id: 'workflow-group',
         position: { x: 468, y: 564 },
-        size: { width: 1108, height: 756 }
+        size: { width: 1108, height: 1060 }
       })
     ])
     expect(second).toEqual({ ...first, graphChanged: false })
@@ -196,6 +198,7 @@ describe('terminal layout in the default block graph', () => {
     createTerminal(graph, 'terminal-b', 40, 400)
     createTerminal(graph, 'terminal-d', 800, 40)
     createTerminal(graph, 'terminal-c', 800, 400)
+    createTerminal(graph, 'terminal-companion', 40, 40)
     graph.connectTerminalBlocks({
       id: 'a-to-c',
       sourceBlockId: 'terminal-a',
@@ -209,11 +212,11 @@ describe('terminal layout in the default block graph', () => {
     graph.createTerminalGroup({
       id: 'cross-layer-group',
       name: 'Cross layer',
-      memberBlockIds: ['terminal-a', 'terminal-c']
+      memberBlockIds: ['terminal-a', 'terminal-c', 'terminal-companion']
     })
     const input = {
       anchorRegion: region(500, 100, 600, 400),
-      blockIds: ['terminal-a', 'terminal-b', 'terminal-c', 'terminal-d'],
+      blockIds: ['terminal-a', 'terminal-b', 'terminal-c', 'terminal-d', 'terminal-companion'],
       reservedRegions: []
     }
 
@@ -341,10 +344,11 @@ describe('terminal layout in the default block graph', () => {
 
   it('rejects a scope that contains only part of a terminal group without changing the graph', () => {
     const graph = createGraphWithSizedWorkflow()
+    createTerminal(graph, 'workflow-companion', 40, 40)
     graph.createTerminalGroup({
       id: 'workflow-group',
       name: 'Workflow',
-      memberBlockIds: ['install-terminal', 'api-terminal']
+      memberBlockIds: ['install-terminal', 'workflow-companion']
     })
     const before = graph.toSnapshot()
 

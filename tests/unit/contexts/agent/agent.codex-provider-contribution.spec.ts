@@ -9,6 +9,7 @@ import {
 import { findUniqueCodexThreadIdByPrefix } from '../../../../src/contexts/agent/infrastructure/providers/codex/CodexThreadPrefixResolver'
 import { CodexThreadIdentityReporter } from '../../../../src/contexts/agent/infrastructure/pty/CodexThreadIdentityReporter'
 import { NodeAgentProviderCliDetector } from '../../../../src/contexts/agent/infrastructure/providers/shared/NodeAgentProviderCliDetector'
+import { canvasExecutionSemanticInstructions } from '../../../../src/shared-kernel/domain/policies/CanvasExecutionSemantics'
 
 describe('Codex Agent Provider contribution', () => {
   it('uses the shared cross-platform CLI detector by default', () => {
@@ -111,6 +112,7 @@ describe('Codex Agent Provider contribution', () => {
       expect(plan.args.join('\n')).toContain('mcp_servers.cleancode=')
       expect(plan.args.join('\n')).not.toContain('required=true')
       expect(plan.args.join('\n')).toContain('developer_instructions=')
+      expect(plan.args.join('\n')).toContain(canvasExecutionSemanticInstructions)
       expect(plan.args.join('\n')).toContain('notify=')
       expect(plan.args).toEqual(
         expect.arrayContaining([

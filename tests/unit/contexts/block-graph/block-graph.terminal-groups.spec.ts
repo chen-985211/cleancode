@@ -61,6 +61,19 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
+  it('rejects creating a group around one complete workflow', () => {
+    const graph = createGraphWithWorkflowComponents()
+
+    expect(() =>
+      graph.createTerminalGroup({
+        id: 'workflow-wrapper',
+        name: 'Workflow wrapper',
+        memberBlockIds: ['build-terminal']
+      })
+    ).toThrow('Terminal group must contain at least two top-level execution units.')
+    expect(graph.toSnapshot().terminalGroups).toEqual([])
+  })
+
   it('adds a terminal workflow to an existing group as one complete unit', () => {
     const graph = createGraphWithWorkflowComponents()
     graph.createTerminalGroup({
@@ -156,6 +169,19 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
+  it('removes a complete workflow and dissolves a group that would have one top-level unit', () => {
+    const graph = createGraphWithWorkflowComponents()
+    graph.createTerminalGroup({
+      id: 'development-group',
+      name: 'Development',
+      memberBlockIds: ['build-terminal', 'shell-terminal']
+    })
+
+    graph.removeTerminalFromGroup('development-group', 'build-terminal')
+
+    expect(graph.toSnapshot().terminalGroups).toEqual([])
+  })
+
   it('restores legacy graphs and drops invalid restored groups', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
@@ -207,6 +233,50 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
+  it('drops a restored group that wraps only one complete workflow', () => {
+    const graph = BlockGraph.fromSnapshot({
+      id: 'graph-1',
+      projectId: 'project-1',
+      workspaceId: 'main',
+      blocks: [
+        {
+          id: 'backend-terminal',
+          type: 'terminal',
+          name: 'Backend',
+          description: '',
+          position: { x: 0, y: 0 }
+        },
+        {
+          id: 'frontend-terminal',
+          type: 'terminal',
+          name: 'Frontend',
+          description: '',
+          position: { x: 500, y: 0 }
+        }
+      ],
+      connections: [
+        {
+          id: 'backend-frontend',
+          sourceBlockId: 'backend-terminal',
+          targetBlockId: 'frontend-terminal'
+        }
+      ],
+      terminalGroups: [
+        {
+          id: 'workflow-wrapper',
+          type: 'terminal-group',
+          name: 'Workflow wrapper',
+          position: { x: 0, y: 0 },
+          size: defaultTerminalGroupSize,
+          isCollapsed: false,
+          memberBlockIds: ['backend-terminal', 'frontend-terminal']
+        }
+      ]
+    } as never)
+
+    expect(graph.toSnapshot().terminalGroups).toEqual([])
+  })
+
   it('rejects ambiguous terminal group membership', () => {
     const graph = createGraphWithGroupedTerminals()
 
@@ -221,7 +291,7 @@ describe('terminal groups in the default block graph', () => {
         name: 'Single',
         memberBlockIds: ['backend-terminal']
       })
-    ).toThrow('Terminal group must contain at least two terminals.')
+    ).toThrow('Terminal group must contain at least two top-level execution units.')
   })
 })
 

@@ -1,4 +1,5 @@
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
+import { classifyCanvasExecutionStructure } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
 import type {
   BlockTemplateConnectionSnapshot,
   BlockTemplateNodeSnapshot,
@@ -171,29 +172,19 @@ function recognizeBlockTemplateType(
   nodes: readonly Pick<BlockTemplateNodeSnapshot, 'templateNodeId'>[],
   connections: readonly BlockTemplateConnectionSnapshot[]
 ): BlockTemplateType {
-  if (nodes.length === 1) {
-    return 'terminal'
-  }
-  if (connections.length === 0) {
-    return 'combination'
+  const classification = classifyCanvasExecutionStructure({
+    dependencies: connections.map((connection) => ({
+      sourceTerminalId: connection.sourceTemplateNodeId,
+      targetTerminalId: connection.targetTemplateNodeId
+    })),
+    terminals: nodes.map((node) => ({ terminalId: node.templateNodeId }))
+  })
+
+  if (!classification) {
+    invalidTemplate('A block template must contain at least one terminal.')
   }
 
-  const adjacent = new Map(nodes.map((node) => [node.templateNodeId, new Set<string>()]))
-  for (const connection of connections) {
-    adjacent.get(connection.sourceTemplateNodeId)?.add(connection.targetTemplateNodeId)
-    adjacent.get(connection.targetTemplateNodeId)?.add(connection.sourceTemplateNodeId)
-  }
-  const visited = new Set<string>()
-  const pending = [nodes[0]!.templateNodeId]
-
-  while (pending.length > 0) {
-    const nodeId = pending.shift()
-    if (!nodeId || visited.has(nodeId)) continue
-    visited.add(nodeId)
-    pending.push(...(adjacent.get(nodeId) ?? []))
-  }
-
-  return visited.size === nodes.length ? 'workflow' : 'combination'
+  return classification
 }
 
 function assertAcyclic(

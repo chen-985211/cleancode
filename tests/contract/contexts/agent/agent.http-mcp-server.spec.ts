@@ -47,7 +47,7 @@ describe('cleancode HTTP MCP server', () => {
       expect.objectContaining({
         result: expect.objectContaining({
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'cleancode-agent-tools', version: '0.3.1' }
+          serverInfo: { name: 'cleancode-agent-tools', version: '0.3.2' }
         })
       })
     )

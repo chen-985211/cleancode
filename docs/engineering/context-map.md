@@ -178,7 +178,7 @@ Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession`
 
 - Presentation 调用应用层用例、订阅 IPC 事件并形成派生视图，不是上下文之间的数据后门。
 - Platform 注册 IPC、创建仓储和适配器、连接端口，不拥有 Project、BlockGraph、Run 或 Agent 业务状态。
-- Shared Kernel 只容纳稳定且确实被多个上下文共同使用的错误/契约；当前由它拥有规范画布对象身份 `projectId + workspaceId + objectKind + objectId`，供 BlockGraph、Run、Agent 和 Presentation 共同构造 owner key。分支、目录和显示名不得进入该身份。除此之外不得用 Shared Kernel 规避端口边界。
+- Shared Kernel 只容纳稳定且确实被多个上下文共同使用的错误/契约；当前由它拥有规范画布对象身份 `projectId + workspaceId + objectKind + objectId`，以及供 BlockGraph、模板、Presentation 和 Agent 指引共同消费的纯[画布执行语义契约](../product/canvas-semantic-contract.md)。前者构造 owner key，后者只分析完整流程、顶层执行单元与组合资格；两者都不拥有 BlockGraph 状态，也不得被用于规避应用层端口边界。分支、目录和显示名不得进入规范身份。
 - JSON 文件、PTY、Git CLI、HTTP Server、Codex、Claude Code 和 OpenCode CLI 都是基础设施细节，不是新的限界上下文。
 
 ## 规划中的 Plugin
