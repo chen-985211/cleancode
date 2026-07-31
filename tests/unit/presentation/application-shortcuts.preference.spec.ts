@@ -132,7 +132,7 @@ describe('application shortcut preference', () => {
 
   it('migrates the v4 direction bindings to directional node selection', () => {
     const nonDirectionalBindings = Object.fromEntries(
-      Object.entries(defaultApplicationShortcutBindings).filter(
+      Object.entries(v6DefaultBindings).filter(
         ([command]) => !command.startsWith('selectCanvasNode')
       )
     )
@@ -150,6 +150,11 @@ describe('application shortcut preference', () => {
 
     expect(readApplicationShortcutBindings()).toEqual({
       ...nonDirectionalBindings,
+      quickExecution1: defaultApplicationShortcutBindings.quickExecution1,
+      quickExecution2: defaultApplicationShortcutBindings.quickExecution2,
+      quickExecution3: defaultApplicationShortcutBindings.quickExecution3,
+      quickExecution4: defaultApplicationShortcutBindings.quickExecution4,
+      quickExecution5: defaultApplicationShortcutBindings.quickExecution5,
       selectCanvasNodeLeft: v4Bindings.panCanvasLeft,
       selectCanvasNodeRight: null,
       selectCanvasNodeUp: v4Bindings.panCanvasUp,
@@ -159,7 +164,7 @@ describe('application shortcut preference', () => {
 
   it('migrates v5 default canvas zoom bindings to the non-conflicting defaults', () => {
     const v5Bindings = {
-      ...defaultApplicationShortcutBindings,
+      ...v6DefaultBindings,
       zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
       zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
       fitCanvas: { alt: false, key: '0', primary: true, shift: false }
@@ -174,7 +179,7 @@ describe('application shortcut preference', () => {
 
   it('preserves v5 customized and cleared canvas zoom bindings', () => {
     const v5Bindings = {
-      ...defaultApplicationShortcutBindings,
+      ...v6DefaultBindings,
       zoomCanvasIn: null,
       zoomCanvasOut: { alt: true, key: 'Z', primary: true, shift: false },
       fitCanvas: { alt: false, key: '0', primary: true, shift: false }
@@ -193,7 +198,7 @@ describe('application shortcut preference', () => {
 
   it('leaves a migrated v5 default unassigned when the new binding is already customized', () => {
     const v5Bindings = {
-      ...defaultApplicationShortcutBindings,
+      ...v6DefaultBindings,
       createAgent: defaultApplicationShortcutBindings.zoomCanvasIn,
       zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
       zoomCanvasOut: { alt: false, key: '-', primary: true, shift: false },
@@ -211,12 +216,43 @@ describe('application shortcut preference', () => {
     })
   })
 
-  it('writes the complete catalog with preference schema v6', () => {
+  it('migrates v6 defaults to fit-canvas backslash and quick slots one through five', () => {
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({
+        bindings: {
+          ...v6DefaultBindings,
+          fitCanvas: { alt: false, key: '1', primary: true, shift: false }
+        },
+        version: 6
+      })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
+  })
+
+  it('preserves a v6 custom backslash binding while adding non-conflicting quick slots', () => {
+    const bindings = {
+      ...v6DefaultBindings,
+      fitCanvas: { alt: false, key: '\\', primary: true, shift: false }
+    }
+    window.localStorage.setItem(
+      shortcutBindingsStorageKey,
+      JSON.stringify({ bindings, version: 6 })
+    )
+
+    expect(readApplicationShortcutBindings()).toEqual({
+      ...defaultApplicationShortcutBindings,
+      ...bindings
+    })
+  })
+
+  it('writes the complete catalog with preference schema v7', () => {
     writeApplicationShortcutBindings(defaultApplicationShortcutBindings)
 
     expect(JSON.parse(window.localStorage.getItem(shortcutBindingsStorageKey) ?? '')).toEqual({
       bindings: defaultApplicationShortcutBindings,
-      version: 6
+      version: 7
     })
   })
 
@@ -253,3 +289,9 @@ describe('application shortcut preference', () => {
     expect(readApplicationShortcutBindings()).toEqual(defaultApplicationShortcutBindings)
   })
 })
+
+const v6DefaultBindings = Object.fromEntries(
+  Object.entries(defaultApplicationShortcutBindings).filter(
+    ([command]) => !command.startsWith('quickExecution')
+  )
+)

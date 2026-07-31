@@ -1,0 +1,308 @@
+.quick-execution {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  z-index: 8;
+  width: min(440px, calc(100% - 20px));
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.quick-execution__slots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.quick-execution--drop-target .quick-execution__slot {
+  border-color: var(--cc-primary);
+  background: var(--cc-primary-soft);
+  box-shadow: 0 0 0 2px var(--cc-primary-ring);
+}
+
+.quick-execution__slot {
+  position: relative;
+  min-width: 0;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface-translucent);
+  backdrop-filter: blur(10px);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    opacity 140ms ease;
+}
+
+.quick-execution__slot--filled {
+  cursor: grab;
+}
+
+.quick-execution__slot:hover,
+.quick-execution__slot:focus-within {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
+}
+
+.quick-execution__slot--dragging {
+  cursor: grabbing;
+  opacity: 0.5;
+}
+
+.quick-execution__slot--reorder-target {
+  border-color: var(--cc-primary);
+  background: var(--cc-primary-soft);
+}
+
+.quick-execution__slot--unavailable {
+  border-color: var(--cc-warning-border);
+}
+
+.quick-execution__content {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  grid-template-columns: 16px 13px minmax(0, 1fr);
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--cc-foreground);
+  font: inherit;
+  padding: 2px 5px;
+  text-align: left;
+}
+
+.quick-execution__add {
+  cursor: pointer;
+}
+
+.quick-execution__content--empty {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+
+.quick-execution__add:focus-visible,
+.quick-execution__slot--filled .quick-execution__content:focus-visible,
+.quick-execution__more:focus-visible,
+.quick-execution__popover button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
+}
+
+.quick-execution kbd {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--cc-muted);
+  font: inherit;
+  font-size: 8.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.quick-execution__type-icon {
+  flex: 0 0 auto;
+  color: var(--cc-muted-strong);
+}
+
+.quick-execution__add .quick-execution__type-icon {
+  color: var(--cc-primary);
+}
+
+.quick-execution__copy {
+  display: grid;
+  min-width: 0;
+}
+
+.quick-execution__copy strong,
+.quick-execution__copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-execution__copy strong {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.quick-execution__copy small {
+  color: var(--cc-warning-strong);
+  font-size: 8.5px;
+  line-height: 1.1;
+}
+
+.quick-execution__more {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  display: inline-flex;
+  width: 17px;
+  height: 17px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  opacity: 0;
+}
+
+.quick-execution__slot:hover .quick-execution__more,
+.quick-execution__slot:focus-within .quick-execution__more {
+  opacity: 1;
+}
+
+.quick-execution__popover {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  width: min(300px, calc(100vw - 28px));
+  max-height: min(340px, calc(100vh - 100px));
+  overflow: auto;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 9px;
+  background: var(--cc-surface-overlay);
+  padding: 4px;
+  box-shadow: var(--cc-shadow-floating);
+  transform: translateX(-50%);
+  animation: quick-execution-popover-in 150ms ease-out;
+}
+
+.quick-execution__picker-list,
+.quick-execution__action-list {
+  display: grid;
+  gap: 2px;
+}
+
+.quick-execution__picker-list button,
+.quick-execution__action-list button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  grid-template-columns: 17px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 8px;
+  text-align: left;
+}
+
+.quick-execution__picker-list button:hover,
+.quick-execution__action-list button:hover {
+  background: var(--cc-neutral-overlay);
+}
+
+.quick-execution__picker-list button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-execution__picker-list button small {
+  color: var(--cc-muted);
+  font-size: 10px;
+}
+
+.quick-execution__action-list button {
+  display: flex;
+}
+
+.quick-execution__empty-list {
+  margin: 0;
+  padding: 11px;
+  color: var(--cc-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.quick-execution__trash {
+  position: absolute;
+  bottom: -2px;
+  left: calc(100% + 8px);
+  display: flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cc-danger-border);
+  border-radius: 9px;
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px) scale(0.88);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.quick-execution__trash--visible {
+  opacity: 0.82;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.quick-execution__trash--target {
+  border-color: var(--cc-danger);
+  box-shadow: 0 0 0 3px var(--cc-danger-border);
+  opacity: 1;
+  transform: translateY(0) scale(1.05);
+}
+
+.quick-execution__trash svg {
+  pointer-events: none;
+}
+
+@keyframes quick-execution-popover-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-execution__slots,
+  .quick-execution__slot,
+  .quick-execution__trash {
+    transition: none;
+  }
+
+  .quick-execution__popover {
+    animation: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .quick-execution {
+    width: calc(100% - 20px);
+  }
+
+  .quick-execution__content {
+    grid-template-columns: 16px 12px minmax(0, 1fr);
+    gap: 2px;
+    padding-inline: 3px;
+  }
+}

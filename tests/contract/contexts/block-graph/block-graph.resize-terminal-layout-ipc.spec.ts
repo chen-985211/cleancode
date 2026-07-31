@@ -133,6 +133,93 @@ describe('block graph terminal resize IPC contract', () => {
     })
     expect(updateTerminalDefinition).not.toHaveBeenCalled()
   })
+
+  it('validates quick execution add, binding, clearing, and reorder commands at the IPC boundary', async () => {
+    const ipcMain = new FakeIpcMain()
+    const addQuickExecutionTarget = vi.fn(async () => createGraphSnapshot())
+    const bindQuickExecutionSlot = vi.fn(async () => createGraphSnapshot())
+    const clearQuickExecutionSlot = vi.fn(async () => createGraphSnapshot())
+    const reorderQuickExecutionSlots = vi.fn(async () => createGraphSnapshot())
+    registerBlockGraphIpcHandlers({
+      addQuickExecutionTarget,
+      bindQuickExecutionSlot,
+      clearQuickExecutionSlot,
+      ipcMain,
+      logger: silentLogger,
+      reorderQuickExecutionSlots
+    } as unknown as BlockGraphIpcHandlersInput)
+
+    const addCommand = {
+      projectDirectory: '/repo/app',
+      target: { terminalBlockId: 'worker', type: 'terminal' },
+      workspaceId: 'main'
+    }
+    const bindCommand = {
+      number: 2,
+      projectDirectory: '/repo/app',
+      target: { terminalBlockIds: ['api', 'web'], type: 'workflow' },
+      workspaceId: 'main'
+    }
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:add-quick-execution-target', addCommand)
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:bind-quick-execution-slot', bindCommand)
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:clear-quick-execution-slot', {
+        number: 2,
+        projectDirectory: '/repo/app',
+        workspaceId: 'main'
+      })
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+    await expect(
+      ipcMain.invoke<BlockGraphSnapshot>('cleancode:reorder-quick-execution-slots', {
+        destinationNumber: 4,
+        projectDirectory: '/repo/app',
+        sourceNumber: 2,
+        workspaceId: 'main'
+      })
+    ).resolves.toEqual({ ok: true, value: createGraphSnapshot() })
+
+    expect(addQuickExecutionTarget).toHaveBeenCalledWith(addCommand)
+    expect(bindQuickExecutionSlot).toHaveBeenCalledWith(bindCommand)
+    expect(clearQuickExecutionSlot).toHaveBeenCalledWith({
+      number: 2,
+      projectDirectory: '/repo/app',
+      workspaceId: 'main'
+    })
+    expect(reorderQuickExecutionSlots).toHaveBeenCalledWith({
+      destinationNumber: 4,
+      projectDirectory: '/repo/app',
+      sourceNumber: 2,
+      workspaceId: 'main'
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:bind-quick-execution-slot', {
+        ...bindCommand,
+        number: 6
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND' },
+      ok: false
+    })
+    expect(bindQuickExecutionSlot).toHaveBeenCalledTimes(1)
+
+    await expect(
+      ipcMain.invoke('cleancode:reorder-quick-execution-slots', {
+        destinationNumber: 6,
+        projectDirectory: '/repo/app',
+        sourceNumber: 2,
+        workspaceId: 'main'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND' },
+      ok: false
+    })
+    expect(reorderQuickExecutionSlots).toHaveBeenCalledTimes(1)
+  })
 })
 
 function createGraphSnapshot(): BlockGraphSnapshot {
@@ -142,6 +229,13 @@ function createGraphSnapshot(): BlockGraphSnapshot {
     workspaceId: 'main',
     viewport: { x: 0, y: 0, zoom: 1 },
     terminalGroups: [],
+    quickExecutionSlots: [
+      { number: 1, target: null },
+      { number: 2, target: null },
+      { number: 3, target: null },
+      { number: 4, target: null },
+      { number: 5, target: null }
+    ],
     blocks: [
       {
         id: 'terminal-1',

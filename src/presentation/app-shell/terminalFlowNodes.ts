@@ -89,6 +89,10 @@ interface CreateTerminalFlowNodesInput {
   readonly hoveredTerminalBlockId: string | null
   readonly activeWorkflowRootBlockIds?: readonly string[]
   readonly isStoppingWorkflow?: boolean
+  readonly launchCommandEditRequest?: {
+    readonly blockId: string
+    readonly requestId: number
+  } | null
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
@@ -106,6 +110,7 @@ export function createTerminalFlowNodes({
   hoveredTerminalBlockId,
   activeWorkflowRootBlockIds = [],
   isStoppingWorkflow = false,
+  launchCommandEditRequest = null,
   terminalStates,
   handlers,
   workflowNodeStatuses = {}
@@ -148,6 +153,10 @@ export function createTerminalFlowNodes({
         isNavigationHighlighted: hoveredTerminalBlockId === block.id,
         isActiveWorkflowRoot: activeWorkflowRootIds.has(block.id),
         isStoppingWorkflow,
+        launchCommandEditRequestId:
+          launchCommandEditRequest?.blockId === block.id
+            ? launchCommandEditRequest.requestId
+            : undefined,
         isSelected: selectedBlockIds.has(block.id),
         isTerminalGroupSelectionMode,
         terminalStates,
@@ -171,6 +180,7 @@ interface CreateTerminalFlowNodeInput {
   readonly isNavigationHighlighted: boolean
   readonly isActiveWorkflowRoot: boolean
   readonly isStoppingWorkflow: boolean
+  readonly launchCommandEditRequestId?: number
   readonly workflowStatus?: WorkflowRunNodeStatus
 }
 
@@ -187,6 +197,7 @@ function createTerminalFlowNode({
   isNavigationHighlighted,
   isActiveWorkflowRoot,
   isStoppingWorkflow,
+  launchCommandEditRequestId,
   workflowStatus
 }: CreateTerminalFlowNodeInput): TerminalFlowNode {
   return {
@@ -216,6 +227,7 @@ function createTerminalFlowNode({
       isNavigationHighlighted,
       isActiveWorkflowRoot,
       isStoppingWorkflow,
+      launchCommandEditRequestId,
       workflowStatus,
       ...handlers,
       onSelect: (additive) => handlers.onSelect?.(block, additive)

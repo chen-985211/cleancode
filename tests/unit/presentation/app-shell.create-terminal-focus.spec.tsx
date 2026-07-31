@@ -185,7 +185,7 @@ describe('app shell create terminal focus', () => {
 
     fireEvent.keyDown(document, { key: ']', ...primaryModifier })
     fireEvent.keyDown(document, { key: '[', ...primaryModifier })
-    fireEvent.keyDown(document, { key: '1', ...primaryModifier })
+    fireEvent.keyDown(document, { key: '\\', ...primaryModifier })
 
     expect(reactFlowSpies.zoomIn).toHaveBeenCalledWith({ duration: 160 })
     expect(reactFlowSpies.zoomOut).toHaveBeenCalledWith({ duration: 160 })

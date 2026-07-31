@@ -26,7 +26,12 @@ export const applicationShortcutCommandMessageKeys: Readonly<
   zoomCanvasIn: 'settings.shortcuts.command.zoomCanvasIn',
   zoomCanvasOut: 'settings.shortcuts.command.zoomCanvasOut',
   fitCanvas: 'settings.shortcuts.command.fitCanvas',
-  toggleMinimap: 'settings.shortcuts.command.toggleMinimap'
+  toggleMinimap: 'settings.shortcuts.command.toggleMinimap',
+  quickExecution1: 'settings.shortcuts.command.quickExecution1',
+  quickExecution2: 'settings.shortcuts.command.quickExecution2',
+  quickExecution3: 'settings.shortcuts.command.quickExecution3',
+  quickExecution4: 'settings.shortcuts.command.quickExecution4',
+  quickExecution5: 'settings.shortcuts.command.quickExecution5'
 }
 
 export type ApplicationShortcutTooltipLabels = Readonly<Record<ApplicationShortcutCommand, string>>

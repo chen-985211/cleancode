@@ -94,6 +94,7 @@ interface TerminalNodeData extends Record<string, unknown> {
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly isNavigationHighlighted: boolean
+  readonly launchCommandEditRequestId?: number
   readonly isActiveWorkflowRoot?: boolean
   readonly isStoppingWorkflow?: boolean
   readonly workflowStatus?: WorkflowRunNodeStatus

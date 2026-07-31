@@ -1,4 +1,4 @@
-import { Star } from 'lucide-react'
+import { Rocket, Star } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
@@ -17,13 +17,15 @@ interface CanvasObjectContextMenuProps {
   readonly target: CanvasObjectContextTarget
   readonly onClose: () => void
   readonly onFavorite: (terminalBlockIds: readonly string[]) => void
+  readonly onAddToQuickExecution?: (target: CanvasObjectContextTarget) => void
 }
 
 export function CanvasObjectContextMenu({
   position,
   target,
   onClose,
-  onFavorite
+  onFavorite,
+  onAddToQuickExecution
 }: CanvasObjectContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -102,6 +104,20 @@ export function CanvasObjectContextMenu({
         <Star size={16} fill="currentColor" aria-hidden="true" />
         {t(`canvas.contextMenu.favorite.${target.kind}`)}
       </button>
+      {onAddToQuickExecution ? (
+        <button
+          className="canvas-object-context-menu__item"
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose()
+            onAddToQuickExecution(target)
+          }}
+        >
+          <Rocket size={16} aria-hidden="true" />
+          {t('canvas.contextMenu.addToQuickExecution')}
+        </button>
+      ) : null}
     </div>,
     document.body
   )
@@ -113,5 +129,15 @@ function keepMenuItemFocused(
 ): void {
   if (!menu || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
   event.preventDefault()
-  menu.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+  const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  const activeIndex = items.findIndex((item) => item === document.activeElement)
+  const nextIndex =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? items.length - 1
+        : event.key === 'ArrowDown'
+          ? (activeIndex + 1) % items.length
+          : (activeIndex - 1 + items.length) % items.length
+  items[nextIndex]?.focus()
 }

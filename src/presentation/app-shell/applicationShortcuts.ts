@@ -15,7 +15,12 @@ export const applicationShortcutCommands = [
   'zoomCanvasIn',
   'zoomCanvasOut',
   'fitCanvas',
-  'toggleMinimap'
+  'toggleMinimap',
+  'quickExecution1',
+  'quickExecution2',
+  'quickExecution3',
+  'quickExecution4',
+  'quickExecution5'
 ] as const
 
 export type ApplicationShortcutCommand = (typeof applicationShortcutCommands)[number]
@@ -49,8 +54,13 @@ export const defaultApplicationShortcutBindings = {
   selectCanvasNodeDown: { alt: false, key: 'ArrowDown', primary: true, shift: false },
   zoomCanvasIn: { alt: false, key: ']', primary: true, shift: false },
   zoomCanvasOut: { alt: false, key: '[', primary: true, shift: false },
-  fitCanvas: { alt: false, key: '1', primary: true, shift: false },
-  toggleMinimap: { alt: false, key: 'M', primary: true, shift: true }
+  fitCanvas: { alt: false, key: '\\', primary: true, shift: false },
+  toggleMinimap: { alt: false, key: 'M', primary: true, shift: true },
+  quickExecution1: { alt: false, key: '1', primary: true, shift: false },
+  quickExecution2: { alt: false, key: '2', primary: true, shift: false },
+  quickExecution3: { alt: false, key: '3', primary: true, shift: false },
+  quickExecution4: { alt: false, key: '4', primary: true, shift: false },
+  quickExecution5: { alt: false, key: '5', primary: true, shift: false }
 } as const satisfies ApplicationShortcutBindings
 
 export const applicationShortcutGroups = [
@@ -78,7 +88,12 @@ export const applicationShortcutGroups = [
       'zoomCanvasIn',
       'zoomCanvasOut',
       'fitCanvas',
-      'toggleMinimap'
+      'toggleMinimap',
+      'quickExecution1',
+      'quickExecution2',
+      'quickExecution3',
+      'quickExecution4',
+      'quickExecution5'
     ]
   }
 ] as const satisfies readonly {

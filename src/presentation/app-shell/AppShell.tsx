@@ -57,6 +57,10 @@ import { useApplicationSettingsNavigation } from './useApplicationSettingsNaviga
 import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
 import { useBlockTemplateActions } from './useBlockTemplateActions'
 import { AppShellSettings } from './AppShellSettings'
+import { useQuickExecutionActions } from './useQuickExecutionActions'
+import { useAppShellBlockActions } from './useAppShellBlockActions'
+import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
+import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -162,6 +166,11 @@ export function AppShell({
     },
     [cancelPendingWorkbenchInputFocus]
   )
+  const { launchCommandEditRequest, requestTerminalLaunchCommand } =
+    useTerminalLaunchCommandRequest({
+      currentWorkspace,
+      focusTerminalBlock
+    })
   const {
     dismissPortConflict,
     findTerminalBlockIdForSession,
@@ -268,6 +277,16 @@ export function AppShell({
     setCurrentGraph
   })
   const { start: startWorkflow, startTerminalCombination, stop: stopWorkflow } = terminalWorkflow
+  const quickExecution = useQuickExecutionActions({
+    currentWorkbench,
+    currentWorkspace,
+    notifications,
+    quickLaunchTerminal,
+    requestTerminalLaunchCommand,
+    setCurrentGraph,
+    startScope: terminalWorkflow.startScope,
+    startTerminalCombination
+  })
   const {
     copyServiceEndpoint,
     locateManagedServiceOwner,
@@ -307,36 +326,18 @@ export function AppShell({
     setWorkbenches,
     terminateWorkbenchTerminalSessions
   })
-  const createTerminalGroup = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || !canCreateTerminalGroup) return
-
-    const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
-    const graphSnapshot = await window.cleancode?.createTerminalGroup({
-      projectDirectory: currentWorkbench.project.directory,
-      workspaceId: currentWorkspace.workspaceId,
-      name:
-        currentWorkbench.graph.terminalGroups.length === 0
-          ? t('group.defaultFirstName')
-          : t('group.defaultName'),
-      memberBlockIds: selectedUngroupedTerminalBlockIds
-    })
-
-    if (graphSnapshot) {
-      setCurrentGraph(graphSnapshot)
-      completeTerminalGroupSelection()
-      setSelectedTerminalGroupId(
-        graphSnapshot.terminalGroups.find((group) => !existingGroupIds.has(group.id))?.id ?? null
-      )
-    }
-  }, [
-    currentWorkbench,
-    currentWorkspace,
+  const { createTerminalGroup, deleteTerminalBlock } = useAppShellBlockActions({
     canCreateTerminalGroup,
     completeTerminalGroupSelection,
+    currentWorkbench,
+    currentWorkspace,
+    defaultGroupName: t('group.defaultName'),
+    firstGroupName: t('group.defaultFirstName'),
     selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
-    t
-  ])
+    setSelectedTerminalGroupId,
+    terminateTerminalSession
+  })
 
   const workbenchNodeSelection = useWorkbenchNodeSelection({
     isTerminalGroupSelectionMode,
@@ -374,18 +375,22 @@ export function AppShell({
       setCurrentGraph,
       setNodes: nodeStore.setNodes
     })
-  const { onAgentGraphUpdated, onNodeDragStart, onNodeDragStop, protectedLayoutNodeIds } =
-    useAgentLayoutCoordination({
-      clearTerminalGroupDropPreview,
-      currentProjectId: currentWorkbench?.project.id ?? null,
-      currentWorkspaceId: currentWorkspace?.workspaceId ?? null,
-      moveWorkbenchNode,
-      moveWorkspaceAgent,
-      nodeStore,
-      reactFlowInstanceRef,
-      setCurrentGraph
-    })
-
+  const {
+    cancelNodeDrag,
+    onAgentGraphUpdated,
+    onNodeDragStart,
+    onNodeDragStop,
+    protectedLayoutNodeIds
+  } = useAgentLayoutCoordination({
+    clearTerminalGroupDropPreview,
+    currentProjectId: currentWorkbench?.project.id ?? null,
+    currentWorkspaceId: currentWorkspace?.workspaceId ?? null,
+    moveWorkbenchNode,
+    moveWorkspaceAgent,
+    nodeStore,
+    reactFlowInstanceRef,
+    setCurrentGraph
+  })
   const minimapNodeInteraction = useMemo(
     () =>
       createMinimapNodeInteraction({
@@ -395,27 +400,6 @@ export function AppShell({
         terminalGroupsById
       }),
     [currentWorkbench?.agents, terminalBlocksById, terminalGroupsById]
-  )
-
-  const deleteTerminalBlock = useCallback(
-    async (block: TerminalBlockSnapshot) => {
-      if (!currentWorkbench || !currentWorkspace) {
-        return
-      }
-
-      await terminateTerminalSession(block)
-
-      const graphSnapshot = await window.cleancode?.deleteBlock({
-        projectDirectory: currentWorkbench.project.directory,
-        workspaceId: currentWorkspace.workspaceId,
-        blockId: block.id
-      })
-
-      if (graphSnapshot) {
-        setCurrentGraph(graphSnapshot)
-      }
-    },
-    [currentWorkbench, currentWorkspace, setCurrentGraph, terminateTerminalSession]
   )
 
   const resizeTerminalBlock = useTerminalBlockResizeAction({
@@ -516,6 +500,10 @@ export function AppShell({
     terminalStates,
     activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
     isStoppingWorkflow: terminalWorkflow.isStopping,
+    launchCommandEditRequest:
+      launchCommandEditRequest?.workspaceId === currentWorkspace?.workspaceId
+        ? launchCommandEditRequest
+        : null,
     workflowNodeStatuses: terminalWorkflow.nodeStatuses,
     onRemoveAgent: removeWorkspaceAgent,
     onMcpCapabilityChange: updateWorkspaceAgentMcpCapability,
@@ -540,6 +528,7 @@ export function AppShell({
     createAgent: createWorkspaceAgent,
     createBranchWorkspace: shortcutNavigation.requestBranchWorkspaceCreation,
     createTerminal: createTerminalBlock,
+    executeQuickExecutionSlot: quickExecution.executeSlot,
     fitCanvas,
     groupTerminals: beginTerminalGroupSelection,
     hasMultipleWorkspaces,
@@ -560,18 +549,16 @@ export function AppShell({
     bindings,
     platform: shortcutPlatform
   })
-  const commitWorkbenchNodeDrag = useCallback(
-    (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
-      void onNodeDragStop(event, node).catch(() => {
-        notifications.notify({
-          kind: 'error',
-          message: t('canvas.layoutSaveFailed'),
-          title: t('canvas.layoutSaveFailedTitle')
-        })
-      })
-    },
-    [notifications, onNodeDragStop, t]
-  )
+  const { bindQuickExecutionFromNodeDrop, commitWorkbenchNodeDrag } = useAppShellNodeDragActions({
+    addQuickExecutionTarget: quickExecution.addTarget,
+    cancelNodeDrag,
+    graph,
+    layoutSaveFailedMessage: t('canvas.layoutSaveFailed'),
+    layoutSaveFailedTitle: t('canvas.layoutSaveFailedTitle'),
+    nodeStore,
+    notify: notifications.notify,
+    onNodeDragStop
+  })
   return (
     <AgentProviderStateProvider>
       <TerminalSurfaceRegistryProvider registry={terminalSurfaceRegistry}>
@@ -662,6 +649,12 @@ export function AppShell({
             onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
             onPlaceBlockTemplate={blockTemplates.place}
             onRequestSaveBlockTemplate={blockTemplates.requestSave}
+            onAddQuickExecutionTarget={quickExecution.addTarget}
+            onBindQuickExecutionSlot={quickExecution.bindSlot}
+            onClearQuickExecutionSlot={quickExecution.clearSlot}
+            onReorderQuickExecutionSlots={quickExecution.reorderSlots}
+            onQuickExecutionNodeDrop={bindQuickExecutionFromNodeDrop}
+            onQuickExecutionDragPreview={clearTerminalGroupDropPreview}
             isMinimapCollapsed={shortcutNavigation.isMinimapCollapsed}
             onToggleMinimap={shortcutNavigation.toggleMinimap}
             onZoomCanvasIn={zoomCanvasIn}

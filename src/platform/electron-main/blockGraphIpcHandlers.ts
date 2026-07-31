@@ -1,6 +1,8 @@
 import type {
   BlockGraphSnapshot,
   CanvasViewportSnapshot,
+  QuickExecutionSlotNumber,
+  QuickExecutionTargetSnapshot,
   TerminalExecutionConfigSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
@@ -18,9 +20,47 @@ interface TerminalDefinitionIpcCommand {
   readonly executionConfig: TerminalExecutionConfigSnapshot
 }
 
+interface BindQuickExecutionSlotIpcCommand {
+  readonly projectDirectory: string
+  readonly workspaceId: string
+  readonly number: QuickExecutionSlotNumber
+  readonly target: QuickExecutionTargetSnapshot
+}
+
+interface AddQuickExecutionTargetIpcCommand {
+  readonly projectDirectory: string
+  readonly workspaceId: string
+  readonly target: QuickExecutionTargetSnapshot
+}
+
+interface ClearQuickExecutionSlotIpcCommand {
+  readonly projectDirectory: string
+  readonly workspaceId: string
+  readonly number: QuickExecutionSlotNumber
+}
+
+interface ReorderQuickExecutionSlotsIpcCommand {
+  readonly projectDirectory: string
+  readonly workspaceId: string
+  readonly sourceNumber: QuickExecutionSlotNumber
+  readonly destinationNumber: QuickExecutionSlotNumber
+}
+
 export interface BlockGraphIpcHandlersInput {
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
+  readonly addQuickExecutionTarget: (
+    command: AddQuickExecutionTargetIpcCommand
+  ) => Promise<BlockGraphSnapshot>
+  readonly bindQuickExecutionSlot: (
+    command: BindQuickExecutionSlotIpcCommand
+  ) => Promise<BlockGraphSnapshot>
+  readonly clearQuickExecutionSlot: (
+    command: ClearQuickExecutionSlotIpcCommand
+  ) => Promise<BlockGraphSnapshot>
+  readonly reorderQuickExecutionSlots: (
+    command: ReorderQuickExecutionSlotsIpcCommand
+  ) => Promise<BlockGraphSnapshot>
   readonly createTerminalBlock: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
@@ -129,6 +169,45 @@ export interface BlockGraphIpcHandlersInput {
 }
 
 export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput): void {
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:add-quick-execution-target',
+    handler: (command) =>
+      input.addQuickExecutionTarget(readAddQuickExecutionTargetCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'addQuickExecutionTarget',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:bind-quick-execution-slot',
+    handler: (command) => input.bindQuickExecutionSlot(readBindQuickExecutionSlotCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'bindQuickExecutionSlot',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:clear-quick-execution-slot',
+    handler: (command) =>
+      input.clearQuickExecutionSlot(readClearQuickExecutionSlotCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'clearQuickExecutionSlot',
+    scope: 'block-graph'
+  })
+
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:reorder-quick-execution-slots',
+    handler: (command) =>
+      input.reorderQuickExecutionSlots(readReorderQuickExecutionSlotsCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'reorderQuickExecutionSlots',
+    scope: 'block-graph'
+  })
+
   registerIpcHandler<
     {
       readonly projectDirectory: string
@@ -435,6 +514,128 @@ function readTerminalDefinitionCommand(command: unknown): TerminalDefinitionIpcC
   }
 
   return command as unknown as TerminalDefinitionIpcCommand
+}
+
+function readBindQuickExecutionSlotCommand(command: unknown): BindQuickExecutionSlotIpcCommand {
+  const scope = readQuickExecutionSlotScope(command)
+  if (!isRecord(command) || !isQuickExecutionTarget(command.target)) {
+    throwInvalidQuickExecutionSlotCommand()
+  }
+
+  return {
+    ...scope,
+    target: command.target
+  }
+}
+
+function readAddQuickExecutionTargetCommand(command: unknown): AddQuickExecutionTargetIpcCommand {
+  const scope = readQuickExecutionScope(command)
+  if (!isRecord(command) || !isQuickExecutionTarget(command.target)) {
+    throwInvalidQuickExecutionSlotCommand()
+  }
+
+  return {
+    ...scope,
+    target: command.target
+  }
+}
+
+function readClearQuickExecutionSlotCommand(command: unknown): ClearQuickExecutionSlotIpcCommand {
+  return readQuickExecutionSlotScope(command)
+}
+
+function readQuickExecutionSlotScope(command: unknown): ClearQuickExecutionSlotIpcCommand {
+  const scope = readQuickExecutionScope(command)
+  if (!isRecord(command) || ![1, 2, 3, 4, 5].includes(command.number as number)) {
+    throwInvalidQuickExecutionSlotCommand()
+  }
+
+  return {
+    ...scope,
+    number: command.number as QuickExecutionSlotNumber
+  }
+}
+
+function readReorderQuickExecutionSlotsCommand(
+  command: unknown
+): ReorderQuickExecutionSlotsIpcCommand {
+  const scope = readQuickExecutionScope(command)
+  if (
+    !isRecord(command) ||
+    ![1, 2, 3, 4, 5].includes(command.sourceNumber as number) ||
+    ![1, 2, 3, 4, 5].includes(command.destinationNumber as number)
+  ) {
+    throwInvalidQuickExecutionSlotCommand()
+  }
+
+  return {
+    ...scope,
+    destinationNumber: command.destinationNumber as QuickExecutionSlotNumber,
+    sourceNumber: command.sourceNumber as QuickExecutionSlotNumber
+  }
+}
+
+function readQuickExecutionScope(command: unknown): {
+  readonly projectDirectory: string
+  readonly workspaceId: string
+} {
+  if (
+    !isRecord(command) ||
+    typeof command.projectDirectory !== 'string' ||
+    command.projectDirectory.length === 0 ||
+    typeof command.workspaceId !== 'string' ||
+    command.workspaceId.length === 0
+  ) {
+    throwInvalidQuickExecutionSlotCommand()
+  }
+
+  return {
+    projectDirectory: command.projectDirectory,
+    workspaceId: command.workspaceId
+  }
+}
+
+function isQuickExecutionTarget(value: unknown): value is QuickExecutionTargetSnapshot {
+  if (!isRecord(value)) return false
+  if (value.type === 'terminal') {
+    return (
+      hasExactKeys(value, ['type', 'terminalBlockId']) &&
+      typeof value.terminalBlockId === 'string' &&
+      value.terminalBlockId.length > 0
+    )
+  }
+  if (value.type === 'workflow') {
+    return (
+      hasExactKeys(value, ['type', 'terminalBlockIds']) &&
+      Array.isArray(value.terminalBlockIds) &&
+      value.terminalBlockIds.length > 0 &&
+      value.terminalBlockIds.every(
+        (terminalBlockId) => typeof terminalBlockId === 'string' && terminalBlockId.length > 0
+      ) &&
+      new Set(value.terminalBlockIds).size === value.terminalBlockIds.length
+    )
+  }
+  return (
+    value.type === 'combination' &&
+    hasExactKeys(value, ['type', 'terminalGroupId']) &&
+    typeof value.terminalGroupId === 'string' &&
+    value.terminalGroupId.length > 0
+  )
+}
+
+function throwInvalidQuickExecutionSlotCommand(): never {
+  throw createExpectedAppError(
+    'INVALID_IPC_COMMAND',
+    'Invalid IPC command: quick execution slot command is required.'
+  )
+}
+
+function hasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  const allowedKeys = new Set(keys)
+  return (
+    Object.keys(record).length === keys.length &&
+    Object.keys(record).every((key) => allowedKeys.has(key))
+  )
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

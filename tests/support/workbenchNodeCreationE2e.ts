@@ -1,5 +1,7 @@
 import type { Page } from 'playwright'
 
+import { resolveWorkbenchSafeViewport } from '../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+
 export const createdWorkbenchNodeZoomUpperBound = 1.001
 
 export interface CreatedWorkbenchNodeResult {
@@ -124,11 +126,11 @@ async function waitForCanvasZoomToSettle(page: Page): Promise<void> {
   throw new Error('Canvas zoom animation did not settle.')
 }
 
-function readCreatedNodeGeometry(
+async function readCreatedNodeGeometry(
   page: Page,
   selector: string
 ): Promise<CreatedWorkbenchNodeResult | null> {
-  return page.evaluate((nodeSelector) => {
+  const geometry = await page.evaluate((nodeSelector) => {
     const canvas = document.querySelector<HTMLElement>('.react-flow')
     const node = document.querySelector<HTMLElement>(nodeSelector)
     const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
@@ -137,36 +139,44 @@ function readCreatedNodeGeometry(
       return null
     }
 
-    const margin = 24
-    const canvasBounds = canvas.getBoundingClientRect()
-    const obstructionBottom = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-workbench-canvas-obstruction]')
-    )
-      .map((element) => element.getBoundingClientRect())
-      .filter(
-        (bounds) =>
-          bounds.right > canvasBounds.left &&
-          bounds.left < canvasBounds.right &&
-          bounds.bottom > canvasBounds.top &&
-          bounds.top < canvasBounds.bottom
-      )
-      .reduce((bottom, bounds) => Math.max(bottom, bounds.bottom), canvasBounds.top)
-    const safeBounds = {
-      bottom: canvasBounds.bottom - margin,
-      left: canvasBounds.left + margin,
-      right: canvasBounds.right - margin,
-      top: Math.max(canvasBounds.top + margin, obstructionBottom + margin)
-    }
+    const toRect = (bounds: DOMRect) => ({
+      bottom: bounds.bottom,
+      left: bounds.left,
+      right: bounds.right,
+      top: bounds.top
+    })
     const nodeBounds = node.getBoundingClientRect()
 
     return {
-      insets: {
-        bottom: safeBounds.bottom - nodeBounds.bottom,
-        left: nodeBounds.left - safeBounds.left,
-        right: safeBounds.right - nodeBounds.right,
-        top: nodeBounds.top - safeBounds.top
-      },
+      canvasRect: toRect(canvas.getBoundingClientRect()),
+      nodeRect: toRect(nodeBounds),
+      obstructionRects: Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workbench-canvas-obstruction]')
+      ).map((element) => toRect(element.getBoundingClientRect())),
       zoom: new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
     }
   }, selector)
+
+  if (!geometry) return null
+
+  const safeViewport = resolveWorkbenchSafeViewport({
+    canvasRect: geometry.canvasRect,
+    obstructionRects: geometry.obstructionRects
+  })
+  const safeBounds = {
+    bottom: geometry.canvasRect.top + safeViewport.y + safeViewport.height,
+    left: geometry.canvasRect.left + safeViewport.x,
+    right: geometry.canvasRect.left + safeViewport.x + safeViewport.width,
+    top: geometry.canvasRect.top + safeViewport.y
+  }
+
+  return {
+    insets: {
+      bottom: safeBounds.bottom - geometry.nodeRect.bottom,
+      left: geometry.nodeRect.left - safeBounds.left,
+      right: safeBounds.right - geometry.nodeRect.right,
+      top: geometry.nodeRect.top - safeBounds.top
+    },
+    zoom: geometry.zoom
+  }
 }

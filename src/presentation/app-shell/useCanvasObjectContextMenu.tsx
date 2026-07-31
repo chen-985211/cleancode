@@ -26,12 +26,14 @@ export function useCanvasObjectContextMenu({
   edges,
   graph,
   nodes,
-  onRequestSaveBlockTemplate
+  onRequestSaveBlockTemplate,
+  onRequestQuickExecutionBinding
 }: {
   readonly edges: readonly Edge[]
   readonly graph: BlockGraphSnapshot | null
   readonly nodes: readonly WorkbenchFlowNode[]
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
+  readonly onRequestQuickExecutionBinding?: (target: CanvasObjectContextTarget) => void
 }): {
   readonly close: () => void
   readonly edges: Edge[]
@@ -88,6 +90,7 @@ export function useCanvasObjectContextMenu({
         position={activeState.position}
         target={activeState.target}
         onClose={close}
+        onAddToQuickExecution={onRequestQuickExecutionBinding}
         onFavorite={(blockIds) => onRequestSaveBlockTemplate?.(blockIds)}
       />
     ) : null,

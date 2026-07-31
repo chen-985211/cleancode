@@ -123,6 +123,23 @@ describe('workbench safe viewport', () => {
       height: 562
     })
   })
+
+  it('reserves bottom canvas chrome without treating it as a top obstruction', () => {
+    expect(
+      resolveWorkbenchSafeViewport({
+        canvasRect: { left: 100, top: 50, right: 1_300, bottom: 850 },
+        obstructionRects: [
+          { left: 980, top: 96, right: 1_276, bottom: 156 },
+          { left: 420, top: 776, right: 980, bottom: 836 }
+        ]
+      })
+    ).toEqual({
+      x: 24,
+      y: 130,
+      width: 1_152,
+      height: 572
+    })
+  })
 })
 
 function createNode(

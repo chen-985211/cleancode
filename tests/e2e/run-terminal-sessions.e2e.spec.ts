@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
@@ -173,7 +174,7 @@ describe('run terminal sessions e2e', () => {
   )
 
   it(
-    'configures and starts one launch command from a terminal block',
+    'binds, persists and executes a terminal from the quick execution bar',
     async () => {
       await createRunningTerminal(page)
 
@@ -191,6 +192,126 @@ describe('run terminal sessions e2e', () => {
 
       expect(graph.blocks[0]?.launchCommand).toBe(launchCommand)
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
+
+      await page.getByRole('button', { name: '添加画布对象' }).click()
+      const objectPicker = page.getByRole('dialog', { name: '选择要绑定的画布对象' })
+      await objectPicker.getByRole('button').filter({ hasText: 'Terminal 1' }).click()
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[0]?.target)
+        .toEqual({ type: 'terminal', terminalBlockId: graph.blocks[0]?.id })
+
+      const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；点击仅用于定位视图。`
+      await page.locator('[data-quick-execution-slot="1"]').hover()
+      await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
+      await page.mouse.move(0, 0)
+      await expect.poll(() => page.getByRole('tooltip').count()).toBe(0)
+
+      if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
+        const resultDirectory = join(process.cwd(), 'test-results')
+        await mkdir(resultDirectory, { recursive: true })
+        await selectTheme(page, 'light')
+        await waitForQuickExecutionVisualToSettle(page)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-light.png')
+        })
+        await page.locator('[data-quick-execution-slot="1"]').hover()
+        await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
+        await waitForQuickExecutionVisualToSettle(page)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-light-hover.png')
+        })
+        await selectTheme(page, 'dark')
+        await waitForQuickExecutionVisualToSettle(page)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-dark.png')
+        })
+        await electronApp.evaluate(({ BrowserWindow }) => {
+          BrowserWindow.getAllWindows()[0]?.setSize(960, 640)
+        })
+        await page.waitForFunction(() => window.innerWidth <= 960)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-dark-narrow.png')
+        })
+      }
+
+      await page
+        .locator('[data-quick-execution-slot="1"]')
+        .dragTo(page.locator('[data-quick-execution-slot="2"]'))
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.slice(0, 2))
+        .toEqual([
+          { number: 1, target: null },
+          { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
+        ])
+
+      const boundSlot = page.getByRole('button', {
+        name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+      })
+      await boundSlot.click()
+      expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
+      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
+      await waitForQuickLaunchCount(reportPath, launchOutput, 2)
+
+      await electronApp.close()
+      resources.electronApp = undefined
+      electronApp = await launchApp(workbench, {
+        environment: createE2eTerminalEnvironment()
+      })
+      resources.electronApp = electronApp
+      page = await electronApp.firstWindow()
+      resources.page = page
+      await page.waitForLoadState('domcontentloaded')
+
+      await expect
+        .poll(() =>
+          page
+            .getByRole('button', {
+              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+            })
+            .isVisible()
+        )
+        .toBe(true)
+      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
+      await waitForQuickLaunchCount(reportPath, launchOutput, 3)
+
+      const quickSlot = page.locator('[data-quick-execution-slot="2"]')
+      const quickSlotBox = await quickSlot.boundingBox()
+      if (!quickSlotBox) throw new Error('Quick execution slot 2 is not visible')
+
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2,
+        quickSlotBox.y + quickSlotBox.height / 2
+      )
+      await page.mouse.down()
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2 + 8,
+        quickSlotBox.y + quickSlotBox.height / 2,
+        { steps: 4 }
+      )
+      await expect
+        .poll(() => page.locator('[data-quick-execution-trash]').getAttribute('aria-hidden'))
+        .toBe('false')
+
+      const trashBox = await page.locator('[data-quick-execution-trash]').boundingBox()
+      if (!trashBox) throw new Error('Quick execution trash target is not visible')
+      await page.mouse.move(trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, {
+        steps: 8
+      })
+      await page.mouse.up()
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target)
+        .toBeNull()
+      await expect
+        .poll(() =>
+          page
+            .getByRole('button', {
+              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+            })
+            .count()
+        )
+        .toBe(0)
     },
     electronScenarioTimeoutMs
   )
@@ -419,6 +540,43 @@ async function waitForFakeAgentReport(
   throw new Error(
     `Timed out waiting for ${description}. Last fixture reports: ${JSON.stringify(reports.slice(-5))}`
   )
+}
+
+async function waitForQuickLaunchCount(
+  reportPath: string,
+  marker: string,
+  expectedCount: number
+): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (await readFile(reportPath, 'utf8')).split('\n').filter((line) => line === marker).length,
+      { interval: 50, timeout: 10_000 }
+    )
+    .toBe(expectedCount)
+}
+
+async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
+  await page.getByRole('button', { name: '主题设置' }).click()
+  await page.getByText(theme === 'light' ? '浅色' : '深色', { exact: true }).click()
+  await page.waitForFunction(
+    (expectedTheme) => document.documentElement.dataset.theme === expectedTheme,
+    theme
+  )
+  await page.getByRole('button', { name: '关闭主题设置' }).click()
+  await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
+  await page.waitForFunction(() => document.querySelector('[inert]') === null)
+}
+
+async function waitForQuickExecutionVisualToSettle(page: Page): Promise<void> {
+  await page.locator('[data-quick-execution-bar]').evaluate(async (bar) => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    await Promise.allSettled(
+      bar.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    )
+  })
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {

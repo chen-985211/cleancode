@@ -28,11 +28,15 @@ import { createBuiltinAgentProviderContributions } from '../../contexts/agent/in
 import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
 import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
 import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
+import { AddQuickExecutionTargetUseCase } from '../../contexts/block-graph/application/use-cases/AddQuickExecutionTargetUseCase'
 import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
+import { BindQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/BindQuickExecutionSlotUseCase'
 import { BuildTerminalWorkflowPlanUseCase } from '../../contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
 import { ConnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
+import { ClearQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/ClearQuickExecutionSlotUseCase'
+import { ReorderQuickExecutionSlotsUseCase } from '../../contexts/block-graph/application/use-cases/ReorderQuickExecutionSlotsUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
 import { DeleteBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockTemplateUseCase'
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
@@ -141,6 +145,10 @@ const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const arrangeTerminalLayoutUseCase = new ArrangeTerminalLayoutUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const createTerminalGroupUseCase = new CreateTerminalGroupUseCase(graphRepository)
+const addQuickExecutionTargetUseCase = new AddQuickExecutionTargetUseCase(graphRepository)
+const bindQuickExecutionSlotUseCase = new BindQuickExecutionSlotUseCase(graphRepository)
+const clearQuickExecutionSlotUseCase = new ClearQuickExecutionSlotUseCase(graphRepository)
+const reorderQuickExecutionSlotsUseCase = new ReorderQuickExecutionSlotsUseCase(graphRepository)
 const connectTerminalBlocksUseCase = new ConnectTerminalBlocksUseCase(graphRepository)
 const disconnectTerminalBlocksUseCase = new DisconnectTerminalBlocksUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
@@ -342,7 +350,11 @@ registerProjectIpcHandlers({
 })
 
 registerBlockGraphIpcHandlers({
+  addQuickExecutionTarget: (command) => addQuickExecutionTargetUseCase.execute(command),
   addTerminalToGroup: (command) => addTerminalToGroupUseCase.execute(command),
+  bindQuickExecutionSlot: (command) => bindQuickExecutionSlotUseCase.execute(command),
+  clearQuickExecutionSlot: (command) => clearQuickExecutionSlotUseCase.execute(command),
+  reorderQuickExecutionSlots: (command) => reorderQuickExecutionSlotsUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
   connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),

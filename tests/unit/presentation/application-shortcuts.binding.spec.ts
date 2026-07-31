@@ -53,8 +53,14 @@ describe('application shortcut bindings', () => {
     ])
     expect(formatShortcutBinding(defaultApplicationShortcutBindings.fitCanvas, 'mac')).toEqual([
       '⌘',
-      '1'
+      '\\'
     ])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.quickExecution1, 'mac')
+    ).toEqual(['⌘', '1'])
+    expect(
+      formatShortcutBinding(defaultApplicationShortcutBindings.quickExecution5, 'other')
+    ).toEqual(['Ctrl', '5'])
     expect(
       formatShortcutBinding(defaultApplicationShortcutBindings.selectCanvasNodeLeft, 'mac')
     ).toEqual(['⌘', '←'])
@@ -87,7 +93,7 @@ describe('application shortcut bindings', () => {
       new Set(
         Object.values(defaultApplicationShortcutBindings).map((binding) => JSON.stringify(binding))
       ).size
-    ).toBe(17)
+    ).toBe(22)
   })
 
   it('normalizes primary-modifier combinations and rejects unsafe single keys', () => {

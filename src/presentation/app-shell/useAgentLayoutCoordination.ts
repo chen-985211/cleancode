@@ -103,6 +103,13 @@ export function useAgentLayoutCoordination({
     },
     [moveWorkbenchNode, moveWorkspaceAgent, nodeStore, updateDragProtection]
   )
+  const cancelNodeDrag = useCallback(
+    (nodeId: string): void => {
+      clearTerminalGroupDropPreview()
+      updateDragProtection(nodeId, null)
+    },
+    [clearTerminalGroupDropPreview, updateDragProtection]
+  )
 
   useEffect(() => {
     dragProtectionByNodeIdRef.current.clear()
@@ -119,6 +126,7 @@ export function useAgentLayoutCoordination({
   })
 
   return {
+    cancelNodeDrag,
     onAgentGraphUpdated,
     onNodeDragStart,
     onNodeDragStop,

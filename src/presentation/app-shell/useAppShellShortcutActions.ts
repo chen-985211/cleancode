@@ -22,6 +22,7 @@ interface UseAppShellShortcutActionsInput {
   readonly isSettingsOpen: boolean
   readonly navigateWorkspace: (direction: WorkspaceNavigationDirection) => void | Promise<void>
   readonly openSettings: ShortcutRun
+  readonly executeQuickExecutionSlot: (number: 1 | 2 | 3 | 4 | 5) => void | Promise<void>
   readonly selectCanvasNode: (direction: CanvasNavigationDirection) => void
   readonly toggleMinimap: ShortcutRun
   readonly toggleSidebar: ShortcutRun
@@ -43,6 +44,7 @@ export function useAppShellShortcutActions({
   isSettingsOpen,
   navigateWorkspace,
   openSettings,
+  executeQuickExecutionSlot,
   selectCanvasNode,
   toggleMinimap,
   toggleSidebar,
@@ -91,7 +93,12 @@ export function useAppShellShortcutActions({
       zoomCanvasIn: { enabled: hasWorkbench, run: zoomCanvasIn },
       zoomCanvasOut: { enabled: hasWorkbench, run: zoomCanvasOut },
       fitCanvas: { enabled: hasWorkbench, run: fitCanvas },
-      toggleMinimap: { enabled: hasWorkbench, run: toggleMinimap }
+      toggleMinimap: { enabled: hasWorkbench, run: toggleMinimap },
+      quickExecution1: { enabled: hasWorkbench, run: () => executeQuickExecutionSlot(1) },
+      quickExecution2: { enabled: hasWorkbench, run: () => executeQuickExecutionSlot(2) },
+      quickExecution3: { enabled: hasWorkbench, run: () => executeQuickExecutionSlot(3) },
+      quickExecution4: { enabled: hasWorkbench, run: () => executeQuickExecutionSlot(4) },
+      quickExecution5: { enabled: hasWorkbench, run: () => executeQuickExecutionSlot(5) }
     }),
     [
       addProject,
@@ -107,6 +114,7 @@ export function useAppShellShortcutActions({
       isSettingsOpen,
       navigateWorkspace,
       openSettings,
+      executeQuickExecutionSlot,
       selectCanvasNode,
       toggleMinimap,
       toggleSidebar,
