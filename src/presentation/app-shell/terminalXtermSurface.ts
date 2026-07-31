@@ -24,6 +24,11 @@ import type { TerminalDimensions } from './types'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
+import {
+  shouldReassertTerminalStartupDimensions,
+  startTerminalStartupGridReconciliation,
+  type TerminalStartupGridReconciliationHandle
+} from './terminalStartupGridReconciliation'
 
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
@@ -55,9 +60,12 @@ class XtermTerminalSurface implements TerminalSurface {
   private searchSubscription: IDisposable | null = null
   private fileLinkProviderSubscription: IDisposable | null = null
   private pendingFitAnimationFrame: number | null = null
+  private startupGridReconciliation: TerminalStartupGridReconciliationHandle | null = null
   private lastReportedDimensions: TerminalDimensions | null = null
   private isResizeSuspended = false
   private hasDeferredResizeFit = false
+  private hasObservedElementGeometry = false
+  private hasRendererActivationSettled = false
   private isOpened = false
   private isDisposed = false
   private isRestoring = true
@@ -120,19 +128,24 @@ class XtermTerminalSurface implements TerminalSurface {
     this.onRestoreRequired = attachment.onRestoreRequired
     this.onSearchResultsChange = attachment.onSearchResultsChange
     this.isResizeSuspended = attachment.isResizeSuspended
+    this.hasObservedElementGeometry = false
     attachment.element.addEventListener('pointerdown', this.focus, true)
 
     if (!this.isOpened) {
       this.terminal.open(attachment.element)
       const terminal = this.terminal
-      void this.rendererController.activate({
-        get rows() {
-          return terminal.rows
-        },
-        loadAddon: (addon) =>
-          terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
-        refresh: (start, end) => terminal.refresh(start, end)
-      })
+      void this.rendererController
+        .activate({
+          get rows() {
+            return terminal.rows
+          },
+          loadAddon: (addon) =>
+            terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
+          refresh: (start, end) => terminal.refresh(start, end)
+        })
+        .finally(() => {
+          this.hasRendererActivationSettled = true
+        })
       installTerminalSelectionCopy(this.terminal, { onOpenSearch: () => this.onOpenSearch() })
       this.dataSubscription = this.terminal.onData((input) => this.onInput(input))
       this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>
@@ -141,13 +154,34 @@ class XtermTerminalSurface implements TerminalSurface {
       this.isOpened = true
     }
 
-    this.fitAndReportDimensions()
-    this.resizeObserver = new ResizeObserver(this.requestFitAndReportDimensions)
+    const initialDimensions = this.fitAndReportDimensions()
+    this.resizeObserver = new ResizeObserver(this.handleResizeObservation)
     this.resizeObserver.observe(attachment.element)
+    this.startupGridReconciliation?.cancel()
+    // Packaged desktop layout and renderer setup can settle after the first valid fit.
+    this.startupGridReconciliation = startTerminalStartupGridReconciliation({
+      initialDimensions,
+      canSettle: () =>
+        this.element === attachment.element &&
+        this.hasObservedElementGeometry &&
+        this.hasRendererActivationSettled,
+      measure: () => {
+        if (this.element !== attachment.element || this.isResizeSuspended) return null
+        return this.fitAndMeasureDimensions()
+      },
+      onDimensionsChange: (dimensions) => this.reportDimensions(dimensions),
+      onSettledDimensions: shouldReassertTerminalStartupDimensions(navigator.platform)
+        ? (dimensions) => this.onDimensionsChange(dimensions)
+        : undefined,
+      requestFrame: (callback) => window.requestAnimationFrame(callback),
+      cancelFrame: (handle) => window.cancelAnimationFrame(handle)
+    })
   }
 
   detach(element: HTMLDivElement): void {
     if (this.element !== element) return
+    this.startupGridReconciliation?.cancel()
+    this.startupGridReconciliation = null
     if (this.pendingFitAnimationFrame !== null) {
       window.cancelAnimationFrame(this.pendingFitAnimationFrame)
       this.pendingFitAnimationFrame = null
@@ -155,6 +189,7 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    this.hasObservedElementGeometry = false
     this.terminal.element?.remove()
     this.element = null
   }
@@ -354,15 +389,43 @@ class XtermTerminalSurface implements TerminalSurface {
     })
   }
 
-  private fitAndReportDimensions(): void {
-    if (!this.element) return
-    this.fitAddon.fit()
+  private readonly handleResizeObservation = (): void => {
+    this.hasObservedElementGeometry = true
+    this.requestFitAndReportDimensions()
+  }
+
+  private fitAndReportDimensions(): TerminalDimensions | null {
+    const dimensions = this.fitAndMeasureDimensions()
+    if (!dimensions) return null
+    this.reportDimensions(dimensions)
+    return dimensions
+  }
+
+  private fitAndMeasureDimensions(): TerminalDimensions | null {
+    if (!this.element) return null
+    const proposeDimensions = this.fitAddon.proposeDimensions
+    if (typeof proposeDimensions !== 'function') {
+      this.fitAddon.fit()
+    } else {
+      const proposedDimensions = proposeDimensions.call(this.fitAddon)
+      if (!proposedDimensions || proposedDimensions.cols <= 0 || proposedDimensions.rows <= 0) {
+        return null
+      }
+      if (
+        this.terminal.cols !== proposedDimensions.cols ||
+        this.terminal.rows !== proposedDimensions.rows
+      ) {
+        this.fitAddon.fit()
+      }
+    }
     const dimensions = { columns: this.terminal.cols, rows: this.terminal.rows }
+    return dimensions.columns > 0 && dimensions.rows > 0 ? dimensions : null
+  }
+
+  private reportDimensions(dimensions: TerminalDimensions): void {
     if (
-      dimensions.columns <= 0 ||
-      dimensions.rows <= 0 ||
-      (this.lastReportedDimensions?.columns === dimensions.columns &&
-        this.lastReportedDimensions.rows === dimensions.rows)
+      this.lastReportedDimensions?.columns === dimensions.columns &&
+      this.lastReportedDimensions.rows === dimensions.rows
     ) {
       return
     }

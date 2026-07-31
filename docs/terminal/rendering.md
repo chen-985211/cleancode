@@ -246,7 +246,7 @@ Agent 控制台与普通终端共享 Run 视图不变量；Agent 额外维护首
 
 1. PTY 首次 attach 使用当前可见 xterm 的首次有效行列，不使用占位尺寸抢跑。
 2. 当前 xterm 的最新有效行列最终会到达对应 session 的 `resize`；允许 RAF 合并不需要落地的中间值。
-3. 相同行列不会重复 attach 或重复 resize。
+3. 相同行列不会重复 attach；常规布局观测不会重复 resize。Windows 可见 surface 在首次有效测量、`ResizeObserver` 与 renderer 全部稳定后，允许对当前 session 额外重申一次相同行列，用于修复 xterm 已正确但 ConPTY 仍保留启动旧尺寸的偏差；该例外每次 attach 至多一次，其他平台不触发。
 4. attach 期间发生的最新 resize 不会丢失。
 5. 切换项目、工作区、Git 分支或 Agent 后，旧异步结果不会污染新 surface。
 6. 字符宽度不受相邻全角标点的上下文影响。
@@ -471,7 +471,7 @@ xterm 提供过针对重叠字形和不同 renderer 的能力，但不能代替�
 每次改动终端尺寸或渲染逻辑后，至少检查：
 
 - [ ] 首次 attach 的 `columns`、`rows` 等于当前 xterm 实测值。
-- [ ] resize 不创建第二个 PTY，重复尺寸不重复发送。
+- [ ] resize 不创建第二个 PTY；常规重复尺寸不发送，Windows 首次稳定尺寸重申每次 attach 至多一次，其他平台不触发。
 - [ ] attach pending 和快速切换工作区都不会产生旧 session 污染。
 - [ ] attach 失败可见且可重试；替代 attach 失败不丢失原 terminal binding。
 - [ ] 子进程收到 Run 保留的 `TERM`、`COLORTERM`、`TERM_PROGRAM` 和 source-theme `COLORFGBG`，并保留明确的 `NO_COLOR`。
