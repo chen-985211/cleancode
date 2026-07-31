@@ -48,7 +48,7 @@ describe('create terminal block layout', () => {
 
     expect(graph.blocks.at(-1)).toMatchObject({
       name: 'Automatic',
-      position: { x: 300, y: 1204 },
+      position: { x: 450, y: 1204 },
       size: { width: 420, height: 240 }
     })
     expect(repository.transactionCount).toBe(1)

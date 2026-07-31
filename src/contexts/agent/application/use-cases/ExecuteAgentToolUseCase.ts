@@ -140,6 +140,21 @@ export class ExecuteAgentToolUseCase {
         )
       case 'create_block':
         return this.createTerminalBlock(command, context, invocation.input)
+      case 'create_terminal_workflow': {
+        const result = await this.blockGraphTools.createTerminalWorkflow(context, {
+          ...invocation.input,
+          ...(await this.resolveWorkspaceLayout(command))
+        })
+        return completedGraphResult(command.toolCallId, result.graph, {
+          arrangedBlockIds: result.arrangedBlockIds,
+          arrangedTerminalGroupIds: result.arrangedTerminalGroupIds,
+          createdConnections: result.createdConnections,
+          createdTerminalGroupId: result.createdTerminalGroupId,
+          createdTerminals: result.createdTerminals,
+          plan: result.plan,
+          type: 'terminal_workflow_created'
+        })
+      }
       case 'update_block':
         return completedGraphResult(
           command.toolCallId,
@@ -339,7 +354,7 @@ function createApprovalSummary(invocation: ParsedAgentToolInvocation): string {
 function completedGraphResult(
   toolCallId: string,
   graph: AgentBlockGraphSnapshot,
-  output: Extract<AgentToolOutput, { readonly type: 'block_graph' }>,
+  output: Extract<AgentToolOutput, { readonly type: 'block_graph' | 'terminal_workflow_created' }>,
   graphChanged = true
 ): CompletedGraphToolResult {
   return { graph, graphChanged, output, status: 'completed', toolCallId }

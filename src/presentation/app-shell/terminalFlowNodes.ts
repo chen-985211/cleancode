@@ -8,6 +8,7 @@ import {
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
+import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 import {
   createIdleTerminalState,
@@ -96,6 +97,7 @@ interface CreateTerminalFlowNodesInput {
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
+  readonly workflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
 }
 
 export function createTerminalFlowNodes({
@@ -113,7 +115,8 @@ export function createTerminalFlowNodes({
   launchCommandEditRequest = null,
   terminalStates,
   handlers,
-  workflowNodeStatuses = {}
+  workflowNodeStatuses = {},
+  workflowBuildPresentation = null
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
   const activeWorkflowRootIds = new Set(activeWorkflowRootBlockIds)
   const selectedBlockIds = new Set(
@@ -137,7 +140,8 @@ export function createTerminalFlowNodes({
       selectedTerminalGroupId: selectedTerminalGroupId ?? null,
       selectedUngroupedTerminalBlockIds,
       terminalGroupDropAction,
-      terminalStates
+      terminalStates,
+      workflowBuildPresentation
     })
   )
   const terminalNodes = (graph?.blocks ?? [])
@@ -160,6 +164,7 @@ export function createTerminalFlowNodes({
         isSelected: selectedBlockIds.has(block.id),
         isTerminalGroupSelectionMode,
         terminalStates,
+        workflowBuildPresentation,
         workflowStatus: workflowNodeStatuses[block.id]
       })
     )
@@ -182,6 +187,7 @@ interface CreateTerminalFlowNodeInput {
   readonly isStoppingWorkflow: boolean
   readonly launchCommandEditRequestId?: number
   readonly workflowStatus?: WorkflowRunNodeStatus
+  readonly workflowBuildPresentation: TerminalWorkflowBuildPresentation | null
 }
 
 function createTerminalFlowNode({
@@ -198,12 +204,14 @@ function createTerminalFlowNode({
   isActiveWorkflowRoot,
   isStoppingWorkflow,
   launchCommandEditRequestId,
-  workflowStatus
+  workflowStatus,
+  workflowBuildPresentation
 }: CreateTerminalFlowNodeInput): TerminalFlowNode {
+  const buildInitialPosition = workflowBuildPresentation?.initialPositionsByBlockId?.get(block.id)
   return {
     id: block.id,
     type: 'terminal',
-    position: block.position,
+    position: buildInitialPosition ?? block.position,
     selectable: false,
     selected: isSelected,
     zIndex: 3,
@@ -211,6 +219,9 @@ function createTerminalFlowNode({
       width: block.size.width,
       height: block.size.height
     },
+    className: workflowBuildPresentation?.terminalBlockIds.has(block.id)
+      ? 'terminal-workflow-build-node'
+      : undefined,
     data: {
       identity: createCanvasObjectIdentity({
         projectId,
@@ -245,6 +256,7 @@ interface CreateTerminalGroupFlowNodeInput {
   readonly terminalGroupDropAction: TerminalGroupDropAction
   readonly terminalStates: Record<string, TerminalViewState>
   readonly handlers: Partial<TerminalGroupFlowNodeHandlers>
+  readonly workflowBuildPresentation: TerminalWorkflowBuildPresentation | null
 }
 
 function createTerminalGroupFlowNode({
@@ -256,7 +268,8 @@ function createTerminalGroupFlowNode({
   selectedUngroupedTerminalBlockIds,
   terminalGroupDropAction,
   terminalStates,
-  handlers
+  handlers,
+  workflowBuildPresentation
 }: CreateTerminalGroupFlowNodeInput): TerminalGroupFlowNode {
   const memberBlocks = (graph?.blocks ?? []).filter((block) =>
     group.memberBlockIds.includes(block.id)
@@ -276,6 +289,11 @@ function createTerminalGroupFlowNode({
       width: size.width,
       height: size.height
     },
+    className: workflowBuildPresentation?.pendingTerminalGroupIds.has(group.id)
+      ? 'terminal-workflow-build-group--pending'
+      : workflowBuildPresentation?.enteringTerminalGroupIds.has(group.id)
+        ? 'terminal-workflow-build-group--entering'
+        : undefined,
     data: {
       identity: createCanvasObjectIdentity({
         projectId: graph!.projectId,

@@ -3,6 +3,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
+import { prefersReducedMotion } from './workbenchFocusTransition'
 
 export interface WorkbenchLayoutFocusRequest {
   readonly operationId: string
@@ -75,7 +76,7 @@ export function useWorkbenchLayoutFocus({
       handledOperationIdsRef.current.add(request.operationId)
       deferredOperationIdsRef.current.delete(request.operationId)
       void reactFlowInstance.fitView({
-        duration: 220,
+        duration: prefersReducedMotion() ? 0 : 220,
         nodes: focusNodes as WorkbenchFlowNode[],
         padding: 0.24
       })

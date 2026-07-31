@@ -374,7 +374,7 @@ function blockGraphSnapshotSchema(): AgentToolJsonSchema {
   )
 }
 
-function terminalWorkflowPlanSnapshotSchema(): AgentToolJsonSchema {
+export function terminalWorkflowPlanSnapshotSchema(): AgentToolJsonSchema {
   return objectSchema(
     {
       graphId: stringSchema,

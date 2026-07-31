@@ -7,6 +7,7 @@ import type {
   AgentToolContext,
   CreateBlockAgentToolInput,
   CreateTerminalGroupAgentToolInput,
+  CreateTerminalWorkflowAgentToolInput,
   DeleteBlockAgentToolInput,
   DeleteTerminalGroupAgentToolInput,
   UpdateBlockAgentToolInput,
@@ -63,6 +64,25 @@ export interface AgentArrangeTerminalLayoutResult {
   readonly graphChanged: boolean
 }
 
+export interface AgentCreateTerminalWorkflowInput extends CreateTerminalWorkflowAgentToolInput {
+  readonly anchorRegion: AgentCanvasLayoutRegion
+  readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+}
+
+export interface AgentCreateTerminalWorkflowResult {
+  readonly arrangedBlockIds: readonly string[]
+  readonly arrangedTerminalGroupIds: readonly string[]
+  readonly createdConnections: readonly {
+    readonly connectionId: string
+    readonly sourceRef: string
+    readonly targetRef: string
+  }[]
+  readonly createdTerminalGroupId: string | null
+  readonly createdTerminals: readonly { readonly blockId: string; readonly ref: string }[]
+  readonly graph: AgentBlockGraphSnapshot
+  readonly plan: AgentTerminalWorkflowPlanSnapshot
+}
+
 export interface AgentBlockGraphToolPort {
   arrangeTerminalLayout(
     context: AgentToolContext,
@@ -73,6 +93,10 @@ export interface AgentBlockGraphToolPort {
     context: AgentToolContext,
     input: AgentCreateTerminalBlockInput
   ): Promise<AgentBlockGraphSnapshot>
+  createTerminalWorkflow(
+    context: AgentToolContext,
+    input: AgentCreateTerminalWorkflowInput
+  ): Promise<AgentCreateTerminalWorkflowResult>
   updateTerminalBlock(
     context: AgentToolContext,
     input: UpdateBlockAgentToolInput

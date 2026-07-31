@@ -44,6 +44,8 @@ import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { toQuickExecutionTarget } from './quickExecutionTargets'
 import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
+import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
+import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -64,6 +66,7 @@ interface WorkbenchCanvasProps {
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
+  readonly terminalWorkflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
   readonly shortcutTooltips: Partial<ApplicationShortcutTooltipLabels> &
     Pick<
       ApplicationShortcutTooltipLabels,
@@ -131,6 +134,7 @@ interface WorkbenchCanvasProps {
     node: WorkbenchFlowNode
   ) => void
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+  readonly onViewportInteractionStart?: () => void
   readonly onMinimapNodeClick: (blockId: string) => void
   readonly getMiniMapNodeColor: (node: MinimapFlowNode) => string
   readonly getMiniMapNodeStrokeColor: (node: MinimapFlowNode) => string
@@ -154,6 +158,7 @@ export function WorkbenchCanvas({
   reactFlowInstanceRef,
   minimapNodeInteraction,
   terminalWorkflow,
+  terminalWorkflowBuildPresentation = null,
   shortcutTooltips,
   shortcutPlatform = 'mac',
   placementTemplate,
@@ -191,6 +196,7 @@ export function WorkbenchCanvas({
   onNodeDragStart,
   onNodeDragStop,
   onViewportChange,
+  onViewportInteractionStart,
   onMinimapNodeClick,
   getMiniMapNodeColor,
   getMiniMapNodeStrokeColor,
@@ -207,11 +213,11 @@ export function WorkbenchCanvas({
   const workflowEdges = useMemo(
     () =>
       projectAgentConnectionApprovalsOntoWorkflowEdges(
-        workflow.edges,
+        projectTerminalWorkflowBuildOntoEdges(workflow.edges, terminalWorkflowBuildPresentation),
         approvalIntents,
         currentWorkbench?.graph ?? null
       ),
-    [approvalIntents, currentWorkbench?.graph, workflow.edges]
+    [approvalIntents, currentWorkbench?.graph, terminalWorkflowBuildPresentation, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
@@ -432,6 +438,9 @@ export function WorkbenchCanvas({
 
             setViewportZoom(canvasViewportSnapshot.zoom)
             setCanvasViewport(canvasViewportSnapshot)
+          }}
+          onMoveStart={(event) => {
+            if (event) onViewportInteractionStart?.()
           }}
           onMoveEnd={(_event, viewport) => {
             if (!isRestoringViewportRef.current) {

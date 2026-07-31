@@ -119,6 +119,32 @@ describe('Agent layout coordination', () => {
 
     expect(nodeStore.getNodes()[0]?.position).toEqual(agent.layout.position)
   })
+
+  it('does not recenter after the user takes control of the viewport', async () => {
+    const terminalNode = createNode('terminal-1', 'terminal')
+    const agentNode = createNode('agent:agent-1', 'agentConsole')
+    const nodes = [agentNode, terminalNode]
+    const fitView = vi.fn(async () => undefined)
+    const nodeStore = createWorkbenchNodeStore(nodes)
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceId: 'main',
+        moveWorkbenchNode: vi.fn(async () => undefined),
+        moveWorkspaceAgent: vi.fn(async () => undefined),
+        nodeStore,
+        reactFlowInstanceRef: { current: createReactFlowInstance(nodes, fitView) },
+        setCurrentGraph: vi.fn()
+      })
+    )
+
+    act(() => result.current.onAgentGraphUpdated(createLayoutEvent()))
+    act(() => result.current.cancelLayoutFocus())
+    await act(() => Promise.resolve())
+
+    expect(fitView).not.toHaveBeenCalled()
+  })
 })
 
 function createLayoutEvent(): AgentGraphUpdatedEvent {

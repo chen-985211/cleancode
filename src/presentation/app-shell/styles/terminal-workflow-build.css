@@ -1,0 +1,73 @@
+.terminal-workflow-edge--build-pending {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.terminal-workflow-edge--build-entering {
+  animation: terminal-workflow-edge-build-fade-in 300ms ease-out both;
+}
+
+.terminal-workflow-edge--build-entering .react-flow__edge-path {
+  stroke-dasharray: 10 8;
+  animation: terminal-workflow-edge-build-in 420ms ease-out both;
+}
+
+.terminal-workflow-build-node .terminal-node {
+  animation: terminal-workflow-node-build-in 420ms ease-out both;
+}
+
+.terminal-workflow-build-group--pending {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.terminal-workflow-build-group--entering {
+  animation: terminal-workflow-group-build-in 300ms ease-out both;
+}
+
+@keyframes terminal-workflow-edge-build-in {
+  from {
+    stroke-dashoffset: 28;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes terminal-workflow-edge-build-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes terminal-workflow-node-build-in {
+  from {
+    opacity: 0.76;
+    filter: saturate(0.8);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
+@keyframes terminal-workflow-group-build-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-workflow-edge--build-entering .react-flow__edge-path,
+  .terminal-workflow-edge--build-entering,
+  .terminal-workflow-build-node .terminal-node,
+  .terminal-workflow-build-group--entering {
+    animation: none;
+  }
+}

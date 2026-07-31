@@ -14,6 +14,7 @@ describe('agent tool protocol', () => {
     expect(agentToolDefinitions.map((tool) => tool.name)).toEqual([
       'inspect_graph',
       'create_block',
+      'create_terminal_workflow',
       'update_block',
       'delete_block',
       'create_terminal_group',
@@ -42,10 +43,21 @@ describe('agent tool protocol', () => {
   })
 
   it('declares strict discriminated workflow authoring input schemas', () => {
+    const createWorkflow = requireTool('create_terminal_workflow')
     const updateExecutionConfig = requireTool('update_terminal_execution_config')
     const connectTerminals = requireTool('connect_terminal_blocks')
     const disconnectTerminals = requireTool('disconnect_terminal_blocks')
     const inspectPlan = requireTool('inspect_terminal_workflow_plan')
+
+    expect(createWorkflow.inputSchema).toMatchObject({
+      additionalProperties: false,
+      required: ['terminals', 'connections'],
+      type: 'object'
+    })
+    expect(readSchemaProperty(createWorkflow.inputSchema, 'terminals')).toMatchObject({
+      minItems: 1,
+      type: 'array'
+    })
 
     expect(updateExecutionConfig.inputSchema).toMatchObject({
       additionalProperties: false,
@@ -290,6 +302,7 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpDeveloperInstructions).toContain('启动项目的终端组合')
     expect(cleancodeMcpDeveloperInstructions).toContain('inspect_graph')
     expect(cleancodeMcpDeveloperInstructions).toContain('create_block')
+    expect(cleancodeMcpDeveloperInstructions).toContain('create_terminal_workflow')
     expect(cleancodeMcpDeveloperInstructions).toContain('create_terminal_group')
     expect(cleancodeMcpDeveloperInstructions).toContain('update_terminal_execution_config')
     expect(cleancodeMcpDeveloperInstructions).toContain('connect_terminal_blocks')
@@ -329,6 +342,11 @@ describe('agent tool protocol', () => {
       Object.fromEntries(agentToolDefinitions.map((tool) => [tool.name, tool.annotations] as const))
     ).toEqual({
       create_block: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      create_terminal_workflow: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: false

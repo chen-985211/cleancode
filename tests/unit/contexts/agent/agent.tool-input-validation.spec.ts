@@ -18,6 +18,40 @@ describe('agent tool input validation', () => {
         name: 'Build',
         type: 'terminal'
       },
+      create_terminal_workflow: {
+        connections: [{ sourceRef: 'api', targetRef: 'web' }],
+        terminalGroup: {
+          memberRefs: ['api', 'web', 'worker'],
+          name: 'Development'
+        },
+        terminals: [
+          {
+            executionConfig: {
+              mode: 'service',
+              port: {
+                binding: { type: 'environment', variableName: 'PORT' },
+                policy: { port: 4100, type: 'preferred' },
+                protocol: 'http'
+              },
+              readiness: { type: 'tcp' },
+              readinessTimeoutMs: 30_000
+            },
+            launchCommand: 'pnpm api',
+            name: 'API',
+            ref: 'api'
+          },
+          {
+            launchCommand: 'pnpm web',
+            name: 'Web',
+            ref: 'web'
+          },
+          {
+            launchCommand: 'pnpm worker',
+            name: 'Worker',
+            ref: 'worker'
+          }
+        ]
+      },
       create_terminal_group: {
         memberBlockIds: ['terminal-build', 'terminal-test'],
         name: 'Checks'
@@ -174,6 +208,14 @@ describe('agent tool input validation', () => {
     expectInvalidInput(
       () => parseAgentToolInput('arrange_terminal_layout', { blockIds: [] }),
       '$.blockIds'
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('create_terminal_workflow', {
+          connections: [],
+          terminals: []
+        }),
+      '$.terminals'
     )
     expectInvalidInput(
       () =>

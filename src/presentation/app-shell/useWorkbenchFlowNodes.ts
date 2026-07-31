@@ -15,6 +15,7 @@ import type {
   WorkbenchSnapshot
 } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
+import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
@@ -41,6 +42,7 @@ interface UseWorkbenchFlowNodesInput {
     readonly requestId: number
   } | null
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
+  readonly terminalWorkflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
   readonly onRemoveAgent: (agent: WorkspaceAgentSnapshot) => Promise<void>
   readonly onMcpCapabilityChange: (
     agent: WorkspaceAgentSnapshot,
@@ -74,6 +76,7 @@ export function useWorkbenchFlowNodes({
   isStoppingWorkflow,
   launchCommandEditRequest,
   workflowNodeStatuses,
+  terminalWorkflowBuildPresentation,
   onRemoveAgent,
   onMcpCapabilityChange,
   onRenameAgent,
@@ -110,6 +113,7 @@ export function useWorkbenchFlowNodes({
         selectedTerminalGroupId,
         selectedUngroupedTerminalBlockIds,
         terminalStates,
+        workflowBuildPresentation: terminalWorkflowBuildPresentation,
         workflowNodeStatuses
       })
       const agents = resolveWorkspaceAgents(currentWorkbench)
@@ -158,6 +162,7 @@ export function useWorkbenchFlowNodes({
     setNodes,
     terminalStates,
     workflowNodeStatuses,
+    terminalWorkflowBuildPresentation,
     onRemoveAgent,
     onMcpCapabilityChange,
     onRenameAgent,

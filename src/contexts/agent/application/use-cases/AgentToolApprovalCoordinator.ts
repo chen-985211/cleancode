@@ -165,20 +165,32 @@ export class AgentToolApprovalCoordinator {
   private publishGraphUpdate(session: ManagedAgentSession, result: AgentToolExecutionResult): void {
     if (result.status !== 'completed' || !result.graphChanged || !('graph' in result)) return
 
-    const layoutChange =
-      result.output.arrangedBlockIds && result.output.arrangedTerminalGroupIds
+    const graphChange =
+      result.output.type === 'terminal_workflow_created'
         ? {
-            blockIds: result.output.arrangedBlockIds,
-            kind: 'terminal_layout_arranged' as const,
+            blockIds: result.output.createdTerminals.map((terminal) => terminal.blockId),
+            connectionIds: result.output.createdConnections.map(
+              (connection) => connection.connectionId
+            ),
+            kind: 'terminal_workflow_created' as const,
             operationId: result.toolCallId,
-            terminalGroupIds: result.output.arrangedTerminalGroupIds
+            terminalGroupIds: result.output.createdTerminalGroupId
+              ? [result.output.createdTerminalGroupId]
+              : []
           }
-        : undefined
+        : result.output.arrangedBlockIds && result.output.arrangedTerminalGroupIds
+          ? {
+              blockIds: result.output.arrangedBlockIds,
+              kind: 'terminal_layout_arranged' as const,
+              operationId: result.toolCallId,
+              terminalGroupIds: result.output.arrangedTerminalGroupIds
+            }
+          : undefined
 
     try {
       session.callbacks.onGraphUpdated({
         agentId: session.agentId,
-        ...(layoutChange ? { change: layoutChange } : {}),
+        ...(graphChange ? { change: graphChange } : {}),
         graph: result.graph,
         projectDirectory: session.projectDirectory,
         sessionId: session.sessionId,

@@ -1,5 +1,6 @@
 import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
+import { projectTerminalWorkflowBuildOntoEdges } from '../../../src/presentation/app-shell/terminalWorkflowBuildEdgePresentation'
 
 describe('terminal workflow edges', () => {
   it('maps persistent connections and hides edges of collapsed group members', () => {
@@ -66,5 +67,23 @@ describe('terminal workflow edges', () => {
 
     expect(edges.find((edge) => edge.id === 'a-b')).toMatchObject({ zIndex: 3 })
     expect(edges.find((edge) => edge.id === 'c-d')?.zIndex).toBeUndefined()
+  })
+
+  it('keeps committed connections hidden until their dependency layer begins', () => {
+    const edges = [
+      { id: 'a-b', source: 'a', target: 'b', className: 'terminal-workflow-edge' },
+      { id: 'b-c', source: 'b', target: 'c', className: 'terminal-workflow-edge' }
+    ]
+    const projected = projectTerminalWorkflowBuildOntoEdges(edges, {
+      enteringConnectionIds: new Set(['a-b']),
+      enteringTerminalGroupIds: new Set(),
+      operationId: 'operation-1',
+      pendingConnectionIds: new Set(['b-c']),
+      pendingTerminalGroupIds: new Set(),
+      terminalBlockIds: new Set(['a', 'b', 'c'])
+    })
+
+    expect(projected[0]?.className).toContain('terminal-workflow-edge--build-entering')
+    expect(projected[1]?.className).toContain('terminal-workflow-edge--build-pending')
   })
 })

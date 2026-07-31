@@ -65,17 +65,27 @@ export interface AgentRuntimeChangedEvent {
 
 export interface AgentGraphUpdatedEvent {
   readonly agentId: string
-  readonly change?: {
-    readonly blockIds: readonly string[]
-    readonly kind: 'terminal_layout_arranged'
-    readonly operationId: string
-    readonly terminalGroupIds: readonly string[]
-  }
+  readonly change?: AgentGraphChange
   readonly graph: AgentBlockGraphSnapshot
   readonly projectDirectory: string
   readonly sessionId: string
   readonly workspaceId: string
 }
+
+export type AgentGraphChange =
+  | {
+      readonly blockIds: readonly string[]
+      readonly kind: 'terminal_layout_arranged'
+      readonly operationId: string
+      readonly terminalGroupIds: readonly string[]
+    }
+  | {
+      readonly blockIds: readonly string[]
+      readonly connectionIds: readonly string[]
+      readonly kind: 'terminal_workflow_created'
+      readonly operationId: string
+      readonly terminalGroupIds: readonly string[]
+    }
 
 export type AgentToolApprovalTarget =
   | {

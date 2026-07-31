@@ -11,9 +11,9 @@ describe('terminal layout in the default block graph', () => {
     })
 
     expect(readPositions(graph)).toEqual({
-      'api-terminal': { x: 500, y: 868 },
-      'install-terminal': { x: 500, y: 564 },
-      'test-terminal': { x: 1124, y: 564 }
+      'api-terminal': { x: 278, y: 868 },
+      'install-terminal': { x: 278, y: 564 },
+      'test-terminal': { x: 902, y: 736 }
     })
     expect(readSizes(graph)).toEqual({
       'api-terminal': { width: 560, height: 300 },
@@ -65,7 +65,7 @@ describe('terminal layout in the default block graph', () => {
     expect(existingGroup.position).toEqual({ x: 268, y: 824 })
     expect(existingGroup.size).toEqual({ width: 968, height: 392 })
     expect(graph.blocks.find((block) => block.id === 'selected-terminal')?.position).toEqual({
-      x: 300,
+      x: 450,
       y: 1534
     })
   })
@@ -135,8 +135,8 @@ describe('terminal layout in the default block graph', () => {
     expect(firstSnapshot.terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-group',
-        position: { x: 468, y: 564 },
-        size: { width: 1108, height: 1060 }
+        position: { x: 4, y: 564 },
+        size: { width: 1592, height: 756 }
       })
     ])
     expect(second).toEqual({ ...first, graphChanged: false })

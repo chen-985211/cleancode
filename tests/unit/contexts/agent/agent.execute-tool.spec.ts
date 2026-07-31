@@ -447,6 +447,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
       graphChanged: false
     })),
     createTerminalBlock: vi.fn(async () => fakeGraph),
+    createTerminalWorkflow: vi.fn(),
     createTerminalGroup: vi.fn(async () => fakeGraph),
     connectTerminalBlocks: vi.fn(async () => ({ connectionId: 'connection-1', graph: fakeGraph })),
     deleteTerminalBlock: vi.fn(async () => fakeGraph),

@@ -25,10 +25,10 @@ describe('arrange terminal layout use case', () => {
       graphChanged: true
     })
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
-      ['upstream-terminal', { x: 500, y: 944 }],
-      ['downstream-terminal', { x: 984, y: 640 }],
+      ['upstream-terminal', { x: 348, y: 640 }],
+      ['downstream-terminal', { x: 832, y: 640 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 500, y: 640 }]
+      ['group-companion', { x: 590, y: 944 }]
     ])
     expect(repository.transactionCount).toBe(1)
   })
@@ -70,7 +70,7 @@ describe('arrange terminal layout use case', () => {
     expect(result.arrangedBlockIds).toEqual(['downstream-terminal'])
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
       ['upstream-terminal', { x: 1600, y: 900 }],
-      ['downstream-terminal', { x: 500, y: 564 }],
+      ['downstream-terminal', { x: 590, y: 564 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
       ['group-companion', { x: 40, y: 40 }]
     ])

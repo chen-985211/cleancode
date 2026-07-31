@@ -21,7 +21,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       jsonrpc: '2.0',
       result: expect.objectContaining({
         instructions: expect.stringMatching(/arrange_terminal_layout[\s\S]*preferred/),
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.3.2' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.4.0' }
       })
     })
   })
@@ -95,6 +95,18 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       destructiveHint: false,
       openWorldHint: false,
       readOnlyHint: false
+    })
+    expect(result.tools.find((tool) => tool.name === 'create_terminal_workflow')).toMatchObject({
+      annotations: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      inputSchema: {
+        additionalProperties: false,
+        required: ['terminals', 'connections'],
+        type: 'object'
+      }
     })
     expect(result.tools.find((tool) => tool.name === 'delete_block')?.annotations).toEqual({
       destructiveHint: true,
