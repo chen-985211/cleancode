@@ -1,14 +1,4 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  Boxes,
-  Ellipsis,
-  Plus,
-  RotateCcw,
-  TerminalSquare,
-  Trash2,
-  Workflow
-} from 'lucide-react'
+import { Boxes, Ellipsis, Plus, RotateCcw, TerminalSquare, Workflow } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 
 import type {
@@ -32,6 +22,7 @@ interface QuickExecutionBarProps {
     target: QuickExecutionTargetSnapshot
   ) => Promise<void> | void
   readonly onClear: (number: QuickExecutionSlotNumber) => Promise<void> | void
+  readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
   readonly onReorder: (
     sourceNumber: QuickExecutionSlotNumber,
     destinationNumber: QuickExecutionSlotNumber
@@ -48,6 +39,7 @@ export function QuickExecutionBar({
   onAdd,
   onBind,
   onClear,
+  onFocus,
   onReorder
 }: QuickExecutionBarProps) {
   const { t } = useI18n()
@@ -59,6 +51,7 @@ export function QuickExecutionBar({
   const [reorderTargetNumber, setReorderTargetNumber] = useState<QuickExecutionSlotNumber | null>(
     null
   )
+  const [isTrashTarget, setIsTrashTarget] = useState(false)
   const candidates = useMemo(() => listQuickExecutionCandidates(graph), [graph])
   const slots = useMemo(
     () =>
@@ -107,6 +100,7 @@ export function QuickExecutionBar({
     draggedNumberRef.current = null
     setDraggedNumber(null)
     setReorderTargetNumber(null)
+    setIsTrashTarget(false)
   }
 
   const beginReorder = (
@@ -158,41 +152,6 @@ export function QuickExecutionBar({
                 <RotateCcw size={14} aria-hidden="true" />
                 {t('quickExecution.rebind')}
               </button>
-              {popover.number > 1 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closePopover()
-                    void onReorder(popover.number, (popover.number - 1) as QuickExecutionSlotNumber)
-                  }}
-                >
-                  <ArrowLeft size={14} aria-hidden="true" />
-                  {t('quickExecution.moveLeft')}
-                </button>
-              ) : null}
-              {popover.number < 5 ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    closePopover()
-                    void onReorder(popover.number, (popover.number + 1) as QuickExecutionSlotNumber)
-                  }}
-                >
-                  <ArrowRight size={14} aria-hidden="true" />
-                  {t('quickExecution.moveRight')}
-                </button>
-              ) : null}
-              <button
-                className="quick-execution__clear"
-                type="button"
-                onClick={() => {
-                  closePopover()
-                  void onClear(popover.number)
-                }}
-              >
-                <Trash2 size={14} aria-hidden="true" />
-                {t('quickExecution.clear')}
-              </button>
             </div>
           ) : null}
         </div>
@@ -216,15 +175,6 @@ export function QuickExecutionBar({
                 .join(' ')}
               data-quick-execution-slot={slot.number}
               draggable={Boolean(projection)}
-              role={projection ? 'group' : undefined}
-              aria-label={
-                projection
-                  ? t('quickExecution.boundSlot', {
-                      name: projection.name,
-                      number: slot.number
-                    })
-                  : undefined
-              }
               onDragStart={projection ? (event) => beginReorder(event, slot.number) : undefined}
               onDragEnd={projection ? resetReorder : undefined}
               onDragOver={(event) => {
@@ -245,14 +195,22 @@ export function QuickExecutionBar({
               }}
             >
               {projection ? (
-                <div className="quick-execution__content">
+                <button
+                  className="quick-execution__content"
+                  type="button"
+                  aria-label={t('quickExecution.boundSlot', {
+                    name: projection.name,
+                    number: slot.number
+                  })}
+                  onClick={() => onFocus(projection.target)}
+                >
                   <kbd>{slot.number}</kbd>
                   <TypeIcon type={projection.type} />
                   <span className="quick-execution__copy">
                     <strong title={projection.name}>{projection.name}</strong>
                     {isUnavailable ? <small>{t('quickExecution.unavailable')}</small> : null}
                   </span>
-                </div>
+                </button>
               ) : slot.number === firstEmptyNumber ? (
                 <button
                   className="quick-execution__content quick-execution__add"
@@ -282,6 +240,42 @@ export function QuickExecutionBar({
             </div>
           )
         })}
+      </div>
+      <div
+        className={[
+          'quick-execution__trash',
+          draggedNumber ? 'quick-execution__trash--visible' : '',
+          isTrashTarget ? 'quick-execution__trash--target' : ''
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        data-quick-execution-trash
+        role="region"
+        aria-hidden={!draggedNumber}
+        aria-label={
+          draggedNumber
+            ? t('quickExecution.removeDropTarget', { number: draggedNumber })
+            : undefined
+        }
+        onDragOver={(event) => {
+          if (!draggedNumberRef.current) return
+          event.preventDefault()
+          event.stopPropagation()
+          if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+          setIsTrashTarget(true)
+          setReorderTargetNumber(null)
+        }}
+        onDragLeave={() => setIsTrashTarget(false)}
+        onDrop={(event) => {
+          const sourceNumber = draggedNumberRef.current
+          if (!sourceNumber) return
+          event.preventDefault()
+          event.stopPropagation()
+          resetReorder()
+          void onClear(sourceNumber)
+        }}
+      >
+        <TrashDropIcon filled={isTrashTarget} />
       </div>
     </div>
   )
@@ -330,4 +324,49 @@ function CandidatePicker({
 function TypeIcon({ type }: { readonly type: QuickExecutionTargetSnapshot['type'] }) {
   const Icon = type === 'terminal' ? TerminalSquare : type === 'workflow' ? Workflow : Boxes
   return <Icon className="quick-execution__type-icon" size={13} aria-hidden="true" />
+}
+
+function TrashDropIcon({ filled }: { readonly filled: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      data-trash-icon-variant={filled ? 'filled' : 'outline'}
+    >
+      {filled ? (
+        <>
+          <path
+            d="M7 4.25v-.8C7 2.1 8.1 1 9.45 1h1.1C11.9 1 13 2.1 13 3.45v.8H7Z"
+            fill="currentColor"
+          />
+          <path d="M4 4.5h12a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1 0-1.5Z" fill="currentColor" />
+          <path
+            d="M5.2 6.25h9.6l-.62 9.5a2.25 2.25 0 0 1-2.24 2.1H8.06a2.25 2.25 0 0 1-2.24-2.1l-.62-9.5Z"
+            fill="currentColor"
+          />
+        </>
+      ) : (
+        <>
+          <path
+            d="M7 4.25v-.8C7 2.1 8.1 1 9.45 1h1.1C11.9 1 13 2.1 13 3.45v.8"
+            stroke="currentColor"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M4 5.25h12M5.2 6.25l.62 9.5a2.25 2.25 0 0 0 2.24 2.1h3.88a2.25 2.25 0 0 0 2.24-2.1l.62-9.5M8.15 8.25v6.5M11.85 8.25v6.5"
+            stroke="currentColor"
+            strokeWidth="1.35"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
+    </svg>
+  )
 }

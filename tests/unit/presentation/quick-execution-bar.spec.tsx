@@ -12,6 +12,7 @@ describe('quick execution bar', () => {
         onAdd={onAdd}
         onBind={vi.fn()}
         onClear={vi.fn()}
+        onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
     )
@@ -27,19 +28,28 @@ describe('quick execution bar', () => {
     })
   })
 
-  it('does not execute a filled slot on click and keeps an invalid binding visible', () => {
+  it('focuses a filled slot on click and keeps an invalid binding visible', () => {
+    const onFocus = vi.fn()
     render(
       <QuickExecutionBar
         graph={createGraph()}
         onAdd={vi.fn()}
         onBind={vi.fn()}
         onClear={vi.fn()}
+        onFocus={onFocus}
         onReorder={vi.fn()}
       />
     )
 
-    fireEvent.click(screen.getByText('Worker'))
-    expect(screen.queryByRole('button', { name: '执行快捷位 2：Worker' })).not.toBeInTheDocument()
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: '快捷位 2：Worker，点击定位，仅支持快捷键执行'
+      })
+    )
+    expect(onFocus).toHaveBeenCalledWith({
+      type: 'terminal',
+      terminalBlockId: 'worker'
+    })
 
     expect(screen.getByText('removed-terminal')).toBeInTheDocument()
     expect(screen.getByText('不可用')).toBeInTheDocument()
@@ -53,6 +63,7 @@ describe('quick execution bar', () => {
         onAdd={vi.fn()}
         onBind={vi.fn()}
         onClear={vi.fn()}
+        onFocus={vi.fn()}
         onReorder={onReorder}
       />
     )
@@ -66,7 +77,27 @@ describe('quick execution bar', () => {
     expect(onReorder).toHaveBeenCalledWith(2, 1)
   })
 
-  it('offers separate rebind and clear actions for a filled slot', () => {
+  it('keeps only rebind in the filled-slot menu', () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
+
+    expect(screen.getByRole('button', { name: '重新绑定' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '向左移动' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '向右移动' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '清空快捷位' })).not.toBeInTheDocument()
+  })
+
+  it('clears a filled slot when it is dropped on the temporary trash target', () => {
     const onClear = vi.fn()
     render(
       <QuickExecutionBar
@@ -74,14 +105,23 @@ describe('quick execution bar', () => {
         onAdd={vi.fn()}
         onBind={vi.fn()}
         onClear={onClear}
+        onFocus={vi.fn()}
         onReorder={vi.fn()}
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
-    fireEvent.click(screen.getByRole('button', { name: '清空快捷位' }))
+    expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
+
+    const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    fireEvent.dragStart(source)
+    const trash = screen.getByRole('region', { name: '拖到此处清空快捷位 2' })
+    expect(trash.querySelector('[data-trash-icon-variant="outline"]')).toBeInTheDocument()
+    fireEvent.dragOver(trash)
+    expect(trash.querySelector('[data-trash-icon-variant="filled"]')).toBeInTheDocument()
+    fireEvent.drop(trash)
 
     expect(onClear).toHaveBeenCalledWith(2)
+    expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
   })
 })
 

@@ -19,6 +19,9 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
 }))
+const reactFlowSpies = vi.hoisted(() => ({
+  fitView: vi.fn(async () => true)
+}))
 
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactFlowModule>()
@@ -34,6 +37,9 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       const { onInit } = props
       React.useEffect(() => {
         onInit?.({
+          fitView: reactFlowSpies.fitView,
+          getNode: (nodeId: string) =>
+            reactFlowProps.latest?.nodes?.find((node) => node.id === nodeId),
           getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
           setViewport: async () => undefined
         })
@@ -50,6 +56,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('workbench canvas object context menu', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
+    reactFlowSpies.fitView.mockClear()
   })
 
   it('selects an independent terminal and favorites only that terminal', () => {
@@ -80,6 +87,38 @@ describe('workbench canvas object context menu', () => {
       terminalBlockId: 'standalone'
     })
     expect(screen.queryByRole('dialog', { name: '选择快捷位' })).not.toBeInTheDocument()
+  })
+
+  it('fits a bound quick target into view without starting any workflow action', () => {
+    const terminalWorkflow = createTerminalWorkflow(createGraph())
+    renderCanvas({
+      onAddQuickExecutionTarget: vi.fn(),
+      quickExecutionTarget: {
+        type: 'workflow',
+        terminalBlockIds: ['workflow-a', 'workflow-b', 'workflow-c']
+      },
+      terminalWorkflow
+    })
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: '快捷位 1：workflow-a → workflow-b → workflow-c，点击定位，仅支持快捷键执行'
+      })
+    )
+
+    expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
+      duration: 220,
+      maxZoom: 1,
+      nodes: [
+        expect.objectContaining({ id: 'workflow-a' }),
+        expect.objectContaining({ id: 'workflow-b' }),
+        expect.objectContaining({ id: 'workflow-c' })
+      ],
+      padding: 0.24
+    })
+    expect(terminalWorkflow.start).not.toHaveBeenCalled()
+    expect(terminalWorkflow.startScope).not.toHaveBeenCalled()
+    expect(terminalWorkflow.startTerminalCombination).not.toHaveBeenCalled()
   })
 
   it('gives a quick-slot drop priority over the normal canvas layout commit', () => {
@@ -227,6 +266,8 @@ interface MockReactFlowProps {
   readonly edges?: readonly { readonly id: string; readonly className?: string }[]
   readonly nodes?: readonly WorkbenchFlowNode[]
   readonly onInit?: (instance: {
+    readonly fitView: () => Promise<boolean>
+    readonly getNode: (nodeId: string) => WorkbenchFlowNode | undefined
     readonly getViewport: () => { readonly x: number; readonly y: number; readonly zoom: number }
     readonly setViewport: () => Promise<void>
   }) => void
@@ -253,6 +294,8 @@ function renderCanvas({
   onAddQuickExecutionTarget,
   onNodeDragStop = vi.fn(),
   onQuickExecutionNodeDrop,
+  quickExecutionTarget,
+  terminalWorkflow,
   selectedTerminalBlockIds = []
 }: {
   readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
@@ -264,9 +307,23 @@ function renderCanvas({
     target: QuickExecutionTargetSnapshot,
     node: WorkbenchFlowNode
   ) => void
+  readonly quickExecutionTarget?: QuickExecutionTargetSnapshot
+  readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly selectedTerminalBlockIds?: readonly string[]
 } = {}): void {
-  const graph = createGraph()
+  const baseGraph = createGraph()
+  const graph: BlockGraphSnapshot = quickExecutionTarget
+    ? {
+        ...baseGraph,
+        quickExecutionSlots: [
+          { number: 1, target: quickExecutionTarget },
+          { number: 2, target: null },
+          { number: 3, target: null },
+          { number: 4, target: null },
+          { number: 5, target: null }
+        ]
+      }
+    : baseGraph
   const nodes = createTerminalFlowNodes({
     graph,
     handlers: {
@@ -328,7 +385,7 @@ function renderCanvas({
       nodeTypes={{}}
       reactFlowInstanceRef={{ current: null }}
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
-      terminalWorkflow={createTerminalWorkflow(graph)}
+      terminalWorkflow={terminalWorkflow ?? createTerminalWorkflow(graph)}
       onRequestSaveBlockTemplate={onRequestSaveBlockTemplate}
       onAddQuickExecutionTarget={onAddQuickExecutionTarget}
       onBindQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}

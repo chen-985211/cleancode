@@ -11,31 +11,24 @@
 .quick-execution__slots {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1px;
-  border: 1px solid var(--cc-border);
-  border-radius: 8px;
-  background: var(--cc-surface-overlay);
-  padding: 2px;
-  box-shadow: var(--cc-shadow-xs);
-  backdrop-filter: blur(12px);
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+  gap: 3px;
 }
 
-.quick-execution--drop-target .quick-execution__slots {
+.quick-execution--drop-target .quick-execution__slot {
   border-color: var(--cc-primary);
-  box-shadow: 0 0 0 3px var(--cc-primary-ring);
+  background: var(--cc-primary-soft);
+  box-shadow: 0 0 0 2px var(--cc-primary-ring);
 }
 
 .quick-execution__slot {
   position: relative;
   min-width: 0;
-  height: 32px;
+  height: 36px;
   overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface-translucent);
+  backdrop-filter: blur(10px);
   transition:
     border-color 140ms ease,
     background 140ms ease,
@@ -43,14 +36,13 @@
 }
 
 .quick-execution__slot--filled {
-  background: var(--cc-surface-subtle);
   cursor: grab;
 }
 
-.quick-execution__slot--filled:hover,
-.quick-execution__slot--filled:focus-within {
-  border-color: var(--cc-border);
-  background: var(--cc-surface-raised);
+.quick-execution__slot:hover,
+.quick-execution__slot:focus-within {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-subtle);
 }
 
 .quick-execution__slot--dragging {
@@ -65,7 +57,6 @@
 
 .quick-execution__slot--unavailable {
   border-color: var(--cc-warning-border);
-  background: var(--cc-warning-soft);
 }
 
 .quick-execution__content {
@@ -89,15 +80,12 @@
   cursor: pointer;
 }
 
-.quick-execution__add:hover {
-  background: var(--cc-neutral-overlay);
-}
-
 .quick-execution__content--empty {
   grid-template-columns: 16px minmax(0, 1fr);
 }
 
 .quick-execution__add:focus-visible,
+.quick-execution__slot--filled .quick-execution__content:focus-visible,
 .quick-execution__more:focus-visible,
 .quick-execution__popover button:focus-visible {
   outline: 2px solid var(--cc-ring);
@@ -110,9 +98,8 @@
   height: 15px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cc-border);
-  border-radius: 4px;
-  background: var(--cc-surface);
+  border: 0;
+  background: transparent;
   color: var(--cc-muted);
   font: inherit;
   font-size: 8.5px;
@@ -165,10 +152,9 @@
   justify-content: center;
   border: 0;
   border-radius: 5px;
-  background: var(--cc-surface-overlay);
+  background: transparent;
   color: var(--cc-muted-strong);
   opacity: 0;
-  box-shadow: var(--cc-shadow-xs);
 }
 
 .quick-execution__slot:hover .quick-execution__more,
@@ -237,16 +223,52 @@
   display: flex;
 }
 
-.quick-execution__action-list .quick-execution__clear {
-  color: var(--cc-danger);
-}
-
 .quick-execution__empty-list {
   margin: 0;
   padding: 11px;
   color: var(--cc-muted);
   font-size: 12px;
   text-align: center;
+}
+
+.quick-execution__trash {
+  position: absolute;
+  bottom: -2px;
+  left: calc(100% + 8px);
+  display: flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--cc-danger-border);
+  border-radius: 9px;
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px) scale(0.88);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.quick-execution__trash--visible {
+  opacity: 0.82;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.quick-execution__trash--target {
+  border-color: var(--cc-danger);
+  box-shadow: 0 0 0 3px var(--cc-danger-border);
+  opacity: 1;
+  transform: translateY(0) scale(1.05);
+}
+
+.quick-execution__trash svg {
+  pointer-events: none;
 }
 
 @keyframes quick-execution-popover-in {
@@ -258,6 +280,18 @@
   to {
     opacity: 1;
     transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-execution__slots,
+  .quick-execution__slot,
+  .quick-execution__trash {
+    transition: none;
+  }
+
+  .quick-execution__popover {
+    animation: none;
   }
 }
 

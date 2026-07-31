@@ -40,6 +40,7 @@ import { BlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
 import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
 import { QuickExecutionBar } from './QuickExecutionBar'
+import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { toQuickExecutionTarget } from './quickExecutionTargets'
 import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
@@ -478,6 +479,12 @@ export function WorkbenchCanvas({
             onAdd={onAddQuickExecutionTarget}
             onBind={onBindQuickExecutionSlot}
             onClear={onClearQuickExecutionSlot}
+            onFocus={(target) =>
+              focusQuickExecutionTargetInCanvas({
+                instance: reactFlowInstanceRef.current,
+                target
+              })
+            }
             onReorder={onReorderQuickExecutionSlots}
           />
         ) : null}

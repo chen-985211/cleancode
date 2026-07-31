@@ -204,10 +204,17 @@ describe('run terminal sessions e2e', () => {
         const resultDirectory = join(process.cwd(), 'test-results')
         await mkdir(resultDirectory, { recursive: true })
         await selectTheme(page, 'light')
+        await waitForQuickExecutionVisualToSettle(page)
         await page.screenshot({
           path: join(resultDirectory, 'quick-execution-light.png')
         })
+        await page.locator('[data-quick-execution-slot="1"]').hover()
+        await waitForQuickExecutionVisualToSettle(page)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-light-hover.png')
+        })
         await selectTheme(page, 'dark')
+        await waitForQuickExecutionVisualToSettle(page)
         await page.screenshot({
           path: join(resultDirectory, 'quick-execution-dark.png')
         })
@@ -230,10 +237,10 @@ describe('run terminal sessions e2e', () => {
           { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
         ])
 
-      const boundSlot = page.getByRole('group', {
-        name: '快捷位 2：Terminal 1，仅支持快捷键执行'
+      const boundSlot = page.getByRole('button', {
+        name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
       })
-      await boundSlot.getByText('Terminal 1').click()
+      await boundSlot.click()
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
       await page.getByRole('button', { name: '新建终端积木' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
@@ -252,8 +259,8 @@ describe('run terminal sessions e2e', () => {
       await expect
         .poll(() =>
           page
-            .getByRole('group', {
-              name: '快捷位 2：Terminal 1，仅支持快捷键执行'
+            .getByRole('button', {
+              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
             })
             .isVisible()
         )
@@ -261,6 +268,43 @@ describe('run terminal sessions e2e', () => {
       await page.getByRole('button', { name: '新建终端积木' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
       await waitForQuickLaunchCount(reportPath, launchOutput, 3)
+
+      const quickSlot = page.locator('[data-quick-execution-slot="2"]')
+      const quickSlotBox = await quickSlot.boundingBox()
+      if (!quickSlotBox) throw new Error('Quick execution slot 2 is not visible')
+
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2,
+        quickSlotBox.y + quickSlotBox.height / 2
+      )
+      await page.mouse.down()
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2 + 8,
+        quickSlotBox.y + quickSlotBox.height / 2,
+        { steps: 4 }
+      )
+      await expect
+        .poll(() => page.locator('[data-quick-execution-trash]').getAttribute('aria-hidden'))
+        .toBe('false')
+
+      const trashBox = await page.locator('[data-quick-execution-trash]').boundingBox()
+      if (!trashBox) throw new Error('Quick execution trash target is not visible')
+      await page.mouse.move(trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, {
+        steps: 8
+      })
+      await page.mouse.up()
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target)
+        .toBeNull()
+      await expect
+        .poll(() =>
+          page
+            .getByRole('button', {
+              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+            })
+            .count()
+        )
+        .toBe(0)
     },
     electronScenarioTimeoutMs
   )
@@ -515,6 +559,17 @@ async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await page.getByRole('button', { name: '关闭主题设置' }).click()
   await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
   await page.waitForFunction(() => document.querySelector('[inert]') === null)
+}
+
+async function waitForQuickExecutionVisualToSettle(page: Page): Promise<void> {
+  await page.locator('[data-quick-execution-bar]').evaluate(async (bar) => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    })
+    await Promise.allSettled(
+      bar.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    )
+  })
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {
