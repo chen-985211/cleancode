@@ -112,10 +112,7 @@ export function BlockTemplateLibraryRoot({
             aria-labelledby="block-template-library-title"
           >
             <header className="block-template-library-header">
-              <div>
-                <h2 id="block-template-library-title">{t('templates.title')}</h2>
-                <p>{t('templates.description')}</p>
-              </div>
+              <h2 id="block-template-library-title">{t('templates.title')}</h2>
               <TooltipLabel content={t('templates.close')} side="left">
                 <button
                   ref={closeButtonRef}
@@ -305,9 +302,15 @@ function TemplateLibraryItem({
   const [name, setName] = useState(template.name)
   const [description, setDescription] = useState(template.description)
   const typeLabel = t(`templates.type.${template.type}`)
+  const renameLabel = t('templates.rename', { name: template.name })
+  const moveLabel = t(
+    template.scope.type === 'project' ? 'templates.moveToGlobal' : 'templates.moveToProject',
+    { name: template.name }
+  )
+  const deleteLabel = t('templates.delete', { name: template.name })
 
   return (
-    <article className="block-template-card">
+    <article className="block-template-card" data-template-type={template.type}>
       {isEditing ? (
         <form
           className="block-template-card-edit"
@@ -349,37 +352,30 @@ function TemplateLibraryItem({
               {template.description ? <p>{template.description}</p> : null}
             </div>
             <div className="block-template-card-tools">
-              <button
-                type="button"
-                aria-label={t('templates.rename', { name: template.name })}
-                onClick={onEdit}
-              >
-                <Pencil size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                aria-label={t(
-                  template.scope.type === 'project'
-                    ? 'templates.moveToGlobal'
-                    : 'templates.moveToProject',
-                  { name: template.name }
-                )}
-                disabled={template.scope.type === 'global' && !currentProjectId}
-                onClick={onMove}
-              >
-                {template.scope.type === 'project' ? (
-                  <Globe2 size={14} aria-hidden="true" />
-                ) : (
-                  <FolderInput size={14} aria-hidden="true" />
-                )}
-              </button>
-              <button
-                type="button"
-                aria-label={t('templates.delete', { name: template.name })}
-                onClick={onRequestDelete}
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
+              <TooltipLabel content={renameLabel}>
+                <button type="button" aria-label={renameLabel} onClick={onEdit}>
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+              </TooltipLabel>
+              <TooltipLabel content={moveLabel}>
+                <button
+                  type="button"
+                  aria-label={moveLabel}
+                  disabled={template.scope.type === 'global' && !currentProjectId}
+                  onClick={onMove}
+                >
+                  {template.scope.type === 'project' ? (
+                    <Globe2 size={14} aria-hidden="true" />
+                  ) : (
+                    <FolderInput size={14} aria-hidden="true" />
+                  )}
+                </button>
+              </TooltipLabel>
+              <TooltipLabel content={deleteLabel}>
+                <button type="button" aria-label={deleteLabel} onClick={onRequestDelete}>
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </TooltipLabel>
             </div>
           </div>
           {isDeletePending ? (
