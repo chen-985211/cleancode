@@ -44,6 +44,7 @@ describe('block template library', () => {
     fireEvent.click(screen.getByRole('button', { name: '收藏模板' }))
 
     expect(await screen.findByRole('dialog', { name: '收藏模板' })).toBeInTheDocument()
+    expect(screen.queryByText('保存并复用终端、流程和组合。')).not.toBeInTheDocument()
     expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
       scope: { type: 'project', projectId: 'project-1' }
     })
@@ -82,6 +83,27 @@ describe('block template library', () => {
     fireEvent.click(screen.getByRole('button', { name: '放置并运行“共享发布”' }))
 
     expect(onBeginPlacement).toHaveBeenCalledWith(globalTemplate, true)
+  })
+
+  it('explains icon-only maintenance actions with tooltips', async () => {
+    renderLibrary(vi.fn())
+    fireEvent.click(screen.getByRole('button', { name: '收藏模板' }))
+    await screen.findByText('本地构建')
+
+    for (const accessibleName of [
+      '重命名“本地构建”',
+      '移动“本地构建”到全局收藏',
+      '删除“本地构建”'
+    ]) {
+      fireEvent.keyDown(document, { key: 'Tab' })
+      const action = screen.getByRole('button', { name: accessibleName })
+      fireEvent.focus(action)
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(accessibleName)
+
+      fireEvent.blur(action)
+      await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+    }
   })
 
   it('renames, moves, and deletes through the application-level library API', async () => {
