@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { QuickExecutionBar } from '../../../src/presentation/app-shell/QuickExecutionBar'
@@ -53,6 +53,58 @@ describe('quick execution bar', () => {
 
     expect(screen.getByText('removed-terminal')).toBeInTheDocument()
     expect(screen.getByText('不可用')).toBeInTheDocument()
+  })
+
+  it('uses shared tooltips to explain bound and empty slots without implying click execution', async () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+        shortcutPlatform="other"
+        shortcutTooltips={{ quickExecution2: '执行快捷位 2 (Ctrl+2)' }}
+      />
+    )
+
+    const boundSlot = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    expect(boundSlot.querySelector('[title]')).toBeNull()
+    fireEvent.pointerMove(boundSlot, { pointerType: 'mouse' })
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      '已绑定终端「Worker」。执行快捷位 2 (Ctrl+2)；点击仅用于定位视图。'
+    )
+
+    fireEvent.pointerLeave(boundSlot)
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+
+    const emptySlot = document.querySelector<HTMLElement>('[data-quick-execution-slot="1"]')!
+    fireEvent.pointerMove(emptySlot, { pointerType: 'mouse' })
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      '快捷位 1 为空，可绑定当前画布中的对象。'
+    )
+  })
+
+  it('falls back to a platform-appropriate shortcut when no configured label is provided', async () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+        shortcutPlatform="other"
+      />
+    )
+
+    const boundSlot = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    fireEvent.pointerMove(boundSlot, { pointerType: 'mouse' })
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      '已绑定终端「Worker」。按 Ctrl+2 执行此快捷位；点击仅用于定位视图。'
+    )
   })
 
   it('reorders filled slots by dragging one shortcut assignment onto another', () => {
@@ -115,6 +167,8 @@ describe('quick execution bar', () => {
     const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
     fireEvent.dragStart(source)
     const trash = screen.getByRole('region', { name: '拖到此处清空快捷位 2' })
+    expect(trash).not.toHaveAttribute('data-state')
+    expect(trash).not.toHaveAttribute('aria-describedby')
     expect(trash.querySelector('[data-trash-icon-variant="outline"]')).toBeInTheDocument()
     fireEvent.dragOver(trash)
     expect(trash.querySelector('[data-trash-icon-variant="filled"]')).toBeInTheDocument()

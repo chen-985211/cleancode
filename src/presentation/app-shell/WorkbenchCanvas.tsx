@@ -486,6 +486,8 @@ export function WorkbenchCanvas({
               })
             }
             onReorder={onReorderQuickExecutionSlots}
+            shortcutPlatform={shortcutPlatform}
+            shortcutTooltips={shortcutTooltips}
           />
         ) : null}
         {objectContextMenu.menu}

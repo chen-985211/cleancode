@@ -225,6 +225,11 @@ export const enMessages = {
   'quickExecution.type.terminal': 'Terminal',
   'quickExecution.type.workflow': 'Workflow',
   'quickExecution.type.combination': 'Combination',
+  'quickExecution.tooltip.bound':
+    'Bound to {type} “{name}”. {shortcutHint}. Clicking only focuses it on the canvas.',
+  'quickExecution.tooltip.empty':
+    'Quick slot {number} is empty and can be bound to an object on this canvas.',
+  'quickExecution.tooltip.executeShortcut': 'Press {shortcut} to run this quick slot',
   'quickExecution.updateFailedTitle': 'Could not update quick execution bar',
   'quickExecution.updateFailed': 'The quick slot could not be saved. Try again.',
   'quickExecution.executeFailedTitle': 'Quick execution failed',

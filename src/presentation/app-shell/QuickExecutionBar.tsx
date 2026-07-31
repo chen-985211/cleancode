@@ -11,7 +11,16 @@ import {
   resolveQuickExecutionBinding,
   type QuickExecutionCandidate
 } from './quickExecutionTargets'
+import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
+import {
+  defaultApplicationShortcutBindings,
+  formatShortcutBinding,
+  type ShortcutPlatform
+} from './applicationShortcuts'
 import { useI18n } from './i18n/useI18n'
+import { TooltipLabel } from './Tooltip'
+
+type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
 
 interface QuickExecutionBarProps {
   readonly isExternalDropTarget?: boolean
@@ -27,6 +36,10 @@ interface QuickExecutionBarProps {
     sourceNumber: QuickExecutionSlotNumber,
     destinationNumber: QuickExecutionSlotNumber
   ) => Promise<void> | void
+  readonly shortcutPlatform?: ShortcutPlatform
+  readonly shortcutTooltips?: Partial<
+    Pick<ApplicationShortcutTooltipLabels, QuickExecutionShortcutCommand>
+  >
 }
 
 type PopoverState =
@@ -40,7 +53,9 @@ export function QuickExecutionBar({
   onBind,
   onClear,
   onFocus,
-  onReorder
+  onReorder,
+  shortcutPlatform = 'mac',
+  shortcutTooltips
 }: QuickExecutionBarProps) {
   const { t } = useI18n()
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -160,84 +175,102 @@ export function QuickExecutionBar({
         {slots.map((slot) => {
           const projection = slot.projection
           const isUnavailable = Boolean(projection && !projection.isAvailable)
+          const shortcutCommand = `quickExecution${slot.number}` as QuickExecutionShortcutCommand
+          const defaultShortcut = formatShortcutBinding(
+            defaultApplicationShortcutBindings[shortcutCommand],
+            shortcutPlatform
+          ).join(shortcutPlatform === 'mac' ? '' : '+')
+          const shortcutHint =
+            shortcutTooltips?.[shortcutCommand] ??
+            t('quickExecution.tooltip.executeShortcut', { shortcut: defaultShortcut })
+          const tooltipContent = projection
+            ? t('quickExecution.tooltip.bound', {
+                name: projection.name,
+                shortcutHint,
+                type: t(`quickExecution.type.${projection.type}`)
+              })
+            : t('quickExecution.tooltip.empty', { number: slot.number })
 
           return (
-            <div
-              key={slot.number}
-              className={[
-                'quick-execution__slot',
-                projection ? 'quick-execution__slot--filled' : '',
-                draggedNumber === slot.number ? 'quick-execution__slot--dragging' : '',
-                reorderTargetNumber === slot.number ? 'quick-execution__slot--reorder-target' : '',
-                isUnavailable ? 'quick-execution__slot--unavailable' : ''
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              data-quick-execution-slot={slot.number}
-              draggable={Boolean(projection)}
-              onDragStart={projection ? (event) => beginReorder(event, slot.number) : undefined}
-              onDragEnd={projection ? resetReorder : undefined}
-              onDragOver={(event) => {
-                if (!draggedNumberRef.current) return
-                event.preventDefault()
-                if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-                setReorderTargetNumber(slot.number)
-              }}
-              onDragLeave={() =>
-                setReorderTargetNumber((number) => (number === slot.number ? null : number))
-              }
-              onDrop={(event) => {
-                const sourceNumber = draggedNumberRef.current
-                if (!sourceNumber) return
-                event.preventDefault()
-                resetReorder()
-                if (sourceNumber !== slot.number) void onReorder(sourceNumber, slot.number)
-              }}
-            >
-              {projection ? (
-                <button
-                  className="quick-execution__content"
-                  type="button"
-                  aria-label={t('quickExecution.boundSlot', {
-                    name: projection.name,
-                    number: slot.number
-                  })}
-                  onClick={() => onFocus(projection.target)}
-                >
-                  <kbd>{slot.number}</kbd>
-                  <TypeIcon type={projection.type} />
-                  <span className="quick-execution__copy">
-                    <strong title={projection.name}>{projection.name}</strong>
-                    {isUnavailable ? <small>{t('quickExecution.unavailable')}</small> : null}
-                  </span>
-                </button>
-              ) : slot.number === firstEmptyNumber ? (
-                <button
-                  className="quick-execution__content quick-execution__add"
-                  type="button"
-                  aria-label={t('quickExecution.addObject')}
-                  onClick={() => setPopover({ type: 'candidates', number: null })}
-                >
-                  <kbd>{slot.number}</kbd>
-                  <Plus className="quick-execution__type-icon" size={13} aria-hidden="true" />
-                </button>
-              ) : (
-                <div className="quick-execution__content quick-execution__content--empty">
-                  <kbd>{slot.number}</kbd>
-                </div>
-              )}
-              {projection ? (
-                <button
-                  className="quick-execution__more"
-                  type="button"
-                  draggable={false}
-                  aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
-                  onClick={() => setPopover({ type: 'actions', number: slot.number })}
-                >
-                  <Ellipsis size={13} aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
+            <TooltipLabel key={slot.number} content={tooltipContent}>
+              <div
+                className={[
+                  'quick-execution__slot',
+                  projection ? 'quick-execution__slot--filled' : '',
+                  draggedNumber === slot.number ? 'quick-execution__slot--dragging' : '',
+                  reorderTargetNumber === slot.number
+                    ? 'quick-execution__slot--reorder-target'
+                    : '',
+                  isUnavailable ? 'quick-execution__slot--unavailable' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-quick-execution-slot={slot.number}
+                draggable={Boolean(projection)}
+                onDragStart={projection ? (event) => beginReorder(event, slot.number) : undefined}
+                onDragEnd={projection ? resetReorder : undefined}
+                onDragOver={(event) => {
+                  if (!draggedNumberRef.current) return
+                  event.preventDefault()
+                  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+                  setReorderTargetNumber(slot.number)
+                }}
+                onDragLeave={() =>
+                  setReorderTargetNumber((number) => (number === slot.number ? null : number))
+                }
+                onDrop={(event) => {
+                  const sourceNumber = draggedNumberRef.current
+                  if (!sourceNumber) return
+                  event.preventDefault()
+                  resetReorder()
+                  if (sourceNumber !== slot.number) void onReorder(sourceNumber, slot.number)
+                }}
+              >
+                {projection ? (
+                  <button
+                    className="quick-execution__content"
+                    type="button"
+                    aria-label={t('quickExecution.boundSlot', {
+                      name: projection.name,
+                      number: slot.number
+                    })}
+                    onClick={() => onFocus(projection.target)}
+                  >
+                    <kbd>{slot.number}</kbd>
+                    <TypeIcon type={projection.type} />
+                    <span className="quick-execution__copy">
+                      <strong>{projection.name}</strong>
+                      {isUnavailable ? <small>{t('quickExecution.unavailable')}</small> : null}
+                    </span>
+                  </button>
+                ) : slot.number === firstEmptyNumber ? (
+                  <button
+                    className="quick-execution__content quick-execution__add"
+                    type="button"
+                    aria-label={t('quickExecution.addObject')}
+                    onClick={() => setPopover({ type: 'candidates', number: null })}
+                  >
+                    <kbd>{slot.number}</kbd>
+                    <Plus className="quick-execution__type-icon" size={13} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <div className="quick-execution__content quick-execution__content--empty">
+                    <kbd>{slot.number}</kbd>
+                  </div>
+                )}
+                {projection ? (
+                  <button
+                    className="quick-execution__more"
+                    type="button"
+                    draggable={false}
+                    aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
+                    onClick={() => setPopover({ type: 'actions', number: slot.number })}
+                  >
+                    <Ellipsis size={13} aria-hidden="true" />
+                  </button>
+                ) : null}
+              </div>
+            </TooltipLabel>
           )
         })}
       </div>

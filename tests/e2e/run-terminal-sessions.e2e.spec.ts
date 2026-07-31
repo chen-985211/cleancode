@@ -200,6 +200,12 @@ describe('run terminal sessions e2e', () => {
         .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[0]?.target)
         .toEqual({ type: 'terminal', terminalBlockId: graph.blocks[0]?.id })
 
+      const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；点击仅用于定位视图。`
+      await page.locator('[data-quick-execution-slot="1"]').hover()
+      await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
+      await page.mouse.move(0, 0)
+      await expect.poll(() => page.getByRole('tooltip').count()).toBe(0)
+
       if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
         const resultDirectory = join(process.cwd(), 'test-results')
         await mkdir(resultDirectory, { recursive: true })
@@ -209,6 +215,7 @@ describe('run terminal sessions e2e', () => {
           path: join(resultDirectory, 'quick-execution-light.png')
         })
         await page.locator('[data-quick-execution-slot="1"]').hover()
+        await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
         await waitForQuickExecutionVisualToSettle(page)
         await page.screenshot({
           path: join(resultDirectory, 'quick-execution-light-hover.png')
