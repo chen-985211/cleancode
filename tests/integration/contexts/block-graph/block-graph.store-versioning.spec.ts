@@ -20,7 +20,7 @@ describe('block graph versioned store', () => {
     await rm(projectDirectory, { force: true, recursive: true })
   })
 
-  it('writes new graphs in the version 2 envelope', async () => {
+  it('writes new graphs in the version 3 envelope', async () => {
     const repository = new FileSystemBlockGraphRepository(appStateDirectory)
     const graph = BlockGraph.createDefault({
       id: 'graph-1',
@@ -32,7 +32,42 @@ describe('block graph versioned store', () => {
 
     await expect(readStore(appStateDirectory)).resolves.toEqual({
       graph: graph.toSnapshot(),
-      version: 2
+      version: 3
+    })
+  })
+
+  it('reads version 2 with five empty slots and rewrites only on the next transaction', async () => {
+    const repository = new FileSystemBlockGraphRepository(appStateDirectory)
+    const graphPath = await initializeAndFindGraphPath(
+      repository,
+      appStateDirectory,
+      projectDirectory
+    )
+    const versionTwoStore = `${JSON.stringify(
+      { graph: createRawGraph([]), version: 2 },
+      null,
+      2
+    )}\n`
+    await writeFile(graphPath, versionTwoStore)
+
+    const restored = await repository.findDefaultGraphSnapshot(projectDirectory, 'main')
+
+    expect(restored?.quickExecutionSlots).toEqual([
+      { number: 1, target: null },
+      { number: 2, target: null },
+      { number: 3, target: null },
+      { number: 4, target: null },
+      { number: 5, target: null }
+    ])
+    await expect(readFile(graphPath, 'utf8')).resolves.toBe(versionTwoStore)
+
+    await repository.transactDefaultGraph(projectDirectory, 'main', (graph) => {
+      graph.updateViewport({ x: 48 })
+    })
+
+    await expect(readStore(appStateDirectory)).resolves.toMatchObject({
+      graph: { quickExecutionSlots: restored?.quickExecutionSlots },
+      version: 3
     })
   })
 
@@ -103,7 +138,23 @@ describe('block graph versioned store', () => {
         id: 'invalid-server'
       }
     ])
-    const originalStore = `${JSON.stringify({ graph: malformedGraph, version: 2 }, null, 2)}\n`
+    const originalStore = `${JSON.stringify(
+      {
+        graph: {
+          ...malformedGraph,
+          quickExecutionSlots: [
+            { number: 1, target: null },
+            { number: 2, target: null },
+            { number: 3, target: null },
+            { number: 4, target: null },
+            { number: 5, target: null }
+          ]
+        },
+        version: 3
+      },
+      null,
+      2
+    )}\n`
     await writeFile(graphPath, originalStore)
 
     await expect(repository.findDefaultGraphSnapshot(projectDirectory, 'main')).rejects.toSatisfy(

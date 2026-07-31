@@ -5,6 +5,7 @@ import {
 import { BlockGraph } from '../../domain/aggregates/BlockGraph'
 import type {
   BlockGraphSnapshot,
+  QuickExecutionSlotSnapshot,
   RestorableBlockGraphSnapshot,
   TerminalExecutionConfigSnapshot
 } from '../../domain/aggregates/BlockGraphTypes'
@@ -26,7 +27,7 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
 
   if (!isRecord(parsed)) throwCorruptedStore(path)
 
-  if (parsed.version !== 2) {
+  if (parsed.version !== 2 && parsed.version !== 3) {
     throw createExpectedAppError(
       'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED',
       'Persisted block graph snapshot version is unsupported.',
@@ -35,17 +36,21 @@ export function parseBlockGraphStore(contents: string, path: string): ParsedBloc
   }
 
   return {
-    graph: restoreGraph(parsed.graph, path)
+    graph: restoreGraph(parsed.graph, path, parsed.version === 3)
   }
 }
 
 export function serializeBlockGraphStore(graph: BlockGraphSnapshot): string {
-  return `${JSON.stringify({ version: 2, graph }, null, 2)}\n`
+  return `${JSON.stringify({ version: 3, graph }, null, 2)}\n`
 }
 
-function restoreGraph(rawGraph: unknown, path: string): BlockGraphSnapshot {
+function restoreGraph(
+  rawGraph: unknown,
+  path: string,
+  requiresQuickExecutionSlots: boolean
+): BlockGraphSnapshot {
   try {
-    const snapshot = validateGraphSnapshot(rawGraph)
+    const snapshot = validateGraphSnapshot(rawGraph, requiresQuickExecutionSlots)
     return BlockGraph.fromSnapshot(snapshot).toSnapshot()
   } catch (error) {
     if (getAppErrorCode(error) === 'BLOCK_GRAPH_SNAPSHOT_VERSION_UNSUPPORTED') throw error
@@ -53,7 +58,10 @@ function restoreGraph(rawGraph: unknown, path: string): BlockGraphSnapshot {
   }
 }
 
-function validateGraphSnapshot(rawGraph: unknown): RestorableBlockGraphSnapshot {
+function validateGraphSnapshot(
+  rawGraph: unknown,
+  requiresQuickExecutionSlots: boolean
+): RestorableBlockGraphSnapshot {
   if (
     !isRecord(rawGraph) ||
     typeof rawGraph.id !== 'string' ||
@@ -65,11 +73,71 @@ function validateGraphSnapshot(rawGraph: unknown): RestorableBlockGraphSnapshot 
   }
 
   const blocks = rawGraph.blocks.map(validateTerminalBlock)
+  const quickExecutionSlots = requiresQuickExecutionSlots
+    ? validateQuickExecutionSlots(rawGraph.quickExecutionSlots)
+    : undefined
 
   return {
     ...(rawGraph as unknown as RestorableBlockGraphSnapshot),
-    blocks
+    blocks,
+    quickExecutionSlots
   }
+}
+
+function validateQuickExecutionSlots(rawSlots: unknown): readonly QuickExecutionSlotSnapshot[] {
+  if (!Array.isArray(rawSlots) || rawSlots.length !== 5) {
+    throw new TypeError('Invalid quick execution slots.')
+  }
+
+  return rawSlots.map((rawSlot, index) => {
+    const expectedNumber = index + 1
+    if (
+      !isRecord(rawSlot) ||
+      !hasExactKeys(rawSlot, ['number', 'target']) ||
+      rawSlot.number !== expectedNumber
+    ) {
+      throw new TypeError('Invalid quick execution slot.')
+    }
+
+    return {
+      number: expectedNumber as QuickExecutionSlotSnapshot['number'],
+      target: validateQuickExecutionTarget(rawSlot.target)
+    }
+  })
+}
+
+function validateQuickExecutionTarget(rawTarget: unknown): QuickExecutionSlotSnapshot['target'] {
+  if (rawTarget === null) return null
+  if (!isRecord(rawTarget)) throw new TypeError('Invalid quick execution target.')
+
+  if (
+    rawTarget.type === 'terminal' &&
+    hasExactKeys(rawTarget, ['type', 'terminalBlockId']) &&
+    isNonEmptyString(rawTarget.terminalBlockId)
+  ) {
+    return { type: 'terminal', terminalBlockId: rawTarget.terminalBlockId }
+  }
+
+  if (
+    rawTarget.type === 'workflow' &&
+    hasExactKeys(rawTarget, ['type', 'terminalBlockIds']) &&
+    Array.isArray(rawTarget.terminalBlockIds) &&
+    rawTarget.terminalBlockIds.length > 0 &&
+    rawTarget.terminalBlockIds.every(isNonEmptyString) &&
+    new Set(rawTarget.terminalBlockIds).size === rawTarget.terminalBlockIds.length
+  ) {
+    return { type: 'workflow', terminalBlockIds: [...rawTarget.terminalBlockIds] }
+  }
+
+  if (
+    rawTarget.type === 'combination' &&
+    hasExactKeys(rawTarget, ['type', 'terminalGroupId']) &&
+    isNonEmptyString(rawTarget.terminalGroupId)
+  ) {
+    return { type: 'combination', terminalGroupId: rawTarget.terminalGroupId }
+  }
+
+  throw new TypeError('Invalid quick execution target.')
 }
 
 function validateTerminalBlock(rawBlock: unknown) {
@@ -171,6 +239,10 @@ function hasOnlyKeys(record: Record<string, unknown>, keys: readonly string[]): 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0
 }
 
 function throwCorruptedStore(path: string): never {

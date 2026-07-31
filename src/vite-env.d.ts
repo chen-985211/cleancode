@@ -22,6 +22,8 @@ import type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
+  QuickExecutionSlotNumber,
+  QuickExecutionTargetSnapshot,
   TerminalBlockSizeSnapshot,
   TerminalExecutionConfigSnapshot
 } from './contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -176,6 +178,28 @@ declare global {
         readonly name: string
         readonly description: string
         readonly position: BlockPositionSnapshot
+      }): Promise<BlockGraphSnapshot>
+      addQuickExecutionTarget(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly target: QuickExecutionTargetSnapshot
+      }): Promise<BlockGraphSnapshot>
+      bindQuickExecutionSlot(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly number: QuickExecutionSlotNumber
+        readonly target: QuickExecutionTargetSnapshot
+      }): Promise<BlockGraphSnapshot>
+      clearQuickExecutionSlot(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly number: QuickExecutionSlotNumber
+      }): Promise<BlockGraphSnapshot>
+      reorderQuickExecutionSlots(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly sourceNumber: QuickExecutionSlotNumber
+        readonly destinationNumber: QuickExecutionSlotNumber
       }): Promise<BlockGraphSnapshot>
       createTerminalGroup(command: {
         readonly projectDirectory: string

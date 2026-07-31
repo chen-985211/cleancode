@@ -22,12 +22,17 @@ describe('application shortcut dispatch', () => {
     ['groupTerminals', 'g', false],
     ['zoomCanvasIn', ']', false],
     ['zoomCanvasOut', '[', false],
-    ['fitCanvas', '1', false],
+    ['fitCanvas', '\\', false],
     ['selectCanvasNodeLeft', 'ArrowLeft', false],
     ['selectCanvasNodeRight', 'ArrowRight', false],
     ['selectCanvasNodeUp', 'ArrowUp', false],
     ['selectCanvasNodeDown', 'ArrowDown', false],
-    ['toggleMinimap', 'm', true]
+    ['toggleMinimap', 'm', true],
+    ['quickExecution1', '1', false],
+    ['quickExecution2', '2', false],
+    ['quickExecution3', '3', false],
+    ['quickExecution4', '4', false],
+    ['quickExecution5', '5', false]
   ] as const)(
     'dispatches the %s default shortcut and cancels the native event',
     (command, key, shiftKey) => {
@@ -157,6 +162,18 @@ describe('application shortcut dispatch', () => {
     expect(actions.createTerminal.run).not.toHaveBeenCalled()
   })
 
+  it('does not execute a quick slot while terminal input has focus', () => {
+    const actions = createActions()
+    render(<ShortcutHarness actions={actions} />)
+
+    fireEvent.keyDown(screen.getByLabelText('快捷键测试终端'), {
+      key: '1',
+      metaKey: true
+    })
+
+    expect(actions.quickExecution1.run).not.toHaveBeenCalled()
+  })
+
   it('suspends global actions while a modal dialog is open', () => {
     const actions = createActions()
     render(<ShortcutHarness actions={actions} showDialog />)
@@ -251,6 +268,11 @@ function createActions(
     selectCanvasNodeRight: { enabled: enabled.selectCanvasNodeRight ?? true, run: vi.fn() },
     selectCanvasNodeUp: { enabled: enabled.selectCanvasNodeUp ?? true, run: vi.fn() },
     selectCanvasNodeDown: { enabled: enabled.selectCanvasNodeDown ?? true, run: vi.fn() },
-    toggleMinimap: { enabled: enabled.toggleMinimap ?? true, run: vi.fn() }
+    toggleMinimap: { enabled: enabled.toggleMinimap ?? true, run: vi.fn() },
+    quickExecution1: { enabled: enabled.quickExecution1 ?? true, run: vi.fn() },
+    quickExecution2: { enabled: enabled.quickExecution2 ?? true, run: vi.fn() },
+    quickExecution3: { enabled: enabled.quickExecution3 ?? true, run: vi.fn() },
+    quickExecution4: { enabled: enabled.quickExecution4 ?? true, run: vi.fn() },
+    quickExecution5: { enabled: enabled.quickExecution5 ?? true, run: vi.fn() }
   }
 }

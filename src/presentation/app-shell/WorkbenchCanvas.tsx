@@ -9,12 +9,14 @@ import {
   type Viewport
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
   maximumCanvasZoom,
-  minimumCanvasZoom
+  minimumCanvasZoom,
+  type QuickExecutionSlotNumber,
+  type QuickExecutionTargetSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
@@ -37,6 +39,10 @@ import type { ShortcutPlatform } from './applicationShortcuts'
 import { BlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
 import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
+import { QuickExecutionBar } from './QuickExecutionBar'
+import { toQuickExecutionTarget } from './quickExecutionTargets'
+import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
+import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -57,7 +63,17 @@ interface WorkbenchCanvasProps {
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
-  readonly shortcutTooltips: ApplicationShortcutTooltipLabels
+  readonly shortcutTooltips: Partial<ApplicationShortcutTooltipLabels> &
+    Pick<
+      ApplicationShortcutTooltipLabels,
+      | 'createAgent'
+      | 'createTerminal'
+      | 'fitCanvas'
+      | 'groupTerminals'
+      | 'toggleMinimap'
+      | 'zoomCanvasIn'
+      | 'zoomCanvasOut'
+    >
   readonly shortcutPlatform?: ShortcutPlatform
   readonly placementTemplate?: BlockTemplateSnapshot
   readonly onPlaceBlockTemplate?: (origin: {
@@ -66,6 +82,23 @@ interface WorkbenchCanvasProps {
   }) => Promise<void> | void
   readonly onCancelBlockTemplatePlacement?: () => void
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
+  readonly onAddQuickExecutionTarget?: (
+    target: QuickExecutionTargetSnapshot
+  ) => Promise<void> | void
+  readonly onBindQuickExecutionSlot?: (
+    number: QuickExecutionSlotNumber,
+    target: QuickExecutionTargetSnapshot
+  ) => Promise<void> | void
+  readonly onClearQuickExecutionSlot?: (number: QuickExecutionSlotNumber) => Promise<void> | void
+  readonly onReorderQuickExecutionSlots?: (
+    sourceNumber: QuickExecutionSlotNumber,
+    destinationNumber: QuickExecutionSlotNumber
+  ) => Promise<void> | void
+  readonly onQuickExecutionNodeDrop?: (
+    target: QuickExecutionTargetSnapshot,
+    node: WorkbenchFlowNode
+  ) => Promise<void> | void
+  readonly onQuickExecutionDragPreview?: () => void
   readonly isMinimapCollapsed: boolean
   readonly onToggleMinimap: () => void
   readonly onZoomCanvasIn: () => void
@@ -126,6 +159,12 @@ export function WorkbenchCanvas({
   onPlaceBlockTemplate,
   onCancelBlockTemplatePlacement,
   onRequestSaveBlockTemplate,
+  onAddQuickExecutionTarget,
+  onBindQuickExecutionSlot,
+  onClearQuickExecutionSlot,
+  onReorderQuickExecutionSlots,
+  onQuickExecutionNodeDrop,
+  onQuickExecutionDragPreview,
   isMinimapCollapsed,
   onToggleMinimap,
   onZoomCanvasIn,
@@ -174,11 +213,15 @@ export function WorkbenchCanvas({
     [approvalIntents, currentWorkbench?.graph, workflow.edges]
   )
   const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
+  const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
   const objectContextMenu = useCanvasObjectContextMenu({
     edges,
     graph: currentWorkbench?.graph ?? null,
     nodes,
-    onRequestSaveBlockTemplate
+    onRequestSaveBlockTemplate,
+    onRequestQuickExecutionBinding: onAddQuickExecutionTarget
+      ? (target) => void onAddQuickExecutionTarget(toQuickExecutionTarget(target))
+      : undefined
   })
   const [viewportZoom, setViewportZoom] = useState(1)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
@@ -349,14 +392,35 @@ export function WorkbenchCanvas({
             onPaneClick()
           }}
           onNodeDragStart={(event, node) => {
+            setIsQuickExecutionDropTarget(false)
             activeDraggedNodeRef.current = node
             canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
             onNodeDragStart(event, node)
           }}
-          onNodeDrag={onNodeDrag}
+          onNodeDrag={(event, node) => {
+            const target = resolveQuickExecutionNodeTarget(currentWorkbench?.graph ?? null, node)
+            const isDropTarget = Boolean(
+              target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
+            )
+            setIsQuickExecutionDropTarget(isDropTarget)
+            if (isDropTarget) {
+              onQuickExecutionDragPreview?.()
+              return
+            }
+            onNodeDrag(event, node)
+          }}
           onNodeDragStop={(event, node) => {
             try {
               canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
+              const target = resolveQuickExecutionNodeTarget(currentWorkbench?.graph ?? null, node)
+              const isDropTarget = Boolean(
+                target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
+              )
+              setIsQuickExecutionDropTarget(false)
+              if (isDropTarget && target && onQuickExecutionNodeDrop) {
+                void onQuickExecutionNodeDrop(target, node)
+                return
+              }
               onNodeDragStop(event, node)
             } finally {
               activeDraggedNodeRef.current = null
@@ -403,6 +467,20 @@ export function WorkbenchCanvas({
             />
           </Panel>
         </ReactFlow>
+        {currentWorkbench &&
+        onAddQuickExecutionTarget &&
+        onBindQuickExecutionSlot &&
+        onClearQuickExecutionSlot &&
+        onReorderQuickExecutionSlots ? (
+          <QuickExecutionBar
+            isExternalDropTarget={isQuickExecutionDropTarget}
+            graph={currentWorkbench.graph}
+            onAdd={onAddQuickExecutionTarget}
+            onBind={onBindQuickExecutionSlot}
+            onClear={onClearQuickExecutionSlot}
+            onReorder={onReorderQuickExecutionSlots}
+          />
+        ) : null}
         {objectContextMenu.menu}
         {templateInteraction.templateSelection ? (
           <div
@@ -451,6 +529,44 @@ export function WorkbenchCanvas({
       />
     </section>
   )
+}
+
+function resolveQuickExecutionNodeTarget(
+  graph: WorkbenchSnapshot['graph'] | null,
+  node: WorkbenchFlowNode
+): QuickExecutionTargetSnapshot | null {
+  if (!graph || node.type === 'agentConsole') return null
+
+  const contextTarget = resolveCanvasObjectContextTarget(graph, {
+    nodeId: node.id,
+    nodeType: node.type === 'terminalGroup' ? 'terminalGroup' : 'terminal'
+  })
+
+  return contextTarget ? toQuickExecutionTarget(contextTarget) : null
+}
+
+function resolveQuickExecutionDropTarget(
+  surface: HTMLElement | null,
+  event: globalThis.MouseEvent | TouchEvent
+): boolean {
+  const point = readClientPoint(event)
+  const bar = surface?.querySelector<HTMLElement>('[data-quick-execution-bar]')
+  if (!bar || !point) return false
+
+  const rect = bar.getBoundingClientRect()
+  return (
+    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
+  )
+}
+
+function readClientPoint(
+  event: globalThis.MouseEvent | TouchEvent
+): { readonly x: number; readonly y: number } | null {
+  if ('clientX' in event) return { x: event.clientX, y: event.clientY }
+  if (!('changedTouches' in event) || !('touches' in event)) return null
+
+  const touch = event.changedTouches[0] ?? event.touches[0]
+  return touch ? { x: touch.clientX, y: touch.clientY } : null
 }
 
 const inactiveTerminalWorkflowController = {
@@ -545,134 +661,4 @@ function centerCanvasViewportOnMinimapPoint({
 
 function resolveCanvasDimension(value: number, fallback: number): number {
   return value > 0 ? value : fallback
-}
-
-function CanvasInitialWorkbenchState({
-  isDesktopRuntime,
-  phase,
-  onOpenProject,
-  onRetry
-}: {
-  readonly isDesktopRuntime: boolean
-  readonly phase: InitialWorkbenchLoadPhase
-  readonly onOpenProject?: () => void
-  readonly onRetry?: () => void
-}) {
-  const { t } = useI18n()
-
-  if (!isDesktopRuntime || phase === 'ready') {
-    return <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} onOpenProject={onOpenProject} />
-  }
-
-  if (phase === 'loading') {
-    const label = t('canvas.restoringProject')
-
-    return (
-      <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
-        <div className="canvas-empty__panel">
-          <span className="canvas-empty__icon" aria-hidden="true">
-            <LoaderCircle className="canvas-empty__spinner" size={20} />
-          </span>
-          <div className="canvas-empty__copy">
-            <p>{label}</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="canvas-empty" role="alert" data-tone="danger">
-      <div className="canvas-empty__panel">
-        <span className="canvas-empty__icon" aria-hidden="true">
-          <CircleAlert size={20} />
-        </span>
-        <div className="canvas-empty__copy">
-          <h2>{t('canvas.restoreFailedTitle')}</h2>
-          <p>{t('canvas.restoreFailedDescription')}</p>
-        </div>
-        <button className="canvas-empty__action" type="button" onClick={onRetry}>
-          <RefreshCw size={14} aria-hidden="true" />
-          {t('canvas.retryRestore')}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function CanvasEmptyState({
-  isDesktopRuntime,
-  onOpenProject
-}: {
-  readonly isDesktopRuntime: boolean
-  readonly onOpenProject?: () => void
-}) {
-  const { t } = useI18n()
-
-  return (
-    <div className="canvas-empty">
-      <div className="canvas-empty__panel">
-        <span className="canvas-empty__icon" aria-hidden="true">
-          <Box size={21} />
-        </span>
-        <div className="canvas-empty__copy">
-          {isDesktopRuntime ? (
-            <>
-              <h2>{t('canvas.emptyTitle')}</h2>
-              <p>{t('canvas.emptyDescription')}</p>
-            </>
-          ) : (
-            <p>{t('canvas.emptyPreview')}</p>
-          )}
-        </div>
-        {isDesktopRuntime ? (
-          <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
-            <FolderOpen size={14} aria-hidden="true" />
-            {t('canvas.openProject')}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-interface CanvasStatusbarProps {
-  readonly isDesktopRuntime: boolean
-  readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
-  readonly initialWorkbenchLoadPhase: InitialWorkbenchLoadPhase
-  readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly currentWorkspace: CurrentWorkspace | undefined
-}
-
-function CanvasStatusbar({
-  isDesktopRuntime,
-  terminalRuntimeAvailability,
-  initialWorkbenchLoadPhase,
-  currentWorkbench,
-  currentWorkspace
-}: CanvasStatusbarProps) {
-  const { t } = useI18n()
-  return (
-    <footer className="app-shell__statusbar">
-      <span
-        className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
-      />
-      <span>
-        {!isDesktopRuntime
-          ? t('canvas.statusPreview')
-          : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
-            ? t('canvas.statusProjectRestoring')
-            : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
-              ? t('canvas.statusProjectRestoreFailed')
-              : terminalRuntimeAvailability.phase === 'initializing'
-                ? t('canvas.statusRuntimeInitializing')
-                : terminalRuntimeAvailability.phase === 'unavailable'
-                  ? t('canvas.statusRuntimeUnavailable')
-                  : currentWorkbench
-                    ? t('canvas.statusConnected')
-                    : t('canvas.statusWaiting')}
-      </span>
-      {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
-    </footer>
-  )
 }

@@ -2,6 +2,8 @@ export type {
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
+  QuickExecutionSlotNumber,
+  QuickExecutionTargetSnapshot,
   TerminalLayoutRegion,
   TerminalBlockSizeSnapshot,
   TerminalBlockSnapshot,

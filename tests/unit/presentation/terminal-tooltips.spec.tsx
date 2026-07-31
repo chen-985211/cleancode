@@ -370,6 +370,47 @@ describe('terminal tooltips', () => {
     )
     expect(onUpdateDefinition).toHaveBeenCalledTimes(1)
   })
+
+  it('opens the existing launch-command editor for an external quick-execution request', async () => {
+    const data = createTerminalNodeData()
+    const { rerender } = render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={data}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    expect(screen.queryByLabelText('启动命令')).not.toBeInTheDocument()
+
+    rerender(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{ ...data, launchCommandEditRequestId: 1 }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    await waitFor(() => expect(screen.getByLabelText('启动命令')).toHaveFocus())
+  })
 })
 
 function createTerminalNodeData(): TerminalFlowNode['data'] {

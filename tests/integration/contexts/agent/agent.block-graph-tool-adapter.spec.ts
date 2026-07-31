@@ -124,7 +124,15 @@ describe('agent block graph workflow tool adapter', () => {
     expect(disconnected.connections).toEqual([
       expect.objectContaining({ id: unrelatedConnection.connectionId })
     ])
-    expect(persisted).toEqual(disconnected)
+    const { quickExecutionSlots, ...persistedAgentProjection } = persisted
+    expect(persistedAgentProjection).toEqual(disconnected)
+    expect(quickExecutionSlots).toEqual([
+      { number: 1, target: null },
+      { number: 2, target: null },
+      { number: 3, target: null },
+      { number: 4, target: null },
+      { number: 5, target: null }
+    ])
   })
 
   it('returns stable full and from-block plans from the BlockGraph use case', async () => {

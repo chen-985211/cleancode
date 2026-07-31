@@ -90,6 +90,27 @@ export interface TerminalGroupSnapshot {
   readonly memberBlockIds: readonly string[]
 }
 
+export type QuickExecutionSlotNumber = 1 | 2 | 3 | 4 | 5
+
+export type QuickExecutionTargetSnapshot =
+  | {
+      readonly type: 'terminal'
+      readonly terminalBlockId: string
+    }
+  | {
+      readonly type: 'workflow'
+      readonly terminalBlockIds: readonly string[]
+    }
+  | {
+      readonly type: 'combination'
+      readonly terminalGroupId: string
+    }
+
+export interface QuickExecutionSlotSnapshot {
+  readonly number: QuickExecutionSlotNumber
+  readonly target: QuickExecutionTargetSnapshot | null
+}
+
 export interface BlockGraphSnapshot {
   readonly id: string
   readonly projectId: string
@@ -98,6 +119,7 @@ export interface BlockGraphSnapshot {
   readonly blocks: readonly TerminalBlockSnapshot[]
   readonly connections?: readonly TerminalConnectionSnapshot[]
   readonly terminalGroups: readonly TerminalGroupSnapshot[]
+  readonly quickExecutionSlots?: readonly QuickExecutionSlotSnapshot[]
 }
 
 export type RestorableTerminalBlockSnapshot = Omit<
@@ -111,12 +133,13 @@ export type RestorableTerminalBlockSnapshot = Omit<
 
 export type RestorableBlockGraphSnapshot = Omit<
   BlockGraphSnapshot,
-  'blocks' | 'connections' | 'terminalGroups' | 'viewport'
+  'blocks' | 'connections' | 'quickExecutionSlots' | 'terminalGroups' | 'viewport'
 > & {
   readonly blocks: readonly RestorableTerminalBlockSnapshot[]
   readonly connections?: readonly Partial<TerminalConnectionSnapshot>[]
   readonly viewport?: Partial<CanvasViewportSnapshot>
   readonly terminalGroups?: readonly Partial<TerminalGroupSnapshot>[]
+  readonly quickExecutionSlots?: readonly QuickExecutionSlotSnapshot[]
 }
 
 export interface CreateDefaultGraphInput {

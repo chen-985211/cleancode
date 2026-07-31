@@ -1,0 +1,138 @@
+import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
+
+import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
+import { useI18n } from './i18n/useI18n'
+import type { WorkbenchSnapshot } from './types'
+import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
+
+type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
+
+export function CanvasInitialWorkbenchState({
+  isDesktopRuntime,
+  phase,
+  onOpenProject,
+  onRetry
+}: {
+  readonly isDesktopRuntime: boolean
+  readonly phase: InitialWorkbenchLoadPhase
+  readonly onOpenProject?: () => void
+  readonly onRetry?: () => void
+}) {
+  const { t } = useI18n()
+
+  if (!isDesktopRuntime || phase === 'ready') {
+    return <CanvasEmptyState isDesktopRuntime={isDesktopRuntime} onOpenProject={onOpenProject} />
+  }
+
+  if (phase === 'loading') {
+    const label = t('canvas.restoringProject')
+
+    return (
+      <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
+        <div className="canvas-empty__panel">
+          <span className="canvas-empty__icon" aria-hidden="true">
+            <LoaderCircle className="canvas-empty__spinner" size={20} />
+          </span>
+          <div className="canvas-empty__copy">
+            <p>{label}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="canvas-empty" role="alert" data-tone="danger">
+      <div className="canvas-empty__panel">
+        <span className="canvas-empty__icon" aria-hidden="true">
+          <CircleAlert size={20} />
+        </span>
+        <div className="canvas-empty__copy">
+          <h2>{t('canvas.restoreFailedTitle')}</h2>
+          <p>{t('canvas.restoreFailedDescription')}</p>
+        </div>
+        <button className="canvas-empty__action" type="button" onClick={onRetry}>
+          <RefreshCw size={14} aria-hidden="true" />
+          {t('canvas.retryRestore')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function CanvasEmptyState({
+  isDesktopRuntime,
+  onOpenProject
+}: {
+  readonly isDesktopRuntime: boolean
+  readonly onOpenProject?: () => void
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="canvas-empty">
+      <div className="canvas-empty__panel">
+        <span className="canvas-empty__icon" aria-hidden="true">
+          <Box size={21} />
+        </span>
+        <div className="canvas-empty__copy">
+          {isDesktopRuntime ? (
+            <>
+              <h2>{t('canvas.emptyTitle')}</h2>
+              <p>{t('canvas.emptyDescription')}</p>
+            </>
+          ) : (
+            <p>{t('canvas.emptyPreview')}</p>
+          )}
+        </div>
+        {isDesktopRuntime ? (
+          <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
+            <FolderOpen size={14} aria-hidden="true" />
+            {t('canvas.openProject')}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+interface CanvasStatusbarProps {
+  readonly isDesktopRuntime: boolean
+  readonly terminalRuntimeAvailability: TerminalRuntimeAvailabilitySnapshot
+  readonly initialWorkbenchLoadPhase: InitialWorkbenchLoadPhase
+  readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly currentWorkspace: CurrentWorkspace | undefined
+}
+
+export function CanvasStatusbar({
+  isDesktopRuntime,
+  terminalRuntimeAvailability,
+  initialWorkbenchLoadPhase,
+  currentWorkbench,
+  currentWorkspace
+}: CanvasStatusbarProps) {
+  const { t } = useI18n()
+  return (
+    <footer className="app-shell__statusbar">
+      <span
+        className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
+      />
+      <span>
+        {!isDesktopRuntime
+          ? t('canvas.statusPreview')
+          : initialWorkbenchLoadPhase === 'loading' && !currentWorkbench
+            ? t('canvas.statusProjectRestoring')
+            : initialWorkbenchLoadPhase === 'error' && !currentWorkbench
+              ? t('canvas.statusProjectRestoreFailed')
+              : terminalRuntimeAvailability.phase === 'initializing'
+                ? t('canvas.statusRuntimeInitializing')
+                : terminalRuntimeAvailability.phase === 'unavailable'
+                  ? t('canvas.statusRuntimeUnavailable')
+                  : currentWorkbench
+                    ? t('canvas.statusConnected')
+                    : t('canvas.statusWaiting')}
+      </span>
+      {currentWorkspace ? <span className="status-path">{currentWorkspace.directory}</span> : null}
+    </footer>
+  )
+}

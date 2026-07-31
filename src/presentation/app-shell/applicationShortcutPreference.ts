@@ -56,12 +56,39 @@ const v4ApplicationShortcutCommands = [
   'toggleMinimap'
 ] as const
 
+const v6ApplicationShortcutCommands = [
+  'openSettings',
+  'toggleSidebar',
+  'addProject',
+  'createBranchWorkspace',
+  'previousWorkspace',
+  'nextWorkspace',
+  'createTerminal',
+  'createAgent',
+  'groupTerminals',
+  'selectCanvasNodeLeft',
+  'selectCanvasNodeRight',
+  'selectCanvasNodeUp',
+  'selectCanvasNodeDown',
+  'zoomCanvasIn',
+  'zoomCanvasOut',
+  'fitCanvas',
+  'toggleMinimap'
+] as const
+
 type ShortcutBindingCatalog = Readonly<Record<string, ApplicationShortcutBinding | null>>
 
 interface StoredApplicationShortcutBindings {
   readonly bindings: ApplicationShortcutBindings
-  readonly version: 6
+  readonly version: 7
 }
+
+const v6FitCanvasDefaultBinding = {
+  alt: false,
+  key: '1',
+  primary: true,
+  shift: false
+} as const satisfies ApplicationShortcutBinding
 
 const v5CanvasZoomDefaultBindings = {
   zoomCanvasIn: { alt: false, key: '=', primary: true, shift: false },
@@ -148,6 +175,28 @@ function migrateCanvasZoomDefaults(
   return cloneBindings(migrated)
 }
 
+function migrateV6Bindings(bindings: ShortcutBindingCatalog): ApplicationShortcutBindings {
+  const migrated: Record<string, ApplicationShortcutBinding | null> = Object.fromEntries(
+    v6ApplicationShortcutCommands.map((command) => [
+      command,
+      bindings[command] === null ? null : { ...bindings[command] }
+    ])
+  )
+
+  if (applicationShortcutBindingsEqual(bindings.fitCanvas, v6FitCanvasDefaultBinding)) {
+    const nextDefault = defaultApplicationShortcutBindings.fitCanvas
+    const conflictsWithPreservedBinding = v6ApplicationShortcutCommands.some(
+      (command) =>
+        command !== 'fitCanvas' &&
+        migrated[command] !== null &&
+        applicationShortcutBindingsEqual(migrated[command], nextDefault)
+    )
+    migrated.fitCanvas = conflictsWithPreservedBinding ? null : { ...nextDefault }
+  }
+
+  return extendLegacyBindings(migrated, v6ApplicationShortcutCommands)
+}
+
 function extendLegacyBindings(
   bindings: ShortcutBindingCatalog,
   preservedCommands: readonly string[]
@@ -189,7 +238,7 @@ export function readApplicationShortcutBindings(
       readonly version?: unknown
     }
     if (
-      preference.version === 6 &&
+      preference.version === 7 &&
       hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
       !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
     ) {
@@ -197,11 +246,21 @@ export function readApplicationShortcutBindings(
     }
 
     if (
-      preference.version === 5 &&
-      hasCompleteBindingCatalog(preference.bindings, applicationShortcutCommands) &&
-      !hasShortcutConflict(preference.bindings, applicationShortcutCommands)
+      preference.version === 6 &&
+      hasCompleteBindingCatalog(preference.bindings, v6ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v6ApplicationShortcutCommands)
     ) {
-      return migrateCanvasZoomDefaults(cloneBindings(preference.bindings))
+      return migrateV6Bindings(preference.bindings)
+    }
+
+    if (
+      preference.version === 5 &&
+      hasCompleteBindingCatalog(preference.bindings, v6ApplicationShortcutCommands) &&
+      !hasShortcutConflict(preference.bindings, v6ApplicationShortcutCommands)
+    ) {
+      return migrateCanvasZoomDefaults(
+        extendLegacyBindings(preference.bindings, v6ApplicationShortcutCommands)
+      )
     }
 
     if (
@@ -210,13 +269,16 @@ export function readApplicationShortcutBindings(
       !hasShortcutConflict(preference.bindings, v4ApplicationShortcutCommands)
     ) {
       return migrateCanvasZoomDefaults(
-        cloneBindings({
-          ...preference.bindings,
-          selectCanvasNodeLeft: preference.bindings.panCanvasLeft,
-          selectCanvasNodeRight: preference.bindings.panCanvasRight,
-          selectCanvasNodeUp: preference.bindings.panCanvasUp,
-          selectCanvasNodeDown: preference.bindings.panCanvasDown
-        })
+        extendLegacyBindings(
+          {
+            ...preference.bindings,
+            selectCanvasNodeLeft: preference.bindings.panCanvasLeft,
+            selectCanvasNodeRight: preference.bindings.panCanvasRight,
+            selectCanvasNodeUp: preference.bindings.panCanvasUp,
+            selectCanvasNodeDown: preference.bindings.panCanvasDown
+          },
+          v6ApplicationShortcutCommands
+        )
       )
     }
 
@@ -268,7 +330,7 @@ export function writeApplicationShortcutBindings(
 ): void {
   const preference: StoredApplicationShortcutBindings = {
     bindings,
-    version: 6
+    version: 7
   }
   storage.setItem(shortcutBindingsStorageKey, JSON.stringify(preference))
 }

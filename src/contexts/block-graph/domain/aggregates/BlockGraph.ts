@@ -9,6 +9,8 @@ import {
   type CreateDefaultGraphInput,
   type CreateTerminalBlockInput,
   type CreateTerminalGroupInput,
+  type QuickExecutionSlotSnapshot,
+  type QuickExecutionTargetSnapshot,
   type ResizeTerminalBlockInput,
   type RestorableBlockGraphSnapshot,
   type TerminalBlockSnapshot,
@@ -58,6 +60,12 @@ import {
 } from '../services/BlockGraphIdentifiers'
 import type { BlockTemplateSnapshot, InstantiatedBlockTemplateSnapshot } from './BlockTemplateTypes'
 import { normalizeBlockTemplate } from '../services/BlockTemplateProjection'
+import {
+  createEmptyQuickExecutionSlots,
+  normalizeQuickExecutionTarget,
+  requireQuickExecutionSlotNumber,
+  restoreQuickExecutionSlots
+} from '../services/QuickExecutionSlotRules'
 
 export type * from './BlockGraphTypes'
 
@@ -84,7 +92,8 @@ export class BlockGraph {
     private viewportSnapshot: CanvasViewportSnapshot,
     private blockSnapshots: TerminalBlockSnapshot[],
     private terminalConnectionSnapshots: TerminalConnectionSnapshot[],
-    private terminalGroupSnapshots: TerminalGroupSnapshot[]
+    private terminalGroupSnapshots: TerminalGroupSnapshot[],
+    private quickExecutionSlotSnapshots: QuickExecutionSlotSnapshot[]
   ) {}
 
   static createDefault(input: CreateDefaultGraphInput): BlockGraph {
@@ -95,7 +104,8 @@ export class BlockGraph {
       defaultCanvasViewport,
       [],
       [],
-      []
+      [],
+      createEmptyQuickExecutionSlots()
     )
   }
 
@@ -110,7 +120,8 @@ export class BlockGraph {
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
       blocks,
       connections,
-      normalizeTerminalGroups(snapshot.terminalGroups, blocks, connections, createTerminalGroupId)
+      normalizeTerminalGroups(snapshot.terminalGroups, blocks, connections, createTerminalGroupId),
+      restoreQuickExecutionSlots(snapshot.quickExecutionSlots)
     )
   }
 
@@ -128,6 +139,54 @@ export class BlockGraph {
 
   get terminalGroups(): readonly TerminalGroupSnapshot[] {
     return this.terminalGroupSnapshots
+  }
+
+  get quickExecutionSlots(): readonly QuickExecutionSlotSnapshot[] {
+    return this.quickExecutionSlotSnapshots
+  }
+
+  bindQuickExecutionSlot(number: number, target: QuickExecutionTargetSnapshot): void {
+    const slotNumber = requireQuickExecutionSlotNumber(number)
+    const normalizedTarget = normalizeQuickExecutionTarget(
+      target,
+      this.blockSnapshots,
+      this.terminalConnectionSnapshots,
+      this.terminalGroupSnapshots
+    )
+    this.quickExecutionSlotSnapshots = this.quickExecutionSlotSnapshots.map((slot) =>
+      slot.number === slotNumber ? { ...slot, target: normalizedTarget } : slot
+    )
+  }
+
+  addQuickExecutionTarget(target: QuickExecutionTargetSnapshot): void {
+    const emptySlot = this.quickExecutionSlotSnapshots.find((slot) => !slot.target)
+    if (!emptySlot) {
+      throw createExpectedAppError('QUICK_EXECUTION_BAR_FULL', 'Quick execution bar is full.')
+    }
+    this.bindQuickExecutionSlot(emptySlot.number, target)
+  }
+
+  clearQuickExecutionSlot(number: number): void {
+    const slotNumber = requireQuickExecutionSlotNumber(number)
+    this.quickExecutionSlotSnapshots = this.quickExecutionSlotSnapshots.map((slot) =>
+      slot.number === slotNumber ? { ...slot, target: null } : slot
+    )
+  }
+
+  reorderQuickExecutionSlots(sourceNumber: number, destinationNumber: number): void {
+    const source = requireQuickExecutionSlotNumber(sourceNumber)
+    const destination = requireQuickExecutionSlotNumber(destinationNumber)
+    if (source === destination) return
+
+    const sourceTarget =
+      this.quickExecutionSlotSnapshots.find((slot) => slot.number === source)?.target ?? null
+    const destinationTarget =
+      this.quickExecutionSlotSnapshots.find((slot) => slot.number === destination)?.target ?? null
+    this.quickExecutionSlotSnapshots = this.quickExecutionSlotSnapshots.map((slot) => {
+      if (slot.number === source) return { ...slot, target: destinationTarget }
+      if (slot.number === destination) return { ...slot, target: sourceTarget }
+      return slot
+    })
   }
 
   createTerminalBlock(input: CreateTerminalBlockInput): TerminalBlockSnapshot {
@@ -524,7 +583,8 @@ export class BlockGraph {
       viewport: this.viewportSnapshot,
       blocks: this.blockSnapshots,
       connections: this.terminalConnectionSnapshots,
-      terminalGroups: this.terminalGroupSnapshots
+      terminalGroups: this.terminalGroupSnapshots,
+      quickExecutionSlots: this.quickExecutionSlotSnapshots
     }
   }
 

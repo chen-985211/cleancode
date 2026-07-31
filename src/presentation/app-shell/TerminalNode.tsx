@@ -36,6 +36,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [focusRequestId, setFocusRequestId] = useState(0)
   const [isResizingBlock, setIsResizingBlock] = useState(false)
   const hasRequestedAutoStartRef = useRef(false)
+  const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
   const terminalNodeClassName = [
     'terminal-node',
@@ -105,6 +106,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     setShouldFocusLaunchCommand(true)
     setIsEditingMetadata(true)
   }, [])
+
+  useEffect(() => {
+    const requestId = data.launchCommandEditRequestId
+    if (requestId === undefined || requestId === lastLaunchCommandEditRequestIdRef.current) return
+
+    lastLaunchCommandEditRequestIdRef.current = requestId
+    startEditingLaunchCommand()
+  }, [data.launchCommandEditRequestId, startEditingLaunchCommand])
 
   const requestTerminalFocus = useCallback(() => {
     setFocusRequestId((currentFocusRequestId) => currentFocusRequestId + 1)

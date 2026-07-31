@@ -65,6 +65,14 @@ const cleancodeApi = {
     subscribeRendererEvent('cleancode:agent-tool-approval-requested', listener),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
+  addQuickExecutionTarget: (command: unknown) =>
+    invokeCleancode('cleancode:add-quick-execution-target', command),
+  bindQuickExecutionSlot: (command: unknown) =>
+    invokeCleancode('cleancode:bind-quick-execution-slot', command),
+  clearQuickExecutionSlot: (command: unknown) =>
+    invokeCleancode('cleancode:clear-quick-execution-slot', command),
+  reorderQuickExecutionSlots: (command: unknown) =>
+    invokeCleancode('cleancode:reorder-quick-execution-slots', command),
   createTerminalGroup: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-group', command),
   connectTerminalBlocks: (command: unknown) =>

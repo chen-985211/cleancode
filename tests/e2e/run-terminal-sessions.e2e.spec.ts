@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
@@ -173,7 +174,7 @@ describe('run terminal sessions e2e', () => {
   )
 
   it(
-    'configures and starts one launch command from a terminal block',
+    'binds, persists and executes a terminal from the quick execution bar',
     async () => {
       await createRunningTerminal(page)
 
@@ -191,6 +192,75 @@ describe('run terminal sessions e2e', () => {
 
       expect(graph.blocks[0]?.launchCommand).toBe(launchCommand)
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
+
+      await page.getByRole('button', { name: '添加画布对象' }).click()
+      const objectPicker = page.getByRole('dialog', { name: '选择要绑定的画布对象' })
+      await objectPicker.getByRole('button').filter({ hasText: 'Terminal 1' }).click()
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[0]?.target)
+        .toEqual({ type: 'terminal', terminalBlockId: graph.blocks[0]?.id })
+
+      if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
+        const resultDirectory = join(process.cwd(), 'test-results')
+        await mkdir(resultDirectory, { recursive: true })
+        await selectTheme(page, 'light')
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-light.png')
+        })
+        await selectTheme(page, 'dark')
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-dark.png')
+        })
+        await electronApp.evaluate(({ BrowserWindow }) => {
+          BrowserWindow.getAllWindows()[0]?.setSize(960, 640)
+        })
+        await page.waitForFunction(() => window.innerWidth <= 960)
+        await page.screenshot({
+          path: join(resultDirectory, 'quick-execution-dark-narrow.png')
+        })
+      }
+
+      await page
+        .locator('[data-quick-execution-slot="1"]')
+        .dragTo(page.locator('[data-quick-execution-slot="2"]'))
+      await expect
+        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.slice(0, 2))
+        .toEqual([
+          { number: 1, target: null },
+          { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
+        ])
+
+      const boundSlot = page.getByRole('group', {
+        name: '快捷位 2：Terminal 1，仅支持快捷键执行'
+      })
+      await boundSlot.getByText('Terminal 1').click()
+      expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
+      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
+      await waitForQuickLaunchCount(reportPath, launchOutput, 2)
+
+      await electronApp.close()
+      resources.electronApp = undefined
+      electronApp = await launchApp(workbench, {
+        environment: createE2eTerminalEnvironment()
+      })
+      resources.electronApp = electronApp
+      page = await electronApp.firstWindow()
+      resources.page = page
+      await page.waitForLoadState('domcontentloaded')
+
+      await expect
+        .poll(() =>
+          page
+            .getByRole('group', {
+              name: '快捷位 2：Terminal 1，仅支持快捷键执行'
+            })
+            .isVisible()
+        )
+        .toBe(true)
+      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
+      await waitForQuickLaunchCount(reportPath, launchOutput, 3)
     },
     electronScenarioTimeoutMs
   )
@@ -419,6 +489,32 @@ async function waitForFakeAgentReport(
   throw new Error(
     `Timed out waiting for ${description}. Last fixture reports: ${JSON.stringify(reports.slice(-5))}`
   )
+}
+
+async function waitForQuickLaunchCount(
+  reportPath: string,
+  marker: string,
+  expectedCount: number
+): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (await readFile(reportPath, 'utf8')).split('\n').filter((line) => line === marker).length,
+      { interval: 50, timeout: 10_000 }
+    )
+    .toBe(expectedCount)
+}
+
+async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
+  await page.getByRole('button', { name: '主题设置' }).click()
+  await page.getByText(theme === 'light' ? '浅色' : '深色', { exact: true }).click()
+  await page.waitForFunction(
+    (expectedTheme) => document.documentElement.dataset.theme === expectedTheme,
+    theme
+  )
+  await page.getByRole('button', { name: '关闭主题设置' }).click()
+  await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
+  await page.waitForFunction(() => document.querySelector('[inert]') === null)
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {

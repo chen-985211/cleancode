@@ -22,11 +22,21 @@ export function resolveWorkbenchSafeViewport({
   const normalizedMargin = Math.max(0, margin)
   const left = canvasRect.left + normalizedMargin
   const right = canvasRect.right - normalizedMargin
-  const bottom = canvasRect.bottom - normalizedMargin
-  const obstructionBottom = obstructionRects
-    .filter((rect) => intersectsCanvas(rect, canvasRect))
+  const canvasVerticalCenter = (canvasRect.top + canvasRect.bottom) / 2
+  const intersectingObstructions = obstructionRects.filter((rect) =>
+    intersectsCanvas(rect, canvasRect)
+  )
+  const topObstructionBottom = intersectingObstructions
+    .filter((rect) => (rect.top + rect.bottom) / 2 <= canvasVerticalCenter)
     .reduce((lowestBottom, rect) => Math.max(lowestBottom, rect.bottom), canvasRect.top)
-  const top = Math.max(canvasRect.top + normalizedMargin, obstructionBottom + normalizedMargin)
+  const bottomObstructionTop = intersectingObstructions
+    .filter((rect) => (rect.top + rect.bottom) / 2 > canvasVerticalCenter)
+    .reduce((highestTop, rect) => Math.min(highestTop, rect.top), canvasRect.bottom)
+  const top = Math.max(canvasRect.top + normalizedMargin, topObstructionBottom + normalizedMargin)
+  const bottom = Math.min(
+    canvasRect.bottom - normalizedMargin,
+    bottomObstructionTop - normalizedMargin
+  )
 
   if (right <= left || bottom <= top) {
     throw new RangeError('Canvas chrome leaves no safe viewport for a created workbench node.')
