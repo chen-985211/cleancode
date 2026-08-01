@@ -30,6 +30,7 @@ import { TerminalSettingsPane } from './TerminalSettingsPane'
 import { AgentSettingsPane } from './AgentSettingsPane'
 import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
+import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export type ApplicationSettingsPane = 'agents' | 'shortcuts' | 'terminal'
 
@@ -54,6 +55,8 @@ interface ApplicationSettingsRootProps {
   readonly onResetAll: () => void
   readonly terminalScrollbackRows: TerminalScrollbackRows
   readonly onTerminalScrollbackChange: (rows: TerminalScrollbackRows) => void
+  readonly terminalWorkflowBuildMode: TerminalWorkflowBuildMode
+  readonly onTerminalWorkflowBuildModeChange: (mode: TerminalWorkflowBuildMode) => void
 }
 
 export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
@@ -193,6 +196,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 <TerminalSettingsPane
                   scrollbackRows={props.terminalScrollbackRows}
                   onScrollbackChange={props.onTerminalScrollbackChange}
+                  terminalWorkflowBuildMode={props.terminalWorkflowBuildMode}
+                  onTerminalWorkflowBuildModeChange={props.onTerminalWorkflowBuildModeChange}
                 />
               ) : (
                 <div className="shortcut-settings-pane">

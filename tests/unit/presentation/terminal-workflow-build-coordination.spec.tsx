@@ -40,7 +40,8 @@ describe('terminal workflow build coordination', () => {
         reactFlowInstanceRef: { current: null },
         setCurrentGraph: (nextGraph) => {
           nodeStore.setNodes([agentNode, ...createTerminalNodes(nextGraph)])
-        }
+        },
+        terminalWorkflowBuildMode: 'parallel'
       })
     )
 
@@ -111,6 +112,57 @@ describe('terminal workflow build coordination', () => {
     runAnimationFrame(500)
 
     expect(findNode(nodeStore, 'terminal-api').position).toEqual({ x: 777, y: 555 })
+  })
+
+  it('keeps later terminals hidden until progressive construction reaches their step', () => {
+    const graph = createGraph(['terminal-api', 'terminal-web'])
+    const agentNode = createAgentNode()
+    const nodeStore = createWorkbenchNodeStore([agentNode])
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceId: 'main',
+        moveWorkbenchNode: vi.fn(async () => undefined),
+        moveWorkspaceAgent: vi.fn(async () => undefined),
+        nodeStore,
+        reactFlowInstanceRef: { current: null },
+        setCurrentGraph: (nextGraph) => {
+          nodeStore.setNodes([agentNode, ...createTerminalNodes(nextGraph)])
+        },
+        terminalWorkflowBuildMode: 'progressive'
+      })
+    )
+
+    act(() =>
+      result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api', 'terminal-web']))
+    )
+    runAnimationFrame(0)
+
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toContain(
+      'terminal-api'
+    )
+    expect(result.current.terminalWorkflowBuildPresentation?.pendingTerminalBlockIds).toContain(
+      'terminal-web'
+    )
+    expect(result.current.terminalWorkflowBuildPresentation?.pendingConnectionIds).toContain(
+      'connection-api-web'
+    )
+
+    runAnimationFrame(800)
+
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toContain(
+      'terminal-web'
+    )
+    expect(result.current.terminalWorkflowBuildPresentation?.pendingConnectionIds).toContain(
+      'connection-api-web'
+    )
+
+    runAnimationFrame(1_000)
+
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringConnectionIds).toContain(
+      'connection-api-web'
+    )
   })
 
   it('settles the previous build before a newer committed graph starts', () => {

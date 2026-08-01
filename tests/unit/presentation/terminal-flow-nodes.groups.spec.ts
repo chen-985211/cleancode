@@ -155,9 +155,11 @@ describe('terminal flow nodes for terminal groups', () => {
       terminalStates: createTerminalStates(),
       workflowBuildPresentation: {
         enteringConnectionIds: new Set(),
+        enteringTerminalBlockIds: new Set(['backend-terminal']),
         enteringTerminalGroupIds: new Set(),
         operationId: 'operation-1',
         pendingConnectionIds: new Set(),
+        pendingTerminalBlockIds: new Set(['frontend-terminal']),
         pendingTerminalGroupIds: new Set(['development-group']),
         terminalBlockIds: new Set(['backend-terminal', 'frontend-terminal'])
       }
@@ -167,7 +169,10 @@ describe('terminal flow nodes for terminal groups', () => {
       'terminal-workflow-build-group--pending'
     )
     expect(nodes.find((node) => node.id === 'backend-terminal')?.className).toBe(
-      'terminal-workflow-build-node'
+      'terminal-workflow-build-node--entering'
+    )
+    expect(nodes.find((node) => node.id === 'frontend-terminal')?.className).toBe(
+      'terminal-workflow-build-node--pending'
     )
   })
 })

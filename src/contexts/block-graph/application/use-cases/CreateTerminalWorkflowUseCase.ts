@@ -21,13 +21,12 @@ interface CreateTerminalWorkflowTerminalInput {
 }
 
 export interface CreateTerminalWorkflowCommand {
-  readonly anchorRegion: TerminalLayoutRegion
+  readonly canvasRegions: readonly TerminalLayoutRegion[]
   readonly connections: readonly {
     readonly sourceRef: string
     readonly targetRef: string
   }[]
   readonly projectDirectory: string
-  readonly reservedRegions: readonly TerminalLayoutRegion[]
   readonly terminalGroup?: {
     readonly memberRefs: readonly string[]
     readonly name: string
@@ -103,9 +102,8 @@ export class CreateTerminalWorkflowUseCase {
           : null
         const createdBlockIds = createdTerminals.map((terminal) => terminal.blockId)
         const layout = graph.arrangeTerminalLayout({
-          anchorRegion: command.anchorRegion,
           blockIds: createdBlockIds,
-          reservedRegions: command.reservedRegions
+          canvasRegions: command.canvasRegions
         })
         const plan = buildTerminalWorkflowPlan(graph.toSnapshot(), {
           blockIds: createdBlockIds,

@@ -141,6 +141,51 @@ describe('workbench layout focus', () => {
 
     await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
   })
+
+  it('frames committed workflow bounds while terminals are still at entering positions', async () => {
+    const fitBounds = vi.fn(async () => undefined)
+    const fitView = vi.fn(async () => undefined)
+    const onHandled = vi.fn()
+    const agentNode = createSizedAgentNode()
+    const enteringTerminalNode = createTerminalNode({ x: 380, y: 340 })
+    const nodes = [agentNode, enteringTerminalNode]
+    const instance = createReactFlowInstance(
+      new Map(nodes.map((node) => [node.id, node])),
+      fitView,
+      fitBounds
+    )
+    const request: WorkbenchLayoutFocusRequest = {
+      affectedNodeIds: ['terminal-1'],
+      expectedNodeLayouts: [
+        {
+          nodeId: 'terminal-1',
+          position: { x: 1_000, y: 800 },
+          size: { width: 420, height: 306 }
+        }
+      ],
+      focusNodeIds: ['agent:agent-1', 'terminal-1'],
+      focusTarget: 'committed-layouts',
+      operationId: 'workflow-call-1'
+    }
+
+    render(
+      <Harness
+        instance={instance}
+        nodes={nodes}
+        onHandled={onHandled}
+        protectedNodeIds={new Set()}
+        request={request}
+      />
+    )
+
+    await waitFor(() => expect(fitBounds).toHaveBeenCalledOnce())
+    expect(fitBounds).toHaveBeenCalledWith(
+      { x: 40, y: 40, width: 1_380, height: 1_066 },
+      { duration: 220, padding: 0.24 }
+    )
+    expect(fitView).not.toHaveBeenCalled()
+    expect(onHandled).toHaveBeenCalledWith('workflow-call-1')
+  })
 })
 
 function Harness({
@@ -184,9 +229,39 @@ function createRequest(): WorkbenchLayoutFocusRequest {
         size: { width: 900, height: 500 }
       }
     ],
+    focusTarget: 'projected-nodes',
     focusNodeIds: ['agent:agent-1', 'group-1'],
     operationId: 'tool-call-1'
   }
+}
+
+function createSizedAgentNode(): WorkbenchFlowNode {
+  return {
+    id: 'agent:agent-1',
+    position: { x: 40, y: 40 },
+    style: { width: 440, height: 520 },
+    type: 'agentConsole',
+    data: {
+      agent: {
+        layout: { position: { x: 40, y: 40 }, size: { width: 440, height: 520 } }
+      }
+    }
+  } as WorkbenchFlowNode
+}
+
+function createTerminalNode(position: {
+  readonly x: number
+  readonly y: number
+}): WorkbenchFlowNode {
+  return {
+    id: 'terminal-1',
+    position,
+    style: { width: 420, height: 306 },
+    type: 'terminal',
+    data: {
+      block: { id: 'terminal-1', position, size: { width: 420, height: 306 } }
+    }
+  } as WorkbenchFlowNode
 }
 
 function createNode(
@@ -212,9 +287,11 @@ function createGroupNode(
 
 function createReactFlowInstance(
   nodes: ReadonlyMap<string, WorkbenchFlowNode>,
-  fitView: ReturnType<typeof vi.fn>
+  fitView: ReturnType<typeof vi.fn>,
+  fitBounds: ReturnType<typeof vi.fn> = vi.fn(async () => undefined)
 ): ReactFlowInstance<WorkbenchFlowNode, Edge> {
   return {
+    fitBounds,
     fitView,
     getNode: (nodeId: string) => nodes.get(nodeId)
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>

@@ -9,12 +9,15 @@ describe('terminal workflow build choreography', () => {
   it('launches dependency layers in parallel within a bounded window', () => {
     const graph = createGraph(20)
     const choreography = createTerminalWorkflowBuildChoreography({
-      agentNode: {
-        position: { x: 40, y: 100 },
-        size: { height: 480, width: 520 }
-      },
+      canvasNodes: [
+        {
+          position: { x: 40, y: 100 },
+          size: { height: 480, width: 520 }
+        }
+      ],
       change: createChange(graph),
       graph,
+      mode: 'parallel',
       reducedMotion: false
     })
 
@@ -26,9 +29,10 @@ describe('terminal workflow build choreography', () => {
 
     const parallelGraph = createParallelGraph()
     const parallel = createTerminalWorkflowBuildChoreography({
-      agentNode: null,
+      canvasNodes: [],
       change: createChange(parallelGraph),
       graph: parallelGraph,
+      mode: 'parallel',
       reducedMotion: false
     })!
     const delayByBlockId = new Map(
@@ -43,9 +47,10 @@ describe('terminal workflow build choreography', () => {
   it('lets the final terminals settle before the group closes around them', () => {
     const graph = createParallelGraph()
     const choreography = createTerminalWorkflowBuildChoreography({
-      agentNode: null,
+      canvasNodes: [],
       change: { ...createChange(graph), terminalGroupIds: ['group-development'] },
       graph,
+      mode: 'parallel',
       reducedMotion: false
     })!
 
@@ -58,7 +63,7 @@ describe('terminal workflow build choreography', () => {
   it('starts at the Agent edge nearest the final workflow centroid', () => {
     expect(
       resolveTerminalWorkflowBuildOrigin({
-        agent: {
+        source: {
           position: { x: 100, y: 100 },
           size: { height: 400, width: 500 }
         },
@@ -67,12 +72,98 @@ describe('terminal workflow build choreography', () => {
     ).toEqual({ x: 632, y: 279 })
   })
 
+  it('starts at the closest pre-existing canvas node instead of the invoking Agent', () => {
+    const createdGraph = createParallelGraph()
+    const contextNode = {
+      description: '',
+      id: 'terminal-context',
+      launchCommand: '',
+      name: 'Context',
+      position: { x: 200, y: 400 },
+      size: { height: 280, width: 420 },
+      type: 'terminal' as const
+    }
+    const graph = { ...createdGraph, blocks: [contextNode, ...createdGraph.blocks] }
+    const change = {
+      ...createChange(createdGraph),
+      blockIds: createdGraph.blocks.map((block) => block.id)
+    }
+    const targetCenter = { x: 994, y: 550 }
+
+    const choreography = createTerminalWorkflowBuildChoreography({
+      canvasNodes: [
+        {
+          position: { x: -1_200, y: 0 },
+          size: { height: 480, width: 520 }
+        },
+        contextNode
+      ],
+      change,
+      graph,
+      mode: 'progressive',
+      reducedMotion: false
+    })!
+
+    expect(choreography.origin).toEqual(
+      resolveTerminalWorkflowBuildOrigin({ source: contextNode, targetCenter })
+    )
+  })
+
+  it('reveals terminals one at a time and grows downstream terminals from their parent', () => {
+    const graph = createParallelGraph()
+    const choreography = createTerminalWorkflowBuildChoreography({
+      canvasNodes: [],
+      change: { ...createChange(graph), terminalGroupIds: ['group-development'] },
+      graph,
+      mode: 'progressive',
+      reducedMotion: false
+    })!
+
+    expect(
+      choreography.terminalStages.map(({ blockId, delayMs, durationMs }) => ({
+        blockId,
+        delayMs,
+        durationMs
+      }))
+    ).toEqual([
+      { blockId: 'terminal-api', delayMs: 0, durationMs: 520 },
+      { blockId: 'terminal-worker', delayMs: 780, durationMs: 520 },
+      { blockId: 'terminal-web', delayMs: 1_560, durationMs: 520 }
+    ])
+    expect(choreography.terminalStages[2]?.initialPosition).toEqual(
+      graph.blocks.find((block) => block.id === 'terminal-api')?.position
+    )
+    expect(choreography.connectionStages).toEqual([
+      { connectionId: 'connection-api-web', revealAtMs: 1_740 }
+    ])
+    expect(choreography.groupStages).toEqual([
+      { revealAtMs: 2_320, terminalGroupId: 'group-development' }
+    ])
+    expect(choreography.totalDurationMs).toBe(2_620)
+  })
+
+  it('compresses progressive steps into a bounded launch window for large workflows', () => {
+    const graph = createGraph(20)
+    const choreography = createTerminalWorkflowBuildChoreography({
+      canvasNodes: [],
+      change: createChange(graph),
+      graph,
+      mode: 'progressive',
+      reducedMotion: false
+    })!
+
+    expect(choreography.terminalStages[0]?.delayMs).toBe(0)
+    expect(choreography.terminalStages.at(-1)?.delayMs).toBe(8_000)
+    expect(choreography.totalDurationMs).toBe(8_520)
+  })
+
   it('collapses all movement and staging when reduced motion is requested', () => {
     const graph = createParallelGraph()
     const choreography = createTerminalWorkflowBuildChoreography({
-      agentNode: null,
+      canvasNodes: [],
       change: createChange(graph),
       graph,
+      mode: 'progressive',
       reducedMotion: true
     })!
 

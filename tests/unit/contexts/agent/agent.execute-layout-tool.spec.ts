@@ -46,19 +46,19 @@ describe('execute Agent layout tools', () => {
     expect(blockGraphTools.createTerminalBlock).toHaveBeenCalledWith(
       { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
-        anchorRegion: {
-          position: { x: 980, y: 180 },
-          size: { height: 460, width: 720 }
-        },
-        description: 'Runs the API server',
-        launchCommand: 'pnpm dev:api',
-        name: 'API Server',
-        reservedRegions: [
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          },
           {
             position: { x: 40, y: 80 },
             size: { height: 420, width: 680 }
           }
         ],
+        description: 'Runs the API server',
+        launchCommand: 'pnpm dev:api',
+        name: 'API Server',
         type: 'terminal'
       }
     )
@@ -96,12 +96,12 @@ describe('execute Agent layout tools', () => {
     expect(blockGraphTools.arrangeTerminalLayout).toHaveBeenCalledWith(
       { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
-        anchorRegion: {
-          position: { x: 980, y: 180 },
-          size: { height: 460, width: 720 }
-        },
         blockIds: ['terminal-api', 'terminal-test'],
-        reservedRegions: [
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          },
           {
             position: { x: 40, y: 80 },
             size: { height: 420, width: 680 }
@@ -193,11 +193,12 @@ describe('execute Agent layout tools', () => {
     expect(blockGraphTools.createTerminalWorkflow).toHaveBeenCalledWith(
       { projectDirectory: '/tmp/project', workspaceId: 'main' },
       expect.objectContaining({
-        anchorRegion: {
-          position: { x: 980, y: 180 },
-          size: { height: 460, width: 720 }
-        },
-        reservedRegions: []
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          }
+        ]
       })
     )
     expect(result).toMatchObject({

@@ -13,13 +13,12 @@ describe('create terminal workflow use case', () => {
     const createWorkflow = new CreateTerminalWorkflowUseCase(repository)
 
     const result = await createWorkflow.execute({
-      anchorRegion: region(600, 80, 560, 520),
+      canvasRegions: [region(600, 80, 560, 520), region(1800, 80, 520, 500)],
       connections: [
         { sourceRef: 'install', targetRef: 'api' },
         { sourceRef: 'api', targetRef: 'web' }
       ],
       projectDirectory: '/tmp/project',
-      reservedRegions: [region(1800, 80, 520, 500)],
       terminalGroup: {
         memberRefs: ['install', 'api', 'web', 'worker'],
         name: 'Development'
@@ -113,9 +112,8 @@ describe('create terminal workflow use case', () => {
 
     await expect(
       createWorkflow.execute({
-        anchorRegion: region(600, 80, 560, 520),
+        canvasRegions: [region(600, 80, 560, 520)],
         projectDirectory: '/tmp/project',
-        reservedRegions: [],
         terminalGroup: undefined,
         workspaceId: 'main',
         ...override

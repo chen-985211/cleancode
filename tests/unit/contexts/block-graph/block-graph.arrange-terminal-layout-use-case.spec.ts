@@ -11,10 +11,9 @@ describe('arrange terminal layout use case', () => {
     const arrangeTerminalLayout = new ArrangeTerminalLayoutUseCase(repository)
 
     const result = await arrangeTerminalLayout.execute({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['downstream-terminal', 'upstream-terminal', 'group-companion'],
+      canvasRegions: [region(500, 100, 600, 400)],
       projectDirectory: '/tmp/project',
-      reservedRegions: [],
       workspaceId: 'main'
     })
 
@@ -25,10 +24,10 @@ describe('arrange terminal layout use case', () => {
       graphChanged: true
     })
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
-      ['upstream-terminal', { x: 348, y: 640 }],
-      ['downstream-terminal', { x: 832, y: 640 }],
+      ['upstream-terminal', { x: 138, y: 640 }],
+      ['downstream-terminal', { x: 622, y: 640 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 590, y: 944 }]
+      ['group-companion', { x: 380, y: 944 }]
     ])
     expect(repository.transactionCount).toBe(1)
   })
@@ -37,10 +36,9 @@ describe('arrange terminal layout use case', () => {
     const repository = new TransactionalBlockGraphRepository(createWorkflowGraph())
     const arrangeTerminalLayout = new ArrangeTerminalLayoutUseCase(repository)
     const command = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['upstream-terminal', 'downstream-terminal', 'group-companion'],
+      canvasRegions: [region(500, 100, 600, 400)],
       projectDirectory: '/tmp/project',
-      reservedRegions: [],
       workspaceId: 'main'
     }
 
@@ -60,17 +58,16 @@ describe('arrange terminal layout use case', () => {
     const arrangeTerminalLayout = new ArrangeTerminalLayoutUseCase(repository)
 
     const result = await arrangeTerminalLayout.execute({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['upstream-terminal', 'downstream-terminal'],
+      canvasRegions: [region(500, 100, 600, 400)],
       projectDirectory: '/tmp/project',
-      reservedRegions: [],
       workspaceId: 'main'
     })
 
     expect(result.arrangedBlockIds).toEqual(['downstream-terminal'])
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
       ['upstream-terminal', { x: 1600, y: 900 }],
-      ['downstream-terminal', { x: 590, y: 564 }],
+      ['downstream-terminal', { x: 820, y: 564 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
       ['group-companion', { x: 40, y: 40 }]
     ])
@@ -86,10 +83,9 @@ describe('arrange terminal layout use case', () => {
     const arrangeTerminalLayout = new ArrangeTerminalLayoutUseCase(repository)
 
     const result = await arrangeTerminalLayout.execute({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['upstream-terminal', 'downstream-terminal', 'group-companion'],
+      canvasRegions: [region(500, 100, 600, 400)],
       projectDirectory: '/tmp/project',
-      reservedRegions: [],
       workspaceId: 'main'
     })
 
@@ -112,10 +108,9 @@ describe('arrange terminal layout use case', () => {
 
     await expect(
       arrangeTerminalLayout.execute({
-        anchorRegion: region(500, 100, 600, 400),
         blockIds: ['missing-terminal'],
+        canvasRegions: [region(500, 100, 600, 400)],
         projectDirectory: '/tmp/project',
-        reservedRegions: [],
         workspaceId: 'main'
       })
     ).rejects.toThrow('Default block graph was not created.')

@@ -76,9 +76,11 @@ describe('terminal workflow edges', () => {
     ]
     const projected = projectTerminalWorkflowBuildOntoEdges(edges, {
       enteringConnectionIds: new Set(['a-b']),
+      enteringTerminalBlockIds: new Set(['a', 'b']),
       enteringTerminalGroupIds: new Set(),
       operationId: 'operation-1',
       pendingConnectionIds: new Set(['b-c']),
+      pendingTerminalBlockIds: new Set(['c']),
       pendingTerminalGroupIds: new Set(),
       terminalBlockIds: new Set(['a', 'b', 'c'])
     })

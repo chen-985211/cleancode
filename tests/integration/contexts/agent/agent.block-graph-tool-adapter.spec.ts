@@ -186,11 +186,11 @@ describe('agent block graph workflow tool adapter', () => {
   })
 
   it('creates and arranges terminals through one atomic BlockGraph callback each', async () => {
-    const anchorRegion = {
+    const activeAgentRegion = {
       position: { x: 1_600, y: 160 },
       size: { height: 460, width: 720 }
     }
-    const reservedRegions = [
+    const otherAgentRegions = [
       {
         position: { x: 2_900, y: 80 },
         size: { height: 520, width: 760 }
@@ -198,11 +198,10 @@ describe('agent block graph workflow tool adapter', () => {
     ]
     const beforeCreate = await adapter.inspectGraph(context)
     const createdGraph = await adapter.createTerminalBlock(context, {
-      anchorRegion,
+      canvasRegions: [activeAgentRegion, ...otherAgentRegions],
       description: 'Runs the API server',
       launchCommand: 'pnpm dev:api',
       name: 'API Server',
-      reservedRegions,
       size: { height: 300, width: 460 },
       type: 'terminal'
     })
@@ -215,18 +214,20 @@ describe('agent block graph workflow tool adapter', () => {
       name: 'API Server',
       size: { height: 300, width: 460 }
     })
-    expect(createdBlock && overlaps(createdBlock, anchorRegion)).toBe(false)
-    expect(createdBlock && overlaps(createdBlock, reservedRegions[0])).toBe(false)
+    expect(createdBlock && overlaps(createdBlock, activeAgentRegion)).toBe(false)
+    expect(createdBlock && overlaps(createdBlock, otherAgentRegions[0])).toBe(false)
 
     if (!createdBlock) throw new Error('Expected the adapter to create a terminal block.')
 
     const arranged = await adapter.arrangeTerminalLayout(context, {
-      anchorRegion: {
-        position: { x: 4_200, y: 240 },
-        size: { height: 460, width: 720 }
-      },
       blockIds: [createdBlock.id],
-      reservedRegions
+      canvasRegions: [
+        {
+          position: { x: 4_200, y: 240 },
+          size: { height: 460, width: 720 }
+        },
+        ...otherAgentRegions
+      ]
     })
 
     expect(arranged).toMatchObject({
@@ -239,9 +240,8 @@ describe('agent block graph workflow tool adapter', () => {
   it('creates a configured terminal workflow atomically through the Agent adapter', async () => {
     const before = await adapter.inspectGraph(context)
     const created = await adapter.createTerminalWorkflow(context, {
-      anchorRegion: { position: { x: 1_600, y: 120 }, size: { height: 420, width: 720 } },
+      canvasRegions: [{ position: { x: 1_600, y: 120 }, size: { height: 420, width: 720 } }],
       connections: [{ sourceRef: 'api', targetRef: 'web' }],
-      reservedRegions: [],
       terminalGroup: { memberRefs: ['api', 'web', 'worker'], name: 'Development' },
       terminals: [
         {
@@ -280,9 +280,8 @@ describe('agent block graph workflow tool adapter', () => {
 
     await expect(
       adapter.createTerminalWorkflow(context, {
-        anchorRegion: { position: { x: 0, y: 0 }, size: { height: 10, width: 10 } },
+        canvasRegions: [{ position: { x: 0, y: 0 }, size: { height: 10, width: 10 } }],
         connections: [{ sourceRef: 'missing', targetRef: 'only' }],
-        reservedRegions: [],
         terminals: [
           {
             description: '',

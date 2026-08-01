@@ -5,15 +5,14 @@ describe('terminal layout in the default block graph', () => {
     const graph = createGraphWithSizedWorkflow()
 
     const result = graph.arrangeTerminalLayout({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['test-terminal', 'api-terminal', 'install-terminal'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     })
 
     expect(readPositions(graph)).toEqual({
-      'api-terminal': { x: 278, y: 868 },
-      'install-terminal': { x: 278, y: 564 },
-      'test-terminal': { x: 902, y: 736 }
+      'api-terminal': { x: 1_164, y: 302 },
+      'install-terminal': { x: 1_164, y: -2 },
+      'test-terminal': { x: 1_788, y: 170 }
     })
     expect(readSizes(graph)).toEqual({
       'api-terminal': { width: 560, height: 300 },
@@ -27,7 +26,7 @@ describe('terminal layout in the default block graph', () => {
     })
   })
 
-  it('keeps the arranged workflow below the agent while avoiding terminals, groups, and reserved regions', () => {
+  it('keeps the arranged workflow clear of terminals, groups, and reserved regions', () => {
     const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })
     graph.createTerminalBlock({
       id: 'selected-terminal',
@@ -57,15 +56,18 @@ describe('terminal layout in the default block graph', () => {
     })
 
     graph.arrangeTerminalLayout({
-      anchorRegion: region(300, 100, 720, 460),
       blockIds: ['selected-terminal'],
-      reservedRegions: [region(300, 624, 720, 180), region(300, 1270, 720, 200)]
+      canvasRegions: [
+        region(300, 100, 720, 460),
+        region(300, 624, 720, 180),
+        region(300, 1270, 720, 200)
+      ]
     })
 
     expect(existingGroup.position).toEqual({ x: 268, y: 824 })
     expect(existingGroup.size).toEqual({ width: 968, height: 392 })
     expect(graph.blocks.find((block) => block.id === 'selected-terminal')?.position).toEqual({
-      x: 450,
+      x: 542,
       y: 1534
     })
   })
@@ -93,9 +95,8 @@ describe('terminal layout in the default block graph', () => {
       name: 'Group V'
     })
     const input = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['u-0', 'u-1', 'u-companion', 'v-0', 'v-1'],
-      reservedRegions: [region(1100, 500, 300, 1500)]
+      canvasRegions: [region(500, 100, 600, 400), region(1100, 500, 300, 1500)]
     }
 
     graph.arrangeTerminalLayout(input)
@@ -118,9 +119,8 @@ describe('terminal layout in the default block graph', () => {
       memberBlockIds: ['install-terminal', 'api-terminal', 'test-terminal', 'workflow-companion']
     })
     const input = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['test-terminal', 'install-terminal', 'api-terminal', 'workflow-companion'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     }
 
     const first = graph.arrangeTerminalLayout(input)
@@ -135,7 +135,7 @@ describe('terminal layout in the default block graph', () => {
     expect(firstSnapshot.terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-group',
-        position: { x: 4, y: 564 },
+        position: { x: 1_164, y: -78 },
         size: { width: 1592, height: 756 }
       })
     ])
@@ -152,9 +152,8 @@ describe('terminal layout in the default block graph', () => {
     })
 
     graph.arrangeTerminalLayout({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['terminal-a', 'terminal-b', 'terminal-c'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     })
 
     const snapshot = graph.toSnapshot()
@@ -178,9 +177,8 @@ describe('terminal layout in the default block graph', () => {
     })
 
     graph.arrangeTerminalLayout({
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['terminal-a', 'terminal-b', 'terminal-c', 'terminal-d'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     })
 
     const [firstGroup, secondGroup] = [...graph.terminalGroups].sort(
@@ -215,9 +213,8 @@ describe('terminal layout in the default block graph', () => {
       memberBlockIds: ['terminal-a', 'terminal-c', 'terminal-companion']
     })
     const input = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['terminal-a', 'terminal-b', 'terminal-c', 'terminal-d', 'terminal-companion'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     }
 
     const first = graph.arrangeTerminalLayout(input)
@@ -273,9 +270,8 @@ describe('terminal layout in the default block graph', () => {
       targetBlockId: 'b-two'
     })
     const input = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: ['a-root', 'a-child', 'c-root', 'c-child', 'b-one', 'b-two'],
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     }
 
     const first = graph.arrangeTerminalLayout(input)
@@ -329,9 +325,8 @@ describe('terminal layout in the default block graph', () => {
     }
 
     const input = {
-      anchorRegion: region(500, 100, 600, 400),
       blockIds: terminals.map(([id]) => id),
-      reservedRegions: []
+      canvasRegions: [region(500, 100, 600, 400)]
     }
     const first = graph.arrangeTerminalLayout(input)
     const firstSnapshot = graph.toSnapshot()
@@ -354,9 +349,8 @@ describe('terminal layout in the default block graph', () => {
 
     expect(() =>
       graph.arrangeTerminalLayout({
-        anchorRegion: region(500, 100, 600, 400),
         blockIds: ['install-terminal', 'test-terminal'],
-        reservedRegions: []
+        canvasRegions: [region(500, 100, 600, 400)]
       })
     ).toThrow('Terminal layout scope must contain every member of an included group.')
     expect(graph.toSnapshot()).toEqual(before)
@@ -368,16 +362,14 @@ describe('terminal layout in the default block graph', () => {
 
     expect(() =>
       graph.arrangeTerminalLayout({
-        anchorRegion: region(500, 100, 600, 400),
         blockIds: [],
-        reservedRegions: []
+        canvasRegions: [region(500, 100, 600, 400)]
       })
     ).toThrow('Terminal layout scope cannot be empty.')
     expect(() =>
       graph.arrangeTerminalLayout({
-        anchorRegion: region(500, 100, 600, 400),
         blockIds: ['missing-terminal'],
-        reservedRegions: []
+        canvasRegions: [region(500, 100, 600, 400)]
       })
     ).toThrow('Terminal block was not found.')
     expect(graph.toSnapshot()).toEqual(before)

@@ -11,13 +11,12 @@ describe('create terminal block layout', () => {
     const createTerminalBlock = new CreateTerminalBlockUseCase(repository)
 
     const graph = await createTerminalBlock.execute({
-      anchorRegion: region(300, 100, 720, 460),
+      canvasRegions: [region(300, 100, 720, 460), region(0, 0, 2000, 2000)],
       description: 'Runs the dev server.',
       launchCommand: ' pnpm dev ',
       name: 'Development',
       position: { x: 33, y: 44 },
       projectDirectory: '/tmp/project',
-      reservedRegions: [region(0, 0, 2000, 2000)],
       size: { width: 420, height: 260 },
       workspaceId: 'main'
     })
@@ -32,23 +31,22 @@ describe('create terminal block layout', () => {
     expect(repository.transactionCount).toBe(1)
   })
 
-  it('automatically places an omitted position below the agent and obstacles using the new size', async () => {
+  it('automatically places an omitted position near occupied canvas regions using the new size', async () => {
     const repository = new TransactionalBlockGraphRepository(createGraph())
     const createTerminalBlock = new CreateTerminalBlockUseCase(repository)
 
     const graph = await createTerminalBlock.execute({
-      anchorRegion: region(300, 100, 720, 460),
+      canvasRegions: [region(300, 100, 720, 460), region(300, 624, 720, 180)],
       description: '',
       name: 'Automatic',
       projectDirectory: '/tmp/project',
-      reservedRegions: [region(300, 624, 720, 180)],
       size: { width: 420, height: 240 },
       workspaceId: 'main'
     })
 
     expect(graph.blocks.at(-1)).toMatchObject({
       name: 'Automatic',
-      position: { x: 450, y: 1204 },
+      position: { x: 784, y: 868 },
       size: { width: 420, height: 240 }
     })
     expect(repository.transactionCount).toBe(1)
@@ -66,7 +64,7 @@ describe('create terminal block layout', () => {
         projectDirectory: '/tmp/project',
         workspaceId: 'main'
       })
-    ).rejects.toThrow('Automatic terminal placement requires an anchor region.')
+    ).rejects.toThrow('Automatic terminal placement requires canvas regions.')
     expect(repository.graph?.toSnapshot()).toEqual(before)
   })
 })

@@ -101,6 +101,13 @@ export const enMessages = {
   'settings.terminal.title': 'Terminal',
   'settings.terminal.scrollback': 'Scrollback history',
   'settings.terminal.scrollbackRows': '{rows} lines',
+  'settings.terminal.workflowBuild': 'Workflow construction motion',
+  'settings.terminal.workflowBuild.progressive': 'Build step by step',
+  'settings.terminal.workflowBuild.progressiveDescription':
+    'Reveal terminals and dependencies in sequence as the workflow grows.',
+  'settings.terminal.workflowBuild.parallel': 'Enter in parallel',
+  'settings.terminal.workflowBuild.parallelDescription':
+    'Reveal each dependency layer together to finish construction faster.',
   'settings.agents.title': 'Agents',
   'settings.agents.preferences': 'Agent defaults',
   'settings.agents.permission': 'Agent permissions',

@@ -48,13 +48,11 @@ export interface AgentCanvasLayoutRegion {
 }
 
 export interface AgentCreateTerminalBlockInput extends CreateBlockAgentToolInput {
-  readonly anchorRegion?: AgentCanvasLayoutRegion
-  readonly reservedRegions?: readonly AgentCanvasLayoutRegion[]
+  readonly canvasRegions?: readonly AgentCanvasLayoutRegion[]
 }
 
 export interface AgentArrangeTerminalLayoutInput extends ArrangeTerminalLayoutAgentToolInput {
-  readonly anchorRegion: AgentCanvasLayoutRegion
-  readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+  readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
 }
 
 export interface AgentArrangeTerminalLayoutResult {
@@ -65,8 +63,7 @@ export interface AgentArrangeTerminalLayoutResult {
 }
 
 export interface AgentCreateTerminalWorkflowInput extends CreateTerminalWorkflowAgentToolInput {
-  readonly anchorRegion: AgentCanvasLayoutRegion
-  readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+  readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
 }
 
 export interface AgentCreateTerminalWorkflowResult {

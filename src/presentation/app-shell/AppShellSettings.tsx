@@ -9,6 +9,7 @@ import type { useApplicationSettingsNavigation } from './useApplicationSettingsN
 import type { useApplicationShortcutPreference } from './useApplicationShortcutPreference'
 import type { useBlockTemplateActions } from './useBlockTemplateActions'
 import { useI18n } from './i18n/useI18n'
+import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export function AppShellSettings({
   agentCreation,
@@ -17,12 +18,14 @@ export function AppShellSettings({
   blockTemplates,
   changeBinding,
   changeTerminalScrollback,
+  changeTerminalWorkflowBuildMode,
   currentWorkbench,
   currentWorkspace,
   isDesktopRuntime,
   resetAllBindings,
   shortcutPlatform,
-  terminalScrollbackRows
+  terminalScrollbackRows,
+  terminalWorkflowBuildMode
 }: {
   readonly agentCreation: ReturnType<typeof useAgentCreationProviders>
   readonly applicationSettings: ReturnType<typeof useApplicationSettingsNavigation>
@@ -32,12 +35,14 @@ export function AppShellSettings({
     ...args: Parameters<ReturnType<typeof useApplicationShortcutPreference>['changeBinding']>
   ) => void
   readonly changeTerminalScrollback: (rows: 1000 | 5000 | 10000) => void
+  readonly changeTerminalWorkflowBuildMode: (mode: TerminalWorkflowBuildMode) => void
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly isDesktopRuntime: boolean
   readonly resetAllBindings: () => void
   readonly shortcutPlatform: ShortcutPlatform
   readonly terminalScrollbackRows: 1000 | 5000 | 10000
+  readonly terminalWorkflowBuildMode: TerminalWorkflowBuildMode
 }) {
   const { t } = useI18n()
 
@@ -67,6 +72,8 @@ export function AppShellSettings({
         onResetAll={resetAllBindings}
         terminalScrollbackRows={terminalScrollbackRows}
         onTerminalScrollbackChange={changeTerminalScrollback}
+        terminalWorkflowBuildMode={terminalWorkflowBuildMode}
+        onTerminalWorkflowBuildModeChange={changeTerminalWorkflowBuildMode}
       />
     </div>
   )

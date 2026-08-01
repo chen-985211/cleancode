@@ -13,6 +13,10 @@ import {
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'
 import { useTerminalWorkflowBuildChoreography } from './useTerminalWorkflowBuildChoreography'
+import {
+  defaultTerminalWorkflowBuildMode,
+  type TerminalWorkflowBuildMode
+} from './terminalWorkflowBuildPreference'
 
 interface UseAgentLayoutCoordinationInput {
   readonly clearTerminalGroupDropPreview: () => void
@@ -30,6 +34,7 @@ interface UseAgentLayoutCoordinationInput {
   readonly nodeStore: WorkbenchNodeStore
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
+  readonly terminalWorkflowBuildMode?: TerminalWorkflowBuildMode
 }
 
 export function useAgentLayoutCoordination({
@@ -40,7 +45,8 @@ export function useAgentLayoutCoordination({
   moveWorkspaceAgent,
   nodeStore,
   reactFlowInstanceRef,
-  setCurrentGraph
+  setCurrentGraph,
+  terminalWorkflowBuildMode = defaultTerminalWorkflowBuildMode
 }: UseAgentLayoutCoordinationInput) {
   const [protectedLayoutNodeIds, setProtectedLayoutNodeIds] = useState<ReadonlySet<string>>(
     () => new Set()
@@ -52,7 +58,8 @@ export function useAgentLayoutCoordination({
   const terminalWorkflowBuild = useTerminalWorkflowBuildChoreography({
     currentProjectId,
     currentWorkspaceId,
-    nodeStore
+    nodeStore,
+    terminalWorkflowBuildMode
   })
 
   const onAgentGraphUpdated = useCallback(
@@ -60,7 +67,6 @@ export function useAgentLayoutCoordination({
       terminalWorkflowBuild.begin(event)
       setCurrentGraph(event.graph)
       const request = resolveWorkbenchLayoutFocusRequest({
-        agentId: event.agentId,
         change: event.change,
         graph: event.graph
       })

@@ -219,9 +219,11 @@ function createTerminalFlowNode({
       width: block.size.width,
       height: block.size.height
     },
-    className: workflowBuildPresentation?.terminalBlockIds.has(block.id)
-      ? 'terminal-workflow-build-node'
-      : undefined,
+    className: workflowBuildPresentation?.pendingTerminalBlockIds.has(block.id)
+      ? 'terminal-workflow-build-node--pending'
+      : workflowBuildPresentation?.enteringTerminalBlockIds.has(block.id)
+        ? 'terminal-workflow-build-node--entering'
+        : undefined,
     data: {
       identity: createCanvasObjectIdentity({
         projectId,

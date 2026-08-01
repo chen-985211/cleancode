@@ -48,6 +48,7 @@ import { useApplicationShortcutNavigation } from './useApplicationShortcutNaviga
 import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
+import { useTerminalWorkflowBuildPreference } from './useTerminalWorkflowBuildPreference'
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
@@ -193,6 +194,8 @@ export function AppShell({
   })
   const { changeTerminalScrollback, terminalScrollbackRows } =
     useTerminalRuntimePreference(terminalSurfaceRegistry)
+  const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
+    useTerminalWorkflowBuildPreference()
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -383,7 +386,8 @@ export function AppShell({
     moveWorkspaceAgent,
     nodeStore,
     reactFlowInstanceRef,
-    setCurrentGraph
+    setCurrentGraph,
+    terminalWorkflowBuildMode
   })
   const { fitCanvas, zoomCanvasIn, zoomCanvasOut } = useCanvasViewportActions({
     onUserAction: cancelLayoutFocus,
@@ -579,12 +583,14 @@ export function AppShell({
             blockTemplates={blockTemplates}
             changeBinding={changeBinding}
             changeTerminalScrollback={changeTerminalScrollback}
+            changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
             currentWorkbench={currentWorkbench}
             currentWorkspace={currentWorkspace}
             isDesktopRuntime={isDesktopRuntime}
             resetAllBindings={resetAllBindings}
             shortcutPlatform={shortcutPlatform}
             terminalScrollbackRows={terminalScrollbackRows}
+            terminalWorkflowBuildMode={terminalWorkflowBuildMode}
           />
           <div className="project-sidebar-column">
             <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>

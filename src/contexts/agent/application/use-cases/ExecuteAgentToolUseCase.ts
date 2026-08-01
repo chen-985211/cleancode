@@ -252,8 +252,7 @@ export class ExecuteAgentToolUseCase {
   }
 
   private async resolveWorkspaceLayout(command: ExecuteAgentToolCommand): Promise<{
-    readonly anchorRegion: AgentCanvasLayoutRegion
-    readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+    readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
   }> {
     const agents =
       (await this.agentSessionRepository.findWorkspace(command.projectId, command.workspaceId)) ??
@@ -268,10 +267,7 @@ export class ExecuteAgentToolUseCase {
     }
 
     return {
-      anchorRegion: toCanvasLayoutRegion(activeAgent.layout),
-      reservedRegions: agents
-        .filter((agent) => agent.id !== activeAgent.id)
-        .map((agent) => toCanvasLayoutRegion(agent.layout))
+      canvasRegions: agents.map((agent) => toCanvasLayoutRegion(agent.layout))
     }
   }
 

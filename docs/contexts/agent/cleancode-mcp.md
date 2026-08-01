@@ -137,7 +137,7 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 | 工具                               | 行为                                           | 必填输入                         | 可选输入                                                   | UI 审批 |
 | ---------------------------------- | ---------------------------------------------- | -------------------------------- | ---------------------------------------------------------- | ------- |
 | `inspect_graph`                    | 读取当前工作区积木图快照                       | 无                               | `reason`                                                   | 否      |
-| `create_block`                     | 创建终端；省略位置时在当前 Agent 附近智能落位  | `type: "terminal"`、`name`       | `description`、`launchCommand`、`position`、`size`         | 否      |
+| `create_block`                     | 创建终端；省略位置时在现有画布节点附近智能落位 | `type: "terminal"`、`name`       | `description`、`launchCommand`、`position`、`size`         | 否      |
 | `create_terminal_workflow`         | 原子创建、配置、连接、组合、排列并校验新工作流 | `terminals`、`connections`       | `terminalGroup`                                            | 否      |
 | `update_block`                     | 更新终端积木元数据、位置或大小                 | `blockId`                        | `name`、`description`、`launchCommand`、`position`、`size` | 否      |
 | `delete_block`                     | 删除终端积木                                   | `blockId`                        | 无                                                         | 是      |
@@ -156,11 +156,11 @@ launch 级 instructions 和 MCP 工具元数据分别在 Provider CLI 启动与 
 
 `0.3.2` 不增加工具名称或运行能力，只同步共享画布语义契约：单个终端或单条完整流程不能创建组合，组合必须至少包含两个顶层执行单元，命中流程任意终端时 BlockGraph 以完整流程校验成员。Developer Instructions、MCP 初始化说明和 `create_terminal_group` 描述都投影同一规范说明；Agent 指引不能替代 BlockGraph 领域兜底。
 
-`0.4.0` 新增 `create_terminal_workflow`。输入用一次调用内的稳定 `ref` 描述终端、内部连接和可选组合；活动 Agent 的布局由应用层注入为 anchor，其他 Agent 作为 reserved regions。BlockGraph 在一个仓储事务中完成定义校验、终端创建与完整执行配置、内部依赖、可选组合、确定性排列和计划校验；任一环节失败都不提交图。成功结果返回 `ref` 到持久化终端 ID、连接 ID、可选组合 ID、实际排列作用域和已验证计划。原有细粒度工具不删除、不改名，继续用于既有图的增量编辑。
+`0.4.0` 新增 `create_terminal_workflow`。输入用一次调用内的稳定 `ref` 描述终端、内部连接和可选组合；应用层把当前工作区全部 Agent 的已保存布局作为无优先级 `canvasRegions` 注入，BlockGraph 再与图内顶层对象共同寻找空位。BlockGraph 在一个仓储事务中完成定义校验、终端创建与完整执行配置、内部依赖、可选组合、确定性排列和计划校验；任一环节失败都不提交图。成功结果返回 `ref` 到持久化终端 ID、连接 ID、可选组合 ID、实际排列作用域和已验证计划，并以一次已提交图变更为 Presentation 提供连续演出事实；演出可以逐步或按依赖层呈现，但不得把视觉阶段重新拆成多次工具调用。原有细粒度工具不删除、不改名，继续用于既有图的增量编辑。
 
 工作流计划 `scope` 必须是 `{ type: "full" }` 或 `{ type: "from-block", blockId }`。连接方向固定为 source 上游到 target 下游。终端组合只承担视觉组织，不是工作流节点；终端、流程和组合分类由共享画布语义契约定义。
 
-`create_block` 显式提供 `position` 时原样采用；省略时，应用层从当前受管 Agent 的持久化布局注入 anchor，并把同工作区其他 Agent 注入为 reserved regions，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
+`create_block` 显式提供 `position` 时原样采用；省略时，应用层把同工作区全部 Agent 的持久化布局统一注入为 `canvasRegions`，不赋予发起 Agent 特殊方向或距离优先级，模型不能提供或伪造这些区域。`arrange_terminal_layout` 只接受精确 `blockIds`，返回实际排列的终端与组合 ID；部分组合、空或未知作用域由 BlockGraph 拒绝。
 
 Agent 使用画布工具时应先调用 `inspect_graph` 获得当前 ID、配置和依赖，再执行后续变更。完整新建路径由 `create_terminal_workflow` 在一次提交中返回新对象 ID、排列结果和已验证计划，不需要再串联细粒度工具；既有对象编辑路径仍按实际需要使用细粒度工具并在需要时重新排列、检查计划。Agent 的最终说明应报告持久化的策略与注入方式，不能把请求端口误报为本次运行的实际端点。
 
@@ -267,7 +267,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 6. 同一工作区的多个 Agent 使用不同会话端点，审批和调用不串线；同时发起图工具时按工作区串行执行且不丢失已完成变更。
 7. 在没有更高优先级组织受管策略覆盖时，CleanCode MCP 工具不触发 Provider 的重复审批；破坏性工具仍只等待 cleancode UI 审批。
 8. 任一支持 MCP 的 Provider 在 Server 无法注册或认证初始化握手超时时，Agent 仍可使用，MCP 图标以黄色状态点持续显示不可用，并在失败首次被当前作用域观察到时发送一次可自动关闭的应用警告通知；不得使用整行内联提示或把失败伪装成 MCP 已可用。
-9. Agent 完成终端工作流后只排列精确相关终端；提交成功后从发起 Agent 朝最终重心连续演出，同依赖层并行、跨层错峰且启动窗口不超过 1.4s，节点接近落位后连线、组合最后收束，整体不超过约 2.4s；拖动立即保护对象，用户平移/缩放取消自动聚焦，新图更新中断并接续最新事实，reduced-motion 直接显示最终布局。
+9. Agent 完成终端工作流后只排列精确相关终端；提交成功后从最终落位附近最近的既有画布节点边缘连续演出，逐步模式按稳定拓扑顺序逐个搭建，按层模式在同层并行，节点接近落位后连线、组合最后收束，启动窗口分别不超过 8s 与 1.4s；自动聚焦只框住本次可见结果，不强制包含发起 Agent。拖动立即保护对象，用户平移/缩放取消自动聚焦，新图更新中断并接续最新事实，reduced-motion 直接显示最终布局。
 10. 为两个可能并行运行的项目或 worktree 搭建本地服务工作流时，Agent 对已有惯用端口默认写入 `preferred` 与经仓库确认的环境变量或参数注入；没有惯用端口时使用 `auto`；只有明确不可变端口约束时才写入 `fixed`，并在最终说明中报告策略和注入方式而不是声称已经获得实际端点。
 
 ## 第二阶段候选：运行态 MCP（尚未实现）

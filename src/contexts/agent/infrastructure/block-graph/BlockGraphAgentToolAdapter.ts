@@ -56,13 +56,12 @@ export interface BlockGraphAgentToolAdapterInput {
     command: AgentToolContext & AgentConnectTerminalBlocksInput
   ) => Promise<BlockGraphSnapshot>
   readonly createTerminalBlock: (command: {
-    readonly anchorRegion?: AgentCreateTerminalBlockInput['anchorRegion']
+    readonly canvasRegions?: AgentCreateTerminalBlockInput['canvasRegions']
     readonly description: string
     readonly launchCommand?: string
     readonly name: string
     readonly position?: BlockPositionSnapshot
     readonly projectDirectory: string
-    readonly reservedRegions?: AgentCreateTerminalBlockInput['reservedRegions']
     readonly size?: TerminalBlockSizeSnapshot
     readonly workspaceId: string
   }) => Promise<BlockGraphSnapshot>
@@ -161,12 +160,11 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     return toAgentBlockGraphSnapshot(
       await this.tools.createTerminalBlock({
         ...context,
-        ...(input.anchorRegion ? { anchorRegion: input.anchorRegion } : {}),
+        ...(input.canvasRegions ? { canvasRegions: input.canvasRegions } : {}),
         description: input.description ?? '',
         ...(input.launchCommand !== undefined ? { launchCommand: input.launchCommand } : {}),
         name: input.name,
         ...(input.position ? { position: input.position } : {}),
-        ...(input.reservedRegions ? { reservedRegions: input.reservedRegions } : {}),
         ...(input.size ? { size: input.size } : {})
       })
     )
@@ -178,9 +176,8 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
   ): Promise<AgentCreateTerminalWorkflowResult> {
     const result = await this.tools.createTerminalWorkflow({
       ...context,
-      anchorRegion: input.anchorRegion,
+      canvasRegions: input.canvasRegions,
       connections: input.connections.map((connection) => ({ ...connection })),
-      reservedRegions: input.reservedRegions,
       ...(input.terminalGroup
         ? {
             terminalGroup: {

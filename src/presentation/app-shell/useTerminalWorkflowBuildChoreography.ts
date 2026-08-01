@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { resolveNodeSize } from './resolveNodeSize'
 import {
   createTerminalWorkflowBuildChoreography,
@@ -10,9 +9,11 @@ import {
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 import { prefersReducedMotion } from './workbenchFocusTransition'
+import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export interface TerminalWorkflowBuildPresentation {
   readonly enteringConnectionIds: ReadonlySet<string>
+  readonly enteringTerminalBlockIds: ReadonlySet<string>
   readonly enteringTerminalGroupIds: ReadonlySet<string>
   readonly operationId: string
   readonly initialPositionsByBlockId?: ReadonlyMap<
@@ -20,6 +21,7 @@ export interface TerminalWorkflowBuildPresentation {
     { readonly x: number; readonly y: number }
   >
   readonly pendingConnectionIds: ReadonlySet<string>
+  readonly pendingTerminalBlockIds: ReadonlySet<string>
   readonly pendingTerminalGroupIds: ReadonlySet<string>
   readonly terminalBlockIds: ReadonlySet<string>
 }
@@ -34,11 +36,13 @@ interface ActiveBuild {
 export function useTerminalWorkflowBuildChoreography({
   currentProjectId,
   currentWorkspaceId,
-  nodeStore
+  nodeStore,
+  terminalWorkflowBuildMode
 }: {
   readonly currentProjectId: string | null
   readonly currentWorkspaceId: string | null
   readonly nodeStore: WorkbenchNodeStore
+  readonly terminalWorkflowBuildMode: TerminalWorkflowBuildMode
 }) {
   const [presentation, setPresentation] = useState<TerminalWorkflowBuildPresentation | null>(null)
   const activeBuildRef = useRef<ActiveBuild | null>(null)
@@ -72,30 +76,16 @@ export function useTerminalWorkflowBuildChoreography({
       cancelActiveBuild(true)
       if (event.change?.kind !== 'terminal_workflow_created') return
 
-      const agentNode = nodeStore
+      const createdNodeIds = new Set([...event.change.blockIds, ...event.change.terminalGroupIds])
+      const canvasNodes = nodeStore
         .getNodes()
-        .find(
-          (node) => node.id === toAgentFlowNodeId(event.agentId) && node.type === 'agentConsole'
-        )
+        .filter((node) => !createdNodeIds.has(node.id))
+        .flatMap(resolveCanvasNodeLayout)
       const choreography = createTerminalWorkflowBuildChoreography({
-        agentNode:
-          agentNode?.type === 'agentConsole'
-            ? {
-                position: agentNode.position,
-                size: {
-                  height: resolveNodeSize(
-                    agentNode.style?.height,
-                    agentNode.data.agent.layout.size.height
-                  ),
-                  width: resolveNodeSize(
-                    agentNode.style?.width,
-                    agentNode.data.agent.layout.size.width
-                  )
-                }
-              }
-            : null,
+        canvasNodes,
         change: event.change,
         graph: event.graph,
+        mode: terminalWorkflowBuildMode,
         reducedMotion: prefersReducedMotion()
       })
 
@@ -147,7 +137,7 @@ export function useTerminalWorkflowBuildChoreography({
 
       animationFrameRef.current = window.requestAnimationFrame(animate)
     },
-    [cancelActiveBuild, nodeStore]
+    [cancelActiveBuild, nodeStore, terminalWorkflowBuildMode]
   )
 
   const interruptNodes = useCallback((nodeIds: readonly string[]): void => {
@@ -179,6 +169,31 @@ export function useTerminalWorkflowBuildChoreography({
   )
 
   return { begin, interruptNodes, presentation }
+}
+
+function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
+  readonly position: { readonly x: number; readonly y: number }
+  readonly size: { readonly height: number; readonly width: number }
+}> {
+  const persistedSize =
+    node.type === 'terminal'
+      ? node.data.block.size
+      : node.type === 'terminalGroup'
+        ? node.data.group.size
+        : node.type === 'agentConsole'
+          ? node.data.agent.layout.size
+          : null
+  if (!persistedSize) return []
+
+  return [
+    {
+      position: node.position,
+      size: {
+        height: resolveNodeSize(node.style?.height, persistedSize.height),
+        width: resolveNodeSize(node.style?.width, persistedSize.width)
+      }
+    }
+  ]
 }
 
 function resolveAnimatedPosition(
@@ -231,6 +246,12 @@ function projectPresentation(
   const enteringConnectionIds = activeBuild.choreography.connectionStages
     .filter((stage) => elapsedMs >= stage.revealAtMs)
     .map((stage) => stage.connectionId)
+  const pendingTerminalBlockIds = activeBuild.choreography.terminalStages
+    .filter((stage) => elapsedMs < stage.delayMs)
+    .map((stage) => stage.blockId)
+  const enteringTerminalBlockIds = activeBuild.choreography.terminalStages
+    .filter((stage) => elapsedMs >= stage.delayMs)
+    .map((stage) => stage.blockId)
   const pendingTerminalGroupIds = activeBuild.choreography.groupStages
     .filter((stage) => elapsedMs < stage.revealAtMs)
     .map((stage) => stage.terminalGroupId)
@@ -240,6 +261,8 @@ function projectPresentation(
   const signature = [
     pendingConnectionIds.join(','),
     enteringConnectionIds.join(','),
+    pendingTerminalBlockIds.join(','),
+    enteringTerminalBlockIds.join(','),
     pendingTerminalGroupIds.join(','),
     enteringTerminalGroupIds.join(',')
   ].join('|')
@@ -247,12 +270,14 @@ function projectPresentation(
   activeBuild.presentationSignature = signature
   setPresentation({
     enteringConnectionIds: new Set(enteringConnectionIds),
+    enteringTerminalBlockIds: new Set(enteringTerminalBlockIds),
     enteringTerminalGroupIds: new Set(enteringTerminalGroupIds),
     initialPositionsByBlockId: new Map(
       activeBuild.choreography.terminalStages.map((stage) => [stage.blockId, stage.initialPosition])
     ),
     operationId: activeBuild.choreography.operationId,
     pendingConnectionIds: new Set(pendingConnectionIds),
+    pendingTerminalBlockIds: new Set(pendingTerminalBlockIds),
     pendingTerminalGroupIds: new Set(pendingTerminalGroupIds),
     terminalBlockIds: new Set(activeBuild.choreography.terminalStages.map((stage) => stage.blockId))
   })

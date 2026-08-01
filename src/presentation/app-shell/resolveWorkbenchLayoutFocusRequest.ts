@@ -1,18 +1,15 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
-import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import type { WorkbenchLayoutFocusRequest } from './useWorkbenchLayoutFocus'
 
 type TerminalLayoutArrangedChange = NonNullable<AgentGraphUpdatedEvent['change']>
 
 interface ResolveWorkbenchLayoutFocusRequestInput {
-  readonly agentId: string
   readonly change?: TerminalLayoutArrangedChange
   readonly graph: BlockGraphSnapshot
 }
 
 export function resolveWorkbenchLayoutFocusRequest({
-  agentId,
   change,
   graph
 }: ResolveWorkbenchLayoutFocusRequestInput): WorkbenchLayoutFocusRequest | null {
@@ -51,10 +48,11 @@ export function resolveWorkbenchLayoutFocusRequest({
     affectedNodeIds: uniqueIds([...change.blockIds, ...change.terminalGroupIds]),
     expectedNodeLayouts,
     focusNodeIds: uniqueIds([
-      toAgentFlowNodeId(agentId),
       ...visibleGroups.map((group) => group.id),
       ...visibleUngroupedBlocks.map((block) => block.id)
     ]),
+    focusTarget:
+      change.kind === 'terminal_workflow_created' ? 'committed-layouts' : 'projected-nodes',
     operationId: change.operationId
   }
 }

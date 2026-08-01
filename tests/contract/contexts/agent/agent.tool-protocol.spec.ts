@@ -237,6 +237,8 @@ describe('agent tool protocol', () => {
     )
     expect(createBlock?.description).toContain('Omit position')
     expect(createBlock?.description).toContain('exact coordinates')
+    expect(createBlock?.description).toContain('existing canvas content')
+    expect(createBlock?.description).not.toContain('active Agent')
     expect(arrangeLayout).toEqual(
       expect.objectContaining({
         annotations: {
@@ -273,6 +275,8 @@ describe('agent tool protocol', () => {
         ])
       })
     )
+    expect(arrangeLayout?.description).toContain('existing canvas content')
+    expect(arrangeLayout?.description).not.toContain('active Agent')
     expect(createGroup).toEqual(
       expect.objectContaining({
         description: expect.stringContaining('existing terminal blocks'),
@@ -312,6 +316,8 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpDeveloperInstructions).toMatch(/do not claim/i)
     expect(cleancodeMcpDeveloperInstructions).toContain('cannot start it')
     expect(cleancodeMcpDeveloperInstructions).toContain('source-code implementation')
+    expect(cleancodeMcpDeveloperInstructions).toContain('existing canvas content')
+    expect(cleancodeMcpDeveloperInstructions).not.toContain('around the active Agent')
     expect(cleancodeMcpInstructions).toContain('not workflow nodes')
   })
 
