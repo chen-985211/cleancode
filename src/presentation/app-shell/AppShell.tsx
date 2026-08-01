@@ -48,6 +48,7 @@ import { useApplicationShortcutNavigation } from './useApplicationShortcutNaviga
 import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
+import { useTerminalWorkflowBuildPreference } from './useTerminalWorkflowBuildPreference'
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
@@ -61,6 +62,7 @@ import { useQuickExecutionActions } from './useQuickExecutionActions'
 import { useAppShellBlockActions } from './useAppShellBlockActions'
 import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
 import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
+import { useCanvasViewportActions } from './useCanvasViewportActions'
 
 export function AppShell({
   notifications = ignoreAppNotifications
@@ -91,15 +93,6 @@ export function AppShell({
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
   const canvasSizeRef = useRef({ width: 0, height: 0 })
-  const zoomCanvasIn = useCallback((): void => {
-    void reactFlowInstanceRef.current?.zoomIn({ duration: 160 })
-  }, [])
-  const zoomCanvasOut = useCallback((): void => {
-    void reactFlowInstanceRef.current?.zoomOut({ duration: 160 })
-  }, [])
-  const fitCanvas = useCallback((): void => {
-    void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
-  }, [])
   const projectSidebarToggleRef = useRef<HTMLButtonElement | null>(null)
   const toggleProjectSidebar = useCallback((): void => {
     if (!isProjectSidebarCollapsed && document.activeElement?.closest('#project-sidebar')) {
@@ -201,6 +194,8 @@ export function AppShell({
   })
   const { changeTerminalScrollback, terminalScrollbackRows } =
     useTerminalRuntimePreference(terminalSurfaceRegistry)
+  const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
+    useTerminalWorkflowBuildPreference()
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -377,10 +372,12 @@ export function AppShell({
     })
   const {
     cancelNodeDrag,
+    cancelLayoutFocus,
     onAgentGraphUpdated,
     onNodeDragStart,
     onNodeDragStop,
-    protectedLayoutNodeIds
+    protectedLayoutNodeIds,
+    terminalWorkflowBuildPresentation
   } = useAgentLayoutCoordination({
     clearTerminalGroupDropPreview,
     currentProjectId: currentWorkbench?.project.id ?? null,
@@ -389,7 +386,12 @@ export function AppShell({
     moveWorkspaceAgent,
     nodeStore,
     reactFlowInstanceRef,
-    setCurrentGraph
+    setCurrentGraph,
+    terminalWorkflowBuildMode
+  })
+  const { fitCanvas, zoomCanvasIn, zoomCanvasOut } = useCanvasViewportActions({
+    onUserAction: cancelLayoutFocus,
+    reactFlowInstanceRef
   })
   const minimapNodeInteraction = useMemo(
     () =>
@@ -495,6 +497,7 @@ export function AppShell({
     selectedTerminalGroupId,
     selectedUngroupedTerminalBlockIds,
     protectedLayoutNodeIds,
+    terminalWorkflowBuildPresentation,
     onAgentGraphUpdated,
     setNodes: nodeStore.setNodes,
     terminalStates,
@@ -580,12 +583,14 @@ export function AppShell({
             blockTemplates={blockTemplates}
             changeBinding={changeBinding}
             changeTerminalScrollback={changeTerminalScrollback}
+            changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
             currentWorkbench={currentWorkbench}
             currentWorkspace={currentWorkspace}
             isDesktopRuntime={isDesktopRuntime}
             resetAllBindings={resetAllBindings}
             shortcutPlatform={shortcutPlatform}
             terminalScrollbackRows={terminalScrollbackRows}
+            terminalWorkflowBuildMode={terminalWorkflowBuildMode}
           />
           <div className="project-sidebar-column">
             <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
@@ -643,6 +648,7 @@ export function AppShell({
             reactFlowInstanceRef={reactFlowInstanceRef}
             minimapNodeInteraction={minimapNodeInteraction}
             terminalWorkflow={terminalWorkflow}
+            terminalWorkflowBuildPresentation={terminalWorkflowBuildPresentation}
             shortcutTooltips={shortcutTooltips}
             shortcutPlatform={shortcutPlatform}
             placementTemplate={blockTemplates.placementTemplate}
@@ -680,6 +686,7 @@ export function AppShell({
             onNodeDragStart={onNodeDragStart}
             onNodeDragStop={commitWorkbenchNodeDrag}
             onViewportChange={updateGraphViewport}
+            onViewportInteractionStart={cancelLayoutFocus}
             onMinimapNodeClick={focusWorkbenchNode}
             getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}

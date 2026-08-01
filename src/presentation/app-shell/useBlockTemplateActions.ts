@@ -151,6 +151,7 @@ function createBlockTemplateFocusRequest(
     ],
     expectedNodeLayouts,
     focusNodeIds,
+    focusTarget: 'projected-nodes',
     operationId: `block-template:${
       result.instance.terminalGroupId ?? result.instance.blockIds.join(':')
     }`

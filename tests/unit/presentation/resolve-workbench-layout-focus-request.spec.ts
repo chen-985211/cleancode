@@ -2,10 +2,9 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import { resolveWorkbenchLayoutFocusRequest } from '../../../src/presentation/app-shell/resolveWorkbenchLayoutFocusRequest'
 
 describe('resolve workbench layout focus request', () => {
-  it('focuses the invoking Agent, visible groups, and ungrouped arranged terminals', () => {
+  it('focuses visible groups and ungrouped arranged terminals without forcing the Agent into view', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({
-        agentId: 'agent-1',
         change: {
           blockIds: ['backend', 'worker'],
           kind: 'terminal_layout_arranged',
@@ -28,15 +27,40 @@ describe('resolve workbench layout focus request', () => {
           size: { width: 420, height: 306 }
         }
       ],
-      focusNodeIds: ['agent:agent-1', 'startup-group', 'worker'],
+      focusTarget: 'projected-nodes',
+      focusNodeIds: ['startup-group', 'worker'],
       operationId: 'tool-call-1'
+    })
+  })
+
+  it('frames the committed destination before an atomic workflow finishes entering', () => {
+    expect(
+      resolveWorkbenchLayoutFocusRequest({
+        change: {
+          blockIds: ['worker'],
+          connectionIds: [],
+          kind: 'terminal_workflow_created',
+          operationId: 'tool-call-2',
+          terminalGroupIds: []
+        },
+        graph: createGraph()
+      })
+    ).toMatchObject({
+      expectedNodeLayouts: [
+        {
+          nodeId: 'worker',
+          position: { x: 0, y: 0 },
+          size: { width: 420, height: 306 }
+        }
+      ],
+      focusNodeIds: ['worker'],
+      focusTarget: 'committed-layouts'
     })
   })
 
   it('does not request focus for an ordinary graph update', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({
-        agentId: 'agent-1',
         graph: createGraph()
       })
     ).toBeNull()

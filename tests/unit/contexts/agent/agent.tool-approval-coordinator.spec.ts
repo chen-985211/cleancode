@@ -112,6 +112,40 @@ describe('Agent tool approval coordinator', () => {
     })
   })
 
+  it('publishes one atomic workflow creation event after the committed graph result', async () => {
+    const session = createManagedSession()
+    const coordinator = new AgentToolApprovalCoordinator(
+      {
+        cancel: vi.fn(),
+        execute: vi.fn(async () => completedWorkflowCreationResult('workflow-operation-1'))
+      },
+      () => session
+    )
+
+    await coordinator.execute(session, {
+      input: {},
+      sessionId: session.sessionId,
+      toolCallId: 'workflow-operation-1',
+      toolName: 'create_terminal_workflow'
+    })
+
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledOnce()
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledWith({
+      agentId: 'agent-1',
+      change: {
+        blockIds: ['terminal-api', 'terminal-web'],
+        connectionIds: ['connection-api-web'],
+        kind: 'terminal_workflow_created',
+        operationId: 'workflow-operation-1',
+        terminalGroupIds: ['terminal-group-dev']
+      },
+      graph: fakeGraph,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceId: 'main'
+    })
+  })
+
   it('returns a structured failure to the approval surface and completes the tool call', async () => {
     const failure = failedResult('tool-call-failed')
     const execute = vi
@@ -360,6 +394,33 @@ function completedArrangeResult(toolCallId: string): AgentToolExecutionResult {
       arrangedBlockIds: ['terminal-api', 'terminal-test'],
       arrangedTerminalGroupIds: ['terminal-group-dev-test'],
       type: 'block_graph'
+    },
+    status: 'completed',
+    toolCallId
+  }
+}
+
+function completedWorkflowCreationResult(toolCallId: string): AgentToolExecutionResult {
+  return {
+    graph: fakeGraph,
+    graphChanged: true,
+    output: {
+      arrangedBlockIds: ['terminal-api', 'terminal-web'],
+      arrangedTerminalGroupIds: ['terminal-group-dev'],
+      createdConnections: [
+        {
+          connectionId: 'connection-api-web',
+          sourceRef: 'api',
+          targetRef: 'web'
+        }
+      ],
+      createdTerminalGroupId: 'terminal-group-dev',
+      createdTerminals: [
+        { blockId: 'terminal-api', ref: 'api' },
+        { blockId: 'terminal-web', ref: 'web' }
+      ],
+      plan: { graphId: 'graph-1', nodes: [], workspaceId: 'main' },
+      type: 'terminal_workflow_created'
     },
     status: 'completed',
     toolCallId

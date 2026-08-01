@@ -12,6 +12,11 @@ import {
 } from './useWorkbenchLayoutFocus'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 import { restoreWorkbenchNodeLayout } from './restoreWorkbenchNodeLayout'
+import { useTerminalWorkflowBuildChoreography } from './useTerminalWorkflowBuildChoreography'
+import {
+  defaultTerminalWorkflowBuildMode,
+  type TerminalWorkflowBuildMode
+} from './terminalWorkflowBuildPreference'
 
 interface UseAgentLayoutCoordinationInput {
   readonly clearTerminalGroupDropPreview: () => void
@@ -29,6 +34,7 @@ interface UseAgentLayoutCoordinationInput {
   readonly nodeStore: WorkbenchNodeStore
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
+  readonly terminalWorkflowBuildMode?: TerminalWorkflowBuildMode
 }
 
 export function useAgentLayoutCoordination({
@@ -39,7 +45,8 @@ export function useAgentLayoutCoordination({
   moveWorkspaceAgent,
   nodeStore,
   reactFlowInstanceRef,
-  setCurrentGraph
+  setCurrentGraph,
+  terminalWorkflowBuildMode = defaultTerminalWorkflowBuildMode
 }: UseAgentLayoutCoordinationInput) {
   const [protectedLayoutNodeIds, setProtectedLayoutNodeIds] = useState<ReadonlySet<string>>(
     () => new Set()
@@ -48,19 +55,25 @@ export function useAgentLayoutCoordination({
     null
   )
   const dragProtectionByNodeIdRef = useRef(new Map<string, readonly string[]>())
+  const terminalWorkflowBuild = useTerminalWorkflowBuildChoreography({
+    currentProjectId,
+    currentWorkspaceId,
+    nodeStore,
+    terminalWorkflowBuildMode
+  })
 
   const onAgentGraphUpdated = useCallback(
     (event: AgentGraphUpdatedEvent): void => {
+      terminalWorkflowBuild.begin(event)
       setCurrentGraph(event.graph)
       const request = resolveWorkbenchLayoutFocusRequest({
-        agentId: event.agentId,
         change: event.change,
         graph: event.graph
       })
 
       if (request) setLayoutFocusRequest(request)
     },
-    [setCurrentGraph]
+    [setCurrentGraph, terminalWorkflowBuild.begin]
   )
   const handleLayoutFocusHandled = useCallback((operationId: string): void => {
     setLayoutFocusRequest((currentRequest) =>
@@ -77,9 +90,16 @@ export function useAgentLayoutCoordination({
   const onNodeDragStart = useCallback(
     (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
       clearTerminalGroupDropPreview()
-      updateDragProtection(node.id, resolveDragProtectedNodeIds(node, nodeStore.getNodes()))
+      const protectedNodeIds = resolveDragProtectedNodeIds(node, nodeStore.getNodes())
+      terminalWorkflowBuild.interruptNodes(protectedNodeIds)
+      updateDragProtection(node.id, protectedNodeIds)
     },
-    [clearTerminalGroupDropPreview, nodeStore, updateDragProtection]
+    [
+      clearTerminalGroupDropPreview,
+      nodeStore,
+      terminalWorkflowBuild.interruptNodes,
+      updateDragProtection
+    ]
   )
   const onNodeDragStop = useCallback(
     async (event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): Promise<void> => {
@@ -110,6 +130,7 @@ export function useAgentLayoutCoordination({
     },
     [clearTerminalGroupDropPreview, updateDragProtection]
   )
+  const cancelLayoutFocus = useCallback((): void => setLayoutFocusRequest(null), [])
 
   useEffect(() => {
     dragProtectionByNodeIdRef.current.clear()
@@ -127,10 +148,12 @@ export function useAgentLayoutCoordination({
 
   return {
     cancelNodeDrag,
+    cancelLayoutFocus,
     onAgentGraphUpdated,
     onNodeDragStart,
     onNodeDragStop,
-    protectedLayoutNodeIds
+    protectedLayoutNodeIds,
+    terminalWorkflowBuildPresentation: terminalWorkflowBuild.presentation
   }
 }
 

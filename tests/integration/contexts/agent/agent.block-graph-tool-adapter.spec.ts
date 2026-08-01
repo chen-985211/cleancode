@@ -7,6 +7,7 @@ import { ArrangeTerminalLayoutUseCase } from '../../../../src/contexts/block-gra
 import { BuildTerminalWorkflowPlanUseCase } from '../../../../src/contexts/block-graph/application/use-cases/BuildTerminalWorkflowPlanUseCase'
 import { ConnectTerminalBlocksUseCase } from '../../../../src/contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
+import { CreateTerminalWorkflowUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalWorkflowUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../../../src/contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../../../src/contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../../../src/contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
@@ -185,11 +186,11 @@ describe('agent block graph workflow tool adapter', () => {
   })
 
   it('creates and arranges terminals through one atomic BlockGraph callback each', async () => {
-    const anchorRegion = {
+    const activeAgentRegion = {
       position: { x: 1_600, y: 160 },
       size: { height: 460, width: 720 }
     }
-    const reservedRegions = [
+    const otherAgentRegions = [
       {
         position: { x: 2_900, y: 80 },
         size: { height: 520, width: 760 }
@@ -197,11 +198,10 @@ describe('agent block graph workflow tool adapter', () => {
     ]
     const beforeCreate = await adapter.inspectGraph(context)
     const createdGraph = await adapter.createTerminalBlock(context, {
-      anchorRegion,
+      canvasRegions: [activeAgentRegion, ...otherAgentRegions],
       description: 'Runs the API server',
       launchCommand: 'pnpm dev:api',
       name: 'API Server',
-      reservedRegions,
       size: { height: 300, width: 460 },
       type: 'terminal'
     })
@@ -214,18 +214,20 @@ describe('agent block graph workflow tool adapter', () => {
       name: 'API Server',
       size: { height: 300, width: 460 }
     })
-    expect(createdBlock && overlaps(createdBlock, anchorRegion)).toBe(false)
-    expect(createdBlock && overlaps(createdBlock, reservedRegions[0])).toBe(false)
+    expect(createdBlock && overlaps(createdBlock, activeAgentRegion)).toBe(false)
+    expect(createdBlock && overlaps(createdBlock, otherAgentRegions[0])).toBe(false)
 
     if (!createdBlock) throw new Error('Expected the adapter to create a terminal block.')
 
     const arranged = await adapter.arrangeTerminalLayout(context, {
-      anchorRegion: {
-        position: { x: 4_200, y: 240 },
-        size: { height: 460, width: 720 }
-      },
       blockIds: [createdBlock.id],
-      reservedRegions
+      canvasRegions: [
+        {
+          position: { x: 4_200, y: 240 },
+          size: { height: 460, width: 720 }
+        },
+        ...otherAgentRegions
+      ]
     })
 
     expect(arranged).toMatchObject({
@@ -234,12 +236,78 @@ describe('agent block graph workflow tool adapter', () => {
       graphChanged: true
     })
   })
+
+  it('creates a configured terminal workflow atomically through the Agent adapter', async () => {
+    const before = await adapter.inspectGraph(context)
+    const created = await adapter.createTerminalWorkflow(context, {
+      canvasRegions: [{ position: { x: 1_600, y: 120 }, size: { height: 420, width: 720 } }],
+      connections: [{ sourceRef: 'api', targetRef: 'web' }],
+      terminalGroup: { memberRefs: ['api', 'web', 'worker'], name: 'Development' },
+      terminals: [
+        {
+          description: 'API service',
+          launchCommand: 'pnpm dev:api',
+          name: 'API',
+          ref: 'api'
+        },
+        {
+          description: 'Web client',
+          launchCommand: 'pnpm dev:web',
+          name: 'Web',
+          ref: 'web'
+        },
+        {
+          description: 'Background worker',
+          launchCommand: 'pnpm dev:worker',
+          name: 'Worker',
+          ref: 'worker'
+        }
+      ]
+    })
+    const persisted = await repository.findDefaultGraphSnapshot(
+      context.projectDirectory,
+      context.workspaceId
+    )
+
+    expect(created.createdTerminals).toHaveLength(3)
+    expect(created.createdConnections).toEqual([
+      expect.objectContaining({ sourceRef: 'api', targetRef: 'web' })
+    ])
+    expect(created.createdTerminalGroupId).toEqual(expect.any(String))
+    expect(created.plan.nodes).toHaveLength(3)
+    expect(persisted?.blocks).toHaveLength(before.blocks.length + 3)
+    expect(persisted?.connections).toHaveLength((before.connections?.length ?? 0) + 1)
+
+    await expect(
+      adapter.createTerminalWorkflow(context, {
+        canvasRegions: [{ position: { x: 0, y: 0 }, size: { height: 10, width: 10 } }],
+        connections: [{ sourceRef: 'missing', targetRef: 'only' }],
+        terminals: [
+          {
+            description: '',
+            launchCommand: 'pnpm dev',
+            name: 'Only',
+            ref: 'only'
+          }
+        ]
+      })
+    ).rejects.toSatisfy(
+      (error: unknown) => getAppErrorCode(error) === 'TERMINAL_WORKFLOW_DEFINITION_INVALID'
+    )
+    const afterFailure = await repository.findDefaultGraphSnapshot(
+      context.projectDirectory,
+      context.workspaceId
+    )
+
+    expect(afterFailure).toEqual(persisted)
+  })
 })
 
 function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAgentToolAdapter {
   const arrange = new ArrangeTerminalLayoutUseCase(repository)
   const connect = new ConnectTerminalBlocksUseCase(repository)
   const createTerminal = new CreateTerminalBlockUseCase(repository)
+  const createTerminalWorkflow = new CreateTerminalWorkflowUseCase(repository)
   const disconnect = new DisconnectTerminalBlocksUseCase(repository)
   const getGraph = new GetDefaultGraphUseCase(repository)
   const inspectPlan = new BuildTerminalWorkflowPlanUseCase(repository)
@@ -250,6 +318,7 @@ function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAg
     buildTerminalWorkflowPlan: (query) => inspectPlan.execute(query),
     connectTerminalBlocks: (command) => connect.execute(command),
     createTerminalBlock: (command) => createTerminal.execute(command),
+    createTerminalWorkflow: (command) => createTerminalWorkflow.execute(command),
     createTerminalGroup: notUsed,
     deleteBlock: notUsed,
     disconnectTerminalBlocks: (command) => disconnect.execute(command),

@@ -145,6 +145,17 @@ describe('application settings', () => {
     fireEvent.click(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' }))
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).toBeChecked()
   })
+
+  it('switches terminal workflow construction between progressive and parallel presentation', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '终端' }))
+
+    const buildModeOptions = screen.getByRole('radiogroup', { name: '工作流搭建动效' })
+    expect(within(buildModeOptions).getByRole('radio', { name: /逐步搭建/ })).toBeChecked()
+    fireEvent.click(within(buildModeOptions).getByRole('radio', { name: /并行进入/ }))
+    expect(within(buildModeOptions).getByRole('radio', { name: /并行进入/ })).toBeChecked()
+  })
 })
 
 function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {
@@ -153,6 +164,9 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
     defaultApplicationShortcutBindings
   )
   const [terminalScrollbackRows, setTerminalScrollbackRows] = useState<1000 | 5000 | 10000>(1000)
+  const [terminalWorkflowBuildMode, setTerminalWorkflowBuildMode] = useState<
+    'parallel' | 'progressive'
+  >('progressive')
 
   const changeBinding = (
     command: ApplicationShortcutCommand,
@@ -172,6 +186,8 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
       onResetAll={() => setBindings(defaultApplicationShortcutBindings)}
       terminalScrollbackRows={terminalScrollbackRows}
       onTerminalScrollbackChange={setTerminalScrollbackRows}
+      terminalWorkflowBuildMode={terminalWorkflowBuildMode}
+      onTerminalWorkflowBuildModeChange={setTerminalWorkflowBuildMode}
     />
   )
 }

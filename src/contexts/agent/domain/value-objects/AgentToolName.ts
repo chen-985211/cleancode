@@ -1,6 +1,7 @@
 export type AgentToolName =
   | 'inspect_graph'
   | 'create_block'
+  | 'create_terminal_workflow'
   | 'update_block'
   | 'delete_block'
   | 'create_terminal_group'

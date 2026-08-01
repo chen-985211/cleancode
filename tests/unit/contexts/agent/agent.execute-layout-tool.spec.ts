@@ -46,19 +46,19 @@ describe('execute Agent layout tools', () => {
     expect(blockGraphTools.createTerminalBlock).toHaveBeenCalledWith(
       { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
-        anchorRegion: {
-          position: { x: 980, y: 180 },
-          size: { height: 460, width: 720 }
-        },
-        description: 'Runs the API server',
-        launchCommand: 'pnpm dev:api',
-        name: 'API Server',
-        reservedRegions: [
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          },
           {
             position: { x: 40, y: 80 },
             size: { height: 420, width: 680 }
           }
         ],
+        description: 'Runs the API server',
+        launchCommand: 'pnpm dev:api',
+        name: 'API Server',
         type: 'terminal'
       }
     )
@@ -96,12 +96,12 @@ describe('execute Agent layout tools', () => {
     expect(blockGraphTools.arrangeTerminalLayout).toHaveBeenCalledWith(
       { projectDirectory: '/tmp/project', workspaceId: 'main' },
       {
-        anchorRegion: {
-          position: { x: 980, y: 180 },
-          size: { height: 460, width: 720 }
-        },
         blockIds: ['terminal-api', 'terminal-test'],
-        reservedRegions: [
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          },
           {
             position: { x: 40, y: 80 },
             size: { height: 420, width: 680 }
@@ -139,6 +139,80 @@ describe('execute Agent layout tools', () => {
       }
     ])
   })
+
+  it('creates a complete workflow through one atomic graph port call', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.createTerminalWorkflow).mockResolvedValue({
+      arrangedBlockIds: ['terminal-api', 'terminal-web'],
+      arrangedTerminalGroupIds: [],
+      createdConnections: [
+        {
+          connectionId: 'connection-api-web',
+          sourceRef: 'api',
+          targetRef: 'web'
+        }
+      ],
+      createdTerminalGroupId: null,
+      createdTerminals: [
+        { blockId: 'terminal-api', ref: 'api' },
+        { blockId: 'terminal-web', ref: 'web' }
+      ],
+      graph: fakeGraph,
+      plan: {
+        graphId: 'graph-1',
+        nodes: [],
+        workspaceId: 'main'
+      }
+    })
+    const executeTool = createExecuteTool(
+      blockGraphTools,
+      new RecordingAgentAuditRepository(),
+      createAgentSessionRepository([
+        createAgent('agent-1', { x: 980, y: 180 }, { height: 460, width: 720 })
+      ])
+    )
+
+    const result = await executeTool.execute({
+      agentId: 'agent-1',
+      input: {
+        connections: [{ sourceRef: 'api', targetRef: 'web' }],
+        terminals: [
+          { launchCommand: 'pnpm api', name: 'API', ref: 'api' },
+          { launchCommand: 'pnpm web', name: 'Web', ref: 'web' }
+        ]
+      },
+      projectDirectory: '/tmp/project',
+      projectId: 'project-1',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-create-workflow',
+      toolName: 'create_terminal_workflow',
+      workspaceId: 'main'
+    })
+
+    expect(blockGraphTools.createTerminalWorkflow).toHaveBeenCalledOnce()
+    expect(blockGraphTools.createTerminalWorkflow).toHaveBeenCalledWith(
+      { projectDirectory: '/tmp/project', workspaceId: 'main' },
+      expect.objectContaining({
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          }
+        ]
+      })
+    )
+    expect(result).toMatchObject({
+      graphChanged: true,
+      output: {
+        createdTerminals: [
+          { blockId: 'terminal-api', ref: 'api' },
+          { blockId: 'terminal-web', ref: 'web' }
+        ],
+        type: 'terminal_workflow_created'
+      },
+      status: 'completed'
+    })
+  })
 })
 
 const fakeGraph: BlockGraphSnapshot = {
@@ -174,6 +248,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
       graphChanged: false
     })),
     createTerminalBlock: vi.fn(async () => fakeGraph),
+    createTerminalWorkflow: vi.fn(),
     createTerminalGroup: vi.fn(async () => fakeGraph),
     connectTerminalBlocks: vi.fn(async () => ({ connectionId: 'connection-1', graph: fakeGraph })),
     deleteTerminalBlock: vi.fn(async () => fakeGraph),

@@ -16,8 +16,7 @@ export interface CreateTerminalBlockCommand {
   readonly launchCommand?: string
   readonly position?: BlockPositionSnapshot
   readonly size?: TerminalBlockSizeSnapshot
-  readonly reservedRegions?: readonly TerminalLayoutRegion[]
-  readonly anchorRegion?: TerminalLayoutRegion
+  readonly canvasRegions?: readonly TerminalLayoutRegion[]
 }
 
 export class CreateTerminalBlockUseCase {
@@ -28,10 +27,10 @@ export class CreateTerminalBlockUseCase {
       this.graphRepository,
       command,
       (graph) => {
-        if (!command.position && !command.anchorRegion) {
+        if (!command.position && !command.canvasRegions) {
           throw createExpectedAppError(
             'TERMINAL_LAYOUT_ANCHOR_REQUIRED',
-            'Automatic terminal placement requires an anchor region.'
+            'Automatic terminal placement requires canvas regions.'
           )
         }
 
@@ -43,11 +42,10 @@ export class CreateTerminalBlockUseCase {
           size: command.size
         })
 
-        if (!command.position && command.anchorRegion) {
+        if (!command.position && command.canvasRegions) {
           graph.arrangeTerminalLayout({
-            anchorRegion: command.anchorRegion,
             blockIds: [block.id],
-            reservedRegions: command.reservedRegions ?? []
+            canvasRegions: command.canvasRegions
           })
         }
 

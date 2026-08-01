@@ -140,6 +140,21 @@ export class ExecuteAgentToolUseCase {
         )
       case 'create_block':
         return this.createTerminalBlock(command, context, invocation.input)
+      case 'create_terminal_workflow': {
+        const result = await this.blockGraphTools.createTerminalWorkflow(context, {
+          ...invocation.input,
+          ...(await this.resolveWorkspaceLayout(command))
+        })
+        return completedGraphResult(command.toolCallId, result.graph, {
+          arrangedBlockIds: result.arrangedBlockIds,
+          arrangedTerminalGroupIds: result.arrangedTerminalGroupIds,
+          createdConnections: result.createdConnections,
+          createdTerminalGroupId: result.createdTerminalGroupId,
+          createdTerminals: result.createdTerminals,
+          plan: result.plan,
+          type: 'terminal_workflow_created'
+        })
+      }
       case 'update_block':
         return completedGraphResult(
           command.toolCallId,
@@ -237,8 +252,7 @@ export class ExecuteAgentToolUseCase {
   }
 
   private async resolveWorkspaceLayout(command: ExecuteAgentToolCommand): Promise<{
-    readonly anchorRegion: AgentCanvasLayoutRegion
-    readonly reservedRegions: readonly AgentCanvasLayoutRegion[]
+    readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
   }> {
     const agents =
       (await this.agentSessionRepository.findWorkspace(command.projectId, command.workspaceId)) ??
@@ -253,10 +267,7 @@ export class ExecuteAgentToolUseCase {
     }
 
     return {
-      anchorRegion: toCanvasLayoutRegion(activeAgent.layout),
-      reservedRegions: agents
-        .filter((agent) => agent.id !== activeAgent.id)
-        .map((agent) => toCanvasLayoutRegion(agent.layout))
+      canvasRegions: agents.map((agent) => toCanvasLayoutRegion(agent.layout))
     }
   }
 
@@ -339,7 +350,7 @@ function createApprovalSummary(invocation: ParsedAgentToolInvocation): string {
 function completedGraphResult(
   toolCallId: string,
   graph: AgentBlockGraphSnapshot,
-  output: Extract<AgentToolOutput, { readonly type: 'block_graph' }>,
+  output: Extract<AgentToolOutput, { readonly type: 'block_graph' | 'terminal_workflow_created' }>,
   graphChanged = true
 ): CompletedGraphToolResult {
   return { graph, graphChanged, output, status: 'completed', toolCallId }

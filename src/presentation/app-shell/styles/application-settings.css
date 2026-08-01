@@ -268,6 +268,42 @@
   accent-color: var(--cc-primary);
 }
 
+.terminal-settings-options--workflow-build {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terminal-settings-options--workflow-build label {
+  min-height: 76px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px;
+}
+
+.terminal-settings-option-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  text-align: left;
+}
+
+.terminal-settings-option-copy__title {
+  color: var(--cc-foreground);
+  line-height: 1.35;
+}
+
+.terminal-settings-option-copy__description {
+  color: var(--cc-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.terminal-settings-options--workflow-build
+  label:has(input:checked)
+  .terminal-settings-option-copy__title {
+  color: var(--cc-primary);
+}
+
 .shortcut-settings-pane__header {
   display: flex;
   align-items: flex-start;

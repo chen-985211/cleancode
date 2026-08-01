@@ -146,6 +146,35 @@ describe('terminal flow nodes for terminal groups', () => {
       }
     })
   })
+
+  it('projects build staging onto committed terminal and group nodes', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph({ isCollapsed: false }),
+      handlers: createHandlers(),
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      workflowBuildPresentation: {
+        enteringConnectionIds: new Set(),
+        enteringTerminalBlockIds: new Set(['backend-terminal']),
+        enteringTerminalGroupIds: new Set(),
+        operationId: 'operation-1',
+        pendingConnectionIds: new Set(),
+        pendingTerminalBlockIds: new Set(['frontend-terminal']),
+        pendingTerminalGroupIds: new Set(['development-group']),
+        terminalBlockIds: new Set(['backend-terminal', 'frontend-terminal'])
+      }
+    })
+
+    expect(nodes.find((node) => node.id === 'development-group')?.className).toBe(
+      'terminal-workflow-build-group--pending'
+    )
+    expect(nodes.find((node) => node.id === 'backend-terminal')?.className).toBe(
+      'terminal-workflow-build-node--entering'
+    )
+    expect(nodes.find((node) => node.id === 'frontend-terminal')?.className).toBe(
+      'terminal-workflow-build-node--pending'
+    )
+  })
 })
 
 function createGraph(input: {

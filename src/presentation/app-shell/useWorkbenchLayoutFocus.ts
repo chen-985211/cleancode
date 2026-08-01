@@ -3,12 +3,15 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
+import { prefersReducedMotion } from './workbenchFocusTransition'
+import { resolveNodeSize } from './resolveNodeSize'
 
 export interface WorkbenchLayoutFocusRequest {
   readonly operationId: string
   readonly affectedNodeIds: readonly string[]
   readonly expectedNodeLayouts: readonly WorkbenchExpectedNodeLayout[]
   readonly focusNodeIds: readonly string[]
+  readonly focusTarget: 'committed-layouts' | 'projected-nodes'
 }
 
 interface WorkbenchExpectedNodeLayout {
@@ -74,11 +77,22 @@ export function useWorkbenchLayoutFocus({
 
       handledOperationIdsRef.current.add(request.operationId)
       deferredOperationIdsRef.current.delete(request.operationId)
-      void reactFlowInstance.fitView({
-        duration: 220,
-        nodes: focusNodes as WorkbenchFlowNode[],
-        padding: 0.24
-      })
+      const duration = prefersReducedMotion() ? 0 : 220
+      const resolvedFocusNodes = focusNodes as WorkbenchFlowNode[]
+      const committedBounds =
+        request.focusTarget === 'committed-layouts'
+          ? resolveCommittedFocusBounds(resolvedFocusNodes, request.expectedNodeLayouts)
+          : null
+
+      if (committedBounds) {
+        void reactFlowInstance.fitBounds(committedBounds, { duration, padding: 0.24 })
+      } else {
+        void reactFlowInstance.fitView({
+          duration,
+          nodes: resolvedFocusNodes,
+          padding: 0.24
+        })
+      }
       onHandled(request.operationId)
     }
 
@@ -89,7 +103,8 @@ export function useWorkbenchLayoutFocus({
 
       if (
         !request.focusNodeIds.every((nodeId) => projectedNodesById.has(nodeId)) ||
-        (!deferredOperationIdsRef.current.has(request.operationId) &&
+        (request.focusTarget === 'projected-nodes' &&
+          !deferredOperationIdsRef.current.has(request.operationId) &&
           !request.expectedNodeLayouts.every((layout) =>
             hasExpectedLayout(projectedNodesById.get(layout.nodeId), layout)
           ))
@@ -110,6 +125,55 @@ export function useWorkbenchLayoutFocus({
       window.cancelAnimationFrame(animationFrame)
     }
   }, [nodeStore, onHandled, protectedNodeIds, reactFlowInstanceRef, request])
+}
+
+function resolveCommittedFocusBounds(
+  nodes: readonly WorkbenchFlowNode[],
+  expectedNodeLayouts: readonly WorkbenchExpectedNodeLayout[]
+): {
+  readonly height: number
+  readonly width: number
+  readonly x: number
+  readonly y: number
+} | null {
+  const expectedLayoutsByNodeId = new Map(
+    expectedNodeLayouts.map((layout) => [layout.nodeId, layout] as const)
+  )
+  const layouts = nodes.flatMap((node) => {
+    const expectedLayout = expectedLayoutsByNodeId.get(node.id)
+    return expectedLayout ? [expectedLayout] : resolveCurrentNodeLayout(node)
+  })
+  if (layouts.length === 0) return null
+
+  const left = Math.min(...layouts.map((layout) => layout.position.x))
+  const top = Math.min(...layouts.map((layout) => layout.position.y))
+  const right = Math.max(...layouts.map((layout) => layout.position.x + layout.size.width))
+  const bottom = Math.max(...layouts.map((layout) => layout.position.y + layout.size.height))
+
+  return { height: bottom - top, width: right - left, x: left, y: top }
+}
+
+function resolveCurrentNodeLayout(node: WorkbenchFlowNode): WorkbenchExpectedNodeLayout[] {
+  const persistedLayout =
+    node.type === 'terminal'
+      ? node.data.block
+      : node.type === 'terminalGroup'
+        ? node.data.group
+        : node.type === 'agentConsole'
+          ? node.data.agent.layout
+          : null
+  if (!persistedLayout) return []
+
+  return [
+    {
+      nodeId: node.id,
+      position: node.position,
+      size: {
+        height: resolveNodeSize(node.style?.height, persistedLayout.size.height),
+        width: resolveNodeSize(node.style?.width, persistedLayout.size.width)
+      }
+    }
+  ]
 }
 
 function hasExpectedLayout(

@@ -118,6 +118,20 @@ describe('workbench canvas drag isolation', () => {
 
     expect(onPaneClick).toHaveBeenCalledOnce()
   })
+
+  it('reports only user-originated viewport movement', () => {
+    const { agentNode, terminalNode } = createNodes()
+    const onViewportInteractionStart = vi.fn()
+
+    renderCanvas([agentNode, terminalNode], vi.fn(), vi.fn(), onViewportInteractionStart)
+
+    act(() => {
+      reactFlowProps.latest?.onMoveStart?.(null)
+      reactFlowProps.latest?.onMoveStart?.({} as MouseEvent)
+    })
+
+    expect(onViewportInteractionStart).toHaveBeenCalledOnce()
+  })
 })
 
 interface MockReactFlowProps {
@@ -126,13 +140,15 @@ interface MockReactFlowProps {
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onPaneClick?: () => void
+  readonly onMoveStart?: (event: MouseEvent | null) => void
   readonly selectionKeyCode?: string | null
 }
 
 function renderCanvas(
   nodes: WorkbenchFlowNode[],
   onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void,
-  onPaneClick = vi.fn()
+  onPaneClick = vi.fn(),
+  onViewportInteractionStart = vi.fn()
 ): void {
   const nodeStore = createWorkbenchNodeStore(nodes)
 
@@ -190,6 +206,7 @@ function renderCanvas(
       onNodeDragStart={vi.fn()}
       onNodeDragStop={vi.fn()}
       onViewportChange={vi.fn()}
+      onViewportInteractionStart={onViewportInteractionStart}
       onMinimapNodeClick={vi.fn()}
       onToggleMinimap={vi.fn()}
       getMiniMapNodeColor={() => '#fff'}

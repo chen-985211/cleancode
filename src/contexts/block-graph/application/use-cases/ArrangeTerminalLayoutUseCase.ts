@@ -4,10 +4,9 @@ import { BlockGraph } from '../../domain/aggregates/BlockGraph'
 import { executeDefaultGraphTransaction } from './executeDefaultGraphTransaction'
 
 export interface ArrangeTerminalLayoutCommand {
-  readonly anchorRegion: TerminalLayoutRegion
   readonly blockIds: readonly string[]
+  readonly canvasRegions: readonly TerminalLayoutRegion[]
   readonly projectDirectory: string
-  readonly reservedRegions: readonly TerminalLayoutRegion[]
   readonly workspaceId: string
 }
 
@@ -31,9 +30,8 @@ export class ArrangeTerminalLayoutUseCase {
       command,
       (graph) => {
         const layoutInput = {
-          anchorRegion: command.anchorRegion,
           blockIds: command.blockIds,
-          reservedRegions: command.reservedRegions
+          canvasRegions: command.canvasRegions
         }
         const currentGraph = graph.toSnapshot()
 

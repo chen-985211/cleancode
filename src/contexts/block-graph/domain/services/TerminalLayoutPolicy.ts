@@ -9,9 +9,15 @@ import type {
   TerminalGroupSnapshot
 } from '../aggregates/BlockGraphTypes'
 import { normalizeTerminalGroupBounds } from './TerminalGroupRules'
+import { resolveTerminalCanvasPlacement } from './TerminalCanvasPlacementPolicy'
 import { resolveStableTerminalLayoutUnitIds } from './TerminalLayoutUnitOrder'
-
-const terminalLayoutGap = 64
+import {
+  selectBalancedTerminalExecutionUnitPacking,
+  sumWithGap,
+  terminalLayoutGap,
+  type TerminalBlockLayout,
+  type TerminalExecutionUnitLayout
+} from './TerminalExecutionUnitPacking'
 
 export interface TerminalLayoutRegion {
   readonly position: BlockPositionSnapshot
@@ -19,14 +25,8 @@ export interface TerminalLayoutRegion {
 }
 
 export interface ArrangeTerminalLayoutInput {
-  readonly anchorRegion: TerminalLayoutRegion
   readonly blockIds: readonly string[]
-  readonly reservedRegions: readonly TerminalLayoutRegion[]
-}
-
-interface TerminalBlockLayout {
-  readonly blockId: string
-  readonly position: BlockPositionSnapshot
+  readonly canvasRegions: readonly TerminalLayoutRegion[]
 }
 
 export interface TerminalLayoutPlan {
@@ -68,8 +68,13 @@ export function createTerminalLayoutPlan(
     graph.connections ?? [],
     scopedBlockIds
   )
-  const layoutUnits = createLayoutUnits(scopedBlocks, scopedGroups)
-  const orderedLayoutUnits = resolveStableLayoutUnitOrder(stableBlocksByLayer, layoutUnits)
+  const layoutUnits = createLayoutUnits(
+    scopedBlocks,
+    scopedGroups,
+    graph.connections ?? [],
+    scopedBlockIds
+  )
+  const orderedLayoutUnits = resolveStableLayoutUnitOrder(layoutUnits)
   const unitRankByBlockId = createLayoutUnitRankByBlockId(orderedLayoutUnits)
   const blocksByLayer = stableBlocksByLayer.map((layer) =>
     [...layer].sort(
@@ -78,13 +83,33 @@ export function createTerminalLayoutPlan(
           requireUnitRank(unitRankByBlockId, right.id) || compareStableBlockOrder(left, right)
     )
   )
-  const baseLayouts = placeBlocksByLayer(blocksByLayer, input.anchorRegion)
-  const blockLayouts = placeLayoutUnits(
-    graph,
-    baseLayouts,
-    orderedLayoutUnits,
-    createObstacleRegions(graph, input, scopedBlockIds, scopedGroups)
+  const baseLayouts = placeTerminalExecutionUnits(
+    scopedBlocks,
+    graph.connections ?? [],
+    scopedBlockIds
   )
+  const internallySpacedLayouts = spaceLayoutUnits(graph, baseLayouts, orderedLayoutUnits)
+  const layoutRegion = mergePositionedRegions(
+    orderedLayoutUnits.map((unit) => createLayoutUnitRegion(graph, unit, internallySpacedLayouts))
+  )
+  const placement = resolveTerminalCanvasPlacement(
+    layoutRegion,
+    createObstacleRegions(graph, input, scopedBlockIds, scopedGroups),
+    terminalLayoutGap
+  )
+  const positionedLayouts = internallySpacedLayouts.map((layout) => ({
+    ...layout,
+    position: {
+      x: layout.position.x + placement.x,
+      y: layout.position.y + placement.y
+    }
+  }))
+  const positionedLayoutsByBlockId = new Map(
+    positionedLayouts.map((layout) => [layout.blockId, layout] as const)
+  )
+  const blockLayouts = blocksByLayer
+    .flat()
+    .map((block) => requireLayout(positionedLayoutsByBlockId, block.id))
   const currentBlocksById = new Map(graph.blocks.map((block) => [block.id, block]))
 
   return {
@@ -225,40 +250,126 @@ function compareStableBlockOrder(
   )
 }
 
-function placeBlocksByLayer(
-  blocksByLayer: readonly (readonly TerminalBlockSnapshot[])[],
-  anchorRegion: TerminalLayoutRegion
+function placeTerminalExecutionUnits(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[],
+  scopedBlockIds: ReadonlySet<string>
 ): TerminalBlockLayout[] {
-  const layouts: TerminalBlockLayout[] = []
-  let layerX = anchorRegion.position.x
-  const originY = anchorRegion.position.y + anchorRegion.size.height + terminalLayoutGap
+  const executionUnits = resolveWeaklyConnectedTerminalUnits(
+    blocks,
+    connections,
+    scopedBlockIds
+  ).map((unitBlocks) => createTerminalExecutionUnitLayout(unitBlocks, connections))
+  const packedUnits = selectBalancedTerminalExecutionUnitPacking(executionUnits)
 
-  for (const blocks of blocksByLayer) {
-    let blockY = originY
-
-    for (const block of blocks) {
-      layouts.push({ blockId: block.id, position: { x: layerX, y: blockY } })
-      blockY += block.size.height + terminalLayoutGap
-    }
-
-    const layerWidth = Math.max(...blocks.map((block) => block.size.width))
-    layerX += layerWidth + terminalLayoutGap
-  }
-
-  return layouts
+  return [...packedUnits.blockLayouts]
 }
 
-function placeLayoutUnits(
+function resolveWeaklyConnectedTerminalUnits(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[],
+  scopedBlockIds: ReadonlySet<string>
+): TerminalBlockSnapshot[][] {
+  const blocksById = new Map(blocks.map((block) => [block.id, block] as const))
+  const adjacentBlockIds = new Map(blocks.map((block) => [block.id, new Set<string>()] as const))
+
+  for (const connection of connections) {
+    if (
+      !scopedBlockIds.has(connection.sourceBlockId) ||
+      !scopedBlockIds.has(connection.targetBlockId)
+    ) {
+      continue
+    }
+    adjacentBlockIds.get(connection.sourceBlockId)?.add(connection.targetBlockId)
+    adjacentBlockIds.get(connection.targetBlockId)?.add(connection.sourceBlockId)
+  }
+
+  const visitedBlockIds = new Set<string>()
+  const units: TerminalBlockSnapshot[][] = []
+
+  const inputOrderByBlockId = new Map(blocks.map((block, index) => [block.id, index] as const))
+
+  for (const seed of blocks) {
+    if (visitedBlockIds.has(seed.id)) continue
+    const pendingBlockIds = [seed.id]
+    const unitBlocks: TerminalBlockSnapshot[] = []
+    visitedBlockIds.add(seed.id)
+
+    while (pendingBlockIds.length > 0) {
+      const blockId = pendingBlockIds.shift()!
+      const block = blocksById.get(blockId)
+      if (block) unitBlocks.push(block)
+
+      for (const adjacentBlockId of [...(adjacentBlockIds.get(blockId) ?? [])].sort(
+        (left, right) =>
+          requireBlockOrder(inputOrderByBlockId, left) -
+            requireBlockOrder(inputOrderByBlockId, right) || left.localeCompare(right)
+      )) {
+        if (visitedBlockIds.has(adjacentBlockId)) continue
+        visitedBlockIds.add(adjacentBlockId)
+        pendingBlockIds.push(adjacentBlockId)
+      }
+    }
+    units.push(unitBlocks.sort(compareStableBlockOrder))
+  }
+
+  return units
+}
+
+function createTerminalExecutionUnitLayout(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[]
+): TerminalExecutionUnitLayout {
+  const blockIds = new Set(blocks.map((block) => block.id))
+  const blocksByLayer = groupBlocksByDependencyLayer(blocks, connections, blockIds)
+  const layerWidths = blocksByLayer.map((layer) =>
+    Math.max(...layer.map((block) => block.size.width))
+  )
+  const layerHeights = blocksByLayer.map((layer) =>
+    sumWithGap(
+      layer.map((block) => block.size.height),
+      terminalLayoutGap
+    )
+  )
+  const height = Math.max(...layerHeights)
+  const blockLayouts: TerminalBlockLayout[] = []
+  let layerX = 0
+
+  for (const [layerIndex, layer] of blocksByLayer.entries()) {
+    let blockY = Math.round((height - layerHeights[layerIndex]!) / 2)
+
+    for (const block of layer) {
+      blockLayouts.push({ blockId: block.id, position: { x: layerX, y: blockY } })
+      blockY += block.size.height + terminalLayoutGap
+    }
+    layerX += layerWidths[layerIndex]! + terminalLayoutGap
+  }
+
+  return {
+    blockLayouts,
+    height,
+    width: sumWithGap(layerWidths, terminalLayoutGap)
+  }
+}
+
+function spaceLayoutUnits(
   graph: BlockGraphSnapshot,
   baseLayouts: readonly TerminalBlockLayout[],
-  units: readonly TerminalLayoutUnit[],
-  externalObstacles: readonly PositionedRegion[]
+  units: readonly TerminalLayoutUnit[]
 ): TerminalBlockLayout[] {
   const baseLayoutsByBlockId = new Map(
     baseLayouts.map((layout) => [layout.blockId, layout] as const)
   )
-  const occupiedRegions = [...externalObstacles]
-  const precedingUnitRegions: PositionedRegion[] = []
+  const occupiedRegions: PositionedRegion[] = []
   const positionedLayoutsByBlockId = new Map<string, TerminalBlockLayout>()
 
   for (const unit of units) {
@@ -266,11 +377,7 @@ function placeLayoutUnits(
       requireLayout(baseLayoutsByBlockId, blockId)
     )
     const baseUnitRegion = createLayoutUnitRegion(graph, unit, baseUnitLayouts)
-    const verticalOffset = resolveObstacleOffset(
-      [baseUnitRegion],
-      occupiedRegions,
-      resolvePrecedingUnitOffset(baseUnitRegion, precedingUnitRegions)
-    )
+    const verticalOffset = resolveObstacleOffset([baseUnitRegion], occupiedRegions)
     const positionedLayouts = baseUnitLayouts.map((layout) => ({
       ...layout,
       position: {
@@ -284,7 +391,6 @@ function placeLayoutUnits(
     }
     const positionedUnitRegion = createLayoutUnitRegion(graph, unit, positionedLayouts)
     occupiedRegions.push(positionedUnitRegion)
-    precedingUnitRegions.push(positionedUnitRegion)
   }
 
   return baseLayouts.map((layout) => requireLayout(positionedLayoutsByBlockId, layout.blockId))
@@ -292,9 +398,16 @@ function placeLayoutUnits(
 
 function createLayoutUnits(
   scopedBlocks: readonly TerminalBlockSnapshot[],
-  scopedGroups: readonly TerminalGroupSnapshot[]
+  scopedGroups: readonly TerminalGroupSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[],
+  scopedBlockIds: ReadonlySet<string>
 ): TerminalLayoutUnit[] {
   const groupedBlockIds = new Set(scopedGroups.flatMap((group) => [...group.memberBlockIds]))
+  const ungroupedBlocks = scopedBlocks.filter((block) => !groupedBlockIds.has(block.id))
+  const ungroupedBlockIds = new Set(ungroupedBlocks.map((block) => block.id))
 
   return [
     ...scopedGroups.map((group) => ({
@@ -302,28 +415,19 @@ function createLayoutUnits(
       group,
       id: `group:${group.id}`
     })),
-    ...scopedBlocks
-      .filter((block) => !groupedBlockIds.has(block.id))
-      .map((block) => ({ blockIds: [block.id], id: `block:${block.id}` }))
+    ...resolveWeaklyConnectedTerminalUnits(
+      ungroupedBlocks,
+      connections,
+      new Set([...scopedBlockIds].filter((blockId) => ungroupedBlockIds.has(blockId)))
+    ).map((blocks) => {
+      const blockIds = blocks.map((block) => block.id)
+
+      return {
+        blockIds,
+        id: `blocks:${[...blockIds].sort().join(',')}`
+      }
+    })
   ]
-}
-
-function resolveStableLayoutUnitOrder(
-  blocksByLayer: readonly (readonly TerminalBlockSnapshot[])[],
-  units: readonly TerminalLayoutUnit[]
-): TerminalLayoutUnit[] {
-  const unitById = new Map(units.map((unit) => [unit.id, unit] as const))
-  const unitIdByBlockId = new Map(
-    units.flatMap((unit) => unit.blockIds.map((blockId) => [blockId, unit.id] as const))
-  )
-  const orderedUnitIds = resolveStableTerminalLayoutUnitIds(
-    [...unitById.keys()],
-    blocksByLayer.map((layer) =>
-      layer.map((block) => requireLayoutUnitId(unitIdByBlockId, block.id))
-    )
-  )
-
-  return orderedUnitIds.map((unitId) => requireLayoutUnit(unitById, unitId))
 }
 
 function createLayoutUnitRankByBlockId(
@@ -334,17 +438,12 @@ function createLayoutUnitRankByBlockId(
   )
 }
 
-function requireLayoutUnitId(
-  unitIdByBlockId: ReadonlyMap<string, string>,
-  blockId: string
-): string {
-  const unitId = unitIdByBlockId.get(blockId)
+function resolveStableLayoutUnitOrder(units: readonly TerminalLayoutUnit[]): TerminalLayoutUnit[] {
+  const unitsById = new Map(units.map((unit) => [unit.id, unit] as const))
+  const stableUnitIds = [...unitsById.keys()]
+  const orderedUnitIds = resolveStableTerminalLayoutUnitIds(stableUnitIds, [stableUnitIds])
 
-  if (!unitId) {
-    throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
-  }
-
-  return unitId
+  return orderedUnitIds.map((unitId) => requireLayoutUnit(unitsById, unitId))
 }
 
 function requireLayoutUnit(
@@ -370,6 +469,18 @@ function requireUnitRank(unitRankByBlockId: ReadonlyMap<string, number>, blockId
   return rank
 }
 
+function requireBlockOrder(orderByBlockId: ReadonlyMap<string, number>, blockId: string): number {
+  const order = orderByBlockId.get(blockId)
+
+  if (order === undefined) {
+    throw createUnexpectedAppError('Terminal execution unit ordering is inconsistent.', {
+      blockId
+    })
+  }
+
+  return order
+}
+
 function createLayoutUnitRegion(
   graph: BlockGraphSnapshot,
   unit: TerminalLayoutUnit,
@@ -390,7 +501,24 @@ function createLayoutUnitRegion(
 
   return unit.group
     ? toPositionedRegion(normalizeTerminalGroupBounds(unit.group, blocks))
-    : toPositionedRegion(blocks[0])
+    : mergePositionedRegions(blocks.map(toPositionedRegion))
+}
+
+function mergePositionedRegions(regions: readonly PositionedRegion[]): PositionedRegion {
+  return regions.reduce(
+    (bounds, region) => ({
+      bottom: Math.max(bounds.bottom, region.bottom),
+      left: Math.min(bounds.left, region.left),
+      right: Math.max(bounds.right, region.right),
+      top: Math.min(bounds.top, region.top)
+    }),
+    {
+      bottom: Number.NEGATIVE_INFINITY,
+      left: Number.POSITIVE_INFINITY,
+      right: Number.NEGATIVE_INFINITY,
+      top: Number.POSITIVE_INFINITY
+    }
+  )
 }
 
 function requireLayout(
@@ -413,12 +541,17 @@ function createObstacleRegions(
   scopedGroups: readonly TerminalGroupSnapshot[]
 ): PositionedRegion[] {
   const scopedGroupIds = new Set(scopedGroups.map((group) => group.id))
+  const obstacleGroups = graph.terminalGroups.filter((group) => !scopedGroupIds.has(group.id))
+  const groupedObstacleBlockIds = new Set(
+    obstacleGroups.flatMap((group) => [...group.memberBlockIds])
+  )
 
   return [
-    toPositionedRegion(input.anchorRegion),
-    ...input.reservedRegions.map(toPositionedRegion),
-    ...graph.blocks.filter((block) => !scopedBlockIds.has(block.id)).map(toPositionedRegion),
-    ...graph.terminalGroups.filter((group) => !scopedGroupIds.has(group.id)).map(toPositionedRegion)
+    ...input.canvasRegions.map(toPositionedRegion),
+    ...graph.blocks
+      .filter((block) => !scopedBlockIds.has(block.id) && !groupedObstacleBlockIds.has(block.id))
+      .map(toPositionedRegion),
+    ...obstacleGroups.map(toPositionedRegion)
   ]
 }
 
@@ -450,19 +583,6 @@ function resolveObstacleOffset(
   }
 
   return offset
-}
-
-function resolvePrecedingUnitOffset(
-  movingRegion: PositionedRegion,
-  precedingUnitRegions: readonly PositionedRegion[]
-): number {
-  return precedingUnitRegions.reduce(
-    (minimumOffset, precedingRegion) =>
-      horizontallyOverlapsWithGap(movingRegion, precedingRegion)
-        ? Math.max(minimumOffset, precedingRegion.bottom + terminalLayoutGap - movingRegion.top)
-        : minimumOffset,
-    0
-  )
 }
 
 function horizontallyOverlapsWithGap(left: PositionedRegion, right: PositionedRegion): boolean {

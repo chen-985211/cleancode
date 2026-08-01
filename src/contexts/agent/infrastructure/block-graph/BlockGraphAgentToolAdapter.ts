@@ -9,6 +9,10 @@ import type {
   TerminalExecutionConfigSnapshot
 } from '../../../block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkflowPlanSnapshot } from '../../../block-graph/application/dto/TerminalWorkflowPlanSnapshot'
+import type {
+  CreateTerminalWorkflowCommand,
+  CreateTerminalWorkflowResult
+} from '../../../block-graph/application/use-cases/CreateTerminalWorkflowUseCase'
 import type { AgentBlockGraphSnapshot } from '../../application/dto/AgentBlockGraphProtocol'
 import type {
   AgentArrangeTerminalLayoutInput,
@@ -17,6 +21,8 @@ import type {
   AgentConnectTerminalBlocksInput,
   AgentConnectTerminalBlocksResult,
   AgentCreateTerminalBlockInput,
+  AgentCreateTerminalWorkflowInput,
+  AgentCreateTerminalWorkflowResult,
   AgentDisconnectTerminalBlocksInput,
   AgentInspectTerminalWorkflowPlanInput,
   AgentUpdateTerminalExecutionConfigInput
@@ -50,16 +56,18 @@ export interface BlockGraphAgentToolAdapterInput {
     command: AgentToolContext & AgentConnectTerminalBlocksInput
   ) => Promise<BlockGraphSnapshot>
   readonly createTerminalBlock: (command: {
-    readonly anchorRegion?: AgentCreateTerminalBlockInput['anchorRegion']
+    readonly canvasRegions?: AgentCreateTerminalBlockInput['canvasRegions']
     readonly description: string
     readonly launchCommand?: string
     readonly name: string
     readonly position?: BlockPositionSnapshot
     readonly projectDirectory: string
-    readonly reservedRegions?: AgentCreateTerminalBlockInput['reservedRegions']
     readonly size?: TerminalBlockSizeSnapshot
     readonly workspaceId: string
   }) => Promise<BlockGraphSnapshot>
+  readonly createTerminalWorkflow: (
+    command: CreateTerminalWorkflowCommand
+  ) => Promise<CreateTerminalWorkflowResult>
   readonly createTerminalGroup: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
@@ -152,15 +160,55 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     return toAgentBlockGraphSnapshot(
       await this.tools.createTerminalBlock({
         ...context,
-        ...(input.anchorRegion ? { anchorRegion: input.anchorRegion } : {}),
+        ...(input.canvasRegions ? { canvasRegions: input.canvasRegions } : {}),
         description: input.description ?? '',
         ...(input.launchCommand !== undefined ? { launchCommand: input.launchCommand } : {}),
         name: input.name,
         ...(input.position ? { position: input.position } : {}),
-        ...(input.reservedRegions ? { reservedRegions: input.reservedRegions } : {}),
         ...(input.size ? { size: input.size } : {})
       })
     )
+  }
+
+  async createTerminalWorkflow(
+    context: AgentToolContext,
+    input: AgentCreateTerminalWorkflowInput
+  ): Promise<AgentCreateTerminalWorkflowResult> {
+    const result = await this.tools.createTerminalWorkflow({
+      ...context,
+      canvasRegions: input.canvasRegions,
+      connections: input.connections.map((connection) => ({ ...connection })),
+      ...(input.terminalGroup
+        ? {
+            terminalGroup: {
+              memberRefs: [...input.terminalGroup.memberRefs],
+              name: input.terminalGroup.name
+            }
+          }
+        : {}),
+      terminals: input.terminals.map((terminal) => ({
+        description: terminal.description ?? '',
+        ...(terminal.executionConfig
+          ? {
+              executionConfig: toBlockGraphTerminalExecutionConfig(terminal.executionConfig)
+            }
+          : {}),
+        launchCommand: terminal.launchCommand,
+        name: terminal.name,
+        ref: terminal.ref,
+        ...(terminal.size ? { size: terminal.size } : {})
+      }))
+    })
+
+    return {
+      arrangedBlockIds: [...result.arrangedBlockIds],
+      arrangedTerminalGroupIds: [...result.arrangedTerminalGroupIds],
+      createdConnections: result.createdConnections.map((connection) => ({ ...connection })),
+      createdTerminalGroupId: result.createdTerminalGroupId,
+      createdTerminals: result.createdTerminals.map((terminal) => ({ ...terminal })),
+      graph: toAgentBlockGraphSnapshot(result.graph),
+      plan: toAgentTerminalWorkflowPlan(result.plan)
+    }
   }
 
   async updateTerminalBlock(

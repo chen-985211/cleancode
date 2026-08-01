@@ -35,6 +35,7 @@ import { BuildTerminalWorkflowPlanUseCase } from '../../contexts/block-graph/app
 import { ConnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
+import { CreateTerminalWorkflowUseCase } from '../../contexts/block-graph/application/use-cases/CreateTerminalWorkflowUseCase'
 import { ClearQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/ClearQuickExecutionSlotUseCase'
 import { ReorderQuickExecutionSlotsUseCase } from '../../contexts/block-graph/application/use-cases/ReorderQuickExecutionSlotsUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
@@ -145,6 +146,7 @@ const getDefaultGraphUseCase = new GetDefaultGraphUseCase(graphRepository)
 const arrangeTerminalLayoutUseCase = new ArrangeTerminalLayoutUseCase(graphRepository)
 const createTerminalBlockUseCase = new CreateTerminalBlockUseCase(graphRepository)
 const createTerminalGroupUseCase = new CreateTerminalGroupUseCase(graphRepository)
+const createTerminalWorkflowUseCase = new CreateTerminalWorkflowUseCase(graphRepository)
 const addQuickExecutionTargetUseCase = new AddQuickExecutionTargetUseCase(graphRepository)
 const bindQuickExecutionSlotUseCase = new BindQuickExecutionSlotUseCase(graphRepository)
 const clearQuickExecutionSlotUseCase = new ClearQuickExecutionSlotUseCase(graphRepository)
@@ -259,6 +261,7 @@ const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),
   createTerminalBlock: (command) => createTerminalBlockUseCase.execute(command),
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
+  createTerminalWorkflow: (command) => createTerminalWorkflowUseCase.execute(command),
   deleteBlock: (command) => deleteBlockUseCase.execute(command),
   dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
   disconnectTerminalBlocks: (command) => disconnectTerminalBlocksUseCase.execute(command),
