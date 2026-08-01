@@ -6,6 +6,7 @@ type RunLifecycleContract = Pick<
   RunLifecycleService,
   | 'hardDisposeProject'
   | 'hardDisposeTerminal'
+  | 'hardDisposeTerminals'
   | 'hardDisposeWorkspace'
   | 'hardDisposeWorkspaces'
   | 'isWorkspaceQuarantined'
@@ -19,7 +20,7 @@ export function createRunLifecycleAdapters(service: RunLifecycleContract): {
   return {
     terminalRuns: {
       acquireTerminalDeletion: async (scope) => {
-        const lease = await service.hardDisposeTerminal(scope)
+        const lease = await service.hardDisposeTerminals(scope)
 
         return {
           hardDispose: async () => undefined,

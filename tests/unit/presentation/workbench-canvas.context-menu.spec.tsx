@@ -3,6 +3,7 @@ import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
 import type {
+  BatchTerminalRemovalTargetSnapshot,
   BlockGraphSnapshot,
   QuickExecutionTargetSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -87,6 +88,50 @@ describe('workbench canvas object context menu', () => {
       terminalBlockId: 'standalone'
     })
     expect(screen.queryByRole('dialog', { name: '选择快捷位' })).not.toBeInTheDocument()
+  })
+
+  it('removes a complete workflow directly from the same neutral context menu surface', () => {
+    const onDeleteTerminalScope = vi.fn(async () => undefined)
+    renderCanvas({ onDeleteTerminalScope })
+
+    openNodeContextMenu('workflow-b')
+    const removeItem = screen.getByRole('menuitem', { name: '移除流程' })
+
+    expect(removeItem).toHaveClass('canvas-object-context-menu__item')
+    expect(removeItem).not.toHaveClass('canvas-object-context-menu__item--danger')
+    fireEvent.click(removeItem)
+
+    expect(onDeleteTerminalScope).toHaveBeenCalledWith({
+      type: 'workflow',
+      terminalBlockIds: ['workflow-a', 'workflow-b', 'workflow-c']
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('removes a combination with the exact members shown by the context selection', () => {
+    const onDeleteTerminalScope = vi.fn(async () => undefined)
+    renderCanvas({ onDeleteTerminalScope })
+    const groupHeader = document.createElement('div')
+    groupHeader.className = 'terminal-group-node__header'
+
+    openNodeContextMenu('combination', groupHeader)
+    fireEvent.click(screen.getByRole('menuitem', { name: '移除组合' }))
+
+    expect(onDeleteTerminalScope).toHaveBeenCalledWith({
+      type: 'combination',
+      terminalGroupId: 'combination',
+      terminalBlockIds: ['combination-a', 'combination-b']
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('does not add a batch removal action for an independent terminal', () => {
+    renderCanvas({ onDeleteTerminalScope: vi.fn() })
+
+    openNodeContextMenu('standalone')
+
+    expect(screen.queryByRole('menuitem', { name: /移除/ })).not.toBeInTheDocument()
   })
 
   it('fits a bound quick target into view without starting any workflow action', () => {
@@ -291,6 +336,7 @@ function renderCanvas({
   onNodeClick = vi.fn(),
   onPaneClick = vi.fn(),
   onRequestSaveBlockTemplate = vi.fn(),
+  onDeleteTerminalScope,
   onAddQuickExecutionTarget,
   onNodeDragStop = vi.fn(),
   onQuickExecutionNodeDrop,
@@ -301,6 +347,9 @@ function renderCanvas({
   readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
   readonly onPaneClick?: () => void
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
+  readonly onDeleteTerminalScope?: (
+    target: BatchTerminalRemovalTargetSnapshot
+  ) => Promise<void> | void
   readonly onAddQuickExecutionTarget?: (target: QuickExecutionTargetSnapshot) => void
   readonly onNodeDragStop?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onQuickExecutionNodeDrop?: (
@@ -387,6 +436,7 @@ function renderCanvas({
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
       terminalWorkflow={terminalWorkflow ?? createTerminalWorkflow(graph)}
       onRequestSaveBlockTemplate={onRequestSaveBlockTemplate}
+      onDeleteTerminalScope={onDeleteTerminalScope}
       onAddQuickExecutionTarget={onAddQuickExecutionTarget}
       onBindQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}
       onClearQuickExecutionSlot={onAddQuickExecutionTarget ? vi.fn() : undefined}

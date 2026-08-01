@@ -2,7 +2,7 @@ interface TerminalRunLifecycleScope {
   readonly projectId: string
   readonly projectDirectory: string
   readonly workspaceId: string
-  readonly blockId: string
+  readonly blockIds: readonly string[]
 }
 
 export interface TerminalRunLifecycleLease {

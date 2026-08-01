@@ -90,7 +90,7 @@ function createFixture(input: { readonly hardDisposeError?: Error } = {}) {
   const lifecycle: TerminalRunLifecyclePort = {
     acquireTerminalDeletion: async (scope) => {
       calls.push(
-        `run:acquire:${scope.projectId}:${scope.projectDirectory}:${scope.workspaceId}:${scope.blockId}`
+        `run:acquire:${scope.projectId}:${scope.projectDirectory}:${scope.workspaceId}:${scope.blockIds.join(',')}`
       )
       return createLease(calls, input.hardDisposeError)
     }

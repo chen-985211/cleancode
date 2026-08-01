@@ -103,6 +103,8 @@ const cleancodeApi = {
   moveTerminalGroup: (command: unknown) =>
     invokeCleancode('cleancode:move-terminal-group', command),
   deleteBlock: (command: unknown) => invokeCleancode('cleancode:delete-block', command),
+  deleteTerminalScope: (command: unknown) =>
+    invokeCleancode('cleancode:delete-terminal-scope', command),
   listBlockTemplates: (command: unknown) =>
     invokeCleancode('cleancode:list-block-templates', command),
   saveBlockTemplate: (command: unknown) =>

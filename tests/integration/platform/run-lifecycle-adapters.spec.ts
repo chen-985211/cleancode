@@ -10,6 +10,7 @@ describe('Run lifecycle platform adapters', () => {
       hardDisposeWorkspaces: vi.fn(async () => workspacesLease),
       hardDisposeProject: vi.fn(async () => projectLease),
       hardDisposeTerminal: vi.fn(),
+      hardDisposeTerminals: vi.fn(),
       isWorkspaceQuarantined: vi.fn(() => true),
       resolveProjectQuarantines: vi.fn()
     }
@@ -49,13 +50,14 @@ describe('Run lifecycle platform adapters', () => {
     expect(service.resolveProjectQuarantines).toHaveBeenCalledWith('/work/app')
   })
 
-  it('hard-disposes a terminal while acquiring the BlockGraph deletion lease', async () => {
+  it('hard-disposes an exact terminal set while acquiring one BlockGraph deletion lease', async () => {
     const runLease = createLease()
     const service = {
       hardDisposeWorkspace: vi.fn(),
       hardDisposeWorkspaces: vi.fn(),
       hardDisposeProject: vi.fn(),
-      hardDisposeTerminal: vi.fn(async () => runLease),
+      hardDisposeTerminal: vi.fn(),
+      hardDisposeTerminals: vi.fn(async () => runLease),
       isWorkspaceQuarantined: vi.fn(() => false),
       resolveProjectQuarantines: vi.fn()
     }
@@ -65,19 +67,19 @@ describe('Run lifecycle platform adapters', () => {
       projectId: 'project-1',
       projectDirectory: '/work/app',
       workspaceId: 'main',
-      blockId: 'terminal-1'
+      blockIds: ['terminal-1', 'terminal-2']
     })
     await lease.hardDispose()
     lease.release()
     lease.resolve()
     lease.quarantine()
 
-    expect(service.hardDisposeTerminal).toHaveBeenCalledTimes(1)
-    expect(service.hardDisposeTerminal).toHaveBeenCalledWith({
+    expect(service.hardDisposeTerminals).toHaveBeenCalledTimes(1)
+    expect(service.hardDisposeTerminals).toHaveBeenCalledWith({
       projectId: 'project-1',
       projectDirectory: '/work/app',
       workspaceId: 'main',
-      blockId: 'terminal-1'
+      blockIds: ['terminal-1', 'terminal-2']
     })
     expect(runLease.release).toHaveBeenCalledTimes(1)
     expect(runLease.resolve).toHaveBeenCalledTimes(1)

@@ -16,6 +16,7 @@ import {
   type TerminalBlockSnapshot,
   type TerminalConnectionSnapshot,
   type TerminalGroupSnapshot,
+  type TerminalRemovalTargetSnapshot,
   type UpdateTerminalBlockMetadataInput,
   type UpdateTerminalDefinitionInput,
   type UpdateTerminalExecutionConfigInput,
@@ -66,6 +67,7 @@ import {
   requireQuickExecutionSlotNumber,
   restoreQuickExecutionSlots
 } from '../services/QuickExecutionSlotRules'
+import { resolveTerminalRemovalBlockIds } from '../services/TerminalRemovalRules'
 
 export type * from './BlockGraphTypes'
 
@@ -348,15 +350,33 @@ export class BlockGraph {
   }
 
   deleteBlock(blockId: string): void {
-    this.requireTerminalBlock(blockId)
-    this.blockSnapshots = this.blockSnapshots.filter((block) => block.id !== blockId)
+    this.deleteBlocks([blockId])
+  }
+
+  resolveTerminalRemovalBlockIds(target: TerminalRemovalTargetSnapshot): readonly string[] {
+    return resolveTerminalRemovalBlockIds(
+      target,
+      this.blockSnapshots,
+      this.terminalConnectionSnapshots,
+      this.terminalGroupSnapshots
+    )
+  }
+
+  deleteBlocks(blockIds: readonly string[]): void {
+    const deletedBlockIds = new Set(blockIds)
+    for (const blockId of deletedBlockIds) this.requireTerminalBlock(blockId)
+    this.blockSnapshots = this.blockSnapshots.filter((block) => !deletedBlockIds.has(block.id))
     this.terminalConnectionSnapshots = this.terminalConnectionSnapshots.filter(
-      (connection) => connection.sourceBlockId !== blockId && connection.targetBlockId !== blockId
+      (connection) =>
+        !deletedBlockIds.has(connection.sourceBlockId) &&
+        !deletedBlockIds.has(connection.targetBlockId)
     )
     this.terminalGroupSnapshots = this.terminalGroupSnapshots
       .map((group) => ({
         ...group,
-        memberBlockIds: group.memberBlockIds.filter((memberBlockId) => memberBlockId !== blockId)
+        memberBlockIds: group.memberBlockIds.filter(
+          (memberBlockId) => !deletedBlockIds.has(memberBlockId)
+        )
       }))
       .filter((group) =>
         isValidTerminalGroupMembership(

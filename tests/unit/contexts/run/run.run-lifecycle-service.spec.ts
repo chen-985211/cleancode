@@ -250,6 +250,40 @@ describe('run lifecycle service', () => {
     lease.resolve()
   })
 
+  it('hard-disposes an exact terminal set behind one shared BlockGraph deletion gate', async () => {
+    const lifecycle = new RunLifecycleService()
+    const apiDispose = vi.fn(async () => undefined)
+    const webDispose = vi.fn(async () => undefined)
+    const workerDispose = vi.fn(async () => undefined)
+    const apiOwner = runOwner('api')
+    const webOwner = runOwner('web')
+    const workerOwner = runOwner('worker')
+    lifecycle.track(apiOwner, apiDispose)
+    lifecycle.track(webOwner, webDispose)
+    lifecycle.track(workerOwner, workerDispose)
+
+    const lease = await lifecycle.hardDisposeTerminals({
+      projectId: 'project-1',
+      projectDirectory: '/project',
+      workspaceId: 'main',
+      blockIds: ['api', 'web', 'api']
+    })
+
+    expect(apiDispose).toHaveBeenCalledOnce()
+    expect(webDispose).toHaveBeenCalledOnce()
+    expect(workerDispose).not.toHaveBeenCalled()
+    await expect(lifecycle.runStart(apiOwner, async () => undefined)).rejects.toMatchObject({
+      code: 'RUN_START_BLOCKED'
+    })
+    await expect(lifecycle.runStart(webOwner, async () => undefined)).rejects.toMatchObject({
+      code: 'RUN_START_BLOCKED'
+    })
+    await expect(lifecycle.runStart(workerOwner, async () => 'worker')).resolves.toBe('worker')
+
+    lease.resolve()
+    await expect(lifecycle.runStart(apiOwner, async () => 'api')).resolves.toBe('api')
+  })
+
   it('closes the global start gate before application shutdown cleanup', async () => {
     const lifecycle = new RunLifecycleService()
     const dispose = vi.fn(async () => undefined)

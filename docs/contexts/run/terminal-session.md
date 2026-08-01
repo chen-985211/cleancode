@@ -59,7 +59,7 @@ idle -> running -> stopping -> exited
 - 输出、退出、视图、快照和服务端点事件必须同时匹配当前槽位的完整运行身份；旧运行的迟到回调不能覆盖新会话。
 - 每次启动在取得 PTY 前通过 `RunRuntimeScopeValidationPort` 校验 Project 的权威项目、`workspaceId` 与目录，并受 `RunLifecycleService` 启动闸门保护；分支不参与稳定身份校验。
 - 应用退出时先关闭新启动准入并等待在途启动；Agent 与工作流上下文只排空自己的在途操作，并在 Provider handoff 后释放本地引用，不逐会话发起 PTY stop。Agent 可以在 handoff 前按自身 contribution 的有界协议向当前前台任务写入正常退出输入并等待 launch 退出，以便对应 CLI 发布最终结构化事实；该动作不停止 shell/PTY，也不改变 Run 的所有权。Run application 只向独立 Terminal Provider 提交一次应用级 detach，Run/Terminal Provider 是该流程唯一的 PTY shutdown authority。Terminal Provider 终止全部 Agent、工作流和默认策略会话；只有可靠 checkpoint 的明确保留普通会话从应用 detach。应用断连或 Electron 停止等待不等于 Provider shutdown。
-- 显式关闭、replacement、删除积木、归档/移除物理工作区、目录重绑定和移除项目始终是硬清理：终止精确 PTY、撤销恢复资格并删除 checkpoint，覆盖退出保留策略。分支 checkout 不是硬清理条件。
+- 显式关闭、replacement、删除积木、归档/移除物理工作区、目录重绑定和移除项目始终是硬清理：终止精确 PTY、撤销恢复资格并删除 checkpoint，覆盖退出保留策略。删除完整流程或终端组合时，Run lifecycle 在同一个项目串行边界内为精确终端集合建立一个租约并清理全部匹配 owner，不能要求调用方逐终端持有嵌套租约。分支 checkout 不是硬清理条件。
 
 Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层已经接受的会话，并只按完整运行身份收敛状态。应用完整重开时，Run 先完成 Provider 对账再允许终端节点自动启动，避免新 shell 抢占 warm/historical identity。退出事件先于启动响应抵达时，表现层先用事件中的项目、工作区、终端和运行身份建立 `exited` 投影；同一运行迟到的 `running` 启动响应不得把它降级。已经保留但不再运行的 session 收到迟到 `write`、Ctrl+C 或 resize 时，应用层不再访问 PTY，而是幂等返回当前权威快照；这些交互动作指向未知 session 时仍返回 `TERMINAL_SESSION_NOT_FOUND`。终止动作表达“确保该 session 不再存在”，因此未知 session 视为已经完成并返回空结果，不能阻断随后启动新会话。
 

@@ -1,6 +1,12 @@
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 
-import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  BatchTerminalRemovalTargetSnapshot,
+  TerminalBlockSnapshot
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type { AppNotificationController } from './appNotifications'
+import { resolveUserFacingErrorMessage } from './appErrorMessages'
+import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseAppShellBlockActionsInput {
@@ -10,6 +16,7 @@ interface UseAppShellBlockActionsInput {
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly defaultGroupName: string
   readonly firstGroupName: string
+  readonly notifications: AppNotificationController
   readonly selectedUngroupedTerminalBlockIds: readonly string[]
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
   readonly setSelectedTerminalGroupId: (groupId: string | null) => void
@@ -23,11 +30,14 @@ export function useAppShellBlockActions({
   currentWorkspace,
   defaultGroupName,
   firstGroupName,
+  notifications,
   selectedUngroupedTerminalBlockIds,
   setCurrentGraph,
   setSelectedTerminalGroupId,
   terminateTerminalSession
 }: UseAppShellBlockActionsInput) {
+  const { t } = useI18n()
+  const deletingWorkspaceScopesRef = useRef(new Set<string>())
   const createTerminalGroup = useCallback(async () => {
     if (!currentWorkbench || !currentWorkspace || !canCreateTerminalGroup) return
 
@@ -74,5 +84,39 @@ export function useAppShellBlockActions({
     [currentWorkbench, currentWorkspace, setCurrentGraph, terminateTerminalSession]
   )
 
-  return { createTerminalGroup, deleteTerminalBlock }
+  const deleteTerminalScope = useCallback(
+    async (target: BatchTerminalRemovalTargetSnapshot): Promise<void> => {
+      if (!currentWorkbench || !currentWorkspace) return
+      const scopeKey = `${currentWorkbench.project.id}\0${currentWorkspace.workspaceId}`
+      if (deletingWorkspaceScopesRef.current.has(scopeKey)) return
+
+      deletingWorkspaceScopesRef.current.add(scopeKey)
+      const notificationId = notifications.notify({
+        isActivity: true,
+        kind: 'info',
+        title: t(`canvas.remove.pending.${target.type}`)
+      })
+      try {
+        const graphSnapshot = await window.cleancode?.deleteTerminalScope({
+          projectDirectory: currentWorkbench.project.directory,
+          target,
+          workspaceId: currentWorkspace.workspaceId
+        })
+        if (graphSnapshot) setCurrentGraph(graphSnapshot)
+        notifications.dismiss(notificationId)
+      } catch (error) {
+        const failure = {
+          kind: 'error' as const,
+          message: resolveUserFacingErrorMessage(error, 'canvas.remove.failed', t),
+          title: t('canvas.remove.failedTitle')
+        }
+        if (!notifications.update(notificationId, failure)) notifications.notify(failure)
+      } finally {
+        deletingWorkspaceScopesRef.current.delete(scopeKey)
+      }
+    },
+    [currentWorkbench, currentWorkspace, notifications, setCurrentGraph, t]
+  )
+
+  return { createTerminalGroup, deleteTerminalBlock, deleteTerminalScope }
 }
