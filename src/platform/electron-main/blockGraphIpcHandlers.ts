@@ -9,6 +9,10 @@ import { createExpectedAppError } from '../../shared-kernel/application/errors/A
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
+import {
+  readDeleteTerminalScopeCommand,
+  type DeleteTerminalScopeIpcCommand
+} from './blockGraphDeleteTerminalScopeIpcCommand'
 
 interface TerminalDefinitionIpcCommand {
   readonly projectDirectory: string
@@ -166,6 +170,9 @@ export interface BlockGraphIpcHandlersInput {
     readonly workspaceId: string
     readonly blockId: string
   }) => Promise<BlockGraphSnapshot>
+  readonly deleteTerminalScope: (
+    command: DeleteTerminalScopeIpcCommand
+  ) => Promise<BlockGraphSnapshot>
 }
 
 export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput): void {
@@ -491,6 +498,16 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'deleteBlock',
+    scope: 'block-graph',
+    successLogLevel: 'info'
+  })
+
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:delete-terminal-scope',
+    handler: (command) => input.deleteTerminalScope(readDeleteTerminalScopeCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'deleteTerminalScope',
     scope: 'block-graph',
     successLogLevel: 'info'
   })

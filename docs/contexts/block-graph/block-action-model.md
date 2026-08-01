@@ -50,12 +50,14 @@
 | 从此处运行流程   | 运行依赖子图     | 当前终端及其后代       | terminal       |
 | 编辑终端信息     | 编辑配置         | 单个终端积木           | terminal       |
 | 删除终端         | 修改图结构       | 单个终端积木           | terminal       |
+| 移除流程         | 批量修改图结构   | 右键命中的完整流程     | workflow       |
 | 停止本次运行     | 停止依赖图       | 当前工作区活动工作流   | workflow run   |
 | 启动组合命令     | 运行组合执行计划 | 组合内全部终端成员     | terminal group |
 | 停止全部当前命令 | 批量停止当前执行 | 组合内全部终端成员     | terminal group |
 | 重开组合终端会话 | 批量重建运行环境 | 组合内全部终端成员     | terminal group |
 | 编辑组合         | 编辑组合元数据   | 一个终端组合           | terminal group |
 | 解散组合         | 修改图结构       | 组合本身，保留成员终端 | terminal group |
+| 移除组合         | 批量修改图结构   | 组合及其全部成员终端   | terminal group |
 | 收藏终端         | 保存可复用快照   | 右键命中的独立终端     | terminal       |
 | 收藏流程         | 保存可复用快照   | 右键终端所在完整流程   | workflow       |
 | 收藏组合         | 保存可复用快照   | 右键命中的组合全部成员 | terminal group |
@@ -71,6 +73,8 @@
 
 “停止当前命令”只向一个终端的当前 PTY 发送 Ctrl+C；“停止本次运行”则停止当前工作区的整个活动 `WorkflowRun`，包括尚未开始和已经运行/就绪的节点，不影响同画布的无关命令、其他工作区或其他项目。两者不得复用同一个作用范围。
 
+“移除流程”只接受右键命中时由共享画布语义契约解析出的完整流程；“移除组合”只接受组合身份及当时的精确成员集合。BlockGraph 在提交前必须重新解析权威图并要求作用域仍完全一致，陈旧或部分作用域整体拒绝，不能删除仍然匹配的子集。两项动作都在一个图事务中删除全部目标终端、关联连接和相关组合关系，并通过同一个批量生命周期租约硬清理精确 Run 作用域；不得在表现层逐终端调用删除入口。
+
 ## 类型化终端组合
 
 `TerminalGroup` 只允许终端成员，是类型化批量操作对象，不是任意视觉分组，也不是工作流节点。
@@ -82,6 +86,7 @@
 3. 在文案中明确“组合”或“全部”，避免误认为只影响当前节点。
 4. 不沿工作流连接扩散到组合之外的终端。
 5. 解散时只删除组合，保留终端及其连接。
+6. 移除组合时删除组合及其全部成员终端；该动作与“解散组合”的作用结果不得混淆。
 
 创建组合、加入或移出成员是第 4 条的前置结构动作例外：动作命中的任意终端必须通过共享契约扩展为当时依赖图中的完整弱连通流程，再以完整流程为单位调整成员。提交结果必须至少包含两个顶层执行单元；单个终端或单条流程无论入口为何都不能形成组合。该扩展不改变普通单击、编辑终端或其他单终端动作的作用对象；组合启动仍只读取已经提交的精确成员，不在运行时再次沿连接扩大范围。
 
@@ -103,7 +108,7 @@
 - 普通空终端运行环境动作进入 Run 的 `TerminalSessionService`；执行已保存启动命令进入 `LaunchTerminalCommandUseCase`。
 - 依赖工作流与组合启动动作进入 Run 的 `TerminalWorkflowService`。
 - PTY、进程和系统命令只能通过 Run 应用层端口访问。
-- 删除终端由 BlockGraph 用例通过 `TerminalRunLifecyclePort` 先硬清理精确 Run 作用域，再提交图结构变化；UI 不直接停止进程。
+- 删除终端、移除完整流程和移除组合由 BlockGraph 用例通过 `TerminalRunLifecyclePort` 先以一个租约硬清理精确 Run 作用域，再提交图结构变化；UI 不直接停止进程或逐成员删除。
 - Agent 控制台当前不是积木，不得套用终端动作或终端组合批量动作。
 
 ## 当前设计不变量
@@ -118,6 +123,7 @@
 8. 模板实例与原对象、模板记录及其他实例必须使用互不关联的新身份。
 9. 模板放置的自动避让只允许整体平移，不能改变内部相对布局、依赖连接或组合边界。
 10. 创建组合或加入成员不能提交半条流程；普通单终端动作不得因此隐式扩大。
+11. 流程或组合的批量移除必须重新校验完整作用域并原子提交；作用域变化后不得静默改为部分删除。
 
 ## 验证入口
 
@@ -127,6 +133,7 @@
 | 终端组合批量动作     | [`app-shell.terminal-group-actions.spec.tsx`](../../../tests/unit/presentation/app-shell.terminal-group-actions.spec.tsx)                                                                                                                                                                                                                                                                                                                                                              |
 | 从节点运行与停止流程 | [`run.terminal-workflow-service.spec.ts`](../../../tests/unit/contexts/run/run.terminal-workflow-service.spec.ts)、[`terminal-workflow-edges.spec.ts`](../../../tests/unit/presentation/terminal-workflow-edges.spec.ts)                                                                                                                                                                                                                                                               |
 | 组合结构边界         | [`block-graph.terminal-groups.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.terminal-groups.spec.ts)                                                                                                                                                                                                                                                                                                                                                                  |
+| 流程与组合批量移除   | [`block-graph.delete-terminal-scope.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.delete-terminal-scope.spec.ts)、[`workbench-canvas.context-menu.spec.tsx`](../../../tests/unit/presentation/workbench-canvas.context-menu.spec.tsx)、[`use-app-shell-block-actions.spec.tsx`](../../../tests/unit/presentation/use-app-shell-block-actions.spec.tsx)                                                                                                                |
 | 收藏、放置与运行     | [`block-graph.block-template-use-cases.spec.ts`](../../../tests/unit/contexts/block-graph/block-graph.block-template-use-cases.spec.ts)、[`block-template-placement.spec.ts`](../../../tests/unit/presentation/block-template-placement.spec.ts)、[`canvas-object-context-target.spec.ts`](../../../tests/unit/presentation/canvas-object-context-target.spec.ts)、[`workbench-canvas.context-menu.spec.tsx`](../../../tests/unit/presentation/workbench-canvas.context-menu.spec.tsx) |
 
 ## 维护规则

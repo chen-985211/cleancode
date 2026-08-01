@@ -64,9 +64,9 @@ import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandReque
 import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
 
-export function AppShell({
-  notifications = ignoreAppNotifications
-}: { readonly notifications?: AppNotificationController } = {}) {
+type AppShellProps = { readonly notifications?: AppNotificationController }
+
+export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
   const { t } = useI18n()
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
@@ -321,19 +321,19 @@ export function AppShell({
     setWorkbenches,
     terminateWorkbenchTerminalSessions
   })
-  const { createTerminalGroup, deleteTerminalBlock } = useAppShellBlockActions({
+  const blockActions = useAppShellBlockActions({
     canCreateTerminalGroup,
     completeTerminalGroupSelection,
     currentWorkbench,
     currentWorkspace,
     defaultGroupName: t('group.defaultName'),
     firstGroupName: t('group.defaultFirstName'),
+    notifications,
     selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
     setSelectedTerminalGroupId,
     terminateTerminalSession
   })
-
   const workbenchNodeSelection = useWorkbenchNodeSelection({
     isTerminalGroupSelectionMode,
     selectTerminalBlock,
@@ -441,7 +441,7 @@ export function AppShell({
       onQuickLaunch: quickLaunchTerminal,
       onRestart: restartTerminal,
       onToggleRetention: toggleTerminalRetention,
-      onDelete: deleteTerminalBlock,
+      onDelete: blockActions.deleteTerminalBlock,
       onUpdateDefinition: updateTerminalDefinition,
       onCopyServiceEndpoint: copyServiceEndpoint,
       onOpenServiceEndpoint: openServiceEndpoint,
@@ -461,7 +461,7 @@ export function AppShell({
       ...terminalGroupActions
     }),
     [
-      deleteTerminalBlock,
+      blockActions.deleteTerminalBlock,
       copyServiceEndpoint,
       dismissPortConflict,
       interruptTerminal,
@@ -655,6 +655,7 @@ export function AppShell({
             onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
             onPlaceBlockTemplate={blockTemplates.place}
             onRequestSaveBlockTemplate={blockTemplates.requestSave}
+            onDeleteTerminalScope={blockActions.deleteTerminalScope}
             onAddQuickExecutionTarget={quickExecution.addTarget}
             onBindQuickExecutionSlot={quickExecution.bindSlot}
             onClearQuickExecutionSlot={quickExecution.clearSlot}
@@ -673,7 +674,7 @@ export function AppShell({
             onOpenAgentSettings={applicationSettings.openAgents}
             onSelectDefaultAgentProvider={changePreferredProvider}
             onBeginTerminalGroupSelection={beginTerminalGroupSelection}
-            onCreateTerminalGroup={createTerminalGroup}
+            onCreateTerminalGroup={blockActions.createTerminalGroup}
             onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
             isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
             selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}

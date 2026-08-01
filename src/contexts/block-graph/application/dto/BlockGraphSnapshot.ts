@@ -1,4 +1,5 @@
 export type {
+  BatchTerminalRemovalTargetSnapshot,
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,

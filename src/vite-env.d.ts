@@ -19,6 +19,7 @@ import type { UpdateAgentProviderPreferencesCommand } from './contexts/agent/app
 import type { CreatableAgentProviderSnapshot } from './contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentLayoutSnapshot } from './contexts/agent/domain/aggregates/AgentSession'
 import type {
+  BatchTerminalRemovalTargetSnapshot,
   BlockGraphSnapshot,
   BlockPositionSnapshot,
   CanvasViewportSnapshot,
@@ -298,6 +299,11 @@ declare global {
         readonly projectDirectory: string
         readonly workspaceId: string
         readonly blockId: string
+      }): Promise<BlockGraphSnapshot>
+      deleteTerminalScope(command: {
+        readonly projectDirectory: string
+        readonly workspaceId: string
+        readonly target: BatchTerminalRemovalTargetSnapshot
       }): Promise<BlockGraphSnapshot>
       listBlockTemplates(command: {
         readonly scope: BlockTemplateScope

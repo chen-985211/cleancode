@@ -39,6 +39,7 @@ import { CreateTerminalWorkflowUseCase } from '../../contexts/block-graph/applic
 import { ClearQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/ClearQuickExecutionSlotUseCase'
 import { ReorderQuickExecutionSlotsUseCase } from '../../contexts/block-graph/application/use-cases/ReorderQuickExecutionSlotsUseCase'
 import { DeleteBlockUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockUseCase'
+import { DeleteTerminalScopeUseCase } from '../../contexts/block-graph/application/use-cases/DeleteTerminalScopeUseCase'
 import { DeleteBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/DeleteBlockTemplateUseCase'
 import { DissolveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
@@ -205,6 +206,7 @@ const {
   workflowPlans: new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase)
 })
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
+const deleteTerminalScopeUseCase = new DeleteTerminalScopeUseCase(graphRepository, terminalRuns)
 const defaultAgentProviderId = 'codex'
 const agentProviderRegistry = new AgentProviderRegistry(createBuiltinAgentProviderContributions())
 const agentProviderPreferencesRepository = new FileSystemAgentProviderPreferencesRepository(
@@ -362,6 +364,7 @@ registerBlockGraphIpcHandlers({
   createTerminalGroup: (command) => createTerminalGroupUseCase.execute(command),
   connectTerminalBlocks: (command) => connectTerminalBlocksUseCase.execute(command),
   deleteBlock: (command) => deleteBlockUseCase.execute(command),
+  deleteTerminalScope: (command) => deleteTerminalScopeUseCase.execute(command),
   dissolveTerminalGroup: (command) => dissolveTerminalGroupUseCase.execute(command),
   disconnectTerminalBlocks: (command) => disconnectTerminalBlocksUseCase.execute(command),
   ipcMain,

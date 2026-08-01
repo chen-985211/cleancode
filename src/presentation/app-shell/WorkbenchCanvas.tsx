@@ -13,6 +13,7 @@ import { Star } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
+  type BatchTerminalRemovalTargetSnapshot,
   maximumCanvasZoom,
   minimumCanvasZoom,
   type QuickExecutionSlotNumber,
@@ -86,6 +87,9 @@ interface WorkbenchCanvasProps {
   }) => Promise<void> | void
   readonly onCancelBlockTemplatePlacement?: () => void
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
+  readonly onDeleteTerminalScope?: (
+    target: BatchTerminalRemovalTargetSnapshot
+  ) => Promise<void> | void
   readonly onAddQuickExecutionTarget?: (
     target: QuickExecutionTargetSnapshot
   ) => Promise<void> | void
@@ -165,6 +169,7 @@ export function WorkbenchCanvas({
   onPlaceBlockTemplate,
   onCancelBlockTemplatePlacement,
   onRequestSaveBlockTemplate,
+  onDeleteTerminalScope,
   onAddQuickExecutionTarget,
   onBindQuickExecutionSlot,
   onClearQuickExecutionSlot,
@@ -226,6 +231,7 @@ export function WorkbenchCanvas({
     graph: currentWorkbench?.graph ?? null,
     nodes,
     onRequestSaveBlockTemplate,
+    onRequestDeleteTerminalScope: onDeleteTerminalScope,
     onRequestQuickExecutionBinding: onAddQuickExecutionTarget
       ? (target) => void onAddQuickExecutionTarget(toQuickExecutionTarget(target))
       : undefined

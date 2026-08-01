@@ -106,6 +106,24 @@ export type QuickExecutionTargetSnapshot =
       readonly terminalGroupId: string
     }
 
+export type BatchTerminalRemovalTargetSnapshot =
+  | {
+      readonly type: 'workflow'
+      readonly terminalBlockIds: readonly string[]
+    }
+  | {
+      readonly type: 'combination'
+      readonly terminalGroupId: string
+      readonly terminalBlockIds: readonly string[]
+    }
+
+export type TerminalRemovalTargetSnapshot =
+  | {
+      readonly type: 'terminal'
+      readonly terminalBlockId: string
+    }
+  | BatchTerminalRemovalTargetSnapshot
+
 export interface QuickExecutionSlotSnapshot {
   readonly number: QuickExecutionSlotNumber
   readonly target: QuickExecutionTargetSnapshot | null

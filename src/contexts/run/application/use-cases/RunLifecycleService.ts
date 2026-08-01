@@ -188,16 +188,32 @@ export class RunLifecycleService {
     readonly workspaceId: string
     readonly blockId: string
   }): Promise<RunStartGateLease> {
+    return this.hardDisposeTerminals({
+      blockIds: [command.blockId],
+      projectDirectory: command.projectDirectory,
+      projectId: command.projectId,
+      workspaceId: command.workspaceId
+    })
+  }
+
+  hardDisposeTerminals(command: {
+    readonly projectId: string
+    readonly projectDirectory: string
+    readonly workspaceId: string
+    readonly blockIds: readonly string[]
+  }): Promise<RunStartGateLease> {
+    const blockIds = [...new Set(command.blockIds)]
+    if (blockIds.length === 0) return Promise.resolve(createInactiveRunStartGateLease())
     return this.runWithGate(`project:${command.projectDirectory}`, [
-      {
-        quarantineKey: `${workspaceQuarantineKey(command.projectDirectory, command.workspaceId)}\0block:${command.blockId}`,
+      ...blockIds.map((blockId) => ({
+        quarantineKey: `${workspaceQuarantineKey(command.projectDirectory, command.workspaceId)}\0block:${blockId}`,
         resolvesPrefix: false,
-        predicate: (owner) =>
+        predicate: (owner: TerminalRunOwner) =>
           owner.projectId === command.projectId &&
           owner.projectDirectory === command.projectDirectory &&
           owner.workspaceId === command.workspaceId &&
-          owner.blockId === command.blockId
-      }
+          owner.blockId === blockId
+      }))
     ])
   }
 

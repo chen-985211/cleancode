@@ -1,4 +1,4 @@
-import { Rocket, Star } from 'lucide-react'
+import { Rocket, Star, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
@@ -18,6 +18,7 @@ interface CanvasObjectContextMenuProps {
   readonly onClose: () => void
   readonly onFavorite: (terminalBlockIds: readonly string[]) => void
   readonly onAddToQuickExecution?: (target: CanvasObjectContextTarget) => void
+  readonly onRemove?: (target: CanvasObjectContextTarget) => void
 }
 
 export function CanvasObjectContextMenu({
@@ -25,7 +26,8 @@ export function CanvasObjectContextMenu({
   target,
   onClose,
   onFavorite,
-  onAddToQuickExecution
+  onAddToQuickExecution,
+  onRemove
 }: CanvasObjectContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -116,6 +118,20 @@ export function CanvasObjectContextMenu({
         >
           <Rocket size={16} aria-hidden="true" />
           {t('canvas.contextMenu.addToQuickExecution')}
+        </button>
+      ) : null}
+      {target.kind !== 'terminal' && onRemove ? (
+        <button
+          className="canvas-object-context-menu__item"
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose()
+            onRemove(target)
+          }}
+        >
+          <Trash2 size={16} aria-hidden="true" />
+          {t(`canvas.contextMenu.remove.${target.kind}`)}
         </button>
       ) : null}
     </div>,

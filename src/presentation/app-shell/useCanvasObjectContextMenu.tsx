@@ -8,7 +8,10 @@ import {
   type ReactNode
 } from 'react'
 
-import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
+import type {
+  BatchTerminalRemovalTargetSnapshot,
+  BlockGraphSnapshot
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { CanvasObjectContextMenu } from './CanvasObjectContextMenu'
 import {
   resolveCanvasObjectContextTarget,
@@ -27,13 +30,17 @@ export function useCanvasObjectContextMenu({
   graph,
   nodes,
   onRequestSaveBlockTemplate,
-  onRequestQuickExecutionBinding
+  onRequestQuickExecutionBinding,
+  onRequestDeleteTerminalScope
 }: {
   readonly edges: readonly Edge[]
   readonly graph: BlockGraphSnapshot | null
   readonly nodes: readonly WorkbenchFlowNode[]
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
   readonly onRequestQuickExecutionBinding?: (target: CanvasObjectContextTarget) => void
+  readonly onRequestDeleteTerminalScope?: (
+    target: BatchTerminalRemovalTargetSnapshot
+  ) => Promise<void> | void
 }): {
   readonly close: () => void
   readonly edges: Edge[]
@@ -92,6 +99,14 @@ export function useCanvasObjectContextMenu({
         onClose={close}
         onAddToQuickExecution={onRequestQuickExecutionBinding}
         onFavorite={(blockIds) => onRequestSaveBlockTemplate?.(blockIds)}
+        onRemove={
+          onRequestDeleteTerminalScope
+            ? (target) => {
+                const removalTarget = toBatchTerminalRemovalTarget(target)
+                if (removalTarget) void onRequestDeleteTerminalScope(removalTarget)
+              }
+            : undefined
+        }
       />
     ) : null,
     nodes: useMemo(
@@ -99,6 +114,20 @@ export function useCanvasObjectContextMenu({
       [activeState?.target, nodes]
     ),
     onNodeContextMenu
+  }
+}
+
+function toBatchTerminalRemovalTarget(
+  target: CanvasObjectContextTarget
+): BatchTerminalRemovalTargetSnapshot | null {
+  if (target.kind === 'terminal') return null
+  if (target.kind === 'workflow') {
+    return { type: 'workflow', terminalBlockIds: [...target.terminalBlockIds] }
+  }
+  return {
+    type: 'combination',
+    terminalGroupId: target.groupId,
+    terminalBlockIds: [...target.terminalBlockIds]
   }
 }
 
