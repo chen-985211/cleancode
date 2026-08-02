@@ -419,6 +419,7 @@ async function assertElectronRunsInBackground(
       }),
     accept: (state) => state.found && state.visible && !state.focused && !state.intersectsDisplay,
     intervalMs: 50,
+    retryObservationErrors: true,
     timeoutMs: electronWindowStateTimeoutMs
   })
 

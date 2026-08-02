@@ -1,6 +1,7 @@
 import type { Page } from 'playwright'
 
 import type { AgentRuntimeChangedEvent } from '../../src/contexts/agent/application/dto/AgentSessionProtocol'
+import { pollUntilState } from './e2ePolling'
 
 export const agentLaunchReadyTimeoutMs = 15_000
 
@@ -80,11 +81,11 @@ export function getAgentTerminalReadySnapshot(
   }
 }
 
-export async function waitForAgentLaunchReady(
+export function waitForAgentLaunchReady(
   page: Page,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<AgentLaunchReadySnapshot> {
-  return page.evaluate((timeout) => {
+  const readiness = page.evaluate((timeout) => {
     const api = window.cleancode
     if (!api?.onAgentRuntimeChanged) {
       throw new Error('Agent runtime events are unavailable.')
@@ -166,6 +167,29 @@ export async function waitForAgentLaunchReady(
       if (settled) unsubscribe()
     })
   }, timeoutMs)
+
+  void readiness.catch(() => undefined)
+  return readiness
+}
+
+export async function waitForAgentProviderInstalled(
+  page: Page,
+  providerId: string,
+  timeoutMs = agentLaunchReadyTimeoutMs
+): Promise<void> {
+  await pollUntilState({
+    description: `Agent Provider ${providerId} to become installed`,
+    observe: () =>
+      page.evaluate(async (requestedProviderId) => {
+        const inspect = window.cleancode?.inspectAgentProvider
+        if (!inspect) throw new Error('Agent Provider inspection is unavailable.')
+        return inspect({ providerId: requestedProviderId })
+      }, providerId),
+    accept: (availability) =>
+      availability.providerId === providerId && availability.status === 'installed',
+    intervalMs: 100,
+    timeoutMs
+  })
 }
 
 export async function waitForAgentTerminalReady(

@@ -23,6 +23,7 @@ import {
 import {
   agentLaunchReadyTimeoutMs,
   waitForAgentLaunchReady,
+  waitForAgentProviderInstalled,
   waitForAgentTerminalReady
 } from '../support/e2eAgentRuntime'
 import { pollUntilState } from '../support/e2ePolling'
@@ -65,7 +66,7 @@ describe('Codex Agent session e2e', () => {
       await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
-      await expectAgentProviderInstalled(page, 'codex')
+      await waitForAgentProviderInstalled(page, 'codex')
       await selectDefaultAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
@@ -241,16 +242,6 @@ async function selectDefaultAgentProvider(page: Page, providerName: string): Pro
   }
 
   await providerOption.click({ timeout: 1_000 })
-}
-
-async function expectAgentProviderInstalled(page: Page, providerId: string): Promise<void> {
-  const availability = await page.evaluate(async (requestedProviderId) => {
-    const inspect = window.cleancode?.inspectAgentProvider
-    if (!inspect) throw new Error('Agent Provider inspection is unavailable.')
-    return inspect({ providerId: requestedProviderId })
-  }, providerId)
-
-  expect(availability).toMatchObject({ providerId, status: 'installed' })
 }
 
 async function waitForCodexLaunch(

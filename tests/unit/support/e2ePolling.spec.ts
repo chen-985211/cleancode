@@ -41,4 +41,25 @@ describe('E2E state polling', () => {
     await vi.advanceTimersByTimeAsync(20)
     await assertion
   })
+
+  it('retries transient observation errors only when the caller explicitly opts in', async () => {
+    let attempts = 0
+    const result = pollUntilState({
+      description: 'Electron window state becomes observable',
+      observe: () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('Execution context was destroyed')
+        return 'ready'
+      },
+      accept: (observation) => observation === 'ready',
+      intervalMs: 10,
+      retryObservationErrors: true,
+      timeoutMs: 100
+    })
+
+    await vi.advanceTimersByTimeAsync(10)
+
+    await expect(result).resolves.toBe('ready')
+    expect(attempts).toBe(2)
+  })
 })
