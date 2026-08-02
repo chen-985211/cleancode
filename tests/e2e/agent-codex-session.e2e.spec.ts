@@ -25,6 +25,7 @@ import {
   waitForAgentLaunchReady,
   waitForAgentTerminalReady
 } from '../support/e2eAgentRuntime'
+import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Codex Agent session e2e', () => {
@@ -294,14 +295,15 @@ async function waitForCodexReport(
   description: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const reports = await readFakeCodexCliReports(reportPath)
-    const selected = select(reports)
-    if (selected) return selected
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for ${description}.`)
+  const report = await pollUntilState({
+    description,
+    observe: async () => select(await readFakeCodexCliReports(reportPath)),
+    accept: (observation) => observation !== undefined,
+    timeoutMs
+  })
+
+  if (!report) throw new Error(`The completed ${description} observation was unavailable.`)
+  return report
 }
 
 async function readCodexProviderSessionRefs(
@@ -330,19 +332,15 @@ async function waitForCodexConversationBinding(
   sessionId: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const bindings = await readCodexProviderSessionRefs(workbench)
-    if (
+  await pollUntilState({
+    description: `durable Codex conversation binding ${sessionId}`,
+    observe: () => readCodexProviderSessionRefs(workbench),
+    accept: (bindings) =>
       bindings.some(
         (sessionRef) => sessionRef.kind === 'codex-thread' && sessionRef.value === sessionId
-      )
-    ) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error('Timed out waiting for a durable Codex conversation binding.')
+      ),
+    timeoutMs
+  })
 }
 
 interface CodexProviderSessionRef {

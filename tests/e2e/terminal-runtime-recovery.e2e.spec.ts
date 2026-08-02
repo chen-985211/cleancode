@@ -281,37 +281,25 @@ async function waitForPersistedTerminalHistory(
 }
 
 async function launchWorkbench(workbench: E2eWorkbench) {
-  const launch = () =>
-    launchApp(workbench, {
+  let electronApp: ElectronApplication | undefined
+
+  try {
+    electronApp = await launchApp(workbench, {
       environment: createE2eTerminalEnvironment()
     })
-  const launchErrors: unknown[] = []
-  const retryDelaysMs = process.platform === 'win32' ? [0, 500, 1_000] : [0]
-
-  for (const retryDelayMs of retryDelaysMs) {
-    let electronApp: ElectronApplication | undefined
-    if (retryDelayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    const page = await electronApp.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await expectDesktopRuntime(page)
+    await waitForTerminalRuntimeReady(page)
+    return { electronApp, page }
+  } catch (error) {
+    if (electronApp) {
+      await closeElectronApp(electronApp).catch(() => undefined)
     }
-    try {
-      electronApp = await launch()
-      const page = await electronApp.firstWindow()
-      await page.waitForLoadState('domcontentloaded')
-      await expectDesktopRuntime(page)
-      await waitForTerminalRuntimeReady(page)
-      return { electronApp, page }
-    } catch (error) {
-      launchErrors.push(error)
-      if (electronApp) {
-        await closeElectronApp(electronApp).catch(() => undefined)
-      }
-    }
+    throw new Error('Electron failed to relaunch after the terminal Provider handoff.', {
+      cause: error
+    })
   }
-
-  throw new AggregateError(
-    launchErrors,
-    'Electron failed to relaunch after the Windows process handoff.'
-  )
 }
 
 async function waitForTerminalRuntimeReady(page: Page): Promise<void> {

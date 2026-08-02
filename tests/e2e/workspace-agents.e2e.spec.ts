@@ -30,7 +30,8 @@ import {
   readCanvasViewportTransform,
   readXtermSelection,
   selectExactXtermText,
-  setCanvasZoomFromDefault
+  setCanvasZoomFromDefault,
+  waitForTerminalDomText
 } from '../support/terminalSelectionE2e'
 import {
   createdWorkbenchNodeZoomUpperBound,
@@ -524,20 +525,6 @@ async function waitForAgentTerminalSurfaces(page: Page, count: number): Promise<
       )
     )
   }, count)
-}
-
-async function waitForTerminalDomText(terminal: Locator, text: string): Promise<void> {
-  const deadline = Date.now() + 5_000
-  while (Date.now() < deadline) {
-    await ensureTerminalDomRenderer(terminal)
-    const contents = await terminal
-      .locator('.xterm-rows')
-      .textContent()
-      .catch(() => '')
-    if (contents?.includes(text)) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
 }
 
 async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promise<void> {

@@ -12,6 +12,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -172,23 +173,14 @@ async function waitForGraph(
   workbench: E2eWorkbench,
   predicate: (graph: TerminalGroupGraphRecord) => boolean
 ): Promise<TerminalGroupGraphRecord> {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    try {
-      const graph = await readGraph(page, workbench)
-
-      if (predicate(graph)) {
-        return graph
-      }
-    } catch {
-      // The project may not be registered until the first action completes.
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250))
-  }
-
-  return readGraph(page, workbench)
+  return pollUntilState({
+    description: 'terminal group graph state',
+    observe: () => readGraph(page, workbench),
+    accept: predicate,
+    intervalMs: 250,
+    retryObservationErrors: true,
+    timeoutMs: 5_000
+  })
 }
 
 async function readGraph(page: Page, workbench: E2eWorkbench): Promise<TerminalGroupGraphRecord> {

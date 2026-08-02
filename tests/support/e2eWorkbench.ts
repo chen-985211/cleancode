@@ -15,6 +15,7 @@ import {
   stopE2eTracing
 } from './e2eDiagnostics'
 import { runE2eTeardown, withE2eDeadline } from './e2eLifecycle'
+import { pollUntilState } from './e2ePolling'
 import {
   encodeTerminalProviderFrame,
   TerminalProviderFrameDecoder,
@@ -114,12 +115,18 @@ export async function readAuthenticatedTerminalProviderMetadata(
 }
 
 export async function waitForProcessIdExit(processId: number, timeoutMs = 3_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline && isProcessAlive(processId)) {
-    await new Promise((resolve) => setTimeout(resolve, 25))
-  }
-  if (isProcessAlive(processId)) {
-    throw new Error(`Process ${processId} did not exit naturally within ${timeoutMs}ms.`)
+  try {
+    await pollUntilState({
+      description: `process ${processId} to exit naturally`,
+      observe: () => isProcessAlive(processId),
+      accept: (isAlive) => !isAlive,
+      intervalMs: 25,
+      timeoutMs
+    })
+  } catch (error) {
+    throw new Error(`Process ${processId} did not exit naturally within ${timeoutMs}ms.`, {
+      cause: error
+    })
   }
 }
 
@@ -476,19 +483,14 @@ export async function readOnlyJsonFile(directory: string, fileName: string): Pro
 }
 
 export async function waitForJsonFile(directory: string, fileName: string): Promise<string> {
-  const deadline = Date.now() + 5_000
+  const matches = await pollUntilState({
+    description: `exactly one ${fileName} beneath ${directory}`,
+    observe: () => findFilesNamed(directory, fileName),
+    accept: (observations) => observations.length === 1,
+    timeoutMs: 5_000
+  })
 
-  while (Date.now() < deadline) {
-    const matches = await findFilesNamed(directory, fileName)
-
-    if (matches.length === 1) {
-      return readFile(matches[0]!, 'utf8')
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readOnlyJsonFile(directory, fileName)
+  return readFile(matches[0]!, 'utf8')
 }
 
 export interface WaitForTextFileOptions {
@@ -503,51 +505,73 @@ export async function waitForTextFile(
 ): Promise<string> {
   const timeoutMs = options.timeoutMs ?? 5_000
   const intervalMs = Math.max(1, options.intervalMs ?? 50)
-  const deadline = Date.now() + timeoutMs
-  let lastError: unknown
   let previousContents: string | undefined
+  let lastError: unknown
 
-  do {
-    try {
-      const contents = await readFile(filePath, 'utf8')
-      let isComplete = true
+  try {
+    const observation = await pollUntilState({
+      description: `text file ${filePath} to become complete and stable`,
+      observe: async (): Promise<TextFileObservation> => {
+        lastError = undefined
 
-      try {
-        isComplete = options.isComplete?.(contents) ?? true
-      } catch (error) {
-        isComplete = false
-        lastError = error
-      }
+        try {
+          const contents = await readFile(filePath, 'utf8')
+          let isComplete = true
 
-      if (!isComplete) {
-        previousContents = undefined
-        lastError ??= new Error('Text file content did not pass readiness validation.')
-      } else if (contents === previousContents) {
-        return contents
-      } else {
-        previousContents = contents
-        lastError = new Error(
-          `Text file content had not settled yet (last length: ${contents.length}).`
-        )
-      }
-    } catch (error) {
-      if (!isTransientTextFileReadError(error)) {
-        throw error
-      }
-      previousContents = undefined
-      lastError = error
-    }
+          try {
+            isComplete = options.isComplete?.(contents) ?? true
+          } catch (error) {
+            previousContents = undefined
+            lastError = error
+            return { contents, isReady: false, status: describeError(error) }
+          }
 
-    const remainingMs = deadline - Date.now()
-    if (remainingMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, remainingMs)))
-    }
-  } while (Date.now() < deadline)
+          if (!isComplete) {
+            previousContents = undefined
+            lastError = new Error('Text file content did not pass readiness validation.')
+            return { contents, isReady: false, status: 'readiness validation failed' }
+          }
+          if (contents === previousContents) {
+            return { contents, isReady: true, status: 'complete and stable' }
+          }
 
-  throw new Error(
-    `Text file ${filePath} did not become complete and stable within ${timeoutMs}ms. Last observation: ${describeError(lastError)}`,
-    { cause: lastError }
-  )
+          previousContents = contents
+          lastError = new Error(
+            `Text file content had not settled yet (last length: ${contents.length}).`
+          )
+          return {
+            contents,
+            isReady: false,
+            status: `content had not settled yet (last length: ${contents.length})`
+          }
+        } catch (error) {
+          if (!isTransientTextFileReadError(error)) throw error
+          previousContents = undefined
+          lastError = error
+          return { contents: '', isReady: false, status: describeError(error) }
+        }
+      },
+      accept: (candidate) => candidate.isReady,
+      describeObservation: (candidate) =>
+        JSON.stringify({ contentLength: candidate.contents.length, status: candidate.status }),
+      intervalMs,
+      timeoutMs
+    })
+
+    return observation.contents
+  } catch (error) {
+    if (!lastError) throw error
+    throw new Error(
+      `Text file ${filePath} did not become complete and stable within ${timeoutMs}ms. Last observation: ${describeError(lastError)}`,
+      { cause: lastError }
+    )
+  }
+}
+
+interface TextFileObservation {
+  readonly contents: string
+  readonly isReady: boolean
+  readonly status: string
 }
 
 export async function pathExists(path: string): Promise<boolean> {

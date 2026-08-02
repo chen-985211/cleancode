@@ -26,6 +26,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { readE2eBlockGraph } from '../support/e2eBlockGraph'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   readRequiredBoundingBox,
   readTerminalBlockPosition,
@@ -527,19 +528,16 @@ async function waitForFakeAgentReport(
   predicate: (report: FakeAgentReport) => boolean,
   description: string
 ): Promise<FakeAgentReport> {
-  const deadline = Date.now() + 5_000
-  let reports: readonly FakeAgentReport[] = []
+  const reports = await pollUntilState({
+    description,
+    observe: () => readFakeAgentReports(reportPath),
+    accept: (observations) => observations.some(predicate),
+    timeoutMs: 5_000
+  })
+  const report = reports.find(predicate)
 
-  while (Date.now() < deadline) {
-    reports = await readFakeAgentReports(reportPath)
-    const report = reports.find(predicate)
-    if (report) return report
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  throw new Error(
-    `Timed out waiting for ${description}. Last fixture reports: ${JSON.stringify(reports.slice(-5))}`
-  )
+  if (!report) throw new Error(`The completed ${description} observation was unavailable.`)
+  return report
 }
 
 async function waitForQuickLaunchCount(

@@ -29,6 +29,7 @@ import {
   waitForAgentLaunchReady,
   waitForAgentTerminalReady
 } from '../support/e2eAgentRuntime'
+import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Claude Code Agent session e2e', () => {
@@ -254,13 +255,12 @@ async function expectAgentProviderInstalled(page: Page, providerId: string): Pro
 }
 
 async function waitForClaudeInspection(reportPath: string): Promise<void> {
-  const deadline = Date.now() + 5_000
-  while (Date.now() < deadline) {
-    const reports = await readFakeClaudeCliReports(reportPath)
-    if (reports.some((report) => report.kind === 'inspection')) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error('Claude Code was reported installed without inspecting the fake CLI.')
+  await pollUntilState({
+    description: 'Claude Code fake CLI inspection',
+    observe: () => readFakeClaudeCliReports(reportPath),
+    accept: (reports) => reports.some((report) => report.kind === 'inspection'),
+    timeoutMs: 5_000
+  })
 }
 
 async function waitForClaudeLaunch(
@@ -268,15 +268,18 @@ async function waitForClaudeLaunch(
   expectedCount: number,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeClaudeCliReport> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const launches = (await readFakeClaudeCliReports(reportPath)).filter(
-      (report) => report.kind === 'session'
-    )
-    if (launches.length >= expectedCount) return launches[expectedCount - 1]!
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Claude launch ${expectedCount}.`)
+  const launch = await pollUntilState({
+    description: `Claude launch ${expectedCount}`,
+    observe: async () =>
+      (await readFakeClaudeCliReports(reportPath)).filter((report) => report.kind === 'session')[
+        expectedCount - 1
+      ],
+    accept: (observation) => observation !== undefined,
+    timeoutMs
+  })
+
+  if (!launch) throw new Error(`The completed Claude launch ${expectedCount} was unavailable.`)
+  return launch
 }
 
 async function waitForClaudeSessionStart(
@@ -284,19 +287,15 @@ async function waitForClaudeSessionStart(
   sessionId: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const reports = await readFakeClaudeCliReports(reportPath)
-    if (
+  await pollUntilState({
+    description: `Claude SessionStart Hook ${sessionId}`,
+    observe: () => readFakeClaudeCliReports(reportPath),
+    accept: (reports) =>
       reports.some(
         (report) => report.kind === 'session-start-hook' && report.sessionId === sessionId
-      )
-    ) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Claude SessionStart Hook ${sessionId}.`)
+      ),
+    timeoutMs
+  })
 }
 
 async function waitForClaudeUserPrompt(
@@ -304,17 +303,15 @@ async function waitForClaudeUserPrompt(
   sessionId: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const reports = await readFakeClaudeCliReports(reportPath)
-    if (
-      reports.some((report) => report.kind === 'user-prompt-hook' && report.sessionId === sessionId)
-    ) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Claude UserPromptSubmit Hook ${sessionId}.`)
+  await pollUntilState({
+    description: `Claude UserPromptSubmit Hook ${sessionId}`,
+    observe: () => readFakeClaudeCliReports(reportPath),
+    accept: (reports) =>
+      reports.some(
+        (report) => report.kind === 'user-prompt-hook' && report.sessionId === sessionId
+      ),
+    timeoutMs
+  })
 }
 
 async function readClaudeProviderSessionRefs(
@@ -343,20 +340,16 @@ async function waitForClaudeConversationBinding(
   sessionId: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const bindings = await readClaudeProviderSessionRefs(workbench)
-    if (
+  await pollUntilState({
+    description: `durable Claude conversation binding ${sessionId}`,
+    observe: () => readClaudeProviderSessionRefs(workbench),
+    accept: (bindings) =>
       bindings.some(
         (sessionRef) =>
           sessionRef.value === sessionId && sessionRef.metadata?.confirmedBy === 'session-hook'
-      )
-    ) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error('Timed out waiting for a durable Claude conversation binding.')
+      ),
+    timeoutMs
+  })
 }
 
 function requireSessionId(report: FakeClaudeCliReport): string {

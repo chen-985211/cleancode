@@ -1,5 +1,7 @@
 import type { Locator, Page } from 'playwright'
 
+import { pollUntilState } from './e2ePolling'
+
 export type CanvasZoomDirection = 'in' | 'out'
 
 export async function setCanvasZoomFromDefault(
@@ -232,6 +234,25 @@ export async function ensureTerminalDomRenderer(terminal: Locator): Promise<void
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
       })
   )
+}
+
+export async function waitForTerminalDomText(
+  terminal: Locator,
+  text: string,
+  timeoutMs = 5_000
+): Promise<void> {
+  await pollUntilState({
+    description: `terminal DOM output ${JSON.stringify(text)}`,
+    observe: async () => {
+      await ensureTerminalDomRenderer(terminal)
+      return terminal
+        .locator('.xterm-rows')
+        .textContent()
+        .catch(() => '')
+    },
+    accept: (contents) => contents?.includes(text) ?? false,
+    timeoutMs
+  })
 }
 
 export async function readXtermSelection(terminal: Locator): Promise<string> {

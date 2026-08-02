@@ -27,6 +27,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   asE2eTerminalInput,
   createE2eFileCommand,
@@ -425,22 +426,13 @@ async function waitForVisibleXtermText(
 }
 
 async function expectCurrentGitBranch(directory: string, branchName: string): Promise<void> {
-  const deadline = Date.now() + 5_000
-  let currentBranch = ''
-
-  while (Date.now() < deadline) {
-    const { stdout } = await execGit(directory, ['branch', '--show-current'])
-
-    currentBranch = stdout.trim()
-
-    if (currentBranch === branchName) {
-      return
-    }
-
-    await new Promise((resolveTimer) => setTimeout(resolveTimer, 100))
-  }
-
-  expect(currentBranch).toBe(branchName)
+  await pollUntilState({
+    description: `Git branch ${branchName} in ${directory}`,
+    observe: async () => (await execGit(directory, ['branch', '--show-current'])).stdout.trim(),
+    accept: (currentBranch) => currentBranch === branchName,
+    intervalMs: 100,
+    timeoutMs: 5_000
+  })
 }
 
 async function execGit(directory: string, args: readonly string[]) {

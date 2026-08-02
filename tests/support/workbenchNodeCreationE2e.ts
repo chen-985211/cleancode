@@ -1,6 +1,7 @@
 import type { Page } from 'playwright'
 
 import { resolveWorkbenchSafeViewport } from '../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+import { pollUntilState } from './e2ePolling'
 
 export const createdWorkbenchNodeZoomUpperBound = 1.001
 
@@ -41,23 +42,18 @@ export async function waitForCreatedWorkbenchNodeResult(
   page: Page,
   selector: string
 ): Promise<CreatedWorkbenchNodeResult> {
-  const deadline = Date.now() + 5_000
+  const geometry = await pollUntilState({
+    description: `created workbench node to reach the safe viewport result: ${selector}`,
+    observe: () => readCreatedNodeGeometry(page, selector),
+    accept: (observation) =>
+      observation !== null &&
+      observation.zoom <= createdWorkbenchNodeZoomUpperBound &&
+      Object.values(observation.insets).every((inset) => inset >= -1),
+    timeoutMs: 5_000
+  })
 
-  while (Date.now() < deadline) {
-    const geometry = await readCreatedNodeGeometry(page, selector)
-
-    if (
-      geometry &&
-      geometry.zoom <= createdWorkbenchNodeZoomUpperBound &&
-      Object.values(geometry.insets).every((inset) => inset >= -1)
-    ) {
-      return geometry
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  throw new Error(`Created workbench node did not reach the safe viewport result: ${selector}`)
+  if (!geometry) throw new Error(`The completed node geometry was unavailable: ${selector}`)
+  return geometry
 }
 
 export async function readCanvasNodeGap(
@@ -105,25 +101,21 @@ async function readCanvasZoom(page: Page): Promise<number> {
 }
 
 async function waitForCanvasZoomToSettle(page: Page): Promise<void> {
-  const deadline = Date.now() + 2_000
   let previousZoom = await readCanvasZoom(page)
   let stableSamples = 0
 
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 32))
-    const currentZoom = await readCanvasZoom(page)
-
-    if (Math.abs(currentZoom - previousZoom) <= 0.0005) {
-      stableSamples += 1
-      if (stableSamples >= 3) return
-    } else {
-      stableSamples = 0
-    }
-
-    previousZoom = currentZoom
-  }
-
-  throw new Error('Canvas zoom animation did not settle.')
+  await pollUntilState({
+    description: 'canvas zoom animation to settle for three samples',
+    observe: async () => {
+      const currentZoom = await readCanvasZoom(page)
+      stableSamples = Math.abs(currentZoom - previousZoom) <= 0.0005 ? stableSamples + 1 : 0
+      previousZoom = currentZoom
+      return { currentZoom, stableSamples }
+    },
+    accept: (observation) => observation.stableSamples >= 3,
+    intervalMs: 32,
+    timeoutMs: 2_000
+  })
 }
 
 async function readCreatedNodeGeometry(

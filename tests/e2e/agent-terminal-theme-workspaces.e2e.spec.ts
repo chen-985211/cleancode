@@ -29,7 +29,7 @@ import {
   readTerminalSessionId,
   waitForTerminalShellReady
 } from '../support/e2eTerminal'
-import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
+import { waitForTerminalDomText } from '../support/terminalSelectionE2e'
 
 const execFileAsync = promisify(execFile)
 const featureBranchName = 'feature/agent-theme'
@@ -312,7 +312,7 @@ async function waitForAgentTerminal(
   const viewport = page.locator(
     `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceDisplayName}"]`
   )
-  await waitForTerminalDomText(viewport, fakeCodexMarker)
+  await waitForTerminalDomText(viewport, fakeCodexMarker, 15_000)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
   expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
   expect(visibleOutput).not.toContain('CLEANCODE_JOB:')
@@ -346,20 +346,6 @@ async function waitForAgentTerminal(
     viewport,
     workspaceId: attributes.workspaceId
   }
-}
-
-async function waitForTerminalDomText(viewport: Locator, text: string): Promise<void> {
-  const deadline = Date.now() + 15_000
-  while (Date.now() < deadline) {
-    await ensureTerminalDomRenderer(viewport)
-    const contents = await viewport
-      .locator('.xterm-rows')
-      .textContent()
-      .catch(() => '')
-    if (contents?.includes(text)) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
 }
 
 async function readTerminalRuntime(page: Page, sessionId: string) {
