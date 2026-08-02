@@ -3,7 +3,7 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   readFakeAgentReports,
@@ -197,15 +197,27 @@ describe('run terminal sessions e2e', () => {
       await page.getByRole('button', { name: '添加画布对象' }).click()
       const objectPicker = page.getByRole('dialog', { name: '选择要绑定的画布对象' })
       await objectPicker.getByRole('button').filter({ hasText: 'Terminal 1' }).click()
-      await expect
-        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[0]?.target)
-        .toEqual({ type: 'terminal', terminalBlockId: graph.blocks[0]?.id })
+      const firstSlotTarget = await pollUntilState({
+        description: 'quick execution slot 1 to persist its terminal target',
+        observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[0]?.target,
+        accept: (target) =>
+          target?.type === 'terminal' && target.terminalBlockId === graph.blocks[0]?.id,
+        timeoutMs: 10_000
+      })
+      expect(firstSlotTarget).toEqual({
+        type: 'terminal',
+        terminalBlockId: graph.blocks[0]?.id
+      })
 
       const quickExecutionTooltip = `已绑定终端「Terminal 1」。执行快捷位 1 (${process.platform === 'darwin' ? '⌘1' : 'Ctrl+1'})；点击仅用于定位视图。`
       await page.locator('[data-quick-execution-slot="1"]').hover()
-      await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
+      await waitForLocatorText(
+        page.getByRole('tooltip'),
+        quickExecutionTooltip,
+        'quick slot tooltip'
+      )
       await page.mouse.move(0, 0)
-      await expect.poll(() => page.getByRole('tooltip').count()).toBe(0)
+      await page.getByRole('tooltip').waitFor({ state: 'detached' })
 
       if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
         const resultDirectory = join(process.cwd(), 'test-results')
@@ -216,7 +228,11 @@ describe('run terminal sessions e2e', () => {
           path: join(resultDirectory, 'quick-execution-light.png')
         })
         await page.locator('[data-quick-execution-slot="1"]').hover()
-        await expect.poll(() => page.getByRole('tooltip').textContent()).toBe(quickExecutionTooltip)
+        await waitForLocatorText(
+          page.getByRole('tooltip'),
+          quickExecutionTooltip,
+          'quick slot tooltip in light theme'
+        )
         await waitForQuickExecutionVisualToSettle(page)
         await page.screenshot({
           path: join(resultDirectory, 'quick-execution-light-hover.png')
@@ -238,12 +254,21 @@ describe('run terminal sessions e2e', () => {
       await page
         .locator('[data-quick-execution-slot="1"]')
         .dragTo(page.locator('[data-quick-execution-slot="2"]'))
-      await expect
-        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.slice(0, 2))
-        .toEqual([
-          { number: 1, target: null },
-          { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
-        ])
+      const reorderedSlots = await pollUntilState({
+        description: 'quick execution slots to persist their reordered targets',
+        observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.slice(0, 2),
+        accept: (slots) =>
+          slots?.[0]?.number === 1 &&
+          slots[0].target === null &&
+          slots[1]?.number === 2 &&
+          slots[1].target?.type === 'terminal' &&
+          slots[1].target.terminalBlockId === graph.blocks[0]?.id,
+        timeoutMs: 10_000
+      })
+      expect(reorderedSlots).toEqual([
+        { number: 1, target: null },
+        { number: 2, target: { type: 'terminal', terminalBlockId: graph.blocks[0]?.id } }
+      ])
 
       const boundSlot = page.getByRole('button', {
         name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
@@ -264,15 +289,18 @@ describe('run terminal sessions e2e', () => {
       resources.page = page
       await page.waitForLoadState('domcontentloaded')
 
-      await expect
-        .poll(() =>
-          page
-            .getByRole('button', {
-              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
-            })
-            .isVisible()
-        )
-        .toBe(true)
+      const restoredSlot = page.getByRole('button', {
+        name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
+      })
+      await pollUntilState({
+        description: 'workbench restoration to expose persisted quick execution slot 2',
+        observe: async () => ({
+          restoring: (await page.locator('[aria-label="正在恢复上次的工作台"]').count()) > 0,
+          slotVisible: await restoredSlot.isVisible()
+        }),
+        accept: (state) => !state.restoring && state.slotVisible,
+        timeoutMs: 10_000
+      })
       await page.getByRole('button', { name: '新建终端积木' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
       await waitForQuickLaunchCount(reportPath, launchOutput, 3)
@@ -291,28 +319,29 @@ describe('run terminal sessions e2e', () => {
         quickSlotBox.y + quickSlotBox.height / 2,
         { steps: 4 }
       )
-      await expect
-        .poll(() => page.locator('[data-quick-execution-trash]').getAttribute('aria-hidden'))
-        .toBe('false')
+      const trashTarget = page.locator('[data-quick-execution-trash]')
+      const trashAriaHidden = await pollUntilState({
+        description: 'quick execution trash target to become available',
+        observe: () => trashTarget.getAttribute('aria-hidden'),
+        accept: (value) => value === 'false',
+        timeoutMs: 5_000
+      })
+      expect(trashAriaHidden).toBe('false')
 
-      const trashBox = await page.locator('[data-quick-execution-trash]').boundingBox()
+      const trashBox = await trashTarget.boundingBox()
       if (!trashBox) throw new Error('Quick execution trash target is not visible')
       await page.mouse.move(trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, {
         steps: 8
       })
       await page.mouse.up()
-      await expect
-        .poll(async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target)
-        .toBeNull()
-      await expect
-        .poll(() =>
-          page
-            .getByRole('button', {
-              name: '快捷位 2：Terminal 1，点击定位，仅支持快捷键执行'
-            })
-            .count()
-        )
-        .toBe(0)
+      const clearedTarget = await pollUntilState({
+        description: 'quick execution slot 2 target to be cleared',
+        observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target,
+        accept: (target) => target === null,
+        timeoutMs: 10_000
+      })
+      expect(clearedTarget).toBeNull()
+      await restoredSlot.waitFor({ state: 'detached' })
     },
     electronScenarioTimeoutMs
   )
@@ -545,13 +574,31 @@ async function waitForQuickLaunchCount(
   marker: string,
   expectedCount: number
 ): Promise<void> {
-  await expect
-    .poll(
-      async () =>
-        (await readFile(reportPath, 'utf8')).split('\n').filter((line) => line === marker).length,
-      { interval: 50, timeout: 10_000 }
-    )
-    .toBe(expectedCount)
+  const count = await pollUntilState({
+    description: `quick launch report count to become ${expectedCount}`,
+    observe: async () =>
+      (await readFile(reportPath, 'utf8')).split('\n').filter((line) => line === marker).length,
+    accept: (currentCount) => currentCount === expectedCount,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
+
+  expect(count).toBe(expectedCount)
+}
+
+async function waitForLocatorText(
+  locator: Locator,
+  expectedText: string,
+  description: string
+): Promise<void> {
+  const text = await pollUntilState({
+    description,
+    observe: () => locator.textContent(),
+    accept: (currentText) => currentText === expectedText,
+    timeoutMs: 5_000
+  })
+
+  expect(text).toBe(expectedText)
 }
 
 async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
@@ -585,7 +632,10 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await waitForTerminalShellReady(page, 'Terminal 1')
   const terminalInput = page.getByLabel('Terminal input')
   await terminalInput.focus()
-  await expect
-    .poll(() => terminalInput.evaluate((element) => element === document.activeElement))
-    .toBe(true)
+  await pollUntilState({
+    description: 'terminal input to receive focus',
+    observe: () => terminalInput.evaluate((element) => element === document.activeElement),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
 }

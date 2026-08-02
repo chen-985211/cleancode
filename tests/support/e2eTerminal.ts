@@ -4,6 +4,8 @@ import { delimiter } from 'node:path'
 import type { Page } from 'playwright'
 import { expect } from 'vitest'
 
+import { pollUntilState } from './e2ePolling'
+
 export const e2eShellReadyMarker = '__CLEANCODE_E2E_SHELL_READY__'
 
 export function createE2eTerminalEnvironment(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
@@ -175,34 +177,31 @@ export async function waitForTerminalViewportGeometry(
   let previousGeometry = ''
   let stableSamples = 0
 
-  await expect
-    .poll(
-      async () => {
-        const geometry = await readTerminalViewportGeometry(page, sessionId)
+  await pollUntilState({
+    description: `terminal viewport geometry for session ${sessionId} to settle`,
+    observe: async () => {
+      const geometry = await readTerminalViewportGeometry(page, sessionId)
 
-        if (!geometry) {
-          previousGeometry = ''
-          stableSamples = 0
-          return false
-        }
-
-        const currentGeometry = JSON.stringify(geometry)
-        if (currentGeometry === previousGeometry) {
-          stableSamples += 1
-        } else {
-          previousGeometry = currentGeometry
-          stableSamples = 1
-        }
-
-        return stableSamples >= 2
-      },
-      {
-        interval: 50,
-        message: `Terminal viewport geometry for session ${sessionId} should settle`,
-        timeout: 10_000
+      if (!geometry) {
+        previousGeometry = ''
+        stableSamples = 0
+        return { geometry, stable: false }
       }
-    )
-    .toBe(true)
+
+      const currentGeometry = JSON.stringify(geometry)
+      if (currentGeometry === previousGeometry) {
+        stableSamples += 1
+      } else {
+        previousGeometry = currentGeometry
+        stableSamples = 1
+      }
+
+      return { geometry, stable: stableSamples >= 2 }
+    },
+    accept: (observation) => observation.stable,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
 }
 
 export async function writeTerminalCommand(
@@ -233,7 +232,13 @@ export async function configureAndStartTerminalLaunchCommand(
 
   await launchCommandInput.fill(launchCommand)
   const saveAction = metadataForm.getByRole('button', { name: '保存终端信息' })
-  await expect.poll(() => saveAction.isEnabled(), { interval: 50, timeout: 10_000 }).toBe(true)
+  await pollUntilState({
+    description: `${terminalName} metadata save action to become enabled`,
+    observe: () => saveAction.isEnabled(),
+    accept: Boolean,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
   await saveAction.click()
   await metadataForm.waitFor({ state: 'detached' })
   await page.waitForFunction(
@@ -256,22 +261,25 @@ export async function expectTerminalWorkingDirectory(
   const sessionId = await readTerminalSessionId(page, terminalName)
   const canonicalExpectedDirectory = await realpath(expectedDirectory)
 
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async (targetSessionId) => {
-          const workingDirectories = await window.cleancode?.listTerminalWorkingDirectories({
-            sessionIds: [targetSessionId]
-          })
+  const workingDirectory = await pollUntilState({
+    description: `terminal ${sessionId} working directory to become ${canonicalExpectedDirectory}`,
+    observe: () =>
+      page.evaluate(async (targetSessionId) => {
+        const workingDirectories = await window.cleancode?.listTerminalWorkingDirectories({
+          sessionIds: [targetSessionId]
+        })
 
-          return (
-            workingDirectories?.find((entry) => entry.sessionId === targetSessionId)
-              ?.workingDirectory ?? null
-          )
-        }, sessionId),
-      { interval: 100, timeout: 10_000 }
-    )
-    .toBe(canonicalExpectedDirectory)
+        return (
+          workingDirectories?.find((entry) => entry.sessionId === targetSessionId)
+            ?.workingDirectory ?? null
+        )
+      }, sessionId),
+    accept: (currentDirectory) => currentDirectory === canonicalExpectedDirectory,
+    intervalMs: 100,
+    timeoutMs: 10_000
+  })
+
+  expect(workingDirectory).toBe(canonicalExpectedDirectory)
 }
 
 interface TerminalViewportGeometry {

@@ -70,12 +70,16 @@ describe('terminal groups e2e', () => {
 
       await dragTerminalHeader(page, terminalTwo.id, 260, 0)
 
-      await expect
-        .poll(async () => {
+      const resizedWidth = await pollUntilState({
+        description: 'terminal group visible width to reflect the member drag',
+        observe: async () => {
           const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
           return box?.width ?? 0
-        })
-        .toBeGreaterThan(groupBeforeBox.width + 120)
+        },
+        accept: (width) => width > groupBeforeBox.width + 120,
+        timeoutMs: 5_000
+      })
+      expect(resizedWidth).toBeGreaterThan(groupBeforeBox.width + 120)
       const groupAfterDrag = await waitForTerminalGroup(
         page,
         workbench,

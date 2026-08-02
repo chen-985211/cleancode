@@ -100,6 +100,12 @@ function findFileViolations(cwd, filePath) {
         'no-fixed-time-wait',
         'Wait for an observable process, protocol, identity, or UI state instead of elapsed time.'
       )
+    } else if (isDirectStatePollCall(node)) {
+      report(
+        node,
+        'no-direct-state-poll',
+        'Use tests/support/e2ePolling.ts with an observable state, completion predicate, deadline, and diagnostic description.'
+      )
     } else if (isRawTimerSleep(node, promiseTimerNames) && !allowedRawSleepFiles.has(filePath)) {
       report(
         node,
@@ -132,6 +138,18 @@ function isWaitForTimeoutCall(node) {
     ts.isCallExpression(node) &&
     ts.isPropertyAccessExpression(node.expression) &&
     node.expression.name.text === 'waitForTimeout'
+  )
+}
+
+function isDirectStatePollCall(node) {
+  if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return false
+
+  const owner = node.expression.expression
+  if (!ts.isIdentifier(owner)) return false
+
+  return (
+    (owner.text === 'expect' && node.expression.name.text === 'poll') ||
+    (['vi', 'vitest'].includes(owner.text) && node.expression.name.text === 'waitUntil')
   )
 }
 

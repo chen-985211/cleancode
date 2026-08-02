@@ -2,7 +2,7 @@
 
 import { basename, join } from 'node:path'
 
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   closeElectronApp,
@@ -18,6 +18,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { waitForE2eBlockGraph } from '../support/e2eBlockGraph'
+import { pollUntilState } from '../support/e2ePolling'
 
 describe('project workspaces e2e', () => {
   let workbench: E2eWorkbench
@@ -60,83 +61,73 @@ describe('project workspaces e2e', () => {
       const collapseSidebar = titlebarNavigation.getByRole('button', { name: '收起侧边栏' })
       const windowedTitlebarInset = process.platform === 'darwin' ? 80 : 12
 
-      await expect
-        .poll(() => readSidebarTitlebarGeometry(page))
-        .toMatchObject({
-          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
-          buttonOwnsHitTarget: true,
-          navigationBoundary: {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            borderRightWidth: '0px',
-            boxShadow: 'none'
-          },
-          navigation: { height: 36, x: 0, y: 0 },
-          sidebar: {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            borderRightWidth: '0px',
-            y: 36
-          }
-        })
+      await waitForSidebarTitlebarGeometry(page, 'windowed sidebar titlebar geometry', {
+        button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
+        buttonOwnsHitTarget: true,
+        navigationBoundary: {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          borderRightWidth: '0px',
+          boxShadow: 'none'
+        },
+        navigation: { height: 36, x: 0, y: 0 },
+        sidebar: {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          borderRightWidth: '0px',
+          y: 36
+        }
+      })
 
       await collapseSidebar.click()
 
-      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBe('true')
+      await waitForSidebarVisibilityState(sidebar, 'true')
       const expandSidebar = titlebarNavigation.getByRole('button', { name: '展开侧边栏' })
       await expandSidebar.waitFor()
-      await expect
-        .poll(() => readSidebarTitlebarGeometry(page))
-        .toMatchObject({
-          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
-          buttonOwnsHitTarget: true,
-          navigationBoundary: {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            borderRightWidth: '0px',
-            boxShadow: 'none'
-          },
-          navigation: { height: 36, width: windowedTitlebarInset + 32, x: 0, y: 0 },
-          sidebar: {
-            backgroundColor: 'rgba(0, 0, 0, 0)',
-            borderRightWidth: '0px'
-          }
-        })
+      await waitForSidebarTitlebarGeometry(page, 'collapsed windowed titlebar geometry', {
+        button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
+        buttonOwnsHitTarget: true,
+        navigationBoundary: {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          borderRightWidth: '0px',
+          boxShadow: 'none'
+        },
+        navigation: { height: 36, width: windowedTitlebarInset + 32, x: 0, y: 0 },
+        sidebar: {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          borderRightWidth: '0px'
+        }
+      })
       await expandSidebar.click()
 
-      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBeNull()
+      await waitForSidebarVisibilityState(sidebar, null)
       await titlebarNavigation.getByRole('button', { name: '收起侧边栏' }).waitFor()
 
       await electronApp.evaluate(({ BrowserWindow }) => {
         BrowserWindow.getAllWindows()[0]?.emit('enter-full-screen')
       })
-      await expect
-        .poll(() => readSidebarTitlebarGeometry(page))
-        .toMatchObject({
-          button: { height: 24, width: 32, x: 0, y: 6 },
-          buttonOwnsHitTarget: true,
-          navigation: { height: 36, x: 0, y: 0 }
-        })
+      await waitForSidebarTitlebarGeometry(page, 'fullscreen sidebar titlebar geometry', {
+        button: { height: 24, width: 32, x: 0, y: 6 },
+        buttonOwnsHitTarget: true,
+        navigation: { height: 36, x: 0, y: 0 }
+      })
 
       await titlebarNavigation.getByRole('button', { name: '收起侧边栏' }).click()
-      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBe('true')
-      await expect
-        .poll(() => readSidebarTitlebarGeometry(page))
-        .toMatchObject({
-          button: { height: 24, width: 32, x: 0, y: 6 },
-          buttonOwnsHitTarget: true,
-          navigation: { height: 36, width: 32, x: 0, y: 0 }
-        })
+      await waitForSidebarVisibilityState(sidebar, 'true')
+      await waitForSidebarTitlebarGeometry(page, 'collapsed fullscreen titlebar geometry', {
+        button: { height: 24, width: 32, x: 0, y: 6 },
+        buttonOwnsHitTarget: true,
+        navigation: { height: 36, width: 32, x: 0, y: 0 }
+      })
       await titlebarNavigation.getByRole('button', { name: '展开侧边栏' }).click()
-      await expect.poll(() => sidebar.getAttribute('aria-hidden')).toBeNull()
+      await waitForSidebarVisibilityState(sidebar, null)
 
       await electronApp.evaluate(({ BrowserWindow }) => {
         BrowserWindow.getAllWindows()[0]?.emit('leave-full-screen')
       })
-      await expect
-        .poll(() => readSidebarTitlebarGeometry(page))
-        .toMatchObject({
-          button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
-          buttonOwnsHitTarget: true,
-          navigation: { height: 36, x: 0, y: 0 }
-        })
+      await waitForSidebarTitlebarGeometry(page, 'restored windowed titlebar geometry', {
+        button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
+        buttonOwnsHitTarget: true,
+        navigation: { height: 36, x: 0, y: 0 }
+      })
     },
     electronScenarioTimeoutMs
   )
@@ -251,6 +242,63 @@ async function readSidebarTitlebarGeometry(page: Page): Promise<{
       }
     }
   })
+}
+
+type SidebarTitlebarGeometry = Awaited<ReturnType<typeof readSidebarTitlebarGeometry>>
+type SidebarTitlebarGeometryExpectation = {
+  readonly [
+    Section in keyof SidebarTitlebarGeometry
+  ]?: SidebarTitlebarGeometry[Section] extends object
+    ? Partial<SidebarTitlebarGeometry[Section]>
+    : SidebarTitlebarGeometry[Section]
+}
+
+async function waitForSidebarTitlebarGeometry(
+  page: Page,
+  description: string,
+  expected: SidebarTitlebarGeometryExpectation
+): Promise<void> {
+  const geometry = await pollUntilState({
+    description,
+    observe: () => readSidebarTitlebarGeometry(page),
+    accept: (observation) => matchesSidebarTitlebarGeometry(observation, expected),
+    timeoutMs: 5_000
+  })
+
+  expect(geometry).toMatchObject(expected)
+}
+
+function matchesSidebarTitlebarGeometry(
+  geometry: SidebarTitlebarGeometry,
+  expected: SidebarTitlebarGeometryExpectation
+): boolean {
+  return Object.entries(expected).every(([section, sectionExpectation]) => {
+    const actualSection = geometry[section as keyof SidebarTitlebarGeometry]
+    if (typeof sectionExpectation !== 'object' || sectionExpectation === null) {
+      return actualSection === sectionExpectation
+    }
+    if (typeof actualSection !== 'object' || actualSection === null) return false
+
+    return Object.entries(sectionExpectation).every(
+      ([property, value]) =>
+        (actualSection as unknown as Record<string, unknown>)[property] === value
+    )
+  })
+}
+
+async function waitForSidebarVisibilityState(
+  sidebar: Locator,
+  expectedAriaHidden: string | null
+): Promise<void> {
+  const ariaHidden = await pollUntilState({
+    description:
+      expectedAriaHidden === null ? 'project sidebar to become visible' : 'project sidebar to hide',
+    observe: () => sidebar.getAttribute('aria-hidden'),
+    accept: (value) => value === expectedAriaHidden,
+    timeoutMs: 5_000
+  })
+
+  expect(ariaHidden).toBe(expectedAriaHidden)
 }
 
 async function expectEmptyProjectStateWithoutPreviewData(page: Page): Promise<void> {

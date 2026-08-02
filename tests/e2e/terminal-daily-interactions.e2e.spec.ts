@@ -15,6 +15,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   asE2eTerminalInput,
   createE2ePrintCommand,
@@ -90,9 +91,13 @@ describe('terminal daily interactions e2e', () => {
             canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }))
           }
         })
-        await expect
-          .poll(() => terminalViewport.getAttribute('data-terminal-renderer'), { timeout: 5_000 })
-          .toBe('dom')
+        const renderer = await pollUntilState({
+          description: 'terminal renderer to fall back to DOM',
+          observe: () => terminalViewport.getAttribute('data-terminal-renderer'),
+          accept: (currentRenderer) => currentRenderer === 'dom',
+          timeoutMs: 5_000
+        })
+        expect(renderer).toBe('dom')
       }
 
       const clipboardText = asE2eTerminalInput(
@@ -123,7 +128,10 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await waitForTerminalShellReady(page, 'Terminal 1')
   const terminalInput = page.getByLabel('Terminal input')
   await terminalInput.focus()
-  await expect
-    .poll(() => terminalInput.evaluate((element) => element === document.activeElement))
-    .toBe(true)
+  await pollUntilState({
+    description: 'terminal input to receive focus',
+    observe: () => terminalInput.evaluate((element) => element === document.activeElement),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
 }

@@ -392,43 +392,42 @@ async function assertElectronRunsInBackground(
 ): Promise<void> {
   await electronApplication.firstWindow()
 
-  await expect
-    .poll(
-      () =>
-        electronApplication.evaluate(({ BrowserWindow, screen }) => {
-          const mainWindow = BrowserWindow.getAllWindows()[0]
-          const bounds = mainWindow?.getBounds() ?? null
-          const intersectsDisplay = bounds
-            ? screen.getAllDisplays().some(({ bounds: displayBounds }) => {
-                return (
-                  bounds.x < displayBounds.x + displayBounds.width &&
-                  bounds.x + bounds.width > displayBounds.x &&
-                  bounds.y < displayBounds.y + displayBounds.height &&
-                  bounds.y + bounds.height > displayBounds.y
-                )
-              })
-            : false
+  const windowState = await pollUntilState({
+    description: 'background Electron window to be visible, unfocused, and offscreen',
+    observe: () =>
+      electronApplication.evaluate(({ BrowserWindow, screen }) => {
+        const mainWindow = BrowserWindow.getAllWindows()[0]
+        const bounds = mainWindow?.getBounds() ?? null
+        const intersectsDisplay = bounds
+          ? screen.getAllDisplays().some(({ bounds: displayBounds }) => {
+              return (
+                bounds.x < displayBounds.x + displayBounds.width &&
+                bounds.x + bounds.width > displayBounds.x &&
+                bounds.y < displayBounds.y + displayBounds.height &&
+                bounds.y + bounds.height > displayBounds.y
+              )
+            })
+          : false
 
-          return {
-            bounds,
-            focused: mainWindow?.isFocused() ?? false,
-            found: Boolean(mainWindow),
-            intersectsDisplay,
-            visible: mainWindow?.isVisible() ?? false
-          }
-        }),
-      {
-        interval: 50,
-        message: 'Background Electron E2E window should be visible, unfocused, and offscreen',
-        timeout: electronWindowStateTimeoutMs
-      }
-    )
-    .toMatchObject({
-      focused: false,
-      found: true,
-      intersectsDisplay: false,
-      visible: true
-    })
+        return {
+          bounds,
+          focused: mainWindow?.isFocused() ?? false,
+          found: Boolean(mainWindow),
+          intersectsDisplay,
+          visible: mainWindow?.isVisible() ?? false
+        }
+      }),
+    accept: (state) => state.found && state.visible && !state.focused && !state.intersectsDisplay,
+    intervalMs: 50,
+    timeoutMs: electronWindowStateTimeoutMs
+  })
+
+  expect(windowState).toMatchObject({
+    focused: false,
+    found: true,
+    intersectsDisplay: false,
+    visible: true
+  })
 }
 
 export async function closeElectronApp(

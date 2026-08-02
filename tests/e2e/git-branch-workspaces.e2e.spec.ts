@@ -327,7 +327,14 @@ async function waitForTerminalSessionDetached(page: Page, sessionId: string): Pr
 }
 
 async function waitForCurrentWorkspace(workspace: Locator): Promise<void> {
-  await expect.poll(() => workspace.getAttribute('aria-current')).toBe('page')
+  const ariaCurrent = await pollUntilState({
+    description: 'selected branch workspace to become current',
+    observe: () => workspace.getAttribute('aria-current'),
+    accept: (value) => value === 'page',
+    timeoutMs: 10_000
+  })
+
+  expect(ariaCurrent).toBe('page')
 }
 
 async function markTerminalSurface(page: Page, sessionId: string, token: string): Promise<void> {

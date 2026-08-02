@@ -16,6 +16,8 @@ describe('test stability quality gate', () => {
           "import { launchApp } from '../support/e2eWorkbench'",
           'await page.waitForTimeout(1_000)',
           'await new Promise((resolve) => setTimeout(resolve, 500))',
+          'await expect.poll(() => readReportCount()).toBe(3)',
+          'await vi.waitUntil(() => readRuntime())',
           'for (const delayMs of [0, 500]) {',
           '  try {',
           '    const app = await launchApp()',
@@ -74,6 +76,16 @@ describe('test stability quality gate', () => {
         expect.objectContaining({
           filePath: 'tests/e2e/Bad.e2e.spec.ts',
           line: 4,
+          rule: 'no-direct-state-poll'
+        }),
+        expect.objectContaining({
+          filePath: 'tests/e2e/Bad.e2e.spec.ts',
+          line: 5,
+          rule: 'no-direct-state-poll'
+        }),
+        expect.objectContaining({
+          filePath: 'tests/e2e/Bad.e2e.spec.ts',
+          line: 6,
           rule: 'no-action-retry-loop'
         }),
         expect.objectContaining({
@@ -117,7 +129,7 @@ describe('test stability quality gate', () => {
           "  accept: (runtime) => runtime.status === 'ready',",
           '  timeoutMs: 10_000',
           '})',
-          'await expect.poll(() => readReportCount()).toBe(3)',
+          'await expect(page.getByRole("status")).toHaveText("ready")',
           ''
         ].join('\n')
       )

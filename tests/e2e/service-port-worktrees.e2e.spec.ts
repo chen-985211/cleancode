@@ -17,6 +17,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
@@ -112,12 +113,12 @@ describe('service port management across worktrees e2e', () => {
         name: /feature\/service-one.*独立工作区/
       })
       await firstWorkspace.click()
-      await expect
-        .poll(() => firstWorkspace.getAttribute('aria-current'), {
-          interval: 50,
-          timeout: 10_000
-        })
-        .toBe('page')
+      await waitForLocatorAttribute(
+        firstWorkspace,
+        'aria-current',
+        'page',
+        'first service workspace to become current'
+      )
       await secondTerminal.waitFor({ state: 'detached' })
 
       await firstTerminal.waitFor()
@@ -148,9 +149,12 @@ describe('service port management across worktrees e2e', () => {
         name: '切换到默认工作区 main'
       })
       await mainWorkspace.click()
-      await expect
-        .poll(() => mainWorkspace.getAttribute('aria-current'), { interval: 50, timeout: 10_000 })
-        .toBe('page')
+      await waitForLocatorAttribute(
+        mainWorkspace,
+        'aria-current',
+        'page',
+        'main workspace to become current'
+      )
       await branchTerminal.waitFor({ state: 'detached' })
 
       await launchConfiguredTerminal(page, mainTerminal)
@@ -161,30 +165,30 @@ describe('service port management across worktrees e2e', () => {
         name: /feature\/service-stop.*独立工作区/
       })
       await branchWorkspace.click()
-      await expect
-        .poll(() => branchWorkspace.getAttribute('aria-current'), {
-          interval: 50,
-          timeout: 10_000
-        })
-        .toBe('page')
+      await waitForLocatorAttribute(
+        branchWorkspace,
+        'aria-current',
+        'page',
+        'service branch workspace to become current'
+      )
       await mainTerminal.waitFor({ state: 'detached' })
 
       const stopAction = branchTerminal.getByRole('button', {
         name: 'Terminal 1 停止当前命令'
       })
       await stopAction.click()
-      await expect.poll(() => stopAction.isDisabled(), { interval: 50, timeout: 10_000 }).toBe(true)
-      await expect
-        .poll(() => branchTerminal.getByLabel('实际服务地址', { exact: true }).count(), {
-          interval: 50,
-          timeout: 10_000
-        })
-        .toBe(0)
+      await waitForLocatorDisabled(stopAction, 'branch service stop action to settle')
+      await branchTerminal
+        .getByLabel('实际服务地址', { exact: true })
+        .waitFor({ state: 'detached' })
 
       await mainWorkspace.click()
-      await expect
-        .poll(() => mainWorkspace.getAttribute('aria-current'), { interval: 50, timeout: 10_000 })
-        .toBe('page')
+      await waitForLocatorAttribute(
+        mainWorkspace,
+        'aria-current',
+        'page',
+        'main workspace to become current after service stop'
+      )
       await branchTerminal.waitFor({ state: 'detached' })
 
       await launchConfiguredTerminal(page, mainTerminal)
@@ -203,9 +207,12 @@ async function createBranchWorkspace(projectCard: Locator, branchName: string): 
     name: new RegExp(`${escapeRegExp(branchName)}.*独立工作区`)
   })
   await workspace.waitFor()
-  await expect
-    .poll(() => workspace.getAttribute('aria-current'), { interval: 50, timeout: 10_000 })
-    .toBe('page')
+  await waitForLocatorAttribute(
+    workspace,
+    'aria-current',
+    'page',
+    `${branchName} workspace to become current`
+  )
 }
 
 async function createPreferredHttpServiceTerminal(
@@ -248,7 +255,13 @@ async function createHttpServiceTerminal(
   await environmentVariable.waitFor()
   await environmentVariable.fill('PORT')
   const saveAction = terminal.getByRole('button', { name: '保存终端信息' })
-  await expect.poll(() => saveAction.isEnabled(), { interval: 50, timeout: 10_000 }).toBe(true)
+  await pollUntilState({
+    description: 'service terminal metadata save action to become enabled',
+    observe: () => saveAction.isEnabled(),
+    accept: Boolean,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
   await saveAction.click()
   await terminal.getByRole('form', { name: '编辑终端信息' }).waitFor({ state: 'detached' })
 
@@ -259,12 +272,12 @@ async function createHttpServiceTerminal(
 
 async function launchConfiguredTerminal(page: Page, terminal: Locator): Promise<void> {
   const launchAction = terminal.getByRole('button', { name: 'Terminal 1 启动命令' })
-  await expect
-    .poll(() => launchAction.getAttribute('data-launch-command-state'), {
-      interval: 50,
-      timeout: 10_000
-    })
-    .toBe('configured')
+  await waitForLocatorAttribute(
+    launchAction,
+    'data-launch-command-state',
+    'configured',
+    'service terminal launch command to become configured'
+  )
   const previousSessionId = await readTerminalSessionId(page, 'Terminal 1')
   await launchAction.click()
   await page.waitForFunction(
@@ -296,12 +309,42 @@ async function expectActualServiceAddress(
 ): Promise<void> {
   const address = terminal.getByLabel('实际服务地址', { exact: true })
 
-  await expect
-    .poll(async () => (await address.textContent())?.trim() ?? '', {
-      interval: 50,
-      timeout: 10_000
-    })
-    .toBe(expectedAddress)
+  const actualAddress = await pollUntilState({
+    description: `actual service address to become ${expectedAddress}`,
+    observe: async () => (await address.textContent())?.trim() ?? '',
+    accept: (currentAddress) => currentAddress === expectedAddress,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
+
+  expect(actualAddress).toBe(expectedAddress)
+}
+
+async function waitForLocatorAttribute(
+  locator: Locator,
+  name: string,
+  expectedValue: string,
+  description: string
+): Promise<void> {
+  const value = await pollUntilState({
+    description,
+    observe: () => locator.getAttribute(name),
+    accept: (currentValue) => currentValue === expectedValue,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
+
+  expect(value).toBe(expectedValue)
+}
+
+async function waitForLocatorDisabled(locator: Locator, description: string): Promise<void> {
+  await pollUntilState({
+    description,
+    observe: () => locator.isDisabled(),
+    accept: Boolean,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
 }
 
 async function initializeGitProjectWithHttpService(directory: string): Promise<void> {

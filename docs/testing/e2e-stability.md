@@ -74,7 +74,7 @@ await expectAuthoritativeResult(currentIdentity)
 3. 用户目标本身是可见行为时，等待真实 UI 状态和几何结果。
 4. 只有“经过一段时间”本身就是被测行为，或负向断言需要有界观察窗口时，才使用固定时间，并在测试中说明其业务含义。
 
-`waitForFunction`、locator 自动等待和 `expect.poll` 只是实现手段。稳定性的来源是条件表达了真实完成语义，而不是换了一个等待 API。
+`waitForFunction`、locator 自动等待和项目统一的 `pollUntilState` 只是实现手段。稳定性的来源是条件表达了真实完成语义，而不是换了一个等待 API；Node 侧普通轮询必须使用统一入口，直接 `expect.poll` 或 `vi.waitUntil` 会被静态门禁拒绝。
 
 ## 用稳定身份跟随生命周期
 
