@@ -23,13 +23,18 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
   prependE2ePath,
   readTerminalSessionId,
   waitForTerminalShellReady
 } from '../support/e2eTerminal'
-import { ensureTerminalDomRenderer } from '../support/terminalSelectionE2e'
+import { waitForTerminalDomText } from '../support/terminalSelectionE2e'
+import {
+  expectProjectionColorContinuity,
+  expectTerminalPresentation
+} from '../support/terminalThemeE2e'
 
 const execFileAsync = promisify(execFile)
 const featureBranchName = 'feature/agent-theme'
@@ -312,7 +317,7 @@ async function waitForAgentTerminal(
   const viewport = page.locator(
     `.agent-terminal-viewport[data-agent-terminal-workspace-name="${workspaceDisplayName}"]`
   )
-  await waitForTerminalDomText(viewport, fakeCodexMarker)
+  await waitForTerminalDomText(viewport, fakeCodexMarker, 15_000)
   const visibleOutput = await viewport.locator('.xterm-rows').textContent()
   expect(visibleOutput).not.toMatch(/(?:2)?;1H/)
   expect(visibleOutput).not.toContain('CLEANCODE_JOB:')
@@ -348,20 +353,6 @@ async function waitForAgentTerminal(
   }
 }
 
-async function waitForTerminalDomText(viewport: Locator, text: string): Promise<void> {
-  const deadline = Date.now() + 15_000
-  while (Date.now() < deadline) {
-    await ensureTerminalDomRenderer(viewport)
-    const contents = await viewport
-      .locator('.xterm-rows')
-      .textContent()
-      .catch(() => '')
-    if (contents?.includes(text)) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for Agent terminal output: ${text}`)
-}
-
 async function readTerminalRuntime(page: Page, sessionId: string) {
   const runtime = await page.evaluate(async (targetSessionId) => {
     const sessions =
@@ -386,219 +377,14 @@ async function readProjectMetadata(workbench: E2eWorkbench): Promise<{
   return JSON.parse(await readOnlyJsonFile(workbench.appStateDirectory, 'project.json'))
 }
 
-async function expectTerminalPresentation(
-  page: Page,
-  viewport: Locator,
-  visualTheme: 'dark' | 'light',
-  shouldBeFiltered: boolean
-): Promise<void> {
-  const projection = viewport.locator('..')
-
-  await expect
-    .poll(() => projection.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
-      interval: 50,
-      timeout: 5_000
-    })
-    .toBe(false)
-  await expect
-    .poll(() => viewport.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
-      interval: 50,
-      timeout: 5_000
-    })
-    .toBe(shouldBeFiltered)
-
-  const luminance = expect.poll(() => readCenterLuminance(page, viewport), {
-    interval: 100,
-    timeout: 5_000
-  })
-
-  if (visualTheme === 'dark') {
-    await luminance.toBeLessThan(0.2)
-  } else {
-    await luminance.toBeGreaterThan(0.8)
-  }
-}
-
-interface PixelColor {
-  readonly blue: number
-  readonly green: number
-  readonly red: number
-}
-
-async function readProjectionColors(
-  page: Page,
-  projection: Locator
-): Promise<{
-  readonly bottom: PixelColor
-  readonly content: PixelColor
-  readonly left: PixelColor
-  readonly top: PixelColor
-}> {
-  const geometry = await projection.evaluate((element) => {
-    const bounds = element.getBoundingClientRect()
-    const content = element.firstElementChild
-    if (!content) throw new Error('Terminal theme projection has no content.')
-    const contentBounds = content.getBoundingClientRect()
-    const leftInset = contentBounds.left - bounds.left
-    const topInset = contentBounds.top - bounds.top
-    const bottomInset = bounds.bottom - contentBounds.bottom
-
-    return {
-      cssHeight: bounds.height,
-      cssWidth: bounds.width,
-      sampleBottomY: bounds.height - bottomInset / 2,
-      sampleContentX: contentBounds.right - bounds.left - 24,
-      sampleContentY: contentBounds.top - bounds.top + contentBounds.height / 2,
-      sampleLeftX: leftInset / 2,
-      sampleTopY: topInset / 2
-    }
-  })
-  const screenshot = await projection.screenshot()
-
-  return page.evaluate(
-    async ({
-      base64Png,
-      cssHeight,
-      cssWidth,
-      sampleBottomY,
-      sampleContentX,
-      sampleContentY,
-      sampleLeftX,
-      sampleTopY
-    }) => {
-      const image = new Image()
-      image.src = `data:image/png;base64,${base64Png}`
-      await image.decode()
-
-      const canvas = document.createElement('canvas')
-      canvas.width = image.naturalWidth
-      canvas.height = image.naturalHeight
-      const context = canvas.getContext('2d')
-      if (!context) throw new Error('Unable to sample terminal theme projection.')
-      context.drawImage(image, 0, 0)
-
-      const scaleX = canvas.width / cssWidth
-      const scaleY = canvas.height / cssHeight
-      const read = (cssX: number, cssY: number) => {
-        const pixel = context.getImageData(
-          Math.max(0, Math.min(canvas.width - 1, Math.round(cssX * scaleX))),
-          Math.max(0, Math.min(canvas.height - 1, Math.round(cssY * scaleY))),
-          1,
-          1
-        ).data
-        return { blue: pixel[2]!, green: pixel[1]!, red: pixel[0]! }
-      }
-
-      return {
-        bottom: read(sampleContentX, sampleBottomY),
-        content: read(sampleContentX, sampleContentY),
-        left: read(sampleLeftX, sampleContentY),
-        top: read(sampleContentX, sampleTopY)
-      }
-    },
-    {
-      base64Png: screenshot.toString('base64'),
-      ...geometry
-    }
-  )
-}
-
-async function expectProjectionColorContinuity(
-  page: Page,
-  projection: Locator,
-  kind: 'agent' | 'terminal'
-): Promise<void> {
-  const content = projection
-    .locator(':scope > .agent-terminal-viewport, :scope > .terminal-viewport')
-    .first()
-  await expect
-    .poll(() => content.evaluate((element) => getComputedStyle(element).filter !== 'none'), {
-      interval: 50,
-      timeout: 5_000
-    })
-    .toBe(true)
-  expect(await projection.evaluate((element) => getComputedStyle(element).filter)).toBe('none')
-  await expect
-    .poll(
-      () =>
-        projection.evaluate((element) => {
-          const bounds = element.getBoundingClientRect()
-          const canvasBounds = element.closest('.react-flow')?.getBoundingClientRect()
-          return Boolean(
-            canvasBounds &&
-            bounds.left >= canvasBounds.left &&
-            bounds.top >= canvasBounds.top &&
-            bounds.right <= canvasBounds.right &&
-            bounds.bottom <= canvasBounds.bottom
-          )
-        }),
-      { interval: 50, timeout: 5_000 }
-    )
-    .toBe(true)
-
-  const colors = await readProjectionColors(page, projection)
-  const distances = {
-    bottom: maximumColorDistance(colors.content, colors.bottom),
-    left: maximumColorDistance(colors.content, colors.left),
-    top: maximumColorDistance(colors.content, colors.top)
-  }
-  const message = `${kind} projection colors: ${JSON.stringify(colors)}`
-  expect(distances.bottom, message).toBeLessThanOrEqual(2)
-  expect(distances.left, message).toBeLessThanOrEqual(2)
-  expect(distances.top, message).toBeLessThanOrEqual(2)
-}
-
-function maximumColorDistance(left: PixelColor, right: PixelColor): number {
-  return Math.max(
-    Math.abs(left.red - right.red),
-    Math.abs(left.green - right.green),
-    Math.abs(left.blue - right.blue)
-  )
-}
-
-async function readCenterLuminance(page: Page, viewport: Locator): Promise<number> {
-  const screenshot = await viewport.screenshot()
-
-  return page.evaluate(async (base64Png) => {
-    const image = new Image()
-    image.src = `data:image/png;base64,${base64Png}`
-    await image.decode()
-
-    const canvas = document.createElement('canvas')
-    canvas.width = image.naturalWidth
-    canvas.height = image.naturalHeight
-    const context = canvas.getContext('2d')
-
-    if (!context) {
-      throw new Error('Unable to create screenshot sampling context.')
-    }
-
-    context.drawImage(image, 0, 0)
-    const sampleSize = 5
-    const pixels = context.getImageData(
-      Math.floor((canvas.width - sampleSize) / 2),
-      Math.floor((canvas.height - sampleSize) / 2),
-      sampleSize,
-      sampleSize
-    ).data
-    let luminance = 0
-
-    for (let index = 0; index < pixels.length; index += 4) {
-      luminance +=
-        (0.2126 * pixels[index]! + 0.7152 * pixels[index + 1]! + 0.0722 * pixels[index + 2]!) / 255
-    }
-
-    return luminance / (pixels.length / 4)
-  }, screenshot.toString('base64'))
-}
-
 async function expectFakeCodexSession(
   identity: AgentTerminalIdentity,
   expectedDirectory: string,
   reportPath: string
 ): Promise<void> {
-  await expect
-    .poll(async () => {
+  await pollUntilState({
+    description: `fake Codex session ${identity.providerProcessId} to report ${expectedDirectory}`,
+    observe: async () => {
       const reports = await readFakeCodexCliReports(reportPath)
       return reports.some(
         (report) =>
@@ -606,8 +392,10 @@ async function expectFakeCodexSession(
           String(report.pid) === identity.providerProcessId &&
           report.cwd === expectedDirectory
       )
-    })
-    .toBe(true)
+    },
+    accept: Boolean,
+    timeoutMs: 10_000
+  })
 }
 
 function expectSessionReport(
@@ -665,12 +453,17 @@ async function initializeGitProject(directory: string): Promise<void> {
 }
 
 async function expectCurrentGitBranch(directory: string, branchName: string): Promise<void> {
-  await expect
-    .poll(async () => {
+  const currentBranch = await pollUntilState({
+    description: `Git branch to become ${branchName}`,
+    observe: async () => {
       const { stdout } = await execGit(directory, ['branch', '--show-current'])
       return stdout.trim()
-    })
-    .toBe(branchName)
+    },
+    accept: (branch) => branch === branchName,
+    timeoutMs: 10_000
+  })
+
+  expect(currentBranch).toBe(branchName)
 }
 
 async function execGit(directory: string, args: readonly string[]) {

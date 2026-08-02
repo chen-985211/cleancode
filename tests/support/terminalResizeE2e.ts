@@ -1,6 +1,7 @@
 import type { Page } from 'playwright'
 
 import { readE2eBlockGraph } from './e2eBlockGraph'
+import { pollUntilState } from './e2ePolling'
 import type { E2eWorkbench } from './e2eWorkbench'
 
 export async function readRequiredBoundingBox(locator: ReturnType<Page['locator']>) {
@@ -50,30 +51,24 @@ export async function waitForTerminalBlockPositionChange(
   workbench: E2eWorkbench,
   beforePosition: { readonly x: number; readonly y: number }
 ) {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const position = await readTerminalBlockPosition(workbench)
-    if (position.x !== beforePosition.x || position.y !== beforePosition.y) return position
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readTerminalBlockPosition(workbench)
+  return pollUntilState({
+    description: 'terminal block position to change',
+    observe: () => readTerminalBlockPosition(workbench),
+    accept: (position) => position.x !== beforePosition.x || position.y !== beforePosition.y,
+    timeoutMs: 5_000
+  })
 }
 
 export async function waitForTerminalBlockSizeChange(
   workbench: E2eWorkbench,
   beforeSize: { readonly width: number; readonly height: number }
 ) {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const size = await readTerminalBlockSize(workbench)
-    if (size.width !== beforeSize.width || size.height !== beforeSize.height) return size
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readTerminalBlockSize(workbench)
+  return pollUntilState({
+    description: 'terminal block size to change',
+    observe: () => readTerminalBlockSize(workbench),
+    accept: (size) => size.width !== beforeSize.width || size.height !== beforeSize.height,
+    timeoutMs: 5_000
+  })
 }
 
 async function startTerminalResizeFromBottomRight(

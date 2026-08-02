@@ -12,6 +12,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { pollUntilState } from '../support/e2ePolling'
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -69,12 +70,16 @@ describe('terminal groups e2e', () => {
 
       await dragTerminalHeader(page, terminalTwo.id, 260, 0)
 
-      await expect
-        .poll(async () => {
+      const resizedWidth = await pollUntilState({
+        description: 'terminal group visible width to reflect the member drag',
+        observe: async () => {
           const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
           return box?.width ?? 0
-        })
-        .toBeGreaterThan(groupBeforeBox.width + 120)
+        },
+        accept: (width) => width > groupBeforeBox.width + 120,
+        timeoutMs: 5_000
+      })
+      expect(resizedWidth).toBeGreaterThan(groupBeforeBox.width + 120)
       const groupAfterDrag = await waitForTerminalGroup(
         page,
         workbench,
@@ -172,23 +177,14 @@ async function waitForGraph(
   workbench: E2eWorkbench,
   predicate: (graph: TerminalGroupGraphRecord) => boolean
 ): Promise<TerminalGroupGraphRecord> {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    try {
-      const graph = await readGraph(page, workbench)
-
-      if (predicate(graph)) {
-        return graph
-      }
-    } catch {
-      // The project may not be registered until the first action completes.
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 250))
-  }
-
-  return readGraph(page, workbench)
+  return pollUntilState({
+    description: 'terminal group graph state',
+    observe: () => readGraph(page, workbench),
+    accept: predicate,
+    intervalMs: 250,
+    retryObservationErrors: true,
+    timeoutMs: 5_000
+  })
 }
 
 async function readGraph(page: Page, workbench: E2eWorkbench): Promise<TerminalGroupGraphRecord> {

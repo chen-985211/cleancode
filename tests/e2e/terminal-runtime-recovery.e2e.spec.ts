@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
-import { expect, vi } from 'vitest'
+import { expect } from 'vitest'
 
 import {
   closeElectronApp,
@@ -20,6 +20,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { readE2eProcessOutput } from '../support/e2eDiagnostics'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
@@ -264,97 +265,82 @@ async function waitForPersistedTerminalHistory(
     'recovery'
   )
 
-  await expect
-    .poll(
-      async () => {
-        const entries = await readdir(recoveryDirectory, { recursive: true }).catch(() => [])
+  await pollUntilState({
+    description: `persisted terminal history to contain ${expectedText}`,
+    observe: async () => {
+      const entries = await readdir(recoveryDirectory, { recursive: true }).catch(() => [])
 
-        for (const entry of entries) {
-          const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
-          if (contents.includes(expectedText)) return true
-        }
-        return false
-      },
-      { interval: 100, timeout: 10_000 }
-    )
-    .toBe(true)
+      for (const entry of entries) {
+        const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
+        if (contents.includes(expectedText)) return true
+      }
+      return false
+    },
+    accept: Boolean,
+    intervalMs: 100,
+    timeoutMs: 10_000
+  })
 }
 
 async function launchWorkbench(workbench: E2eWorkbench) {
-  const launch = () =>
-    launchApp(workbench, {
+  let electronApp: ElectronApplication | undefined
+
+  try {
+    electronApp = await launchApp(workbench, {
       environment: createE2eTerminalEnvironment()
     })
-  const launchErrors: unknown[] = []
-  const retryDelaysMs = process.platform === 'win32' ? [0, 500, 1_000] : [0]
-
-  for (const retryDelayMs of retryDelaysMs) {
-    let electronApp: ElectronApplication | undefined
-    if (retryDelayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    const page = await electronApp.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await expectDesktopRuntime(page)
+    await waitForTerminalRuntimeReady(page)
+    return { electronApp, page }
+  } catch (error) {
+    if (electronApp) {
+      await closeElectronApp(electronApp).catch(() => undefined)
     }
-    try {
-      electronApp = await launch()
-      const page = await electronApp.firstWindow()
-      await page.waitForLoadState('domcontentloaded')
-      await expectDesktopRuntime(page)
-      await waitForTerminalRuntimeReady(page)
-      return { electronApp, page }
-    } catch (error) {
-      launchErrors.push(error)
-      if (electronApp) {
-        await closeElectronApp(electronApp).catch(() => undefined)
-      }
-    }
+    throw new Error('Electron failed to relaunch after the terminal Provider handoff.', {
+      cause: error
+    })
   }
-
-  throw new AggregateError(
-    launchErrors,
-    'Electron failed to relaunch after the Windows process handoff.'
-  )
 }
 
 async function waitForTerminalRuntimeReady(page: Page): Promise<void> {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async () => {
-          const availability = await window.cleancode?.getTerminalRuntimeAvailability()
-          if (availability?.phase === 'unavailable' && availability.retryable) {
-            return (await window.cleancode?.retryTerminalRuntime())?.phase ?? 'missing'
-          }
-          return availability?.phase ?? 'missing'
-        }),
-      { interval: 250, timeout: process.platform === 'win32' ? 10_000 : 5_000 }
-    )
-    .toBe('ready')
+  const phase = await pollUntilState({
+    description: 'terminal runtime availability to become ready',
+    observe: () =>
+      page.evaluate(async () => {
+        const availability = await window.cleancode?.getTerminalRuntimeAvailability()
+        if (availability?.phase === 'unavailable' && availability.retryable) {
+          return (await window.cleancode?.retryTerminalRuntime())?.phase ?? 'missing'
+        }
+        return availability?.phase ?? 'missing'
+      }),
+    accept: (currentPhase) => currentPhase === 'ready',
+    intervalMs: 250,
+    timeoutMs: process.platform === 'win32' ? 10_000 : 5_000
+  })
+
+  expect(phase).toBe('ready')
 }
 
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
   const createTerminal = page.getByRole('button', { name: '新建终端积木' })
-  await expect.poll(() => createTerminal.isEnabled(), { timeout: 10_000 }).toBe(true)
+  await pollUntilState({
+    description: 'new terminal action to become enabled',
+    observe: () => createTerminal.isEnabled(),
+    accept: Boolean,
+    timeoutMs: 10_000
+  })
   await createTerminal.click()
   await ensureTerminalShellStarted(page, 'Terminal 1')
 }
 
 async function ensureTerminalShellStarted(page: Page, terminalName: string): Promise<void> {
-  const maximumAttempts = process.platform === 'win32' ? 2 : 1
-  let failureReason = 'unknown terminal startup failure'
+  const outcome = await waitForTerminalShellOutcome(page, terminalName)
+  if (outcome.phase === 'ready') return
 
-  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
-    const outcome = await waitForTerminalShellOutcome(page, terminalName)
-    if (outcome.phase === 'ready') return
-
-    failureReason = outcome.failureReason
-    if (attempt < maximumAttempts) {
-      await page.getByRole('button', { name: `${terminalName} 重开空终端会话` }).click()
-    }
-  }
-
-  throw new Error(
-    `${terminalName} did not start after ${maximumAttempts} attempt(s): ${failureReason}`
-  )
+  throw new Error(`${terminalName} did not start: ${outcome.failureReason}`)
 }
 
 async function waitForTerminalShellOutcome(
@@ -363,8 +349,9 @@ async function waitForTerminalShellOutcome(
 ): Promise<
   { readonly phase: 'failed'; readonly failureReason: string } | { readonly phase: 'ready' }
 > {
-  return vi.waitUntil(
-    () =>
+  const outcome = await pollUntilState({
+    description: `${terminalName} shell to become ready or fail`,
+    observe: () =>
       page.evaluate(
         async ({ marker, terminalName, windows }) => {
           const output = Array.from(
@@ -396,8 +383,13 @@ async function waitForTerminalShellOutcome(
           windows: process.platform === 'win32'
         }
       ),
-    { interval: 50, timeout: 30_000 }
-  )
+    accept: (currentOutcome) => currentOutcome !== null,
+    intervalMs: 50,
+    timeoutMs: 30_000
+  })
+
+  if (!outcome) throw new Error(`${terminalName} shell outcome was unavailable.`)
+  return outcome
 }
 
 async function crashElectronMainProcess(electronApp: ElectronApplication): Promise<void> {
@@ -420,7 +412,12 @@ async function crashElectronMainProcess(electronApp: ElectronApplication): Promi
 
 async function waitForTerminalStopActionDisabled(page: Page): Promise<void> {
   const stopAction = page.getByRole('button', { name: 'Terminal 1 停止当前命令' })
-  await expect.poll(() => stopAction.isDisabled(), { timeout: 5_000 }).toBe(true)
+  await pollUntilState({
+    description: 'terminal stop action to become disabled',
+    observe: () => stopAction.isDisabled(),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
 }
 
 async function retainTerminal(page: Page): Promise<string> {

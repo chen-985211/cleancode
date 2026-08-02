@@ -23,8 +23,10 @@ import {
 import {
   agentLaunchReadyTimeoutMs,
   waitForAgentLaunchReady,
+  waitForAgentProviderInstalled,
   waitForAgentTerminalReady
 } from '../support/e2eAgentRuntime'
+import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
 describe('Codex Agent session e2e', () => {
@@ -64,7 +66,7 @@ describe('Codex Agent session e2e', () => {
       await configureCodexExecutable(page, fakeCodex.executablePath)
       await page.getByRole('button', { name: '添加项目' }).click()
       await waitForAgentCount(page, 0)
-      await expectAgentProviderInstalled(page, 'codex')
+      await waitForAgentProviderInstalled(page, 'codex')
       await selectDefaultAgentProvider(page, 'Codex')
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
@@ -242,16 +244,6 @@ async function selectDefaultAgentProvider(page: Page, providerName: string): Pro
   await providerOption.click({ timeout: 1_000 })
 }
 
-async function expectAgentProviderInstalled(page: Page, providerId: string): Promise<void> {
-  const availability = await page.evaluate(async (requestedProviderId) => {
-    const inspect = window.cleancode?.inspectAgentProvider
-    if (!inspect) throw new Error('Agent Provider inspection is unavailable.')
-    return inspect({ providerId: requestedProviderId })
-  }, providerId)
-
-  expect(availability).toMatchObject({ providerId, status: 'installed' })
-}
-
 async function waitForCodexLaunch(
   reportPath: string,
   expectedCount: number,
@@ -294,14 +286,15 @@ async function waitForCodexReport(
   description: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<FakeCodexCliReport> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const reports = await readFakeCodexCliReports(reportPath)
-    const selected = select(reports)
-    if (selected) return selected
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error(`Timed out waiting for ${description}.`)
+  const report = await pollUntilState({
+    description,
+    observe: async () => select(await readFakeCodexCliReports(reportPath)),
+    accept: (observation) => observation !== undefined,
+    timeoutMs
+  })
+
+  if (!report) throw new Error(`The completed ${description} observation was unavailable.`)
+  return report
 }
 
 async function readCodexProviderSessionRefs(
@@ -330,19 +323,15 @@ async function waitForCodexConversationBinding(
   sessionId: string,
   timeoutMs = agentLaunchReadyTimeoutMs
 ): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const bindings = await readCodexProviderSessionRefs(workbench)
-    if (
+  await pollUntilState({
+    description: `durable Codex conversation binding ${sessionId}`,
+    observe: () => readCodexProviderSessionRefs(workbench),
+    accept: (bindings) =>
       bindings.some(
         (sessionRef) => sessionRef.kind === 'codex-thread' && sessionRef.value === sessionId
-      )
-    ) {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-  throw new Error('Timed out waiting for a durable Codex conversation binding.')
+      ),
+    timeoutMs
+  })
 }
 
 interface CodexProviderSessionRef {

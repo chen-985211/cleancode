@@ -71,6 +71,8 @@ Renderer 重新进入工作区或崩溃重建时，可以批量查询应用层�
 
 `owner.kind = agent` 只开放基础终端和前台任务能力。它不能进入 BlockGraph 组合、依赖工作流、受管服务端口或普通终端批量动作；Agent 通过自己拥有的 `AgentTerminalRuntimePort` 和基础设施 adapter 调用 Run 应用层，Run 不反向依赖 Agent 类型。
 
+Windows agent-owned terminal 在开放 `launchForegroundJob` 前必须先完成外层 PowerShell 的交互就绪握手。Run infrastructure 的单一 readiness owner 只接受精确 OSC marker 作为 `ready`，把 marker 前的 PTY exit 收敛为 `exited`，并用独立 safety deadline 防止启动永久挂起；deadline 只形成 `deadlineExceeded` 失败，不能证明成功。marker 可以跨多个 `node-pty.onData` chunk 到达，首个终局状态不可被迟到 output 或 exit 改写。失败诊断只包含耗时、接收字节数和 marker 匹配进度，不得包含 terminal 输出或环境变量；失败后沿 PTY 既有停止路径释放进程。
+
 `launchForegroundJob` 为当前仍运行的 agent-owned terminal 创建单调 generation 和随机 `launchId`。macOS/Linux 把经过校验的 executable、argv 与 environment 写入 mode `0700` 的 POSIX 临时脚本，参数逐个 shell quote；Windows 通过 ConPTY 的长期 PowerShell 启动 ASCII-only 临时 `.ps1`，executable、argv 与 environment 值先按 UTF-8 Base64 编码，再在子 PowerShell 进程内恢复为独立参数和进程级环境变量。Windows 脚本还必须在 started 控制帧之前按固定 `terminalSourceTheme` 设置 ConsoleColor：浅色使用 `Black`/`White`，深色使用 `Gray`/`Black`。两条路径都校验环境名，并通过随机 Token 控制帧确认 started/exit；PowerShell `finally` 在 `Ctrl+C` 时仍报告本次 launch 退出，而不关闭外层 shell。从内部 probe 写入 shell 到 started 控制帧到达之间属于 `awaiting_started` 控制阶段，该阶段的 shell 回显、颜色准备、临时脚本路径、状态变量和控制 Token 必须被消费，不能进入 transcript、snapshot 或用户屏幕；started 之后的 Provider 输出和 exit 之后的 shell 输出才进入权威模型。临时目录在退出、替换、terminal 终止或失败时幂等删除。
 
 前台任务自然结束、被 `Ctrl+C` 中断，或响应拥有该 Agent Provider 协议的有界正常退出输入后，`ForegroundJob` 记录真实退出码，底层 shell 继续运行并接受输入。只有 shell/PTY 退出才使 `TerminalSession` 进入 `exited`。同一 terminal 可以顺序启动多个 job，旧 `launchId + generation` 的 started/exit 事件不能改变新 job；正常退出输入也只能作用于仍匹配的当前 generation，launch 一旦退出便停止发送剩余步骤。

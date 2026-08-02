@@ -1,6 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { pollUntilState } from '../../../support/e2ePolling'
+
 export interface MouseReport {
   readonly button: number
   readonly column: number
@@ -277,18 +279,13 @@ export async function waitForMouseReports(
   reportPath: string,
   requiredKinds: readonly MouseReport['kind'][]
 ): Promise<MouseReport[]> {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    const reports = await readMouseReports(reportPath)
-
-    if (requiredKinds.every((kind) => reports.some((report) => report.kind === kind))) {
-      return reports
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-
-  return readMouseReports(reportPath)
+  return pollUntilState({
+    description: `mouse reports ${requiredKinds.join(', ')}`,
+    observe: () => readMouseReports(reportPath),
+    accept: (reports) =>
+      requiredKinds.every((kind) => reports.some((report) => report.kind === kind)),
+    timeoutMs: 5_000
+  })
 }
 
 async function readMouseReports(reportPath: string): Promise<MouseReport[]> {
