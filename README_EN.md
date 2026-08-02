@@ -25,7 +25,7 @@
 </div>
 
 <p align="center">
-  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Build and run a project startup workflow with an Agent in cleancode" />
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the cleancode canvas" />
 </p>
 
 ---
@@ -55,6 +55,8 @@ Start with one terminal, or assemble a complete development workbench:
 - Declare real dependencies with directed connections, not decorative lines.
 - Place multiple Agent consoles, each pinned to a Provider, on the same canvas.
 - Save a dedicated canvas, terminal definitions, and Agent identities for every branch workspace.
+- Save terminals, complete workflows, or combinations as project-scoped or global favorites, then place or place and run them.
+- Bind frequently used terminals, workflows, or combinations to quick execution slots `1` through `5`.
 
 **Your tools. Your Agents. Your workflow.**
 
@@ -123,14 +125,23 @@ Connections represent real dependencies; configuration represents real execution
 
 Node state, failure reasons, and actual service URLs all come from the runtime. The canvas shows what happened, but never presents a static label as runtime truth.
 
+## Build Once, Reuse Anytime
+
+Independent terminals, complete dependency workflows, and terminal combinations can all be saved as favorite templates. Project templates stay with the current project, while global templates can be placed in any project. Every placement creates new terminals, connections, and an optional combination while preserving the template's configuration, dependencies, and relative layout. **Place and run** sends the exact new instance to the same workflow scheduler.
+
+Each workspace also has five numbered quick execution slots. Bind a terminal, complete workflow, or combination from the object picker, by dragging it, or from its context menu. Clicking a slot only focuses the object on the canvas; press `Command/Ctrl + 1` through `5` to run it.
+
 ## Let Agents Help You Build
 
 Agents that support the native cleancode MCP can understand and organize the same workspace through stable tools instead of editing internal canvas data. The current toolset can:
 
 - Read the canvas, terminal blocks, connections, and execution plan.
-- Create, update, delete, and connect terminal blocks.
+- Create, configure, connect, group, arrange, and validate a complete new terminal workflow in one operation.
+- Incrementally create, update, delete, and connect existing terminal blocks.
 - Validate dependencies and inspect the startup plan.
-- Align, distribute, and automatically arrange terminal layouts.
+- Deterministically arrange related terminals and complete groups while avoiding existing canvas objects.
+
+A complete workflow created by an Agent lands on the canvas as one atomic update, then appears continuously using either **Build step by step** or **Enter in parallel**. Dragging objects, panning, or zooming immediately returns control to you; reduced-motion preferences show the final layout directly.
 
 Deleting blocks, dissolving groups, and disconnecting dependencies require approval in the cleancode UI. Starting and stopping workflows also remains under human control. Agents can help build your environment while every action that changes it stays visible.
 
@@ -140,7 +151,8 @@ Deleting blocks, dissolving groups, and disconnecting dependencies require appro
 2. Add the Coding Agent you use.
 3. Turn builds, tests, development servers, and helper commands into terminal blocks.
 4. Configure tasks, services, ports, and dependencies.
-5. Run any terminal and all its descendants, then inspect the result on the same canvas.
+5. Save frequently used terminals, workflows, or combinations as templates, or bind them to quick execution slots.
+6. Run a workflow from a terminal, combination, template, or shortcut, then inspect the result on the same canvas.
 
 ## Quick Start
 
@@ -210,8 +222,8 @@ When you push a `v*` tag that matches the version in `package.json`, GitHub Acti
 
 cleancode is under active development. Keep these current limitations in mind:
 
-- The canvas currently provides terminal blocks and terminal groups. Preview, HTTP, Test, File, Plugin, and other block types remain on the roadmap.
-- Agents can orchestrate and inspect terminal dependencies through MCP, but they cannot yet start, query, or stop workflows through MCP.
+- Executable block types currently remain terminal-centered, with terminal dependency workflows and terminal combinations. Preview, HTTP, Test, File, Plugin, and other standalone block types remain on the roadmap.
+- Agents can build, organize, and inspect terminal dependencies through MCP, but they cannot yet start, query, or stop workflows.
 - Active workflows and Agent terminal processes do not continue running after the app exits. Recoverable terminals and upstream conversations reconnect according to their individual capabilities.
 - The plugin extension system is not yet public, and third-party plugin compatibility is not guaranteed.
 - The prebuilt packages on GitHub Releases are unsigned Preview builds, not signed production releases.
@@ -228,6 +240,7 @@ For architecture and domain boundaries, see the [Architecture Guide](./docs/engi
 
 ## Documentation
 
+- [Product Features and Quick Start](./docs/product/feature-guide.md)
 - [Documentation Center](./docs/README.md)
 - [UI Contract](./docs/product/ui-contract.md)
 - [Terminal Dependency Workflows](./docs/contexts/run/terminal-workflow.md)
