@@ -9,9 +9,9 @@ describe('application shortcut navigation', () => {
   it.each([
     ['left', 'left'],
     ['right', 'right'],
-    ['up', 'up'],
+    ['up', 'closer-diagonal'],
     ['down', 'down']
-  ] as const)('selects the closest aligned node to the %s', (direction, expectedId) => {
+  ] as const)('selects the stable row or column target to the %s', (direction, expectedId) => {
     const nodes = [
       createNode('selected', 'terminal', 400, 300),
       createNode('left', 'terminalGroup', 100, 300),
@@ -30,6 +30,203 @@ describe('application shortcut navigation', () => {
         direction
       )?.id
     ).toBe(expectedId)
+  })
+
+  it.each([
+    ['right', 'top-left', 'top-right'],
+    ['left', 'top-right', 'top-left'],
+    ['down', 'top-left', 'bottom-left'],
+    ['up', 'bottom-left', 'top-left']
+  ] as const)(
+    'navigates %s between expanded group members without selecting the group frame',
+    (direction, selectedNodeId, expectedId) => {
+      const nodes = [
+        createExpandedGroupNode(),
+        createNode('top-left', 'terminal', 100, 100),
+        createNode('top-right', 'terminal', 500, 100),
+        createNode('bottom-left', 'terminal', 100, 400),
+        createNode('bottom-right', 'terminal', 500, 400)
+      ]
+
+      expect(
+        resolveDirectionalWorkbenchNode(
+          nodes,
+          selectedNodeId,
+          { x: 0, y: 0, zoom: 1 },
+          { width: 960, height: 640 },
+          direction
+        )?.id
+      ).toBe(expectedId)
+    }
+  )
+
+  it.each([
+    ['down', 'adjacent-lower-row'],
+    ['up', 'adjacent-upper-row']
+  ] as const)(
+    'chooses the adjacent %s row before a farther axis-aligned node',
+    (direction, expectedId) => {
+      const nodes = [
+        createSizedNode('selected', 'terminal', 400, 300, 160, 100),
+        createSizedNode('adjacent-upper-row', 'terminal', 0, 100, 120, 80),
+        createSizedNode('farther-upper-aligned', 'terminal', 430, -120, 100, 80),
+        createSizedNode('adjacent-lower-row', 'terminal', 0, 500, 120, 80),
+        createSizedNode('farther-lower-aligned', 'terminal', 430, 720, 100, 80)
+      ]
+
+      expect(
+        resolveDirectionalWorkbenchNode(
+          nodes,
+          'selected',
+          { x: 0, y: 0, zoom: 1 },
+          { width: 960, height: 640 },
+          direction
+        )?.id
+      ).toBe(expectedId)
+    }
+  )
+
+  it('selects an expanded group as a whole when navigating into it from outside', () => {
+    const nodes = [
+      createNode('outside', 'terminal', -400, 300),
+      createExpandedGroupNode(),
+      createNode('top-left', 'terminal', 100, 100),
+      createNode('top-right', 'terminal', 500, 100),
+      createNode('bottom-left', 'terminal', 100, 400),
+      createNode('bottom-right', 'terminal', 500, 400)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'outside',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'right'
+      )?.id
+    ).toBe('expanded-group')
+  })
+
+  it.each([
+    ['down', 'top-left'],
+    ['up', 'bottom-left'],
+    ['right', 'top-left'],
+    ['left', 'top-right']
+  ] as const)('enters an expanded group through its %s-facing edge', (direction, expectedId) => {
+    const nodes = [
+      createExpandedGroupNode(),
+      createNode('top-left', 'terminal', 100, 100),
+      createNode('top-right', 'terminal', 500, 100),
+      createNode('bottom-left', 'terminal', 100, 400),
+      createNode('bottom-right', 'terminal', 500, 400)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'expanded-group',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        direction
+      )?.id
+    ).toBe(expectedId)
+  })
+
+  it.each([
+    ['right', 'middle', 'right'],
+    ['left', 'middle', 'left'],
+    ['down', 'middle', 'lower-near'],
+    ['up', 'middle', 'upper-near']
+  ] as const)(
+    'uses stable row and column navigation for %s across irregular node sizes',
+    (direction, selectedNodeId, expectedId) => {
+      const nodes = [
+        createSizedNode('middle', 'terminal', 400, 300, 160, 100),
+        createSizedNode('left', 'agentConsole', 80, 320, 240, 70),
+        createSizedNode('right', 'terminal', 650, 280, 100, 160),
+        createSizedNode('upper-far', 'terminal', 410, -200, 120, 80),
+        createSizedNode('upper-near', 'terminal', 430, 120, 100, 80),
+        createSizedNode('lower-far', 'terminal', 420, 760, 120, 80),
+        createSizedNode('lower-near', 'terminal', 450, 500, 100, 80)
+      ]
+
+      expect(
+        resolveDirectionalWorkbenchNode(
+          nodes,
+          selectedNodeId,
+          { x: 0, y: 0, zoom: 1 },
+          { width: 960, height: 640 },
+          direction
+        )?.id
+      ).toBe(expectedId)
+    }
+  )
+
+  it('selects the expanded parent group before leaving its member scope', () => {
+    const nodes = [
+      createExpandedGroupNode(),
+      createNode('top-left', 'terminal', 100, 100),
+      createNode('top-right', 'terminal', 500, 100),
+      createNode('bottom-left', 'terminal', 100, 400),
+      createNode('bottom-right', 'terminal', 500, 400),
+      createNode('outside-right', 'terminal', 1_200, 100)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'top-right',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'right'
+      )?.id
+    ).toBe('expanded-group')
+  })
+
+  it('leaves the expanded group after it was selected from a boundary member', () => {
+    const nodes = [
+      createExpandedGroupNode(),
+      createNode('top-left', 'terminal', 100, 100),
+      createNode('top-right', 'terminal', 500, 100),
+      createNode('bottom-left', 'terminal', 100, 400),
+      createNode('bottom-right', 'terminal', 500, 400),
+      createNode('outside-right', 'terminal', 1_200, 100)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'expanded-group',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'right',
+        'top-right',
+        'right'
+      )?.id
+    ).toBe('outside-right')
+  })
+
+  it('re-enters an expanded group when direction changes at the parent boundary', () => {
+    const nodes = [
+      createExpandedGroupNode(),
+      createNode('top-left', 'terminal', 100, 100),
+      createNode('top-right', 'terminal', 500, 100),
+      createNode('bottom-left', 'terminal', 100, 400),
+      createNode('bottom-right', 'terminal', 500, 400),
+      createNode('outside-right', 'terminal', 1_200, 100)
+    ]
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        nodes,
+        'expanded-group',
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'down',
+        'top-right',
+        'right'
+      )?.id
+    ).toBe('top-left')
   })
 
   it('uses the viewport center when nothing is selected', () => {
@@ -140,6 +337,36 @@ function createNode(
     id,
     type,
     position: { x, y },
-    style: { width: 120, height: 80 }
+    style: { width: 120, height: 80 },
+    ...(type === 'terminalGroup' ? { data: { group: { isCollapsed: true } } } : {})
+  } as unknown as WorkbenchFlowNode
+}
+
+function createSizedNode(
+  id: string,
+  type: WorkbenchFlowNode['type'],
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): WorkbenchFlowNode {
+  return {
+    ...createNode(id, type, x, y),
+    style: { width, height }
   } as WorkbenchFlowNode
+}
+
+function createExpandedGroupNode(): WorkbenchFlowNode {
+  return {
+    id: 'expanded-group',
+    type: 'terminalGroup',
+    position: { x: 50, y: 50 },
+    style: { width: 1_000, height: 800 },
+    data: {
+      group: {
+        isCollapsed: false,
+        memberBlockIds: ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+      }
+    }
+  } as unknown as WorkbenchFlowNode
 }

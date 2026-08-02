@@ -12,20 +12,18 @@ export interface WorkbenchNodeFocusSize {
 interface ResolveWorkbenchNodeFocusZoomInput {
   readonly canvasSize: WorkbenchNodeFocusSize
   readonly currentZoom: number
-  readonly intent: 'minimap' | 'shortcut'
   readonly nodeSize: WorkbenchNodeFocusSize
 }
 
 const focusSafeWidthRatio = 0.72
 const focusSafeHeightRatio = 0.68
-const minimapReadableZoom = 0.9
+const workbenchNodeReadableZoom = 0.9
 const zoomChangeThresholdRatio = 0.08
 const fallbackCanvasSize = { width: 960, height: 640 }
 
 export function resolveWorkbenchNodeFocusZoom({
   canvasSize,
   currentZoom,
-  intent,
   nodeSize
 }: ResolveWorkbenchNodeFocusZoomInput): number {
   const normalizedCurrentZoom = clampZoom(currentZoom)
@@ -39,10 +37,7 @@ export function resolveWorkbenchNodeFocusZoom({
       safeHeight / resolvePositiveDimension(nodeSize.height, safeHeight)
     )
   )
-  const preferredZoom =
-    intent === 'minimap'
-      ? Math.max(normalizedCurrentZoom, minimapReadableZoom)
-      : normalizedCurrentZoom
+  const preferredZoom = Math.max(normalizedCurrentZoom, workbenchNodeReadableZoom)
   const targetZoom = clampZoom(Math.min(preferredZoom, fitZoom))
 
   return isMaterialZoomChange(normalizedCurrentZoom, targetZoom)

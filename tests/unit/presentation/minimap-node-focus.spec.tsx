@@ -37,6 +37,27 @@ describe('minimap node focus', () => {
     })
   })
 
+  it('restores a readable zoom when a compact minimap target is too small', () => {
+    const setCenter = vi.fn(async () => true)
+    const terminal = createTerminalBlock()
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter, 0.5)
+
+    render(
+      <MinimapFocusHarness
+        instance={instance}
+        nodeId={terminal.id}
+        terminalBlocksById={new Map([[terminal.id, terminal]])}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
+
+    const options = (
+      setCenter.mock.calls[0] as unknown as [number, number, { readonly zoom: number }]
+    )[2]
+    expect(options.zoom).toBe(0.9)
+  })
+
   it('zooms out enough to keep an oversized minimap terminal inside the focus safe frame', () => {
     const setCenter = vi.fn(async () => true)
     const terminal = createTerminalBlock({ width: 1_400, height: 1_000 })

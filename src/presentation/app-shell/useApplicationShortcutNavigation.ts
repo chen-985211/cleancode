@@ -52,9 +52,15 @@ export function useApplicationShortcutNavigation({
   const intentIdRef = useRef(0)
   const isWorkspaceTransitionPendingRef = useRef(false)
   const selectedNodeIdRef = useRef(selectedNodeId)
+  const previousShortcutSelectedNodeIdRef = useRef<string | null>(null)
+  const previousShortcutDirectionRef = useRef<CanvasNavigationDirection | null>(null)
   const activateWorkbenchNodeInputRef = useRef(activateWorkbenchNodeInput)
   const selectWorkbenchNodeRef = useRef(selectWorkbenchNode)
-  selectedNodeIdRef.current = selectedNodeId
+  if (selectedNodeIdRef.current !== selectedNodeId) {
+    selectedNodeIdRef.current = selectedNodeId
+    previousShortcutSelectedNodeIdRef.current = null
+    previousShortcutDirectionRef.current = null
+  }
   activateWorkbenchNodeInputRef.current = activateWorkbenchNodeInput
   selectWorkbenchNodeRef.current = selectWorkbenchNode
 
@@ -75,24 +81,28 @@ export function useApplicationShortcutNavigation({
       }
 
       const viewport = instance.getViewport()
+      const currentSelectedNodeId = selectedNodeIdRef.current
       const target = resolveDirectionalWorkbenchNode(
         getNodes(),
-        selectedNodeIdRef.current,
+        currentSelectedNodeId,
         viewport,
         canvasSizeRef.current,
-        direction
+        direction,
+        previousShortcutSelectedNodeIdRef.current,
+        previousShortcutDirectionRef.current
       )
       if (!target) {
         return
       }
 
       selectWorkbenchNodeRef.current(target)
+      previousShortcutSelectedNodeIdRef.current = currentSelectedNodeId
+      previousShortcutDirectionRef.current = direction
       selectedNodeIdRef.current = target.id
       const center = resolveWorkbenchNodeCenter(target)
       const zoom = resolveWorkbenchNodeFocusZoom({
         canvasSize: canvasSizeRef.current,
         currentZoom: viewport.zoom,
-        intent: 'shortcut',
         nodeSize: resolveWorkbenchNodeSize(target)
       })
       const transition = resolveWorkbenchFocusTransition({

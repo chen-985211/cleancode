@@ -87,6 +87,25 @@ describe('application shortcut navigation hook', () => {
     expect(options.zoom).toBeCloseTo(0.4352, 4)
   })
 
+  it('restores a readable zoom when the shortcut target is too small', () => {
+    const target = createNode('compact', 1_200, 700, { width: 400, height: 300 })
+    const setCenter = vi.fn(async () => true)
+    const hook = renderNavigationHook({
+      nodes: [target],
+      selectedNodeId: null,
+      selectWorkbenchNode: vi.fn(),
+      setCenter,
+      zoom: 0.5
+    })
+
+    act(() => hook.result.current.selectCanvasNode('right'))
+
+    const options = (
+      setCenter.mock.calls[0] as unknown as [number, number, { readonly zoom: number }]
+    )[2]
+    expect(options.zoom).toBe(0.9)
+  })
+
   it('centers without spatial motion when the user prefers reduced motion', () => {
     vi.stubGlobal(
       'matchMedia',
@@ -144,6 +163,37 @@ describe('application shortcut navigation hook', () => {
     expect(setCenter).toHaveBeenCalledTimes(2)
     expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(1, second)
     expect(activateWorkbenchNodeInput).toHaveBeenNthCalledWith(2, third)
+  })
+
+  it('traverses an expanded group boundary without skipping or oscillating', () => {
+    const outsideLeft = createNode('outside-left', -400, 300)
+    const memberLeft = createNode('member-left', 100, 400)
+    const memberRight = createNode('member-right', 500, 400)
+    const group = createExpandedGroupNode(['member-left', 'member-right'])
+    const outsideRight = createNode('outside-right', 1_200, 300)
+    const selectWorkbenchNode = vi.fn()
+    const hook = renderNavigationHook({
+      nodes: [outsideLeft, group, memberLeft, memberRight, outsideRight],
+      selectedNodeId: outsideLeft.id,
+      selectWorkbenchNode,
+      setCenter: vi.fn(async () => true)
+    })
+
+    act(() => {
+      hook.result.current.selectCanvasNode('right')
+      hook.result.current.selectCanvasNode('right')
+      hook.result.current.selectCanvasNode('right')
+      hook.result.current.selectCanvasNode('right')
+      hook.result.current.selectCanvasNode('right')
+    })
+
+    expect(selectWorkbenchNode.mock.calls.map(([node]) => node.id)).toEqual([
+      'expanded-group',
+      'member-left',
+      'member-right',
+      'expanded-group',
+      'outside-right'
+    ])
   })
 
   it('reactivates the selected target after its viewport transition settles', async () => {
@@ -228,4 +278,14 @@ function createNode(
     position: { x, y },
     style: size
   } as WorkbenchFlowNode
+}
+
+function createExpandedGroupNode(memberBlockIds: readonly string[]): WorkbenchFlowNode {
+  return {
+    id: 'expanded-group',
+    type: 'terminalGroup',
+    position: { x: 50, y: 50 },
+    style: { width: 1_000, height: 800 },
+    data: { group: { isCollapsed: false, memberBlockIds } }
+  } as unknown as WorkbenchFlowNode
 }

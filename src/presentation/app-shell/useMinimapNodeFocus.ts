@@ -314,7 +314,6 @@ function resolveMinimapTargetZoom(
   return resolveWorkbenchNodeFocusZoom({
     canvasSize: readMinimapFocusCanvasSize(),
     currentZoom: reactFlowInstance.getZoom(),
-    intent: 'minimap',
     nodeSize
   })
 }
