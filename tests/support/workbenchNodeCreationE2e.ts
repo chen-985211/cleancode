@@ -32,7 +32,7 @@ export async function setCanvasZoomToMaximum(page: Page): Promise<number> {
       if (!viewport) return false
       return new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a > previousZoom + 0.001
     }, currentZoom)
-    await waitForCanvasZoomToSettle(page)
+    await waitForCanvasZoomToPersist(page, currentZoom)
   }
 
   throw new Error('Canvas did not reach its maximum zoom.')
@@ -100,21 +100,31 @@ async function readCanvasZoom(page: Page): Promise<number> {
   })
 }
 
-async function waitForCanvasZoomToSettle(page: Page): Promise<void> {
-  let previousZoom = await readCanvasZoom(page)
-  let stableSamples = 0
-
+async function waitForCanvasZoomToPersist(page: Page, previousZoom: number): Promise<void> {
   await pollUntilState({
-    description: 'canvas zoom animation to settle for three samples',
-    observe: async () => {
-      const currentZoom = await readCanvasZoom(page)
-      stableSamples = Math.abs(currentZoom - previousZoom) <= 0.0005 ? stableSamples + 1 : 0
-      previousZoom = currentZoom
-      return { currentZoom, stableSamples }
-    },
-    accept: (observation) => observation.stableSamples >= 3,
-    intervalMs: 32,
-    timeoutMs: 2_000
+    description: 'canvas zoom animation to persist its completed viewport',
+    observe: () =>
+      page.evaluate(async () => {
+        const viewport = document.querySelector('.react-flow__viewport')
+        const api = window.cleancode
+        if (!viewport || !api) return null
+
+        const workbenches = await api.listWorkbenches()
+        const currentWorkbench =
+          workbenches.find((workbench) => workbench.isCurrentProject) ?? workbenches[0]
+
+        return {
+          currentZoom: new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a,
+          persistedZoom: currentWorkbench?.graph.viewport.zoom ?? null
+        }
+      }),
+    accept: (observation) =>
+      observation !== null &&
+      observation.persistedZoom !== null &&
+      observation.currentZoom > previousZoom + 0.001 &&
+      Math.abs(observation.currentZoom - observation.persistedZoom) <= 0.0005,
+    intervalMs: 50,
+    timeoutMs: 5_000
   })
 }
 
