@@ -25,6 +25,7 @@ import {
   createE2eTerminalEnvironment,
   prependE2ePath
 } from '../support/e2eTerminal'
+import { agentLaunchReadyTimeoutMs } from '../support/e2eAgentRuntime'
 import {
   ensureTerminalDomRenderer,
   readCanvasViewportTransform,
@@ -490,8 +491,42 @@ async function waitForAgentCreationReady(page: Page): Promise<void> {
 }
 
 async function createCodexAgent(page: Page): Promise<void> {
+  const refreshed = await ensureCodexProviderInstalled(page)
+  if (refreshed) {
+    await page.reload({ waitUntil: 'domcontentloaded' })
+  }
+  await waitForAgentCreationReady(page)
   await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
+  const codexOption = page.getByRole('menuitemradio', { name: 'Codex', exact: true })
+
+  try {
+    await codexOption.waitFor({ state: 'visible', timeout: 5_000 })
+  } catch {
+    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
+    throw new Error(
+      `Codex was installed but did not become selectable. Visible Providers: ${JSON.stringify(visibleProviders)}`
+    )
+  }
+
+  await codexOption.click({ timeout: 1_000 })
+}
+
+async function ensureCodexProviderInstalled(page: Page): Promise<boolean> {
+  return page.evaluate(async () => {
+    const api = window.cleancode
+    if (!api) throw new Error('CleanCode desktop API is unavailable.')
+
+    const discovered = await api.discoverCreatableAgentProviders()
+    if (discovered.some((provider) => provider.descriptor.id === 'codex')) return false
+
+    const availability = await api.inspectAgentProvider({ providerId: 'codex' })
+    if (availability.status !== 'installed') {
+      throw new Error(
+        `The fake Codex Provider did not become installed: ${JSON.stringify(availability)}`
+      )
+    }
+    return true
+  })
 }
 
 async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
@@ -534,7 +569,7 @@ async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promis
   }
 
   await page.evaluate(
-    ({ sessionId }) =>
+    ({ sessionId, timeoutMs }) =>
       new Promise<void>((resolve, reject) => {
         const api = window.cleancode
         if (!api) {
@@ -543,11 +578,17 @@ async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promis
         }
 
         let unsubscribe = (): void => undefined
+        let lastEvent: unknown = null
         const timeout = window.setTimeout(() => {
           unsubscribe()
-          reject(new Error('Timed out waiting for the fake Codex launch to exit.'))
-        }, 5_000)
+          reject(
+            new Error(
+              `Timed out waiting for the fake Codex launch to exit after ${timeoutMs}ms. Last runtime event: ${JSON.stringify(lastEvent)}`
+            )
+          )
+        }, timeoutMs)
         unsubscribe = api.onAgentRuntimeChanged((event) => {
+          if (event.sessionId === sessionId) lastEvent = event
           if (
             event.sessionId !== sessionId ||
             event.runtime.terminal.status !== 'running' ||
@@ -566,7 +607,7 @@ async function stopFakeCodexForShellSetup(page: Page, terminal: Locator): Promis
           reject(error)
         })
       }),
-    { sessionId }
+    { sessionId, timeoutMs: agentLaunchReadyTimeoutMs }
   )
 }
 
