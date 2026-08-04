@@ -1,4 +1,6 @@
 import { Check, GitBranch, Plus, Search } from 'lucide-react'
+import { useLayoutEffect, useState, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { WorkbenchSnapshot } from './types'
 import { useI18n } from './i18n/useI18n'
@@ -6,27 +8,73 @@ import { useI18n } from './i18n/useI18n'
 type GitBranchNavigationItem = WorkbenchSnapshot['gitBranches'][number]
 
 interface BranchSelectorPopoverProps {
+  readonly anchorRef: RefObject<HTMLElement | null>
   readonly branches: readonly GitBranchNavigationItem[]
+  readonly popoverRef: RefObject<HTMLDivElement | null>
   readonly searchQuery: string
   readonly onSearchQueryChange: (query: string) => void
   readonly onChooseBranch: (branch: GitBranchNavigationItem) => void
 }
 
+interface BranchSelectorPopoverPosition {
+  readonly left: number
+  readonly top: number
+}
+
 export function BranchSelectorPopover({
+  anchorRef,
   branches,
+  popoverRef,
   searchQuery,
   onSearchQueryChange,
   onChooseBranch
 }: BranchSelectorPopoverProps) {
   const { t } = useI18n()
+  const [position, setPosition] = useState<BranchSelectorPopoverPosition | null>(null)
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
   const visibleBranches = normalizedQuery
     ? branches.filter((branch) => branch.name.toLocaleLowerCase().includes(normalizedQuery))
     : branches
   const orderedVisibleBranches = orderBranchSelectorItems(visibleBranches)
 
-  return (
-    <div className="branch-selector-popover" role="dialog" aria-label={t('branchSelector.dialog')}>
+  useLayoutEffect(() => {
+    const positionPopover = (): void => {
+      const anchor = anchorRef.current
+      const popover = popoverRef.current
+      if (!anchor || !popover) return
+
+      setPosition(
+        resolveBranchSelectorPopoverPosition({
+          anchorRect: anchor.getBoundingClientRect(),
+          popoverHeight: popover.offsetHeight,
+          popoverWidth: popover.offsetWidth,
+          viewportHeight: window.innerHeight,
+          viewportWidth: window.innerWidth
+        })
+      )
+    }
+
+    positionPopover()
+    window.addEventListener('resize', positionPopover)
+    window.addEventListener('scroll', positionPopover, true)
+    return () => {
+      window.removeEventListener('resize', positionPopover)
+      window.removeEventListener('scroll', positionPopover, true)
+    }
+  }, [anchorRef, popoverRef])
+
+  return createPortal(
+    <div
+      className="branch-selector-popover"
+      ref={popoverRef}
+      role="dialog"
+      aria-label={t('branchSelector.dialog')}
+      style={{
+        left: position?.left ?? 0,
+        top: position?.top ?? 0,
+        visibility: position ? 'visible' : 'hidden'
+      }}
+    >
       <label className="sr-only" htmlFor="branch-selector-search">
         {t('branchSelector.search')}
       </label>
@@ -82,8 +130,34 @@ export function BranchSelectorPopover({
         <Plus size={16} aria-hidden="true" />
         {t('branchSelector.create')}
       </button>
-    </div>
+    </div>,
+    document.body
   )
+}
+
+function resolveBranchSelectorPopoverPosition(input: {
+  readonly anchorRect: DOMRect
+  readonly popoverHeight: number
+  readonly popoverWidth: number
+  readonly viewportHeight: number
+  readonly viewportWidth: number
+}): BranchSelectorPopoverPosition {
+  const viewportPadding = 8
+  const horizontalGap = 10
+  const preferredTopOffset = 64
+  const maxLeft = Math.max(
+    viewportPadding,
+    input.viewportWidth - input.popoverWidth - viewportPadding
+  )
+  const maxTop = Math.max(
+    viewportPadding,
+    input.viewportHeight - input.popoverHeight - viewportPadding
+  )
+
+  return {
+    left: Math.min(Math.max(input.anchorRect.right + horizontalGap, viewportPadding), maxLeft),
+    top: Math.min(Math.max(input.anchorRect.top - preferredTopOffset, viewportPadding), maxTop)
+  }
 }
 
 function orderBranchSelectorItems(

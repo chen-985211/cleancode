@@ -446,14 +446,18 @@ describe('app shell', () => {
 
     const branchDialog = await screen.findByRole('dialog', { name: '选择默认工作区分支' })
     const branchOptionButtons = within(branchDialog).getAllByRole('button')
+    const branchSearch = within(branchDialog).getByPlaceholderText('搜索分支')
 
-    expect(within(branchDialog).getByPlaceholderText('搜索分支')).toBeInTheDocument()
+    expect(branchDialog.parentElement).toBe(document.body)
+    expect(branchSearch).toBeInTheDocument()
     expect(branchOptionButtons[0]).toHaveAccessibleName('main')
     expect(within(branchDialog).getByRole('button', { name: /feature\/free/ })).toBeEnabled()
     expect(
       within(branchDialog).getByRole('button', { name: /feature\/worktree.*独立工作区/ })
     ).toBeDisabled()
 
+    fireEvent.pointerDown(branchSearch)
+    expect(branchDialog).toBeInTheDocument()
     fireEvent.pointerDown(document.body)
 
     await waitFor(() =>

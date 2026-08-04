@@ -204,6 +204,7 @@ function ProjectCard({
   const [archiveWorkspaceId, setArchiveWorkspaceId] = useState<string | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
+  const branchSelectorPopoverRef = useRef<HTMLDivElement>(null)
   const branchSelectorRootRef = useRef<HTMLDivElement>(null)
   const removeProjectButtonRef = useRef<HTMLButtonElement>(null)
   const {
@@ -277,8 +278,13 @@ function ProjectCard({
     const closeBranchSelectorWhenClickingOutside = (event: PointerEvent): void => {
       const target = event.target
 
-      if (target instanceof Node && branchSelectorRootRef.current?.contains(target)) {
-        return
+      if (target instanceof Node) {
+        if (
+          branchSelectorRootRef.current?.contains(target) ||
+          branchSelectorPopoverRef.current?.contains(target)
+        ) {
+          return
+        }
       }
 
       closeBranchSelector()
@@ -437,7 +443,9 @@ function ProjectCard({
                       </div>
                       {isBranchSelectorOpen ? (
                         <BranchSelectorPopover
+                          anchorRef={branchSelectorRootRef}
                           branches={workbench.gitBranches}
+                          popoverRef={branchSelectorPopoverRef}
                           searchQuery={branchSearchQuery}
                           onSearchQueryChange={setBranchSearchQuery}
                           onChooseBranch={(branch) => {

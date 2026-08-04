@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { mkdir } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
 import type { ElectronApplication, Locator, Page } from 'playwright'
@@ -73,6 +74,7 @@ describe('project workspaces e2e', () => {
         sidebar: {
           backgroundColor: 'rgba(0, 0, 0, 0)',
           borderRightWidth: '0px',
+          width: 280,
           y: 36
         }
       })
@@ -93,7 +95,8 @@ describe('project workspaces e2e', () => {
         navigation: { height: 36, width: windowedTitlebarInset + 32, x: 0, y: 0 },
         sidebar: {
           backgroundColor: 'rgba(0, 0, 0, 0)',
-          borderRightWidth: '0px'
+          borderRightWidth: '0px',
+          width: 0
         }
       })
       await expandSidebar.click()
@@ -107,7 +110,8 @@ describe('project workspaces e2e', () => {
       await waitForSidebarTitlebarGeometry(page, 'fullscreen sidebar titlebar geometry', {
         button: { height: 24, width: 32, x: 0, y: 6 },
         buttonOwnsHitTarget: true,
-        navigation: { height: 36, x: 0, y: 0 }
+        navigation: { height: 36, x: 0, y: 0 },
+        sidebar: { width: 280 }
       })
 
       await titlebarNavigation.getByRole('button', { name: '收起侧边栏' }).click()
@@ -126,8 +130,49 @@ describe('project workspaces e2e', () => {
       await waitForSidebarTitlebarGeometry(page, 'restored windowed titlebar geometry', {
         button: { height: 24, width: 32, x: windowedTitlebarInset, y: 6 },
         buttonOwnsHitTarget: true,
-        navigation: { height: 36, x: 0, y: 0 }
+        navigation: { height: 36, x: 0, y: 0 },
+        sidebar: { width: 280 }
       })
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'scrolls overflowing projects inside the sidebar',
+    async () => {
+      await expectDesktopRuntime(page)
+
+      for (let index = 1; index <= 8; index += 1) {
+        const projectName = `sidebar-project-${index}`
+        const projectDirectory = join(workbench.projectDirectory, projectName)
+        await mkdir(projectDirectory)
+        await electronApp.evaluate((_electron, directory) => {
+          process.env.CLEANCODE_TEST_PROJECT_DIRECTORY = directory
+        }, projectDirectory)
+        await page.getByRole('button', { name: '添加项目' }).click()
+        await page.getByRole('button', { name: projectName, exact: true }).waitFor()
+      }
+
+      const projectList = page.locator('.project-list')
+      const initialGeometry = await projectList.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        scrollTop: element.scrollTop
+      }))
+      expect(initialGeometry.scrollHeight).toBeGreaterThan(initialGeometry.clientHeight)
+      expect(initialGeometry.scrollTop).toBe(0)
+
+      await projectList.hover()
+      await page.mouse.wheel(0, 360)
+
+      const scrollTop = await pollUntilState({
+        description: 'project list to scroll after a wheel gesture',
+        observe: () => projectList.evaluate((element) => element.scrollTop),
+        accept: (value) => value > 0,
+        timeoutMs: 5_000
+      })
+      expect(scrollTop).toBeGreaterThan(0)
+      await page.getByRole('button', { name: '添加项目' }).waitFor()
     },
     electronScenarioTimeoutMs
   )
@@ -193,6 +238,7 @@ async function readSidebarTitlebarGeometry(page: Page): Promise<{
   readonly sidebar: {
     readonly backgroundColor: string
     readonly borderRightWidth: string
+    readonly width: number
     readonly y: number
   }
 }> {
@@ -238,6 +284,7 @@ async function readSidebarTitlebarGeometry(page: Page): Promise<{
       sidebar: {
         backgroundColor: sidebarStyle.backgroundColor,
         borderRightWidth: sidebarStyle.borderRightWidth,
+        width: round(sidebarRect.width),
         y: round(sidebarRect.y)
       }
     }
