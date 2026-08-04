@@ -40,7 +40,7 @@ describe('canvas selection viewport e2e', () => {
   })
 
   it(
-    'returns to 35% from the pane and centers a node selected from its title',
+    'returns to 35% around the node selected from its title',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -50,19 +50,22 @@ describe('canvas selection viewport e2e', () => {
       await node.waitFor()
       await clickTrueCanvasPane(page, page.locator('.react-flow__pane'))
 
-      const globalPresentation = await pollCanvasPresentation(page, node, (presentation) =>
-        isNear(presentation.zoom, 0.35, 0.000_1)
+      const globalPresentation = await pollCanvasPresentation(
+        page,
+        node,
+        (presentation) =>
+          isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
       )
       expect(globalPresentation.zoom).toBeCloseTo(0.35, 3)
+      expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
+      expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
 
       await node.locator('.terminal-node__header').click()
       const focusedPresentation = await pollCanvasPresentation(
         page,
         node,
         (presentation) =>
-          isNear(presentation.zoom, 0.9, 0.000_1) &&
-          Math.abs(presentation.nodeCenterOffsetX) < 2 &&
-          Math.abs(presentation.nodeCenterOffsetY) < 2
+          isNear(presentation.zoom, 0.9, 0.000_1) && isCanvasNodeCentered(presentation)
       )
 
       expect(focusedPresentation.zoom).toBeCloseTo(0.9, 3)
@@ -136,4 +139,10 @@ function pollCanvasPresentation(
 
 function isNear(value: number, expected: number, tolerance: number): boolean {
   return Math.abs(value - expected) <= tolerance
+}
+
+function isCanvasNodeCentered(presentation: CanvasPresentation): boolean {
+  return (
+    Math.abs(presentation.nodeCenterOffsetX) < 0.4 && Math.abs(presentation.nodeCenterOffsetY) < 0.4
+  )
 }

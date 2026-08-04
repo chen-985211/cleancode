@@ -27,7 +27,6 @@ export async function startTerminalBlockResizeFromBottomRight(page: Page): Promi
   readonly startX: number
   readonly startY: number
 }> {
-  await page.locator('[data-terminal-block-id] .terminal-node__header').first().click()
   await page.waitForFunction(
     () => document.querySelectorAll('.terminal-node__resize-handle').length > 0
   )

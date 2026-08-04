@@ -98,7 +98,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     if (!isProjectSidebarCollapsed && document.activeElement?.closest('#project-sidebar')) {
       projectSidebarToggleRef.current?.focus()
     }
-
     setIsProjectSidebarCollapsed((collapsed) => !collapsed)
   }, [isProjectSidebarCollapsed])
   const revealProjectSidebar = useCallback((): void => setIsProjectSidebarCollapsed(false), [])
@@ -109,11 +108,9 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     if (value === null) {
       setSelectedTerminalGroupId(null)
     }
-
     setSelectedTerminalBlockIds((currentIds) => {
       const currentId = currentIds[0] ?? null
       const nextId = typeof value === 'function' ? value(currentId) : value
-
       return nextId ? [nextId] : []
     })
   }, [])
@@ -377,6 +374,9 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     returnToGlobalCanvasView: selectionViewport.returnToGlobalCanvasView,
     selectTerminalBlock,
     selectTerminalGroup,
+    selectedAgentId,
+    selectedTerminalBlockIds,
+    selectedTerminalGroupId,
     setNodes: nodeStore.setNodes,
     setSelectedAgentId,
     setSelectedTerminalBlockIds,

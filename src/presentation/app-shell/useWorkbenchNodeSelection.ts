@@ -11,6 +11,9 @@ export function useWorkbenchNodeSelection({
   returnToGlobalCanvasView,
   selectTerminalBlock,
   selectTerminalGroup,
+  selectedAgentId,
+  selectedTerminalBlockIds,
+  selectedTerminalGroupId,
   setNodes,
   setSelectedAgentId,
   setSelectedTerminalBlockIds,
@@ -18,9 +21,12 @@ export function useWorkbenchNodeSelection({
 }: {
   readonly focusSelectedWorkbenchNode: (nodeId: string) => void
   readonly isTerminalGroupSelectionMode: boolean
-  readonly returnToGlobalCanvasView: () => void
+  readonly returnToGlobalCanvasView: (anchorNodeId: string | null) => void
   readonly selectTerminalBlock: (blockId: string, additive: boolean) => void
   readonly selectTerminalGroup: (groupId: string) => void
+  readonly selectedAgentId: string | null
+  readonly selectedTerminalBlockIds: readonly string[]
+  readonly selectedTerminalGroupId: string | null
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockIds: Dispatch<SetStateAction<string[]>>
@@ -120,12 +126,22 @@ export function useWorkbenchNodeSelection({
   )
 
   const clearWorkbenchSelection = useCallback(() => {
+    const anchorNodeId = resolveWorkbenchSelectionAnchorNodeId({
+      isTerminalGroupSelectionMode,
+      selectedAgentId,
+      selectedTerminalBlockIds,
+      selectedTerminalGroupId
+    })
     setSelectedAgentId(null)
     setSelectedTerminalBlockIds([])
     setSelectedTerminalGroupId(null)
-    returnToGlobalCanvasView()
+    returnToGlobalCanvasView(anchorNodeId)
   }, [
+    isTerminalGroupSelectionMode,
     returnToGlobalCanvasView,
+    selectedAgentId,
+    selectedTerminalBlockIds,
+    selectedTerminalGroupId,
     setSelectedAgentId,
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
@@ -139,6 +155,22 @@ export function useWorkbenchNodeSelection({
     selectWorkbenchNodeFromShortcut,
     selectWorkbenchNode
   }
+}
+
+function resolveWorkbenchSelectionAnchorNodeId({
+  isTerminalGroupSelectionMode,
+  selectedAgentId,
+  selectedTerminalBlockIds,
+  selectedTerminalGroupId
+}: {
+  readonly isTerminalGroupSelectionMode: boolean
+  readonly selectedAgentId: string | null
+  readonly selectedTerminalBlockIds: readonly string[]
+  readonly selectedTerminalGroupId: string | null
+}): string | null {
+  if (isTerminalGroupSelectionMode || selectedTerminalBlockIds.length > 1) return null
+  if (selectedAgentId) return toAgentFlowNodeId(selectedAgentId)
+  return selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null
 }
 
 function isWorkbenchNodeTitleClick(event: MouseEvent): boolean {

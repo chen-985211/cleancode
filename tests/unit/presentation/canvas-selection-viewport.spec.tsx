@@ -29,61 +29,70 @@ describe('canvas selection viewport', () => {
     expect(setViewport).toHaveBeenCalledWith({ x: 84, y: 23, zoom: 0.9 }, { duration: 0 })
   })
 
-  it('returns to the stable visible content center at exactly the minimum 35% zoom', () => {
-    const visibleNode = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
-    const expandingNode = createNode('terminal-2', { x: 900, y: 500 }, { width: 420, height: 306 })
-    Object.assign(expandingNode.data, {
-      objectMotion: {
-        id: 'expand:terminal-2',
-        kind: 'group-expand',
-        offset: { x: 20, y: 20 }
-      }
-    })
-    const hiddenNode = createNode(
-      'hidden-terminal',
-      { x: 2_000, y: 900 },
-      { width: 400, height: 300 }
-    )
-    hiddenNode.hidden = true
-    const exitingNode = createNode(
-      'exiting-terminal',
-      { x: -1_000, y: -800 },
-      { width: 400, height: 300 }
-    )
-    Object.assign(exitingNode.data, {
-      objectMotion: {
-        id: 'collapse:exiting-terminal',
-        kind: 'group-collapse',
-        offset: { x: -20, y: -20 }
-      }
-    })
+  it('returns to 35% around the uniquely selected node center', () => {
+    const selectedNode = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const distantNode = createNode('terminal-2', { x: 2_000, y: 900 }, { width: 420, height: 306 })
     const { getNodesBounds, instance, setViewport } = createReactFlowInstance([
-      visibleNode,
-      expandingNode,
-      hiddenNode,
-      exitingNode
+      selectedNode,
+      distantNode
     ])
-    getNodesBounds.mockReturnValue({ height: 686, width: 1_220, x: 100, y: 120 })
     const { result } = renderSelectionViewportHook(instance)
 
     act(() => {
-      result.current.returnToGlobalCanvasView()
+      result.current.returnToGlobalCanvasView(selectedNode.id)
     })
 
-    expect(getNodesBounds).toHaveBeenCalledWith([visibleNode, expandingNode])
-    const [globalViewport, transition] = setViewport.mock.calls[0]!
-    expect(globalViewport.x).toBeCloseTo(231.5)
-    expect(globalViewport.y).toBeCloseTo(157.95)
-    expect(globalViewport.zoom).toBe(0.35)
-    expect(transition).toEqual({ duration: 0 })
+    expect(getNodesBounds).not.toHaveBeenCalled()
+    expect(setViewport).toHaveBeenCalledWith({ x: 375, y: 225.5, zoom: 0.35 }, { duration: 0 })
   })
+
+  it('keeps the current viewport center when no unique selection exists', () => {
+    const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance, setViewport } = createReactFlowInstance([node], {
+      x: -100,
+      y: -80,
+      zoom: 0.5
+    })
+    const { result } = renderSelectionViewportHook(instance)
+
+    act(() => {
+      result.current.returnToGlobalCanvasView(null)
+    })
+
+    expect(setViewport).toHaveBeenCalledWith({ x: 74, y: 40, zoom: 0.35 }, { duration: 0 })
+  })
+
+  it.each(['missing-terminal', 'hidden-terminal'])(
+    'falls back to the current viewport center when anchor %s is unavailable',
+    (anchorNodeId) => {
+      const visibleNode = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+      const hiddenNode = createNode(
+        'hidden-terminal',
+        { x: 2_000, y: 900 },
+        { width: 400, height: 300 }
+      )
+      hiddenNode.hidden = true
+      const { instance, setViewport } = createReactFlowInstance([visibleNode, hiddenNode], {
+        x: -100,
+        y: -80,
+        zoom: 0.5
+      })
+      const { result } = renderSelectionViewportHook(instance)
+
+      act(() => {
+        result.current.returnToGlobalCanvasView(anchorNodeId)
+      })
+
+      expect(setViewport).toHaveBeenCalledWith({ x: 74, y: 40, zoom: 0.35 }, { duration: 0 })
+    }
+  )
 
   it('does not move an empty canvas', () => {
     const { instance, setViewport } = createReactFlowInstance([])
     const { result } = renderSelectionViewportHook(instance)
 
     act(() => {
-      result.current.returnToGlobalCanvasView()
+      result.current.returnToGlobalCanvasView(null)
     })
 
     expect(setViewport).not.toHaveBeenCalled()
@@ -97,7 +106,7 @@ describe('canvas selection viewport', () => {
 
     act(() => {
       result.current.focusSelectedWorkbenchNode(node.id)
-      result.current.returnToGlobalCanvasView()
+      result.current.returnToGlobalCanvasView(node.id)
     })
 
     expect(onUserAction).toHaveBeenCalledTimes(2)

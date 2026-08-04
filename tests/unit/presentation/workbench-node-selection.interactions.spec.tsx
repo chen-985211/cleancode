@@ -6,7 +6,9 @@ import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/u
 
 describe('workbench node selection', () => {
   it('clears terminal, terminal group, and Agent selection from the canvas pane', () => {
-    const { input, result } = renderSelectionHook()
+    const { input, result } = renderSelectionHook({
+      selectedTerminalBlockIds: ['backend-terminal']
+    })
 
     act(() => {
       result.current.clearWorkbenchSelection()
@@ -15,7 +17,33 @@ describe('workbench node selection', () => {
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
     expect(input.setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(input.setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
-    expect(input.returnToGlobalCanvasView).toHaveBeenCalledOnce()
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith('backend-terminal')
+  })
+
+  it.each([
+    [{ selectedAgentId: 'reviewer' }, 'agent:reviewer'],
+    [{ selectedTerminalGroupId: 'development-group' }, 'development-group']
+  ] as const)('anchors pane return to the uniquely selected object', (options, expectedNodeId) => {
+    const { input, result } = renderSelectionHook(options)
+
+    act(() => {
+      result.current.clearWorkbenchSelection()
+    })
+
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(expectedNodeId)
+  })
+
+  it.each([
+    { selectedTerminalBlockIds: ['terminal-1', 'terminal-2'] },
+    { isTerminalGroupSelectionMode: true, selectedTerminalBlockIds: ['terminal-1'] }
+  ])('does not choose an arbitrary return anchor from multi-selection', (options) => {
+    const { input, result } = renderSelectionHook(options)
+
+    act(() => {
+      result.current.clearWorkbenchSelection()
+    })
+
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(null)
   })
 
   it('selects a terminal group only from its title and clears Agent selection', () => {
@@ -112,11 +140,21 @@ describe('workbench node selection', () => {
   )
 })
 
-function renderSelectionHook(options: { readonly isTerminalGroupSelectionMode?: boolean } = {}) {
+function renderSelectionHook(
+  options: {
+    readonly isTerminalGroupSelectionMode?: boolean
+    readonly selectedAgentId?: string | null
+    readonly selectedTerminalBlockIds?: readonly string[]
+    readonly selectedTerminalGroupId?: string | null
+  } = {}
+) {
   const input = {
     focusSelectedWorkbenchNode: vi.fn(),
     isTerminalGroupSelectionMode: options.isTerminalGroupSelectionMode ?? false,
     returnToGlobalCanvasView: vi.fn(),
+    selectedAgentId: options.selectedAgentId ?? null,
+    selectedTerminalBlockIds: options.selectedTerminalBlockIds ?? [],
+    selectedTerminalGroupId: options.selectedTerminalGroupId ?? null,
     selectTerminalBlock: vi.fn(),
     selectTerminalGroup: vi.fn(),
     setNodes: vi.fn(),

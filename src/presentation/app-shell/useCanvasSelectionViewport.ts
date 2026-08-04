@@ -48,30 +48,48 @@ export function useCanvasSelectionViewport({
     [canvasSizeRef, onUserAction, reactFlowInstanceRef]
   )
 
-  const returnToGlobalCanvasView = useCallback((): void => {
-    onUserAction()
-    const instance = reactFlowInstanceRef.current
-    if (!instance) return
+  const returnToGlobalCanvasView = useCallback(
+    (anchorNodeId: string | null): void => {
+      onUserAction()
+      const instance = reactFlowInstanceRef.current
+      if (!instance) return
 
-    const stableVisibleNodes = instance
-      .getNodes()
-      .filter((node) => !node.hidden && node.data.objectMotion?.kind !== 'group-collapse')
-    if (stableVisibleNodes.length === 0) return
+      const stableVisibleNodes = instance
+        .getNodes()
+        .filter((node) => !node.hidden && node.data.objectMotion?.kind !== 'group-collapse')
+      if (stableVisibleNodes.length === 0) return
 
-    const bounds = instance.getNodesBounds(stableVisibleNodes)
-    void transitionWorkbenchViewport(instance, {
-      center: {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height / 2
-      },
-      intent: {
-        canvasSize: canvasSizeRef.current,
-        type: 'adaptive-focus'
-      },
-      type: 'center',
-      zoom: minimumCanvasZoom
-    })
-  }, [canvasSizeRef, onUserAction, reactFlowInstanceRef])
+      const anchorNode = anchorNodeId ? instance.getNode(anchorNodeId) : undefined
+      const center =
+        anchorNode && !anchorNode.hidden && anchorNode.data.objectMotion?.kind !== 'group-collapse'
+          ? resolveWorkbenchNodeCenter(anchorNode)
+          : resolveCurrentViewportCenter(instance.getViewport(), canvasSizeRef.current)
+      void transitionWorkbenchViewport(instance, {
+        center,
+        intent: {
+          canvasSize: canvasSizeRef.current,
+          type: 'adaptive-focus'
+        },
+        type: 'center',
+        zoom: minimumCanvasZoom
+      })
+    },
+    [canvasSizeRef, onUserAction, reactFlowInstanceRef]
+  )
 
   return { focusSelectedWorkbenchNode, returnToGlobalCanvasView }
+}
+
+function resolveCurrentViewportCenter(
+  viewport: { readonly x: number; readonly y: number; readonly zoom: number },
+  canvasSize: CanvasSize
+): { readonly x: number; readonly y: number } {
+  const width = canvasSize.width > 0 ? canvasSize.width : 960
+  const height = canvasSize.height > 0 ? canvasSize.height : 640
+  const zoom = viewport.zoom > 0 ? viewport.zoom : 1
+
+  return {
+    x: (width / 2 - viewport.x) / zoom,
+    y: (height / 2 - viewport.y) / zoom
+  }
 }
