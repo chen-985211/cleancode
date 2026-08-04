@@ -44,8 +44,21 @@ export interface WorkbenchViewportMotionFrameScheduler {
   readonly requestFrame: (callback: FrameRequestCallback) => number
 }
 
+export interface WorkbenchViewportMotionCompletion {
+  readonly intent: WorkbenchViewportMotionIntent
+  readonly viewport: Viewport
+}
+
+export type WorkbenchViewportMotionCompletionListener = (
+  completion: WorkbenchViewportMotionCompletion
+) => void
+
 export interface WorkbenchViewportMotionController {
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
+  readonly subscribe: (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: WorkbenchViewportMotionCompletionListener
+  ) => () => void
   readonly transition: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     command: WorkbenchViewportCommand
@@ -206,6 +219,7 @@ interface ActiveViewportMotion {
   elapsedMilliseconds: number
   frameId: number | null
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  intent: WorkbenchViewportMotionIntent
   lastTimestamp: number | null
   requestId: number
   resolve: (completed: boolean) => void
@@ -220,6 +234,10 @@ export function createWorkbenchViewportMotionController(
   scheduler: WorkbenchViewportMotionFrameScheduler
 ): WorkbenchViewportMotionController {
   let activeMotion: ActiveViewportMotion | null = null
+  const completionListeners = new WeakMap<
+    ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    Set<WorkbenchViewportMotionCompletionListener>
+  >()
   let latestRequest: {
     readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
     readonly requestId: number
@@ -244,16 +262,37 @@ export function createWorkbenchViewportMotionController(
     cancelActiveMotion(instance)
   }
 
+  const subscribe = (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: WorkbenchViewportMotionCompletionListener
+  ): (() => void) => {
+    const listeners = completionListeners.get(instance) ?? new Set()
+    listeners.add(listener)
+    completionListeners.set(instance, listeners)
+
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) {
+        completionListeners.delete(instance)
+      }
+    }
+  }
+
   const completeRequest = (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     requestId: number,
-    applied: boolean
+    applied: boolean,
+    completion: WorkbenchViewportMotionCompletion
   ): boolean => {
     const isLatest = latestRequest?.instance === instance && latestRequest.requestId === requestId
     if (isLatest) {
       latestRequest = null
     }
-    return applied && isLatest
+    const completed = applied && isLatest
+    if (completed) {
+      completionListeners.get(instance)?.forEach((listener) => listener(completion))
+    }
+    return completed
   }
 
   const scheduleNextFrame = (): void => {
@@ -269,7 +308,12 @@ export function createWorkbenchViewportMotionController(
     }
     activeMotion = null
     void applyViewport(motion.instance, motion.target).then((applied) =>
-      motion.resolve(completeRequest(motion.instance, motion.requestId, applied))
+      motion.resolve(
+        completeRequest(motion.instance, motion.requestId, applied, {
+          intent: motion.intent,
+          viewport: motion.target
+        })
+      )
     )
   }
 
@@ -331,7 +375,7 @@ export function createWorkbenchViewportMotionController(
       cancelActiveMotion()
       latestRequest = { instance, requestId }
       return applyViewport(instance, target).then((applied) =>
-        completeRequest(instance, requestId, applied)
+        completeRequest(instance, requestId, applied, { intent: command.intent, viewport: target })
       )
     }
     const springResponse = transitionOptions.response
@@ -340,6 +384,7 @@ export function createWorkbenchViewportMotionController(
       if (activeMotion?.instance === instance) {
         activeMotion.resolve(false)
         activeMotion.elapsedMilliseconds = 0
+        activeMotion.intent = command.intent
         activeMotion.lastTimestamp = null
         activeMotion.requestId = requestId
         activeMotion.resolve = resolve
@@ -356,6 +401,7 @@ export function createWorkbenchViewportMotionController(
         elapsedMilliseconds: 0,
         frameId: null,
         instance,
+        intent: command.intent,
         lastTimestamp: null,
         requestId,
         resolve,
@@ -369,7 +415,7 @@ export function createWorkbenchViewportMotionController(
     })
   }
 
-  return { cancel, transition }
+  return { cancel, subscribe, transition }
 }
 
 const browserViewportMotionController = createWorkbenchViewportMotionController({
@@ -388,6 +434,13 @@ export function cancelWorkbenchViewportMotion(
   instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
 ): void {
   browserViewportMotionController.cancel(instance)
+}
+
+export function subscribeWorkbenchViewportMotionCompletion(
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+  listener: WorkbenchViewportMotionCompletionListener
+): () => void {
+  return browserViewportMotionController.subscribe(instance, listener)
 }
 
 function resolveCommandCanvasSize(command: WorkbenchViewportCommand): {

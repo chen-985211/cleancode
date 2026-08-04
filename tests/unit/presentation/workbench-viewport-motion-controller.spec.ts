@@ -7,6 +7,38 @@ import {
 } from '../../../src/presentation/app-shell/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
+  it('publishes only the latest successfully settled programmatic viewport', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const instance = createViewportInstance()
+    const completions: Array<{ readonly viewport: Viewport }> = []
+    const unsubscribe = controller.subscribe(instance.value, (completion) => {
+      completions.push(completion)
+    })
+    const firstCompletion = controller.transition(instance.value, centerCommand(1_480))
+
+    frames.step()
+    frames.step()
+    expect(completions).toEqual([])
+
+    const latestCompletion = controller.transition(instance.value, centerCommand(380))
+
+    frames.finish()
+    await expect(firstCompletion).resolves.toBe(false)
+    await expect(latestCompletion).resolves.toBe(true)
+    expect(completions).toEqual([
+      {
+        intent: {
+          canvasSize: { height: 640, width: 960 },
+          type: 'adaptive-focus'
+        },
+        viewport: { x: 100, y: 0, zoom: 1 }
+      }
+    ])
+
+    unsubscribe()
+  })
+
   it('retargets one in-flight spring from its presentation value and preserves velocity', async () => {
     const frames = new TestFrameScheduler()
     const controller = createWorkbenchViewportMotionController(frames)

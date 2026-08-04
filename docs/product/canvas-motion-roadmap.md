@@ -210,11 +210,12 @@ flowchart LR
 - React Flow 内建的 D3 transition 只能接受目标、固定时长和插值选项，不能暴露 presentation velocity 或可靠的重新定向身份；统一 owner 因此改用无新增依赖、由 `requestAnimationFrame` 驱动的解析式临界阻尼 spring。
 - `quick`、`spatial` 与 `adaptive-focus` 分别使用 `0.30s`、`0.34s` 和 `0.34–0.42s` response，阻尼比固定为 `1`；自适应 response 继续同时读取屏幕位移和 `log2` zoom 级差，但不再把固定 duration 当成运动完成条件。
 - X、Y 和 zoom 分别保存 presentation value 与 velocity。新目标从当前呈现帧重新定向并继承各轴速度，不回到旧起点，也不因二维距离抵消而掩盖单轴反转。
-- 控制器全局只保留一个在途相机身份和至多一个待执行动画帧。每帧通过 React Flow 的 imperative `setViewport` 写入，不进入 React 状态；延迟帧按 `1/30s` 限制积分步长，并保留 `1.2s` 的异常运行上限。
+- 控制器全局只保留一个在途相机身份和至多一个待执行动画帧。每帧通过 React Flow 的 imperative `setViewport` 写入；`WorkbenchCanvas` 会识别 React Flow 没有源输入事件的程序化 `onMove` / `onMoveEnd`，中间帧不再回流到画布 React 状态或 viewport 持久化。延迟帧按 `1/30s` 限制积分步长，并保留 `1.2s` 的异常运行上限。
+- 统一 owner 只为最新且成功落位的请求发布一次完成事件。画布在非即时运动完成时同步一次小地图 viewport 并提交一次最终 viewport；被取消、被替代和写入失败的请求不发布完成结果。`instant` 恢复与小地图直接预览继续由显式调用方同步和决定是否提交，不会被完成订阅重复保存。
 - 新定位、即时工作区 viewport 恢复和用户 `onMoveStart` 会取消旧运动；取消停留在当前呈现值，不补写旧终点。工作区切换还同步撤销布局聚焦和待处理输入聚焦。
 - 每次过渡返回带身份校验的完成结果。已取消、被替代或晚于新请求完成的 Promise 返回 `false`；终端、Agent 和方向导航只有在最后一个有效运动完成后才能重新激活目标输入。
 - `prefers-reduced-motion` 与 `instant` 继续直接设置最终 viewport，但同样经过完成身份校验，不会让迟到的即时请求覆盖更新目标。
-- Unit 覆盖临界阻尼无过冲、反向重定向速度连续、延迟帧稳定性、单 RAF 上限、当前帧取消、工作区恢复接管、异步迟到完成、用户拖动取消和输入激活失效；Presentation 消费侧回归验证最终 viewport 与节点集合，不固化中间像素帧。
+- Unit 覆盖临界阻尼无过冲、反向重定向速度连续、延迟帧稳定性、单 RAF 上限、当前帧取消、工作区恢复接管、异步迟到完成、用户拖动取消和输入激活失效；另以副作用次数为 oracle，验证程序化中间帧不更新 React 投影或持久化、最新完成只提交一次、直接操控保持实时投影、`instant` 继续由显式调用方负责。Presentation 消费侧回归验证最终 viewport 与节点集合，不固化中间像素帧。
 
 ## 第四阶段：空间对象反馈与缩放分级
 
@@ -246,7 +247,7 @@ flowchart LR
 
 - React Flow 基于 D3 transition 的 Promise 在被新过渡打断时可能无法按旧调用方预期完成；第一阶段只统一入口，第三阶段再引入显式取消身份。
 - 在 macOS 触控板已有惯性事件上叠加自定义惯性会产生双重滑动；路线不为直接操控追加惯性。
-- 每帧把 viewport 写入 React 状态可能影响终端输出和画布节点渲染；自定义 spring 必须先用性能 trace 证明预算。
+- 自定义 spring 已把程序化中间帧与 `WorkbenchCanvas` React 状态、viewport IPC 持久化隔离；React Flow 自身仍会在每帧同步内部 transform store，后续真实终端高输出场景继续用性能 trace 检查该剩余预算，不引入对其私有 pan/zoom API 的依赖。
 - `smooth` 空间插值在远距离移动时可能过度缩远；第二阶段已用距离与缩放矩阵建立 `1.5` 个画布对角线的线性回退，后续真实使用反馈如需调参仍只修改统一 owner。
 - 任一阶段都可以回退到前一阶段的统一入口与当前节奏，不回滚 BlockGraph 数据或用户布局。
 

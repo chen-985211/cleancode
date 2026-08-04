@@ -46,10 +46,16 @@ import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
-import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
+import {
+  cancelWorkbenchViewportMotion,
+  subscribeWorkbenchViewportMotionCompletion
+} from './workbenchViewportMotion'
 import {
   centerCanvasViewportOnMinimapPoint,
+  commitCompletedCanvasViewportMotion,
+  persistCanvasViewportFromMoveEnd,
   restoreCanvasViewport,
+  synchronizeCanvasViewportFromMove,
   toCanvasViewportSnapshot
 } from './workbenchCanvasViewport'
 
@@ -248,6 +254,8 @@ export function WorkbenchCanvas({
   const activeDraggedNodeRef = useRef<WorkbenchFlowNode | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
   const isRestoringViewportRef = useRef(false)
+  const onViewportChangeRef = useRef(onViewportChange)
+  const unsubscribeViewportMotionRef = useRef<(() => void) | null>(null)
   const templateInteraction = useBlockTemplateCanvasInteraction({
     graph: currentWorkbench?.graph ?? null,
     nodes,
@@ -281,6 +289,14 @@ export function WorkbenchCanvas({
     onBeginTerminalGroupSelection()
     onFitCanvas()
   }
+
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange
+  }, [onViewportChange])
+
+  useEffect(() => {
+    return () => unsubscribeViewportMotionRef.current?.()
+  }, [])
 
   useEffect(() => {
     const canvasSurface = canvasSurfaceRef.current
@@ -379,6 +395,17 @@ export function WorkbenchCanvas({
           nodeTypes={nodeTypes}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance
+            unsubscribeViewportMotionRef.current?.()
+            unsubscribeViewportMotionRef.current = subscribeWorkbenchViewportMotionCompletion(
+              instance,
+              (completion) =>
+                commitCompletedCanvasViewportMotion({
+                  completion,
+                  onViewportChange: onViewportChangeRef.current,
+                  setCanvasViewport,
+                  setViewportZoom
+                })
+            )
 
             if (currentWorkbench) {
               restoreCanvasViewport({
@@ -444,23 +471,28 @@ export function WorkbenchCanvas({
               activeDraggedNodeRef.current = null
             }
           }}
-          onMove={(_event, viewport) => {
-            const canvasViewportSnapshot = toCanvasViewportSnapshot(viewport)
-
-            setViewportZoom(canvasViewportSnapshot.zoom)
-            setCanvasViewport(canvasViewportSnapshot)
-          }}
+          onMove={(event, viewport) =>
+            synchronizeCanvasViewportFromMove({
+              event,
+              viewport,
+              setCanvasViewport,
+              setViewportZoom
+            })
+          }
           onMoveStart={(event) => {
             if (event) {
               cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
               onViewportInteractionStart?.()
             }
           }}
-          onMoveEnd={(_event, viewport) => {
-            if (!isRestoringViewportRef.current) {
-              onViewportChange(toCanvasViewportSnapshot(viewport))
-            }
-          }}
+          onMoveEnd={(event, viewport) =>
+            persistCanvasViewportFromMoveEnd({
+              event,
+              isRestoringViewport: isRestoringViewportRef.current,
+              onViewportChange,
+              viewport
+            })
+          }
           defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
           multiSelectionKeyCode={null}
           selectionKeyCode={null}

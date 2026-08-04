@@ -3,7 +3,79 @@ import type { MutableRefObject } from 'react'
 
 import type { MinimapViewportCenter } from './CanvasMinimap'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
-import { transitionWorkbenchViewport } from './workbenchViewportMotion'
+import {
+  transitionWorkbenchViewport,
+  type WorkbenchViewportMotionCompletion
+} from './workbenchViewportMotion'
+
+interface CanvasViewportProjection {
+  readonly setViewportZoom: (zoom: number) => void
+  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+}
+
+interface CanvasViewportPersistence {
+  readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+}
+
+interface SynchronizeCanvasViewportFromMoveInput extends CanvasViewportProjection {
+  readonly event: unknown
+  readonly viewport: Viewport
+}
+
+export function synchronizeCanvasViewportFromMove({
+  event,
+  viewport,
+  setViewportZoom,
+  setCanvasViewport
+}: SynchronizeCanvasViewportFromMoveInput): void {
+  if (!event) {
+    return
+  }
+
+  const canvasViewport = toCanvasViewportSnapshot(viewport)
+  setViewportZoom(canvasViewport.zoom)
+  setCanvasViewport(canvasViewport)
+}
+
+interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistence {
+  readonly event: unknown
+  readonly isRestoringViewport: boolean
+  readonly viewport: Viewport
+}
+
+export function persistCanvasViewportFromMoveEnd({
+  event,
+  isRestoringViewport,
+  viewport,
+  onViewportChange
+}: PersistCanvasViewportFromMoveEndInput): void {
+  if (!event || isRestoringViewport) {
+    return
+  }
+
+  onViewportChange(toCanvasViewportSnapshot(viewport))
+}
+
+interface CommitCompletedCanvasViewportMotionInput
+  extends CanvasViewportProjection, CanvasViewportPersistence {
+  readonly completion: WorkbenchViewportMotionCompletion
+}
+
+export function commitCompletedCanvasViewportMotion({
+  completion,
+  onViewportChange,
+  setViewportZoom,
+  setCanvasViewport
+}: CommitCompletedCanvasViewportMotionInput): void {
+  if (completion.intent.type === 'instant') {
+    return
+  }
+
+  const canvasViewport = toCanvasViewportSnapshot(completion.viewport)
+  setViewportZoom(canvasViewport.zoom)
+  setCanvasViewport(canvasViewport)
+  onViewportChange(canvasViewport)
+}
 
 interface RestoreCanvasViewportInput {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
