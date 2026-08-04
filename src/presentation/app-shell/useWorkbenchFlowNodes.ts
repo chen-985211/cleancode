@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type Dispatch,
+  type SetStateAction
+} from 'react'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from '../../contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
@@ -12,10 +19,13 @@ import type {
   TerminalViewState,
   WorkbenchFlowNode,
   WorkbenchNodeLayoutInput,
+  WorkbenchObjectMotion,
   WorkbenchSnapshot
 } from './types'
 import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
+import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
+import { prefersReducedMotion } from './workbenchViewportMotion'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
@@ -85,6 +95,41 @@ export function useWorkbenchFlowNodes({
 }: UseWorkbenchFlowNodesInput): void {
   const graphIdUsedForNodesRef = useRef<string | null>(null)
   const agentToolApprovalsRef = useRef(agentToolApprovals)
+  const activeObjectEntrancesRef = useRef(new Map<string, WorkbenchObjectMotion>())
+  const exitingObjectNodesRef = useRef(new Map<string, WorkbenchFlowNode>())
+  const nextObjectMotionIdRef = useRef(1)
+
+  const completeObjectMotion = useCallback(
+    (nodeId: string, motionId: string): void => {
+      const activeEntrance = activeObjectEntrancesRef.current.get(nodeId)
+      if (activeEntrance?.id === motionId) {
+        activeObjectEntrancesRef.current.delete(nodeId)
+        setNodes((nodes) =>
+          nodes.map((node): WorkbenchFlowNode => {
+            if (node.id !== nodeId || node.data.objectMotion?.id !== motionId) return node
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                objectMotion: undefined,
+                onObjectMotionComplete: undefined
+              }
+            } as WorkbenchFlowNode
+          })
+        )
+        return
+      }
+
+      const exitingNode = exitingObjectNodesRef.current.get(nodeId)
+      if (exitingNode?.data.objectMotion?.id !== motionId) return
+
+      exitingObjectNodesRef.current.delete(nodeId)
+      setNodes((nodes) =>
+        nodes.filter((node) => node.id !== nodeId || node.data.objectMotion?.id !== motionId)
+      )
+    },
+    [setNodes]
+  )
 
   useLayoutEffect(() => {
     agentToolApprovalsRef.current = agentToolApprovals
@@ -139,13 +184,64 @@ export function useWorkbenchFlowNodes({
       const shouldPreserveTransientLayout = graphIdUsedForNodesRef.current === graphId
       graphIdUsedForNodesRef.current = graphId
 
+      if (!shouldPreserveTransientLayout) {
+        activeObjectEntrancesRef.current.clear()
+        exitingObjectNodesRef.current.clear()
+      }
+
+      const motionProjection = projectWorkbenchObjectMotion({
+        createMotionId: (kind, nodeId) => {
+          const motionId = `workbench-object-motion-${nextObjectMotionIdRef.current}-${kind}-${nodeId}`
+          nextObjectMotionIdRef.current += 1
+          return motionId
+        },
+        currentNodes,
+        isContinuingGraph: shouldPreserveTransientLayout,
+        nextNodes,
+        reducedMotion: prefersReducedMotion()
+      })
+      motionProjection.nodes.forEach((node) => {
+        if (node.data.objectMotion) {
+          activeObjectEntrancesRef.current.set(node.id, node.data.objectMotion)
+        }
+      })
+      const projectedNodeIds = new Set(motionProjection.nodes.map((node) => node.id))
+      activeObjectEntrancesRef.current.forEach((_motion, nodeId) => {
+        if (!projectedNodeIds.has(nodeId)) activeObjectEntrancesRef.current.delete(nodeId)
+      })
+      projectedNodeIds.forEach((nodeId) => exitingObjectNodesRef.current.delete(nodeId))
+      motionProjection.exitingNodes.forEach((node) => {
+        exitingObjectNodesRef.current.set(node.id, {
+          ...node,
+          data: {
+            ...node.data,
+            onObjectMotionComplete: (motionId) => completeObjectMotion(node.id, motionId)
+          }
+        } as WorkbenchFlowNode)
+      })
+      const nodesWithEntrances = motionProjection.nodes.map((node): WorkbenchFlowNode => {
+        const objectMotion = activeObjectEntrancesRef.current.get(node.id)
+        if (!objectMotion) return node
+
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            objectMotion,
+            onObjectMotionComplete: (motionId) => completeObjectMotion(node.id, motionId)
+          }
+        } as WorkbenchFlowNode
+      })
+      const nodesWithExits = [...nodesWithEntrances, ...exitingObjectNodesRef.current.values()]
+
       return shouldPreserveTransientLayout
-        ? preserveWorkbenchNodeTransientLayout(nextNodes, currentNodes, protectedLayoutNodeIds)
-        : nextNodes
+        ? preserveWorkbenchNodeTransientLayout(nodesWithExits, currentNodes, protectedLayoutNodeIds)
+        : nodesWithExits
     })
   }, [
     currentWorkbench,
     currentWorkspace,
+    completeObjectMotion,
     graph,
     handlers,
     hoveredTerminalBlockId,

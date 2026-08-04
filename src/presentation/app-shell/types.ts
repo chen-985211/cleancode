@@ -84,7 +84,20 @@ export interface WorkbenchNodeLayoutInput {
 }
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
-interface TerminalNodeData extends Record<string, unknown> {
+export type WorkbenchObjectMotionKind = 'create' | 'group-collapse' | 'group-expand'
+
+export interface WorkbenchObjectMotion {
+  readonly id: string
+  readonly kind: WorkbenchObjectMotionKind
+  readonly offset: { readonly x: number; readonly y: number }
+}
+
+interface WorkbenchObjectMotionNodeData {
+  readonly objectMotion?: WorkbenchObjectMotion
+  readonly onObjectMotionComplete?: (motionId: string) => void
+}
+
+interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {
   readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
@@ -130,7 +143,7 @@ interface TerminalNodeData extends Record<string, unknown> {
 
 export type TerminalFlowNode = Node<TerminalNodeData, 'terminal'>
 
-interface TerminalGroupNodeData extends Record<string, unknown> {
+interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {
   readonly identity: CanvasObjectIdentity
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly group: TerminalGroupSnapshot
@@ -162,7 +175,7 @@ interface TerminalGroupNodeData extends Record<string, unknown> {
 }
 
 export type TerminalGroupFlowNode = Node<TerminalGroupNodeData, 'terminalGroup'>
-interface AgentConsoleNodeData extends Record<string, unknown> {
+interface AgentConsoleNodeData extends Record<string, unknown>, WorkbenchObjectMotionNodeData {
   readonly identity: CanvasObjectIdentity
   readonly agent: WorkspaceAgentSnapshot
   readonly isContextSelected?: boolean

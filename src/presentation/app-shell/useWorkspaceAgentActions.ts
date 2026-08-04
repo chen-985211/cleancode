@@ -15,6 +15,7 @@ import type {
   WorkbenchNodeCreationReservation
 } from './workbenchNodeCreationCoordinator'
 import type { WorkbenchNodeSize } from './workbenchNodeCreationPolicy'
+import { scheduleWorkbenchCreatedObjectFocus } from './workbenchObjectMotion'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -49,6 +50,7 @@ export function useWorkspaceAgentActions({
 }) {
   const { t } = useI18n()
   const [isCreatingAgent, setIsCreatingAgent] = useState(false)
+  const cancelScheduledCreationFocusRef = useRef<(() => void) | null>(null)
   const creationGenerationRef = useRef(0)
   const warnedWorkspaceScopesRef = useRef(new Set<string>())
   const workspaceScopeKey =
@@ -61,6 +63,10 @@ export function useWorkspaceAgentActions({
   useEffect(() => {
     creationGenerationRef.current += 1
     setIsCreatingAgent(false)
+    return () => {
+      cancelScheduledCreationFocusRef.current?.()
+      cancelScheduledCreationFocusRef.current = null
+    }
   }, [workspaceScopeKey])
 
   const setWorkspaceAgents = useCallback(
@@ -138,7 +144,16 @@ export function useWorkspaceAgentActions({
         setWorkbenches((entries) =>
           entries.map((workbench) => updateWorkbenchAgent(workbench, created))
         )
-        onWorkspaceAgentCreated(created)
+        cancelScheduledCreationFocusRef.current?.()
+        cancelScheduledCreationFocusRef.current = scheduleWorkbenchCreatedObjectFocus(() => {
+          cancelScheduledCreationFocusRef.current = null
+          if (
+            generation === creationGenerationRef.current &&
+            workspaceScopeKeyRef.current === scopeKey
+          ) {
+            onWorkspaceAgentCreated(created)
+          }
+        })
       } catch {
         if (
           generation === creationGenerationRef.current &&

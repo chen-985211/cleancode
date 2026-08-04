@@ -9,6 +9,7 @@ import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import { WorkbenchNodeResizer } from './WorkbenchNodeResizer'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
+import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 
 export const AgentNode = memo(function AgentNode({
   data,
@@ -16,11 +17,16 @@ export const AgentNode = memo(function AgentNode({
 }: NodeProps<AgentConsoleFlowNode>) {
   const { t } = useI18n()
   const approvalController = data.approvalController ?? inactiveApprovalController
+  const objectMotion = useWorkbenchObjectMotionPresentation(
+    data.objectMotion,
+    data.onObjectMotionComplete
+  )
   const hasActiveApproval = approvalController.approvals.some(
     (approval) => approval.request.agentId === data.agent.agentId
   )
   const className = [
     'agent-console-node',
+    objectMotion.className,
     hasActiveApproval ? 'agent-console-node--approval-source' : '',
     'nowheel',
     selected ? 'agent-console-node--selected' : ''
@@ -36,6 +42,8 @@ export const AgentNode = memo(function AgentNode({
       data-agent-console-node={data.agent.agentId}
       data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
       data-selection-state={selected ? 'selected' : 'unselected'}
+      style={objectMotion.style}
+      onAnimationEnd={objectMotion.onAnimationEnd}
     >
       <Handle
         id={agentApprovalSourceHandleId}

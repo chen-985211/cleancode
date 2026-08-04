@@ -16,6 +16,7 @@ import {
 import type { WorkbenchNodeSize } from './workbenchNodeCreationPolicy'
 import { createWorkbenchNodeOccupancy } from './workbenchNodeOccupancy'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
+import { scheduleWorkbenchCreatedObjectFocus } from './workbenchObjectMotion'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -41,9 +42,14 @@ export function useWorkbenchNodeCreationActions({
       ? `${currentWorkbench.project.id}\0${currentWorkspace.workspaceId}`
       : null
   const workspaceScopeKeyRef = useRef(workspaceScopeKey)
+  const cancelScheduledCreationFocusRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     workspaceScopeKeyRef.current = workspaceScopeKey
+    return () => {
+      cancelScheduledCreationFocusRef.current?.()
+      cancelScheduledCreationFocusRef.current = null
+    }
   }, [workspaceScopeKey])
 
   const reserveWorkbenchNodeCreation = useCallback(
@@ -102,7 +108,13 @@ export function useWorkbenchNodeCreationActions({
       if (createdBlock) {
         nodeCreationCoordinator.commit(reservation.reservationId, createdBlock.id)
         isCommitted = true
-        focusCreatedTerminalBlock(createdBlock)
+        cancelScheduledCreationFocusRef.current?.()
+        cancelScheduledCreationFocusRef.current = scheduleWorkbenchCreatedObjectFocus(() => {
+          cancelScheduledCreationFocusRef.current = null
+          if (workspaceScopeKeyRef.current === creationScopeKey) {
+            focusCreatedTerminalBlock(createdBlock)
+          }
+        })
       }
     } finally {
       if (!isCommitted) {

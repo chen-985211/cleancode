@@ -24,6 +24,7 @@ import type { TerminalGroupFlowNode, TerminalViewState } from './types'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
+import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
@@ -33,9 +34,14 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const [isEditingName, setIsEditingName] = useState(false)
   const [draftName, setDraftName] = useState(group.name)
   const trimmedDraftName = draftName.trim()
+  const objectMotion = useWorkbenchObjectMotionPresentation(
+    data.objectMotion,
+    data.onObjectMotionComplete
+  )
   const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
+    objectMotion.className,
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
     data.isContextSelected ? 'terminal-group-node--context-selected' : '',
     data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : '',
@@ -73,6 +79,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       className={className}
       data-terminal-group-id={group.id}
       data-context-selected={data.isContextSelected || undefined}
+      style={objectMotion.style}
+      onAnimationEnd={objectMotion.onAnimationEnd}
     >
       <Handle
         id={agentApprovalConnectionSourceHandleId}

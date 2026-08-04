@@ -26,6 +26,7 @@ import {
   type WorkbenchNodeLayoutInput
 } from './types'
 import { useI18n } from './i18n/useI18n'
+import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -38,8 +39,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const hasRequestedAutoStartRef = useRef(false)
   const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
+  const objectMotion = useWorkbenchObjectMotionPresentation(
+    data.objectMotion,
+    data.onObjectMotionComplete
+  )
   const terminalNodeClassName = [
     'terminal-node',
+    objectMotion.className,
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
     data.isContextSelected ? 'terminal-node--context-selected' : '',
@@ -164,6 +170,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       className={terminalNodeClassName}
       data-terminal-block-id={block.id}
       data-context-selected={data.isContextSelected || undefined}
+      style={objectMotion.style}
+      onAnimationEnd={objectMotion.onAnimationEnd}
     >
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}

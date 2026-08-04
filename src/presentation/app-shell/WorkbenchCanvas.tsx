@@ -31,6 +31,7 @@ import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
+import { resolveWorkbenchCanvasDetailLevel } from './workbenchObjectMotion'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
@@ -248,6 +249,7 @@ export function WorkbenchCanvas({
       : undefined
   })
   const [viewportZoom, setViewportZoom] = useState(1)
+  const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -355,6 +357,7 @@ export function WorkbenchCanvas({
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
       <div
         ref={canvasSurfaceRef}
+        data-canvas-detail={canvasDetailLevel}
         className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
           .filter(Boolean)
           .join(' ')}

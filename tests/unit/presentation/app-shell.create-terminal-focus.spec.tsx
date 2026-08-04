@@ -64,6 +64,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         nodes.map((node) =>
           React.createElement('div', {
             key: node.id,
+            'data-object-motion': node.data.objectMotion?.kind,
             'data-selected': String(Boolean(node.selected)),
             'data-testid': `mock-node-${node.id}`
           })
@@ -126,6 +127,34 @@ describe('app shell create terminal focus', () => {
       )
     )
     expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
+  })
+
+  it('marks a newly projected terminal for object materialization when motion is allowed', async () => {
+    stubReducedMotionPreference(false)
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+
+    runtimeApi.createTerminalBlock.mockImplementation(async (command) => ({
+      ...workbench.graph,
+      blocks: [createTerminalBlockSnapshot({ position: command.position })]
+    }))
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: runtimeApi
+    })
+
+    render(<AppShell />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '新建终端积木' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-node-created-terminal')).toHaveAttribute(
+        'data-object-motion',
+        'create'
+      )
+    )
   })
 
   it('fits the canvas when entering terminal group selection mode', async () => {
@@ -285,11 +314,11 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
   }
 }
 
-function stubReducedMotionPreference(): void {
+function stubReducedMotionPreference(matches = true): void {
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({
-      matches: true,
+      matches,
       media: '(prefers-reduced-motion: reduce)',
       onchange: null,
       addEventListener: vi.fn(),
