@@ -26,7 +26,11 @@ interface WorkbenchObjectFrameScheduler {
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
 
-export function resolveWorkbenchCanvasDetailLevel(zoom: number): WorkbenchCanvasDetailLevel {
+export function resolveWorkbenchCanvasDetailLevel(
+  zoom: number,
+  reduceVisualNoise = true
+): WorkbenchCanvasDetailLevel {
+  if (!reduceVisualNoise) return 'full'
   if (!Number.isFinite(zoom) || zoom <= 0 || zoom >= compactCanvasZoom) {
     return 'full'
   }

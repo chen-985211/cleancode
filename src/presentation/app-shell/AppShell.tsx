@@ -2,7 +2,6 @@ import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { PanelLeft } from 'lucide-react'
 import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -30,7 +29,6 @@ import { useWorkbenchNodeSelection } from './useWorkbenchNodeSelection'
 import { useWorkspaceAgentActions } from './useWorkspaceAgentActions'
 import { useAgentToolApprovals } from './useAgentToolApprovals'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
-import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
 import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvider'
 import { WorkbenchCanvas } from './WorkbenchCanvas'
@@ -49,6 +47,7 @@ import { useAppShellShortcutActions } from './useAppShellShortcutActions'
 import { useWindowFullScreenState } from './useWindowFullScreenState'
 import { useTerminalRuntimePreference } from './useTerminalRuntimePreference'
 import { useTerminalWorkflowBuildPreference } from './useTerminalWorkflowBuildPreference'
+import { useCanvasVisualNoisePreference } from './useCanvasVisualNoisePreference'
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
@@ -63,6 +62,7 @@ import { useAppShellBlockActions } from './useAppShellBlockActions'
 import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
 import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
+import { ProjectSidebarToggle } from './ProjectSidebarToggle'
 
 type AppShellProps = { readonly notifications?: AppNotificationController }
 export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
@@ -195,6 +195,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     useTerminalRuntimePreference(terminalSurfaceRegistry)
   const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
     useTerminalWorkflowBuildPreference()
+  const { changeReduceVisualNoise, reduceVisualNoise } = useCanvasVisualNoisePreference()
   const minimapAppearance = useTerminalMinimapAppearance({
     terminalStates,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
@@ -582,33 +583,25 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
             bindings={bindings}
             blockTemplates={blockTemplates}
             changeBinding={changeBinding}
+            changeReduceVisualNoise={changeReduceVisualNoise}
             changeTerminalScrollback={changeTerminalScrollback}
             changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
             currentWorkbench={currentWorkbench}
             currentWorkspace={currentWorkspace}
             isDesktopRuntime={isDesktopRuntime}
             resetAllBindings={resetAllBindings}
+            reduceVisualNoise={reduceVisualNoise}
             shortcutPlatform={shortcutPlatform}
             terminalScrollbackRows={terminalScrollbackRows}
             terminalWorkflowBuildMode={terminalWorkflowBuildMode}
           />
           <div className="project-sidebar-column">
-            <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
-              <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
-              <TooltipLabel content={shortcutTooltips.toggleSidebar} side="bottom">
-                <button
-                  ref={projectSidebarToggleRef}
-                  className="project-sidebar-toggle"
-                  type="button"
-                  aria-controls="project-sidebar"
-                  aria-expanded={!isProjectSidebarCollapsed}
-                  aria-label={t(isProjectSidebarCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
-                  onClick={toggleProjectSidebar}
-                >
-                  <PanelLeft size={16} aria-hidden="true" />
-                </button>
-              </TooltipLabel>
-            </nav>
+            <ProjectSidebarToggle
+              buttonRef={projectSidebarToggleRef}
+              isCollapsed={isProjectSidebarCollapsed}
+              shortcutTooltip={shortcutTooltips.toggleSidebar}
+              onToggle={toggleProjectSidebar}
+            />
             <ProjectSidebar
               workbenches={workbenches}
               currentWorkbench={currentWorkbench}
@@ -647,6 +640,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
             canvasSizeRef={canvasSizeRef}
             reactFlowInstanceRef={reactFlowInstanceRef}
             minimapNodeInteraction={minimapNodeInteraction}
+            reduceVisualNoise={reduceVisualNoise}
             terminalWorkflow={terminalWorkflow}
             terminalWorkflowBuildPresentation={terminalWorkflowBuildPresentation}
             shortcutTooltips={shortcutTooltips}

@@ -70,38 +70,6 @@
   color: var(--cc-foreground);
 }
 
-.agent-settings-switch {
-  position: relative;
-  width: 34px;
-  height: 19px;
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 999px;
-  background: var(--cc-border-strong);
-  padding: 2px;
-  transition:
-    background 140ms ease,
-    opacity 140ms ease;
-}
-
-.agent-settings-switch span {
-  display: block;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--cc-primary-contrast);
-  box-shadow: var(--cc-shadow-sm);
-  transition: transform 140ms ease;
-}
-
-.agent-settings-switch[aria-checked='true'] {
-  background: var(--cc-primary);
-}
-
-.agent-settings-switch[aria-checked='true'] span {
-  transform: translateX(15px);
-}
-
 .agent-settings-catalog {
   display: grid;
 }

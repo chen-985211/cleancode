@@ -85,6 +85,7 @@ interface WorkbenchCanvasProps {
   readonly canvasSizeRef?: MutableRefObject<{ width: number; height: number }>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly minimapNodeInteraction: MinimapNodeInteractionContextValue
+  readonly reduceVisualNoise?: boolean
   readonly terminalWorkflow?: ReturnType<typeof useTerminalWorkflow>
   readonly terminalWorkflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
   readonly shortcutTooltips: Partial<ApplicationShortcutTooltipLabels> &
@@ -180,6 +181,7 @@ export function WorkbenchCanvas({
   canvasSizeRef,
   reactFlowInstanceRef,
   minimapNodeInteraction,
+  reduceVisualNoise = true,
   terminalWorkflow,
   terminalWorkflowBuildPresentation = null,
   shortcutTooltips,
@@ -263,7 +265,7 @@ export function WorkbenchCanvas({
       : undefined
   })
   const [viewportZoom, setViewportZoom] = useState(1)
-  const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom)
+  const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom, reduceVisualNoise)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [viewportMotionInstance, setViewportMotionInstance] = useState<ReactFlowInstance<

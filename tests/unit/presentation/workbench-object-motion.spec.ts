@@ -8,15 +8,20 @@ import {
 
 describe('workbench object motion', () => {
   it.each([
-    { expected: 'full', zoom: 1 },
-    { expected: 'full', zoom: 0.78 },
-    { expected: 'compact', zoom: 0.779 },
-    { expected: 'compact', zoom: 0.52 },
-    { expected: 'overview', zoom: 0.519 },
-    { expected: 'full', zoom: Number.NaN }
-  ] as const)('resolves zoom $zoom to the shared $expected detail level', ({ expected, zoom }) => {
-    expect(resolveWorkbenchCanvasDetailLevel(zoom)).toBe(expected)
-  })
+    { expected: 'full', reduceVisualNoise: true, zoom: 1 },
+    { expected: 'full', reduceVisualNoise: true, zoom: 0.78 },
+    { expected: 'compact', reduceVisualNoise: true, zoom: 0.779 },
+    { expected: 'compact', reduceVisualNoise: true, zoom: 0.52 },
+    { expected: 'overview', reduceVisualNoise: true, zoom: 0.519 },
+    { expected: 'full', reduceVisualNoise: true, zoom: Number.NaN },
+    { expected: 'full', reduceVisualNoise: false, zoom: 0.779 },
+    { expected: 'full', reduceVisualNoise: false, zoom: 0.519 }
+  ] as const)(
+    'resolves zoom $zoom with noise reduction $reduceVisualNoise to $expected',
+    ({ expected, reduceVisualNoise, zoom }) => {
+      expect(resolveWorkbenchCanvasDetailLevel(zoom, reduceVisualNoise)).toBe(expected)
+    }
+  )
 
   it('materializes newly projected objects without changing their final geometry', () => {
     const terminal = createTerminalNode('terminal-1', { x: 640, y: 360 })

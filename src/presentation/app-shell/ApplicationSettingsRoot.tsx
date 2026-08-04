@@ -1,4 +1,13 @@
-import { ArrowLeft, Bot, Keyboard, RotateCcw, Settings, SquareTerminal, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  Bot,
+  Keyboard,
+  LayoutGrid,
+  RotateCcw,
+  Settings,
+  SquareTerminal,
+  X
+} from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -31,8 +40,9 @@ import { AgentSettingsPane } from './AgentSettingsPane'
 import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
 import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
+import { CanvasSettingsPane } from './CanvasSettingsPane'
 
-export type ApplicationSettingsPane = 'agents' | 'shortcuts' | 'terminal'
+export type ApplicationSettingsPane = 'agents' | 'canvas' | 'shortcuts' | 'terminal'
 
 interface ApplicationSettingsRootProps {
   readonly agentProviderPreferences?: AgentProviderPreferencesSnapshot
@@ -53,6 +63,8 @@ interface ApplicationSettingsRootProps {
   ) => Promise<void> | void
   readonly onAgentProvidersRefresh?: () => Promise<void> | void
   readonly onResetAll: () => void
+  readonly reduceVisualNoise: boolean
+  readonly onReduceVisualNoiseChange: (reduceVisualNoise: boolean) => void
   readonly terminalScrollbackRows: TerminalScrollbackRows
   readonly onTerminalScrollbackChange: (rows: TerminalScrollbackRows) => void
   readonly terminalWorkflowBuildMode: TerminalWorkflowBuildMode
@@ -168,6 +180,14 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               </button>
               <button
                 type="button"
+                aria-current={activePane === 'canvas' ? 'page' : undefined}
+                onClick={() => setSelectedPane('canvas')}
+              >
+                <LayoutGrid size={17} aria-hidden="true" />
+                <span>{t('settings.canvas.title')}</span>
+              </button>
+              <button
+                type="button"
                 aria-current={activePane === 'terminal' ? 'page' : undefined}
                 onClick={() => setSelectedPane('terminal')}
               >
@@ -184,7 +204,12 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
               </button>
             </nav>
             <main className="application-settings-content">
-              {activePane === 'agents' ? (
+              {activePane === 'canvas' ? (
+                <CanvasSettingsPane
+                  reduceVisualNoise={props.reduceVisualNoise}
+                  onReduceVisualNoiseChange={props.onReduceVisualNoiseChange}
+                />
+              ) : activePane === 'agents' ? (
                 <AgentSettingsPane
                   defaultProviderId={props.defaultAgentProviderId ?? null}
                   preferences={props.agentProviderPreferences}

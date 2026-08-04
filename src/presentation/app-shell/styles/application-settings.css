@@ -187,6 +187,43 @@
   width: min(100%, 760px);
 }
 
+.application-settings-switch {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  background: var(--cc-border-strong);
+  padding: 2px;
+  transition:
+    background 140ms ease,
+    opacity 140ms ease;
+}
+
+.application-settings-switch span {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--cc-primary-contrast);
+  box-shadow: var(--cc-shadow-sm);
+  transition: transform 140ms ease;
+}
+
+.application-settings-switch[aria-checked='true'] {
+  background: var(--cc-primary);
+}
+
+.application-settings-switch[aria-checked='true'] span {
+  transform: translateX(15px);
+}
+
+.application-settings-switch:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 3px;
+}
+
 .terminal-settings-pane__header h2 {
   margin: 0;
   font-size: 24px;
