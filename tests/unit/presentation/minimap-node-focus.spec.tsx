@@ -1,4 +1,4 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type { Edge, ReactFlowInstance, Viewport } from '@xyflow/react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useRef } from 'react'
 
@@ -11,14 +11,18 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useMinimapNodeFocus } from '../../../src/presentation/app-shell/useMinimapNodeFocus'
 
 describe('minimap node focus', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the longer capped transition when a minimap terminal is far from the current view', () => {
-    const setCenter = vi.fn(async () => true)
+  it('centers a far minimap terminal through the shared viewport controller', () => {
+    const setViewport = vi.fn(async () => true)
     const terminal = createTerminalBlock()
-    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
 
     render(
       <MinimapFocusHarness
@@ -30,18 +34,13 @@ describe('minimap node focus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
-    expect(setCenter).toHaveBeenCalledWith(4_200, 3_150, {
-      zoom: 1,
-      duration: 300,
-      ease: expect.any(Function),
-      interpolate: 'linear'
-    })
+    expect(setViewport).toHaveBeenCalledWith({ x: -3_720, y: -2_830, zoom: 1 }, { duration: 0 })
   })
 
   it('restores a readable zoom when a compact minimap target is too small', () => {
-    const setCenter = vi.fn(async () => true)
+    const setViewport = vi.fn(async () => true)
     const terminal = createTerminalBlock()
-    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter, 0.5)
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport, 0.5)
 
     render(
       <MinimapFocusHarness
@@ -53,16 +52,14 @@ describe('minimap node focus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
-    const options = (
-      setCenter.mock.calls[0] as unknown as [number, number, { readonly zoom: number }]
-    )[2]
-    expect(options.zoom).toBe(0.9)
+    const [viewport] = setViewport.mock.calls[0] as unknown as [{ readonly zoom: number }]
+    expect(viewport.zoom).toBe(0.9)
   })
 
   it('zooms out enough to keep an oversized minimap terminal inside the focus safe frame', () => {
-    const setCenter = vi.fn(async () => true)
+    const setViewport = vi.fn(async () => true)
     const terminal = createTerminalBlock({ width: 1_400, height: 1_000 })
-    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter, 0.9)
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport, 0.9)
 
     render(
       <MinimapFocusHarness
@@ -74,39 +71,19 @@ describe('minimap node focus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
-    expect(setCenter).toHaveBeenCalledOnce()
-    const [centerX, centerY, options] = setCenter.mock.calls[0] as unknown as [
-      number,
-      number,
-      { readonly duration: number; readonly interpolate: string; readonly zoom: number }
+    expect(setViewport).toHaveBeenCalledOnce()
+    const [viewport] = setViewport.mock.calls[0] as unknown as [
+      { readonly x: number; readonly y: number; readonly zoom: number }
     ]
-    expect(centerX).toBe(4_700)
-    expect(centerY).toBe(3_500)
-    expect(options).toMatchObject({
-      interpolate: 'linear'
-    })
-    expect(options.duration).toBeGreaterThanOrEqual(220)
-    expect(options.duration).toBeLessThanOrEqual(300)
-    expect(options.zoom).toBeCloseTo(0.4352, 4)
+    expect(viewport.x).toBeCloseTo(-1_565.44, 2)
+    expect(viewport.y).toBeCloseTo(-1_203.2, 2)
+    expect(viewport.zoom).toBeCloseTo(0.4352, 4)
   })
 
   it('locates a minimap target without spatial motion when reduced motion is preferred', () => {
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: true,
-        media: '(prefers-reduced-motion: reduce)',
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn()
-      }))
-    )
-    const setCenter = vi.fn(async () => true)
+    const setViewport = vi.fn(async () => true)
     const terminal = createTerminalBlock()
-    const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+    const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
 
     render(
       <MinimapFocusHarness
@@ -118,19 +95,16 @@ describe('minimap node focus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
-    expect(setCenter).toHaveBeenCalledWith(4_200, 3_150, {
-      duration: 0,
-      zoom: 1
-    })
+    expect(setViewport).toHaveBeenCalledWith({ x: -3_720, y: -2_830, zoom: 1 }, { duration: 0 })
   })
 
-  it('activates xterm input after locating a terminal from the minimap', () => {
+  it('activates xterm input after locating a terminal from the minimap', async () => {
     vi.useFakeTimers()
 
     try {
-      const setCenter = vi.fn(async () => true)
+      const setViewport = vi.fn(async () => true)
       const terminal = createTerminalBlock()
-      const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+      const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
 
       render(
         <>
@@ -152,7 +126,7 @@ describe('minimap node focus', () => {
       const navigationTarget = screen.getByRole('button', { name: '聚焦远端终端' })
       navigationTarget.focus()
       fireEvent.click(navigationTarget)
-      vi.advanceTimersByTime(350)
+      await vi.advanceTimersByTimeAsync(350)
 
       expect(screen.getByLabelText('终端输入')).toHaveFocus()
     } finally {
@@ -160,13 +134,13 @@ describe('minimap node focus', () => {
     }
   })
 
-  it('still activates xterm input for an explicit terminal focus request', () => {
+  it('still activates xterm input for an explicit terminal focus request', async () => {
     vi.useFakeTimers()
 
     try {
-      const setCenter = vi.fn(async () => true)
+      const setViewport = vi.fn(async () => true)
       const terminal = createTerminalBlock()
-      const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+      const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
 
       render(
         <>
@@ -186,7 +160,7 @@ describe('minimap node focus', () => {
       )
 
       fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
-      vi.advanceTimersByTime(25)
+      await vi.advanceTimersByTimeAsync(25)
 
       expect(screen.getByLabelText('终端输入')).toHaveFocus()
     } finally {
@@ -194,13 +168,13 @@ describe('minimap node focus', () => {
     }
   })
 
-  it('does not steal focus from an editor opened while terminal input projection is pending', () => {
+  it('does not steal focus from an editor opened while terminal input projection is pending', async () => {
     vi.useFakeTimers()
 
     try {
-      const setCenter = vi.fn(async () => true)
+      const setViewport = vi.fn(async () => true)
       const terminal = createTerminalBlock()
-      const instance = createReactFlowInstance(createTerminalNode(terminal), setCenter)
+      const instance = createReactFlowInstance(createTerminalNode(terminal), setViewport)
 
       render(
         <>
@@ -219,7 +193,7 @@ describe('minimap node focus', () => {
 
       fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
       screen.getByLabelText('分支名称').focus()
-      vi.advanceTimersByTime(2_000)
+      await vi.advanceTimersByTimeAsync(2_000)
 
       expect(screen.getByLabelText('分支名称')).toHaveFocus()
       expect(screen.getByLabelText('终端输入')).not.toHaveFocus()
@@ -228,14 +202,17 @@ describe('minimap node focus', () => {
     }
   })
 
-  it('replaces pending terminal input activation when the minimap locates an Agent', () => {
+  it('replaces pending terminal input activation when the minimap locates an Agent', async () => {
     vi.useFakeTimers()
 
     try {
-      const setCenter = vi.fn(async () => true)
+      const setViewport = vi.fn(async () => true)
       const terminal = createTerminalBlock()
       const agentNode = createAgentNode()
-      const instance = createReactFlowInstance([createTerminalNode(terminal), agentNode], setCenter)
+      const instance = createReactFlowInstance(
+        [createTerminalNode(terminal), agentNode],
+        setViewport
+      )
 
       render(
         <>
@@ -258,7 +235,7 @@ describe('minimap node focus', () => {
       const navigationTarget = screen.getByRole('button', { name: '聚焦远端终端' })
       navigationTarget.focus()
       fireEvent.click(navigationTarget)
-      vi.advanceTimersByTime(350)
+      await vi.advanceTimersByTimeAsync(350)
 
       expect(screen.getByLabelText('终端输入')).not.toHaveFocus()
       expect(screen.getByLabelText('Agent 输入')).toHaveFocus()
@@ -271,8 +248,8 @@ describe('minimap node focus', () => {
     ['Agent', createAgentNode()],
     ['折叠组合', createTerminalGroupNode()]
   ] as const)('applies the same safe frame to an oversized %s', (_kind, node) => {
-    const setCenter = vi.fn(async () => true)
-    const instance = createReactFlowInstance(node, setCenter, 0.9)
+    const setViewport = vi.fn(async () => true)
+    const instance = createReactFlowInstance(node, setViewport, 0.9)
     const terminalGroupsById =
       node.type === 'terminalGroup'
         ? new Map([[node.data.group.id, node.data.group]])
@@ -288,10 +265,8 @@ describe('minimap node focus', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '聚焦远端终端' }))
 
-    const options = (
-      setCenter.mock.calls[0] as unknown as [number, number, { readonly zoom: number }]
-    )[2]
-    expect(options.zoom).toBeCloseTo(0.4352, 4)
+    const [viewport] = setViewport.mock.calls[0] as unknown as [{ readonly zoom: number }]
+    expect(viewport.zoom).toBeCloseTo(0.4352, 4)
   })
 })
 
@@ -345,17 +320,41 @@ function MinimapFocusHarness({
 
 function createReactFlowInstance(
   nodeOrNodes: WorkbenchFlowNode | readonly WorkbenchFlowNode[],
-  setCenter: ReturnType<typeof vi.fn>,
+  setViewport: SetViewportSpy,
   zoom = 1
 ): ReactFlowInstance<WorkbenchFlowNode, Edge> {
   const nodes = Array.isArray(nodeOrNodes) ? nodeOrNodes : [nodeOrNodes]
+  let viewport = { x: 0, y: 0, zoom }
 
   return {
     getNode: (nodeId: string) => nodes.find((node) => node.id === nodeId),
-    getViewport: () => ({ x: 0, y: 0, zoom }),
-    getZoom: () => zoom,
-    setCenter
+    getViewport: () => viewport,
+    getZoom: () => viewport.zoom,
+    setViewport: (nextViewport: Viewport, options: { readonly duration: number }) => {
+      viewport = nextViewport
+      return setViewport(nextViewport, options)
+    }
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+}
+
+type SetViewportSpy = ReturnType<
+  typeof vi.fn<(viewport: Viewport, options: { readonly duration: number }) => Promise<boolean>>
+>
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createTerminalNode(terminal: TerminalBlockSnapshot): WorkbenchFlowNode {

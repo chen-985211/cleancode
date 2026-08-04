@@ -1,35 +1,31 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import { getViewportForBounds, type Edge, type ReactFlowInstance } from '@xyflow/react'
 
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import {
-  resolveWorkbenchViewportTransition,
-  transitionWorkbenchViewport
+  resolveWorkbenchViewportCommandTarget,
+  resolveWorkbenchViewportTransition
 } from '../../../src/presentation/app-shell/workbenchViewportMotion'
 
 describe('workbench viewport motion', () => {
   it.each([
     {
       commandType: 'zoom-in' as const,
-      expectedDuration: 180,
-      expectedInterpolation: 'smooth' as const,
+      expectedResponse: 0.3,
       intent: { type: 'quick' as const }
     },
     {
       commandType: 'fit-view' as const,
-      expectedDuration: 180,
-      expectedInterpolation: 'smooth' as const,
+      expectedResponse: 0.3,
       intent: { type: 'quick' as const }
     },
     {
       commandType: 'center' as const,
-      expectedDuration: 220,
-      expectedInterpolation: 'smooth' as const,
+      expectedResponse: 0.34,
       intent: { type: 'spatial' as const }
     },
     {
       commandType: 'set-viewport' as const,
-      expectedDuration: 220,
-      expectedInterpolation: 'smooth' as const,
+      expectedResponse: 0.34,
       intent: { type: 'spatial' as const }
     }
   ])('maps $intent.type $commandType motion to one shared rhythm', (input) => {
@@ -39,13 +35,9 @@ describe('workbench viewport motion', () => {
     })
 
     expect(transition).toMatchObject({
-      duration: input.expectedDuration,
-      interpolate: input.expectedInterpolation
+      dampingRatio: 1,
+      response: input.expectedResponse
     })
-    expect(transition.ease).toEqual(expect.any(Function))
-    expect(transition.ease?.(0)).toBe(0)
-    expect(transition.ease?.(0.5)).toBeCloseTo(0.875)
-    expect(transition.ease?.(1)).toBe(1)
   })
 
   it('keeps instant and reduced-motion transitions free from spatial interpolation', () => {
@@ -54,7 +46,7 @@ describe('workbench viewport motion', () => {
         intent: { type: 'instant' },
         reducedMotion: false
       })
-    ).toEqual({ duration: 0 })
+    ).toEqual({})
     expect(
       resolveWorkbenchViewportTransition({
         intent: {
@@ -63,38 +55,36 @@ describe('workbench viewport motion', () => {
         },
         reducedMotion: true
       })
-    ).toEqual({ duration: 0 })
+    ).toEqual({})
   })
 
-  it('uses smooth spatial travel until an extreme target would over-zoom the canvas', () => {
+  it('bounds the spring response for increasingly distant targets', () => {
     const sharedInput = {
       currentViewport: { x: 0, y: 0, zoom: 1 },
       intent: {
         canvasSize: { height: 640, width: 960 },
         type: 'adaptive-focus' as const
       },
-      reducedMotion: false,
-      targetZoom: 1
+      reducedMotion: false
     }
 
     const nearby = resolveWorkbenchViewportTransition({
       ...sharedInput,
-      targetCenter: { x: 480, y: 320 }
+      targetViewport: { x: 0, y: 0, zoom: 1 }
     })
     const distant = resolveWorkbenchViewportTransition({
       ...sharedInput,
-      targetCenter: { x: 1_480, y: 1_070 }
+      targetViewport: { x: -1_000, y: -750, zoom: 1 }
     })
     const extremelyDistant = resolveWorkbenchViewportTransition({
       ...sharedInput,
-      targetCenter: { x: 40_480, y: 30_320 }
+      targetViewport: { x: -40_000, y: -30_000, zoom: 1 }
     })
 
-    expect(nearby).toMatchObject({ duration: 220, interpolate: 'smooth' })
-    expect(distant.duration).toBeGreaterThan(nearby.duration)
-    expect(distant.duration).toBeLessThanOrEqual(300)
-    expect(distant.interpolate).toBe('smooth')
-    expect(extremelyDistant).toMatchObject({ duration: 300, interpolate: 'linear' })
+    expect(nearby).toMatchObject({ dampingRatio: 1, response: 0.34 })
+    expect(distant.response).toBeGreaterThan(nearby.response!)
+    expect(distant.response).toBeLessThanOrEqual(0.42)
+    expect(extremelyDistant).toMatchObject({ dampingRatio: 1, response: 0.42 })
   })
 
   it('accounts for zoom change independently from screen-space travel', () => {
@@ -108,17 +98,14 @@ describe('workbench viewport motion', () => {
     }
     const translationOnly = resolveWorkbenchViewportTransition({
       ...sharedInput,
-      targetCenter: { x: 880, y: 620 },
-      targetZoom: 1
+      targetViewport: { x: -400, y: -300, zoom: 1 }
     })
     const translationAndZoom = resolveWorkbenchViewportTransition({
       ...sharedInput,
-      targetCenter: { x: 1_760, y: 1_240 },
-      targetZoom: 0.5
+      targetViewport: { x: -400, y: -300, zoom: 0.5 }
     })
 
-    expect(translationAndZoom.duration).toBeGreaterThan(translationOnly.duration)
-    expect(translationAndZoom.interpolate).toBe('smooth')
+    expect(translationAndZoom.response).toBeGreaterThan(translationOnly.response!)
   })
 
   it('uses a stable fallback before the canvas has reported a positive size', () => {
@@ -130,96 +117,80 @@ describe('workbench viewport motion', () => {
           type: 'adaptive-focus'
         },
         reducedMotion: false,
-        targetCenter: { x: 480, y: 320 },
-        targetZoom: 1
+        targetViewport: { x: 0, y: 0, zoom: 1 }
       })
-    ).toMatchObject({ duration: 220, interpolate: 'smooth' })
+    ).toMatchObject({ dampingRatio: 1, response: 0.34 })
   })
 
-  it('forwards every viewport command through the shared transition options', async () => {
-    const setCenter = vi.fn(async () => true)
-    const setViewport = vi.fn(async () => true)
-    const fitView = vi.fn(async () => true)
-    const fitBounds = vi.fn(async () => true)
-    const zoomIn = vi.fn(async () => true)
-    const zoomOut = vi.fn(async () => true)
+  it('resolves every viewport command to an explicit spring target', () => {
     const instance = {
-      fitBounds,
-      fitView,
-      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
-      setCenter,
-      setViewport,
-      zoomIn,
-      zoomOut
+      getNode: () => undefined,
+      getNodes: () => [],
+      getNodesBounds: () => ({ height: 300, width: 400, x: 50, y: 60 }),
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 })
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
-    const node = { id: 'terminal-1' } as WorkbenchFlowNode
-
-    await transitionWorkbenchViewport(instance, {
+    const node = {
+      data: {},
+      id: 'terminal-1',
+      position: { x: 50, y: 60 },
+      type: 'terminal'
+    } as WorkbenchFlowNode
+    const center = resolveWorkbenchViewportCommandTarget(instance, {
       center: { x: 120, y: 80 },
       intent: { type: 'spatial' },
       type: 'center',
       zoom: 0.9
     })
-    await transitionWorkbenchViewport(instance, {
+    const viewport = resolveWorkbenchViewportCommandTarget(instance, {
       intent: { type: 'instant' },
       type: 'set-viewport',
       viewport: { x: 10, y: 20, zoom: 0.8 }
     })
-    await transitionWorkbenchViewport(instance, {
+    const fitView = resolveWorkbenchViewportCommandTarget(instance, {
       intent: { type: 'spatial' },
       maxZoom: 1,
       nodes: [node],
       padding: 0.24,
       type: 'fit-view'
     })
-    await transitionWorkbenchViewport(instance, {
+    const fitBounds = resolveWorkbenchViewportCommandTarget(instance, {
       bounds: { height: 300, width: 400, x: 50, y: 60 },
       intent: { type: 'spatial' },
       padding: 0.24,
       type: 'fit-bounds'
     })
-    await transitionWorkbenchViewport(instance, {
+    const zoomIn = resolveWorkbenchViewportCommandTarget(instance, {
       intent: { type: 'quick' },
       type: 'zoom-in'
     })
-    await transitionWorkbenchViewport(instance, {
+    const zoomOut = resolveWorkbenchViewportCommandTarget(instance, {
       intent: { type: 'quick' },
       type: 'zoom-out'
     })
 
-    expect(setCenter).toHaveBeenCalledWith(120, 80, {
-      duration: 220,
-      ease: expect.any(Function),
-      interpolate: 'smooth',
-      zoom: 0.9
-    })
-    expect(setViewport).toHaveBeenCalledWith({ x: 10, y: 20, zoom: 0.8 }, { duration: 0 })
-    expect(fitView).toHaveBeenCalledWith({
-      duration: 220,
-      ease: expect.any(Function),
-      interpolate: 'smooth',
-      maxZoom: 1,
-      nodes: [node],
-      padding: 0.24
-    })
-    expect(fitBounds).toHaveBeenCalledWith(
+    const fittedView = getViewportForBounds(
       { height: 300, width: 400, x: 50, y: 60 },
-      {
-        duration: 220,
-        ease: expect.any(Function),
-        interpolate: 'smooth',
-        padding: 0.24
-      }
+      960,
+      640,
+      0.35,
+      1,
+      0.24
     )
-    expect(zoomIn).toHaveBeenCalledWith({
-      duration: 180,
-      ease: expect.any(Function),
-      interpolate: 'smooth'
-    })
-    expect(zoomOut).toHaveBeenCalledWith({
-      duration: 180,
-      ease: expect.any(Function),
-      interpolate: 'smooth'
-    })
+    const fittedBounds = getViewportForBounds(
+      { height: 300, width: 400, x: 50, y: 60 },
+      960,
+      640,
+      0.35,
+      1.6,
+      0.24
+    )
+    expect(center).toEqual({ x: 372, y: 248, zoom: 0.9 })
+    expect(viewport).toEqual({ x: 10, y: 20, zoom: 0.8 })
+    expect(fitView).toEqual(fittedView)
+    expect(fitBounds).toEqual(fittedBounds)
+    expect(zoomIn).toEqual({ x: -96, y: -64, zoom: 1.2 })
+    expect(zoomOut.x).toBe(80)
+    expect(zoomOut.y).toBeCloseTo(160 / 3)
+    expect(zoomOut.zoom).toBeCloseTo(5 / 6)
   })
 })

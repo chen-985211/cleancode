@@ -115,8 +115,8 @@ export function useApplicationShortcutNavigation({
         zoom
       })
       activateWorkbenchNodeInputRef.current(target)
-      void transitionCompletion.then(() => {
-        if (selectedNodeIdRef.current === target.id) {
+      void transitionCompletion.then((completed) => {
+        if (completed && selectedNodeIdRef.current === target.id) {
           activateWorkbenchNodeInputRef.current(target)
         }
       })

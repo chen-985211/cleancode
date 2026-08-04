@@ -21,12 +21,7 @@ export async function setCanvasZoomFromDefault(
       Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - expected) <= 0.001
     )
   }, expectedZoom)
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-  )
+  await waitForCanvasViewportToSettle(page)
 
   return readCanvasZoom(page)
 }

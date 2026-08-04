@@ -65,7 +65,6 @@ import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
 
 type AppShellProps = { readonly notifications?: AppNotificationController }
-
 export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
   const { t } = useI18n()
@@ -385,6 +384,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     moveWorkbenchNode,
     moveWorkspaceAgent,
     nodeStore,
+    onCancelLayoutFocus: cancelPendingWorkbenchInputFocus,
     reactFlowInstanceRef,
     setCurrentGraph,
     terminalWorkflowBuildMode

@@ -14,15 +14,24 @@ import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFix
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('Agent layout projection timing', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('fits the arranged geometry after the existing terminal node has been reprojected', async () => {
-    const fitView = vi.fn(async (options: { readonly nodes?: readonly WorkbenchFlowNode[] }) => {
-      void options
+    const getNodesBounds = vi.fn((nodes: readonly WorkbenchFlowNode[]) => {
+      void nodes
+      return { height: 1_026, width: 840, x: 40, y: 40 }
     })
     let publishGraphUpdate: ((event: AgentGraphUpdatedEvent) => void) | undefined
 
     render(
       <Harness
-        fitView={fitView}
+        getNodesBounds={getNodesBounds}
         onReady={(listener) => {
           publishGraphUpdate = listener
         }}
@@ -33,8 +42,8 @@ describe('Agent layout projection timing', () => {
 
     act(() => publishGraphUpdate?.(createLayoutEvent()))
 
-    await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
-    const focusedNodes = fitView.mock.calls[0]![0].nodes as WorkbenchFlowNode[]
+    await waitFor(() => expect(getNodesBounds).toHaveBeenCalledOnce())
+    const focusedNodes = getNodesBounds.mock.calls[0]![0]
 
     expect(focusedNodes.find((node) => node.id === 'terminal-1')?.position).toEqual({
       x: 320,
@@ -44,17 +53,19 @@ describe('Agent layout projection timing', () => {
 })
 
 function Harness({
-  fitView,
+  getNodesBounds,
   onReady
 }: {
-  readonly fitView: ReturnType<typeof vi.fn>
+  readonly getNodesBounds: ReturnType<typeof vi.fn>
   readonly onReady: (listener: (event: AgentGraphUpdatedEvent) => void) => void
 }) {
   const [graph, setGraph] = useState(createGraph({ x: 80, y: 80 }))
   const [nodeStore] = useState(() => createWorkbenchNodeStore())
   const reactFlowInstanceRef = useRef({
-    fitView,
-    getNode: (nodeId: string) => nodeStore.getNodes().find((node) => node.id === nodeId)
+    getNode: (nodeId: string) => nodeStore.getNodes().find((node) => node.id === nodeId),
+    getNodesBounds,
+    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+    setViewport: vi.fn(async () => true)
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>)
   const coordination = useAgentLayoutCoordination({
     clearTerminalGroupDropPreview: noop,
@@ -170,4 +181,20 @@ function noop(): void {}
 async function noopAsync(): Promise<void> {}
 async function noopOptionalAsync(): Promise<undefined> {
   return undefined
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }

@@ -7,7 +7,6 @@ import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInp
 import type { WorkbenchFlowNode } from './types'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 import {
-  resolveWorkbenchViewportCommandTransition,
   transitionWorkbenchViewport,
   type WorkbenchViewportCommand,
   type WorkbenchViewportMotionIntent
@@ -45,7 +44,7 @@ export function focusTerminalBlockInCanvas({
   const measuredWidth = node?.measured?.width ?? block.size.width
   const measuredHeight = node?.measured?.height ?? block.size.height
   const position = node?.position ?? block.position
-  const transitionDuration =
+  const transitionCompletion =
     viewportIntent === 'creation'
       ? revealCreatedWorkbenchNode({
           ...readWorkbenchCanvasCreationGeometry(),
@@ -76,7 +75,7 @@ export function focusTerminalBlockInCanvas({
             type: 'terminal'
           } as WorkbenchFlowNode)
       ),
-    transitionDuration
+    transitionCompletion
   })
 }
 
@@ -94,7 +93,7 @@ function revealNavigatedTerminalBlock({
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly targetZoom?: number
   readonly width: number
-}): number {
+}): Promise<boolean> {
   const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
   const command = {
     center: { x: position.x + width / 2, y: position.y + height / 2 },
@@ -102,12 +101,5 @@ function revealNavigatedTerminalBlock({
     type: 'center',
     zoom: nextZoom
   } satisfies WorkbenchViewportCommand
-  const transitionDuration = resolveWorkbenchViewportCommandTransition(
-    reactFlowInstance,
-    command
-  ).duration
-
-  void transitionWorkbenchViewport(reactFlowInstance, command)
-
-  return transitionDuration
+  return transitionWorkbenchViewport(reactFlowInstance, command)
 }

@@ -17,7 +17,7 @@
 
 ## 背景
 
-cleancode 已经具备画布平移、缩放、小地图、方向快捷键、快捷执行定位、新节点显露和布局完成后的适应视图。当前实现的问题不是缺少动画，而是相同空间意图分散在多个调用方：各入口分别调用 React Flow 的 `setCenter`、`setViewport`、`fitView`、`fitBounds` 或 zoom helper，并各自决定时长与插值选项。
+路线启动时，cleancode 已经具备画布平移、缩放、小地图、方向快捷键、快捷执行定位、新节点显露和布局完成后的适应视图。起点问题不是缺少动画，而是相同空间意图分散在多个调用方：各入口分别调用 React Flow 的 `setCenter`、`setViewport`、`fitView`、`fitBounds` 或 zoom helper，并各自决定时长与插值选项。
 
 分散策略会产生三类风险：
 
@@ -68,7 +68,7 @@ cleancode 已经具备画布平移、缩放、小地图、方向快捷键、快�
 ```mermaid
 flowchart LR
   C["画布入口<br/>小地图 / 快捷键 / 快捷执行 / 创建 / 布局"] --> M["Presentation motion owner<br/>意图、节奏、reduced motion、取消"]
-  M --> R["React Flow viewport helpers<br/>center / fit / set / zoom"]
+  M --> R["React Flow imperative viewport<br/>逐帧 setViewport"]
   R --> V["当前 viewport"]
   U["鼠标 / 触控板 / 键盘新输入"] --> M
   B["BlockGraph viewport 与节点投影"] --> C
@@ -82,7 +82,7 @@ flowchart LR
 | ---- | ---------------------- | -------------------------------------------------- | -------- |
 | 1    | 统一相机运动入口       | 所有程序化 viewport helper 经单一 Presentation API | 已完成   |
 | 2    | 连续空间路径与统一节奏 | 聚焦、适应视图和 zoom 使用一致的路径与收敛曲线     | 已完成   |
-| 3    | 可打断与速度连续       | 新输入从实时值接管，目标改变时保留连续速度         | 尚未开始 |
+| 3    | 可打断与速度连续       | 新输入从实时值接管，目标改变时保留连续速度         | 已完成   |
 | 4    | 空间对象反馈与缩放分级 | 对象抬升、展开收起和细节层级与相机语言一致         | 尚未开始 |
 
 阶段按顺序建立稳定边界。第一阶段不主动改变手感参数；第二阶段的曲线调整必须建立在统一入口上；第三阶段不得绕过 React Flow 的直接操控另建并行 viewport；第四阶段不得让对象装饰影响终端正文或节点几何事实。
@@ -202,6 +202,19 @@ flowchart LR
 - 动画中拖动画布时同一帧或下一帧获得控制权。
 - 快速连续定位多个对象时只完成最后一个有效意图。
 - 终端持续输出期间相机运动不造成明显输入延迟或掉帧。
+
+### 第三阶段完成证据
+
+第三阶段于 2026-08-04 完成：
+
+- React Flow 内建的 D3 transition 只能接受目标、固定时长和插值选项，不能暴露 presentation velocity 或可靠的重新定向身份；统一 owner 因此改用无新增依赖、由 `requestAnimationFrame` 驱动的解析式临界阻尼 spring。
+- `quick`、`spatial` 与 `adaptive-focus` 分别使用 `0.30s`、`0.34s` 和 `0.34–0.42s` response，阻尼比固定为 `1`；自适应 response 继续同时读取屏幕位移和 `log2` zoom 级差，但不再把固定 duration 当成运动完成条件。
+- X、Y 和 zoom 分别保存 presentation value 与 velocity。新目标从当前呈现帧重新定向并继承各轴速度，不回到旧起点，也不因二维距离抵消而掩盖单轴反转。
+- 控制器全局只保留一个在途相机身份和至多一个待执行动画帧。每帧通过 React Flow 的 imperative `setViewport` 写入，不进入 React 状态；延迟帧按 `1/30s` 限制积分步长，并保留 `1.2s` 的异常运行上限。
+- 新定位、即时工作区 viewport 恢复和用户 `onMoveStart` 会取消旧运动；取消停留在当前呈现值，不补写旧终点。工作区切换还同步撤销布局聚焦和待处理输入聚焦。
+- 每次过渡返回带身份校验的完成结果。已取消、被替代或晚于新请求完成的 Promise 返回 `false`；终端、Agent 和方向导航只有在最后一个有效运动完成后才能重新激活目标输入。
+- `prefers-reduced-motion` 与 `instant` 继续直接设置最终 viewport，但同样经过完成身份校验，不会让迟到的即时请求覆盖更新目标。
+- Unit 覆盖临界阻尼无过冲、反向重定向速度连续、延迟帧稳定性、单 RAF 上限、当前帧取消、工作区恢复接管、异步迟到完成、用户拖动取消和输入激活失效；Presentation 消费侧回归验证最终 viewport 与节点集合，不固化中间像素帧。
 
 ## 第四阶段：空间对象反馈与缩放分级
 

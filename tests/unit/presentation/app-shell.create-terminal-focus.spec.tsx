@@ -75,6 +75,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell create terminal focus', () => {
   beforeEach(() => {
+    stubReducedMotionPreference()
     reactFlowSpies.fitView.mockClear()
     reactFlowSpies.setCenter.mockClear()
     reactFlowSpies.setViewport.mockClear()
@@ -87,7 +88,11 @@ describe('app shell create terminal focus', () => {
     })
   })
 
-  it('animates toward the terminal block returned by creation before the next graph render catches up', async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('targets the terminal block returned by creation before the next graph render catches up', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
@@ -117,11 +122,7 @@ describe('app shell create terminal focus', () => {
     await waitFor(() =>
       expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(
         { x: 0, y: 0, zoom: 1 },
-        {
-          duration: 220,
-          ease: expect.any(Function),
-          interpolate: 'smooth'
-        }
+        { duration: 0 }
       )
     )
     expect(reactFlowSpies.setCenter).not.toHaveBeenCalled()
@@ -154,16 +155,12 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+    const groupButton = await screen.findByRole('button', { name: '组合终端' })
+    reactFlowSpies.setViewport.mockClear()
+    fireEvent.click(groupButton)
 
-    await waitFor(() =>
-      expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
-        padding: 0.22,
-        duration: 180,
-        ease: expect.any(Function),
-        interpolate: 'smooth'
-      })
-    )
+    await waitFor(() => expect(reactFlowSpies.setViewport).toHaveBeenCalledOnce())
+    expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
   })
 
   it('dispatches canvas shortcuts to the current React Flow instance', async () => {
@@ -181,7 +178,7 @@ describe('app shell create terminal focus', () => {
     await screen.findByTestId('mock-react-flow')
     await waitFor(() => expect(screen.getByRole('button', { name: '新建终端积木' })).toBeEnabled())
 
-    reactFlowSpies.fitView.mockClear()
+    reactFlowSpies.setViewport.mockClear()
     const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
       ? { metaKey: true }
       : { ctrlKey: true }
@@ -190,22 +187,7 @@ describe('app shell create terminal focus', () => {
     fireEvent.keyDown(document, { key: '[', ...primaryModifier })
     fireEvent.keyDown(document, { key: '\\', ...primaryModifier })
 
-    expect(reactFlowSpies.zoomIn).toHaveBeenCalledWith({
-      duration: 180,
-      ease: expect.any(Function),
-      interpolate: 'smooth'
-    })
-    expect(reactFlowSpies.zoomOut).toHaveBeenCalledWith({
-      duration: 180,
-      ease: expect.any(Function),
-      interpolate: 'smooth'
-    })
-    expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
-      padding: 0.22,
-      duration: 180,
-      ease: expect.any(Function),
-      interpolate: 'smooth'
-    })
+    expect(reactFlowSpies.setViewport).toHaveBeenCalledTimes(3)
   })
 
   it('selects canvas nodes by direction without animated panning and toggles the minimap', async () => {
@@ -250,7 +232,7 @@ describe('app shell create terminal focus', () => {
         'true'
       )
     )
-    expect(reactFlowSpies.setViewport).not.toHaveBeenCalled()
+    expect(reactFlowSpies.setViewport).toHaveBeenCalledOnce()
 
     fireEvent.keyDown(document, { key: 'ArrowLeft', ...primaryModifier })
 
@@ -272,6 +254,13 @@ interface MockReactFlowProps {
 
 interface MockReactFlowInstance {
   readonly getNode: () => undefined
+  readonly getNodes: () => readonly WorkbenchFlowNode[]
+  readonly getNodesBounds: () => {
+    readonly height: number
+    readonly width: number
+    readonly x: number
+    readonly y: number
+  }
   readonly getViewport: () => WorkbenchSnapshot['graph']['viewport']
   readonly getZoom: () => number
   readonly setCenter: typeof reactFlowSpies.setCenter
@@ -284,6 +273,8 @@ interface MockReactFlowInstance {
 function createMockReactFlowInstance(): MockReactFlowInstance {
   return {
     getNode: () => undefined,
+    getNodes: () => [],
+    getNodesBounds: () => ({ height: 460, width: 1_700, x: 340, y: 240 }),
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getZoom: () => 1,
     setCenter: reactFlowSpies.setCenter,
@@ -292,6 +283,22 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: reactFlowSpies.zoomIn,
     fitView: reactFlowSpies.fitView
   }
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createTerminalBlockSnapshot(

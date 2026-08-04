@@ -10,8 +10,17 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('workbench layout focus', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('waits for every focus node to reach the arranged geometry, then fits exactly once', async () => {
-    const fitView = vi.fn(async () => undefined)
+    const getNodesBounds = vi.fn(() => ({ height: 1_180, width: 1_180, x: 40, y: 40 }))
+    const setViewport = vi.fn(async () => true)
     const onHandled = vi.fn()
     const agentNode = createNode('agent:agent-1', { x: 40, y: 40 })
     const oldGroupNode = createGroupNode({ x: 80, y: 80 }, { width: 700, height: 420 })
@@ -19,7 +28,7 @@ describe('workbench layout focus', () => {
       [agentNode.id, agentNode],
       [oldGroupNode.id, oldGroupNode]
     ])
-    const instance = createReactFlowInstance(projectedNodes, fitView)
+    const instance = createReactFlowInstance(projectedNodes, getNodesBounds, setViewport)
     const request = createRequest()
     const { rerender } = render(
       <Harness
@@ -31,7 +40,7 @@ describe('workbench layout focus', () => {
       />
     )
 
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
 
     const groupNode = createGroupNode({ x: 320, y: 720 }, { width: 900, height: 500 })
     projectedNodes.set(groupNode.id, groupNode)
@@ -46,14 +55,9 @@ describe('workbench layout focus', () => {
       />
     )
 
-    await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
-    expect(fitView).toHaveBeenCalledWith({
-      duration: 220,
-      ease: expect.any(Function),
-      interpolate: 'smooth',
-      nodes: [agentNode, groupNode],
-      padding: 0.24
-    })
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
+    expect(getNodesBounds).toHaveBeenCalledWith([agentNode, groupNode])
+    expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
     expect(onHandled).toHaveBeenCalledWith('tool-call-1')
 
     rerender(
@@ -66,17 +70,18 @@ describe('workbench layout focus', () => {
       />
     )
 
-    expect(fitView).toHaveBeenCalledOnce()
+    expect(setViewport).toHaveBeenCalledOnce()
   })
 
   it('defers focus until every affected drag commit is no longer protected', async () => {
-    const fitView = vi.fn(async () => undefined)
+    const getNodesBounds = vi.fn(() => ({ height: 1_360, width: 1_380, x: 40, y: 40 }))
+    const setViewport = vi.fn(async () => true)
     const onHandled = vi.fn()
     const agentNode = createNode('agent:agent-1', { x: 40, y: 40 })
     const groupNode = createGroupNode({ x: 320, y: 720 }, { width: 900, height: 500 })
     const nodes = [agentNode, groupNode]
     const projectedNodes = new Map(nodes.map((node) => [node.id, node]))
-    const instance = createReactFlowInstance(projectedNodes, fitView)
+    const instance = createReactFlowInstance(projectedNodes, getNodesBounds, setViewport)
     const request = createRequest()
     const { rerender } = render(
       <Harness
@@ -88,7 +93,7 @@ describe('workbench layout focus', () => {
       />
     )
 
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
 
     const userPositionedGroupNode = createGroupNode({ x: 520, y: 900 }, { width: 900, height: 500 })
     projectedNodes.set(userPositionedGroupNode.id, userPositionedGroupNode)
@@ -103,23 +108,22 @@ describe('workbench layout focus', () => {
       />
     )
 
-    await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
-    expect(fitView).toHaveBeenCalledWith({
-      duration: 220,
-      ease: expect.any(Function),
-      interpolate: 'smooth',
-      nodes: [agentNode, userPositionedGroupNode],
-      padding: 0.24
-    })
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
+    expect(getNodesBounds).toHaveBeenCalledWith([agentNode, userPositionedGroupNode])
   })
 
   it('defers focus while the invoking Agent is being dragged', async () => {
-    const fitView = vi.fn(async () => undefined)
+    const getNodesBounds = vi.fn(() => ({ height: 1_180, width: 1_180, x: 40, y: 40 }))
+    const setViewport = vi.fn(async () => true)
     const onHandled = vi.fn()
     const agentNode = createNode('agent:agent-1', { x: 40, y: 40 })
     const groupNode = createGroupNode({ x: 320, y: 720 }, { width: 900, height: 500 })
     const nodes = [agentNode, groupNode]
-    const instance = createReactFlowInstance(new Map(nodes.map((node) => [node.id, node])), fitView)
+    const instance = createReactFlowInstance(
+      new Map(nodes.map((node) => [node.id, node])),
+      getNodesBounds,
+      setViewport
+    )
     const request = createRequest()
     const { rerender } = render(
       <Harness
@@ -131,7 +135,7 @@ describe('workbench layout focus', () => {
       />
     )
 
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
 
     rerender(
       <Harness
@@ -143,20 +147,20 @@ describe('workbench layout focus', () => {
       />
     )
 
-    await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
   })
 
   it('frames committed workflow bounds while terminals are still at entering positions', async () => {
-    const fitBounds = vi.fn(async () => undefined)
-    const fitView = vi.fn(async () => undefined)
+    const getNodesBounds = vi.fn(() => ({ height: 0, width: 0, x: 0, y: 0 }))
+    const setViewport = vi.fn(async () => true)
     const onHandled = vi.fn()
     const agentNode = createSizedAgentNode()
     const enteringTerminalNode = createTerminalNode({ x: 380, y: 340 })
     const nodes = [agentNode, enteringTerminalNode]
     const instance = createReactFlowInstance(
       new Map(nodes.map((node) => [node.id, node])),
-      fitView,
-      fitBounds
+      getNodesBounds,
+      setViewport
     )
     const request: WorkbenchLayoutFocusRequest = {
       affectedNodeIds: ['terminal-1'],
@@ -182,17 +186,9 @@ describe('workbench layout focus', () => {
       />
     )
 
-    await waitFor(() => expect(fitBounds).toHaveBeenCalledOnce())
-    expect(fitBounds).toHaveBeenCalledWith(
-      { x: 40, y: 40, width: 1_380, height: 1_066 },
-      {
-        duration: 220,
-        ease: expect.any(Function),
-        interpolate: 'smooth',
-        padding: 0.24
-      }
-    )
-    expect(fitView).not.toHaveBeenCalled()
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
+    expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
+    expect(getNodesBounds).not.toHaveBeenCalled()
     expect(onHandled).toHaveBeenCalledWith('workflow-call-1')
   })
 })
@@ -296,12 +292,29 @@ function createGroupNode(
 
 function createReactFlowInstance(
   nodes: ReadonlyMap<string, WorkbenchFlowNode>,
-  fitView: ReturnType<typeof vi.fn>,
-  fitBounds: ReturnType<typeof vi.fn> = vi.fn(async () => undefined)
+  getNodesBounds: ReturnType<typeof vi.fn>,
+  setViewport: ReturnType<typeof vi.fn>
 ): ReactFlowInstance<WorkbenchFlowNode, Edge> {
   return {
-    fitBounds,
-    fitView,
-    getNode: (nodeId: string) => nodes.get(nodeId)
+    getNode: (nodeId: string) => nodes.get(nodeId),
+    getNodesBounds,
+    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+    setViewport
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }

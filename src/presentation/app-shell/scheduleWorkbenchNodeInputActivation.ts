@@ -1,6 +1,6 @@
 interface ScheduleWorkbenchNodeInputActivationInput {
   readonly activate: () => boolean
-  readonly transitionDuration: number
+  readonly transitionCompletion: Promise<boolean>
 }
 
 const inputProjectionRetryInterval = 50
@@ -10,7 +10,7 @@ const postTransitionFocusDelay = 20
 
 export function scheduleWorkbenchNodeInputActivation({
   activate,
-  transitionDuration
+  transitionCompletion
 }: ScheduleWorkbenchNodeInputActivationInput): () => void {
   let isPending = true
   let remainingRetryTime = inputProjectionTimeout
@@ -47,9 +47,20 @@ export function scheduleWorkbenchNodeInputActivation({
     scheduleRetry(inputProjectionRetryInterval)
   }
 
-  timeoutId = window.setTimeout(
-    tryActivation,
-    Math.max(0, transitionDuration) + postTransitionFocusDelay
+  void transitionCompletion.then(
+    (completed) => {
+      if (!isPending) {
+        return
+      }
+      if (!completed) {
+        isPending = false
+        return
+      }
+      scheduleRetry(postTransitionFocusDelay)
+    },
+    () => {
+      isPending = false
+    }
   )
 
   return () => {

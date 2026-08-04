@@ -1,6 +1,22 @@
-import type { Edge, FitViewOptions, ReactFlowInstance, Rect, Viewport } from '@xyflow/react'
+import {
+  getViewportForBounds,
+  type Edge,
+  type FitViewOptions,
+  type ReactFlowInstance,
+  type Rect,
+  type Viewport
+} from '@xyflow/react'
 
+import {
+  maximumCanvasZoom,
+  minimumCanvasZoom
+} from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from './types'
+import {
+  advanceCriticalSpringAxis,
+  isCriticalSpringAxisSettled,
+  type CriticalSpringAxis
+} from './workbenchViewportSpring'
 
 export type WorkbenchViewportMotionIntent =
   | { readonly type: 'instant' }
@@ -15,14 +31,25 @@ interface ResolveWorkbenchViewportTransitionInput {
   readonly currentViewport?: Viewport
   readonly intent: WorkbenchViewportMotionIntent
   readonly reducedMotion: boolean
-  readonly targetCenter?: { readonly x: number; readonly y: number }
-  readonly targetZoom?: number
+  readonly targetViewport?: Viewport
 }
 
 export interface WorkbenchViewportTransition {
-  readonly duration: number
-  readonly ease?: (progress: number) => number
-  readonly interpolate?: 'linear' | 'smooth'
+  readonly dampingRatio?: 1
+  readonly response?: number
+}
+
+export interface WorkbenchViewportMotionFrameScheduler {
+  readonly cancelFrame: (frameId: number) => void
+  readonly requestFrame: (callback: FrameRequestCallback) => number
+}
+
+export interface WorkbenchViewportMotionController {
+  readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
+  readonly transition: (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    command: WorkbenchViewportCommand
+  ) => Promise<boolean>
 }
 
 type WorkbenchFitViewOptions = Omit<
@@ -58,41 +85,37 @@ export type WorkbenchViewportCommand =
   | { readonly intent: WorkbenchViewportMotionIntent; readonly type: 'zoom-in' }
   | { readonly intent: WorkbenchViewportMotionIntent; readonly type: 'zoom-out' }
 
-const quickTransitionDuration = 180
-const spatialTransitionDuration = 220
-const adaptiveFocusMinimumDuration = spatialTransitionDuration
-const adaptiveFocusMaximumDuration = 300
-const durationPerViewport = 48
-const durationPerZoomStop = 20
-const maximumSmoothTravelInViewports = 1.5
 const fallbackCanvasSize = { height: 640, width: 960 }
-
-function easeOutCubic(progress: number): number {
-  return 1 - (1 - progress) ** 3
-}
-
-const continuousTransition = {
-  ease: easeOutCubic,
-  interpolate: 'smooth' as const
-}
+const quickSpringResponse = 0.3
+const spatialSpringResponse = 0.34
+const adaptiveFocusMaximumResponse = 0.42
+const responsePerViewport = 0.05
+const responsePerZoomStop = 0.02
+const maximumSpringRuntime = 1_200
+const maximumFrameDeltaSeconds = 1 / 30
+const initialFrameDeltaSeconds = 1 / 60
+const viewportValueSettlement = 0.1
+const viewportSpeedSettlement = 2
+const zoomValueSettlement = 0.000_2
+const zoomSpeedSettlement = 0.002
 
 export function resolveWorkbenchViewportTransition(
   input: ResolveWorkbenchViewportTransitionInput
 ): WorkbenchViewportTransition {
-  const { currentViewport, intent, reducedMotion, targetCenter, targetZoom } = input
+  const { currentViewport, intent, reducedMotion, targetViewport } = input
   if (intent.type === 'instant') {
-    return { duration: 0 }
+    return {}
   }
 
   if (reducedMotion) {
-    return { duration: 0 }
+    return {}
   }
 
   if (intent.type === 'adaptive-focus') {
-    if (!currentViewport || !targetCenter || targetZoom === undefined) {
+    if (!currentViewport || !targetViewport) {
       throw new TypeError('Adaptive viewport focus requires current and target geometry.')
     }
-    if (currentViewport.zoom <= 0 || targetZoom <= 0) {
+    if (currentViewport.zoom <= 0 || targetViewport.zoom <= 0) {
       throw new RangeError('Adaptive viewport focus zoom must be positive.')
     }
 
@@ -100,90 +123,331 @@ export function resolveWorkbenchViewportTransition(
       intent.canvasSize.width > 0 && intent.canvasSize.height > 0
         ? intent.canvasSize
         : fallbackCanvasSize
-    const targetViewport = {
-      x: canvasSize.width / 2 - targetCenter.x * targetZoom,
-      y: canvasSize.height / 2 - targetCenter.y * targetZoom
-    }
     const travelDistance = Math.hypot(
       targetViewport.x - currentViewport.x,
       targetViewport.y - currentViewport.y
     )
     const viewportDiagonal = Math.hypot(canvasSize.width, canvasSize.height)
     const travelInViewports = travelDistance / viewportDiagonal
-    const zoomStops = Math.abs(Math.log2(targetZoom / currentViewport.zoom))
-    const duration = Math.min(
-      adaptiveFocusMaximumDuration,
-      adaptiveFocusMinimumDuration +
-        Math.round(travelInViewports * durationPerViewport + zoomStops * durationPerZoomStop)
+    const zoomStops = Math.abs(Math.log2(targetViewport.zoom / currentViewport.zoom))
+    const response = Math.min(
+      adaptiveFocusMaximumResponse,
+      spatialSpringResponse +
+        travelInViewports * responsePerViewport +
+        zoomStops * responsePerZoomStop
     )
 
     return {
-      duration,
-      ...continuousTransition,
-      ...(travelInViewports > maximumSmoothTravelInViewports
-        ? { interpolate: 'linear' as const }
-        : {})
+      dampingRatio: 1,
+      response
     }
   }
 
   if (intent.type === 'quick') {
-    return { duration: quickTransitionDuration, ...continuousTransition }
+    return { dampingRatio: 1, response: quickSpringResponse }
   }
 
-  return { duration: spatialTransitionDuration, ...continuousTransition }
+  return { dampingRatio: 1, response: spatialSpringResponse }
 }
+
+export function resolveWorkbenchViewportCommandTarget(
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+  command: WorkbenchViewportCommand,
+  currentViewport = instance.getViewport()
+): Viewport {
+  const canvasSize = resolveCommandCanvasSize(command)
+
+  switch (command.type) {
+    case 'center': {
+      const zoom = command.zoom ?? currentViewport.zoom
+      return {
+        x: canvasSize.width / 2 - command.center.x * zoom,
+        y: canvasSize.height / 2 - command.center.y * zoom,
+        zoom
+      }
+    }
+    case 'fit-bounds':
+      return getViewportForBounds(
+        command.bounds,
+        canvasSize.width,
+        canvasSize.height,
+        minimumCanvasZoom,
+        maximumCanvasZoom,
+        command.padding ?? 0.1
+      )
+    case 'fit-view': {
+      const nodes = (command.nodes ?? instance.getNodes())
+        .map((node) => ('position' in node ? node : instance.getNode(node.id)))
+        .filter((node): node is WorkbenchFlowNode =>
+          Boolean(node && (command.includeHiddenNodes || !node.hidden))
+        )
+      if (nodes.length === 0) {
+        return currentViewport
+      }
+      return getViewportForBounds(
+        instance.getNodesBounds(nodes),
+        canvasSize.width,
+        canvasSize.height,
+        command.minZoom ?? minimumCanvasZoom,
+        command.maxZoom ?? maximumCanvasZoom,
+        command.padding ?? 0.1
+      )
+    }
+    case 'set-viewport':
+      return command.viewport
+    case 'zoom-in':
+      return resolveZoomTarget(currentViewport, canvasSize, 1.2)
+    case 'zoom-out':
+      return resolveZoomTarget(currentViewport, canvasSize, 1 / 1.2)
+  }
+}
+
+interface ActiveViewportMotion {
+  elapsedMilliseconds: number
+  frameId: number | null
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  lastTimestamp: number | null
+  requestId: number
+  resolve: (completed: boolean) => void
+  response: number
+  target: Viewport
+  x: CriticalSpringAxis
+  y: CriticalSpringAxis
+  zoom: CriticalSpringAxis
+}
+
+export function createWorkbenchViewportMotionController(
+  scheduler: WorkbenchViewportMotionFrameScheduler
+): WorkbenchViewportMotionController {
+  let activeMotion: ActiveViewportMotion | null = null
+  let latestRequest: {
+    readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+    readonly requestId: number
+  } | null = null
+  let nextRequestId = 1
+
+  const cancelActiveMotion = (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>): void => {
+    if (!activeMotion || (instance && activeMotion.instance !== instance)) {
+      return
+    }
+    if (activeMotion.frameId !== null) {
+      scheduler.cancelFrame(activeMotion.frameId)
+    }
+    activeMotion.resolve(false)
+    activeMotion = null
+  }
+
+  const cancel = (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>): void => {
+    if (latestRequest && (!instance || latestRequest.instance === instance)) {
+      latestRequest = null
+    }
+    cancelActiveMotion(instance)
+  }
+
+  const completeRequest = (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    requestId: number,
+    applied: boolean
+  ): boolean => {
+    const isLatest = latestRequest?.instance === instance && latestRequest.requestId === requestId
+    if (isLatest) {
+      latestRequest = null
+    }
+    return applied && isLatest
+  }
+
+  const scheduleNextFrame = (): void => {
+    if (!activeMotion || activeMotion.frameId !== null) {
+      return
+    }
+    activeMotion.frameId = scheduler.requestFrame(advanceMotion)
+  }
+
+  const finishMotion = (motion: ActiveViewportMotion): void => {
+    if (activeMotion?.requestId !== motion.requestId) {
+      return
+    }
+    activeMotion = null
+    void applyViewport(motion.instance, motion.target).then((applied) =>
+      motion.resolve(completeRequest(motion.instance, motion.requestId, applied))
+    )
+  }
+
+  const advanceMotion = (timestamp: number): void => {
+    const motion = activeMotion
+    if (!motion) {
+      return
+    }
+    motion.frameId = null
+    const elapsedSinceFrame =
+      motion.lastTimestamp === null
+        ? initialFrameDeltaSeconds
+        : Math.max(0, (timestamp - motion.lastTimestamp) / 1_000)
+    const deltaSeconds = Math.min(maximumFrameDeltaSeconds, elapsedSinceFrame)
+    motion.elapsedMilliseconds += elapsedSinceFrame * 1_000
+    motion.lastTimestamp = timestamp
+    motion.x = advanceCriticalSpringAxis(motion.x, motion.target.x, motion.response, deltaSeconds)
+    motion.y = advanceCriticalSpringAxis(motion.y, motion.target.y, motion.response, deltaSeconds)
+    motion.zoom = advanceCriticalSpringAxis(
+      motion.zoom,
+      motion.target.zoom,
+      motion.response,
+      deltaSeconds
+    )
+
+    const viewport = { x: motion.x.value, y: motion.y.value, zoom: motion.zoom.value }
+    void applyViewport(motion.instance, viewport)
+
+    if (motion.elapsedMilliseconds >= maximumSpringRuntime || isMotionSettled(motion)) {
+      finishMotion(motion)
+      return
+    }
+    scheduleNextFrame()
+  }
+
+  const transition = (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    command: WorkbenchViewportCommand
+  ): Promise<boolean> => {
+    const currentViewport =
+      activeMotion?.instance === instance
+        ? {
+            x: activeMotion.x.value,
+            y: activeMotion.y.value,
+            zoom: activeMotion.zoom.value
+          }
+        : instance.getViewport()
+    const target = resolveWorkbenchViewportCommandTarget(instance, command, currentViewport)
+    const transitionOptions = resolveWorkbenchViewportTransition({
+      currentViewport,
+      intent: command.intent,
+      reducedMotion: prefersReducedMotion(),
+      targetViewport: target
+    })
+    const requestId = nextRequestId
+    nextRequestId += 1
+
+    if (transitionOptions.response === undefined) {
+      cancelActiveMotion()
+      latestRequest = { instance, requestId }
+      return applyViewport(instance, target).then((applied) =>
+        completeRequest(instance, requestId, applied)
+      )
+    }
+    const springResponse = transitionOptions.response
+
+    return new Promise<boolean>((resolve) => {
+      if (activeMotion?.instance === instance) {
+        activeMotion.resolve(false)
+        activeMotion.elapsedMilliseconds = 0
+        activeMotion.lastTimestamp = null
+        activeMotion.requestId = requestId
+        activeMotion.resolve = resolve
+        activeMotion.response = springResponse
+        activeMotion.target = target
+        latestRequest = { instance, requestId }
+        scheduleNextFrame()
+        return
+      }
+
+      cancelActiveMotion()
+      latestRequest = { instance, requestId }
+      activeMotion = {
+        elapsedMilliseconds: 0,
+        frameId: null,
+        instance,
+        lastTimestamp: null,
+        requestId,
+        resolve,
+        response: springResponse,
+        target,
+        x: { value: currentViewport.x, velocity: 0 },
+        y: { value: currentViewport.y, velocity: 0 },
+        zoom: { value: currentViewport.zoom, velocity: 0 }
+      }
+      scheduleNextFrame()
+    })
+  }
+
+  return { cancel, transition }
+}
+
+const browserViewportMotionController = createWorkbenchViewportMotionController({
+  cancelFrame: (frameId) => window.cancelAnimationFrame(frameId),
+  requestFrame: (callback) => window.requestAnimationFrame(callback)
+})
 
 export function transitionWorkbenchViewport(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
   command: WorkbenchViewportCommand
 ): Promise<boolean> {
-  const transition = resolveWorkbenchViewportCommandTransition(instance, command)
+  return browserViewportMotionController.transition(instance, command)
+}
 
-  switch (command.type) {
-    case 'center':
-      return instance.setCenter(command.center.x, command.center.y, {
-        ...transition,
-        ...(command.zoom === undefined ? {} : { zoom: command.zoom })
-      })
-    case 'fit-bounds':
-      return instance.fitBounds(command.bounds, {
-        ...transition,
-        ...(command.padding === undefined ? {} : { padding: command.padding })
-      })
-    case 'fit-view':
-      return instance.fitView({
-        ...transition,
-        ...(command.includeHiddenNodes === undefined
-          ? {}
-          : { includeHiddenNodes: command.includeHiddenNodes }),
-        ...(command.maxZoom === undefined ? {} : { maxZoom: command.maxZoom }),
-        ...(command.minZoom === undefined ? {} : { minZoom: command.minZoom }),
-        ...(command.nodes === undefined ? {} : { nodes: command.nodes }),
-        ...(command.padding === undefined ? {} : { padding: command.padding })
-      })
-    case 'set-viewport':
-      return instance.setViewport(command.viewport, transition)
-    case 'zoom-in':
-      return instance.zoomIn(transition)
-    case 'zoom-out':
-      return instance.zoomOut(transition)
+export function cancelWorkbenchViewportMotion(
+  instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+): void {
+  browserViewportMotionController.cancel(instance)
+}
+
+function resolveCommandCanvasSize(command: WorkbenchViewportCommand): {
+  readonly height: number
+  readonly width: number
+} {
+  if (
+    command.intent.type === 'adaptive-focus' &&
+    command.intent.canvasSize.width > 0 &&
+    command.intent.canvasSize.height > 0
+  ) {
+    return command.intent.canvasSize
+  }
+
+  const canvas = typeof document === 'undefined' ? null : document.querySelector('.react-flow')
+  if (canvas instanceof HTMLElement && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+    return { height: canvas.clientHeight, width: canvas.clientWidth }
+  }
+  return fallbackCanvasSize
+}
+
+function resolveZoomTarget(
+  currentViewport: Viewport,
+  canvasSize: { readonly height: number; readonly width: number },
+  factor: number
+): Viewport {
+  const zoom = Math.min(
+    maximumCanvasZoom,
+    Math.max(minimumCanvasZoom, currentViewport.zoom * factor)
+  )
+  const centerX = (canvasSize.width / 2 - currentViewport.x) / currentViewport.zoom
+  const centerY = (canvasSize.height / 2 - currentViewport.y) / currentViewport.zoom
+
+  return {
+    x: canvasSize.width / 2 - centerX * zoom,
+    y: canvasSize.height / 2 - centerY * zoom,
+    zoom
   }
 }
 
-export function resolveWorkbenchViewportCommandTransition(
+function isMotionSettled(motion: ActiveViewportMotion): boolean {
+  const viewportThresholds = { speed: viewportSpeedSettlement, value: viewportValueSettlement }
+  const zoomThresholds = { speed: zoomSpeedSettlement, value: zoomValueSettlement }
+
+  return (
+    isCriticalSpringAxisSettled(motion.x, motion.target.x, viewportThresholds) &&
+    isCriticalSpringAxisSettled(motion.y, motion.target.y, viewportThresholds) &&
+    isCriticalSpringAxisSettled(motion.zoom, motion.target.zoom, zoomThresholds)
+  )
+}
+
+async function applyViewport(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-  command: WorkbenchViewportCommand
-): WorkbenchViewportTransition {
-  return resolveWorkbenchViewportTransition({
-    intent: command.intent,
-    reducedMotion: prefersReducedMotion(),
-    ...(command.intent.type === 'adaptive-focus'
-      ? {
-          currentViewport: instance.getViewport()
-        }
-      : {}),
-    ...(command.type === 'center' ? { targetCenter: command.center, targetZoom: command.zoom } : {})
-  })
+  viewport: Viewport
+): Promise<boolean> {
+  try {
+    return (await instance.setViewport(viewport, { duration: 0 })) !== false
+  } catch {
+    return false
+  }
 }
 
 export function prefersReducedMotion(): boolean {

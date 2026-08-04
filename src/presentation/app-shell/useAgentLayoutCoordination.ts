@@ -32,6 +32,7 @@ interface UseAgentLayoutCoordinationInput {
     size: { readonly width: number; readonly height: number }
   ) => Promise<void>
   readonly nodeStore: WorkbenchNodeStore
+  readonly onCancelLayoutFocus?: () => void
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
   readonly terminalWorkflowBuildMode?: TerminalWorkflowBuildMode
@@ -44,6 +45,7 @@ export function useAgentLayoutCoordination({
   moveWorkbenchNode,
   moveWorkspaceAgent,
   nodeStore,
+  onCancelLayoutFocus,
   reactFlowInstanceRef,
   setCurrentGraph,
   terminalWorkflowBuildMode = defaultTerminalWorkflowBuildMode
@@ -130,7 +132,10 @@ export function useAgentLayoutCoordination({
     },
     [clearTerminalGroupDropPreview, updateDragProtection]
   )
-  const cancelLayoutFocus = useCallback((): void => setLayoutFocusRequest(null), [])
+  const cancelLayoutFocus = useCallback((): void => {
+    setLayoutFocusRequest(null)
+    onCancelLayoutFocus?.()
+  }, [onCancelLayoutFocus])
 
   useEffect(() => {
     dragProtectionByNodeIdRef.current.clear()

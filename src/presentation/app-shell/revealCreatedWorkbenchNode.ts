@@ -8,7 +8,6 @@ import type {
 } from './workbenchNodeCreationPolicy'
 import { resolveWorkbenchNodeCreationViewport } from './workbenchNodeCreationPolicy'
 import {
-  resolveWorkbenchViewportCommandTransition,
   transitionWorkbenchViewport,
   type WorkbenchViewportCommand
 } from './workbenchViewportMotion'
@@ -27,7 +26,7 @@ export function revealCreatedWorkbenchNode({
   nodeSize,
   reactFlowInstance,
   safeViewport
-}: RevealCreatedWorkbenchNodeInput): number {
+}: RevealCreatedWorkbenchNodeInput): Promise<boolean> {
   const command = {
     intent: { type: 'spatial' },
     type: 'set-viewport',
@@ -38,12 +37,5 @@ export function revealCreatedWorkbenchNode({
       safeViewport
     })
   } satisfies WorkbenchViewportCommand
-  const transitionDuration = resolveWorkbenchViewportCommandTransition(
-    reactFlowInstance,
-    command
-  ).duration
-
-  void transitionWorkbenchViewport(reactFlowInstance, command)
-
-  return transitionDuration
+  return transitionWorkbenchViewport(reactFlowInstance, command)
 }

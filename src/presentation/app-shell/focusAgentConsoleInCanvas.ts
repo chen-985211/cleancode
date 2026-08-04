@@ -8,7 +8,6 @@ import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInp
 import type { WorkbenchFlowNode } from './types'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 import {
-  resolveWorkbenchViewportCommandTransition,
   transitionWorkbenchViewport,
   type WorkbenchViewportCommand,
   type WorkbenchViewportMotionIntent
@@ -58,7 +57,7 @@ export function focusAgentConsoleInCanvas({
     x: position.x + width / 2,
     y: position.y + height / 2
   }
-  const transitionDuration =
+  const transitionCompletion =
     viewportIntent === 'creation'
       ? revealCreatedWorkbenchNode({
           ...readWorkbenchCanvasCreationGeometry(),
@@ -87,7 +86,7 @@ export function focusAgentConsoleInCanvas({
             type: 'agentConsole'
           } as WorkbenchFlowNode)
       ),
-    transitionDuration
+    transitionCompletion
   })
 }
 
@@ -101,7 +100,7 @@ function revealNavigatedAgentConsole({
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly targetCenter: { readonly x: number; readonly y: number }
   readonly targetZoom?: number
-}): number {
+}): Promise<boolean> {
   const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
   const command = {
     center: targetCenter,
@@ -109,14 +108,7 @@ function revealNavigatedAgentConsole({
     type: 'center',
     zoom: nextZoom
   } satisfies WorkbenchViewportCommand
-  const transitionDuration = resolveWorkbenchViewportCommandTransition(
-    reactFlowInstance,
-    command
-  ).duration
-
-  void transitionWorkbenchViewport(reactFlowInstance, command)
-
-  return transitionDuration
+  return transitionWorkbenchViewport(reactFlowInstance, command)
 }
 
 function resolveDimension(value: unknown): number | null {

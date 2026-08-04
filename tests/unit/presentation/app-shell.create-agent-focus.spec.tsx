@@ -54,6 +54,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell create Agent focus', () => {
   beforeEach(() => {
+    stubReducedMotionPreference()
     reactFlowSpies.setCenter.mockClear()
     reactFlowSpies.setViewport.mockClear()
     window.localStorage.clear()
@@ -62,6 +63,10 @@ describe('app shell create Agent focus', () => {
       configurable: true,
       value: undefined
     })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('creates with the default Provider immediately and focuses the returned Agent', async () => {
@@ -114,9 +119,7 @@ describe('app shell create Agent focus', () => {
           zoom: 1
         },
         {
-          duration: 220,
-          ease: expect.any(Function),
-          interpolate: 'smooth'
+          duration: 0
         }
       )
     )
@@ -448,6 +451,22 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: async () => undefined,
     fitView: async () => undefined
   }
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createAgent(
