@@ -74,6 +74,89 @@ describe('workbench viewport motion controller', () => {
     await expect(delayedCompletion).resolves.toBe(false)
   })
 
+  it('uses the same anchored zoom curve at every world position', async () => {
+    const canvasSize = { height: 640, width: 960 }
+    const originFrames = new TestFrameScheduler()
+    const distantFrames = new TestFrameScheduler()
+    const originController = createWorkbenchViewportMotionController(originFrames)
+    const distantController = createWorkbenchViewportMotionController(distantFrames)
+    const originCenter = { x: 0, y: 0 }
+    const distantCenter = { x: 3_000, y: 2_000 }
+    const originInstance = createViewportInstance(centeredViewport(originCenter, 0.35, canvasSize))
+    const distantInstance = createViewportInstance(
+      centeredViewport(distantCenter, 0.35, canvasSize)
+    )
+    const originCompletion = originController.transition(
+      originInstance.value,
+      focusCommand(originCenter, 0.9)
+    )
+    const distantCompletion = distantController.transition(
+      distantInstance.value,
+      focusCommand(distantCenter, 0.9)
+    )
+    let previousZoom = 0.35
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      originFrames.step()
+      distantFrames.step()
+      expect(distantInstance.viewport.zoom).toBeCloseTo(originInstance.viewport.zoom, 12)
+      expect(distantInstance.viewport.zoom).toBeGreaterThanOrEqual(previousZoom)
+      expect(
+        (canvasSize.width / 2 - distantInstance.viewport.x) / distantInstance.viewport.zoom
+      ).toBeCloseTo(distantCenter.x, 10)
+      expect(
+        (canvasSize.height / 2 - distantInstance.viewport.y) / distantInstance.viewport.zoom
+      ).toBeCloseTo(distantCenter.y, 10)
+      previousZoom = distantInstance.viewport.zoom
+    }
+
+    originController.cancel()
+    distantController.cancel()
+    await expect(originCompletion).resolves.toBe(false)
+    await expect(distantCompletion).resolves.toBe(false)
+  })
+
+  it('makes focus and overview zoom perceptually symmetric in log space', async () => {
+    const canvasSize = { height: 640, width: 960 }
+    const center = { x: 1_800, y: 1_100 }
+    const focusFrames = new TestFrameScheduler()
+    const overviewFrames = new TestFrameScheduler()
+    const focusController = createWorkbenchViewportMotionController(focusFrames)
+    const overviewController = createWorkbenchViewportMotionController(overviewFrames)
+    const focusInstance = createViewportInstance(centeredViewport(center, 0.35, canvasSize))
+    const overviewInstance = createViewportInstance(centeredViewport(center, 0.9, canvasSize))
+    const focusCompletion = focusController.transition(
+      focusInstance.value,
+      focusCommand(center, 0.9)
+    )
+    const overviewCompletion = overviewController.transition(
+      overviewInstance.value,
+      focusCommand(center, 0.35)
+    )
+
+    const zoomRange = Math.log2(0.9) - Math.log2(0.35)
+    let previousFocusZoom = 0.35
+    let previousOverviewZoom = 0.9
+    for (let frame = 0; frame < 8; frame += 1) {
+      focusFrames.step()
+      overviewFrames.step()
+
+      const focusProgress = (Math.log2(focusInstance.viewport.zoom) - Math.log2(0.35)) / zoomRange
+      const overviewProgress =
+        (Math.log2(0.9) - Math.log2(overviewInstance.viewport.zoom)) / zoomRange
+      expect(focusProgress).toBeCloseTo(overviewProgress, 12)
+      expect(focusInstance.viewport.zoom).toBeGreaterThanOrEqual(previousFocusZoom)
+      expect(overviewInstance.viewport.zoom).toBeLessThanOrEqual(previousOverviewZoom)
+      previousFocusZoom = focusInstance.viewport.zoom
+      previousOverviewZoom = overviewInstance.viewport.zoom
+    }
+
+    focusController.cancel()
+    overviewController.cancel()
+    await expect(focusCompletion).resolves.toBe(false)
+    await expect(overviewCompletion).resolves.toBe(false)
+  })
+
   it('briefly widens the view for a distant focus flight without making nearby moves breathe', async () => {
     const distantFrames = new TestFrameScheduler()
     const nearbyFrames = new TestFrameScheduler()
@@ -273,8 +356,35 @@ function centerCommand(centerX: number): WorkbenchViewportCommand {
   }
 }
 
-function createViewportInstance() {
-  let viewport: Viewport = { x: 0, y: 0, zoom: 1 }
+function focusCommand(
+  center: { readonly x: number; readonly y: number },
+  zoom: number
+): WorkbenchViewportCommand {
+  return {
+    center,
+    intent: {
+      canvasSize: { height: 640, width: 960 },
+      type: 'adaptive-focus'
+    },
+    type: 'center',
+    zoom
+  }
+}
+
+function centeredViewport(
+  center: { readonly x: number; readonly y: number },
+  zoom: number,
+  canvasSize: { readonly height: number; readonly width: number }
+): Viewport {
+  return {
+    x: canvasSize.width / 2 - center.x * zoom,
+    y: canvasSize.height / 2 - center.y * zoom,
+    zoom
+  }
+}
+
+function createViewportInstance(initialViewport: Viewport = { x: 0, y: 0, zoom: 1 }) {
+  let viewport = initialViewport
   const setViewport = vi.fn(async (nextViewport: Viewport) => {
     viewport = nextViewport
     return true

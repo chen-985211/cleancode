@@ -108,6 +108,23 @@ describe('workbench viewport motion', () => {
     expect(translationAndZoom.response).toBeGreaterThan(translationOnly.response!)
   })
 
+  it('keeps anchored zoom response independent from the anchor world position', () => {
+    const canvasSize = { height: 640, width: 960 }
+    const intent = { canvasSize, type: 'adaptive-focus' as const }
+    const resolveAnchoredResponse = (center: { readonly x: number; readonly y: number }) =>
+      resolveWorkbenchViewportTransition({
+        currentViewport: viewportCenteredOn(center, 0.35, canvasSize),
+        intent,
+        reducedMotion: false,
+        targetViewport: viewportCenteredOn(center, 0.9, canvasSize)
+      }).response!
+
+    expect(resolveAnchoredResponse({ x: 0, y: 0 })).toBeCloseTo(
+      resolveAnchoredResponse({ x: 3_000, y: 2_000 }),
+      12
+    )
+  })
+
   it('uses a stable fallback before the canvas has reported a positive size', () => {
     expect(
       resolveWorkbenchViewportTransition({
@@ -194,3 +211,15 @@ describe('workbench viewport motion', () => {
     expect(zoomOut.zoom).toBeCloseTo(5 / 6)
   })
 })
+
+function viewportCenteredOn(
+  center: { readonly x: number; readonly y: number },
+  zoom: number,
+  canvasSize: { readonly height: number; readonly width: number }
+) {
+  return {
+    x: canvasSize.width / 2 - center.x * zoom,
+    y: canvasSize.height / 2 - center.y * zoom,
+    zoom
+  }
+}

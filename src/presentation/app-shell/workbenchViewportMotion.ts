@@ -18,6 +18,15 @@ import {
   type WorkbenchViewportFlight
 } from './workbenchViewportFlight'
 import {
+  resolveWorkbenchViewportCamera,
+  resolveWorkbenchViewportCameraVelocity,
+  resolveWorkbenchViewportFromCamera,
+  resolveWorkbenchViewportSpatialTravel,
+  resolveWorkbenchViewportVelocityFromCamera,
+  type WorkbenchCanvasSize,
+  type WorkbenchViewportCamera
+} from './workbenchViewportCamera'
+import {
   advanceCriticalSpringAxis,
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
@@ -148,9 +157,10 @@ export function resolveWorkbenchViewportTransition(
       intent.canvasSize.width > 0 && intent.canvasSize.height > 0
         ? intent.canvasSize
         : fallbackCanvasSize
-    const travelDistance = Math.hypot(
-      targetViewport.x - currentViewport.x,
-      targetViewport.y - currentViewport.y
+    const travelDistance = resolveWorkbenchViewportSpatialTravel(
+      currentViewport,
+      targetViewport,
+      canvasSize
     )
     const viewportDiagonal = Math.hypot(canvasSize.width, canvasSize.height)
     const travelInViewports = travelDistance / viewportDiagonal
@@ -228,6 +238,9 @@ export function resolveWorkbenchViewportCommandTarget(
 }
 
 interface ActiveViewportMotion {
+  canvasSize: WorkbenchCanvasSize
+  centerX: CriticalSpringAxis
+  centerY: CriticalSpringAxis
   elapsedMilliseconds: number
   flight: WorkbenchViewportFlight | null
   flightProgress: CriticalSpringAxis
@@ -241,9 +254,8 @@ interface ActiveViewportMotion {
   resolve: (completed: boolean) => void
   response: number
   target: Viewport
-  x: CriticalSpringAxis
-  y: CriticalSpringAxis
-  zoom: CriticalSpringAxis
+  targetCamera: WorkbenchViewportCamera
+  zoomStops: CriticalSpringAxis
 }
 
 export function createWorkbenchViewportMotionController(
@@ -375,21 +387,21 @@ export function createWorkbenchViewportMotionController(
     const elapsedSinceFrame = Math.max(0, (timestamp - motion.lastTimestamp) / 1_000)
     motion.elapsedMilliseconds += elapsedSinceFrame * 1_000
     motion.lastTimestamp = timestamp
-    motion.x = advanceCriticalSpringAxis(
-      motion.x,
-      motion.target.x,
+    motion.centerX = advanceCriticalSpringAxis(
+      motion.centerX,
+      motion.targetCamera.centerX,
       motion.response,
       elapsedSinceFrame
     )
-    motion.y = advanceCriticalSpringAxis(
-      motion.y,
-      motion.target.y,
+    motion.centerY = advanceCriticalSpringAxis(
+      motion.centerY,
+      motion.targetCamera.centerY,
       motion.response,
       elapsedSinceFrame
     )
-    motion.zoom = advanceCriticalSpringAxis(
-      motion.zoom,
-      motion.target.zoom,
+    motion.zoomStops = advanceCriticalSpringAxis(
+      motion.zoomStops,
+      motion.targetCamera.zoomStops,
       motion.response,
       elapsedSinceFrame
     )
@@ -400,7 +412,8 @@ export function createWorkbenchViewportMotionController(
       elapsedSinceFrame
     )
 
-    const baseViewport = { x: motion.x.value, y: motion.y.value, zoom: motion.zoom.value }
+    const camera = resolveMotionCamera(motion)
+    const baseViewport = resolveWorkbenchViewportFromCamera(camera, motion.canvasSize)
     const presentation = resolveWorkbenchViewportFlightPresentation(
       baseViewport,
       motion.flightProgress.value,
@@ -427,7 +440,9 @@ export function createWorkbenchViewportMotionController(
   ): Promise<boolean> => {
     const currentViewport =
       activeMotion?.instance === instance ? activeMotion.presentation : instance.getViewport()
+    const canvasSize = resolveCommandCanvasSize(command)
     const target = resolveWorkbenchViewportCommandTarget(instance, command, currentViewport)
+    const targetCamera = resolveWorkbenchViewportCamera(target, canvasSize)
     const transitionOptions = resolveWorkbenchViewportTransition({
       currentViewport,
       intent: command.intent,
@@ -448,28 +463,30 @@ export function createWorkbenchViewportMotionController(
 
     return new Promise<boolean>((resolve) => {
       if (activeMotion?.instance === instance) {
+        const camera = resolveWorkbenchViewportCamera(currentViewport, canvasSize)
+        const cameraVelocity = resolveWorkbenchViewportCameraVelocity(
+          currentViewport,
+          activeMotion.presentationVelocity,
+          canvasSize
+        )
         activeMotion.resolve(false)
+        activeMotion.canvasSize = canvasSize
+        activeMotion.centerX = { value: camera.centerX, velocity: cameraVelocity.centerX }
+        activeMotion.centerY = { value: camera.centerY, velocity: cameraVelocity.centerY }
         activeMotion.elapsedMilliseconds = 0
         activeMotion.flight = resolveViewportFlight(currentViewport, target, command.intent)
         activeMotion.flightProgress = { value: 0, velocity: 0 }
         activeMotion.intent = command.intent
         activeMotion.lastTimestamp = scheduler.now()
-        activeMotion.x = {
-          value: currentViewport.x,
-          velocity: activeMotion.presentationVelocity.x
-        }
-        activeMotion.y = {
-          value: currentViewport.y,
-          velocity: activeMotion.presentationVelocity.y
-        }
-        activeMotion.zoom = {
-          value: currentViewport.zoom,
-          velocity: activeMotion.presentationVelocity.zoom
-        }
         activeMotion.requestId = requestId
         activeMotion.resolve = resolve
         activeMotion.response = springResponse
         activeMotion.target = target
+        activeMotion.targetCamera = targetCamera
+        activeMotion.zoomStops = {
+          value: camera.zoomStops,
+          velocity: cameraVelocity.zoomStops
+        }
         latestRequest = { instance, requestId }
         scheduleNextFrame()
         return
@@ -477,7 +494,11 @@ export function createWorkbenchViewportMotionController(
 
       cancelActiveMotion()
       latestRequest = { instance, requestId }
+      const camera = resolveWorkbenchViewportCamera(currentViewport, canvasSize)
       activeMotion = {
+        canvasSize,
+        centerX: { value: camera.centerX, velocity: 0 },
+        centerY: { value: camera.centerY, velocity: 0 },
         elapsedMilliseconds: 0,
         flight: resolveViewportFlight(currentViewport, target, command.intent),
         flightProgress: { value: 0, velocity: 0 },
@@ -491,9 +512,8 @@ export function createWorkbenchViewportMotionController(
         resolve,
         response: springResponse,
         target,
-        x: { value: currentViewport.x, velocity: 0 },
-        y: { value: currentViewport.y, velocity: 0 },
-        zoom: { value: currentViewport.zoom, velocity: 0 }
+        targetCamera,
+        zoomStops: { value: camera.zoomStops, velocity: 0 }
       }
       scheduleNextFrame()
     })
@@ -574,13 +594,23 @@ function resolveZoomTarget(
 }
 
 function isMotionSettled(motion: ActiveViewportMotion): boolean {
-  const viewportThresholds = { speed: viewportSpeedSettlement, value: viewportValueSettlement }
-  const zoomThresholds = { speed: zoomSpeedSettlement, value: zoomValueSettlement }
+  const centerThresholds = {
+    speed: viewportSpeedSettlement / motion.target.zoom,
+    value: viewportValueSettlement / motion.target.zoom
+  }
+  const zoomStopsThresholds = {
+    speed: zoomSpeedSettlement / (motion.target.zoom * Math.LN2),
+    value: zoomValueSettlement / (motion.target.zoom * Math.LN2)
+  }
 
   return (
-    isCriticalSpringAxisSettled(motion.x, motion.target.x, viewportThresholds) &&
-    isCriticalSpringAxisSettled(motion.y, motion.target.y, viewportThresholds) &&
-    isCriticalSpringAxisSettled(motion.zoom, motion.target.zoom, zoomThresholds) &&
+    isCriticalSpringAxisSettled(motion.centerX, motion.targetCamera.centerX, centerThresholds) &&
+    isCriticalSpringAxisSettled(motion.centerY, motion.targetCamera.centerY, centerThresholds) &&
+    isCriticalSpringAxisSettled(
+      motion.zoomStops,
+      motion.targetCamera.zoomStops,
+      zoomStopsThresholds
+    ) &&
     (!motion.flight ||
       isCriticalSpringAxisSettled(motion.flightProgress, 1, {
         speed: flightProgressSpeedSettlement,
@@ -605,11 +635,11 @@ function resolvePresentationVelocity(
   deltaSeconds: number
 ): Viewport {
   if (!motion.flight) {
-    return {
-      x: motion.x.velocity,
-      y: motion.y.velocity,
-      zoom: motion.zoom.velocity
-    }
+    return resolveWorkbenchViewportVelocityFromCamera(resolveMotionCamera(motion), {
+      centerX: motion.centerX.velocity,
+      centerY: motion.centerY.velocity,
+      zoomStops: motion.zoomStops.velocity
+    })
   }
   if (deltaSeconds <= 0) {
     return motion.presentationVelocity
@@ -619,6 +649,14 @@ function resolvePresentationVelocity(
     x: (presentation.x - motion.presentation.x) / deltaSeconds,
     y: (presentation.y - motion.presentation.y) / deltaSeconds,
     zoom: (presentation.zoom - motion.presentation.zoom) / deltaSeconds
+  }
+}
+
+function resolveMotionCamera(motion: ActiveViewportMotion): WorkbenchViewportCamera {
+  return {
+    centerX: motion.centerX.value,
+    centerY: motion.centerY.value,
+    zoomStops: motion.zoomStops.value
   }
 }
 

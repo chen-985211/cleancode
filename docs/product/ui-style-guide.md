@@ -157,7 +157,7 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 画布普通单选与空白返回的相机目标由 `src/presentation/app-shell/useCanvasSelectionViewport.ts` 统一协调，并继续交给上述相机 owner 执行。标题普通单选复用现有节点中心与可读缩放算法；空白返回捕获清除前的唯一整体选择，以同一节点中心为锚点精确回到 `35%`，不得重新计算全部内容的外接范围中心。没有唯一选择或锚点不可用时，以当前 viewport 中心缩放，不能从多选中任取节点。平移和缩放必须作为同一个 `adaptive-focus` 目标连续收敛，不能先缩放再平移或先停顿再启动第二段动画。新的选择、平移、缩放或其他定位输入必须从当前 presentation 重新定向；`prefers-reduced-motion` 下即时应用同一最终中心和缩放。终端多选、组合候选以及已经自行负责相机的快捷键和小地图入口不得叠加第二次选择聚焦。
 
-非即时程序化相机运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring，阻尼比固定为 `1`，不产生装饰性回弹。当前 motion token 的 response 为：`quick` 约 `0.30s`、`spatial` 约 `0.34s`、`adaptive-focus` 约 `0.34–0.42s`；response 描述弹簧响应快慢，不是固定动画时长。X、Y 和 zoom 独立保存当前位置与速度；新目标必须从当前呈现值重新定向并继承速度。用户开始拖动、工作区恢复或更新的定位意图会立即取消旧运动，迟到完成不得重新激活旧目标。曲线、阈值和取消语义只能在统一 owner 中调整，并必须由距离、缩放、重新定向、异步完成和 reduced-motion 参数矩阵覆盖。
+非即时程序化相机运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring，阻尼比固定为 `1`，不产生装饰性回弹。当前 motion token 的 response 为：`quick` 约 `0.30s`、`spatial` 约 `0.34s`、`adaptive-focus` 约 `0.34–0.42s`；response 描述弹簧响应快慢，不是固定动画时长。统一 owner 必须在世界坐标相机中心与 `log2(zoom)` 上保存位置和速度，再逐帧投影为 React Flow viewport；不得以 viewport transform 的 X、Y 差值估算空间移动，否则锚定缩放会随节点绝对位置改变曲线。纯锚定缩放的空间移动距离为零，双向缩放在对数尺度保持同一节奏，只有相机中心真实跨越画布时才允许 flight。新目标必须从当前呈现值重新定向并继承速度。用户开始拖动、工作区恢复或更新的定位意图会立即取消旧运动，迟到完成不得重新激活旧目标。曲线、阈值和取消语义只能在统一 owner 中调整，并必须由距离、缩放、锚点漂移、缩放单调性、重新定向、异步完成和 reduced-motion 参数矩阵覆盖。
 
 依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框通过相机 owner 的轻量实时信号逐帧跟随，订阅范围只覆盖框本身；不得为同步框而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
 

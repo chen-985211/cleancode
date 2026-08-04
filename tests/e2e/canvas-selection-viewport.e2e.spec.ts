@@ -50,16 +50,14 @@ describe('canvas selection viewport e2e', () => {
       await node.waitFor()
       await clickTrueCanvasPane(page, page.locator('.react-flow__pane'))
 
-      const globalPresentation = await pollCanvasPresentation(
+      await pollCanvasPresentation(
         page,
         node,
         (presentation) =>
           isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
       )
-      expect(globalPresentation.zoom).toBeCloseTo(0.35, 3)
-      expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
-      expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
 
+      await beginCanvasMotionSampling(page, node)
       await node.locator('.terminal-node__header').click()
       const focusedPresentation = await pollCanvasPresentation(
         page,
@@ -71,6 +69,22 @@ describe('canvas selection viewport e2e', () => {
       expect(focusedPresentation.zoom).toBeCloseTo(0.9, 3)
       expect(focusedPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
       expect(focusedPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
+
+      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.35, 0.9)
+
+      await beginCanvasMotionSampling(page, node)
+      await clickTrueCanvasPane(page, page.locator('.react-flow__pane'))
+      const globalPresentation = await pollCanvasPresentation(
+        page,
+        node,
+        (presentation) =>
+          isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
+      )
+
+      expect(globalPresentation.zoom).toBeCloseTo(0.35, 3)
+      expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
+      expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
+      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.9, 0.35)
     },
     electronScenarioTimeoutMs
   )
@@ -145,4 +159,73 @@ function isCanvasNodeCentered(presentation: CanvasPresentation): boolean {
   return (
     Math.abs(presentation.nodeCenterOffsetX) < 0.4 && Math.abs(presentation.nodeCenterOffsetY) < 0.4
   )
+}
+
+async function beginCanvasMotionSampling(page: Page, node: Locator): Promise<void> {
+  const nodeElement = await node.elementHandle()
+
+  await page.evaluate((targetNode) => {
+    if (!targetNode) throw new Error('Canvas node is unavailable for motion sampling.')
+
+    const samplingWindow = window as typeof window & {
+      canvasMotionSampling?: { frameId: number; presentations: CanvasPresentation[] }
+    }
+    samplingWindow.canvasMotionSampling = { frameId: 0, presentations: [] }
+
+    const sample = () => {
+      const canvas = document.querySelector<HTMLElement>('.react-flow')
+      const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
+      const sampling = samplingWindow.canvasMotionSampling
+      if (!canvas || !viewport || !sampling) return
+
+      const canvasBounds = canvas.getBoundingClientRect()
+      const nodeBounds = targetNode.getBoundingClientRect()
+      const transform = new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
+      sampling.presentations.push({
+        nodeCenterOffsetX:
+          nodeBounds.left + nodeBounds.width / 2 - (canvasBounds.left + canvasBounds.width / 2),
+        nodeCenterOffsetY:
+          nodeBounds.top + nodeBounds.height / 2 - (canvasBounds.top + canvasBounds.height / 2),
+        zoom: transform.a
+      })
+      sampling.frameId = requestAnimationFrame(sample)
+    }
+
+    samplingWindow.canvasMotionSampling.frameId = requestAnimationFrame(sample)
+  }, nodeElement)
+}
+
+function finishCanvasMotionSampling(page: Page): Promise<CanvasPresentation[]> {
+  return page.evaluate(() => {
+    const samplingWindow = window as typeof window & {
+      canvasMotionSampling?: { frameId: number; presentations: CanvasPresentation[] }
+    }
+    const sampling = samplingWindow.canvasMotionSampling
+    if (!sampling) throw new Error('Canvas motion sampling was not started.')
+
+    cancelAnimationFrame(sampling.frameId)
+    delete samplingWindow.canvasMotionSampling
+    return sampling.presentations
+  })
+}
+
+function expectSmoothAnchoredZoom(
+  presentations: CanvasPresentation[],
+  startZoom: number,
+  targetZoom: number
+): void {
+  const direction = Math.sign(targetZoom - startZoom)
+  const movingPresentations = presentations.filter(
+    (presentation) => Math.abs(presentation.zoom - startZoom) > 0.000_1
+  )
+
+  expect(movingPresentations.length).toBeGreaterThan(2)
+  presentations.forEach((presentation) => {
+    expect(Math.abs(presentation.nodeCenterOffsetX)).toBeLessThan(0.75)
+    expect(Math.abs(presentation.nodeCenterOffsetY)).toBeLessThan(0.75)
+  })
+  presentations.slice(1).forEach((presentation, index) => {
+    const previous = presentations[index]
+    expect((presentation.zoom - previous.zoom) * direction).toBeGreaterThanOrEqual(-0.000_1)
+  })
 }

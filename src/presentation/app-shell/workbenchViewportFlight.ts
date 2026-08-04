@@ -1,14 +1,13 @@
 import type { Viewport } from '@xyflow/react'
 
 import { minimumCanvasZoom } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-
-interface CanvasSize {
-  readonly height: number
-  readonly width: number
-}
+import {
+  resolveWorkbenchViewportSpatialTravel,
+  type WorkbenchCanvasSize
+} from './workbenchViewportCamera'
 
 export interface WorkbenchViewportFlight {
-  readonly canvasSize: CanvasSize
+  readonly canvasSize: WorkbenchCanvasSize
   readonly zoomStops: number
 }
 
@@ -19,7 +18,7 @@ const maximumFlightZoomStops = 0.75
 export function createWorkbenchViewportFlight(
   currentViewport: Viewport,
   targetViewport: Viewport,
-  canvasSize: CanvasSize
+  canvasSize: WorkbenchCanvasSize
 ): WorkbenchViewportFlight | null {
   if (canvasSize.width <= 0 || canvasSize.height <= 0) {
     return null
@@ -27,7 +26,7 @@ export function createWorkbenchViewportFlight(
 
   const viewportDiagonal = Math.hypot(canvasSize.width, canvasSize.height)
   const travelInViewports =
-    Math.hypot(targetViewport.x - currentViewport.x, targetViewport.y - currentViewport.y) /
+    resolveWorkbenchViewportSpatialTravel(currentViewport, targetViewport, canvasSize) /
     viewportDiagonal
   const desiredZoomStops = Math.min(
     maximumFlightZoomStops,
