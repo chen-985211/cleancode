@@ -8,7 +8,7 @@
 }
 
 .app-shell {
-  --cc-sidebar-width: clamp(220px, 17vw, 252px);
+  --cc-sidebar-width: 280px;
   position: relative;
   display: grid;
   width: 100%;
@@ -120,7 +120,6 @@ textarea:focus-visible {
 
 @media (max-width: 1120px) {
   .app-shell {
-    --cc-sidebar-width: 220px;
     grid-template-columns: var(--cc-sidebar-width) minmax(400px, 1fr);
   }
 

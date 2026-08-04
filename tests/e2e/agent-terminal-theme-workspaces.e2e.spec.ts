@@ -236,7 +236,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
         name: `项目 ${basename(workbench.projectDirectory)}`
       })
       await projectCard.getByRole('button', { name: /选择默认工作区分支/ }).click()
-      await projectCard
+      await page
         .getByRole('dialog', { name: '选择默认工作区分支' })
         .getByRole('button', {
           name: branchName,

@@ -143,7 +143,23 @@
   flex: 1 1 auto;
   margin-top: 6px;
   padding: 0 4px 44px;
-  overflow: visible;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--cc-scrollbar) transparent;
+  scrollbar-width: thin;
+}
+
+.project-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.project-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--cc-scrollbar);
 }
 
 .project-list--dragging {
@@ -485,10 +501,8 @@
 }
 
 .branch-selector-popover {
-  position: absolute;
-  top: -64px;
-  left: calc(100% + 10px);
-  z-index: 40;
+  position: fixed;
+  z-index: 200;
   width: min(300px, calc(100vw - 32px));
   border: 1px solid var(--cc-border);
   border-radius: 11px;
