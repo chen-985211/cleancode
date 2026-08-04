@@ -29,7 +29,8 @@ export const AgentNode = memo(function AgentNode({
     objectMotion.className,
     hasActiveApproval ? 'agent-console-node--approval-source' : '',
     'nowheel',
-    selected ? 'agent-console-node--selected' : ''
+    selected ? 'agent-console-node--selected' : '',
+    data.isContextSelected ? 'agent-console-node--context-selected' : ''
   ]
     .filter(Boolean)
     .join(' ')
@@ -41,6 +42,7 @@ export const AgentNode = memo(function AgentNode({
       aria-label={t('agent.consoleRegion', { agentName: data.agent.name })}
       data-agent-console-node={data.agent.agentId}
       data-approval-state={hasActiveApproval ? 'pending' : 'idle'}
+      data-context-selected={data.isContextSelected || undefined}
       data-selection-state={selected ? 'selected' : 'unselected'}
       style={objectMotion.style}
       onAnimationEnd={objectMotion.onAnimationEnd}
@@ -74,7 +76,7 @@ export const AgentNode = memo(function AgentNode({
         onRename={data.onRename}
         onSelect={data.onSelect}
       />
-      {selected ? <WorkbenchNodeSelectionVeil /> : null}
+      {selected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>
   )
 })

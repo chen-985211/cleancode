@@ -8,6 +8,7 @@ import type {
   QuickExecutionTargetSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
+import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
 import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
 import type {
@@ -249,6 +250,20 @@ describe('workbench canvas object context menu', () => {
     expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['combination-a', 'combination-b'])
   })
 
+  it('context-selects an Agent without replacing the existing normal selection', () => {
+    renderCanvas({ selectedTerminalBlockIds: ['standalone'] })
+
+    openNodeContextMenu('agent:reviewer')
+
+    expect(screen.getByRole('menu', { name: 'Reviewer 操作' })).toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual(['agent:reviewer'])
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(contextSelectedNodeIds()).toEqual([])
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+  })
+
   it('does not treat collapsed combination member content as the combination frame or title', () => {
     renderCanvas()
     const groupSurface = document.createElement('section')
@@ -397,7 +412,7 @@ function renderCanvas({
         ]
       }
     : baseGraph
-  const nodes = createTerminalFlowNodes({
+  const terminalNodes = createTerminalFlowNodes({
     graph,
     handlers: {
       onDelete: vi.fn(),
@@ -415,6 +430,19 @@ function renderCanvas({
     selectedTerminalBlockIds,
     terminalStates: {}
   })
+  const agentNode = createAgentConsoleFlowNode({
+    agent: reviewerAgent,
+    currentWorkbench: null,
+    currentWorkspace: null,
+    isSelected: false,
+    onGraphUpdated: vi.fn(),
+    onMcpCapabilityChange: vi.fn(async () => undefined),
+    onRemove: vi.fn(async () => undefined),
+    onRename: vi.fn(async () => undefined),
+    onResize: vi.fn(async () => undefined),
+    onSelect: vi.fn()
+  })
+  const nodes = [agentNode, ...terminalNodes]
 
   render(
     <WorkbenchCanvas
@@ -538,7 +566,7 @@ function contextSelectedConnectionIds(): string[] {
 
 function createWorkbench(graph: BlockGraphSnapshot): WorkbenchSnapshot {
   return {
-    agents: [],
+    agents: [reviewerAgent],
     gitBranches: [],
     graph,
     project: {
@@ -558,6 +586,19 @@ function createWorkbench(graph: BlockGraphSnapshot): WorkbenchSnapshot {
     }
   }
 }
+
+const reviewerAgent = {
+  agentId: 'reviewer',
+  cleancodeMcpEnabled: true,
+  layout: {
+    position: { x: -480, y: 0 },
+    size: { width: 420, height: 360 }
+  },
+  name: 'Reviewer',
+  projectId: 'project-1',
+  providerId: 'codex',
+  workspaceId: 'main'
+} as const
 
 function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof useTerminalWorkflow> {
   return {

@@ -50,8 +50,21 @@ describe('canvas object context target', () => {
     })
   })
 
+  it('resolves an Agent without inventing terminal actions', () => {
+    expect(
+      resolveCanvasObjectContextTarget(graph, {
+        nodeId: 'agent:reviewer',
+        nodeType: 'agentConsole'
+      })
+    ).toEqual({
+      agentId: 'reviewer',
+      kind: 'agent',
+      selectedConnectionIds: [],
+      selectedNodeIds: ['agent:reviewer']
+    })
+  })
+
   it.each([
-    { nodeId: 'agent:reviewer', nodeType: 'agentConsole' as const },
     { nodeId: 'missing-terminal', nodeType: 'terminal' as const },
     { nodeId: 'missing-group', nodeType: 'terminalGroup' as const }
   ])('does not invent a context target for $nodeType $nodeId', (hit) => {

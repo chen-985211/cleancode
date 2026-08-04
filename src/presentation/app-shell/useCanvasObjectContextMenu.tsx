@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
   type ReactNode
@@ -15,13 +16,15 @@ import type {
 import { CanvasObjectContextMenu } from './CanvasObjectContextMenu'
 import {
   resolveCanvasObjectContextTarget,
-  type CanvasObjectContextTarget
+  type CanvasObjectContextTarget,
+  type CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
-import type { WorkbenchFlowNode } from './types'
+import type { AgentConsoleFlowNode, WorkbenchFlowNode } from './types'
 
 interface CanvasObjectContextMenuState {
   readonly graphKey: string
   readonly position: { readonly x: number; readonly y: number }
+  readonly requestId: number
   readonly target: CanvasObjectContextTarget
 }
 
@@ -37,7 +40,7 @@ export function useCanvasObjectContextMenu({
   readonly graph: BlockGraphSnapshot | null
   readonly nodes: readonly WorkbenchFlowNode[]
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
-  readonly onRequestQuickExecutionBinding?: (target: CanvasObjectContextTarget) => void
+  readonly onRequestQuickExecutionBinding?: (target: CanvasTerminalObjectContextTarget) => void
   readonly onRequestDeleteTerminalScope?: (
     target: BatchTerminalRemovalTargetSnapshot
   ) => Promise<void> | void
@@ -49,9 +52,11 @@ export function useCanvasObjectContextMenu({
   readonly onNodeContextMenu: (event: ReactMouseEvent<Element>, node: WorkbenchFlowNode) => void
 } {
   const [state, setState] = useState<CanvasObjectContextMenuState | null>(null)
+  const nextRequestIdRef = useRef(0)
   const close = useCallback(() => setState(null), [])
   const graphKey = graph ? createGraphKey(graph) : null
   const activeState = state?.graphKey === graphKey ? state : null
+  const activeAgentNode = resolveActiveAgentNode(nodes, activeState?.target ?? null)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(
@@ -80,6 +85,7 @@ export function useCanvasObjectContextMenu({
       setState({
         graphKey: createGraphKey(graph),
         position: { x: event.clientX, y: event.clientY },
+        requestId: (nextRequestIdRef.current += 1),
         target
       })
     },
@@ -94,11 +100,25 @@ export function useCanvasObjectContextMenu({
     ),
     menu: activeState ? (
       <CanvasObjectContextMenu
+        key={activeState.requestId}
+        agentActions={
+          activeAgentNode
+            ? {
+                agent: activeAgentNode.data.agent,
+                onRemove: activeAgentNode.data.onRemove,
+                onRename: activeAgentNode.data.onRename
+              }
+            : undefined
+        }
         position={activeState.position}
         target={activeState.target}
         onClose={close}
         onAddToQuickExecution={onRequestQuickExecutionBinding}
-        onFavorite={(blockIds) => onRequestSaveBlockTemplate?.(blockIds)}
+        onFavorite={
+          activeState.target.kind === 'agent'
+            ? undefined
+            : (blockIds) => onRequestSaveBlockTemplate?.(blockIds)
+        }
         onRemove={
           onRequestDeleteTerminalScope
             ? (target) => {
@@ -120,7 +140,7 @@ export function useCanvasObjectContextMenu({
 function toBatchTerminalRemovalTarget(
   target: CanvasObjectContextTarget
 ): BatchTerminalRemovalTargetSnapshot | null {
-  if (target.kind === 'terminal') return null
+  if (target.kind === 'agent' || target.kind === 'terminal') return null
   if (target.kind === 'workflow') {
     return { type: 'workflow', terminalBlockIds: [...target.terminalBlockIds] }
   }
@@ -155,8 +175,6 @@ function projectContextSelectionOntoNodes(
   const selectedNodeIds = new Set(target.selectedNodeIds)
 
   return nodes.map((node) => {
-    if (node.type === 'agentConsole') return node
-
     return {
       ...node,
       data: {
@@ -165,6 +183,20 @@ function projectContextSelectionOntoNodes(
       }
     } as WorkbenchFlowNode
   })
+}
+
+function resolveActiveAgentNode(
+  nodes: readonly WorkbenchFlowNode[],
+  target: CanvasObjectContextTarget | null
+): AgentConsoleFlowNode | null {
+  if (target?.kind !== 'agent') return null
+
+  return (
+    nodes.find(
+      (node): node is AgentConsoleFlowNode =>
+        node.type === 'agentConsole' && node.data.agent.agentId === target.agentId
+    ) ?? null
+  )
 }
 
 function projectContextSelectionOntoEdges(

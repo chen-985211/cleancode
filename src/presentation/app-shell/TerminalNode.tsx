@@ -273,7 +273,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
             onPaste={data.onPaste}
           />
         </div>
-        {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
+        {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
       </section>
       <Handle
         className="terminal-node__handle terminal-node__handle--output"

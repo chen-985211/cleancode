@@ -184,7 +184,13 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 2.8;
+  stroke: var(--cc-primary);
+  stroke-width: 3;
+  stroke-dasharray: none;
+}
+
+.react-flow__edge.selected .react-flow__arrowhead polyline {
+  stroke: var(--cc-primary);
 }
 
 .canvas-minimap-panel {

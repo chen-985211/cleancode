@@ -637,7 +637,9 @@ function resolveQuickExecutionNodeTarget(
     nodeType: node.type === 'terminalGroup' ? 'terminalGroup' : 'terminal'
   })
 
-  return contextTarget ? toQuickExecutionTarget(contextTarget) : null
+  return contextTarget && contextTarget.kind !== 'agent'
+    ? toQuickExecutionTarget(contextTarget)
+    : null
 }
 
 function resolveQuickExecutionDropTarget(

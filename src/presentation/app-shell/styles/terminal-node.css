@@ -35,9 +35,9 @@
   border-color: var(--cc-border);
 }
 
-.terminal-node.terminal-node--selected {
+.terminal-node.terminal-node--selected,
+.terminal-node.terminal-node--context-selected {
   border-color: var(--cc-primary-border);
-  box-shadow: var(--cc-shadow-node);
 }
 
 .terminal-node--group-selection-mode {

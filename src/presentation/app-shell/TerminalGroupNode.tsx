@@ -186,7 +186,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           ))}
         </div>
       ) : null}
-      {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
+      {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>
   )
 })

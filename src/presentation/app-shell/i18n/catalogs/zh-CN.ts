@@ -460,6 +460,7 @@ export const zhCNMessages = {
   'agent.moreActions': '{agentName} 更多操作',
   'agent.actions': '{agentName} 操作',
   'agent.rename': '重命名',
+  'agent.saveName': '保存 Agent 名称',
   'agent.remove': '移除',
   'agent.multipleNoticeTitle': 'Agent 共享当前工作区',
   'agent.multipleNotice': '多个 Agent 可能同时修改相同文件，请留意未提交更改。',

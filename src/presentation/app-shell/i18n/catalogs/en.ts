@@ -487,6 +487,7 @@ export const enMessages = {
   'agent.moreActions': 'More actions for {agentName}',
   'agent.actions': 'Actions for {agentName}',
   'agent.rename': 'Rename',
+  'agent.saveName': 'Save Agent name',
   'agent.remove': 'Remove',
   'agent.multipleNoticeTitle': 'Agents share this workspace',
   'agent.multipleNotice':
