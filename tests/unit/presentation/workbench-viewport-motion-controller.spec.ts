@@ -136,6 +136,27 @@ describe('workbench viewport motion controller', () => {
     unsubscribe()
   })
 
+  it('publishes each successfully applied presentation viewport', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const instance = createViewportInstance()
+    const presentations: Viewport[] = []
+    const unsubscribe = controller.subscribePresentation(instance.value, (viewport) => {
+      presentations.push(viewport)
+    })
+    const completion = controller.transition(instance.value, centerCommand(1_480))
+
+    frames.step()
+    await vi.waitFor(() => expect(presentations).toHaveLength(1))
+    expect(presentations[0]).toEqual(instance.viewport)
+
+    frames.finish()
+    await expect(completion).resolves.toBe(true)
+    expect(presentations.at(-1)).toEqual({ x: -1_000, y: 0, zoom: 1 })
+
+    unsubscribe()
+  })
+
   it('retargets one in-flight spring from its presentation value and preserves velocity', async () => {
     const frames = new TestFrameScheduler()
     const controller = createWorkbenchViewportMotionController(frames)

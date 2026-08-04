@@ -1,18 +1,44 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
-import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap'
+import {
+  CanvasMinimap,
+  LiveCanvasMinimapViewportFrame
+} from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
 import {
   createIdleTerminalState,
   type TerminalFlowNode,
-  type TerminalGroupFlowNode
+  type TerminalGroupFlowNode,
+  type WorkbenchFlowNode
 } from '../../../src/presentation/app-shell/types'
+
+const liveViewportMotion = vi.hoisted(() => ({
+  listener: null as
+    ((viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void) | null
+}))
+
+vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', () => ({
+  subscribeWorkbenchViewportMotionPresentation: (
+    _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: (viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void
+  ) => {
+    liveViewportMotion.listener = listener
+    return () => {
+      liveViewportMotion.listener = null
+    }
+  }
+}))
 
 describe('canvas minimap', () => {
   const restoreSvgGeometry = installSvgGeometryMocks()
 
   afterAll(() => {
     restoreSvgGeometry()
+  })
+
+  beforeEach(() => {
+    liveViewportMotion.listener = null
   })
 
   it('routes controls and terminal node activation through presentation callbacks', () => {
@@ -350,6 +376,35 @@ describe('canvas minimap', () => {
     expect(onViewportCenterPreview).toHaveBeenNthCalledWith(1, { x: 100, y: 120 })
     expect(onViewportCenterPreview).toHaveBeenNthCalledWith(2, { x: 160, y: 180 })
     expect(onViewportCenterCommit).toHaveBeenCalledWith({ x: 160, y: 180 })
+  })
+
+  it('keeps the viewport frame synchronized with the live React Flow viewport', () => {
+    const instance = {} as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    const { container } = render(
+      <svg>
+        <LiveCanvasMinimapViewportFrame
+          canvasSize={{ width: 960, height: 640 }}
+          fallbackViewport={{ x: 0, y: 0, zoom: 1 }}
+          instance={instance}
+        />
+      </svg>
+    )
+
+    const viewportFrame = container.querySelector('.canvas-minimap__viewport-frame')
+
+    expect(viewportFrame).toHaveAttribute('x', '0')
+    expect(viewportFrame).toHaveAttribute('y', '0')
+    expect(viewportFrame).toHaveAttribute('width', '960')
+    expect(viewportFrame).toHaveAttribute('height', '640')
+
+    act(() => {
+      liveViewportMotion.listener?.({ x: -120, y: 48, zoom: 1.25 })
+    })
+
+    expect(viewportFrame).toHaveAttribute('x', '96')
+    expect(viewportFrame).toHaveAttribute('y', '-38.4')
+    expect(viewportFrame).toHaveAttribute('width', '768')
+    expect(viewportFrame).toHaveAttribute('height', '512')
   })
 })
 

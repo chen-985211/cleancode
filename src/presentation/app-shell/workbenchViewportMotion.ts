@@ -59,11 +59,17 @@ export type WorkbenchViewportMotionCompletionListener = (
   completion: WorkbenchViewportMotionCompletion
 ) => void
 
+export type WorkbenchViewportMotionPresentationListener = (viewport: Viewport) => void
+
 export interface WorkbenchViewportMotionController {
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
   readonly subscribe: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: WorkbenchViewportMotionCompletionListener
+  ) => () => void
+  readonly subscribePresentation: (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: WorkbenchViewportMotionPresentationListener
   ) => () => void
   readonly transition: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
@@ -248,6 +254,10 @@ export function createWorkbenchViewportMotionController(
     ReactFlowInstance<WorkbenchFlowNode, Edge>,
     Set<WorkbenchViewportMotionCompletionListener>
   >()
+  const presentationListeners = new WeakMap<
+    ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    Set<WorkbenchViewportMotionPresentationListener>
+  >()
   let latestRequest: {
     readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
     readonly requestId: number
@@ -288,6 +298,35 @@ export function createWorkbenchViewportMotionController(
     }
   }
 
+  const subscribePresentation = (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: WorkbenchViewportMotionPresentationListener
+  ): (() => void) => {
+    const listeners = presentationListeners.get(instance) ?? new Set()
+    listeners.add(listener)
+    presentationListeners.set(instance, listeners)
+
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) {
+        presentationListeners.delete(instance)
+      }
+    }
+  }
+
+  const applyPresentedViewport = (
+    instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    viewport: Viewport
+  ): Promise<boolean> => {
+    const applied = applyViewport(instance, viewport)
+    void applied.then((didApply) => {
+      if (didApply) {
+        presentationListeners.get(instance)?.forEach((listener) => listener(viewport))
+      }
+    })
+    return applied
+  }
+
   const completeRequest = (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     requestId: number,
@@ -317,7 +356,7 @@ export function createWorkbenchViewportMotionController(
       return
     }
     activeMotion = null
-    void applyViewport(motion.instance, motion.target).then((applied) =>
+    void applyPresentedViewport(motion.instance, motion.target).then((applied) =>
       motion.resolve(
         completeRequest(motion.instance, motion.requestId, applied, {
           intent: motion.intent,
@@ -378,7 +417,7 @@ export function createWorkbenchViewportMotionController(
       finishMotion(motion)
       return
     }
-    void applyViewport(motion.instance, presentation)
+    void applyPresentedViewport(motion.instance, presentation)
     scheduleNextFrame()
   }
 
@@ -401,7 +440,7 @@ export function createWorkbenchViewportMotionController(
     if (transitionOptions.response === undefined) {
       cancelActiveMotion()
       latestRequest = { instance, requestId }
-      return applyViewport(instance, target).then((applied) =>
+      return applyPresentedViewport(instance, target).then((applied) =>
         completeRequest(instance, requestId, applied, { intent: command.intent, viewport: target })
       )
     }
@@ -460,7 +499,7 @@ export function createWorkbenchViewportMotionController(
     })
   }
 
-  return { cancel, subscribe, transition }
+  return { cancel, subscribe, subscribePresentation, transition }
 }
 
 const browserViewportMotionController = createWorkbenchViewportMotionController({
@@ -487,6 +526,13 @@ export function subscribeWorkbenchViewportMotionCompletion(
   listener: WorkbenchViewportMotionCompletionListener
 ): () => void {
   return browserViewportMotionController.subscribe(instance, listener)
+}
+
+export function subscribeWorkbenchViewportMotionPresentation(
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+  listener: WorkbenchViewportMotionPresentationListener
+): () => void {
+  return browserViewportMotionController.subscribePresentation(instance, listener)
 }
 
 function resolveCommandCanvasSize(command: WorkbenchViewportCommand): {

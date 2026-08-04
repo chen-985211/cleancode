@@ -157,6 +157,8 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 非即时程序化相机运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring，阻尼比固定为 `1`，不产生装饰性回弹。当前 motion token 的 response 为：`quick` 约 `0.30s`、`spatial` 约 `0.34s`、`adaptive-focus` 约 `0.34–0.42s`；response 描述弹簧响应快慢，不是固定动画时长。X、Y 和 zoom 独立保存当前位置与速度；新目标必须从当前呈现值重新定向并继承速度。用户开始拖动、工作区恢复或更新的定位意图会立即取消旧运动，迟到完成不得重新激活旧目标。曲线、阈值和取消语义只能在统一 owner 中调整，并必须由距离、缩放、重新定向、异步完成和 reduced-motion 参数矩阵覆盖。
 
+依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框通过相机 owner 的轻量实时信号逐帧跟随，订阅范围只覆盖框本身；不得为同步框而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
+
 画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 
 组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或组合根元素上设置会改变 xterm、resize 或 React Flow 坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。

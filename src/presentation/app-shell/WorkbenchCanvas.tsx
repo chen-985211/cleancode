@@ -18,7 +18,11 @@ import {
   type QuickExecutionSlotNumber,
   type QuickExecutionTargetSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
+import {
+  CanvasMinimap,
+  LiveCanvasMinimapViewportFrame,
+  type MinimapViewportCenter
+} from './CanvasMinimap'
 import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
 import { filterMinimapNodes, type MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
@@ -262,6 +266,10 @@ export function WorkbenchCanvas({
   const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  const [viewportMotionInstance, setViewportMotionInstance] = useState<ReactFlowInstance<
+    WorkbenchFlowNode,
+    Edge
+  > | null>(null)
   const canvasSurfaceRef = useRef<HTMLDivElement | null>(null)
   const activeDraggedNodeRef = useRef<WorkbenchFlowNode | null>(null)
   const restoredGraphIdRef = useRef<string | null>(null)
@@ -408,6 +416,7 @@ export function WorkbenchCanvas({
           nodeTypes={nodeTypes}
           onInit={(instance) => {
             reactFlowInstanceRef.current = instance
+            setViewportMotionInstance((currentInstance) => currentInstance ?? instance)
             unsubscribeViewportMotionRef.current?.()
             unsubscribeViewportMotionRef.current = subscribeWorkbenchViewportMotionCompletion(
               instance,
@@ -520,6 +529,13 @@ export function WorkbenchCanvas({
               nodes={minimapNodes}
               canvasViewport={canvasViewport}
               canvasSize={canvasSize}
+              viewportFrame={
+                <LiveCanvasMinimapViewportFrame
+                  canvasSize={canvasSize}
+                  fallbackViewport={canvasViewport}
+                  instance={viewportMotionInstance}
+                />
+              }
               viewportZoom={viewportZoom}
               shortcutTooltips={shortcutTooltips}
               minimapNodeInteraction={minimapNodeInteraction}
