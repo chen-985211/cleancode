@@ -47,6 +47,7 @@ import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
+import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -274,7 +275,7 @@ export function WorkbenchCanvas({
   }
   const beginTerminalGroupSelection = (): void => {
     onBeginTerminalGroupSelection()
-    void reactFlowInstanceRef.current?.fitView({ padding: 0.22, duration: 180 })
+    onFitCanvas()
   }
 
   useEffect(() => {
@@ -633,7 +634,11 @@ function restoreCanvasViewport({
   setViewportZoom(viewport.zoom)
   setCanvasViewport(viewport)
 
-  void instance.setViewport(viewport, { duration: 0 }).finally(() => {
+  void transitionWorkbenchViewport(instance, {
+    intent: { type: 'instant' },
+    type: 'set-viewport',
+    viewport
+  }).finally(() => {
     window.setTimeout(() => {
       isRestoringViewportRef.current = false
     }, 0)
@@ -676,7 +681,11 @@ function centerCanvasViewportOnMinimapPoint({
 
   setViewportZoom(zoom)
   setCanvasViewport(viewport)
-  void instance.setViewport(viewport, { duration: 0 })
+  void transitionWorkbenchViewport(instance, {
+    intent: { type: 'instant' },
+    type: 'set-viewport',
+    viewport
+  })
 
   if (persistViewport) {
     onViewportChange(viewport)

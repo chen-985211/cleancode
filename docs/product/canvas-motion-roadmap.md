@@ -49,7 +49,7 @@ cleancode 已经具备画布平移、缩放、小地图、方向快捷键、快�
 4. 用户直接操控期间不播放脱离输入的补间动画。
 5. 减弱动态效果由统一 JavaScript 策略处理，不能只依赖 CSS。
 6. 动画时长、阻尼、插值函数和逐帧路径是实现参数，不成为持久化事实或领域契约。
-7. 动画完成、选择和焦点同步不得依赖固定等待作为业务完成条件。
+7. 程序化相机入口必须保留 React Flow 的异步完成信号，为后续取消身份和焦点协调提供稳定接入点。
 8. 不为动效引入跨上下文协作、IPC、仓储或运行时协议。
 
 ## 统一语言与职责
@@ -80,7 +80,7 @@ flowchart LR
 
 | 阶段 | 名称                   | 核心结果                                           | 状态     |
 | ---- | ---------------------- | -------------------------------------------------- | -------- |
-| 1    | 统一相机运动入口       | 所有程序化 viewport helper 经单一 Presentation API | 实施中   |
+| 1    | 统一相机运动入口       | 所有程序化 viewport helper 经单一 Presentation API | 已完成   |
 | 2    | 连续空间路径与统一节奏 | 聚焦、适应视图和 zoom 使用一致的路径与收敛曲线     | 尚未开始 |
 | 3    | 可打断与速度连续       | 新输入从实时值接管，目标改变时保留连续速度         | 尚未开始 |
 | 4    | 空间对象反馈与缩放分级 | 对象抬升、展开收起和细节层级与相机语言一致         | 尚未开始 |
@@ -99,7 +99,7 @@ flowchart LR
 2. 统一处理 `prefers-reduced-motion`；`instant` 和减弱动态效果都使用零时长。
 3. 为 center、viewport、fit view、fit bounds 和 zoom command 提供一个命令式入口。
 4. 保留当前阶段已有节奏和最终 viewport 结果，不在重构中提前引入 spring 或新依赖。
-5. 让动画 Promise 原样返回给需要协调输入激活的消费者，不使用额外固定等待替代完成信号。
+5. 让 React Flow 动画 Promise 原样返回，为需要完成协调的消费者保留接入点；现有输入激活重试与取消语义不在本阶段改写。
 6. 直接操控和小地图 viewport 拖动预览保留即时更新，但也通过统一入口声明其 `instant` 例外。
 
 ### 已知消费者
@@ -140,6 +140,17 @@ flowchart LR
 - 所有生产调用方完成收敛，没有并行时长与插值 owner。
 - 目标 unit 和统一门禁通过。
 - 阶段完成证据写回本文；稳定共享规则如有新增，同步迁入 UI Style Guide。
+
+### 第一阶段完成证据
+
+第一阶段于 2026-08-04 完成：
+
+- `workbenchViewportMotion.ts` 成为根级 Presentation 程序化 viewport motion owner，集中维护 `instant`、`quick`、`spatial` 和 `adaptive-focus` intent、当前节奏、距离上限、插值路径与 reduced-motion。
+- center、set viewport、fit view、fit bounds、zoom in 和 zoom out 统一通过 `transitionWorkbenchViewport` 转发；Presentation 其余模块不再直接调用 React Flow viewport helper。
+- 方向快捷键和小地图定位继续使用按屏幕距离限制在 `180–260ms`、`180–300ms` 的自适应过渡；创建显露、快捷执行、审批与布局适应视图保持原有最终 viewport 和节奏。
+- 工作区 viewport 恢复与小地图 viewport 拖动继续声明为 `instant`，不会把持久化恢复或直接操控伪装成程序动画。
+- JavaScript 驱动的画布控制、空间显露和自适应定位统一尊重 `prefers-reduced-motion`；选择、最终定位和输入激活结果不被删除。
+- Unit 参数矩阵覆盖 intent、命令类型、距离上下界、reduced-motion 和全部 React Flow viewport command 转发；既有方向导航、小地图、创建聚焦、快捷执行、审批和布局聚焦回归继续通过。
 
 ## 第二阶段：连续空间路径与统一节奏
 

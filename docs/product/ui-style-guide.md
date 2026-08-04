@@ -153,6 +153,8 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 精确时长不是产品语义。逐步搭建允许为解释对象与依赖的先后关系采用更长的整体时间，但相邻步骤仍应快速收敛，大图必须压缩步骤间隔并设置有限的启动窗口，不能让演出时间随节点数无限增长。后续若建立 motion token，必须先对齐现有调用方和减弱动态效果，再把 token 写入本文；不得先在文档中声明不存在的实现。
 
+程序化画布相机运动由 `src/presentation/app-shell/workbenchViewportMotion.ts` 统一拥有。调用方必须通过 `instant`、`quick`、`spatial` 或 `adaptive-focus` intent 表达运动原因，不得直接调用 React Flow 的 viewport helper，也不得在消费者中维护裸时长或插值曲线。`instant` 用于持久化 viewport 恢复和直接操控预览；`quick` 用于用户主动触发的 zoom 与适应画布；`spatial` 用于创建显露和对象集合定位；`adaptive-focus` 用于按当前 viewport 与目标屏幕距离限制时长的空间导航。intent 的精确参数仍是实现细节，不构成产品契约。
+
 工作流演出的空间起点必须来自最终落位附近最近的既有画布节点边缘；发起 Agent 只有在它确实是当地最近节点时才成为起点。自动适应视图只框住本次新内容并保留局部上下文，不得为了同时展示远处的发起 Agent 而把搭建过程缩成难以阅读的全景。
 
 ### 减弱动态效果

@@ -18,6 +18,7 @@ import type {
   AgentToolApprovalViewState
 } from './agentToolApprovalTypes'
 import type { WorkbenchFlowNode } from './types'
+import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 import { useI18n } from './i18n/useI18n'
 import type { Translate } from './i18n/messages'
 
@@ -145,7 +146,12 @@ export function useAgentToolApprovals({
         .filter((node): node is WorkbenchFlowNode => Boolean(node))
 
       if (focusNodes.length === 0) return
-      void instance.fitView({ duration: 220, nodes: focusNodes, padding: 0.24 })
+      void transitionWorkbenchViewport(instance, {
+        intent: { type: 'spatial' },
+        nodes: focusNodes,
+        padding: 0.24,
+        type: 'fit-view'
+      })
     },
     [reactFlowInstanceRef]
   )

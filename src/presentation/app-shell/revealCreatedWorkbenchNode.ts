@@ -7,11 +7,14 @@ import type {
   WorkbenchScreenRect
 } from './workbenchNodeCreationPolicy'
 import { resolveWorkbenchNodeCreationViewport } from './workbenchNodeCreationPolicy'
-import { prefersReducedMotion } from './workbenchFocusTransition'
+import {
+  resolveWorkbenchViewportCommandTransition,
+  transitionWorkbenchViewport,
+  type WorkbenchViewportCommand
+} from './workbenchViewportMotion'
 
 interface RevealCreatedWorkbenchNodeInput {
   readonly canvasSize: WorkbenchNodeSize
-  readonly duration: number
   readonly nodePosition: WorkbenchNodePosition
   readonly nodeSize: WorkbenchNodeSize
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
@@ -20,26 +23,27 @@ interface RevealCreatedWorkbenchNodeInput {
 
 export function revealCreatedWorkbenchNode({
   canvasSize,
-  duration,
   nodePosition,
   nodeSize,
   reactFlowInstance,
   safeViewport
 }: RevealCreatedWorkbenchNodeInput): number {
-  const transitionDuration = prefersReducedMotion() ? 0 : duration
-
-  void reactFlowInstance.setViewport(
-    resolveWorkbenchNodeCreationViewport({
+  const command = {
+    intent: { path: 'direct', type: 'spatial' },
+    type: 'set-viewport',
+    viewport: resolveWorkbenchNodeCreationViewport({
       canvasSize,
       nodePosition,
       nodeSize,
       safeViewport
-    }),
-    {
-      duration: transitionDuration,
-      interpolate: 'linear'
-    }
-  )
+    })
+  } satisfies WorkbenchViewportCommand
+  const transitionDuration = resolveWorkbenchViewportCommandTransition(
+    reactFlowInstance,
+    command
+  ).duration
+
+  void transitionWorkbenchViewport(reactFlowInstance, command)
 
   return transitionDuration
 }

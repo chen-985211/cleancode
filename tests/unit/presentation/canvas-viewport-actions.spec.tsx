@@ -33,4 +33,44 @@ describe('canvas viewport actions', () => {
     expect(zoomOut).toHaveBeenCalledWith({ duration: 160 })
     expect(fitView).toHaveBeenCalledWith({ duration: 180, padding: 0.22 })
   })
+
+  it('keeps viewport controls functional without spatial motion when reduced motion is preferred', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        media: '(prefers-reduced-motion: reduce)',
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }))
+    )
+    const fitView = vi.fn(async () => true)
+    const zoomIn = vi.fn(async () => true)
+    const zoomOut = vi.fn(async () => true)
+    const { result } = renderHook(() =>
+      useCanvasViewportActions({
+        onUserAction: vi.fn(),
+        reactFlowInstanceRef: {
+          current: { fitView, zoomIn, zoomOut } as unknown as ReactFlowInstance<
+            WorkbenchFlowNode,
+            Edge
+          >
+        }
+      })
+    )
+
+    act(() => {
+      result.current.zoomCanvasIn()
+      result.current.zoomCanvasOut()
+      result.current.fitCanvas()
+    })
+
+    expect(zoomIn).toHaveBeenCalledWith({ duration: 0 })
+    expect(zoomOut).toHaveBeenCalledWith({ duration: 0 })
+    expect(fitView).toHaveBeenCalledWith({ duration: 0, padding: 0.22 })
+  })
 })

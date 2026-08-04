@@ -329,7 +329,7 @@ function MinimapFocusHarness({
       type="button"
       onClick={() => {
         if (action === 'activateTerminal') {
-          focusTerminalBlock(nodeId, 0)
+          focusTerminalBlock(nodeId, { type: 'instant' })
           return
         }
         if (action === 'activateThenLocateFromMinimap') {

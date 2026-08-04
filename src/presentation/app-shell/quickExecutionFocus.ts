@@ -2,6 +2,7 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
 import type { QuickExecutionTargetSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from './types'
+import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 
 export function focusQuickExecutionTargetInCanvas({
   instance,
@@ -22,11 +23,12 @@ export function focusQuickExecutionTargetInCanvas({
 
   if (nodes.some((node) => !node)) return false
 
-  void instance.fitView({
-    duration: 220,
+  void transitionWorkbenchViewport(instance, {
+    intent: { type: 'spatial' },
     maxZoom: 1,
     nodes: nodes as WorkbenchFlowNode[],
-    padding: 0.24
+    padding: 0.24,
+    type: 'fit-view'
   })
   return true
 }

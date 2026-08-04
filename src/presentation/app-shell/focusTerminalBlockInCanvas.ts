@@ -6,13 +6,18 @@ import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from './types'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
+import {
+  resolveWorkbenchViewportCommandTransition,
+  transitionWorkbenchViewport,
+  type WorkbenchViewportCommand,
+  type WorkbenchViewportMotionIntent
+} from './workbenchViewportMotion'
 
 interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
   readonly activateTerminalInput?: boolean
-  readonly duration?: number
-  readonly interpolate?: 'smooth' | 'linear'
+  readonly motion?: WorkbenchViewportMotionIntent
   readonly targetZoom?: number
   readonly viewportIntent?: 'creation' | 'navigation'
   readonly setSelectedTerminalBlockId: (blockId: string | null) => void
@@ -23,8 +28,7 @@ export function focusTerminalBlockInCanvas({
   block,
   reactFlowInstance,
   activateTerminalInput = true,
-  duration = 220,
-  interpolate,
+  motion = { type: 'spatial' },
   targetZoom,
   viewportIntent = 'navigation',
   setSelectedTerminalBlockId,
@@ -45,15 +49,13 @@ export function focusTerminalBlockInCanvas({
     viewportIntent === 'creation'
       ? revealCreatedWorkbenchNode({
           ...readWorkbenchCanvasCreationGeometry(),
-          duration,
           nodePosition: position,
           nodeSize: { height: measuredHeight, width: measuredWidth },
           reactFlowInstance
         })
       : revealNavigatedTerminalBlock({
-          duration,
           height: measuredHeight,
-          interpolate,
+          motion,
           position,
           reactFlowInstance,
           targetZoom,
@@ -79,29 +81,33 @@ export function focusTerminalBlockInCanvas({
 }
 
 function revealNavigatedTerminalBlock({
-  duration,
   height,
-  interpolate,
+  motion,
   position,
   reactFlowInstance,
   targetZoom,
   width
 }: {
-  readonly duration: number
   readonly height: number
-  readonly interpolate?: 'smooth' | 'linear'
+  readonly motion: WorkbenchViewportMotionIntent
   readonly position: { readonly x: number; readonly y: number }
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly targetZoom?: number
   readonly width: number
 }): number {
   const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
+  const command = {
+    center: { x: position.x + width / 2, y: position.y + height / 2 },
+    intent: motion,
+    type: 'center',
+    zoom: nextZoom
+  } satisfies WorkbenchViewportCommand
+  const transitionDuration = resolveWorkbenchViewportCommandTransition(
+    reactFlowInstance,
+    command
+  ).duration
 
-  void reactFlowInstance.setCenter(position.x + width / 2, position.y + height / 2, {
-    zoom: nextZoom,
-    duration,
-    ...(interpolate ? { interpolate } : {})
-  })
+  void transitionWorkbenchViewport(reactFlowInstance, command)
 
-  return duration
+  return transitionDuration
 }
