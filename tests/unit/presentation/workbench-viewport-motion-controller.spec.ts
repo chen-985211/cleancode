@@ -7,6 +7,103 @@ import {
 } from '../../../src/presentation/app-shell/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
+  it('presents the same spring state at the same elapsed time on 60Hz and 120Hz displays', async () => {
+    const sixtyHertzFrames = new TestFrameScheduler()
+    const hundredTwentyHertzFrames = new TestFrameScheduler()
+    const sixtyHertzController = createWorkbenchViewportMotionController(sixtyHertzFrames)
+    const hundredTwentyHertzController =
+      createWorkbenchViewportMotionController(hundredTwentyHertzFrames)
+    const sixtyHertzInstance = createViewportInstance()
+    const hundredTwentyHertzInstance = createViewportInstance()
+    const sixtyHertzCompletion = sixtyHertzController.transition(
+      sixtyHertzInstance.value,
+      centerCommand(1_480)
+    )
+    const hundredTwentyHertzCompletion = hundredTwentyHertzController.transition(
+      hundredTwentyHertzInstance.value,
+      centerCommand(1_480)
+    )
+
+    sixtyHertzFrames.step(1_000 / 60)
+    hundredTwentyHertzFrames.step(1_000 / 120)
+    hundredTwentyHertzFrames.step(1_000 / 120)
+
+    expect(hundredTwentyHertzInstance.viewport.x).toBeCloseTo(sixtyHertzInstance.viewport.x, 8)
+    expect(hundredTwentyHertzInstance.viewport.y).toBeCloseTo(sixtyHertzInstance.viewport.y, 8)
+    expect(hundredTwentyHertzInstance.viewport.zoom).toBeCloseTo(
+      sixtyHertzInstance.viewport.zoom,
+      8
+    )
+
+    sixtyHertzController.cancel()
+    hundredTwentyHertzController.cancel()
+    await expect(sixtyHertzCompletion).resolves.toBe(false)
+    await expect(hundredTwentyHertzCompletion).resolves.toBe(false)
+  })
+
+  it('advances through a delayed frame using real elapsed time instead of slowing the motion clock', async () => {
+    const regularFrames = new TestFrameScheduler()
+    const delayedFrames = new TestFrameScheduler()
+    const regularController = createWorkbenchViewportMotionController(regularFrames)
+    const delayedController = createWorkbenchViewportMotionController(delayedFrames)
+    const regularInstance = createViewportInstance()
+    const delayedInstance = createViewportInstance()
+    const regularCompletion = regularController.transition(
+      regularInstance.value,
+      centerCommand(1_480)
+    )
+    const delayedCompletion = delayedController.transition(
+      delayedInstance.value,
+      centerCommand(1_480)
+    )
+
+    regularFrames.step()
+    delayedFrames.step()
+    for (let frame = 0; frame < 6; frame += 1) {
+      regularFrames.step()
+    }
+    delayedFrames.step(100)
+
+    expect(delayedInstance.viewport.x).toBeCloseTo(regularInstance.viewport.x, 8)
+    expect(delayedInstance.viewport.y).toBeCloseTo(regularInstance.viewport.y, 8)
+    expect(delayedInstance.viewport.zoom).toBeCloseTo(regularInstance.viewport.zoom, 8)
+
+    regularController.cancel()
+    delayedController.cancel()
+    await expect(regularCompletion).resolves.toBe(false)
+    await expect(delayedCompletion).resolves.toBe(false)
+  })
+
+  it('briefly widens the view for a distant focus flight without making nearby moves breathe', async () => {
+    const distantFrames = new TestFrameScheduler()
+    const nearbyFrames = new TestFrameScheduler()
+    const distantController = createWorkbenchViewportMotionController(distantFrames)
+    const nearbyController = createWorkbenchViewportMotionController(nearbyFrames)
+    const distantInstance = createViewportInstance()
+    const nearbyInstance = createViewportInstance()
+    const distantCompletion = distantController.transition(
+      distantInstance.value,
+      centerCommand(4_480)
+    )
+    const nearbyCompletion = nearbyController.transition(nearbyInstance.value, centerCommand(580))
+
+    for (let frame = 0; frame < 7; frame += 1) {
+      distantFrames.step()
+      nearbyFrames.step()
+    }
+
+    expect(distantInstance.viewport.zoom).toBeLessThan(0.85)
+    expect(distantInstance.viewport.zoom).toBeGreaterThanOrEqual(0.35)
+    expect(nearbyInstance.viewport.zoom).toBeCloseTo(1, 8)
+
+    distantFrames.finish()
+    nearbyFrames.finish()
+    await expect(distantCompletion).resolves.toBe(true)
+    await expect(nearbyCompletion).resolves.toBe(true)
+    expect(distantInstance.viewport).toEqual({ x: -4_000, y: 0, zoom: 1 })
+    expect(nearbyInstance.viewport).toEqual({ x: -100, y: 0, zoom: 1 })
+  })
+
   it('publishes only the latest successfully settled programmatic viewport', async () => {
     const frames = new TestFrameScheduler()
     const controller = createWorkbenchViewportMotionController(frames)
@@ -60,6 +157,29 @@ describe('workbench viewport motion controller', () => {
     await expect(secondCompletion).resolves.toBe(true)
     expect(instance.viewport).toEqual({ x: 100, y: 0, zoom: 1 })
     expect(frames.maximumPendingCount).toBe(1)
+  })
+
+  it('retargets a distant flight without jumping or zeroing its visible velocity', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const instance = createViewportInstance()
+    const firstCompletion = controller.transition(instance.value, centerCommand(4_480))
+
+    frames.step()
+    frames.step()
+    frames.step()
+    const presentationBeforeRetarget = instance.viewport
+    const secondCompletion = controller.transition(instance.value, centerCommand(-3_520))
+
+    await expect(firstCompletion).resolves.toBe(false)
+    expect(instance.viewport).toEqual(presentationBeforeRetarget)
+
+    frames.step()
+    expect(instance.viewport.x).toBeLessThan(presentationBeforeRetarget.x)
+
+    frames.finish()
+    await expect(secondCompletion).resolves.toBe(true)
+    expect(instance.viewport).toEqual({ x: 4_000, y: 0, zoom: 1 })
   })
 
   it('cancels in the current presentation frame so direct manipulation can take over', async () => {
@@ -181,6 +301,8 @@ class TestFrameScheduler {
   readonly cancelFrame = (frameId: number): void => {
     this.callbacks.delete(frameId)
   }
+
+  readonly now = (): number => this.timestamp
 
   readonly requestFrame = (callback: FrameRequestCallback): number => {
     const frameId = this.nextFrameId

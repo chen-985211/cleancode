@@ -13,6 +13,11 @@ import {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from './types'
 import {
+  createWorkbenchViewportFlight,
+  resolveWorkbenchViewportFlightPresentation,
+  type WorkbenchViewportFlight
+} from './workbenchViewportFlight'
+import {
   advanceCriticalSpringAxis,
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
@@ -41,6 +46,7 @@ export interface WorkbenchViewportTransition {
 
 export interface WorkbenchViewportMotionFrameScheduler {
   readonly cancelFrame: (frameId: number) => void
+  readonly now: () => number
   readonly requestFrame: (callback: FrameRequestCallback) => number
 }
 
@@ -105,12 +111,12 @@ const adaptiveFocusMaximumResponse = 0.42
 const responsePerViewport = 0.05
 const responsePerZoomStop = 0.02
 const maximumSpringRuntime = 1_200
-const maximumFrameDeltaSeconds = 1 / 30
-const initialFrameDeltaSeconds = 1 / 60
 const viewportValueSettlement = 0.1
 const viewportSpeedSettlement = 2
 const zoomValueSettlement = 0.000_2
 const zoomSpeedSettlement = 0.002
+const flightProgressValueSettlement = 0.001
+const flightProgressSpeedSettlement = 0.01
 
 export function resolveWorkbenchViewportTransition(
   input: ResolveWorkbenchViewportTransitionInput
@@ -217,10 +223,14 @@ export function resolveWorkbenchViewportCommandTarget(
 
 interface ActiveViewportMotion {
   elapsedMilliseconds: number
+  flight: WorkbenchViewportFlight | null
+  flightProgress: CriticalSpringAxis
   frameId: number | null
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   intent: WorkbenchViewportMotionIntent
-  lastTimestamp: number | null
+  lastTimestamp: number
+  presentation: Viewport
+  presentationVelocity: Viewport
   requestId: number
   resolve: (completed: boolean) => void
   response: number
@@ -323,29 +333,52 @@ export function createWorkbenchViewportMotionController(
       return
     }
     motion.frameId = null
-    const elapsedSinceFrame =
-      motion.lastTimestamp === null
-        ? initialFrameDeltaSeconds
-        : Math.max(0, (timestamp - motion.lastTimestamp) / 1_000)
-    const deltaSeconds = Math.min(maximumFrameDeltaSeconds, elapsedSinceFrame)
+    const elapsedSinceFrame = Math.max(0, (timestamp - motion.lastTimestamp) / 1_000)
     motion.elapsedMilliseconds += elapsedSinceFrame * 1_000
     motion.lastTimestamp = timestamp
-    motion.x = advanceCriticalSpringAxis(motion.x, motion.target.x, motion.response, deltaSeconds)
-    motion.y = advanceCriticalSpringAxis(motion.y, motion.target.y, motion.response, deltaSeconds)
+    motion.x = advanceCriticalSpringAxis(
+      motion.x,
+      motion.target.x,
+      motion.response,
+      elapsedSinceFrame
+    )
+    motion.y = advanceCriticalSpringAxis(
+      motion.y,
+      motion.target.y,
+      motion.response,
+      elapsedSinceFrame
+    )
     motion.zoom = advanceCriticalSpringAxis(
       motion.zoom,
       motion.target.zoom,
       motion.response,
-      deltaSeconds
+      elapsedSinceFrame
+    )
+    motion.flightProgress = advanceCriticalSpringAxis(
+      motion.flightProgress,
+      1,
+      motion.response,
+      elapsedSinceFrame
     )
 
-    const viewport = { x: motion.x.value, y: motion.y.value, zoom: motion.zoom.value }
-    void applyViewport(motion.instance, viewport)
+    const baseViewport = { x: motion.x.value, y: motion.y.value, zoom: motion.zoom.value }
+    const presentation = resolveWorkbenchViewportFlightPresentation(
+      baseViewport,
+      motion.flightProgress.value,
+      motion.flight
+    )
+    motion.presentationVelocity = resolvePresentationVelocity(
+      motion,
+      presentation,
+      elapsedSinceFrame
+    )
+    motion.presentation = presentation
 
     if (motion.elapsedMilliseconds >= maximumSpringRuntime || isMotionSettled(motion)) {
       finishMotion(motion)
       return
     }
+    void applyViewport(motion.instance, presentation)
     scheduleNextFrame()
   }
 
@@ -354,13 +387,7 @@ export function createWorkbenchViewportMotionController(
     command: WorkbenchViewportCommand
   ): Promise<boolean> => {
     const currentViewport =
-      activeMotion?.instance === instance
-        ? {
-            x: activeMotion.x.value,
-            y: activeMotion.y.value,
-            zoom: activeMotion.zoom.value
-          }
-        : instance.getViewport()
+      activeMotion?.instance === instance ? activeMotion.presentation : instance.getViewport()
     const target = resolveWorkbenchViewportCommandTarget(instance, command, currentViewport)
     const transitionOptions = resolveWorkbenchViewportTransition({
       currentViewport,
@@ -384,8 +411,22 @@ export function createWorkbenchViewportMotionController(
       if (activeMotion?.instance === instance) {
         activeMotion.resolve(false)
         activeMotion.elapsedMilliseconds = 0
+        activeMotion.flight = resolveViewportFlight(currentViewport, target, command.intent)
+        activeMotion.flightProgress = { value: 0, velocity: 0 }
         activeMotion.intent = command.intent
-        activeMotion.lastTimestamp = null
+        activeMotion.lastTimestamp = scheduler.now()
+        activeMotion.x = {
+          value: currentViewport.x,
+          velocity: activeMotion.presentationVelocity.x
+        }
+        activeMotion.y = {
+          value: currentViewport.y,
+          velocity: activeMotion.presentationVelocity.y
+        }
+        activeMotion.zoom = {
+          value: currentViewport.zoom,
+          velocity: activeMotion.presentationVelocity.zoom
+        }
         activeMotion.requestId = requestId
         activeMotion.resolve = resolve
         activeMotion.response = springResponse
@@ -399,10 +440,14 @@ export function createWorkbenchViewportMotionController(
       latestRequest = { instance, requestId }
       activeMotion = {
         elapsedMilliseconds: 0,
+        flight: resolveViewportFlight(currentViewport, target, command.intent),
+        flightProgress: { value: 0, velocity: 0 },
         frameId: null,
         instance,
         intent: command.intent,
-        lastTimestamp: null,
+        lastTimestamp: scheduler.now(),
+        presentation: currentViewport,
+        presentationVelocity: { x: 0, y: 0, zoom: 0 },
         requestId,
         resolve,
         response: springResponse,
@@ -420,6 +465,7 @@ export function createWorkbenchViewportMotionController(
 
 const browserViewportMotionController = createWorkbenchViewportMotionController({
   cancelFrame: (frameId) => window.cancelAnimationFrame(frameId),
+  now: () => window.performance.now(),
   requestFrame: (callback) => window.requestAnimationFrame(callback)
 })
 
@@ -488,8 +534,46 @@ function isMotionSettled(motion: ActiveViewportMotion): boolean {
   return (
     isCriticalSpringAxisSettled(motion.x, motion.target.x, viewportThresholds) &&
     isCriticalSpringAxisSettled(motion.y, motion.target.y, viewportThresholds) &&
-    isCriticalSpringAxisSettled(motion.zoom, motion.target.zoom, zoomThresholds)
+    isCriticalSpringAxisSettled(motion.zoom, motion.target.zoom, zoomThresholds) &&
+    (!motion.flight ||
+      isCriticalSpringAxisSettled(motion.flightProgress, 1, {
+        speed: flightProgressSpeedSettlement,
+        value: flightProgressValueSettlement
+      }))
   )
+}
+
+function resolveViewportFlight(
+  currentViewport: Viewport,
+  targetViewport: Viewport,
+  intent: WorkbenchViewportMotionIntent
+): WorkbenchViewportFlight | null {
+  return intent.type === 'adaptive-focus'
+    ? createWorkbenchViewportFlight(currentViewport, targetViewport, intent.canvasSize)
+    : null
+}
+
+function resolvePresentationVelocity(
+  motion: ActiveViewportMotion,
+  presentation: Viewport,
+  deltaSeconds: number
+): Viewport {
+  if (!motion.flight) {
+    return {
+      x: motion.x.velocity,
+      y: motion.y.velocity,
+      zoom: motion.zoom.velocity
+    }
+  }
+  if (deltaSeconds <= 0) {
+    return motion.presentationVelocity
+  }
+
+  return {
+    x: (presentation.x - motion.presentation.x) / deltaSeconds,
+    y: (presentation.y - motion.presentation.y) / deltaSeconds,
+    zoom: (presentation.zoom - motion.presentation.zoom) / deltaSeconds
+  }
 }
 
 async function applyViewport(
