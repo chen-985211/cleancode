@@ -56,6 +56,16 @@ describe('workbench canvas cursor styles', () => {
     expect(cursorAsset).toMatch(/viewBox="0 0 (24|32) (24|32)"/)
     expect(cursorAsset).not.toContain('<animate')
   })
+
+  it('uses the compact tailless Spatial paper-plane silhouette', () => {
+    const cursorAsset = readFileSync(cursorAssetPath, 'utf8')
+
+    expect(cursorAsset).toContain(
+      'd="M3.25 2.9 20.8 9.15c1.05.37 1.08 1.82.05 2.24l-6.48 2.62-2.3 6.55c-.36 1.04-1.8 1.09-2.23.08L2.92 4.91C2.47 3.87 2.2 2.53 3.25 2.9Z"'
+    )
+    expect(cursorAsset).toContain('stroke-width="1.15"')
+    expect(cursorAsset).not.toContain('<filter')
+  })
 })
 
 function readRule(selector: string, styles = canvasStyles): string {

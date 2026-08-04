@@ -1,15 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="color-scheme: light">
-  <defs>
-    <filter id="shadow" x="-30%" y="-25%" width="170%" height="180%">
-      <feDropShadow dx="0.45" dy="0.9" stdDeviation="0.7" flood-color="CanvasText" flood-opacity="0.58" />
-    </filter>
-  </defs>
   <path
-    d="M3.15 2.75 19.1 9.2c.74.3.7 1.36-.07 1.59l-6.38 1.9 3.12 6.45c.24.5.03 1.1-.47 1.34l-2.32 1.12c-.5.24-1.1.03-1.34-.47L8.5 14.65l-3.76 5.31c-.47.67-1.52.34-1.52-.48L3.15 2.75Z"
+    d="M3.25 2.9 20.8 9.15c1.05.37 1.08 1.82.05 2.24l-6.48 2.62-2.3 6.55c-.36 1.04-1.8 1.09-2.23.08L2.92 4.91C2.47 3.87 2.2 2.53 3.25 2.9Z"
     fill="CanvasText"
     stroke="Canvas"
-    stroke-width="1.35"
+    stroke-width="1.15"
+    stroke-linecap="round"
     stroke-linejoin="round"
-    filter="url(#shadow)"
   />
 </svg>
