@@ -1,3 +1,9 @@
+.terminal-node-anchor {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .terminal-node {
   --terminal-shell: var(--cc-surface);
   --terminal-shell-raised: var(--cc-surface);
@@ -29,7 +35,7 @@
   border-color: var(--cc-border);
 }
 
-.terminal-node--selected {
+.terminal-node.terminal-node--selected {
   border-color: var(--cc-primary-border);
   box-shadow: var(--cc-shadow-node);
 }
@@ -58,7 +64,7 @@
   box-shadow: var(--cc-shadow-node);
 }
 
-.react-flow__node.dragging .terminal-node--selected {
+.react-flow__node.dragging .terminal-node.terminal-node--selected {
   box-shadow: var(--cc-shadow-node);
 }
 
@@ -618,8 +624,8 @@
   background: var(--cc-muted);
 }
 
-.terminal-node:hover .terminal-node__handle,
-.terminal-node--selected .terminal-node__handle {
+.terminal-node-anchor:hover > .terminal-node__handle,
+.terminal-node-anchor--selected > .terminal-node__handle {
   opacity: 1;
   background: var(--cc-primary);
 }

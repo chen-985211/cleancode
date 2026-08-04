@@ -31,7 +31,10 @@ import type { AgentToolApprovalViewState } from './agentToolApprovalTypes'
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
-import { resolveWorkbenchCanvasDetailLevel } from './workbenchObjectMotion'
+import {
+  projectWorkbenchObjectMotionOntoEdges,
+  resolveWorkbenchCanvasDetailLevel
+} from './workbenchObjectMotion'
 import { useWorkbenchNodes, type WorkbenchNodeStore } from './workbenchNodeStore'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
@@ -236,7 +239,14 @@ export function WorkbenchCanvas({
       ),
     [approvalIntents, currentWorkbench?.graph, terminalWorkflowBuildPresentation, workflow.edges]
   )
-  const edges = useMemo(() => [...workflowEdges, ...approvalEdges], [approvalEdges, workflowEdges])
+  const baseEdges = useMemo(
+    () => [...workflowEdges, ...approvalEdges],
+    [approvalEdges, workflowEdges]
+  )
+  const edges = useMemo(
+    () => projectWorkbenchObjectMotionOntoEdges(baseEdges, nodes),
+    [baseEdges, nodes]
+  )
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
   const objectContextMenu = useCanvasObjectContextMenu({
     edges,

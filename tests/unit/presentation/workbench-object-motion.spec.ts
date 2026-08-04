@@ -1,5 +1,6 @@
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import {
+  projectWorkbenchObjectMotionOntoEdges,
   projectWorkbenchObjectMotion,
   resolveWorkbenchCanvasDetailLevel,
   scheduleWorkbenchCreatedObjectFocus
@@ -175,6 +176,34 @@ describe('workbench object motion', () => {
     expect(staleFocus).not.toHaveBeenCalled()
 
     cancel()
+  })
+
+  it('holds workflow edges until expanding group members reach stable handle geometry', () => {
+    const terminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
+    const expandingTerminal = {
+      ...terminal,
+      data: {
+        ...terminal.data,
+        objectMotion: {
+          id: 'group-expand:terminal-1',
+          kind: 'group-expand' as const,
+          offset: { x: -320, y: -170 }
+        }
+      }
+    } as WorkbenchFlowNode
+    const edges = [
+      { id: 'connected', source: 'terminal-1', target: 'terminal-2' },
+      { id: 'unrelated', source: 'terminal-3', target: 'terminal-4' }
+    ]
+
+    expect(projectWorkbenchObjectMotionOntoEdges(edges, [expandingTerminal])).toEqual([
+      expect.objectContaining({
+        id: 'connected',
+        className: 'workbench-object-edge--motion-pending'
+      }),
+      edges[1]
+    ])
+    expect(projectWorkbenchObjectMotionOntoEdges(edges, [terminal])).toBe(edges)
   })
 })
 

@@ -53,7 +53,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     data.isTerminalGroupSelectionMode && data.isSelected
       ? 'terminal-node--group-candidate-selected'
       : '',
-    data.isNavigationHighlighted ? 'terminal-node--navigation-highlighted' : '',
+    data.isNavigationHighlighted ? 'terminal-node--navigation-highlighted' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const terminalAnchorClassName = [
+    'terminal-node-anchor',
+    data.isSelected ? 'terminal-node-anchor--selected' : '',
+    data.isSelected ? 'terminal-node--selected' : '',
     data.approvalIntent ? 'terminal-node--approval-target' : ''
   ]
     .filter(Boolean)
@@ -166,12 +173,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
 
   return (
-    <section
-      className={terminalNodeClassName}
+    <div
+      className={terminalAnchorClassName}
       data-terminal-block-id={block.id}
       data-context-selected={data.isContextSelected || undefined}
-      style={objectMotion.style}
-      onAnimationEnd={objectMotion.onAnimationEnd}
     >
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}
@@ -193,83 +198,89 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         position={Position.Left}
         isConnectable={false}
       />
-      <TerminalHeader
-        blockName={block.name}
-        blockDescription={block.description}
-        blockLaunchCommand={block.launchCommand}
-        isRunning={isRunning}
-        isRecoveryPending={Boolean(session.isRecoveryPending)}
-        isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
-        isSelectedForTerminalGroup={data.isSelected}
-        canSelectForTerminalGroup={data.canSelectForTerminalGroup}
-        sessionKind={session.sessionKind ?? null}
-        retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
-        workflowStatus={data.workflowStatus}
-        isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
-        isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
-        onSelect={(additive) => data.onSelect?.(additive)}
-        onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
-        onStartEditing={startEditingMetadata}
-        onStop={stopTerminal}
-        onQuickLaunch={quickLaunchTerminal}
-        onRestart={restartTerminal}
-        onToggleRetention={() => data.onToggleRetention?.(block)}
-        onRunFromHere={() => data.onRunFromHere?.(block)}
-        onStopWorkflow={() => data.onStopWorkflow?.()}
-        onDelete={() => data.onDelete(block)}
-      />
-      {isEditingMetadata ? (
-        <TerminalMetadataForm
-          block={block}
-          shouldFocusLaunchCommand={shouldFocusLaunchCommand}
-          onSave={saveMetadata}
-          onCancel={() => {
-            setShouldFocusLaunchCommand(false)
-            setIsEditingMetadata(false)
+      <section
+        className={terminalNodeClassName}
+        style={objectMotion.style}
+        onAnimationEnd={objectMotion.onAnimationEnd}
+      >
+        <TerminalHeader
+          blockName={block.name}
+          blockDescription={block.description}
+          blockLaunchCommand={block.launchCommand}
+          isRunning={isRunning}
+          isRecoveryPending={Boolean(session.isRecoveryPending)}
+          isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
+          isSelectedForTerminalGroup={data.isSelected}
+          canSelectForTerminalGroup={data.canSelectForTerminalGroup}
+          sessionKind={session.sessionKind ?? null}
+          retentionPolicy={session.retentionPolicy ?? 'terminate-on-application-exit'}
+          workflowStatus={data.workflowStatus}
+          isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
+          isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
+          onSelect={(additive) => data.onSelect?.(additive)}
+          onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
+          onStartEditing={startEditingMetadata}
+          onStop={stopTerminal}
+          onQuickLaunch={quickLaunchTerminal}
+          onRestart={restartTerminal}
+          onToggleRetention={() => data.onToggleRetention?.(block)}
+          onRunFromHere={() => data.onRunFromHere?.(block)}
+          onStopWorkflow={() => data.onStopWorkflow?.()}
+          onDelete={() => data.onDelete(block)}
+        />
+        {isEditingMetadata ? (
+          <TerminalMetadataForm
+            block={block}
+            shouldFocusLaunchCommand={shouldFocusLaunchCommand}
+            onSave={saveMetadata}
+            onCancel={() => {
+              setShouldFocusLaunchCommand(false)
+              setIsEditingMetadata(false)
+            }}
+          />
+        ) : null}
+        <TerminalServiceRuntimeBar
+          identity={session.runIdentity ?? null}
+          endpoint={session.actualEndpoint ?? null}
+          portState={session.servicePortState ?? null}
+          conflict={session.portConflict ?? null}
+          onCopyEndpoint={async (endpoint) => {
+            if (data.onCopyServiceEndpoint) {
+              await data.onCopyServiceEndpoint(endpoint)
+              return
+            }
+
+            await window.navigator.clipboard?.writeText(endpoint.displayAddress)
+          }}
+          onOpenEndpoint={(identity) => data.onOpenServiceEndpoint?.(identity)}
+          onLocateOwner={(owner) => data.onLocateManagedServiceOwner?.(owner)}
+          onEditPortConfiguration={startEditingMetadata}
+          onDismissConflict={() => {
+            if (session.runIdentity) data.onDismissPortConflict?.(session.runIdentity)
           }}
         />
-      ) : null}
-      <TerminalServiceRuntimeBar
-        identity={session.runIdentity ?? null}
-        endpoint={session.actualEndpoint ?? null}
-        portState={session.servicePortState ?? null}
-        conflict={session.portConflict ?? null}
-        onCopyEndpoint={async (endpoint) => {
-          if (data.onCopyServiceEndpoint) {
-            await data.onCopyServiceEndpoint(endpoint)
-            return
-          }
-
-          await window.navigator.clipboard?.writeText(endpoint.displayAddress)
-        }}
-        onOpenEndpoint={(identity) => data.onOpenServiceEndpoint?.(identity)}
-        onLocateOwner={(owner) => data.onLocateManagedServiceOwner?.(owner)}
-        onEditPortConfiguration={startEditingMetadata}
-        onDismissConflict={() => {
-          if (session.runIdentity) data.onDismissPortConflict?.(session.runIdentity)
-        }}
-      />
-      <div className="terminal-frame">
-        <TerminalViewport
-          key={session.sessionId ?? 'idle'}
-          block={block}
-          session={session}
-          focusRequestId={focusRequestId}
-          isResizeSuspended={isResizingBlock}
-          isInputDisabled={session.status !== 'running' || Boolean(session.isRecoveryPending)}
-          onViewIdentityStale={data.onViewIdentityStale}
-          onDimensionsChange={handleDimensionsChange}
-          onInput={data.onInput}
-          onPaste={data.onPaste}
-        />
-      </div>
+        <div className="terminal-frame">
+          <TerminalViewport
+            key={session.sessionId ?? 'idle'}
+            block={block}
+            session={session}
+            focusRequestId={focusRequestId}
+            isResizeSuspended={isResizingBlock}
+            isInputDisabled={session.status !== 'running' || Boolean(session.isRecoveryPending)}
+            onViewIdentityStale={data.onViewIdentityStale}
+            onDimensionsChange={handleDimensionsChange}
+            onInput={data.onInput}
+            onPaste={data.onPaste}
+          />
+        </div>
+        {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
+      </section>
       <Handle
         className="terminal-node__handle terminal-node__handle--output"
         type="source"
         position={Position.Right}
       />
-      {data.isSelected ? <WorkbenchNodeSelectionVeil /> : null}
-    </section>
+    </div>
   )
 })
 

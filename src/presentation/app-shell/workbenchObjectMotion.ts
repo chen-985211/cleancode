@@ -1,3 +1,5 @@
+import type { Edge } from '@xyflow/react'
+
 import { resolveNodeSize } from './resolveNodeSize'
 import type { WorkbenchFlowNode, WorkbenchObjectMotion, WorkbenchObjectMotionKind } from './types'
 
@@ -29,6 +31,26 @@ export function resolveWorkbenchCanvasDetailLevel(zoom: number): WorkbenchCanvas
     return 'full'
   }
   return zoom >= overviewCanvasZoom ? 'compact' : 'overview'
+}
+
+export function projectWorkbenchObjectMotionOntoEdges(
+  edges: Edge[],
+  nodes: readonly WorkbenchFlowNode[]
+): Edge[] {
+  const expandingNodeIds = new Set(
+    nodes.filter((node) => node.data.objectMotion?.kind === 'group-expand').map((node) => node.id)
+  )
+  if (expandingNodeIds.size === 0) return edges
+
+  return edges.map((edge) => {
+    const isMotionPending = expandingNodeIds.has(edge.source) || expandingNodeIds.has(edge.target)
+    if (!isMotionPending) return edge
+
+    const classNames = new Set(edge.className?.split(/\s+/).filter(Boolean) ?? [])
+    classNames.add('workbench-object-edge--motion-pending')
+
+    return { ...edge, className: [...classNames].join(' ') }
+  })
 }
 
 export function scheduleWorkbenchCreatedObjectFocus(

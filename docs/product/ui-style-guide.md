@@ -159,7 +159,7 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 
-组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或组合根元素上设置会改变 xterm、resize 或 React Flow 坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。
+组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或组合根元素上设置会改变 xterm、resize 或 React Flow 坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。
 
 画布缩放分级只减少次要描述、动作和地址等视觉噪声，不改变对象外框和空间占位，也不隐藏导航所需的名称、类型与关键状态。resize 与连接 handle 沿用原有命中和可见性规则；其他被降噪的控件也必须保留命中区域和可访问路径，并在节点悬停、键盘聚焦或选中时显露，不得用 `visibility: hidden` 或禁用指针事件改变既有操作契约。细节阈值属于统一 owner 的实现参数；消费者不得根据 zoom 另建近似阈值或改变持久化几何。
 

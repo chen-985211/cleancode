@@ -1,4 +1,5 @@
 import { act, render, waitFor } from '@testing-library/react'
+import type { Edge } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
@@ -92,6 +93,12 @@ describe('app shell terminal group object motion', () => {
     })
 
     await expectMemberMotion('group-expand')
+    expect(reactFlowProps.latest?.edges).toEqual([
+      expect.objectContaining({
+        id: 'backend-frontend',
+        className: expect.stringContaining('workbench-object-edge--motion-pending')
+      })
+    ])
   })
 
   it('keeps collapsed group members as presentation-only reverse-path exits', async () => {
@@ -117,6 +124,7 @@ describe('app shell terminal group object motion', () => {
 
 interface MockReactFlowProps {
   readonly children?: ReactNode
+  readonly edges: Edge[]
   readonly nodes: WorkbenchFlowNode[]
   readonly onInit?: (instance: MockReactFlowInstance) => void
 }
@@ -189,6 +197,13 @@ function createWorkbenchWithTerminalGroup(isCollapsed: boolean): WorkbenchSnapsh
     graph: {
       ...workbench.graph,
       blocks,
+      connections: [
+        {
+          id: 'backend-frontend',
+          sourceBlockId: 'backend-terminal',
+          targetBlockId: 'frontend-terminal'
+        }
+      ],
       terminalGroups: [
         {
           id: 'development-group',
