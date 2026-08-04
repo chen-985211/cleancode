@@ -152,7 +152,6 @@ export function useMinimapNodeFocus({
         center: targetCenter,
         intent: {
           canvasSize: readMinimapFocusCanvasSize(),
-          source: 'minimap',
           type: 'adaptive-focus'
         },
         type: 'center',
@@ -220,7 +219,6 @@ export function useMinimapNodeFocus({
           agent: node.data.agent,
           motion: {
             canvasSize: readMinimapFocusCanvasSize(),
-            source: 'minimap',
             type: 'adaptive-focus'
           },
           reactFlowInstance,
@@ -245,7 +243,6 @@ export function useMinimapNodeFocus({
           targetZoom = resolveMinimapTargetZoom(reactFlowInstance, nodeSize)
           motion = {
             canvasSize: readMinimapFocusCanvasSize(),
-            source: 'minimap',
             type: 'adaptive-focus'
           }
         }

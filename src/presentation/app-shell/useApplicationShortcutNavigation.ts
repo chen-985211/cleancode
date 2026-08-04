@@ -109,7 +109,6 @@ export function useApplicationShortcutNavigation({
         center,
         intent: {
           canvasSize: canvasSizeRef.current,
-          source: 'shortcut',
           type: 'adaptive-focus'
         },
         type: 'center',

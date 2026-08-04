@@ -29,9 +29,22 @@ describe('canvas viewport actions', () => {
     })
 
     expect(onUserAction).toHaveBeenCalledTimes(3)
-    expect(zoomIn).toHaveBeenCalledWith({ duration: 160 })
-    expect(zoomOut).toHaveBeenCalledWith({ duration: 160 })
-    expect(fitView).toHaveBeenCalledWith({ duration: 180, padding: 0.22 })
+    expect(zoomIn).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
+    expect(zoomOut).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
+    expect(fitView).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
+      padding: 0.22
+    })
   })
 
   it('keeps viewport controls functional without spatial motion when reduced motion is preferred', () => {

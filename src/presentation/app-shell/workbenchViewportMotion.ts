@@ -2,21 +2,16 @@ import type { Edge, FitViewOptions, ReactFlowInstance, Rect, Viewport } from '@x
 
 import type { WorkbenchFlowNode } from './types'
 
-type ViewportCommandType =
-  'center' | 'fit-bounds' | 'fit-view' | 'set-viewport' | 'zoom-in' | 'zoom-out'
-
 export type WorkbenchViewportMotionIntent =
   | { readonly type: 'instant' }
   | { readonly type: 'quick' }
-  | { readonly path?: 'continuous' | 'direct'; readonly type: 'spatial' }
+  | { readonly type: 'spatial' }
   | {
       readonly canvasSize: { readonly height: number; readonly width: number }
-      readonly source: 'minimap' | 'shortcut'
       readonly type: 'adaptive-focus'
     }
 
 interface ResolveWorkbenchViewportTransitionInput {
-  readonly commandType: ViewportCommandType
   readonly currentViewport?: Viewport
   readonly intent: WorkbenchViewportMotionIntent
   readonly reducedMotion: boolean
@@ -26,6 +21,7 @@ interface ResolveWorkbenchViewportTransitionInput {
 
 export interface WorkbenchViewportTransition {
   readonly duration: number
+  readonly ease?: (progress: number) => number
   readonly interpolate?: 'linear' | 'smooth'
 }
 
@@ -62,38 +58,48 @@ export type WorkbenchViewportCommand =
   | { readonly intent: WorkbenchViewportMotionIntent; readonly type: 'zoom-in' }
   | { readonly intent: WorkbenchViewportMotionIntent; readonly type: 'zoom-out' }
 
-const quickZoomDuration = 160
 const quickTransitionDuration = 180
 const spatialTransitionDuration = 220
-const durationPerPixel = 0.06
-const focusMotionBySource = {
-  minimap: { maximumDuration: 300, minimumDuration: 180 },
-  shortcut: { maximumDuration: 260, minimumDuration: 180 }
-} as const
+const adaptiveFocusMinimumDuration = spatialTransitionDuration
+const adaptiveFocusMaximumDuration = 300
+const durationPerViewport = 48
+const durationPerZoomStop = 20
+const maximumSmoothTravelInViewports = 1.5
+const fallbackCanvasSize = { height: 640, width: 960 }
 
-export function resolveWorkbenchViewportTransition({
-  commandType,
-  currentViewport,
-  intent,
-  reducedMotion,
-  targetCenter,
-  targetZoom
-}: ResolveWorkbenchViewportTransitionInput): WorkbenchViewportTransition {
+function easeOutCubic(progress: number): number {
+  return 1 - (1 - progress) ** 3
+}
+
+const continuousTransition = {
+  ease: easeOutCubic,
+  interpolate: 'smooth' as const
+}
+
+export function resolveWorkbenchViewportTransition(
+  input: ResolveWorkbenchViewportTransitionInput
+): WorkbenchViewportTransition {
+  const { currentViewport, intent, reducedMotion, targetCenter, targetZoom } = input
   if (intent.type === 'instant') {
     return { duration: 0 }
   }
 
-  if (intent.type === 'adaptive-focus') {
-    const interpolation = { interpolate: 'linear' as const }
-    if (reducedMotion) {
-      return { duration: 0, ...interpolation }
-    }
+  if (reducedMotion) {
+    return { duration: 0 }
+  }
 
+  if (intent.type === 'adaptive-focus') {
     if (!currentViewport || !targetCenter || targetZoom === undefined) {
       throw new TypeError('Adaptive viewport focus requires current and target geometry.')
     }
+    if (currentViewport.zoom <= 0 || targetZoom <= 0) {
+      throw new RangeError('Adaptive viewport focus zoom must be positive.')
+    }
 
-    const { canvasSize } = intent
+    const canvasSize =
+      intent.canvasSize.width > 0 && intent.canvasSize.height > 0
+        ? intent.canvasSize
+        : fallbackCanvasSize
     const targetViewport = {
       x: canvasSize.width / 2 - targetCenter.x * targetZoom,
       y: canvasSize.height / 2 - targetCenter.y * targetZoom
@@ -102,29 +108,29 @@ export function resolveWorkbenchViewportTransition({
       targetViewport.x - currentViewport.x,
       targetViewport.y - currentViewport.y
     )
-    const { maximumDuration, minimumDuration } = focusMotionBySource[intent.source]
+    const viewportDiagonal = Math.hypot(canvasSize.width, canvasSize.height)
+    const travelInViewports = travelDistance / viewportDiagonal
+    const zoomStops = Math.abs(Math.log2(targetZoom / currentViewport.zoom))
+    const duration = Math.min(
+      adaptiveFocusMaximumDuration,
+      adaptiveFocusMinimumDuration +
+        Math.round(travelInViewports * durationPerViewport + zoomStops * durationPerZoomStop)
+    )
 
     return {
-      duration: Math.min(
-        maximumDuration,
-        minimumDuration + Math.round(travelDistance * durationPerPixel)
-      ),
-      ...interpolation
+      duration,
+      ...continuousTransition,
+      ...(travelInViewports > maximumSmoothTravelInViewports
+        ? { interpolate: 'linear' as const }
+        : {})
     }
   }
 
-  const interpolate =
-    intent.type === 'spatial' && intent.path === 'direct' ? { interpolate: 'linear' as const } : {}
-  if (reducedMotion) {
-    return { duration: 0, ...interpolate }
-  }
-
   if (intent.type === 'quick') {
-    const isZoomCommand = commandType === 'zoom-in' || commandType === 'zoom-out'
-    return { duration: isZoomCommand ? quickZoomDuration : quickTransitionDuration }
+    return { duration: quickTransitionDuration, ...continuousTransition }
   }
 
-  return { duration: spatialTransitionDuration, ...interpolate }
+  return { duration: spatialTransitionDuration, ...continuousTransition }
 }
 
 export function transitionWorkbenchViewport(
@@ -169,7 +175,6 @@ export function resolveWorkbenchViewportCommandTransition(
   command: WorkbenchViewportCommand
 ): WorkbenchViewportTransition {
   return resolveWorkbenchViewportTransition({
-    commandType: command.type,
     intent: command.intent,
     reducedMotion: prefersReducedMotion(),
     ...(command.intent.type === 'adaptive-focus'

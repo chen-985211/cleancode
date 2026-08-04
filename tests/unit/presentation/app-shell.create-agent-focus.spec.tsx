@@ -115,7 +115,8 @@ describe('app shell create Agent focus', () => {
         },
         {
           duration: 220,
-          interpolate: 'linear'
+          ease: expect.any(Function),
+          interpolate: 'smooth'
         }
       )
     )

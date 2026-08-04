@@ -43,6 +43,8 @@ describe('Agent connection approval location', () => {
     ])
     expect(fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       nodes: [
         visibleNodes.get('agent:agent-1'),
         visibleNodes.get('group-source'),

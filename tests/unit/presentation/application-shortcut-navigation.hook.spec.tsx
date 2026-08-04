@@ -30,8 +30,9 @@ describe('application shortcut navigation hook', () => {
 
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
     expect(setCenter).toHaveBeenCalledWith(460, 140, {
-      duration: 191,
-      interpolate: 'linear',
+      duration: 228,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       zoom: 1
     })
     expect(activateWorkbenchNodeInput).toHaveBeenCalledWith(target)
@@ -52,8 +53,9 @@ describe('application shortcut navigation hook', () => {
 
     expect(selectWorkbenchNode).toHaveBeenCalledWith(target)
     expect(setCenter).toHaveBeenCalledWith(1_260, 740, {
-      duration: 233,
-      interpolate: 'linear',
+      duration: 257,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       zoom: 1
     })
   })
@@ -81,9 +83,9 @@ describe('application shortcut navigation hook', () => {
     ]
     expect(centerX).toBe(1_900)
     expect(centerY).toBe(1_200)
-    expect(options.duration).toBeGreaterThanOrEqual(180)
-    expect(options.duration).toBeLessThanOrEqual(260)
-    expect(options.interpolate).toBe('linear')
+    expect(options.duration).toBeGreaterThanOrEqual(220)
+    expect(options.duration).toBeLessThanOrEqual(300)
+    expect(options.interpolate).toBe('smooth')
     expect(options.zoom).toBeCloseTo(0.4352, 4)
   })
 
@@ -133,7 +135,6 @@ describe('application shortcut navigation hook', () => {
 
     expect(setCenter).toHaveBeenCalledWith(660, 140, {
       duration: 0,
-      interpolate: 'linear',
       zoom: 1
     })
   })

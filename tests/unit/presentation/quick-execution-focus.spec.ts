@@ -35,6 +35,8 @@ describe('quick execution canvas focus', () => {
     expect(focusQuickExecutionTargetInCanvas({ instance, target })).toBe(true)
     expect(fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       maxZoom: 1,
       nodes: expectedNodeIds.map((nodeId) => expect.objectContaining({ id: nodeId })),
       padding: 0.24

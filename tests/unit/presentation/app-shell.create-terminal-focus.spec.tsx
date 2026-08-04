@@ -119,7 +119,8 @@ describe('app shell create terminal focus', () => {
         { x: 0, y: 0, zoom: 1 },
         {
           duration: 220,
-          interpolate: 'linear'
+          ease: expect.any(Function),
+          interpolate: 'smooth'
         }
       )
     )
@@ -158,7 +159,9 @@ describe('app shell create terminal focus', () => {
     await waitFor(() =>
       expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
         padding: 0.22,
-        duration: 180
+        duration: 180,
+        ease: expect.any(Function),
+        interpolate: 'smooth'
       })
     )
   })
@@ -187,11 +190,21 @@ describe('app shell create terminal focus', () => {
     fireEvent.keyDown(document, { key: '[', ...primaryModifier })
     fireEvent.keyDown(document, { key: '\\', ...primaryModifier })
 
-    expect(reactFlowSpies.zoomIn).toHaveBeenCalledWith({ duration: 160 })
-    expect(reactFlowSpies.zoomOut).toHaveBeenCalledWith({ duration: 160 })
+    expect(reactFlowSpies.zoomIn).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
+    expect(reactFlowSpies.zoomOut).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
     expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
       padding: 0.22,
-      duration: 180
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
     })
   })
 

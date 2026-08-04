@@ -27,7 +27,9 @@ describe('focus Agent console in canvas', () => {
     expect(setHoveredTerminalBlockId).toHaveBeenCalledWith(null)
     expect(setCenter).toHaveBeenCalledWith(1_260, 470, {
       zoom: 0.9,
-      duration: 220
+      duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
     })
   })
 })

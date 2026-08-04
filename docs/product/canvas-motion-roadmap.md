@@ -81,7 +81,7 @@ flowchart LR
 | 阶段 | 名称                   | 核心结果                                           | 状态     |
 | ---- | ---------------------- | -------------------------------------------------- | -------- |
 | 1    | 统一相机运动入口       | 所有程序化 viewport helper 经单一 Presentation API | 已完成   |
-| 2    | 连续空间路径与统一节奏 | 聚焦、适应视图和 zoom 使用一致的路径与收敛曲线     | 尚未开始 |
+| 2    | 连续空间路径与统一节奏 | 聚焦、适应视图和 zoom 使用一致的路径与收敛曲线     | 已完成   |
 | 3    | 可打断与速度连续       | 新输入从实时值接管，目标改变时保留连续速度         | 尚未开始 |
 | 4    | 空间对象反馈与缩放分级 | 对象抬升、展开收起和细节层级与相机语言一致         | 尚未开始 |
 
@@ -147,7 +147,7 @@ flowchart LR
 
 - `workbenchViewportMotion.ts` 成为根级 Presentation 程序化 viewport motion owner，集中维护 `instant`、`quick`、`spatial` 和 `adaptive-focus` intent、当前节奏、距离上限、插值路径与 reduced-motion。
 - center、set viewport、fit view、fit bounds、zoom in 和 zoom out 统一通过 `transitionWorkbenchViewport` 转发；Presentation 其余模块不再直接调用 React Flow viewport helper。
-- 方向快捷键和小地图定位继续使用按屏幕距离限制在 `180–260ms`、`180–300ms` 的自适应过渡；创建显露、快捷执行、审批与布局适应视图保持原有最终 viewport 和节奏。
+- 第一阶段完成时，方向快捷键和小地图定位继续使用按屏幕距离限制在 `180–260ms`、`180–300ms` 的自适应过渡；创建显露、快捷执行、审批与布局适应视图保持当时的最终 viewport 和节奏。
 - 工作区 viewport 恢复与小地图 viewport 拖动继续声明为 `instant`，不会把持久化恢复或直接操控伪装成程序动画。
 - JavaScript 驱动的画布控制、空间显露和自适应定位统一尊重 `prefers-reduced-motion`；选择、最终定位和输入激活结果不被删除。
 - Unit 参数矩阵覆盖 intent、命令类型、距离上下界、reduced-motion 和全部 React Flow viewport command 转发；既有方向导航、小地图、创建聚焦、快捷执行、审批和布局聚焦回归继续通过。
@@ -170,6 +170,18 @@ flowchart LR
 - 相同 motion intent 在不同入口具有一致节奏。
 - 远距离定位保留局部上下文，不产生突兀跳变或过度缩远。
 - reduced motion、最终 viewport、选择与焦点契约保持不变。
+
+### 第二阶段完成证据
+
+第二阶段于 2026-08-04 完成：
+
+- 统一 owner 建立程序化画布 motion token：`quick` 为 `180ms`，`spatial` 为 `220ms`，`adaptive-focus` 根据运动幅度限制在 `220–300ms`；小地图与方向快捷键不再维护无产品理由的不同时间范围。
+- 所有非即时程序化相机运动使用同一条快速启动、柔和停止的 cubic ease；常规路径显式使用 React Flow 基于 `d3-interpolateZoom` 的 `smooth` 空间插值。
+- `adaptive-focus` 同时使用目标 viewport 的屏幕位移和 `log2` zoom 级差计算节奏；时长在极端距离下保持有界，不随画布坐标无限增长。
+- 当目标超过 `1.5` 个当前画布对角线时，路径回退为 `linear`，避免 `smooth` 在极远移动中产生不受控的中途缩远；最终 viewport、zoom 安全策略和目标几何不变。
+- 创建显露不再由消费者指定独立的 `direct` 路径；路径、曲线和时长差异全部由统一 owner 决定。
+- `instant` 与 reduced motion 继续使用零时长且不附带空间插值；选择、焦点和输入激活结果保持原有契约。
+- 参数矩阵覆盖 quick、spatial、adaptive-focus、缩放级差、平滑路径阈值、极远上限、未测量画布回退和全部 React Flow command 转发；目标消费者回归继续通过。
 
 ## 第三阶段：可打断与速度连续
 
@@ -222,7 +234,7 @@ flowchart LR
 - React Flow 基于 D3 transition 的 Promise 在被新过渡打断时可能无法按旧调用方预期完成；第一阶段只统一入口，第三阶段再引入显式取消身份。
 - 在 macOS 触控板已有惯性事件上叠加自定义惯性会产生双重滑动；路线不为直接操控追加惯性。
 - 每帧把 viewport 写入 React 状态可能影响终端输出和画布节点渲染；自定义 spring 必须先用性能 trace 证明预算。
-- `smooth` 空间插值可能在远距离移动时过度缩远；第二阶段必须用不同距离、缩放和节点尺寸建立比较矩阵。
+- `smooth` 空间插值在远距离移动时可能过度缩远；第二阶段已用距离与缩放矩阵建立 `1.5` 个画布对角线的线性回退，后续真实使用反馈如需调参仍只修改统一 owner。
 - 任一阶段都可以回退到前一阶段的统一入口与当前节奏，不回滚 BlockGraph 数据或用户布局。
 
 ## 维护规则

@@ -10,56 +10,67 @@ describe('workbench viewport motion', () => {
   it.each([
     {
       commandType: 'zoom-in' as const,
-      expected: { duration: 160 },
+      expectedDuration: 180,
+      expectedInterpolation: 'smooth' as const,
       intent: { type: 'quick' as const }
     },
     {
       commandType: 'fit-view' as const,
-      expected: { duration: 180 },
+      expectedDuration: 180,
+      expectedInterpolation: 'smooth' as const,
       intent: { type: 'quick' as const }
     },
     {
       commandType: 'center' as const,
-      expected: { duration: 220 },
+      expectedDuration: 220,
+      expectedInterpolation: 'smooth' as const,
       intent: { type: 'spatial' as const }
     },
     {
       commandType: 'set-viewport' as const,
-      expected: { duration: 220, interpolate: 'linear' as const },
-      intent: { path: 'direct' as const, type: 'spatial' as const }
-    },
-    {
-      commandType: 'set-viewport' as const,
-      expected: { duration: 0 },
-      intent: { type: 'instant' as const }
+      expectedDuration: 220,
+      expectedInterpolation: 'smooth' as const,
+      intent: { type: 'spatial' as const }
     }
   ])('maps $intent.type $commandType motion to one shared rhythm', (input) => {
+    const transition = resolveWorkbenchViewportTransition({
+      intent: input.intent,
+      reducedMotion: false
+    })
+
+    expect(transition).toMatchObject({
+      duration: input.expectedDuration,
+      interpolate: input.expectedInterpolation
+    })
+    expect(transition.ease).toEqual(expect.any(Function))
+    expect(transition.ease?.(0)).toBe(0)
+    expect(transition.ease?.(0.5)).toBeCloseTo(0.875)
+    expect(transition.ease?.(1)).toBe(1)
+  })
+
+  it('keeps instant and reduced-motion transitions free from spatial interpolation', () => {
     expect(
       resolveWorkbenchViewportTransition({
-        commandType: input.commandType,
-        intent: input.intent,
+        intent: { type: 'instant' },
         reducedMotion: false
       })
-    ).toEqual(input.expected)
-  })
-
-  it('removes non-essential spatial movement when reduced motion is preferred', () => {
+    ).toEqual({ duration: 0 })
     expect(
       resolveWorkbenchViewportTransition({
-        commandType: 'set-viewport',
-        intent: { path: 'direct', type: 'spatial' },
+        intent: {
+          canvasSize: { height: 640, width: 960 },
+          type: 'adaptive-focus'
+        },
         reducedMotion: true
       })
-    ).toEqual({ duration: 0, interpolate: 'linear' })
+    ).toEqual({ duration: 0 })
   })
 
-  it('gives distant focus targets more time without allowing unbounded motion', () => {
+  it('uses smooth spatial travel until an extreme target would over-zoom the canvas', () => {
     const sharedInput = {
-      commandType: 'center' as const,
       currentViewport: { x: 0, y: 0, zoom: 1 },
       intent: {
         canvasSize: { height: 640, width: 960 },
-        source: 'minimap' as const,
         type: 'adaptive-focus' as const
       },
       reducedMotion: false,
@@ -79,10 +90,50 @@ describe('workbench viewport motion', () => {
       targetCenter: { x: 40_480, y: 30_320 }
     })
 
-    expect(nearby).toEqual({ duration: 180, interpolate: 'linear' })
+    expect(nearby).toMatchObject({ duration: 220, interpolate: 'smooth' })
     expect(distant.duration).toBeGreaterThan(nearby.duration)
     expect(distant.duration).toBeLessThanOrEqual(300)
-    expect(extremelyDistant).toEqual({ duration: 300, interpolate: 'linear' })
+    expect(distant.interpolate).toBe('smooth')
+    expect(extremelyDistant).toMatchObject({ duration: 300, interpolate: 'linear' })
+  })
+
+  it('accounts for zoom change independently from screen-space travel', () => {
+    const sharedInput = {
+      currentViewport: { x: 0, y: 0, zoom: 1 },
+      intent: {
+        canvasSize: { height: 640, width: 960 },
+        type: 'adaptive-focus' as const
+      },
+      reducedMotion: false
+    }
+    const translationOnly = resolveWorkbenchViewportTransition({
+      ...sharedInput,
+      targetCenter: { x: 880, y: 620 },
+      targetZoom: 1
+    })
+    const translationAndZoom = resolveWorkbenchViewportTransition({
+      ...sharedInput,
+      targetCenter: { x: 1_760, y: 1_240 },
+      targetZoom: 0.5
+    })
+
+    expect(translationAndZoom.duration).toBeGreaterThan(translationOnly.duration)
+    expect(translationAndZoom.interpolate).toBe('smooth')
+  })
+
+  it('uses a stable fallback before the canvas has reported a positive size', () => {
+    expect(
+      resolveWorkbenchViewportTransition({
+        currentViewport: { x: 0, y: 0, zoom: 1 },
+        intent: {
+          canvasSize: { height: 0, width: 0 },
+          type: 'adaptive-focus'
+        },
+        reducedMotion: false,
+        targetCenter: { x: 480, y: 320 },
+        targetZoom: 1
+      })
+    ).toMatchObject({ duration: 220, interpolate: 'smooth' })
   })
 
   it('forwards every viewport command through the shared transition options', async () => {
@@ -136,19 +187,39 @@ describe('workbench viewport motion', () => {
       type: 'zoom-out'
     })
 
-    expect(setCenter).toHaveBeenCalledWith(120, 80, { duration: 220, zoom: 0.9 })
+    expect(setCenter).toHaveBeenCalledWith(120, 80, {
+      duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
+      zoom: 0.9
+    })
     expect(setViewport).toHaveBeenCalledWith({ x: 10, y: 20, zoom: 0.8 }, { duration: 0 })
     expect(fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       maxZoom: 1,
       nodes: [node],
       padding: 0.24
     })
     expect(fitBounds).toHaveBeenCalledWith(
       { height: 300, width: 400, x: 50, y: 60 },
-      { duration: 220, padding: 0.24 }
+      {
+        duration: 220,
+        ease: expect.any(Function),
+        interpolate: 'smooth',
+        padding: 0.24
+      }
     )
-    expect(zoomIn).toHaveBeenCalledWith({ duration: 160 })
-    expect(zoomOut).toHaveBeenCalledWith({ duration: 160 })
+    expect(zoomIn).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
+    expect(zoomOut).toHaveBeenCalledWith({
+      duration: 180,
+      ease: expect.any(Function),
+      interpolate: 'smooth'
+    })
   })
 })

@@ -29,7 +29,7 @@ export function revealCreatedWorkbenchNode({
   safeViewport
 }: RevealCreatedWorkbenchNodeInput): number {
   const command = {
-    intent: { path: 'direct', type: 'spatial' },
+    intent: { type: 'spatial' },
     type: 'set-viewport',
     viewport: resolveWorkbenchNodeCreationViewport({
       canvasSize,

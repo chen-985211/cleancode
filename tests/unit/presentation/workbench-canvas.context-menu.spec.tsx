@@ -153,6 +153,8 @@ describe('workbench canvas object context menu', () => {
 
     expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       maxZoom: 1,
       nodes: [
         expect.objectContaining({ id: 'workflow-a' }),

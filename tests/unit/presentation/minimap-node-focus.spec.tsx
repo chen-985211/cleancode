@@ -33,6 +33,7 @@ describe('minimap node focus', () => {
     expect(setCenter).toHaveBeenCalledWith(4_200, 3_150, {
       zoom: 1,
       duration: 300,
+      ease: expect.any(Function),
       interpolate: 'linear'
     })
   })
@@ -84,7 +85,7 @@ describe('minimap node focus', () => {
     expect(options).toMatchObject({
       interpolate: 'linear'
     })
-    expect(options.duration).toBeGreaterThanOrEqual(180)
+    expect(options.duration).toBeGreaterThanOrEqual(220)
     expect(options.duration).toBeLessThanOrEqual(300)
     expect(options.zoom).toBeCloseTo(0.4352, 4)
   })
@@ -119,7 +120,6 @@ describe('minimap node focus', () => {
 
     expect(setCenter).toHaveBeenCalledWith(4_200, 3_150, {
       duration: 0,
-      interpolate: 'linear',
       zoom: 1
     })
   })

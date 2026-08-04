@@ -49,6 +49,8 @@ describe('workbench layout focus', () => {
     await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
     expect(fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       nodes: [agentNode, groupNode],
       padding: 0.24
     })
@@ -104,6 +106,8 @@ describe('workbench layout focus', () => {
     await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
     expect(fitView).toHaveBeenCalledWith({
       duration: 220,
+      ease: expect.any(Function),
+      interpolate: 'smooth',
       nodes: [agentNode, userPositionedGroupNode],
       padding: 0.24
     })
@@ -181,7 +185,12 @@ describe('workbench layout focus', () => {
     await waitFor(() => expect(fitBounds).toHaveBeenCalledOnce())
     expect(fitBounds).toHaveBeenCalledWith(
       { x: 40, y: 40, width: 1_380, height: 1_066 },
-      { duration: 220, padding: 0.24 }
+      {
+        duration: 220,
+        ease: expect.any(Function),
+        interpolate: 'smooth',
+        padding: 0.24
+      }
     )
     expect(fitView).not.toHaveBeenCalled()
     expect(onHandled).toHaveBeenCalledWith('workflow-call-1')
