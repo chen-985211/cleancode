@@ -62,6 +62,7 @@ import { useAppShellBlockActions } from './useAppShellBlockActions'
 import { useTerminalLaunchCommandRequest } from './useTerminalLaunchCommandRequest'
 import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
+import { useCanvasSelectionViewport } from './useCanvasSelectionViewport'
 import { ProjectSidebarToggle } from './ProjectSidebarToggle'
 
 type AppShellProps = { readonly notifications?: AppNotificationController }
@@ -334,31 +335,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     setSelectedTerminalGroupId,
     terminateTerminalSession
   })
-  const workbenchNodeSelection = useWorkbenchNodeSelection({
-    isTerminalGroupSelectionMode,
-    selectTerminalBlock,
-    selectTerminalGroup,
-    setNodes: nodeStore.setNodes,
-    setSelectedAgentId,
-    setSelectedTerminalBlockIds,
-    setSelectedTerminalGroupId
-  })
-  const selectedWorkbenchNodeId = selectedAgentId
-    ? toAgentFlowNodeId(selectedAgentId)
-    : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
-  const shortcutNavigation = useApplicationShortcutNavigation({
-    activateWorkbenchNodeInput: activateWorkbenchNodeInputFromShortcut,
-    canvasSizeRef,
-    currentWorkbench,
-    getNodes: nodeStore.getNodes,
-    onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
-    reactFlowInstanceRef,
-    revealProjectSidebar,
-    selectedNodeId: selectedWorkbenchNodeId,
-    selectWorkbenchNode: workbenchNodeSelection.selectWorkbenchNodeFromShortcut,
-    workbenches
-  })
-  const { selectTerminalFromTitle } = workbenchNodeSelection
   const { clearTerminalGroupDropPreview, moveWorkbenchNode, previewTerminalGroupDrop } =
     useTerminalGroupDragActions({
       currentWorkbench,
@@ -390,6 +366,38 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     setCurrentGraph,
     terminalWorkflowBuildMode
   })
+  const selectionViewport = useCanvasSelectionViewport({
+    canvasSizeRef,
+    onUserAction: cancelLayoutFocus,
+    reactFlowInstanceRef
+  })
+  const workbenchNodeSelection = useWorkbenchNodeSelection({
+    focusSelectedWorkbenchNode: selectionViewport.focusSelectedWorkbenchNode,
+    isTerminalGroupSelectionMode,
+    returnToGlobalCanvasView: selectionViewport.returnToGlobalCanvasView,
+    selectTerminalBlock,
+    selectTerminalGroup,
+    setNodes: nodeStore.setNodes,
+    setSelectedAgentId,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  })
+  const selectedWorkbenchNodeId = selectedAgentId
+    ? toAgentFlowNodeId(selectedAgentId)
+    : (selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null)
+  const shortcutNavigation = useApplicationShortcutNavigation({
+    activateWorkbenchNodeInput: activateWorkbenchNodeInputFromShortcut,
+    canvasSizeRef,
+    currentWorkbench,
+    getNodes: nodeStore.getNodes,
+    onSelectWorkspace: branchWorkspaceActions.selectWorkspace,
+    reactFlowInstanceRef,
+    revealProjectSidebar,
+    selectedNodeId: selectedWorkbenchNodeId,
+    selectWorkbenchNode: workbenchNodeSelection.selectWorkbenchNodeFromShortcut,
+    workbenches
+  })
+  const { selectTerminalFromTitle } = workbenchNodeSelection
   const { fitCanvas, zoomCanvasIn, zoomCanvasOut } = useCanvasViewportActions({
     onUserAction: cancelLayoutFocus,
     reactFlowInstanceRef
@@ -404,7 +412,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
       }),
     [currentWorkbench?.agents, terminalBlocksById, terminalGroupsById]
   )
-
   const resizeTerminalBlock = useTerminalBlockResizeAction({
     currentWorkbench,
     currentWorkspace,
@@ -434,7 +441,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
       }),
     [currentWorkbench, currentWorkspace, setCurrentGraph]
   )
-
   const terminalFlowNodeHandlers = useMemo(
     () => ({
       onStart: startTerminal,
