@@ -59,6 +59,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private isResizeSuspended = false
   private hasDeferredResizeFit = false
   private isOpened = false
+  private isRendererActivationSettled = false
   private isDisposed = false
   private isRestoring = true
   private isWriteInFlight = false
@@ -112,6 +113,7 @@ class XtermTerminalSurface implements TerminalSurface {
 
     this.element = attachment.element
     this.element.dataset.terminalRenderer = this.rendererController.state
+    this.element.dataset.terminalRendererReady = String(this.isRendererActivationSettled)
     this.element.dataset.terminalSourceTheme = this.terminalSourceTheme
     this.onDimensionsChange = attachment.onDimensionsChange
     this.onInput = attachment.onInput
@@ -125,14 +127,19 @@ class XtermTerminalSurface implements TerminalSurface {
     if (!this.isOpened) {
       this.terminal.open(attachment.element)
       const terminal = this.terminal
-      void this.rendererController.activate({
-        get rows() {
-          return terminal.rows
-        },
-        loadAddon: (addon) =>
-          terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
-        refresh: (start, end) => terminal.refresh(start, end)
-      })
+      void this.rendererController
+        .activate({
+          get rows() {
+            return terminal.rows
+          },
+          loadAddon: (addon) =>
+            terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
+          refresh: (start, end) => terminal.refresh(start, end)
+        })
+        .finally(() => {
+          this.isRendererActivationSettled = true
+          if (this.element) this.element.dataset.terminalRendererReady = 'true'
+        })
       installTerminalSelectionCopy(this.terminal, { onOpenSearch: () => this.onOpenSearch() })
       this.dataSubscription = this.terminal.onData((input) => this.onInput(input))
       this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>

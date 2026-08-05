@@ -74,6 +74,23 @@ describe('workbench viewport motion controller', () => {
     await expect(delayedCompletion).resolves.toBe(false)
   })
 
+  it('commits the final target when the display stops delivering animation frames', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const instance = createViewportInstance()
+    const completion = controller.transition(instance.value, centerCommand(1_480))
+
+    frames.step()
+    const presentationBeforeSuspension = instance.viewport
+    frames.elapseWithoutFrames(1_200)
+
+    expect(presentationBeforeSuspension).not.toEqual({ x: -1_000, y: 0, zoom: 1 })
+    expect(instance.viewport).toEqual({ x: -1_000, y: 0, zoom: 1 })
+    await expect(completion).resolves.toBe(true)
+    expect(frames.pendingCount).toBe(0)
+    expect(frames.pendingTimeoutCount).toBe(0)
+  })
+
   it('uses the same anchored zoom curve at every world position', async () => {
     const canvasSize = { height: 640, width: 960 }
     const originFrames = new TestFrameScheduler()
@@ -300,6 +317,7 @@ describe('workbench viewport motion controller', () => {
     await expect(completion).resolves.toBe(false)
     expect(instance.viewport).toEqual(presentationViewport)
     expect(frames.pendingCount).toBe(0)
+    expect(frames.pendingTimeoutCount).toBe(0)
   })
 
   it('lets an instant workspace restore supersede a spring without a late completion', async () => {
@@ -319,6 +337,7 @@ describe('workbench viewport motion controller', () => {
     await expect(restoreCompletion).resolves.toBe(true)
     expect(instance.viewport).toEqual({ x: -240, y: 80, zoom: 0.75 })
     expect(frames.pendingCount).toBe(0)
+    expect(frames.pendingTimeoutCount).toBe(0)
   })
 
   it('rejects a stale completion when a newer instant target starts before apply resolves', async () => {
@@ -425,7 +444,12 @@ function createDeferredViewportInstance(): {
 
 class TestFrameScheduler {
   private callbacks = new Map<number, FrameRequestCallback>()
+  private timeoutCallbacks = new Map<
+    number,
+    { readonly callback: () => void; readonly dueAt: number }
+  >()
   private nextFrameId = 1
+  private nextTimeoutId = 1
   private timestamp = 0
   maximumPendingCount = 0
 
@@ -435,6 +459,10 @@ class TestFrameScheduler {
 
   readonly now = (): number => this.timestamp
 
+  readonly cancelTimeout = (timeoutId: number): void => {
+    this.timeoutCallbacks.delete(timeoutId)
+  }
+
   readonly requestFrame = (callback: FrameRequestCallback): number => {
     const frameId = this.nextFrameId
     this.nextFrameId += 1
@@ -443,8 +471,27 @@ class TestFrameScheduler {
     return frameId
   }
 
+  readonly requestTimeout = (callback: () => void, delayMilliseconds: number): number => {
+    const timeoutId = this.nextTimeoutId
+    this.nextTimeoutId += 1
+    this.timeoutCallbacks.set(timeoutId, {
+      callback,
+      dueAt: this.timestamp + delayMilliseconds
+    })
+    return timeoutId
+  }
+
   get pendingCount(): number {
     return this.callbacks.size
+  }
+
+  get pendingTimeoutCount(): number {
+    return this.timeoutCallbacks.size
+  }
+
+  elapseWithoutFrames(milliseconds: number): void {
+    this.timestamp += milliseconds
+    this.runDueTimeouts()
   }
 
   step(milliseconds = 1000 / 60): void {
@@ -452,6 +499,7 @@ class TestFrameScheduler {
     const callbacks = [...this.callbacks.values()]
     this.callbacks.clear()
     callbacks.forEach((callback) => callback(this.timestamp))
+    this.runDueTimeouts()
   }
 
   finish(): void {
@@ -460,6 +508,16 @@ class TestFrameScheduler {
     }
     if (this.pendingCount > 0) {
       throw new Error('Viewport spring did not settle within the test frame budget.')
+    }
+  }
+
+  private runDueTimeouts(): void {
+    const dueTimeouts = [...this.timeoutCallbacks.entries()].filter(
+      ([, timeout]) => timeout.dueAt <= this.timestamp
+    )
+    for (const [timeoutId, timeout] of dueTimeouts) {
+      this.timeoutCallbacks.delete(timeoutId)
+      timeout.callback()
     }
   }
 }

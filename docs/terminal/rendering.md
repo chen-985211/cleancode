@@ -201,7 +201,7 @@ xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model �
 1. addon 加载失败时直接保持 DOM renderer，不中断 attach、输入或恢复。
 2. WebGL context loss 时立即 dispose addon、把 renderer 状态切回 `dom`，并 refresh 当前行区间。
 3. 降级不得 reset xterm、重新 attach view、替换 session、重放 snapshot 或清空搜索和粘贴状态。
-4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，registry 诊断同时统计两类 surface，便于测试和故障定位。
+4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，并在异步 addon 激活完成后把 `data-terminal-renderer-ready` 置为 `true`；registry 诊断同时统计两类 surface，便于测试和故障定位。
 
 终端搜索是 xterm buffer 上的局部投影。snapshot restore 会 reset 可见终端，因此 restore 完成后必须用当前查询重新建立匹配；关闭搜索则清除 decorations 并恢复终端焦点。粘贴进度、确认和链接反馈是 React 局部覆盖层，不得改变 xterm 网格或拦截无关终端输入。
 

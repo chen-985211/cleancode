@@ -31,6 +31,13 @@ import {
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
 } from './workbenchViewportSpring'
+import {
+  browserViewportMotionFrameScheduler,
+  prefersReducedMotion,
+  type WorkbenchViewportMotionFrameScheduler
+} from './workbenchViewportMotionEnvironment'
+
+export { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
 
 export type WorkbenchViewportMotionIntent =
   | { readonly type: 'instant' }
@@ -51,12 +58,6 @@ interface ResolveWorkbenchViewportTransitionInput {
 export interface WorkbenchViewportTransition {
   readonly dampingRatio?: 1
   readonly response?: number
-}
-
-export interface WorkbenchViewportMotionFrameScheduler {
-  readonly cancelFrame: (frameId: number) => void
-  readonly now: () => number
-  readonly requestFrame: (callback: FrameRequestCallback) => number
 }
 
 export interface WorkbenchViewportMotionCompletion {
@@ -255,6 +256,7 @@ interface ActiveViewportMotion {
   response: number
   target: Viewport
   targetCamera: WorkbenchViewportCamera
+  timeoutId: number | null
   zoomStops: CriticalSpringAxis
 }
 
@@ -276,13 +278,22 @@ export function createWorkbenchViewportMotionController(
   } | null = null
   let nextRequestId = 1
 
+  const cancelMotionSchedule = (motion: ActiveViewportMotion): void => {
+    if (motion.frameId !== null) {
+      scheduler.cancelFrame(motion.frameId)
+      motion.frameId = null
+    }
+    if (motion.timeoutId !== null) {
+      scheduler.cancelTimeout(motion.timeoutId)
+      motion.timeoutId = null
+    }
+  }
+
   const cancelActiveMotion = (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>): void => {
     if (!activeMotion || (instance && activeMotion.instance !== instance)) {
       return
     }
-    if (activeMotion.frameId !== null) {
-      scheduler.cancelFrame(activeMotion.frameId)
-    }
+    cancelMotionSchedule(activeMotion)
     activeMotion.resolve(false)
     activeMotion = null
   }
@@ -367,6 +378,7 @@ export function createWorkbenchViewportMotionController(
     if (activeMotion?.requestId !== motion.requestId) {
       return
     }
+    cancelMotionSchedule(motion)
     activeMotion = null
     void applyPresentedViewport(motion.instance, motion.target).then((applied) =>
       motion.resolve(
@@ -376,6 +388,17 @@ export function createWorkbenchViewportMotionController(
         })
       )
     )
+  }
+
+  const scheduleMotionDeadline = (motion: ActiveViewportMotion): void => {
+    motion.timeoutId = scheduler.requestTimeout(() => {
+      const currentMotion = activeMotion
+      if (!currentMotion || currentMotion.requestId !== motion.requestId) {
+        return
+      }
+      currentMotion.timeoutId = null
+      finishMotion(currentMotion)
+    }, maximumSpringRuntime)
   }
 
   const advanceMotion = (timestamp: number): void => {
@@ -463,6 +486,7 @@ export function createWorkbenchViewportMotionController(
 
     return new Promise<boolean>((resolve) => {
       if (activeMotion?.instance === instance) {
+        cancelMotionSchedule(activeMotion)
         const camera = resolveWorkbenchViewportCamera(currentViewport, canvasSize)
         const cameraVelocity = resolveWorkbenchViewportCameraVelocity(
           currentViewport,
@@ -489,6 +513,7 @@ export function createWorkbenchViewportMotionController(
         }
         latestRequest = { instance, requestId }
         scheduleNextFrame()
+        scheduleMotionDeadline(activeMotion)
         return
       }
 
@@ -513,20 +538,20 @@ export function createWorkbenchViewportMotionController(
         response: springResponse,
         target,
         targetCamera,
+        timeoutId: null,
         zoomStops: { value: camera.zoomStops, velocity: 0 }
       }
       scheduleNextFrame()
+      scheduleMotionDeadline(activeMotion)
     })
   }
 
   return { cancel, subscribe, subscribePresentation, transition }
 }
 
-const browserViewportMotionController = createWorkbenchViewportMotionController({
-  cancelFrame: (frameId) => window.cancelAnimationFrame(frameId),
-  now: () => window.performance.now(),
-  requestFrame: (callback) => window.requestAnimationFrame(callback)
-})
+const browserViewportMotionController = createWorkbenchViewportMotionController(
+  browserViewportMotionFrameScheduler
+)
 
 export function transitionWorkbenchViewport(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
@@ -669,12 +694,4 @@ async function applyViewport(
   } catch {
     return false
   }
-}
-
-export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
 }

@@ -250,6 +250,19 @@ describe('terminal viewport daily interactions', () => {
     )
   })
 
+  it('reports when asynchronous renderer activation has settled', async () => {
+    const workspace = renderViewport()
+
+    await installedTerminal()
+
+    await waitFor(() =>
+      expect(workspace.container.querySelector('.terminal-viewport')).toHaveAttribute(
+        'data-terminal-renderer-ready',
+        'true'
+      )
+    )
+  })
+
   it('confirms risky text and file paths while refusing image bytes', async () => {
     const onPaste = vi.fn(async () => undefined)
     const workspace = renderViewport(onPaste)
