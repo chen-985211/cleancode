@@ -77,7 +77,10 @@ describe('workbench canvas object context menu', () => {
     expect(screen.getByRole('menu', { name: '终端操作' })).toBeInTheDocument()
     expect(contextSelectedNodeIds()).toEqual(['standalone'])
 
-    fireEvent.click(screen.getByRole('menuitem', { name: '收藏终端' }))
+    const favoriteItem = screen.getByRole('menuitem', { name: '收藏终端' })
+    expect(favoriteItem.querySelector('svg')).not.toHaveAttribute('fill', 'currentColor')
+
+    fireEvent.click(favoriteItem)
 
     expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['standalone'])
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
@@ -105,8 +108,8 @@ describe('workbench canvas object context menu', () => {
     openNodeContextMenu('workflow-b')
     const removeItem = screen.getByRole('menuitem', { name: '移除流程' })
 
-    expect(removeItem).toHaveClass('canvas-object-context-menu__item')
-    expect(removeItem).not.toHaveClass('canvas-object-context-menu__item--danger')
+    expect(removeItem).toHaveClass('canvas-node-menu__item')
+    expect(removeItem).not.toHaveClass('canvas-node-menu__item--danger')
     fireEvent.click(removeItem)
 
     expect(onDeleteTerminalScope).toHaveBeenCalledWith({

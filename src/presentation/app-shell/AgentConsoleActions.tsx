@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
 
@@ -227,9 +228,8 @@ export function AgentConsoleActions({
       </div>
       {mode === 'menu'
         ? createPortal(
-            <div
+            <CanvasNodeMenu
               id={menuId}
-              className="agent-console-actions__menu nodrag"
               role="menu"
               aria-label={t('agent.actions', { agentName: agent.name })}
               data-side={menuPosition?.side ?? 'bottom'}
@@ -246,7 +246,7 @@ export function AgentConsoleActions({
                 visibility: menuPosition ? 'visible' : 'hidden'
               }}
             >
-              <button
+              <CanvasNodeMenuItem
                 type="button"
                 role="menuitem"
                 tabIndex={activeMenuItem === 0 ? 0 : -1}
@@ -255,10 +255,8 @@ export function AgentConsoleActions({
               >
                 <Pencil size={14} aria-hidden="true" />
                 {t('agent.rename')}
-              </button>
-              <div className="agent-console-actions__menu-separator" role="separator" />
-              <button
-                className="agent-console-actions__menu-item--danger"
+              </CanvasNodeMenuItem>
+              <CanvasNodeMenuItem
                 type="button"
                 role="menuitem"
                 tabIndex={activeMenuItem === 1 ? 0 : -1}
@@ -267,8 +265,8 @@ export function AgentConsoleActions({
               >
                 <Trash2 size={14} aria-hidden="true" />
                 {t('agent.remove')}
-              </button>
-            </div>,
+              </CanvasNodeMenuItem>
+            </CanvasNodeMenu>,
             document.body
           )
         : null}

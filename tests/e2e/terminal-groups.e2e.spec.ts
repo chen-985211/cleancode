@@ -57,7 +57,11 @@ describe('terminal groups e2e', () => {
 
       await page.getByRole('button', { name: '启动项目 展开组合' }).click()
       await page.waitForFunction(
-        () => document.querySelectorAll('[data-terminal-block-id]').length === 2
+        () =>
+          document.querySelectorAll('[data-terminal-block-id]').length === 2 &&
+          document.querySelectorAll(
+            '[data-terminal-block-id] .workbench-object-motion--group-expand'
+          ).length === 0
       )
       expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
 
