@@ -103,8 +103,9 @@ async function createTwoRunningTerminals(
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
   await page.getByRole('button', { name: '新建终端积木' }).click()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
   const firstSessionId = await waitForTerminalShellReady(page, 'Terminal 1')
+
+  await page.getByRole('button', { name: '新建终端积木' }).click()
   const secondSessionId = await waitForTerminalShellReady(page, 'Terminal 2')
 
   await page.getByRole('button', { name: '适应画布' }).click()
