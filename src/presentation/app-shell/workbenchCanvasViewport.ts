@@ -4,9 +4,11 @@ import type { MutableRefObject } from 'react'
 import type { MinimapViewportCenter } from './CanvasMinimap'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import {
+  subscribeWorkbenchViewportMotionCompletion,
   transitionWorkbenchViewport,
   type WorkbenchViewportMotionCompletion
 } from './workbenchViewportMotion'
+import { subscribeWorkbenchDirectZoomCompletion } from './workbenchDirectZoom'
 
 interface CanvasViewportProjection {
   readonly setViewportZoom: (zoom: number) => void
@@ -61,6 +63,22 @@ interface CommitCompletedCanvasViewportMotionInput
   readonly completion: WorkbenchViewportMotionCompletion
 }
 
+interface CommitCanvasViewportInput extends CanvasViewportProjection, CanvasViewportPersistence {
+  readonly viewport: Viewport
+}
+
+function commitCanvasViewport({
+  viewport,
+  onViewportChange,
+  setViewportZoom,
+  setCanvasViewport
+}: CommitCanvasViewportInput): void {
+  const canvasViewport = toCanvasViewportSnapshot(viewport)
+  setViewportZoom(canvasViewport.zoom)
+  setCanvasViewport(canvasViewport)
+  onViewportChange(canvasViewport)
+}
+
 export function commitCompletedCanvasViewportMotion({
   completion,
   onViewportChange,
@@ -71,10 +89,46 @@ export function commitCompletedCanvasViewportMotion({
     return
   }
 
-  const canvasViewport = toCanvasViewportSnapshot(completion.viewport)
-  setViewportZoom(canvasViewport.zoom)
-  setCanvasViewport(canvasViewport)
-  onViewportChange(canvasViewport)
+  commitCanvasViewport({
+    viewport: completion.viewport,
+    onViewportChange,
+    setViewportZoom,
+    setCanvasViewport
+  })
+}
+
+export function subscribeCanvasViewportMotionCompletion({
+  instance,
+  onViewportChangeRef,
+  setViewportZoom,
+  setCanvasViewport
+}: CanvasViewportProjection & {
+  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  readonly onViewportChangeRef: MutableRefObject<CanvasViewportPersistence['onViewportChange']>
+}): () => void {
+  const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionCompletion(
+    instance,
+    (completion) =>
+      commitCompletedCanvasViewportMotion({
+        completion,
+        onViewportChange: onViewportChangeRef.current,
+        setCanvasViewport,
+        setViewportZoom
+      })
+  )
+  const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) =>
+    commitCanvasViewport({
+      viewport,
+      onViewportChange: onViewportChangeRef.current,
+      setCanvasViewport,
+      setViewportZoom
+    })
+  )
+
+  return () => {
+    unsubscribeProgrammatic()
+    unsubscribeDirect()
+  }
 }
 
 interface RestoreCanvasViewportInput {

@@ -155,11 +155,13 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 程序化画布相机运动由 `src/presentation/app-shell/workbenchViewportMotion.ts` 统一拥有。调用方必须通过 `instant`、`quick`、`spatial` 或 `adaptive-focus` intent 表达运动原因，不得直接调用 React Flow 的 viewport helper，也不得在消费者中维护裸时长、spring 参数或独立取消策略。`instant` 用于持久化 viewport 恢复和直接操控预览；`quick` 用于用户主动触发的 zoom 与适应画布；`spatial` 用于创建显露和对象集合定位；`adaptive-focus` 同时按当前 viewport、目标屏幕距离和 zoom 级差调整收敛速度。intent 的精确参数仍是实现细节，不构成产品契约。
 
+滚轮与触控板 wheel 缩放由 `src/presentation/app-shell/workbenchDirectZoom.ts` 统一拥有，输入接管位于 `src/presentation/app-shell/useWorkbenchDirectZoom.ts`。React Flow 的原生滚轮缩放保持关闭；输入按 wheel delta 模式规范化后在 `log2(zoom)` 上连续累积，同一显示帧内的事件只合并一次。一个 wheel burst 使用同一条快速、无回弹的临界阻尼曲线：新输入只从当前 presentation 重定向累计目标并继承当前 zoom 速度，不得为每个 wheel delta 分别排队播放动画，也不得通过首帧硬跳、距离截断或固定分段补间制造接缝。连续帧链已经排定时，后续 wheel 事件只能更新目标和 burst 结束时间，不得重置上一 presentation frame 的积分时钟；一帧前到达的高频事件必须作为同一批输入推进。不同刷新率在相同经过时间必须得到相同 presentation。每批输入必须从当前 presentation 计算指针下的世界坐标，并在各帧 viewport 中保持该锚点不漂移。一个 wheel burst 只在输入停止且曲线收敛后提交一次最终 viewport；程序化相机、画布平移或恢复输入会取消未完成的直接缩放，反向接管亦然。`nowheel` 内容继续优先接收自己的滚动，原生触摸 pinch 不受 wheel 接管影响；`prefers-reduced-motion` 下每次输入即时呈现，但仍等 burst 结束后统一提交。response 和收敛阈值是统一 owner 的实现细节，不构成产品契约。
+
 画布普通单选与空白返回的相机目标由 `src/presentation/app-shell/useCanvasSelectionViewport.ts` 统一协调，并继续交给上述相机 owner 执行。标题普通单选复用现有节点中心与可读缩放算法；空白返回捕获清除前的唯一整体选择，以同一节点中心为锚点精确回到 `35%`，不得重新计算全部内容的外接范围中心。没有唯一选择或锚点不可用时，以当前 viewport 中心缩放，不能从多选中任取节点。平移和缩放必须作为同一个 `adaptive-focus` 目标连续收敛，不能先缩放再平移或先停顿再启动第二段动画。新的选择、平移、缩放或其他定位输入必须从当前 presentation 重新定向；`prefers-reduced-motion` 下即时应用同一最终中心和缩放。终端多选、组合候选以及已经自行负责相机的快捷键和小地图入口不得叠加第二次选择聚焦。
 
 非即时程序化相机运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring，阻尼比固定为 `1`，不产生装饰性回弹。当前 motion token 的 response 为：`quick` 约 `0.30s`、`spatial` 约 `0.34s`、`adaptive-focus` 约 `0.34–0.42s`；response 描述弹簧响应快慢，不是固定动画时长。统一 owner 必须在世界坐标相机中心与 `log2(zoom)` 上保存位置和速度，再逐帧投影为 React Flow viewport；不得以 viewport transform 的 X、Y 差值估算空间移动，否则锚定缩放会随节点绝对位置改变曲线。纯锚定缩放的空间移动距离为零，双向缩放在对数尺度保持同一节奏，只有相机中心真实跨越画布时才允许 flight。新目标必须从当前呈现值重新定向并继承速度。用户开始拖动、工作区恢复或更新的定位意图会立即取消旧运动，迟到完成不得重新激活旧目标。曲线、阈值和取消语义只能在统一 owner 中调整，并必须由距离、缩放、锚点漂移、缩放单调性、重新定向、异步完成和 reduced-motion 参数矩阵覆盖。
 
-依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框通过相机 owner 的轻量实时信号逐帧跟随，订阅范围只覆盖框本身；不得为同步框而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
+依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框与缩放百分比通过相机 owner 的轻量实时信号逐帧跟随，订阅和重渲染范围分别只覆盖框本身与百分比 `<output>`；不得为同步反馈而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
 
 画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 

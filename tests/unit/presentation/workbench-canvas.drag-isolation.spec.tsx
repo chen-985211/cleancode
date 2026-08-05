@@ -3,6 +3,7 @@ import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 import type * as WorkbenchViewportMotionModule from '../../../src/presentation/app-shell/workbenchViewportMotion'
+import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
 
 import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
@@ -19,6 +20,14 @@ const reactFlowProps = vi.hoisted(() => ({
 }))
 const viewportMotionSpies = vi.hoisted(() => ({
   cancel: vi.fn()
+}))
+const directZoomSpies = vi.hoisted(() => ({
+  cancel: vi.fn()
+}))
+
+vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
+  cancelWorkbenchDirectZoom: directZoomSpies.cancel
 }))
 
 vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', async (importOriginal) => ({
@@ -47,6 +56,7 @@ describe('workbench canvas drag isolation', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
     viewportMotionSpies.cancel.mockClear()
+    directZoomSpies.cancel.mockClear()
   })
 
   it('does not move an Agent when dragging a selected terminal', () => {
@@ -142,6 +152,15 @@ describe('workbench canvas drag isolation', () => {
 
     expect(onViewportInteractionStart).toHaveBeenCalledOnce()
     expect(viewportMotionSpies.cancel).toHaveBeenCalledOnce()
+    expect(directZoomSpies.cancel).toHaveBeenCalledOnce()
+  })
+
+  it('leaves wheel zoom to the anchored direct zoom controller', () => {
+    const { agentNode, terminalNode } = createNodes()
+
+    renderCanvas([agentNode, terminalNode], vi.fn())
+
+    expect(reactFlowProps.latest?.zoomOnScroll).toBe(false)
   })
 })
 
@@ -153,6 +172,7 @@ interface MockReactFlowProps {
   readonly onPaneClick?: () => void
   readonly onMoveStart?: (event: MouseEvent | null) => void
   readonly selectionKeyCode?: string | null
+  readonly zoomOnScroll?: boolean
 }
 
 function renderCanvas(

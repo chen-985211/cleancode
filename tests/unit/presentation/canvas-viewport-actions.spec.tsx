@@ -1,11 +1,20 @@
 import { act, renderHook } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import type * as WorkbenchDirectZoomModule from '../../../src/presentation/app-shell/workbenchDirectZoom'
 
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { useCanvasViewportActions } from '../../../src/presentation/app-shell/useCanvasViewportActions'
 
+const directZoomSpies = vi.hoisted(() => ({ cancel: vi.fn() }))
+
+vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchDirectZoomModule>()),
+  cancelWorkbenchDirectZoom: directZoomSpies.cancel
+}))
+
 describe('canvas viewport actions', () => {
   beforeEach(() => {
+    directZoomSpies.cancel.mockClear()
     stubReducedMotionPreference()
   })
 
@@ -30,6 +39,7 @@ describe('canvas viewport actions', () => {
     })
 
     expect(onUserAction).toHaveBeenCalledTimes(3)
+    expect(directZoomSpies.cancel).toHaveBeenCalledTimes(3)
     expect(setViewport).toHaveBeenCalledTimes(3)
   })
 
