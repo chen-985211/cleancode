@@ -6,13 +6,17 @@ import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from './types'
 import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
+import {
+  transitionWorkbenchViewport,
+  type WorkbenchViewportCommand,
+  type WorkbenchViewportMotionIntent
+} from './workbenchViewportMotion'
 
 interface FocusTerminalBlockInCanvasInput {
   readonly block: TerminalBlockSnapshot
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
   readonly activateTerminalInput?: boolean
-  readonly duration?: number
-  readonly interpolate?: 'smooth' | 'linear'
+  readonly motion?: WorkbenchViewportMotionIntent
   readonly targetZoom?: number
   readonly viewportIntent?: 'creation' | 'navigation'
   readonly setSelectedTerminalBlockId: (blockId: string | null) => void
@@ -23,8 +27,7 @@ export function focusTerminalBlockInCanvas({
   block,
   reactFlowInstance,
   activateTerminalInput = true,
-  duration = 220,
-  interpolate,
+  motion = { type: 'spatial' },
   targetZoom,
   viewportIntent = 'navigation',
   setSelectedTerminalBlockId,
@@ -41,19 +44,17 @@ export function focusTerminalBlockInCanvas({
   const measuredWidth = node?.measured?.width ?? block.size.width
   const measuredHeight = node?.measured?.height ?? block.size.height
   const position = node?.position ?? block.position
-  const transitionDuration =
+  const transitionCompletion =
     viewportIntent === 'creation'
       ? revealCreatedWorkbenchNode({
           ...readWorkbenchCanvasCreationGeometry(),
-          duration,
           nodePosition: position,
           nodeSize: { height: measuredHeight, width: measuredWidth },
           reactFlowInstance
         })
       : revealNavigatedTerminalBlock({
-          duration,
           height: measuredHeight,
-          interpolate,
+          motion,
           position,
           reactFlowInstance,
           targetZoom,
@@ -74,34 +75,31 @@ export function focusTerminalBlockInCanvas({
             type: 'terminal'
           } as WorkbenchFlowNode)
       ),
-    transitionDuration
+    transitionCompletion
   })
 }
 
 function revealNavigatedTerminalBlock({
-  duration,
   height,
-  interpolate,
+  motion,
   position,
   reactFlowInstance,
   targetZoom,
   width
 }: {
-  readonly duration: number
   readonly height: number
-  readonly interpolate?: 'smooth' | 'linear'
+  readonly motion: WorkbenchViewportMotionIntent
   readonly position: { readonly x: number; readonly y: number }
   readonly reactFlowInstance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly targetZoom?: number
   readonly width: number
-}): number {
+}): Promise<boolean> {
   const nextZoom = targetZoom ?? Math.max(reactFlowInstance.getZoom(), 0.9)
-
-  void reactFlowInstance.setCenter(position.x + width / 2, position.y + height / 2, {
-    zoom: nextZoom,
-    duration,
-    ...(interpolate ? { interpolate } : {})
-  })
-
-  return duration
+  const command = {
+    center: { x: position.x + width / 2, y: position.y + height / 2 },
+    intent: motion,
+    type: 'center',
+    zoom: nextZoom
+  } satisfies WorkbenchViewportCommand
+  return transitionWorkbenchViewport(reactFlowInstance, command)
 }

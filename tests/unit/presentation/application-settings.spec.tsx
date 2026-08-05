@@ -35,7 +35,7 @@ describe('application settings', () => {
       within(settingsNavigation)
         .getAllByRole('button')
         .map((button) => button.textContent)
-    ).toEqual(['快捷键', '终端', 'Agent'])
+    ).toEqual(['快捷键', '画布', '终端', 'Agent'])
     expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '快捷键' })).toBeInTheDocument()
     expect(
@@ -156,6 +156,23 @@ describe('application settings', () => {
     fireEvent.click(within(buildModeOptions).getByRole('radio', { name: /并行进入/ }))
     expect(within(buildModeOptions).getByRole('radio', { name: /并行进入/ })).toBeChecked()
   })
+
+  it('lets the user control canvas visual noise with an accessible switch', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '画布' }))
+
+    expect(screen.getByRole('heading', { name: '画布' })).toBeInTheDocument()
+    expect(
+      screen.getByText('缩小画布时隐藏次要描述和操作；悬停、聚焦或选中时重新显示。')
+    ).toBeInTheDocument()
+    const toggle = screen.getByRole('switch', { name: '减少视觉噪声' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
 })
 
 function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {
@@ -167,6 +184,7 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
   const [terminalWorkflowBuildMode, setTerminalWorkflowBuildMode] = useState<
     'parallel' | 'progressive'
   >('progressive')
+  const [reduceVisualNoise, setReduceVisualNoise] = useState(true)
 
   const changeBinding = (
     command: ApplicationShortcutCommand,
@@ -184,6 +202,8 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
       onClose={() => setIsOpen(false)}
       onOpen={() => setIsOpen(true)}
       onResetAll={() => setBindings(defaultApplicationShortcutBindings)}
+      reduceVisualNoise={reduceVisualNoise}
+      onReduceVisualNoiseChange={setReduceVisualNoise}
       terminalScrollbackRows={terminalScrollbackRows}
       onTerminalScrollbackChange={setTerminalScrollbackRows}
       terminalWorkflowBuildMode={terminalWorkflowBuildMode}

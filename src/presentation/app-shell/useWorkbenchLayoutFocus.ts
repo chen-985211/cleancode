@@ -3,7 +3,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
-import { prefersReducedMotion } from './workbenchFocusTransition'
+import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 import { resolveNodeSize } from './resolveNodeSize'
 
 export interface WorkbenchLayoutFocusRequest {
@@ -77,7 +77,6 @@ export function useWorkbenchLayoutFocus({
 
       handledOperationIdsRef.current.add(request.operationId)
       deferredOperationIdsRef.current.delete(request.operationId)
-      const duration = prefersReducedMotion() ? 0 : 220
       const resolvedFocusNodes = focusNodes as WorkbenchFlowNode[]
       const committedBounds =
         request.focusTarget === 'committed-layouts'
@@ -85,12 +84,18 @@ export function useWorkbenchLayoutFocus({
           : null
 
       if (committedBounds) {
-        void reactFlowInstance.fitBounds(committedBounds, { duration, padding: 0.24 })
+        void transitionWorkbenchViewport(reactFlowInstance, {
+          bounds: committedBounds,
+          intent: { type: 'spatial' },
+          padding: 0.24,
+          type: 'fit-bounds'
+        })
       } else {
-        void reactFlowInstance.fitView({
-          duration,
+        void transitionWorkbenchViewport(reactFlowInstance, {
+          intent: { type: 'spatial' },
           nodes: resolvedFocusNodes,
-          padding: 0.24
+          padding: 0.24,
+          type: 'fit-view'
         })
       }
       onHandled(request.operationId)

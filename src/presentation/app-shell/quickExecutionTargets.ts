@@ -6,7 +6,7 @@ import type {
 import type { TerminalWorkflowPlanScope } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
 import {
   resolveCanvasObjectContextTarget,
-  type CanvasObjectContextTarget
+  type CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
 
 export interface QuickExecutionCandidate {
@@ -29,7 +29,7 @@ export function listQuickExecutionCandidates(graph: BlockGraphSnapshot): QuickEx
       nodeId: block.id,
       nodeType: 'terminal'
     })
-    if (!contextTarget) continue
+    if (!contextTarget || contextTarget.kind === 'agent') continue
 
     const target = toQuickExecutionTarget(contextTarget)
     const projection = resolveQuickExecutionBinding(graph, target)
@@ -126,7 +126,7 @@ export function resolveQuickExecutionBinding(
 }
 
 export function toQuickExecutionTarget(
-  target: CanvasObjectContextTarget
+  target: CanvasTerminalObjectContextTarget
 ): QuickExecutionTargetSnapshot {
   if (target.kind === 'combination') {
     return { type: 'combination', terminalGroupId: target.groupId }

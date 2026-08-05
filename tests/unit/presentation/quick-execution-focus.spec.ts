@@ -4,6 +4,14 @@ import { focusQuickExecutionTargetInCanvas } from '../../../src/presentation/app
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 
 describe('quick execution canvas focus', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it.each([
     {
       expectedNodeIds: ['terminal-1'],
@@ -26,26 +34,28 @@ describe('quick execution canvas focus', () => {
       createNode('terminal-2', 'terminal'),
       createNode('combination-1', 'terminalGroup')
     ]
-    const fitView = vi.fn(async () => true)
+    const getNodesBounds = vi.fn(() => ({ height: 100, width: 120, x: 0, y: 0 }))
+    const setViewport = vi.fn(async () => true)
     const instance = {
-      fitView,
-      getNode: (nodeId: string) => nodes.find((node) => node.id === nodeId)
+      getNode: (nodeId: string) => nodes.find((node) => node.id === nodeId),
+      getNodesBounds,
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setViewport
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
 
     expect(focusQuickExecutionTargetInCanvas({ instance, target })).toBe(true)
-    expect(fitView).toHaveBeenCalledWith({
-      duration: 220,
-      maxZoom: 1,
-      nodes: expectedNodeIds.map((nodeId) => expect.objectContaining({ id: nodeId })),
-      padding: 0.24
-    })
+    expect(getNodesBounds).toHaveBeenCalledWith(
+      expectedNodeIds.map((nodeId) => expect.objectContaining({ id: nodeId }))
+    )
+    expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
   })
 
   it('does not move the canvas when any target node is unavailable', () => {
-    const fitView = vi.fn(async () => true)
+    const setViewport = vi.fn(async () => true)
     const instance = {
-      fitView,
-      getNode: () => undefined
+      getNode: () => undefined,
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setViewport
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
 
     expect(
@@ -54,7 +64,7 @@ describe('quick execution canvas focus', () => {
         target: { type: 'terminal', terminalBlockId: 'removed-terminal' }
       })
     ).toBe(false)
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
   })
 })
 
@@ -65,4 +75,20 @@ function createNode(id: string, type: 'terminal' | 'terminalGroup'): WorkbenchFl
     position: { x: 0, y: 0 },
     type
   } as WorkbenchFlowNode
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }

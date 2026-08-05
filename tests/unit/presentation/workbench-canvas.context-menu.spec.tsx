@@ -8,6 +8,7 @@ import type {
   QuickExecutionTargetSnapshot
 } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
+import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
 import { createTerminalWorkflowEdges } from '../../../src/presentation/app-shell/terminalWorkflowEdges'
 import type {
@@ -21,7 +22,8 @@ const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
 }))
 const reactFlowSpies = vi.hoisted(() => ({
-  fitView: vi.fn(async () => true)
+  getNodesBounds: vi.fn(() => ({ height: 700, width: 1_400, x: 100, y: 100 })),
+  setViewport: vi.fn(async () => true)
 }))
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -38,11 +40,11 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       const { onInit } = props
       React.useEffect(() => {
         onInit?.({
-          fitView: reactFlowSpies.fitView,
           getNode: (nodeId: string) =>
             reactFlowProps.latest?.nodes?.find((node) => node.id === nodeId),
+          getNodesBounds: reactFlowSpies.getNodesBounds,
           getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
-          setViewport: async () => undefined
+          setViewport: reactFlowSpies.setViewport
         })
       }, [onInit])
       return React.createElement(
@@ -56,8 +58,14 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('workbench canvas object context menu', () => {
   beforeEach(() => {
+    stubReducedMotionPreference()
     reactFlowProps.latest = null
-    reactFlowSpies.fitView.mockClear()
+    reactFlowSpies.getNodesBounds.mockClear()
+    reactFlowSpies.setViewport.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('selects an independent terminal and favorites only that terminal', () => {
@@ -151,16 +159,12 @@ describe('workbench canvas object context menu', () => {
       })
     )
 
-    expect(reactFlowSpies.fitView).toHaveBeenCalledWith({
-      duration: 220,
-      maxZoom: 1,
-      nodes: [
-        expect.objectContaining({ id: 'workflow-a' }),
-        expect.objectContaining({ id: 'workflow-b' }),
-        expect.objectContaining({ id: 'workflow-c' })
-      ],
-      padding: 0.24
-    })
+    expect(reactFlowSpies.getNodesBounds).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'workflow-a' }),
+      expect.objectContaining({ id: 'workflow-b' }),
+      expect.objectContaining({ id: 'workflow-c' })
+    ])
+    expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
     expect(terminalWorkflow.start).not.toHaveBeenCalled()
     expect(terminalWorkflow.startScope).not.toHaveBeenCalled()
     expect(terminalWorkflow.startTerminalCombination).not.toHaveBeenCalled()
@@ -246,6 +250,20 @@ describe('workbench canvas object context menu', () => {
     expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['combination-a', 'combination-b'])
   })
 
+  it('context-selects an Agent without replacing the existing normal selection', () => {
+    renderCanvas({ selectedTerminalBlockIds: ['standalone'] })
+
+    openNodeContextMenu('agent:reviewer')
+
+    expect(screen.getByRole('menu', { name: 'Reviewer 操作' })).toBeInTheDocument()
+    expect(contextSelectedNodeIds()).toEqual(['agent:reviewer'])
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(contextSelectedNodeIds()).toEqual([])
+    expect(normallySelectedNodeIds()).toEqual(['standalone'])
+  })
+
   it('does not treat collapsed combination member content as the combination frame or title', () => {
     renderCanvas()
     const groupSurface = document.createElement('section')
@@ -311,10 +329,15 @@ interface MockReactFlowProps {
   readonly edges?: readonly { readonly id: string; readonly className?: string }[]
   readonly nodes?: readonly WorkbenchFlowNode[]
   readonly onInit?: (instance: {
-    readonly fitView: () => Promise<boolean>
     readonly getNode: (nodeId: string) => WorkbenchFlowNode | undefined
+    readonly getNodesBounds: (nodes: readonly WorkbenchFlowNode[]) => {
+      readonly height: number
+      readonly width: number
+      readonly x: number
+      readonly y: number
+    }
     readonly getViewport: () => { readonly x: number; readonly y: number; readonly zoom: number }
-    readonly setViewport: () => Promise<void>
+    readonly setViewport: typeof reactFlowSpies.setViewport
   }) => void
   readonly onNodeClick?: (event: object, node: WorkbenchFlowNode) => void
   readonly onNodeContextMenu?: (
@@ -330,6 +353,22 @@ interface MockReactFlowProps {
   readonly onNodeDrag?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStart?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent | TouchEvent, node: WorkbenchFlowNode) => void
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function renderCanvas({
@@ -373,7 +412,7 @@ function renderCanvas({
         ]
       }
     : baseGraph
-  const nodes = createTerminalFlowNodes({
+  const terminalNodes = createTerminalFlowNodes({
     graph,
     handlers: {
       onDelete: vi.fn(),
@@ -391,6 +430,19 @@ function renderCanvas({
     selectedTerminalBlockIds,
     terminalStates: {}
   })
+  const agentNode = createAgentConsoleFlowNode({
+    agent: reviewerAgent,
+    currentWorkbench: null,
+    currentWorkspace: null,
+    isSelected: false,
+    onGraphUpdated: vi.fn(),
+    onMcpCapabilityChange: vi.fn(async () => undefined),
+    onRemove: vi.fn(async () => undefined),
+    onRename: vi.fn(async () => undefined),
+    onResize: vi.fn(async () => undefined),
+    onSelect: vi.fn()
+  })
+  const nodes = [agentNode, ...terminalNodes]
 
   render(
     <WorkbenchCanvas
@@ -514,7 +566,7 @@ function contextSelectedConnectionIds(): string[] {
 
 function createWorkbench(graph: BlockGraphSnapshot): WorkbenchSnapshot {
   return {
-    agents: [],
+    agents: [reviewerAgent],
     gitBranches: [],
     graph,
     project: {
@@ -534,6 +586,19 @@ function createWorkbench(graph: BlockGraphSnapshot): WorkbenchSnapshot {
     }
   }
 }
+
+const reviewerAgent = {
+  agentId: 'reviewer',
+  cleancodeMcpEnabled: true,
+  layout: {
+    position: { x: -480, y: 0 },
+    size: { width: 420, height: 360 }
+  },
+  name: 'Reviewer',
+  projectId: 'project-1',
+  providerId: 'codex',
+  workspaceId: 'main'
+} as const
 
 function createTerminalWorkflow(graph: BlockGraphSnapshot): ReturnType<typeof useTerminalWorkflow> {
   return {

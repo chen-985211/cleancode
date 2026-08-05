@@ -156,7 +156,7 @@ export function AgentSettingsPane({
           <button
             aria-checked={preferences.defaultCleancodeMcpEnabled}
             aria-label={t('settings.agents.defaultMcp')}
-            className="agent-settings-switch"
+            className="application-settings-switch"
             disabled={settingsDisabled}
             role="switch"
             type="button"

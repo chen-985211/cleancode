@@ -15,7 +15,7 @@ import {
   resolveWorkbenchNodeFocusZoom,
   resolveWorkbenchNodeSize
 } from './workbenchNodeFocusViewport'
-import { prefersReducedMotion, resolveWorkbenchFocusTransition } from './workbenchFocusTransition'
+import { transitionWorkbenchViewport } from './workbenchViewportMotion'
 
 interface UseApplicationShortcutNavigationInput {
   readonly activateWorkbenchNodeInput: (node: WorkbenchFlowNode) => void
@@ -105,18 +105,18 @@ export function useApplicationShortcutNavigation({
         currentZoom: viewport.zoom,
         nodeSize: resolveWorkbenchNodeSize(target)
       })
-      const transition = resolveWorkbenchFocusTransition({
-        canvasSize: canvasSizeRef.current,
-        currentViewport: viewport,
-        intent: 'shortcut',
-        reducedMotion: prefersReducedMotion(),
-        targetCenter: center,
-        targetZoom: zoom
+      const transitionCompletion = transitionWorkbenchViewport(instance, {
+        center,
+        intent: {
+          canvasSize: canvasSizeRef.current,
+          type: 'adaptive-focus'
+        },
+        type: 'center',
+        zoom
       })
-      const transitionCompletion = instance.setCenter(center.x, center.y, { ...transition, zoom })
       activateWorkbenchNodeInputRef.current(target)
-      void transitionCompletion.then(() => {
-        if (selectedNodeIdRef.current === target.id) {
+      void transitionCompletion.then((completed) => {
+        if (completed && selectedNodeIdRef.current === target.id) {
           activateWorkbenchNodeInputRef.current(target)
         }
       })

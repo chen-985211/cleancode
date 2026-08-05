@@ -1,5 +1,5 @@
 .canvas-surface--placing-template {
-  cursor: crosshair;
+  cursor: var(--cc-canvas-pointer);
 }
 
 .block-template-selection {

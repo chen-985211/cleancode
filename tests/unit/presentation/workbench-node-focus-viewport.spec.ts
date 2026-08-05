@@ -21,6 +21,16 @@ describe('workbench node focus viewport', () => {
     ).toBe(1.1)
   })
 
+  it('fits a wide node inside a narrow canvas instead of forcing the readable zoom', () => {
+    expect(
+      resolveWorkbenchNodeFocusZoom({
+        canvasSize: { width: 728, height: 681 },
+        currentZoom: 0.35,
+        nodeSize: { width: 720, height: 460 }
+      })
+    ).toBeCloseTo(0.728, 10)
+  })
+
   it('ignores small zoom corrections to prevent scale breathing', () => {
     expect(
       resolveWorkbenchNodeFocusZoom({

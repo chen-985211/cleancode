@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react'
 import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
+import type * as WorkbenchViewportMotionModule from '../../../src/presentation/app-shell/workbenchViewportMotion'
 
 import { createAgentConsoleFlowNode } from '../../../src/presentation/app-shell/agentConsoleFlowNode'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
@@ -15,6 +16,14 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 
 const reactFlowProps = vi.hoisted(() => ({
   latest: null as MockReactFlowProps | null
+}))
+const viewportMotionSpies = vi.hoisted(() => ({
+  cancel: vi.fn()
+}))
+
+vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchViewportMotionModule>()),
+  cancelWorkbenchViewportMotion: viewportMotionSpies.cancel
 }))
 
 vi.mock('@xyflow/react', async (importOriginal) => {
@@ -37,6 +46,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('workbench canvas drag isolation', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
+    viewportMotionSpies.cancel.mockClear()
   })
 
   it('does not move an Agent when dragging a selected terminal', () => {
@@ -131,6 +141,7 @@ describe('workbench canvas drag isolation', () => {
     })
 
     expect(onViewportInteractionStart).toHaveBeenCalledOnce()
+    expect(viewportMotionSpies.cancel).toHaveBeenCalledOnce()
   })
 })
 

@@ -8,7 +8,12 @@ import { useAgentToolApprovals } from '../../../src/presentation/app-shell/useAg
 import { createRuntimeApi } from '../../fixtures/presentation/appShellFixtures'
 
 describe('Agent connection approval location', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
   afterEach(() => {
+    vi.unstubAllGlobals()
     Object.defineProperty(window, 'cleancode', { configurable: true, value: undefined })
   })
 
@@ -19,11 +24,14 @@ describe('Agent connection approval location', () => {
       ['group-target', createFlowNode('group-target')]
     ])
     const getNode = vi.fn((nodeId: string) => visibleNodes.get(nodeId))
-    const fitView = vi.fn(async () => undefined)
-    const reactFlowInstance = { fitView, getNode } as unknown as ReactFlowInstance<
-      WorkbenchFlowNode,
-      Edge
-    >
+    const getNodesBounds = vi.fn(() => ({ height: 400, width: 800, x: 40, y: 40 }))
+    const setViewport = vi.fn(async () => true)
+    const reactFlowInstance = {
+      getNode,
+      getNodesBounds,
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setViewport
+    } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
     const { result } = renderHook(() =>
       useAgentToolApprovals({
         graph,
@@ -41,15 +49,12 @@ describe('Agent connection approval location', () => {
       'group-source',
       'group-target'
     ])
-    expect(fitView).toHaveBeenCalledWith({
-      duration: 220,
-      nodes: [
-        visibleNodes.get('agent:agent-1'),
-        visibleNodes.get('group-source'),
-        visibleNodes.get('group-target')
-      ],
-      padding: 0.24
-    })
+    expect(getNodesBounds).toHaveBeenCalledWith([
+      visibleNodes.get('agent:agent-1'),
+      visibleNodes.get('group-source'),
+      visibleNodes.get('group-target')
+    ])
+    expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
   })
 
   it('retains the approval card when an approved tool returns a structured failure', async () => {
@@ -95,6 +100,22 @@ describe('Agent connection approval location', () => {
     ])
   })
 })
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
+}
 
 function createFlowNode(id: string): WorkbenchFlowNode {
   return { data: {}, id, position: { x: 0, y: 0 }, type: 'terminal' } as WorkbenchFlowNode

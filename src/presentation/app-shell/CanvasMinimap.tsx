@@ -1,5 +1,14 @@
+import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { ChevronUp, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
-import { useCallback, useRef, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode
+} from 'react'
 
 import type { CanvasViewportSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { defaultAgentLayoutSize } from '../../contexts/agent/domain/aggregates/AgentSession'
@@ -8,10 +17,11 @@ import {
   type MinimapNodeInteractionContextValue
 } from './minimapInteraction'
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
-import type { MinimapFlowNode } from './types'
+import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
 
 interface CanvasSize {
   readonly width: number
@@ -28,6 +38,7 @@ interface CanvasMinimapProps {
   readonly nodes: MinimapFlowNode[]
   readonly canvasViewport: CanvasViewportSnapshot
   readonly canvasSize: CanvasSize
+  readonly viewportFrame?: ReactNode
   readonly viewportZoom: number
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
@@ -73,6 +84,7 @@ export function CanvasMinimap({
   nodes,
   canvasViewport,
   canvasSize,
+  viewportFrame,
   viewportZoom,
   shortcutTooltips,
   minimapNodeInteraction,
@@ -96,7 +108,6 @@ export function CanvasMinimap({
   )
   const frames = nodes.map(toMinimapFrame)
   const viewBox = resolveMinimapViewBox(frames)
-  const viewportFrame = resolveViewportFrame(canvasViewport, canvasSize)
   const minimapClassName = ['canvas-minimap', isCollapsed ? 'canvas-minimap--collapsed' : '']
     .filter(Boolean)
     .join(' ')
@@ -170,14 +181,9 @@ export function CanvasMinimap({
                   width={viewBox.width}
                   height={viewBox.height}
                 />
-                <rect
-                  className="canvas-minimap__viewport-frame"
-                  x={viewportFrame.x}
-                  y={viewportFrame.y}
-                  width={viewportFrame.width}
-                  height={viewportFrame.height}
-                  rx={16}
-                />
+                {viewportFrame ?? (
+                  <CanvasMinimapViewportFrame viewport={canvasViewport} canvasSize={canvasSize} />
+                )}
                 {frames.map((frame) => (
                   <MinimapWorkbenchNode
                     key={frame.node.id}
@@ -268,6 +274,64 @@ export function CanvasMinimap({
         </div>
       </div>
     </div>
+  )
+}
+
+export function LiveCanvasMinimapViewportFrame({
+  canvasSize,
+  fallbackViewport,
+  instance
+}: {
+  readonly canvasSize: CanvasSize
+  readonly fallbackViewport: CanvasViewportSnapshot
+  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
+}) {
+  const [presentation, setPresentation] = useState<{
+    readonly baseline: CanvasViewportSnapshot
+    readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+    readonly viewport: CanvasViewportSnapshot
+  } | null>(null)
+
+  useEffect(() => {
+    if (!instance) {
+      return undefined
+    }
+
+    return subscribeWorkbenchViewportMotionPresentation(instance, (viewport) => {
+      setPresentation({
+        baseline: fallbackViewport,
+        instance,
+        viewport
+      })
+    })
+  }, [fallbackViewport, instance])
+
+  const viewport =
+    presentation?.baseline === fallbackViewport && presentation.instance === instance
+      ? presentation.viewport
+      : fallbackViewport
+
+  return <CanvasMinimapViewportFrame viewport={viewport} canvasSize={canvasSize} />
+}
+
+function CanvasMinimapViewportFrame({
+  viewport,
+  canvasSize
+}: {
+  readonly viewport: CanvasViewportSnapshot
+  readonly canvasSize: CanvasSize
+}) {
+  const frame = resolveViewportFrame(viewport, canvasSize)
+
+  return (
+    <rect
+      className="canvas-minimap__viewport-frame"
+      x={frame.x}
+      y={frame.y}
+      width={frame.width}
+      height={frame.height}
+      rx={16}
+    />
   )
 }
 

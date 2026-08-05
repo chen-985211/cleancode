@@ -21,12 +21,7 @@ export async function setCanvasZoomFromDefault(
       Math.abs(new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a - expected) <= 0.001
     )
   }, expectedZoom)
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-  )
+  await waitForCanvasViewportToSettle(page)
 
   return readCanvasZoom(page)
 }
@@ -204,6 +199,27 @@ export async function ensureTerminalDomRenderer(terminal: Locator): Promise<void
   await terminal.evaluate(async (element) => {
     const terminalElement = element as HTMLElement
     const readRenderer = (): string | undefined => terminalElement.dataset.terminalRenderer
+    const isRendererReady = (): boolean => terminalElement.dataset.terminalRendererReady === 'true'
+
+    if (!isRendererReady()) {
+      await new Promise<void>((resolve, reject) => {
+        const observer = new MutationObserver(() => {
+          if (!isRendererReady()) return
+          observer.disconnect()
+          clearTimeout(timeout)
+          resolve()
+        })
+        const timeout = setTimeout(() => {
+          observer.disconnect()
+          reject(new Error('Terminal renderer activation did not settle.'))
+        }, 5_000)
+        observer.observe(terminalElement, {
+          attributeFilter: ['data-terminal-renderer-ready'],
+          attributes: true
+        })
+      })
+    }
+
     if (readRenderer() !== 'webgl') return
 
     for (const canvas of terminalElement.querySelectorAll('canvas')) {

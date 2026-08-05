@@ -1,7 +1,8 @@
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { analyzeCanvasExecutionSelection } from '../../shared-kernel/domain/policies/CanvasExecutionSemantics'
+import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 
-export type CanvasObjectContextTarget =
+export type CanvasTerminalObjectContextTarget =
   | {
       readonly kind: 'terminal'
       readonly selectedConnectionIds: readonly string[]
@@ -22,6 +23,15 @@ export type CanvasObjectContextTarget =
       readonly terminalBlockIds: readonly string[]
     }
 
+export type CanvasObjectContextTarget =
+  | CanvasTerminalObjectContextTarget
+  | {
+      readonly agentId: string
+      readonly kind: 'agent'
+      readonly selectedConnectionIds: readonly string[]
+      readonly selectedNodeIds: readonly string[]
+    }
+
 export interface CanvasNodeContextHit {
   readonly nodeId: string
   readonly nodeType: 'agentConsole' | 'terminal' | 'terminalGroup'
@@ -32,6 +42,18 @@ export function resolveCanvasObjectContextTarget(
   hit: CanvasNodeContextHit
 ): CanvasObjectContextTarget | null {
   const connections = graph.connections ?? []
+
+  if (hit.nodeType === 'agentConsole') {
+    const agentId = readAgentIdFromFlowNodeId(hit.nodeId)
+    return agentId
+      ? {
+          agentId,
+          kind: 'agent',
+          selectedConnectionIds: [],
+          selectedNodeIds: [hit.nodeId]
+        }
+      : null
+  }
 
   if (hit.nodeType === 'terminalGroup') {
     const group = graph.terminalGroups.find((candidate) => candidate.id === hit.nodeId)

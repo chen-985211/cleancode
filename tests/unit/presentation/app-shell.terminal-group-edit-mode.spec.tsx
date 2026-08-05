@@ -64,6 +64,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
 describe('app shell terminal group edit mode', () => {
   beforeEach(() => {
+    stubReducedMotionPreference()
     reactFlowProps.latest = null
     reactFlowProps.renderCount = 0
     appShellRenderStats.sidebarRenderCount = 0
@@ -71,6 +72,10 @@ describe('app shell terminal group edit mode', () => {
       configurable: true,
       value: undefined
     })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('does not re-render the canvas for a terminal drag preview outside group edit mode', async () => {
@@ -526,6 +531,13 @@ interface MockReactFlowProps {
 
 interface MockReactFlowInstance {
   readonly getNode: () => undefined
+  readonly getNodes: () => readonly WorkbenchFlowNode[]
+  readonly getNodesBounds: () => {
+    readonly height: number
+    readonly width: number
+    readonly x: number
+    readonly y: number
+  }
   readonly getViewport: () => WorkbenchSnapshot['graph']['viewport']
   readonly getZoom: () => number
   readonly setCenter: () => Promise<void>
@@ -538,6 +550,8 @@ interface MockReactFlowInstance {
 function createMockReactFlowInstance(): MockReactFlowInstance {
   return {
     getNode: () => undefined,
+    getNodes: () => reactFlowProps.latest?.nodes ?? [],
+    getNodesBounds: () => ({ height: 460, width: 880, x: 320, y: 240 }),
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getZoom: () => 1,
     setCenter: async () => undefined,
@@ -546,6 +560,22 @@ function createMockReactFlowInstance(): MockReactFlowInstance {
     zoomIn: async () => undefined,
     fitView: async () => undefined
   }
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createWorkbenchWithTerminalBlocks(): WorkbenchSnapshot {

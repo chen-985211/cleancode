@@ -100,6 +100,7 @@
 }
 
 .canvas-surface {
+  --cc-canvas-pointer: url('../assets/canvas-pointer.svg') 3 3, default;
   position: relative;
   min-width: 0;
   min-height: 0;
@@ -124,12 +125,21 @@
   z-index: 0;
 }
 
-.react-flow__pane.draggable {
-  cursor: grab;
-}
-
-.react-flow__pane.dragging {
-  cursor: grabbing;
+:is(
+  .react-flow__pane,
+  .react-flow__pane.draggable,
+  .react-flow__pane.dragging,
+  .react-flow__pane.selection,
+  .react-flow__node,
+  .react-flow__node.selectable,
+  .react-flow__node.draggable,
+  .react-flow__node.draggable.dragging,
+  .react-flow__nodesselection-rect,
+  .terminal-node__header,
+  .terminal-group-node__header,
+  .agent-console__header
+) {
+  cursor: var(--cc-canvas-pointer);
 }
 
 .react-flow__nodes {
@@ -174,17 +184,13 @@
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke-width: 2.8;
+  stroke: var(--cc-primary);
+  stroke-width: 3;
+  stroke-dasharray: none;
 }
 
-.terminal-node__header,
-.agent-console__header {
-  cursor: grab;
-}
-
-.react-flow__node.dragging .terminal-node__header,
-.react-flow__node.dragging .agent-console__header {
-  cursor: grabbing;
+.react-flow__edge.selected .react-flow__arrowhead polyline {
+  stroke: var(--cc-primary);
 }
 
 .canvas-minimap-panel {

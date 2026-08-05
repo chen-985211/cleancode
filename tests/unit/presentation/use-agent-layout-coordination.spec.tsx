@@ -8,12 +8,20 @@ import { useAgentLayoutCoordination } from '../../../src/presentation/app-shell/
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 describe('Agent layout coordination', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('keeps a user-dragged terminal protected and focuses once its commit settles', async () => {
     const terminalNode = createNode('terminal-1', 'terminal')
     const agentNode = createNode('agent:agent-1', 'agentConsole')
     const nodes = [agentNode, terminalNode]
     const nodeStore = createWorkbenchNodeStore(nodes)
-    const fitView = vi.fn(async () => undefined)
+    const setViewport = vi.fn(async () => true)
     const moveCommit = createDeferred<void>()
     const setCurrentGraph = vi.fn()
     const { result } = renderHook(() =>
@@ -25,7 +33,7 @@ describe('Agent layout coordination', () => {
         moveWorkspaceAgent: vi.fn(async () => undefined),
         nodeStore,
         reactFlowInstanceRef: {
-          current: createReactFlowInstance(nodes, fitView)
+          current: createReactFlowInstance(nodes, setViewport)
         },
         setCurrentGraph
       })
@@ -35,18 +43,18 @@ describe('Agent layout coordination', () => {
     act(() => result.current.onAgentGraphUpdated(createLayoutEvent()))
 
     expect(setCurrentGraph).toHaveBeenCalledWith(createGraph())
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
 
     let committed!: Promise<void>
     act(() => {
       committed = result.current.onNodeDragStop({} as MouseEvent, terminalNode)
     })
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
 
     moveCommit.resolve()
     await act(() => committed)
 
-    await waitFor(() => expect(fitView).toHaveBeenCalledOnce())
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
   })
 
   it.each([
@@ -124,7 +132,8 @@ describe('Agent layout coordination', () => {
     const terminalNode = createNode('terminal-1', 'terminal')
     const agentNode = createNode('agent:agent-1', 'agentConsole')
     const nodes = [agentNode, terminalNode]
-    const fitView = vi.fn(async () => undefined)
+    const setViewport = vi.fn(async () => true)
+    const onCancelLayoutFocus = vi.fn()
     const nodeStore = createWorkbenchNodeStore(nodes)
     const { result } = renderHook(() =>
       useAgentLayoutCoordination({
@@ -134,7 +143,8 @@ describe('Agent layout coordination', () => {
         moveWorkbenchNode: vi.fn(async () => undefined),
         moveWorkspaceAgent: vi.fn(async () => undefined),
         nodeStore,
-        reactFlowInstanceRef: { current: createReactFlowInstance(nodes, fitView) },
+        onCancelLayoutFocus,
+        reactFlowInstanceRef: { current: createReactFlowInstance(nodes, setViewport) },
         setCurrentGraph: vi.fn()
       })
     )
@@ -143,7 +153,8 @@ describe('Agent layout coordination', () => {
     act(() => result.current.cancelLayoutFocus())
     await act(() => Promise.resolve())
 
-    expect(fitView).not.toHaveBeenCalled()
+    expect(setViewport).not.toHaveBeenCalled()
+    expect(onCancelLayoutFocus).toHaveBeenCalledOnce()
   })
 })
 
@@ -213,14 +224,32 @@ function createGroupedNodes(): WorkbenchFlowNode[] {
 
 function createReactFlowInstance(
   nodes: readonly WorkbenchFlowNode[],
-  fitView: ReturnType<typeof vi.fn>
+  setViewport: ReturnType<typeof vi.fn>
 ): ReactFlowInstance<WorkbenchFlowNode, Edge> {
   const nodesById = new Map(nodes.map((node) => [node.id, node]))
 
   return {
-    fitView,
-    getNode: (nodeId: string) => nodesById.get(nodeId)
+    getNode: (nodeId: string) => nodesById.get(nodeId),
+    getNodesBounds: () => ({ height: 1_026, width: 840, x: 40, y: 40 }),
+    getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+    setViewport
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createDeferred<T>(): {

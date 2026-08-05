@@ -237,13 +237,43 @@ describe('workspace Agents e2e', () => {
 
         return {
           backgroundColor: getComputedStyle(veil).backgroundColor,
+          borderColor: getComputedStyle(veil).borderColor,
+          borderStyle: getComputedStyle(veil).borderStyle,
+          borderWidth: getComputedStyle(veil).borderWidth,
+          boxShadow: getComputedStyle(veil).boxShadow,
           terminalText: element.querySelector('.xterm-rows')?.textContent ?? ''
         }
       })
 
       expect(selectedPresentation.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+      expect(selectedPresentation.borderStyle).toBe('solid')
+      expect(selectedPresentation.borderWidth).toBe('2px')
       await page.locator('.react-flow__pane').click({ force: true, position: { x: 8, y: 8 } })
       await waitForAgentSelectionState(page, 'unselected')
+
+      await agent.locator('.agent-console__header').click({ button: 'right' })
+      await page.getByRole('menu').waitFor()
+      expect(await agent.getAttribute('data-selection-state')).toBe('unselected')
+      const contextPresentation = await agent.evaluate((element) => {
+        const veil = element.querySelector<HTMLElement>('[data-workbench-node-selection]')
+        if (!veil) throw new Error('Agent context-selection feedback is unavailable.')
+        const style = getComputedStyle(veil)
+        return {
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          borderStyle: style.borderStyle,
+          borderWidth: style.borderWidth,
+          boxShadow: style.boxShadow
+        }
+      })
+      expect(contextPresentation).toEqual({
+        backgroundColor: selectedPresentation.backgroundColor,
+        borderColor: selectedPresentation.borderColor,
+        borderStyle: selectedPresentation.borderStyle,
+        borderWidth: selectedPresentation.borderWidth,
+        boxShadow: selectedPresentation.boxShadow
+      })
+      await page.keyboard.press('Escape')
 
       expect(
         await terminal

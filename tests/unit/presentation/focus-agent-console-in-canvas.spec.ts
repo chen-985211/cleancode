@@ -5,8 +5,16 @@ import { focusAgentConsoleInCanvas } from '../../../src/presentation/app-shell/f
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 
 describe('focus Agent console in canvas', () => {
+  beforeEach(() => {
+    stubReducedMotionPreference()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('uses the created Agent layout before its flow node exists and clears sibling selections', () => {
-    const setCenter = vi.fn(async () => true)
+    const setViewport = vi.fn(async () => true)
     const setSelectedAgentId = vi.fn()
     const setSelectedTerminalBlockIds = vi.fn()
     const setSelectedTerminalGroupId = vi.fn()
@@ -14,7 +22,7 @@ describe('focus Agent console in canvas', () => {
 
     focusAgentConsoleInCanvas({
       agent: createAgent(),
-      reactFlowInstance: createReactFlowInstance(setCenter),
+      reactFlowInstance: createReactFlowInstance(setViewport),
       setSelectedAgentId,
       setSelectedTerminalBlockIds,
       setSelectedTerminalGroupId,
@@ -25,21 +33,35 @@ describe('focus Agent console in canvas', () => {
     expect(setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
     expect(setHoveredTerminalBlockId).toHaveBeenCalledWith(null)
-    expect(setCenter).toHaveBeenCalledWith(1_260, 470, {
-      zoom: 0.9,
-      duration: 220
-    })
+    expect(setViewport).toHaveBeenCalledWith({ x: -654, y: -103, zoom: 0.9 }, { duration: 0 })
   })
 })
 
 function createReactFlowInstance(
-  setCenter: ReturnType<typeof vi.fn>
+  setViewport: ReturnType<typeof vi.fn>
 ): ReactFlowInstance<WorkbenchFlowNode, Edge> {
   return {
     getNode: () => undefined,
+    getViewport: () => ({ x: 0, y: 0, zoom: 0.6 }),
     getZoom: () => 0.6,
-    setCenter
+    setViewport
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+}
+
+function stubReducedMotionPreference(): void {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  )
 }
 
 function createAgent(): WorkspaceAgentSnapshot {

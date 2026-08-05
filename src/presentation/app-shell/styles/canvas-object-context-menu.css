@@ -43,25 +43,81 @@
   box-shadow: 0 0 0 1px var(--cc-border-strong) inset;
 }
 
-.terminal-node--context-selected {
-  border-color: var(--cc-primary-border);
-  box-shadow:
-    0 0 0 2px var(--cc-primary-ring),
-    var(--cc-shadow-node);
+.canvas-object-context-menu__separator {
+  height: 1px;
+  margin: 3px 7px;
+  background: var(--cc-divider);
 }
 
-.terminal-group-node--context-selected {
-  box-shadow:
-    0 0 0 2px var(--cc-primary-ring),
-    0 3px 8px var(--cc-shadow-color),
-    0 16px 32px var(--cc-shadow-color),
-    0 0 0 1px var(--cc-primary-border) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset;
+.canvas-object-context-menu__item--danger svg {
+  color: var(--cc-danger);
+}
+
+.canvas-object-context-menu__item--danger:hover,
+.canvas-object-context-menu__item--danger:focus-visible {
+  background: var(--cc-danger-soft);
+  color: var(--cc-danger-strong);
+}
+
+.canvas-object-context-menu__rename {
+  display: grid;
+  min-width: 220px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.canvas-object-context-menu__rename input {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 7px;
+  background: var(--cc-surface);
+  color: var(--cc-foreground);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.canvas-object-context-menu__rename input:focus-visible {
+  border-color: var(--cc-primary-border);
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 1px;
+}
+
+.canvas-object-context-menu__rename-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.canvas-object-context-menu__rename-actions button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+}
+
+.canvas-object-context-menu__rename-actions button:hover:not(:disabled),
+.canvas-object-context-menu__rename-actions button:focus-visible {
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-foreground);
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
+}
+
+.canvas-object-context-menu__rename-actions button:disabled {
+  opacity: 0.42;
 }
 
 .terminal-workflow-edge--context-selected .react-flow__edge-path {
   stroke: var(--cc-primary);
   stroke-width: 3;
+  stroke-dasharray: none;
 }
 
 .terminal-workflow-edge--context-selected .react-flow__arrowhead polyline {

@@ -1,22 +1,32 @@
 import type { NodeChange } from '@xyflow/react'
 import { useCallback, type Dispatch, type MouseEvent, type SetStateAction } from 'react'
 
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
+import { readAgentIdFromFlowNodeId, toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { applyWorkbenchNodeChanges } from './applyWorkbenchNodeChanges'
 import type { WorkbenchFlowNode } from './types'
 
 export function useWorkbenchNodeSelection({
+  focusSelectedWorkbenchNode,
   isTerminalGroupSelectionMode,
+  returnToGlobalCanvasView,
   selectTerminalBlock,
   selectTerminalGroup,
+  selectedAgentId,
+  selectedTerminalBlockIds,
+  selectedTerminalGroupId,
   setNodes,
   setSelectedAgentId,
   setSelectedTerminalBlockIds,
   setSelectedTerminalGroupId
 }: {
+  readonly focusSelectedWorkbenchNode: (nodeId: string) => void
   readonly isTerminalGroupSelectionMode: boolean
+  readonly returnToGlobalCanvasView: (anchorNodeId: string | null) => void
   readonly selectTerminalBlock: (blockId: string, additive: boolean) => void
   readonly selectTerminalGroup: (groupId: string) => void
+  readonly selectedAgentId: string | null
+  readonly selectedTerminalBlockIds: readonly string[]
+  readonly selectedTerminalGroupId: string | null
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
   readonly setSelectedAgentId: Dispatch<SetStateAction<string | null>>
   readonly setSelectedTerminalBlockIds: Dispatch<SetStateAction<string[]>>
@@ -48,32 +58,56 @@ export function useWorkbenchNodeSelection({
 
       setSelectedAgentId(null)
       selectTerminalGroup(node.id)
+      focusSelectedWorkbenchNode(node.id)
     },
-    [selectTerminalGroup, setSelectedAgentId]
+    [focusSelectedWorkbenchNode, selectTerminalGroup, setSelectedAgentId]
   )
 
-  const selectAgentFromTitle = useCallback(
-    (agentId: string) => {
+  const selectAgent = useCallback(
+    (agentId: string, shouldFocus: boolean) => {
       setSelectedAgentId(agentId)
       setSelectedTerminalBlockIds([])
       setSelectedTerminalGroupId(null)
+      if (shouldFocus) focusSelectedWorkbenchNode(toAgentFlowNodeId(agentId))
     },
-    [setSelectedAgentId, setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
+    [
+      focusSelectedWorkbenchNode,
+      setSelectedAgentId,
+      setSelectedTerminalBlockIds,
+      setSelectedTerminalGroupId
+    ]
+  )
+  const selectAgentFromTitle = useCallback(
+    (agentId: string) => selectAgent(agentId, true),
+    [selectAgent]
   )
 
-  const selectTerminalFromTitle = useCallback(
-    (blockId: string, additive: boolean) => {
+  const selectTerminal = useCallback(
+    (blockId: string, additive: boolean, shouldFocus: boolean) => {
       setSelectedAgentId(null)
       setSelectedTerminalGroupId(null)
       selectTerminalBlock(blockId, additive)
+      if (shouldFocus && !additive && !isTerminalGroupSelectionMode) {
+        focusSelectedWorkbenchNode(blockId)
+      }
     },
-    [selectTerminalBlock, setSelectedAgentId, setSelectedTerminalGroupId]
+    [
+      focusSelectedWorkbenchNode,
+      isTerminalGroupSelectionMode,
+      selectTerminalBlock,
+      setSelectedAgentId,
+      setSelectedTerminalGroupId
+    ]
+  )
+  const selectTerminalFromTitle = useCallback(
+    (blockId: string, additive: boolean) => selectTerminal(blockId, additive, true),
+    [selectTerminal]
   )
 
   const selectWorkbenchNodeFromShortcut = useCallback(
     (node: WorkbenchFlowNode) => {
       if (node.type === 'terminal') {
-        selectTerminalFromTitle(node.id, false)
+        selectTerminal(node.id, false, false)
         return
       }
 
@@ -85,17 +119,33 @@ export function useWorkbenchNodeSelection({
 
       const agentId = readAgentIdFromFlowNodeId(node.id)
       if (agentId) {
-        selectAgentFromTitle(agentId)
+        selectAgent(agentId, false)
       }
     },
-    [selectAgentFromTitle, selectTerminalFromTitle, selectTerminalGroup, setSelectedAgentId]
+    [selectAgent, selectTerminal, selectTerminalGroup, setSelectedAgentId]
   )
 
   const clearWorkbenchSelection = useCallback(() => {
+    const anchorNodeId = resolveWorkbenchSelectionAnchorNodeId({
+      isTerminalGroupSelectionMode,
+      selectedAgentId,
+      selectedTerminalBlockIds,
+      selectedTerminalGroupId
+    })
     setSelectedAgentId(null)
     setSelectedTerminalBlockIds([])
     setSelectedTerminalGroupId(null)
-  }, [setSelectedAgentId, setSelectedTerminalBlockIds, setSelectedTerminalGroupId])
+    returnToGlobalCanvasView(anchorNodeId)
+  }, [
+    isTerminalGroupSelectionMode,
+    returnToGlobalCanvasView,
+    selectedAgentId,
+    selectedTerminalBlockIds,
+    selectedTerminalGroupId,
+    setSelectedAgentId,
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  ])
 
   return {
     clearWorkbenchSelection,
@@ -105,6 +155,22 @@ export function useWorkbenchNodeSelection({
     selectWorkbenchNodeFromShortcut,
     selectWorkbenchNode
   }
+}
+
+function resolveWorkbenchSelectionAnchorNodeId({
+  isTerminalGroupSelectionMode,
+  selectedAgentId,
+  selectedTerminalBlockIds,
+  selectedTerminalGroupId
+}: {
+  readonly isTerminalGroupSelectionMode: boolean
+  readonly selectedAgentId: string | null
+  readonly selectedTerminalBlockIds: readonly string[]
+  readonly selectedTerminalGroupId: string | null
+}): string | null {
+  if (isTerminalGroupSelectionMode || selectedTerminalBlockIds.length > 1) return null
+  if (selectedAgentId) return toAgentFlowNodeId(selectedAgentId)
+  return selectedTerminalGroupId ?? selectedTerminalBlockIds[0] ?? null
 }
 
 function isWorkbenchNodeTitleClick(event: MouseEvent): boolean {

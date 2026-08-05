@@ -6,7 +6,9 @@ import { useWorkbenchNodeSelection } from '../../../src/presentation/app-shell/u
 
 describe('workbench node selection', () => {
   it('clears terminal, terminal group, and Agent selection from the canvas pane', () => {
-    const { input, result } = renderSelectionHook()
+    const { input, result } = renderSelectionHook({
+      selectedTerminalBlockIds: ['backend-terminal']
+    })
 
     act(() => {
       result.current.clearWorkbenchSelection()
@@ -15,6 +17,33 @@ describe('workbench node selection', () => {
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
     expect(input.setSelectedTerminalBlockIds).toHaveBeenCalledWith([])
     expect(input.setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith('backend-terminal')
+  })
+
+  it.each([
+    [{ selectedAgentId: 'reviewer' }, 'agent:reviewer'],
+    [{ selectedTerminalGroupId: 'development-group' }, 'development-group']
+  ] as const)('anchors pane return to the uniquely selected object', (options, expectedNodeId) => {
+    const { input, result } = renderSelectionHook(options)
+
+    act(() => {
+      result.current.clearWorkbenchSelection()
+    })
+
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(expectedNodeId)
+  })
+
+  it.each([
+    { selectedTerminalBlockIds: ['terminal-1', 'terminal-2'] },
+    { isTerminalGroupSelectionMode: true, selectedTerminalBlockIds: ['terminal-1'] }
+  ])('does not choose an arbitrary return anchor from multi-selection', (options) => {
+    const { input, result } = renderSelectionHook(options)
+
+    act(() => {
+      result.current.clearWorkbenchSelection()
+    })
+
+    expect(input.returnToGlobalCanvasView).toHaveBeenCalledWith(null)
   })
 
   it('selects a terminal group only from its title and clears Agent selection', () => {
@@ -32,6 +61,7 @@ describe('workbench node selection', () => {
 
     expect(input.selectTerminalGroup).toHaveBeenCalledWith('development-group')
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
+    expect(input.focusSelectedWorkbenchNode).toHaveBeenCalledWith('development-group')
 
     input.selectTerminalGroup.mockClear()
 
@@ -41,18 +71,48 @@ describe('workbench node selection', () => {
     })
 
     expect(input.selectTerminalGroup).not.toHaveBeenCalled()
+    expect(input.focusSelectedWorkbenchNode).toHaveBeenCalledOnce()
   })
 
-  it('clears terminal group and Agent selection before selecting terminals', () => {
+  it('clears terminal group and Agent selection before focusing an exclusively selected terminal', () => {
     const { input, result } = renderSelectionHook()
 
     act(() => {
-      result.current.selectTerminalFromTitle('backend-terminal', true)
+      result.current.selectTerminalFromTitle('backend-terminal', false)
     })
 
     expect(input.setSelectedAgentId).toHaveBeenCalledWith(null)
     expect(input.setSelectedTerminalGroupId).toHaveBeenCalledWith(null)
-    expect(input.selectTerminalBlock).toHaveBeenCalledWith('backend-terminal', true)
+    expect(input.selectTerminalBlock).toHaveBeenCalledWith('backend-terminal', false)
+    expect(input.focusSelectedWorkbenchNode).toHaveBeenCalledWith('backend-terminal')
+  })
+
+  it('does not focus the canvas for additive or terminal-group candidate selection', () => {
+    const additiveSelection = renderSelectionHook()
+
+    act(() => {
+      additiveSelection.result.current.selectTerminalFromTitle('backend-terminal', true)
+    })
+
+    expect(additiveSelection.input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+
+    const candidateSelection = renderSelectionHook({ isTerminalGroupSelectionMode: true })
+
+    act(() => {
+      candidateSelection.result.current.selectTerminalFromTitle('backend-terminal', false)
+    })
+
+    expect(candidateSelection.input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
+  })
+
+  it('focuses an Agent selected from its title', () => {
+    const { input, result } = renderSelectionHook()
+
+    act(() => {
+      result.current.selectAgentFromTitle('reviewer')
+    })
+
+    expect(input.focusSelectedWorkbenchNode).toHaveBeenCalledWith('agent:reviewer')
   })
 
   it.each([
@@ -75,13 +135,26 @@ describe('workbench node selection', () => {
       } else {
         expect(input.setSelectedAgentId).toHaveBeenCalledWith('reviewer')
       }
+      expect(input.focusSelectedWorkbenchNode).not.toHaveBeenCalled()
     }
   )
 })
 
-function renderSelectionHook() {
+function renderSelectionHook(
+  options: {
+    readonly isTerminalGroupSelectionMode?: boolean
+    readonly selectedAgentId?: string | null
+    readonly selectedTerminalBlockIds?: readonly string[]
+    readonly selectedTerminalGroupId?: string | null
+  } = {}
+) {
   const input = {
-    isTerminalGroupSelectionMode: false,
+    focusSelectedWorkbenchNode: vi.fn(),
+    isTerminalGroupSelectionMode: options.isTerminalGroupSelectionMode ?? false,
+    returnToGlobalCanvasView: vi.fn(),
+    selectedAgentId: options.selectedAgentId ?? null,
+    selectedTerminalBlockIds: options.selectedTerminalBlockIds ?? [],
+    selectedTerminalGroupId: options.selectedTerminalGroupId ?? null,
     selectTerminalBlock: vi.fn(),
     selectTerminalGroup: vi.fn(),
     setNodes: vi.fn(),

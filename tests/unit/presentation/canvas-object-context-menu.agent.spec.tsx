@@ -1,0 +1,69 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+
+import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { CanvasObjectContextMenu } from '../../../src/presentation/app-shell/CanvasObjectContextMenu'
+
+describe('Agent canvas object context menu', () => {
+  it('renames the Agent through its existing action callback', async () => {
+    const onClose = vi.fn()
+    const onRename = vi.fn(async () => undefined)
+    renderMenu({ onClose, onRename })
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'Agent 名称' }), {
+      target: { value: 'Reviewer 2' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存 Agent 名称' }))
+
+    await waitFor(() => expect(onRename).toHaveBeenCalledWith(reviewerAgent, 'Reviewer 2'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('removes the Agent through its existing action callback', async () => {
+    const onClose = vi.fn()
+    const onRemove = vi.fn(async () => undefined)
+    renderMenu({ onClose, onRemove })
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '移除' }))
+
+    await waitFor(() => expect(onRemove).toHaveBeenCalledWith(reviewerAgent))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+})
+
+function renderMenu({
+  onClose = vi.fn(),
+  onRemove = vi.fn(async () => undefined),
+  onRename = vi.fn(async () => undefined)
+}: {
+  readonly onClose?: () => void
+  readonly onRemove?: (agent: WorkspaceAgentSnapshot) => Promise<void>
+  readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+}): void {
+  render(
+    <CanvasObjectContextMenu
+      agentActions={{ agent: reviewerAgent, onRemove, onRename }}
+      position={{ x: 100, y: 100 }}
+      target={{
+        agentId: reviewerAgent.agentId,
+        kind: 'agent',
+        selectedConnectionIds: [],
+        selectedNodeIds: [`agent:${reviewerAgent.agentId}`]
+      }}
+      onClose={onClose}
+    />
+  )
+}
+
+const reviewerAgent: WorkspaceAgentSnapshot = {
+  agentId: 'reviewer',
+  cleancodeMcpEnabled: true,
+  layout: {
+    position: { x: -480, y: 0 },
+    size: { width: 420, height: 360 }
+  },
+  name: 'Reviewer',
+  projectId: 'project-1',
+  providerId: 'codex',
+  workspaceId: 'main'
+}

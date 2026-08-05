@@ -3,6 +3,7 @@
 @import './styles/theme-settings.css';
 @import './styles/block-template-library.css';
 @import './styles/application-settings.css';
+@import './styles/canvas-settings.css';
 @import './styles/language-settings.css';
 @import './styles/notifications.css';
 @import './styles/project-sidebar.css';
@@ -29,3 +30,4 @@
 @import './styles/agent-tool-approval.css';
 @import './styles/agent-tool-approval-connection.css';
 @import './styles/agent-mcp-capability.css';
+@import './styles/workbench-object-motion.css';

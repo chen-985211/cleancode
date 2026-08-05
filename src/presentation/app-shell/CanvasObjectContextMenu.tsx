@@ -1,27 +1,38 @@
-import { Rocket, Star, Trash2 } from 'lucide-react'
+import { Check, Pencil, Rocket, Star, Trash2, X } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
 import { createPortal } from 'react-dom'
 
-import type { CanvasObjectContextTarget } from './canvasObjectContextTarget'
+import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type {
+  CanvasObjectContextTarget,
+  CanvasTerminalObjectContextTarget
+} from './canvasObjectContextTarget'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from './i18n/useI18n'
 
 interface CanvasObjectContextMenuProps {
+  readonly agentActions?: {
+    readonly agent: WorkspaceAgentSnapshot
+    readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
+    readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
+  }
   readonly position: { readonly x: number; readonly y: number }
   readonly target: CanvasObjectContextTarget
   readonly onClose: () => void
-  readonly onFavorite: (terminalBlockIds: readonly string[]) => void
-  readonly onAddToQuickExecution?: (target: CanvasObjectContextTarget) => void
+  readonly onFavorite?: (terminalBlockIds: readonly string[]) => void
+  readonly onAddToQuickExecution?: (target: CanvasTerminalObjectContextTarget) => void
   readonly onRemove?: (target: CanvasObjectContextTarget) => void
 }
 
 export function CanvasObjectContextMenu({
+  agentActions,
   position,
   target,
   onClose,
@@ -31,6 +42,9 @@ export function CanvasObjectContextMenu({
 }: CanvasObjectContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const [mode, setMode] = useState<'actions' | 'rename'>('actions')
+  const [agentName, setAgentName] = useState(agentActions?.agent.name ?? '')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [resolvedPosition, setResolvedPosition] = useState<{
     readonly left: number
     readonly top: number
@@ -54,7 +68,7 @@ export function CanvasObjectContextMenu({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [onClose])
+  }, [mode, onClose])
 
   useLayoutEffect(() => {
     const menu = menuRef.current
@@ -76,31 +90,150 @@ export function CanvasObjectContextMenu({
     updatePosition()
     window.addEventListener('resize', updatePosition)
     return () => window.removeEventListener('resize', updatePosition)
-  }, [position.x, position.y])
+  }, [mode, position.x, position.y])
+
+  const renameAgent = async (event: FormEvent): Promise<void> => {
+    event.preventDefault()
+    const normalizedName = agentName.trim()
+    if (!agentActions || !normalizedName || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      await agentActions.onRename(agentActions.agent, normalizedName)
+      onClose()
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const removeAgent = async (): Promise<void> => {
+    if (!agentActions || isSubmitting) return
+
+    setIsSubmitting(true)
+    onClose()
+    try {
+      await agentActions.onRemove(agentActions.agent)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const ariaLabel =
+    target.kind === 'agent' && agentActions
+      ? t('agent.actions', { agentName: agentActions.agent.name })
+      : target.kind === 'agent'
+        ? t('agent.actions', { agentName: target.agentId })
+        : t(`canvas.contextMenu.${target.kind}Actions`)
 
   return createPortal(
     <div
       ref={menuRef}
       className="canvas-object-context-menu nodrag"
-      role="menu"
-      aria-label={t(`canvas.contextMenu.${target.kind}Actions`)}
+      role={mode === 'rename' ? 'dialog' : 'menu'}
+      aria-label={mode === 'rename' ? t('agent.rename') : ariaLabel}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose()
       }}
-      onKeyDown={(event) => keepMenuItemFocused(event, menuRef.current)}
+      onKeyDown={(event) => {
+        if (mode === 'actions') keepMenuItemFocused(event, menuRef.current)
+      }}
       style={{
         left: resolvedPosition?.left ?? 0,
         top: resolvedPosition?.top ?? 0,
         visibility: resolvedPosition ? 'visible' : 'hidden'
       }}
     >
+      {mode === 'rename' && agentActions ? (
+        <form
+          className="canvas-object-context-menu__rename"
+          onSubmit={(event) => void renameAgent(event)}
+        >
+          <input
+            autoFocus
+            aria-label={t('agent.name')}
+            disabled={isSubmitting}
+            value={agentName}
+            onChange={(event) => setAgentName(event.target.value)}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <div className="canvas-object-context-menu__rename-actions">
+            <button
+              type="submit"
+              aria-label={t('agent.saveName')}
+              disabled={isSubmitting || !agentName.trim()}
+            >
+              <Check size={14} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              aria-label={t('common.cancel')}
+              onClick={() => setMode('actions')}
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        </form>
+      ) : target.kind === 'agent' ? (
+        <>
+          <button
+            className="canvas-object-context-menu__item"
+            type="button"
+            role="menuitem"
+            onClick={() => setMode('rename')}
+          >
+            <Pencil size={16} aria-hidden="true" />
+            {t('agent.rename')}
+          </button>
+          <div className="canvas-object-context-menu__separator" aria-hidden="true" />
+          <button
+            className="canvas-object-context-menu__item canvas-object-context-menu__item--danger"
+            type="button"
+            role="menuitem"
+            disabled={isSubmitting}
+            onClick={() => void removeAgent()}
+          >
+            <Trash2 size={16} aria-hidden="true" />
+            {t('agent.remove')}
+          </button>
+        </>
+      ) : (
+        <TerminalContextMenuItems
+          target={target}
+          onAddToQuickExecution={onAddToQuickExecution}
+          onClose={onClose}
+          onFavorite={onFavorite}
+          onRemove={onRemove}
+        />
+      )}
+    </div>,
+    document.body
+  )
+}
+
+function TerminalContextMenuItems({
+  target,
+  onAddToQuickExecution,
+  onClose,
+  onFavorite,
+  onRemove
+}: {
+  readonly target: CanvasTerminalObjectContextTarget
+  readonly onAddToQuickExecution?: (target: CanvasTerminalObjectContextTarget) => void
+  readonly onClose: () => void
+  readonly onFavorite?: (terminalBlockIds: readonly string[]) => void
+  readonly onRemove?: (target: CanvasObjectContextTarget) => void
+}) {
+  const { t } = useI18n()
+
+  return (
+    <>
       <button
         className="canvas-object-context-menu__item"
         type="button"
         role="menuitem"
         onClick={() => {
           onClose()
-          onFavorite(target.terminalBlockIds)
+          onFavorite?.(target.terminalBlockIds)
         }}
       >
         <Star size={16} fill="currentColor" aria-hidden="true" />
@@ -134,8 +267,7 @@ export function CanvasObjectContextMenu({
           {t(`canvas.contextMenu.remove.${target.kind}`)}
         </button>
       ) : null}
-    </div>,
-    document.body
+    </>
   )
 }
 

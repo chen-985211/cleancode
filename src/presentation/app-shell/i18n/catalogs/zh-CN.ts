@@ -96,6 +96,10 @@ export const zhCNMessages = {
   'settings.shortcuts.command.quickExecution3': '执行快捷位 3',
   'settings.shortcuts.command.quickExecution4': '执行快捷位 4',
   'settings.shortcuts.command.quickExecution5': '执行快捷位 5',
+  'settings.canvas.title': '画布',
+  'settings.canvas.reduceVisualNoise': '减少视觉噪声',
+  'settings.canvas.reduceVisualNoiseDescription':
+    '缩小画布时隐藏次要描述和操作；悬停、聚焦或选中时重新显示。',
   'settings.terminal.title': '终端',
   'settings.terminal.scrollback': '滚动历史',
   'settings.terminal.scrollbackRows': '{rows} 行',
@@ -456,6 +460,7 @@ export const zhCNMessages = {
   'agent.moreActions': '{agentName} 更多操作',
   'agent.actions': '{agentName} 操作',
   'agent.rename': '重命名',
+  'agent.saveName': '保存 Agent 名称',
   'agent.remove': '移除',
   'agent.multipleNoticeTitle': 'Agent 共享当前工作区',
   'agent.multipleNotice': '多个 Agent 可能同时修改相同文件，请留意未提交更改。',

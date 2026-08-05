@@ -98,6 +98,10 @@ export const enMessages = {
   'settings.shortcuts.command.quickExecution3': 'Run quick slot 3',
   'settings.shortcuts.command.quickExecution4': 'Run quick slot 4',
   'settings.shortcuts.command.quickExecution5': 'Run quick slot 5',
+  'settings.canvas.title': 'Canvas',
+  'settings.canvas.reduceVisualNoise': 'Reduce visual noise',
+  'settings.canvas.reduceVisualNoiseDescription':
+    'Hide secondary descriptions and actions when zoomed out; reveal them on hover, focus, or selection.',
   'settings.terminal.title': 'Terminal',
   'settings.terminal.scrollback': 'Scrollback history',
   'settings.terminal.scrollbackRows': '{rows} lines',
@@ -483,6 +487,7 @@ export const enMessages = {
   'agent.moreActions': 'More actions for {agentName}',
   'agent.actions': 'Actions for {agentName}',
   'agent.rename': 'Rename',
+  'agent.saveName': 'Save Agent name',
   'agent.remove': 'Remove',
   'agent.multipleNoticeTitle': 'Agents share this workspace',
   'agent.multipleNotice':

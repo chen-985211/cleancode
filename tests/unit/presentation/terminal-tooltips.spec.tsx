@@ -6,7 +6,7 @@ import { TerminalNode } from '../../../src/presentation/app-shell/TerminalNode'
 import type { TerminalFlowNode } from '../../../src/presentation/app-shell/types'
 
 vi.mock('@xyflow/react', () => ({
-  Handle: () => null,
+  Handle: () => <span data-testid="terminal-flow-handle" />,
   NodeResizeControl: ({ onResizeEnd, position, style }: ResizeControlProps) => (
     <span
       data-resize-position={position}
@@ -46,6 +46,42 @@ interface NodeResizerProps {
 }
 
 describe('terminal tooltips', () => {
+  it('keeps React Flow handles outside the animated terminal surface', () => {
+    const { container } = render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...createTerminalNodeData(),
+          objectMotion: {
+            id: 'group-expand:terminal-1',
+            kind: 'group-expand',
+            offset: { x: 180, y: 120 }
+          }
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const anchor = container.querySelector('.terminal-node-anchor')!
+    const animatedSurface = container.querySelector('.terminal-node')!
+
+    expect(anchor).not.toBe(animatedSurface)
+    expect(anchor).toContainElement(screen.getAllByTestId('terminal-flow-handle')[0])
+    expect(animatedSurface).not.toContainElement(screen.getAllByTestId('terminal-flow-handle')[0])
+    expect(animatedSurface).not.toContainElement(
+      screen.getAllByTestId('terminal-resize-control')[0]
+    )
+  })
+
   it('exposes all four corner resize controls while the terminal is not selected', () => {
     render(
       <TerminalNode
@@ -121,6 +157,9 @@ describe('terminal tooltips', () => {
     expect(document.querySelector('[data-workbench-node-selection]')).toHaveAttribute(
       'aria-hidden',
       'true'
+    )
+    expect(document.querySelector('[data-terminal-block-id]')).toHaveClass(
+      'terminal-node--selected'
     )
   })
 

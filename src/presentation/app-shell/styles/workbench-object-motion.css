@@ -1,0 +1,186 @@
+:is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  --workbench-object-motion-x: 0px;
+  --workbench-object-motion-y: 0px;
+}
+
+:is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
+  transform-origin: center;
+  animation: workbench-object-create-in 360ms cubic-bezier(0.18, 0.84, 0.22, 1) both;
+  will-change: opacity;
+}
+
+.terminal-node.workbench-object-motion--create::before,
+.terminal-group-node.workbench-object-motion--create::before,
+.agent-console-node.workbench-object-motion--create::before {
+  position: absolute;
+  z-index: 8;
+  inset: -1px;
+  border: 1px solid var(--cc-primary-border);
+  border-radius: inherit;
+  box-shadow: 0 0 22px var(--cc-shadow-color);
+  content: '';
+  pointer-events: none;
+  animation: workbench-object-create-accent 360ms ease-out both;
+}
+
+:is(.terminal-node, .terminal-group-node).workbench-object-motion--group-expand {
+  transform-origin: center;
+  animation: workbench-object-group-expand 300ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform, opacity;
+}
+
+.terminal-node.workbench-object-motion--group-collapse {
+  transform-origin: center;
+  animation: workbench-object-group-collapse 260ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+:is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
+  transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:is(.terminal-node__header, .terminal-group-node__header, .agent-console__header):active {
+  transform: translate3d(0, 1px, 0);
+}
+
+.react-flow__node.dragging :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  box-shadow: var(--cc-shadow-node);
+}
+
+.terminal-workflow-edge {
+  transition: opacity 140ms ease;
+}
+
+.workbench-object-edge--motion-pending {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-canvas-detail='compact']
+  :is(
+    .terminal-node__description,
+    .terminal-node__actions,
+    .terminal-group-node__action-group--membership,
+    .agent-console-actions__center,
+    .agent-console-actions__menu-anchor
+  ),
+[data-canvas-detail='overview']
+  :is(
+    .terminal-node__description,
+    .terminal-node__actions,
+    .terminal-service-runtime__label,
+    .terminal-service-runtime__address,
+    .terminal-group-node__action-group,
+    .terminal-group-node__toolbar-divider,
+    .agent-console-actions__center,
+    .agent-console-actions__menu-anchor
+  ) {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+:is([data-canvas-detail='compact'], [data-canvas-detail='overview'])
+  :is(.terminal-node, .terminal-group-node, .agent-console-node):is(:hover, :focus-within)
+  :is(
+    .terminal-node__description,
+    .terminal-node__actions,
+    .terminal-service-runtime__label,
+    .terminal-service-runtime__address,
+    .terminal-group-node__action-group,
+    .terminal-group-node__toolbar-divider,
+    .agent-console-actions__center,
+    .agent-console-actions__menu-anchor
+  ),
+:is([data-canvas-detail='compact'], [data-canvas-detail='overview'])
+  .react-flow__node.selected
+  :is(
+    .terminal-node__description,
+    .terminal-node__actions,
+    .terminal-service-runtime__label,
+    .terminal-service-runtime__address,
+    .terminal-group-node__action-group,
+    .terminal-group-node__toolbar-divider,
+    .agent-console-actions__center,
+    .agent-console-actions__menu-anchor
+  ) {
+  opacity: 1;
+}
+
+@keyframes workbench-object-create-in {
+  from {
+    opacity: 0.16;
+  }
+
+  42% {
+    opacity: 0.88;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes workbench-object-create-accent {
+  from {
+    clip-path: inset(49% 8% 49% 8% round 12px);
+    opacity: 0;
+  }
+
+  36% {
+    clip-path: inset(5% 2% 5% 2% round 12px);
+    opacity: 0.72;
+  }
+
+  to {
+    clip-path: inset(0 round 12px);
+    opacity: 0;
+  }
+}
+
+@keyframes workbench-object-group-expand {
+  from {
+    opacity: 0.28;
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workbench-object-group-collapse {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
+    transition: none;
+    transform: none;
+  }
+
+  :is(
+    .workbench-object-motion--create,
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse
+  ),
+  :is(
+    .workbench-object-motion--create,
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse
+  )::before {
+    clip-path: none;
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
