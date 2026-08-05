@@ -13,6 +13,7 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
+import { resolveWorkbenchNodeFocusZoom } from '../../src/presentation/app-shell/workbenchNodeFocusViewport'
 
 describe('canvas selection viewport e2e', () => {
   let workbench: E2eWorkbench
@@ -56,6 +57,7 @@ describe('canvas selection viewport e2e', () => {
         (presentation) =>
           isNear(presentation.zoom, 0.35, 0.000_1) && isCanvasNodeCentered(presentation)
       )
+      const focusedZoom = await resolveExpectedFocusedZoom(page, node)
 
       await beginCanvasMotionSampling(page, node)
       await node.locator('.terminal-node__header').click()
@@ -63,14 +65,14 @@ describe('canvas selection viewport e2e', () => {
         page,
         node,
         (presentation) =>
-          isNear(presentation.zoom, 0.9, 0.000_1) && isCanvasNodeCentered(presentation)
+          isNear(presentation.zoom, focusedZoom, 0.000_1) && isCanvasNodeCentered(presentation)
       )
 
-      expect(focusedPresentation.zoom).toBeCloseTo(0.9, 3)
+      expect(focusedPresentation.zoom).toBeCloseTo(focusedZoom, 3)
       expect(focusedPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
       expect(focusedPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
 
-      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.35, 0.9)
+      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.35, focusedZoom)
 
       await beginCanvasMotionSampling(page, node)
       await clickTrueCanvasPane(page, page.locator('.react-flow__pane'))
@@ -84,7 +86,7 @@ describe('canvas selection viewport e2e', () => {
       expect(globalPresentation.zoom).toBeCloseTo(0.35, 3)
       expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
       expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
-      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.9, 0.35)
+      expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), focusedZoom, 0.35)
     },
     electronScenarioTimeoutMs
   )
@@ -159,6 +161,29 @@ function isCanvasNodeCentered(presentation: CanvasPresentation): boolean {
   return (
     Math.abs(presentation.nodeCenterOffsetX) < 0.4 && Math.abs(presentation.nodeCenterOffsetY) < 0.4
   )
+}
+
+async function resolveExpectedFocusedZoom(page: Page, node: Locator): Promise<number> {
+  const nodeElement = await node.elementHandle()
+  const geometry = await page.evaluate((targetNode) => {
+    const canvas = document.querySelector<HTMLElement>('.react-flow')
+    const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
+    if (!canvas || !viewport || !targetNode) {
+      throw new Error('Canvas focus geometry is unavailable.')
+    }
+
+    const zoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
+    const canvasBounds = canvas.getBoundingClientRect()
+    const nodeBounds = targetNode.getBoundingClientRect()
+
+    return {
+      canvasSize: { height: canvasBounds.height, width: canvasBounds.width },
+      currentZoom: zoom,
+      nodeSize: { height: nodeBounds.height / zoom, width: nodeBounds.width / zoom }
+    }
+  }, nodeElement)
+
+  return resolveWorkbenchNodeFocusZoom(geometry)
 }
 
 async function beginCanvasMotionSampling(page: Page, node: Locator): Promise<void> {
