@@ -48,12 +48,12 @@ describe('workbench canvas cursor styles', () => {
     expect(placementRule).not.toContain('crosshair')
   })
 
-  it('ships a compact static vector cursor without a DOM-following animation', () => {
+  it('ships a compact 20px static vector cursor without a DOM-following animation', () => {
     expect(existsSync(cursorAssetPath)).toBe(true)
     const cursorAsset = existsSync(cursorAssetPath) ? readFileSync(cursorAssetPath, 'utf8') : ''
 
     expect(cursorAsset).toContain('<svg')
-    expect(cursorAsset).toMatch(/viewBox="0 0 (24|32) (24|32)"/)
+    expect(cursorAsset).toContain('width="20" height="20" viewBox="0 0 24 24"')
     expect(cursorAsset).not.toContain('<animate')
   })
 
