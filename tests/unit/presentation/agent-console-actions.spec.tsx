@@ -46,8 +46,14 @@ describe('Agent console actions', () => {
 
     const menu = screen.getByRole('menu', { name: 'Agent 2 操作' })
     expect(menu.parentElement).toBe(document.body)
+    expect(menu).toHaveClass('canvas-node-menu')
+    expect(screen.getByRole('menuitem', { name: '重命名' })).toHaveClass('canvas-node-menu__item')
     expect(screen.getByRole('menuitem', { name: '重命名' })).toHaveFocus()
-    expect(screen.getByRole('menuitem', { name: '移除' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: '移除' })).toHaveClass('canvas-node-menu__item')
+    expect(screen.getByRole('menuitem', { name: '移除' })).not.toHaveClass(
+      'canvas-node-menu__item--danger'
+    )
+    expect(menu.querySelector('.canvas-node-menu__separator')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
 
     expect(menu).not.toBeInTheDocument()
@@ -163,22 +169,53 @@ describe('Agent console actions', () => {
     expect(trigger).toBeEnabled()
   })
 
-  it('uses a resilient floating menu and an adequate icon-button target', () => {
-    const styles = readFileSync(
+  it('uses the canonical Spatial menu palette and an adequate icon-button target', () => {
+    const agentStyles = readFileSync(
       resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
       'utf8'
     )
-    const moreButtonRule = styles.split('.agent-console-actions__more {')[1]?.split('}')[0] ?? ''
-    const menuRule = styles.split('.agent-console-actions__menu {')[1]?.split('}')[0] ?? ''
-    const focusRule = styles
-      .split(
-        '.agent-console-actions__menu button:hover,\n.agent-console-actions__menu button:focus-visible {'
-      )[1]
-      ?.split('}')[0]
+    const menuStyles = readFileSync(
+      resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-object-context-menu.css'),
+      'utf8'
+    )
+    const themeStyles = readFileSync(
+      resolve(process.cwd(), 'src/presentation/app-shell/styles/theme.css'),
+      'utf8'
+    )
+    const moreButtonRule =
+      agentStyles.split('.agent-console-actions__more {')[1]?.split('}')[0] ?? ''
+    const menuRule = menuStyles.split('.canvas-node-menu {')[1]?.split('}')[0] ?? ''
+    const itemRule = menuStyles.split('.canvas-node-menu__item {')[1]?.split('}')[0] ?? ''
+    const iconRule = menuStyles.split('.canvas-node-menu__item svg {')[1]?.split('}')[0] ?? ''
+    const focusRule =
+      menuStyles.split('.canvas-node-menu__item:focus-visible {')[1]?.split('}')[0] ?? ''
 
     expect(moreButtonRule).toContain('width: 30px;')
     expect(moreButtonRule).toContain('height: 30px;')
     expect(menuRule).toContain('position: fixed;')
+    expect(menuRule).toContain('width: 340px;')
+    expect(menuRule).toContain('border-radius: 24px;')
+    expect(menuRule).toContain('background: var(--cc-canvas-node-menu-surface);')
+    expect(itemRule).toContain('height: 44px;')
+    expect(itemRule).toContain('border-radius: 15px;')
+    expect(itemRule).toContain('font-weight: 500;')
+    expect(itemRule).toContain('font-synthesis: none;')
+    expect(itemRule).toContain("'Eina03-Regular'")
+    expect(itemRule).toContain("'Avenir Next'")
+    expect(iconRule).toContain('color: var(--cc-canvas-node-menu-icon);')
     expect(focusRule).toContain('outline: 2px solid var(--cc-ring);')
+    expect(menuStyles).toContain('background: var(--cc-canvas-node-menu-hover);')
+    expect(menuStyles).not.toContain('canvas-node-menu__item--danger')
+    expect(menuStyles).not.toContain('.canvas-node-menu__separator')
+    expect(menuStyles).not.toContain('var(--cc-danger')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-surface: #f2f4f5;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-hover: #e9ebec;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-foreground: #16181a;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-icon: #16181a;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-surface: #212426;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-hover: #373a3c;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-foreground: #e9ebec;')
+    expect(themeStyles).toContain('--cc-canvas-node-menu-icon: #e9ebec;')
+    expect(themeStyles).not.toContain('--cc-canvas-node-menu-divider')
   })
 })

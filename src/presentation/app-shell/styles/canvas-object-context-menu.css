@@ -1,82 +1,104 @@
-.canvas-object-context-menu {
+.canvas-node-menu {
+  --canvas-node-menu-enter-y: -4px;
+  --canvas-node-menu-transform-origin: top left;
+
   position: fixed;
   z-index: 220;
   display: grid;
-  min-width: 152px;
+  box-sizing: border-box;
+  width: 340px;
   max-width: calc(100vw - 16px);
   gap: 1px;
-  border: 1px solid var(--cc-border-strong);
-  border-radius: 10px;
-  background: var(--cc-surface-overlay);
+  overflow: hidden;
+  border: 0;
+  border-radius: 24px;
+  background: var(--cc-canvas-node-menu-surface);
   box-shadow: var(--cc-shadow-floating);
-  padding: 5px;
-  transform-origin: left top;
-  animation: canvas-object-context-menu-in 160ms ease-out;
+  padding: 8px;
+  transform-origin: var(--canvas-node-menu-transform-origin);
+  animation: canvas-node-menu-in 160ms ease-out;
 }
 
-.canvas-object-context-menu__item {
+.canvas-node-menu[data-side='bottom'] {
+  --canvas-node-menu-transform-origin: top right;
+}
+
+.canvas-node-menu[data-side='top'] {
+  --canvas-node-menu-enter-y: 4px;
+  --canvas-node-menu-transform-origin: bottom right;
+}
+
+.canvas-node-menu__item {
   display: flex;
   width: 100%;
-  height: 30px;
+  min-width: 0;
+  height: 44px;
   align-items: center;
-  gap: 8px;
+  gap: 18px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 15px;
   background: transparent;
-  color: var(--cc-foreground);
+  color: var(--cc-canvas-node-menu-foreground);
   font: inherit;
-  font-size: 13px;
+  font-family:
+    'Eina03-Regular',
+    'Avenir Next',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-size: 15px;
+  font-synthesis: none;
   font-weight: 500;
-  padding: 0 9px;
+  line-height: 1;
+  padding: 0 18px;
   text-align: left;
+  transition: background 150ms ease;
 }
 
-.canvas-object-context-menu__item svg {
+.canvas-node-menu__item svg {
+  width: 16px;
+  height: 16px;
   flex: 0 0 auto;
-  color: var(--cc-primary);
+  color: var(--cc-canvas-node-menu-icon);
 }
 
-.canvas-object-context-menu__item:hover,
-.canvas-object-context-menu__item:focus-visible {
-  background: var(--cc-neutral-overlay);
-  outline: none;
-  box-shadow: 0 0 0 1px var(--cc-border-strong) inset;
+.canvas-node-menu__item:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
 }
 
-.canvas-object-context-menu__separator {
-  height: 1px;
-  margin: 3px 7px;
-  background: var(--cc-divider);
+.canvas-node-menu__item:hover:not(:disabled),
+.canvas-node-menu__item:focus-visible {
+  background: var(--cc-canvas-node-menu-hover);
 }
 
-.canvas-object-context-menu__item--danger svg {
-  color: var(--cc-danger);
+.canvas-node-menu__item:active:not(:disabled) {
+  background: var(--cc-canvas-node-menu-hover);
 }
 
-.canvas-object-context-menu__item--danger:hover,
-.canvas-object-context-menu__item--danger:focus-visible {
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger-strong);
+.canvas-node-menu__item:disabled {
+  opacity: 0.42;
 }
 
 .canvas-object-context-menu__rename {
   display: grid;
-  min-width: 220px;
+  min-width: 272px;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
+  padding: 2px;
 }
 
 .canvas-object-context-menu__rename input {
   min-width: 0;
-  height: 30px;
+  height: 38px;
   border: 1px solid var(--cc-border-strong);
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--cc-surface);
   color: var(--cc-foreground);
   font: inherit;
-  font-size: 13px;
-  padding: 0 8px;
+  font-size: 14px;
+  padding: 0 10px;
 }
 
 .canvas-object-context-menu__rename input:focus-visible {
@@ -87,27 +109,27 @@
 
 .canvas-object-context-menu__rename-actions {
   display: inline-flex;
-  gap: 2px;
+  gap: 3px;
 }
 
 .canvas-object-context-menu__rename-actions button {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
   background: transparent;
   color: var(--cc-muted-strong);
 }
 
 .canvas-object-context-menu__rename-actions button:hover:not(:disabled),
 .canvas-object-context-menu__rename-actions button:focus-visible {
-  background: var(--cc-neutral-overlay);
+  background: var(--cc-surface-subtle);
   color: var(--cc-foreground);
-  outline: 2px solid var(--cc-ring);
-  outline-offset: -2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--cc-ring) inset;
 }
 
 .canvas-object-context-menu__rename-actions button:disabled {
@@ -124,10 +146,10 @@
   stroke: var(--cc-primary);
 }
 
-@keyframes canvas-object-context-menu-in {
+@keyframes canvas-node-menu-in {
   from {
     opacity: 0;
-    transform: translateY(-3px) scale(0.98);
+    transform: translateY(var(--canvas-node-menu-enter-y)) scale(0.98);
   }
 
   to {
@@ -137,7 +159,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .canvas-object-context-menu {
+  .canvas-node-menu {
     animation: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .canvas-node-menu {
+    outline: 1px solid var(--cc-canvas-node-menu-foreground);
   }
 }

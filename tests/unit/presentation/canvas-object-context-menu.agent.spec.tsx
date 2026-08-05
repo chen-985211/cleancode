@@ -4,6 +4,19 @@ import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/applica
 import { CanvasObjectContextMenu } from '../../../src/presentation/app-shell/CanvasObjectContextMenu'
 
 describe('Agent canvas object context menu', () => {
+  it('uses the canonical canvas node menu template', () => {
+    renderMenu({})
+
+    const menu = screen.getByRole('menu', { name: 'Reviewer 操作' })
+    expect(menu).toHaveClass('canvas-node-menu')
+    expect(screen.getByRole('menuitem', { name: '重命名' })).toHaveClass('canvas-node-menu__item')
+    expect(screen.getByRole('menuitem', { name: '移除' })).toHaveClass('canvas-node-menu__item')
+    expect(screen.getByRole('menuitem', { name: '移除' })).not.toHaveClass(
+      'canvas-node-menu__item--danger'
+    )
+    expect(menu.querySelector('.canvas-node-menu__separator')).not.toBeInTheDocument()
+  })
+
   it('renames the Agent through its existing action callback', async () => {
     const onClose = vi.fn()
     const onRename = vi.fn(async () => undefined)

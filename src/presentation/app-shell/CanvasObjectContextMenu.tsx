@@ -14,6 +14,7 @@ import type {
   CanvasObjectContextTarget,
   CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
+import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from './i18n/useI18n'
 
@@ -126,9 +127,8 @@ export function CanvasObjectContextMenu({
         : t(`canvas.contextMenu.${target.kind}Actions`)
 
   return createPortal(
-    <div
+    <CanvasNodeMenu
       ref={menuRef}
-      className="canvas-object-context-menu nodrag"
       role={mode === 'rename' ? 'dialog' : 'menu'}
       aria-label={mode === 'rename' ? t('agent.rename') : ariaLabel}
       onBlur={(event) => {
@@ -175,18 +175,11 @@ export function CanvasObjectContextMenu({
         </form>
       ) : target.kind === 'agent' ? (
         <>
-          <button
-            className="canvas-object-context-menu__item"
-            type="button"
-            role="menuitem"
-            onClick={() => setMode('rename')}
-          >
+          <CanvasNodeMenuItem type="button" role="menuitem" onClick={() => setMode('rename')}>
             <Pencil size={16} aria-hidden="true" />
             {t('agent.rename')}
-          </button>
-          <div className="canvas-object-context-menu__separator" aria-hidden="true" />
-          <button
-            className="canvas-object-context-menu__item canvas-object-context-menu__item--danger"
+          </CanvasNodeMenuItem>
+          <CanvasNodeMenuItem
             type="button"
             role="menuitem"
             disabled={isSubmitting}
@@ -194,7 +187,7 @@ export function CanvasObjectContextMenu({
           >
             <Trash2 size={16} aria-hidden="true" />
             {t('agent.remove')}
-          </button>
+          </CanvasNodeMenuItem>
         </>
       ) : (
         <TerminalContextMenuItems
@@ -205,7 +198,7 @@ export function CanvasObjectContextMenu({
           onRemove={onRemove}
         />
       )}
-    </div>,
+    </CanvasNodeMenu>,
     document.body
   )
 }
@@ -227,8 +220,7 @@ function TerminalContextMenuItems({
 
   return (
     <>
-      <button
-        className="canvas-object-context-menu__item"
+      <CanvasNodeMenuItem
         type="button"
         role="menuitem"
         onClick={() => {
@@ -236,12 +228,11 @@ function TerminalContextMenuItems({
           onFavorite?.(target.terminalBlockIds)
         }}
       >
-        <Star size={16} fill="currentColor" aria-hidden="true" />
+        <Star size={16} aria-hidden="true" />
         {t(`canvas.contextMenu.favorite.${target.kind}`)}
-      </button>
+      </CanvasNodeMenuItem>
       {onAddToQuickExecution ? (
-        <button
-          className="canvas-object-context-menu__item"
+        <CanvasNodeMenuItem
           type="button"
           role="menuitem"
           onClick={() => {
@@ -251,11 +242,10 @@ function TerminalContextMenuItems({
         >
           <Rocket size={16} aria-hidden="true" />
           {t('canvas.contextMenu.addToQuickExecution')}
-        </button>
+        </CanvasNodeMenuItem>
       ) : null}
       {target.kind !== 'terminal' && onRemove ? (
-        <button
-          className="canvas-object-context-menu__item"
+        <CanvasNodeMenuItem
           type="button"
           role="menuitem"
           onClick={() => {
@@ -265,7 +255,7 @@ function TerminalContextMenuItems({
         >
           <Trash2 size={16} aria-hidden="true" />
           {t(`canvas.contextMenu.remove.${target.kind}`)}
-        </button>
+        </CanvasNodeMenuItem>
       ) : null}
     </>
   )
