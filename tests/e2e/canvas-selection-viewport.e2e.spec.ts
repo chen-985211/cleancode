@@ -168,42 +168,49 @@ async function beginCanvasMotionSampling(page: Page, node: Locator): Promise<voi
     if (!targetNode) throw new Error('Canvas node is unavailable for motion sampling.')
 
     const samplingWindow = window as typeof window & {
-      canvasMotionSampling?: { frameId: number; presentations: CanvasPresentation[] }
+      canvasMotionSampling?: {
+        observer: MutationObserver
+        presentations: CanvasPresentation[]
+      }
     }
-    samplingWindow.canvasMotionSampling = { frameId: 0, presentations: [] }
+    const canvas = document.querySelector<HTMLElement>('.react-flow')
+    const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
+    if (!canvas || !viewport) throw new Error('Canvas presentation is unavailable.')
+
+    const presentations: CanvasPresentation[] = []
 
     const sample = () => {
-      const canvas = document.querySelector<HTMLElement>('.react-flow')
-      const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
-      const sampling = samplingWindow.canvasMotionSampling
-      if (!canvas || !viewport || !sampling) return
-
       const canvasBounds = canvas.getBoundingClientRect()
       const nodeBounds = targetNode.getBoundingClientRect()
       const transform = new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
-      sampling.presentations.push({
+      presentations.push({
         nodeCenterOffsetX:
           nodeBounds.left + nodeBounds.width / 2 - (canvasBounds.left + canvasBounds.width / 2),
         nodeCenterOffsetY:
           nodeBounds.top + nodeBounds.height / 2 - (canvasBounds.top + canvasBounds.height / 2),
         zoom: transform.a
       })
-      sampling.frameId = requestAnimationFrame(sample)
     }
 
-    samplingWindow.canvasMotionSampling.frameId = requestAnimationFrame(sample)
+    const observer = new MutationObserver(sample)
+    observer.observe(viewport, { attributeFilter: ['style'], attributes: true })
+    samplingWindow.canvasMotionSampling = { observer, presentations }
+    sample()
   }, nodeElement)
 }
 
 function finishCanvasMotionSampling(page: Page): Promise<CanvasPresentation[]> {
   return page.evaluate(() => {
     const samplingWindow = window as typeof window & {
-      canvasMotionSampling?: { frameId: number; presentations: CanvasPresentation[] }
+      canvasMotionSampling?: {
+        observer: MutationObserver
+        presentations: CanvasPresentation[]
+      }
     }
     const sampling = samplingWindow.canvasMotionSampling
     if (!sampling) throw new Error('Canvas motion sampling was not started.')
 
-    cancelAnimationFrame(sampling.frameId)
+    sampling.observer.disconnect()
     delete samplingWindow.canvasMotionSampling
     return sampling.presentations
   })
