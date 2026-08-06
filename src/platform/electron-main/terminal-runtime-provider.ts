@@ -1,8 +1,12 @@
-import { appendFile, readFile } from 'node:fs/promises'
+import { appendFile, readFile, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import { TerminalProviderServer } from '../../contexts/run/infrastructure/provider/TerminalProviderServer'
 import { terminalProviderProtocolVersion } from '../../contexts/run/infrastructure/provider/TerminalProviderProtocol'
+import { rotateProviderLog } from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
+
+const maxProviderLogBytes = 5 * 1024 * 1024
+let diagnosticTail: Promise<void> = Promise.resolve()
 
 interface ProviderMetadata {
   readonly schemaVersion: 1
@@ -33,8 +37,15 @@ async function startProvider(): Promise<void> {
   })
   await server.start()
 
+  let isClosing = false
   const close = () => {
-    void server.close().finally(() => process.exit(0))
+    if (isClosing) return
+    isClosing = true
+    const forceExit = setTimeout(() => process.exit(1), 4_500)
+    void server.close().finally(() => {
+      clearTimeout(forceExit)
+      process.exit(0)
+    })
   }
   process.once('SIGTERM', close)
   process.once('SIGINT', close)
@@ -74,9 +85,21 @@ async function writeProviderDiagnostic(
 ): Promise<void> {
   const metadataPath = process.argv[process.argv.indexOf('--metadata') + 1]
   if (!metadataPath) return
-  const line = JSON.stringify({ timestamp: new Date().toISOString(), event, ...details })
-  await appendFile(join(dirname(metadataPath), 'provider.log'), `${line}\n`, {
-    encoding: 'utf8',
-    mode: 0o600
-  }).catch(() => undefined)
+  const logPath = join(dirname(metadataPath), 'provider.log')
+  diagnosticTail = diagnosticTail
+    .catch(() => undefined)
+    .then(async () => {
+      if ((await fileSize(logPath)) >= maxProviderLogBytes) rotateProviderLog(logPath)
+      const line = JSON.stringify({ timestamp: new Date().toISOString(), event, ...details })
+      await appendFile(logPath, `${line}\n`, { encoding: 'utf8', mode: 0o600 })
+    })
+  await diagnosticTail.catch(() => undefined)
+}
+
+async function fileSize(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size
+  } catch {
+    return 0
+  }
 }

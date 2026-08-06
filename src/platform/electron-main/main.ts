@@ -127,6 +127,7 @@ if (acquiresSingleInstanceLock) {
 }
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
+consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)

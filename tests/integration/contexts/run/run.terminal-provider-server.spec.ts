@@ -1,6 +1,4 @@
-import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
-import { connect, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -14,13 +12,9 @@ import type { TerminalSnapshot } from '../../../../src/contexts/run/application/
 import { FileTerminalRecoveryStore } from '../../../../src/contexts/run/infrastructure/persistence/FileTerminalRecoveryStore'
 import { TerminalProviderServer } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderServer'
 import { createProviderEndpoint } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
-import {
-  encodeTerminalProviderFrame,
-  type TerminalProviderEvent,
-  TerminalProviderFrameDecoder,
-  type TerminalProviderResponse,
-  terminalProviderProtocolVersion
-} from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
+import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
+import { terminalProviderProtocolVersion } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
+import { TerminalProviderTestClient as TestProviderClient } from '../../../support/terminalProviderTestClient'
 
 describe('terminal provider server', () => {
   let rootDirectory = ''
@@ -169,6 +163,108 @@ describe('terminal provider server', () => {
     })
 
     expect(snapshot.transcript).toContain('eager startup output')
+    client.close()
+  })
+
+  it('isolates a permanently blocked model request from control and other sessions', async () => {
+    const processes = new RecordingProcessPort()
+    const models = new HeadlessTerminalModelAdapter()
+    const flush = models.flush.bind(models)
+    vi.spyOn(models, 'flush').mockImplementation((scope) => {
+      if (scope.sessionId === 'session-blocked') return new Promise(() => undefined)
+      return flush(scope)
+    })
+    server = new TerminalProviderServer({
+      endpoint,
+      authToken: 'secret-token',
+      instanceId: 'provider-1',
+      recoveryDirectory: join(rootDirectory, 'recovery'),
+      processes,
+      models
+    })
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    const blocked = identityFor('blocked')
+    const healthy = identityFor('healthy')
+    await createModel(client, blocked)
+    await createModel(client, healthy)
+
+    const blockedFlush = client.request(
+      'flushModel',
+      { identity: blocked },
+      terminalProviderProtocolVersion,
+      25
+    )
+
+    await expect(
+      client.request('health', undefined, terminalProviderProtocolVersion, 250)
+    ).resolves.toMatchObject({ instanceId: 'provider-1' })
+    await expect(
+      client.request(
+        'attachView',
+        { identity: healthy, viewId: 'healthy-view' },
+        terminalProviderProtocolVersion,
+        250
+      )
+    ).resolves.toMatchObject({ identity: healthy })
+    await expect(blockedFlush).rejects.toMatchObject({
+      code: 'COMMAND_TIMED_OUT'
+    })
+    client.close()
+  })
+
+  it('reconciles an unknown start outcome without exposing idle recovery or spawning twice', async () => {
+    const processes = new DeferredStartProcessPort()
+    server = createServer(processes)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+    await claimController(client)
+    const scope = identityFor('unknown-start')
+    await createModel(client, scope)
+    await createModel(client, scope)
+
+    const firstStart = client.request(
+      'startProcess',
+      {
+        command: {
+          scope,
+          workingDirectory: '/work/app',
+          columns: 80,
+          rows: 24,
+          sessionKind: 'interactive'
+        }
+      },
+      terminalProviderProtocolVersion,
+      25
+    )
+    await expect(firstStart).rejects.toMatchObject({ code: 'COMMAND_TIMED_OUT' })
+    const starting = await client.request<{
+      readonly sessions: readonly TerminalSessionSnapshot[]
+    }>('listSessions')
+    expect(starting.sessions).toEqual([])
+
+    processes.resolveStart(4343)
+    await vi.waitFor(async () => {
+      const recovered = await client.request<{
+        readonly sessions: readonly TerminalSessionSnapshot[]
+      }>('listSessions')
+      expect(recovered.sessions).toEqual([
+        expect.objectContaining({ sessionId: scope.sessionId, processId: 4343, status: 'running' })
+      ])
+    })
+    await expect(
+      client.request('startProcess', {
+        command: {
+          scope,
+          workingDirectory: '/work/app',
+          columns: 80,
+          rows: 24,
+          sessionKind: 'interactive'
+        }
+      })
+    ).resolves.toEqual({ processId: 4343 })
+    expect(processes.starts).toHaveLength(1)
     client.close()
   })
 
@@ -479,78 +575,16 @@ class RecordingProcessPort implements TerminalProcessPort {
   }
 }
 
-class TestProviderClient {
-  private readonly decoder = new TerminalProviderFrameDecoder()
-  private readonly responses = new Map<
-    string,
-    { readonly resolve: (value: unknown) => void; readonly reject: (error: unknown) => void }
-  >()
-  private readonly events: TerminalProviderEvent[] = []
+class DeferredStartProcessPort extends RecordingProcessPort {
+  private readonly startResult = deferred<{ readonly processId: number }>()
 
-  private constructor(
-    private readonly socket: Socket,
-    private readonly authToken: string
-  ) {
-    socket.on('data', (chunk) => {
-      for (const message of this.decoder.push(chunk)) this.accept(message)
-    })
+  override async start(command: StartTerminalProcessCommand) {
+    this.starts.push(command)
+    return this.startResult.promise
   }
 
-  static async connect(endpoint: string, authToken: string): Promise<TestProviderClient> {
-    const socket = connect(endpoint)
-    await new Promise<void>((resolve, reject) => {
-      socket.once('connect', resolve)
-      socket.once('error', reject)
-    })
-    return new TestProviderClient(socket, authToken)
-  }
-
-  request<T = void>(
-    method: string,
-    params?: unknown,
-    protocolVersion = terminalProviderProtocolVersion
-  ): Promise<T> {
-    const requestId = randomUUID()
-    this.socket.write(
-      encodeTerminalProviderFrame({
-        type: 'request',
-        protocolVersion,
-        requestId,
-        authToken: this.authToken,
-        method,
-        params
-      })
-    )
-    return new Promise<T>((resolve, reject) => {
-      this.responses.set(requestId, {
-        resolve: (value) => resolve(value as T),
-        reject
-      })
-    })
-  }
-
-  async waitForEvent(event: TerminalProviderEvent['event']): Promise<TerminalProviderEvent> {
-    await vi.waitFor(() =>
-      expect(this.events.some((candidate) => candidate.event === event)).toBe(true)
-    )
-    return this.events.find((candidate) => candidate.event === event) as TerminalProviderEvent
-  }
-
-  close(): void {
-    this.socket.destroy()
-  }
-
-  private accept(value: unknown): void {
-    const message = value as TerminalProviderResponse | TerminalProviderEvent
-    if (message.type === 'event') {
-      this.events.push(message)
-      return
-    }
-    const pending = this.responses.get(message.requestId)
-    if (!pending) return
-    this.responses.delete(message.requestId)
-    if (message.ok) pending.resolve(message.result)
-    else pending.reject(message.error)
+  resolveStart(processId: number): void {
+    this.startResult.resolve({ processId })
   }
 }
 
@@ -579,6 +613,21 @@ async function createAndStart(
   })
 }
 
+async function createModel(
+  client: TestProviderClient,
+  scope: ReturnType<typeof identityFor>
+): Promise<void> {
+  await client.request('createModel', {
+    command: {
+      identity: scope,
+      columns: 80,
+      rows: 24,
+      workingDirectory: '/work/app',
+      terminalSourceTheme: 'light'
+    }
+  })
+}
+
 function claimController(client: TestProviderClient, controllerId = 'controller-1') {
   return client.request<{ readonly controllerLeaseId: string }>('claimController', {
     controllerId,
@@ -587,15 +636,27 @@ function claimController(client: TestProviderClient, controllerId = 'controller-
 }
 
 function identity() {
+  return identityFor('1')
+}
+
+function identityFor(suffix: string) {
   return {
     projectId: 'project-1',
     projectDirectory: '/work/app',
     workspaceId: 'main',
     workspaceDirectory: '/work/app',
     gitBranch: 'main',
-    blockId: 'block-1',
-    sessionId: 'session-1',
-    runId: 'run-1',
+    blockId: `block-${suffix}`,
+    sessionId: `session-${suffix}`,
+    runId: `run-${suffix}`,
     generation: 1
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }

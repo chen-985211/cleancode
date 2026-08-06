@@ -66,7 +66,6 @@ export class TerminalProviderSessionPersistence {
   async retire(): Promise<void> {
     this.clearTimers()
     this.pendingOutputs = []
-    await this.tail.catch(() => undefined)
   }
 
   private scheduleOutputFlush(): void {
@@ -111,6 +110,7 @@ export class TerminalProviderSessionPersistence {
     model: TerminalModelCheckpoint,
     truncateOutputLog: boolean
   ): Promise<void> {
+    if (this.options.isRetired()) return Promise.resolve()
     const record: TerminalRecoveryRecord = {
       schemaVersion: 2,
       providerInstanceId: this.options.instanceId,

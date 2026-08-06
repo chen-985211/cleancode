@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
+import { existsSync, mkdirSync, openSync, renameSync, rmSync } from 'node:fs'
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { connect } from 'node:net'
@@ -7,6 +7,12 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import type { ForegroundJobProcessIdentity } from '../../application/ports/TerminalProcessPort'
+import type { TerminalModelDiagnosticsSnapshot } from '../../application/dto/TerminalModelSnapshot'
+import {
+  createExpectedAppError,
+  isAppError,
+  type AppError
+} from '../../../../shared-kernel/application/errors/AppError'
 import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
 
 export interface TerminalProviderMetadata {
@@ -140,11 +146,22 @@ export function rotateProviderLog(path: string): void {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   if (!existsSync(path)) return
   try {
-    const descriptor = openSync(path, 'w', 0o600)
-    closeSync(descriptor)
+    for (let index = 3; index >= 1; index -= 1) {
+      const source = index === 1 ? path : `${path}.${index - 1}`
+      const target = `${path}.${index}`
+      if (!existsSync(source)) continue
+      rmSync(target, { force: true })
+      renameSync(source, target)
+    }
   } catch {
     // Provider startup can continue when diagnostics rotation is unavailable.
   }
+}
+
+export function openProviderProcessLog(stateDirectory: string): number {
+  const path = join(stateDirectory, 'provider-process.log')
+  rotateProviderLog(path)
+  return openSync(path, 'a', 0o600)
 }
 
 export async function acquireProviderLaunchLock(
@@ -181,6 +198,24 @@ export function delayProviderOperation(durationMs: number): Promise<void> {
 
 export function getProviderErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+export function createProviderUnavailableError(message: string) {
+  return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
+}
+
+export function isRuntimeInvalidatingProviderError(error: unknown): error is AppError {
+  return (
+    isAppError(error) &&
+    (error.code === 'TERMINAL_PROVIDER_UNAVAILABLE' || error.code === 'COMMAND_TIMED_OUT')
+  )
+}
+
+export function createProviderDiagnostics(
+  modelCount: number,
+  attachedViewCount: number
+): TerminalModelDiagnosticsSnapshot {
+  return { attachedViewCount, lastRestoreDurationMs: 0, modelCount, pendingOutputBytes: 0 }
 }
 
 function isProviderMetadata(value: unknown): value is TerminalProviderMetadata {

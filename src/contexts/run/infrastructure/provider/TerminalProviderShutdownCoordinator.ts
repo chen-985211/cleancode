@@ -5,11 +5,16 @@ import {
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalProviderApplicationDetachResult } from './TerminalProviderProtocol'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const defaultShutdownConcurrency = 8
+const defaultCheckpointDeadlineMs = 750
+const defaultRetireDeadlineMs = 750
+const defaultStopDeadlineMs = 2_500
 
 export interface TerminalProviderShutdownSession {
   readonly snapshot: TerminalSessionSnapshot
+  readonly starting?: boolean
   readonly persistence: {
     checkpoint(truncateOutputLog: boolean): Promise<void>
   }
@@ -17,6 +22,10 @@ export interface TerminalProviderShutdownSession {
 
 interface TerminalProviderShutdownCoordinatorOptions {
   readonly concurrency?: number
+  readonly checkpointDeadlineMs?: number
+  readonly operationDeadlineMs?: number
+  readonly retireDeadlineMs?: number
+  readonly stopDeadlineMs?: number
   readonly processes: Pick<TerminalProcessPort, 'stop'>
   readonly retireSession: (identity: TerminalRunScope) => Promise<void>
   readonly onFailure?: (
@@ -40,9 +49,24 @@ interface CapturedSession {
 
 export class TerminalProviderShutdownCoordinator {
   private readonly concurrency: number
+  private readonly checkpointDeadlineMs: number
+  private readonly retireDeadlineMs: number
+  private readonly stopDeadlineMs: number
 
   constructor(private readonly options: TerminalProviderShutdownCoordinatorOptions) {
     this.concurrency = Math.max(1, Math.floor(options.concurrency ?? defaultShutdownConcurrency))
+    this.checkpointDeadlineMs = resolveDeadline(
+      options.operationDeadlineMs ?? options.checkpointDeadlineMs,
+      defaultCheckpointDeadlineMs
+    )
+    this.retireDeadlineMs = resolveDeadline(
+      options.operationDeadlineMs ?? options.retireDeadlineMs,
+      defaultRetireDeadlineMs
+    )
+    this.stopDeadlineMs = resolveDeadline(
+      options.operationDeadlineMs ?? options.stopDeadlineMs,
+      defaultStopDeadlineMs
+    )
   }
 
   async release(
@@ -60,19 +84,29 @@ export class TerminalProviderShutdownCoordinator {
     const terminate = async (candidate: CapturedSession): Promise<void> => {
       try {
         if (candidate.isRunning) {
-          await this.options.processes.stop(candidate.identity.sessionId)
+          await withOperationDeadline(
+            this.options.processes.stop(candidate.identity.sessionId),
+            this.stopDeadlineMs,
+            'stop terminal process'
+          )
           stoppedSessionCount += 1
         }
-        await this.options.retireSession(candidate.identity)
+        await withOperationDeadline(
+          this.options.retireSession(candidate.identity),
+          this.retireDeadlineMs,
+          'retire terminal session'
+        )
         retiredSessionCount += 1
       } catch (error) {
         failedSessions.add(candidate.identity.sessionId)
         this.options.onFailure?.(error, candidate.session, 'stop-or-retire')
-        await candidate.session.persistence
-          .checkpoint(true)
-          .catch((checkpointError) =>
-            this.options.onFailure?.(checkpointError, candidate.session, 'checkpoint')
-          )
+        await withOperationDeadline(
+          candidate.session.persistence.checkpoint(true),
+          this.checkpointDeadlineMs,
+          'checkpoint failed terminal session'
+        ).catch((checkpointError) =>
+          this.options.onFailure?.(checkpointError, candidate.session, 'checkpoint')
+        )
       }
     }
 
@@ -82,7 +116,11 @@ export class TerminalProviderShutdownCoordinator {
       async (candidate) => {
         if (!candidate.shouldTerminate) {
           try {
-            await candidate.session.persistence.checkpoint(true)
+            await withOperationDeadline(
+              candidate.session.persistence.checkpoint(true),
+              this.checkpointDeadlineMs,
+              'checkpoint terminal session'
+            )
             retainedSessionCount += 1
           } catch (error) {
             failedSessions.add(candidate.identity.sessionId)
@@ -108,17 +146,43 @@ export class TerminalProviderShutdownCoordinator {
   }
 }
 
+function resolveDeadline(value: number | undefined, fallback: number): number {
+  return Math.max(1, Math.floor(value ?? fallback))
+}
+
+function withOperationDeadline<T>(
+  operation: Promise<T>,
+  deadlineMs: number,
+  operationName: string
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(
+        createExpectedAppError(
+          'COMMAND_TIMED_OUT',
+          `Terminal provider could not ${operationName} before its deadline.`
+        )
+      )
+    }, deadlineMs)
+    timeout.unref()
+  })
+  return Promise.race([operation, deadline]).finally(() => {
+    if (timeout) clearTimeout(timeout)
+  })
+}
+
 function captureSession(session: TerminalProviderShutdownSession): CapturedSession {
   const snapshot = session.snapshot
   return {
     identity: snapshot,
-    isRunning: snapshot.status === 'running',
+    isRunning: snapshot.status === 'running' || session.starting === true,
     session,
     shouldTerminate: shouldTerminateProviderSession(snapshot)
   }
 }
 
-export function shouldTerminateProviderSession(snapshot: TerminalSessionSnapshot): boolean {
+function shouldTerminateProviderSession(snapshot: TerminalSessionSnapshot): boolean {
   return (
     snapshot.kind === 'workflow' ||
     resolveTerminalOwnerRef(snapshot).kind === 'agent' ||

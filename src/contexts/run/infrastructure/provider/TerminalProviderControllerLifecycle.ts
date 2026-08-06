@@ -12,8 +12,8 @@ import type {
 interface TerminalProviderControllerLifecycleOptions {
   readonly createRelease: (releaseId: string) => Promise<TerminalProviderApplicationDetachResult>
   readonly hasLiveSessions: () => boolean
-  readonly hasUnsafeLiveSessions: () => boolean
   readonly isProcessAlive: (processId: number) => boolean
+  readonly releaseDeadlineMs?: number
   readonly log?: (message: string, details?: Readonly<Record<string, unknown>>) => void
   readonly onClaim: () => void
   readonly onIdleWithoutLiveSessions: () => void
@@ -75,7 +75,10 @@ export class TerminalProviderControllerLifecycle {
     if (this.stateValue.kind !== 'active') return null
     const controller = this.stateValue
     const releaseId = randomUUID()
-    const release = this.options.createRelease(releaseId)
+    const release = withReleaseDeadline(
+      this.options.createRelease(releaseId),
+      this.options.releaseDeadlineMs ?? 4_500
+    )
     const controllerRelease: ProviderControllerRelease = {
       socket: controller.socket,
       controllerId: controller.controllerId,
@@ -147,13 +150,6 @@ export class TerminalProviderControllerLifecycle {
     if (this.stateValue.kind !== 'releasing' || this.stateValue.releaseId !== release.releaseId) {
       return
     }
-    if (this.options.hasUnsafeLiveSessions()) {
-      this.log('controller-release-retained-for-safety', {
-        reason: release.reason,
-        releaseId: release.releaseId
-      })
-      return
-    }
     this.stateValue = { kind: 'unclaimed' }
     this.log('controller-released', {
       reason: release.reason,
@@ -165,6 +161,27 @@ export class TerminalProviderControllerLifecycle {
   private log(message: string, details: Readonly<Record<string, unknown>>): void {
     this.options.log?.(message, details)
   }
+}
+
+function withReleaseDeadline<T>(operation: Promise<T>, deadlineMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () => {
+        reject(
+          createExpectedAppError(
+            'COMMAND_TIMED_OUT',
+            'Terminal provider controller release exceeded its deadline.'
+          )
+        )
+      },
+      Math.max(1, deadlineMs)
+    )
+    timeout.unref()
+  })
+  return Promise.race([operation, deadline]).finally(() => {
+    if (timeout) clearTimeout(timeout)
+  })
 }
 
 function controllerBusy() {

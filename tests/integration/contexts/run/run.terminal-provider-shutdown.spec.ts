@@ -78,7 +78,7 @@ describe('terminal provider application shutdown', () => {
     reattached.close()
   })
 
-  it('keeps ownership after a failed physical stop and rejects a replacement controller', async () => {
+  it('quarantines an unverified process without blocking a replacement controller', async () => {
     const processes = new ControlledProcessPort(new Set(['failed-stop']))
     const onExitRequested = vi.fn()
     server = createServer(processes, onExitRequested)
@@ -106,10 +106,12 @@ describe('terminal provider application shutdown', () => {
     })
     const reattached = await TestProviderClient.connect(endpoint)
     const health = await reattached.request<{ readonly controllerState: string }>('health')
-    expect(health.controllerState).toBe('releasing')
-    await expect(claimController(reattached, 'controller-2')).rejects.toMatchObject({
-      code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY'
-    })
+    expect(health.controllerState).toBe('unclaimed')
+    await expect(claimController(reattached, 'controller-2')).resolves.toBeDefined()
+    const listed = await reattached.request<{
+      readonly sessions: readonly TerminalSessionSnapshot[]
+    }>('listSessions')
+    expect(listed.sessions).toEqual([])
     await expectNoCall(onExitRequested)
     reattached.close()
   })
@@ -169,6 +171,7 @@ class TestProviderClient {
     string,
     { readonly resolve: (value: unknown) => void; readonly reject: (error: unknown) => void }
   >()
+  private controllerLeaseId: string | undefined
 
   private constructor(private readonly socket: Socket) {
     socket.on('data', (chunk) => {
@@ -199,13 +202,25 @@ class TestProviderClient {
         protocolVersion: terminalProviderProtocolVersion,
         requestId,
         authToken: 'secret-token',
+        controllerLeaseId: this.controllerLeaseId,
         method,
         params
       })
     )
     return new Promise<T>((resolve, reject) => {
       this.responses.set(requestId, {
-        resolve: (value) => resolve(value as T),
+        resolve: (value) => {
+          if (
+            method === 'claimController' &&
+            typeof value === 'object' &&
+            value !== null &&
+            'controllerLeaseId' in value &&
+            typeof value.controllerLeaseId === 'string'
+          ) {
+            this.controllerLeaseId = value.controllerLeaseId
+          }
+          resolve(value as T)
+        },
         reject
       })
     })
