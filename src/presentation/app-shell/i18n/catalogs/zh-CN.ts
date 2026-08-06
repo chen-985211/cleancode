@@ -205,6 +205,7 @@ export const zhCNMessages = {
   'sidebar.archiveWorkspace': '归档工作区',
   'sidebar.reorderFailed': '项目排序失败，请重试。',
   'canvas.label': '积木画布',
+  'canvas.contextMenu.canvasActions': '画布操作',
   'canvas.contextMenu.terminalActions': '终端操作',
   'canvas.contextMenu.workflowActions': '流程操作',
   'canvas.contextMenu.combinationActions': '组合操作',

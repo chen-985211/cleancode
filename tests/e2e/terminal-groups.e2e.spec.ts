@@ -8,6 +8,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
@@ -43,7 +44,7 @@ describe('terminal groups e2e', () => {
     async () => {
       await createTwoTerminalBlocks(page)
 
-      await page.getByRole('button', { name: '组合终端', exact: true }).click()
+      await selectBlankCanvasAction(page, '组合终端')
       await ensureTerminalSelectedForGroup(page, 'Terminal 1')
       await ensureTerminalSelectedForGroup(page, 'Terminal 2')
       await page.getByRole('button', { name: '创建组合' }).click()
@@ -109,7 +110,7 @@ async function createTerminalBlocks(page: Page, count: number): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
 
   for (let index = 1; index <= count; index += 1) {
-    await page.getByRole('button', { name: '新建终端积木' }).click()
+    await selectBlankCanvasAction(page, '新建终端积木')
     await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
   }
 }

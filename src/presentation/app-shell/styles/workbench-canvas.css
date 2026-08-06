@@ -48,13 +48,6 @@
     0 4px 16px var(--cc-shadow-color);
 }
 
-.toolbar-divider {
-  width: 1px;
-  height: 20px;
-  margin: 0 2px;
-  background: var(--cc-divider);
-}
-
 .toolbar-button {
   height: 30px;
   border-color: transparent;

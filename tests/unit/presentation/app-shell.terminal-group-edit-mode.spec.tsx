@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { NodeChange } from '@xyflow/react'
 import type * as ReactFlowModule from '@xyflow/react'
-import type { ReactNode } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 
 import {
   createRuntimeApi,
@@ -57,7 +57,11 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         props.onInit?.(createMockReactFlowInstance())
       }, [props])
 
-      return React.createElement('div', { 'data-testid': 'mock-react-flow' }, props.children)
+      return React.createElement(
+        'div',
+        { 'data-testid': 'mock-react-flow', onContextMenu: props.onPaneContextMenu },
+        props.children
+      )
     }
   }
 })
@@ -209,7 +213,7 @@ describe('app shell terminal group edit mode', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
 
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
 
@@ -287,7 +291,7 @@ describe('app shell terminal group edit mode', () => {
     backendNode?.data.onSelect?.(false)
     frontendNode?.data.onSelect?.(true)
 
-    fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
     fireEvent.click(await screen.findByRole('button', { name: '创建组合' }))
 
     await waitFor(() =>
@@ -330,7 +334,7 @@ describe('app shell terminal group edit mode', () => {
     )
 
     backendNode?.data.onSelect?.(false)
-    fireEvent.click(screen.getByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
     const createGroupButton = await screen.findByRole('button', { name: '创建组合' })
 
     expect(createGroupButton).toBeDisabled()
@@ -351,7 +355,7 @@ describe('app shell terminal group edit mode', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
 
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
 
@@ -394,7 +398,7 @@ describe('app shell terminal group edit mode', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
 
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
 
@@ -450,7 +454,7 @@ describe('app shell terminal group edit mode', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '组合终端' }))
+    await enterTerminalGroupEditMode()
 
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThan(0))
 
@@ -527,6 +531,15 @@ interface MockReactFlowProps {
   readonly onNodeDrag?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void | Promise<void>
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  readonly onPaneContextMenu?: (event: ReactMouseEvent) => void
+}
+
+async function enterTerminalGroupEditMode(): Promise<void> {
+  await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
+  fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
+  const menuItem = await screen.findByRole('menuitem', { name: '组合终端' })
+  await waitFor(() => expect(menuItem).toBeEnabled())
+  fireEvent.click(menuItem)
 }
 
 interface MockReactFlowInstance {

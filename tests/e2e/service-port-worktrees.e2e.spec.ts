@@ -13,6 +13,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
@@ -228,7 +229,7 @@ async function createHttpServiceTerminal(
   policy: 'fixed' | 'preferred',
   shouldStart: boolean
 ): Promise<Locator> {
-  await page.getByRole('button', { name: '新建终端积木' }).click()
+  await selectBlankCanvasAction(page, '新建终端积木')
   const currentTerminal = terminalBlock(page)
   await currentTerminal.waitFor()
   const terminalBlockId = await currentTerminal.getAttribute('data-terminal-block-id')

@@ -14,6 +14,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readAuthenticatedTerminalProviderMetadata,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForProcessIdExit,
   type E2eScenarioResources,
@@ -94,7 +95,7 @@ describe('terminal runtime recovery e2e', () => {
     async () => {
       const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
       for (const terminalName of terminalNames.slice(1)) {
-        await page.getByRole('button', { name: '新建终端积木' }).click()
+        await selectBlankCanvasAction(page, '新建终端积木')
         await ensureTerminalShellStarted(page, terminalName)
       }
       const sessionIds = await Promise.all(
@@ -325,14 +326,7 @@ async function waitForTerminalRuntimeReady(page: Page): Promise<void> {
 
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
-  const createTerminal = page.getByRole('button', { name: '新建终端积木' })
-  await pollUntilState({
-    description: 'new terminal action to become enabled',
-    observe: () => createTerminal.isEnabled(),
-    accept: Boolean,
-    timeoutMs: 10_000
-  })
-  await createTerminal.click()
+  await selectBlankCanvasAction(page, '新建终端积木')
   await ensureTerminalShellStarted(page, 'Terminal 1')
 }
 

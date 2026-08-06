@@ -20,6 +20,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForTextFile,
   type E2eScenarioResources,
@@ -275,7 +276,7 @@ describe('run terminal sessions e2e', () => {
       })
       await boundSlot.click()
       expect(await waitForTextFile(reportPath)).toBe(`${launchOutput}\n`)
-      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.getByRole('button', { name: '新建 Agent' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
       await waitForQuickLaunchCount(reportPath, launchOutput, 2)
 
@@ -301,7 +302,7 @@ describe('run terminal sessions e2e', () => {
         accept: (state) => !state.restoring && state.slotVisible,
         timeoutMs: 10_000
       })
-      await page.getByRole('button', { name: '新建终端积木' }).focus()
+      await page.getByRole('button', { name: '新建 Agent' }).focus()
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+2' : 'Control+2')
       await waitForQuickLaunchCount(reportPath, launchOutput, 3)
 
@@ -485,7 +486,7 @@ describe('run terminal sessions e2e', () => {
     'allows another terminal to receive keyboard input while a fullscreen agent is running',
     async () => {
       await createRunningTerminal(page)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await readTerminalSessionId(page, 'Terminal 2')
       await waitForTerminalShellReady(page, 'Terminal 2')
 
@@ -627,7 +628,7 @@ async function waitForQuickExecutionVisualToSettle(page: Page): Promise<void> {
 async function createRunningTerminal(page: Page): Promise<void> {
   await expectDesktopRuntime(page)
   await page.getByRole('button', { name: '添加项目' }).click()
-  await page.getByRole('button', { name: '新建终端积木' }).click()
+  await selectBlankCanvasAction(page, '新建终端积木')
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
   const terminalInput = page.getByLabel('Terminal input')

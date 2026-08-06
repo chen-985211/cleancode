@@ -8,6 +8,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
@@ -45,7 +46,7 @@ describe('canvas selection viewport e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
 
       const node = page.locator('[data-terminal-block-id]').filter({ hasText: 'Terminal 1' })
       await node.waitFor()
@@ -96,7 +97,7 @@ describe('canvas selection viewport e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
 
       const node = page.locator('[data-terminal-block-id]').filter({ hasText: 'Terminal 1' })
       await node.waitFor()

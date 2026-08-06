@@ -13,6 +13,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   pathExists,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForJsonFile,
   type E2eScenarioResources,
@@ -185,7 +186,7 @@ describe('project workspaces e2e', () => {
       await expectEmptyProjectStateWithoutPreviewData(page)
 
       await page.getByRole('button', { name: '打开项目' }).click()
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await page.getByText('Terminal 1').waitFor()
 
       const projectMetadata = JSON.parse(

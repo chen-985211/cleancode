@@ -52,6 +52,7 @@ import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { toQuickExecutionTarget } from './quickExecutionTargets'
 import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
+import { useCanvasPaneContextMenu } from './useCanvasPaneContextMenu'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
@@ -263,6 +264,18 @@ export function WorkbenchCanvas({
       ? (target) => void onAddQuickExecutionTarget(toQuickExecutionTarget(target))
       : undefined
   })
+  const paneContextMenu = useCanvasPaneContextMenu({
+    canCreateTerminal: isDesktopRuntime && Boolean(currentWorkbench),
+    canGroupTerminals:
+      isDesktopRuntime && Boolean(currentWorkbench) && canBeginTerminalGroupSelection,
+    graphId: currentWorkbench?.graph.id ?? null,
+    isBlocked: isTerminalGroupSelectionMode || Boolean(placementTemplate),
+    shortcutTooltips,
+    onBeforeOpen: objectContextMenu.close,
+    onBeginTerminalGroupSelection,
+    onCreateTerminal: onCreateTerminalBlock,
+    onFitCanvas
+  })
   const [viewportZoom, setViewportZoom] = useState(1)
   const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom, reduceVisualNoise)
   const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
@@ -312,11 +325,6 @@ export function WorkbenchCanvas({
       setViewportZoom
     })
   }
-  const beginTerminalGroupSelection = (): void => {
-    onBeginTerminalGroupSelection()
-    onFitCanvas()
-  }
-
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange
   }, [onViewportChange])
@@ -402,13 +410,10 @@ export function WorkbenchCanvas({
           hasWorkbench={Boolean(currentWorkbench)}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
           selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
-          canBeginTerminalGroupSelection={canBeginTerminalGroupSelection}
           canCreateTerminalGroup={canCreateTerminalGroup}
-          onCreateTerminalBlock={onCreateTerminalBlock}
           onCreateWorkspaceAgent={onCreateWorkspaceAgent}
           onOpenAgentSettings={onOpenAgentSettings}
           onSelectDefaultAgentProvider={onSelectDefaultAgentProvider}
-          onBeginTerminalGroupSelection={beginTerminalGroupSelection}
           onCreateTerminalGroup={onCreateTerminalGroup}
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
         />
@@ -454,9 +459,14 @@ export function WorkbenchCanvas({
             onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
           }
           onNodeClick={onNodeClick}
-          onNodeContextMenu={objectContextMenu.onNodeContextMenu}
+          onNodeContextMenu={(event, node) => {
+            paneContextMenu.close()
+            objectContextMenu.onNodeContextMenu(event, node)
+          }}
+          onPaneContextMenu={paneContextMenu.open}
           onPaneClick={() => {
             objectContextMenu.close()
+            paneContextMenu.close()
             if (placementTemplate) return
             templateInteraction.clearSelection()
             onPaneClick()
@@ -581,6 +591,7 @@ export function WorkbenchCanvas({
           />
         ) : null}
         {objectContextMenu.menu}
+        {paneContextMenu.menu}
         {templateInteraction.templateSelection ? (
           <div
             className="block-template-selection"

@@ -97,7 +97,10 @@ describe('app shell git state synchronization', () => {
     await screen.findByRole('group', { name: '项目 alpha-project' })
     await waitFor(() => expect(synchronizeProjectGitState).toHaveBeenCalledOnce())
 
-    fireEvent.click(screen.getByRole('button', { name: '新建终端积木' }))
+    const pane = document.querySelector<HTMLElement>('.react-flow__pane')
+    if (!pane) throw new Error('Expected a React Flow pane')
+    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+    fireEvent.click(await screen.findByRole('menuitem', { name: '新建终端积木' }))
     await waitFor(() =>
       expect(document.querySelector('[data-terminal-block-id="terminal-new"]')).not.toBeNull()
     )

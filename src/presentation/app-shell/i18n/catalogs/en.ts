@@ -211,6 +211,7 @@ export const enMessages = {
   'sidebar.archiveWorkspace': 'Archive workspace',
   'sidebar.reorderFailed': 'Could not reorder projects. Try again.',
   'canvas.label': 'Block canvas',
+  'canvas.contextMenu.canvasActions': 'Canvas actions',
   'canvas.contextMenu.terminalActions': 'Terminal actions',
   'canvas.contextMenu.workflowActions': 'Workflow actions',
   'canvas.contextMenu.combinationActions': 'Combination actions',

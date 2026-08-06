@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
-import type { ReactNode } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import type * as WorkbenchCanvasSafeViewportModule from '../../../src/presentation/app-shell/workbenchCanvasSafeViewport'
 
 import {
@@ -45,7 +45,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     NodeResizeControl: () => null,
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
-    ReactFlow: ({ children, nodes = [], onInit }: MockReactFlowProps) => {
+    ReactFlow: ({ children, nodes = [], onInit, onPaneContextMenu }: MockReactFlowProps) => {
       const hasInitializedRef = React.useRef(false)
 
       React.useEffect(() => {
@@ -59,7 +59,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 
       return React.createElement(
         'div',
-        { 'data-testid': 'mock-react-flow' },
+        { 'data-testid': 'mock-react-flow', onContextMenu: onPaneContextMenu },
         children,
         nodes.map((node) =>
           React.createElement('div', {
@@ -111,7 +111,7 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '新建终端积木' }))
+    await selectBlankCanvasAction('新建终端积木')
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalBlock).toHaveBeenCalledWith(
@@ -147,7 +147,7 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '新建终端积木' }))
+    await selectBlankCanvasAction('新建终端积木')
 
     await waitFor(() =>
       expect(screen.getByTestId('mock-node-created-terminal')).toHaveAttribute(
@@ -184,9 +184,9 @@ describe('app shell create terminal focus', () => {
 
     render(<AppShell />)
 
-    const groupButton = await screen.findByRole('button', { name: '组合终端' })
+    await screen.findByTestId('mock-react-flow')
     reactFlowSpies.setViewport.mockClear()
-    fireEvent.click(groupButton)
+    await selectBlankCanvasAction('组合终端')
 
     await waitFor(() => expect(reactFlowSpies.setViewport).toHaveBeenCalledOnce())
     expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
@@ -205,7 +205,6 @@ describe('app shell create terminal focus', () => {
     render(<AppShell />)
 
     await screen.findByTestId('mock-react-flow')
-    await waitFor(() => expect(screen.getByRole('button', { name: '新建终端积木' })).toBeEnabled())
 
     reactFlowSpies.setViewport.mockClear()
     const primaryModifier = /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
@@ -279,6 +278,15 @@ interface MockReactFlowProps {
   readonly children?: ReactNode
   readonly nodes?: readonly WorkbenchFlowNode[]
   readonly onInit?: (instance: MockReactFlowInstance) => void
+  readonly onPaneContextMenu?: (event: ReactMouseEvent) => void
+}
+
+async function selectBlankCanvasAction(action: '新建终端积木' | '组合终端'): Promise<void> {
+  await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
+  fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
+  const menuItem = await screen.findByRole('menuitem', { name: action })
+  await waitFor(() => expect(menuItem).toBeEnabled())
+  fireEvent.click(menuItem)
 }
 
 interface MockReactFlowInstance {

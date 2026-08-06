@@ -14,6 +14,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForJsonFile,
   type E2eScenarioResources,
@@ -112,7 +113,7 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCount(page, 0)
 
       expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       const terminalSelector = '[data-terminal-block-id]'
       await page.locator(terminalSelector).first().waitFor()
       const terminalResult = await waitForCreatedWorkbenchNodeResult(page, terminalSelector)
