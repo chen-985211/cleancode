@@ -155,14 +155,56 @@ describe('persistent terminal provider client lifecycle', () => {
   it('publishes runtime unavailability when an established Provider disconnects', async () => {
     const runtimeUnavailable = vi.fn()
     const client = createClient(rootDirectory, undefined, runtimeUnavailable)
+    const onExit = vi.fn()
 
     await client.initialize()
+    client.bindRecoveredSession(outputIdentity('block'), {
+      onExit,
+      onOutput: vi.fn()
+    })
     provider.disconnectClients()
 
     await vi.waitFor(() =>
       expect(runtimeUnavailable).toHaveBeenCalledWith(
         expect.objectContaining({ code: 'TERMINAL_PROVIDER_UNAVAILABLE' })
       )
+    )
+    expect(onExit).not.toHaveBeenCalled()
+    await client.detachApplication()
+  })
+
+  it('invalidates runtime readiness when an unresponsive Provider exceeds the client deadline', async () => {
+    const runtimeUnavailable = vi.fn()
+    const client = createClient(rootDirectory, undefined, runtimeUnavailable, undefined, 25)
+    await client.initialize()
+    provider.pauseMethodResponses('flushModel')
+
+    await expect(client.flush(outputIdentity('block'))).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_UNAVAILABLE'
+    })
+    await vi.waitFor(() =>
+      expect(runtimeUnavailable).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'TERMINAL_PROVIDER_UNAVAILABLE' })
+      )
+    )
+    await client.detachApplication()
+  })
+
+  it('invalidates cached readiness when the Provider reports a server-side deadline', async () => {
+    const runtimeUnavailable = vi.fn()
+    const client = createClient(rootDirectory, undefined, runtimeUnavailable)
+    await client.initialize()
+    provider.failMethod('flushModel', {
+      code: 'COMMAND_TIMED_OUT',
+      isExpected: true,
+      message: 'Provider request exceeded its deadline.'
+    })
+
+    await expect(client.flush(outputIdentity('block'))).rejects.toMatchObject({
+      code: 'COMMAND_TIMED_OUT'
+    })
+    expect(runtimeUnavailable).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'COMMAND_TIMED_OUT' })
     )
     await client.detachApplication()
   })
@@ -362,14 +404,16 @@ function createClient(
   rootDirectory: string,
   onBackgroundError?: (error: unknown) => void,
   onRuntimeUnavailable?: (error: unknown) => void,
-  onOutput?: PersistentTerminalProviderClientOptions['onOutput']
+  onOutput?: PersistentTerminalProviderClientOptions['onOutput'],
+  requestDeadlineMs?: number
 ) {
   return new PersistentTerminalProviderClient({
     stateDirectory: rootDirectory,
     providerEntryPath: join(rootDirectory, 'unused-provider-entry.js'),
     onBackgroundError,
     onRuntimeUnavailable,
-    onOutput
+    onOutput,
+    requestDeadlineMs
   })
 }
 
@@ -423,6 +467,8 @@ class ControllableProvider {
   private server: Server | null = null
   private healthResponses: Deferred | null = null
   private applicationDetachCompletion: Deferred | null = null
+  private readonly pausedMethodResponses = new Map<string, Deferred>()
+  private readonly methodFailures = new Map<string, unknown>()
   private rejectedControllerClaims = 0
   private processLifecycleBeforeStartResponse: ReturnType<typeof outputIdentity> | null = null
 
@@ -459,6 +505,14 @@ class ControllableProvider {
 
   pauseApplicationDetachCompletion(): void {
     this.applicationDetachCompletion = createDeferred()
+  }
+
+  pauseMethodResponses(method: string): void {
+    this.pausedMethodResponses.set(method, createDeferred())
+  }
+
+  failMethod(method: string, error: unknown): void {
+    this.methodFailures.set(method, error)
   }
 
   resumeApplicationDetachCompletion(): void {
@@ -512,6 +566,20 @@ class ControllableProvider {
 
   private async respond(socket: Socket, request: TerminalProviderRequest): Promise<void> {
     this.requests.push(request)
+    await this.pausedMethodResponses.get(request.method)?.promise
+    const failure = this.methodFailures.get(request.method)
+    if (failure) {
+      this.methodFailures.delete(request.method)
+      socket.write(
+        encodeTerminalProviderFrame({
+          type: 'response',
+          requestId: request.requestId,
+          ok: false,
+          error: failure
+        })
+      )
+      return
+    }
     if (request.method === 'health') await this.healthResponses?.promise
     if (request.method === 'awaitApplicationDetach') {
       await this.applicationDetachCompletion?.promise

@@ -1,8 +1,9 @@
-export const terminalProviderProtocolVersion = 8
-export const terminalProviderMinimumCompatibleProtocolVersion = 7
+export const terminalProviderProtocolVersion = 9
+export const terminalProviderMinimumCompatibleProtocolVersion = 8
 export const terminalProviderApplicationDetachProtocolVersion = 5
 export const terminalProviderMaxFrameBytes = 32 * 1024 * 1024
 export const terminalProviderMaxOutputChunkBytes = 256 * 1024
+export const terminalProviderDefaultRequestDeadlineMs = 30_000
 
 export interface TerminalProviderApplicationDetachReceipt {
   readonly releaseId: string
@@ -23,8 +24,10 @@ export interface TerminalProviderRequest {
   readonly protocolVersion: number
   readonly requestId: string
   readonly authToken: string
+  readonly controllerLeaseId?: string
   readonly method: string
   readonly params?: unknown
+  readonly deadlineMs?: number
 }
 
 export interface TerminalProviderResponse {

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto'
-import { closeSync, existsSync, openSync } from 'node:fs'
+import { closeSync, existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -49,12 +49,16 @@ import { TerminalProviderRpcConnection } from './TerminalProviderRpcConnection'
 import {
   acquireProviderLaunchLock,
   atomicWriteProviderMetadata,
+  createProviderDiagnostics,
+  createProviderUnavailableError as providerUnavailable,
   createProviderEndpoint,
   delayProviderOperation,
   getProviderErrorMessage,
   isApplicationDetachReceipt,
   isProviderProcessAlive,
+  isRuntimeInvalidatingProviderError,
   matchesForegroundJob,
+  openProviderProcessLog,
   providerEndpointAcceptsConnections,
   readProviderMetadata,
   removeStaleProviderMetadata,
@@ -74,6 +78,7 @@ export interface PersistentTerminalProviderClientOptions {
   readonly onBackgroundError?: (error: unknown) => void
   readonly onRuntimeUnavailable?: (error: unknown) => void
   readonly onOutput?: (event: TerminalProcessOutputEvent) => void
+  readonly requestDeadlineMs?: number
 }
 
 export class PersistentTerminalProviderClient
@@ -332,12 +337,7 @@ export class PersistentTerminalProviderClient
   }
 
   getDiagnostics(): TerminalModelDiagnosticsSnapshot {
-    return {
-      modelCount: this.identities.size,
-      attachedViewCount: this.viewCallbacks.size,
-      pendingOutputBytes: 0,
-      lastRestoreDurationMs: 0
-    }
+    return createProviderDiagnostics(this.identities.size, this.viewCallbacks.size)
   }
 
   setRetentionPolicy(sessionId: string, retentionPolicy: TerminalRetentionPolicy): Promise<void> {
@@ -404,7 +404,7 @@ export class PersistentTerminalProviderClient
 
   private async connectOrLaunchProvider(): Promise<TerminalProviderMetadata> {
     await mkdir(this.options.stateDirectory, { mode: 0o700, recursive: true })
-    const metadataPath = this.metadataPath()
+    const metadataPath = join(this.options.stateDirectory, 'provider.json')
     let launchLock = await this.acquireLaunchLock()
     if (!launchLock) {
       try {
@@ -476,7 +476,7 @@ export class PersistentTerminalProviderClient
   }
 
   private acquireLaunchLock() {
-    return acquireProviderLaunchLock(this.launchLockPath())
+    return acquireProviderLaunchLock(join(this.options.stateDirectory, 'provider-launch.lock'))
   }
 
   private async connectMetadata(metadata: TerminalProviderMetadata): Promise<void> {
@@ -484,6 +484,7 @@ export class PersistentTerminalProviderClient
       endpoint: metadata.endpoint,
       authToken: metadata.authToken,
       protocolVersion: metadata.protocolVersion,
+      requestDeadlineMs: this.options.requestDeadlineMs,
       onEvent: (event) => this.handleEvent(event),
       onDisconnect: () => this.handleProviderDisconnect(connection)
     })
@@ -511,8 +512,9 @@ export class PersistentTerminalProviderClient
       }
       await this.claimController(connection)
       connection.instanceId = health.instanceId
-      this.connection?.close()
+      const previousConnection = this.connection
       this.connection = connection
+      previousConnection?.close()
     } catch (error) {
       connection.close()
       throw error
@@ -523,10 +525,7 @@ export class PersistentTerminalProviderClient
     const deadline = Date.now() + providerControllerClaimTimeoutMs
     while (true) {
       try {
-        await connection.request('claimController', {
-          controllerId: this.controllerId,
-          processId: process.pid
-        })
+        await connection.claimController(this.controllerId, process.pid)
         return
       } catch (error) {
         if (!isAppError(error) || error.code !== 'TERMINAL_PROVIDER_CONTROLLER_BUSY') throw error
@@ -553,17 +552,17 @@ export class PersistentTerminalProviderClient
     await atomicWriteProviderMetadata(metadataPath, metadata)
     const logPath = join(this.options.stateDirectory, 'provider.log')
     rotateProviderLog(logPath)
-    const logFd = openSync(logPath, 'a', 0o600)
+    const processLog = openProviderProcessLog(this.options.stateDirectory)
     const child = spawn(
       this.options.executablePath ?? process.execPath,
       [this.options.providerEntryPath, '--metadata', metadataPath],
       {
         detached: true,
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-        stdio: ['ignore', logFd, logFd]
+        stdio: ['ignore', processLog, processLog]
       }
     )
-    closeSync(logFd)
+    closeSync(processLog)
     child.unref()
     if (!child.pid) throw providerUnavailable('Terminal provider process could not be started.')
     const launched = { ...metadata, processId: child.pid }
@@ -633,25 +632,23 @@ export class PersistentTerminalProviderClient
       this.options.onBackgroundError?.(disconnectError)
       this.options.onRuntimeUnavailable?.(disconnectError)
     }
-    for (const [sessionId, callbacks] of this.processCallbacks) {
-      if (this.processEventGate.isPending(sessionId)) continue
-      const scope = this.identities.get(sessionId)
-      if (scope) callbacks.onExit({ scope, sessionId, exitCode: null })
-    }
-    for (const callbacks of this.foregroundJobCallbacks.values()) {
-      callbacks.onExit({
-        generation: callbacks.generation,
-        launchId: callbacks.launchId,
-        sessionId: callbacks.sessionId,
-        exitCode: null
-      })
-    }
-    this.foregroundJobCallbacks.clear()
   }
 
   private async request<T = void>(method: string, params?: unknown): Promise<T> {
-    if (!this.connection) await this.ensureProviderConnection()
-    return this.requireConnection().request<T>(method, params)
+    let connection: TerminalProviderRpcConnection | null = null
+    try {
+      if (!this.connection) await this.ensureProviderConnection()
+      connection = this.requireConnection()
+      return await connection.request<T>(method, params)
+    } catch (error) {
+      if (isRuntimeInvalidatingProviderError(error)) {
+        if (connection && error.code === 'TERMINAL_PROVIDER_UNAVAILABLE') {
+          this.invalidateConnection(connection)
+        }
+        this.options.onRuntimeUnavailable?.(error)
+      }
+      throw error
+    }
   }
 
   private backgroundRequest(method: string, params?: unknown): void {
@@ -663,24 +660,29 @@ export class PersistentTerminalProviderClient
       this.options.onRuntimeUnavailable?.(error)
       return
     }
-    void this.connection
-      .request(method, params)
-      .catch((error) => this.options.onBackgroundError?.(error))
+    const connection = this.connection
+    void connection.request(method, params).catch((error) => {
+      this.options.onBackgroundError?.(error)
+      if (isRuntimeInvalidatingProviderError(error)) {
+        if (error.code === 'TERMINAL_PROVIDER_UNAVAILABLE') {
+          this.invalidateConnection(connection)
+        }
+        this.options.onRuntimeUnavailable?.(error)
+      }
+    })
   }
 
+  private invalidateConnection(connection: TerminalProviderRpcConnection): void {
+    if (this.connection === connection) {
+      this.connection = null
+      this.connectedMetadata = null
+    }
+    connection.close()
+  }
   private requireConnection(): TerminalProviderRpcConnection {
     if (!this.connection) throw providerUnavailable('Terminal provider is not connected.')
     return this.connection
   }
-
-  private metadataPath(): string {
-    return join(this.options.stateDirectory, 'provider.json')
-  }
-
-  private launchLockPath(): string {
-    return join(this.options.stateDirectory, 'provider-launch.lock')
-  }
-
   private clearApplicationReferences(): void {
     this.processCallbacks.clear()
     this.foregroundJobCallbacks.clear()
@@ -692,8 +694,4 @@ export class PersistentTerminalProviderClient
     this.identities.clear()
     this.recoveryIssueHandler = null
   }
-}
-
-function providerUnavailable(message: string) {
-  return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
 }

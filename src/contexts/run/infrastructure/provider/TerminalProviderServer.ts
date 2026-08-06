@@ -21,22 +21,13 @@ import { HeadlessTerminalModelAdapter } from '../terminal-model/HeadlessTerminal
 import { NodePtyTerminalProcessAdapter } from '../pty/NodePtyTerminalProcessAdapter'
 import {
   type TerminalProviderEvent,
-  TerminalProviderFrameDecoder,
   terminalProviderMaxOutputChunkBytes,
   terminalProviderProtocolVersion
 } from './TerminalProviderProtocol'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import {
-  createExpectedAppError,
-  createUnexpectedAppError,
-  isAppError,
-  serializeAppError
-} from '../../../../shared-kernel/application/errors/AppError'
-import {
-  authenticateTerminalProviderRequest,
-  authorizeTerminalProviderController,
   createProviderSessionSnapshot,
   getErrorMessage,
-  isTerminalProviderRequest,
   sendTerminalProviderMessage,
   splitUtf8
 } from './TerminalProviderServerSupport'
@@ -45,14 +36,18 @@ import { TerminalProviderSessionPersistence } from './TerminalProviderSessionPer
 import { TerminalProviderControllerLifecycle } from './TerminalProviderControllerLifecycle'
 import { TerminalProviderShutdownCoordinator } from './TerminalProviderShutdownCoordinator'
 import {
+  attachTerminalProviderSocket,
+  withTerminalProviderOperationDeadline
+} from './TerminalProviderSocketHandler'
+import {
   countLiveProviderSessions,
   hasLiveProviderSessions,
-  hasUnsafeLiveProviderSessions,
   type ProviderTerminalSession,
   type TerminalProviderRequestParams
 } from './TerminalProviderServerTypes'
 
 const maxRetainedLiveSessions = 32
+const providerCloseCheckpointDeadlineMs = 750
 
 export interface TerminalProviderServerOptions {
   readonly endpoint: string
@@ -75,6 +70,7 @@ export class TerminalProviderServer {
   private readonly shutdownCoordinator: TerminalProviderShutdownCoordinator
   private readonly controllerLifecycle: TerminalProviderControllerLifecycle
   private readonly sessions = new Map<string, ProviderTerminalSession>()
+  private readonly modelIdentities = new Map<string, TerminalRunScope>()
   private readonly recoveryIssues: TerminalRecoveryLoadIssue[] = []
   private readonly sockets = new Set<Socket>()
   private server: Server | null = null
@@ -95,6 +91,10 @@ export class TerminalProviderServer {
           this.recordPersistenceFailure(error, session)
           return
         }
+        const current = this.sessions.get(session.snapshot.sessionId)
+        if (current && isSameTerminalRun(current.snapshot, session.snapshot)) {
+          current.quarantined = true
+        }
         this.log('shutdown-session-failed', {
           message: getErrorMessage(error),
           sessionId: session.snapshot.sessionId
@@ -109,7 +109,6 @@ export class TerminalProviderServer {
         )
       },
       hasLiveSessions: () => hasLiveProviderSessions(this.sessions.values()),
-      hasUnsafeLiveSessions: () => hasUnsafeLiveProviderSessions(this.sessions.values()),
       isProcessAlive: isControllerProcessAlive,
       log: (message, details) => this.log(message, details),
       onClaim: () => this.prepareControllerClaim(),
@@ -142,11 +141,19 @@ export class TerminalProviderServer {
     this.isClosing = true
     if (this.exitTimer) clearTimeout(this.exitTimer)
     this.exitTimer = null
-    for (const session of this.sessions.values()) {
-      await session.persistence
-        .checkpoint(true)
-        .catch((error) => this.log('checkpoint-failed', { message: getErrorMessage(error) }))
-    }
+    await Promise.allSettled(
+      [...this.sessions.values()].map((session) =>
+        withTerminalProviderOperationDeadline(
+          session.persistence.checkpoint(true),
+          providerCloseCheckpointDeadlineMs
+        ).catch((error) =>
+          this.log('checkpoint-failed', {
+            message: getErrorMessage(error),
+            sessionId: session.snapshot.sessionId
+          })
+        )
+      )
+    )
     for (const socket of this.sockets) socket.destroy()
     await new Promise<void>((resolve) => {
       if (!this.server) return resolve()
@@ -158,66 +165,19 @@ export class TerminalProviderServer {
   }
 
   private acceptSocket(socket: Socket): void {
-    const decoder = new TerminalProviderFrameDecoder()
-    let detachedCleanly = false
-    let requestTail = Promise.resolve()
     this.sockets.add(socket)
-    socket.on('data', (chunk) => {
-      try {
-        for (const message of decoder.push(chunk)) {
-          requestTail = requestTail
-            .then(async () => {
-              detachedCleanly ||= await this.handleRequest(socket, message)
-            })
-            .catch((error) => {
-              this.log('protocol-error', { message: getErrorMessage(error) })
-              socket.destroy()
-            })
-        }
-      } catch (error) {
-        this.log('protocol-error', { message: getErrorMessage(error) })
-        socket.destroy()
-      }
+    attachTerminalProviderSocket({
+      authToken: this.options.authToken,
+      dispatch: (method, params, activeSocket) => this.dispatch(method, params, activeSocket),
+      getControllerState: () => this.controllerLifecycle.state,
+      log: (message, details) => this.log(message, details),
+      onClose: (detachedCleanly) => {
+        this.sockets.delete(socket)
+        if (this.isClosing || detachedCleanly) return
+        this.controllerLifecycle.handleSocketClose(socket)
+      },
+      socket
     })
-    socket.on('close', () => {
-      this.sockets.delete(socket)
-      if (this.isClosing || detachedCleanly) return
-      const pendingRequests = requestTail
-      void pendingRequests.finally(() => this.controllerLifecycle.handleSocketClose(socket))
-    })
-    socket.on('error', (error) => this.log('socket-error', { message: error.message }))
-  }
-
-  private async handleRequest(socket: Socket, value: unknown): Promise<boolean> {
-    if (!isTerminalProviderRequest(value)) {
-      socket.destroy()
-      return false
-    }
-    const request = value
-    try {
-      authenticateTerminalProviderRequest(request, this.options.authToken)
-      authorizeTerminalProviderController(socket, request.method, this.controllerLifecycle.state)
-      const result = await this.dispatch(request.method, request.params, socket)
-      sendTerminalProviderMessage(socket, {
-        type: 'response',
-        requestId: request.requestId,
-        ok: true,
-        result
-      })
-      if (request.method === 'detachApplication' || request.method === 'awaitApplicationDetach') {
-        setTimeout(() => socket.end(), 0)
-        return true
-      }
-    } catch (error) {
-      const appError = isAppError(error) ? error : createUnexpectedAppError(getErrorMessage(error))
-      sendTerminalProviderMessage(socket, {
-        type: 'response',
-        requestId: request.requestId,
-        ok: false,
-        error: serializeAppError(appError)
-      })
-    }
-    return false
   }
 
   private async dispatch(method: string, params: unknown, socket: Socket): Promise<unknown> {
@@ -234,10 +194,13 @@ export class TerminalProviderServer {
         return this.controllerLifecycle.claim(socket, input.controllerId, input.processId)
       case 'listSessions':
         return {
-          sessions: [...this.sessions.values()].map(({ snapshot }) => snapshot),
+          sessions: [...this.sessions.values()]
+            .filter(({ quarantined, snapshot }) => !quarantined && snapshot.status !== 'idle')
+            .map(({ snapshot }) => snapshot),
           issues: this.recoveryIssues,
           managedServiceEndpoints: [...this.sessions.values()].flatMap((session) =>
             session.managedServiceEndpoint &&
+            !session.quarantined &&
             session.snapshot.status === 'running' &&
             session.snapshot.processId !== null
               ? [
@@ -250,7 +213,13 @@ export class TerminalProviderServer {
               : []
           )
         }
-      case 'createModel':
+      case 'createModel': {
+        const identity = input.command.identity
+        const existingIdentity = this.modelIdentities.get(identity.sessionId)
+        if (existingIdentity) {
+          if (isSameTerminalRun(existingIdentity, identity)) return null
+          throw createExpectedAppError('RUN_SCOPE_STALE', 'Terminal model identity is stale.')
+        }
         this.models.create({
           ...input.command,
           onQueryResponse: (response) => {
@@ -277,7 +246,9 @@ export class TerminalProviderServer {
             })
           }
         })
+        this.modelIdentities.set(identity.sessionId, identity)
         return null
+      }
       case 'startProcess':
         return this.startProcess(input.command)
       case 'launchForegroundJob':
@@ -333,6 +304,7 @@ export class TerminalProviderServer {
         return null
       case 'disposeModels':
         this.models.disposeAll()
+        this.modelIdentities.clear()
         return null
       case 'getDiagnostics':
         return this.models.getDiagnostics()
@@ -368,6 +340,30 @@ export class TerminalProviderServer {
   private async startProcess(
     command: Omit<StartTerminalProcessCommand, 'onOutput' | 'onExit'>
   ): Promise<{ readonly processId: number }> {
+    const existing = this.sessions.get(command.scope.sessionId)
+    if (existing) {
+      if (existing.quarantined) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_CONTROLLER_BUSY',
+          'Terminal session is quarantined after an incomplete controller release.'
+        )
+      }
+      if (
+        isSameTerminalRun(existing.snapshot, command.scope) &&
+        existing.snapshot.status === 'running' &&
+        existing.snapshot.processId !== null
+      ) {
+        return { processId: existing.snapshot.processId }
+      }
+      if (isSameTerminalRun(existing.snapshot, command.scope) && existing.starting) {
+        throw createExpectedAppError(
+          'TERMINAL_PROVIDER_CONTROLLER_BUSY',
+          'Terminal session is still starting.',
+          { retryAfterMs: 50 }
+        )
+      }
+      throw createExpectedAppError('RUN_SCOPE_STALE', 'Terminal session identity is stale.')
+    }
     if (countLiveProviderSessions(this.sessions.values()) >= maxRetainedLiveSessions) {
       throw createExpectedAppError(
         'TERMINAL_RECOVERY_STORAGE_LIMIT',
@@ -378,11 +374,17 @@ export class TerminalProviderServer {
     this.sessions.set(command.scope.sessionId, session)
     try {
       await session.persistence.checkpoint(true)
+      if (session.retired) throw providerSessionRetiredDuringStart()
       const handle = await this.processes.start({
         ...command,
         onOutput: (event) => this.acceptProcessOutput(session, event.data),
         onExit: (event) => void this.handleProcessExit(session, event.exitCode)
       })
+      session.starting = false
+      if (session.retired || this.sessions.get(command.scope.sessionId) !== session) {
+        await this.processes.stop(command.scope.sessionId).catch(() => undefined)
+        throw providerSessionRetiredDuringStart()
+      }
       if (session.snapshot.status === 'idle') {
         session.snapshot = {
           ...session.snapshot,
@@ -393,6 +395,7 @@ export class TerminalProviderServer {
       }
       return handle
     } catch (error) {
+      session.starting = false
       await this.retireSession(command.scope)
       throw error
     }
@@ -491,10 +494,15 @@ export class TerminalProviderServer {
 
   private async retireSession(identity: TerminalRunScope): Promise<void> {
     const session = this.sessions.get(identity.sessionId)
-    if (!session || !isSameTerminalRun(session.snapshot, identity)) return
-    session.retired = true
-    await session.persistence.retire()
-    this.models.retire(identity)
+    const exactSession = session && isSameTerminalRun(session.snapshot, identity) ? session : null
+    if (exactSession) exactSession.retired = true
+    const modelIdentity = this.modelIdentities.get(identity.sessionId)
+    if (modelIdentity && isSameTerminalRun(modelIdentity, identity)) {
+      this.models.retire(identity)
+      this.modelIdentities.delete(identity.sessionId)
+    }
+    if (!exactSession) return
+    await exactSession.persistence.retire()
     this.sessions.delete(identity.sessionId)
     await this.store.delete(identity)
   }
@@ -522,6 +530,7 @@ export class TerminalProviderServer {
         onQueryResponse: () => undefined,
         onFlowControlChange: () => undefined
       })
+      this.modelIdentities.set(exactCheckpoint.identity.sessionId, exactCheckpoint.identity)
       for (const output of bundle.output) {
         this.models.acceptOutput(exactCheckpoint.identity, output.data)
       }
@@ -553,7 +562,9 @@ export class TerminalProviderServer {
     const sessionState: Omit<ProviderTerminalSession, 'persistence'> = {
       snapshot,
       managedServiceEndpoint: undefined,
-      retired: false
+      quarantined: false,
+      retired: false,
+      starting: snapshot.status === 'idle'
     }
     const persistence = new TerminalProviderSessionPersistence({
       batchWindowMs: this.options.outputPersistenceBatchWindowMs,
@@ -593,6 +604,12 @@ export class TerminalProviderServer {
     if (!session) {
       throw createExpectedAppError('TERMINAL_SESSION_NOT_FOUND', 'Terminal session was not found.')
     }
+    if (session.quarantined) {
+      throw createExpectedAppError(
+        'TERMINAL_PROVIDER_UNAVAILABLE',
+        'Terminal session is quarantined after an incomplete controller release.'
+      )
+    }
     return session
   }
 
@@ -628,4 +645,11 @@ function isControllerProcessAlive(processId: number): boolean {
   } catch {
     return false
   }
+}
+
+function providerSessionRetiredDuringStart() {
+  return createExpectedAppError(
+    'TERMINAL_PROVIDER_UNAVAILABLE',
+    'Terminal session was retired while its process was starting.'
+  )
 }

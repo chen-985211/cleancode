@@ -163,6 +163,38 @@ describe('terminal provider shutdown coordinator', () => {
       failureCount: 1
     })
   })
+
+  it('bounds a checkpoint that never settles and continues releasing the controller', async () => {
+    const retained = createSession('blocked-checkpoint', {
+      retentionPolicy: 'keep-after-application-exit'
+    })
+    vi.mocked(retained.persistence.checkpoint).mockImplementation(
+      () => new Promise(() => undefined)
+    )
+    const stop = vi.fn(async () => undefined)
+    const retireSession = vi.fn(async () => undefined)
+    const onFailure = vi.fn()
+    const coordinator = new TerminalProviderShutdownCoordinator({
+      operationDeadlineMs: 25,
+      processes: { stop },
+      retireSession,
+      onFailure
+    })
+
+    const result = await coordinator.release({
+      releaseId: 'release-blocked-checkpoint',
+      sessions: [retained]
+    })
+
+    expect(stop).toHaveBeenCalledWith('blocked-checkpoint')
+    expect(retireSession).toHaveBeenCalledWith(retained.snapshot)
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'COMMAND_TIMED_OUT' }),
+      retained,
+      'checkpoint'
+    )
+    expect(result).toMatchObject({ outcome: 'partial-failure', retiredSessionCount: 1 })
+  })
 })
 
 function createSession(

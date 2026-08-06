@@ -17,7 +17,10 @@ export function authenticateTerminalProviderRequest(
   request: TerminalProviderRequest,
   expectedAuthToken: string
 ): void {
-  if (request.protocolVersion !== terminalProviderProtocolVersion) {
+  if (
+    request.protocolVersion < terminalProviderProtocolVersion - 1 ||
+    request.protocolVersion > terminalProviderProtocolVersion
+  ) {
     throw createExpectedAppError(
       'TERMINAL_PROVIDER_PROTOCOL_UNSUPPORTED',
       'Terminal provider protocol version is unsupported.'
@@ -33,14 +36,22 @@ export function authenticateTerminalProviderRequest(
 
 export function authorizeTerminalProviderController(
   socket: Socket,
-  method: string,
+  request: TerminalProviderRequest,
   state: ProviderControllerState
 ): void {
+  const method = request.method
   if (method === 'health' || method === 'claimController') return
-  if (state.kind === 'active' && state.socket === socket) return
+  if (
+    state.kind === 'active' &&
+    state.socket === socket &&
+    hasCurrentControllerLease(request, state.controllerLeaseId)
+  ) {
+    return
+  }
   if (
     state.kind === 'releasing' &&
     state.socket === socket &&
+    hasCurrentControllerLease(request, state.controllerLeaseId) &&
     (method === 'beginApplicationDetach' ||
       method === 'awaitApplicationDetach' ||
       method === 'detachApplication')
@@ -104,9 +115,23 @@ export function isTerminalProviderRequest(value: unknown): value is TerminalProv
     typeof value.requestId === 'string' &&
     'authToken' in value &&
     typeof value.authToken === 'string' &&
+    (!('controllerLeaseId' in value) || typeof value.controllerLeaseId === 'string') &&
     'method' in value &&
-    typeof value.method === 'string'
+    typeof value.method === 'string' &&
+    (!('deadlineMs' in value) ||
+      (typeof value.deadlineMs === 'number' &&
+        Number.isFinite(value.deadlineMs) &&
+        value.deadlineMs > 0))
   )
+}
+
+function hasCurrentControllerLease(
+  request: TerminalProviderRequest,
+  controllerLeaseId: string
+): boolean {
+  return request.protocolVersion < terminalProviderProtocolVersion
+    ? request.controllerLeaseId === undefined || request.controllerLeaseId === controllerLeaseId
+    : request.controllerLeaseId === controllerLeaseId
 }
 
 export function getErrorMessage(error: unknown): string {

@@ -11,13 +11,14 @@ import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualSer
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalProviderSessionPersistence } from './TerminalProviderSessionPersistence'
 import type { TerminalProviderApplicationDetachResult } from './TerminalProviderProtocol'
-import { shouldTerminateProviderSession } from './TerminalProviderShutdownCoordinator'
 
 export interface ProviderTerminalSession {
   snapshot: TerminalSessionSnapshot
   persistence: TerminalProviderSessionPersistence
   managedServiceEndpoint: ActualServiceEndpoint | undefined
+  quarantined: boolean
   retired: boolean
+  starting: boolean
 }
 
 export type ProviderControllerReleaseReason = 'application-detach' | 'unexpected-disconnect'
@@ -63,17 +64,10 @@ export interface TerminalProviderRequestParams {
 }
 
 export function countLiveProviderSessions(sessions: Iterable<ProviderTerminalSession>): number {
-  return [...sessions].filter(({ snapshot }) => snapshot.status === 'running').length
+  return [...sessions].filter(({ snapshot, starting }) => snapshot.status === 'running' || starting)
+    .length
 }
 
 export function hasLiveProviderSessions(sessions: Iterable<ProviderTerminalSession>): boolean {
-  return [...sessions].some(({ snapshot }) => snapshot.status === 'running')
-}
-
-export function hasUnsafeLiveProviderSessions(
-  sessions: Iterable<ProviderTerminalSession>
-): boolean {
-  return [...sessions].some(
-    ({ snapshot }) => snapshot.status === 'running' && shouldTerminateProviderSession(snapshot)
-  )
+  return [...sessions].some(({ snapshot, starting }) => snapshot.status === 'running' || starting)
 }

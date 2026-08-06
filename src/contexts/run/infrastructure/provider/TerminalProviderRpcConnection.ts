@@ -11,13 +11,15 @@ import {
   type TerminalProviderEvent,
   TerminalProviderFrameDecoder,
   type TerminalProviderMessage,
-  type TerminalProviderRequest
+  type TerminalProviderRequest,
+  terminalProviderDefaultRequestDeadlineMs
 } from './TerminalProviderProtocol'
 
-const providerRequestTimeoutMs = 30_000
+const providerRequestDeadlineGraceMs = 100
 
 export class TerminalProviderRpcConnection {
   instanceId = ''
+  private controllerLeaseId: string | undefined
   private readonly pending = new Map<
     string,
     {
@@ -32,6 +34,7 @@ export class TerminalProviderRpcConnection {
     private readonly socket: Socket,
     private readonly authToken: string,
     private readonly protocolVersion: number,
+    private readonly requestDeadlineMs: number,
     private readonly onEvent: (event: TerminalProviderEvent) => void,
     private readonly onDisconnect: () => void
   ) {
@@ -54,6 +57,7 @@ export class TerminalProviderRpcConnection {
     readonly endpoint: string
     readonly authToken: string
     readonly protocolVersion: number
+    readonly requestDeadlineMs?: number
     readonly onEvent: (event: TerminalProviderEvent) => void
     readonly onDisconnect: () => void
   }): Promise<TerminalProviderRpcConnection> {
@@ -66,6 +70,7 @@ export class TerminalProviderRpcConnection {
       socket,
       input.authToken,
       input.protocolVersion,
+      resolveRequestDeadline(input.requestDeadlineMs),
       input.onEvent,
       input.onDisconnect
     )
@@ -78,14 +83,18 @@ export class TerminalProviderRpcConnection {
       protocolVersion: this.protocolVersion,
       requestId,
       authToken: this.authToken,
+      controllerLeaseId: this.controllerLeaseId,
       method,
-      params
+      params,
+      deadlineMs: this.requestDeadlineMs
     }
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pending.delete(requestId)
-        reject(providerUnavailable(`Terminal provider request timed out: ${method}`))
-      }, providerRequestTimeoutMs)
+        const error = providerUnavailable(`Terminal provider request timed out: ${method}`)
+        reject(error)
+        this.socket.destroy()
+      }, this.requestDeadlineMs + providerRequestDeadlineGraceMs)
       this.pending.set(requestId, {
         resolve: (value) => resolve(value as T),
         reject,
@@ -98,6 +107,17 @@ export class TerminalProviderRpcConnection {
   close(): void {
     this.socket.end()
     this.socket.destroy()
+  }
+
+  async claimController(controllerId: string, processId: number): Promise<void> {
+    const claim = await this.request<{ readonly controllerLeaseId: string }>('claimController', {
+      controllerId,
+      processId
+    })
+    if (!claim.controllerLeaseId) {
+      throw providerUnavailable('Terminal provider returned an invalid controller lease.')
+    }
+    this.controllerLeaseId = claim.controllerLeaseId
   }
 
   private handleMessage(value: unknown): void {
@@ -134,4 +154,9 @@ function isProviderMessage(value: unknown): value is TerminalProviderMessage {
 
 function providerUnavailable(message: string) {
   return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
+}
+
+function resolveRequestDeadline(value: number | undefined): number {
+  if (value === undefined) return terminalProviderDefaultRequestDeadlineMs
+  return Math.max(1, Math.min(terminalProviderDefaultRequestDeadlineMs, Math.floor(value)))
 }

@@ -13,7 +13,6 @@ describe('terminal provider controller lifecycle', () => {
     const lifecycle = new TerminalProviderControllerLifecycle({
       createRelease: () => release.promise,
       hasLiveSessions: () => true,
-      hasUnsafeLiveSessions: () => false,
       isProcessAlive: (processId) => processId !== 101 || isFirstControllerAlive,
       onClaim: vi.fn(),
       onIdleWithoutLiveSessions: vi.fn()
@@ -50,7 +49,6 @@ describe('terminal provider controller lifecycle', () => {
     const lifecycle = new TerminalProviderControllerLifecycle({
       createRelease: () => release.promise,
       hasLiveSessions: () => true,
-      hasUnsafeLiveSessions: () => false,
       isProcessAlive: () => true,
       onClaim: vi.fn(),
       onIdleWithoutLiveSessions: vi.fn()
@@ -86,7 +84,6 @@ describe('terminal provider controller lifecycle', () => {
     const lifecycle = new TerminalProviderControllerLifecycle({
       createRelease: () => release.promise,
       hasLiveSessions: () => true,
-      hasUnsafeLiveSessions: () => false,
       isProcessAlive: () => true,
       onClaim: vi.fn(),
       onIdleWithoutLiveSessions: vi.fn()
@@ -111,6 +108,27 @@ describe('terminal provider controller lifecycle', () => {
     })
     await vi.waitFor(() => expect(lifecycle.state.kind).toBe('unclaimed'))
 
+    expect(lifecycle.claim(replacementSocket, 'controller-2', 202)).toEqual({
+      controllerLeaseId: expect.any(String)
+    })
+  })
+
+  it('expires an unresponsive release before admitting a replacement controller', async () => {
+    const firstSocket = { destroyed: false } as Socket
+    const replacementSocket = {} as Socket
+    const lifecycle = new TerminalProviderControllerLifecycle({
+      createRelease: () => new Promise(() => undefined),
+      hasLiveSessions: () => true,
+      isProcessAlive: () => true,
+      releaseDeadlineMs: 25,
+      onClaim: vi.fn(),
+      onIdleWithoutLiveSessions: vi.fn()
+    })
+
+    lifecycle.claim(firstSocket, 'controller-1', 101)
+    lifecycle.handleSocketClose(firstSocket)
+
+    await vi.waitFor(() => expect(lifecycle.state.kind).toBe('unclaimed'))
     expect(lifecycle.claim(replacementSocket, 'controller-2', 202)).toEqual({
       controllerLeaseId: expect.any(String)
     })
