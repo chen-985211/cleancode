@@ -16,13 +16,11 @@ import {
   agentApprovalTargetHandleId
 } from './agentApprovalHandles'
 import {
-  GroupAddIcon,
   GroupCollapseIcon,
   GroupDissolveIcon,
   GroupEditIcon,
   GroupExpandIcon,
   GroupMemberUnlinkIcon,
-  GroupRemoveIcon,
   GroupRestartIcon,
   GroupStartIcon,
   GroupStopIcon
@@ -53,6 +51,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     'terminal-group-node',
     objectMotion.className,
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
+    data.isEditing ? 'terminal-group-node--editing' : '',
     data.isContextSelected ? 'terminal-group-node--context-selected' : '',
     data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : '',
     data.approvalIntent ? 'terminal-group-node--approval-target' : ''
@@ -138,6 +137,10 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         ]
           .filter(Boolean)
           .join(' ')}
+        onDoubleClick={(event) => {
+          event.stopPropagation()
+          startEditingName()
+        }}
       >
         <div className="terminal-group-node__title">
           {isEditingName ? (
@@ -187,7 +190,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         ) : group.isCollapsed ? (
           <DisclosureButton data={data} />
         ) : (
-          <GroupActionToolbar data={data} onEdit={startEditingName} isInline />
+          <GroupActionToolbar data={data} isInline />
         )}
       </div>
 
@@ -202,7 +205,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             />
           </div>
         ) : (
-          <GroupActionToolbar data={data} onEdit={startEditingName} />
+          <GroupActionToolbar data={data} />
         )
       ) : null}
 
@@ -218,6 +221,11 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           ))}
         </div>
       ) : null}
+      {!group.isCollapsed && group.memberBlockIds.length === 0 ? (
+        <div className="terminal-group-node__empty-state">
+          {data.isEditing ? t('group.emptyEditingHint') : t('group.emptyHint')}
+        </div>
+      ) : null}
       {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>
   )
@@ -226,10 +234,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 interface GroupActionToolbarProps {
   readonly data: TerminalGroupFlowNode['data']
   readonly isInline?: boolean
-  readonly onEdit: () => void
 }
 
-function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolbarProps) {
+function GroupActionToolbar({ data, isInline = false }: GroupActionToolbarProps) {
   const group = data.group
   const { t } = useI18n()
 
@@ -256,6 +263,7 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
           tooltip={t('group.action.start')}
           tone="primary"
           surface="raised"
+          disabled={group.memberBlockIds.length === 0}
           onClick={() => data.onStartGroup(group)}
         >
           <GroupStartIcon />
@@ -300,35 +308,12 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
           })}
           tooltip={t('group.action.edit')}
           surface="raised"
-          onClick={onEdit}
+          pressed={data.isEditing}
+          onClick={() => data.onEditGroup?.(group)}
         >
           <GroupEditIcon />
         </IconButton>
         {isInline ? <DisclosureButton data={data} /> : null}
-        <div className="terminal-group-node__membership-actions" data-control-group="membership">
-          <IconButton
-            label={t('group.namedAction', {
-              groupName: group.name,
-              action: t('group.action.addSelected')
-            })}
-            tooltip={t('group.action.addSelected')}
-            disabled={data.selectedUngroupedTerminalBlockIds.length === 0}
-            onClick={() => void data.onAddSelectedTerminalsToGroup(group)}
-          >
-            <GroupAddIcon />
-          </IconButton>
-          <IconButton
-            label={t('group.namedAction', {
-              groupName: group.name,
-              action: t('group.action.removeSelected')
-            })}
-            tooltip={t('group.action.removeSelected')}
-            disabled={data.selectedMemberBlockIds.length === 0}
-            onClick={() => void data.onRemoveSelectedTerminalsFromGroup(group)}
-          >
-            <GroupRemoveIcon />
-          </IconButton>
-        </div>
       </div>
 
       <span
@@ -437,6 +422,7 @@ interface IconButtonProps {
   readonly tone?: 'primary' | 'danger'
   readonly surface?: 'raised'
   readonly disabled?: boolean
+  readonly pressed?: boolean
   readonly onClick: () => void
   readonly children: ReactNode
 }
@@ -447,6 +433,7 @@ function IconButton({
   tone,
   surface,
   disabled = false,
+  pressed,
   onClick,
   children
 }: IconButtonProps) {
@@ -461,6 +448,7 @@ function IconButton({
           .join(' ')}
         type="button"
         aria-label={label}
+        aria-pressed={pressed}
         data-control-surface={surface}
         disabled={disabled}
         onClick={onClick}

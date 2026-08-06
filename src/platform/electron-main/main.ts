@@ -27,7 +27,6 @@ import { FileSystemAgentSessionRepository } from '../../contexts/agent/infrastru
 import { createBuiltinAgentProviderContributions } from '../../contexts/agent/infrastructure/providers/catalog/BuiltinAgentProviderCatalog'
 import { NodeAgentProviderShellPathHydrator } from '../../contexts/agent/infrastructure/providers/shared/NodeAgentProviderShellPathHydrator'
 import { RunAgentTerminalRuntimeAdapter } from '../../contexts/agent/infrastructure/run/RunAgentTerminalRuntimeAdapter'
-import { AddTerminalToGroupUseCase } from '../../contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { AddQuickExecutionTargetUseCase } from '../../contexts/block-graph/application/use-cases/AddQuickExecutionTargetUseCase'
 import { ArrangeTerminalLayoutUseCase } from '../../contexts/block-graph/application/use-cases/ArrangeTerminalLayoutUseCase'
 import { BindQuickExecutionSlotUseCase } from '../../contexts/block-graph/application/use-cases/BindQuickExecutionSlotUseCase'
@@ -50,7 +49,7 @@ import { ListBlockTemplatesUseCase } from '../../contexts/block-graph/applicatio
 import { MoveBlockUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockUseCase'
 import { MoveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/MoveBlockTemplateUseCase'
 import { MoveTerminalGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
-import { RemoveTerminalFromGroupUseCase } from '../../contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
+import { MoveTerminalWorkflowToGroupUseCase } from '../../contexts/block-graph/application/use-cases/MoveTerminalWorkflowToGroupUseCase'
 import { ResizeTerminalBlockUseCase } from '../../contexts/block-graph/application/use-cases/ResizeTerminalBlockUseCase'
 import { SaveBlockTemplateUseCase } from '../../contexts/block-graph/application/use-cases/SaveBlockTemplateUseCase'
 import { SetTerminalGroupCollapsedUseCase } from '../../contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
@@ -157,8 +156,7 @@ const connectTerminalBlocksUseCase = new ConnectTerminalBlocksUseCase(graphRepos
 const disconnectTerminalBlocksUseCase = new DisconnectTerminalBlocksUseCase(graphRepository)
 const moveBlockUseCase = new MoveBlockUseCase(graphRepository)
 const moveTerminalGroupUseCase = new MoveTerminalGroupUseCase(graphRepository)
-const addTerminalToGroupUseCase = new AddTerminalToGroupUseCase(graphRepository)
-const removeTerminalFromGroupUseCase = new RemoveTerminalFromGroupUseCase(graphRepository)
+const moveTerminalWorkflowToGroupUseCase = new MoveTerminalWorkflowToGroupUseCase(graphRepository)
 const dissolveTerminalGroupUseCase = new DissolveTerminalGroupUseCase(graphRepository)
 const resizeTerminalBlockUseCase = new ResizeTerminalBlockUseCase(graphRepository)
 const setTerminalGroupCollapsedUseCase = new SetTerminalGroupCollapsedUseCase(graphRepository)
@@ -357,7 +355,6 @@ registerProjectIpcHandlers({
 
 registerBlockGraphIpcHandlers({
   addQuickExecutionTarget: (command) => addQuickExecutionTargetUseCase.execute(command),
-  addTerminalToGroup: (command) => addTerminalToGroupUseCase.execute(command),
   bindQuickExecutionSlot: (command) => bindQuickExecutionSlotUseCase.execute(command),
   clearQuickExecutionSlot: (command) => clearQuickExecutionSlotUseCase.execute(command),
   reorderQuickExecutionSlots: (command) => reorderQuickExecutionSlotsUseCase.execute(command),
@@ -372,7 +369,7 @@ registerBlockGraphIpcHandlers({
   logger: consoleLogger,
   moveBlock: (command) => moveBlockUseCase.execute(command),
   moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
-  removeTerminalFromGroup: (command) => removeTerminalFromGroupUseCase.execute(command),
+  moveTerminalWorkflowToGroup: (command) => moveTerminalWorkflowToGroupUseCase.execute(command),
   resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
   setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateGraphViewport: (command) => updateGraphViewportUseCase.execute(command),

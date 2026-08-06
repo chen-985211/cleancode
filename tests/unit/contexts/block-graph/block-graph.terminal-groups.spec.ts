@@ -61,17 +61,20 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
-  it('rejects creating a group around one complete workflow', () => {
+  it('creates a stable group around one complete workflow', () => {
     const graph = createGraphWithWorkflowComponents()
 
-    expect(() =>
-      graph.createTerminalGroup({
-        id: 'workflow-wrapper',
-        name: 'Workflow wrapper',
-        memberBlockIds: ['build-terminal']
-      })
-    ).toThrow('Terminal group must contain at least two top-level execution units.')
-    expect(graph.toSnapshot().terminalGroups).toEqual([])
+    graph.createTerminalGroup({
+      id: 'workflow-wrapper',
+      name: 'Workflow wrapper',
+      memberBlockIds: ['build-terminal']
+    })
+
+    expect(graph.toSnapshot().terminalGroups[0]?.memberBlockIds).toEqual([
+      'install-terminal',
+      'build-terminal',
+      'test-terminal'
+    ])
   })
 
   it('adds a terminal workflow to an existing group as one complete unit', () => {
@@ -93,34 +96,19 @@ describe('terminal groups in the default block graph', () => {
     ])
   })
 
-  it('rejects adding a partial workflow when another group owns one of its terminals', () => {
+  it('rejects a dependency that crosses a group boundary', () => {
     const graph = createGraphWithWorkflowComponents(false)
     graph.createTerminalGroup({
       id: 'release-group',
       name: 'Release',
       memberBlockIds: ['test-terminal', 'package-terminal']
     })
-    graph.createTerminalGroup({
-      id: 'development-group',
-      name: 'Development',
-      memberBlockIds: ['shell-terminal', 'docs-terminal']
-    })
-    graph.connectTerminalBlocks({
-      sourceBlockId: 'install-terminal',
-      targetBlockId: 'build-terminal'
-    })
-    graph.connectTerminalBlocks({
-      sourceBlockId: 'build-terminal',
-      targetBlockId: 'test-terminal'
-    })
-
-    expect(() => graph.addTerminalToGroup('development-group', 'build-terminal')).toThrow(
-      'Terminal block already belongs to a group.'
-    )
-    expect(
-      graph.toSnapshot().terminalGroups.find((group) => group.id === 'development-group')
-        ?.memberBlockIds
-    ).toEqual(['shell-terminal', 'docs-terminal'])
+    expect(() =>
+      graph.connectTerminalBlocks({
+        sourceBlockId: 'build-terminal',
+        targetBlockId: 'test-terminal'
+      })
+    ).toThrow('Terminal connections must stay within one container scope.')
   })
 
   it('moves grouped terminals together when the group moves', () => {
@@ -162,14 +150,19 @@ describe('terminal groups in the default block graph', () => {
 
     graph.deleteBlock(worker.id)
 
-    expect(graph.toSnapshot().terminalGroups).toEqual([])
+    expect(graph.toSnapshot().terminalGroups).toEqual([
+      expect.objectContaining({
+        id: 'development-group',
+        memberBlockIds: ['backend-terminal']
+      })
+    ])
     expect(graph.toSnapshot().blocks.map((block) => block.id)).toEqual([
       'backend-terminal',
       'frontend-terminal'
     ])
   })
 
-  it('removes a complete workflow and dissolves a group that would have one top-level unit', () => {
+  it('removes a complete workflow without dissolving the remaining group', () => {
     const graph = createGraphWithWorkflowComponents()
     graph.createTerminalGroup({
       id: 'development-group',
@@ -179,10 +172,12 @@ describe('terminal groups in the default block graph', () => {
 
     graph.removeTerminalFromGroup('development-group', 'build-terminal')
 
-    expect(graph.toSnapshot().terminalGroups).toEqual([])
+    expect(graph.toSnapshot().terminalGroups).toEqual([
+      expect.objectContaining({ id: 'development-group', memberBlockIds: ['shell-terminal'] })
+    ])
   })
 
-  it('restores legacy graphs and drops invalid restored groups', () => {
+  it('restores legacy graphs and preserves a dangling container as empty', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
@@ -229,11 +224,12 @@ describe('terminal groups in the default block graph', () => {
       expect.objectContaining({
         id: 'valid-group',
         memberBlockIds: ['backend-terminal', 'frontend-terminal']
-      })
+      }),
+      expect.objectContaining({ id: 'dangling-group', memberBlockIds: [] })
     ])
   })
 
-  it('drops a restored group that wraps only one complete workflow', () => {
+  it('preserves a restored group that wraps one complete workflow', () => {
     const graph = BlockGraph.fromSnapshot({
       id: 'graph-1',
       projectId: 'project-1',
@@ -274,7 +270,12 @@ describe('terminal groups in the default block graph', () => {
       ]
     } as never)
 
-    expect(graph.toSnapshot().terminalGroups).toEqual([])
+    expect(graph.toSnapshot().terminalGroups).toEqual([
+      expect.objectContaining({
+        id: 'workflow-wrapper',
+        memberBlockIds: ['backend-terminal', 'frontend-terminal']
+      })
+    ])
   })
 
   it('rejects ambiguous terminal group membership', () => {
@@ -291,7 +292,7 @@ describe('terminal groups in the default block graph', () => {
         name: 'Single',
         memberBlockIds: ['backend-terminal']
       })
-    ).toThrow('Terminal group must contain at least two top-level execution units.')
+    ).toThrow('Terminal block already belongs to a group.')
   })
 })
 

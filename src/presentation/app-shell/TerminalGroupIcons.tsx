@@ -18,14 +18,6 @@ export function GroupEditIcon(props: TerminalGroupIconProps) {
   return <WorkbenchIcon {...props} data-icon="group-edit" role="edit" />
 }
 
-export function GroupAddIcon(props: TerminalGroupIconProps) {
-  return <WorkbenchIcon {...props} data-icon="group-add" role="group-add" />
-}
-
-export function GroupRemoveIcon(props: TerminalGroupIconProps) {
-  return <WorkbenchIcon {...props} data-icon="group-remove" role="group-remove" />
-}
-
 export function GroupDissolveIcon({
   className,
   size = 24,

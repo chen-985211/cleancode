@@ -1,6 +1,11 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
-
-import { analyzeCanvasExecutionSelection } from '../../shared-kernel/domain/policies/CanvasExecutionSemantics'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction
+} from 'react'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseTerminalGroupSelectionModeInput {
@@ -16,7 +21,7 @@ export function useTerminalGroupSelectionMode({
   setSelectedTerminalBlockIds,
   setSelectedTerminalGroupId
 }: UseTerminalGroupSelectionModeInput) {
-  const [isTerminalGroupSelectionMode, setIsTerminalGroupSelectionMode] = useState(false)
+  const [editingTerminalGroupId, setEditingTerminalGroupId] = useState<string | null>(null)
   const groupedTerminalBlockIds = useMemo(
     () => new Set((graph?.terminalGroups ?? []).flatMap((group) => group.memberBlockIds)),
     [graph]
@@ -29,47 +34,39 @@ export function useTerminalGroupSelectionMode({
     () => selectedTerminalBlockIds.filter((blockId) => !groupedTerminalBlockIds.has(blockId)),
     [groupedTerminalBlockIds, selectedTerminalBlockIds]
   )
-  const canCreateTerminalGroup = useMemo(() => {
-    if (!graph) return false
+  const isTerminalGroupSelectionMode = editingTerminalGroupId !== null
+  const canCreateTerminalGroup = editingTerminalGroupId === null
 
-    const analysis = analyzeCanvasExecutionSelection({
-      dependencies: (graph.connections ?? []).map((connection) => ({
-        sourceTerminalId: connection.sourceBlockId,
-        targetTerminalId: connection.targetBlockId
-      })),
-      selectedTerminalIds: selectedUngroupedTerminalBlockIds,
-      terminals: graph.blocks.map((block) => ({ terminalId: block.id }))
-    })
+  useEffect(() => {
+    if (
+      editingTerminalGroupId &&
+      !graph?.terminalGroups.some((group) => group.id === editingTerminalGroupId)
+    ) {
+      setEditingTerminalGroupId(null)
+    }
+  }, [editingTerminalGroupId, graph])
 
-    return (
-      analysis.canCreateCombination &&
-      analysis.expandedTerminalIds.every((blockId) => !groupedTerminalBlockIds.has(blockId))
-    )
-  }, [graph, groupedTerminalBlockIds, selectedUngroupedTerminalBlockIds])
-
-  const beginTerminalGroupSelection = useCallback(() => {
-    setSelectedTerminalGroupId(null)
-    setIsTerminalGroupSelectionMode(true)
-  }, [setSelectedTerminalGroupId])
+  const beginTerminalGroupSelection = useCallback(
+    (groupId: string) => {
+      setSelectedTerminalGroupId(groupId)
+      setSelectedTerminalBlockIds([])
+      setEditingTerminalGroupId(groupId)
+    },
+    [setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
+  )
 
   const cancelTerminalGroupSelection = useCallback(() => {
-    setIsTerminalGroupSelectionMode(false)
+    setEditingTerminalGroupId(null)
     setSelectedTerminalBlockIds([])
   }, [setSelectedTerminalBlockIds])
 
   const completeTerminalGroupSelection = useCallback(() => {
-    setIsTerminalGroupSelectionMode(false)
+    setEditingTerminalGroupId(null)
     setSelectedTerminalBlockIds([])
   }, [setSelectedTerminalBlockIds])
 
   const selectTerminalBlock = useCallback(
     (blockId: string, shouldToggle: boolean) => {
-      if (isTerminalGroupSelectionMode) {
-        setSelectedTerminalGroupId(null)
-        setSelectedTerminalBlockIds((blockIds) => toggleTerminalSelection(blockIds, blockId, true))
-        return
-      }
-
       setSelectedTerminalBlockIds((blockIds) =>
         toggleTerminalSelection(blockIds, blockId, shouldToggle)
       )
@@ -78,12 +75,11 @@ export function useTerminalGroupSelectionMode({
         setSelectedTerminalGroupId(null)
       }
     },
-    [isTerminalGroupSelectionMode, setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
+    [setSelectedTerminalBlockIds, setSelectedTerminalGroupId]
   )
 
   const selectTerminalGroup = useCallback(
     (groupId: string) => {
-      setIsTerminalGroupSelectionMode(false)
       setSelectedTerminalBlockIds([])
       setSelectedTerminalGroupId(groupId)
     },
@@ -95,6 +91,7 @@ export function useTerminalGroupSelectionMode({
     canCreateTerminalGroup,
     cancelTerminalGroupSelection,
     completeTerminalGroupSelection,
+    editingTerminalGroupId,
     isTerminalGroupSelectionMode,
     selectTerminalBlock,
     selectTerminalGroup,

@@ -184,7 +184,7 @@ describe('app shell terminal group edit mode', () => {
     )
   })
 
-  it('moves and immediately adds an ungrouped terminal dropped inside a group', async () => {
+  it('moves a complete terminal workflow into the edited group in one operation', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const movedGraph = {
       ...workbench.graph,
@@ -203,8 +203,7 @@ describe('app shell terminal group edit mode', () => {
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
     })
-    runtimeApi.moveBlock.mockResolvedValue(movedGraph)
-    runtimeApi.addTerminalToGroup.mockResolvedValue(groupedGraph)
+    runtimeApi.moveTerminalWorkflowToGroup.mockResolvedValue(groupedGraph)
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -231,24 +230,19 @@ describe('app shell terminal group edit mode', () => {
     })
 
     await waitFor(() =>
-      expect(runtimeApi.moveBlock).toHaveBeenCalledWith({
+      expect(runtimeApi.moveTerminalWorkflowToGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
         workspaceId: 'main',
         blockId: 'worker-terminal',
+        targetTerminalGroupId: 'development-group',
         position: { x: 420, y: 260 }
       })
     )
-    await waitFor(() =>
-      expect(runtimeApi.addTerminalToGroup).toHaveBeenCalledWith({
-        projectDirectory: '/tmp/alpha-project',
-        workspaceId: 'main',
-        terminalGroupId: 'development-group',
-        blockId: 'worker-terminal'
-      })
-    )
+    expect(runtimeApi.moveBlock).not.toHaveBeenCalled()
+    expect(runtimeApi.addTerminalToGroup).not.toHaveBeenCalled()
   })
 
-  it('creates a new group from terminals selected before entering edit mode', async () => {
+  it('creates an empty group at the context-menu coordinate and enters its edit space', async () => {
     const workbench = createWorkbenchWithTerminalBlocks()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
@@ -260,10 +254,10 @@ describe('app shell terminal group edit mode', () => {
           id: 'new-group',
           type: 'terminal-group',
           name: '启动项目',
-          position: { x: 288, y: 164 },
-          size: { width: 984, height: 458 },
+          position: { x: 320, y: 240 },
+          size: { width: 520, height: 320 },
           isCollapsed: false,
-          memberBlockIds: ['backend-terminal', 'frontend-terminal']
+          memberBlockIds: []
         }
       ]
     })
@@ -277,48 +271,26 @@ describe('app shell terminal group edit mode', () => {
 
     await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThanOrEqual(2))
 
-    const backendNode = reactFlowProps.latest?.nodes.find(
-      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
-    )
-    const frontendNode = reactFlowProps.latest?.nodes.find(
-      (node): node is TerminalFlowNode =>
-        node.id === 'frontend-terminal' && node.type === 'terminal'
-    )
-
-    expect(backendNode).toBeDefined()
-    expect(frontendNode).toBeDefined()
-
-    backendNode?.data.onSelect?.(false)
-    frontendNode?.data.onSelect?.(true)
-
-    await enterTerminalGroupEditMode()
-    fireEvent.click(await screen.findByRole('button', { name: '创建组合' }))
+    fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
+    fireEvent.click(await screen.findByRole('menuitem', { name: '组合终端' }))
 
     await waitFor(() =>
       expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
         workspaceId: 'main',
         name: '启动项目',
-        memberBlockIds: ['backend-terminal', 'frontend-terminal']
+        position: { x: 320, y: 240 }
+      })
+    )
+    await waitFor(() =>
+      expect(reactFlowProps.latest?.nodes.find((node) => node.id === 'new-group')).toMatchObject({
+        data: { isEditing: true }
       })
     )
   })
 
-  it('does not create a group from one complete workflow', async () => {
-    const baseWorkbench = createWorkbenchWithTerminalBlocks()
-    const workbench = {
-      ...baseWorkbench,
-      graph: {
-        ...baseWorkbench.graph,
-        connections: [
-          {
-            id: 'backend-frontend',
-            sourceBlockId: 'backend-terminal',
-            targetBlockId: 'frontend-terminal'
-          }
-        ]
-      }
-    }
+  it('does not offer nested group creation while editing a group space', async () => {
+    const workbench = createWorkbenchWithTerminalGroup()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
     })
@@ -328,21 +300,15 @@ describe('app shell terminal group edit mode', () => {
     })
 
     render(<AppShell />)
-    await waitFor(() => expect(reactFlowProps.latest?.nodes.length).toBeGreaterThanOrEqual(2))
-    const backendNode = reactFlowProps.latest?.nodes.find(
-      (node): node is TerminalFlowNode => node.id === 'backend-terminal' && node.type === 'terminal'
-    )
-
-    backendNode?.data.onSelect?.(false)
     await enterTerminalGroupEditMode()
-    const createGroupButton = await screen.findByRole('button', { name: '创建组合' })
+    fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
+    const createGroupItem = await screen.findByRole('menuitem', { name: '组合终端' })
 
-    expect(createGroupButton).toBeDisabled()
-    fireEvent.click(createGroupButton)
+    expect(createGroupItem).toBeDisabled()
     expect(runtimeApi.createTerminalGroup).not.toHaveBeenCalled()
   })
 
-  it('selects grouped member terminals while editing group membership', async () => {
+  it('marks the container as editing without changing terminal selection semantics', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
@@ -365,24 +331,15 @@ describe('app shell terminal group edit mode', () => {
 
     expect(backendNode).toMatchObject({
       data: {
-        canSelectForTerminalGroup: true
+        canSelectForTerminalGroup: false,
+        isTerminalGroupSelectionMode: false
       }
     })
-
-    backendNode?.data.onToggleTerminalGroupCandidate(backendNode.data.block)
-
-    await waitFor(() => {
-      const groupNode = reactFlowProps.latest?.nodes.find(
+    expect(
+      reactFlowProps.latest?.nodes.find(
         (node) => node.id === 'development-group' && node.type === 'terminalGroup'
       )
-
-      expect(groupNode).toMatchObject({
-        data: {
-          selectedMemberBlockIds: ['backend-terminal'],
-          selectedUngroupedTerminalBlockIds: []
-        }
-      })
-    })
+    ).toMatchObject({ data: { isEditing: true } })
   })
 
   it('keeps the group shell size stable while dragging a member in edit mode', async () => {
@@ -423,7 +380,7 @@ describe('app shell terminal group edit mode', () => {
     })
   })
 
-  it('moves and immediately removes a member terminal dropped outside its group', async () => {
+  it('moves a complete terminal workflow out of the edited group in one operation', async () => {
     const workbench = createWorkbenchWithTerminalGroup({
       memberBlockIds: ['backend-terminal', 'frontend-terminal', 'worker-terminal']
     })
@@ -444,8 +401,7 @@ describe('app shell terminal group edit mode', () => {
     const runtimeApi = createRuntimeApi({
       listWorkbenches: vi.fn(async () => [workbench])
     })
-    runtimeApi.moveBlock.mockResolvedValue(movedGraph)
-    runtimeApi.removeTerminalFromGroup.mockResolvedValue(ungroupedGraph)
+    runtimeApi.moveTerminalWorkflowToGroup.mockResolvedValue(ungroupedGraph)
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -470,13 +426,16 @@ describe('app shell terminal group edit mode', () => {
     })
 
     await waitFor(() =>
-      expect(runtimeApi.removeTerminalFromGroup).toHaveBeenCalledWith({
+      expect(runtimeApi.moveTerminalWorkflowToGroup).toHaveBeenCalledWith({
         projectDirectory: '/tmp/alpha-project',
         workspaceId: 'main',
-        terminalGroupId: 'development-group',
-        blockId: 'backend-terminal'
+        blockId: 'backend-terminal',
+        targetTerminalGroupId: null,
+        position: { x: 1280, y: 260 }
       })
     )
+    expect(runtimeApi.moveBlock).not.toHaveBeenCalled()
+    expect(runtimeApi.removeTerminalFromGroup).not.toHaveBeenCalled()
   })
 
   it('serializes repeated moves of the same terminal group', async () => {
@@ -535,11 +494,18 @@ interface MockReactFlowProps {
 }
 
 async function enterTerminalGroupEditMode(): Promise<void> {
-  await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
-  fireEvent.contextMenu(screen.getByTestId('mock-react-flow'), { clientX: 320, clientY: 240 })
-  const menuItem = await screen.findByRole('menuitem', { name: '组合终端' })
-  await waitFor(() => expect(menuItem).toBeEnabled())
-  fireEvent.click(menuItem)
+  await waitFor(() =>
+    expect(
+      reactFlowProps.latest?.nodes.find(
+        (node) => node.id === 'development-group' && node.type === 'terminalGroup'
+      )
+    ).toBeDefined()
+  )
+  const groupNode = reactFlowProps.latest?.nodes.find(
+    (node) => node.id === 'development-group' && node.type === 'terminalGroup'
+  )
+  if (groupNode?.type !== 'terminalGroup') throw new Error('Expected terminal group node.')
+  act(() => groupNode.data.onEditGroup?.(groupNode.data.group))
 }
 
 interface MockReactFlowInstance {

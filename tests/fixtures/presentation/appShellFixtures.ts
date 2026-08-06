@@ -167,6 +167,7 @@ export function createRuntimeApi(overrides: RuntimeApiOverrides = {}) {
     setTerminalGroupCollapsed: vi.fn(),
     addTerminalToGroup: vi.fn(),
     removeTerminalFromGroup: vi.fn(),
+    moveTerminalWorkflowToGroup: vi.fn(),
     dissolveTerminalGroup: vi.fn(),
     resizeTerminalBlock: overrides.resizeTerminalBlock ?? vi.fn(),
     updateGraphViewport: vi.fn(),

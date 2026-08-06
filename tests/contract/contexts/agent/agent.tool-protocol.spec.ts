@@ -58,6 +58,15 @@ describe('agent tool protocol', () => {
       minItems: 1,
       type: 'array'
     })
+    const terminalGroupSchema = readSchemaProperty(
+      createWorkflow.inputSchema,
+      'terminalGroup'
+    ) as AgentToolJsonSchema
+    expect(readSchemaProperty(terminalGroupSchema, 'memberRefs')).toMatchObject({
+      minItems: 1,
+      type: 'array',
+      uniqueItems: true
+    })
 
     expect(updateExecutionConfig.inputSchema).toMatchObject({
       additionalProperties: false,
@@ -279,10 +288,10 @@ describe('agent tool protocol', () => {
     expect(arrangeLayout?.description).not.toContain('active Agent')
     expect(createGroup).toEqual(
       expect.objectContaining({
-        description: expect.stringContaining('existing terminal blocks'),
+        description: expect.stringContaining('persistent terminal-group space'),
         inputSchema: expect.objectContaining({
           additionalProperties: false,
-          required: ['name', 'memberBlockIds']
+          required: ['name']
         })
       })
     )
@@ -324,13 +333,19 @@ describe('agent tool protocol', () => {
   it('projects the canonical canvas execution semantics into MCP and Provider instructions', () => {
     for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
       expect(instructions).toContain(canvasExecutionSemanticInstructions)
-      expect(instructions).toContain('at least two top-level execution units')
-      expect(instructions).toContain('Never wrap a single complete workflow')
+      expect(instructions).toContain('persistent container and connection scope')
+      expect(instructions).toContain('may remain empty')
+      expect(instructions).toContain('same combination')
     }
 
     const createGroup = requireTool('create_terminal_group')
-    expect(createGroup.description).toContain('at least two top-level execution units')
-    expect(createGroup.description).toContain('complete workflows')
+    expect(createGroup.description).toContain('may start empty')
+    expect(createGroup.description).toContain('connection scope')
+    expect(createGroup.inputSchema.required).toEqual(['name'])
+    expect(readSchemaProperty(createGroup.inputSchema, 'memberBlockIds')).toMatchObject({
+      type: 'array',
+      uniqueItems: true
+    })
   })
 
   it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {

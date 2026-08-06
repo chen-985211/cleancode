@@ -105,7 +105,6 @@ describe('BlockGraph terminal launch plan adapter', () => {
       name: 'Development',
       memberBlockIds: ['install', 'build', 'companion']
     })
-    graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
     const adapter = new BlockGraphTerminalWorkflowPlanAdapter(
       new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
     )

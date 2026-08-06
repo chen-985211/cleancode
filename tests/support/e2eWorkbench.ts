@@ -23,6 +23,7 @@ import {
 } from '../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
 
 export { e2eTeardownTimeoutMs } from './e2eLifecycle'
+export { selectBlankCanvasAction } from './e2eCanvasActions'
 
 export const electronLaunchTimeoutMs = 30_000
 export const electronScenarioTimeoutMs = 60_000
@@ -45,30 +46,6 @@ export interface E2eScenarioResources {
 
 export interface LaunchAppOptions {
   readonly environment?: NodeJS.ProcessEnv
-}
-
-export async function selectBlankCanvasAction(
-  page: Page,
-  action: '新建终端积木' | '组合终端'
-): Promise<void> {
-  await pollUntilState({
-    description: 'blank-canvas actions to become available',
-    observe: () => page.getByRole('button', { name: '新建 Agent' }).isEnabled(),
-    accept: Boolean,
-    timeoutMs: 10_000
-  })
-  const pane = page.locator('.react-flow__pane')
-  await pane.waitFor({ state: 'visible' })
-  const bounds = await pane.boundingBox()
-  if (!bounds) throw new Error('React Flow pane is not visible')
-
-  await page.mouse.click(bounds.x + bounds.width - 24, bounds.y + bounds.height - 24, {
-    button: 'right'
-  })
-  await page
-    .getByRole('menu', { name: '画布操作' })
-    .getByRole('menuitem', { name: action, exact: true })
-    .click()
 }
 
 export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> {

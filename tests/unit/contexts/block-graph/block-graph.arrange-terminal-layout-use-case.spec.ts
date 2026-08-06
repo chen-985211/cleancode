@@ -24,10 +24,10 @@ describe('arrange terminal layout use case', () => {
       graphChanged: true
     })
     expect(result.graph.blocks.map((block) => [block.id, block.position])).toEqual([
-      ['upstream-terminal', { x: 138, y: 640 }],
-      ['downstream-terminal', { x: 622, y: 640 }],
+      ['upstream-terminal', { x: 0, y: 640 }],
+      ['downstream-terminal', { x: 484, y: 640 }],
       ['unrelated-terminal', { x: 80, y: 80 }],
-      ['group-companion', { x: 380, y: 944 }]
+      ['group-companion', { x: 242, y: 944 }]
     ])
     expect(repository.transactionCount).toBe(1)
   })

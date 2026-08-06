@@ -13,12 +13,12 @@ interface WorkbenchToolbarProps {
   readonly hasWorkbench: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalGroupCandidateCount: number
-  readonly canCreateTerminalGroup: boolean
+  readonly canCreateTerminalGroup?: boolean
   readonly shortcutTooltips: Pick<ApplicationShortcutTooltipLabels, 'createAgent'>
   readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
   readonly onSelectDefaultAgentProvider?: (providerId: string) => void
-  readonly onCreateTerminalGroup: () => void
+  readonly onCreateTerminalGroup?: () => void
   readonly onCancelTerminalGroupSelection: () => void
 }
 
@@ -43,15 +43,6 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
             {t('toolbar.groupEditing')}
             <strong>{props.selectedTerminalGroupCandidateCount}</strong>
           </span>
-          <button
-            className="toolbar-button toolbar-button--primary"
-            type="button"
-            onClick={props.onCreateTerminalGroup}
-            disabled={!props.canCreateTerminalGroup}
-          >
-            <WorkbenchIcon role="confirm" size={16} />
-            {t('toolbar.createGroup')}
-          </button>
           <button
             className="toolbar-button"
             type="button"

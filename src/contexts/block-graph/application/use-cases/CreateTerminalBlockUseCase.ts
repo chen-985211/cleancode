@@ -17,6 +17,7 @@ export interface CreateTerminalBlockCommand {
   readonly position?: BlockPositionSnapshot
   readonly size?: TerminalBlockSizeSnapshot
   readonly canvasRegions?: readonly TerminalLayoutRegion[]
+  readonly terminalGroupId?: string
 }
 
 export class CreateTerminalBlockUseCase {
@@ -39,10 +40,11 @@ export class CreateTerminalBlockUseCase {
           description: command.description,
           launchCommand: command.launchCommand,
           position: command.position ?? { x: 0, y: 0 },
-          size: command.size
+          size: command.size,
+          terminalGroupId: command.terminalGroupId
         })
 
-        if (!command.position && command.canvasRegions) {
+        if (!command.position && command.canvasRegions && !command.terminalGroupId) {
           graph.arrangeTerminalLayout({
             blockIds: [block.id],
             canvasRegions: command.canvasRegions

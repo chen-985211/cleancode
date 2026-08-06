@@ -1,4 +1,4 @@
-export type CanvasExecutionStructureType = 'terminal' | 'workflow' | 'combination'
+export type CanvasExecutionStructureType = 'terminal' | 'workflow' | 'multiple'
 
 interface CanvasSemanticTerminal {
   readonly terminalId: string
@@ -24,18 +24,18 @@ interface CanvasExecutionSelectionInput extends CanvasExecutionStructureInput {
 }
 
 export interface CanvasExecutionSelectionAnalysis {
-  readonly canCreateCombination: boolean
   readonly classification: CanvasExecutionStructureType | null
   readonly expandedTerminalIds: readonly string[]
   readonly topLevelExecutionUnits: readonly CanvasTopLevelExecutionUnit[]
   readonly unknownTerminalIds: readonly string[]
 }
 
-const minimumCombinationTopLevelExecutionUnits = 2
-
 export const canvasExecutionSemanticContract = Object.freeze({
   definitions: Object.freeze({
-    combination: bilingual('A container of top-level execution units.', '顶层执行单元的容器。'),
+    combination: bilingual(
+      'A persistent container and connection scope for zero or more complete execution units.',
+      '组合是可持久存在的独立容器与连线作用域，可容纳零个或多个完整执行单元。'
+    ),
     terminal: bilingual('A terminal is the smallest execution unit.', '终端是最小执行单位。'),
     topLevelExecutionUnit: bilingual(
       'A top-level execution unit is either an independent terminal or one complete workflow.',
@@ -46,7 +46,6 @@ export const canvasExecutionSemanticContract = Object.freeze({
       '流程是由终端及依赖连线构成的完整执行整体。'
     )
   }),
-  minimumCombinationTopLevelExecutionUnits,
   rules: Object.freeze({
     completeWorkflowMembership: bilingual(
       'When creating or adjusting combination membership, selecting any terminal in a workflow must include that complete workflow.',
@@ -55,24 +54,32 @@ export const canvasExecutionSemanticContract = Object.freeze({
     ordinaryTerminalScope: bilingual(
       'Ordinary terminal clicks, inspection, and configuration still affect only that terminal.',
       '普通单击、查看和配置仍只作用于当前终端。'
+    ),
+    connectionScopeIsolation: bilingual(
+      'A dependency connection may only join two root terminals or two terminals in the same combination.',
+      '依赖连线只能连接两个根画布终端，或同一组合中的两个终端。'
+    ),
+    emptyCombinationPersistence: bilingual(
+      'A combination may remain empty until the user explicitly dissolves or removes it.',
+      '组合可以保持为空，直到用户显式解散或删除它。'
     )
   }),
-  version: 1
+  version: 2
 })
 
 export const canvasExecutionSemanticInstructions = [
   `CleanCode canvas execution semantics / CleanCode 画布执行语义：${projectBilingual(
     canvasExecutionSemanticContract.definitions.terminal
-  )} ${projectBilingual(canvasExecutionSemanticContract.definitions.workflow)}`,
-  `A combination must always contain at least ${toEnglishNumber(
-    canvasExecutionSemanticContract.minimumCombinationTopLevelExecutionUnits
-  )} top-level execution units（组合始终至少${toChineseNumber(
-    canvasExecutionSemanticContract.minimumCombinationTopLevelExecutionUnits
-  )}个顶层执行单元）. ${projectBilingual(
+  )} ${projectBilingual(canvasExecutionSemanticContract.definitions.workflow)} ${projectBilingual(
+    canvasExecutionSemanticContract.definitions.combination
+  )}`,
+  `${projectBilingual(
     canvasExecutionSemanticContract.definitions.topLevelExecutionUnit
-  )} Never wrap a single complete workflow or one independent terminal in a combination（单条完整流程或单个独立终端不得创建组合）.`,
+  )} ${projectBilingual(canvasExecutionSemanticContract.rules.emptyCombinationPersistence)}`,
   `${projectBilingual(
     canvasExecutionSemanticContract.rules.completeWorkflowMembership
+  )} ${projectBilingual(
+    canvasExecutionSemanticContract.rules.connectionScopeIsolation
   )} ${projectBilingual(canvasExecutionSemanticContract.rules.ordinaryTerminalScope)}`
 ].join(' ')
 
@@ -102,9 +109,6 @@ export function analyzeCanvasExecutionSelection(
   ]
 
   return Object.freeze({
-    canCreateCombination:
-      selectedUnits.length >=
-      canvasExecutionSemanticContract.minimumCombinationTopLevelExecutionUnits,
     classification: classifyTopLevelExecutionUnits(selectedUnits),
     expandedTerminalIds: Object.freeze(expandedTerminalIds),
     topLevelExecutionUnits: Object.freeze(selectedUnits),
@@ -171,22 +175,12 @@ function classifyTopLevelExecutionUnits(
   units: readonly CanvasTopLevelExecutionUnit[]
 ): CanvasExecutionStructureType | null {
   if (units.length === 0) return null
-  if (units.length >= canvasExecutionSemanticContract.minimumCombinationTopLevelExecutionUnits) {
-    return 'combination'
-  }
+  if (units.length > 1) return 'multiple'
   return units[0]?.type ?? null
 }
 
 function normalizeIds(ids: readonly string[]): string[] {
   return Array.from(new Set(ids))
-}
-
-function toChineseNumber(value: number): string {
-  return value === 2 ? '两' : String(value)
-}
-
-function toEnglishNumber(value: number): string {
-  return value === 2 ? 'two' : String(value)
 }
 
 function bilingual(english: string, chinese: string) {

@@ -64,10 +64,17 @@ export function createBlockTemplate(input: CreateBlockTemplateInput): BlockTempl
       ? [{ sourceTemplateNodeId, targetTemplateNodeId }]
       : []
   })
+  const sourceGroup = input.graph.terminalGroups.find((group) =>
+    referencesExactIds(
+      group.memberBlockIds,
+      selectedBlocks.map((block) => block.id)
+    )
+  )
+  const type = sourceGroup ? 'combination' : recognizeUngroupedBlockTemplateType(nodes, connections)
 
   return normalizeBlockTemplate({
     id: input.id,
-    type: recognizeBlockTemplateType(nodes, connections),
+    type,
     name: input.name,
     description: input.description,
     scope: input.scope,
@@ -150,8 +157,8 @@ export function normalizeBlockTemplate(template: BlockTemplateSnapshot): BlockTe
   })
 
   assertAcyclic(nodes, connections)
-  const recognizedType = recognizeBlockTemplateType(nodes, connections)
-  if (recognizedType !== template.type) {
+  const recognizedType = recognizeCanvasStructure(nodes, connections)
+  if (template.type !== 'combination' && recognizedType !== template.type) {
     invalidTemplate('Template type does not match its terminal dependency graph.')
   }
 
@@ -168,10 +175,23 @@ export function normalizeBlockTemplate(template: BlockTemplateSnapshot): BlockTe
   })
 }
 
-function recognizeBlockTemplateType(
+function recognizeUngroupedBlockTemplateType(
   nodes: readonly Pick<BlockTemplateNodeSnapshot, 'templateNodeId'>[],
   connections: readonly BlockTemplateConnectionSnapshot[]
 ): BlockTemplateType {
+  const classification = recognizeCanvasStructure(nodes, connections)
+
+  if (classification === 'multiple') {
+    invalidTemplate('A multi-unit template must reference one explicit terminal combination.')
+  }
+
+  return classification
+}
+
+function recognizeCanvasStructure(
+  nodes: readonly Pick<BlockTemplateNodeSnapshot, 'templateNodeId'>[],
+  connections: readonly BlockTemplateConnectionSnapshot[]
+) {
   const classification = classifyCanvasExecutionStructure({
     dependencies: connections.map((connection) => ({
       sourceTerminalId: connection.sourceTemplateNodeId,
@@ -185,6 +205,15 @@ function recognizeBlockTemplateType(
   }
 
   return classification
+}
+
+function referencesExactIds(leftIds: readonly string[], rightIds: readonly string[]): boolean {
+  const left = new Set(leftIds)
+  return (
+    left.size === leftIds.length &&
+    left.size === rightIds.length &&
+    rightIds.every((id) => left.has(id))
+  )
 }
 
 function assertAcyclic(

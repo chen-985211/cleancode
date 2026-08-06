@@ -6,7 +6,8 @@ export interface CreateTerminalGroupCommand {
   readonly projectDirectory: string
   readonly workspaceId: string
   readonly name: string
-  readonly memberBlockIds: readonly string[]
+  readonly memberBlockIds?: readonly string[]
+  readonly position?: { readonly x: number; readonly y: number }
 }
 
 export class CreateTerminalGroupUseCase {
@@ -19,7 +20,8 @@ export class CreateTerminalGroupUseCase {
       (graph) =>
         graph.createTerminalGroup({
           name: command.name,
-          memberBlockIds: command.memberBlockIds
+          memberBlockIds: command.memberBlockIds,
+          position: command.position
         })
     )
 

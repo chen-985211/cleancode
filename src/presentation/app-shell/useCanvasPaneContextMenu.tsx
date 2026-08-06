@@ -19,9 +19,10 @@ interface UseCanvasPaneContextMenuOptions {
     'createTerminal' | 'groupTerminals'
   >
   readonly onBeforeOpen: () => void
-  readonly onBeginTerminalGroupSelection: () => void
-  readonly onCreateTerminal: () => void
-  readonly onFitCanvas: () => void
+  readonly onBeginTerminalGroupSelection?: () => void
+  readonly onCreateTerminal: (position: { readonly x: number; readonly y: number }) => void
+  readonly onCreateTerminalGroup?: (position: { readonly x: number; readonly y: number }) => void
+  readonly onFitCanvas?: () => void
 }
 
 export function useCanvasPaneContextMenu({
@@ -33,6 +34,7 @@ export function useCanvasPaneContextMenu({
   onBeforeOpen,
   onBeginTerminalGroupSelection,
   onCreateTerminal,
+  onCreateTerminalGroup,
   onFitCanvas
 }: UseCanvasPaneContextMenuOptions) {
   const [position, setPosition] = useState<{
@@ -64,10 +66,13 @@ export function useCanvasPaneContextMenu({
           position={position}
           shortcutTooltips={shortcutTooltips}
           onClose={close}
-          onCreateTerminal={onCreateTerminal}
+          onCreateTerminal={() => onCreateTerminal(position)}
           onGroupTerminals={() => {
-            onBeginTerminalGroupSelection()
-            onFitCanvas()
+            if (onCreateTerminalGroup) onCreateTerminalGroup(position)
+            else {
+              onBeginTerminalGroupSelection?.()
+              onFitCanvas?.()
+            }
           }}
         />
       ) : null,

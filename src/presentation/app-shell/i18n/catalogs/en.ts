@@ -440,7 +440,7 @@ export const enMessages = {
   'group.action.restart': 'Restart group terminal sessions',
   'group.action.restartDescription':
     'Restart group terminal sessions without running launch commands',
-  'group.action.edit': 'Edit group name',
+  'group.action.edit': 'Edit group space',
   'group.action.addSelected': 'Add selected terminals',
   'group.action.removeSelected': 'Remove selected terminals',
   'group.action.dissolve': 'Dissolve group',
@@ -457,6 +457,8 @@ export const enMessages = {
   'group.dropJoin': 'Release to join group',
   'group.dropLeave': 'Release to leave group',
   'group.dropDissolve': 'Release to dissolve group',
+  'group.emptyHint': 'Empty group. Edit it to drag in a terminal or workflow.',
+  'group.emptyEditingHint': 'Drag a terminal or complete workflow here',
   'service.label': 'Service',
   'service.actualAddress': 'Actual service address',
   'service.fallback': 'Preferred port {requestedPort} was busy; using {port}',
@@ -651,6 +653,9 @@ export const enMessages = {
     'Managed ports are unavailable in this environment. Use a supported runtime.',
   'error.TERMINAL_CONNECTION_DUPLICATE': 'This terminal dependency already exists.',
   'error.TERMINAL_CONNECTION_INVALID': 'A terminal cannot connect to itself.',
+  'error.TERMINAL_CONNECTION_SCOPE_MISMATCH':
+    'Both ends of a connection must be in the same group space.',
+  'error.TERMINAL_SCOPE_MOVE_STALE': 'The workflow changed spaces. Try the move again.',
   'error.TERMINAL_EXECUTION_CONFIG_INVALID':
     'The terminal execution settings are invalid. Check exit codes, timeouts, and readiness conditions.',
   'error.TERMINAL_SHELL_UNSUPPORTED':

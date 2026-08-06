@@ -21,14 +21,21 @@ const dependencies = [
 ]
 
 describe('canvas execution semantic contract', () => {
-  it('publishes the versioned minimum combination invariant', () => {
+  it('publishes the versioned container and scope invariants', () => {
     expect(canvasExecutionSemanticContract).toMatchObject({
-      minimumCombinationTopLevelExecutionUnits: 2,
-      version: 1
+      version: 2,
+      rules: {
+        completeWorkflowMembership: expect.any(Object),
+        connectionScopeIsolation: expect.any(Object),
+        emptyCombinationPersistence: expect.any(Object)
+      }
     })
+    expect(canvasExecutionSemanticContract).not.toHaveProperty(
+      'minimumCombinationTopLevelExecutionUnits'
+    )
   })
 
-  it('classifies one complete workflow without creating a combination', () => {
+  it('expands one selected terminal to its complete workflow', () => {
     const analysis = analyzeCanvasExecutionSelection({
       dependencies,
       selectedTerminalIds: ['build'],
@@ -36,16 +43,16 @@ describe('canvas execution semantic contract', () => {
     })
 
     expect(analysis).toMatchObject({
-      canCreateCombination: false,
       classification: 'workflow',
       expandedTerminalIds: ['install', 'build', 'test']
     })
+    expect(analysis).not.toHaveProperty('canCreateCombination')
     expect(analysis.topLevelExecutionUnits).toEqual([
       { terminalIds: ['install', 'build', 'test'], type: 'workflow' }
     ])
   })
 
-  it('classifies multiple top-level execution units as a combination', () => {
+  it('keeps a multi-unit selection distinct from an explicit combination container', () => {
     const analysis = analyzeCanvasExecutionSelection({
       dependencies,
       selectedTerminalIds: ['build', 'api', 'shell'],
@@ -53,8 +60,7 @@ describe('canvas execution semantic contract', () => {
     })
 
     expect(analysis).toMatchObject({
-      canCreateCombination: true,
-      classification: 'combination',
+      classification: 'multiple',
       expandedTerminalIds: ['install', 'build', 'test', 'api', 'worker', 'shell']
     })
     expect(analysis.topLevelExecutionUnits).toEqual([
@@ -64,7 +70,7 @@ describe('canvas execution semantic contract', () => {
     ])
   })
 
-  it('uses the same classification for template-sized structures', () => {
+  it('uses the same structural classification without inferring a combination', () => {
     expect(
       classifyCanvasExecutionStructure({
         dependencies: dependencies.slice(0, 2),
@@ -76,7 +82,7 @@ describe('canvas execution semantic contract', () => {
         dependencies: [...dependencies.slice(0, 2), dependencies[2]!],
         terminals: terminals.slice(0, 5)
       })
-    ).toBe('combination')
+    ).toBe('multiple')
     expect(
       classifyCanvasExecutionStructure({
         dependencies: [],
@@ -86,9 +92,9 @@ describe('canvas execution semantic contract', () => {
   })
 
   it('publishes the canonical bilingual instructions from the structured rules', () => {
-    expect(canvasExecutionSemanticInstructions).toContain('at least two top-level execution units')
-    expect(canvasExecutionSemanticInstructions).toContain('至少两个顶层执行单元')
-    expect(canvasExecutionSemanticInstructions).toContain('Never wrap a single complete workflow')
+    expect(canvasExecutionSemanticInstructions).toContain('may remain empty')
+    expect(canvasExecutionSemanticInstructions).toContain('可以保持为空')
+    expect(canvasExecutionSemanticInstructions).toContain('same combination')
     expect(canvasExecutionSemanticInstructions).toContain('命中流程中的任意终端')
   })
 })

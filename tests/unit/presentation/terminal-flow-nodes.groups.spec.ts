@@ -31,7 +31,7 @@ describe('terminal flow nodes for terminal groups', () => {
       position: { x: 288, y: 164 },
       style: { width: 984, height: 458 },
       data: {
-        selectedMemberBlockIds: ['backend-terminal']
+        isEditing: false
       }
     })
     expect(nodes[1]).toMatchObject({
@@ -96,11 +96,12 @@ describe('terminal flow nodes for terminal groups', () => {
     })
   })
 
-  it('marks ungrouped terminal nodes as selectable while composing a new group', () => {
+  it('keeps terminal selection semantics independent from group-space editing', () => {
     const graph = createGraph({ isCollapsed: false })
     const nodes = createTerminalFlowNodes({
       graph: { ...graph, terminalGroups: [] },
       selectedTerminalBlockIds: ['backend-terminal'],
+      selectedTerminalGroupId: 'development-group',
       hoveredTerminalBlockId: null,
       isTerminalGroupSelectionMode: true,
       terminalStates: createTerminalStates(),
@@ -111,16 +112,17 @@ describe('terminal flow nodes for terminal groups', () => {
       type: 'terminal',
       data: {
         isSelected: true,
-        isTerminalGroupSelectionMode: true,
-        canSelectForTerminalGroup: true
+        isTerminalGroupSelectionMode: false,
+        canSelectForTerminalGroup: false
       }
     })
   })
 
-  it('keeps grouped terminal nodes selectable while editing group membership', () => {
+  it('marks only the active container as editing', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph({ isCollapsed: false }),
       selectedTerminalBlockIds: ['backend-terminal'],
+      selectedTerminalGroupId: 'development-group',
       hoveredTerminalBlockId: null,
       isTerminalGroupSelectionMode: true,
       terminalStates: createTerminalStates(),
@@ -133,16 +135,15 @@ describe('terminal flow nodes for terminal groups', () => {
       selected: true,
       data: {
         isSelected: true,
-        isTerminalGroupSelectionMode: true,
-        canSelectForTerminalGroup: true
+        isTerminalGroupSelectionMode: false,
+        canSelectForTerminalGroup: false
       }
     })
     expect(nodes[0]).toMatchObject({
       id: 'development-group',
       type: 'terminalGroup',
       data: {
-        selectedMemberBlockIds: ['backend-terminal'],
-        selectedUngroupedTerminalBlockIds: []
+        isEditing: true
       }
     })
   })

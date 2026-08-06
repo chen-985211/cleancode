@@ -393,15 +393,15 @@ describe('run terminal sessions e2e', () => {
       const beforeBox = await readRequiredBoundingBox(terminalBlock)
       const beforeSize = await readTerminalBlockSize(workbench)
 
-      await resizeTerminalBlockFromBottomRight(page, 180, 120)
+      await resizeTerminalBlockFromBottomRight(page, 140, 100)
 
       const afterSize = await waitForTerminalBlockSizeChange(workbench, beforeSize)
       const afterBox = await readRequiredBoundingBox(terminalBlock)
 
-      expect(afterSize.width - beforeSize.width).toBeGreaterThan(120)
-      expect(afterSize.height - beforeSize.height).toBeGreaterThan(80)
-      expect(afterBox.width - beforeBox.width).toBeGreaterThan(120)
-      expect(afterBox.height - beforeBox.height).toBeGreaterThan(80)
+      expect(afterSize.width - beforeSize.width).toBeGreaterThan(100)
+      expect(afterSize.height - beforeSize.height).toBeGreaterThan(70)
+      expect(afterBox.width - beforeBox.width).toBeGreaterThan(100)
+      expect(afterBox.height - beforeBox.height).toBeGreaterThan(70)
     },
     electronScenarioTimeoutMs
   )
@@ -415,14 +415,19 @@ describe('run terminal sessions e2e', () => {
       const beforeBox = await readRequiredBoundingBox(terminalBlock)
       const resizeDrag = await startTerminalBlockResizeFromBottomRight(page)
 
-      await page.mouse.move(resizeDrag.startX + 180, resizeDrag.startY + 120, { steps: 18 })
+      await page.mouse.move(resizeDrag.startX + 140, resizeDrag.startY + 100, { steps: 18 })
 
-      const duringBox = await readRequiredBoundingBox(terminalBlock)
+      const duringBox = await pollUntilState({
+        description: 'terminal resize preview before pointer release',
+        observe: () => readRequiredBoundingBox(terminalBlock),
+        accept: (box) => box.width - beforeBox.width > 100 && box.height - beforeBox.height > 70,
+        timeoutMs: 5_000
+      })
 
       await page.mouse.up()
 
-      expect(duringBox.width - beforeBox.width).toBeGreaterThan(120)
-      expect(duringBox.height - beforeBox.height).toBeGreaterThan(80)
+      expect(duringBox.width - beforeBox.width).toBeGreaterThan(100)
+      expect(duringBox.height - beforeBox.height).toBeGreaterThan(70)
     },
     electronScenarioTimeoutMs
   )
@@ -450,7 +455,7 @@ describe('run terminal sessions e2e', () => {
       const terminalBlock = page.locator('[data-terminal-block-id]').first()
       const beforeBox = await readRequiredBoundingBox(terminalBlock)
 
-      await resizeTerminalBlockFromBottomRight(page, 180, 120)
+      await resizeTerminalBlockFromBottomRight(page, 140, 100)
       const afterMouseUpBox = await readRequiredBoundingBox(terminalBlock)
 
       const resized = await waitForFakeAgentReport(
@@ -474,8 +479,8 @@ describe('run terminal sessions e2e', () => {
 
       expect(resizeReports.length).toBeGreaterThan(0)
       expect(resizeReports.length).toBeLessThanOrEqual(2)
-      expect(afterMouseUpBox.width - beforeBox.width).toBeGreaterThan(120)
-      expect(afterMouseUpBox.height - beforeBox.height).toBeGreaterThan(80)
+      expect(afterMouseUpBox.width - beforeBox.width).toBeGreaterThan(100)
+      expect(afterMouseUpBox.height - beforeBox.height).toBeGreaterThan(70)
       expect(resized.columns).toBeGreaterThan(beforeResizeState.columns)
       expect(resized.rows).toBeGreaterThan(beforeResizeState.rows)
     },

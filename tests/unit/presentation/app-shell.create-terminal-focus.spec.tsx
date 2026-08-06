@@ -116,7 +116,7 @@ describe('app shell create terminal focus', () => {
     await waitFor(() =>
       expect(runtimeApi.createTerminalBlock).toHaveBeenCalledWith(
         expect.objectContaining({
-          position: { x: 340, y: 308 }
+          position: { x: 320, y: 240 }
         })
       )
     )
@@ -157,39 +157,59 @@ describe('app shell create terminal focus', () => {
     )
   })
 
-  it('fits the canvas when entering terminal group selection mode', async () => {
+  it('creates an empty group at the blank-canvas menu coordinate', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [
+        {
+          ...workbench,
+          graph: {
+            ...workbench.graph,
+            blocks: [
+              createTerminalBlockSnapshot({ id: 'terminal-1', name: 'Terminal 1' }),
+              createTerminalBlockSnapshot({
+                id: 'terminal-2',
+                name: 'Terminal 2',
+                position: { x: 980, y: 240 }
+              })
+            ]
+          }
+        }
+      ])
+    })
+    runtimeApi.createTerminalGroup.mockImplementation(async (command) => ({
+      ...workbench.graph,
+      terminalGroups: [
+        {
+          id: 'new-group',
+          isCollapsed: false,
+          memberBlockIds: [],
+          name: command.name,
+          position: command.position,
+          size: { width: 520, height: 320 },
+          type: 'terminal-group'
+        }
+      ]
+    }))
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [
-          {
-            ...workbench,
-            graph: {
-              ...workbench.graph,
-              blocks: [
-                createTerminalBlockSnapshot({ id: 'terminal-1', name: 'Terminal 1' }),
-                createTerminalBlockSnapshot({
-                  id: 'terminal-2',
-                  name: 'Terminal 2',
-                  position: { x: 980, y: 240 }
-                })
-              ]
-            }
-          }
-        ])
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
 
     await screen.findByTestId('mock-react-flow')
-    reactFlowSpies.setViewport.mockClear()
     await selectBlankCanvasAction('组合终端')
 
-    await waitFor(() => expect(reactFlowSpies.setViewport).toHaveBeenCalledOnce())
-    expect(reactFlowSpies.setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
+    await waitFor(() =>
+      expect(runtimeApi.createTerminalGroup).toHaveBeenCalledWith({
+        name: '启动项目',
+        position: { x: 320, y: 240 },
+        projectDirectory: '/tmp/alpha-project',
+        workspaceId: 'main'
+      })
+    )
   })
 
   it('dispatches canvas shortcuts to the current React Flow instance', async () => {

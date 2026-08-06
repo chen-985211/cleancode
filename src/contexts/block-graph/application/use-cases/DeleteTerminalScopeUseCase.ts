@@ -40,6 +40,9 @@ export class DeleteTerminalScopeUseCase {
           await leaseState.current.hardDispose()
           disposalConfirmed = true
           graph.deleteBlocks(blockIds)
+          if (command.target.type === 'combination') {
+            graph.dissolveTerminalGroup(command.target.terminalGroupId)
+          }
         }
       )
 

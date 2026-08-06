@@ -173,6 +173,7 @@ export interface CreateTerminalBlockInput {
   readonly launchCommand?: string
   readonly position: BlockPositionSnapshot
   readonly size?: Partial<TerminalBlockSizeSnapshot>
+  readonly terminalGroupId?: string
 }
 
 export interface UpdateTerminalBlockMetadataInput {
@@ -201,7 +202,9 @@ export interface ResizeTerminalBlockInput {
 export interface CreateTerminalGroupInput {
   readonly id?: string
   readonly name: string
-  readonly memberBlockIds: readonly string[]
+  readonly memberBlockIds?: readonly string[]
+  readonly position?: BlockPositionSnapshot
+  readonly size?: Partial<TerminalGroupSizeSnapshot>
 }
 
 export interface UpdateTerminalGroupMetadataInput {

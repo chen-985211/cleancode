@@ -40,7 +40,7 @@ interface UseWorkbenchFlowNodesInput {
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalBlockIds: readonly string[]
   readonly selectedTerminalGroupId: string | null
-  readonly selectedUngroupedTerminalBlockIds: readonly string[]
+  readonly selectedUngroupedTerminalBlockIds?: readonly string[]
   readonly protectedLayoutNodeIds: ReadonlySet<string>
   readonly onAgentGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
@@ -77,7 +77,6 @@ export function useWorkbenchFlowNodes({
   isTerminalGroupSelectionMode,
   selectedTerminalBlockIds,
   selectedTerminalGroupId,
-  selectedUngroupedTerminalBlockIds,
   protectedLayoutNodeIds,
   onAgentGraphUpdated,
   setNodes,
@@ -156,7 +155,6 @@ export function useWorkbenchFlowNodes({
         isTerminalGroupSelectionMode,
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
-        selectedUngroupedTerminalBlockIds,
         terminalStates,
         workflowBuildPresentation: terminalWorkflowBuildPresentation,
         workflowNodeStatuses
@@ -252,7 +250,6 @@ export function useWorkbenchFlowNodes({
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
-    selectedUngroupedTerminalBlockIds,
     protectedLayoutNodeIds,
     onAgentGraphUpdated,
     setNodes,

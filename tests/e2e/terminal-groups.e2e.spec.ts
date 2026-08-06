@@ -45,10 +45,26 @@ describe('terminal groups e2e', () => {
       await createTwoTerminalBlocks(page)
 
       await selectBlankCanvasAction(page, '组合终端')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 1')
-      await ensureTerminalSelectedForGroup(page, 'Terminal 2')
-      await page.getByRole('button', { name: '创建组合' }).click()
+      const emptyGroup = await waitForTerminalGroup(
+        page,
+        workbench,
+        (group) => group.memberBlockIds.length === 0
+      )
+      expect(emptyGroup.memberBlockIds).toEqual([])
+      await page.getByRole('button', { name: '适应画布' }).click()
+      await waitForCanvasViewportToSettle(page)
+
+      const graphWithEmptyGroup = await readGraph(page, workbench)
+      for (const terminal of graphWithEmptyGroup.blocks) {
+        await dragTerminalIntoGroup(page, terminal.id)
+        await waitForTerminalGroup(page, workbench, (group) =>
+          group.memberBlockIds.includes(terminal.id)
+        )
+      }
+      await page.getByRole('button', { name: '完成' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
+      await page.getByRole('button', { name: '适应画布' }).click()
+      await waitForCanvasViewportToSettle(page)
 
       await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
       await page.waitForFunction(
@@ -66,6 +82,8 @@ describe('terminal groups e2e', () => {
       )
       expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
 
+      await page.getByRole('button', { name: '启动项目 编辑组合空间' }).click()
+
       const graphBeforeDrag = await readGraph(page, workbench)
       const groupBeforeDrag = graphBeforeDrag.terminalGroups[0]!
       const terminalTwo = graphBeforeDrag.blocks.find((block) => block.name === 'Terminal 2')!
@@ -73,7 +91,7 @@ describe('terminal groups e2e', () => {
         page.locator('[data-terminal-group-id]').first()
       )
 
-      await dragTerminalHeader(page, terminalTwo.id, 260, 0)
+      await dragTerminalTowardGroupRightEdge(page, terminalTwo.id)
 
       const resizedWidth = await pollUntilState({
         description: 'terminal group visible width to reflect the member drag',
@@ -110,56 +128,90 @@ async function createTerminalBlocks(page: Page, count: number): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
 
   for (let index = 1; index <= count; index += 1) {
-    await selectBlankCanvasAction(page, '新建终端积木')
+    await selectBlankCanvasActionAt(page, '新建终端积木', 0.2 + index * 0.26, 0.28)
     await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
   }
 }
 
-async function dragTerminalHeader(
+async function selectBlankCanvasActionAt(
   page: Page,
-  terminalBlockId: string,
-  deltaX: number,
-  deltaY: number
+  action: '新建终端积木' | '组合终端',
+  xRatio: number,
+  yRatio: number
 ): Promise<void> {
-  const terminalHeader = page.locator(
-    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
-  )
+  await pollUntilState({
+    description: 'blank-canvas actions to become available',
+    observe: () => page.getByRole('button', { name: '新建 Agent' }).isEnabled(),
+    accept: Boolean,
+    timeoutMs: 10_000
+  })
+  const pane = page.locator('.react-flow__pane')
+  const bounds = await readRequiredBoundingBox(pane)
+  await page.mouse.click(bounds.x + bounds.width * xRatio, bounds.y + bounds.height * yRatio, {
+    button: 'right'
+  })
+  await page
+    .getByRole('menu', { name: '画布操作' })
+    .getByRole('menuitem', { name: action, exact: true })
+    .click()
+}
+
+async function dragTerminalIntoGroup(page: Page, terminalBlockId: string): Promise<void> {
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  const terminalHeader = terminal.locator('.terminal-node__header')
+  const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
-  const viewport = page.viewportSize()
+  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
   const startX = headerBox.x + headerBox.width / 2
   const startY = headerBox.y + headerBox.height / 2
-  const targetX = viewport ? Math.min(startX + deltaX, viewport.width - 16) : startX + deltaX
-  const targetY = viewport ? Math.min(startY + deltaY, viewport.height - 16) : startY + deltaY
+  const deltaX = groupBox.x + groupBox.width / 2 - (terminalBox.x + terminalBox.width / 2)
+  const deltaY = groupBox.y + groupBox.height / 2 - (terminalBox.y + terminalBox.height / 2)
 
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(targetX, targetY, { steps: 18 })
+  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 18 })
   await page.mouse.up()
 }
 
-async function ensureTerminalSelectedForGroup(page: Page, terminalName: string): Promise<void> {
-  await waitForTerminalGroupSelectionButton(page, terminalName)
+async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
+  let previousTransform = ''
+  let stableObservationCount = 0
 
-  if (await page.getByRole('button', { name: `${terminalName} 已选择终端` }).count()) {
-    return
-  }
-
-  await page.getByRole('button', { name: `${terminalName} 选择终端` }).click()
+  await pollUntilState({
+    description: 'canvas viewport motion to settle',
+    observe: () =>
+      page.locator('.react-flow__viewport').evaluate((viewport) => viewport.getAttribute('style')),
+    accept: (style) => {
+      const transform = style ?? ''
+      stableObservationCount = transform === previousTransform ? stableObservationCount + 1 : 0
+      previousTransform = transform
+      return stableObservationCount >= 3
+    },
+    intervalMs: 50,
+    timeoutMs: 5_000
+  })
 }
 
-async function waitForTerminalGroupSelectionButton(
+async function dragTerminalTowardGroupRightEdge(
   page: Page,
-  terminalName: string
+  terminalBlockId: string
 ): Promise<void> {
-  await page.waitForFunction(
-    (name) =>
-      Array.from(document.querySelectorAll('button')).some((button) => {
-        const label = button.getAttribute('aria-label')
-
-        return label === `${name} 选择终端` || label === `${name} 已选择终端`
-      }),
-    terminalName
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  const terminalHeader = page.locator(
+    `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
   )
+  const terminalBox = await readRequiredBoundingBox(terminal)
+  const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
+  const startX = headerBox.x + headerBox.width / 2
+  const startY = headerBox.y + headerBox.height / 2
+  const terminalCenterX = terminalBox.x + terminalBox.width / 2
+  const targetX = startX + groupBox.x + groupBox.width - 20 - terminalCenterX
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(targetX, startY, { steps: 18 })
+  await page.mouse.up()
 }
 
 async function waitForTerminalGroup(

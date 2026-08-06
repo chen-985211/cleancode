@@ -39,6 +39,35 @@
   background: var(--terminal-group-surface);
 }
 
+.terminal-group-node--editing {
+  background: color-mix(in srgb, var(--cc-primary-soft) 22%, var(--cc-surface-translucent));
+  box-shadow:
+    0 0 0 2px var(--cc-primary-border),
+    0 8px 24px var(--cc-shadow-color),
+    0 0 0 1px var(--terminal-group-border) inset;
+}
+
+.terminal-group-node__empty-state {
+  position: absolute;
+  inset: 58px 18px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--cc-border-strong);
+  border-radius: 8px;
+  color: var(--cc-muted);
+  font-size: 12px;
+  font-weight: 520;
+  letter-spacing: 0.005em;
+  pointer-events: none;
+}
+
+.terminal-group-node--editing .terminal-group-node__empty-state {
+  border-color: var(--cc-primary-border);
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+}
+
 .terminal-group-node--drop-join {
   box-shadow:
     0 0 0 2px var(--cc-success-border),

@@ -64,14 +64,15 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
             name: 'create_block'
           }),
           expect.objectContaining({
-            description: expect.stringContaining('existing terminal blocks'),
+            description: expect.stringContaining('persistent terminal-group space'),
             inputSchema: expect.objectContaining({
               additionalProperties: false,
               properties: expect.objectContaining({
                 memberBlockIds: expect.objectContaining({ type: 'array' }),
-                name: expect.objectContaining({ type: 'string' })
+                name: expect.objectContaining({ type: 'string' }),
+                position: expect.objectContaining({ required: ['x', 'y'], type: 'object' })
               }),
-              required: ['name', 'memberBlockIds'],
+              required: ['name'],
               type: 'object'
             }),
             name: 'create_terminal_group'

@@ -173,7 +173,7 @@ describe('build terminal workflow plan', () => {
     ])
   })
 
-  it('builds an exact block-set plan without expanding through outside connections', async () => {
+  it('builds an exact block-set plan for one container scope', async () => {
     const graph = createCombinationGraph()
     const buildPlan = new BuildTerminalWorkflowPlanUseCase(new InMemoryRepository(graph))
 
@@ -294,8 +294,6 @@ function createCombinationGraph(): BlockGraph {
     name: 'Development',
     memberBlockIds: ['standalone', 'install', 'build']
   })
-  graph.connectTerminalBlocks({ sourceBlockId: 'build', targetBlockId: 'outside' })
-
   return graph
 }
 

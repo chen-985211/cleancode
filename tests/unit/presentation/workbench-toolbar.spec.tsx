@@ -54,7 +54,9 @@ describe('workbench toolbar', () => {
     })
 
     expect(within(terminalTools).getByRole('status')).toHaveTextContent('组合编辑2')
-    expect(within(terminalTools).getByRole('button', { name: '创建组合' })).toBeEnabled()
+    expect(
+      within(terminalTools).queryByRole('button', { name: '创建组合' })
+    ).not.toBeInTheDocument()
     expect(within(terminalTools).getByRole('button', { name: '完成' })).toBeEnabled()
     expect(
       within(terminalTools).queryByRole('button', { name: '新建终端积木' })

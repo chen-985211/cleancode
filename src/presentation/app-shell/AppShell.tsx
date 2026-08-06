@@ -116,13 +116,11 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
   }, [])
   const {
     beginTerminalGroupSelection,
-    canCreateTerminalGroup,
     cancelTerminalGroupSelection,
-    completeTerminalGroupSelection,
+    editingTerminalGroupId,
     isTerminalGroupSelectionMode,
     selectTerminalBlock,
-    selectTerminalGroup,
-    selectedUngroupedTerminalBlockIds
+    selectTerminalGroup
   } = useTerminalGroupSelectionMode({
     graph,
     selectedTerminalBlockIds,
@@ -320,25 +318,22 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     terminateWorkbenchTerminalSessions
   })
   const blockActions = useAppShellBlockActions({
-    canCreateTerminalGroup,
-    completeTerminalGroupSelection,
+    beginTerminalGroupSelection,
     currentWorkbench,
     currentWorkspace,
     defaultGroupName: t('group.defaultName'),
     firstGroupName: t('group.defaultFirstName'),
     notifications,
-    selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
-    setSelectedTerminalGroupId,
     terminateTerminalSession
   })
   const { clearTerminalGroupDropPreview, moveWorkbenchNode, previewTerminalGroupDrop } =
     useTerminalGroupDragActions({
       currentWorkbench,
       currentWorkspace,
+      editingTerminalGroupId,
       getNodes: nodeStore.getNodes,
       graph,
-      isTerminalGroupSelectionMode,
       layoutCommitQueue,
       setCurrentGraph,
       setNodes: nodeStore.setNodes
@@ -422,11 +417,9 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     currentWorkbench,
     currentWorkspace,
     interruptTerminal,
+    onEditGroup: beginTerminalGroupSelection,
     restartTerminal,
-    selectedTerminalBlockIds,
-    selectedUngroupedTerminalBlockIds,
     setCurrentGraph,
-    setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId,
     startTerminalCombination,
     terminalBlocksById
@@ -502,7 +495,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     isTerminalGroupSelectionMode,
     selectedTerminalBlockIds,
     selectedTerminalGroupId,
-    selectedUngroupedTerminalBlockIds,
     protectedLayoutNodeIds,
     terminalWorkflowBuildPresentation,
     onAgentGraphUpdated,
@@ -540,7 +532,13 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     createTerminal: createTerminalBlock,
     executeQuickExecutionSlot: quickExecution.executeSlot,
     fitCanvas,
-    groupTerminals: beginTerminalGroupSelection,
+    groupTerminals: () => {
+      const instance = reactFlowInstanceRef.current
+      if (!instance) return
+      void blockActions.createTerminalGroup(
+        instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+      )
+    },
     hasMultipleWorkspaces,
     hasWorkbench: Boolean(currentWorkbench),
     isDesktopRuntime,
@@ -673,13 +671,14 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
             onCreateWorkspaceAgent={createWorkspaceAgent}
             onOpenAgentSettings={applicationSettings.openAgents}
             onSelectDefaultAgentProvider={changePreferredProvider}
-            onBeginTerminalGroupSelection={beginTerminalGroupSelection}
             onCreateTerminalGroup={blockActions.createTerminalGroup}
             onCancelTerminalGroupSelection={cancelTerminalGroupSelection}
             isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
-            selectedTerminalGroupCandidateCount={selectedUngroupedTerminalBlockIds.length}
-            canBeginTerminalGroupSelection={Boolean(currentWorkbench)}
-            canCreateTerminalGroup={canCreateTerminalGroup}
+            editingTerminalGroupId={editingTerminalGroupId}
+            selectedTerminalGroupCandidateCount={
+              graph?.terminalGroups.find((group) => group.id === editingTerminalGroupId)
+                ?.memberBlockIds.length ?? 0
+            }
             onNodesChange={workbenchNodeSelection.onNodesChange}
             onNodeClick={workbenchNodeSelection.selectWorkbenchNode}
             onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}

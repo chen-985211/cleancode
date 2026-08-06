@@ -134,14 +134,29 @@ describe('app shell', () => {
     expect(runtimeApi.attachAgentSession).not.toHaveBeenCalled()
   })
 
-  it('allows entering terminal group editing whenever a workbench is open', async () => {
+  it('creates an empty group and enters its editing space from the blank-canvas menu', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.createTerminalGroup.mockResolvedValue({
+      ...workbench.graph,
+      terminalGroups: [
+        {
+          id: 'new-group',
+          isCollapsed: false,
+          memberBlockIds: [],
+          name: '启动项目',
+          position: { x: 0, y: 0 },
+          size: { width: 520, height: 320 },
+          type: 'terminal-group'
+        }
+      ]
+    })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench])
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
@@ -151,8 +166,8 @@ describe('app shell', () => {
     await openBlankCanvasMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: '组合终端' }))
 
-    expect(toolbar.getByText('组合编辑')).toBeInTheDocument()
-    expect(toolbar.getByRole('button', { name: '创建组合' })).toBeDisabled()
+    await waitFor(() => expect(toolbar.getByText('组合编辑')).toBeInTheDocument())
+    expect(toolbar.queryByRole('button', { name: '创建组合' })).not.toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
   })
 

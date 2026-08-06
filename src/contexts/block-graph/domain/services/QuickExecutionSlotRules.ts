@@ -42,7 +42,8 @@ export function normalizeQuickExecutionTarget(
   terminalGroups: readonly TerminalGroupSnapshot[]
 ): QuickExecutionTargetSnapshot {
   if (target.type === 'combination') {
-    if (!terminalGroups.some((group) => group.id === target.terminalGroupId)) {
+    const group = terminalGroups.find((candidate) => candidate.id === target.terminalGroupId)
+    if (!group || group.memberBlockIds.length === 0) {
       throw createExpectedAppError(
         'QUICK_EXECUTION_TARGET_NOT_FOUND',
         'Quick execution combination was not found.'

@@ -129,7 +129,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
           {
             memberRefs: {
               items: { minLength: 1, type: 'string' },
-              minItems: 2,
+              minItems: 1,
               type: 'array',
               uniqueItems: true
             },
@@ -225,19 +225,19 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Create a visual terminal group on the cleancode canvas from existing terminal blocks that resolve to at least two top-level execution units: independent terminals or complete workflows. A group is not a workflow node, and one terminal or one complete workflow cannot be wrapped in a group.',
+      'Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. A group is a connection scope, not a workflow node; dependencies cannot cross its boundary.',
     graphChanged: true,
     inputSchema: objectSchema(
       {
         memberBlockIds: {
           items: { type: 'string' },
-          minItems: 2,
           type: 'array',
           uniqueItems: true
         },
-        name: { type: 'string' }
+        name: { type: 'string' },
+        position: positionSchema()
       },
-      ['name', 'memberBlockIds']
+      ['name']
     ),
     name: 'create_terminal_group',
     output: blockGraphOutputSchema({ createdTerminalGroupId: { type: 'string' } })
@@ -396,8 +396,9 @@ export interface DeleteBlockAgentToolInput {
 }
 
 export interface CreateTerminalGroupAgentToolInput {
-  readonly memberBlockIds: readonly string[]
+  readonly memberBlockIds?: readonly string[]
   readonly name: string
+  readonly position?: AgentBlockPositionSnapshot
 }
 
 export interface UpdateTerminalGroupAgentToolInput {

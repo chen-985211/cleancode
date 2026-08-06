@@ -150,8 +150,7 @@ interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObject
   readonly isContextSelected?: boolean
   readonly memberBlocks: readonly TerminalBlockSnapshot[]
   readonly memberStates: Record<string, TerminalViewState>
-  readonly selectedUngroupedTerminalBlockIds: readonly string[]
-  readonly selectedMemberBlockIds: readonly string[]
+  readonly isEditing?: boolean
   readonly isSelected: boolean
   readonly dropFeedback: TerminalGroupDropFeedback | null
   readonly onStartGroup: (group: TerminalGroupSnapshot) => void
@@ -165,8 +164,7 @@ interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObject
     group: TerminalGroupSnapshot,
     isCollapsed: boolean
   ) => Promise<void>
-  readonly onAddSelectedTerminalsToGroup: (group: TerminalGroupSnapshot) => Promise<void>
-  readonly onRemoveSelectedTerminalsFromGroup: (group: TerminalGroupSnapshot) => Promise<void>
+  readonly onEditGroup?: (group: TerminalGroupSnapshot) => void
   readonly onRemoveTerminalFromGroup: (
     group: TerminalGroupSnapshot,
     block: TerminalBlockSnapshot

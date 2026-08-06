@@ -72,7 +72,8 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly projectDirectory: string
     readonly workspaceId: string
     readonly name: string
-    readonly memberBlockIds: readonly string[]
+    readonly memberBlockIds?: readonly string[]
+    readonly position?: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly deleteBlock: (command: {
     readonly projectDirectory: string
@@ -273,8 +274,9 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
     return toAgentBlockGraphSnapshot(
       await this.tools.createTerminalGroup({
         ...context,
-        memberBlockIds: input.memberBlockIds,
-        name: input.name
+        ...(input.memberBlockIds ? { memberBlockIds: input.memberBlockIds } : {}),
+        name: input.name,
+        ...(input.position ? { position: input.position } : {})
       })
     )
   }

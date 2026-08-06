@@ -14,7 +14,6 @@ export type TerminalGroupDropAction =
   | {
       readonly type: 'leave-group'
       readonly terminalGroupId: string
-      readonly willDissolveGroup: boolean
     }
   | {
       readonly type: 'none'
@@ -23,12 +22,14 @@ export type TerminalGroupDropAction =
 interface ResolveTerminalGroupDropActionInput {
   readonly graph: WorkbenchSnapshot['graph']
   readonly draggedNode: TerminalFlowNode
+  readonly editingTerminalGroupId?: string
   readonly nodes: readonly WorkbenchFlowNode[]
 }
 
 export function resolveTerminalGroupDropAction({
   graph,
   draggedNode,
+  editingTerminalGroupId,
   nodes
 }: ResolveTerminalGroupDropActionInput): TerminalGroupDropAction {
   const terminalCenter = getNodeCenter(draggedNode)
@@ -38,21 +39,22 @@ export function resolveTerminalGroupDropAction({
   const groupNodes = nodes.filter(
     (node): node is TerminalGroupFlowNode => node.type === 'terminalGroup'
   )
+  const activeGroupId = editingTerminalGroupId ?? currentGroup?.id ?? groupNodes[0]?.id
+  if (!activeGroupId) return { type: 'none' }
 
-  if (currentGroup) {
+  if (currentGroup?.id === activeGroupId) {
     if (isPointInsideRect(terminalCenter, currentGroup.position, currentGroup.size)) {
       return { type: 'none' }
     }
 
     return {
       type: 'leave-group',
-      terminalGroupId: currentGroup.id,
-      willDissolveGroup: currentGroup.memberBlockIds.length <= 2
+      terminalGroupId: currentGroup.id
     }
   }
 
-  const targetGroupNode = groupNodes.find((groupNode) =>
-    isPointInsideNode(terminalCenter, groupNode)
+  const targetGroupNode = groupNodes.find(
+    (groupNode) => groupNode.id === activeGroupId && isPointInsideNode(terminalCenter, groupNode)
   )
 
   return targetGroupNode
@@ -88,7 +90,7 @@ export function resolveTerminalGroupDropFeedback(
   }
 
   if (action.type === 'leave-group' && action.terminalGroupId === terminalGroupId) {
-    return action.willDissolveGroup ? 'dissolve' : 'leave'
+    return 'leave'
   }
 
   return null
@@ -107,8 +109,7 @@ export function isSameTerminalGroupDropAction(
   return (
     left.type === 'leave-group' &&
     right.type === 'leave-group' &&
-    left.terminalGroupId === right.terminalGroupId &&
-    left.willDissolveGroup === right.willDissolveGroup
+    left.terminalGroupId === right.terminalGroupId
   )
 }
 

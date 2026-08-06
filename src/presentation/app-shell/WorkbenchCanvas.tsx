@@ -3,6 +3,7 @@ import {
   Panel,
   ReactFlow,
   type Edge,
+  type Connection,
   type NodeChange,
   type NodeTypes,
   type ReactFlowInstance
@@ -26,6 +27,7 @@ import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChang
 import { filterMinimapNodes, type MinimapNodeInteractionContextValue } from './minimapInteraction'
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
+import { inactiveTerminalWorkflowController } from './inactiveTerminalWorkflowController'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -50,10 +52,13 @@ import { useCanvasObjectContextMenu } from './useCanvasObjectContextMenu'
 import { QuickExecutionBar } from './QuickExecutionBar'
 import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { toQuickExecutionTarget } from './quickExecutionTargets'
-import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { useCanvasPaneContextMenu } from './useCanvasPaneContextMenu'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
+import {
+  isTerminalConnectionAllowedInCanvasScope,
+  isTerminalConnectionEditableInCanvasScope
+} from './terminalConnectionScope'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
@@ -66,6 +71,12 @@ import {
   synchronizeCanvasViewportFromMove,
   toCanvasViewportSnapshot
 } from './workbenchCanvasViewport'
+import {
+  resolveQuickExecutionDropTarget,
+  resolveQuickExecutionNodeTarget,
+  resolveTerminalCreationGroupId,
+  toWorkbenchFlowPosition
+} from './workbenchCanvasInteractionTargets'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -134,17 +145,21 @@ interface WorkbenchCanvasProps {
   readonly onFitCanvas: () => void
   readonly onOpenProject?: () => void
   readonly onRetryInitialWorkbenchLoad?: () => void
-  readonly onCreateTerminalBlock: () => void
+  readonly onCreateTerminalBlock: (options?: {
+    readonly position?: { readonly x: number; readonly y: number }
+    readonly terminalGroupId?: string
+  }) => void
   readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
   readonly onSelectDefaultAgentProvider?: (providerId: string) => void
-  readonly onBeginTerminalGroupSelection: () => void
-  readonly onCreateTerminalGroup: () => void
+  readonly onCreateTerminalGroup: (position: { readonly x: number; readonly y: number }) => void
+  readonly onBeginTerminalGroupSelection?: () => void
   readonly onCancelTerminalGroupSelection: () => void
+  readonly editingTerminalGroupId?: string | null
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalGroupCandidateCount: number
-  readonly canBeginTerminalGroupSelection: boolean
-  readonly canCreateTerminalGroup: boolean
+  readonly canBeginTerminalGroupSelection?: boolean
+  readonly canCreateTerminalGroup?: boolean
   readonly onNodesChange: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onNodeClick: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onPaneClick: () => void
@@ -208,13 +223,11 @@ export function WorkbenchCanvas({
   onCreateWorkspaceAgent,
   onOpenAgentSettings,
   onSelectDefaultAgentProvider,
-  onBeginTerminalGroupSelection,
   onCreateTerminalGroup,
   onCancelTerminalGroupSelection,
+  editingTerminalGroupId = null,
   isTerminalGroupSelectionMode,
   selectedTerminalGroupCandidateCount,
-  canBeginTerminalGroupSelection,
-  canCreateTerminalGroup,
   onNodesChange,
   onNodeClick,
   onPaneClick,
@@ -266,15 +279,25 @@ export function WorkbenchCanvas({
   })
   const paneContextMenu = useCanvasPaneContextMenu({
     canCreateTerminal: isDesktopRuntime && Boolean(currentWorkbench),
-    canGroupTerminals:
-      isDesktopRuntime && Boolean(currentWorkbench) && canBeginTerminalGroupSelection,
+    canGroupTerminals: isDesktopRuntime && Boolean(currentWorkbench) && !editingTerminalGroupId,
     graphId: currentWorkbench?.graph.id ?? null,
-    isBlocked: isTerminalGroupSelectionMode || Boolean(placementTemplate),
+    isBlocked: Boolean(placementTemplate),
     shortcutTooltips,
     onBeforeOpen: objectContextMenu.close,
-    onBeginTerminalGroupSelection,
-    onCreateTerminal: onCreateTerminalBlock,
-    onFitCanvas
+    onCreateTerminal: (screenPosition) => {
+      const position = toWorkbenchFlowPosition(reactFlowInstanceRef.current, screenPosition)
+      onCreateTerminalBlock({
+        position,
+        terminalGroupId: resolveTerminalCreationGroupId(
+          currentWorkbench?.graph ?? null,
+          editingTerminalGroupId,
+          position
+        )
+      })
+    },
+    onCreateTerminalGroup: (screenPosition) => {
+      onCreateTerminalGroup(toWorkbenchFlowPosition(reactFlowInstanceRef.current, screenPosition))
+    }
   })
   const [viewportZoom, setViewportZoom] = useState(1)
   const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom, reduceVisualNoise)
@@ -410,20 +433,37 @@ export function WorkbenchCanvas({
           hasWorkbench={Boolean(currentWorkbench)}
           isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
           selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
-          canCreateTerminalGroup={canCreateTerminalGroup}
           onCreateWorkspaceAgent={onCreateWorkspaceAgent}
           onOpenAgentSettings={onOpenAgentSettings}
           onSelectDefaultAgentProvider={onSelectDefaultAgentProvider}
-          onCreateTerminalGroup={onCreateTerminalGroup}
           onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
         />
         <ReactFlow<WorkbenchFlowNode, Edge>
           nodes={objectContextMenu.nodes}
           edges={objectContextMenu.edges}
           edgeTypes={workbenchEdgeTypes}
+          isValidConnection={(connection: Connection | Edge) =>
+            isTerminalConnectionAllowedInCanvasScope(
+              currentWorkbench?.graph ?? null,
+              connection.source,
+              connection.target,
+              editingTerminalGroupId
+            )
+          }
           onConnect={(connection) => void workflow.connect(connection)}
           onEdgesDelete={(edges) =>
-            void workflow.deleteEdges(edges.filter((edge) => !edge.id.startsWith('approval:')))
+            void workflow.deleteEdges(
+              edges.filter(
+                (edge) =>
+                  !edge.id.startsWith('approval:') &&
+                  isTerminalConnectionEditableInCanvasScope(
+                    currentWorkbench?.graph ?? null,
+                    edge.source,
+                    edge.target,
+                    editingTerminalGroupId
+                  )
+              )
+            )
           }
           nodeTypes={nodeTypes}
           onInit={(instance) => {
@@ -460,6 +500,11 @@ export function WorkbenchCanvas({
           }
           onNodeClick={onNodeClick}
           onNodeContextMenu={(event, node) => {
+            if (node.type === 'terminalGroup' && node.id === editingTerminalGroupId) {
+              objectContextMenu.close()
+              paneContextMenu.open(event)
+              return
+            }
             paneContextMenu.close()
             objectContextMenu.onNodeContextMenu(event, node)
           }}
@@ -640,59 +685,3 @@ export function WorkbenchCanvas({
     </section>
   )
 }
-
-function resolveQuickExecutionNodeTarget(
-  graph: WorkbenchSnapshot['graph'] | null,
-  node: WorkbenchFlowNode
-): QuickExecutionTargetSnapshot | null {
-  if (!graph || node.type === 'agentConsole') return null
-
-  const contextTarget = resolveCanvasObjectContextTarget(graph, {
-    nodeId: node.id,
-    nodeType: node.type === 'terminalGroup' ? 'terminalGroup' : 'terminal'
-  })
-
-  return contextTarget && contextTarget.kind !== 'agent'
-    ? toQuickExecutionTarget(contextTarget)
-    : null
-}
-
-function resolveQuickExecutionDropTarget(
-  surface: HTMLElement | null,
-  event: globalThis.MouseEvent | TouchEvent
-): boolean {
-  const point = readClientPoint(event)
-  const bar = surface?.querySelector<HTMLElement>('[data-quick-execution-bar]')
-  if (!bar || !point) return false
-
-  const rect = bar.getBoundingClientRect()
-  return (
-    point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom
-  )
-}
-
-function readClientPoint(
-  event: globalThis.MouseEvent | TouchEvent
-): { readonly x: number; readonly y: number } | null {
-  if ('clientX' in event) return { x: event.clientX, y: event.clientY }
-  if (!('changedTouches' in event) || !('touches' in event)) return null
-
-  const touch = event.changedTouches[0] ?? event.touches[0]
-  return touch ? { x: touch.clientX, y: touch.clientY } : null
-}
-
-const inactiveTerminalWorkflowController = {
-  activeRootBlockIds: [],
-  connect: async () => undefined,
-  deleteEdges: async () => undefined,
-  edges: [],
-  isActive: false,
-  isStopping: false,
-  nodeStatuses: {},
-  run: null,
-  start: async () => undefined,
-  startScope: async () => undefined,
-  startTerminalCombination: async () => undefined,
-  stop: async () => undefined,
-  updateExecutionConfig: async () => undefined
-} satisfies ReturnType<typeof useTerminalWorkflow>

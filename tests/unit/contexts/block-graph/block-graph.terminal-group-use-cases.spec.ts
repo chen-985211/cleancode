@@ -1,8 +1,7 @@
-import { AddTerminalToGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/AddTerminalToGroupUseCase'
 import { CreateTerminalGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
 import { DissolveTerminalGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/DissolveTerminalGroupUseCase'
+import { MoveTerminalWorkflowToGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/MoveTerminalWorkflowToGroupUseCase'
 import { MoveTerminalGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/MoveTerminalGroupUseCase'
-import { RemoveTerminalFromGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/RemoveTerminalFromGroupUseCase'
 import { SetTerminalGroupCollapsedUseCase } from '../../../../src/contexts/block-graph/application/use-cases/SetTerminalGroupCollapsedUseCase'
 import { UpdateTerminalGroupMetadataUseCase } from '../../../../src/contexts/block-graph/application/use-cases/UpdateTerminalGroupMetadataUseCase'
 import type { BlockGraphRepository } from '../../../../src/contexts/block-graph/application/ports/BlockGraphRepository'
@@ -61,7 +60,7 @@ describe('terminal group use cases', () => {
     expect(repository.savedGraph?.toSnapshot()).toEqual(updatedGraph)
   })
 
-  it('rejects creating a group from one complete workflow', async () => {
+  it('creates a group from one complete workflow', async () => {
     const graph = createGraphWithThreeTerminals()
     graph.connectTerminalBlocks({
       sourceBlockId: 'backend-terminal',
@@ -69,15 +68,17 @@ describe('terminal group use cases', () => {
     })
     const repository = new InMemoryBlockGraphRepository(graph)
 
-    await expect(
-      new CreateTerminalGroupUseCase(repository).execute({
-        projectDirectory: '/tmp/project',
-        workspaceId: 'main',
-        name: 'Application',
-        memberBlockIds: ['frontend-terminal']
-      })
-    ).rejects.toThrow('Terminal group must contain at least two top-level execution units.')
-    expect(repository.savedGraph?.terminalGroups).toEqual([])
+    const updatedGraph = await new CreateTerminalGroupUseCase(repository).execute({
+      projectDirectory: '/tmp/project',
+      workspaceId: 'main',
+      name: 'Application',
+      memberBlockIds: ['frontend-terminal']
+    })
+
+    expect(updatedGraph.terminalGroups[0]?.memberBlockIds).toEqual([
+      'backend-terminal',
+      'frontend-terminal'
+    ])
   })
 
   it('updates terminal group metadata, collapsed state, members, and position', async () => {
@@ -85,8 +86,7 @@ describe('terminal group use cases', () => {
     const repository = new InMemoryBlockGraphRepository(graph)
     const updateMetadata = new UpdateTerminalGroupMetadataUseCase(repository)
     const setCollapsed = new SetTerminalGroupCollapsedUseCase(repository)
-    const addTerminal = new AddTerminalToGroupUseCase(repository)
-    const removeTerminal = new RemoveTerminalFromGroupUseCase(repository)
+    const moveTerminalWorkflow = new MoveTerminalWorkflowToGroupUseCase(repository)
     const moveTerminalGroup = new MoveTerminalGroupUseCase(repository)
 
     await updateMetadata.execute({
@@ -101,17 +101,19 @@ describe('terminal group use cases', () => {
       terminalGroupId: 'development-group',
       isCollapsed: true
     })
-    await addTerminal.execute({
+    await moveTerminalWorkflow.execute({
       projectDirectory: '/tmp/project',
       workspaceId: 'main',
-      terminalGroupId: 'development-group',
-      blockId: 'worker-terminal'
+      targetTerminalGroupId: 'development-group',
+      blockId: 'worker-terminal',
+      position: { x: 320, y: 700 }
     })
-    await removeTerminal.execute({
+    await moveTerminalWorkflow.execute({
       projectDirectory: '/tmp/project',
       workspaceId: 'main',
-      terminalGroupId: 'development-group',
-      blockId: 'frontend-terminal'
+      targetTerminalGroupId: null,
+      blockId: 'frontend-terminal',
+      position: { x: 820, y: 240 }
     })
     const updatedGraph = await moveTerminalGroup.execute({
       projectDirectory: '/tmp/project',
