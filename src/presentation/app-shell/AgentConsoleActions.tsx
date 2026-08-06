@@ -1,4 +1,3 @@
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
@@ -14,6 +13,7 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface MenuPosition {
   readonly left: number
@@ -220,7 +220,7 @@ export function AgentConsoleActions({
                   setMode((current) => (current === 'menu' ? 'closed' : 'menu'))
                 }}
               >
-                <MoreHorizontal size={15} aria-hidden="true" />
+                <WorkbenchIcon role="more" size={15} />
               </button>
             </TooltipLabel>
           </span>
@@ -253,7 +253,7 @@ export function AgentConsoleActions({
                 onClick={startRename}
                 onFocus={() => setActiveMenuItem(0)}
               >
-                <Pencil size={14} aria-hidden="true" />
+                <WorkbenchIcon role="edit" size={14} />
                 {t('agent.rename')}
               </CanvasNodeMenuItem>
               <CanvasNodeMenuItem
@@ -263,7 +263,7 @@ export function AgentConsoleActions({
                 onClick={() => void removeAgent()}
                 onFocus={() => setActiveMenuItem(1)}
               >
-                <Trash2 size={14} aria-hidden="true" />
+                <WorkbenchIcon role="delete" size={14} />
                 {t('agent.remove')}
               </CanvasNodeMenuItem>
             </CanvasNodeMenu>,

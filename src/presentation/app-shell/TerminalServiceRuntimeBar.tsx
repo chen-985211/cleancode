@@ -1,5 +1,3 @@
-import { Copy, ExternalLink, LocateFixed, Pencil, TriangleAlert, X } from 'lucide-react'
-
 import type {
   ManagedTerminalServiceOwner,
   TerminalRunIdentity,
@@ -9,6 +7,7 @@ import type {
 import { useI18n } from './i18n/useI18n'
 import type { Translate } from './i18n/messages'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalServiceRuntimeBarProps {
   readonly identity: TerminalRunIdentity | null
@@ -106,7 +105,7 @@ function EndpointRow({
           tooltip={t('service.copyAddress')}
           onClick={() => void onCopyEndpoint(endpoint)}
         >
-          <Copy size={13} aria-hidden="true" />
+          <WorkbenchIcon role="copy" size={13} />
         </RuntimeIconButton>
         {canOpen && identity ? (
           <RuntimeIconButton
@@ -114,7 +113,7 @@ function EndpointRow({
             tooltip={t('service.openAddress')}
             onClick={() => void onOpenEndpoint(identity)}
           >
-            <ExternalLink size={13} aria-hidden="true" />
+            <WorkbenchIcon role="open-external" size={13} />
           </RuntimeIconButton>
         ) : null}
       </div>
@@ -142,7 +141,7 @@ function ConflictRow({
       role="status"
       aria-label={t('service.portConflict')}
     >
-      <TriangleAlert size={14} aria-hidden="true" />
+      <WorkbenchIcon role="warning" size={14} />
       <span className="terminal-service-runtime__conflict-message">
         {createConflictMessage(conflict, owner, t)}
       </span>
@@ -154,7 +153,7 @@ function ConflictRow({
               tooltip={t('service.locateOwner')}
               onClick={() => void onLocateOwner(owner)}
             >
-              <LocateFixed size={13} aria-hidden="true" />
+              <WorkbenchIcon role="locate" size={13} />
             </RuntimeIconButton>
             {canOpenOwner ? (
               <RuntimeIconButton
@@ -162,7 +161,7 @@ function ConflictRow({
                 tooltip={t('service.openOwner')}
                 onClick={() => void onOpenEndpoint(owner.identity)}
               >
-                <ExternalLink size={13} aria-hidden="true" />
+                <WorkbenchIcon role="open-external" size={13} />
               </RuntimeIconButton>
             ) : null}
           </>
@@ -172,14 +171,14 @@ function ConflictRow({
           tooltip={t('service.editPort')}
           onClick={onEditPortConfiguration}
         >
-          <Pencil size={13} aria-hidden="true" />
+          <WorkbenchIcon role="edit" size={13} />
         </RuntimeIconButton>
         <RuntimeIconButton
           label={t('service.dismissConflict')}
           tooltip={t('service.dismiss')}
           onClick={onDismissConflict}
         >
-          <X size={13} aria-hidden="true" />
+          <WorkbenchIcon role="close" size={13} />
         </RuntimeIconButton>
       </div>
     </div>

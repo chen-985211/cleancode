@@ -1,9 +1,42 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { TerminalMetadataForm } from '../../../src/presentation/app-shell/TerminalMetadataForm'
 import type { TerminalBlockSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 
 describe('terminal workflow advanced configuration', () => {
+  it('opens with a visible editing context, focuses the intended field, and cancels with Escape', () => {
+    const onCancel = vi.fn()
+    const { rerender } = render(
+      <TerminalMetadataForm
+        block={createBlock()}
+        shouldFocusLaunchCommand={false}
+        onSave={vi.fn(async () => undefined)}
+        onCancel={onCancel}
+      />
+    )
+
+    const form = screen.getByRole('form', { name: '编辑终端信息' })
+
+    expect(within(form).getByText('编辑终端信息')).toBeVisible()
+    expect(screen.getByLabelText('终端名称')).toHaveFocus()
+    expect(screen.getByRole('button', { name: '保存终端信息' })).toHaveTextContent('保存终端信息')
+    expect(screen.getByRole('button', { name: '取消编辑终端信息' })).toHaveTextContent('取消编辑')
+
+    fireEvent.keyDown(screen.getByLabelText('终端名称'), { key: 'Escape' })
+    expect(onCancel).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <TerminalMetadataForm
+        block={createBlock()}
+        shouldFocusLaunchCommand
+        onSave={vi.fn(async () => undefined)}
+        onCancel={onCancel}
+      />
+    )
+
+    expect(screen.getByLabelText('启动命令')).toHaveFocus()
+  })
+
   it('saves literal-output service readiness together with terminal metadata', async () => {
     const onSave = vi.fn(async () => undefined)
     render(

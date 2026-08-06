@@ -1,4 +1,4 @@
-import { Archive } from 'lucide-react'
+import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive'
 
 import { ProjectSidebarConfirmationDialog } from './ProjectSidebarConfirmationDialog'
 import { useI18n } from './i18n/useI18n'
@@ -41,7 +41,7 @@ export function ArchiveWorkspaceDialog({
       confirmLabel={isLocked ? t('archive.unlockConfirm') : t('archive.confirm')}
       description={description}
       detail={detail}
-      icon={<Archive size={16} aria-hidden="true" />}
+      icon={<ArchiveIcon size={16} weight="bold" aria-hidden="true" />}
       title={ariaLabel}
       onCancel={onCancel}
       onConfirm={onConfirm}

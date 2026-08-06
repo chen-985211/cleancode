@@ -1,5 +1,4 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { ChevronUp, Map as MapIcon, Minus, Plus, Scan } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -23,6 +22,7 @@ import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
 import { subscribeWorkbenchDirectZoomPresentation } from './workbenchDirectZoom'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface CanvasSize {
   readonly width: number
@@ -225,7 +225,7 @@ export function CanvasMinimap({
               tooltip={shortcutTooltips.toggleMinimap}
               onClick={onToggleCollapsed}
             >
-              <ChevronUp size={13} aria-hidden="true" />
+              <WorkbenchIcon role="collapse" size={13} />
             </MinimapControlButton>
           </div>
         </div>
@@ -242,7 +242,7 @@ export function CanvasMinimap({
               tooltip={shortcutTooltips.toggleMinimap}
               onClick={onToggleCollapsed}
             >
-              <MapIcon size={14} aria-hidden="true" />
+              <WorkbenchIcon role="minimap" size={14} />
             </MinimapControlButton>
           </div>
         ) : null}
@@ -256,7 +256,7 @@ export function CanvasMinimap({
             tooltip={shortcutTooltips.zoomCanvasOut}
             onClick={onZoomOut}
           >
-            <Minus size={14} aria-hidden="true" />
+            <WorkbenchIcon role="zoom-out" size={14} />
           </MinimapControlButton>
           <LiveCanvasMinimapZoomLevel
             baseline={canvasViewport}
@@ -268,7 +268,7 @@ export function CanvasMinimap({
             tooltip={shortcutTooltips.zoomCanvasIn}
             onClick={onZoomIn}
           >
-            <Plus size={14} aria-hidden="true" />
+            <WorkbenchIcon role="zoom-in" size={14} />
           </MinimapControlButton>
           <span className="canvas-minimap__viewport-divider" aria-hidden="true" />
           <MinimapControlButton
@@ -276,7 +276,7 @@ export function CanvasMinimap({
             tooltip={shortcutTooltips.fitCanvas}
             onClick={onFitCanvas}
           >
-            <Scan size={14} aria-hidden="true" />
+            <WorkbenchIcon role="fit-canvas" size={14} />
           </MinimapControlButton>
         </div>
       </div>

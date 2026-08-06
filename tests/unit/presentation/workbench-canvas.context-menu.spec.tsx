@@ -78,7 +78,13 @@ describe('workbench canvas object context menu', () => {
     expect(contextSelectedNodeIds()).toEqual(['standalone'])
 
     const favoriteItem = screen.getByRole('menuitem', { name: '收藏终端' })
-    expect(favoriteItem.querySelector('svg')).not.toHaveAttribute('fill', 'currentColor')
+    expect(favoriteItem.querySelector('svg')).toMatchObject({
+      dataset: expect.objectContaining({
+        iconGlyph: 'star',
+        iconRole: 'favorite',
+        iconWeight: 'bold'
+      })
+    })
 
     fireEvent.click(favoriteItem)
 

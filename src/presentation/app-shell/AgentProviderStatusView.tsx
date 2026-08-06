@@ -1,15 +1,4 @@
-import {
-  Check,
-  CircleAlert,
-  CirclePause,
-  Copy,
-  Download,
-  Loader2,
-  MonitorOff,
-  RefreshCw,
-  X
-} from 'lucide-react'
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
@@ -17,6 +6,7 @@ import type { AgentBlockingFeedback, AgentFeedbackIssue } from './agentProviderF
 import type { AgentProviderPanelState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
 
 interface PanelPosition {
   readonly left: number
@@ -115,7 +105,7 @@ export function AgentProviderStatusControl({
 
   if (issues.length === 0) return null
   const isNeutral = issues.every((issue) => issue === 'session_ended')
-  const Icon = isNeutral ? CirclePause : CircleAlert
+  const iconRole: WorkbenchIconRole = isNeutral ? 'paused' : 'error'
   const controlLabel = t('agent.statusCount', { agentName, count: issues.length })
 
   const runAction = (action: () => void): void => {
@@ -141,7 +131,7 @@ export function AgentProviderStatusControl({
           }}
           ref={triggerRef}
         >
-          <Icon size={15} aria-hidden="true" />
+          <WorkbenchIcon role={iconRole} size={15} />
           {issues.length > 1 ? (
             <span className="agent-provider-status-control__count" aria-hidden="true">
               {issues.length}
@@ -176,7 +166,7 @@ export function AgentProviderStatusControl({
                       triggerRef.current?.focus()
                     }}
                   >
-                    <X size={14} aria-hidden="true" />
+                    <WorkbenchIcon role="close" size={14} />
                   </button>
                 </TooltipLabel>
               </div>
@@ -222,7 +212,7 @@ function StatusIssue({
 }) {
   const { t } = useI18n()
   const isNeutral = issue === 'session_ended'
-  const Icon = isNeutral ? CirclePause : CircleAlert
+  const iconRole: WorkbenchIconRole = isNeutral ? 'paused' : 'error'
   const actions: Array<{ readonly label: string; readonly onClick: () => void }> = []
   if (issue === 'attachment_failed' && onRetryAttachment) {
     actions.push({ label: t('provider.retry'), onClick: onRetryAttachment })
@@ -255,7 +245,7 @@ function StatusIssue({
       className="agent-provider-status-panel__issue"
       data-tone={isNeutral ? 'neutral' : 'warning'}
     >
-      <Icon size={15} aria-hidden="true" />
+      <WorkbenchIcon role={iconRole} size={15} />
       <div>
         <p>{feedbackIssueLabel(issue, providerName, state, t)}</p>
         {actions.length > 0 ? (
@@ -290,13 +280,13 @@ export function AgentProviderBlockingState({
   const [isCopied, setIsCopied] = useState(false)
   const availability = installableAvailability(state)
   const isChecking = blocking === 'checking_provider'
-  const Icon: ComponentType<{ className?: string; size: number; 'aria-hidden': true }> = isChecking
-    ? Loader2
+  const iconRole: WorkbenchIconRole = isChecking
+    ? 'loading'
     : blocking === 'runtime_unavailable'
-      ? MonitorOff
+      ? 'runtime-unavailable'
       : availability
-        ? Download
-        : CircleAlert
+        ? 'download'
+        : 'error'
   const canRetryAttachment = blocking === 'attachment_failed' && onRetryAttachment
   const canRetryInspection =
     blocking === 'provider_missing' ||
@@ -320,10 +310,10 @@ export function AgentProviderBlockingState({
       data-tone={isChecking ? 'neutral' : 'warning'}
     >
       <span className="agent-provider-empty-state__icon" aria-hidden="true">
-        <Icon
+        <WorkbenchIcon
           className={isChecking ? 'agent-provider-empty-state__spinner' : undefined}
+          role={iconRole}
           size={18}
-          aria-hidden={true}
         />
       </span>
       <p>{blockingLabel(blocking, providerName, state, t)}</p>
@@ -335,7 +325,7 @@ export function AgentProviderBlockingState({
               aria-label={t('provider.retryAttach', { provider: providerName })}
               onClick={onRetryAttachment}
             >
-              <RefreshCw size={13} aria-hidden="true" />
+              <WorkbenchIcon role="restart" size={13} />
               {t('provider.retry')}
             </button>
           ) : null}
@@ -345,7 +335,7 @@ export function AgentProviderBlockingState({
               aria-label={t('provider.recheck', { provider: providerName })}
               onClick={onRetryInspection}
             >
-              <RefreshCw size={13} aria-hidden="true" />
+              <WorkbenchIcon role="restart" size={13} />
               {t('provider.recheckShort')}
             </button>
           ) : null}
@@ -369,9 +359,9 @@ export function AgentProviderBlockingState({
             onClick={() => void copyInstallCommand()}
           >
             {isCopied ? (
-              <Check size={13} aria-hidden="true" />
+              <WorkbenchIcon role="confirm" size={13} />
             ) : (
-              <Copy size={13} aria-hidden="true" />
+              <WorkbenchIcon role="copy" size={13} />
             )}
             {isCopied ? t('provider.copied') : t('provider.copy')}
           </button>

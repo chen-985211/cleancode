@@ -1,4 +1,5 @@
-import { Archive, MoreHorizontal } from 'lucide-react'
+import { ArchiveIcon } from '@phosphor-icons/react/dist/csr/Archive'
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/csr/DotsThree'
 import {
   useEffect,
   useId,
@@ -127,7 +128,7 @@ export function WorkspaceRowMenu({
             onToggle()
           }}
         >
-          <MoreHorizontal size={15} aria-hidden="true" />
+          <DotsThreeIcon size={15} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
       {isOpen
@@ -161,7 +162,7 @@ export function WorkspaceRowMenu({
                   onArchive()
                 }}
               >
-                <Archive size={16} strokeWidth={1.8} aria-hidden="true" />
+                <ArchiveIcon size={16} weight="bold" aria-hidden="true" />
                 {t('sidebar.archiveWorkspace')}
               </button>
             </div>,

@@ -143,7 +143,12 @@ describe('quick execution bar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
 
-    expect(screen.getByRole('button', { name: '重新绑定' })).toBeInTheDocument()
+    const rebindButton = screen.getByRole('button', { name: '重新绑定' })
+    expect(rebindButton).toBeInTheDocument()
+    expect(rebindButton.querySelector('[data-icon-role="restart"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrow-clockwise'
+    )
     expect(screen.queryByRole('button', { name: '向左移动' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '向右移动' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '清空快捷位' })).not.toBeInTheDocument()
@@ -170,6 +175,10 @@ describe('quick execution bar', () => {
     expect(trash).not.toHaveAttribute('data-state')
     expect(trash).not.toHaveAttribute('aria-describedby')
     expect(trash.querySelector('[data-trash-icon-variant="outline"]')).toBeInTheDocument()
+    expect(trash.querySelector('[data-icon-role="delete"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'trash'
+    )
     fireEvent.dragOver(trash)
     expect(trash.querySelector('[data-trash-icon-variant="filled"]')).toBeInTheDocument()
     fireEvent.drop(trash)

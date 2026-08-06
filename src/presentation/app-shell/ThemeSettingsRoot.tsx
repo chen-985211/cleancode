@@ -1,4 +1,5 @@
-import { Check, X } from 'lucide-react'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
 import type { ThemePreference } from './themePreference'
@@ -88,7 +89,7 @@ export function ThemeSettingsRoot() {
                   aria-label={t('theme.close')}
                   onClick={closeSettings}
                 >
-                  <X size={18} aria-hidden="true" />
+                  <XIcon size={18} weight="bold" aria-hidden="true" />
                 </button>
               </TooltipLabel>
             </div>
@@ -116,7 +117,7 @@ export function ThemeSettingsRoot() {
                       </span>
                       {preference === option ? (
                         <span className="theme-option__check">
-                          <Check size={13} aria-hidden="true" />
+                          <CheckIcon size={13} weight="bold" aria-hidden="true" />
                         </span>
                       ) : null}
                     </span>

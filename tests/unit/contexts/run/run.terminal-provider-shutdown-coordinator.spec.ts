@@ -164,6 +164,48 @@ describe('terminal provider shutdown coordinator', () => {
     })
   })
 
+  it('retains a session whose durable checkpoint completes within the handoff budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const retained = createSession('slow-durable-checkpoint', {
+        retentionPolicy: 'keep-after-application-exit'
+      })
+      const checkpoint = deferred<void>()
+      vi.mocked(retained.persistence.checkpoint).mockImplementation(() => checkpoint.promise)
+      const stop = vi.fn(async () => undefined)
+      const retireSession = vi.fn(async () => undefined)
+      const onFailure = vi.fn()
+      const coordinator = new TerminalProviderShutdownCoordinator({
+        processes: { stop },
+        retireSession,
+        onFailure
+      })
+
+      const release = coordinator.release({
+        releaseId: 'release-slow-durable-checkpoint',
+        sessions: [retained]
+      })
+      await vi.advanceTimersByTimeAsync(1_000)
+      checkpoint.resolve()
+      const result = await release
+
+      expect(stop).not.toHaveBeenCalled()
+      expect(retireSession).not.toHaveBeenCalled()
+      expect(onFailure).not.toHaveBeenCalled()
+      expect(result).toEqual({
+        releaseId: 'release-slow-durable-checkpoint',
+        outcome: 'completed',
+        terminateCandidateCount: 0,
+        retainedSessionCount: 1,
+        stoppedSessionCount: 0,
+        retiredSessionCount: 0,
+        failureCount: 0
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('bounds a checkpoint that never settles and continues releasing the controller', async () => {
     const retained = createSession('blocked-checkpoint', {
       retentionPolicy: 'keep-after-application-exit'

@@ -8,7 +8,7 @@ import type { TerminalProviderApplicationDetachResult } from './TerminalProvider
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 
 const defaultShutdownConcurrency = 8
-const defaultCheckpointDeadlineMs = 750
+const defaultCheckpointDeadlineMs = 2_000
 const defaultRetireDeadlineMs = 750
 const defaultStopDeadlineMs = 2_500
 

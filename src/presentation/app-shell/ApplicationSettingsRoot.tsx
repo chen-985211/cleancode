@@ -1,13 +1,11 @@
-import {
-  ArrowLeft,
-  Bot,
-  Keyboard,
-  LayoutGrid,
-  RotateCcw,
-  Settings,
-  SquareTerminal,
-  X
-} from 'lucide-react'
+import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise'
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft'
+import { EraserIcon } from '@phosphor-icons/react/dist/csr/Eraser'
+import { GearSixIcon } from '@phosphor-icons/react/dist/csr/GearSix'
+import { KeyboardIcon } from '@phosphor-icons/react/dist/csr/Keyboard'
+import { RobotIcon } from '@phosphor-icons/react/dist/csr/Robot'
+import { SquaresFourIcon } from '@phosphor-icons/react/dist/csr/SquaresFour'
+import { TerminalWindowIcon } from '@phosphor-icons/react/dist/csr/TerminalWindow'
 import {
   useCallback,
   useEffect,
@@ -141,7 +139,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             props.onOpen()
           }}
         >
-          <Settings size={17} aria-hidden="true" />
+          <GearSixIcon size={17} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
       {props.isOpen ? (
@@ -163,7 +161,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 aria-label={t('settings.back')}
                 onClick={closeSettings}
               >
-                <ArrowLeft size={18} aria-hidden="true" />
+                <ArrowLeftIcon size={18} weight="bold" aria-hidden="true" />
               </button>
             </TooltipLabel>
             <h1 id="application-settings-title">{t('settings.title')}</h1>
@@ -175,7 +173,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 aria-current={activePane === 'shortcuts' ? 'page' : undefined}
                 onClick={() => setSelectedPane('shortcuts')}
               >
-                <Keyboard size={17} aria-hidden="true" />
+                <KeyboardIcon size={17} aria-hidden="true" />
                 <span>{t('settings.shortcuts.title')}</span>
               </button>
               <button
@@ -183,7 +181,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 aria-current={activePane === 'canvas' ? 'page' : undefined}
                 onClick={() => setSelectedPane('canvas')}
               >
-                <LayoutGrid size={17} aria-hidden="true" />
+                <SquaresFourIcon size={17} aria-hidden="true" />
                 <span>{t('settings.canvas.title')}</span>
               </button>
               <button
@@ -191,7 +189,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 aria-current={activePane === 'terminal' ? 'page' : undefined}
                 onClick={() => setSelectedPane('terminal')}
               >
-                <SquareTerminal size={17} aria-hidden="true" />
+                <TerminalWindowIcon size={17} aria-hidden="true" />
                 <span>{t('settings.terminal.title')}</span>
               </button>
               <button
@@ -199,7 +197,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                 aria-current={activePane === 'agents' ? 'page' : undefined}
                 onClick={() => setSelectedPane('agents')}
               >
-                <Bot size={17} aria-hidden="true" />
+                <RobotIcon size={17} aria-hidden="true" />
                 <span>{t('settings.agents.title')}</span>
               </button>
             </nav>
@@ -237,7 +235,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                         props.onResetAll()
                       }}
                     >
-                      <RotateCcw size={14} aria-hidden="true" />
+                      <ArrowCounterClockwiseIcon size={14} weight="bold" aria-hidden="true" />
                       {t('settings.shortcuts.resetAll')}
                     </button>
                   </header>
@@ -301,7 +299,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                                         setCaptureError(undefined)
                                       }}
                                     >
-                                      <X size={15} aria-hidden="true" />
+                                      <EraserIcon size={15} weight="bold" aria-hidden="true" />
                                     </button>
                                   </TooltipLabel>
                                   <TooltipLabel content={t('settings.shortcuts.reset', { action })}>
@@ -322,7 +320,11 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                                         setCaptureError(undefined)
                                       }}
                                     >
-                                      <RotateCcw size={15} aria-hidden="true" />
+                                      <ArrowCounterClockwiseIcon
+                                        size={15}
+                                        weight="bold"
+                                        aria-hidden="true"
+                                      />
                                     </button>
                                   </TooltipLabel>
                                 </div>

@@ -1,17 +1,8 @@
-import {
-  Box,
-  LoaderCircle,
-  MapPin,
-  ShieldAlert,
-  Terminal,
-  TriangleAlert,
-  Waypoints
-} from 'lucide-react'
-
 import type { AgentApprovalPresentation } from './agentApprovalPresentation'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import type { Translate } from './i18n/messages'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface AgentToolApprovalCardProps {
   readonly onApprove: () => void
@@ -58,7 +49,7 @@ export function AgentToolApprovalCard({
     >
       <header className="agent-tool-approval-card__header">
         <span className="agent-tool-approval-card__status-icon" aria-hidden="true">
-          <ShieldAlert size={18} />
+          <WorkbenchIcon role="approval" size={18} />
         </span>
         <div className="agent-tool-approval-card__heading">
           <span className="agent-tool-approval-card__eyebrow">{statusLabel}</span>
@@ -77,7 +68,7 @@ export function AgentToolApprovalCard({
       <div className="agent-tool-approval-card__body">
         {isMissing ? (
           <div className="agent-tool-approval-card__notice" role="status">
-            <TriangleAlert size={15} aria-hidden="true" />
+            <WorkbenchIcon role="warning" size={15} />
             <span>
               {t('approval.targetMissing')}
               <TooltipLabel content={presentation.targetId}>
@@ -95,13 +86,13 @@ export function AgentToolApprovalCard({
 
         {isFailed ? (
           <div className="agent-tool-approval-card__error" role="alert">
-            <TriangleAlert size={15} aria-hidden="true" />
+            <WorkbenchIcon role="warning" size={15} />
             <span>{presentation.approval.errorMessage ?? t('approval.failedFallback')}</span>
           </div>
         ) : (
           <p className="agent-tool-approval-card__impact">
             <span className="agent-tool-approval-card__impact-icon" aria-hidden="true">
-              <TriangleAlert size={14} />
+              <WorkbenchIcon role="warning" size={14} />
             </span>
             <span>{createImpact(presentation, t)}</span>
           </p>
@@ -130,10 +121,10 @@ export function AgentToolApprovalCard({
               onClick={onApprove}
             >
               {isApproving ? (
-                <LoaderCircle
+                <WorkbenchIcon
                   className="agent-tool-approval-card__spinner"
+                  role="loading"
                   size={14}
-                  aria-hidden="true"
                 />
               ) : null}
               {actionCopy.destructiveLabel}
@@ -163,7 +154,7 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
         aria-label={t('approval.target', { name: presentation.block.name })}
       >
         <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
-          <Terminal size={18} />
+          <WorkbenchIcon role="terminal" size={18} />
         </span>
         <div className="agent-tool-approval-card__target-copy">
           <span className="agent-tool-approval-card__target-type">
@@ -206,7 +197,7 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
         aria-label={t('approval.target', { name: locateName })}
       >
         <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
-          <Waypoints size={18} />
+          <WorkbenchIcon role="workflow" size={18} />
         </span>
         <div className="agent-tool-approval-card__target-copy">
           <span className="agent-tool-approval-card__target-type">
@@ -252,7 +243,7 @@ function TargetDetails({ isLocatingDisabled, onLocate, presentation }: TargetDet
       aria-label={t('approval.target', { name: presentation.group.name })}
     >
       <span className="agent-tool-approval-card__object-icon" aria-hidden="true">
-        <Box size={18} />
+        <WorkbenchIcon role="terminal-group" size={18} />
       </span>
       <div className="agent-tool-approval-card__target-copy">
         <span className="agent-tool-approval-card__target-type">{t('approval.targetGroup')}</span>
@@ -320,7 +311,7 @@ function LocateTargetButton({ disabled, name, onLocate }: LocateTargetButtonProp
       disabled={disabled}
       onClick={onLocate}
     >
-      <MapPin size={14} aria-hidden="true" />
+      <WorkbenchIcon role="locate" size={14} />
       {t('approval.locateShort')}
     </button>
   )

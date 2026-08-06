@@ -1,9 +1,8 @@
-import { Box, CircleAlert, FolderOpen, LoaderCircle, RefreshCw } from 'lucide-react'
-
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 import type { InitialWorkbenchLoadPhase } from './useInitialWorkbenchLoad'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -31,7 +30,7 @@ export function CanvasInitialWorkbenchState({
       <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
         <div className="canvas-empty__panel">
           <span className="canvas-empty__icon" aria-hidden="true">
-            <LoaderCircle className="canvas-empty__spinner" size={20} />
+            <WorkbenchIcon className="canvas-empty__spinner" role="loading" size={20} />
           </span>
           <div className="canvas-empty__copy">
             <p>{label}</p>
@@ -45,14 +44,14 @@ export function CanvasInitialWorkbenchState({
     <div className="canvas-empty" role="alert" data-tone="danger">
       <div className="canvas-empty__panel">
         <span className="canvas-empty__icon" aria-hidden="true">
-          <CircleAlert size={20} />
+          <WorkbenchIcon role="error" size={20} />
         </span>
         <div className="canvas-empty__copy">
           <h2>{t('canvas.restoreFailedTitle')}</h2>
           <p>{t('canvas.restoreFailedDescription')}</p>
         </div>
         <button className="canvas-empty__action" type="button" onClick={onRetry}>
-          <RefreshCw size={14} aria-hidden="true" />
+          <WorkbenchIcon role="restart" size={14} />
           {t('canvas.retryRestore')}
         </button>
       </div>
@@ -73,7 +72,7 @@ function CanvasEmptyState({
     <div className="canvas-empty">
       <div className="canvas-empty__panel">
         <span className="canvas-empty__icon" aria-hidden="true">
-          <Box size={21} />
+          <WorkbenchIcon role="canvas" size={21} />
         </span>
         <div className="canvas-empty__copy">
           {isDesktopRuntime ? (
@@ -87,7 +86,7 @@ function CanvasEmptyState({
         </div>
         {isDesktopRuntime ? (
           <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
-            <FolderOpen size={14} aria-hidden="true" />
+            <WorkbenchIcon role="open-project" size={14} />
             {t('canvas.openProject')}
           </button>
         ) : null}

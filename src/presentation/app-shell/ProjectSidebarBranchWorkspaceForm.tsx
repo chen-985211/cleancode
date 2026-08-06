@@ -1,4 +1,4 @@
-import { Folders } from 'lucide-react'
+import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import type { FormEvent, RefObject } from 'react'
 import { useI18n } from './i18n/useI18n'
 
@@ -30,7 +30,7 @@ export function ProjectSidebarBranchWorkspaceForm({
         placeholder={t('branchWorkspace.newBranchPlaceholder')}
       />
       <button type="submit">
-        <Folders size={13} aria-hidden="true" />
+        <FoldersIcon size={13} weight="bold" aria-hidden="true" />
         <span>{t('branchWorkspace.createWorktree')}</span>
       </button>
     </form>

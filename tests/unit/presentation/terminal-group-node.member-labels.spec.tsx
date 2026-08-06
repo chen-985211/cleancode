@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { TerminalGroupNode } from '../../../src/presentation/app-shell/TerminalGroupNode'
@@ -92,22 +92,33 @@ describe('terminal group member labels', () => {
     expect(membershipGroup).toContainElement(removeButton)
     expect(dissolveButton).toHaveAttribute('data-control-surface', 'raised')
 
-    expect(startButton.querySelector('[data-icon="group-start"]')).toHaveAttribute(
-      'fill',
-      'currentColor'
+    expect(startButton.querySelector('[data-icon="group-start"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'play', iconWeight: 'fill' })
+    })
+    expect(stopButton.querySelector('[data-icon="group-stop"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'stop', iconWeight: 'fill' })
+    })
+    expect(restartButton.querySelector('[data-icon="group-restart"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'arrow-clockwise', iconRole: 'restart' })
+    })
+    expect(editButton.querySelector('[data-icon="group-edit"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'pencil-simple'
     )
-    expect(stopButton.querySelector('[data-icon="group-stop"]')).toBeInTheDocument()
-    expect(restartButton.querySelector('[data-icon="group-restart"]')).toBeInTheDocument()
-    expect(editButton.querySelector('[data-icon="group-edit"]')).toBeInTheDocument()
-    expect(addButton.querySelector('[data-icon="group-add"]')).toBeInTheDocument()
-    expect(removeButton.querySelector('[data-icon="group-remove"]')).toBeInTheDocument()
+    expect(addButton.querySelector('[data-icon="group-add"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'stack-plus'
+    )
+    expect(removeButton.querySelector('[data-icon="group-remove"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'stack-minus'
+    )
     expect(dissolveButton.querySelector('[data-icon="group-dissolve"]')).toBeInTheDocument()
     expect(dissolveButton.querySelector('[data-icon-part="disconnect-accent"]')).toBeInTheDocument()
-    expect(
-      screen
-        .getByRole('button', { name: 'Backend 移出组合' })
-        .querySelector('[data-icon="group-member-unlink"]')
-    ).toBeInTheDocument()
+    const unlinkIcon = screen
+      .getByRole('button', { name: 'Backend 移出组合' })
+      .querySelector('[data-icon="group-member-unlink"]')
+    expect(unlinkIcon).toHaveAttribute('data-icon-glyph', 'link-break')
   })
 
   it('reports the explicit disclosure state for collapsed and expanded groups', () => {
@@ -119,6 +130,10 @@ describe('terminal group member labels', () => {
 
     expect(expandButton).toHaveAttribute('aria-expanded', 'false')
     expect(expandButton).toHaveTextContent('展开')
+    expect(expandButton.querySelector('[data-icon="group-expand"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrows-out-simple'
+    )
 
     rerender(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
 
@@ -126,6 +141,10 @@ describe('terminal group member labels', () => {
 
     expect(collapseButton).toHaveAttribute('aria-expanded', 'true')
     expect(collapseButton).toHaveTextContent('折叠')
+    expect(collapseButton.querySelector('[data-icon="group-collapse"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrows-in-simple'
+    )
   })
 
   it('routes every direct group action through its existing callback', () => {
@@ -186,12 +205,17 @@ describe('terminal group member labels', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('解散组合，保留成员终端')
   })
 
-  it('keeps the group header compact while editing the group name', () => {
+  it('keeps the group header compact and keyboard-ready while editing the group name', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
     fireEvent.click(screen.getByRole('button', { name: '启动项目 编辑组合名称' }))
 
-    expect(screen.getByRole('textbox', { name: '组合名称' })).toBeInTheDocument()
+    const nameInput = screen.getByRole('textbox', { name: '组合名称' })
+
+    expect(nameInput).toHaveFocus()
+    expect(nameInput).toHaveValue('启动项目')
+    expect(nameInput).toHaveProperty('selectionStart', 0)
+    expect(nameInput).toHaveProperty('selectionEnd', '启动项目'.length)
     expect(screen.getByRole('button', { name: '保存组合名称' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '取消编辑组合名称' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '启动项目 启动组合命令' })).not.toBeInTheDocument()
@@ -201,6 +225,51 @@ describe('terminal group member labels', () => {
     expect(
       screen.queryByRole('button', { name: '启动项目 重开组合终端会话' })
     ).not.toBeInTheDocument()
+
+    fireEvent.change(nameInput, { target: { value: '临时名称' } })
+    fireEvent.keyDown(nameInput, { key: 'Escape' })
+
+    expect(screen.queryByRole('textbox', { name: '组合名称' })).not.toBeInTheDocument()
+    expect(screen.getByText('启动项目')).toBeInTheDocument()
+  })
+
+  it('prevents duplicate group-name saves while keeping the editor visibly busy', async () => {
+    let resolveSave!: () => void
+    const onUpdateGroupMetadata = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        })
+    )
+    render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: true,
+          data: { onUpdateGroupMetadata }
+        })}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 编辑组合名称' }))
+    fireEvent.change(screen.getByRole('textbox', { name: '组合名称' }), {
+      target: { value: '开发服务' }
+    })
+
+    const saveButton = screen.getByRole('button', { name: '保存组合名称' })
+    const cancelButton = screen.getByRole('button', { name: '取消编辑组合名称' })
+
+    fireEvent.click(saveButton)
+    fireEvent.click(saveButton)
+
+    expect(onUpdateGroupMetadata).toHaveBeenCalledTimes(1)
+    expect(saveButton).toBeDisabled()
+    expect(saveButton).toHaveAttribute('aria-busy', 'true')
+    expect(cancelButton).toBeDisabled()
+
+    resolveSave()
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: '组合名称' })).not.toBeInTheDocument()
+    )
   })
 
   it('keeps member labels available while the group is collapsed', () => {

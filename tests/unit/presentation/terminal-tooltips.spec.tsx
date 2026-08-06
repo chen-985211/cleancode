@@ -249,12 +249,41 @@ describe('terminal tooltips', () => {
     await expectTooltip('Terminal 删除终端', '删除终端')
 
     const restartButton = screen.getByRole('button', { name: 'Terminal 重开空终端会话' })
-    expect(restartButton.querySelector('[data-icon="group-restart"]')).not.toBeNull()
+    expect(restartButton.querySelector('[data-icon-role="restart"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrow-clockwise'
+    )
     expect(screen.queryByRole('button', { name: 'Terminal 更多终端操作' })).not.toBeInTheDocument()
 
+    expect(document.querySelector('[data-icon="terminal-node"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'terminal-window'
+    )
+    expect(
+      screen
+        .getByRole('button', { name: 'Terminal 启动命令' })
+        .querySelector('[data-icon="terminal-launch"]')
+    ).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'play', iconWeight: 'fill' })
+    })
+    expect(
+      screen
+        .getByRole('button', { name: 'Terminal 停止当前命令' })
+        .querySelector('[data-icon="terminal-stop-command"]')
+    ).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'stop', iconWeight: 'fill' })
+    })
+    expect(
+      screen
+        .getByRole('button', { name: 'Terminal 编辑终端信息' })
+        .querySelector('[data-icon="terminal-edit"]')
+    ).toHaveAttribute('data-icon-glyph', 'pencil-simple')
+
     const deleteButton = screen.getByRole('button', { name: 'Terminal 删除终端' })
-    expect(deleteButton.querySelector('.lucide-x')).not.toBeNull()
-    expect(deleteButton.querySelector('.lucide-trash-2')).toBeNull()
+    expect(deleteButton.querySelector('[data-icon="terminal-delete"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'trash'
+    )
   })
 
   it('turns the workflow action into a scoped stop action on the active run root', async () => {
@@ -282,6 +311,10 @@ describe('terminal tooltips', () => {
     )
 
     const stopWorkflow = screen.getByRole('button', { name: 'Terminal 停止本次运行' })
+
+    expect(stopWorkflow.querySelector('[data-icon="terminal-workflow-stop"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'stop', iconRole: 'stop', iconWeight: 'fill' })
+    })
 
     fireEvent.keyDown(document, { key: 'Tab' })
     fireEvent.focus(stopWorkflow)
@@ -392,7 +425,17 @@ describe('terminal tooltips', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal 编辑终端信息' }))
+    const editButton = screen.getByRole('button', { name: 'Terminal 编辑终端信息' })
+
+    fireEvent.click(editButton)
+
+    expect(editButton).toHaveAttribute('aria-expanded', 'true')
+    expect(editButton).toHaveAttribute('aria-pressed', 'true')
+    expect(editButton).toHaveAttribute('aria-controls', 'terminal-metadata-form-terminal-1')
+    expect(screen.getByRole('form', { name: '编辑终端信息' })).toHaveAttribute(
+      'id',
+      'terminal-metadata-form-terminal-1'
+    )
     fireEvent.change(screen.getByLabelText('启动命令'), { target: { value: ' pnpm dev ' } })
     fireEvent.click(screen.getByRole('button', { name: '保存终端信息' }))
 
@@ -408,6 +451,62 @@ describe('terminal tooltips', () => {
       )
     )
     expect(onUpdateDefinition).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a semantic action icon for both unselected and selected group candidates', () => {
+    const data = createTerminalNodeData()
+    const { rerender } = render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...data,
+          isTerminalGroupSelectionMode: true,
+          canSelectForTerminalGroup: true
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected={false}
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const selectButton = screen.getByRole('button', { name: 'Terminal 选择终端' })
+
+    expect(selectButton).toHaveAttribute('aria-pressed', 'false')
+    expect(selectButton.querySelector('[data-icon-role="group-add"]')).toBeInTheDocument()
+
+    rerender(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...data,
+          isSelected: true,
+          isTerminalGroupSelectionMode: true,
+          canSelectForTerminalGroup: true
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable
+        deletable
+        selected
+        draggable
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const selectedButton = screen.getByRole('button', { name: 'Terminal 已选择终端' })
+
+    expect(selectedButton).toHaveAttribute('aria-pressed', 'true')
+    expect(selectedButton.querySelector('[data-icon-role="confirm"]')).toBeInTheDocument()
   })
 
   it('opens the existing launch-command editor for an external quick-execution request', async () => {

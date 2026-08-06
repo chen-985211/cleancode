@@ -1,4 +1,3 @@
-import { Bot, Check, ChevronDown, LoaderCircle, Settings } from 'lucide-react'
 import {
   useCallback,
   useEffect,
@@ -12,6 +11,7 @@ import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/applic
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface AgentCreateSplitButtonProps {
   readonly defaultProviderId: string | null
@@ -100,11 +100,11 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           onClick={() => (props.defaultProviderId ? props.onCreate() : props.onOpenAgentSettings())}
         >
           {props.isCreating ? (
-            <LoaderCircle className="agent-create-split__spinner" size={16} aria-hidden="true" />
+            <WorkbenchIcon className="agent-create-split__spinner" role="loading" size={16} />
           ) : defaultProvider ? (
             <AgentProviderIcon icon={defaultProvider.descriptor.icon} />
           ) : (
-            <Bot size={16} aria-hidden="true" />
+            <WorkbenchIcon role="agent" size={16} />
           )}
           {t(props.isCreating ? 'toolbar.creatingAgent' : 'toolbar.newAgent')}
         </button>
@@ -123,7 +123,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           else openMenu()
         }}
       >
-        <ChevronDown size={14} aria-hidden="true" />
+        <WorkbenchIcon role="disclosure" size={14} />
       </button>
       {isOpen ? (
         <div aria-label={t('toolbar.chooseDefaultAgent')} className="agent-create-menu" role="menu">
@@ -156,11 +156,11 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
                     <AgentProviderIcon icon={provider.descriptor.icon} />
                   </span>
                   <span>{provider.descriptor.displayName}</span>
-                  <Check
+                  <WorkbenchIcon
                     className="agent-create-menu__check"
                     data-visible={providerId === props.defaultProviderId}
+                    role="confirm"
                     size={14}
-                    aria-hidden="true"
                   />
                 </button>
               )
@@ -186,7 +186,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
             }
           >
             <span className="agent-create-menu__icon" aria-hidden="true">
-              <Settings size={16} />
+              <WorkbenchIcon role="settings" size={16} />
             </span>
             <span>{t('toolbar.agentSettings')}</span>
           </button>

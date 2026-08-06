@@ -1,6 +1,13 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Check, X } from 'lucide-react'
-import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode
+} from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import {
@@ -25,6 +32,7 @@ import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
@@ -32,7 +40,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const { t } = useI18n()
   const group = data.group
   const [isEditingName, setIsEditingName] = useState(false)
+  const [isSavingName, setIsSavingName] = useState(false)
   const [draftName, setDraftName] = useState(group.name)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
   const trimmedDraftName = draftName.trim()
   const objectMotion = useWorkbenchObjectMotionPresentation(
     data.objectMotion,
@@ -54,18 +64,24 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
 
-      if (!trimmedDraftName) {
+      if (!trimmedDraftName || isSavingName) {
         return
       }
 
-      await data.onUpdateGroupMetadata(group, { name: trimmedDraftName })
-      setIsEditingName(false)
+      setIsSavingName(true)
+      try {
+        await data.onUpdateGroupMetadata(group, { name: trimmedDraftName })
+        setIsEditingName(false)
+      } finally {
+        setIsSavingName(false)
+      }
     },
-    [data, group, trimmedDraftName]
+    [data, group, isSavingName, trimmedDraftName]
   )
 
   const startEditingName = useCallback(() => {
     setDraftName(group.name)
+    setIsSavingName(false)
     setIsEditingName(true)
   }, [group.name])
 
@@ -73,6 +89,12 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     setDraftName(group.name)
     setIsEditingName(false)
   }, [group.name])
+
+  useLayoutEffect(() => {
+    if (!isEditingName) return
+    nameInputRef.current?.focus()
+    nameInputRef.current?.select()
+  }, [isEditingName])
 
   return (
     <section
@@ -122,11 +144,19 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             <form
               id={nameFormId}
               className="terminal-group-name-form nodrag"
+              aria-busy={isSavingName}
               onSubmit={saveName}
+              onKeyDown={(event) => {
+                if (event.key !== 'Escape' || isSavingName) return
+                event.preventDefault()
+                event.stopPropagation()
+                cancelEditingName()
+              }}
               onPointerDown={(event) => event.stopPropagation()}
             >
               <input
                 aria-label={t('group.name')}
+                ref={nameInputRef}
                 value={draftName}
                 onChange={(event) => setDraftName(event.target.value)}
               />
@@ -150,6 +180,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             <EditActions
               formId={nameFormId}
               canSave={Boolean(trimmedDraftName)}
+              isSaving={isSavingName}
               onCancel={cancelEditingName}
             />
           )
@@ -166,6 +197,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             <EditActions
               formId={nameFormId}
               canSave={Boolean(trimmedDraftName)}
+              isSaving={isSavingName}
               onCancel={cancelEditingName}
             />
           </div>
@@ -357,10 +389,11 @@ function DisclosureButton({ data }: DisclosureButtonProps) {
 interface EditActionsProps {
   readonly canSave: boolean
   readonly formId: string
+  readonly isSaving: boolean
   readonly onCancel: () => void
 }
 
-function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
+function EditActions({ canSave, formId, isSaving, onCancel }: EditActionsProps) {
   const { t } = useI18n()
   return (
     <div
@@ -373,9 +406,14 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
           type="submit"
           form={formId}
           aria-label={t('group.action.saveName')}
-          disabled={!canSave}
+          aria-busy={isSaving}
+          disabled={!canSave || isSaving}
         >
-          <Check size={15} aria-hidden="true" />
+          <WorkbenchIcon
+            className={isSaving ? 'terminal-group-node__saving-indicator' : undefined}
+            role={isSaving ? 'loading' : 'confirm'}
+            size={15}
+          />
         </button>
       </TooltipLabel>
       <TooltipLabel content={t('common.cancel')}>
@@ -383,9 +421,10 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
           className="terminal-group-node__action"
           type="button"
           aria-label={t('group.action.cancelEditName')}
+          disabled={isSaving}
           onClick={onCancel}
         >
-          <X size={15} aria-hidden="true" />
+          <WorkbenchIcon role="close" size={15} />
         </button>
       </TooltipLabel>
     </div>

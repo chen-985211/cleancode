@@ -113,24 +113,45 @@ describe('terminal provider controller lifecycle', () => {
     })
   })
 
-  it('expires an unresponsive release before admitting a replacement controller', async () => {
-    const firstSocket = { destroyed: false } as Socket
-    const replacementSocket = {} as Socket
-    const lifecycle = new TerminalProviderControllerLifecycle({
-      createRelease: () => new Promise(() => undefined),
-      hasLiveSessions: () => true,
-      isProcessAlive: () => true,
-      releaseDeadlineMs: 25,
-      onClaim: vi.fn(),
-      onIdleWithoutLiveSessions: vi.fn()
-    })
+  it('keeps a replacement controller blocked until the bounded release actually completes', async () => {
+    vi.useFakeTimers()
+    try {
+      const firstSocket = { destroyed: false } as Socket
+      const replacementSocket = {} as Socket
+      const release = createDeferred<TerminalProviderApplicationDetachResult>()
+      const lifecycle = new TerminalProviderControllerLifecycle({
+        createRelease: () => release.promise,
+        hasLiveSessions: () => true,
+        isProcessAlive: () => true,
+        onClaim: vi.fn(),
+        onIdleWithoutLiveSessions: vi.fn()
+      })
 
-    lifecycle.claim(firstSocket, 'controller-1', 101)
-    lifecycle.handleSocketClose(firstSocket)
+      lifecycle.claim(firstSocket, 'controller-1', 101)
+      lifecycle.handleSocketClose(firstSocket)
 
-    await vi.waitFor(() => expect(lifecycle.state.kind).toBe('unclaimed'))
-    expect(lifecycle.claim(replacementSocket, 'controller-2', 202)).toEqual({
-      controllerLeaseId: expect.any(String)
-    })
+      await vi.advanceTimersByTimeAsync(4_500)
+      expect(lifecycle.state.kind).toBe('releasing')
+      expect(() => lifecycle.claim(replacementSocket, 'controller-2', 202)).toThrow(
+        expect.objectContaining({ code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY' })
+      )
+
+      release.resolve({
+        releaseId: 'release-1',
+        outcome: 'completed',
+        terminateCandidateCount: 0,
+        retainedSessionCount: 1,
+        stoppedSessionCount: 0,
+        retiredSessionCount: 0,
+        failureCount: 0
+      })
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(lifecycle.claim(replacementSocket, 'controller-2', 202)).toEqual({
+        controllerLeaseId: expect.any(String)
+      })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

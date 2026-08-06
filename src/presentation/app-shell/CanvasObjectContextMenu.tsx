@@ -1,4 +1,3 @@
-import { Check, Pencil, Rocket, Star, Trash2, X } from 'lucide-react'
 import {
   useEffect,
   useLayoutEffect,
@@ -17,6 +16,7 @@ import type {
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from './i18n/useI18n'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface CanvasObjectContextMenuProps {
   readonly agentActions?: {
@@ -162,21 +162,21 @@ export function CanvasObjectContextMenu({
               aria-label={t('agent.saveName')}
               disabled={isSubmitting || !agentName.trim()}
             >
-              <Check size={14} aria-hidden="true" />
+              <WorkbenchIcon role="confirm" size={14} />
             </button>
             <button
               type="button"
               aria-label={t('common.cancel')}
               onClick={() => setMode('actions')}
             >
-              <X size={14} aria-hidden="true" />
+              <WorkbenchIcon role="close" size={14} />
             </button>
           </div>
         </form>
       ) : target.kind === 'agent' ? (
         <>
           <CanvasNodeMenuItem type="button" role="menuitem" onClick={() => setMode('rename')}>
-            <Pencil size={16} aria-hidden="true" />
+            <WorkbenchIcon role="edit" size={16} />
             {t('agent.rename')}
           </CanvasNodeMenuItem>
           <CanvasNodeMenuItem
@@ -185,7 +185,7 @@ export function CanvasObjectContextMenu({
             disabled={isSubmitting}
             onClick={() => void removeAgent()}
           >
-            <Trash2 size={16} aria-hidden="true" />
+            <WorkbenchIcon role="delete" size={16} />
             {t('agent.remove')}
           </CanvasNodeMenuItem>
         </>
@@ -228,7 +228,7 @@ function TerminalContextMenuItems({
           onFavorite?.(target.terminalBlockIds)
         }}
       >
-        <Star size={16} aria-hidden="true" />
+        <WorkbenchIcon role="favorite" size={16} />
         {t(`canvas.contextMenu.favorite.${target.kind}`)}
       </CanvasNodeMenuItem>
       {onAddToQuickExecution ? (
@@ -240,7 +240,7 @@ function TerminalContextMenuItems({
             onAddToQuickExecution(target)
           }}
         >
-          <Rocket size={16} aria-hidden="true" />
+          <WorkbenchIcon role="quick-execution-add" size={16} />
           {t('canvas.contextMenu.addToQuickExecution')}
         </CanvasNodeMenuItem>
       ) : null}
@@ -253,7 +253,7 @@ function TerminalContextMenuItems({
             onRemove(target)
           }}
         >
-          <Trash2 size={16} aria-hidden="true" />
+          <WorkbenchIcon role="delete" size={16} />
           {t(`canvas.contextMenu.remove.${target.kind}`)}
         </CanvasNodeMenuItem>
       ) : null}

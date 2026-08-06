@@ -1,4 +1,3 @@
-import { Boxes, Ellipsis, Plus, RotateCcw, TerminalSquare, Workflow } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 
 import type {
@@ -19,6 +18,7 @@ import {
 } from './applicationShortcuts'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
 
 type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
 
@@ -164,7 +164,7 @@ export function QuickExecutionBar({
                 type="button"
                 onClick={() => setPopover({ type: 'candidates', number: popover.number })}
               >
-                <RotateCcw size={14} aria-hidden="true" />
+                <WorkbenchIcon role="restart" size={14} />
                 {t('quickExecution.rebind')}
               </button>
             </div>
@@ -251,7 +251,7 @@ export function QuickExecutionBar({
                     onClick={() => setPopover({ type: 'candidates', number: null })}
                   >
                     <kbd>{slot.number}</kbd>
-                    <Plus className="quick-execution__type-icon" size={13} aria-hidden="true" />
+                    <WorkbenchIcon className="quick-execution__type-icon" role="add" size={13} />
                   </button>
                 ) : (
                   <div className="quick-execution__content quick-execution__content--empty">
@@ -266,7 +266,7 @@ export function QuickExecutionBar({
                     aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
                     onClick={() => setPopover({ type: 'actions', number: slot.number })}
                   >
-                    <Ellipsis size={13} aria-hidden="true" />
+                    <WorkbenchIcon role="more" size={13} />
                   </button>
                 ) : null}
               </div>
@@ -308,7 +308,12 @@ export function QuickExecutionBar({
           void onClear(sourceNumber)
         }}
       >
-        <TrashDropIcon filled={isTrashTarget} />
+        <WorkbenchIcon
+          active={isTrashTarget}
+          data-trash-icon-variant={isTrashTarget ? 'filled' : 'outline'}
+          role="delete"
+          size={18}
+        />
       </div>
     </div>
   )
@@ -355,51 +360,7 @@ function CandidatePicker({
 }
 
 function TypeIcon({ type }: { readonly type: QuickExecutionTargetSnapshot['type'] }) {
-  const Icon = type === 'terminal' ? TerminalSquare : type === 'workflow' ? Workflow : Boxes
-  return <Icon className="quick-execution__type-icon" size={13} aria-hidden="true" />
-}
-
-function TrashDropIcon({ filled }: { readonly filled: boolean }) {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 20 20"
-      fill="none"
-      aria-hidden="true"
-      focusable="false"
-      data-trash-icon-variant={filled ? 'filled' : 'outline'}
-    >
-      {filled ? (
-        <>
-          <path
-            d="M7 4.25v-.8C7 2.1 8.1 1 9.45 1h1.1C11.9 1 13 2.1 13 3.45v.8H7Z"
-            fill="currentColor"
-          />
-          <path d="M4 4.5h12a.75.75 0 0 1 0 1.5H4a.75.75 0 0 1 0-1.5Z" fill="currentColor" />
-          <path
-            d="M5.2 6.25h9.6l-.62 9.5a2.25 2.25 0 0 1-2.24 2.1H8.06a2.25 2.25 0 0 1-2.24-2.1l-.62-9.5Z"
-            fill="currentColor"
-          />
-        </>
-      ) : (
-        <>
-          <path
-            d="M7 4.25v-.8C7 2.1 8.1 1 9.45 1h1.1C11.9 1 13 2.1 13 3.45v.8"
-            stroke="currentColor"
-            strokeWidth="1.35"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M4 5.25h12M5.2 6.25l.62 9.5a2.25 2.25 0 0 0 2.24 2.1h3.88a2.25 2.25 0 0 0 2.24-2.1l.62-9.5M8.15 8.25v6.5M11.85 8.25v6.5"
-            stroke="currentColor"
-            strokeWidth="1.35"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      )}
-    </svg>
-  )
+  const role: WorkbenchIconRole =
+    type === 'terminal' ? 'terminal' : type === 'workflow' ? 'workflow' : 'terminal-group'
+  return <WorkbenchIcon className="quick-execution__type-icon" role={role} size={13} />
 }
