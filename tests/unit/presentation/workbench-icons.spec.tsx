@@ -21,6 +21,7 @@ const canonicalIconCases = [
   ['disconnect', 'link-break', 'bold'],
   ['locate', 'crosshair', 'bold'],
   ['fit-canvas', 'corners-out', 'bold'],
+  ['minimap', 'map-trifold', 'bold'],
   ['copy', 'copy', 'bold'],
   ['open-external', 'arrow-square-out', 'bold'],
   ['add', 'plus', 'bold'],

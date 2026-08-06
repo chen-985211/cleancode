@@ -16,6 +16,7 @@
 | 类型系统       | TypeScript                                                                          |
 | 构建与开发     | electron-vite、Vite、electron-builder                                               |
 | 积木画布       | React Flow（`@xyflow/react`）                                                       |
+| 界面图标       | Phosphor Icons（`@phosphor-icons/react`）                                           |
 | 终端渲染与模型 | xterm.js、fit/search/serialize/Unicode 11/web-links/WebGL addons、`@xterm/headless` |
 | 伪终端         | node-pty                                                                            |
 | 本地运行时     | Node.js                                                                             |
@@ -71,6 +72,8 @@ Electron 只是平台技术。领域模型和应用层不得依赖 Electron API�
 ## 前端与画布
 
 React 负责应用外壳和界面组件，React Flow 负责节点式画布。当前状态通过组件状态、hooks 和应用层/IPC 快照协作，没有引入 Zustand 等集中式状态库。
+
+第一方通用界面图标统一使用 Phosphor Icons。主画布、顶部工具栏、小地图、节点、节点菜单、快捷执行栏和 Agent 局部状态通过表现层 `WorkbenchIcons` 选择语义角色；Provider 品牌图标和产品专属几何保留为显式例外。
 
 表现层只保存选择、悬停、编辑中表单和运行事件投影等临时状态。项目、积木图和 Agent 的已提交状态仍必须通过应用层用例读取和修改。
 

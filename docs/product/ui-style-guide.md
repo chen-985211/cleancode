@@ -91,6 +91,8 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 
 新增跨界面组件抽象前必须证明至少有两个真实调用方共享相同语义和交互。不得为了减少 CSS 或文件数量提前建立无明确职责的通用组件。
 
+第一方通用界面图标统一采用 Phosphor Icons（`@phosphor-icons/react`）。非画布消费者按具体图标的 CSR 路径导入，画布相关消费者进入下述 `WorkbenchIcons` 语义边界；不得重新引入 Lucide 或另一套并行的通用动作图标库。Provider 品牌图标、CleanCode MCP 标志和产品专属几何继续作为显式例外。
+
 ### 画布图标语义
 
 主画布及其顶部工具栏、小地图、节点、节点菜单、快捷执行栏和 Agent 局部状态统一使用 `WorkbenchIcons` 提供的语义图标。消费者必须按对象、动作或状态角色选择图标，不得直接按外形从图标库另选近似实现。
@@ -100,10 +102,13 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 | 终端、终端组合、工作流、Agent | `TerminalWindow`、`Stack`、`FlowArrow`、`Robot`          | 表达对象身份，不表达运行状态                       |
 | 启动、停止                    | `Play`、`Stop`                                           | 直接执行动作，使用 `fill`                          |
 | 重启、重试、重连              | `ArrowClockwise`                                         | 再次执行同一作用域动作                             |
+| 刷新外部状态、恢复默认        | `ArrowsClockwise`、`ArrowCounterClockwise`               | 不得与重新执行当前作用域的动作混用                 |
 | 保留会话                      | `PushPin`                                                | 默认 `bold`，已保留使用 `fill`                     |
 | 编辑、确认、关闭              | `PencilSimple`、`Check`、`X`                             | X 只表达关闭或取消                                 |
+| 清除已配置值                  | `Eraser`                                                 | 不得用 X 表达清除绑定或配置                        |
 | 删除对象                      | `Trash`                                                  | 不得用 X 表达删除                                  |
 | 断开关系、定位对象、适应画布  | `LinkBreak`、`Crosshair`、`CornersOut`                   | 定位单一对象与适应全部内容不得混用                 |
+| 小地图展开、收起              | `MapTrifold`、`CaretUp`                                  | 两者都是紧凑动作，统一使用 `bold`                  |
 | 加载、警告、错误、暂停        | `CircleNotch`、`Warning`、`WarningCircle`、`PauseCircle` | 状态必须继续由文字、结构或可访问名称提供非颜色表达 |
 
 对象身份默认使用 `regular`，紧凑动作默认使用 `bold`，主要执行动作和明确状态使用 `fill`。同一图形的 active 状态可以通过 weight 变化表达，但不得在状态切换时更换成另一种隐喻。Provider 品牌图标、CleanCode MCP 标志、小地图几何和没有标准替代的产品专属图形属于显式例外；这些例外不得扩展成第二套通用动作图标。

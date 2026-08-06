@@ -63,7 +63,7 @@ const workbenchIconDefinitions = {
   launch: [PlayIcon, 'play', 'fill'],
   loading: [CircleNotchIcon, 'circle-notch', 'bold'],
   locate: [CrosshairIcon, 'crosshair', 'bold'],
-  minimap: [MapTrifoldIcon, 'map-trifold', 'regular'],
+  minimap: [MapTrifoldIcon, 'map-trifold', 'bold'],
   more: [DotsThreeIcon, 'dots-three', 'bold'],
   'open-external': [ArrowSquareOutIcon, 'arrow-square-out', 'bold'],
   'open-project': [FolderOpenIcon, 'folder-open', 'bold'],
