@@ -1,13 +1,13 @@
-import { Bot } from 'lucide-react'
 import { useId } from 'react'
 
 import type { AgentProviderIcon as AgentProviderIconDescriptor } from '../../contexts/agent/application/ports/AgentProviderContribution'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 export function AgentProviderIcon({ icon }: { readonly icon: AgentProviderIconDescriptor | null }) {
   const definitionPrefix = useId().replaceAll(':', '')
 
   if (!icon) {
-    return <Bot aria-hidden="true" className="agent-provider-icon" />
+    return <WorkbenchIcon className="agent-provider-icon" role="agent" />
   }
 
   if ('imageDataUrl' in icon) {

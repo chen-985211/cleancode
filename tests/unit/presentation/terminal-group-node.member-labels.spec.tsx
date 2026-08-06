@@ -92,22 +92,33 @@ describe('terminal group member labels', () => {
     expect(membershipGroup).toContainElement(removeButton)
     expect(dissolveButton).toHaveAttribute('data-control-surface', 'raised')
 
-    expect(startButton.querySelector('[data-icon="group-start"]')).toHaveAttribute(
-      'fill',
-      'currentColor'
+    expect(startButton.querySelector('[data-icon="group-start"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'play', iconWeight: 'fill' })
+    })
+    expect(stopButton.querySelector('[data-icon="group-stop"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'stop', iconWeight: 'fill' })
+    })
+    expect(restartButton.querySelector('[data-icon="group-restart"]')).toMatchObject({
+      dataset: expect.objectContaining({ iconGlyph: 'arrow-clockwise', iconRole: 'restart' })
+    })
+    expect(editButton.querySelector('[data-icon="group-edit"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'pencil-simple'
     )
-    expect(stopButton.querySelector('[data-icon="group-stop"]')).toBeInTheDocument()
-    expect(restartButton.querySelector('[data-icon="group-restart"]')).toBeInTheDocument()
-    expect(editButton.querySelector('[data-icon="group-edit"]')).toBeInTheDocument()
-    expect(addButton.querySelector('[data-icon="group-add"]')).toBeInTheDocument()
-    expect(removeButton.querySelector('[data-icon="group-remove"]')).toBeInTheDocument()
+    expect(addButton.querySelector('[data-icon="group-add"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'stack-plus'
+    )
+    expect(removeButton.querySelector('[data-icon="group-remove"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'stack-minus'
+    )
     expect(dissolveButton.querySelector('[data-icon="group-dissolve"]')).toBeInTheDocument()
     expect(dissolveButton.querySelector('[data-icon-part="disconnect-accent"]')).toBeInTheDocument()
-    expect(
-      screen
-        .getByRole('button', { name: 'Backend 移出组合' })
-        .querySelector('[data-icon="group-member-unlink"]')
-    ).toBeInTheDocument()
+    const unlinkIcon = screen
+      .getByRole('button', { name: 'Backend 移出组合' })
+      .querySelector('[data-icon="group-member-unlink"]')
+    expect(unlinkIcon).toHaveAttribute('data-icon-glyph', 'link-break')
   })
 
   it('reports the explicit disclosure state for collapsed and expanded groups', () => {
@@ -119,6 +130,10 @@ describe('terminal group member labels', () => {
 
     expect(expandButton).toHaveAttribute('aria-expanded', 'false')
     expect(expandButton).toHaveTextContent('展开')
+    expect(expandButton.querySelector('[data-icon="group-expand"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrows-out-simple'
+    )
 
     rerender(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
 
@@ -126,6 +141,10 @@ describe('terminal group member labels', () => {
 
     expect(collapseButton).toHaveAttribute('aria-expanded', 'true')
     expect(collapseButton).toHaveTextContent('折叠')
+    expect(collapseButton.querySelector('[data-icon="group-collapse"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'arrows-in-simple'
+    )
   })
 
   it('routes every direct group action through its existing callback', () => {

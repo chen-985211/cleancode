@@ -1,4 +1,3 @@
-import { Check, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import {
@@ -14,6 +13,7 @@ import {
 import type { TerminalBlockMetadataInput } from './types'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalMetadataFormProps {
   readonly block: TerminalBlockSnapshot
@@ -177,7 +177,7 @@ export function TerminalMetadataForm({
               aria-busy={isSaving}
               disabled={!canSave}
             >
-              <Check size={15} aria-hidden="true" />
+              <WorkbenchIcon role="confirm" size={15} />
             </button>
           </TooltipLabel>
           <TooltipLabel content={t('terminalForm.cancelShort')}>
@@ -187,7 +187,7 @@ export function TerminalMetadataForm({
               aria-label={t('terminalForm.cancel')}
               onClick={onCancel}
             >
-              <X size={15} aria-hidden="true" />
+              <WorkbenchIcon role="close" size={15} />
             </button>
           </TooltipLabel>
         </div>

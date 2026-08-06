@@ -1,5 +1,4 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Check, X } from 'lucide-react'
 import { memo, useCallback, useState, type FormEvent, type ReactNode } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -25,6 +24,7 @@ import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
@@ -375,7 +375,7 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
           aria-label={t('group.action.saveName')}
           disabled={!canSave}
         >
-          <Check size={15} aria-hidden="true" />
+          <WorkbenchIcon role="confirm" size={15} />
         </button>
       </TooltipLabel>
       <TooltipLabel content={t('common.cancel')}>
@@ -385,7 +385,7 @@ function EditActions({ canSave, formId, onCancel }: EditActionsProps) {
           aria-label={t('group.action.cancelEditName')}
           onClick={onCancel}
         >
-          <X size={15} aria-hidden="true" />
+          <WorkbenchIcon role="close" size={15} />
         </button>
       </TooltipLabel>
     </div>

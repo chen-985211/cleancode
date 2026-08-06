@@ -1,9 +1,9 @@
-import { RefreshCw } from 'lucide-react'
 import { useId } from 'react'
 
 import type { AgentMcpPresentationStatus } from './agentProviderFeedback'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 export function AgentMcpCapabilityToggle({
   enabled,
@@ -76,7 +76,7 @@ export function AgentMcpCapabilityToggle({
               onReconnect()
             }}
           >
-            <RefreshCw size={13} aria-hidden="true" />
+            <WorkbenchIcon role="restart" size={13} />
           </button>
         </TooltipLabel>
       ) : null}

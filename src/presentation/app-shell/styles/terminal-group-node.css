@@ -168,7 +168,6 @@
 .terminal-group-node__disclosure svg {
   width: 14px;
   height: 14px;
-  stroke-width: 2;
 }
 
 .terminal-group-node__disclosure:hover:not(:disabled) {
@@ -297,7 +296,6 @@
 .terminal-group-node__member-remove svg {
   width: 15px;
   height: 15px;
-  stroke-width: 1.8;
 }
 
 .terminal-group-node__member:hover .terminal-group-node__member-remove,

@@ -88,6 +88,17 @@ describe('canvas minimap', () => {
 
     expect(screen.getByText('151%')).toBeInTheDocument()
 
+    expect(
+      screen
+        .getByRole('button', { name: '适应画布' })
+        .querySelector('[data-icon-role="fit-canvas"]')
+    ).toHaveAttribute('data-icon-glyph', 'corners-out')
+    expect(
+      screen
+        .getByRole('button', { name: '收起小地图' })
+        .querySelector('[data-icon-role="collapse"]')
+    ).toHaveAttribute('data-icon-glyph', 'caret-up')
+
     fireEvent.click(screen.getByRole('button', { name: '放大画布' }))
     fireEvent.click(screen.getByRole('button', { name: '缩小画布' }))
     fireEvent.click(screen.getByRole('button', { name: '适应画布' }))

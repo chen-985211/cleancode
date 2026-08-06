@@ -8,7 +8,6 @@ import {
   type ReactFlowInstance
 } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type MutableRefObject } from 'react'
-import { Star } from 'lucide-react'
 
 import {
   defaultCanvasViewport,
@@ -28,6 +27,7 @@ import { filterMinimapNodes, type MinimapNodeInteractionContextValue } from './m
 import type { MinimapFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import type { useTerminalWorkflow } from './useTerminalWorkflow'
 import { WorkbenchToolbar } from './WorkbenchToolbar'
+import { WorkbenchIcon } from './WorkbenchIcons'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
@@ -598,7 +598,7 @@ export function WorkbenchCanvas({
                 templateInteraction.clearSelection()
               }}
             >
-              <Star size={14} fill="currentColor" aria-hidden="true" />
+              <WorkbenchIcon active role="favorite" size={14} />
               {t('templates.saveSelection')}
             </button>
           </div>

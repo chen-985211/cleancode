@@ -1,9 +1,9 @@
-import { Box, Check, Terminal, X } from 'lucide-react'
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import { AgentCreateSplitButton } from './AgentCreateSplitButton'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface WorkbenchToolbarProps {
   readonly agentProviders?: readonly CreatableAgentProviderSnapshot[]
@@ -50,7 +50,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
             onClick={props.onCreateTerminalBlock}
             disabled={!props.isDesktopRuntime || !props.hasWorkbench}
           >
-            <Terminal size={16} aria-hidden="true" />
+            <WorkbenchIcon role="terminal" size={16} />
             {t('toolbar.newTerminal')}
           </button>
         </TooltipLabel>
@@ -67,7 +67,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
               onClick={props.onCreateTerminalGroup}
               disabled={!props.canCreateTerminalGroup}
             >
-              <Check size={16} aria-hidden="true" />
+              <WorkbenchIcon role="confirm" size={16} />
               {t('toolbar.createGroup')}
             </button>
             <button
@@ -75,7 +75,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
               type="button"
               onClick={props.onCancelTerminalGroupSelection}
             >
-              <X size={16} aria-hidden="true" />
+              <WorkbenchIcon role="close" size={16} />
               {t('toolbar.finish')}
             </button>
           </>
@@ -91,7 +91,7 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
                 !props.canBeginTerminalGroupSelection
               }
             >
-              <Box size={16} aria-hidden="true" />
+              <WorkbenchIcon role="terminal-group" size={16} />
               {t('toolbar.groupTerminals')}
             </button>
           </TooltipLabel>

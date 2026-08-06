@@ -5,10 +5,8 @@ import {
   type ResizeDragEvent,
   type ResizeParams
 } from '@xyflow/react'
-import { Check, CircleStop, Edit3, Pin, Play, Square, Terminal, Waypoints, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
-import { GroupRestartIcon } from './TerminalGroupIcons'
 import { TerminalMetadataForm } from './TerminalMetadataForm'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { agentApprovalTargetHandleId } from './agentApprovalHandles'
@@ -27,6 +25,7 @@ import {
 } from './types'
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
@@ -366,7 +365,7 @@ function TerminalHeader({
   return (
     <div className="terminal-node__header" onClick={(event) => onSelect(event.shiftKey)}>
       <span className="terminal-node__icon">
-        <Terminal size={19} aria-hidden="true" />
+        <WorkbenchIcon size={19} data-icon="terminal-node" role="terminal" />
       </span>
       {isTerminalGroupSelectionMode ? (
         <TooltipLabel content={terminalGroupSelectionLabel}>
@@ -390,7 +389,7 @@ function TerminalHeader({
               onToggleTerminalGroupCandidate()
             }}
           >
-            {isSelectedForTerminalGroup ? <Check size={16} aria-hidden="true" /> : null}
+            {isSelectedForTerminalGroup ? <WorkbenchIcon role="confirm" size={16} /> : null}
           </button>
         </TooltipLabel>
       ) : null}
@@ -426,9 +425,9 @@ function TerminalHeader({
             onClick={isActiveWorkflowRoot ? onStopWorkflow : onRunFromHere}
           >
             {isActiveWorkflowRoot ? (
-              <CircleStop size={15} aria-hidden="true" />
+              <WorkbenchIcon size={15} data-icon="terminal-workflow-stop" role="stop" />
             ) : (
-              <Waypoints size={15} aria-hidden="true" />
+              <WorkbenchIcon size={15} data-icon="terminal-workflow-run" role="workflow" />
             )}
           </button>
         </TooltipLabel>
@@ -448,7 +447,7 @@ function TerminalHeader({
             disabled={isRecoveryPending && canQuickLaunch}
             onClick={onQuickLaunch}
           >
-            <Play size={15} aria-hidden="true" />
+            <WorkbenchIcon size={15} data-icon="terminal-launch" role="launch" />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('terminal.action.stopCommand')}>
@@ -462,7 +461,7 @@ function TerminalHeader({
             disabled={!isRunning || isRecoveryPending}
             onClick={onStop}
           >
-            <Square size={14} aria-hidden="true" />
+            <WorkbenchIcon size={14} data-icon="terminal-stop-command" role="stop" />
           </button>
         </TooltipLabel>
         <TooltipLabel content={retentionActionLabel}>
@@ -475,7 +474,12 @@ function TerminalHeader({
             disabled={!isRunning || isRecoveryPending}
             onClick={isWorkflowRetentionUnavailable ? undefined : onToggleRetention}
           >
-            <Pin size={14} fill={isRetained ? 'currentColor' : 'none'} aria-hidden="true" />
+            <WorkbenchIcon
+              active={isRetained}
+              size={14}
+              data-icon="terminal-retention"
+              role="retention"
+            />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('terminal.action.restartEmptyDescription')}>
@@ -489,7 +493,7 @@ function TerminalHeader({
             disabled={isRecoveryPending}
             onClick={onRestart}
           >
-            <GroupRestartIcon size={16} />
+            <WorkbenchIcon data-icon="terminal-restart" role="restart" size={16} />
           </button>
         </TooltipLabel>
         <span className="terminal-node__action-divider" aria-hidden="true" />
@@ -503,7 +507,7 @@ function TerminalHeader({
             })}
             onClick={onStartEditing}
           >
-            <Edit3 size={15} aria-hidden="true" />
+            <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('terminal.action.delete')}>
@@ -516,7 +520,7 @@ function TerminalHeader({
             })}
             onClick={onDelete}
           >
-            <X size={15} aria-hidden="true" />
+            <WorkbenchIcon size={15} data-icon="terminal-delete" role="delete" />
           </button>
         </TooltipLabel>
       </div>

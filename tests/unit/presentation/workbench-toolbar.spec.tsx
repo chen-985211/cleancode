@@ -30,6 +30,22 @@ describe('workbench toolbar', () => {
     ).not.toBeInTheDocument()
     expect(within(agentTools).getByRole('button', { name: '新建 Agent' })).toBeInTheDocument()
     expect(toolbar.lastElementChild).toBe(agentTools)
+
+    expect(
+      within(terminalTools)
+        .getByRole('button', { name: '新建终端积木' })
+        .querySelector('[data-icon-role="terminal"]')
+    ).toHaveAttribute('data-icon-glyph', 'terminal-window')
+    expect(
+      within(terminalTools)
+        .getByRole('button', { name: '组合终端' })
+        .querySelector('[data-icon-role="terminal-group"]')
+    ).toHaveAttribute('data-icon-glyph', 'stack')
+    expect(
+      within(agentTools)
+        .getByRole('button', { name: '新建 Agent' })
+        .querySelector('[data-icon-role="agent"]')
+    ).toHaveAttribute('data-icon-glyph', 'robot')
   })
 
   it('keeps workflow status and controls out of the toolbar in every run state', () => {

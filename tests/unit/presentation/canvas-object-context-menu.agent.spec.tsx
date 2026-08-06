@@ -15,6 +15,12 @@ describe('Agent canvas object context menu', () => {
       'canvas-node-menu__item--danger'
     )
     expect(menu.querySelector('.canvas-node-menu__separator')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('menuitem', { name: '重命名' }).querySelector('[data-icon-role="edit"]')
+    ).toHaveAttribute('data-icon-glyph', 'pencil-simple')
+    expect(
+      screen.getByRole('menuitem', { name: '移除' }).querySelector('[data-icon-role="delete"]')
+    ).toHaveAttribute('data-icon-glyph', 'trash')
   })
 
   it('renames the Agent through its existing action callback', async () => {

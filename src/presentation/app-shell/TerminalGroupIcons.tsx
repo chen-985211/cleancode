@@ -1,67 +1,29 @@
-import {
-  Edit3,
-  Link,
-  Maximize2,
-  Minimize2,
-  Minus,
-  Play,
-  Plus,
-  Square,
-  type LucideProps
-} from 'lucide-react'
+import { WorkbenchIcon, type WorkbenchIconProps } from './WorkbenchIcons'
 
-type TerminalGroupIconProps = Omit<LucideProps, 'absoluteStrokeWidth'>
+type TerminalGroupIconProps = Omit<WorkbenchIconProps, 'active' | 'role'>
 
 export function GroupStartIcon(props: TerminalGroupIconProps) {
-  return <Play {...props} aria-hidden="true" data-icon="group-start" fill="currentColor" />
+  return <WorkbenchIcon {...props} data-icon="group-start" role="launch" />
 }
 
 export function GroupStopIcon(props: TerminalGroupIconProps) {
-  return <Square {...props} aria-hidden="true" data-icon="group-stop" />
+  return <WorkbenchIcon {...props} data-icon="group-stop" role="stop" />
 }
 
-export function GroupRestartIcon({
-  className,
-  size = 24,
-  strokeWidth = 2,
-  ...props
-}: TerminalGroupIconProps) {
-  return (
-    <svg
-      {...props}
-      aria-hidden="true"
-      className={className}
-      data-icon="group-restart"
-      fill="none"
-      focusable="false"
-      height={size}
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={strokeWidth}
-      viewBox="0 0 24 24"
-      width={size}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M4 7h13" />
-      <path d="M17 11V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h5" />
-      <path d="m7 10 2 2-2 2" />
-      <path d="M13.25 15.25a4.5 4.5 0 1 1-.25 4.5" />
-      <path d="M13.25 12.75v2.5h2.5" />
-    </svg>
-  )
+export function GroupRestartIcon(props: TerminalGroupIconProps) {
+  return <WorkbenchIcon {...props} data-icon="group-restart" role="restart" />
 }
 
 export function GroupEditIcon(props: TerminalGroupIconProps) {
-  return <Edit3 {...props} aria-hidden="true" data-icon="group-edit" />
+  return <WorkbenchIcon {...props} data-icon="group-edit" role="edit" />
 }
 
 export function GroupAddIcon(props: TerminalGroupIconProps) {
-  return <Plus {...props} aria-hidden="true" data-icon="group-add" />
+  return <WorkbenchIcon {...props} data-icon="group-add" role="group-add" />
 }
 
 export function GroupRemoveIcon(props: TerminalGroupIconProps) {
-  return <Minus {...props} aria-hidden="true" data-icon="group-remove" />
+  return <WorkbenchIcon {...props} data-icon="group-remove" role="group-remove" />
 }
 
 export function GroupDissolveIcon({
@@ -100,13 +62,13 @@ export function GroupDissolveIcon({
 }
 
 export function GroupMemberUnlinkIcon(props: TerminalGroupIconProps) {
-  return <Link {...props} aria-hidden="true" data-icon="group-member-unlink" />
+  return <WorkbenchIcon {...props} data-icon="group-member-unlink" role="disconnect" />
 }
 
 export function GroupExpandIcon(props: TerminalGroupIconProps) {
-  return <Maximize2 {...props} aria-hidden="true" data-icon="group-expand" />
+  return <WorkbenchIcon {...props} data-icon="group-expand" role="expand-object" />
 }
 
 export function GroupCollapseIcon(props: TerminalGroupIconProps) {
-  return <Minimize2 {...props} aria-hidden="true" data-icon="group-collapse" />
+  return <WorkbenchIcon {...props} data-icon="group-collapse" role="collapse-object" />
 }

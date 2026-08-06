@@ -92,7 +92,6 @@
 .terminal-group-node__action svg {
   width: 17px;
   height: 17px;
-  stroke-width: 2;
 }
 
 .terminal-group-node__action:hover:not(:disabled) {
@@ -126,10 +125,6 @@
   --terminal-group-icon-cutout: var(--cc-primary-soft);
   background: var(--cc-primary-soft) !important;
   color: var(--cc-primary-hover);
-}
-
-.terminal-group-node__action--primary svg {
-  fill: currentColor;
 }
 
 .terminal-group-node__action-group--danger {

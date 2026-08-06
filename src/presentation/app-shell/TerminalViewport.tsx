@@ -9,7 +9,6 @@ import {
   type FocusEvent,
   type KeyboardEvent
 } from 'react'
-import { RefreshCw } from 'lucide-react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSnapshot } from '../../contexts/run/application/dto/TerminalModelSnapshot'
@@ -32,6 +31,7 @@ import {
   type TerminalPasteState
 } from './terminalPaste'
 import { TerminalThemeProjection } from './TerminalThemeProjection'
+import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalViewportProps {
   readonly block: TerminalBlockSnapshot
@@ -447,7 +447,7 @@ export function TerminalViewport({
             title={t('terminal.view.retry')}
             onClick={() => requestRestoreRef.current()}
           >
-            <RefreshCw size={14} aria-hidden="true" />
+            <WorkbenchIcon role="restart" size={14} />
           </button>
         </div>
       ) : null}
