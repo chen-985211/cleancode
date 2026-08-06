@@ -9,6 +9,10 @@ import type {
   TerminalProcessPort
 } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { TerminalSessionSnapshot } from '../../../../src/contexts/run/application/dto/TerminalSessionSnapshot'
+import {
+  FileTerminalRecoveryStore,
+  type TerminalRecoveryRecord
+} from '../../../../src/contexts/run/infrastructure/persistence/FileTerminalRecoveryStore'
 import { TerminalProviderServer } from '../../../../src/contexts/run/infrastructure/provider/TerminalProviderServer'
 import { createProviderEndpoint } from '../../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
 import {
@@ -116,17 +120,101 @@ describe('terminal provider application shutdown', () => {
     reattached.close()
   })
 
-  function createServer(processes: TerminalProcessPort, onExitRequested?: () => void) {
+  it('keeps the controller releasing until a retained checkpoint crosses its durability barrier', async () => {
+    const processes = new ControlledProcessPort()
+    const store = new GatedTerminalRecoveryStore(join(rootDirectory, 'recovery'))
+    server = createServer(processes, undefined, store)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint)
+    await claimController(client)
+    const retained = identity('retained-handoff')
+    await createAndStart(client, retained)
+    await client.request('setRetention', {
+      sessionId: retained.sessionId,
+      retentionPolicy: 'keep-after-application-exit'
+    })
+
+    store.blockNextCheckpoint()
+    client.close()
+    await store.waitForBlockedCheckpoint()
+
+    const replacement = await TestProviderClient.connect(endpoint)
+    try {
+      await expect(claimController(replacement, 'controller-2')).rejects.toMatchObject({
+        code: 'TERMINAL_PROVIDER_CONTROLLER_BUSY'
+      })
+    } finally {
+      store.releaseCheckpoint()
+    }
+    await vi.waitFor(async () => {
+      await expect(claimController(replacement, 'controller-2')).resolves.toBeDefined()
+    })
+    const listed = await replacement.request<{
+      readonly sessions: readonly TerminalSessionSnapshot[]
+    }>('listSessions')
+    expect(listed.sessions.map(({ sessionId }) => sessionId)).toEqual([retained.sessionId])
+    replacement.close()
+  })
+
+  function createServer(
+    processes: TerminalProcessPort,
+    onExitRequested?: () => void,
+    store?: FileTerminalRecoveryStore
+  ) {
     return new TerminalProviderServer({
       endpoint,
       authToken: 'secret-token',
       instanceId: 'provider-1',
       recoveryDirectory: join(rootDirectory, 'recovery'),
       processes,
+      ...(store ? { store } : {}),
       onExitRequested
     })
   }
 })
+
+class GatedTerminalRecoveryStore extends FileTerminalRecoveryStore {
+  private activeCheckpoint: ReturnType<typeof deferred<void>> | null = null
+  private blockedCheckpoint: ReturnType<typeof deferred<void>> | null = null
+  private checkpointEntered: ReturnType<typeof deferred<void>> | null = null
+
+  constructor(rootDirectory: string) {
+    super({ rootDirectory })
+  }
+
+  blockNextCheckpoint(): void {
+    this.blockedCheckpoint = deferred<void>()
+    this.checkpointEntered = deferred<void>()
+  }
+
+  waitForBlockedCheckpoint(): Promise<void> {
+    if (!this.checkpointEntered) throw new Error('No checkpoint barrier is armed.')
+    return this.checkpointEntered.promise
+  }
+
+  releaseCheckpoint(): void {
+    if (!this.activeCheckpoint) throw new Error('No checkpoint is currently blocked.')
+    this.activeCheckpoint.resolve()
+  }
+
+  override async writeCheckpoint(
+    record: TerminalRecoveryRecord,
+    options: { readonly truncateOutputLog?: boolean } = {}
+  ): Promise<void> {
+    const gate = this.blockedCheckpoint
+    if (gate) {
+      this.blockedCheckpoint = null
+      this.activeCheckpoint = gate
+      this.checkpointEntered?.resolve()
+      try {
+        await gate.promise
+      } finally {
+        this.activeCheckpoint = null
+      }
+    }
+    await super.writeCheckpoint(record, options)
+  }
+}
 
 class ControlledProcessPort implements TerminalProcessPort {
   readonly starts = new Map<string, StartTerminalProcessCommand>()
