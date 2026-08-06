@@ -99,15 +99,15 @@ describe('balanced terminal layout', () => {
     })
 
     expect(readPositions(graph)).toEqual({
-      'build-app': { x: 590, y: 944 },
-      'check-app': { x: 106, y: 944 },
-      'interactive-shell': { x: 348, y: 640 },
-      'local-build': { x: 832, y: 640 },
-      'start-app': { x: 1_074, y: 944 }
+      'build-app': { x: 1_680, y: 332 },
+      'check-app': { x: 1_196, y: 332 },
+      'interactive-shell': { x: 1_438, y: 28 },
+      'local-build': { x: 1_922, y: 28 },
+      'start-app': { x: 2_164, y: 332 }
     })
     expect(graph.terminalGroups[0]).toMatchObject({
-      position: { x: 74, y: 564 },
-      size: { height: 1_672, width: 1_452 }
+      position: { x: 1_164, y: -48 },
+      size: { height: 696, width: 1_452 }
     })
   })
 })

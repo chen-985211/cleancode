@@ -135,8 +135,8 @@ describe('terminal layout in the default block graph', () => {
     expect(firstSnapshot.terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-group',
-        position: { x: 1_164, y: -106 },
-        size: { width: 1592, height: 812 }
+        position: { x: 1_164, y: -78 },
+        size: { width: 1592, height: 756 }
       })
     ])
     expect(second).toEqual({ ...first, graphChanged: false })

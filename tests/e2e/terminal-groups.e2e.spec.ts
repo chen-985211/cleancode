@@ -114,6 +114,19 @@ describe('terminal groups e2e', () => {
 
       expect(groupAfterDrag.size.width).toBeGreaterThan(groupBeforeDrag.size.width + 160)
       expect(groupAfterBox.width).toBeGreaterThan(groupBeforeBox.width + 120)
+
+      await dragTerminalIntoGroup(page, terminalTwo.id)
+
+      const contractedGroup = await waitForTerminalGroup(
+        page,
+        workbench,
+        (group) => group.size.width < groupAfterDrag.size.width - 100
+      )
+      const contractedBox = await readRequiredBoundingBox(
+        page.locator('[data-terminal-group-id]').first()
+      )
+      expect(contractedGroup.size.width).toBeLessThan(groupAfterDrag.size.width - 100)
+      expect(contractedBox.width).toBeLessThan(groupAfterBox.width - 60)
     },
     electronScenarioTimeoutMs
   )

@@ -405,12 +405,17 @@ export class BlockGraph {
         !deletedBlockIds.has(connection.sourceBlockId) &&
         !deletedBlockIds.has(connection.targetBlockId)
     )
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => ({
-      ...group,
-      memberBlockIds: group.memberBlockIds.filter(
-        (memberBlockId) => !deletedBlockIds.has(memberBlockId)
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
+      normalizeTerminalGroupBounds(
+        {
+          ...group,
+          memberBlockIds: group.memberBlockIds.filter(
+            (memberBlockId) => !deletedBlockIds.has(memberBlockId)
+          )
+        },
+        this.blockSnapshots
       )
-    }))
+    )
   }
 
   ensureTerminalBlockExists(blockId: string): void {
@@ -589,17 +594,18 @@ export class BlockGraph {
 
     this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
       const withoutMovedMembers = group.memberBlockIds.filter((id) => !movedBlockIds.has(id))
-      if (group.id !== terminalGroupId) {
-        return { ...group, memberBlockIds: withoutMovedMembers }
-      }
+      const nextMemberBlockIds =
+        group.id === terminalGroupId
+          ? [
+              ...withoutMovedMembers,
+              ...this.blockSnapshots.map((block) => block.id).filter((id) => movedBlockIds.has(id))
+            ]
+          : withoutMovedMembers
+      const hasMembershipChanged = nextMemberBlockIds.length !== group.memberBlockIds.length
+      if (!hasMembershipChanged) return group
+
       return normalizeTerminalGroupBounds(
-        {
-          ...group,
-          memberBlockIds: [
-            ...withoutMovedMembers,
-            ...this.blockSnapshots.map((block) => block.id).filter((id) => movedBlockIds.has(id))
-          ]
-        },
+        { ...group, memberBlockIds: nextMemberBlockIds },
         this.blockSnapshots
       )
     })

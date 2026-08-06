@@ -40,15 +40,20 @@ export function normalizeTerminalGroups(
       assignedBlockIds.add(memberBlockId)
     }
 
-    validGroups.push({
-      id: group.id ?? createTerminalGroupId(),
-      type: 'terminal-group',
-      name: normalizeRestoredTerminalGroupName(group.name),
-      position: normalizeBlockPosition(group.position),
-      size: normalizeTerminalGroupSize(group.size),
-      isCollapsed: group.isCollapsed === true,
-      memberBlockIds
-    })
+    validGroups.push(
+      normalizeTerminalGroupBounds(
+        {
+          id: group.id ?? createTerminalGroupId(),
+          type: 'terminal-group',
+          name: normalizeRestoredTerminalGroupName(group.name),
+          position: normalizeBlockPosition(group.position),
+          size: normalizeTerminalGroupSize(group.size),
+          isCollapsed: group.isCollapsed === true,
+          memberBlockIds
+        },
+        blocks
+      )
+    )
   }
 
   return validGroups
@@ -88,24 +93,9 @@ export function normalizeTerminalGroupBounds(
 
   if (memberBlocks.length === 0) return group
 
-  const bounds = getTerminalGroupMemberBounds(memberBlocks)
-  const currentRight = group.position.x + group.size.width
-  const currentBottom = group.position.y + group.size.height
-  const nextLeft = Math.min(group.position.x, bounds.left - terminalGroupPadding.x)
-  const nextTop = Math.min(group.position.y, bounds.top - terminalGroupPadding.y)
-  const nextRight = Math.max(currentRight, bounds.right + terminalGroupPadding.x)
-  const nextBottom = Math.max(currentBottom, bounds.bottom + terminalGroupPadding.y)
-
   return {
     ...group,
-    position: {
-      x: nextLeft,
-      y: nextTop
-    },
-    size: {
-      width: Math.max(defaultTerminalGroupSize.width, nextRight - nextLeft),
-      height: Math.max(defaultTerminalGroupSize.height, nextBottom - nextTop)
-    }
+    ...createTerminalGroupBounds(group.memberBlockIds, blocks)
   }
 }
 

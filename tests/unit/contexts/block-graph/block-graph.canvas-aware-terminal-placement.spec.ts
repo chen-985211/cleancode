@@ -44,8 +44,8 @@ describe('canvas-aware terminal placement', () => {
     })
 
     expect(graph.terminalGroups[0]).toMatchObject({
-      position: { x: 74, y: 564 },
-      size: { height: 1_672, width: 1_452 }
+      position: { x: 1_164, y: -48 },
+      size: { height: 696, width: 1_452 }
     })
   })
 

@@ -100,7 +100,7 @@ describe('terminal combination container scopes', () => {
     expect(graph.toSnapshot().connections).toHaveLength(1)
   })
 
-  it('never shrinks a combination as members move out and moves its members with the container', () => {
+  it('refits a combination when members move out and moves the remaining members with it', () => {
     const graph = createGraph()
     createTerminal(graph, 'left', 100, 100)
     createTerminal(graph, 'right', 1_200, 100)
@@ -111,12 +111,32 @@ describe('terminal combination container scopes', () => {
     graph.moveTerminalGroup('wide', { x: 500, y: 400 })
 
     const current = graph.toSnapshot().terminalGroups[0]!
-    expect(current.size).toEqual(initial.size)
+    expect(current.size.width).toBeLessThan(initial.size.width)
+    expect(current.size).toEqual({ width: 784, height: 612 })
     expect(current.position).toEqual({ x: 500, y: 400 })
     expect(graph.toSnapshot().blocks.find((block) => block.id === 'left')?.position).toEqual({
       x: 532,
       y: 476
     })
+  })
+
+  it('contracts again when a member moves inward after expanding the combination', () => {
+    const graph = createGraph()
+    createTerminal(graph, 'left', 100, 100)
+    createTerminal(graph, 'right', 1_200, 100)
+    graph.createTerminalGroup({
+      id: 'adaptive',
+      name: 'Adaptive',
+      memberBlockIds: ['left', 'right']
+    })
+    const expandedWidth = graph.toSnapshot().terminalGroups[0]!.size.width
+
+    graph.moveBlock('right', { x: 900, y: 100 })
+
+    const contracted = graph.toSnapshot().terminalGroups[0]!
+    expect(contracted.position).toEqual({ x: 68, y: 24 })
+    expect(contracted.size.width).toBeLessThan(expandedWidth)
+    expect(contracted.size).toEqual({ width: 1_584, height: 612 })
   })
 })
 

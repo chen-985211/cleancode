@@ -262,8 +262,8 @@ describe('terminal groups in the default block graph', () => {
           id: 'workflow-wrapper',
           type: 'terminal-group',
           name: 'Workflow wrapper',
-          position: { x: 0, y: 0 },
-          size: defaultTerminalGroupSize,
+          position: { x: -1_000, y: -1_000 },
+          size: { width: 4_000, height: 3_000 },
           isCollapsed: false,
           memberBlockIds: ['backend-terminal', 'frontend-terminal']
         }
@@ -273,6 +273,8 @@ describe('terminal groups in the default block graph', () => {
     expect(graph.toSnapshot().terminalGroups).toEqual([
       expect.objectContaining({
         id: 'workflow-wrapper',
+        position: { x: -32, y: -76 },
+        size: { width: 1_284, height: 612 },
         memberBlockIds: ['backend-terminal', 'frontend-terminal']
       })
     ])
