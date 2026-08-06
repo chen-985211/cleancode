@@ -41,6 +41,13 @@
   flex: 0 0 auto;
 }
 
+.app-shell__toolbar-group--terminal-group-editing {
+  border-color: var(--cc-primary-border);
+  box-shadow:
+    0 0 0 2px var(--cc-primary-ring),
+    0 4px 16px var(--cc-shadow-color);
+}
+
 .toolbar-divider {
   width: 1px;
   height: 20px;
@@ -56,6 +63,17 @@
   padding: 0 10px;
   font-size: 12px;
   pointer-events: auto;
+  transition:
+    transform 100ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.toolbar-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px var(--cc-shadow-color) inset;
 }
 
 .toolbar-button--primary {
@@ -83,6 +101,11 @@
   font-size: 12px;
   font-weight: 600;
   pointer-events: auto;
+}
+
+.toolbar-selection-status > svg {
+  flex: 0 0 auto;
+  color: var(--cc-primary);
 }
 
 .toolbar-selection-status strong {

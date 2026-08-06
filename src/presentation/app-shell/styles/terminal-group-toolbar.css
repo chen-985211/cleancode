@@ -66,6 +66,7 @@
   font: inherit;
   box-shadow: none;
   transition:
+    transform 100ms ease,
     background 140ms ease,
     color 140ms ease,
     box-shadow 140ms ease;
@@ -106,6 +107,7 @@
 
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
+  transform: translateY(1px);
   box-shadow:
     0 0 0 1px var(--cc-border-strong) inset,
     0 1px 3px var(--cc-shadow-color) inset;
@@ -118,7 +120,7 @@
   box-shadow:
     0 0 0 1px var(--cc-primary-border) inset !important,
     0 1px 0 var(--cc-neutral-overlay) inset !important,
-    0 3px 8px var(--cc-primary-ring) !important;
+    0 2px 5px var(--cc-shadow-color) !important;
 }
 
 .terminal-group-node__action--primary:hover:not(:disabled) {
@@ -219,6 +221,10 @@
   flex-basis: 32px;
 }
 
+.terminal-group-node__saving-indicator {
+  animation: terminal-group-saving-spin 900ms linear infinite;
+}
+
 .terminal-group-node__toolbar--editing {
   justify-content: flex-end;
 }
@@ -289,4 +295,10 @@
 .terminal-group-icon__disconnect-accent {
   fill: var(--cc-danger);
   stroke: var(--cc-danger);
+}
+
+@keyframes terminal-group-saving-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

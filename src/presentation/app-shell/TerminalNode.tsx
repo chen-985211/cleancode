@@ -35,6 +35,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
   const [isResizingBlock, setIsResizingBlock] = useState(false)
+  const metadataFormId = `terminal-metadata-form-${block.id}`
   const hasRequestedAutoStartRef = useRef(false)
   const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
@@ -206,6 +207,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           blockName={block.name}
           blockDescription={block.description}
           blockLaunchCommand={block.launchCommand}
+          metadataFormId={metadataFormId}
+          isEditingMetadata={isEditingMetadata}
           isRunning={isRunning}
           isRecoveryPending={Boolean(session.isRecoveryPending)}
           isTerminalGroupSelectionMode={data.isTerminalGroupSelectionMode}
@@ -230,6 +233,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         {isEditingMetadata ? (
           <TerminalMetadataForm
             block={block}
+            formId={metadataFormId}
             shouldFocusLaunchCommand={shouldFocusLaunchCommand}
             onSave={saveMetadata}
             onCancel={() => {
@@ -294,6 +298,8 @@ interface TerminalHeaderProps {
   readonly blockName: string
   readonly blockDescription: string
   readonly blockLaunchCommand: string
+  readonly metadataFormId: string
+  readonly isEditingMetadata: boolean
   readonly isRunning: boolean
   readonly isRecoveryPending: boolean
   readonly isTerminalGroupSelectionMode: boolean
@@ -320,6 +326,8 @@ function TerminalHeader({
   blockName,
   blockDescription,
   blockLaunchCommand,
+  metadataFormId,
+  isEditingMetadata,
   isRunning,
   isRecoveryPending,
   isTerminalGroupSelectionMode,
@@ -389,7 +397,10 @@ function TerminalHeader({
               onToggleTerminalGroupCandidate()
             }}
           >
-            {isSelectedForTerminalGroup ? <WorkbenchIcon role="confirm" size={16} /> : null}
+            <WorkbenchIcon
+              role={isSelectedForTerminalGroup ? 'confirm' : 'group-add'}
+              size={isSelectedForTerminalGroup ? 16 : 15}
+            />
           </button>
         </TooltipLabel>
       ) : null}
@@ -499,12 +510,21 @@ function TerminalHeader({
         <span className="terminal-node__action-divider" aria-hidden="true" />
         <TooltipLabel content={t('terminal.action.edit')}>
           <button
-            className="terminal-node__action"
+            className={[
+              'terminal-node__action',
+              'terminal-node__action--edit',
+              isEditingMetadata ? 'terminal-node__action--active' : ''
+            ]
+              .filter(Boolean)
+              .join(' ')}
             type="button"
             aria-label={t('terminal.namedAction', {
               blockName,
               action: t('terminal.action.edit')
             })}
+            aria-controls={metadataFormId}
+            aria-expanded={isEditingMetadata}
+            aria-pressed={isEditingMetadata}
             onClick={onStartEditing}
           >
             <WorkbenchIcon size={15} data-icon="terminal-edit" role="edit" />

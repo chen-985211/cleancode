@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 import {
   defaultTerminalExecutionConfig,
@@ -12,11 +12,11 @@ import {
 } from './terminalExecutionConfigDraft'
 import type { TerminalBlockMetadataInput } from './types'
 import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface TerminalMetadataFormProps {
   readonly block: TerminalBlockSnapshot
+  readonly formId?: string
   readonly shouldFocusLaunchCommand: boolean
   readonly onSave: (
     metadata: TerminalBlockMetadataInput,
@@ -27,6 +27,7 @@ interface TerminalMetadataFormProps {
 
 export function TerminalMetadataForm({
   block,
+  formId,
   shouldFocusLaunchCommand,
   onSave,
   onCancel
@@ -40,6 +41,7 @@ export function TerminalMetadataForm({
   )
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const nameInputRef = useRef<HTMLInputElement | null>(null)
   const launchCommandInputRef = useRef<HTMLInputElement | null>(null)
   const executionValidation = useMemo(
     () => validateExecutionConfigDraft(executionDraft, t),
@@ -47,8 +49,9 @@ export function TerminalMetadataForm({
   )
   const canSave = Boolean(name.trim()) && executionValidation.config !== null && !isSaving
 
-  useEffect(() => {
-    if (shouldFocusLaunchCommand) launchCommandInputRef.current?.focus()
+  useLayoutEffect(() => {
+    const target = shouldFocusLaunchCommand ? launchCommandInputRef.current : nameInputRef.current
+    target?.focus()
   }, [shouldFocusLaunchCommand])
 
   const updateExecutionDraft = (draft: ExecutionConfigDraft): void => {
@@ -79,6 +82,7 @@ export function TerminalMetadataForm({
 
   return (
     <form
+      id={formId}
       className="terminal-metadata-form nodrag"
       aria-label={t('terminalForm.edit')}
       aria-busy={isSaving}
@@ -92,14 +96,30 @@ export function TerminalMetadataForm({
           void save()
         }
       }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || isSaving) return
+        event.preventDefault()
+        event.stopPropagation()
+        onCancel()
+      }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <fieldset className="terminal-metadata-form__fieldset" disabled={isSaving}>
+        <header className="terminal-metadata-form__header">
+          <span className="terminal-metadata-form__header-icon" aria-hidden="true">
+            <WorkbenchIcon role="terminal" size={16} />
+          </span>
+          <span className="terminal-metadata-form__heading">
+            <strong>{t('terminalForm.edit')}</strong>
+            <span>{block.name}</span>
+          </span>
+        </header>
         <div className="terminal-metadata-form__body">
           <div className="terminal-metadata-form__fields">
             <MetadataField label={t('terminalForm.name')}>
               <input
                 aria-label={t('terminalForm.terminalName')}
+                ref={nameInputRef}
                 placeholder={t('terminalForm.namePlaceholder')}
                 value={name}
                 onChange={(event) => {
@@ -169,27 +189,29 @@ export function TerminalMetadataForm({
           ) : null}
         </div>
         <div className="terminal-metadata-form__footer">
-          <TooltipLabel content={isSaving ? t('terminalForm.saving') : t('terminalForm.save')}>
-            <button
-              className="terminal-node__action terminal-node__action--confirm"
-              type="submit"
-              aria-label={t('terminalForm.save')}
-              aria-busy={isSaving}
-              disabled={!canSave}
-            >
-              <WorkbenchIcon role="confirm" size={15} />
-            </button>
-          </TooltipLabel>
-          <TooltipLabel content={t('terminalForm.cancelShort')}>
-            <button
-              className="terminal-node__action"
-              type="button"
-              aria-label={t('terminalForm.cancel')}
-              onClick={onCancel}
-            >
-              <WorkbenchIcon role="close" size={15} />
-            </button>
-          </TooltipLabel>
+          <button
+            className="terminal-metadata-form__action"
+            type="button"
+            aria-label={t('terminalForm.cancel')}
+            onClick={onCancel}
+          >
+            <WorkbenchIcon role="close" size={14} />
+            <span>{t('terminalForm.cancelShort')}</span>
+          </button>
+          <button
+            className="terminal-metadata-form__action terminal-metadata-form__action--primary"
+            type="submit"
+            aria-label={t('terminalForm.save')}
+            aria-busy={isSaving}
+            disabled={!canSave}
+          >
+            <WorkbenchIcon
+              className={isSaving ? 'terminal-metadata-form__saving-indicator' : undefined}
+              role={isSaving ? 'loading' : 'confirm'}
+              size={14}
+            />
+            <span>{isSaving ? t('terminalForm.saving') : t('terminalForm.save')}</span>
+          </button>
         </div>
       </fieldset>
     </form>

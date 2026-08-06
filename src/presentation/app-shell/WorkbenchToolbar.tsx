@@ -39,7 +39,15 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
       aria-label={t('toolbar.label')}
     >
       <div
-        className="app-shell__toolbar-group"
+        className={[
+          'app-shell__toolbar-group',
+          props.isTerminalGroupSelectionMode
+            ? 'app-shell__toolbar-group--terminal-group-editing'
+            : ''
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        data-selection-mode={props.isTerminalGroupSelectionMode ? 'active' : 'idle'}
         role="group"
         aria-label={t('toolbar.terminalTools')}
       >
@@ -57,7 +65,8 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
         <span className="toolbar-divider" aria-hidden="true" />
         {props.isTerminalGroupSelectionMode ? (
           <>
-            <span className="toolbar-selection-status" role="status">
+            <span className="toolbar-selection-status" role="status" aria-live="polite">
+              <WorkbenchIcon role="terminal-group" size={15} />
               {t('toolbar.groupEditing')}
               <strong>{props.selectedTerminalGroupCandidateCount}</strong>
             </span>
