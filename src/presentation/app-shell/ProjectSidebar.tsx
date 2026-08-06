@@ -1,4 +1,9 @@
-import { ChevronDown, Folders, GitBranch, Plus, Trash2, X } from 'lucide-react'
+import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
+import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
+import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
@@ -94,7 +99,7 @@ export function ProjectSidebar({
             onClick={onAddProject}
             disabled={!isDesktopRuntime}
           >
-            <Plus size={17} aria-hidden="true" />
+            <PlusIcon size={17} weight="bold" aria-hidden="true" />
             {t('sidebar.addProject')}
           </button>
         </TooltipLabel>
@@ -114,7 +119,7 @@ export function ProjectSidebar({
               aria-label={t('sidebar.closeAlert')}
               onClick={onDismissActionError}
             >
-              <X size={13} aria-hidden="true" />
+              <XIcon size={13} weight="bold" aria-hidden="true" />
             </button>
           </TooltipLabel>
         </div>
@@ -341,7 +346,7 @@ function ProjectCard({
             ref={triggerRef}
             onClick={toggleBranchWorkspaceForm}
           >
-            <Plus size={14} aria-hidden="true" />
+            <PlusIcon size={14} weight="bold" aria-hidden="true" />
           </button>
         </TooltipLabel>
         <TooltipLabel content={t('sidebar.removeProjectFromList')}>
@@ -352,7 +357,7 @@ function ProjectCard({
             ref={removeProjectButtonRef}
             onClick={() => setIsRemoveProjectDialogOpen((isOpen) => !isOpen)}
           >
-            <Trash2 size={14} aria-hidden="true" />
+            <TrashIcon size={14} weight="bold" aria-hidden="true" />
           </button>
         </TooltipLabel>
       </div>
@@ -416,7 +421,7 @@ function ProjectCard({
                             onClick={() => onSelectWorkspace(workbench, workspace.workspaceId)}
                           >
                             <span className="workspace-row__branch-icon" aria-hidden="true">
-                              <GitBranch size={14} />
+                              <GitBranchIcon size={14} />
                             </span>
                             <span className="workspace-row__name truncate">{boundBranchName}</span>
                             {shouldShowDefaultWorkspaceBadge ? (
@@ -437,7 +442,7 @@ function ProjectCard({
                             type="button"
                             onClick={toggleBranchSelector}
                           >
-                            <ChevronDown size={14} aria-hidden="true" />
+                            <CaretDownIcon size={14} weight="bold" aria-hidden="true" />
                           </button>
                         </TooltipLabel>
                       </div>
@@ -484,7 +489,7 @@ function ProjectCard({
                             onClick={() => onSelectWorkspace(workbench, workspace.workspaceId)}
                           >
                             <span className="workspace-row__branch-icon" aria-hidden="true">
-                              <GitBranch size={14} />
+                              <GitBranchIcon size={14} />
                             </span>
                             <span className="workspace-row__name truncate">
                               {workspaceDisplayName}
@@ -500,7 +505,7 @@ function ProjectCard({
                                 ) : null}
                                 {isWorktreeWorkspace ? (
                                   <span className="workspace-row__kind" aria-hidden="true">
-                                    <Folders size={12} />
+                                    <FoldersIcon size={12} />
                                   </span>
                                 ) : null}
                                 {shouldShowGitBranchBadge ? (

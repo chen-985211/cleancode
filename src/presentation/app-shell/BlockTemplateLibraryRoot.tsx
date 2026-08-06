@@ -1,4 +1,11 @@
-import { FolderInput, Globe2, Pencil, Play, Search, Star, Trash2, X } from 'lucide-react'
+import { FolderSimplePlusIcon } from '@phosphor-icons/react/dist/csr/FolderSimplePlus'
+import { GlobeHemisphereWestIcon } from '@phosphor-icons/react/dist/csr/GlobeHemisphereWest'
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
+import { PencilSimpleIcon } from '@phosphor-icons/react/dist/csr/PencilSimple'
+import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play'
+import { StarIcon } from '@phosphor-icons/react/dist/csr/Star'
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import type {
@@ -99,7 +106,7 @@ export function BlockTemplateLibraryRoot({
             setIsOpen(true)
           }}
         >
-          <Star size={18} strokeWidth={1.9} aria-hidden="true" />
+          <StarIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
       {isOpen ? (
@@ -121,7 +128,7 @@ export function BlockTemplateLibraryRoot({
                   aria-label={t('templates.close')}
                   onClick={closeLibrary}
                 >
-                  <X size={18} aria-hidden="true" />
+                  <XIcon size={18} weight="bold" aria-hidden="true" />
                 </button>
               </TooltipLabel>
             </header>
@@ -152,7 +159,7 @@ export function BlockTemplateLibraryRoot({
                 </button>
               </div>
               <label className="block-template-library-search">
-                <Search size={15} aria-hidden="true" />
+                <MagnifyingGlassIcon size={15} aria-hidden="true" />
                 <input
                   type="search"
                   value={searchQuery}
@@ -354,7 +361,7 @@ function TemplateLibraryItem({
             <div className="block-template-card-tools">
               <TooltipLabel content={renameLabel}>
                 <button type="button" aria-label={renameLabel} onClick={onEdit}>
-                  <Pencil size={14} aria-hidden="true" />
+                  <PencilSimpleIcon size={14} weight="bold" aria-hidden="true" />
                 </button>
               </TooltipLabel>
               <TooltipLabel content={moveLabel}>
@@ -365,15 +372,15 @@ function TemplateLibraryItem({
                   onClick={onMove}
                 >
                   {template.scope.type === 'project' ? (
-                    <Globe2 size={14} aria-hidden="true" />
+                    <GlobeHemisphereWestIcon size={14} weight="bold" aria-hidden="true" />
                   ) : (
-                    <FolderInput size={14} aria-hidden="true" />
+                    <FolderSimplePlusIcon size={14} weight="bold" aria-hidden="true" />
                   )}
                 </button>
               </TooltipLabel>
               <TooltipLabel content={deleteLabel}>
                 <button type="button" aria-label={deleteLabel} onClick={onRequestDelete}>
-                  <Trash2 size={14} aria-hidden="true" />
+                  <TrashIcon size={14} weight="bold" aria-hidden="true" />
                 </button>
               </TooltipLabel>
             </div>
@@ -402,7 +409,7 @@ function TemplateLibraryItem({
                 aria-label={t('templates.placeRunNamed', { name: template.name })}
                 onClick={() => onBeginPlacement(true)}
               >
-                <Play size={14} fill="currentColor" aria-hidden="true" />
+                <PlayIcon size={14} weight="fill" aria-hidden="true" />
                 {t('templates.placeAndRun')}
               </button>
             </div>

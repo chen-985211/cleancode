@@ -1,5 +1,11 @@
-import { CircleAlert, CircleCheck, Info, LoaderCircle, TriangleAlert, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle'
+import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
+import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info'
+import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle'
+import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
+import type { Icon } from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 
 import type { AppNotification, AppNotificationKind } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
@@ -55,7 +61,7 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
     return () => window.clearTimeout(timeoutId)
   }, [notification.autoDismissMs, notification.id, onDismiss])
 
-  const Icon = notification.isActivity ? LoaderCircle : notificationIcons[notification.kind]
+  const Icon = notification.isActivity ? CircleNotchIcon : notificationIcons[notification.kind]
   const actionLabel =
     (isActionPending || notification.action?.disabled) && notification.action?.pendingLabel
       ? notification.action.pendingLabel
@@ -85,7 +91,7 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
         <Icon
           className={notification.isActivity ? 'notification-card__spinner' : undefined}
           size={17}
-          strokeWidth={2}
+          weight={notification.isActivity ? 'bold' : 'fill'}
         />
       </span>
       <div className="notification-card__content">
@@ -113,19 +119,16 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
           aria-label={t('notifications.dismiss', { title: notification.title })}
           onClick={() => onDismiss(notification.id)}
         >
-          <X size={15} aria-hidden="true" />
+          <XIcon size={15} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
     </section>
   )
 }
 
-const notificationIcons: Record<
-  AppNotificationKind,
-  ComponentType<{ size: number; strokeWidth: number }>
-> = {
-  error: CircleAlert,
-  info: Info,
-  success: CircleCheck,
-  warning: TriangleAlert
+const notificationIcons: Record<AppNotificationKind, Icon> = {
+  error: WarningCircleIcon,
+  info: InfoIcon,
+  success: CheckCircleIcon,
+  warning: WarningIcon
 }

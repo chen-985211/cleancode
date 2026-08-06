@@ -1,4 +1,5 @@
-import { Star, X } from 'lucide-react'
+import { StarIcon } from '@phosphor-icons/react/dist/csr/Star'
+import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useMemo, useState } from 'react'
 
 import type {
@@ -66,7 +67,7 @@ export function BlockTemplateSaveDialog({
             <h2 id="block-template-save-title">{t('templates.saveTitle')}</h2>
           </div>
           <button type="button" aria-label={t('common.close')} onClick={onCancel}>
-            <X size={17} aria-hidden="true" />
+            <XIcon size={17} weight="bold" aria-hidden="true" />
           </button>
         </header>
         <label>
@@ -113,7 +114,7 @@ export function BlockTemplateSaveDialog({
             {t('common.cancel')}
           </button>
           <button type="submit" disabled={isSaving || !name.trim()}>
-            <Star size={14} fill="currentColor" aria-hidden="true" />
+            <StarIcon size={14} weight="fill" aria-hidden="true" />
             {isSaving ? t('templates.saving') : t('templates.saveAction')}
           </button>
         </footer>

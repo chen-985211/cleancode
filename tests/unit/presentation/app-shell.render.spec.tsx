@@ -176,7 +176,7 @@ describe('app shell', () => {
       titlebarNavigation.querySelector('.app-shell__titlebar-traffic-light-pad')
     ).toBeInTheDocument()
     expect(collapseSidebar).toHaveAttribute('aria-expanded', 'true')
-    expect(collapseSidebar.querySelector('.lucide-panel-left')).toBeInTheDocument()
+    expect(collapseSidebar.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
     expect(sidebar).not.toHaveAttribute('aria-hidden')
 
     fireEvent.click(collapseSidebar)
@@ -188,7 +188,7 @@ describe('app shell', () => {
     })
     expect(titlebarNavigation.parentElement).toBe(sidebarColumn)
     expect(expandSidebar).toHaveAttribute('aria-expanded', 'false')
-    expect(expandSidebar.querySelector('.lucide-panel-left')).toBeInTheDocument()
+    expect(expandSidebar.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
 
     fireEvent.click(expandSidebar)
 
@@ -439,7 +439,7 @@ describe('app shell', () => {
 
     expect(worktreeIndicator).toBeInTheDocument()
     expect(worktreeIndicator).toHaveAttribute('aria-hidden', 'true')
-    expect(worktreeIndicator.querySelector('.lucide-folders')).toBeInTheDocument()
+    expect(worktreeIndicator.querySelector('svg')).toBeInTheDocument()
     expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))

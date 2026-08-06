@@ -1,4 +1,9 @@
-import { Check, ChevronDown, ExternalLink, LoaderCircle, RefreshCw, RotateCcw } from 'lucide-react'
+import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise'
+import { ArrowSquareOutIcon } from '@phosphor-icons/react/dist/csr/ArrowSquareOut'
+import { ArrowsClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowsClockwise'
+import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import type {
@@ -173,7 +178,12 @@ export function AgentSettingsPane({
 
       {catalog.status === 'loading' ? (
         <div className="agent-settings-state" role="status">
-          <LoaderCircle className="agent-settings-spinner" size={18} aria-hidden="true" />
+          <CircleNotchIcon
+            className="agent-settings-spinner"
+            size={18}
+            weight="bold"
+            aria-hidden="true"
+          />
           {t('settings.agents.loading')}
         </div>
       ) : catalog.status === 'unavailable' ? (
@@ -199,9 +209,10 @@ export function AgentSettingsPane({
                 }
               }}
             >
-              <RefreshCw
+              <ArrowsClockwiseIcon
                 className={isRefreshing ? 'agent-settings-spinner' : undefined}
                 size={13}
+                weight="bold"
                 aria-hidden="true"
               />
               {t('settings.agents.refresh')}
@@ -328,7 +339,7 @@ function InstalledAgentSettingsRow({
               })
             }
           >
-            {isDefault ? <Check size={12} aria-hidden="true" /> : null}
+            {isDefault ? <CheckIcon size={12} weight="bold" aria-hidden="true" /> : null}
             {t(isDefault ? 'settings.agents.default' : 'settings.agents.setDefault')}
           </button>
           <ProviderDocumentationLink provider={provider} />
@@ -340,7 +351,7 @@ function InstalledAgentSettingsRow({
               type="button"
               onClick={() => setExpanded((value) => !value)}
             >
-              <ChevronDown size={14} aria-hidden="true" />
+              <CaretDownIcon size={14} weight="bold" aria-hidden="true" />
             </button>
           ) : null}
         </span>
@@ -382,7 +393,12 @@ function AvailableAgentSettingsRow({
           <strong>{provider.displayName}</strong>
           <span className="agent-settings-row__status">
             {inspection?.status === 'checking' ? (
-              <LoaderCircle className="agent-settings-spinner" size={11} aria-hidden="true" />
+              <CircleNotchIcon
+                className="agent-settings-spinner"
+                size={11}
+                weight="bold"
+                aria-hidden="true"
+              />
             ) : null}
             {status}
           </span>
@@ -484,7 +500,7 @@ function AgentLaunchConfigurationEditor({
       {error ? <div className="agent-settings-launch-editor__error">{error}</div> : null}
       <div className="agent-settings-launch-editor__actions">
         <button disabled={pendingPreference !== null} type="button" onClick={() => void reset()}>
-          <RotateCcw size={12} aria-hidden="true" />
+          <ArrowCounterClockwiseIcon size={12} weight="bold" aria-hidden="true" />
           {t('settings.agents.resetLaunch')}
         </button>
         <button
@@ -518,7 +534,7 @@ function ProviderDocumentationLink({
       target="_blank"
     >
       {showLabel ? t('settings.agents.installGuide') : null}
-      <ExternalLink size={13} aria-hidden="true" />
+      <ArrowSquareOutIcon size={13} weight="bold" aria-hidden="true" />
     </a>
   )
 }

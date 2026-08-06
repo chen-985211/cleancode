@@ -1,4 +1,4 @@
-import { PanelLeft } from 'lucide-react'
+import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/csr/SidebarSimple'
 import type { Ref } from 'react'
 
 import { useI18n } from './i18n/useI18n'
@@ -30,7 +30,7 @@ export function ProjectSidebarToggle({
           aria-label={t(isCollapsed ? 'sidebar.expand' : 'sidebar.collapse')}
           onClick={onToggle}
         >
-          <PanelLeft size={16} aria-hidden="true" />
+          <SidebarSimpleIcon size={16} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
     </nav>

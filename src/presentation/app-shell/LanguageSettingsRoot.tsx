@@ -1,4 +1,5 @@
-import { Check, Languages } from 'lucide-react'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { useI18n } from './i18n/useI18n'
@@ -46,7 +47,7 @@ export function LanguageSettingsRoot() {
           aria-haspopup="menu"
           onClick={() => setIsOpen((current) => !current)}
         >
-          <Languages size={18} strokeWidth={1.9} aria-hidden="true" />
+          <TranslateIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
       {isOpen ? (
@@ -74,7 +75,9 @@ export function LanguageSettingsRoot() {
               onKeyDown={(event) => handleOptionKeyDown(event, index)}
             >
               <span>{languageLabel(optionLocale)}</span>
-              {locale === optionLocale ? <Check size={17} aria-hidden="true" /> : null}
+              {locale === optionLocale ? (
+                <CheckIcon size={17} weight="bold" aria-hidden="true" />
+              ) : null}
             </button>
           ))}
         </div>

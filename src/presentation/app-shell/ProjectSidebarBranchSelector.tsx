@@ -1,4 +1,7 @@
-import { Check, GitBranch, Plus, Search } from 'lucide-react'
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
+import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { useLayoutEffect, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -79,7 +82,7 @@ export function BranchSelectorPopover({
         {t('branchSelector.search')}
       </label>
       <div className="branch-selector-search">
-        <Search size={15} aria-hidden="true" />
+        <MagnifyingGlassIcon size={15} aria-hidden="true" />
         <input
           id="branch-selector-search"
           value={searchQuery}
@@ -107,7 +110,7 @@ export function BranchSelectorPopover({
               disabled={isDisabled}
               onClick={() => onChooseBranch(branch)}
             >
-              <GitBranch size={15} aria-hidden="true" />
+              <GitBranchIcon size={15} aria-hidden="true" />
               <span className="branch-selector-option__content">
                 <span className="truncate">{branch.name}</span>
                 {isWorktreeBranch ? (
@@ -116,7 +119,9 @@ export function BranchSelectorPopover({
                   </span>
                 ) : null}
               </span>
-              {branch.isMainWorkspaceBranch ? <Check size={17} aria-hidden="true" /> : null}
+              {branch.isMainWorkspaceBranch ? (
+                <CheckIcon size={17} weight="bold" aria-hidden="true" />
+              ) : null}
             </button>
           )
         })}
@@ -127,7 +132,7 @@ export function BranchSelectorPopover({
         ) : null}
       </div>
       <button className="branch-selector-create" type="button" disabled>
-        <Plus size={16} aria-hidden="true" />
+        <PlusIcon size={16} weight="bold" aria-hidden="true" />
         {t('branchSelector.create')}
       </button>
     </div>,

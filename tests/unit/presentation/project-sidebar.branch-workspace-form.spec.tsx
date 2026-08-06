@@ -43,7 +43,7 @@ describe('project sidebar branch workspace form', () => {
 
     expect(branchNameInput).toHaveAttribute('placeholder', '新分支名称')
     expect(within(projectCard).queryByText('同时创建独立 Git worktree')).not.toBeInTheDocument()
-    expect(submitButton.querySelector('.lucide-folders')).toBeInTheDocument()
+    expect(submitButton.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
     fireEvent.pointerDown(branchNameInput)
     expect(branchNameInput).toBeInTheDocument()
     fireEvent.change(branchNameInput, {
