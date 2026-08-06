@@ -36,6 +36,7 @@ import {
   prefersReducedMotion,
   type WorkbenchViewportMotionFrameScheduler
 } from './workbenchViewportMotionEnvironment'
+import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 
 export { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
 
@@ -557,6 +558,7 @@ export function transitionWorkbenchViewport(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
   command: WorkbenchViewportCommand
 ): Promise<boolean> {
+  cancelWorkbenchDirectZoom(instance)
   return browserViewportMotionController.transition(instance, command)
 }
 

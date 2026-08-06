@@ -54,15 +54,14 @@ import { resolveCanvasObjectContextTarget } from './canvasObjectContextTarget'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
-import {
-  cancelWorkbenchViewportMotion,
-  subscribeWorkbenchViewportMotionCompletion
-} from './workbenchViewportMotion'
+import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
+import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
+import { useWorkbenchDirectZoom } from './useWorkbenchDirectZoom'
 import {
   centerCanvasViewportOnMinimapPoint,
-  commitCompletedCanvasViewportMotion,
   persistCanvasViewportFromMoveEnd,
   restoreCanvasViewport,
+  subscribeCanvasViewportMotionCompletion,
   synchronizeCanvasViewportFromMove,
   toCanvasViewportSnapshot
 } from './workbenchCanvasViewport'
@@ -287,6 +286,12 @@ export function WorkbenchCanvas({
     reactFlowInstanceRef,
     shortcutPlatform
   })
+  useWorkbenchDirectZoom({
+    canvasSurfaceRef,
+    onViewportInteractionStart,
+    reactFlowInstanceRef,
+    viewportMotionInstance
+  })
   const moveCanvasViewportToMinimapCenter = (
     center: MinimapViewportCenter,
     persistViewport: boolean
@@ -420,16 +425,12 @@ export function WorkbenchCanvas({
             reactFlowInstanceRef.current = instance
             setViewportMotionInstance((currentInstance) => currentInstance ?? instance)
             unsubscribeViewportMotionRef.current?.()
-            unsubscribeViewportMotionRef.current = subscribeWorkbenchViewportMotionCompletion(
+            unsubscribeViewportMotionRef.current = subscribeCanvasViewportMotionCompletion({
               instance,
-              (completion) =>
-                commitCompletedCanvasViewportMotion({
-                  completion,
-                  onViewportChange: onViewportChangeRef.current,
-                  setCanvasViewport,
-                  setViewportZoom
-                })
-            )
+              onViewportChangeRef,
+              setCanvasViewport,
+              setViewportZoom
+            })
 
             if (currentWorkbench) {
               restoreCanvasViewport({
@@ -506,6 +507,7 @@ export function WorkbenchCanvas({
           onMoveStart={(event) => {
             if (event) {
               cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
+              cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
               onViewportInteractionStart?.()
             }
           }}
@@ -522,6 +524,7 @@ export function WorkbenchCanvas({
           selectionKeyCode={null}
           minZoom={minimumCanvasZoom}
           maxZoom={maximumCanvasZoom}
+          zoomOnScroll={false}
           proOptions={{ hideAttribution: true }}
         >
           <Background color="var(--cc-border-strong)" gap={24} size={1} />
@@ -538,6 +541,7 @@ export function WorkbenchCanvas({
                   instance={viewportMotionInstance}
                 />
               }
+              viewportMotionInstance={viewportMotionInstance}
               viewportZoom={viewportZoom}
               shortcutTooltips={shortcutTooltips}
               minimapNodeInteraction={minimapNodeInteraction}

@@ -14,8 +14,22 @@ import {
 } from '../../../src/presentation/app-shell/types'
 
 const liveViewportMotion = vi.hoisted(() => ({
+  directListener: null as
+    ((viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void) | null,
   listener: null as
     ((viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void) | null
+}))
+
+vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', () => ({
+  subscribeWorkbenchDirectZoomPresentation: (
+    _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
+    listener: (viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void
+  ) => {
+    liveViewportMotion.directListener = listener
+    return () => {
+      liveViewportMotion.directListener = null
+    }
+  }
 }))
 
 vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', () => ({
@@ -38,6 +52,7 @@ describe('canvas minimap', () => {
   })
 
   beforeEach(() => {
+    liveViewportMotion.directListener = null
     liveViewportMotion.listener = null
   })
 
@@ -223,6 +238,24 @@ describe('canvas minimap', () => {
     expect(within(viewportControls).getByLabelText('画布缩放比例')).toHaveTextContent('70%')
   })
 
+  it('keeps the zoom level synchronized with live viewport presentations', () => {
+    const instance = {} as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportMotionInstance={instance} />)
+
+    const zoomLevel = screen.getByLabelText('画布缩放比例')
+    expect(zoomLevel).toHaveTextContent('100%')
+
+    act(() => {
+      liveViewportMotion.directListener?.({ x: -120, y: 48, zoom: 1.37 })
+    })
+    expect(zoomLevel).toHaveTextContent('137%')
+
+    act(() => {
+      liveViewportMotion.listener?.({ x: -180, y: 72, zoom: 1.25 })
+    })
+    expect(zoomLevel).toHaveTextContent('125%')
+  })
+
   it('keeps the canvas viewport controls available while the minimap is collapsed', () => {
     render(<CanvasMinimap {...createCanvasMinimapProps()} isCollapsed />)
 
@@ -405,6 +438,15 @@ describe('canvas minimap', () => {
     expect(viewportFrame).toHaveAttribute('y', '-38.4')
     expect(viewportFrame).toHaveAttribute('width', '768')
     expect(viewportFrame).toHaveAttribute('height', '512')
+
+    act(() => {
+      liveViewportMotion.directListener?.({ x: -240, y: 96, zoom: 1.5 })
+    })
+
+    expect(viewportFrame).toHaveAttribute('x', '160')
+    expect(viewportFrame).toHaveAttribute('y', '-64')
+    expect(viewportFrame).toHaveAttribute('width', '640')
+    expect(viewportFrame).toHaveAttribute('height', `${640 / 1.5}`)
   })
 })
 

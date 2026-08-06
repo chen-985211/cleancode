@@ -22,6 +22,7 @@ import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTool
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
+import { subscribeWorkbenchDirectZoomPresentation } from './workbenchDirectZoom'
 
 interface CanvasSize {
   readonly width: number
@@ -39,6 +40,7 @@ interface CanvasMinimapProps {
   readonly canvasViewport: CanvasViewportSnapshot
   readonly canvasSize: CanvasSize
   readonly viewportFrame?: ReactNode
+  readonly viewportMotionInstance?: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
   readonly viewportZoom: number
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
@@ -85,6 +87,7 @@ export function CanvasMinimap({
   canvasViewport,
   canvasSize,
   viewportFrame,
+  viewportMotionInstance,
   viewportZoom,
   shortcutTooltips,
   minimapNodeInteraction,
@@ -255,7 +258,11 @@ export function CanvasMinimap({
           >
             <Minus size={14} aria-hidden="true" />
           </MinimapControlButton>
-          <output aria-label={t('minimap.zoomLevel')}>{Math.round(viewportZoom * 100)}%</output>
+          <LiveCanvasMinimapZoomLevel
+            baseline={canvasViewport}
+            fallbackZoom={viewportZoom}
+            instance={viewportMotionInstance ?? null}
+          />
           <MinimapControlButton
             label={t('minimap.zoomInTitle')}
             tooltip={shortcutTooltips.zoomCanvasIn}
@@ -275,6 +282,51 @@ export function CanvasMinimap({
       </div>
     </div>
   )
+}
+
+function LiveCanvasMinimapZoomLevel({
+  baseline,
+  fallbackZoom,
+  instance
+}: {
+  readonly baseline: CanvasViewportSnapshot
+  readonly fallbackZoom: number
+  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
+}) {
+  const { t } = useI18n()
+  const [presentation, setPresentation] = useState<{
+    readonly baseline: CanvasViewportSnapshot
+    readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+    readonly zoom: number
+  } | null>(null)
+
+  useEffect(() => {
+    if (!instance) return undefined
+
+    const projectPresentation = (viewport: CanvasViewportSnapshot): void => {
+      setPresentation({ baseline, instance, zoom: viewport.zoom })
+    }
+    const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionPresentation(
+      instance,
+      projectPresentation
+    )
+    const unsubscribeDirect = subscribeWorkbenchDirectZoomPresentation(
+      instance,
+      projectPresentation
+    )
+
+    return () => {
+      unsubscribeProgrammatic()
+      unsubscribeDirect()
+    }
+  }, [baseline, instance])
+
+  const zoom =
+    presentation?.baseline === baseline && presentation.instance === instance
+      ? presentation.zoom
+      : fallbackZoom
+
+  return <output aria-label={t('minimap.zoomLevel')}>{Math.round(zoom * 100)}%</output>
 }
 
 export function LiveCanvasMinimapViewportFrame({
@@ -297,13 +349,26 @@ export function LiveCanvasMinimapViewportFrame({
       return undefined
     }
 
-    return subscribeWorkbenchViewportMotionPresentation(instance, (viewport) => {
+    const projectPresentation = (viewport: CanvasViewportSnapshot): void => {
       setPresentation({
         baseline: fallbackViewport,
         instance,
         viewport
       })
-    })
+    }
+    const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionPresentation(
+      instance,
+      projectPresentation
+    )
+    const unsubscribeDirect = subscribeWorkbenchDirectZoomPresentation(
+      instance,
+      projectPresentation
+    )
+
+    return () => {
+      unsubscribeProgrammatic()
+      unsubscribeDirect()
+    }
   }, [fallbackViewport, instance])
 
   const viewport =
