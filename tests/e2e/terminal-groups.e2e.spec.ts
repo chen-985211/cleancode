@@ -82,7 +82,7 @@ describe('terminal groups e2e', () => {
       )
       expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
 
-      await page.getByRole('button', { name: '启动项目 编辑组合空间' }).click()
+      await page.getByRole('button', { name: '启动项目 管理组合内容' }).click()
 
       const graphBeforeDrag = await readGraph(page, workbench)
       const groupBeforeDrag = graphBeforeDrag.terminalGroups[0]!

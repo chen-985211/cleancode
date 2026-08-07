@@ -22,7 +22,7 @@ describe('terminal group member labels', () => {
     expect(screen.queryByRole('button', { name: 'Frontend 移出组合' })).not.toBeInTheDocument()
   })
 
-  it('enters group-space editing through the edit action', () => {
+  it('enters group-space editing through the manage-contents action', () => {
     const onEditGroup = vi.fn()
 
     render(
@@ -36,19 +36,19 @@ describe('terminal group member labels', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 编辑组合空间' }))
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 管理组合内容' }))
 
     expect(onEditGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development-group' }))
   })
 
-  it('marks the edit action as pressed for the active group space', () => {
+  it('marks the manage-contents action as pressed for the active group space', () => {
     render(
       <TerminalGroupNode
         {...createTerminalGroupNodeProps({ isCollapsed: false, data: { isEditing: true } })}
       />
     )
 
-    expect(screen.getByRole('button', { name: '启动项目 编辑组合空间' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '启动项目 管理组合内容' })).toHaveAttribute(
       'aria-pressed',
       'true'
     )
@@ -61,7 +61,8 @@ describe('terminal group member labels', () => {
       '启动项目 启动组合命令',
       '启动项目 停止全部当前命令',
       '启动项目 重开组合终端会话',
-      '启动项目 编辑组合空间',
+      '启动项目 管理组合内容',
+      '启动项目 重命名组合',
       '启动项目 解散组合'
     ]
 
@@ -78,16 +79,19 @@ describe('terminal group member labels', () => {
     const startButton = screen.getByRole('button', { name: '启动项目 启动组合命令' })
     const stopButton = screen.getByRole('button', { name: '启动项目 停止全部当前命令' })
     const restartButton = screen.getByRole('button', { name: '启动项目 重开组合终端会话' })
-    const editButton = screen.getByRole('button', { name: '启动项目 编辑组合空间' })
+    const contentsButton = screen.getByRole('button', { name: '启动项目 管理组合内容' })
+    const renameButton = screen.getByRole('button', { name: '启动项目 重命名组合' })
     const dissolveButton = screen.getByRole('button', { name: '启动项目 解散组合' })
     const runtimeGroup = startButton.closest('[data-control-group="runtime"]')
-    const structureGroup = editButton.closest('[data-control-group="structure"]')
+    const structureGroup = contentsButton.closest('[data-control-group="structure"]')
 
     expect(runtimeGroup).toContainElement(stopButton)
     expect(runtimeGroup).toContainElement(restartButton)
     expect(runtimeGroup?.querySelectorAll('[data-control-surface="raised"]')).toHaveLength(3)
-    expect(editButton).toHaveAttribute('data-control-surface', 'raised')
-    expect(structureGroup).toContainElement(editButton)
+    expect(contentsButton).toHaveAttribute('data-control-surface', 'raised')
+    expect(renameButton).toHaveAttribute('data-control-surface', 'raised')
+    expect(structureGroup).toContainElement(contentsButton)
+    expect(structureGroup).toContainElement(renameButton)
     expect(dissolveButton).toHaveAttribute('data-control-surface', 'raised')
 
     expect(startButton.querySelector('[data-icon="group-start"]')).toMatchObject({
@@ -99,7 +103,11 @@ describe('terminal group member labels', () => {
     expect(restartButton.querySelector('[data-icon="group-restart"]')).toMatchObject({
       dataset: expect.objectContaining({ iconGlyph: 'arrow-clockwise', iconRole: 'restart' })
     })
-    expect(editButton.querySelector('[data-icon="group-edit"]')).toHaveAttribute(
+    expect(contentsButton.querySelector('[data-icon="group-contents"]')).toHaveAttribute(
+      'data-icon-glyph',
+      'folder-open'
+    )
+    expect(renameButton.querySelector('[data-icon="group-rename"]')).toHaveAttribute(
       'data-icon-glyph',
       'pencil-simple'
     )
@@ -165,7 +173,7 @@ describe('terminal group member labels', () => {
     fireEvent.click(screen.getByRole('button', { name: '启动项目 停止全部当前命令' }))
     fireEvent.click(screen.getByRole('button', { name: '启动项目 重开组合终端会话' }))
     fireEvent.click(screen.getByRole('button', { name: '启动项目 展开组合' }))
-    fireEvent.click(screen.getByRole('button', { name: '启动项目 编辑组合空间' }))
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 管理组合内容' }))
     fireEvent.click(screen.getByRole('button', { name: '启动项目 解散组合' }))
 
     const expectedGroup = expect.objectContaining({ id: 'development-group' })
@@ -189,10 +197,10 @@ describe('terminal group member labels', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('解散组合，保留成员终端')
   })
 
-  it('keeps the group header compact and keyboard-ready while editing the group name', () => {
+  it('opens the group-name editor from a single click on the rename action', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
-    fireEvent.doubleClick(screen.getByText('启动项目'))
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 重命名组合' }))
 
     const nameInput = screen.getByRole('textbox', { name: '组合名称' })
 
@@ -234,7 +242,7 @@ describe('terminal group member labels', () => {
       />
     )
 
-    fireEvent.doubleClick(screen.getByText('启动项目'))
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 重命名组合' }))
     fireEvent.change(screen.getByRole('textbox', { name: '组合名称' }), {
       target: { value: '开发服务' }
     })
@@ -261,6 +269,42 @@ describe('terminal group member labels', () => {
 
     expect(screen.getByRole('button', { name: 'Backend 移出组合' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Frontend 移出组合' })).toBeInTheDocument()
+  })
+
+  it('uses a direct empty-group action to enter content management', () => {
+    const onEditGroup = vi.fn()
+
+    render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: false,
+          members: [],
+          data: { onEditGroup }
+        })}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '启动项目 添加终端或流程' }))
+
+    expect(onEditGroup).toHaveBeenCalledWith(expect.objectContaining({ id: 'development-group' }))
+    expect(screen.queryByText('空组合，点击编辑后可将终端或流程拖入')).not.toBeInTheDocument()
+  })
+
+  it('turns the empty group into a passive drop target while managing its contents', () => {
+    render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: false,
+          members: [],
+          data: { isEditing: true }
+        })}
+      />
+    )
+
+    expect(screen.getByText('拖入终端或流程')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '启动项目 添加终端或流程' })
+    ).not.toBeInTheDocument()
   })
 
   it('uses only the shared tooltip for a member remove action', async () => {

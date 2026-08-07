@@ -51,21 +51,77 @@
   position: absolute;
   inset: 58px 18px 18px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  box-sizing: border-box;
   border: 1px dashed var(--cc-border-strong);
   border-radius: 8px;
-  color: var(--cc-muted);
-  font-size: 12px;
-  font-weight: 520;
-  letter-spacing: 0.005em;
+  color: var(--cc-muted-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1.3;
+  text-align: center;
   pointer-events: none;
+}
+
+.terminal-group-node__empty-state svg {
+  width: 20px;
+  height: 20px;
+  box-sizing: content-box;
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--cc-surface-raised);
+  color: var(--cc-muted);
+  box-shadow:
+    0 0 0 1px var(--cc-border) inset,
+    0 3px 8px var(--cc-shadow-color);
+}
+
+.terminal-group-node__empty-state--action {
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.terminal-group-node__empty-state--action:hover {
+  border-color: var(--cc-primary-border);
+  background: color-mix(in srgb, var(--cc-primary-soft) 40%, transparent);
+  color: var(--cc-primary);
+}
+
+.terminal-group-node__empty-state--action:hover svg {
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
+}
+
+.terminal-group-node__empty-state--action:active {
+  background: var(--cc-primary-soft);
+}
+
+.terminal-group-node__empty-state--action:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: 2px;
 }
 
 .terminal-group-node--editing .terminal-group-node__empty-state {
   border-color: var(--cc-primary-border);
   background: var(--cc-primary-soft);
   color: var(--cc-primary);
+}
+
+.terminal-group-node--editing .terminal-group-node__empty-state svg {
+  background: var(--cc-surface-translucent);
+  color: var(--cc-primary);
+  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
 }
 
 .terminal-group-node--drop-join {
