@@ -28,8 +28,7 @@
   box-shadow: var(--cc-shadow-sm);
   transition:
     border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform var(--workbench-object-hover-duration) var(--workbench-object-hover-spring);
+    box-shadow 150ms ease;
 }
 
 .terminal-node--running {

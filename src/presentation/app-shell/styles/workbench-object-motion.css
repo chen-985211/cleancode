@@ -1,28 +1,13 @@
 :is(.terminal-node, .terminal-group-node, .agent-console-node) {
-  --workbench-object-hover-duration: 440ms;
-  --workbench-object-hover-spring: linear(
-    0,
-    0.38 8%,
-    0.72 16%,
-    0.94 24%,
-    1.08 34%,
-    1.12 42%,
-    1.06 52%,
-    0.985 65%,
-    1.008 78%,
-    1
-  );
+  --workbench-object-hover-x: 0px;
+  --workbench-object-hover-y: 0px;
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
   transform-origin: center;
+  transform: translate3d(var(--workbench-object-hover-x), var(--workbench-object-hover-y), 0);
 }
 
-.canvas-surface:not(.canvas-surface--dragging-terminal)
-  .react-flow__node:not(.dragging):hover
-  :is(.terminal-node, .terminal-group-node, .agent-console-node):not(
-    [class*='workbench-object-motion--']
-  ) {
-  transform: translate3d(0, -3px, 0);
+.workbench-object-hover-motion--active {
   will-change: transform;
 }
 
@@ -276,10 +261,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.terminal-node, .terminal-group-node, .agent-console-node),
-  .canvas-surface:not(.canvas-surface--dragging-terminal)
-    .react-flow__node:not(.dragging):hover
-    :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  :is(.terminal-node, .terminal-group-node, .agent-console-node) {
     transform: none;
     transition: none;
   }

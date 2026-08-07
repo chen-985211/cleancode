@@ -31,7 +31,7 @@ describe('workbench object motion styles', () => {
     expect(accentKeyframes).toContain('clip-path:')
     expect(`${createKeyframes}${accentKeyframes}`).not.toMatch(/\b(width|height):/)
     expect(`${createKeyframes}${accentKeyframes}`).not.toContain('scale(')
-    expect(objectBaseRule).not.toContain('transform:')
+    expect(objectBaseRule).not.toContain('scale(')
   })
 
   it('uses symmetric group member paths and disables them for reduced motion', () => {
@@ -94,7 +94,7 @@ describe('workbench object motion styles', () => {
     expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary-border)')
   })
 
-  it('uses one reversible hover spring across every canvas node surface', () => {
+  it('uses one velocity-driven hover surface without a fixed lift transition', () => {
     const objectBaseRule = readRule(
       ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
     )
@@ -104,17 +104,19 @@ describe('workbench object motion styles', () => {
       readStyleRule(agentConsoleStyles, '.agent-console-node')
     ]
 
-    expect(objectBaseRule).toContain('--workbench-object-hover-spring: linear(')
+    expect(objectBaseRule).toContain('--workbench-object-hover-x: 0px;')
+    expect(objectBaseRule).toContain('--workbench-object-hover-y: 0px;')
     expect(objectBaseRule).toContain('transform-origin: center;')
-    expect(objectMotionStyles).toContain('transform: translate3d(0, -3px, 0);')
-    expect(objectMotionStyles).toContain('.canvas-surface:not(.canvas-surface--dragging-terminal)')
-    expect(objectMotionStyles).toMatch(/:not\(\s*\[class\*='workbench-object-motion--'\]\s*\)/)
+    expect(objectBaseRule).toContain(
+      'transform: translate3d(var(--workbench-object-hover-x), var(--workbench-object-hover-y), 0);'
+    )
+    expect(objectMotionStyles).toContain('.workbench-object-hover-motion--active')
+    expect(objectMotionStyles).not.toContain('translate3d(0, -3px, 0)')
+    expect(objectMotionStyles).not.toContain('--workbench-object-hover-spring')
     expect(objectMotionStyles).toContain('.react-flow__node.dragging')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
     nodeRules.forEach((rule) => {
-      expect(rule).toContain(
-        'transform var(--workbench-object-hover-duration) var(--workbench-object-hover-spring)'
-      )
+      expect(rule).not.toMatch(/transition:[^}]*transform/s)
     })
   })
 
