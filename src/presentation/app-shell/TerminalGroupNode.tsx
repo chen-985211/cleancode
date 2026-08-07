@@ -30,6 +30,7 @@ import type { TerminalGroupFlowNode, TerminalViewState } from './types'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
+import { useTerminalGroupDropSpring } from './useTerminalGroupDropSpring'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
@@ -47,6 +48,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     data.objectMotion,
     data.onObjectMotionComplete
   )
+  const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback === 'join')
   const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
@@ -98,6 +100,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 
   return (
     <section
+      ref={dropSpringSurfaceRef}
       className={className}
       data-terminal-group-id={group.id}
       data-context-selected={data.isContextSelected || undefined}
@@ -166,7 +169,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
               <TooltipLabel content={group.name}>
                 <strong className="terminal-group-node__name">{group.name}</strong>
               </TooltipLabel>
-              {data.dropFeedback ? (
+              {data.dropFeedback && data.dropFeedback !== 'join' ? (
                 <span className="terminal-group-node__drop-hint">
                   {getDropFeedbackLabel(data.dropFeedback, t)}
                 </span>
@@ -219,12 +222,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         </div>
       ) : null}
       {!group.isCollapsed && group.memberBlockIds.length === 0 ? (
-        data.isEditing ? (
-          <div className="terminal-group-node__empty-state">
-            <WorkbenchIcon role="terminal-group" size={20} />
-            <span>{t('group.emptyEditingHint')}</span>
-          </div>
-        ) : (
+        data.isEditing ? null : (
           <button
             className="terminal-group-node__empty-state terminal-group-node__empty-state--action nodrag"
             type="button"
@@ -240,7 +238,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           </button>
         )
       ) : null}
-      {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
+      {!data.isEditing && (data.isSelected || data.isContextSelected) ? (
+        <WorkbenchNodeSelectionVeil />
+      ) : null}
     </section>
   )
 })
@@ -523,13 +523,9 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
 }
 
 function getDropFeedbackLabel(
-  feedback: NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>,
+  feedback: Exclude<NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>, 'join'>,
   t: ReturnType<typeof useI18n>['t']
 ) {
-  if (feedback === 'join') {
-    return t('group.dropJoin')
-  }
-
   if (feedback === 'leave') {
     return t('group.dropLeave')
   }

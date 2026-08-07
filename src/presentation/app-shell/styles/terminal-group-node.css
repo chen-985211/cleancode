@@ -7,6 +7,7 @@
 }
 
 .terminal-group-node {
+  --terminal-group-drop-scale: 1;
   --terminal-group-border: var(--cc-border);
   --terminal-group-border-strong: var(--cc-border-strong);
   --terminal-group-surface: var(--cc-surface-raised);
@@ -36,6 +37,12 @@
   transition:
     background 140ms ease-out,
     box-shadow 180ms cubic-bezier(0.2, 0.82, 0.2, 1);
+  transform: scale(var(--terminal-group-drop-scale));
+  transform-origin: center;
+}
+
+.terminal-group-drop-spring--active {
+  will-change: transform;
 }
 
 .terminal-group-node::after {
@@ -52,13 +59,6 @@
 
 .terminal-group-node--collapsed {
   background: var(--terminal-group-surface);
-}
-
-.terminal-group-node--editing {
-  box-shadow:
-    0 0 0 2px var(--cc-primary-border),
-    0 8px 24px var(--cc-shadow-color),
-    0 0 0 1px var(--terminal-group-border) inset;
 }
 
 .terminal-group-node__empty-state {
@@ -109,29 +109,6 @@
 .terminal-group-node__empty-state--action:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 2px;
-}
-
-.terminal-group-node--editing .terminal-group-node__empty-state {
-  color: var(--cc-primary);
-}
-
-.terminal-group-node--editing .terminal-group-node__empty-state svg {
-  background: var(--cc-surface-translucent);
-  color: var(--cc-primary);
-  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
-}
-
-.terminal-group-node--drop-join {
-  background: color-mix(in srgb, var(--cc-foreground) 4%, var(--cc-surface-translucent));
-  box-shadow:
-    0 1px 4px var(--cc-shadow-color),
-    0 8px 20px var(--cc-shadow-color),
-    0 14px 36px var(--cc-shadow-color) inset,
-    0 1px 0 var(--cc-neutral-overlay) inset;
-}
-
-.terminal-group-node--drop-join::after {
-  opacity: 0.9;
 }
 
 .terminal-group-node--drop-leave {
@@ -210,12 +187,6 @@
   box-shadow: 0 0 0 1px var(--terminal-group-border) inset;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.terminal-group-node--drop-join .terminal-group-node__drop-hint {
-  background: var(--cc-surface-raised);
-  color: var(--cc-foreground);
-  box-shadow: none;
 }
 
 .terminal-group-node--drop-leave .terminal-group-node__drop-hint {

@@ -104,13 +104,6 @@ export function projectWorkbenchObjectMotion({
   const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
   const membershipMotion = resolveGroupMembershipMotion(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
-    if (node.type === 'terminalGroup' && membershipMotion.acceptingGroupIds.has(node.id)) {
-      return withObjectMotion(
-        node,
-        createObjectMotion('group-accept', node.id, { x: 0, y: 0 }, createMotionId)
-      )
-    }
-
     if (node.type === 'terminal' && membershipMotion.joinedMemberIds.has(node.id)) {
       const currentNode = currentNodesById.get(node.id)
       return withObjectMotion(
@@ -177,12 +170,10 @@ function resolveGroupMembershipMotion(
   currentNodesById: ReadonlyMap<string, WorkbenchFlowNode>,
   nextNodes: readonly WorkbenchFlowNode[]
 ): {
-  readonly acceptingGroupIds: ReadonlySet<string>
   readonly departedMemberIds: ReadonlySet<string>
   readonly joinedMemberIds: ReadonlySet<string>
   readonly reflowedMemberIds: ReadonlySet<string>
 } {
-  const acceptingGroupIds = new Set<string>()
   const departedMemberIds = new Set<string>()
   const joinedMemberIds = new Set<string>()
   const reflowedMemberIds = new Set<string>()
@@ -202,7 +193,6 @@ function resolveGroupMembershipMotion(
     )
     if (addedMemberIds.length === 0 && !hasRemovedMembers) return
 
-    if (addedMemberIds.length > 0) acceptingGroupIds.add(node.id)
     addedMemberIds.forEach((memberBlockId) => joinedMemberIds.add(memberBlockId))
     currentNode.data.group.memberBlockIds.forEach((memberBlockId) => {
       if (!nextMemberIds.has(memberBlockId)) departedMemberIds.add(memberBlockId)
@@ -212,7 +202,7 @@ function resolveGroupMembershipMotion(
     })
   })
 
-  return { acceptingGroupIds, departedMemberIds, joinedMemberIds, reflowedMemberIds }
+  return { departedMemberIds, joinedMemberIds, reflowedMemberIds }
 }
 
 function resolveExpandingMemberOrigins(

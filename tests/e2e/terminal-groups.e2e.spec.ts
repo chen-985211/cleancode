@@ -60,45 +60,64 @@ describe('terminal groups e2e', () => {
         const groupBoxBeforeDrag = await readRequiredBoundingBox(
           page.locator('[data-terminal-group-id]').first()
         )
+        const groupMaterialBeforeDrag = await readTerminalGroupMaterial(
+          page.locator('[data-terminal-group-id]').first()
+        )
         await dragTerminalIntoGroup(
           page,
           terminal.id,
           terminalIndex === 0
-            ? async ({ group, terminal: draggedTerminal }) => {
+            ? async ({ group, moveAway, moveBack, terminal: draggedTerminal }) => {
+                const engagedScale = await waitForTerminalGroupScale(
+                  group,
+                  (scale) => scale > 1.005,
+                  'terminal group to spring open for a nearby terminal'
+                )
                 const groupBoxDuringHover = await readRequiredBoundingBox(group)
-                const depthOpacity = await pollUntilState({
-                  description: 'terminal group drop surface to reach its open depth',
-                  observe: () =>
-                    group.evaluate((element) =>
-                      Number(getComputedStyle(element, '::after').opacity)
-                    ),
-                  accept: (opacity) => opacity > 0.8,
-                  intervalMs: 16,
-                  timeoutMs: 1_000
-                })
-                const groupMaterial = await group.evaluate((element) => ({
-                  shadow: getComputedStyle(element).boxShadow
-                }))
+                const groupMaterial = await readTerminalGroupMaterial(group)
                 const terminalTransform = await draggedTerminal.evaluate(
                   (element) => getComputedStyle(element).transform
                 )
+                const centerBeforeDrag = centerOf(groupBoxBeforeDrag)
+                const centerDuringHover = centerOf(groupBoxDuringHover)
 
-                expect(groupBoxDuringHover.x).toBeCloseTo(groupBoxBeforeDrag.x, 3)
-                expect(groupBoxDuringHover.y).toBeCloseTo(groupBoxBeforeDrag.y, 3)
-                expect(groupMaterial.shadow).toContain('inset')
-                expect(depthOpacity).toBeGreaterThan(0.8)
+                expect(centerDuringHover.x).toBeCloseTo(centerBeforeDrag.x, 3)
+                expect(centerDuringHover.y).toBeCloseTo(centerBeforeDrag.y, 3)
+                expect(engagedScale).toBeGreaterThan(1.005)
+                expect(groupMaterial).toEqual(groupMaterialBeforeDrag)
+                expect(await group.locator('.terminal-group-node__drop-hint').count()).toBe(0)
                 expect(terminalTransform).toBe('none')
+
+                await moveAway()
+                expect(
+                  await waitForTerminalGroupRest(
+                    group,
+                    'terminal group to spring closed after the terminal moves away'
+                  )
+                ).toBeCloseTo(1, 3)
+
+                await moveBack()
+                expect(
+                  await waitForTerminalGroupScale(
+                    group,
+                    (scale) => scale > 1.005,
+                    'terminal group to spring open after the terminal returns'
+                  )
+                ).toBeGreaterThan(1.005)
               }
             : undefined
         )
-        await Promise.all([
-          page.locator('.terminal-node.workbench-object-motion--group-join').first().waitFor(),
-          page.locator('.terminal-group-node.workbench-object-motion--group-accept').waitFor()
-        ])
+        await page.locator('.terminal-node.workbench-object-motion--group-join').first().waitFor()
         const joinedGroup = await waitForTerminalGroup(page, workbench, (group) =>
           group.memberBlockIds.includes(terminal.id)
         )
         expect(joinedGroup.position).toEqual(groupAnchor)
+        expect(
+          await waitForTerminalGroupRest(
+            page.locator('[data-terminal-group-id]').first(),
+            'terminal group to spring closed after absorbing the terminal'
+          )
+        ).toBeCloseTo(1, 3)
         await waitForTerminalVisuallyInsideGroup(page, terminal.id)
       }
       await page.getByRole('button', { name: '完成' }).click()
@@ -212,7 +231,12 @@ async function selectBlankCanvasActionAt(
 async function dragTerminalIntoGroup(
   page: Page,
   terminalBlockId: string,
-  inspectHover?: (state: { readonly group: Locator; readonly terminal: Locator }) => Promise<void>
+  inspectHover?: (state: {
+    readonly group: Locator
+    readonly moveAway: () => Promise<void>
+    readonly moveBack: () => Promise<void>
+    readonly terminal: Locator
+  }) => Promise<void>
 ): Promise<void> {
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
@@ -226,9 +250,76 @@ async function dragTerminalIntoGroup(
 
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 18 })
-  await inspectHover?.({ group: page.locator('[data-terminal-group-id]').first(), terminal })
+  const targetX = startX + deltaX
+  const targetY = startY + deltaY
+  await page.mouse.move(targetX, targetY, { steps: 18 })
+  await inspectHover?.({
+    group: page.locator('[data-terminal-group-id]').first(),
+    moveAway: () => page.mouse.move(startX, startY, { steps: 12 }),
+    moveBack: () => page.mouse.move(targetX, targetY, { steps: 12 }),
+    terminal
+  })
   await page.mouse.up()
+}
+
+async function waitForTerminalGroupScale(
+  group: Locator,
+  accept: (scale: number) => boolean,
+  description: string
+): Promise<number> {
+  return pollUntilState({
+    description,
+    observe: () => group.evaluate(readScale),
+    accept,
+    intervalMs: 16,
+    timeoutMs: 1_500
+  })
+}
+
+async function waitForTerminalGroupRest(group: Locator, description: string): Promise<number> {
+  const state = await pollUntilState({
+    description,
+    observe: () =>
+      group.evaluate((element) => {
+        const transform = getComputedStyle(element).transform
+        return {
+          active: element.classList.contains('terminal-group-drop-spring--active'),
+          scale: transform === 'none' ? 1 : new DOMMatrixReadOnly(transform).a
+        }
+      }),
+    accept: ({ active, scale }) => !active && Math.abs(scale - 1) < 0.001,
+    intervalMs: 16,
+    timeoutMs: 1_500
+  })
+
+  return state.scale
+}
+
+function readScale(element: Element): number {
+  const transform = getComputedStyle(element).transform
+  if (transform === 'none') return 1
+  return new DOMMatrixReadOnly(transform).a
+}
+
+async function readTerminalGroupMaterial(group: Locator): Promise<{
+  readonly background: string
+  readonly depthOpacity: string
+  readonly shadow: string
+}> {
+  return group.evaluate((element) => ({
+    background: getComputedStyle(element).background,
+    depthOpacity: getComputedStyle(element, '::after').opacity,
+    shadow: getComputedStyle(element).boxShadow
+  }))
+}
+
+function centerOf(box: {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}) {
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
 }
 
 async function waitForTerminalVisuallyInsideGroup(

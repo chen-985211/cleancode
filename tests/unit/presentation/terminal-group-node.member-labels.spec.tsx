@@ -290,21 +290,40 @@ describe('terminal group member labels', () => {
     expect(screen.queryByText('空组合，点击编辑后可将终端或流程拖入')).not.toBeInTheDocument()
   })
 
-  it('turns the empty group into a passive drop target while managing its contents', () => {
+  it('keeps the empty editing group visually quiet until a draggable approaches', () => {
     render(
       <TerminalGroupNode
         {...createTerminalGroupNodeProps({
           isCollapsed: false,
           members: [],
-          data: { isEditing: true }
+          data: { isEditing: true, isSelected: true }
         })}
       />
     )
 
-    expect(screen.getByText('拖入终端或流程')).toBeInTheDocument()
+    expect(screen.queryByText('拖入终端或流程')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-workbench-node-selection]')).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: '启动项目 添加终端或流程' })
     ).not.toBeInTheDocument()
+  })
+
+  it('uses only spring feedback when a terminal approaches the group', () => {
+    const { container } = render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: false,
+          members: [],
+          data: { dropFeedback: 'join', isEditing: true }
+        })}
+      />
+    )
+
+    expect(screen.queryByText('松开加入组合')).not.toBeInTheDocument()
+    expect(screen.queryByText('拖入终端或流程')).not.toBeInTheDocument()
+    expect(container.querySelector('.terminal-group-node')).toHaveClass(
+      'terminal-group-drop-spring--active'
+    )
   })
 
   it('uses only the shared tooltip for a member remove action', async () => {

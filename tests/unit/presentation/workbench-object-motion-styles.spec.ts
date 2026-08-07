@@ -48,10 +48,9 @@ describe('workbench object motion styles', () => {
   it('opens the stationary group surface while members translate into arranged slots', () => {
     const joinKeyframes = readRule('@keyframes workbench-terminal-group-join')
     const reflowKeyframes = readRule('@keyframes workbench-terminal-group-reflow')
-    const acceptKeyframes = readRule('@keyframes workbench-terminal-group-accept-shell')
-    const acceptRule = readRule('.terminal-group-node.workbench-object-motion--group-accept')
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
+    const groupRule = readTerminalGroupRule('.terminal-group-node')
 
     expect(joinKeyframes).toContain('var(--workbench-object-motion-x)')
     expect(joinKeyframes).not.toContain('scale(')
@@ -59,15 +58,14 @@ describe('workbench object motion styles', () => {
     expect(reflowKeyframes).toContain('var(--workbench-object-motion-x)')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
-    expect(acceptRule).toContain('animation:')
-    expect(acceptRule).toContain('transform-origin: center;')
-    expect(acceptKeyframes).toContain('transform: scale(1.012')
-    expect(acceptKeyframes).toMatch(/to\s*{[^}]*transform: scale\(1\);/s)
-    expect(dropTargetRule).toContain('box-shadow:')
+    expect(objectMotionStyles).not.toContain('.workbench-object-motion--group-accept')
+    expect(groupRule).toContain('--terminal-group-drop-scale: 1;')
+    expect(groupRule).toContain('transform: scale(var(--terminal-group-drop-scale));')
+    expect(dropTargetRule).not.toContain('background:')
+    expect(dropTargetRule).not.toContain('box-shadow:')
     expect(dropTargetRule).not.toMatch(/\b(border|outline|transform):/)
-    expect(dropTargetRule).not.toContain('--cc-success')
-    expect(dropTargetDepthRule).toContain('opacity:')
-    expect(dropTargetDepthRule).not.toMatch(/\b(border|outline):/)
+    expect(dropTargetRule).not.toMatch(/--cc-(primary|success)/)
+    expect(dropTargetDepthRule).not.toContain('opacity:')
     expect(objectMotionStyles).not.toContain(
       '.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)'
     )
@@ -81,6 +79,7 @@ describe('workbench object motion styles', () => {
     )
 
     expect(editingGroupRule).not.toContain('background:')
+    expect(editingGroupRule).not.toContain('--cc-primary')
     expect(emptyStateRule).not.toContain('dashed')
     expect(editingEmptyStateRule).not.toContain('background:')
     expect(editingEmptyStateRule).not.toContain('border-color:')
@@ -97,7 +96,7 @@ describe('workbench object motion styles', () => {
     expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary-border)')
   })
 
-  it('keeps idle canvas nodes free of hover transforms', () => {
+  it('keeps ordinary pointer hover free of node transforms', () => {
     const objectBaseRule = readRule(
       ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
     )
@@ -113,10 +112,11 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-x')
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-y')
     expect(objectMotionStyles).not.toContain('translate3d(0, -3px, 0)')
+    expect(terminalGroupStyles).toContain('.terminal-group-drop-spring--active')
     expect(objectMotionStyles).toContain('.react-flow__node.dragging')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
     nodeRules.forEach((rule) => {
-      expect(rule).not.toMatch(/transition:[^}]*transform/s)
+      expect(rule).not.toMatch(/transition:[^;]*\btransform\b/s)
     })
   })
 
