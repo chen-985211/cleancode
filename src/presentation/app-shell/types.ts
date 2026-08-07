@@ -84,8 +84,7 @@ export interface WorkbenchNodeLayoutInput {
 }
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
-export type WorkbenchObjectMotionKind =
-  'create' | 'group-accept' | 'group-collapse' | 'group-expand' | 'group-join'
+export type WorkbenchObjectMotionKind = 'create' | 'group-collapse' | 'group-expand' | 'group-join'
 
 export interface WorkbenchObjectMotion {
   readonly id: string

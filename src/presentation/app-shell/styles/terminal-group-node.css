@@ -33,10 +33,6 @@
     0 16px 32px var(--cc-shadow-color),
     0 0 0 1px var(--terminal-group-border) inset,
     0 1px 0 var(--cc-neutral-overlay) inset;
-  transition:
-    background 160ms ease-out,
-    box-shadow 180ms ease-out,
-    transform 180ms cubic-bezier(0.2, 0.82, 0.2, 1);
 }
 
 .terminal-group-node--collapsed {
@@ -128,17 +124,6 @@
   box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
 }
 
-.terminal-group-node--drop-join {
-  background: color-mix(in srgb, var(--cc-success-soft) 38%, var(--cc-surface-translucent));
-  transform: scale(1.004);
-  box-shadow:
-    0 0 0 2px var(--cc-success),
-    0 0 0 6px var(--cc-success-ring),
-    0 8px 18px var(--cc-shadow-color),
-    0 22px 42px var(--cc-shadow-color),
-    0 0 0 1px var(--cc-success) inset;
-}
-
 .terminal-group-node--drop-leave {
   box-shadow:
     0 0 0 2px var(--cc-primary-border),
@@ -215,12 +200,6 @@
   box-shadow: 0 0 0 1px var(--terminal-group-border) inset;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.terminal-group-node--drop-join .terminal-group-node__drop-hint {
-  background: var(--cc-success-soft);
-  color: var(--cc-success);
-  box-shadow: 0 0 0 1px var(--cc-success-border) inset;
 }
 
 .terminal-group-node--drop-leave .terminal-group-node__drop-hint {

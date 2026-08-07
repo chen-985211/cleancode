@@ -135,7 +135,7 @@ describe('workbench object motion', () => {
     ])
   })
 
-  it('hands a newly joined terminal into the group while the group acknowledges the drop', () => {
+  it('hands a newly joined terminal into a stationary group', () => {
     const currentGroup = createGroupNode('group-1', false, [], {
       height: 420,
       width: 760,
@@ -160,11 +160,7 @@ describe('workbench object motion', () => {
     })
 
     expect(projection.exitingNodes).toEqual([])
-    expect(projection.nodes[0]?.data.objectMotion).toEqual({
-      id: 'group-accept:group-1',
-      kind: 'group-accept',
-      offset: { x: 0, y: 0 }
-    })
+    expect(projection.nodes[0]?.data.objectMotion).toBeUndefined()
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
       id: 'group-join:terminal-1',
       kind: 'group-join',

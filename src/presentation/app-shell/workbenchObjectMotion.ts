@@ -100,17 +100,9 @@ export function projectWorkbenchObjectMotion({
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]))
   const nextNodesById = new Map(nextNodes.map((node) => [node.id, node]))
   const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
-  const membershipChanges = resolveGroupMembershipChanges(currentNodesById, nextNodes)
+  const joinedGroupMemberIds = resolveJoinedGroupMemberIds(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
-    if (node.type === 'terminalGroup' && membershipChanges.groupIds.has(node.id)) {
-      return withObjectMotion(
-        node,
-        createObjectMotion('group-accept', node.id, { x: 0, y: 0 }, createMotionId)
-      )
-    }
-
-    const joinedGroupId = membershipChanges.groupIdByMemberId.get(node.id)
-    if (node.type === 'terminal' && joinedGroupId) {
+    if (node.type === 'terminal' && joinedGroupMemberIds.has(node.id)) {
       const currentNode = currentNodesById.get(node.id)
       return withObjectMotion(
         node,
@@ -148,15 +140,11 @@ export function projectWorkbenchObjectMotion({
   return { exitingNodes, nodes }
 }
 
-function resolveGroupMembershipChanges(
+function resolveJoinedGroupMemberIds(
   currentNodesById: ReadonlyMap<string, WorkbenchFlowNode>,
   nextNodes: readonly WorkbenchFlowNode[]
-): {
-  readonly groupIdByMemberId: ReadonlyMap<string, string>
-  readonly groupIds: ReadonlySet<string>
-} {
-  const groupIdByMemberId = new Map<string, string>()
-  const groupIds = new Set<string>()
+): ReadonlySet<string> {
+  const joinedMemberIds = new Set<string>()
 
   nextNodes.forEach((node) => {
     if (node.type !== 'terminalGroup') return
@@ -166,12 +154,11 @@ function resolveGroupMembershipChanges(
     const currentMemberIds = new Set(currentNode.data.group.memberBlockIds)
     node.data.group.memberBlockIds.forEach((memberBlockId) => {
       if (currentMemberIds.has(memberBlockId)) return
-      groupIdByMemberId.set(memberBlockId, node.id)
-      groupIds.add(node.id)
+      joinedMemberIds.add(memberBlockId)
     })
   })
 
-  return { groupIdByMemberId, groupIds }
+  return joinedMemberIds
 }
 
 function resolveExpandingMemberOrigins(

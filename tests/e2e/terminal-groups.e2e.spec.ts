@@ -57,10 +57,10 @@ describe('terminal groups e2e', () => {
       const graphWithEmptyGroup = await readGraph(page, workbench)
       for (const terminal of graphWithEmptyGroup.blocks) {
         await dragTerminalIntoGroup(page, terminal.id)
-        await Promise.all([
-          page.locator('.terminal-node.workbench-object-motion--group-join').waitFor(),
-          page.locator('.terminal-group-node.workbench-object-motion--group-accept').waitFor()
-        ])
+        await page.locator('.terminal-node.workbench-object-motion--group-join').waitFor()
+        expect(
+          await page.locator('.terminal-group-node.workbench-object-motion--group-accept').count()
+        ).toBe(0)
         await waitForTerminalGroup(page, workbench, (group) =>
           group.memberBlockIds.includes(terminal.id)
         )
