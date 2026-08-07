@@ -23,7 +23,7 @@
   flex-direction: column;
   overflow: visible;
   border: 1px solid var(--terminal-border);
-  border-radius: 12px;
+  border-radius: var(--cc-canvas-node-radius);
   background: var(--terminal-shell);
   box-shadow: var(--cc-shadow-sm);
   transition:
@@ -80,7 +80,8 @@
   align-items: center;
   gap: 8px;
   border-bottom: 1px solid var(--cc-divider);
-  border-radius: 11px 11px 0 0;
+  border-radius: calc(var(--cc-canvas-node-radius) - 1px) calc(var(--cc-canvas-node-radius) - 1px) 0
+    0;
   padding: 7px 9px 7px 10px;
   background: var(--terminal-shell-raised);
 }
@@ -368,7 +369,8 @@
   min-height: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  border-radius: 0 0 11px 11px;
+  border-radius: 0 0 calc(var(--cc-canvas-node-radius) - 1px)
+    calc(var(--cc-canvas-node-radius) - 1px);
   background: var(--terminal-screen);
 }
 
