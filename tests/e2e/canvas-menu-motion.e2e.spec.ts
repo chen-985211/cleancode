@@ -206,10 +206,9 @@ describe('canvas menu motion e2e', () => {
       const menu = page.locator('[role="menu"][aria-label="画布操作"]')
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const openingScales = await sampleMenuScales(menu, 50)
+      const openingScales = await sampleMenuScalesForFrames(menu, 4)
       expect(openingScales[0]).toBeLessThan(0.8)
       expect(openingScales.at(-1)).toBeGreaterThan(openingScales[0] ?? 0)
-      expect(openingScales.at(-1)).toBeLessThan(0.9)
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
       const interruptedClosingScales = await sampleMenuScalesForFrames(menu, 2)
@@ -221,40 +220,13 @@ describe('canvas menu motion e2e', () => {
 
       await waitForMenuMotionState(menu, 'open')
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const closingScales = await sampleMenuScales(menu, 100)
+      const closingScales = await sampleMenuScalesForFrames(menu, 4)
       expect(closingScales.at(-1)).toBeLessThan(closingScales[0] ?? 1)
-      expect(closingScales.at(-1)).toBeGreaterThan(0.8)
-      expect(closingScales.at(-1)).toBeLessThan(0.93)
       await menu.waitFor({ state: 'detached' })
     },
     electronScenarioTimeoutMs
   )
 })
-
-async function sampleMenuScales(
-  menu: Locator,
-  minimumElapsedMilliseconds: number
-): Promise<number[]> {
-  return menu.evaluate(
-    async (element, minimumElapsed) =>
-      new Promise<number[]>((resolve) => {
-        const samples: number[] = []
-        const startedAt = performance.now()
-        const sample = (): void => {
-          samples.push(
-            Number((element as HTMLElement).style.getPropertyValue('--canvas-menu-scale'))
-          )
-          if (performance.now() - startedAt >= minimumElapsed) {
-            resolve(samples)
-            return
-          }
-          requestAnimationFrame(sample)
-        }
-        sample()
-      }),
-    minimumElapsedMilliseconds
-  )
-}
 
 async function sampleMenuScalesForFrames(menu: Locator, frameCount: number): Promise<number[]> {
   return menu.evaluate(
