@@ -41,13 +41,19 @@ export function projectWorkbenchObjectMotionOntoEdges(
   edges: Edge[],
   nodes: readonly WorkbenchFlowNode[]
 ): Edge[] {
-  const expandingNodeIds = new Set(
-    nodes.filter((node) => node.data.objectMotion?.kind === 'group-expand').map((node) => node.id)
+  const movingNodeIds = new Set(
+    nodes
+      .filter(
+        (node) =>
+          node.data.objectMotion?.kind === 'group-expand' ||
+          node.data.objectMotion?.kind === 'group-join'
+      )
+      .map((node) => node.id)
   )
-  if (expandingNodeIds.size === 0) return edges
+  if (movingNodeIds.size === 0) return edges
 
   return edges.map((edge) => {
-    const isMotionPending = expandingNodeIds.has(edge.source) || expandingNodeIds.has(edge.target)
+    const isMotionPending = movingNodeIds.has(edge.source) || movingNodeIds.has(edge.target)
     if (!isMotionPending) return edge
 
     const classNames = new Set(edge.className?.split(/\s+/).filter(Boolean) ?? [])
@@ -94,7 +100,29 @@ export function projectWorkbenchObjectMotion({
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]))
   const nextNodesById = new Map(nextNodes.map((node) => [node.id, node]))
   const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
+  const membershipChanges = resolveGroupMembershipChanges(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
+    if (node.type === 'terminalGroup' && membershipChanges.groupIds.has(node.id)) {
+      return withObjectMotion(
+        node,
+        createObjectMotion('group-accept', node.id, { x: 0, y: 0 }, createMotionId)
+      )
+    }
+
+    const joinedGroupId = membershipChanges.groupIdByMemberId.get(node.id)
+    if (node.type === 'terminal' && joinedGroupId) {
+      const currentNode = currentNodesById.get(node.id)
+      return withObjectMotion(
+        node,
+        createObjectMotion(
+          'group-join',
+          node.id,
+          currentNode ? resolveOffsetFromNode(node, currentNode) : { x: 0, y: 0 },
+          createMotionId
+        )
+      )
+    }
+
     if (currentNodesById.has(node.id) || isWorkflowBuildNode(node)) {
       return node
     }
@@ -118,6 +146,32 @@ export function projectWorkbenchObjectMotion({
   })
 
   return { exitingNodes, nodes }
+}
+
+function resolveGroupMembershipChanges(
+  currentNodesById: ReadonlyMap<string, WorkbenchFlowNode>,
+  nextNodes: readonly WorkbenchFlowNode[]
+): {
+  readonly groupIdByMemberId: ReadonlyMap<string, string>
+  readonly groupIds: ReadonlySet<string>
+} {
+  const groupIdByMemberId = new Map<string, string>()
+  const groupIds = new Set<string>()
+
+  nextNodes.forEach((node) => {
+    if (node.type !== 'terminalGroup') return
+    const currentNode = currentNodesById.get(node.id)
+    if (currentNode?.type !== 'terminalGroup') return
+
+    const currentMemberIds = new Set(currentNode.data.group.memberBlockIds)
+    node.data.group.memberBlockIds.forEach((memberBlockId) => {
+      if (currentMemberIds.has(memberBlockId)) return
+      groupIdByMemberId.set(memberBlockId, node.id)
+      groupIds.add(node.id)
+    })
+  })
+
+  return { groupIdByMemberId, groupIds }
 }
 
 function resolveExpandingMemberOrigins(
@@ -206,6 +260,13 @@ function resolveOffsetFromOrigin(
 ): { readonly x: number; readonly y: number } {
   const center = resolveNodeCenter(node)
   return { x: origin.x - center.x, y: origin.y - center.y }
+}
+
+function resolveOffsetFromNode(
+  node: WorkbenchFlowNode,
+  currentNode: WorkbenchFlowNode
+): { readonly x: number; readonly y: number } {
+  return resolveOffsetFromOrigin(node, resolveNodeCenter(currentNode))
 }
 
 function resolveNodeCenter(node: WorkbenchFlowNode): { readonly x: number; readonly y: number } {

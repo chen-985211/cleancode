@@ -36,6 +36,65 @@
   will-change: transform, opacity;
 }
 
+.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)
+  .react-flow__node.dragging
+  .terminal-node {
+  border-color: var(--cc-success);
+  transform: scale(0.985);
+  box-shadow:
+    0 0 0 2px var(--cc-success),
+    0 0 0 6px var(--cc-success-ring),
+    var(--cc-shadow-node);
+  transition:
+    border-color 120ms ease-out,
+    box-shadow 120ms ease-out,
+    transform 140ms cubic-bezier(0.2, 0.82, 0.2, 1);
+}
+
+.terminal-group-node--drop-join::after {
+  position: absolute;
+  z-index: 7;
+  inset: 6px;
+  border: 2px solid var(--cc-success);
+  border-radius: 8px;
+  box-shadow: 0 0 0 5px var(--cc-success-ring);
+  content: '';
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.terminal-group-node--drop-join .workbench-node-selection-veil,
+.terminal-group-node.workbench-object-motion--group-accept .workbench-node-selection-veil {
+  border-color: var(--cc-success);
+  box-shadow:
+    0 0 0 4px var(--cc-success-ring),
+    var(--cc-shadow-node);
+}
+
+.terminal-node.workbench-object-motion--group-join {
+  transform-origin: center;
+  animation: workbench-terminal-group-join 380ms cubic-bezier(0.16, 0.84, 0.25, 1) both;
+  will-change: transform;
+}
+
+.terminal-group-node.workbench-object-motion--group-accept {
+  transform-origin: center;
+  animation: workbench-terminal-group-accept 420ms cubic-bezier(0.16, 0.84, 0.25, 1) both;
+  will-change: transform;
+}
+
+.terminal-group-node.workbench-object-motion--group-accept::after {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  border: 2px solid var(--cc-success);
+  border-radius: inherit;
+  content: '';
+  pointer-events: none;
+  animation: workbench-terminal-group-accept-ring 420ms ease-out both;
+  will-change: opacity, transform;
+}
+
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
   transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -162,6 +221,51 @@
   }
 }
 
+@keyframes workbench-terminal-group-join {
+  from {
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
+      scale(0.985);
+  }
+
+  66% {
+    transform: translate3d(0, 0, 0) scale(1.012);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes workbench-terminal-group-accept {
+  from {
+    transform: scale(1.004);
+  }
+
+  28% {
+    transform: scale(0.994);
+  }
+
+  66% {
+    transform: scale(1.003);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes workbench-terminal-group-accept-ring {
+  from {
+    opacity: 0.82;
+    transform: scale(0.994);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.018);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
     transition: none;
@@ -170,16 +274,33 @@
 
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--group-accept,
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-join
   ),
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--group-accept,
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-join
   )::before {
     clip-path: none;
     opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .terminal-group-node--drop-join,
+  .canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)
+    .react-flow__node.dragging
+    .terminal-node {
+    transform: none;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-accept::after {
+    opacity: 0;
     transform: none;
     animation: none;
   }

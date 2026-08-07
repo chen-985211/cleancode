@@ -33,6 +33,24 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
+  it('couples group-drop attraction with terminal settling and container acknowledgement', () => {
+    const joinKeyframes = readRule('@keyframes workbench-terminal-group-join')
+    const acceptKeyframes = readRule('@keyframes workbench-terminal-group-accept')
+
+    expect(objectMotionStyles).toContain(
+      '.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)'
+    )
+    expect(objectMotionStyles).toContain('.terminal-group-node--drop-join::after')
+    expect(objectMotionStyles).toContain(
+      '.terminal-group-node--drop-join .workbench-node-selection-veil'
+    )
+    expect(joinKeyframes).toContain('var(--workbench-object-motion-x)')
+    expect(joinKeyframes).toContain('scale(')
+    expect(acceptKeyframes).toContain('scale(')
+    expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
+    expect(objectMotionStyles).toContain('.workbench-object-motion--group-accept')
+  })
+
   it('reduces secondary controls by detail level while preserving node identity surfaces', () => {
     expect(objectMotionStyles).toContain("[data-canvas-detail='compact']")
     expect(objectMotionStyles).toContain("[data-canvas-detail='overview']")
