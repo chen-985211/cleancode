@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import type { ElectronApplication, Page } from 'playwright'
+import type { ElectronApplication, Locator, Page } from 'playwright'
 
 import {
   createE2eWorkbench,
@@ -138,4 +138,65 @@ describe('canvas menu motion e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'toggles on repeated secondary click and consumes primary dismissal before canvas pan',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await pollUntilState({
+        description: 'canvas actions to become available',
+        observe: () => page.getByRole('button', { name: '新建 Agent' }).isEnabled(),
+        accept: Boolean,
+        timeoutMs: 10_000
+      })
+
+      const pane = page.locator('.react-flow__pane')
+      const viewport = page.locator('.react-flow__viewport')
+      await pane.waitFor({ state: 'visible' })
+      const point = await findVisibleBlankCanvasPoint(pane)
+      const menu = page.locator('[role="menu"][aria-label="画布操作"]')
+      const interactiveMenu = page.locator(
+        '[role="menu"][aria-label="画布操作"][data-interactive="true"]'
+      )
+
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      await interactiveMenu.waitFor({ state: 'attached' })
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      await menu.waitFor({ state: 'detached' })
+
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      await interactiveMenu.waitFor({ state: 'attached' })
+      const viewportBeforeDismiss = await viewport.getAttribute('style')
+
+      await page.mouse.move(point.x, point.y)
+      await page.mouse.down({ button: 'left' })
+      await page.mouse.move(point.x + 48, point.y + 32, { steps: 4 })
+      await page.mouse.up({ button: 'left' })
+      await menu.waitFor({ state: 'detached' })
+
+      expect(await viewport.getAttribute('style')).toBe(viewportBeforeDismiss)
+    },
+    electronScenarioTimeoutMs
+  )
 })
+
+async function findVisibleBlankCanvasPoint(
+  pane: Locator
+): Promise<{ readonly x: number; readonly y: number }> {
+  return pane.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    const xRatios = [0.54, 0.7, 0.38, 0.86, 0.22]
+    const yRatios = [0.18, 0.32, 0.48, 0.64, 0.8]
+    for (const yRatio of yRatios) {
+      for (const xRatio of xRatios) {
+        const point = {
+          x: bounds.left + bounds.width * xRatio,
+          y: bounds.top + bounds.height * yRatio
+        }
+        if (document.elementFromPoint(point.x, point.y) === element) return point
+      }
+    }
+    throw new Error('No visible blank React Flow pane point is available.')
+  })
+}

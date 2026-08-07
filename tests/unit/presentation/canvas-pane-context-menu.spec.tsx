@@ -76,6 +76,20 @@ describe('canvas pane context menu', () => {
     expect(pane).toHaveFocus()
     expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
   })
+
+  it('toggles closed on a repeated secondary click without replaying open preparation', () => {
+    const actions = createActions()
+    render(<Harness actions={actions} graphId="graph-1" />)
+
+    const pane = screen.getByTestId('pane')
+    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+    expect(screen.getByRole('menu', { name: '画布操作' })).toBeInTheDocument()
+
+    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+
+    expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
+    expect(actions.onBeforeOpen).toHaveBeenCalledOnce()
+  })
 })
 
 interface HarnessProps {

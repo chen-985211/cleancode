@@ -38,6 +38,8 @@ interface CanvasMenuCoordinator {
     onPresent: (presentation: CanvasMenuMotionPresentation) => void
   ) => CanvasMenuMotionController
   readonly deactivate: (menuId: string) => void
+  readonly dismissActive: () => boolean
+  readonly hasActive: () => boolean
   readonly present: (menuId: string, progress: number) => void
   readonly release: (menuId: string) => void
   readonly reset: () => void
@@ -101,6 +103,22 @@ export function CanvasMenuMotionProvider({
         className="canvas-menu-backdrop"
         data-motion-state="closed"
         data-testid="canvas-menu-backdrop"
+        onContextMenu={(event) => {
+          if (!coordinator.hasActive()) return
+          event.preventDefault()
+          event.stopPropagation()
+          coordinator.dismissActive()
+        }}
+        onPointerDown={(event) => {
+          if (!coordinator.hasActive()) return
+          event.stopPropagation()
+          if (event.button !== 0) return
+          event.preventDefault()
+          if (typeof event.currentTarget.setPointerCapture === 'function') {
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }
+          coordinator.dismissActive()
+        }}
         style={
           {
             '--canvas-menu-backdrop-progress': 0,
@@ -229,7 +247,10 @@ function createCanvasMenuCoordinator({
   const updateBackdrop = (): void => {
     const progress = Math.max(0, ...[...records.values()].map((record) => record.progress))
     backdrop?.style.setProperty('--canvas-menu-backdrop-progress', `${round(progress)}`)
-    if (backdrop) backdrop.dataset.motionState = progress > 0 ? 'open' : 'closed'
+    if (backdrop) {
+      backdrop.dataset.motionState = progress > 0 ? 'open' : 'closed'
+      backdrop.style.pointerEvents = activeMenuId ? 'auto' : 'none'
+    }
   }
 
   return {
@@ -240,6 +261,7 @@ function createCanvasMenuCoordinator({
       const record = records.get(menuId) ?? { onRequestClose, progress: 0 }
       record.onRequestClose = onRequestClose
       records.set(menuId, record)
+      updateBackdrop()
       if (previous && previousMenuId !== menuId) previous.onRequestClose()
     },
     createMotion: (onPresent) => {
@@ -262,7 +284,15 @@ function createCanvasMenuCoordinator({
     },
     deactivate: (menuId) => {
       if (activeMenuId === menuId) activeMenuId = null
+      updateBackdrop()
     },
+    dismissActive: () => {
+      const activeRecord = activeMenuId ? records.get(activeMenuId) : null
+      if (!activeRecord) return false
+      activeRecord.onRequestClose()
+      return true
+    },
+    hasActive: () => activeMenuId !== null,
     present: (menuId, progress) => {
       const record = records.get(menuId)
       if (record) record.progress = progress

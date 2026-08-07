@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 
 import {
@@ -59,9 +59,14 @@ describe('canvas menu surface', () => {
     expect(screen.getAllByRole('menu')).toHaveLength(1)
   })
 
-  it('drives one click-through canvas backdrop from the strongest live menu presentation', () => {
+  it('drives one input-consuming dismiss layer from the strongest live menu presentation', () => {
     const scheduler = new TestFrameScheduler()
-    render(<MenuHarness scheduler={scheduler} />)
+    const onCanvasPointerDown = vi.fn()
+    render(
+      <div onPointerDown={onCanvasPointerDown}>
+        <MenuHarness scheduler={scheduler} />
+      </div>
+    )
 
     const backdrop = screen.getByTestId('canvas-menu-backdrop')
     expect(backdrop).toHaveStyle('--canvas-menu-backdrop-progress: 0')
@@ -71,7 +76,29 @@ describe('canvas menu surface', () => {
     expect(
       Number(backdrop.style.getPropertyValue('--canvas-menu-backdrop-progress'))
     ).toBeGreaterThan(0)
-    expect(backdrop).toHaveStyle('pointer-events: none')
+    expect(backdrop).toHaveStyle('pointer-events: auto')
+
+    fireEvent.pointerDown(backdrop, { button: 0, pointerId: 1 })
+
+    expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
+    expect(onCanvasPointerDown).not.toHaveBeenCalled()
+  })
+
+  it('dismisses on a repeated secondary click without leaking a native context menu', () => {
+    const scheduler = new TestFrameScheduler()
+    render(<MenuHarness scheduler={scheduler} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
+    const backdrop = screen.getByTestId('canvas-menu-backdrop')
+
+    fireEvent.pointerDown(backdrop, { button: 2, pointerId: 2 })
+    expect(screen.getByRole('menu', { name: '测试菜单' })).toBeInTheDocument()
+
+    const contextMenuEvent = createEvent.contextMenu(backdrop)
+    fireEvent(backdrop, contextMenuEvent)
+
+    expect(contextMenuEvent.defaultPrevented).toBe(true)
+    expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
   })
 
   it('cancels live menu motion and clears the backdrop when the workspace reset key changes', () => {

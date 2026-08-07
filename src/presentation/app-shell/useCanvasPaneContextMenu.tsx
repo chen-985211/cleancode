@@ -52,6 +52,10 @@ export function useCanvasPaneContextMenu({
   const open = useCallback(
     (event: CanvasPaneContextMenuEvent): void => {
       event.preventDefault()
+      if (position?.graphId === graphId && position.open) {
+        close()
+        return
+      }
       onBeforeOpen()
       if (isBlocked) {
         close()
@@ -59,7 +63,7 @@ export function useCanvasPaneContextMenu({
       }
       setPosition({ graphId, open: true, x: event.clientX, y: event.clientY })
     },
-    [close, graphId, isBlocked, onBeforeOpen]
+    [close, graphId, isBlocked, onBeforeOpen, position]
   )
 
   return {

@@ -6,6 +6,29 @@ import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/type
 import { useCanvasObjectContextMenu } from '../../../src/presentation/app-shell/useCanvasObjectContextMenu'
 
 describe('canvas object context menu lifecycle', () => {
+  it('toggles closed when the same node receives a repeated secondary click', () => {
+    const graph = createGraph('graph-1')
+    const terminalNode = createTerminalNode()
+    const { result } = renderHook(() =>
+      useCanvasObjectContextMenu({
+        edges: [],
+        graph,
+        nodes: [terminalNode]
+      })
+    )
+    const firstEvent = createContextMenuEvent()
+    const secondEvent = createContextMenuEvent()
+
+    act(() => result.current.onNodeContextMenu(firstEvent, terminalNode))
+    expect(result.current.nodes[0]?.data.isContextSelected).toBe(true)
+
+    act(() => result.current.onNodeContextMenu(secondEvent, terminalNode))
+
+    expect(firstEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(secondEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(result.current.nodes[0]?.data.isContextSelected).toBeUndefined()
+  })
+
   it('clears the transient target when the graph changes', () => {
     const graph = createGraph('graph-1')
     const terminalNode = createTerminalNode()
@@ -37,6 +60,18 @@ describe('canvas object context menu lifecycle', () => {
     expect(result.current.menu).toBeNull()
   })
 })
+
+function createContextMenuEvent(): ReactMouseEvent<Element> & {
+  readonly preventDefault: ReturnType<typeof vi.fn>
+} {
+  return {
+    clientX: 100,
+    clientY: 100,
+    preventDefault: vi.fn()
+  } as unknown as ReactMouseEvent<Element> & {
+    readonly preventDefault: ReturnType<typeof vi.fn>
+  }
+}
 
 function createGraph(id: string): BlockGraphSnapshot {
   return {

@@ -77,6 +77,13 @@ export function useCanvasObjectContextMenu({
         close()
         return
       }
+
+      const nextGraphKey = createGraphKey(graph)
+      if (state?.graphKey === nextGraphKey && state.open) {
+        event.preventDefault()
+        close()
+        return
+      }
       const target = resolveCanvasObjectContextTarget(graph, {
         nodeId: node.id,
         nodeType: node.type
@@ -88,14 +95,14 @@ export function useCanvasObjectContextMenu({
 
       event.preventDefault()
       setState({
-        graphKey: createGraphKey(graph),
+        graphKey: nextGraphKey,
         open: true,
         position: { x: event.clientX, y: event.clientY },
         requestId: (nextRequestIdRef.current += 1),
         target
       })
     },
-    [close, graph]
+    [close, graph, state]
   )
 
   return {
