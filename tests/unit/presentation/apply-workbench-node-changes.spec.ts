@@ -97,6 +97,47 @@ describe('workbench node changes', () => {
       expect.objectContaining({ id: 'frontend-terminal', position: { x: 1120, y: 240 } })
     ])
   })
+
+  it('keeps the committed group shell fixed while workflow members are entering', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph(),
+      selectedTerminalGroupId: 'development-group',
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers()
+    }).map((node): WorkbenchFlowNode => {
+      if (node.id === 'development-group') {
+        return { ...node, className: 'terminal-workflow-build-group--entering' }
+      }
+      if (node.id === 'frontend-terminal') {
+        return {
+          ...node,
+          className: 'terminal-workflow-build-node--entering',
+          position: { x: 1_520, y: 900 }
+        }
+      }
+      return node
+    })
+    const changes: NodeChange<WorkbenchFlowNode>[] = [
+      {
+        dimensions: { height: 306, width: 420 },
+        id: 'frontend-terminal',
+        type: 'dimensions'
+      }
+    ]
+
+    const changedNodes = applyWorkbenchNodeChanges(changes, nodes)
+
+    expect(changedNodes).toEqual([
+      expect.objectContaining({
+        id: 'development-group',
+        position: { x: 288, y: 164 },
+        style: { height: 458, width: 984 }
+      }),
+      expect.objectContaining({ id: 'backend-terminal', position: { x: 320, y: 240 } }),
+      expect.objectContaining({ id: 'frontend-terminal', position: { x: 1_520, y: 900 } })
+    ])
+  })
 })
 
 function createGraph(): BlockGraphSnapshot {

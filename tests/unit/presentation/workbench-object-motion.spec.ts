@@ -135,6 +135,46 @@ describe('workbench object motion', () => {
     ])
   })
 
+  it('absorbs a newly joined terminal while existing group members make room', () => {
+    const currentGroup = createGroupNode('group-1', false, ['terminal-2'], {
+      height: 420,
+      width: 760,
+      x: 100,
+      y: 100
+    })
+    const nextGroup = createGroupNode('group-1', false, ['terminal-2', 'terminal-1'], {
+      height: 460,
+      width: 820,
+      x: 100,
+      y: 100
+    })
+    const draggedTerminal = createTerminalNode('terminal-1', { x: 460, y: 280 })
+    const settledTerminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
+    const currentMember = createTerminalNode('terminal-2', { x: 700, y: 300 })
+    const reflowedMember = createTerminalNode('terminal-2', { x: 300, y: 300 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [currentGroup, draggedTerminal, currentMember],
+      isContinuingGraph: true,
+      nextNodes: [nextGroup, settledTerminal, reflowedMember],
+      reducedMotion: false
+    })
+
+    expect(projection.exitingNodes).toEqual([])
+    expect(projection.nodes[0]?.data.objectMotion).toBeUndefined()
+    expect(projection.nodes[1]?.data.objectMotion).toEqual({
+      id: 'group-join:terminal-1',
+      kind: 'group-join',
+      offset: { x: -40, y: -20 }
+    })
+    expect(projection.nodes[2]?.data.objectMotion).toEqual({
+      id: 'group-reflow:terminal-2',
+      kind: 'group-reflow',
+      offset: { x: 400, y: 0 }
+    })
+  })
+
   it('settles creation and group changes immediately for reduced motion', () => {
     const expandedGroup = createGroupNode('group-1', false, ['terminal-1'], {
       height: 600,
@@ -159,6 +199,32 @@ describe('workbench object motion', () => {
     })
 
     expect(projection).toEqual({ exitingNodes: [], nodes: [collapsedGroup] })
+  })
+
+  it('settles group membership changes immediately for reduced motion', () => {
+    const currentGroup = createGroupNode('group-1', false, [], {
+      height: 420,
+      width: 760,
+      x: 100,
+      y: 100
+    })
+    const nextGroup = createGroupNode('group-1', false, ['terminal-1'], {
+      height: 460,
+      width: 820,
+      x: 100,
+      y: 100
+    })
+    const terminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [currentGroup, terminal],
+      isContinuingGraph: true,
+      nextNodes: [nextGroup, terminal],
+      reducedMotion: true
+    })
+
+    expect(projection).toEqual({ exitingNodes: [], nodes: [nextGroup, terminal] })
   })
 
   it('starts created-object focus after one presented object frame and remains cancellable', () => {
@@ -210,6 +276,32 @@ describe('workbench object motion', () => {
     ])
     expect(projectWorkbenchObjectMotionOntoEdges(edges, [terminal])).toBe(edges)
   })
+
+  it.each(['group-join', 'group-leave', 'group-reflow'] as const)(
+    'holds workflow edges until a terminal finishes %s motion',
+    (kind) => {
+      const terminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
+      const joinedTerminal = {
+        ...terminal,
+        data: {
+          ...terminal.data,
+          objectMotion: {
+            id: `${kind}:terminal-1`,
+            kind,
+            offset: { x: -40, y: -20 }
+          }
+        }
+      } as WorkbenchFlowNode
+      const edges = [{ id: 'connected', source: 'terminal-1', target: 'terminal-2' }]
+
+      expect(projectWorkbenchObjectMotionOntoEdges(edges, [joinedTerminal])).toEqual([
+        expect.objectContaining({
+          id: 'connected',
+          className: 'workbench-object-edge--motion-pending'
+        })
+      ])
+    }
+  )
 })
 
 function createMotionId(kind: string, nodeId: string): string {

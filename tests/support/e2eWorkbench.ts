@@ -23,6 +23,7 @@ import {
 } from '../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
 
 export { e2eTeardownTimeoutMs } from './e2eLifecycle'
+export { selectBlankCanvasAction } from './e2eCanvasActions'
 
 export const electronLaunchTimeoutMs = 30_000
 export const electronScenarioTimeoutMs = 60_000

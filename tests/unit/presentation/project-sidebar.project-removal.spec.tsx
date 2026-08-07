@@ -69,6 +69,9 @@ describe('project sidebar project removal', () => {
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: '项目 alpha-project' })).not.toBeInTheDocument()
     )
-    expect(screen.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+    const pane = document.querySelector<HTMLElement>('.react-flow__pane')
+    if (!pane) throw new Error('Expected a React Flow pane')
+    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+    expect(await screen.findByRole('menuitem', { name: '新建终端积木' })).toBeDisabled()
   })
 })

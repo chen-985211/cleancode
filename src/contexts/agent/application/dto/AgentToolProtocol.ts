@@ -40,7 +40,7 @@ interface AgentToolAnnotations {
 export const cleancodeMcpDeveloperInstructions = [
   'CleanCode canvas routing is mandatory while the built-in cleancode MCP server is enabled. Treat unqualified requests about “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal dependencies, and specifically “启动项目的终端组合” as requests to create or modify persisted CleanCode canvas terminal blocks, groups, execution configuration, and dependency connections, not as requests to run project processes directly.',
   canvasExecutionSemanticInstructions,
-  'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands. For a new configured terminal or a new multi-terminal dependency workflow, use create_terminal_workflow once with the complete definitions, connections, and optional combination; it atomically validates and arranges the new scope near existing canvas content. Keep create_block, update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for empty visual terminals or edits to existing canvas objects. Do not split one new workflow across repeated create/configure/connect/arrange calls.',
+  'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands. For a new configured terminal or a new multi-terminal dependency workflow, use create_terminal_workflow once with the complete definitions, connections, and optional combination; it atomically validates and arranges the new scope near existing canvas content. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group; do not assemble existing membership through create_terminal_group memberBlockIds. Keep create_block, update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for empty visual terminals or edits to existing canvas objects. Do not split one new workflow across repeated create/configure/connect/arrange calls.',
   'When a terminal starts a local HTTP, HTTPS, or TCP development service, inspect its existing launch path before choosing a managed port. For parallel projects and worktrees, use preferred with the conventional port as the recommended default, or auto when no conventional port matters. Both require a verified binding: environment only when the existing project already reads that variable, or argument with a safe template such as --port {port} only when the existing CLI or task wrapper accepts it. Do not invent a variable or select fixed + none merely because logs or defaults mention a port; reserve fixed for an explicit immutable-port requirement. Run replaces the binding with the actual allocated port at launch, and readiness plus the displayed endpoint follow that actual port.',
   'The current CleanCode MCP can author and inspect a terminal workflow but cannot start it. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects, and do not claim that a created workflow or terminal was started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.'
 ].join('\n')
@@ -48,7 +48,7 @@ export const cleancodeMcpDeveloperInstructions = [
 export const cleancodeMcpInstructions = [
   'CleanCode canvas scope / CleanCode 画布语义：while this MCP server is enabled, unqualified requests such as “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal organization, terminal layout, or terminal dependencies mean persisted CleanCode canvas objects, not repository code. Call inspect_graph before reading or searching repository files. Only treat explicit source-code terms such as “终端源码”, “Terminal component”, xterm, PTY, or terminal module implementation as project-code work.',
   canvasExecutionSemanticInstructions,
-  'For canvas work, inspect first. Use create_terminal_workflow once for a new configured terminal or complete new dependency workflow; it atomically creates definitions, internal dependencies, an optional combination, deterministic layout near existing canvas content, and a validated plan. Use create_block, update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for empty visual terminals or edits to existing canvas objects. Do not split one new workflow across repeated tool calls. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
+  'For canvas work, inspect first. Use create_terminal_workflow once for a new configured terminal or complete new dependency workflow; it atomically creates definitions, internal dependencies, an optional combination, deterministic layout near existing canvas content, and a validated plan. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group; do not assemble existing membership through create_terminal_group memberBlockIds. Use create_block, update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for empty visual terminals or edits to existing canvas objects. Do not split one new workflow across repeated tool calls. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
   'For a local HTTP, HTTPS, or TCP development service that may run in parallel projects or worktrees, prefer preferred with its conventional port and a verified environment or argument binding; use auto when no conventional port matters. Environment injection is valid only when the existing project already reads the named variable, and an argument template such as --port {port} is valid only when the existing CLI or wrapper accepts it. Use fixed, especially fixed + none, only for an explicit immutable-port contract. At runtime CleanCode injects the actual allocated port and validates readiness against that actual port.',
   'Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. The Provider launch integration may allow these CleanCode MCP tools directly when that Provider supports a tool allowlist. This does not change the Provider sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval, as does disconnecting a dependency.'
 ].join('\n')
@@ -129,7 +129,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
           {
             memberRefs: {
               items: { minLength: 1, type: 'string' },
-              minItems: 2,
+              minItems: 1,
               type: 'array',
               uniqueItems: true
             },
@@ -225,22 +225,64 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Create a visual terminal group on the cleancode canvas from existing terminal blocks that resolve to at least two top-level execution units: independent terminals or complete workflows. A group is not a workflow node, and one terminal or one complete workflow cannot be wrapped in a group.',
+      'Create a persistent terminal-group space on the cleancode canvas. It may start empty or contain existing independent terminals and complete workflows. Omit position for automatic empty-group placement around existing canvas objects. A group is a connection scope, not a workflow node; dependencies cannot cross its boundary. memberBlockIds remains compatible, but use move_terminal_workflow_to_group for existing workflow membership.',
     graphChanged: true,
     inputSchema: objectSchema(
       {
         memberBlockIds: {
           items: { type: 'string' },
-          minItems: 2,
           type: 'array',
           uniqueItems: true
         },
-        name: { type: 'string' }
+        name: { type: 'string' },
+        position: positionSchema()
       },
-      ['name', 'memberBlockIds']
+      ['name']
     ),
     name: 'create_terminal_group',
-    output: blockGraphOutputSchema({ createdTerminalGroupId: { type: 'string' } })
+    output: objectSchema(
+      {
+        arrangedBlockIds: { items: { type: 'string' }, type: 'array' },
+        arrangedTerminalGroupIds: { items: { type: 'string' }, type: 'array' },
+        createdTerminalGroupId: { type: 'string' },
+        type: { const: 'block_graph' }
+      },
+      ['type', 'createdTerminalGroupId', 'arrangedBlockIds', 'arrangedTerminalGroupIds']
+    )
+  }),
+  graphTool({
+    annotations: nonDestructiveWriteToolAnnotations,
+    description:
+      'Move one complete workflow into another terminal group, between groups, or back to the root canvas. Supply any representative blockId; CleanCode expands it to the complete workflow atomically. The target group stays anchored and its members are automatically arranged. Leaving a group requires a new root-canvas position.',
+    graphChanged: 'dynamic',
+    inputSchema: {
+      oneOf: [
+        objectSchema(
+          {
+            blockId: { type: 'string' },
+            targetTerminalGroupId: { type: 'string' }
+          },
+          ['blockId', 'targetTerminalGroupId']
+        ),
+        objectSchema(
+          {
+            blockId: { type: 'string' },
+            position: positionSchema(),
+            targetTerminalGroupId: { type: 'null' }
+          },
+          ['blockId', 'targetTerminalGroupId', 'position']
+        )
+      ]
+    },
+    name: 'move_terminal_workflow_to_group',
+    output: objectSchema(
+      {
+        arrangedBlockIds: { items: { type: 'string' }, type: 'array' },
+        arrangedTerminalGroupIds: { items: { type: 'string' }, type: 'array' },
+        type: { const: 'block_graph' }
+      },
+      ['type', 'arrangedBlockIds', 'arrangedTerminalGroupIds']
+    )
   }),
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
@@ -396,9 +438,21 @@ export interface DeleteBlockAgentToolInput {
 }
 
 export interface CreateTerminalGroupAgentToolInput {
-  readonly memberBlockIds: readonly string[]
+  readonly memberBlockIds?: readonly string[]
   readonly name: string
+  readonly position?: AgentBlockPositionSnapshot
 }
+
+export type MoveTerminalWorkflowToGroupAgentToolInput =
+  | {
+      readonly blockId: string
+      readonly targetTerminalGroupId: string
+    }
+  | {
+      readonly blockId: string
+      readonly position: AgentBlockPositionSnapshot
+      readonly targetTerminalGroupId: null
+    }
 
 export interface UpdateTerminalGroupAgentToolInput {
   readonly isCollapsed?: boolean
@@ -444,6 +498,7 @@ export interface AgentToolInputByName {
   readonly disconnect_terminal_blocks: DisconnectTerminalBlocksAgentToolInput
   readonly inspect_graph: InspectGraphAgentToolInput
   readonly inspect_terminal_workflow_plan: InspectTerminalWorkflowPlanAgentToolInput
+  readonly move_terminal_workflow_to_group: MoveTerminalWorkflowToGroupAgentToolInput
   readonly update_block: UpdateBlockAgentToolInput
   readonly update_terminal_execution_config: UpdateTerminalExecutionConfigAgentToolInput
   readonly update_terminal_group: UpdateTerminalGroupAgentToolInput

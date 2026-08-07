@@ -167,12 +167,23 @@ function resizeExpandedTerminalGroupShells(
       return memberNode ? [memberNode] : []
     })
 
+    if (
+      isTerminalWorkflowBuildPresentationNode(node) ||
+      memberNodes.some(isTerminalWorkflowBuildPresentationNode)
+    ) {
+      return node
+    }
+
     if (memberNodes.length < 2) {
       return node
     }
 
     return resizeTerminalGroupShell(node, memberNodes)
   })
+}
+
+function isTerminalWorkflowBuildPresentationNode(node: WorkbenchFlowNode): boolean {
+  return typeof node.className === 'string' && node.className.startsWith('terminal-workflow-build-')
 }
 
 function resizeTerminalGroupShell(

@@ -140,6 +140,49 @@ describe('execute Agent layout tools', () => {
     ])
   })
 
+  it('uses authoritative Agent obstacles when automatically placing an empty combination', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.createTerminalGroup).mockResolvedValue(fakeGraphWithEmptyGroup)
+    const executeTool = createExecuteTool(
+      blockGraphTools,
+      new RecordingAgentAuditRepository(),
+      createAgentSessionRepository([
+        createAgent('agent-1', { x: 980, y: 180 }, { height: 460, width: 720 })
+      ])
+    )
+
+    const result = await executeTool.execute({
+      agentId: 'agent-1',
+      input: { name: 'Deployment' },
+      projectDirectory: '/tmp/project',
+      projectId: 'project-1',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-create-empty-group',
+      toolName: 'create_terminal_group',
+      workspaceId: 'main'
+    })
+
+    expect(blockGraphTools.createTerminalGroup).toHaveBeenCalledWith(
+      { projectDirectory: '/tmp/project', workspaceId: 'main' },
+      {
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          }
+        ],
+        name: 'Deployment'
+      }
+    )
+    expect(result).toMatchObject({
+      output: {
+        arrangedBlockIds: [],
+        arrangedTerminalGroupIds: ['terminal-group-deployment'],
+        createdTerminalGroupId: 'terminal-group-deployment'
+      }
+    })
+  })
+
   it('creates a complete workflow through one atomic graph port call', async () => {
     const blockGraphTools = createBlockGraphTools()
     vi.mocked(blockGraphTools.createTerminalWorkflow).mockResolvedValue({
@@ -213,6 +256,67 @@ describe('execute Agent layout tools', () => {
       status: 'completed'
     })
   })
+
+  it('moves one complete workflow into a combination using authoritative Agent obstacles', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.moveTerminalWorkflowToGroup).mockResolvedValue({
+      affectedTerminalGroupIds: ['terminal-group-dev'],
+      graph: fakeGraph,
+      graphChanged: true,
+      movedBlockIds: ['terminal-api', 'terminal-web']
+    })
+    const executeTool = createExecuteTool(
+      blockGraphTools,
+      new RecordingAgentAuditRepository(),
+      createAgentSessionRepository([
+        createAgent('agent-1', { x: 980, y: 180 }, { height: 460, width: 720 }),
+        createAgent('agent-2', { x: 40, y: 80 }, { height: 420, width: 680 })
+      ])
+    )
+
+    const result = await executeTool.execute({
+      agentId: 'agent-1',
+      input: {
+        blockId: 'terminal-web',
+        targetTerminalGroupId: 'terminal-group-dev'
+      },
+      projectDirectory: '/tmp/project',
+      projectId: 'project-1',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-move-workflow',
+      toolName: 'move_terminal_workflow_to_group',
+      workspaceId: 'main'
+    })
+
+    expect(blockGraphTools.moveTerminalWorkflowToGroup).toHaveBeenCalledWith(
+      { projectDirectory: '/tmp/project', workspaceId: 'main' },
+      {
+        blockId: 'terminal-web',
+        canvasRegions: [
+          {
+            position: { x: 980, y: 180 },
+            size: { height: 460, width: 720 }
+          },
+          {
+            position: { x: 40, y: 80 },
+            size: { height: 420, width: 680 }
+          }
+        ],
+        targetTerminalGroupId: 'terminal-group-dev'
+      }
+    )
+    expect(result).toEqual({
+      graph: fakeGraph,
+      graphChanged: true,
+      output: {
+        arrangedBlockIds: ['terminal-api', 'terminal-web'],
+        arrangedTerminalGroupIds: ['terminal-group-dev'],
+        type: 'block_graph'
+      },
+      status: 'completed',
+      toolCallId: 'tool-call-move-workflow'
+    })
+  })
 })
 
 const fakeGraph: BlockGraphSnapshot = {
@@ -239,6 +343,21 @@ const fakeGraphWithApiBlock: BlockGraphSnapshot = {
   ]
 }
 
+const fakeGraphWithEmptyGroup: BlockGraphSnapshot = {
+  ...fakeGraph,
+  terminalGroups: [
+    {
+      id: 'terminal-group-deployment',
+      isCollapsed: false,
+      memberBlockIds: [],
+      name: 'Deployment',
+      position: { x: 320, y: 240 },
+      size: { height: 320, width: 520 },
+      type: 'terminal-group'
+    }
+  ]
+}
+
 function createBlockGraphTools(): AgentBlockGraphToolPort {
   return {
     arrangeTerminalLayout: vi.fn(async () => ({
@@ -260,6 +379,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
       nodes: [],
       workspaceId: 'main'
     })),
+    moveTerminalWorkflowToGroup: vi.fn(),
     updateTerminalBlock: vi.fn(async () => fakeGraph),
     updateTerminalExecutionConfig: vi.fn(async () => fakeGraph),
     updateTerminalGroup: vi.fn(async () => fakeGraph)

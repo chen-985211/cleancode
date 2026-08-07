@@ -2,7 +2,6 @@ import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/applic
 import { AgentCreateSplitButton } from './AgentCreateSplitButton'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
-import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface WorkbenchToolbarProps {
@@ -14,18 +13,12 @@ interface WorkbenchToolbarProps {
   readonly hasWorkbench: boolean
   readonly isTerminalGroupSelectionMode: boolean
   readonly selectedTerminalGroupCandidateCount: number
-  readonly canBeginTerminalGroupSelection: boolean
-  readonly canCreateTerminalGroup: boolean
-  readonly shortcutTooltips: Pick<
-    ApplicationShortcutTooltipLabels,
-    'createAgent' | 'createTerminal' | 'groupTerminals'
-  >
-  readonly onCreateTerminalBlock: () => void
+  readonly canCreateTerminalGroup?: boolean
+  readonly shortcutTooltips: Pick<ApplicationShortcutTooltipLabels, 'createAgent'>
   readonly onCreateWorkspaceAgent: (providerId?: string) => void
   readonly onOpenAgentSettings?: () => void
   readonly onSelectDefaultAgentProvider?: (providerId: string) => void
-  readonly onBeginTerminalGroupSelection: () => void
-  readonly onCreateTerminalGroup: () => void
+  readonly onCreateTerminalGroup?: () => void
   readonly onCancelTerminalGroupSelection: () => void
 }
 
@@ -38,74 +31,28 @@ export function WorkbenchToolbar(props: WorkbenchToolbarProps) {
       role="toolbar"
       aria-label={t('toolbar.label')}
     >
-      <div
-        className={[
-          'app-shell__toolbar-group',
-          props.isTerminalGroupSelectionMode
-            ? 'app-shell__toolbar-group--terminal-group-editing'
-            : ''
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        data-selection-mode={props.isTerminalGroupSelectionMode ? 'active' : 'idle'}
-        role="group"
-        aria-label={t('toolbar.terminalTools')}
-      >
-        <TooltipLabel content={props.shortcutTooltips.createTerminal} side="bottom">
+      {props.isTerminalGroupSelectionMode ? (
+        <div
+          className="app-shell__toolbar-group app-shell__toolbar-group--terminal-group-editing"
+          data-selection-mode="active"
+          role="group"
+          aria-label={t('toolbar.terminalTools')}
+        >
+          <span className="toolbar-selection-status" role="status" aria-live="polite">
+            <WorkbenchIcon role="terminal-group" size={15} />
+            {t('toolbar.groupEditing')}
+            <strong>{props.selectedTerminalGroupCandidateCount}</strong>
+          </span>
           <button
-            className="toolbar-button toolbar-button--primary"
+            className="toolbar-button"
             type="button"
-            onClick={props.onCreateTerminalBlock}
-            disabled={!props.isDesktopRuntime || !props.hasWorkbench}
+            onClick={props.onCancelTerminalGroupSelection}
           >
-            <WorkbenchIcon role="terminal" size={16} />
-            {t('toolbar.newTerminal')}
+            <WorkbenchIcon role="close" size={16} />
+            {t('toolbar.finish')}
           </button>
-        </TooltipLabel>
-        <span className="toolbar-divider" aria-hidden="true" />
-        {props.isTerminalGroupSelectionMode ? (
-          <>
-            <span className="toolbar-selection-status" role="status" aria-live="polite">
-              <WorkbenchIcon role="terminal-group" size={15} />
-              {t('toolbar.groupEditing')}
-              <strong>{props.selectedTerminalGroupCandidateCount}</strong>
-            </span>
-            <button
-              className="toolbar-button toolbar-button--primary"
-              type="button"
-              onClick={props.onCreateTerminalGroup}
-              disabled={!props.canCreateTerminalGroup}
-            >
-              <WorkbenchIcon role="confirm" size={16} />
-              {t('toolbar.createGroup')}
-            </button>
-            <button
-              className="toolbar-button"
-              type="button"
-              onClick={props.onCancelTerminalGroupSelection}
-            >
-              <WorkbenchIcon role="close" size={16} />
-              {t('toolbar.finish')}
-            </button>
-          </>
-        ) : (
-          <TooltipLabel content={props.shortcutTooltips.groupTerminals} side="bottom">
-            <button
-              className="toolbar-button"
-              type="button"
-              onClick={props.onBeginTerminalGroupSelection}
-              disabled={
-                !props.isDesktopRuntime ||
-                !props.hasWorkbench ||
-                !props.canBeginTerminalGroupSelection
-              }
-            >
-              <WorkbenchIcon role="terminal-group" size={16} />
-              {t('toolbar.groupTerminals')}
-            </button>
-          </TooltipLabel>
-        )}
-      </div>
+        </div>
+      ) : null}
       <div
         className="app-shell__toolbar-group app-shell__toolbar-group--agent"
         role="group"

@@ -70,7 +70,7 @@ export function resolveQuickExecutionBinding(
   if (target.type === 'combination') {
     const group = graph.terminalGroups.find((candidate) => candidate.id === target.terminalGroupId)
     return {
-      isAvailable: Boolean(group),
+      isAvailable: Boolean(group && group.memberBlockIds.length > 0),
       key: quickExecutionTargetKey(target),
       name: group?.name ?? target.terminalGroupId,
       target,

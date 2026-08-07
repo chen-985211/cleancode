@@ -80,6 +80,20 @@
   opacity: 0.42;
 }
 
+.canvas-pane-context-menu__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-pane-context-menu__shortcut {
+  margin-left: auto;
+  color: var(--cc-muted);
+  font-size: 13px;
+  font-weight: 450;
+}
+
 .canvas-object-context-menu__rename {
   display: grid;
   min-width: 272px;

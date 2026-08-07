@@ -1,5 +1,5 @@
 import { preserveWorkbenchNodeTransientLayout } from '../../../src/presentation/app-shell/preserveWorkbenchNodeTransientLayout'
-import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
+import type { TerminalFlowNode, WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 
 describe('preserve workbench node transient layout', () => {
   it('keeps current positions and sizes while refreshing node data', () => {
@@ -65,7 +65,7 @@ describe('preserve workbench node transient layout', () => {
     expect(preserveWorkbenchNodeTransientLayout([nextNode], [currentNode])).toEqual([nextNode])
   })
 
-  it('keeps a protected terminal at its transient position while a layout commit is pending', () => {
+  it('keeps a protected terminal transient without consuming its committed layout', () => {
     const currentNode = createTerminalNode({
       position: { x: 640, y: 360 },
       style: { width: 560, height: 420 },
@@ -79,14 +79,29 @@ describe('preserve workbench node transient layout', () => {
       blockSize: { width: 560, height: 420 }
     })
 
-    expect(
-      preserveWorkbenchNodeTransientLayout([nextNode], [currentNode], new Set(['terminal-1']))
-    ).toEqual([
+    const protectedProjection = preserveWorkbenchNodeTransientLayout(
+      [nextNode],
+      [currentNode],
+      new Set(['terminal-1'])
+    )
+
+    expect(protectedProjection).toEqual([
       {
         ...nextNode,
+        data: {
+          ...nextNode.data,
+          block: {
+            ...nextNode.data.block,
+            position: currentNode.data.block.position,
+            size: currentNode.data.block.size
+          }
+        },
         position: currentNode.position,
         style: currentNode.style
       }
+    ])
+    expect(preserveWorkbenchNodeTransientLayout([nextNode], protectedProjection)).toEqual([
+      nextNode
     ])
   })
 
@@ -142,7 +157,7 @@ function createTerminalNode({
   readonly blockPosition?: { readonly x: number; readonly y: number }
   readonly blockSize?: { readonly width: number; readonly height: number }
   readonly output?: string
-}): WorkbenchFlowNode {
+}): TerminalFlowNode {
   return {
     id: 'terminal-1',
     type: 'terminal',

@@ -5,6 +5,7 @@ describe('resolve workbench layout focus request', () => {
   it('focuses visible groups and ungrouped arranged terminals without forcing the Agent into view', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({
+        originAgentNodeId: 'agent:agent-1',
         change: {
           blockIds: ['backend', 'worker'],
           kind: 'terminal_layout_arranged',
@@ -36,6 +37,7 @@ describe('resolve workbench layout focus request', () => {
   it('frames the committed destination before an atomic workflow finishes entering', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({
+        originAgentNodeId: 'agent:agent-1',
         change: {
           blockIds: ['worker'],
           connectionIds: [],
@@ -53,7 +55,7 @@ describe('resolve workbench layout focus request', () => {
           size: { width: 420, height: 306 }
         }
       ],
-      focusNodeIds: ['worker'],
+      focusNodeIds: ['agent:agent-1', 'worker'],
       focusTarget: 'committed-layouts'
     })
   })
@@ -61,6 +63,7 @@ describe('resolve workbench layout focus request', () => {
   it('does not request focus for an ordinary graph update', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({
+        originAgentNodeId: 'agent:agent-1',
         graph: createGraph()
       })
     ).toBeNull()

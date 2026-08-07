@@ -22,6 +22,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForTextFile,
   type E2eScenarioResources,
@@ -121,7 +122,7 @@ describe('git branch workspaces e2e', () => {
       const canonicalFeatureWorktreeDirectory = await realpath(featureWorktreeDirectory)
       await expectCurrentGitBranch(featureWorktreeDirectory, 'feature/sidebar')
 
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await waitForTerminalShellReady(page, 'Terminal 1')
       const featureSessionId = await readTerminalSessionId(page, 'Terminal 1')
       await expectTerminalWorkingDirectory(page, 'Terminal 1', featureWorktreeDirectory)
@@ -130,7 +131,7 @@ describe('git branch workspaces e2e', () => {
       await mainWorkspace.click()
       await waitForCurrentWorkspace(mainWorkspace)
       await waitForTerminalSessionDetached(page, featureSessionId)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await waitForTerminalShellReady(page, 'Terminal 1')
       expect(await readTerminalSessionId(page, 'Terminal 1')).not.toBe(featureSessionId)
       await expectTerminalWorkingDirectory(page, 'Terminal 1', workbench.projectDirectory)
@@ -192,7 +193,7 @@ describe('git branch workspaces e2e', () => {
       })
       await featureWorkspace.waitFor()
       await waitForCurrentWorkspace(featureWorkspace)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await waitForTerminalShellReady(page, 'Terminal 1')
 
       await writeTerminalCommand(

@@ -49,7 +49,12 @@ export function resolveTerminalCanvasPlacement(
         right: left + targetWidth,
         top
       }
-      if (occupiedRegions.some((occupied) => overlapsWithGap(region, occupied, gap))) continue
+      if (
+        occupiedRegions.some((occupied) =>
+          terminalCanvasRegionsOverlapWithGap(region, occupied, gap)
+        )
+      )
+        continue
 
       const candidate = {
         region,
@@ -129,7 +134,7 @@ function resolveDirectionRank(
   return 4
 }
 
-function overlapsWithGap(
+export function terminalCanvasRegionsOverlapWithGap(
   left: TerminalCanvasPlacementRegion,
   right: TerminalCanvasPlacementRegion,
   gap: number

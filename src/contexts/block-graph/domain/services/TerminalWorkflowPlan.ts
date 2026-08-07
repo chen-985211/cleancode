@@ -141,6 +141,12 @@ function resolveIncludedBlockIds(
     if (!terminalGroup) {
       throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
     }
+    if (terminalGroup.memberBlockIds.length === 0) {
+      throw createExpectedAppError(
+        'TERMINAL_WORKFLOW_EMPTY',
+        'Terminal workflow has no configured commands.'
+      )
+    }
 
     return new Set(terminalGroup.memberBlockIds)
   }

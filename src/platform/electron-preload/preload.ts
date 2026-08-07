@@ -89,10 +89,8 @@ const cleancodeApi = {
     invokeCleancode('cleancode:update-terminal-group-metadata', command),
   setTerminalGroupCollapsed: (command: unknown) =>
     invokeCleancode('cleancode:set-terminal-group-collapsed', command),
-  addTerminalToGroup: (command: unknown) =>
-    invokeCleancode('cleancode:add-terminal-to-group', command),
-  removeTerminalFromGroup: (command: unknown) =>
-    invokeCleancode('cleancode:remove-terminal-from-group', command),
+  moveTerminalWorkflowToGroup: (command: unknown) =>
+    invokeCleancode('cleancode:move-terminal-workflow-to-group', command),
   dissolveTerminalGroup: (command: unknown) =>
     invokeCleancode('cleancode:dissolve-terminal-group', command),
   resizeTerminalBlock: (command: unknown) =>

@@ -10,63 +10,64 @@ import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
 
 interface UseAppShellBlockActionsInput {
-  readonly canCreateTerminalGroup: boolean
-  readonly completeTerminalGroupSelection: () => void
+  readonly beginTerminalGroupSelection?: (groupId: string) => void
+  readonly canCreateTerminalGroup?: boolean
+  readonly completeTerminalGroupSelection?: () => void
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly defaultGroupName: string
   readonly firstGroupName: string
   readonly notifications: AppNotificationController
-  readonly selectedUngroupedTerminalBlockIds: readonly string[]
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
-  readonly setSelectedTerminalGroupId: (groupId: string | null) => void
+  readonly selectedUngroupedTerminalBlockIds?: readonly string[]
+  readonly setSelectedTerminalGroupId?: (groupId: string | null) => void
   readonly terminateTerminalSession: (block: TerminalBlockSnapshot) => Promise<void>
 }
 
 export function useAppShellBlockActions({
-  canCreateTerminalGroup,
-  completeTerminalGroupSelection,
+  beginTerminalGroupSelection,
   currentWorkbench,
   currentWorkspace,
   defaultGroupName,
   firstGroupName,
   notifications,
-  selectedUngroupedTerminalBlockIds,
   setCurrentGraph,
-  setSelectedTerminalGroupId,
   terminateTerminalSession
 }: UseAppShellBlockActionsInput) {
   const { t } = useI18n()
   const deletingWorkspaceScopesRef = useRef(new Set<string>())
-  const createTerminalGroup = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || !canCreateTerminalGroup) return
+  const createTerminalGroup = useCallback(
+    async (position: { x: number; y: number } = { x: 0, y: 0 }) => {
+      if (!currentWorkbench || !currentWorkspace) return
 
-    const existingGroupIds = new Set(currentWorkbench.graph.terminalGroups.map((group) => group.id))
-    const graphSnapshot = await window.cleancode?.createTerminalGroup({
-      projectDirectory: currentWorkbench.project.directory,
-      workspaceId: currentWorkspace.workspaceId,
-      name: currentWorkbench.graph.terminalGroups.length === 0 ? firstGroupName : defaultGroupName,
-      memberBlockIds: selectedUngroupedTerminalBlockIds
-    })
+      const existingGroupIds = new Set(
+        currentWorkbench.graph.terminalGroups.map((group) => group.id)
+      )
+      const graphSnapshot = await window.cleancode?.createTerminalGroup({
+        projectDirectory: currentWorkbench.project.directory,
+        workspaceId: currentWorkspace.workspaceId,
+        name:
+          currentWorkbench.graph.terminalGroups.length === 0 ? firstGroupName : defaultGroupName,
+        position
+      })
 
-    if (!graphSnapshot) return
+      if (!graphSnapshot) return
 
-    setCurrentGraph(graphSnapshot)
-    completeTerminalGroupSelection()
-    setSelectedTerminalGroupId(
-      graphSnapshot.terminalGroups.find((group) => !existingGroupIds.has(group.id))?.id ?? null
-    )
-  }, [
-    canCreateTerminalGroup,
-    completeTerminalGroupSelection,
-    currentWorkbench,
-    currentWorkspace,
-    defaultGroupName,
-    firstGroupName,
-    selectedUngroupedTerminalBlockIds,
-    setCurrentGraph,
-    setSelectedTerminalGroupId
-  ])
+      setCurrentGraph(graphSnapshot)
+      const createdGroupId = graphSnapshot.terminalGroups.find(
+        (group) => !existingGroupIds.has(group.id)
+      )?.id
+      if (createdGroupId) beginTerminalGroupSelection?.(createdGroupId)
+    },
+    [
+      beginTerminalGroupSelection,
+      currentWorkbench,
+      currentWorkspace,
+      defaultGroupName,
+      firstGroupName,
+      setCurrentGraph
+    ]
+  )
 
   const deleteTerminalBlock = useCallback(
     async (block: TerminalBlockSnapshot) => {

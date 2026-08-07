@@ -83,11 +83,7 @@ export function createTerminalLayoutPlan(
           requireUnitRank(unitRankByBlockId, right.id) || compareStableBlockOrder(left, right)
     )
   )
-  const baseLayouts = placeTerminalExecutionUnits(
-    scopedBlocks,
-    graph.connections ?? [],
-    scopedBlockIds
-  )
+  const baseLayouts = createBalancedTerminalBlockLayouts(scopedBlocks, graph.connections ?? [])
   const internallySpacedLayouts = spaceLayoutUnits(graph, baseLayouts, orderedLayoutUnits)
   const layoutRegion = mergePositionedRegions(
     orderedLayoutUnits.map((unit) => createLayoutUnitRegion(graph, unit, internallySpacedLayouts))
@@ -139,6 +135,36 @@ export function applyTerminalLayoutPlan(
   })
 }
 
+export function applyTerminalGroupLayoutPlan(
+  groups: readonly TerminalGroupSnapshot[],
+  previousBlocks: readonly TerminalBlockSnapshot[],
+  nextBlocks: readonly TerminalBlockSnapshot[],
+  plan: TerminalLayoutPlan
+): TerminalGroupSnapshot[] {
+  const arrangedGroupIds = new Set(plan.arrangedTerminalGroupIds)
+  const previousBlocksById = new Map(previousBlocks.map((block) => [block.id, block]))
+  const nextBlocksById = new Map(nextBlocks.map((block) => [block.id, block]))
+
+  return groups.map((group) => {
+    if (!arrangedGroupIds.has(group.id) || group.memberBlockIds.length === 0) return group
+    const anchorId = group.memberBlockIds[0]!
+    const previousAnchor = previousBlocksById.get(anchorId)
+    const nextAnchor = nextBlocksById.get(anchorId)
+    if (!previousAnchor || !nextAnchor) return group
+
+    return normalizeTerminalGroupBounds(
+      {
+        ...group,
+        position: {
+          x: group.position.x + nextAnchor.position.x - previousAnchor.position.x,
+          y: group.position.y + nextAnchor.position.y - previousAnchor.position.y
+        }
+      },
+      nextBlocks
+    )
+  })
+}
+
 export function toTerminalLayoutResult(plan: TerminalLayoutPlan): TerminalLayoutResult {
   return {
     arrangedBlockIds: plan.arrangedBlockIds,
@@ -178,6 +204,7 @@ function resolveScopedGroups(
   scopedBlockIds: ReadonlySet<string>
 ): TerminalGroupSnapshot[] {
   return groups.filter((group) => {
+    if (group.memberBlockIds.length === 0) return false
     const selectedMemberCount = group.memberBlockIds.filter((blockId) =>
       scopedBlockIds.has(blockId)
     ).length
@@ -266,6 +293,18 @@ function placeTerminalExecutionUnits(
   const packedUnits = selectBalancedTerminalExecutionUnitPacking(executionUnits)
 
   return [...packedUnits.blockLayouts]
+}
+
+export function createBalancedTerminalBlockLayouts(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[]
+): readonly TerminalBlockLayout[] {
+  if (blocks.length === 0) return []
+
+  return placeTerminalExecutionUnits(blocks, connections, new Set(blocks.map((block) => block.id)))
 }
 
 function resolveWeaklyConnectedTerminalUnits(
@@ -499,9 +538,23 @@ function createLayoutUnitRegion(
     return { ...block, position: positionsByBlockId.get(blockId) ?? block.position }
   })
 
-  return unit.group
-    ? toPositionedRegion(normalizeTerminalGroupBounds(unit.group, blocks))
-    : mergePositionedRegions(blocks.map(toPositionedRegion))
+  if (!unit.group) return mergePositionedRegions(blocks.map(toPositionedRegion))
+
+  const anchorId = unit.group.memberBlockIds[0]
+  const previousAnchor = graph.blocks.find((block) => block.id === anchorId)
+  const nextAnchor = blocks.find((block) => block.id === anchorId)
+  const positionedGroup =
+    previousAnchor && nextAnchor
+      ? {
+          ...unit.group,
+          position: {
+            x: unit.group.position.x + nextAnchor.position.x - previousAnchor.position.x,
+            y: unit.group.position.y + nextAnchor.position.y - previousAnchor.position.y
+          }
+        }
+      : unit.group
+
+  return toPositionedRegion(normalizeTerminalGroupBounds(positionedGroup, blocks))
 }
 
 function mergePositionedRegions(regions: readonly PositionedRegion[]): PositionedRegion {

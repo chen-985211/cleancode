@@ -16,13 +16,12 @@ import {
   agentApprovalTargetHandleId
 } from './agentApprovalHandles'
 import {
-  GroupAddIcon,
   GroupCollapseIcon,
+  GroupContentsIcon,
   GroupDissolveIcon,
-  GroupEditIcon,
   GroupExpandIcon,
   GroupMemberUnlinkIcon,
-  GroupRemoveIcon,
+  GroupRenameIcon,
   GroupRestartIcon,
   GroupStartIcon,
   GroupStopIcon
@@ -31,6 +30,7 @@ import type { TerminalGroupFlowNode, TerminalViewState } from './types'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchNodeSelectionVeil } from './WorkbenchNodeSelectionVeil'
 import { useI18n } from './i18n/useI18n'
+import { useTerminalGroupDropSpring } from './useTerminalGroupDropSpring'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
@@ -48,11 +48,13 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     data.objectMotion,
     data.onObjectMotionComplete
   )
+  const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback)
   const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
     objectMotion.className,
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
+    data.isEditing ? 'terminal-group-node--editing' : '',
     data.isContextSelected ? 'terminal-group-node--context-selected' : '',
     data.dropFeedback ? `terminal-group-node--drop-${data.dropFeedback}` : '',
     data.approvalIntent ? 'terminal-group-node--approval-target' : ''
@@ -98,6 +100,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 
   return (
     <section
+      ref={dropSpringSurfaceRef}
       className={className}
       data-terminal-group-id={group.id}
       data-context-selected={data.isContextSelected || undefined}
@@ -162,16 +165,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
               />
             </form>
           ) : (
-            <>
-              <TooltipLabel content={group.name}>
-                <strong className="terminal-group-node__name">{group.name}</strong>
-              </TooltipLabel>
-              {data.dropFeedback ? (
-                <span className="terminal-group-node__drop-hint">
-                  {getDropFeedbackLabel(data.dropFeedback, t)}
-                </span>
-              ) : null}
-            </>
+            <TooltipLabel content={group.name}>
+              <strong className="terminal-group-node__name">{group.name}</strong>
+            </TooltipLabel>
           )}
         </div>
 
@@ -187,7 +183,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
         ) : group.isCollapsed ? (
           <DisclosureButton data={data} />
         ) : (
-          <GroupActionToolbar data={data} onEdit={startEditingName} isInline />
+          <GroupActionToolbar data={data} isInline onRename={startEditingName} />
         )}
       </div>
 
@@ -202,7 +198,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
             />
           </div>
         ) : (
-          <GroupActionToolbar data={data} onEdit={startEditingName} />
+          <GroupActionToolbar data={data} onRename={startEditingName} />
         )
       ) : null}
 
@@ -218,7 +214,26 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
           ))}
         </div>
       ) : null}
-      {data.isSelected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
+      {!group.isCollapsed && group.memberBlockIds.length === 0 ? (
+        data.isEditing ? null : (
+          <button
+            className="terminal-group-node__empty-state terminal-group-node__empty-state--action nodrag"
+            type="button"
+            aria-label={t('group.namedAction', {
+              groupName: group.name,
+              action: t('group.action.addContents')
+            })}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => data.onEditGroup?.(group)}
+          >
+            <WorkbenchIcon role="group-add" size={20} />
+            <span>{t('group.action.addContents')}</span>
+          </button>
+        )
+      ) : null}
+      {!data.isEditing && (data.isSelected || data.isContextSelected) ? (
+        <WorkbenchNodeSelectionVeil />
+      ) : null}
     </section>
   )
 })
@@ -226,10 +241,10 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 interface GroupActionToolbarProps {
   readonly data: TerminalGroupFlowNode['data']
   readonly isInline?: boolean
-  readonly onEdit: () => void
+  readonly onRename: () => void
 }
 
-function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolbarProps) {
+function GroupActionToolbar({ data, isInline = false, onRename }: GroupActionToolbarProps) {
   const group = data.group
   const { t } = useI18n()
 
@@ -256,6 +271,7 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
           tooltip={t('group.action.start')}
           tone="primary"
           surface="raised"
+          disabled={group.memberBlockIds.length === 0}
           onClick={() => data.onStartGroup(group)}
         >
           <GroupStartIcon />
@@ -296,39 +312,27 @@ function GroupActionToolbar({ data, isInline = false, onEdit }: GroupActionToolb
         <IconButton
           label={t('group.namedAction', {
             groupName: group.name,
-            action: t('group.action.edit')
+            action: t('group.action.manageContents')
           })}
-          tooltip={t('group.action.edit')}
+          tooltip={t('group.action.manageContents')}
           surface="raised"
-          onClick={onEdit}
+          pressed={data.isEditing}
+          onClick={() => data.onEditGroup?.(group)}
         >
-          <GroupEditIcon />
+          <GroupContentsIcon />
+        </IconButton>
+        <IconButton
+          label={t('group.namedAction', {
+            groupName: group.name,
+            action: t('group.action.rename')
+          })}
+          tooltip={t('group.action.rename')}
+          surface="raised"
+          onClick={onRename}
+        >
+          <GroupRenameIcon />
         </IconButton>
         {isInline ? <DisclosureButton data={data} /> : null}
-        <div className="terminal-group-node__membership-actions" data-control-group="membership">
-          <IconButton
-            label={t('group.namedAction', {
-              groupName: group.name,
-              action: t('group.action.addSelected')
-            })}
-            tooltip={t('group.action.addSelected')}
-            disabled={data.selectedUngroupedTerminalBlockIds.length === 0}
-            onClick={() => void data.onAddSelectedTerminalsToGroup(group)}
-          >
-            <GroupAddIcon />
-          </IconButton>
-          <IconButton
-            label={t('group.namedAction', {
-              groupName: group.name,
-              action: t('group.action.removeSelected')
-            })}
-            tooltip={t('group.action.removeSelected')}
-            disabled={data.selectedMemberBlockIds.length === 0}
-            onClick={() => void data.onRemoveSelectedTerminalsFromGroup(group)}
-          >
-            <GroupRemoveIcon />
-          </IconButton>
-        </div>
       </div>
 
       <span
@@ -437,6 +441,7 @@ interface IconButtonProps {
   readonly tone?: 'primary' | 'danger'
   readonly surface?: 'raised'
   readonly disabled?: boolean
+  readonly pressed?: boolean
   readonly onClick: () => void
   readonly children: ReactNode
 }
@@ -447,6 +452,7 @@ function IconButton({
   tone,
   surface,
   disabled = false,
+  pressed,
   onClick,
   children
 }: IconButtonProps) {
@@ -461,6 +467,7 @@ function IconButton({
           .join(' ')}
         type="button"
         aria-label={label}
+        aria-pressed={pressed}
         data-control-surface={surface}
         disabled={disabled}
         onClick={onClick}
@@ -506,19 +513,4 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
       </TooltipLabel>
     </div>
   )
-}
-
-function getDropFeedbackLabel(
-  feedback: NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>,
-  t: ReturnType<typeof useI18n>['t']
-) {
-  if (feedback === 'join') {
-    return t('group.dropJoin')
-  }
-
-  if (feedback === 'leave') {
-    return t('group.dropLeave')
-  }
-
-  return t('group.dropDissolve')
 }

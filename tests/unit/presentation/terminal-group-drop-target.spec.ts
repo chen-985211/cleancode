@@ -54,12 +54,11 @@ describe('terminal group drop target', () => {
 
     expect(action).toEqual({
       type: 'leave-group',
-      terminalGroupId: 'development-group',
-      willDissolveGroup: false
+      terminalGroupId: 'development-group'
     })
   })
 
-  it('marks the leave action as dissolving when the group would have one member left', () => {
+  it('keeps the container when moving its last workflow out', () => {
     const action = resolveTerminalGroupDropAction({
       graph: createGraph(),
       draggedNode: createTerminalNode({
@@ -78,8 +77,7 @@ describe('terminal group drop target', () => {
 
     expect(action).toEqual({
       type: 'leave-group',
-      terminalGroupId: 'development-group',
-      willDissolveGroup: true
+      terminalGroupId: 'development-group'
     })
   })
 
@@ -104,8 +102,7 @@ describe('terminal group drop target', () => {
 
     expect(action).toEqual({
       type: 'leave-group',
-      terminalGroupId: 'development-group',
-      willDissolveGroup: false
+      terminalGroupId: 'development-group'
     })
   })
 

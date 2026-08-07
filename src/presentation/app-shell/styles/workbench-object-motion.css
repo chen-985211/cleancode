@@ -36,6 +36,24 @@
   will-change: transform, opacity;
 }
 
+.terminal-node.workbench-object-motion--group-join {
+  transform-origin: center;
+  animation: workbench-terminal-group-join 380ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
+.terminal-node.workbench-object-motion--group-reflow {
+  transform-origin: center;
+  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
+.terminal-node.workbench-object-motion--group-leave {
+  transform-origin: center;
+  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
   transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -45,7 +63,9 @@
 }
 
 .react-flow__node.dragging :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  transform: none;
   box-shadow: var(--cc-shadow-node);
+  transition: none;
 }
 
 .terminal-workflow-edge {
@@ -162,7 +182,32 @@
   }
 }
 
+@keyframes workbench-terminal-group-join {
+  from {
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workbench-terminal-group-reflow {
+  from {
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+    transform: none;
+    transition: none;
+  }
+
   :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
     transition: none;
     transform: none;
@@ -171,12 +216,18 @@
   :is(
     .workbench-object-motion--create,
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-join,
+    .workbench-object-motion--group-leave,
+    .workbench-object-motion--group-reflow
   ),
   :is(
     .workbench-object-motion--create,
     .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
+    .workbench-object-motion--group-collapse,
+    .workbench-object-motion--group-join,
+    .workbench-object-motion--group-leave,
+    .workbench-object-motion--group-reflow
   )::before {
     clip-path: none;
     opacity: 1;

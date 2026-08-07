@@ -10,6 +10,7 @@ import type {
   CreateTerminalWorkflowAgentToolInput,
   DeleteBlockAgentToolInput,
   DeleteTerminalGroupAgentToolInput,
+  MoveTerminalWorkflowToGroupAgentToolInput,
   UpdateBlockAgentToolInput,
   UpdateTerminalGroupAgentToolInput
 } from '../dto/AgentToolProtocol'
@@ -66,6 +67,21 @@ export interface AgentCreateTerminalWorkflowInput extends CreateTerminalWorkflow
   readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
 }
 
+export interface AgentCreateTerminalGroupInput extends CreateTerminalGroupAgentToolInput {
+  readonly canvasRegions?: readonly AgentCanvasLayoutRegion[]
+}
+
+export type AgentMoveTerminalWorkflowToGroupInput = MoveTerminalWorkflowToGroupAgentToolInput & {
+  readonly canvasRegions: readonly AgentCanvasLayoutRegion[]
+}
+
+export interface AgentMoveTerminalWorkflowToGroupResult {
+  readonly affectedTerminalGroupIds: readonly string[]
+  readonly graph: AgentBlockGraphSnapshot
+  readonly graphChanged: boolean
+  readonly movedBlockIds: readonly string[]
+}
+
 export interface AgentCreateTerminalWorkflowResult {
   readonly arrangedBlockIds: readonly string[]
   readonly arrangedTerminalGroupIds: readonly string[]
@@ -104,8 +120,12 @@ export interface AgentBlockGraphToolPort {
   ): Promise<AgentBlockGraphSnapshot>
   createTerminalGroup(
     context: AgentToolContext,
-    input: CreateTerminalGroupAgentToolInput
+    input: AgentCreateTerminalGroupInput
   ): Promise<AgentBlockGraphSnapshot>
+  moveTerminalWorkflowToGroup(
+    context: AgentToolContext,
+    input: AgentMoveTerminalWorkflowToGroupInput
+  ): Promise<AgentMoveTerminalWorkflowToGroupResult>
   updateTerminalGroup(
     context: AgentToolContext,
     input: UpdateTerminalGroupAgentToolInput

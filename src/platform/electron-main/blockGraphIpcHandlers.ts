@@ -13,6 +13,11 @@ import {
   readDeleteTerminalScopeCommand,
   type DeleteTerminalScopeIpcCommand
 } from './blockGraphDeleteTerminalScopeIpcCommand'
+import {
+  readCreateTerminalBlockCommand,
+  readCreateTerminalGroupCommand,
+  readMoveTerminalWorkflowToGroupCommand
+} from './blockGraphTerminalContainerIpcCommands'
 
 interface TerminalDefinitionIpcCommand {
   readonly projectDirectory: string
@@ -71,12 +76,13 @@ export interface BlockGraphIpcHandlersInput {
     readonly name: string
     readonly description: string
     readonly position: { readonly x: number; readonly y: number }
+    readonly terminalGroupId?: string
   }) => Promise<BlockGraphSnapshot>
   readonly createTerminalGroup: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
     readonly name: string
-    readonly memberBlockIds: readonly string[]
+    readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly connectTerminalBlocks: (command: {
     readonly projectDirectory: string
@@ -136,17 +142,12 @@ export interface BlockGraphIpcHandlersInput {
     readonly terminalGroupId: string
     readonly isCollapsed: boolean
   }) => Promise<BlockGraphSnapshot>
-  readonly addTerminalToGroup: (command: {
+  readonly moveTerminalWorkflowToGroup: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
-    readonly terminalGroupId: string
     readonly blockId: string
-  }) => Promise<BlockGraphSnapshot>
-  readonly removeTerminalFromGroup: (command: {
-    readonly projectDirectory: string
-    readonly workspaceId: string
-    readonly terminalGroupId: string
-    readonly blockId: string
+    readonly targetTerminalGroupId: string | null
+    readonly position: { readonly x: number; readonly y: number }
   }) => Promise<BlockGraphSnapshot>
   readonly dissolveTerminalGroup: (command: {
     readonly projectDirectory: string
@@ -250,18 +251,9 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<
-    {
-      readonly projectDirectory: string
-      readonly workspaceId: string
-      readonly name: string
-      readonly description: string
-      readonly position: { readonly x: number; readonly y: number }
-    },
-    BlockGraphSnapshot
-  >({
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
     channel: 'cleancode:create-terminal-block',
-    handler: (command) => input.createTerminalBlock(command),
+    handler: (command) => input.createTerminalBlock(readCreateTerminalBlockCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'createTerminalBlock',
@@ -269,17 +261,9 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     successLogLevel: 'info'
   })
 
-  registerIpcHandler<
-    {
-      readonly projectDirectory: string
-      readonly workspaceId: string
-      readonly name: string
-      readonly memberBlockIds: readonly string[]
-    },
-    BlockGraphSnapshot
-  >({
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
     channel: 'cleancode:create-terminal-group',
-    handler: (command) => input.createTerminalGroup(command),
+    handler: (command) => input.createTerminalGroup(readCreateTerminalGroupCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
     operation: 'createTerminalGroup',
@@ -400,37 +384,13 @@ export function registerBlockGraphIpcHandlers(input: BlockGraphIpcHandlersInput)
     scope: 'block-graph'
   })
 
-  registerIpcHandler<
-    {
-      readonly projectDirectory: string
-      readonly workspaceId: string
-      readonly terminalGroupId: string
-      readonly blockId: string
-    },
-    BlockGraphSnapshot
-  >({
-    channel: 'cleancode:add-terminal-to-group',
-    handler: (command) => input.addTerminalToGroup(command),
+  registerIpcHandler<unknown, BlockGraphSnapshot>({
+    channel: 'cleancode:move-terminal-workflow-to-group',
+    handler: (command) =>
+      input.moveTerminalWorkflowToGroup(readMoveTerminalWorkflowToGroupCommand(command)),
     ipcMain: input.ipcMain,
     logger: input.logger,
-    operation: 'addTerminalToGroup',
-    scope: 'block-graph'
-  })
-
-  registerIpcHandler<
-    {
-      readonly projectDirectory: string
-      readonly workspaceId: string
-      readonly terminalGroupId: string
-      readonly blockId: string
-    },
-    BlockGraphSnapshot
-  >({
-    channel: 'cleancode:remove-terminal-from-group',
-    handler: (command) => input.removeTerminalFromGroup(command),
-    ipcMain: input.ipcMain,
-    logger: input.logger,
-    operation: 'removeTerminalFromGroup',
+    operation: 'moveTerminalWorkflowToGroup',
     scope: 'block-graph'
   })
 

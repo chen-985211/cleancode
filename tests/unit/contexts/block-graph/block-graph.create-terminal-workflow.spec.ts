@@ -79,6 +79,15 @@ describe('create terminal workflow use case', () => {
         .filter((block) => block.id !== 'unrelated')
         .every((block) => !overlaps(block, region(600, 80, 560, 520)))
     ).toBe(true)
+    const createdGroup = result.graph.terminalGroups[0]!
+    expect(overlaps(createdGroup, region(600, 80, 560, 520))).toBe(false)
+    expect(overlaps(createdGroup, region(1800, 80, 520, 500))).toBe(false)
+    expect(
+      overlaps(
+        createdGroup,
+        result.graph.blocks.find((block) => block.id === 'unrelated')!
+      )
+    ).toBe(false)
   })
 
   it.each([

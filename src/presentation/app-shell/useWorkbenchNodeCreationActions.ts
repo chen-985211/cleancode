@@ -20,6 +20,11 @@ import { scheduleWorkbenchCreatedObjectFocus } from './workbenchObjectMotion'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
+interface CreateTerminalBlockOptions {
+  readonly position?: { readonly x: number; readonly y: number }
+  readonly terminalGroupId?: string
+}
+
 export function useWorkbenchNodeCreationActions({
   currentWorkbench,
   currentWorkspace,
@@ -74,63 +79,70 @@ export function useWorkbenchNodeCreationActions({
     [nodeCreationCoordinator, nodeStore, reactFlowInstanceRef, workspaceScopeKey]
   )
 
-  const createTerminalBlock = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace) {
-      return
-    }
-
-    const reservation = reserveWorkbenchNodeCreation(defaultTerminalBlockSize)
-
-    if (!reservation) {
-      return
-    }
-
-    const creationScopeKey = workspaceScopeKey
-    const existingBlockIds = new Set(currentWorkbench.graph.blocks.map((block) => block.id))
-    let isCommitted = false
-
-    try {
-      const graphSnapshot = await window.cleancode?.createTerminalBlock({
-        projectDirectory: currentWorkbench.project.directory,
-        workspaceId: currentWorkspace.workspaceId,
-        name: t('terminal.defaultName', { index: currentWorkbench.graph.blocks.length + 1 }),
-        description: t('terminal.defaultDescription'),
-        position: reservation.position
-      })
-
-      if (!graphSnapshot || workspaceScopeKeyRef.current !== creationScopeKey) {
+  const createTerminalBlock = useCallback(
+    async (options: CreateTerminalBlockOptions = {}) => {
+      if (!currentWorkbench || !currentWorkspace) {
         return
       }
 
-      setCurrentGraph(graphSnapshot)
-      const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
+      const reservation = options.position
+        ? null
+        : reserveWorkbenchNodeCreation(defaultTerminalBlockSize)
 
-      if (createdBlock) {
-        nodeCreationCoordinator.commit(reservation.reservationId, createdBlock.id)
-        isCommitted = true
-        cancelScheduledCreationFocusRef.current?.()
-        cancelScheduledCreationFocusRef.current = scheduleWorkbenchCreatedObjectFocus(() => {
-          cancelScheduledCreationFocusRef.current = null
-          if (workspaceScopeKeyRef.current === creationScopeKey) {
-            focusCreatedTerminalBlock(createdBlock)
-          }
+      if (!options.position && !reservation) {
+        return
+      }
+
+      const creationScopeKey = workspaceScopeKey
+      const existingBlockIds = new Set(currentWorkbench.graph.blocks.map((block) => block.id))
+      let isCommitted = false
+
+      try {
+        const graphSnapshot = await window.cleancode?.createTerminalBlock({
+          projectDirectory: currentWorkbench.project.directory,
+          workspaceId: currentWorkspace.workspaceId,
+          name: t('terminal.defaultName', { index: currentWorkbench.graph.blocks.length + 1 }),
+          description: t('terminal.defaultDescription'),
+          position: options.position ?? reservation!.position,
+          terminalGroupId: options.terminalGroupId
         })
+
+        if (!graphSnapshot || workspaceScopeKeyRef.current !== creationScopeKey) {
+          return
+        }
+
+        setCurrentGraph(graphSnapshot)
+        const createdBlock = graphSnapshot.blocks.find((block) => !existingBlockIds.has(block.id))
+
+        if (createdBlock) {
+          if (reservation)
+            nodeCreationCoordinator.commit(reservation.reservationId, createdBlock.id)
+          isCommitted = true
+          cancelScheduledCreationFocusRef.current?.()
+          cancelScheduledCreationFocusRef.current = scheduleWorkbenchCreatedObjectFocus(() => {
+            cancelScheduledCreationFocusRef.current = null
+            if (workspaceScopeKeyRef.current === creationScopeKey) {
+              focusCreatedTerminalBlock(createdBlock)
+            }
+          })
+        }
+      } finally {
+        if (!isCommitted && reservation) {
+          nodeCreationCoordinator.release(reservation.reservationId)
+        }
       }
-    } finally {
-      if (!isCommitted) {
-        nodeCreationCoordinator.release(reservation.reservationId)
-      }
-    }
-  }, [
-    currentWorkbench,
-    currentWorkspace,
-    focusCreatedTerminalBlock,
-    nodeCreationCoordinator,
-    reserveWorkbenchNodeCreation,
-    setCurrentGraph,
-    t,
-    workspaceScopeKey
-  ])
+    },
+    [
+      currentWorkbench,
+      currentWorkspace,
+      focusCreatedTerminalBlock,
+      nodeCreationCoordinator,
+      reserveWorkbenchNodeCreation,
+      setCurrentGraph,
+      t,
+      workspaceScopeKey
+    ]
+  )
 
   return {
     createTerminalBlock,

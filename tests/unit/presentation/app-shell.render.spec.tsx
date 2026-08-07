@@ -46,13 +46,17 @@ describe('app shell', () => {
     expect(toolbar.queryByRole('button', { name: '主题设置' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '打开项目' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '添加项目' })).toBeDisabled()
-    expect(toolbar.getAllByRole('button')).toHaveLength(4)
-    expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+    expect(toolbar.getAllByRole('button')).toHaveLength(2)
+    expect(toolbar.queryByRole('button', { name: '新建终端积木' })).not.toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '新建 Agent' })).toBeDisabled()
     expect(toolbar.getByRole('button', { name: '选择默认 Agent' })).toBeDisabled()
     expect(toolbar.queryByRole('button', { name: '运行流程' })).not.toBeInTheDocument()
     expect(toolbar.queryByRole('button', { name: '停止流程' })).not.toBeInTheDocument()
-    expect(toolbar.getByRole('button', { name: '组合终端' })).toBeDisabled()
+    expect(toolbar.queryByRole('button', { name: '组合终端' })).not.toBeInTheDocument()
+    await openBlankCanvasMenu()
+    expect(screen.getByRole('menuitem', { name: '新建终端积木' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: '组合终端' })).toBeDisabled()
+    fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.getByLabelText('积木画布')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: '积木导航小地图' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
@@ -96,13 +100,16 @@ describe('app shell', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开项目' }))
     await waitFor(() => expect(addProject).toHaveBeenCalledOnce())
     expect(screen.getByRole('button', { name: '添加项目' })).toBeEnabled()
-    expect(toolbar.getAllByRole('button')).toHaveLength(4)
-    expect(toolbar.getByRole('button', { name: '新建终端积木' })).toBeDisabled()
+    expect(toolbar.getAllByRole('button')).toHaveLength(2)
+    expect(toolbar.queryByRole('button', { name: '新建终端积木' })).not.toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '新建 Agent' })).toBeDisabled()
     expect(toolbar.getByRole('button', { name: '选择默认 Agent' })).toBeDisabled()
     expect(toolbar.queryByRole('button', { name: '运行流程' })).not.toBeInTheDocument()
     expect(toolbar.queryByRole('button', { name: '停止流程' })).not.toBeInTheDocument()
-    expect(toolbar.getByRole('button', { name: '组合终端' })).toBeDisabled()
+    expect(toolbar.queryByRole('button', { name: '组合终端' })).not.toBeInTheDocument()
+    await openBlankCanvasMenu()
+    expect(screen.getByRole('menuitem', { name: '新建终端积木' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: '组合终端' })).toBeDisabled()
     expect(screen.queryByText('浏览器预览模式')).not.toBeInTheDocument()
   })
 
@@ -127,23 +134,40 @@ describe('app shell', () => {
     expect(runtimeApi.attachAgentSession).not.toHaveBeenCalled()
   })
 
-  it('allows entering terminal group editing whenever a workbench is open', async () => {
+  it('creates an empty group and enters its editing space from the blank-canvas menu', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.createTerminalGroup.mockResolvedValue({
+      ...workbench.graph,
+      terminalGroups: [
+        {
+          id: 'new-group',
+          isCollapsed: false,
+          memberBlockIds: [],
+          name: '启动项目',
+          position: { x: 0, y: 0 },
+          size: { width: 520, height: 320 },
+          type: 'terminal-group'
+        }
+      ]
+    })
 
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
-      value: createRuntimeApi({
-        listWorkbenches: vi.fn(async () => [workbench])
-      })
+      value: runtimeApi
     })
 
     render(<AppShell />)
     const toolbar = within(screen.getByLabelText('工作台工具栏'))
+    await waitFor(() => expect(screen.getByRole('button', { name: '新建 Agent' })).toBeEnabled())
 
-    fireEvent.click(await toolbar.findByRole('button', { name: '组合终端' }))
+    await openBlankCanvasMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: '组合终端' }))
 
-    expect(toolbar.getByText('组合编辑')).toBeInTheDocument()
-    expect(toolbar.getByRole('button', { name: '创建组合' })).toBeDisabled()
+    await waitFor(() => expect(toolbar.getByText('组合编辑')).toBeInTheDocument())
+    expect(toolbar.queryByRole('button', { name: '创建组合' })).not.toBeInTheDocument()
     expect(toolbar.getByRole('button', { name: '完成' })).toBeEnabled()
   })
 
@@ -208,7 +232,7 @@ describe('app shell', () => {
     expect(document.querySelector('.cc-tooltip-content')).toHaveAttribute('data-side', 'bottom')
   })
 
-  it('updates a toolbar tooltip immediately after editing its shortcut', async () => {
+  it('updates a canvas menu shortcut immediately after editing its binding', async () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     Object.defineProperty(window, 'cleancode', {
       configurable: true,
@@ -223,10 +247,9 @@ describe('app shell', () => {
     fireEvent.keyDown(recorder, { altKey: true, key: 'k', metaKey: true })
     fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
 
-    const createTerminal = screen.getByRole('button', { name: '新建终端积木' })
-    fireEvent.pointerMove(createTerminal, { pointerType: 'mouse' })
-
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('新建终端积木 (⌘⌥K)')
+    await openBlankCanvasMenu()
+    const createTerminal = screen.getByRole('menuitem', { name: '新建终端积木' })
+    expect(createTerminal).toHaveTextContent('⌘⌥K')
   })
 
   it('routes Command/Ctrl+B through the sidebar toggle action', () => {
@@ -657,3 +680,10 @@ describe('app shell', () => {
     expect(screen.queryByText('默认工作区')).not.toBeInTheDocument()
   })
 })
+
+async function openBlankCanvasMenu(): Promise<void> {
+  const pane = document.querySelector<HTMLElement>('.react-flow__pane')
+  if (!pane) throw new Error('Expected a React Flow pane')
+  fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+  await screen.findByRole('menu', { name: '画布操作' })
+}

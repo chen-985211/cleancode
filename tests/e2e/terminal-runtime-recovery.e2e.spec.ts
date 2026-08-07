@@ -14,6 +14,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readAuthenticatedTerminalProviderMetadata,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   waitForProcessIdExit,
   type E2eScenarioResources,
@@ -75,7 +76,7 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
-      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+      await waitForTerminalSessionId(page, 'Terminal 1', sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
       await waitForTerminalShellPrompt(page, 'Terminal 1')
@@ -94,7 +95,7 @@ describe('terminal runtime recovery e2e', () => {
     async () => {
       const terminalNames = Array.from({ length: 16 }, (_, index) => `Terminal ${index + 1}`)
       for (const terminalName of terminalNames.slice(1)) {
-        await page.getByRole('button', { name: '新建终端积木' }).click()
+        await selectBlankCanvasAction(page, '新建终端积木')
         await ensureTerminalShellStarted(page, terminalName)
       }
       const sessionIds = await Promise.all(
@@ -148,7 +149,7 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
-      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(inheritedSessionId)
+      await waitForTerminalSessionId(page, 'Terminal 1', inheritedSessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'INHERITED_TICK')
       await retireCurrentTerminal()
     },
@@ -174,7 +175,7 @@ describe('terminal runtime recovery e2e', () => {
       await page.waitForLoadState('domcontentloaded')
       await page.getByText('Terminal 1').waitFor()
 
-      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+      await waitForTerminalSessionId(page, 'Terminal 1', sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'RENDERER_TICK')
     },
     electronScenarioTimeoutMs
@@ -198,7 +199,7 @@ describe('terminal runtime recovery e2e', () => {
       resources.electronApp = electronApp
       resources.page = page
 
-      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+      await waitForTerminalSessionId(page, 'Terminal 1', sessionId)
       await writeTerminalCommand(
         page,
         'Terminal 1',
@@ -229,7 +230,7 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
-      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+      await waitForTerminalSessionId(page, 'Terminal 1', sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'DURABLE_PROVIDER_HISTORY')
       await waitForTerminalStopActionDisabled(page)
       await retireCurrentTerminal()
@@ -323,16 +324,24 @@ async function waitForTerminalRuntimeReady(page: Page): Promise<void> {
   expect(phase).toBe('ready')
 }
 
+async function waitForTerminalSessionId(
+  page: Page,
+  terminalName: string,
+  expectedSessionId: string
+): Promise<void> {
+  const sessionId = await pollUntilState({
+    description: `${terminalName} to reattach its retained session`,
+    observe: () => readTerminalSessionId(page, terminalName),
+    accept: (currentSessionId) => currentSessionId === expectedSessionId,
+    timeoutMs: process.platform === 'win32' ? 10_000 : 5_000
+  })
+
+  expect(sessionId).toBe(expectedSessionId)
+}
+
 async function createRunningTerminal(page: Page): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
-  const createTerminal = page.getByRole('button', { name: '新建终端积木' })
-  await pollUntilState({
-    description: 'new terminal action to become enabled',
-    observe: () => createTerminal.isEnabled(),
-    accept: Boolean,
-    timeoutMs: 10_000
-  })
-  await createTerminal.click()
+  await selectBlankCanvasAction(page, '新建终端积木')
   await ensureTerminalShellStarted(page, 'Terminal 1')
 }
 

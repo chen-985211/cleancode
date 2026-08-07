@@ -211,6 +211,7 @@ export const enMessages = {
   'sidebar.archiveWorkspace': 'Archive workspace',
   'sidebar.reorderFailed': 'Could not reorder projects. Try again.',
   'canvas.label': 'Block canvas',
+  'canvas.contextMenu.canvasActions': 'Canvas actions',
   'canvas.contextMenu.terminalActions': 'Terminal actions',
   'canvas.contextMenu.workflowActions': 'Workflow actions',
   'canvas.contextMenu.combinationActions': 'Combination actions',
@@ -439,7 +440,9 @@ export const enMessages = {
   'group.action.restart': 'Restart group terminal sessions',
   'group.action.restartDescription':
     'Restart group terminal sessions without running launch commands',
-  'group.action.edit': 'Edit group name',
+  'group.action.manageContents': 'Manage group contents',
+  'group.action.rename': 'Rename group',
+  'group.action.addContents': 'Add a terminal or workflow',
   'group.action.addSelected': 'Add selected terminals',
   'group.action.removeSelected': 'Remove selected terminals',
   'group.action.dissolve': 'Dissolve group',
@@ -456,6 +459,7 @@ export const enMessages = {
   'group.dropJoin': 'Release to join group',
   'group.dropLeave': 'Release to leave group',
   'group.dropDissolve': 'Release to dissolve group',
+  'group.emptyEditingHint': 'Drop a terminal or workflow here',
   'service.label': 'Service',
   'service.actualAddress': 'Actual service address',
   'service.fallback': 'Preferred port {requestedPort} was busy; using {port}',
@@ -650,6 +654,9 @@ export const enMessages = {
     'Managed ports are unavailable in this environment. Use a supported runtime.',
   'error.TERMINAL_CONNECTION_DUPLICATE': 'This terminal dependency already exists.',
   'error.TERMINAL_CONNECTION_INVALID': 'A terminal cannot connect to itself.',
+  'error.TERMINAL_CONNECTION_SCOPE_MISMATCH':
+    'Both ends of a connection must be in the same group space.',
+  'error.TERMINAL_SCOPE_MOVE_STALE': 'The workflow changed spaces. Try the move again.',
   'error.TERMINAL_EXECUTION_CONFIG_INVALID':
     'The terminal execution settings are invalid. Check exit codes, timeouts, and readiness conditions.',
   'error.TERMINAL_SHELL_UNSUPPORTED':

@@ -67,6 +67,12 @@ describe('block template projection', () => {
 
   it('recognizes disconnected flows and standalone terminals as one combination', () => {
     const graph = createGraph()
+    graph.disconnectTerminalBlocks('web-outside')
+    graph.createTerminalGroup({
+      id: 'development-group',
+      name: 'Development',
+      memberBlockIds: ['install', 'build', 'api', 'web']
+    })
 
     const template = createBlockTemplate({
       createdAt: '2026-07-30T08:00:00.000Z',

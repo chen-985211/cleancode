@@ -97,16 +97,11 @@ describe('language settings', () => {
           hasWorkbench
           isTerminalGroupSelectionMode={false}
           selectedTerminalGroupCandidateCount={0}
-          canBeginTerminalGroupSelection
           canCreateTerminalGroup={false}
           shortcutTooltips={{
-            createAgent: 'New Agent (Ctrl+Shift+A)',
-            createTerminal: 'New terminal block (Ctrl+T)',
-            groupTerminals: 'Group terminals (Ctrl+G)'
+            createAgent: 'New Agent (Ctrl+Shift+A)'
           }}
-          onCreateTerminalBlock={vi.fn()}
           onCreateWorkspaceAgent={vi.fn()}
-          onBeginTerminalGroupSelection={vi.fn()}
           onCreateTerminalGroup={vi.fn()}
           onCancelTerminalGroupSelection={vi.fn()}
         />
@@ -114,9 +109,9 @@ describe('language settings', () => {
     )
 
     const toolbar = screen.getByRole('toolbar', { name: 'Workbench toolbar' })
-    expect(toolbar).toHaveTextContent('New terminal block')
-    expect(toolbar).toHaveTextContent('Group terminals')
     expect(toolbar).toHaveTextContent('New Agent')
+    expect(toolbar).not.toHaveTextContent('New terminal block')
+    expect(toolbar).not.toHaveTextContent('Group terminals')
   })
 })
 

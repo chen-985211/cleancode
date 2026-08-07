@@ -3,49 +3,64 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { WorkbenchToolbar } from '../../../src/presentation/app-shell/WorkbenchToolbar'
 
 describe('workbench toolbar', () => {
-  it('keeps Agent creation separate at the right edge of the toolbar', () => {
+  it('keeps only Agent creation in the idle toolbar', () => {
     render(
       <WorkbenchToolbar
         isDesktopRuntime
         hasWorkbench
         isTerminalGroupSelectionMode={false}
         selectedTerminalGroupCandidateCount={0}
-        canBeginTerminalGroupSelection
         canCreateTerminalGroup={false}
         shortcutTooltips={shortcutTooltips}
-        onCreateTerminalBlock={vi.fn()}
         onCreateWorkspaceAgent={vi.fn()}
-        onBeginTerminalGroupSelection={vi.fn()}
         onCreateTerminalGroup={vi.fn()}
         onCancelTerminalGroupSelection={vi.fn()}
       />
     )
 
     const toolbar = screen.getByLabelText('工作台工具栏')
-    const terminalTools = within(toolbar).getByRole('group', { name: '终端工具' })
     const agentTools = within(toolbar).getByRole('group', { name: 'Agent 工具' })
 
-    expect(
-      within(terminalTools).queryByRole('button', { name: '新建 Agent' })
-    ).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('group', { name: '终端工具' })).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: '新建终端积木' })).not.toBeInTheDocument()
+    expect(within(toolbar).queryByRole('button', { name: '组合终端' })).not.toBeInTheDocument()
     expect(within(agentTools).getByRole('button', { name: '新建 Agent' })).toBeInTheDocument()
     expect(toolbar.lastElementChild).toBe(agentTools)
 
-    expect(
-      within(terminalTools)
-        .getByRole('button', { name: '新建终端积木' })
-        .querySelector('[data-icon-role="terminal"]')
-    ).toHaveAttribute('data-icon-glyph', 'terminal-window')
-    expect(
-      within(terminalTools)
-        .getByRole('button', { name: '组合终端' })
-        .querySelector('[data-icon-role="terminal-group"]')
-    ).toHaveAttribute('data-icon-glyph', 'stack')
     expect(
       within(agentTools)
         .getByRole('button', { name: '新建 Agent' })
         .querySelector('[data-icon-role="agent"]')
     ).toHaveAttribute('data-icon-glyph', 'robot')
+  })
+
+  it('shows only the temporary group-editing controls while selection mode is active', () => {
+    render(
+      <WorkbenchToolbar
+        isDesktopRuntime
+        hasWorkbench
+        isTerminalGroupSelectionMode
+        selectedTerminalGroupCandidateCount={2}
+        canCreateTerminalGroup
+        shortcutTooltips={shortcutTooltips}
+        onCreateWorkspaceAgent={vi.fn()}
+        onCreateTerminalGroup={vi.fn()}
+        onCancelTerminalGroupSelection={vi.fn()}
+      />
+    )
+
+    const terminalTools = within(screen.getByLabelText('工作台工具栏')).getByRole('group', {
+      name: '终端工具'
+    })
+
+    expect(within(terminalTools).getByRole('status')).toHaveTextContent('组合编辑2')
+    expect(
+      within(terminalTools).queryByRole('button', { name: '创建组合' })
+    ).not.toBeInTheDocument()
+    expect(within(terminalTools).getByRole('button', { name: '完成' })).toBeEnabled()
+    expect(
+      within(terminalTools).queryByRole('button', { name: '新建终端积木' })
+    ).not.toBeInTheDocument()
   })
 
   it('keeps workflow status and controls out of the toolbar in every run state', () => {
@@ -54,12 +69,9 @@ describe('workbench toolbar', () => {
       hasWorkbench: true,
       isTerminalGroupSelectionMode: false,
       selectedTerminalGroupCandidateCount: 0,
-      canBeginTerminalGroupSelection: true,
       canCreateTerminalGroup: false,
       shortcutTooltips,
-      onCreateTerminalBlock: vi.fn(),
       onCreateWorkspaceAgent: vi.fn(),
-      onBeginTerminalGroupSelection: vi.fn(),
       onCreateTerminalGroup: vi.fn(),
       onCancelTerminalGroupSelection: vi.fn()
     } as const
@@ -83,12 +95,9 @@ describe('workbench toolbar', () => {
         hasWorkbench
         isTerminalGroupSelectionMode={false}
         selectedTerminalGroupCandidateCount={0}
-        canBeginTerminalGroupSelection
         canCreateTerminalGroup={false}
         shortcutTooltips={shortcutTooltips}
-        onCreateTerminalBlock={vi.fn()}
         onCreateWorkspaceAgent={vi.fn()}
-        onBeginTerminalGroupSelection={vi.fn()}
         onCreateTerminalGroup={vi.fn()}
         onCancelTerminalGroupSelection={vi.fn()}
       />
@@ -104,23 +113,16 @@ describe('workbench toolbar', () => {
         hasWorkbench
         isTerminalGroupSelectionMode={false}
         selectedTerminalGroupCandidateCount={0}
-        canBeginTerminalGroupSelection
         canCreateTerminalGroup={false}
         shortcutTooltips={{
-          createAgent: '新建 Agent (⌘⇧A)',
-          createTerminal: '新建终端积木 (⌘T)',
-          groupTerminals: '组合终端 (⌘G)'
+          createAgent: '新建 Agent (⌘⇧A)'
         }}
-        onCreateTerminalBlock={vi.fn()}
         onCreateWorkspaceAgent={vi.fn()}
-        onBeginTerminalGroupSelection={vi.fn()}
         onCreateTerminalGroup={vi.fn()}
         onCancelTerminalGroupSelection={vi.fn()}
       />
     )
 
-    await expectPointerTooltip('新建终端积木', '新建终端积木 (⌘T)')
-    await expectPointerTooltip('组合终端', '组合终端 (⌘G)')
     await expectPointerTooltip('新建 Agent', '新建 Agent (⌘⇧A)')
   })
 })

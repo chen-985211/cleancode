@@ -24,13 +24,19 @@ import {
 } from './BlockGraphTypes'
 import {
   analyzeTerminalGroupMemberSelection,
-  defaultTerminalGroupSize,
+  createTerminalGroupBounds,
   expandTerminalGroupMemberIdsToCompleteWorkflows,
-  isValidTerminalGroupMembership,
   normalizeTerminalGroupBounds,
-  normalizeTerminalGroups
+  normalizeTerminalGroups,
+  normalizeRequestedTerminalGroupSize
 } from '../services/TerminalGroupRules'
+import { applyTerminalGroupMembershipMove } from '../services/TerminalGroupMemberLayout'
 import {
+  assertTerminalConnectionWithinOneScope,
+  migrateCrossScopeWorkflowComponentsToRoot
+} from '../services/TerminalConnectionScopeRules'
+import {
+  applyTerminalGroupLayoutPlan,
   applyTerminalLayoutPlan,
   createTerminalLayoutPlan,
   toTerminalLayoutResult,
@@ -114,6 +120,13 @@ export class BlockGraph {
   static fromSnapshot(snapshot: RestorableBlockGraphSnapshot): BlockGraph {
     const blocks = [...snapshot.blocks.map(normalizeTerminalBlock)]
     const connections = normalizeRestoredTerminalConnections(snapshot.connections, blocks)
+    const groups = normalizeTerminalGroups(
+      snapshot.terminalGroups,
+      blocks,
+      connections,
+      createTerminalGroupId
+    )
+    const scopeMigration = migrateCrossScopeWorkflowComponentsToRoot(groups, connections)
 
     return new BlockGraph(
       snapshot.id,
@@ -122,7 +135,7 @@ export class BlockGraph {
       normalizeCanvasViewport(snapshot.viewport, defaultCanvasViewport),
       blocks,
       connections,
-      normalizeTerminalGroups(snapshot.terminalGroups, blocks, connections, createTerminalGroupId),
+      [...scopeMigration.terminalGroups],
       restoreQuickExecutionSlots(snapshot.quickExecutionSlots)
     )
   }
@@ -192,6 +205,8 @@ export class BlockGraph {
   }
 
   createTerminalBlock(input: CreateTerminalBlockInput): TerminalBlockSnapshot {
+    if (input.terminalGroupId) this.requireTerminalGroup(input.terminalGroupId)
+
     const block: TerminalBlockSnapshot = {
       id: input.id ?? createBlockId(),
       type: 'terminal',
@@ -207,6 +222,16 @@ export class BlockGraph {
     }
 
     this.blockSnapshots = [...this.blockSnapshots, block]
+    if (input.terminalGroupId) {
+      this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
+        group.id === input.terminalGroupId
+          ? normalizeTerminalGroupBounds(
+              { ...group, memberBlockIds: [...group.memberBlockIds, block.id] },
+              this.blockSnapshots
+            )
+          : group
+      )
+    }
 
     return block
   }
@@ -272,10 +297,15 @@ export class BlockGraph {
 
   arrangeTerminalLayout(input: ArrangeTerminalLayoutInput): TerminalLayoutResult {
     const plan = createTerminalLayoutPlan(this.toSnapshot(), input)
-    this.blockSnapshots = applyTerminalLayoutPlan(this.blockSnapshots, plan)
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
-      normalizeTerminalGroupBounds(group, this.blockSnapshots)
+    const previousBlocks = this.blockSnapshots
+    const nextBlocks = applyTerminalLayoutPlan(previousBlocks, plan)
+    this.terminalGroupSnapshots = applyTerminalGroupLayoutPlan(
+      this.terminalGroupSnapshots,
+      previousBlocks,
+      nextBlocks,
+      plan
     )
+    this.blockSnapshots = nextBlocks
 
     return toTerminalLayoutResult(plan)
   }
@@ -332,6 +362,11 @@ export class BlockGraph {
   }
 
   connectTerminalBlocks(input: ConnectTerminalBlocksInput): TerminalConnectionSnapshot {
+    assertTerminalConnectionWithinOneScope(
+      input.sourceBlockId,
+      input.targetBlockId,
+      this.terminalGroupSnapshots
+    )
     const result = addTerminalConnection(
       this.blockSnapshots,
       this.terminalConnectionSnapshots,
@@ -371,21 +406,17 @@ export class BlockGraph {
         !deletedBlockIds.has(connection.sourceBlockId) &&
         !deletedBlockIds.has(connection.targetBlockId)
     )
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots
-      .map((group) => ({
-        ...group,
-        memberBlockIds: group.memberBlockIds.filter(
-          (memberBlockId) => !deletedBlockIds.has(memberBlockId)
-        )
-      }))
-      .filter((group) =>
-        isValidTerminalGroupMembership(
-          group.memberBlockIds,
-          this.blockSnapshots,
-          this.terminalConnectionSnapshots
-        )
+    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) =>
+      normalizeTerminalGroupBounds(
+        {
+          ...group,
+          memberBlockIds: group.memberBlockIds.filter(
+            (memberBlockId) => !deletedBlockIds.has(memberBlockId)
+          )
+        },
+        this.blockSnapshots
       )
-      .map((group) => normalizeTerminalGroupBounds(group, this.blockSnapshots))
+    )
   }
 
   ensureTerminalBlockExists(blockId: string): void {
@@ -405,19 +436,28 @@ export class BlockGraph {
     const analysis = analyzeTerminalGroupMemberSelection(
       this.blockSnapshots,
       this.terminalConnectionSnapshots,
-      input.memberBlockIds
+      input.memberBlockIds ?? []
     )
     const memberBlockIds = [...analysis.expandedTerminalIds]
 
-    this.ensureTerminalGroupMembersCanBeGrouped(memberBlockIds, analysis.canCreateCombination)
+    if (analysis.unknownTerminalIds.length > 0) {
+      throw createExpectedAppError('TERMINAL_BLOCK_NOT_FOUND', 'Terminal block was not found.')
+    }
+    this.ensureTerminalGroupMembersAreAvailable(memberBlockIds)
+
+    const derivedBounds = createTerminalGroupBounds(memberBlockIds, this.blockSnapshots)
+    const initialPosition = input.position ?? derivedBounds.position
+    const initialSize = input.size
+      ? normalizeRequestedTerminalGroupSize(input.size)
+      : derivedBounds.size
 
     const group = normalizeTerminalGroupBounds(
       {
         id: input.id ?? createTerminalGroupId(),
         type: 'terminal-group',
         name,
-        position: { x: 0, y: 0 },
-        size: defaultTerminalGroupSize,
+        position: initialPosition,
+        size: initialSize,
         isCollapsed: false,
         memberBlockIds
       },
@@ -497,92 +537,64 @@ export class BlockGraph {
         : block
     )
     this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((currentGroup) =>
-      currentGroup.id === terminalGroupId
-        ? normalizeTerminalGroupBounds({ ...currentGroup, position }, this.blockSnapshots)
-        : currentGroup
+      currentGroup.id === terminalGroupId ? { ...currentGroup, position } : currentGroup
     )
   }
 
   addTerminalToGroup(terminalGroupId: string, blockId: string): void {
-    const terminalGroup = this.requireTerminalGroup(terminalGroupId)
-    const expandedMemberBlockIds = expandTerminalGroupMemberIdsToCompleteWorkflows(
-      this.blockSnapshots,
-      this.terminalConnectionSnapshots,
-      [blockId]
-    )
-    const addedMemberBlockIds = expandedMemberBlockIds.filter(
-      (memberBlockId) => !terminalGroup.memberBlockIds.includes(memberBlockId)
-    )
-    const nextMemberBlockIds = [...terminalGroup.memberBlockIds, ...addedMemberBlockIds]
-    const analysis = analyzeTerminalGroupMemberSelection(
-      this.blockSnapshots,
-      this.terminalConnectionSnapshots,
-      nextMemberBlockIds
-    )
-    const completeMemberBlockIds = [
-      ...nextMemberBlockIds,
-      ...analysis.expandedTerminalIds.filter(
-        (memberBlockId) => !nextMemberBlockIds.includes(memberBlockId)
-      )
-    ]
-    this.ensureTerminalGroupMembersCanBeGrouped(
-      completeMemberBlockIds,
-      analysis.canCreateCombination,
-      terminalGroupId
-    )
-
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
-      if (group.id !== terminalGroupId) {
-        return group
-      }
-
-      return normalizeTerminalGroupBounds(
-        {
-          ...group,
-          memberBlockIds: completeMemberBlockIds
-        },
-        this.blockSnapshots
-      )
-    })
+    this.moveTerminalWorkflowToGroup(blockId, terminalGroupId)
   }
 
   removeTerminalFromGroup(terminalGroupId: string, blockId: string): void {
-    const removedMemberBlockIds = new Set(
+    const group = this.requireTerminalGroup(terminalGroupId)
+    if (!group.memberBlockIds.includes(blockId)) {
+      throw createExpectedAppError(
+        'TERMINAL_BLOCK_NOT_IN_GROUP',
+        'Terminal block does not belong to the group.'
+      )
+    }
+    this.moveTerminalWorkflowToGroup(blockId, null)
+  }
+
+  moveTerminalWorkflowToGroup(
+    blockId: string,
+    terminalGroupId: string | null,
+    position?: BlockPositionSnapshot
+  ): void {
+    this.requireTerminalBlock(blockId)
+    if (terminalGroupId) this.requireTerminalGroup(terminalGroupId)
+
+    const movedBlockIds = new Set(
       expandTerminalGroupMemberIdsToCompleteWorkflows(
         this.blockSnapshots,
         this.terminalConnectionSnapshots,
         [blockId]
       )
     )
-    let hasUpdatedGroup = false
+    const sourceGroup = this.findTerminalGroupByBlockId(blockId)
 
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots
-      .map((group) => {
-        if (group.id !== terminalGroupId) {
-          return group
-        }
-
-        hasUpdatedGroup = true
-
-        return {
-          ...group,
-          memberBlockIds: group.memberBlockIds.filter(
-            (memberBlockId) => !removedMemberBlockIds.has(memberBlockId)
-          )
-        }
-      })
-      .filter((group) =>
-        isValidTerminalGroupMembership(
-          group.memberBlockIds,
-          this.blockSnapshots,
-          this.terminalConnectionSnapshots
+    for (const movedBlockId of movedBlockIds) {
+      const currentGroup = this.findTerminalGroupByBlockId(movedBlockId)
+      if ((currentGroup?.id ?? null) !== (sourceGroup?.id ?? null)) {
+        throw createExpectedAppError(
+          'TERMINAL_SCOPE_MOVE_STALE',
+          'Terminal workflow scope changed before it could be moved.'
         )
-      )
-      .map((group) => normalizeTerminalGroupBounds(group, this.blockSnapshots))
-
-    if (!hasUpdatedGroup) {
-      throw createExpectedAppError('TERMINAL_GROUP_NOT_FOUND', 'Terminal group was not found.')
+      }
     }
+
+    const result = applyTerminalGroupMembershipMove({
+      blockId,
+      blocks: this.blockSnapshots,
+      connections: this.terminalConnectionSnapshots,
+      groups: this.terminalGroupSnapshots,
+      movedBlockIds,
+      position,
+      sourceTerminalGroupId: sourceGroup?.id ?? null,
+      targetTerminalGroupId: terminalGroupId
+    })
+    this.blockSnapshots = result.blocks
+    this.terminalGroupSnapshots = result.groups
   }
 
   dissolveTerminalGroup(terminalGroupId: string): void {
@@ -606,21 +618,6 @@ export class BlockGraph {
       terminalGroups: this.terminalGroupSnapshots,
       quickExecutionSlots: this.quickExecutionSlotSnapshots
     }
-  }
-
-  private ensureTerminalGroupMembersCanBeGrouped(
-    memberBlockIds: readonly string[],
-    canCreateCombination: boolean,
-    allowedTerminalGroupId?: string
-  ): void {
-    if (!canCreateCombination) {
-      throw createExpectedAppError(
-        'TERMINAL_GROUP_REQUIRES_TWO_EXECUTION_UNITS',
-        'Terminal group must contain at least two top-level execution units.'
-      )
-    }
-
-    this.ensureTerminalGroupMembersAreAvailable(memberBlockIds, allowedTerminalGroupId)
   }
 
   private ensureTerminalGroupMembersAreAvailable(

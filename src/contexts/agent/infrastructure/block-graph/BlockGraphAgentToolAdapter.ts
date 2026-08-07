@@ -21,10 +21,13 @@ import type {
   AgentConnectTerminalBlocksInput,
   AgentConnectTerminalBlocksResult,
   AgentCreateTerminalBlockInput,
+  AgentCreateTerminalGroupInput,
   AgentCreateTerminalWorkflowInput,
   AgentCreateTerminalWorkflowResult,
   AgentDisconnectTerminalBlocksInput,
   AgentInspectTerminalWorkflowPlanInput,
+  AgentMoveTerminalWorkflowToGroupInput,
+  AgentMoveTerminalWorkflowToGroupResult,
   AgentUpdateTerminalExecutionConfigInput
 } from '../../application/ports/AgentBlockGraphToolPort'
 import type {
@@ -33,7 +36,6 @@ import type {
 } from '../../application/dto/AgentTerminalWorkflowProtocol'
 import type {
   AgentToolContext,
-  CreateTerminalGroupAgentToolInput,
   DeleteBlockAgentToolInput,
   DeleteTerminalGroupAgentToolInput,
   UpdateBlockAgentToolInput,
@@ -69,10 +71,12 @@ export interface BlockGraphAgentToolAdapterInput {
     command: CreateTerminalWorkflowCommand
   ) => Promise<CreateTerminalWorkflowResult>
   readonly createTerminalGroup: (command: {
+    readonly canvasRegions?: AgentCreateTerminalGroupInput['canvasRegions']
     readonly projectDirectory: string
     readonly workspaceId: string
     readonly name: string
-    readonly memberBlockIds: readonly string[]
+    readonly memberBlockIds?: readonly string[]
+    readonly position?: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
   readonly deleteBlock: (command: {
     readonly projectDirectory: string
@@ -103,6 +107,9 @@ export interface BlockGraphAgentToolAdapterInput {
     readonly terminalGroupId: string
     readonly position: BlockPositionSnapshot
   }) => Promise<BlockGraphSnapshot>
+  readonly moveTerminalWorkflowToGroup: (
+    command: AgentToolContext & AgentMoveTerminalWorkflowToGroupInput
+  ) => Promise<BlockGraphSnapshot>
   readonly resizeTerminalBlock: (command: {
     readonly projectDirectory: string
     readonly workspaceId: string
@@ -268,15 +275,57 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
 
   async createTerminalGroup(
     context: AgentToolContext,
-    input: CreateTerminalGroupAgentToolInput
+    input: AgentCreateTerminalGroupInput
   ): Promise<AgentBlockGraphSnapshot> {
     return toAgentBlockGraphSnapshot(
       await this.tools.createTerminalGroup({
         ...context,
-        memberBlockIds: input.memberBlockIds,
-        name: input.name
+        ...(input.canvasRegions ? { canvasRegions: input.canvasRegions } : {}),
+        ...(input.memberBlockIds ? { memberBlockIds: input.memberBlockIds } : {}),
+        name: input.name,
+        ...(input.position ? { position: input.position } : {})
       })
     )
+  }
+
+  async moveTerminalWorkflowToGroup(
+    context: AgentToolContext,
+    input: AgentMoveTerminalWorkflowToGroupInput
+  ): Promise<AgentMoveTerminalWorkflowToGroupResult> {
+    const before = await this.tools.getDefaultGraph(context)
+    const membershipBefore = indexTerminalGroupMembership(before.terminalGroups)
+    if ((membershipBefore.get(input.blockId) ?? null) === input.targetTerminalGroupId) {
+      return {
+        affectedTerminalGroupIds: [],
+        graph: toAgentBlockGraphSnapshot(before),
+        graphChanged: false,
+        movedBlockIds: []
+      }
+    }
+
+    const graph = await this.tools.moveTerminalWorkflowToGroup({ ...context, ...input })
+    const membershipAfter = indexTerminalGroupMembership(graph.terminalGroups)
+    const movedBlockIds = graph.blocks
+      .filter(
+        (block) =>
+          (membershipBefore.get(block.id) ?? null) !== (membershipAfter.get(block.id) ?? null)
+      )
+      .map((block) => block.id)
+    const affectedTerminalGroupIds = [
+      ...new Set(
+        movedBlockIds.flatMap((blockId) => [
+          membershipBefore.get(blockId),
+          membershipAfter.get(blockId)
+        ])
+      )
+    ].filter((groupId): groupId is string => groupId !== undefined)
+
+    return {
+      affectedTerminalGroupIds,
+      graph: toAgentBlockGraphSnapshot(graph),
+      graphChanged: movedBlockIds.length > 0,
+      movedBlockIds
+    }
   }
 
   async updateTerminalGroup(
@@ -381,6 +430,14 @@ export class BlockGraphAgentToolAdapter implements AgentBlockGraphToolPort {
       })
     )
   }
+}
+
+function indexTerminalGroupMembership(
+  groups: BlockGraphSnapshot['terminalGroups']
+): ReadonlyMap<string, string> {
+  return new Map(
+    groups.flatMap((group) => group.memberBlockIds.map((blockId) => [blockId, group.id] as const))
+  )
 }
 
 function requireTerminalBlock(

@@ -66,7 +66,7 @@ describe('block graph filesystem repository', () => {
     ) as { graph: { id: string }; version: number }
 
     expect(await pathExists(join(projectDirectory, '.cleancode'))).toBe(false)
-    expect(graphMetadata).toMatchObject({ graph: { id: graph.id }, version: 3 })
+    expect(graphMetadata).toMatchObject({ graph: { id: graph.id }, version: 4 })
     expect(openedGraph?.toSnapshot()).toEqual({
       id: graph.id,
       projectId: 'project-1',

@@ -179,6 +179,7 @@ declare global {
         readonly name: string
         readonly description: string
         readonly position: BlockPositionSnapshot
+        readonly terminalGroupId?: string
       }): Promise<BlockGraphSnapshot>
       addQuickExecutionTarget(command: {
         readonly projectDirectory: string
@@ -206,7 +207,7 @@ declare global {
         readonly projectDirectory: string
         readonly workspaceId: string
         readonly name: string
-        readonly memberBlockIds: readonly string[]
+        readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       connectTerminalBlocks(command: {
         readonly projectDirectory: string
@@ -254,17 +255,12 @@ declare global {
         readonly terminalGroupId: string
         readonly isCollapsed: boolean
       }): Promise<BlockGraphSnapshot>
-      addTerminalToGroup(command: {
+      moveTerminalWorkflowToGroup(command: {
         readonly projectDirectory: string
         readonly workspaceId: string
-        readonly terminalGroupId: string
         readonly blockId: string
-      }): Promise<BlockGraphSnapshot>
-      removeTerminalFromGroup(command: {
-        readonly projectDirectory: string
-        readonly workspaceId: string
-        readonly terminalGroupId: string
-        readonly blockId: string
+        readonly targetTerminalGroupId: string | null
+        readonly position: BlockPositionSnapshot
       }): Promise<BlockGraphSnapshot>
       dissolveTerminalGroup(command: {
         readonly projectDirectory: string

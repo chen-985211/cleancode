@@ -14,12 +14,66 @@ export function preserveWorkbenchNodeTransientLayout(
       return nextNode
     }
 
-    if (hasPersistedLayoutChanged(currentNode, nextNode) && !protectedNodeIds.has(nextNode.id)) {
-      return nextNode
+    if (hasPersistedLayoutChanged(currentNode, nextNode)) {
+      return protectedNodeIds.has(nextNode.id)
+        ? preserveProtectedLayoutBaseline(nextNode, currentNode)
+        : nextNode
     }
 
     return preserveTransientGeometry(nextNode, currentNode)
   })
+}
+
+function preserveProtectedLayoutBaseline(
+  nextNode: WorkbenchFlowNode,
+  currentNode: WorkbenchFlowNode
+): WorkbenchFlowNode {
+  const nodeWithTransientGeometry = preserveTransientGeometry(nextNode, currentNode)
+
+  if (nodeWithTransientGeometry.type === 'terminal' && currentNode.type === 'terminal') {
+    return {
+      ...nodeWithTransientGeometry,
+      data: {
+        ...nodeWithTransientGeometry.data,
+        block: {
+          ...nodeWithTransientGeometry.data.block,
+          position: currentNode.data.block.position,
+          size: currentNode.data.block.size
+        }
+      }
+    }
+  }
+
+  if (nodeWithTransientGeometry.type === 'terminalGroup' && currentNode.type === 'terminalGroup') {
+    return {
+      ...nodeWithTransientGeometry,
+      data: {
+        ...nodeWithTransientGeometry.data,
+        group: {
+          ...nodeWithTransientGeometry.data.group,
+          position: currentNode.data.group.position,
+          size: currentNode.data.group.size,
+          isCollapsed: currentNode.data.group.isCollapsed,
+          memberBlockIds: currentNode.data.group.memberBlockIds
+        }
+      }
+    }
+  }
+
+  if (nodeWithTransientGeometry.type === 'agentConsole' && currentNode.type === 'agentConsole') {
+    return {
+      ...nodeWithTransientGeometry,
+      data: {
+        ...nodeWithTransientGeometry.data,
+        agent: {
+          ...nodeWithTransientGeometry.data.agent,
+          layout: currentNode.data.agent.layout
+        }
+      }
+    }
+  }
+
+  return nodeWithTransientGeometry
 }
 
 function preserveTransientGeometry(

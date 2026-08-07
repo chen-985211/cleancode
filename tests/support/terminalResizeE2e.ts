@@ -73,20 +73,37 @@ export async function waitForTerminalBlockSizeChange(
 async function startTerminalResizeFromBottomRight(
   page: Page
 ): Promise<{ readonly startX: number; readonly startY: number }> {
-  const handles = page.locator('.terminal-node__resize-handle')
-  const boxes = await Promise.all(
-    Array.from({ length: await handles.count() }, (_, index) => handles.nth(index).boundingBox())
-  )
-  const orderedBoxes = boxes
-    .filter((box): box is NonNullable<typeof box> => Boolean(box))
-    .sort((left, right) => left.x + left.y - (right.x + right.y))
-  const box = orderedBoxes.at(-1)
+  let lastStartError: unknown
 
-  expect(box).toBeDefined()
-  const startX = box!.x + box!.width / 2
-  const startY = box!.y + box!.height / 2
-  await page.mouse.move(startX, startY)
-  await page.mouse.down()
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const handle = page.locator('.terminal-node__resize-handle.bottom.right').first()
+    await handle.hover()
+    const box = await readRequiredBoundingBox(handle)
+    const startX = box.x + box.width / 2
+    const startY = box.y + box.height / 2
+    const terminal = page.locator('[data-terminal-block-id]').first()
+    const beforeBox = await readRequiredBoundingBox(terminal)
 
-  return { startX, startY }
+    await page.mouse.move(startX, startY)
+    await page.mouse.down()
+    await page.mouse.move(startX + 8, startY + 8, { steps: 4 })
+
+    try {
+      await pollUntilState({
+        description: 'terminal resize drag to start',
+        observe: () => readRequiredBoundingBox(terminal),
+        accept: (candidateBox) =>
+          candidateBox.width - beforeBox.width > 4 || candidateBox.height - beforeBox.height > 4,
+        timeoutMs: 1_000
+      })
+      return { startX, startY }
+    } catch (error) {
+      lastStartError = error
+      await page.mouse.up()
+    }
+  }
+
+  throw new Error('Could not start terminal resize drag after three attempts.', {
+    cause: lastStartError
+  })
 }

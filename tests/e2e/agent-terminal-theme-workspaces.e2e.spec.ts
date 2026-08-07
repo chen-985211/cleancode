@@ -19,6 +19,7 @@ import {
   expectDesktopRuntime,
   launchApp,
   readOnlyJsonFile,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
@@ -181,7 +182,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await page.getByRole('button', { name: '添加项目' }).click()
       await createCodexAgent(page)
       await waitForPersistedAgent(page)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
 
       const terminalProjection = page.locator(
         '[data-terminal-block-id] .terminal-theme-projection[data-terminal-source-theme="light"]'
@@ -217,7 +218,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await page.getByRole('button', { name: '添加项目' }).click()
       await createCodexAgent(page)
       await waitForPersistedAgent(page)
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       await waitForTerminalShellReady(page, 'Terminal 1')
 
       const agentBefore = await waitForAgentTerminal(page, 'main', 'light')

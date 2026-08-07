@@ -15,7 +15,7 @@ export const defaultTerminalGroupSize: TerminalGroupSizeSnapshot = {
   height: 320
 }
 
-const terminalGroupPadding = {
+export const terminalGroupPadding = {
   x: 32,
   y: 76
 }
@@ -23,7 +23,7 @@ const terminalGroupPadding = {
 export function normalizeTerminalGroups(
   groups: readonly Partial<TerminalGroupSnapshot>[] | undefined,
   blocks: readonly TerminalBlockSnapshot[],
-  connections: readonly TerminalConnectionSnapshot[],
+  _connections: readonly TerminalConnectionSnapshot[],
   createTerminalGroupId: () => string
 ): TerminalGroupSnapshot[] {
   const assignedBlockIds = new Set<string>()
@@ -35,10 +35,6 @@ export function normalizeTerminalGroups(
       blocks,
       assignedBlockIds
     )
-
-    if (!isValidTerminalGroupMembership(memberBlockIds, blocks, connections)) {
-      continue
-    }
 
     for (const memberBlockId of memberBlockIds) {
       assignedBlockIds.add(memberBlockId)
@@ -61,10 +57,6 @@ export function normalizeTerminalGroups(
   }
 
   return validGroups
-}
-
-function normalizeTerminalGroupMemberIds(memberBlockIds: readonly string[]): string[] {
-  return Array.from(new Set(memberBlockIds))
 }
 
 export function expandTerminalGroupMemberIdsToCompleteWorkflows(
@@ -93,40 +85,31 @@ export function analyzeTerminalGroupMemberSelection(
   })
 }
 
-export function isValidTerminalGroupMembership(
-  memberBlockIds: readonly string[],
-  blocks: readonly TerminalBlockSnapshot[],
-  connections: readonly TerminalConnectionSnapshot[]
-): boolean {
-  const normalizedMemberBlockIds = normalizeTerminalGroupMemberIds(memberBlockIds)
-  const analysis = analyzeTerminalGroupMemberSelection(
-    blocks,
-    connections,
-    normalizedMemberBlockIds
-  )
-
-  return (
-    analysis.canCreateCombination &&
-    analysis.unknownTerminalIds.length === 0 &&
-    analysis.expandedTerminalIds.length === normalizedMemberBlockIds.length &&
-    analysis.expandedTerminalIds.every((blockId) => normalizedMemberBlockIds.includes(blockId))
-  )
-}
-
 export function normalizeTerminalGroupBounds(
   group: TerminalGroupSnapshot,
   blocks: readonly TerminalBlockSnapshot[]
 ): TerminalGroupSnapshot {
   const memberBlocks = blocks.filter((block) => group.memberBlockIds.includes(block.id))
 
-  if (memberBlocks.length < 2) {
-    return group
-  }
-
-  const bounds = getTerminalGroupMemberBounds(memberBlocks)
+  if (memberBlocks.length === 0) return group
 
   return {
     ...group,
+    ...createTerminalGroupBounds(group.memberBlockIds, blocks)
+  }
+}
+
+export function createTerminalGroupBounds(
+  memberBlockIds: readonly string[],
+  blocks: readonly TerminalBlockSnapshot[]
+): Pick<TerminalGroupSnapshot, 'position' | 'size'> {
+  const memberBlocks = blocks.filter((block) => memberBlockIds.includes(block.id))
+  if (memberBlocks.length === 0) {
+    return { position: { x: 0, y: 0 }, size: defaultTerminalGroupSize }
+  }
+
+  const bounds = getTerminalGroupMemberBounds(memberBlocks)
+  return {
     position: {
       x: bounds.left - terminalGroupPadding.x,
       y: bounds.top - terminalGroupPadding.y
@@ -142,6 +125,16 @@ export function normalizeTerminalGroupBounds(
       )
     }
   }
+}
+
+export function normalizeRequestedTerminalGroupSize(
+  size: Partial<TerminalGroupSizeSnapshot> | undefined
+): TerminalGroupSizeSnapshot {
+  return normalizeTerminalGroupSize(size)
+}
+
+function normalizeTerminalGroupMemberIds(memberBlockIds: readonly string[]): string[] {
+  return Array.from(new Set(memberBlockIds))
 }
 
 function normalizeRestoredTerminalGroupMemberIds(

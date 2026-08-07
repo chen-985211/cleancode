@@ -14,16 +14,12 @@ export function GroupRestartIcon(props: TerminalGroupIconProps) {
   return <WorkbenchIcon {...props} data-icon="group-restart" role="restart" />
 }
 
-export function GroupEditIcon(props: TerminalGroupIconProps) {
-  return <WorkbenchIcon {...props} data-icon="group-edit" role="edit" />
+export function GroupContentsIcon(props: TerminalGroupIconProps) {
+  return <WorkbenchIcon {...props} data-icon="group-contents" role="open-project" />
 }
 
-export function GroupAddIcon(props: TerminalGroupIconProps) {
-  return <WorkbenchIcon {...props} data-icon="group-add" role="group-add" />
-}
-
-export function GroupRemoveIcon(props: TerminalGroupIconProps) {
-  return <WorkbenchIcon {...props} data-icon="group-remove" role="group-remove" />
+export function GroupRenameIcon(props: TerminalGroupIconProps) {
+  return <WorkbenchIcon {...props} data-icon="group-rename" role="edit" />
 }
 
 export function GroupDissolveIcon({

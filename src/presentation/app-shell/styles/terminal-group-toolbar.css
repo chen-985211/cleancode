@@ -105,6 +105,13 @@
     0 3px 7px var(--cc-shadow-color);
 }
 
+.terminal-group-node__action[aria-pressed='true'] {
+  --terminal-group-icon-cutout: var(--cc-primary-soft);
+  background: var(--cc-primary-soft);
+  color: var(--cc-primary);
+  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
+}
+
 .terminal-group-node__action:active:not(:disabled),
 .terminal-group-node__disclosure:active:not(:disabled) {
   transform: translateY(1px);

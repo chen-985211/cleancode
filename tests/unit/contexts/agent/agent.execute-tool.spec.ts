@@ -94,7 +94,12 @@ describe('execute agent tool', () => {
     expect(result).toEqual({
       graph: fakeGraphWithTerminalGroup,
       graphChanged: true,
-      output: { createdTerminalGroupId: 'terminal-group-dev-test', type: 'block_graph' },
+      output: {
+        arrangedBlockIds: ['terminal-api', 'terminal-test'],
+        arrangedTerminalGroupIds: ['terminal-group-dev-test'],
+        createdTerminalGroupId: 'terminal-group-dev-test',
+        type: 'block_graph'
+      },
       status: 'completed',
       toolCallId: 'tool-call-group-create'
     })
@@ -459,6 +464,7 @@ function createBlockGraphTools(): AgentBlockGraphToolPort {
       nodes: [],
       workspaceId: 'main'
     })),
+    moveTerminalWorkflowToGroup: vi.fn(),
     updateTerminalBlock: vi.fn(async () => fakeGraph),
     updateTerminalExecutionConfig: vi.fn(async () => fakeGraph),
     updateTerminalGroup: vi.fn(async () => fakeGraph)

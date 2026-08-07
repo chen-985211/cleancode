@@ -8,6 +8,7 @@ import {
   electronScenarioTimeoutMs,
   expectDesktopRuntime,
   launchApp,
+  selectBlankCanvasAction,
   teardownE2eScenario,
   type E2eScenarioResources,
   type E2eWorkbench
@@ -52,7 +53,7 @@ describe('canvas cursor e2e', () => {
       const draggingPaneCursor = await readCursor(pane)
       await pane.evaluate((element) => element.classList.remove('dragging'))
 
-      await page.getByRole('button', { name: '新建终端积木' }).click()
+      await selectBlankCanvasAction(page, '新建终端积木')
       const node = page.locator('.react-flow__node').filter({ hasText: 'Terminal 1' })
       const header = node.locator('.terminal-node__header')
       await header.waitFor()
