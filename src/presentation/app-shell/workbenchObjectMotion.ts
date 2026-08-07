@@ -46,7 +46,9 @@ export function projectWorkbenchObjectMotionOntoEdges(
       .filter(
         (node) =>
           node.data.objectMotion?.kind === 'group-expand' ||
-          node.data.objectMotion?.kind === 'group-join'
+          node.data.objectMotion?.kind === 'group-join' ||
+          node.data.objectMotion?.kind === 'group-leave' ||
+          node.data.objectMotion?.kind === 'group-reflow'
       )
       .map((node) => node.id)
   )
@@ -100,9 +102,16 @@ export function projectWorkbenchObjectMotion({
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]))
   const nextNodesById = new Map(nextNodes.map((node) => [node.id, node]))
   const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
-  const joinedGroupMemberIds = resolveJoinedGroupMemberIds(currentNodesById, nextNodes)
+  const membershipMotion = resolveGroupMembershipMotion(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
-    if (node.type === 'terminal' && joinedGroupMemberIds.has(node.id)) {
+    if (node.type === 'terminalGroup' && membershipMotion.acceptingGroupIds.has(node.id)) {
+      return withObjectMotion(
+        node,
+        createObjectMotion('group-accept', node.id, { x: 0, y: 0 }, createMotionId)
+      )
+    }
+
+    if (node.type === 'terminal' && membershipMotion.joinedMemberIds.has(node.id)) {
       const currentNode = currentNodesById.get(node.id)
       return withObjectMotion(
         node,
@@ -112,6 +121,30 @@ export function projectWorkbenchObjectMotion({
           currentNode ? resolveOffsetFromNode(node, currentNode) : { x: 0, y: 0 },
           createMotionId
         )
+      )
+    }
+
+    if (node.type === 'terminal' && membershipMotion.reflowedMemberIds.has(node.id)) {
+      const currentNode = currentNodesById.get(node.id)
+      if (!currentNode) return node
+      const offset = resolveOffsetFromNode(node, currentNode)
+      if (offset.x === 0 && offset.y === 0) return node
+
+      return withObjectMotion(
+        node,
+        createObjectMotion('group-reflow', node.id, offset, createMotionId)
+      )
+    }
+
+    if (node.type === 'terminal' && membershipMotion.departedMemberIds.has(node.id)) {
+      const currentNode = currentNodesById.get(node.id)
+      if (!currentNode) return node
+      const offset = resolveOffsetFromNode(node, currentNode)
+      if (offset.x === 0 && offset.y === 0) return node
+
+      return withObjectMotion(
+        node,
+        createObjectMotion('group-leave', node.id, offset, createMotionId)
       )
     }
 
@@ -140,11 +173,19 @@ export function projectWorkbenchObjectMotion({
   return { exitingNodes, nodes }
 }
 
-function resolveJoinedGroupMemberIds(
+function resolveGroupMembershipMotion(
   currentNodesById: ReadonlyMap<string, WorkbenchFlowNode>,
   nextNodes: readonly WorkbenchFlowNode[]
-): ReadonlySet<string> {
+): {
+  readonly acceptingGroupIds: ReadonlySet<string>
+  readonly departedMemberIds: ReadonlySet<string>
+  readonly joinedMemberIds: ReadonlySet<string>
+  readonly reflowedMemberIds: ReadonlySet<string>
+} {
+  const acceptingGroupIds = new Set<string>()
+  const departedMemberIds = new Set<string>()
   const joinedMemberIds = new Set<string>()
+  const reflowedMemberIds = new Set<string>()
 
   nextNodes.forEach((node) => {
     if (node.type !== 'terminalGroup') return
@@ -152,13 +193,26 @@ function resolveJoinedGroupMemberIds(
     if (currentNode?.type !== 'terminalGroup') return
 
     const currentMemberIds = new Set(currentNode.data.group.memberBlockIds)
+    const nextMemberIds = new Set(node.data.group.memberBlockIds)
+    const addedMemberIds = node.data.group.memberBlockIds.filter(
+      (memberBlockId) => !currentMemberIds.has(memberBlockId)
+    )
+    const hasRemovedMembers = currentNode.data.group.memberBlockIds.some(
+      (memberBlockId) => !nextMemberIds.has(memberBlockId)
+    )
+    if (addedMemberIds.length === 0 && !hasRemovedMembers) return
+
+    if (addedMemberIds.length > 0) acceptingGroupIds.add(node.id)
+    addedMemberIds.forEach((memberBlockId) => joinedMemberIds.add(memberBlockId))
+    currentNode.data.group.memberBlockIds.forEach((memberBlockId) => {
+      if (!nextMemberIds.has(memberBlockId)) departedMemberIds.add(memberBlockId)
+    })
     node.data.group.memberBlockIds.forEach((memberBlockId) => {
-      if (currentMemberIds.has(memberBlockId)) return
-      joinedMemberIds.add(memberBlockId)
+      if (currentMemberIds.has(memberBlockId)) reflowedMemberIds.add(memberBlockId)
     })
   })
 
-  return joinedMemberIds
+  return { acceptingGroupIds, departedMemberIds, joinedMemberIds, reflowedMemberIds }
 }
 
 function resolveExpandingMemberOrigins(

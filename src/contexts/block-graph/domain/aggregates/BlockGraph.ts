@@ -30,6 +30,7 @@ import {
   normalizeTerminalGroups,
   normalizeRequestedTerminalGroupSize
 } from '../services/TerminalGroupRules'
+import { applyTerminalGroupMembershipMove } from '../services/TerminalGroupMemberLayout'
 import {
   assertTerminalConnectionWithinOneScope,
   migrateCrossScopeWorkflowComponentsToRoot
@@ -582,33 +583,18 @@ export class BlockGraph {
       }
     }
 
-    if (position) {
-      this.blockSnapshots = this.blockSnapshots.map((block) =>
-        block.id === blockId ? { ...block, position } : block
-      )
-    }
-    if ((sourceGroup?.id ?? null) === terminalGroupId) {
-      this.normalizeGroupsContainingBlock(blockId)
-      return
-    }
-
-    this.terminalGroupSnapshots = this.terminalGroupSnapshots.map((group) => {
-      const withoutMovedMembers = group.memberBlockIds.filter((id) => !movedBlockIds.has(id))
-      const nextMemberBlockIds =
-        group.id === terminalGroupId
-          ? [
-              ...withoutMovedMembers,
-              ...this.blockSnapshots.map((block) => block.id).filter((id) => movedBlockIds.has(id))
-            ]
-          : withoutMovedMembers
-      const hasMembershipChanged = nextMemberBlockIds.length !== group.memberBlockIds.length
-      if (!hasMembershipChanged) return group
-
-      return normalizeTerminalGroupBounds(
-        { ...group, memberBlockIds: nextMemberBlockIds },
-        this.blockSnapshots
-      )
+    const result = applyTerminalGroupMembershipMove({
+      blockId,
+      blocks: this.blockSnapshots,
+      connections: this.terminalConnectionSnapshots,
+      groups: this.terminalGroupSnapshots,
+      movedBlockIds,
+      position,
+      sourceTerminalGroupId: sourceGroup?.id ?? null,
+      targetTerminalGroupId: terminalGroupId
     })
+    this.blockSnapshots = result.blocks
+    this.terminalGroupSnapshots = result.groups
   }
 
   dissolveTerminalGroup(terminalGroupId: string): void {

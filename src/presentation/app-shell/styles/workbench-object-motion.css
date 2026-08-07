@@ -36,22 +36,30 @@
   will-change: transform, opacity;
 }
 
-.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)
-  .react-flow__node.dragging
-  .terminal-node {
-  opacity: 0.78;
-  transform: scale(0.94);
-  box-shadow: var(--cc-shadow-sm);
-  transition:
-    opacity 120ms ease-out,
-    box-shadow 140ms ease-out,
-    transform 160ms cubic-bezier(0.2, 0.82, 0.2, 1);
-}
-
 .terminal-node.workbench-object-motion--group-join {
   transform-origin: center;
-  animation: workbench-terminal-group-join 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
-  will-change: opacity, transform;
+  animation: workbench-terminal-group-join 380ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
+.terminal-node.workbench-object-motion--group-reflow {
+  transform-origin: center;
+  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
+.terminal-node.workbench-object-motion--group-leave {
+  transform-origin: center;
+  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
+}
+
+.terminal-group-node.workbench-object-motion--group-accept {
+  animation: workbench-terminal-group-accept-shell 440ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+}
+
+.terminal-group-node.workbench-object-motion--group-accept::after {
+  animation: workbench-terminal-group-accept-depth 440ms ease-out both;
 }
 
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
@@ -182,19 +190,63 @@
 
 @keyframes workbench-terminal-group-join {
   from {
-    opacity: 0.78;
-    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
-      scale(0.94);
-  }
-
-  72% {
-    opacity: 0.96;
-    transform: translate3d(0, 0, 0) scale(0.985);
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
   }
 
   to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workbench-terminal-group-reflow {
+  from {
+    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes workbench-terminal-group-accept-shell {
+  from {
+    background: color-mix(in srgb, var(--cc-foreground) 4%, var(--cc-surface-translucent));
+    box-shadow:
+      0 1px 4px var(--cc-shadow-color),
+      0 8px 20px var(--cc-shadow-color),
+      0 14px 36px var(--cc-shadow-color) inset,
+      0 1px 0 var(--cc-neutral-overlay) inset;
+  }
+
+  48% {
+    box-shadow:
+      0 2px 6px var(--cc-shadow-color),
+      0 10px 24px var(--cc-shadow-color),
+      0 8px 22px var(--cc-shadow-color) inset,
+      0 1px 0 var(--cc-neutral-overlay) inset;
+  }
+
+  to {
+    background: var(--cc-surface-translucent);
+    box-shadow:
+      0 3px 8px var(--cc-shadow-color),
+      0 16px 32px var(--cc-shadow-color),
+      0 0 0 1px var(--cc-border) inset,
+      0 1px 0 var(--cc-neutral-overlay) inset;
+  }
+}
+
+@keyframes workbench-terminal-group-accept-depth {
+  from {
+    opacity: 0.95;
+  }
+
+  52% {
+    opacity: 0.56;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 
@@ -206,15 +258,21 @@
 
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--group-accept,
     .workbench-object-motion--group-expand,
     .workbench-object-motion--group-collapse,
-    .workbench-object-motion--group-join
+    .workbench-object-motion--group-join,
+    .workbench-object-motion--group-leave,
+    .workbench-object-motion--group-reflow
   ),
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--group-accept,
     .workbench-object-motion--group-expand,
     .workbench-object-motion--group-collapse,
-    .workbench-object-motion--group-join
+    .workbench-object-motion--group-join,
+    .workbench-object-motion--group-leave,
+    .workbench-object-motion--group-reflow
   )::before {
     clip-path: none;
     opacity: 1;
@@ -222,10 +280,8 @@
     animation: none;
   }
 
-  .canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)
-    .react-flow__node.dragging
-    .terminal-node {
-    transform: none;
-    transition: none;
+  .terminal-group-node.workbench-object-motion--group-accept::after {
+    opacity: 0;
+    animation: none;
   }
 }

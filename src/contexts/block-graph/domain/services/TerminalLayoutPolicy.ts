@@ -83,11 +83,7 @@ export function createTerminalLayoutPlan(
           requireUnitRank(unitRankByBlockId, right.id) || compareStableBlockOrder(left, right)
     )
   )
-  const baseLayouts = placeTerminalExecutionUnits(
-    scopedBlocks,
-    graph.connections ?? [],
-    scopedBlockIds
-  )
+  const baseLayouts = createBalancedTerminalBlockLayouts(scopedBlocks, graph.connections ?? [])
   const internallySpacedLayouts = spaceLayoutUnits(graph, baseLayouts, orderedLayoutUnits)
   const layoutRegion = mergePositionedRegions(
     orderedLayoutUnits.map((unit) => createLayoutUnitRegion(graph, unit, internallySpacedLayouts))
@@ -297,6 +293,18 @@ function placeTerminalExecutionUnits(
   const packedUnits = selectBalancedTerminalExecutionUnitPacking(executionUnits)
 
   return [...packedUnits.blockLayouts]
+}
+
+export function createBalancedTerminalBlockLayouts(
+  blocks: readonly TerminalBlockSnapshot[],
+  connections: readonly {
+    readonly sourceBlockId: string
+    readonly targetBlockId: string
+  }[]
+): readonly TerminalBlockLayout[] {
+  if (blocks.length === 0) return []
+
+  return placeTerminalExecutionUnits(blocks, connections, new Set(blocks.map((block) => block.id)))
 }
 
 function resolveWeaklyConnectedTerminalUnits(

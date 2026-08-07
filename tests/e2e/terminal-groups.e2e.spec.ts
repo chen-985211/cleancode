@@ -51,19 +51,54 @@ describe('terminal groups e2e', () => {
         (group) => group.memberBlockIds.length === 0
       )
       expect(emptyGroup.memberBlockIds).toEqual([])
+      const groupAnchor = emptyGroup.position
       await page.getByRole('button', { name: '适应画布' }).click()
       await waitForCanvasViewportToSettle(page)
 
       const graphWithEmptyGroup = await readGraph(page, workbench)
-      for (const terminal of graphWithEmptyGroup.blocks) {
-        await dragTerminalIntoGroup(page, terminal.id)
-        await page.locator('.terminal-node.workbench-object-motion--group-join').waitFor()
-        expect(
-          await page.locator('.terminal-group-node.workbench-object-motion--group-accept').count()
-        ).toBe(0)
-        await waitForTerminalGroup(page, workbench, (group) =>
+      for (const [terminalIndex, terminal] of graphWithEmptyGroup.blocks.entries()) {
+        const groupBoxBeforeDrag = await readRequiredBoundingBox(
+          page.locator('[data-terminal-group-id]').first()
+        )
+        await dragTerminalIntoGroup(
+          page,
+          terminal.id,
+          terminalIndex === 0
+            ? async ({ group, terminal: draggedTerminal }) => {
+                const groupBoxDuringHover = await readRequiredBoundingBox(group)
+                const depthOpacity = await pollUntilState({
+                  description: 'terminal group drop surface to reach its open depth',
+                  observe: () =>
+                    group.evaluate((element) =>
+                      Number(getComputedStyle(element, '::after').opacity)
+                    ),
+                  accept: (opacity) => opacity > 0.8,
+                  intervalMs: 16,
+                  timeoutMs: 1_000
+                })
+                const groupMaterial = await group.evaluate((element) => ({
+                  shadow: getComputedStyle(element).boxShadow
+                }))
+                const terminalTransform = await draggedTerminal.evaluate(
+                  (element) => getComputedStyle(element).transform
+                )
+
+                expect(groupBoxDuringHover.x).toBeCloseTo(groupBoxBeforeDrag.x, 3)
+                expect(groupBoxDuringHover.y).toBeCloseTo(groupBoxBeforeDrag.y, 3)
+                expect(groupMaterial.shadow).toContain('inset')
+                expect(depthOpacity).toBeGreaterThan(0.8)
+                expect(terminalTransform).toBe('none')
+              }
+            : undefined
+        )
+        await Promise.all([
+          page.locator('.terminal-node.workbench-object-motion--group-join').first().waitFor(),
+          page.locator('.terminal-group-node.workbench-object-motion--group-accept').waitFor()
+        ])
+        const joinedGroup = await waitForTerminalGroup(page, workbench, (group) =>
           group.memberBlockIds.includes(terminal.id)
         )
+        expect(joinedGroup.position).toEqual(groupAnchor)
       }
       await page.getByRole('button', { name: '完成' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
@@ -173,7 +208,11 @@ async function selectBlankCanvasActionAt(
     .click()
 }
 
-async function dragTerminalIntoGroup(page: Page, terminalBlockId: string): Promise<void> {
+async function dragTerminalIntoGroup(
+  page: Page,
+  terminalBlockId: string,
+  inspectHover?: (state: { readonly group: Locator; readonly terminal: Locator }) => Promise<void>
+): Promise<void> {
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
   const terminalBox = await readRequiredBoundingBox(terminal)
@@ -187,6 +226,7 @@ async function dragTerminalIntoGroup(page: Page, terminalBlockId: string): Promi
   await page.mouse.move(startX, startY)
   await page.mouse.down()
   await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 18 })
+  await inspectHover?.({ group: page.locator('[data-terminal-group-id]').first(), terminal })
   await page.mouse.up()
 }
 
@@ -297,5 +337,6 @@ interface TerminalBlockRecord {
 interface TerminalGroupRecord {
   readonly isCollapsed: boolean
   readonly memberBlockIds: readonly string[]
+  readonly position: { readonly x: number; readonly y: number }
   readonly size: { readonly width: number; readonly height: number }
 }

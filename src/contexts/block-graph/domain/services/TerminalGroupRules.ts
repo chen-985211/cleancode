@@ -15,7 +15,7 @@ export const defaultTerminalGroupSize: TerminalGroupSizeSnapshot = {
   height: 320
 }
 
-const terminalGroupPadding = {
+export const terminalGroupPadding = {
   x: 32,
   y: 76
 }

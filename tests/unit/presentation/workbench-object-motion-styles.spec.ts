@@ -37,22 +37,28 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
-  it('absorbs a dropped terminal without moving or outlining the group', () => {
+  it('opens the stationary group surface while members translate into arranged slots', () => {
     const joinKeyframes = readRule('@keyframes workbench-terminal-group-join')
+    const reflowKeyframes = readRule('@keyframes workbench-terminal-group-reflow')
+    const acceptRule = readRule('.terminal-group-node.workbench-object-motion--group-accept')
+    const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
+    const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
 
-    expect(objectMotionStyles).toContain(
-      '.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)'
-    )
     expect(joinKeyframes).toContain('var(--workbench-object-motion-x)')
-    expect(joinKeyframes).toContain('scale(0.94)')
-    expect(joinKeyframes).toContain('opacity:')
+    expect(joinKeyframes).not.toContain('scale(')
+    expect(joinKeyframes).not.toContain('opacity:')
+    expect(reflowKeyframes).toContain('var(--workbench-object-motion-x)')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
-    expect(objectMotionStyles).not.toContain('.terminal-group-node--drop-join::after')
-    expect(objectMotionStyles).not.toContain('--cc-success')
-    expect(objectMotionStyles).not.toContain('workbench-object-motion--group-accept')
-    expect(terminalGroupStyles).not.toContain('.terminal-group-node--drop-join {')
-    expect(terminalGroupStyles).not.toContain(
-      '.terminal-group-node--drop-join .terminal-group-node__drop-hint'
+    expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
+    expect(acceptRule).toContain('animation:')
+    expect(acceptRule).not.toContain('transform:')
+    expect(dropTargetRule).toContain('box-shadow:')
+    expect(dropTargetRule).not.toMatch(/\b(border|outline|transform):/)
+    expect(dropTargetRule).not.toContain('--cc-success')
+    expect(dropTargetDepthRule).toContain('opacity:')
+    expect(dropTargetDepthRule).not.toMatch(/\b(border|outline):/)
+    expect(objectMotionStyles).not.toContain(
+      '.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)'
     )
   })
 
@@ -80,4 +86,8 @@ describe('workbench object motion styles', () => {
 
 function readRule(selector: string): string {
   return objectMotionStyles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+}
+
+function readTerminalGroupRule(selector: string): string {
+  return terminalGroupStyles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
 }
