@@ -1,4 +1,6 @@
 import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { useState } from 'react'
 
 import {
@@ -6,6 +8,11 @@ import {
   CanvasMenuSurface
 } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
 import type { CanvasMenuMotionFrameScheduler } from '../../../src/presentation/app-shell/canvasMenuMotion'
+
+const canvasMenuStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-object-context-menu.css'),
+  'utf8'
+)
 
 describe('canvas menu surface', () => {
   it('keeps a closing menu mounted but removes it from interaction until the spring settles', () => {
@@ -80,7 +87,7 @@ describe('canvas menu surface', () => {
     expect(screen.getAllByRole('menu')).toHaveLength(1)
   })
 
-  it('drives one input-consuming dismiss layer from the strongest live menu presentation', () => {
+  it('keeps the input-consuming dismiss layer visually transparent', () => {
     const scheduler = new TestFrameScheduler()
     const onCanvasPointerDown = vi.fn()
     render(
@@ -89,17 +96,18 @@ describe('canvas menu surface', () => {
       </div>
     )
 
-    const backdrop = screen.getByTestId('canvas-menu-backdrop')
-    expect(backdrop).toHaveStyle('--canvas-menu-backdrop-progress: 0')
+    const dismissLayer = screen.getByTestId('canvas-menu-dismiss-layer')
+    const dismissLayerRule = readStyleRule(canvasMenuStyles, '.canvas-menu-dismiss-layer')
+    expect(dismissLayerRule).not.toMatch(/\b(?:background|opacity|backdrop-filter):/)
+    expect(dismissLayerRule).not.toContain('will-change')
+    expect(dismissLayer.style.getPropertyValue('--canvas-menu-backdrop-progress')).toBe('')
     fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
     act(() => scheduler.step())
 
-    expect(
-      Number(backdrop.style.getPropertyValue('--canvas-menu-backdrop-progress'))
-    ).toBeGreaterThan(0)
-    expect(backdrop).toHaveStyle('pointer-events: auto')
+    expect(dismissLayer.style.getPropertyValue('--canvas-menu-backdrop-progress')).toBe('')
+    expect(dismissLayer).toHaveStyle('pointer-events: auto')
 
-    fireEvent.pointerDown(backdrop, { button: 0, pointerId: 1 })
+    fireEvent.pointerDown(dismissLayer, { button: 0, pointerId: 1 })
 
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
     expect(onCanvasPointerDown).not.toHaveBeenCalled()
@@ -110,17 +118,17 @@ describe('canvas menu surface', () => {
     render(<MenuHarness scheduler={scheduler} />)
 
     fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
-    const backdrop = screen.getByTestId('canvas-menu-backdrop')
+    const dismissLayer = screen.getByTestId('canvas-menu-dismiss-layer')
 
-    fireEvent.pointerDown(backdrop, { button: 2, pointerId: 2 })
+    fireEvent.pointerDown(dismissLayer, { button: 2, pointerId: 2 })
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
-    expect(backdrop).toHaveStyle('pointer-events: auto')
+    expect(dismissLayer).toHaveStyle('pointer-events: auto')
 
-    const contextMenuEvent = createEvent.contextMenu(backdrop)
-    fireEvent(backdrop, contextMenuEvent)
+    const contextMenuEvent = createEvent.contextMenu(dismissLayer)
+    fireEvent(dismissLayer, contextMenuEvent)
 
     expect(contextMenuEvent.defaultPrevented).toBe(true)
-    expect(backdrop).toHaveStyle('pointer-events: none')
+    expect(dismissLayer).toHaveStyle('pointer-events: none')
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
   })
 
@@ -145,16 +153,16 @@ describe('canvas menu surface', () => {
     render(<MenuHarness scheduler={scheduler} />)
 
     fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
-    const backdrop = screen.getByTestId('canvas-menu-backdrop')
-    fireEvent.pointerDown(backdrop, { button: 2, pointerId: 4 })
-    expect(backdrop).toHaveStyle('pointer-events: auto')
+    const dismissLayer = screen.getByTestId('canvas-menu-dismiss-layer')
+    fireEvent.pointerDown(dismissLayer, { button: 2, pointerId: 4 })
+    expect(dismissLayer).toHaveStyle('pointer-events: auto')
 
     act(() => scheduler.step(500))
 
-    expect(backdrop).toHaveStyle('pointer-events: none')
+    expect(dismissLayer).toHaveStyle('pointer-events: none')
   })
 
-  it('cancels live menu motion and clears the backdrop when the workspace reset key changes', () => {
+  it('cancels live menu motion and clears the dismiss layer when the workspace reset key changes', () => {
     const scheduler = new TestFrameScheduler()
     const { rerender } = render(<MenuHarness resetKey="graph-1" scheduler={scheduler} />)
 
@@ -165,9 +173,7 @@ describe('canvas menu surface', () => {
     rerender(<MenuHarness resetKey="graph-2" scheduler={scheduler} />)
 
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('canvas-menu-backdrop')).toHaveStyle(
-      '--canvas-menu-backdrop-progress: 0'
-    )
+    expect(screen.getByTestId('canvas-menu-dismiss-layer')).toHaveStyle('pointer-events: none')
     expect(scheduler.pendingFrames).toBe(0)
     expect(scheduler.pendingTimeouts).toBe(0)
   })
@@ -175,6 +181,10 @@ describe('canvas menu surface', () => {
 
 function readMenuScale(menu: HTMLElement): number {
   return Number(menu.style.getPropertyValue('--canvas-menu-scale'))
+}
+
+function readStyleRule(styles: string, selector: string): string {
+  return styles.split(`${selector} {`)[1]?.split('}')[0] ?? ''
 }
 
 function MenuHarness({

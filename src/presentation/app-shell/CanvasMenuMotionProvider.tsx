@@ -42,15 +42,13 @@ interface CanvasMenuCoordinator {
   readonly deactivate: (menuId: string) => void
   readonly dismissActive: () => boolean
   readonly hasActive: () => boolean
-  readonly present: (menuId: string, progress: number) => void
   readonly release: (menuId: string) => void
   readonly reset: () => void
-  readonly setBackdrop: (backdrop: HTMLDivElement | null) => void
+  readonly setDismissLayer: (layer: HTMLDivElement | null) => void
 }
 
 interface CanvasMenuRecord {
   onRequestClose: () => void
-  progress: number
 }
 
 export interface CanvasMenuSurfaceProps extends Omit<HTMLAttributes<HTMLDivElement>, 'className'> {
@@ -83,12 +81,12 @@ export function CanvasMenuMotionProvider({
       }),
     [reducedMotion, scheduler]
   )
-  const backdropRef = useRef<HTMLDivElement | null>(null)
+  const dismissLayerRef = useRef<HTMLDivElement | null>(null)
   const previousResetKeyRef = useRef(resetKey)
 
   useLayoutEffect(() => {
-    coordinator.setBackdrop(backdropRef.current)
-    return () => coordinator.setBackdrop(null)
+    coordinator.setDismissLayer(dismissLayerRef.current)
+    return () => coordinator.setDismissLayer(null)
   }, [coordinator])
 
   useEffect(() => {
@@ -103,11 +101,10 @@ export function CanvasMenuMotionProvider({
     <CanvasMenuMotionContext.Provider value={coordinator}>
       {children}
       <div
-        ref={backdropRef}
+        ref={dismissLayerRef}
         aria-hidden="true"
-        className="canvas-menu-backdrop"
-        data-motion-state="closed"
-        data-testid="canvas-menu-backdrop"
+        className="canvas-menu-dismiss-layer"
+        data-testid="canvas-menu-dismiss-layer"
         onContextMenu={(event) => {
           if (coordinator.consumeSecondaryContextMenu()) {
             event.preventDefault()
@@ -135,7 +132,6 @@ export function CanvasMenuMotionProvider({
         }}
         style={
           {
-            '--canvas-menu-backdrop-progress': 0,
             pointerEvents: 'none'
           } as CSSProperties
         }
@@ -180,7 +176,6 @@ export const CanvasMenuSurface = forwardRef<HTMLDivElement, CanvasMenuSurfacePro
       const controller = coordinator.createMotion((presentation) => {
         presentationRef.current = presentation
         applyCanvasMenuPresentation(surfaceRef.current, anchorRef.current, presentation)
-        coordinator.present(menuId, presentation.progress)
       })
       controllerRef.current = controller
       return () => {
@@ -275,18 +270,14 @@ function createCanvasMenuCoordinator({
   const controllers = new Set<CanvasMenuMotionController>()
   const records = new Map<string, CanvasMenuRecord>()
   let activeMenuId: string | null = null
-  let backdrop: HTMLDivElement | null = null
+  let dismissLayer: HTMLDivElement | null = null
   let secondaryContextMenuPending = false
   let secondaryContextMenuTimeoutId: number | null = null
   let resetting = false
 
-  const updateBackdrop = (): void => {
-    const progress = Math.max(0, ...[...records.values()].map((record) => record.progress))
-    backdrop?.style.setProperty('--canvas-menu-backdrop-progress', `${round(progress)}`)
-    if (backdrop) {
-      backdrop.dataset.motionState = progress > 0 ? 'open' : 'closed'
-      backdrop.style.pointerEvents = activeMenuId || secondaryContextMenuPending ? 'auto' : 'none'
-    }
+  const updateDismissLayer = (): void => {
+    if (!dismissLayer) return
+    dismissLayer.style.pointerEvents = activeMenuId || secondaryContextMenuPending ? 'auto' : 'none'
   }
 
   const cancelSecondaryContextMenuTimeout = (): void => {
@@ -303,13 +294,13 @@ function createCanvasMenuCoordinator({
       const clearPending = (): void => {
         secondaryContextMenuTimeoutId = null
         secondaryContextMenuPending = false
-        updateBackdrop()
+        updateDismissLayer()
       }
       secondaryContextMenuTimeoutId = scheduler
         ? scheduler.requestTimeout(clearPending, secondaryContextMenuGuardMilliseconds)
         : window.setTimeout(clearPending, secondaryContextMenuGuardMilliseconds)
     }
-    updateBackdrop()
+    updateDismissLayer()
   }
 
   const dismissActive = (keepInputShield: boolean): boolean => {
@@ -326,7 +317,7 @@ function createCanvasMenuCoordinator({
       const previous = activeMenuId ? records.get(activeMenuId) : null
       const previousMenuId = activeMenuId
       activeMenuId = menuId
-      const record = records.get(menuId) ?? { onRequestClose, progress: 0 }
+      const record = records.get(menuId) ?? { onRequestClose }
       record.onRequestClose = onRequestClose
       records.set(menuId, record)
       setSecondaryContextMenuPending(false)
@@ -358,20 +349,14 @@ function createCanvasMenuCoordinator({
     },
     deactivate: (menuId) => {
       if (activeMenuId === menuId) activeMenuId = null
-      updateBackdrop()
+      updateDismissLayer()
     },
     dismissActive: () => dismissActive(false),
     hasActive: () => activeMenuId !== null,
-    present: (menuId, progress) => {
-      const record = records.get(menuId)
-      if (record) record.progress = progress
-      else records.set(menuId, { onRequestClose: () => undefined, progress })
-      updateBackdrop()
-    },
     release: (menuId) => {
       records.delete(menuId)
       if (activeMenuId === menuId) activeMenuId = null
-      updateBackdrop()
+      updateDismissLayer()
     },
     reset: () => {
       const closeRequests = [...records.values()].map((record) => record.onRequestClose)
@@ -381,12 +366,12 @@ function createCanvasMenuCoordinator({
       activeMenuId = null
       setSecondaryContextMenuPending(false)
       records.clear()
-      updateBackdrop()
+      updateDismissLayer()
       closeRequests.forEach((close) => close())
     },
-    setBackdrop: (element) => {
-      backdrop = element
-      updateBackdrop()
+    setDismissLayer: (element) => {
+      dismissLayer = element
+      updateDismissLayer()
     }
   }
 }

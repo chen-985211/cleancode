@@ -125,12 +125,21 @@ describe('canvas menu motion e2e', () => {
         })
       })
 
-      const backdropProgress = await page
-        .getByTestId('canvas-menu-backdrop')
-        .evaluate((element) =>
-          Number((element as HTMLElement).style.getPropertyValue('--canvas-menu-backdrop-progress'))
-        )
-      expect(backdropProgress).toBe(1)
+      const dismissLayerPresentation = await page
+        .getByTestId('canvas-menu-dismiss-layer')
+        .evaluate((element) => {
+          const styles = getComputedStyle(element)
+          return {
+            backgroundColor: styles.backgroundColor,
+            opacity: styles.opacity,
+            pointerEvents: styles.pointerEvents
+          }
+        })
+      expect(dismissLayerPresentation).toEqual({
+        backgroundColor: 'rgba(0, 0, 0, 0)',
+        opacity: '1',
+        pointerEvents: 'auto'
+      })
 
       await page.keyboard.press('Escape')
       await menu.waitFor({ state: 'detached' })

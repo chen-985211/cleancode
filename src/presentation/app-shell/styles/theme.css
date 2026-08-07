@@ -16,7 +16,6 @@
   --cc-canvas-node-menu-hover: #e9ebec;
   --cc-canvas-node-menu-foreground: #16181a;
   --cc-canvas-node-menu-icon: #16181a;
-  --cc-canvas-menu-backdrop: rgb(232 234 235 / 72%);
   --cc-foreground: #1b1e27;
   --cc-muted: #6b7280;
   --cc-muted-strong: #4b5563;
@@ -84,7 +83,6 @@
   --cc-canvas-node-menu-hover: #373a3c;
   --cc-canvas-node-menu-foreground: #e9ebec;
   --cc-canvas-node-menu-icon: #e9ebec;
-  --cc-canvas-menu-backdrop: rgb(16 19 24 / 68%);
   --cc-foreground: #edf1f7;
   --cc-muted: #98a2b3;
   --cc-muted-strong: #c0c8d4;

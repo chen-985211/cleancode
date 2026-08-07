@@ -1,11 +1,8 @@
-.canvas-menu-backdrop {
+.canvas-menu-dismiss-layer {
   position: absolute;
   z-index: 210;
   inset: 0;
-  background: var(--cc-canvas-menu-backdrop);
-  opacity: var(--canvas-menu-backdrop-progress, 0);
   pointer-events: none;
-  will-change: opacity;
 }
 
 .canvas-node-menu {
