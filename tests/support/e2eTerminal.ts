@@ -1,7 +1,7 @@
 import { realpath } from 'node:fs/promises'
 import { delimiter } from 'node:path'
 
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 import { expect } from 'vitest'
 
 import { pollUntilState } from './e2ePolling'
@@ -231,16 +231,7 @@ export async function configureAndStartTerminalLaunchCommand(
   const launchCommandInput = metadataForm.getByRole('textbox', { name: '启动命令' })
 
   await launchCommandInput.fill(launchCommand)
-  const saveAction = metadataForm.getByRole('button', { name: '保存终端信息' })
-  await pollUntilState({
-    description: `${terminalName} metadata save action to become enabled`,
-    observe: () => saveAction.isEnabled(),
-    accept: Boolean,
-    intervalMs: 50,
-    timeoutMs: 10_000
-  })
-  await saveAction.click()
-  await metadataForm.waitFor({ state: 'detached' })
+  await submitTerminalMetadataForm(metadataForm, terminalName)
   await page.waitForFunction(
     (buttonName) =>
       document
@@ -251,6 +242,28 @@ export async function configureAndStartTerminalLaunchCommand(
   await page.getByRole('button', { name: launchButtonName }).click()
 
   return waitForTerminalSessionChange(page, terminalName, previousSessionId)
+}
+
+export async function submitTerminalMetadataForm(
+  metadataForm: Locator,
+  terminalName: string
+): Promise<void> {
+  const saveAction = metadataForm.getByRole('button', { name: '保存终端信息' })
+  await pollUntilState({
+    description: `${terminalName} metadata save action to become enabled`,
+    observe: () => saveAction.isEnabled(),
+    accept: Boolean,
+    intervalMs: 50,
+    timeoutMs: 10_000
+  })
+  await metadataForm.evaluate((form) => {
+    if (!(form instanceof HTMLFormElement)) {
+      throw new Error('Terminal metadata editor is not a form.')
+    }
+
+    form.requestSubmit()
+  })
+  await metadataForm.waitFor({ state: 'detached' })
 }
 
 export async function expectTerminalWorkingDirectory(
