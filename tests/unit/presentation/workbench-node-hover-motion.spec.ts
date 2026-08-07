@@ -1,41 +1,82 @@
 import {
   createWorkbenchNodeHoverMotionController,
-  resolveWorkbenchHoverImpulse,
+  workbenchNodeHoverScale,
   type WorkbenchNodeHoverMotionFrameScheduler,
   type WorkbenchNodeHoverMotionSurface
 } from '../../../src/presentation/app-shell/workbenchNodeHoverMotion'
 
 describe('workbench node hover motion', () => {
-  it('turns pointer velocity into a restrained nonlinear impulse', () => {
-    expect(resolveWorkbenchHoverImpulse(0)).toBe(0)
-    expect(resolveWorkbenchHoverImpulse(20)).toBeCloseTo(0.663, 3)
-    expect(resolveWorkbenchHoverImpulse(-20)).toBeCloseTo(-0.663, 3)
-    expect(resolveWorkbenchHoverImpulse(1_000)).toBe(2.4)
-  })
-
-  it('responds from the current presentation and settles without a scripted overshoot', () => {
+  it('grows past the hover scale once, then settles back without moving the node', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
     const controller = createWorkbenchNodeHoverMotionController({ scheduler })
 
-    controller.pointerMoved(null, { x: 0, y: 0 })
-    controller.pointerMoved(surface, { x: 20, y: 8 })
-    scheduler.advanceNextFrame()
+    controller.hoveredSurfaceChanged(surface)
+
+    const presentedScales = advanceAndReadScales(scheduler, surface)
 
     expect(surface.classNames).toContain('workbench-object-hover-motion--active')
-    expect(
-      Number(surface.properties.get('--workbench-object-hover-x')?.replace('px', ''))
-    ).toBeCloseTo(resolveWorkbenchHoverImpulse(20), 3)
-    expect(
-      Number(surface.properties.get('--workbench-object-hover-y')?.replace('px', ''))
-    ).toBeCloseTo(resolveWorkbenchHoverImpulse(8), 3)
-
-    controller.pointerMoved(null, { x: 32, y: 12 })
-    scheduler.advanceUntilIdle()
-
+    expect(Math.max(...presentedScales)).toBeGreaterThan(workbenchNodeHoverScale)
+    expect(readScale(surface)).toBeCloseTo(workbenchNodeHoverScale, 4)
     expect(surface.properties.has('--workbench-object-hover-x')).toBe(false)
     expect(surface.properties.has('--workbench-object-hover-y')).toBe(false)
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('springs from the live hover scale back to rest when the pointer leaves', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
+
+    controller.hoveredSurfaceChanged(surface)
+    scheduler.advanceNextFrame()
+    scheduler.advanceNextFrame()
+    const scaleBeforeLeave = readScale(surface)
+
+    controller.hoveredSurfaceChanged(null)
+
+    expect(readScale(surface)).toBe(scaleBeforeLeave)
+    expect(surface.classNames).toContain('workbench-object-hover-motion--active')
+
+    scheduler.advanceUntilIdle()
+
+    expect(surface.properties.has('--workbench-object-hover-scale')).toBe(false)
     expect(surface.classNames).not.toContain('workbench-object-hover-motion--active')
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('retargets the previous and next nodes independently when hover changes', () => {
+    const scheduler = createFrameScheduler()
+    const firstSurface = createSurface()
+    const secondSurface = createSurface()
+    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
+
+    controller.hoveredSurfaceChanged(firstSurface)
+    scheduler.advanceNextFrame()
+    controller.hoveredSurfaceChanged(secondSurface)
+    scheduler.advanceNextFrame()
+
+    expect(readScale(firstSurface)).toBeGreaterThan(1)
+    expect(readScale(secondSurface)).toBeGreaterThan(1)
+
+    scheduler.advanceUntilIdle()
+
+    expect(firstSurface.properties.has('--workbench-object-hover-scale')).toBe(false)
+    expect(readScale(secondSurface)).toBeCloseTo(workbenchNodeHoverScale, 4)
+    expect(secondSurface.classNames).toContain('workbench-object-hover-motion--active')
+  })
+
+  it('does not restart an already settled hover spring for repeated pointer moves', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
+
+    controller.hoveredSurfaceChanged(surface)
+    scheduler.advanceUntilIdle()
+    controller.hoveredSurfaceChanged(surface)
+
+    expect(readScale(surface)).toBeCloseTo(workbenchNodeHoverScale, 4)
+    expect(scheduler.pendingFrames()).toBe(0)
   })
 
   it('clears presentation immediately when dragging or reduced motion suspends feedback', () => {
@@ -43,61 +84,31 @@ describe('workbench node hover motion', () => {
     const surface = createSurface()
     const controller = createWorkbenchNodeHoverMotionController({ scheduler })
 
-    controller.pointerMoved(null, { x: 0, y: 0 })
-    controller.pointerMoved(surface, { x: 40, y: 20 })
+    controller.hoveredSurfaceChanged(surface)
+    scheduler.advanceNextFrame()
     controller.suspend()
 
     expect(surface.properties.size).toBe(0)
     expect(surface.classNames).not.toContain('workbench-object-hover-motion--active')
     expect(scheduler.pendingFrames()).toBe(0)
   })
-
-  it('stops scheduling frames after an impulse settles while the pointer stays over the node', () => {
-    const scheduler = createFrameScheduler()
-    const surface = createSurface()
-    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
-
-    controller.pointerMoved(null, { x: 0, y: 0 })
-    controller.pointerMoved(surface, { x: 12, y: 6 })
-    scheduler.advanceUntilIdle()
-
-    expect(surface.properties.size).toBe(0)
-    expect(scheduler.pendingFrames()).toBe(0)
-  })
-
-  it('samples pointer travel once per display frame instead of accumulating raw event frequency', () => {
-    const scheduler = createFrameScheduler()
-    const surface = createSurface()
-    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
-
-    controller.pointerMoved(null, { x: 0, y: 0 })
-    controller.pointerMoved(surface, { x: 4, y: 2 })
-    controller.pointerMoved(surface, { x: 20, y: 8 })
-    scheduler.advanceNextFrame()
-
-    expect(
-      Number(surface.properties.get('--workbench-object-hover-x')?.replace('px', ''))
-    ).toBeCloseTo(resolveWorkbenchHoverImpulse(20), 3)
-    expect(scheduler.pendingFrames()).toBe(1)
-  })
-
-  it('tracks approach on blank canvas without running an idle animation loop', () => {
-    const scheduler = createFrameScheduler()
-    const surface = createSurface()
-    const controller = createWorkbenchNodeHoverMotionController({ scheduler })
-
-    controller.pointerMoved(null, { x: 0, y: 0 })
-    controller.pointerMoved(null, { x: 8, y: 4 })
-    expect(scheduler.pendingFrames()).toBe(0)
-
-    controller.pointerMoved(surface, { x: 20, y: 10 })
-    scheduler.advanceNextFrame()
-
-    expect(
-      Number(surface.properties.get('--workbench-object-hover-x')?.replace('px', ''))
-    ).toBeCloseTo(resolveWorkbenchHoverImpulse(12), 3)
-  })
 })
+
+function readScale(surface: ReturnType<typeof createSurface>): number {
+  return Number(surface.properties.get('--workbench-object-hover-scale') ?? '1')
+}
+
+function advanceAndReadScales(
+  scheduler: ReturnType<typeof createFrameScheduler>,
+  surface: ReturnType<typeof createSurface>
+): number[] {
+  const values: number[] = []
+  for (let frame = 0; frame < 240 && scheduler.pendingFrames() > 0; frame += 1) {
+    scheduler.advanceNextFrame()
+    values.push(readScale(surface))
+  }
+  return values
+}
 
 function createSurface(): WorkbenchNodeHoverMotionSurface & {
   readonly classNames: Set<string>

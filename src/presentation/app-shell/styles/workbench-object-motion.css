@@ -1,10 +1,9 @@
 :is(.terminal-node, .terminal-group-node, .agent-console-node) {
-  --workbench-object-hover-x: 0px;
-  --workbench-object-hover-y: 0px;
+  --workbench-object-hover-scale: 1;
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
   transform-origin: center;
-  transform: translate3d(var(--workbench-object-hover-x), var(--workbench-object-hover-y), 0);
+  transform: scale(var(--workbench-object-hover-scale));
 }
 
 .workbench-object-hover-motion--active {

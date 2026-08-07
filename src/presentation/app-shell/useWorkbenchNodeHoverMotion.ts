@@ -31,12 +31,9 @@ export function useWorkbenchNodeHoverMotion(): WorkbenchNodeHoverMotionHandlers 
         return
       }
 
-      controller.pointerMoved(resolveNodeSurface(event), {
-        x: event.clientX,
-        y: event.clientY
-      })
+      controller.hoveredSurfaceChanged(resolveNodeSurface(event))
     },
-    leaveCanvas: controller.suspend,
+    leaveCanvas: () => controller.hoveredSurfaceChanged(null),
     suspend: controller.suspend
   }
 }
