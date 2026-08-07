@@ -205,8 +205,9 @@ describe('canvas menu motion e2e', () => {
       const point = await findVisibleBlankCanvasPoint(pane)
       const menu = page.locator('[role="menu"][aria-label="画布操作"]')
 
+      await beginOpeningMenuScaleSampling(page)
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const openingScales = await sampleMenuScalesForFrames(menu, 4)
+      const openingScales = await finishOpeningMenuScaleSampling(page, 4)
       expect(openingScales[0]).toBeLessThan(0.8)
       expect(openingScales.at(-1)).toBeGreaterThan(openingScales[0] ?? 0)
 
@@ -227,6 +228,55 @@ describe('canvas menu motion e2e', () => {
     electronScenarioTimeoutMs
   )
 })
+
+async function beginOpeningMenuScaleSampling(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const samplingWindow = window as typeof window & {
+      openingMenuScaleSampling?: {
+        frameId: number
+        scales: number[]
+      }
+    }
+    const sampling = { frameId: 0, scales: [] as number[] }
+    const sample = (): void => {
+      const menu = document.querySelector<HTMLElement>('[role="menu"][aria-label="画布操作"]')
+      if (menu) {
+        sampling.scales.push(Number(menu.style.getPropertyValue('--canvas-menu-scale')))
+      }
+      sampling.frameId = requestAnimationFrame(sample)
+    }
+
+    samplingWindow.openingMenuScaleSampling = sampling
+    sample()
+  })
+}
+
+async function finishOpeningMenuScaleSampling(
+  page: Page,
+  minimumSampleCount: number
+): Promise<number[]> {
+  await page.waitForFunction((expectedCount) => {
+    const samplingWindow = window as typeof window & {
+      openingMenuScaleSampling?: { scales: number[] }
+    }
+    return (samplingWindow.openingMenuScaleSampling?.scales.length ?? 0) >= expectedCount
+  }, minimumSampleCount)
+
+  return page.evaluate(() => {
+    const samplingWindow = window as typeof window & {
+      openingMenuScaleSampling?: {
+        frameId: number
+        scales: number[]
+      }
+    }
+    const sampling = samplingWindow.openingMenuScaleSampling
+    if (!sampling) throw new Error('Opening canvas menu scale sampling was not started.')
+
+    cancelAnimationFrame(sampling.frameId)
+    delete samplingWindow.openingMenuScaleSampling
+    return sampling.scales
+  })
+}
 
 async function sampleMenuScalesForFrames(menu: Locator, frameCount: number): Promise<number[]> {
   return menu.evaluate(

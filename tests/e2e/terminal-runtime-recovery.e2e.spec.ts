@@ -139,7 +139,8 @@ describe('terminal runtime recovery e2e', () => {
 
       const inheritedSessionId = await readTerminalSessionId(page, 'Terminal 1')
       expect(inheritedSessionId).not.toBe(previousSessionId)
-      await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
+      await waitForRetainedTerminalSession(page, inheritedSessionId)
+      await waitForPersistedRetainedTerminalSession(workbench, inheritedSessionId)
       await writeTerminalCommand(
         page,
         'Terminal 1',
@@ -274,6 +275,39 @@ async function waitForPersistedTerminalHistory(
       for (const entry of entries) {
         const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
         if (contents.includes(expectedText)) return true
+      }
+      return false
+    },
+    accept: Boolean,
+    intervalMs: 100,
+    timeoutMs: 10_000
+  })
+}
+
+async function waitForPersistedRetainedTerminalSession(
+  workbench: E2eWorkbench,
+  expectedSessionId: string
+): Promise<void> {
+  const recoveryDirectory = join(
+    workbench.appStateDirectory,
+    'terminal-runtime-provider',
+    'recovery'
+  )
+  const expectedFragments = [
+    `"sessionId":"${expectedSessionId}"`,
+    '"status":"running"',
+    '"retentionPolicy":"keep-after-application-exit"'
+  ]
+
+  await pollUntilState({
+    description: `retained terminal ${expectedSessionId} to reach its recovery checkpoint`,
+    observe: async () => {
+      const entries = await readdir(recoveryDirectory, { recursive: true }).catch(() => [])
+
+      for (const entry of entries) {
+        if (!entry.endsWith('checkpoint.json')) continue
+        const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
+        if (expectedFragments.every((fragment) => contents.includes(fragment))) return true
       }
       return false
     },
@@ -434,6 +468,39 @@ async function retainTerminal(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Terminal 1 应用退出后继续运行此会话' }).click()
   await page.getByRole('button', { name: 'Terminal 1 应用退出后不再保留此会话' }).waitFor()
   return sessionId
+}
+
+async function waitForRetainedTerminalSession(
+  page: Page,
+  expectedSessionId: string
+): Promise<void> {
+  const session = await pollUntilState({
+    description: `terminal ${expectedSessionId} to inherit retention`,
+    observe: () =>
+      page.evaluate(async (sessionId) => {
+        const sessions = await window.cleancode?.listTerminalSessions({ sessionIds: [sessionId] })
+        const current = sessions?.[0]
+        return current
+          ? {
+              sessionId: current.id,
+              status: current.status,
+              retentionPolicy: current.retentionPolicy
+            }
+          : null
+      }, expectedSessionId),
+    accept: (current) =>
+      current?.sessionId === expectedSessionId &&
+      current.status === 'running' &&
+      current.retentionPolicy === 'keep-after-application-exit',
+    intervalMs: 100,
+    timeoutMs: 10_000
+  })
+
+  expect(session).toMatchObject({
+    sessionId: expectedSessionId,
+    status: 'running',
+    retentionPolicy: 'keep-after-application-exit'
+  })
 }
 
 async function readTerminalProcessId(page: Page, sessionId: string): Promise<number> {

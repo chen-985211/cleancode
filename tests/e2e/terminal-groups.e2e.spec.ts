@@ -60,9 +60,6 @@ describe('terminal groups e2e', () => {
 
       const graphWithEmptyGroup = await readGraph(page, workbench)
       for (const [terminalIndex, terminal] of graphWithEmptyGroup.blocks.entries()) {
-        const groupBoxBeforeDrag = await readRequiredBoundingBox(
-          page.locator('[data-terminal-group-id]').first()
-        )
         const groupMaterialBeforeDrag = await readTerminalGroupMaterial(
           page.locator('[data-terminal-group-id]').first()
         )
@@ -76,20 +73,14 @@ describe('terminal groups e2e', () => {
                   (scale) => scale > 1.005,
                   'terminal group to spring open for a nearby terminal'
                 )
-                const groupBoxDuringHover = await readRequiredBoundingBox(group)
                 const groupMaterial = await readTerminalGroupMaterial(group)
                 const terminalTransform = await draggedTerminal.evaluate(
                   (element) => getComputedStyle(element).transform
                 )
-                const centerBeforeDrag = centerOf(groupBoxBeforeDrag)
-                const centerDuringHover = centerOf(groupBoxDuringHover)
 
-                expect(
-                  Math.hypot(
-                    centerDuringHover.x - centerBeforeDrag.x,
-                    centerDuringHover.y - centerBeforeDrag.y
-                  )
-                ).toBeLessThan(screenPixelTolerance)
+                expect(await readTerminalGroupSurfaceCenterDrift(group)).toBeLessThan(
+                  screenPixelTolerance
+                )
                 expect(engagedScale).toBeGreaterThan(1.005)
                 expect(groupMaterial).toEqual(groupMaterialBeforeDrag)
                 expect(await group.locator('.terminal-group-node__drop-hint').count()).toBe(0)
@@ -303,15 +294,6 @@ async function readTerminalGroupMaterial(group: Locator): Promise<{
   }))
 }
 
-function centerOf(box: {
-  readonly x: number
-  readonly y: number
-  readonly width: number
-  readonly height: number
-}) {
-  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
-}
-
 async function waitForTerminalVisuallyInsideGroup(
   page: Page,
   terminalBlockId: string
@@ -338,6 +320,20 @@ async function waitForTerminalVisuallyInsideGroup(
     },
     intervalMs: 16,
     timeoutMs: 2_000
+  })
+}
+
+function readTerminalGroupSurfaceCenterDrift(group: Locator): Promise<number> {
+  return group.evaluate((surface) => {
+    const flowNode = surface.closest('.react-flow__node-terminalGroup')
+    if (!flowNode) throw new Error('Terminal group React Flow node is unavailable.')
+
+    const surfaceBox = surface.getBoundingClientRect()
+    const flowNodeBox = flowNode.getBoundingClientRect()
+    return Math.hypot(
+      surfaceBox.x + surfaceBox.width / 2 - (flowNodeBox.x + flowNodeBox.width / 2),
+      surfaceBox.y + surfaceBox.height / 2 - (flowNodeBox.y + flowNodeBox.height / 2)
+    )
   })
 }
 
