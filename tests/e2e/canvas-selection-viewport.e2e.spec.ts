@@ -361,7 +361,7 @@ async function beginPointerZoomSampling(
   await page.evaluate((screenAnchor) => {
     const samplingWindow = window as typeof window & {
       pointerZoomSampling?: {
-        observer: MutationObserver
+        frameId: number
         presentations: PointerZoomPresentation[]
       }
     }
@@ -369,21 +369,23 @@ async function beginPointerZoomSampling(
     const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
     if (!canvas || !viewport) throw new Error('Canvas zoom presentation is unavailable.')
 
-    const presentations: PointerZoomPresentation[] = []
+    const sampling = {
+      frameId: 0,
+      presentations: [] as PointerZoomPresentation[]
+    }
     const sample = () => {
       const bounds = canvas.getBoundingClientRect()
       const transform = new DOMMatrixReadOnly(getComputedStyle(viewport).transform)
       const localX = screenAnchor.x - bounds.left
       const localY = screenAnchor.y - bounds.top
-      presentations.push({
+      sampling.presentations.push({
         anchorWorldX: (localX - transform.e) / transform.a,
         anchorWorldY: (localY - transform.f) / transform.a,
         zoom: transform.a
       })
+      sampling.frameId = requestAnimationFrame(sample)
     }
-    const observer = new MutationObserver(sample)
-    observer.observe(viewport, { attributeFilter: ['style'], attributes: true })
-    samplingWindow.pointerZoomSampling = { observer, presentations }
+    samplingWindow.pointerZoomSampling = sampling
     sample()
   }, anchor)
 }
@@ -392,14 +394,14 @@ function finishPointerZoomSampling(page: Page): Promise<PointerZoomPresentation[
   return page.evaluate(() => {
     const samplingWindow = window as typeof window & {
       pointerZoomSampling?: {
-        observer: MutationObserver
+        frameId: number
         presentations: PointerZoomPresentation[]
       }
     }
     const sampling = samplingWindow.pointerZoomSampling
     if (!sampling) throw new Error('Canvas pointer zoom sampling was not started.')
 
-    sampling.observer.disconnect()
+    cancelAnimationFrame(sampling.frameId)
     delete samplingWindow.pointerZoomSampling
     return sampling.presentations
   })

@@ -24,6 +24,7 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
@@ -429,8 +430,7 @@ async function waitForPersistedAgent(page: Page): Promise<void> {
 }
 
 async function createCodexAgent(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
+  await selectAgentProviderFromCreateMenu(page, 'Codex')
 }
 
 async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {

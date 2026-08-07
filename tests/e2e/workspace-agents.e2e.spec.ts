@@ -27,6 +27,7 @@ import {
   prependE2ePath
 } from '../support/e2eTerminal'
 import { agentLaunchReadyTimeoutMs } from '../support/e2eAgentRuntime'
+import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import {
   ensureTerminalDomRenderer,
   readCanvasViewportTransform,
@@ -527,19 +528,7 @@ async function createCodexAgent(page: Page): Promise<void> {
     await page.reload({ waitUntil: 'domcontentloaded' })
   }
   await waitForAgentCreationReady(page)
-  await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  const codexOption = page.getByRole('menuitemradio', { name: 'Codex', exact: true })
-
-  try {
-    await codexOption.waitFor({ state: 'visible', timeout: 5_000 })
-  } catch {
-    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
-    throw new Error(
-      `Codex was installed but did not become selectable. Visible Providers: ${JSON.stringify(visibleProviders)}`
-    )
-  }
-
-  await codexOption.click({ timeout: 1_000 })
+  await selectAgentProviderFromCreateMenu(page, 'Codex')
 }
 
 async function ensureCodexProviderInstalled(page: Page): Promise<boolean> {
