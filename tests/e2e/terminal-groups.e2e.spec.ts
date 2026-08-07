@@ -157,7 +157,7 @@ describe('terminal groups e2e', () => {
       await inspectTerminalRemovalBoundary(page, terminalTwo.id)
 
       const groupBeforeBox = await readRequiredBoundingBox(
-        page.locator('[data-terminal-group-id]').first()
+        page.locator('.react-flow__node-terminalGroup').first()
       )
       const canvasZoom = await readCanvasZoom(page)
 
@@ -177,7 +177,7 @@ describe('terminal groups e2e', () => {
       )
       expect(Math.abs(resizedWidth - expectedResizedWidth)).toBeLessThan(screenPixelTolerance)
       const groupAfterBox = await readRequiredBoundingBox(
-        page.locator('[data-terminal-group-id]').first()
+        page.locator('.react-flow__node-terminalGroup').first()
       )
 
       expect(groupAfterDrag.size.width).toBeGreaterThan(groupBeforeDrag.size.width + 160)
@@ -375,7 +375,7 @@ async function waitForTerminalGroupProjectedWidth(
     accept: (width) => Math.abs(width - expectedWidth) < screenPixelTolerance,
     description,
     observe: async () => {
-      const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
+      const box = await page.locator('.react-flow__node-terminalGroup').first().boundingBox()
       return box?.width ?? 0
     },
     intervalMs: 16,
