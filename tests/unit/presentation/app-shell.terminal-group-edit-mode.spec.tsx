@@ -186,15 +186,16 @@ describe('app shell terminal group edit mode', () => {
 
   it('moves a complete terminal workflow into the edited group in one operation', async () => {
     const workbench = createWorkbenchWithTerminalGroup()
-    const movedGraph = {
+    const absorbedPosition = { x: 740, y: 228 }
+    const arrangedGraph = {
       ...workbench.graph,
       blocks: workbench.graph.blocks.map((block) =>
-        block.id === 'worker-terminal' ? { ...block, position: { x: 420, y: 260 } } : block
+        block.id === 'worker-terminal' ? { ...block, position: absorbedPosition } : block
       )
     }
     const groupedGraph = {
-      ...movedGraph,
-      terminalGroups: movedGraph.terminalGroups.map((group) =>
+      ...arrangedGraph,
+      terminalGroups: arrangedGraph.terminalGroups.map((group) =>
         group.id === 'development-group'
           ? { ...group, memberBlockIds: [...group.memberBlockIds, 'worker-terminal'] }
           : group
@@ -222,6 +223,9 @@ describe('app shell terminal group edit mode', () => {
 
     expect(workerNode).toBeDefined()
 
+    act(() => {
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, workerNode!)
+    })
     await act(async () => {
       await reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, {
         ...workerNode!,
@@ -240,6 +244,11 @@ describe('app shell terminal group edit mode', () => {
     )
     expect(runtimeApi.moveBlock).not.toHaveBeenCalled()
     expect(runtimeApi.addTerminalToGroup).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(
+        reactFlowProps.latest?.nodes.find((node) => node.id === 'worker-terminal')?.position
+      ).toEqual(absorbedPosition)
+    )
   })
 
   it('creates an empty group at the context-menu coordinate and enters its edit space', async () => {
@@ -488,6 +497,7 @@ interface MockReactFlowProps {
   readonly onInit?: (instance: MockReactFlowInstance) => void
   readonly onNodeClick?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDrag?: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void | Promise<void>
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
   readonly onPaneContextMenu?: (event: ReactMouseEvent) => void

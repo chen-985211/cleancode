@@ -99,6 +99,7 @@ describe('terminal groups e2e', () => {
           group.memberBlockIds.includes(terminal.id)
         )
         expect(joinedGroup.position).toEqual(groupAnchor)
+        await waitForTerminalVisuallyInsideGroup(page, terminal.id)
       }
       await page.getByRole('button', { name: '完成' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
@@ -228,6 +229,35 @@ async function dragTerminalIntoGroup(
   await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 18 })
   await inspectHover?.({ group: page.locator('[data-terminal-group-id]').first(), terminal })
   await page.mouse.up()
+}
+
+async function waitForTerminalVisuallyInsideGroup(
+  page: Page,
+  terminalBlockId: string
+): Promise<void> {
+  const group = page.locator('[data-terminal-group-id]').first()
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+
+  await pollUntilState({
+    description: 'absorbed terminal to settle inside its terminal group',
+    observe: async () => ({
+      group: await group.boundingBox(),
+      terminal: await terminal.boundingBox()
+    }),
+    accept: ({ group: groupBox, terminal: terminalBox }) => {
+      if (!groupBox || !terminalBox) return false
+
+      const tolerance = 2
+      return (
+        terminalBox.x >= groupBox.x - tolerance &&
+        terminalBox.y >= groupBox.y - tolerance &&
+        terminalBox.x + terminalBox.width <= groupBox.x + groupBox.width + tolerance &&
+        terminalBox.y + terminalBox.height <= groupBox.y + groupBox.height + tolerance
+      )
+    },
+    intervalMs: 16,
+    timeoutMs: 2_000
+  })
 }
 
 async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
