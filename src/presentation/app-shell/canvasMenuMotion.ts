@@ -39,7 +39,7 @@ interface ActiveMotionRequest {
   readonly resolve: (completed: boolean) => void
 }
 
-const springResponse = 0.26
+const springResponse = 0.4
 const maximumSpringRuntimeMilliseconds = 900
 const settlementThresholds = { speed: 0.01, value: 0.001 }
 

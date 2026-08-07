@@ -63,6 +63,8 @@ export interface CanvasMenuSurfaceProps extends Omit<HTMLAttributes<HTMLDivEleme
 }
 
 const CanvasMenuMotionContext = createContext<CanvasMenuCoordinator | null>(null)
+const canvasMenuHiddenScale = 0.72
+const canvasMenuOpacityLead = 1.45
 
 export function CanvasMenuMotionProvider({
   children,
@@ -356,11 +358,14 @@ function applyCanvasMenuPresentation(
   surface.dataset.motionState = presentation.phase
   surface.style.setProperty(
     '--canvas-menu-opacity',
-    `${round(Math.min(1, presentation.progress * 1.18))}`
+    `${round(Math.min(1, presentation.progress * canvasMenuOpacityLead))}`
   )
   surface.style.setProperty('--canvas-menu-origin-x', `${round(originX)}px`)
   surface.style.setProperty('--canvas-menu-origin-y', `${round(originY)}px`)
-  surface.style.setProperty('--canvas-menu-scale', `${round(0.94 + presentation.progress * 0.06)}`)
+  surface.style.setProperty(
+    '--canvas-menu-scale',
+    `${round(canvasMenuHiddenScale + presentation.progress * (1 - canvasMenuHiddenScale))}`
+  )
   surface.style.setProperty('--canvas-menu-translate-x', `${round(shiftX * hiddenProgress)}px`)
   surface.style.setProperty('--canvas-menu-translate-y', `${round(shiftY * hiddenProgress)}px`)
 }

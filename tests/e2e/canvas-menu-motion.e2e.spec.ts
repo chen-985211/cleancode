@@ -178,7 +178,91 @@ describe('canvas menu motion e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'visibly grows from its pointer anchor and shrinks back along the same path',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await pollUntilState({
+        description: 'canvas actions to become available',
+        observe: () => page.getByRole('button', { name: '新建 Agent' }).isEnabled(),
+        accept: Boolean,
+        timeoutMs: 10_000
+      })
+
+      const pane = page.locator('.react-flow__pane')
+      await pane.waitFor({ state: 'visible' })
+      const point = await findVisibleBlankCanvasPoint(pane)
+      const menu = page.locator('[role="menu"][aria-label="画布操作"]')
+
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      const openingScales = await sampleMenuScales(menu, 100)
+      expect(openingScales[0]).toBeLessThan(0.8)
+      expect(openingScales.at(-1)).toBeGreaterThan(openingScales[0] ?? 0)
+      expect(openingScales.at(-1)).toBeLessThan(0.92)
+
+      await waitForMenuMotionState(menu, 'open')
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      const closingScales = await sampleMenuScales(menu, 100)
+      expect(closingScales.at(-1)).toBeLessThan(closingScales[0] ?? 1)
+      expect(closingScales.at(-1)).toBeGreaterThan(0.8)
+      expect(closingScales.at(-1)).toBeLessThan(0.93)
+      await menu.waitFor({ state: 'detached' })
+    },
+    electronScenarioTimeoutMs
+  )
 })
+
+async function sampleMenuScales(
+  menu: Locator,
+  minimumElapsedMilliseconds: number
+): Promise<number[]> {
+  return menu.evaluate(
+    async (element, minimumElapsed) =>
+      new Promise<number[]>((resolve) => {
+        const samples: number[] = []
+        const startedAt = performance.now()
+        const sample = (): void => {
+          samples.push(
+            Number((element as HTMLElement).style.getPropertyValue('--canvas-menu-scale'))
+          )
+          if (performance.now() - startedAt >= minimumElapsed) {
+            resolve(samples)
+            return
+          }
+          requestAnimationFrame(sample)
+        }
+        sample()
+      }),
+    minimumElapsedMilliseconds
+  )
+}
+
+async function waitForMenuMotionState(
+  menu: Locator,
+  targetState: 'closed' | 'closing' | 'open' | 'opening'
+): Promise<void> {
+  await menu.evaluate(
+    async (element, target) =>
+      new Promise<void>((resolve, reject) => {
+        const deadline = performance.now() + 2_000
+        const observe = (): void => {
+          if ((element as HTMLElement).dataset.motionState === target) {
+            resolve()
+            return
+          }
+          if (performance.now() >= deadline) {
+            reject(new Error(`Canvas menu did not settle to ${target}.`))
+            return
+          }
+          requestAnimationFrame(observe)
+        }
+        observe()
+      }),
+    targetState
+  )
+}
 
 async function findVisibleBlankCanvasPoint(
   pane: Locator

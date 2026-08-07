@@ -19,6 +19,17 @@ describe('canvas menu motion', () => {
     expect(hundredTwentyHertz.current.velocity).toBeCloseTo(sixtyHertz.current.velocity, 10)
   })
 
+  it('keeps a visible growth phase through the first 100 milliseconds', () => {
+    const harness = createHarness()
+
+    void harness.controller.setOpen(true)
+    for (let frame = 0; frame < 6; frame += 1) harness.scheduler.step()
+
+    expect(harness.current.progress).toBeGreaterThan(0.4)
+    expect(harness.current.progress).toBeLessThan(0.6)
+    expect(harness.current.phase).toBe('opening')
+  })
+
   it('retargets from the live presentation and carries velocity through an opening reversal', async () => {
     const harness = createHarness()
     const opening = harness.controller.setOpen(true)

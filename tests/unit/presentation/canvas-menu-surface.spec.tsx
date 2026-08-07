@@ -44,6 +44,27 @@ describe('canvas menu surface', () => {
     expect(menu).toHaveAttribute('data-motion-state', 'open')
   })
 
+  it('grows from a compact anchored surface and visibly shrinks along the same path', () => {
+    const scheduler = new TestFrameScheduler()
+    render(<MenuHarness scheduler={scheduler} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
+    const menu = screen.getByRole('menu', { name: '测试菜单' })
+    expect(readMenuScale(menu)).toBeGreaterThanOrEqual(0.7)
+    expect(readMenuScale(menu)).toBeLessThan(0.8)
+
+    for (let frame = 0; frame < 6; frame += 1) act(() => scheduler.step())
+    expect(readMenuScale(menu)).toBeGreaterThan(0.82)
+    expect(readMenuScale(menu)).toBeLessThan(0.9)
+
+    act(() => scheduler.finish())
+    fireEvent.click(screen.getByRole('button', { name: '关闭菜单' }))
+    for (let frame = 0; frame < 6; frame += 1) act(() => scheduler.step())
+
+    expect(readMenuScale(menu)).toBeGreaterThan(0.82)
+    expect(readMenuScale(menu)).toBeLessThan(0.9)
+  })
+
   it('closes the previous interactive menu when another canvas menu opens', () => {
     const scheduler = new TestFrameScheduler()
     render(<TwoMenuHarness scheduler={scheduler} />)
@@ -132,6 +153,10 @@ describe('canvas menu surface', () => {
     expect(scheduler.pendingTimeouts).toBe(0)
   })
 })
+
+function readMenuScale(menu: HTMLElement): number {
+  return Number(menu.style.getPropertyValue('--canvas-menu-scale'))
+}
 
 function MenuHarness({
   resetKey,

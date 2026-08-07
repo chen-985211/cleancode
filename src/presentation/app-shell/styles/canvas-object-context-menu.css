@@ -27,7 +27,7 @@
 .canvas-menu-motion-surface {
   opacity: var(--canvas-menu-opacity, 0);
   transform: translate3d(var(--canvas-menu-translate-x, 0), var(--canvas-menu-translate-y, 0), 0)
-    scale(var(--canvas-menu-scale, 0.94));
+    scale(var(--canvas-menu-scale, 0.72));
   transform-origin: var(--canvas-menu-origin-x, 50%) var(--canvas-menu-origin-y, 50%);
   will-change: transform, opacity;
 }
