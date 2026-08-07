@@ -76,7 +76,11 @@ describe('canvas selection viewport e2e', () => {
       expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), 0.35, focusedZoom)
 
       await beginCanvasMotionSampling(page, node)
-      await clickTrueCanvasPane(page, page.locator('.react-flow__pane'))
+      const pane = page.locator('.react-flow__pane')
+      await clickTrueCanvasPane(page, pane)
+      await clickTrueCanvasPane(page, pane)
+      await clickTrueCanvasPane(page, pane)
+      await clickTrueCanvasPane(page, pane)
       const globalPresentation = await pollCanvasPresentation(
         page,
         node,
@@ -88,6 +92,12 @@ describe('canvas selection viewport e2e', () => {
       expect(globalPresentation.nodeCenterOffsetX).toBeCloseTo(0, 0)
       expect(globalPresentation.nodeCenterOffsetY).toBeCloseTo(0, 0)
       expectSmoothAnchoredZoom(await finishCanvasMotionSampling(page), focusedZoom, 0.35)
+
+      const settledPresentation = await readCanvasPresentation(page, node)
+      await clickTrueCanvasPane(page, pane)
+      await clickTrueCanvasPane(page, pane)
+      await clickTrueCanvasPane(page, pane)
+      expect(await readCanvasPresentation(page, node)).toEqual(settledPresentation)
     },
     electronScenarioTimeoutMs
   )
@@ -146,6 +156,10 @@ async function clickTrueCanvasPane(page: Page, pane: Locator): Promise<void> {
   const point = await resolveTrueCanvasPanePoint(pane)
 
   await page.mouse.click(point.x, point.y)
+}
+
+function readCanvasPresentation(page: Page, node: Locator): Promise<CanvasPresentation> {
+  return pollCanvasPresentation(page, node, () => true)
 }
 
 function resolveTrueCanvasPanePoint(
