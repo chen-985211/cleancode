@@ -71,6 +71,18 @@ describe('workbench object motion styles', () => {
     )
   })
 
+  it('uses no text or color decoration for group join, leave, or dissolve feedback', () => {
+    const feedbackStyles = ['join', 'leave', 'dissolve']
+      .map((feedback) => readTerminalGroupRule(`.terminal-group-node--drop-${feedback}`))
+      .join('\n')
+
+    expect(terminalGroupStyles).not.toContain('.terminal-group-node__drop-hint')
+    expect(feedbackStyles).not.toContain('background:')
+    expect(feedbackStyles).not.toContain('box-shadow:')
+    expect(feedbackStyles).not.toMatch(/\b(border|color|outline):/)
+    expect(feedbackStyles).not.toMatch(/--cc-(primary|warning|success)/)
+  })
+
   it('keeps the empty group edit space free of dashed framing and color masks', () => {
     const editingGroupRule = readTerminalGroupRule('.terminal-group-node--editing')
     const emptyStateRule = readTerminalGroupRule('.terminal-group-node__empty-state')

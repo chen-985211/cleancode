@@ -48,7 +48,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     data.objectMotion,
     data.onObjectMotionComplete
   )
-  const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback === 'join')
+  const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback)
   const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
@@ -165,16 +165,9 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
               />
             </form>
           ) : (
-            <>
-              <TooltipLabel content={group.name}>
-                <strong className="terminal-group-node__name">{group.name}</strong>
-              </TooltipLabel>
-              {data.dropFeedback && data.dropFeedback !== 'join' ? (
-                <span className="terminal-group-node__drop-hint">
-                  {getDropFeedbackLabel(data.dropFeedback, t)}
-                </span>
-              ) : null}
-            </>
+            <TooltipLabel content={group.name}>
+              <strong className="terminal-group-node__name">{group.name}</strong>
+            </TooltipLabel>
           )}
         </div>
 
@@ -520,15 +513,4 @@ function MemberRow({ block, state, onRemove }: MemberRowProps) {
       </TooltipLabel>
     </div>
   )
-}
-
-function getDropFeedbackLabel(
-  feedback: Exclude<NonNullable<TerminalGroupFlowNode['data']['dropFeedback']>, 'join'>,
-  t: ReturnType<typeof useI18n>['t']
-) {
-  if (feedback === 'leave') {
-    return t('group.dropLeave')
-  }
-
-  return t('group.dropDissolve')
 }

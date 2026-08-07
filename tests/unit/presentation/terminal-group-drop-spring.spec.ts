@@ -1,6 +1,7 @@
 import {
   createTerminalGroupDropSpringController,
   terminalGroupDropEngagedScale,
+  terminalGroupDropRemovalScale,
   type TerminalGroupDropSpringFrameScheduler,
   type TerminalGroupDropSpringSurface
 } from '../../../src/presentation/app-shell/terminalGroupDropSpring'
@@ -11,7 +12,7 @@ describe('terminal group drop spring', () => {
     const surface = createSurface()
     const controller = createTerminalGroupDropSpringController({ scheduler })
 
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
 
     expect(surface.classNames).toContain('terminal-group-drop-spring--active')
     const scales = advanceAndReadScales(scheduler, surface)
@@ -26,12 +27,12 @@ describe('terminal group drop spring', () => {
     const surface = createSurface()
     const controller = createTerminalGroupDropSpringController({ scheduler })
 
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
     scheduler.advanceNextFrame()
     scheduler.advanceNextFrame()
     const scaleBeforeLeaving = readScale(surface)
 
-    controller.engagedSurfaceChanged(null)
+    controller.feedbackChanged(surface, null)
 
     expect(readScale(surface)).toBe(scaleBeforeLeaving)
     expect(surface.classNames).toContain('terminal-group-drop-spring--active')
@@ -47,12 +48,12 @@ describe('terminal group drop spring', () => {
     const surface = createSurface()
     const controller = createTerminalGroupDropSpringController({ scheduler })
 
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
     scheduler.advanceNextFrame()
-    controller.engagedSurfaceChanged(null)
+    controller.feedbackChanged(surface, null)
     scheduler.advanceNextFrame()
     const scaleWhileReturning = readScale(surface)
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
 
     expect(readScale(surface)).toBe(scaleWhileReturning)
     scheduler.advanceUntilIdle()
@@ -64,9 +65,9 @@ describe('terminal group drop spring', () => {
     const surface = createSurface()
     const controller = createTerminalGroupDropSpringController({ scheduler })
 
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
     scheduler.advanceUntilIdle()
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
 
     expect(scheduler.pendingFrames()).toBe(0)
   })
@@ -76,13 +77,44 @@ describe('terminal group drop spring', () => {
     const surface = createSurface()
     const controller = createTerminalGroupDropSpringController({ scheduler })
 
-    controller.engagedSurfaceChanged(surface)
+    controller.feedbackChanged(surface, 'join')
     scheduler.advanceNextFrame()
     controller.suspend()
 
     expect(surface.properties.size).toBe(0)
     expect(surface.classNames).not.toContain('terminal-group-drop-spring--active')
     expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('contracts the group without color or copy when a member crosses the removal boundary', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createTerminalGroupDropSpringController({ scheduler })
+
+    controller.feedbackChanged(surface, 'leave')
+
+    const scales = advanceAndReadScales(scheduler, surface)
+
+    expect(Math.min(...scales)).toBeLessThan(terminalGroupDropRemovalScale)
+    expect(readScale(surface)).toBeCloseTo(terminalGroupDropRemovalScale, 4)
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('carries live scale and velocity when feedback reverses from joining to removal', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createTerminalGroupDropSpringController({ scheduler })
+
+    controller.feedbackChanged(surface, 'join')
+    scheduler.advanceNextFrame()
+    scheduler.advanceNextFrame()
+    const scaleBeforeReversal = readScale(surface)
+
+    controller.feedbackChanged(surface, 'leave')
+
+    expect(readScale(surface)).toBe(scaleBeforeReversal)
+    scheduler.advanceUntilIdle()
+    expect(readScale(surface)).toBeCloseTo(terminalGroupDropRemovalScale, 4)
   })
 })
 

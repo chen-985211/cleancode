@@ -1,3 +1,5 @@
+import type { TerminalGroupDropFeedback } from './types'
+
 export interface TerminalGroupDropSpringSurface {
   readonly classList: Pick<DOMTokenList, 'add' | 'remove'>
   readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>
@@ -21,13 +23,17 @@ interface SurfaceSpringState {
 
 export interface TerminalGroupDropSpringController {
   readonly dispose: () => void
-  readonly engagedSurfaceChanged: (surface: TerminalGroupDropSpringSurface | null) => void
+  readonly feedbackChanged: (
+    surface: TerminalGroupDropSpringSurface | null,
+    feedback: TerminalGroupDropFeedback | null
+  ) => void
   readonly suspend: () => void
 }
 
 const activeClassName = 'terminal-group-drop-spring--active'
 const restingScale = 1
 export const terminalGroupDropEngagedScale = 1.012
+export const terminalGroupDropRemovalScale = 0.988
 const springResponse = 0.36
 const springDampingRatio = 0.72
 const maximumFrameDeltaSeconds = 1 / 30
@@ -44,7 +50,8 @@ export function createTerminalGroupDropSpringController({
 }: TerminalGroupDropSpringControllerOptions = {}): TerminalGroupDropSpringController {
   const surfaceStates = new Map<TerminalGroupDropSpringSurface, SurfaceSpringState>()
   let animationFrameId: number | null = null
-  let engagedSurface: TerminalGroupDropSpringSurface | null = null
+  let feedbackSurface: TerminalGroupDropSpringSurface | null = null
+  let activeFeedback: TerminalGroupDropFeedback | null = null
   let lastFrameTimestamp = scheduler.now()
 
   const clearSurface = (surface: TerminalGroupDropSpringSurface): void => {
@@ -103,27 +110,31 @@ export function createTerminalGroupDropSpringController({
     animationFrameId = null
     surfaceStates.forEach((_state, surface) => clearSurface(surface))
     surfaceStates.clear()
-    engagedSurface = null
+    feedbackSurface = null
+    activeFeedback = null
   }
 
   return {
     dispose: suspend,
-    engagedSurfaceChanged: (nextSurface) => {
-      if (nextSurface === engagedSurface) return
+    feedbackChanged: (surface, nextFeedback) => {
+      const nextSurface = nextFeedback ? surface : null
+      if (nextSurface === feedbackSurface && nextFeedback === activeFeedback) return
 
-      if (engagedSurface) {
-        const previousState = surfaceStates.get(engagedSurface)
+      if (feedbackSurface && feedbackSurface !== nextSurface) {
+        const previousState = surfaceStates.get(feedbackSurface)
         if (previousState) previousState.target = restingScale
       }
 
-      engagedSurface = nextSurface
-      if (nextSurface) {
+      feedbackSurface = nextSurface
+      activeFeedback = nextFeedback
+      if (nextSurface && nextFeedback) {
+        const target = resolveFeedbackScale(nextFeedback)
         const nextState = surfaceStates.get(nextSurface) ?? {
           scale: restingScale,
-          target: terminalGroupDropEngagedScale,
+          target,
           velocity: 0
         }
-        nextState.target = terminalGroupDropEngagedScale
+        nextState.target = target
         surfaceStates.set(nextSurface, nextState)
         presentSurface(nextSurface, nextState)
       }
@@ -132,6 +143,10 @@ export function createTerminalGroupDropSpringController({
     },
     suspend
   }
+}
+
+function resolveFeedbackScale(feedback: TerminalGroupDropFeedback): number {
+  return feedback === 'join' ? terminalGroupDropEngagedScale : terminalGroupDropRemovalScale
 }
 
 function advanceDampedScaleSpring(

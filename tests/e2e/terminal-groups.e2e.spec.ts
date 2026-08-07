@@ -146,6 +146,9 @@ describe('terminal groups e2e', () => {
       const graphBeforeDrag = await readGraph(page, workbench)
       const groupBeforeDrag = graphBeforeDrag.terminalGroups[0]!
       const terminalTwo = graphBeforeDrag.blocks.find((block) => block.name === 'Terminal 2')!
+
+      await inspectTerminalRemovalBoundary(page, terminalTwo.id)
+
       const groupBeforeBox = await readRequiredBoundingBox(
         page.locator('[data-terminal-group-id]').first()
       )
@@ -390,6 +393,46 @@ async function dragTerminalTowardGroupRightEdge(
   await page.mouse.down()
   await page.mouse.move(targetX, startY, { steps: 18 })
   await page.mouse.up()
+}
+
+async function inspectTerminalRemovalBoundary(page: Page, terminalBlockId: string): Promise<void> {
+  const group = page.locator('[data-terminal-group-id]').first()
+  const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
+  const terminalHeader = terminal.locator('.terminal-node__header')
+  const groupBox = await readRequiredBoundingBox(group)
+  const terminalBox = await readRequiredBoundingBox(terminal)
+  const headerBox = await readRequiredBoundingBox(terminalHeader)
+  const materialBeforeDrag = await readTerminalGroupMaterial(group)
+  const startX = headerBox.x + headerBox.width / 2
+  const startY = headerBox.y + headerBox.height / 2
+  const terminalCenterX = terminalBox.x + terminalBox.width / 2
+  const outsideX = startX + groupBox.x + groupBox.width + 20 - terminalCenterX
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  try {
+    await page.mouse.move(outsideX, startY, { steps: 18 })
+
+    expect(
+      await waitForTerminalGroupScale(
+        group,
+        (scale) => scale < 0.995,
+        'terminal group to contract when a member crosses its removal boundary'
+      )
+    ).toBeLessThan(0.995)
+    expect(await readTerminalGroupMaterial(group)).toEqual(materialBeforeDrag)
+    expect(await group.locator('.terminal-group-node__drop-hint').count()).toBe(0)
+
+    await page.mouse.move(startX, startY, { steps: 18 })
+    expect(
+      await waitForTerminalGroupRest(
+        group,
+        'terminal group to return to rest after the member returns inside'
+      )
+    ).toBeCloseTo(1, 3)
+  } finally {
+    await page.mouse.up()
+  }
 }
 
 async function waitForTerminalGroup(

@@ -380,8 +380,8 @@ describe('terminal group member labels', () => {
     expect(titleRegion).not.toHaveTextContent('运行中')
   })
 
-  it('shows leave feedback while editing the group space', () => {
-    render(
+  it('uses only inverse spring feedback when a member crosses the removal boundary', () => {
+    const { container } = render(
       <TerminalGroupNode
         {...createTerminalGroupNodeProps({
           isCollapsed: false,
@@ -390,7 +390,10 @@ describe('terminal group member labels', () => {
       />
     )
 
-    expect(screen.getByText('松开移出组合')).toBeInTheDocument()
+    expect(screen.queryByText('松开移出组合')).not.toBeInTheDocument()
+    expect(container.querySelector('.terminal-group-node')).toHaveClass(
+      'terminal-group-drop-spring--active'
+    )
   })
 
   it('uses the title as its only selection target and shows the shared selection veil', () => {
