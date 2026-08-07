@@ -37,6 +37,8 @@ interface CanvasMenuCoordinator {
   readonly createMotion: (
     onPresent: (presentation: CanvasMenuMotionPresentation) => void
   ) => CanvasMenuMotionController
+  readonly beginSecondaryDismiss: () => boolean
+  readonly consumeSecondaryContextMenu: () => boolean
   readonly deactivate: (menuId: string) => void
   readonly dismissActive: () => boolean
   readonly hasActive: () => boolean
@@ -65,6 +67,7 @@ export interface CanvasMenuSurfaceProps extends Omit<HTMLAttributes<HTMLDivEleme
 const CanvasMenuMotionContext = createContext<CanvasMenuCoordinator | null>(null)
 const canvasMenuHiddenScale = 0.72
 const canvasMenuOpacityLead = 1.45
+const secondaryContextMenuGuardMilliseconds = 500
 
 export function CanvasMenuMotionProvider({
   children,
@@ -106,6 +109,11 @@ export function CanvasMenuMotionProvider({
         data-motion-state="closed"
         data-testid="canvas-menu-backdrop"
         onContextMenu={(event) => {
+          if (coordinator.consumeSecondaryContextMenu()) {
+            event.preventDefault()
+            event.stopPropagation()
+            return
+          }
           if (!coordinator.hasActive()) return
           event.preventDefault()
           event.stopPropagation()
@@ -114,6 +122,10 @@ export function CanvasMenuMotionProvider({
         onPointerDown={(event) => {
           if (!coordinator.hasActive()) return
           event.stopPropagation()
+          if (event.button === 2) {
+            coordinator.beginSecondaryDismiss()
+            return
+          }
           if (event.button !== 0) return
           event.preventDefault()
           if (typeof event.currentTarget.setPointerCapture === 'function') {
@@ -142,6 +154,7 @@ export const CanvasMenuSurface = forwardRef<HTMLDivElement, CanvasMenuSurfacePro
       motionReady,
       open,
       onContextMenuCapture,
+      onPointerDownCapture,
       onExitComplete,
       onPresenceChange,
       onRequestClose,
@@ -229,10 +242,21 @@ export const CanvasMenuSurface = forwardRef<HTMLDivElement, CanvasMenuSurfacePro
         inert={open && motionReady ? undefined : true}
         onContextMenuCapture={(event) => {
           onContextMenuCapture?.(event)
+          if (coordinator.consumeSecondaryContextMenu()) {
+            event.preventDefault()
+            event.stopPropagation()
+            return
+          }
           if (!openRef.current) return
           event.preventDefault()
           event.stopPropagation()
-          onRequestClose()
+          if (!coordinator.dismissActive()) onRequestClose()
+        }}
+        onPointerDownCapture={(event) => {
+          onPointerDownCapture?.(event)
+          if (event.button !== 2 || !openRef.current) return
+          if (!coordinator.beginSecondaryDismiss()) return
+          event.stopPropagation()
         }}
       >
         {children}
@@ -252,6 +276,8 @@ function createCanvasMenuCoordinator({
   const records = new Map<string, CanvasMenuRecord>()
   let activeMenuId: string | null = null
   let backdrop: HTMLDivElement | null = null
+  let secondaryContextMenuPending = false
+  let secondaryContextMenuTimeoutId: number | null = null
   let resetting = false
 
   const updateBackdrop = (): void => {
@@ -259,8 +285,40 @@ function createCanvasMenuCoordinator({
     backdrop?.style.setProperty('--canvas-menu-backdrop-progress', `${round(progress)}`)
     if (backdrop) {
       backdrop.dataset.motionState = progress > 0 ? 'open' : 'closed'
-      backdrop.style.pointerEvents = activeMenuId ? 'auto' : 'none'
+      backdrop.style.pointerEvents = activeMenuId || secondaryContextMenuPending ? 'auto' : 'none'
     }
+  }
+
+  const cancelSecondaryContextMenuTimeout = (): void => {
+    if (secondaryContextMenuTimeoutId === null) return
+    if (scheduler) scheduler.cancelTimeout(secondaryContextMenuTimeoutId)
+    else window.clearTimeout(secondaryContextMenuTimeoutId)
+    secondaryContextMenuTimeoutId = null
+  }
+
+  const setSecondaryContextMenuPending = (pending: boolean): void => {
+    cancelSecondaryContextMenuTimeout()
+    secondaryContextMenuPending = pending
+    if (pending) {
+      const clearPending = (): void => {
+        secondaryContextMenuTimeoutId = null
+        secondaryContextMenuPending = false
+        updateBackdrop()
+      }
+      secondaryContextMenuTimeoutId = scheduler
+        ? scheduler.requestTimeout(clearPending, secondaryContextMenuGuardMilliseconds)
+        : window.setTimeout(clearPending, secondaryContextMenuGuardMilliseconds)
+    }
+    updateBackdrop()
+  }
+
+  const dismissActive = (keepInputShield: boolean): boolean => {
+    const activeRecord = activeMenuId ? records.get(activeMenuId) : null
+    if (!activeRecord) return false
+    activeMenuId = null
+    setSecondaryContextMenuPending(keepInputShield)
+    activeRecord.onRequestClose()
+    return true
   }
 
   return {
@@ -271,8 +329,14 @@ function createCanvasMenuCoordinator({
       const record = records.get(menuId) ?? { onRequestClose, progress: 0 }
       record.onRequestClose = onRequestClose
       records.set(menuId, record)
-      updateBackdrop()
+      setSecondaryContextMenuPending(false)
       if (previous && previousMenuId !== menuId) previous.onRequestClose()
+    },
+    beginSecondaryDismiss: () => dismissActive(true),
+    consumeSecondaryContextMenu: () => {
+      if (!secondaryContextMenuPending) return false
+      setSecondaryContextMenuPending(false)
+      return true
     },
     createMotion: (onPresent) => {
       const controller = createCanvasMenuMotionController({
@@ -296,12 +360,7 @@ function createCanvasMenuCoordinator({
       if (activeMenuId === menuId) activeMenuId = null
       updateBackdrop()
     },
-    dismissActive: () => {
-      const activeRecord = activeMenuId ? records.get(activeMenuId) : null
-      if (!activeRecord) return false
-      activeRecord.onRequestClose()
-      return true
-    },
+    dismissActive: () => dismissActive(false),
     hasActive: () => activeMenuId !== null,
     present: (menuId, progress) => {
       const record = records.get(menuId)
@@ -320,6 +379,7 @@ function createCanvasMenuCoordinator({
       controllers.forEach((controller) => controller.reset())
       resetting = false
       activeMenuId = null
+      setSecondaryContextMenuPending(false)
       records.clear()
       updateBackdrop()
       closeRequests.forEach((close) => close())

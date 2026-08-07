@@ -139,6 +139,7 @@ export function createCanvasMenuMotionController({
       invalidateActiveRequest()
       const requestId = nextRequestId++
       phase = open ? 'opening' : 'closing'
+      axis = alignVelocityWithTarget(axis, open ? 1 : 0)
 
       if (reducedMotion) {
         axis = { value: open ? 1 : 0, velocity: 0 }
@@ -166,4 +167,10 @@ export function createCanvasMenuMotionController({
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum)
+}
+
+function alignVelocityWithTarget(axis: CriticalSpringAxis, target: number): CriticalSpringAxis {
+  const remainingDistance = target - axis.value
+  if (remainingDistance * axis.velocity >= 0) return axis
+  return { value: axis.value, velocity: 0 }
 }

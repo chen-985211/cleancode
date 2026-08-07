@@ -197,10 +197,18 @@ describe('canvas menu motion e2e', () => {
       const menu = page.locator('[role="menu"][aria-label="画布操作"]')
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const openingScales = await sampleMenuScales(menu, 100)
+      const openingScales = await sampleMenuScales(menu, 50)
       expect(openingScales[0]).toBeLessThan(0.8)
       expect(openingScales.at(-1)).toBeGreaterThan(openingScales[0] ?? 0)
-      expect(openingScales.at(-1)).toBeLessThan(0.92)
+      expect(openingScales.at(-1)).toBeLessThan(0.9)
+
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      const interruptedClosingScales = await sampleMenuScalesForFrames(menu, 2)
+      expect(interruptedClosingScales.at(-1)).toBeLessThan(interruptedClosingScales[0] ?? 1)
+
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      const interruptedOpeningScales = await sampleMenuScalesForFrames(menu, 2)
+      expect(interruptedOpeningScales.at(-1)).toBeGreaterThan(interruptedOpeningScales[0] ?? 0)
 
       await waitForMenuMotionState(menu, 'open')
       await page.mouse.click(point.x, point.y, { button: 'right' })
@@ -236,6 +244,27 @@ async function sampleMenuScales(
         sample()
       }),
     minimumElapsedMilliseconds
+  )
+}
+
+async function sampleMenuScalesForFrames(menu: Locator, frameCount: number): Promise<number[]> {
+  return menu.evaluate(
+    async (element, count) =>
+      new Promise<number[]>((resolve) => {
+        const samples: number[] = []
+        const sample = (): void => {
+          samples.push(
+            Number((element as HTMLElement).style.getPropertyValue('--canvas-menu-scale'))
+          )
+          if (samples.length >= count) {
+            resolve(samples)
+            return
+          }
+          requestAnimationFrame(sample)
+        }
+        sample()
+      }),
+    frameCount
   )
 }
 

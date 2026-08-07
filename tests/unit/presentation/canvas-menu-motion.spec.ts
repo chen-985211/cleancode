@@ -30,7 +30,7 @@ describe('canvas menu motion', () => {
     expect(harness.current.phase).toBe('opening')
   })
 
-  it('retargets from the live presentation and carries velocity through an opening reversal', async () => {
+  it('retargets from the live presentation and drops velocity away from the closing target', async () => {
     const harness = createHarness()
     const opening = harness.controller.setOpen(true)
 
@@ -41,19 +41,19 @@ describe('canvas menu motion', () => {
 
     await expect(opening).resolves.toBe(false)
     expect(harness.current.progress).toBe(beforeReversal.progress)
-    expect(harness.current.velocity).toBe(beforeReversal.velocity)
+    expect(harness.current.velocity).toBe(0)
     expect(harness.current.phase).toBe('closing')
 
     harness.scheduler.step()
-    expect(harness.current.progress).toBeGreaterThan(beforeReversal.progress)
-    expect(harness.current.velocity).toBeGreaterThan(0)
+    expect(harness.current.progress).toBeLessThan(beforeReversal.progress)
+    expect(harness.current.velocity).toBeLessThan(0)
 
     harness.scheduler.finish()
     await expect(closing).resolves.toBe(true)
     expect(harness.current).toEqual({ phase: 'closed', progress: 0, velocity: 0 })
   })
 
-  it('lets closing reverse into opening without adding a second animation frame', async () => {
+  it('lets closing immediately reverse into opening without adding a second animation frame', async () => {
     const harness = createHarness()
     const firstOpening = harness.controller.setOpen(true)
     harness.scheduler.finish()
@@ -67,8 +67,12 @@ describe('canvas menu motion', () => {
 
     await expect(closing).resolves.toBe(false)
     expect(harness.current.progress).toBe(beforeReopen.progress)
-    expect(harness.current.velocity).toBe(beforeReopen.velocity)
+    expect(harness.current.velocity).toBe(0)
     expect(harness.scheduler.maximumPendingFrames).toBe(1)
+
+    harness.scheduler.step()
+    expect(harness.current.progress).toBeGreaterThan(beforeReopen.progress)
+    expect(harness.current.velocity).toBeGreaterThan(0)
 
     harness.scheduler.finish()
     await expect(reopening).resolves.toBe(true)

@@ -113,12 +113,14 @@ describe('canvas menu surface', () => {
     const backdrop = screen.getByTestId('canvas-menu-backdrop')
 
     fireEvent.pointerDown(backdrop, { button: 2, pointerId: 2 })
-    expect(screen.getByRole('menu', { name: '测试菜单' })).toBeInTheDocument()
+    expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
+    expect(backdrop).toHaveStyle('pointer-events: auto')
 
     const contextMenuEvent = createEvent.contextMenu(backdrop)
     fireEvent(backdrop, contextMenuEvent)
 
     expect(contextMenuEvent.defaultPrevented).toBe(true)
+    expect(backdrop).toHaveStyle('pointer-events: none')
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
   })
 
@@ -128,11 +130,28 @@ describe('canvas menu surface', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
     const menu = screen.getByRole('menu', { name: '测试菜单' })
+    fireEvent.pointerDown(menu, { button: 2, pointerId: 3 })
+    expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
+
     const contextMenuEvent = createEvent.contextMenu(menu)
     fireEvent(menu, contextMenuEvent)
 
     expect(contextMenuEvent.defaultPrevented).toBe(true)
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
+  })
+
+  it('releases the secondary input shield when the native context menu never arrives', () => {
+    const scheduler = new TestFrameScheduler()
+    render(<MenuHarness scheduler={scheduler} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
+    const backdrop = screen.getByTestId('canvas-menu-backdrop')
+    fireEvent.pointerDown(backdrop, { button: 2, pointerId: 4 })
+    expect(backdrop).toHaveStyle('pointer-events: auto')
+
+    act(() => scheduler.step(500))
+
+    expect(backdrop).toHaveStyle('pointer-events: none')
   })
 
   it('cancels live menu motion and clears the backdrop when the workspace reset key changes', () => {
