@@ -1,13 +1,6 @@
 :is(.terminal-node, .terminal-group-node, .agent-console-node) {
-  --workbench-object-hover-scale: 1;
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
-  transform-origin: center;
-  transform: scale(var(--workbench-object-hover-scale));
-}
-
-.workbench-object-hover-motion--active {
-  will-change: transform;
 }
 
 :is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
@@ -62,7 +55,9 @@
 }
 
 .terminal-group-node.workbench-object-motion--group-accept {
+  transform-origin: center;
   animation: workbench-terminal-group-accept-shell 440ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  will-change: transform;
 }
 
 .terminal-group-node.workbench-object-motion--group-accept::after {
@@ -225,6 +220,11 @@
       0 8px 20px var(--cc-shadow-color),
       0 14px 36px var(--cc-shadow-color) inset,
       0 1px 0 var(--cc-neutral-overlay) inset;
+    transform: scale(1);
+  }
+
+  36% {
+    transform: scale(1.0124);
   }
 
   48% {
@@ -235,6 +235,14 @@
       0 1px 0 var(--cc-neutral-overlay) inset;
   }
 
+  68% {
+    transform: scale(0.9988);
+  }
+
+  84% {
+    transform: scale(1.0004);
+  }
+
   to {
     background: var(--cc-surface-translucent);
     box-shadow:
@@ -242,6 +250,7 @@
       0 16px 32px var(--cc-shadow-color),
       0 0 0 1px var(--cc-border) inset,
       0 1px 0 var(--cc-neutral-overlay) inset;
+    transform: scale(1);
   }
 }
 

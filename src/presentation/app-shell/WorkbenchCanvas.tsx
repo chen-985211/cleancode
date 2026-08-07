@@ -63,7 +63,6 @@ import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBui
 import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 import { useWorkbenchDirectZoom } from './useWorkbenchDirectZoom'
-import { useWorkbenchNodeHoverMotion } from './useWorkbenchNodeHoverMotion'
 import {
   centerCanvasViewportOnMinimapPoint,
   persistCanvasViewportFromMoveEnd,
@@ -323,7 +322,6 @@ export function WorkbenchCanvas({
     reactFlowInstanceRef,
     shortcutPlatform
   })
-  const nodeHoverMotion = useWorkbenchNodeHoverMotion()
   useWorkbenchDirectZoom({
     canvasSurfaceRef,
     onViewportInteractionStart,
@@ -419,20 +417,10 @@ export function WorkbenchCanvas({
         className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
           .filter(Boolean)
           .join(' ')}
-        onPointerDownCapture={(event) => {
-          nodeHoverMotion.suspend()
-          templateInteraction.beginSelection(event)
-        }}
-        onPointerMoveCapture={(event) => {
-          nodeHoverMotion.continuePointerMotion(event)
-          templateInteraction.continueInteraction(event)
-        }}
+        onPointerDownCapture={templateInteraction.beginSelection}
+        onPointerMoveCapture={templateInteraction.continueInteraction}
         onPointerUpCapture={templateInteraction.completeSelection}
-        onPointerCancelCapture={(event) => {
-          nodeHoverMotion.suspend()
-          templateInteraction.cancelSelection(event)
-        }}
-        onPointerLeave={nodeHoverMotion.leaveCanvas}
+        onPointerCancelCapture={templateInteraction.cancelSelection}
         onClickCapture={templateInteraction.placeFromCanvasClick}
       >
         <WorkbenchToolbar

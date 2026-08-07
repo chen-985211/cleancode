@@ -31,7 +31,7 @@ describe('workbench object motion styles', () => {
     expect(accentKeyframes).toContain('clip-path:')
     expect(`${createKeyframes}${accentKeyframes}`).not.toMatch(/\b(width|height):/)
     expect(`${createKeyframes}${accentKeyframes}`).not.toContain('scale(')
-    expect(objectBaseRule).not.toContain('scale(0')
+    expect(objectBaseRule).not.toContain('scale(')
   })
 
   it('uses symmetric group member paths and disables them for reduced motion', () => {
@@ -48,6 +48,7 @@ describe('workbench object motion styles', () => {
   it('opens the stationary group surface while members translate into arranged slots', () => {
     const joinKeyframes = readRule('@keyframes workbench-terminal-group-join')
     const reflowKeyframes = readRule('@keyframes workbench-terminal-group-reflow')
+    const acceptKeyframes = readRule('@keyframes workbench-terminal-group-accept-shell')
     const acceptRule = readRule('.terminal-group-node.workbench-object-motion--group-accept')
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
@@ -59,7 +60,9 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
     expect(acceptRule).toContain('animation:')
-    expect(acceptRule).not.toContain('transform:')
+    expect(acceptRule).toContain('transform-origin: center;')
+    expect(acceptKeyframes).toContain('transform: scale(1.012')
+    expect(acceptKeyframes).toMatch(/to\s*{[^}]*transform: scale\(1\);/s)
     expect(dropTargetRule).toContain('box-shadow:')
     expect(dropTargetRule).not.toMatch(/\b(border|outline|transform):/)
     expect(dropTargetRule).not.toContain('--cc-success')
@@ -94,7 +97,7 @@ describe('workbench object motion styles', () => {
     expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary-border)')
   })
 
-  it('uses one scale spring for node hover without directional displacement', () => {
+  it('keeps idle canvas nodes free of hover transforms', () => {
     const objectBaseRule = readRule(
       ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
     )
@@ -104,10 +107,9 @@ describe('workbench object motion styles', () => {
       readStyleRule(agentConsoleStyles, '.agent-console-node')
     ]
 
-    expect(objectBaseRule).toContain('--workbench-object-hover-scale: 1;')
-    expect(objectBaseRule).toContain('transform-origin: center;')
-    expect(objectBaseRule).toContain('transform: scale(var(--workbench-object-hover-scale));')
-    expect(objectMotionStyles).toContain('.workbench-object-hover-motion--active')
+    expect(objectBaseRule).not.toContain('--workbench-object-hover-scale')
+    expect(objectBaseRule).not.toContain('transform:')
+    expect(objectMotionStyles).not.toContain('.workbench-object-hover-motion--active')
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-x')
     expect(objectMotionStyles).not.toContain('--workbench-object-hover-y')
     expect(objectMotionStyles).not.toContain('translate3d(0, -3px, 0)')
