@@ -9,6 +9,14 @@ const terminalGroupStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-group-node.css'),
   'utf8'
 )
+const terminalNodeStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/terminal-node.css'),
+  'utf8'
+)
+const agentConsoleStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
+  'utf8'
+)
 
 describe('workbench object motion styles', () => {
   it('materializes new objects with clipping and opacity without animating terminal geometry', () => {
@@ -75,6 +83,41 @@ describe('workbench object motion styles', () => {
     expect(editingEmptyStateRule).not.toContain('border-color:')
   })
 
+  it('keeps the empty group action neutral when the pointer approaches', () => {
+    const hoverRule = readTerminalGroupRule('.terminal-group-node__empty-state--action:hover')
+    const hoverIconRule = readTerminalGroupRule(
+      '.terminal-group-node__empty-state--action:hover svg'
+    )
+
+    expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary)')
+    expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary-soft)')
+    expect(`${hoverRule}${hoverIconRule}`).not.toContain('var(--cc-primary-border)')
+  })
+
+  it('uses one reversible hover spring across every canvas node surface', () => {
+    const objectBaseRule = readRule(
+      ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
+    )
+    const nodeRules = [
+      readStyleRule(terminalNodeStyles, '.terminal-node'),
+      readTerminalGroupRule('.terminal-group-node'),
+      readStyleRule(agentConsoleStyles, '.agent-console-node')
+    ]
+
+    expect(objectBaseRule).toContain('--workbench-object-hover-spring: linear(')
+    expect(objectBaseRule).toContain('transform-origin: center;')
+    expect(objectMotionStyles).toContain('transform: translate3d(0, -3px, 0);')
+    expect(objectMotionStyles).toContain('.canvas-surface:not(.canvas-surface--dragging-terminal)')
+    expect(objectMotionStyles).toMatch(/:not\(\s*\[class\*='workbench-object-motion--'\]\s*\)/)
+    expect(objectMotionStyles).toContain('.react-flow__node.dragging')
+    expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
+    nodeRules.forEach((rule) => {
+      expect(rule).toContain(
+        'transform var(--workbench-object-hover-duration) var(--workbench-object-hover-spring)'
+      )
+    })
+  })
+
   it('reduces secondary controls by detail level while preserving node identity surfaces', () => {
     expect(objectMotionStyles).toContain("[data-canvas-detail='compact']")
     expect(objectMotionStyles).toContain("[data-canvas-detail='overview']")
@@ -103,4 +146,8 @@ function readRule(selector: string): string {
 
 function readTerminalGroupRule(selector: string): string {
   return terminalGroupStyles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+}
+
+function readStyleRule(styles: string, selector: string): string {
+  return styles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
 }

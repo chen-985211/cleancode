@@ -35,7 +35,8 @@
     0 1px 0 var(--cc-neutral-overlay) inset;
   transition:
     background 140ms ease-out,
-    box-shadow 180ms cubic-bezier(0.2, 0.82, 0.2, 1);
+    box-shadow 180ms cubic-bezier(0.2, 0.82, 0.2, 1),
+    transform var(--workbench-object-hover-duration) var(--workbench-object-hover-spring);
 }
 
 .terminal-group-node::after {
@@ -102,18 +103,8 @@
   transition: color 140ms ease;
 }
 
-.terminal-group-node__empty-state--action:hover {
-  color: var(--cc-primary);
-}
-
-.terminal-group-node__empty-state--action:hover svg {
-  background: var(--cc-primary-soft);
-  color: var(--cc-primary);
-  box-shadow: 0 0 0 1px var(--cc-primary-border) inset;
-}
-
 .terminal-group-node__empty-state--action:active {
-  color: var(--cc-primary);
+  color: var(--cc-muted-strong);
 }
 
 .terminal-group-node__empty-state--action:focus-visible {

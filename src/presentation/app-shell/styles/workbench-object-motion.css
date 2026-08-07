@@ -1,6 +1,29 @@
 :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  --workbench-object-hover-duration: 440ms;
+  --workbench-object-hover-spring: linear(
+    0,
+    0.38 8%,
+    0.72 16%,
+    0.94 24%,
+    1.08 34%,
+    1.12 42%,
+    1.06 52%,
+    0.985 65%,
+    1.008 78%,
+    1
+  );
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
+  transform-origin: center;
+}
+
+.canvas-surface:not(.canvas-surface--dragging-terminal)
+  .react-flow__node:not(.dragging):hover
+  :is(.terminal-node, .terminal-group-node, .agent-console-node):not(
+    [class*='workbench-object-motion--']
+  ) {
+  transform: translate3d(0, -3px, 0);
+  will-change: transform;
 }
 
 :is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
@@ -71,7 +94,9 @@
 }
 
 .react-flow__node.dragging :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  transform: none;
   box-shadow: var(--cc-shadow-node);
+  transition: none;
 }
 
 .terminal-workflow-edge {
@@ -251,6 +276,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :is(.terminal-node, .terminal-group-node, .agent-console-node),
+  .canvas-surface:not(.canvas-surface--dragging-terminal)
+    .react-flow__node:not(.dragging):hover
+    :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+    transform: none;
+    transition: none;
+  }
+
   :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
     transition: none;
     transform: none;
