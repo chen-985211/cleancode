@@ -1,11 +1,13 @@
-import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes } from 'react'
+import { forwardRef, type ButtonHTMLAttributes } from 'react'
 
-type CanvasNodeMenuProps = Omit<HTMLAttributes<HTMLDivElement>, 'className'>
+import { CanvasMenuSurface, type CanvasMenuSurfaceProps } from './CanvasMenuMotionProvider'
+
+type CanvasNodeMenuProps = Omit<CanvasMenuSurfaceProps, 'className'>
 type CanvasNodeMenuItemProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'>
 
 export const CanvasNodeMenu = forwardRef<HTMLDivElement, CanvasNodeMenuProps>(
   function CanvasNodeMenu(props, ref) {
-    return <div {...props} className="canvas-node-menu nodrag" ref={ref} />
+    return <CanvasMenuSurface {...props} className="canvas-node-menu nodrag" ref={ref} />
   }
 )
 

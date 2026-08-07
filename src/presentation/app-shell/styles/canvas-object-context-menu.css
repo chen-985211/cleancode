@@ -1,7 +1,14 @@
-.canvas-node-menu {
-  --canvas-node-menu-enter-y: -4px;
-  --canvas-node-menu-transform-origin: top left;
+.canvas-menu-backdrop {
+  position: absolute;
+  z-index: 210;
+  inset: 0;
+  background: var(--cc-canvas-menu-backdrop);
+  opacity: var(--canvas-menu-backdrop-progress, 0);
+  pointer-events: none;
+  will-change: opacity;
+}
 
+.canvas-node-menu {
   position: fixed;
   z-index: 220;
   display: grid;
@@ -15,17 +22,18 @@
   background: var(--cc-canvas-node-menu-surface);
   box-shadow: var(--cc-shadow-floating);
   padding: 8px;
-  transform-origin: var(--canvas-node-menu-transform-origin);
-  animation: canvas-node-menu-in 160ms ease-out;
 }
 
-.canvas-node-menu[data-side='bottom'] {
-  --canvas-node-menu-transform-origin: top right;
+.canvas-menu-motion-surface {
+  opacity: var(--canvas-menu-opacity, 0);
+  transform: translate3d(var(--canvas-menu-translate-x, 0), var(--canvas-menu-translate-y, 0), 0)
+    scale(var(--canvas-menu-scale, 0.94));
+  transform-origin: var(--canvas-menu-origin-x, 50%) var(--canvas-menu-origin-y, 50%);
+  will-change: transform, opacity;
 }
 
-.canvas-node-menu[data-side='top'] {
-  --canvas-node-menu-enter-y: 4px;
-  --canvas-node-menu-transform-origin: bottom right;
+.canvas-menu-motion-surface[data-interactive='false'] {
+  pointer-events: none;
 }
 
 .canvas-node-menu__item {
@@ -160,21 +168,9 @@
   stroke: var(--cc-primary);
 }
 
-@keyframes canvas-node-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--canvas-node-menu-enter-y)) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .canvas-node-menu {
-    animation: none;
+  .canvas-menu-motion-surface {
+    transform: none;
   }
 }
 

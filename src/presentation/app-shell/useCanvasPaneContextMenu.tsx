@@ -25,6 +25,13 @@ interface UseCanvasPaneContextMenuOptions {
   readonly onFitCanvas?: () => void
 }
 
+interface CanvasPaneContextMenuState {
+  readonly graphId: string | null
+  readonly open: boolean
+  readonly x: number
+  readonly y: number
+}
+
 export function useCanvasPaneContextMenu({
   canCreateTerminal,
   canGroupTerminals,
@@ -37,12 +44,11 @@ export function useCanvasPaneContextMenu({
   onCreateTerminalGroup,
   onFitCanvas
 }: UseCanvasPaneContextMenuOptions) {
-  const [position, setPosition] = useState<{
-    readonly graphId: string | null
-    readonly x: number
-    readonly y: number
-  } | null>(null)
-  const close = useCallback(() => setPosition(null), [])
+  const [position, setPosition] = useState<CanvasPaneContextMenuState | null>(null)
+  const close = useCallback(
+    () => setPosition((current) => (current ? { ...current, open: false } : null)),
+    []
+  )
   const open = useCallback(
     (event: CanvasPaneContextMenuEvent): void => {
       event.preventDefault()
@@ -51,7 +57,7 @@ export function useCanvasPaneContextMenu({
         close()
         return
       }
-      setPosition({ graphId, x: event.clientX, y: event.clientY })
+      setPosition({ graphId, open: true, x: event.clientX, y: event.clientY })
     },
     [close, graphId, isBlocked, onBeforeOpen]
   )
@@ -63,6 +69,7 @@ export function useCanvasPaneContextMenu({
         <CanvasPaneContextMenu
           canCreateTerminal={canCreateTerminal}
           canGroupTerminals={canGroupTerminals}
+          open={position.open}
           position={position}
           shortcutTooltips={shortcutTooltips}
           onClose={close}

@@ -1,6 +1,7 @@
 import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 import { useCanvasPaneContextMenu } from '../../../src/presentation/app-shell/useCanvasPaneContextMenu'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
 
 describe('canvas pane context menu', () => {
   it('exposes the existing terminal actions with their configured shortcuts', async () => {
@@ -34,8 +35,11 @@ describe('canvas pane context menu', () => {
     expect(actions.onBeginTerminalGroupSelection).toHaveBeenCalledOnce()
     expect(actions.onFitCanvas).toHaveBeenCalledOnce()
     expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByRole('menu', { name: '画布操作', hidden: true })).not.toBeInTheDocument()
+    )
 
-    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+    fireEvent.contextMenu(pane, { clientX: 410, clientY: 300 })
     fireEvent.click(screen.getByRole('menuitem', { name: '新建终端积木' }))
     expect(actions.onCreateTerminal).toHaveBeenCalledOnce()
   })
@@ -53,6 +57,23 @@ describe('canvas pane context menu', () => {
     expect(screen.getByRole('menu', { name: '画布操作' })).toBeInTheDocument()
 
     rerender(<Harness actions={actions} graphId="graph-2" />)
+    expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
+  })
+
+  it('returns keyboard focus to the canvas entry point when Escape interrupts the menu', async () => {
+    const actions = createActions()
+    render(<Harness actions={actions} graphId="graph-1" />)
+
+    const pane = screen.getByTestId('pane')
+    pane.focus()
+    fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
+    await waitFor(() =>
+      expect(screen.getByRole('menuitem', { name: '新建终端积木' })).toHaveFocus()
+    )
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(pane).toHaveFocus()
     expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
   })
 })
@@ -77,10 +98,10 @@ function Harness({ actions, graphId, isBlocked = false }: HarnessProps) {
   })
 
   return (
-    <>
-      <div data-testid="pane" onContextMenu={contextMenu.open} />
+    <CanvasMenuMotionProvider reducedMotion>
+      <div data-testid="pane" tabIndex={-1} onContextMenu={contextMenu.open} />
       {contextMenu.menu}
-    </>
+    </CanvasMenuMotionProvider>
   )
 }
 

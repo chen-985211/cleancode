@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom'
 
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
+import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { useI18n } from './i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
@@ -16,6 +17,7 @@ import { WorkbenchIcon } from './WorkbenchIcons'
 interface CanvasPaneContextMenuProps {
   readonly canCreateTerminal: boolean
   readonly canGroupTerminals: boolean
+  readonly open: boolean
   readonly position: { readonly x: number; readonly y: number }
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
@@ -29,6 +31,7 @@ interface CanvasPaneContextMenuProps {
 export function CanvasPaneContextMenu({
   canCreateTerminal,
   canGroupTerminals,
+  open,
   position,
   shortcutTooltips,
   onClose,
@@ -37,12 +40,18 @@ export function CanvasPaneContextMenu({
 }: CanvasPaneContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
+  const [isMenuPresent, setIsMenuPresent] = useState(open)
   const [resolvedPosition, setResolvedPosition] = useState<{
     readonly left: number
     readonly top: number
+    readonly pointerX: number
+    readonly pointerY: number
   } | null>(null)
 
   useEffect(() => {
+    if (!open) return undefined
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
@@ -51,7 +60,9 @@ export function CanvasPaneContextMenu({
       onClose()
     }
     const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+      onClose()
+      restoreCanvasMenuFocus(returnFocusRef.current)
     }
 
     document.addEventListener('pointerdown', closeOnOutsidePointerDown)
@@ -60,46 +71,64 @@ export function CanvasPaneContextMenu({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [onClose])
+  }, [isMenuPresent, onClose, open])
+
+  useLayoutEffect(() => {
+    if (open && !wasOpenRef.current) {
+      returnFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
+    }
+    wasOpenRef.current = open
+  }, [open])
 
   useLayoutEffect(() => {
     const menu = menuRef.current
     if (!menu) return undefined
 
     const updatePosition = (): void => {
-      setResolvedPosition(
-        resolveCanvasObjectContextMenuPosition({
+      setResolvedPosition({
+        ...resolveCanvasObjectContextMenuPosition({
           menuHeight: menu.offsetHeight,
           menuWidth: menu.offsetWidth,
           pointerX: position.x,
           pointerY: position.y,
           viewportHeight: window.innerHeight,
           viewportWidth: window.innerWidth
-        })
-      )
+        }),
+        pointerX: position.x,
+        pointerY: position.y
+      })
     }
 
     updatePosition()
     window.addEventListener('resize', updatePosition)
     return () => window.removeEventListener('resize', updatePosition)
-  }, [position.x, position.y])
+  }, [isMenuPresent, position.x, position.y])
 
   const createTerminalLabel = t('toolbar.newTerminal')
   const groupTerminalsLabel = t('toolbar.groupTerminals')
+  const motionReady =
+    resolvedPosition?.pointerX === position.x && resolvedPosition.pointerY === position.y
 
   return createPortal(
     <CanvasNodeMenu
       ref={menuRef}
+      anchor={position}
+      menuId="canvas-pane-context-menu"
+      motionReady={motionReady}
+      open={open}
       role="menu"
       aria-label={t('canvas.contextMenu.canvasActions')}
+      onRequestClose={onClose}
+      onPresenceChange={setIsMenuPresent}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose()
       }}
       onKeyDown={(event) => keepMenuItemFocused(event, menuRef.current)}
       style={{
-        left: resolvedPosition?.left ?? 0,
-        top: resolvedPosition?.top ?? 0,
-        visibility: resolvedPosition ? 'visible' : 'hidden'
+        left: motionReady ? (resolvedPosition?.left ?? 0) : 0,
+        top: motionReady ? (resolvedPosition?.top ?? 0) : 0,
+        visibility: motionReady ? 'visible' : 'hidden'
       }}
     >
       <CanvasPaneContextMenuItem
