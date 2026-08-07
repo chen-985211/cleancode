@@ -150,7 +150,6 @@ describe('terminal groups e2e', () => {
       const groupBeforeBox = await readRequiredBoundingBox(
         page.locator('.react-flow__node-terminalGroup').first()
       )
-      const canvasZoom = await readCanvasZoom(page)
 
       await dragTerminalTowardGroupRightEdge(page, terminalTwo.id)
 
@@ -159,14 +158,14 @@ describe('terminal groups e2e', () => {
         workbench,
         (group) => group.size.width > groupBeforeDrag.size.width + 160
       )
-      const expectedResizedWidth =
-        groupBeforeBox.width + (groupAfterDrag.size.width - groupBeforeDrag.size.width) * canvasZoom
-      const resizedWidth = await waitForTerminalGroupProjectedWidth(
+      const resizedProjection = await waitForTerminalGroupProjectedWidth(
         page,
-        expectedResizedWidth,
+        groupAfterDrag.size.width,
         'terminal group visible width to reflect the member drag'
       )
-      expect(Math.abs(resizedWidth - expectedResizedWidth)).toBeLessThan(screenPixelTolerance)
+      expect(
+        Math.abs(resizedProjection.renderedWidth - resizedProjection.expectedRenderedWidth)
+      ).toBeLessThan(screenPixelTolerance)
       const groupAfterBox = await readRequiredBoundingBox(
         page.locator('.react-flow__node-terminalGroup').first()
       )
@@ -181,15 +180,15 @@ describe('terminal groups e2e', () => {
         workbench,
         (group) => group.size.width < groupAfterDrag.size.width - 100
       )
-      const expectedContractedWidth =
-        groupAfterBox.width - (groupAfterDrag.size.width - contractedGroup.size.width) * canvasZoom
-      const contractedWidth = await waitForTerminalGroupProjectedWidth(
+      const contractedProjection = await waitForTerminalGroupProjectedWidth(
         page,
-        expectedContractedWidth,
+        contractedGroup.size.width,
         'terminal group visible width to reflect member contraction'
       )
       expect(contractedGroup.size.width).toBeLessThan(groupAfterDrag.size.width - 100)
-      expect(Math.abs(contractedWidth - expectedContractedWidth)).toBeLessThan(screenPixelTolerance)
+      expect(
+        Math.abs(contractedProjection.renderedWidth - contractedProjection.expectedRenderedWidth)
+      ).toBeLessThan(screenPixelTolerance)
     },
     electronScenarioTimeoutMs
   )
@@ -356,24 +355,27 @@ async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
   })
 }
 
-function readCanvasZoom(page: Page): Promise<number> {
-  return page.locator('.react-flow__viewport').evaluate((viewport) => {
-    return new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
-  })
-}
-
 async function waitForTerminalGroupProjectedWidth(
   page: Page,
-  expectedWidth: number,
+  expectedCanvasWidth: number,
   description: string
-): Promise<number> {
+): Promise<{ readonly expectedRenderedWidth: number; readonly renderedWidth: number }> {
   return pollUntilState({
-    accept: (width) => Math.abs(width - expectedWidth) < screenPixelTolerance,
+    accept: ({ expectedRenderedWidth, renderedWidth }) =>
+      Math.abs(renderedWidth - expectedRenderedWidth) < screenPixelTolerance,
     description,
-    observe: async () => {
-      const box = await page.locator('.react-flow__node-terminalGroup').first().boundingBox()
-      return box?.width ?? 0
-    },
+    observe: () =>
+      page.evaluate((canvasWidth) => {
+        const group = document.querySelector<HTMLElement>('.react-flow__node-terminalGroup')
+        const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
+        if (!group || !viewport) return { expectedRenderedWidth: 0, renderedWidth: 0 }
+
+        const zoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
+        return {
+          expectedRenderedWidth: canvasWidth * zoom,
+          renderedWidth: group.getBoundingClientRect().width
+        }
+      }, expectedCanvasWidth),
     intervalMs: 16,
     timeoutMs: 5_000
   })
