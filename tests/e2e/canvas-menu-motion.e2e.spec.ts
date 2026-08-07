@@ -161,7 +161,6 @@ describe('canvas menu motion e2e', () => {
       )
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      await interactiveMenu.waitFor({ state: 'attached' })
       await page.mouse.click(point.x, point.y, { button: 'right' })
       await menu.waitFor({ state: 'detached' })
 

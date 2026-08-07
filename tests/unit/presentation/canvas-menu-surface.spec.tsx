@@ -101,6 +101,19 @@ describe('canvas menu surface', () => {
     expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
   })
 
+  it('dismisses when a rapid repeated secondary click lands on the opening menu surface', () => {
+    const scheduler = new TestFrameScheduler()
+    render(<MenuHarness scheduler={scheduler} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
+    const menu = screen.getByRole('menu', { name: '测试菜单' })
+    const contextMenuEvent = createEvent.contextMenu(menu)
+    fireEvent(menu, contextMenuEvent)
+
+    expect(contextMenuEvent.defaultPrevented).toBe(true)
+    expect(screen.queryByRole('menu', { name: '测试菜单' })).not.toBeInTheDocument()
+  })
+
   it('cancels live menu motion and clears the backdrop when the workspace reset key changes', () => {
     const scheduler = new TestFrameScheduler()
     const { rerender } = render(<MenuHarness resetKey="graph-1" scheduler={scheduler} />)

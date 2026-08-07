@@ -54,11 +54,12 @@ export function useCanvasObjectContextMenu({
 } {
   const [state, setState] = useState<CanvasObjectContextMenuState | null>(null)
   const nextRequestIdRef = useRef(0)
-  const close = useCallback(
-    () => setState((current) => (current ? { ...current, open: false } : null)),
-    []
-  )
   const graphKey = graph ? createGraphKey(graph) : null
+  const openIntentRef = useRef({ graphKey, open: false })
+  const close = useCallback(() => {
+    openIntentRef.current = { ...openIntentRef.current, open: false }
+    setState((current) => (current ? { ...current, open: false } : null))
+  }, [])
   const menuState = state?.graphKey === graphKey ? state : null
   const activeTarget = menuState?.open ? menuState.target : null
   const activeAgentNode = resolveActiveAgentNode(nodes, menuState?.target ?? null)
@@ -79,7 +80,7 @@ export function useCanvasObjectContextMenu({
       }
 
       const nextGraphKey = createGraphKey(graph)
-      if (state?.graphKey === nextGraphKey && state.open) {
+      if (openIntentRef.current.graphKey === nextGraphKey && openIntentRef.current.open) {
         event.preventDefault()
         close()
         return
@@ -94,6 +95,7 @@ export function useCanvasObjectContextMenu({
       }
 
       event.preventDefault()
+      openIntentRef.current = { graphKey: nextGraphKey, open: true }
       setState({
         graphKey: nextGraphKey,
         open: true,
@@ -102,7 +104,7 @@ export function useCanvasObjectContextMenu({
         target
       })
     },
-    [close, graph, state]
+    [close, graph]
   )
 
   return {

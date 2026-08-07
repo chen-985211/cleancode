@@ -139,6 +139,7 @@ export const CanvasMenuSurface = forwardRef<HTMLDivElement, CanvasMenuSurfacePro
       menuId,
       motionReady,
       open,
+      onContextMenuCapture,
       onExitComplete,
       onPresenceChange,
       onRequestClose,
@@ -224,6 +225,13 @@ export const CanvasMenuSurface = forwardRef<HTMLDivElement, CanvasMenuSurfacePro
         className={['canvas-menu-motion-surface', className].filter(Boolean).join(' ')}
         data-interactive={open && motionReady}
         inert={open && motionReady ? undefined : true}
+        onContextMenuCapture={(event) => {
+          onContextMenuCapture?.(event)
+          if (!openRef.current) return
+          event.preventDefault()
+          event.stopPropagation()
+          onRequestClose()
+        }}
       >
         {children}
       </div>

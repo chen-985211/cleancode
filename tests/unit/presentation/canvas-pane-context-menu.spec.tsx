@@ -90,6 +90,19 @@ describe('canvas pane context menu', () => {
     expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
     expect(actions.onBeforeOpen).toHaveBeenCalledOnce()
   })
+
+  it('preserves toggle parity when two secondary intents arrive before a render', () => {
+    const actions = createActions()
+    render(<Harness actions={actions} graphId="graph-1" />)
+
+    fireEvent.contextMenu(screen.getByTestId('rapid-pane'), {
+      clientX: 320,
+      clientY: 240
+    })
+
+    expect(screen.queryByRole('menu', { name: '画布操作' })).not.toBeInTheDocument()
+    expect(actions.onBeforeOpen).toHaveBeenCalledOnce()
+  })
 })
 
 interface HarnessProps {
@@ -114,6 +127,13 @@ function Harness({ actions, graphId, isBlocked = false }: HarnessProps) {
   return (
     <CanvasMenuMotionProvider reducedMotion>
       <div data-testid="pane" tabIndex={-1} onContextMenu={contextMenu.open} />
+      <div
+        data-testid="rapid-pane"
+        onContextMenu={(event) => {
+          contextMenu.open(event)
+          contextMenu.open(event)
+        }}
+      />
       {contextMenu.menu}
     </CanvasMenuMotionProvider>
   )

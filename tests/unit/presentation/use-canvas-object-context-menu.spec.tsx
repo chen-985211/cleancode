@@ -29,6 +29,25 @@ describe('canvas object context menu lifecycle', () => {
     expect(result.current.nodes[0]?.data.isContextSelected).toBeUndefined()
   })
 
+  it('preserves toggle parity when two object intents arrive before a render', () => {
+    const graph = createGraph('graph-1')
+    const terminalNode = createTerminalNode()
+    const { result } = renderHook(() =>
+      useCanvasObjectContextMenu({
+        edges: [],
+        graph,
+        nodes: [terminalNode]
+      })
+    )
+
+    act(() => {
+      result.current.onNodeContextMenu(createContextMenuEvent(), terminalNode)
+      result.current.onNodeContextMenu(createContextMenuEvent(), terminalNode)
+    })
+
+    expect(result.current.nodes[0]?.data.isContextSelected).toBeUndefined()
+  })
+
   it('clears the transient target when the graph changes', () => {
     const graph = createGraph('graph-1')
     const terminalNode = createTerminalNode()

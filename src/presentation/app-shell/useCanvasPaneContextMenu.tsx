@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { CanvasPaneContextMenu } from './CanvasPaneContextMenu'
@@ -45,14 +45,15 @@ export function useCanvasPaneContextMenu({
   onFitCanvas
 }: UseCanvasPaneContextMenuOptions) {
   const [position, setPosition] = useState<CanvasPaneContextMenuState | null>(null)
-  const close = useCallback(
-    () => setPosition((current) => (current ? { ...current, open: false } : null)),
-    []
-  )
+  const openIntentRef = useRef({ graphId, open: false })
+  const close = useCallback(() => {
+    openIntentRef.current = { ...openIntentRef.current, open: false }
+    setPosition((current) => (current ? { ...current, open: false } : null))
+  }, [])
   const open = useCallback(
     (event: CanvasPaneContextMenuEvent): void => {
       event.preventDefault()
-      if (position?.graphId === graphId && position.open) {
+      if (openIntentRef.current.graphId === graphId && openIntentRef.current.open) {
         close()
         return
       }
@@ -61,9 +62,10 @@ export function useCanvasPaneContextMenu({
         close()
         return
       }
+      openIntentRef.current = { graphId, open: true }
       setPosition({ graphId, open: true, x: event.clientX, y: event.clientY })
     },
-    [close, graphId, isBlocked, onBeforeOpen, position]
+    [close, graphId, isBlocked, onBeforeOpen]
   )
 
   return {
