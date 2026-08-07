@@ -14,6 +14,9 @@ import {
   type E2eWorkbench
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
+
+const screenPixelTolerance = 1
+
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -81,8 +84,12 @@ describe('terminal groups e2e', () => {
                 const centerBeforeDrag = centerOf(groupBoxBeforeDrag)
                 const centerDuringHover = centerOf(groupBoxDuringHover)
 
-                expect(centerDuringHover.x).toBeCloseTo(centerBeforeDrag.x, 3)
-                expect(centerDuringHover.y).toBeCloseTo(centerBeforeDrag.y, 3)
+                expect(
+                  Math.hypot(
+                    centerDuringHover.x - centerBeforeDrag.x,
+                    centerDuringHover.y - centerBeforeDrag.y
+                  )
+                ).toBeLessThan(screenPixelTolerance)
                 expect(engagedScale).toBeGreaterThan(1.005)
                 expect(groupMaterial).toEqual(groupMaterialBeforeDrag)
                 expect(await group.locator('.terminal-group-node__drop-hint').count()).toBe(0)
@@ -152,6 +159,7 @@ describe('terminal groups e2e', () => {
       const groupBeforeBox = await readRequiredBoundingBox(
         page.locator('[data-terminal-group-id]').first()
       )
+      const canvasZoom = await readCanvasZoom(page)
 
       await dragTerminalTowardGroupRightEdge(page, terminalTwo.id)
 
@@ -160,16 +168,14 @@ describe('terminal groups e2e', () => {
         workbench,
         (group) => group.size.width > groupBeforeDrag.size.width + 160
       )
-      const resizedWidth = await pollUntilState({
-        description: 'terminal group visible width to reflect the member drag',
-        observe: async () => {
-          const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
-          return box?.width ?? 0
-        },
-        accept: (width) => width > groupBeforeBox.width + 120,
-        timeoutMs: 5_000
-      })
-      expect(resizedWidth).toBeGreaterThan(groupBeforeBox.width + 120)
+      const expectedResizedWidth =
+        groupBeforeBox.width + (groupAfterDrag.size.width - groupBeforeDrag.size.width) * canvasZoom
+      const resizedWidth = await waitForTerminalGroupProjectedWidth(
+        page,
+        expectedResizedWidth,
+        'terminal group visible width to reflect the member drag'
+      )
+      expect(Math.abs(resizedWidth - expectedResizedWidth)).toBeLessThan(screenPixelTolerance)
       const groupAfterBox = await readRequiredBoundingBox(
         page.locator('[data-terminal-group-id]').first()
       )
@@ -184,11 +190,15 @@ describe('terminal groups e2e', () => {
         workbench,
         (group) => group.size.width < groupAfterDrag.size.width - 100
       )
-      const contractedBox = await readRequiredBoundingBox(
-        page.locator('[data-terminal-group-id]').first()
+      const expectedContractedWidth =
+        groupAfterBox.width - (groupAfterDrag.size.width - contractedGroup.size.width) * canvasZoom
+      const contractedWidth = await waitForTerminalGroupProjectedWidth(
+        page,
+        expectedContractedWidth,
+        'terminal group visible width to reflect member contraction'
       )
       expect(contractedGroup.size.width).toBeLessThan(groupAfterDrag.size.width - 100)
-      expect(contractedBox.width).toBeLessThan(groupAfterBox.width - 60)
+      expect(Math.abs(contractedWidth - expectedContractedWidth)).toBeLessThan(screenPixelTolerance)
     },
     electronScenarioTimeoutMs
   )
@@ -346,6 +356,29 @@ async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
       return stableObservationCount >= 3
     },
     intervalMs: 50,
+    timeoutMs: 5_000
+  })
+}
+
+function readCanvasZoom(page: Page): Promise<number> {
+  return page.locator('.react-flow__viewport').evaluate((viewport) => {
+    return new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
+  })
+}
+
+async function waitForTerminalGroupProjectedWidth(
+  page: Page,
+  expectedWidth: number,
+  description: string
+): Promise<number> {
+  return pollUntilState({
+    accept: (width) => Math.abs(width - expectedWidth) < screenPixelTolerance,
+    description,
+    observe: async () => {
+      const box = await page.locator('[data-terminal-group-id]').first().boundingBox()
+      return box?.width ?? 0
+    },
+    intervalMs: 16,
     timeoutMs: 5_000
   })
 }
