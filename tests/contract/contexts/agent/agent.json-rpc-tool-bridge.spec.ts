@@ -21,7 +21,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       jsonrpc: '2.0',
       result: expect.objectContaining({
         instructions: expect.stringMatching(/arrange_terminal_layout[\s\S]*preferred/),
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.4.0' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.5.0' }
       })
     })
   })
@@ -76,6 +76,10 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
               type: 'object'
             }),
             name: 'create_terminal_group'
+          }),
+          expect.objectContaining({
+            description: expect.stringContaining('complete workflow'),
+            name: 'move_terminal_workflow_to_group'
           })
         ])
       }

@@ -168,7 +168,23 @@ export class ExecuteAgentToolUseCase {
           { type: 'block_graph' }
         )
       case 'create_terminal_group':
-        return this.createTerminalGroup(command.toolCallId, context, invocation.input)
+        return this.createTerminalGroup(command, context, invocation.input)
+      case 'move_terminal_workflow_to_group': {
+        const result = await this.blockGraphTools.moveTerminalWorkflowToGroup(context, {
+          ...invocation.input,
+          ...(await this.resolveWorkspaceLayout(command))
+        })
+        return completedGraphResult(
+          command.toolCallId,
+          result.graph,
+          {
+            arrangedBlockIds: result.movedBlockIds,
+            arrangedTerminalGroupIds: result.affectedTerminalGroupIds,
+            type: 'block_graph'
+          },
+          result.graphChanged
+        )
+      }
       case 'update_terminal_group':
         return completedGraphResult(
           command.toolCallId,
@@ -272,14 +288,30 @@ export class ExecuteAgentToolUseCase {
   }
 
   private async createTerminalGroup(
-    toolCallId: string,
+    command: ExecuteAgentToolCommand,
     context: AgentToolContext,
     input: AgentToolInputByName['create_terminal_group']
   ): Promise<CompletedGraphToolResult> {
     const beforeGraph = await this.blockGraphTools.inspectGraph(context)
-    const graph = await this.blockGraphTools.createTerminalGroup(context, input)
-    return completedGraphResult(toolCallId, graph, {
-      createdTerminalGroupId: findNewTerminalGroupId(beforeGraph, graph),
+    const graph = await this.blockGraphTools.createTerminalGroup(
+      context,
+      !input.position && (input.memberBlockIds?.length ?? 0) === 0
+        ? { ...input, ...(await this.resolveWorkspaceLayout(command)) }
+        : input
+    )
+    const createdTerminalGroupId = findNewTerminalGroupId(beforeGraph, graph)
+    if (!createdTerminalGroupId) {
+      throw createUnexpectedAppError('Created terminal group was not returned by the graph.')
+    }
+    const createdGroup = graph.terminalGroups.find((group) => group.id === createdTerminalGroupId)
+    if (!createdGroup) {
+      throw createUnexpectedAppError('Created terminal group was not returned by the graph.')
+    }
+
+    return completedGraphResult(command.toolCallId, graph, {
+      arrangedBlockIds: [...createdGroup.memberBlockIds],
+      arrangedTerminalGroupIds: [createdTerminalGroupId],
+      createdTerminalGroupId,
       type: 'block_graph'
     })
   }

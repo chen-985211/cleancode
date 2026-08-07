@@ -18,6 +18,7 @@ describe('agent tool protocol', () => {
       'update_block',
       'delete_block',
       'create_terminal_group',
+      'move_terminal_workflow_to_group',
       'update_terminal_group',
       'delete_terminal_group',
       'update_terminal_execution_config',
@@ -47,6 +48,7 @@ describe('agent tool protocol', () => {
     const updateExecutionConfig = requireTool('update_terminal_execution_config')
     const connectTerminals = requireTool('connect_terminal_blocks')
     const disconnectTerminals = requireTool('disconnect_terminal_blocks')
+    const moveWorkflowToGroup = requireTool('move_terminal_workflow_to_group')
     const inspectPlan = requireTool('inspect_terminal_workflow_plan')
 
     expect(createWorkflow.inputSchema).toMatchObject({
@@ -114,6 +116,16 @@ describe('agent tool protocol', () => {
       additionalProperties: false,
       required: ['connectionId']
     })
+    expect(moveWorkflowToGroup.inputSchema.oneOf).toEqual([
+      expect.objectContaining({
+        additionalProperties: false,
+        required: ['blockId', 'targetTerminalGroupId']
+      }),
+      expect.objectContaining({
+        additionalProperties: false,
+        required: ['blockId', 'targetTerminalGroupId', 'position']
+      })
+    ])
     expect(readSchemaProperty(inspectPlan.inputSchema, 'scope')).toMatchObject({
       oneOf: [
         expect.objectContaining({ additionalProperties: false, required: ['type'] }),
@@ -339,6 +351,7 @@ describe('agent tool protocol', () => {
     }
 
     const createGroup = requireTool('create_terminal_group')
+    const moveWorkflowToGroup = requireTool('move_terminal_workflow_to_group')
     expect(createGroup.description).toContain('may start empty')
     expect(createGroup.description).toContain('connection scope')
     expect(createGroup.inputSchema.required).toEqual(['name'])
@@ -346,6 +359,9 @@ describe('agent tool protocol', () => {
       type: 'array',
       uniqueItems: true
     })
+    expect(moveWorkflowToGroup.description).toContain('complete workflow')
+    expect(moveWorkflowToGroup.description).toContain('group stays anchored')
+    expect(cleancodeMcpInstructions).toContain('move_terminal_workflow_to_group')
   })
 
   it('describes Codex MCP pre-approval without weakening other permission boundaries', () => {
@@ -373,6 +389,11 @@ describe('agent tool protocol', () => {
         readOnlyHint: false
       },
       create_terminal_group: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      move_terminal_workflow_to_group: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: false

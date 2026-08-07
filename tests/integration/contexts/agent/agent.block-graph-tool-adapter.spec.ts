@@ -8,8 +8,10 @@ import { BuildTerminalWorkflowPlanUseCase } from '../../../../src/contexts/block
 import { ConnectTerminalBlocksUseCase } from '../../../../src/contexts/block-graph/application/use-cases/ConnectTerminalBlocksUseCase'
 import { CreateTerminalBlockUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalBlockUseCase'
 import { CreateTerminalWorkflowUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalWorkflowUseCase'
+import { CreateTerminalGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/CreateTerminalGroupUseCase'
 import { DisconnectTerminalBlocksUseCase } from '../../../../src/contexts/block-graph/application/use-cases/DisconnectTerminalBlocksUseCase'
 import { GetDefaultGraphUseCase } from '../../../../src/contexts/block-graph/application/use-cases/GetDefaultGraphUseCase'
+import { MoveTerminalWorkflowToGroupUseCase } from '../../../../src/contexts/block-graph/application/use-cases/MoveTerminalWorkflowToGroupUseCase'
 import { UpdateTerminalBlockMetadataUseCase } from '../../../../src/contexts/block-graph/application/use-cases/UpdateTerminalBlockMetadataUseCase'
 import { UpdateTerminalExecutionConfigUseCase } from '../../../../src/contexts/block-graph/application/use-cases/UpdateTerminalExecutionConfigUseCase'
 import type { BlockGraphSnapshot } from '../../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -301,6 +303,57 @@ describe('agent block graph workflow tool adapter', () => {
 
     expect(afterFailure).toEqual(persisted)
   })
+
+  it('moves the complete connected workflow into an anchored combination through the Agent port', async () => {
+    await adapter.connectTerminalBlocks(context, {
+      sourceBlockId: terminalIds.install,
+      targetBlockId: terminalIds.build
+    })
+    const grouped = await adapter.createTerminalGroup(context, {
+      name: 'Development',
+      position: { x: 2_400, y: 900 }
+    })
+    const targetGroup = grouped.terminalGroups.find((group) => group.name === 'Development')!
+
+    const result = await adapter.moveTerminalWorkflowToGroup(context, {
+      blockId: terminalIds.build,
+      canvasRegions: [],
+      targetTerminalGroupId: targetGroup.id
+    })
+
+    expect(result).toMatchObject({
+      affectedTerminalGroupIds: [targetGroup.id],
+      graphChanged: true,
+      movedBlockIds: [terminalIds.install, terminalIds.build]
+    })
+    expect(result.graph.terminalGroups.find((group) => group.id === targetGroup.id)).toMatchObject({
+      memberBlockIds: [terminalIds.install, terminalIds.build],
+      position: { x: 2_400, y: 900 }
+    })
+  })
+
+  it('treats moving an already root workflow to the root canvas as a true no-op', async () => {
+    await adapter.connectTerminalBlocks(context, {
+      sourceBlockId: terminalIds.install,
+      targetBlockId: terminalIds.build
+    })
+    const before = await adapter.inspectGraph(context)
+
+    const result = await adapter.moveTerminalWorkflowToGroup(context, {
+      blockId: terminalIds.build,
+      canvasRegions: [],
+      position: { x: 9_000, y: 9_000 },
+      targetTerminalGroupId: null
+    })
+
+    expect(result).toMatchObject({
+      affectedTerminalGroupIds: [],
+      graph: before,
+      graphChanged: false,
+      movedBlockIds: []
+    })
+    expect(await adapter.inspectGraph(context)).toEqual(before)
+  })
 })
 
 function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAgentToolAdapter {
@@ -308,9 +361,11 @@ function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAg
   const connect = new ConnectTerminalBlocksUseCase(repository)
   const createTerminal = new CreateTerminalBlockUseCase(repository)
   const createTerminalWorkflow = new CreateTerminalWorkflowUseCase(repository)
+  const createTerminalGroup = new CreateTerminalGroupUseCase(repository)
   const disconnect = new DisconnectTerminalBlocksUseCase(repository)
   const getGraph = new GetDefaultGraphUseCase(repository)
   const inspectPlan = new BuildTerminalWorkflowPlanUseCase(repository)
+  const moveTerminalWorkflowToGroup = new MoveTerminalWorkflowToGroupUseCase(repository)
   const updateExecutionConfig = new UpdateTerminalExecutionConfigUseCase(repository)
 
   return new BlockGraphAgentToolAdapter({
@@ -319,13 +374,14 @@ function createAdapter(repository: FileSystemBlockGraphRepository): BlockGraphAg
     connectTerminalBlocks: (command) => connect.execute(command),
     createTerminalBlock: (command) => createTerminal.execute(command),
     createTerminalWorkflow: (command) => createTerminalWorkflow.execute(command),
-    createTerminalGroup: notUsed,
+    createTerminalGroup: (command) => createTerminalGroup.execute(command),
     deleteBlock: notUsed,
     disconnectTerminalBlocks: (command) => disconnect.execute(command),
     dissolveTerminalGroup: notUsed,
     getDefaultGraph: (query) => getGraph.execute({ ...query, projectId: 'project-1' }),
     moveBlock: notUsed,
     moveTerminalGroup: notUsed,
+    moveTerminalWorkflowToGroup: (command) => moveTerminalWorkflowToGroup.execute(command),
     resizeTerminalBlock: notUsed,
     setTerminalGroupCollapsed: notUsed,
     updateTerminalBlockMetadata: notUsed,

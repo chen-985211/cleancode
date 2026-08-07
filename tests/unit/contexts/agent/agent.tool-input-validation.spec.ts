@@ -61,6 +61,10 @@ describe('agent tool input validation', () => {
       disconnect_terminal_blocks: { connectionId: 'connection-build-test' },
       inspect_graph: { reason: 'Inspect before authoring a workflow.' },
       inspect_terminal_workflow_plan: { scope: { type: 'full' } },
+      move_terminal_workflow_to_group: {
+        blockId: 'terminal-build',
+        targetTerminalGroupId: 'group-checks'
+      },
       update_block: {
         blockId: 'terminal-build',
         launchCommand: 'pnpm build',
@@ -111,6 +115,17 @@ describe('agent tool input validation', () => {
         scope: { blockId: 'terminal-build', type: 'from-block' }
       })
     ).toEqual({ scope: { blockId: 'terminal-build', type: 'from-block' } })
+    expect(
+      parseAgentToolInput('move_terminal_workflow_to_group', {
+        blockId: 'terminal-build',
+        position: { x: 1_200, y: 480 },
+        targetTerminalGroupId: null
+      })
+    ).toEqual({
+      blockId: 'terminal-build',
+      position: { x: 1_200, y: 480 },
+      targetTerminalGroupId: null
+    })
     expect(
       parseAgentToolInput('update_terminal_execution_config', {
         blockId: 'terminal-fixed',
@@ -227,6 +242,14 @@ describe('agent tool input validation', () => {
     expectInvalidInput(
       () => parseAgentToolInput('disconnect_terminal_blocks', {}),
       '$.connectionId'
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('move_terminal_workflow_to_group', {
+          blockId: 'terminal-build',
+          targetTerminalGroupId: null
+        }),
+      '$.targetTerminalGroupId'
     )
     expectInvalidInput(
       () =>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import type { AgentGraphUpdatedEvent } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { resolveNodeSize } from './resolveNodeSize'
+import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { resolveWorkbenchLayoutFocusRequest } from './resolveWorkbenchLayoutFocusRequest'
 import type { TerminalGroupFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import {
@@ -70,7 +71,8 @@ export function useAgentLayoutCoordination({
       setCurrentGraph(event.graph)
       const request = resolveWorkbenchLayoutFocusRequest({
         change: event.change,
-        graph: event.graph
+        graph: event.graph,
+        originAgentNodeId: toAgentFlowNodeId(event.agentId)
       })
 
       if (request) setLayoutFocusRequest(request)

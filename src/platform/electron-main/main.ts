@@ -269,6 +269,7 @@ const agentBlockGraphToolAdapter = new BlockGraphAgentToolAdapter({
   getDefaultGraph: getDefaultGraphForAgent,
   moveBlock: (command) => moveBlockUseCase.execute(command),
   moveTerminalGroup: (command) => moveTerminalGroupUseCase.execute(command),
+  moveTerminalWorkflowToGroup: (command) => moveTerminalWorkflowToGroupUseCase.execute(command),
   resizeTerminalBlock: (command) => resizeTerminalBlockUseCase.execute(command),
   setTerminalGroupCollapsed: (command) => setTerminalGroupCollapsedUseCase.execute(command),
   updateTerminalBlockMetadata: (command) => updateTerminalBlockMetadataUseCase.execute(command),

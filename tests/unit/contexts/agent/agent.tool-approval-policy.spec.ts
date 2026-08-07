@@ -10,6 +10,7 @@ describe('agent tool approval policy', () => {
     expect(policy.requiresApproval('create_block')).toBe(false)
     expect(policy.requiresApproval('update_block')).toBe(false)
     expect(policy.requiresApproval('create_terminal_group')).toBe(false)
+    expect(policy.requiresApproval('move_terminal_workflow_to_group')).toBe(false)
     expect(policy.requiresApproval('update_terminal_group')).toBe(false)
     expect(policy.requiresApproval('update_terminal_execution_config')).toBe(false)
     expect(policy.requiresApproval('connect_terminal_blocks')).toBe(false)

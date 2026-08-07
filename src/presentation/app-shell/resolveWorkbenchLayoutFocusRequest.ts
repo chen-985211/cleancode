@@ -7,11 +7,13 @@ type TerminalLayoutArrangedChange = NonNullable<AgentGraphUpdatedEvent['change']
 interface ResolveWorkbenchLayoutFocusRequestInput {
   readonly change?: TerminalLayoutArrangedChange
   readonly graph: BlockGraphSnapshot
+  readonly originAgentNodeId?: string
 }
 
 export function resolveWorkbenchLayoutFocusRequest({
   change,
-  graph
+  graph,
+  originAgentNodeId
 }: ResolveWorkbenchLayoutFocusRequestInput): WorkbenchLayoutFocusRequest | null {
   if (!change) return null
 
@@ -48,6 +50,9 @@ export function resolveWorkbenchLayoutFocusRequest({
     affectedNodeIds: uniqueIds([...change.blockIds, ...change.terminalGroupIds]),
     expectedNodeLayouts,
     focusNodeIds: uniqueIds([
+      ...(change.kind === 'terminal_workflow_created' && originAgentNodeId
+        ? [originAgentNodeId]
+        : []),
       ...visibleGroups.map((group) => group.id),
       ...visibleUngroupedBlocks.map((block) => block.id)
     ]),
