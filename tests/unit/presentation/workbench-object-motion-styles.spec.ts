@@ -62,6 +62,19 @@ describe('workbench object motion styles', () => {
     )
   })
 
+  it('keeps the empty group edit space free of dashed framing and color masks', () => {
+    const editingGroupRule = readTerminalGroupRule('.terminal-group-node--editing')
+    const emptyStateRule = readTerminalGroupRule('.terminal-group-node__empty-state')
+    const editingEmptyStateRule = readTerminalGroupRule(
+      '.terminal-group-node--editing .terminal-group-node__empty-state'
+    )
+
+    expect(editingGroupRule).not.toContain('background:')
+    expect(emptyStateRule).not.toContain('dashed')
+    expect(editingEmptyStateRule).not.toContain('background:')
+    expect(editingEmptyStateRule).not.toContain('border-color:')
+  })
+
   it('reduces secondary controls by detail level while preserving node identity surfaces', () => {
     expect(objectMotionStyles).toContain("[data-canvas-detail='compact']")
     expect(objectMotionStyles).toContain("[data-canvas-detail='overview']")
