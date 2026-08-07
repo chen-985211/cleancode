@@ -155,6 +155,11 @@ describe('terminal groups e2e', () => {
 
       await dragTerminalTowardGroupRightEdge(page, terminalTwo.id)
 
+      const groupAfterDrag = await waitForTerminalGroup(
+        page,
+        workbench,
+        (group) => group.size.width > groupBeforeDrag.size.width + 160
+      )
       const resizedWidth = await pollUntilState({
         description: 'terminal group visible width to reflect the member drag',
         observe: async () => {
@@ -165,11 +170,6 @@ describe('terminal groups e2e', () => {
         timeoutMs: 5_000
       })
       expect(resizedWidth).toBeGreaterThan(groupBeforeBox.width + 120)
-      const groupAfterDrag = await waitForTerminalGroup(
-        page,
-        workbench,
-        (group) => group.size.width > groupBeforeDrag.size.width + 160
-      )
       const groupAfterBox = await readRequiredBoundingBox(
         page.locator('[data-terminal-group-id]').first()
       )
@@ -203,32 +203,9 @@ async function createTerminalBlocks(page: Page, count: number): Promise<void> {
   await page.getByRole('button', { name: '添加项目' }).click()
 
   for (let index = 1; index <= count; index += 1) {
-    await selectBlankCanvasActionAt(page, '新建终端积木', 0.2 + index * 0.26, 0.28)
+    await selectBlankCanvasAction(page, '新建终端积木')
     await page.getByLabel(`Terminal ${index} 文本输出`).waitFor()
   }
-}
-
-async function selectBlankCanvasActionAt(
-  page: Page,
-  action: '新建终端积木' | '组合终端',
-  xRatio: number,
-  yRatio: number
-): Promise<void> {
-  await pollUntilState({
-    description: 'blank-canvas actions to become available',
-    observe: () => page.getByRole('button', { name: '新建 Agent' }).isEnabled(),
-    accept: Boolean,
-    timeoutMs: 10_000
-  })
-  const pane = page.locator('.react-flow__pane')
-  const bounds = await readRequiredBoundingBox(pane)
-  await page.mouse.click(bounds.x + bounds.width * xRatio, bounds.y + bounds.height * yRatio, {
-    button: 'right'
-  })
-  await page
-    .getByRole('menu', { name: '画布操作' })
-    .getByRole('menuitem', { name: action, exact: true })
-    .click()
 }
 
 async function dragTerminalIntoGroup(
