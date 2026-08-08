@@ -21,12 +21,14 @@
   height: var(--canvas-minimap-panel-height);
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid var(--cc-border);
+  border: 0;
   border-radius: 9px;
   background: var(--cc-canvas);
   margin-bottom: var(--canvas-minimap-panel-gap);
   opacity: var(--canvas-minimap-panel-opacity);
-  box-shadow: var(--cc-shadow-xs);
+  box-shadow:
+    0 0 0 1px var(--cc-border) inset,
+    var(--cc-shadow-xs);
 }
 
 .canvas-minimap:is(
