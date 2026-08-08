@@ -235,6 +235,12 @@
   box-shadow: var(--cc-shadow-xs);
 }
 
+.canvas-minimap__panel.anchored-surface-motion {
+  --cc-anchored-surface-offset-x: 6px;
+  --cc-anchored-surface-offset-y: 6px;
+  --cc-anchored-surface-origin: 100% 100%;
+}
+
 .canvas-minimap__map-frame {
   width: 100%;
   height: 100%;

@@ -216,12 +216,14 @@
 }
 
 .project-card {
+  --project-reorder-y: 0px;
+
   position: relative;
   overflow: visible;
+  transform: translate3d(0, var(--project-reorder-y), 0);
   transition:
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .project-card--dragging {
@@ -229,7 +231,7 @@
   border-radius: 8px;
   background: var(--cc-primary-soft);
   box-shadow: 0 0 0 1px var(--cc-primary-border);
-  transform: scale(1.01);
+  transform: translate3d(0, var(--project-reorder-y), 0) scale(1.01);
 }
 
 .project-card + .project-card {
@@ -385,10 +387,6 @@
   .project-card__disclosure,
   .workspace-list {
     transition: none;
-  }
-
-  .project-card--dragging {
-    transform: none;
   }
 
   .project-card__disclosure--collapsed .workspace-list {

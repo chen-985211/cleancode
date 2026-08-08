@@ -280,6 +280,32 @@ describe('canvas minimap', () => {
     expect(within(viewportControls).getByLabelText('画布缩放比例')).toHaveTextContent('100%')
   })
 
+  it('keeps one inert panel through a bottom-right anchored exit and reverses in place', () => {
+    const props = createCanvasMinimapProps()
+    const { container, rerender } = render(<CanvasMinimap {...props} />)
+    const panel = container.querySelector<HTMLElement>('.canvas-minimap__panel')!
+
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'opening')
+    fireEvent.transitionEnd(panel)
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'open')
+
+    rerender(<CanvasMinimap {...props} isCollapsed />)
+    expect(container.querySelector('.canvas-minimap__panel')).toBe(panel)
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(panel).toHaveAttribute('aria-hidden', 'true')
+    expect(panel).toHaveAttribute('inert')
+
+    rerender(<CanvasMinimap {...props} />)
+    expect(container.querySelector('.canvas-minimap__panel')).toBe(panel)
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'opening')
+    expect(panel).not.toHaveAttribute('inert')
+
+    fireEvent.transitionEnd(panel)
+    rerender(<CanvasMinimap {...props} isCollapsed />)
+    fireEvent.transitionEnd(panel)
+    expect(container.querySelector('.canvas-minimap__panel')).toBeNull()
+  })
+
   it('shows the configured canvas shortcuts in control tooltips', async () => {
     render(<CanvasMinimap {...createCanvasMinimapProps()} />)
 

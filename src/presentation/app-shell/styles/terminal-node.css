@@ -4,6 +4,11 @@
   height: 100%;
 }
 
+.terminal-node-anchor--parked {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .terminal-node {
   --terminal-shell: var(--cc-surface);
   --terminal-shell-raised: var(--cc-surface);

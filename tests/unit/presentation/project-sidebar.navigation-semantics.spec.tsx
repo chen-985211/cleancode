@@ -196,6 +196,9 @@ describe('project sidebar navigation semantics', () => {
 
     fireEvent.pointerDown(gammaTitle, { button: 0, pointerId: 2, clientX: 20, clientY: 300 })
     fireEvent.pointerMove(window, { pointerId: 2, clientX: 20, clientY: 101 })
+
+    expect(projectCards[2]!.style.getPropertyValue('--project-reorder-y')).toBe('-199px')
+
     fireEvent.pointerUp(window, { pointerId: 2, clientX: 20, clientY: 101 })
 
     expect(onReorderProject).toHaveBeenCalledWith(gamma, '/tmp/alpha-project')

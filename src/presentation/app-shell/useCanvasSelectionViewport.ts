@@ -12,6 +12,7 @@ import {
   readWorkbenchViewportPresentation,
   transitionWorkbenchViewport
 } from './workbenchViewportMotion'
+import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
 
 interface UseCanvasSelectionViewportInput {
   readonly canvasSizeRef: MutableRefObject<CanvasSize>
@@ -32,7 +33,7 @@ export function useCanvasSelectionViewport({
       overviewRequestRef.current = null
       const instance = reactFlowInstanceRef.current
       const node = instance?.getNode(nodeId)
-      if (!instance || !node || node.hidden) return
+      if (!instance || !node || isWorkbenchNodePresentationHidden(node)) return
 
       const viewport = instance.getViewport()
       const zoom = resolveWorkbenchNodeFocusZoom({
@@ -62,7 +63,11 @@ export function useCanvasSelectionViewport({
 
       const stableVisibleNodes = instance
         .getNodes()
-        .filter((node) => !node.hidden && node.data.objectMotion?.kind !== 'group-collapse')
+        .filter(
+          (node) =>
+            !isWorkbenchNodePresentationHidden(node) &&
+            node.data.objectMotion?.kind !== 'group-collapse'
+        )
       if (stableVisibleNodes.length === 0) return
 
       const activeOverviewRequest = overviewRequestRef.current
@@ -76,7 +81,9 @@ export function useCanvasSelectionViewport({
       const anchorNode = anchorNodeId ? instance.getNode(anchorNodeId) : undefined
       const presentation = readWorkbenchViewportPresentation(instance)
       const center =
-        anchorNode && !anchorNode.hidden && anchorNode.data.objectMotion?.kind !== 'group-collapse'
+        anchorNode &&
+        !isWorkbenchNodePresentationHidden(anchorNode) &&
+        anchorNode.data.objectMotion?.kind !== 'group-collapse'
           ? resolveWorkbenchNodeCenter(anchorNode)
           : resolveCurrentViewportCenter(presentation, canvasSizeRef.current)
       if (isGlobalCanvasViewPresented(presentation, center, canvasSizeRef.current)) return

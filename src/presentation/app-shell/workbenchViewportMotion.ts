@@ -12,6 +12,7 @@ import {
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from './types'
+import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
 import {
   createWorkbenchViewportFlight,
   resolveWorkbenchViewportFlightPresentation,
@@ -226,7 +227,7 @@ export function resolveWorkbenchViewportCommandTarget(
       const nodes = (command.nodes ?? instance.getNodes())
         .map((node) => ('position' in node ? node : instance.getNode(node.id)))
         .filter((node): node is WorkbenchFlowNode =>
-          Boolean(node && (command.includeHiddenNodes || !node.hidden))
+          Boolean(node && (command.includeHiddenNodes || !isWorkbenchNodePresentationHidden(node)))
         )
       if (nodes.length === 0) {
         return currentViewport

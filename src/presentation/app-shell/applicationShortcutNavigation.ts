@@ -2,6 +2,7 @@ import type { Viewport } from '@xyflow/react'
 
 import type { TerminalGroupFlowNode, WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 import { resolveWorkbenchNodeSize } from './workbenchNodeFocusViewport'
+import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
 
 export type WorkspaceNavigationDirection = 'next' | 'previous'
 
@@ -36,7 +37,9 @@ export function resolveDirectionalWorkbenchNode(
   previousSelectedNodeId: string | null = null,
   previousDirection: CanvasNavigationDirection | null = null
 ): WorkbenchFlowNode | null {
-  const selectedNode = nodes.find((node) => node.id === selectedNodeId)
+  const selectedNode = nodes.find(
+    (node) => node.id === selectedNodeId && !isWorkbenchNodePresentationHidden(node)
+  )
   const origin = selectedNode
     ? toCanvasRect(selectedNode)
     : pointToCanvasRect(resolveViewportCenter(viewport, canvasSize))
@@ -100,7 +103,10 @@ function resolveDirectionalCandidate(
     .map((node, index) => ({ index, node, rect: toCanvasRect(node) }))
     .filter(
       ({ node, rect }) =>
-        node.id !== selectedNodeId && isCandidate(node) && isInDirection(origin, rect, direction)
+        node.id !== selectedNodeId &&
+        !isWorkbenchNodePresentationHidden(node) &&
+        isCandidate(node) &&
+        isInDirection(origin, rect, direction)
     )
 
   if (candidates.length === 0) {
@@ -151,7 +157,7 @@ function resolveGroupEntryCandidate(
 ): WorkbenchFlowNode | null {
   const candidates = nodes
     .map((node, index) => ({ index, node, rect: toCanvasRect(node) }))
-    .filter(({ node }) => memberIds.has(node.id))
+    .filter(({ node }) => memberIds.has(node.id) && !isWorkbenchNodePresentationHidden(node))
 
   if (candidates.length === 0) {
     return null

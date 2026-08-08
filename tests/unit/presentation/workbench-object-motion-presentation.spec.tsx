@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react'
-import type { AnimationEvent, CSSProperties } from 'react'
+import type { AnimationEvent } from 'react'
 
 import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types'
 import { useWorkbenchObjectMotionPresentation } from '../../../src/presentation/app-shell/useWorkbenchObjectMotionPresentation'
@@ -26,7 +26,7 @@ describe('workbench object motion presentation', () => {
     expect(result.current.className).toBe('')
   })
 
-  it('projects group offsets as CSS variables and reports the completed exit identity', () => {
+  it('exposes a spring surface for group motion without projecting a fixed CSS endpoint', () => {
     const onComplete = vi.fn()
     const { result } = renderHook(() =>
       useWorkbenchObjectMotionPresentation(
@@ -35,14 +35,18 @@ describe('workbench object motion presentation', () => {
       )
     )
 
-    expect(result.current.className).toBe('workbench-object-motion--group-collapse')
-    expect(readCustomProperty(result.current.style, '--workbench-object-motion-x')).toBe('-320px')
-    expect(readCustomProperty(result.current.style, '--workbench-object-motion-y')).toBe('-170px')
+    expect(result.current.className).toBe(
+      'workbench-object-motion--group-collapse workbench-object-motion--spatial'
+    )
+    expect(result.current.surfaceRef).toEqual(expect.any(Function))
+    expect(result.current.style).toBeUndefined()
 
     act(() => result.current.onAnimationEnd(createAnimationEvent(false)))
 
-    expect(onComplete).toHaveBeenCalledWith('motion-1')
-    expect(result.current.className).toBe('')
+    expect(onComplete).not.toHaveBeenCalled()
+    expect(result.current.className).toBe(
+      'workbench-object-motion--group-collapse workbench-object-motion--spatial'
+    )
   })
 
   it('ignores animation events from nested terminal content', () => {
@@ -69,8 +73,4 @@ function createAnimationEvent(nested: boolean): AnimationEvent<HTMLElement> {
     currentTarget,
     target: nested ? document.createElement('span') : currentTarget
   } as unknown as AnimationEvent<HTMLElement>
-}
-
-function readCustomProperty(style: CSSProperties | undefined, property: string): unknown {
-  return (style as Record<string, unknown> | undefined)?.[property]
 }

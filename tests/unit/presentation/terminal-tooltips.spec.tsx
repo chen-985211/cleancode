@@ -82,6 +82,30 @@ describe('terminal tooltips', () => {
     )
   })
 
+  it('removes a parked collapsed member surface from interaction and accessibility', () => {
+    const { container } = render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{ ...createTerminalNodeData(), isParkedInCollapsedGroup: true }}
+        dragging={false}
+        zIndex={0}
+        selectable={false}
+        deletable
+        selected={false}
+        draggable={false}
+        isConnectable={false}
+        positionAbsoluteX={240}
+        positionAbsoluteY={180}
+      />
+    )
+
+    const anchor = container.querySelector('.terminal-node-anchor')!
+    expect(anchor).toHaveClass('terminal-node-anchor--parked')
+    expect(anchor).toHaveAttribute('aria-hidden', 'true')
+    expect(anchor).toHaveAttribute('inert')
+  })
+
   it('exposes all four corner resize controls while the terminal is not selected', () => {
     render(
       <TerminalNode

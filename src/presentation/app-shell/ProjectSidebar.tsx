@@ -82,6 +82,7 @@ export function ProjectSidebar({
   const projectReorder = useProjectSidebarReorder({
     canReorder: canReorderProjects,
     getProjectList: () => projectListRef.current,
+    isReorderPending,
     onReorderProject,
     workbenches
   })

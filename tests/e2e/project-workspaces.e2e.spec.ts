@@ -177,6 +177,90 @@ describe('project workspaces e2e', () => {
   )
 
   it(
+    'keeps project reorder direct while neighboring cards spring into the authoritative order',
+    async () => {
+      await expectDesktopRuntime(page)
+      const projectNames = ['reorder-alpha', 'reorder-beta', 'reorder-gamma']
+
+      for (const projectName of projectNames) {
+        const projectDirectory = join(workbench.projectDirectory, projectName)
+        await mkdir(projectDirectory)
+        await setProjectPickerDirectory(electronApp, projectDirectory)
+        await page.getByRole('button', { name: '添加项目' }).click()
+        await page.getByRole('button', { name: projectName, exact: true }).waitFor()
+      }
+
+      const initialNames = await page.locator('.project-card__name').allTextContents()
+      expect(initialNames).toHaveLength(3)
+      const targetName = initialNames[0]!
+      const sourceName = initialNames.at(-1)!
+      const targetCard = page.getByRole('group', { name: `项目 ${targetName}` })
+      const sourceCard = page.getByRole('group', { name: `项目 ${sourceName}` })
+      const sourceTitle = page.getByRole('button', { name: sourceName, exact: true })
+      const targetBox = await targetCard.boundingBox()
+      const sourceBox = await sourceTitle.boundingBox()
+      if (!targetBox || !sourceBox) throw new Error('Project reorder cards are not measurable.')
+
+      await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(sourceBox.x + sourceBox.width / 2, targetBox.y + 1)
+
+      const directOffset = await pollUntilState({
+        description: 'dragged project card to follow the pointer directly',
+        observe: () =>
+          sourceCard.evaluate((element) =>
+            Number.parseFloat(
+              getComputedStyle(element).getPropertyValue('--project-reorder-y') || '0'
+            )
+          ),
+        accept: (offset) => Math.abs(offset) > 20,
+        timeoutMs: 5_000
+      })
+      const neighborOffset = await pollUntilState({
+        description: 'neighboring project card to spring toward the open slot',
+        observe: () =>
+          targetCard.evaluate((element) =>
+            Number.parseFloat(
+              getComputedStyle(element).getPropertyValue('--project-reorder-y') || '0'
+            )
+          ),
+        accept: (offset) => Math.abs(offset) > 0.5,
+        timeoutMs: 5_000
+      })
+      expect(Math.abs(directOffset)).toBeGreaterThan(20)
+      expect(Math.abs(neighborOffset)).toBeGreaterThan(0.5)
+
+      await page.mouse.up()
+
+      const reorderedNames = await pollUntilState({
+        description: 'authoritative project order to reach the sidebar',
+        observe: () => page.locator('.project-card__name').allTextContents(),
+        accept: (names) => names.join('|') === [sourceName, ...initialNames.slice(0, -1)].join('|'),
+        timeoutMs: 5_000
+      })
+      expect(reorderedNames).toEqual([sourceName, ...initialNames.slice(0, -1)])
+
+      const settledOffsets = await pollUntilState({
+        description: 'project cards to settle at the authoritative layout',
+        observe: () =>
+          page
+            .locator('.project-card')
+            .evaluateAll((cards) =>
+              cards.map((card) =>
+                Number.parseFloat(
+                  getComputedStyle(card).getPropertyValue('--project-reorder-y') || '0'
+                )
+              )
+            ),
+        accept: (offsets) => offsets.every((offset) => Math.abs(offset) < 0.05),
+        timeoutMs: 5_000
+      })
+      expect(settledOffsets.every((offset) => Math.abs(offset) < 0.05)).toBe(true)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'creates and restores a local project workspace graph without fake runtime data',
     { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {

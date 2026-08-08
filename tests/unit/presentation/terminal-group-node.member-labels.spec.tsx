@@ -17,6 +17,19 @@ vi.mock('@xyflow/react', () => ({
 describe('terminal group member labels', () => {
   afterEach(() => vi.restoreAllMocks())
 
+  it('uses one material layer for disclosure without a retained visual echo', () => {
+    const { container } = render(
+      <TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />
+    )
+
+    expect(container.querySelectorAll('.terminal-group-node__material')).toHaveLength(1)
+    expect(container.querySelector('.terminal-group-node__material')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    )
+    expect(container.querySelector('.terminal-group-node__material--previous')).toBeNull()
+  })
+
   it('hides member labels while the group is expanded', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
 

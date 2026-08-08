@@ -176,13 +176,15 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 精确时长和 spring response 不是产品语义。逐步搭建允许为解释对象与依赖的先后关系采用更长的整体时间，但相邻步骤仍应快速收敛，大图必须压缩步骤间隔并设置有限的启动窗口，不能让演出时间随节点数无限增长。
 
-锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
+锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；小地图面板以右下控制区为固定锚点进入和退出，小地图内的视口平移仍保持直接操控；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
 
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
 
 普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
 
 主侧栏由 `projectSidebarMotion.ts` 命名 owner 协调：展开和收起时，实心侧栏视觉表面保持完整固定几何并沿所属边缘进出，主工作区网格轨道由同一个欠阻尼 spring 同步让位；布局宽度必须限制在合法端点内，视觉表面可以保留很小的边界回弹来表达质量与收敛。关闭意图发生后侧栏立即退出可访问树并停止接收指针，但视觉表面只在空间运动结束后隐藏；快速反向必须从当前 presentation 与速度继续，不重置 padding、内容排版或画布节点。`prefers-reduced-motion` 下取消大范围滑动并直接投影相同端点。spring response、阻尼和收敛阈值属于 owner 的实现细节，不构成产品契约。
+
+项目卡片排序由 `useProjectSidebarReorder.ts` 接管输入，并由 `projectReorderMotion.ts` 统一拥有位移 presentation。被抓住的卡片必须逐像素跟随指针，滚动发生时也保持同一抓取点；其他卡片按被拖对象的实际外高让位并使用无回弹的临界阻尼 spring。松手后在持久化结果未返回前保留当前 presentation；权威顺序到达时使用 FLIP 从当前屏幕位置收敛到新布局，失败、Escape 或失焦则从当前位置返回原布局。该层不得预测或写回项目顺序；`prefers-reduced-motion` 下保留直接拖动并即时投影让位和最终端点。
 
 画布空白菜单、对象菜单、Agent 更多菜单和默认 Provider 菜单的进出场由 `src/presentation/app-shell/canvasMenuMotion.ts` 与 `CanvasMenuMotionProvider.tsx` 统一拥有。菜单表面从实际触发点或控件锚点以约七成的紧凑初始尺寸开始，沿透明度、显著缩放和短位移逐帧生长，约 100ms 时仍应处于可辨识的生长中段；收起使用同一 presentation 和空间关系反向缩回，不能以接近完整尺寸的短淡入淡出冒充生长。菜单是非模态浮层，画布不得随菜单 presentation 淡化、着色或模糊；一个没有视觉样式的 dismiss layer 只在菜单可交互期间接管菜单外指针。主按钮按下必须由该层捕获并关闭菜单，完整指针序列不得泄漏给 React Flow 平移或底层控件；次按钮按下由统一 coordinator 同步关闭当前意图并保留一次性输入遮罩，紧随其后的 `contextmenu` 只负责阻止原生菜单并释放遮罩，不得再次切换。该遮罩必须有超时自清理，第二次右击无论落在输入接管层还是仍在进场的菜单表面都执行同一输入路径。非即时运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring；新开、关闭、Escape、外部点击或另一菜单接管时，统一 owner 必须保留当前 presentation，并且只继承朝向新目标的速度；背离新目标的旧速度必须在重新定向时归零，使下一帧立即响应新意图，不得排队播放、重置到端点、复制第二个可交互 surface 或依赖 CSS `animation` 完成事件。关闭中的 surface 只为视觉连续性保留，必须立即 `inert`、从可访问树隐藏并停止接收指针，收敛后才释放 DOM；同一菜单反向打开必须复用该 live surface。菜单协调器同时只允许一个可交互菜单，工作区切换会清空全部在途状态。`prefers-reduced-motion` 下直接投影同一最终状态，菜单作用域、透明输入接管层、互斥、焦点和退出清理语义保持不变。spring response、收敛阈值和最长兜底时间属于统一 owner 的实现细节，不构成产品契约。
 
@@ -196,11 +198,13 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框与缩放百分比通过相机 owner 的轻量实时信号逐帧跟随，订阅和重渲染范围分别只覆盖框本身与百分比 `<output>`；不得为同步反馈而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
 
-画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；创建过程不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。组合拖放的专用表面反馈属于下文明确的独立 owner，不得被创建动效规则误判为禁止。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
+画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有，组合成员的逐帧 presentation 由 `workbenchObjectSpring.ts` 执行。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；创建过程不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。组合拖放的专用表面反馈属于下文明确的独立 owner，不得被创建动效规则误判为禁止。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 
-组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或 React Flow 组合节点根上设置会改变 xterm、resize 或坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。该限制不包括下文由组合拖放 owner 临时写入视觉外壳的尺度反馈。
+组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回；组合只呈现最终尺寸的一层真实外壳，空间身份和连续性由成员路径表达，外壳与内部标题、工具和成员摘要使用同一较短的显露。不得同时叠放新旧尺寸外壳，不得用非等比缩放拉伸真实外壳、圆角、阴影或内部内容，也不能让成员在缺少明确目标的情况下随后补动画。展开与收起使用快速、无回弹的临界阻尼 spring；加入、离开和组内重排同样从当前屏幕位置收敛。快速反向时必须保留当前外壳显露进度、成员 presentation 与速度并重新定向，不能先回到端点或重新播放。
 
-终端或完整流程拖入组合时，悬停反馈由组合表面的中性材质、外部阴影、内凹深度和轻微尺度共同承担；不得缩放、淡出或描边被拖终端，也不得使用成功色边框或光环。进入接纳范围时组合视觉外壳轻微放大，跨过移出边界时轻微收缩；两者使用可被反向接管的欠阻尼弹簧，从当前尺度与速度继续，不重置、不排队，也不把具体阻尼数值提升为产品契约。该 transform 只能作用于易失的视觉外壳，不得移动组合、改写持久化尺寸，或让 React Flow 节点根、handle、resize 命中区及 xterm 几何参与缩放。松手后先提交以组合固定位置为原点的内部排版，再让新增成员从当前呈现位置平移到最终槽位、既有成员同步平移让位；组合可以改变尺寸但不得改变位置。`prefers-reduced-motion` 下取消动态尺度与回弹，直接投影最终排版并保留静态材质反馈。
+BlockGraph 新状态先成为事实；收起时已经挂载的终端表面在成员抵达组合后进入不可见、不可交互的 Presentation 停放态，使同一工作区内再次展开可以复用 xterm surface，避免在空间运动的关键帧内集中创建、恢复和测量终端。初次载入时已经折叠的组合不得因此预挂载或自动启动终端；成员离组、组合解散或工作区切换时必须释放停放态。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；停放成员不得参与小地图、键盘导航、选择聚焦或 fit-view。依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或 React Flow 组合节点根上设置会改变 xterm、resize 或坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。该限制不包括下文由组合拖放 owner 临时写入视觉外壳的尺度反馈。
+
+终端或完整流程拖入组合时，悬停反馈由组合表面的中性材质、外部阴影、内凹深度和轻微尺度共同承担；不得缩放、淡出或描边被拖终端，也不得使用成功色边框或光环。进入接纳范围时组合视觉外壳轻微放大，跨过移出边界时轻微收缩；两者刻意使用可被反向接管的欠阻尼物理反馈，当前 owner 的 `dampingRatio: 0.72` 是这项专用反馈的实现参数，不属于应替换为默认临界阻尼的遗留曲线，也不提升为稳定产品契约。运动从当前尺度与速度继续，不重置、不排队。该 transform 只能作用于易失的视觉外壳，不得移动组合、改写持久化尺寸，或让 React Flow 节点根、handle、resize 命中区及 xterm 几何参与缩放。松手后先提交以组合固定位置为原点的内部排版，再让新增成员从当前呈现位置平移到最终槽位、既有成员同步平移让位；组合可以改变尺寸但不得改变位置。`prefers-reduced-motion` 下取消动态尺度与回弹，直接投影最终排版并保留静态材质反馈。
 
 画布直接操控使用单一原生 CSS cursor token。空白 pane、平移、框选、三类节点选择与拖动、模板放置共享同一枚紧凑的无尾纸飞机指针；不根据按下或拖动状态切换 `grab`、`grabbing`、`move` 或 `crosshair`，也不创建随 `pointermove` 更新的 DOM 光标。纸飞机轮廓由左上尖端、右侧机翼、内收折角和下方尖角组成，不得带传统系统箭头的箭杆；使用深色主体与浅色细描边同时适应明暗画布，不叠加模糊光晕。热点必须落在左上尖端并提供系统箭头回退。统一规则不得覆盖 xterm、文本编辑、连接 handle、resize、按钮禁用与等待状态的语义指针。
 

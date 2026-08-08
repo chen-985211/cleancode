@@ -93,6 +93,8 @@ export interface WorkbenchObjectMotion {
   readonly id: string
   readonly kind: WorkbenchObjectMotionKind
   readonly offset: { readonly x: number; readonly y: number }
+  readonly opacity?: { readonly from: number; readonly to: number }
+  readonly contentOpacity?: { readonly from: number; readonly to: number }
 }
 
 interface WorkbenchObjectMotionNodeData {
@@ -110,6 +112,7 @@ interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotio
   readonly isTerminalGroupSelectionMode: boolean
   readonly canSelectForTerminalGroup: boolean
   readonly isNavigationHighlighted: boolean
+  readonly isParkedInCollapsedGroup?: boolean
   readonly launchCommandEditRequestId?: number
   readonly isActiveWorkflowRoot?: boolean
   readonly isStoppingWorkflow?: boolean

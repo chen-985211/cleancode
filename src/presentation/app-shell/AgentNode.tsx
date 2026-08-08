@@ -37,6 +37,7 @@ export const AgentNode = memo(function AgentNode({
 
   return (
     <section
+      ref={objectMotion.surfaceRef}
       className={className}
       role="region"
       aria-label={t('agent.consoleRegion', { agentName: data.agent.name })}

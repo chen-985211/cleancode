@@ -135,15 +135,36 @@ describe('terminal groups e2e', () => {
       await waitForCanvasViewportToSettle(page)
 
       await page.getByRole('button', { name: '启动项目 折叠组合' }).click()
-      await page.waitForFunction(
-        () => document.querySelectorAll('[data-terminal-block-id]').length === 0
-      )
+      const collapsingGroup = terminalGroupLocator(page, emptyGroup.id)
+      await page
+        .locator(
+          `[data-terminal-group-id=${JSON.stringify(emptyGroup.id)}].workbench-object-motion--group-collapse`
+        )
+        .waitFor()
+      expect(await collapsingGroup.locator('.terminal-group-node__material').count()).toBe(1)
+      expect(
+        await collapsingGroup.locator('.terminal-group-node__material--previous').count()
+      ).toBe(0)
+      await page.waitForFunction(() => {
+        const parkedMembers = [...document.querySelectorAll('[data-terminal-block-id]')]
+        return (
+          parkedMembers.length === 2 &&
+          parkedMembers.every(
+            (member) =>
+              member.getAttribute('data-terminal-parked') === 'true' &&
+              member.getAttribute('aria-hidden') === 'true' &&
+              member.hasAttribute('inert')
+          )
+        )
+      })
       await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).waitFor()
 
       await page.getByRole('button', { name: '启动项目 展开组合' }).click()
       await page.waitForFunction(
         () =>
           document.querySelectorAll('[data-terminal-block-id]').length === 2 &&
+          document.querySelectorAll('[data-terminal-block-id][data-terminal-parked="true"]')
+            .length === 0 &&
           document.querySelectorAll(
             '[data-terminal-block-id] .workbench-object-motion--group-expand'
           ).length === 0

@@ -96,6 +96,82 @@ describe('workbench object motion', () => {
     })
   })
 
+  it('reveals one group shell at its final geometry', () => {
+    const currentNodes = [
+      createGroupNode('group-1', true, ['terminal-1'], {
+        height: 180,
+        width: 320,
+        x: 100,
+        y: 100
+      })
+    ]
+    const nextNodes = [
+      createGroupNode('group-1', false, ['terminal-1'], {
+        height: 458,
+        width: 984,
+        x: 100,
+        y: 100
+      })
+    ]
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId: (kind, nodeId) => `${kind}:${nodeId}`,
+      currentNodes,
+      isContinuingGraph: true,
+      nextNodes,
+      reducedMotion: false
+    })
+
+    expect(projection.nodes[0]?.data.objectMotion).toEqual(
+      expect.objectContaining({
+        id: 'group-expand:group-1',
+        kind: 'group-expand',
+        contentOpacity: { from: 0, to: 1 },
+        opacity: { from: 1, to: 1 }
+      })
+    )
+    expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('scale')
+    expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('shellTransition')
+  })
+
+  it('retargets a collapsing member into expansion without snapping its live presentation', () => {
+    const collapsedGroup = createGroupNode('group-1', true, ['terminal-1'], {
+      height: 180,
+      width: 320,
+      x: 100,
+      y: 100
+    })
+    const expandedGroup = createGroupNode('group-1', false, ['terminal-1'], {
+      height: 458,
+      width: 984,
+      x: 100,
+      y: 100
+    })
+    const collapsingMember = {
+      ...createTerminalNode('terminal-1', { x: 420, y: 260 }),
+      data: {
+        ...createTerminalNode('terminal-1', { x: 420, y: 260 }).data,
+        objectMotion: {
+          id: 'group-collapse:terminal-1',
+          kind: 'group-collapse' as const,
+          offset: { x: -320, y: -170 }
+        }
+      }
+    } as WorkbenchFlowNode
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId: (kind, nodeId) => `${kind}:${nodeId}`,
+      currentNodes: [collapsedGroup, collapsingMember],
+      isContinuingGraph: true,
+      nextNodes: [expandedGroup, createTerminalNode('terminal-1', { x: 420, y: 260 })],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes.find((node) => node.id === 'terminal-1')?.data.objectMotion).toEqual(
+      expect.objectContaining({ id: 'group-expand:terminal-1', kind: 'group-expand' })
+    )
+  })
+
   it('keeps collapsing members as presentation-only exits along the reverse path', () => {
     const expandedGroup = createGroupNode('group-1', false, ['terminal-1'], {
       height: 600,
@@ -119,10 +195,22 @@ describe('workbench object motion', () => {
       reducedMotion: false
     })
 
-    expect(projection.nodes).toEqual([collapsedGroup])
+    expect(projection.nodes).toEqual([
+      expect.objectContaining({
+        id: collapsedGroup.id,
+        data: expect.objectContaining({
+          objectMotion: expect.objectContaining({
+            id: 'group-collapse:group-1',
+            kind: 'group-collapse'
+          })
+        })
+      })
+    ])
     expect(projection.exitingNodes).toEqual([
       expect.objectContaining({
         id: 'terminal-1',
+        draggable: false,
+        selectable: false,
         position: terminal.position,
         data: expect.objectContaining({
           objectMotion: {

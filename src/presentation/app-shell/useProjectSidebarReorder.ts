@@ -1,12 +1,20 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent
 } from 'react'
 
 import type { WorkbenchSnapshot } from './types'
+import {
+  createProjectReorderSpringController,
+  resolveDirectProjectOffset,
+  resolveProjectReorderPreviewOffsets
+} from './projectReorderMotion'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 const projectDragThreshold = 4
 
@@ -21,12 +29,19 @@ interface ProjectDragSession {
   readonly workbench: WorkbenchSnapshot
   readonly startX: number
   readonly startY: number
+  readonly startCardTop: number
   promoted: boolean
+}
+
+interface PendingProjectReorder {
+  readonly orderKey: string
+  sawPending: boolean
 }
 
 interface UseProjectSidebarReorderInput {
   readonly canReorder: boolean
   readonly getProjectList: () => HTMLElement | null
+  readonly isReorderPending: boolean
   readonly onReorderProject: (
     workbench: WorkbenchSnapshot,
     beforeProjectDirectory: string | null
@@ -43,6 +58,7 @@ interface ProjectCardRect {
 export function useProjectSidebarReorder({
   canReorder,
   getProjectList,
+  isReorderPending,
   onReorderProject,
   workbenches
 }: UseProjectSidebarReorderInput) {
@@ -51,16 +67,51 @@ export function useProjectSidebarReorder({
     dropIndicatorY: null
   })
   const [isSessionArmed, setIsSessionArmed] = useState(false)
+  const controller = useMemo(() => createProjectReorderSpringController(), [])
+  const reducedMotion = usePrefersReducedMotion()
   const sessionRef = useRef<ProjectDragSession | null>(null)
+  const pendingReorderRef = useRef<PendingProjectReorder | null>(null)
+  const pendingFallbackFrameRef = useRef<number | null>(null)
   const latestDropIndexRef = useRef<number | null>(null)
   const workbenchesRef = useRef(workbenches)
   const onReorderProjectRef = useRef(onReorderProject)
   const getProjectListRef = useRef(getProjectList)
   const clickCleanupRef = useRef<(() => void) | null>(null)
+  const reducedMotionRef = useRef(reducedMotion)
+  const isReorderPendingRef = useRef(isReorderPending)
+  const orderKey = workbenches.map((workbench) => workbench.project.id).join('\u0000')
+  const orderKeyRef = useRef(orderKey)
 
   workbenchesRef.current = workbenches
   onReorderProjectRef.current = onReorderProject
   getProjectListRef.current = getProjectList
+  reducedMotionRef.current = reducedMotion
+  isReorderPendingRef.current = isReorderPending
+  orderKeyRef.current = orderKey
+
+  const syncControllerLayout = useCallback(
+    (preservePresentation: boolean) => {
+      const projectList = getProjectListRef.current()
+      if (!projectList) return
+      const cards = [...projectList.querySelectorAll<HTMLElement>('[data-project-card-id]')].map(
+        (card) => {
+          const id = card.dataset.projectCardId ?? ''
+          const rect = card.getBoundingClientRect()
+          return {
+            id,
+            surface: card,
+            top: rect.top - controller.offsetFor(id)
+          }
+        }
+      )
+      controller.layoutChanged(cards, preservePresentation)
+    },
+    [controller]
+  )
+
+  const releasePresentation = useCallback(() => {
+    controller.targetsChanged(new Map(), null, reducedMotionRef.current, () => undefined)
+  }, [controller])
 
   const clearDragState = useCallback(() => {
     latestDropIndexRef.current = null
@@ -68,31 +119,45 @@ export function useProjectSidebarReorder({
     setIsSessionArmed(false)
   }, [])
 
-  const computeDrop = useCallback((pointerY: number) => {
-    const projectList = getProjectListRef.current()
-    const session = sessionRef.current
+  const computeDrop = useCallback(
+    (pointerY: number) => {
+      const projectList = getProjectListRef.current()
+      const session = sessionRef.current
 
-    if (!projectList || !session) {
-      return null
-    }
+      if (!projectList || !session) {
+        return null
+      }
 
-    const rects = measureProjectCardRects(projectList)
-    const dropIndex = resolveProjectDropIndex(pointerY, rects)
-    const beforeProjectDirectory = resolveProjectReorderTarget(
-      workbenchesRef.current,
-      session.workbench.project.directory,
-      dropIndex
-    )
+      const rects = measureProjectCardRects(projectList, controller.offsetFor)
+      const dropIndex = resolveProjectDropIndex(pointerY, rects)
+      const beforeProjectDirectory = resolveProjectReorderTarget(
+        workbenchesRef.current,
+        session.workbench.project.directory,
+        dropIndex
+      )
 
-    if (beforeProjectDirectory === undefined) {
-      return null
-    }
+      if (beforeProjectDirectory === undefined) {
+        return {
+          directBaseTop: rects.find((rect) => rect.projectId === session.workbench.project.id)?.top,
+          dropIndex: null,
+          dropIndicatorY: null,
+          previewOffsets: new Map(rects.map((rect) => [rect.projectId, 0]))
+        }
+      }
 
-    return {
-      dropIndex,
-      dropIndicatorY: resolveDropIndicatorY(projectList, rects, dropIndex)
-    }
-  }, [])
+      return {
+        dropIndex,
+        directBaseTop: rects.find((rect) => rect.projectId === session.workbench.project.id)?.top,
+        dropIndicatorY: resolveDropIndicatorY(projectList, rects, dropIndex),
+        previewOffsets: resolveProjectReorderPreviewOffsets(
+          rects,
+          session.workbench.project.id,
+          dropIndex
+        )
+      }
+    },
+    [controller.offsetFor]
+  )
 
   const finishDrag = useCallback(
     (commit: boolean) => {
@@ -134,6 +199,7 @@ export function useProjectSidebarReorder({
       clearDragState()
 
       if (dropIndex === null) {
+        releasePresentation()
         return
       }
 
@@ -144,10 +210,21 @@ export function useProjectSidebarReorder({
       )
 
       if (beforeProjectDirectory !== undefined) {
+        pendingReorderRef.current = { orderKey: orderKeyRef.current, sawPending: false }
         onReorderProjectRef.current(session.workbench, beforeProjectDirectory)
+        pendingFallbackFrameRef.current = window.requestAnimationFrame(() => {
+          pendingFallbackFrameRef.current = null
+          const pending = pendingReorderRef.current
+          if (pending && !isReorderPendingRef.current && orderKeyRef.current === pending.orderKey) {
+            pendingReorderRef.current = null
+            releasePresentation()
+          }
+        })
+      } else {
+        releasePresentation()
       }
     },
-    [clearDragState]
+    [clearDragState, releasePresentation]
   )
 
   useEffect(() => {
@@ -182,6 +259,22 @@ export function useProjectSidebarReorder({
 
       const drop = computeDrop(event.clientY)
       latestDropIndexRef.current = drop?.dropIndex ?? null
+      if (drop?.directBaseTop !== undefined) {
+        controller.targetsChanged(
+          drop.previewOffsets,
+          {
+            id: session.workbench.project.id,
+            offset: resolveDirectProjectOffset({
+              currentBaseTop: drop.directBaseTop,
+              pointerY: event.clientY,
+              startCardTop: session.startCardTop,
+              startPointerY: session.startY
+            })
+          },
+          reducedMotionRef.current,
+          () => undefined
+        )
+      }
       setState({
         draggingProjectId: session.workbench.project.id,
         dropIndicatorY: drop?.dropIndicatorY ?? null
@@ -217,14 +310,30 @@ export function useProjectSidebarReorder({
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('blur', onBlur)
     }
-  }, [computeDrop, finishDrag, isSessionArmed])
+  }, [computeDrop, controller, finishDrag, isSessionArmed])
 
   useEffect(
     () => () => {
       clickCleanupRef.current?.()
+      if (pendingFallbackFrameRef.current !== null) {
+        window.cancelAnimationFrame(pendingFallbackFrameRef.current)
+      }
+      controller.dispose()
     },
-    []
+    [controller]
   )
+
+  useLayoutEffect(() => {
+    const pending = pendingReorderRef.current
+    const orderChanged = Boolean(pending && pending.orderKey !== orderKey)
+    syncControllerLayout(orderChanged)
+    if (!pending) return
+    if (isReorderPending) pending.sawPending = true
+    if (orderChanged || (!isReorderPending && pending.sawPending)) {
+      pendingReorderRef.current = null
+      releasePresentation()
+    }
+  }, [isReorderPending, orderKey, releasePresentation, syncControllerLayout, workbenches])
 
   useEffect(() => {
     if (state.draggingProjectId === null) {
@@ -248,29 +357,44 @@ export function useProjectSidebarReorder({
         return
       }
 
+      syncControllerLayout(false)
+      const projectId = workbench.project.id
+      const sourceCard = getProjectListRef
+        .current()
+        ?.querySelector<HTMLElement>(`[data-project-card-id="${CSS.escape(projectId)}"]`)
+      const startCardTop = sourceCard
+        ? sourceCard.getBoundingClientRect().top - controller.offsetFor(projectId)
+        : event.clientY
+
       sessionRef.current = {
         pointerId: event.pointerId,
         source: event.currentTarget,
         workbench,
         startX: event.clientX,
         startY: event.clientY,
+        startCardTop,
         promoted: false
       }
       setIsSessionArmed(true)
     },
-    [canReorder]
+    [canReorder, controller, syncControllerLayout]
   )
 
   return { ...state, onProjectPointerDown }
 }
 
-function measureProjectCardRects(projectList: HTMLElement): ProjectCardRect[] {
+function measureProjectCardRects(
+  projectList: HTMLElement,
+  offsetFor: (projectId: string) => number
+): ProjectCardRect[] {
   return [...projectList.querySelectorAll<HTMLElement>('[data-project-card-id]')].map((card) => {
     const rect = card.getBoundingClientRect()
+    const projectId = card.dataset.projectCardId ?? ''
+    const offset = offsetFor(projectId)
     return {
-      projectId: card.dataset.projectCardId ?? '',
-      top: rect.top,
-      bottom: rect.bottom
+      projectId,
+      top: rect.top - offset,
+      bottom: rect.bottom - offset
     }
   })
 }
