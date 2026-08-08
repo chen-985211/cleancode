@@ -4,11 +4,13 @@
 }
 
 .terminal-workflow-edge--build-entering {
+  /* cc-motion-owner: terminal-workflow-build */
   animation: terminal-workflow-edge-build-fade-in 300ms ease-out both;
 }
 
 .terminal-workflow-edge--build-entering .react-flow__edge-path {
   stroke-dasharray: 10 8;
+  /* cc-motion-owner: terminal-workflow-build */
   animation: terminal-workflow-edge-build-in 420ms ease-out both;
 }
 
@@ -18,6 +20,7 @@
 }
 
 .terminal-workflow-build-node--entering .terminal-node {
+  /* cc-motion-owner: terminal-workflow-build */
   animation: terminal-workflow-node-build-in 420ms ease-out both;
 }
 
@@ -27,6 +30,7 @@
 }
 
 .terminal-workflow-build-group--entering {
+  /* cc-motion-owner: terminal-workflow-build */
   animation: terminal-workflow-group-build-in 300ms ease-out both;
 }
 

@@ -2,23 +2,24 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'rea
 
 import { createTerminalGroupDropSpringController } from './terminalGroupDropSpring'
 import type { TerminalGroupDropFeedback } from './types'
-import { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 export function useTerminalGroupDropSpring(
   feedback: TerminalGroupDropFeedback | null
 ): RefObject<HTMLElement | null> {
   const surfaceRef = useRef<HTMLElement | null>(null)
   const controller = useMemo(() => createTerminalGroupDropSpringController(), [])
+  const reducedMotion = usePrefersReducedMotion()
 
   useLayoutEffect(() => {
     const surface = surfaceRef.current
-    if (!surface || prefersReducedMotion()) {
+    if (!surface || reducedMotion) {
       controller.suspend()
       return
     }
 
     controller.feedbackChanged(surface, feedback)
-  }, [controller, feedback])
+  }, [controller, feedback, reducedMotion])
 
   useEffect(() => () => controller.dispose(), [controller])
 

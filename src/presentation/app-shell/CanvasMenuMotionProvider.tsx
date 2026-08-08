@@ -20,6 +20,7 @@ import {
   type CanvasMenuMotionPresentation
 } from './canvasMenuMotion'
 import { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 export interface CanvasMenuAnchor {
   readonly x: number
@@ -44,6 +45,7 @@ interface CanvasMenuCoordinator {
   readonly hasActive: () => boolean
   readonly release: (menuId: string) => void
   readonly reset: () => void
+  readonly setReducedMotion: (reducedMotion: boolean) => void
   readonly setDismissLayer: (layer: HTMLDivElement | null) => void
 }
 
@@ -73,16 +75,22 @@ export function CanvasMenuMotionProvider({
   resetKey,
   scheduler
 }: CanvasMenuMotionProviderProps) {
+  const systemReducedMotion = usePrefersReducedMotion()
+  const resolvedReducedMotion = reducedMotion ?? systemReducedMotion
   const coordinator = useMemo(
     () =>
       createCanvasMenuCoordinator({
-        reducedMotion: reducedMotion ?? prefersReducedMotion(),
+        reducedMotion: false,
         scheduler
       }),
-    [reducedMotion, scheduler]
+    [scheduler]
   )
   const dismissLayerRef = useRef<HTMLDivElement | null>(null)
   const previousResetKeyRef = useRef(resetKey)
+
+  useLayoutEffect(() => {
+    coordinator.setReducedMotion(resolvedReducedMotion)
+  }, [coordinator, resolvedReducedMotion])
 
   useLayoutEffect(() => {
     coordinator.setDismissLayer(dismissLayerRef.current)
@@ -274,6 +282,7 @@ function createCanvasMenuCoordinator({
   let secondaryContextMenuPending = false
   let secondaryContextMenuTimeoutId: number | null = null
   let resetting = false
+  let currentReducedMotion = reducedMotion
 
   const updateDismissLayer = (): void => {
     if (!dismissLayer) return
@@ -334,7 +343,7 @@ function createCanvasMenuCoordinator({
         onPresent: (presentation) => {
           if (!resetting) onPresent(presentation)
         },
-        reducedMotion,
+        reducedMotion: currentReducedMotion,
         scheduler
       })
       controllers.add(controller)
@@ -344,6 +353,7 @@ function createCanvasMenuCoordinator({
           controller.dispose()
         },
         reset: controller.reset,
+        setReducedMotion: controller.setReducedMotion,
         setOpen: controller.setOpen
       }
     },
@@ -368,6 +378,10 @@ function createCanvasMenuCoordinator({
       records.clear()
       updateDismissLayer()
       closeRequests.forEach((close) => close())
+    },
+    setReducedMotion: (nextReducedMotion) => {
+      currentReducedMotion = nextReducedMotion
+      controllers.forEach((controller) => controller.setReducedMotion(nextReducedMotion))
     },
     setDismissLayer: (element) => {
       dismissLayer = element

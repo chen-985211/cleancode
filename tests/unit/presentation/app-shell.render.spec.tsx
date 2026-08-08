@@ -465,7 +465,10 @@ describe('app shell', () => {
     expect(worktreeIndicator.querySelector('svg')).toBeInTheDocument()
     expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 
-    fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))
+    const branchTrigger = within(projectCard).getByRole('button', {
+      name: '选择默认工作区分支 main'
+    })
+    fireEvent.click(branchTrigger)
 
     const branchDialog = await screen.findByRole('dialog', { name: '选择默认工作区分支' })
     const branchOptionButtons = within(branchDialog).getAllByRole('button')

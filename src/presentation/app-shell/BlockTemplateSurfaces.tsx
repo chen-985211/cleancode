@@ -6,14 +6,14 @@ import type { useBlockTemplateActions } from './useBlockTemplateActions'
 export function BlockTemplateSurfaces({
   actions,
   currentWorkbench,
-  currentWorkspace,
   isDesktopRuntime
 }: {
   readonly actions: ReturnType<typeof useBlockTemplateActions>
   readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly isDesktopRuntime: boolean
 }) {
+  const savePresentation = actions.savePresentation
+
   return (
     <>
       <BlockTemplateLibraryRoot
@@ -21,13 +21,11 @@ export function BlockTemplateSurfaces({
         isDesktopRuntime={isDesktopRuntime}
         onBeginPlacement={actions.beginPlacement}
       />
-      {actions.saveBlockIds && currentWorkbench && currentWorkspace ? (
+      {savePresentation ? (
         <BlockTemplateSaveDialog
-          graph={currentWorkbench.graph}
-          projectDirectory={currentWorkbench.project.directory}
-          selectedBlockIds={actions.saveBlockIds}
-          workspaceId={currentWorkspace.workspaceId}
+          {...savePresentation}
           onCancel={actions.closeSave}
+          onExitComplete={actions.completeSaveExit}
           onSaved={actions.closeSave}
         />
       ) : null}

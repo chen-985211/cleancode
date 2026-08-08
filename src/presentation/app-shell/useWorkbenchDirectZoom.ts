@@ -2,9 +2,16 @@ import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useEffect, type MutableRefObject, type RefObject } from 'react'
 
 import type { WorkbenchFlowNode } from './types'
-import { retargetWorkbenchDirectZoom, type WorkbenchDirectZoomInput } from './workbenchDirectZoom'
-import { cancelWorkbenchViewportMotion } from './workbenchViewportMotion'
-import { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
+import {
+  retargetWorkbenchDirectZoom,
+  setWorkbenchDirectZoomReducedMotion,
+  type WorkbenchDirectZoomInput
+} from './workbenchDirectZoom'
+import {
+  cancelWorkbenchViewportMotion,
+  setWorkbenchViewportReducedMotion
+} from './workbenchViewportMotion'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 interface WorkbenchWheelZoomInput {
   readonly ctrlKey: boolean
@@ -35,6 +42,14 @@ export function useWorkbenchDirectZoom({
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly viewportMotionInstance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
 }): void {
+  const reducedMotion = usePrefersReducedMotion()
+
+  useEffect(() => {
+    if (!viewportMotionInstance) return
+    setWorkbenchDirectZoomReducedMotion(reducedMotion, viewportMotionInstance)
+    setWorkbenchViewportReducedMotion(reducedMotion, viewportMotionInstance)
+  }, [reducedMotion, viewportMotionInstance])
+
   useEffect(() => {
     if (!viewportMotionInstance) return undefined
 
@@ -68,14 +83,20 @@ export function useWorkbenchDirectZoom({
       const input: WorkbenchDirectZoomInput = {
         anchor: { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
         deltaZoomStops,
-        reducedMotion: prefersReducedMotion()
+        reducedMotion
       }
       if (retargetWorkbenchDirectZoom(instance, input)) onViewportInteractionStart?.()
     }
 
     renderer.addEventListener('wheel', handleWheel, { capture: true, passive: false })
     return () => renderer.removeEventListener('wheel', handleWheel, { capture: true })
-  }, [canvasSurfaceRef, onViewportInteractionStart, reactFlowInstanceRef, viewportMotionInstance])
+  }, [
+    canvasSurfaceRef,
+    onViewportInteractionStart,
+    reactFlowInstanceRef,
+    reducedMotion,
+    viewportMotionInstance
+  ])
 }
 
 function isMacPlatform(): boolean {

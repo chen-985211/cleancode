@@ -116,6 +116,26 @@ describe('terminal group drop spring', () => {
     scheduler.advanceUntilIdle()
     expect(readScale(surface)).toBeCloseTo(terminalGroupDropRemovalScale, 4)
   })
+
+  it('consumes all elapsed time when a presentation frame is delayed', () => {
+    const regularScheduler = createFrameScheduler()
+    const delayedScheduler = createFrameScheduler()
+    const regularSurface = createSurface()
+    const delayedSurface = createSurface()
+    const regularController = createTerminalGroupDropSpringController({
+      scheduler: regularScheduler
+    })
+    const delayedController = createTerminalGroupDropSpringController({
+      scheduler: delayedScheduler
+    })
+
+    regularController.feedbackChanged(regularSurface, 'join')
+    delayedController.feedbackChanged(delayedSurface, 'join')
+    for (let frame = 0; frame < 12; frame += 1) regularScheduler.advanceNextFrame()
+    delayedScheduler.advanceNextFrame(100)
+
+    expect(readScale(delayedSurface)).toBeCloseTo(readScale(regularSurface), 6)
+  })
 })
 
 function readScale(surface: ReturnType<typeof createSurface>): number {
@@ -162,7 +182,7 @@ function createSurface(): TerminalGroupDropSpringSurface & {
 }
 
 function createFrameScheduler(): TerminalGroupDropSpringFrameScheduler & {
-  readonly advanceNextFrame: () => void
+  readonly advanceNextFrame: (milliseconds?: number) => void
   readonly advanceUntilIdle: () => void
   readonly pendingFrames: () => number
 } {
@@ -171,8 +191,8 @@ function createFrameScheduler(): TerminalGroupDropSpringFrameScheduler & {
   const callbacks = new Map<number, FrameRequestCallback>()
 
   return {
-    advanceNextFrame: () => {
-      now += 1000 / 120
+    advanceNextFrame: (milliseconds = 1000 / 120) => {
+      now += milliseconds
       const pendingCallbacks = [...callbacks.values()]
       callbacks.clear()
       pendingCallbacks.forEach((callback) => callback(now))

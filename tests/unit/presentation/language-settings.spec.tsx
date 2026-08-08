@@ -74,6 +74,27 @@ describe('language settings', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('keeps a closing menu inert until its exit finishes and reverses from the live surface', () => {
+    renderLanguageSettings('zh-CN')
+
+    const trigger = screen.getByRole('button', { name: '语言' })
+    fireEvent.click(trigger)
+    const liveMenu = screen.getByRole('menu', { name: '语言' })
+
+    fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(liveMenu).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(liveMenu).toHaveAttribute('aria-hidden', 'true')
+    expect(liveMenu).toHaveAttribute('inert')
+
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('menu', { name: '语言' })).toBe(liveMenu)
+    expect(liveMenu).not.toHaveAttribute('aria-hidden')
+    expect(liveMenu).not.toHaveAttribute('inert')
+  })
+
   it('updates neighboring application settings copy in English', () => {
     render(
       <I18nProvider initialLocale="en">

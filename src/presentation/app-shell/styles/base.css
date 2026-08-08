@@ -19,6 +19,7 @@
   overflow: hidden;
   background: var(--cc-background);
   color: var(--cc-foreground);
+  /* cc-motion-owner: app-shell-layout */
   transition: grid-template-columns 180ms ease;
 }
 
@@ -59,10 +60,10 @@ textarea:focus-visible {
   font-size: 13px;
   font-weight: 600;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .sidebar-action:hover,
@@ -84,9 +85,9 @@ textarea:focus-visible {
   background: transparent;
   color: var(--cc-muted);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .icon-button:hover:not(:disabled) {

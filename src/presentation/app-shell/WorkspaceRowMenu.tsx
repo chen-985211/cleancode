@@ -8,8 +8,8 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
-import { createPortal } from 'react-dom'
 
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
 
@@ -131,44 +131,41 @@ export function WorkspaceRowMenu({
           <DotsThreeIcon size={15} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen
-        ? createPortal(
-            <div
-              id={menuId}
-              className="workspace-row-menu"
-              role="menu"
-              aria-labelledby={triggerId}
-              data-side={menuPosition?.side ?? 'bottom'}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                  onClose()
-                }
-              }}
-              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
-              ref={menuRef}
-              style={{
-                left: menuPosition?.left ?? 0,
-                top: menuPosition?.top ?? 0,
-                visibility: menuPosition ? 'visible' : 'hidden'
-              }}
-            >
-              <button
-                className="workspace-row-menu__item"
-                type="button"
-                role="menuitem"
-                tabIndex={0}
-                onClick={() => {
-                  onClose()
-                  onArchive()
-                }}
-              >
-                <ArchiveIcon size={16} weight="bold" aria-hidden="true" />
-                {t('sidebar.archiveWorkspace')}
-              </button>
-            </div>,
-            document.body
-          )
-        : null}
+      <AnchoredSurfaceMotion
+        open={isOpen}
+        portalContainer={document.body}
+        id={menuId}
+        className="workspace-row-menu anchored-surface-motion"
+        role="menu"
+        aria-labelledby={triggerId}
+        data-side={menuPosition?.side ?? 'bottom'}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            onClose()
+          }
+        }}
+        onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+        ref={menuRef}
+        style={{
+          left: menuPosition?.left ?? 0,
+          top: menuPosition?.top ?? 0,
+          visibility: menuPosition ? 'visible' : 'hidden'
+        }}
+      >
+        <button
+          className="workspace-row-menu__item"
+          type="button"
+          role="menuitem"
+          tabIndex={0}
+          onClick={() => {
+            onClose()
+            onArchive()
+          }}
+        >
+          <ArchiveIcon size={16} weight="bold" aria-hidden="true" />
+          {t('sidebar.archiveWorkspace')}
+        </button>
+      </AnchoredSurfaceMotion>
     </>
   )
 }

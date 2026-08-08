@@ -20,8 +20,8 @@
   font-weight: 650;
   padding: 0 4px;
   transition:
-    background 150ms ease,
-    color 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-mcp-capability__switch:hover:not(:disabled) {
@@ -126,8 +126,8 @@
   border-radius: 999px;
   background: var(--cc-surface-subtle);
   transition:
-    background 150ms ease,
-    border-color 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-mcp-capability__thumb {
@@ -139,8 +139,8 @@
   border-radius: 50%;
   background: var(--cc-muted-strong);
   transition:
-    background 150ms ease,
-    transform 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-mcp-capability__switch[aria-checked='true'] .agent-mcp-capability__track {

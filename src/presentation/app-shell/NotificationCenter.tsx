@@ -10,13 +10,24 @@ import { useEffect, useRef, useState } from 'react'
 import type { AppNotification, AppNotificationKind } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { useSurfaceMotionPresence } from './useSurfaceMotionPresence'
 
-interface NotificationCenterProps {
-  readonly notifications: readonly AppNotification[]
-  readonly onDismiss: (notificationId: string) => void
+export interface AppNotificationPresentation {
+  readonly notification: AppNotification
+  readonly open: boolean
 }
 
-export function NotificationCenter({ notifications, onDismiss }: NotificationCenterProps) {
+interface NotificationCenterProps {
+  readonly notifications: readonly AppNotificationPresentation[]
+  readonly onDismiss: (notificationId: string) => void
+  readonly onExitComplete: (notificationId: string) => void
+}
+
+export function NotificationCenter({
+  notifications,
+  onDismiss,
+  onExitComplete
+}: NotificationCenterProps) {
   const { t } = useI18n()
   if (notifications.length === 0) {
     return null
@@ -24,22 +35,32 @@ export function NotificationCenter({ notifications, onDismiss }: NotificationCen
 
   return (
     <div className="notification-viewport" aria-label={t('notifications.label')}>
-      {notifications.map((notification) => (
-        <NotificationCard key={notification.id} notification={notification} onDismiss={onDismiss} />
+      {notifications.map((presentation) => (
+        <NotificationCard
+          key={presentation.notification.id}
+          presentation={presentation}
+          onDismiss={onDismiss}
+          onExitComplete={onExitComplete}
+        />
       ))}
     </div>
   )
 }
 
 interface NotificationCardProps {
-  readonly notification: AppNotification
+  readonly presentation: AppNotificationPresentation
   readonly onDismiss: (notificationId: string) => void
+  readonly onExitComplete: (notificationId: string) => void
 }
 
-function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
+function NotificationCard({ presentation, onDismiss, onExitComplete }: NotificationCardProps) {
   const { t } = useI18n()
+  const { notification } = presentation
   const [isActionPending, setIsActionPending] = useState(false)
   const isMounted = useRef(true)
+  const presence = useSurfaceMotionPresence(presentation.open, {
+    onExitComplete: () => onExitComplete(notification.id)
+  })
 
   useEffect(() => {
     isMounted.current = true
@@ -49,7 +70,7 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
   }, [])
 
   useEffect(() => {
-    if (!notification.autoDismissMs || notification.autoDismissMs <= 0) {
+    if (!presentation.open || !notification.autoDismissMs || notification.autoDismissMs <= 0) {
       return undefined
     }
 
@@ -59,7 +80,9 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
     )
 
     return () => window.clearTimeout(timeoutId)
-  }, [notification.autoDismissMs, notification.id, onDismiss])
+  }, [notification.autoDismissMs, notification.id, onDismiss, presentation.open])
+
+  if (!presence.isPresent) return null
 
   const Icon = notification.isActivity ? CircleNotchIcon : notificationIcons[notification.kind]
   const actionLabel =
@@ -86,6 +109,7 @@ function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
       className={`notification-card notification-card--${notification.kind}${notification.isActivity ? ' notification-card--activity' : ''}`}
       role={notification.kind === 'error' ? 'alert' : 'status'}
       aria-atomic="true"
+      {...presence.surfaceProps}
     >
       <span className="notification-card__icon" aria-hidden="true">
         <Icon

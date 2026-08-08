@@ -19,9 +19,7 @@
   overflow: visible;
   padding: 12px;
   opacity: 1;
-  transition:
-    opacity 120ms ease,
-    padding 180ms ease;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .app-shell--sidebar-collapsed .project-sidebar {
@@ -85,8 +83,8 @@
   padding: 4px 8px;
   color: var(--cc-muted);
   transition:
-    background 150ms ease,
-    color 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -200,9 +198,9 @@
   position: relative;
   overflow: visible;
   transition:
-    background 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .project-card--dragging {
@@ -247,8 +245,8 @@
   font-size: 13px;
   font-weight: 650;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .project-card__select--draggable {
@@ -275,9 +273,9 @@
   border-radius: 7px;
   opacity: 0;
   transition:
-    opacity 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .project-card__branch {
@@ -330,8 +328,8 @@
   grid-template-rows: 1fr;
   opacity: 1;
   transition:
-    grid-template-rows 180ms ease,
-    opacity 160ms ease;
+    grid-template-rows var(--cc-motion-duration-surface) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-surface) var(--cc-easing-standard);
 }
 
 .project-card__disclosure--collapsed {
@@ -354,7 +352,7 @@
   border-left: 1px solid var(--cc-border);
   padding: 2px 0 0 9px;
   transform: translateY(0);
-  transition: transform 180ms ease;
+  transition: transform var(--cc-motion-duration-surface) var(--cc-easing-standard);
 }
 
 .project-card__disclosure--collapsed .workspace-list {
@@ -394,8 +392,8 @@
   color: var(--cc-muted-strong);
   font-size: 12px;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .workspace-row:hover,

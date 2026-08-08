@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useRef } from 'react'
 
@@ -64,6 +64,27 @@ describe('workbench direct zoom input', () => {
     })
     expect(onViewportInteractionStart).toHaveBeenCalledOnce()
   })
+
+  it('settles both canvas motion owners when reduced motion changes at runtime', () => {
+    const media = createMutableMediaQueryList(false)
+    vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
+    const instance = createViewportInstance()
+    const settleDirectZoom = vi
+      .spyOn(directZoom, 'setWorkbenchDirectZoomReducedMotion')
+      .mockImplementation(() => undefined)
+    const settleViewport = vi
+      .spyOn(viewportMotion, 'setWorkbenchViewportReducedMotion')
+      .mockImplementation(() => undefined)
+
+    render(<DirectZoomHarness instance={instance} onViewportInteractionStart={vi.fn()} />)
+    settleDirectZoom.mockClear()
+    settleViewport.mockClear()
+
+    act(() => media.setMatches(true))
+
+    expect(settleDirectZoom).toHaveBeenCalledWith(true, instance)
+    expect(settleViewport).toHaveBeenCalledWith(true, instance)
+  })
 })
 
 function DirectZoomHarness({
@@ -105,4 +126,34 @@ function createViewportInstance(): ReactFlowInstance<WorkbenchFlowNode, Edge> {
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     setViewport: vi.fn(async () => true)
   } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+}
+
+function createMutableMediaQueryList(initialMatches: boolean) {
+  let matches = initialMatches
+  let listener: ((event: MediaQueryListEvent) => void) | null = null
+  const value = {
+    get matches() {
+      return matches
+    },
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: (_type: string, nextListener: EventListenerOrEventListenerObject | null) => {
+      if (typeof nextListener === 'function') {
+        listener = nextListener as (event: MediaQueryListEvent) => void
+      }
+    },
+    removeEventListener: () => {
+      listener = null
+    },
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: () => true
+  } as MediaQueryList
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      listener?.({ matches, media: value.media } as MediaQueryListEvent)
+    },
+    value
+  }
 }

@@ -17,6 +17,7 @@ import {
   type ShortcutPlatform
 } from './applicationShortcuts'
 import { useI18n } from './i18n/useI18n'
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
 
@@ -46,6 +47,11 @@ type PopoverState =
   | { readonly type: 'candidates'; readonly number: QuickExecutionSlotNumber | null }
   | { readonly type: 'actions'; readonly number: QuickExecutionSlotNumber }
 
+interface PopoverPresentation {
+  readonly content: PopoverState
+  readonly open: boolean
+}
+
 export function QuickExecutionBar({
   isExternalDropTarget = false,
   graph,
@@ -61,7 +67,7 @@ export function QuickExecutionBar({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
   const draggedNumberRef = useRef<QuickExecutionSlotNumber | null>(null)
-  const [popover, setPopover] = useState<PopoverState | null>(null)
+  const [popoverPresentation, setPopoverPresentation] = useState<PopoverPresentation | null>(null)
   const [draggedNumber, setDraggedNumber] = useState<QuickExecutionSlotNumber | null>(null)
   const [reorderTargetNumber, setReorderTargetNumber] = useState<QuickExecutionSlotNumber | null>(
     null
@@ -77,10 +83,19 @@ export function QuickExecutionBar({
     [graph]
   )
   const firstEmptyNumber = slots.find((slot) => !slot.target)?.number ?? null
-  const closePopover = useCallback((): void => setPopover(null), [])
+  const closePopover = useCallback(
+    (): void =>
+      setPopoverPresentation((current) => (current ? { ...current, open: false } : current)),
+    []
+  )
+  const openPopover = useCallback((content: PopoverState): void => {
+    setPopoverPresentation({ content, open: true })
+  }, [])
+  const presentedPopover = popoverPresentation?.content ?? null
+  const isPopoverOpen = popoverPresentation?.open ?? false
 
   useEffect(() => {
-    if (!popover) return undefined
+    if (!isPopoverOpen) return undefined
     popoverRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
@@ -97,7 +112,7 @@ export function QuickExecutionBar({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [closePopover, popover])
+  }, [closePopover, isPopoverOpen])
 
   const bind = (
     number: QuickExecutionSlotNumber | null,
@@ -140,37 +155,42 @@ export function QuickExecutionBar({
       data-workbench-canvas-obstruction
       aria-label={t('quickExecution.label')}
     >
-      {popover ? (
-        <div
-          ref={popoverRef}
-          className="quick-execution__popover"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t(
-            popover.type === 'actions'
-              ? 'quickExecution.slotActions'
-              : 'quickExecution.chooseObject'
-          )}
-        >
-          {popover.type === 'candidates' ? (
-            <CandidatePicker
-              candidates={candidates}
-              onSelect={(target) => bind(popover.number, target)}
-            />
-          ) : null}
-          {popover.type === 'actions' ? (
-            <div className="quick-execution__action-list">
-              <button
-                type="button"
-                onClick={() => setPopover({ type: 'candidates', number: popover.number })}
-              >
-                <WorkbenchIcon role="restart" size={14} />
-                {t('quickExecution.rebind')}
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      <AnchoredSurfaceMotion
+        open={isPopoverOpen}
+        onExitComplete={() => {
+          setPopoverPresentation(null)
+        }}
+        ref={popoverRef}
+        className="quick-execution__popover anchored-surface-motion"
+        role="dialog"
+        aria-label={
+          presentedPopover
+            ? t(
+                presentedPopover.type === 'actions'
+                  ? 'quickExecution.slotActions'
+                  : 'quickExecution.chooseObject'
+              )
+            : undefined
+        }
+      >
+        {presentedPopover?.type === 'candidates' ? (
+          <CandidatePicker
+            candidates={candidates}
+            onSelect={(target) => bind(presentedPopover.number, target)}
+          />
+        ) : null}
+        {presentedPopover?.type === 'actions' ? (
+          <div className="quick-execution__action-list">
+            <button
+              type="button"
+              onClick={() => openPopover({ type: 'candidates', number: presentedPopover.number })}
+            >
+              <WorkbenchIcon role="restart" size={14} />
+              {t('quickExecution.rebind')}
+            </button>
+          </div>
+        ) : null}
+      </AnchoredSurfaceMotion>
       <div className="quick-execution__slots">
         {slots.map((slot) => {
           const projection = slot.projection
@@ -248,7 +268,7 @@ export function QuickExecutionBar({
                     className="quick-execution__content quick-execution__add"
                     type="button"
                     aria-label={t('quickExecution.addObject')}
-                    onClick={() => setPopover({ type: 'candidates', number: null })}
+                    onClick={() => openPopover({ type: 'candidates', number: null })}
                   >
                     <kbd>{slot.number}</kbd>
                     <WorkbenchIcon className="quick-execution__type-icon" role="add" size={13} />
@@ -264,7 +284,7 @@ export function QuickExecutionBar({
                     type="button"
                     draggable={false}
                     aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
-                    onClick={() => setPopover({ type: 'actions', number: slot.number })}
+                    onClick={() => openPopover({ type: 'actions', number: slot.number })}
                   >
                     <WorkbenchIcon role="more" size={13} />
                   </button>

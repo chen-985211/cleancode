@@ -59,7 +59,15 @@ describe('application settings', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog', { name: '设置' })).not.toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('inert')
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
+    expect(screen.getByLabelText('项目区域').inert).toBe(true)
+    expect(screen.getByLabelText('工作区状态').inert).toBe(true)
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(dialog).not.toBeInTheDocument()
     expect(screen.getByLabelText('项目区域').inert).toBe(false)
     expect(screen.getByLabelText('工作区状态').inert).toBe(false)
     expect(trigger).toHaveFocus()

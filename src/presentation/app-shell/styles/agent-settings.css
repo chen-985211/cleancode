@@ -337,7 +337,7 @@
 }
 
 .agent-settings-spinner {
-  animation: agent-settings-spin 0.8s linear infinite;
+  animation: agent-settings-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 @keyframes agent-settings-spin {

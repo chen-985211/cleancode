@@ -8,7 +8,7 @@ import {
 } from './terminalWorkflowBuildChoreography'
 import type { WorkbenchFlowNode } from './types'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
-import { prefersReducedMotion } from './workbenchViewportMotion'
+import { prefersReducedMotion, subscribeReducedMotionPreference } from './motionPreference'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
 export interface TerminalWorkflowBuildPresentation {
@@ -151,13 +151,9 @@ export function useTerminalWorkflowBuildChoreography({
   }, [cancelActiveBuild, currentProjectId, currentWorkspaceId])
 
   useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handleChange = (): void => {
-      if (query.matches) cancelActiveBuild(true)
-    }
-    query.addEventListener?.('change', handleChange)
-    return () => query.removeEventListener?.('change', handleChange)
+    return subscribeReducedMotionPreference((reducedMotion) => {
+      if (reducedMotion) cancelActiveBuild(true)
+    })
   }, [cancelActiveBuild])
 
   useEffect(

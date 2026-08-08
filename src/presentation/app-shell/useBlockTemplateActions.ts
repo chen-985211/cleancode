@@ -13,6 +13,14 @@ import {
 } from './useWorkbenchLayoutFocus'
 import type { WorkbenchNodeStore } from './workbenchNodeStore'
 
+interface BlockTemplateSavePresentation {
+  readonly graph: WorkbenchSnapshot['graph']
+  readonly open: boolean
+  readonly projectDirectory: string
+  readonly selectedBlockIds: readonly string[]
+  readonly workspaceId: string
+}
+
 export function useBlockTemplateActions({
   currentWorkbench,
   currentWorkspace,
@@ -33,7 +41,9 @@ export function useBlockTemplateActions({
   readonly terminalWorkflow: Pick<ReturnType<typeof useTerminalWorkflow>, 'startScope'>
 }) {
   const { t } = useI18n()
-  const [saveBlockIds, setSaveBlockIds] = useState<readonly string[] | null>(null)
+  const [savePresentation, setSavePresentation] = useState<BlockTemplateSavePresentation | null>(
+    null
+  )
   const [placement, setPlacement] = useState<{
     readonly runAfterPlacement: boolean
     readonly template: BlockTemplateSnapshot
@@ -45,7 +55,7 @@ export function useBlockTemplateActions({
 
   useEffect(() => {
     placementOperationRef.current = null
-    setSaveBlockIds(null)
+    setSavePresentation(null)
     setPlacement(null)
     setFocusRequest(null)
   }, [currentWorkbench?.graph.id])
@@ -60,6 +70,25 @@ export function useBlockTemplateActions({
     reactFlowInstanceRef,
     request: focusRequest
   })
+  const requestSave = useCallback(
+    (selectedBlockIds: readonly string[]): void => {
+      if (!currentWorkbench || !currentWorkspace) return
+      setSavePresentation({
+        graph: currentWorkbench.graph,
+        open: true,
+        projectDirectory: currentWorkbench.project.directory,
+        selectedBlockIds,
+        workspaceId: currentWorkspace.workspaceId
+      })
+    },
+    [currentWorkbench, currentWorkspace]
+  )
+  const closeSave = useCallback((): void => {
+    setSavePresentation((current) => (current ? { ...current, open: false } : current))
+  }, [])
+  const completeSaveExit = useCallback((): void => {
+    setSavePresentation((current) => (current?.open ? current : null))
+  }, [])
 
   const place = useCallback(
     async (origin: { readonly x: number; readonly y: number }): Promise<void> => {
@@ -110,15 +139,16 @@ export function useBlockTemplateActions({
 
   return {
     beginPlacement: (template: BlockTemplateSnapshot, runAfterPlacement: boolean) => {
-      setSaveBlockIds(null)
+      setSavePresentation(null)
       setPlacement({ runAfterPlacement, template })
     },
     cancelPlacement: () => setPlacement(null),
-    closeSave: () => setSaveBlockIds(null),
+    closeSave,
+    completeSaveExit,
     place,
     placementTemplate: placement?.template,
-    requestSave: setSaveBlockIds,
-    saveBlockIds
+    requestSave,
+    savePresentation
   }
 }
 

@@ -186,6 +186,12 @@ interface ProjectCardProps {
   readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
 }
 
+interface ArchiveWorkspacePresentation {
+  readonly branch: WorkbenchSnapshot['gitBranches'][number] | null
+  readonly open: boolean
+  readonly workspace: WorkbenchSnapshot['project']['workspaces'][number]
+}
+
 function ProjectCard({
   workbench,
   currentWorkbench,
@@ -206,7 +212,8 @@ function ProjectCard({
   const [isExpanded, setIsExpanded] = useState(true)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null)
-  const [archiveWorkspaceId, setArchiveWorkspaceId] = useState<string | null>(null)
+  const [archivePresentation, setArchivePresentation] =
+    useState<ArchiveWorkspacePresentation | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorPopoverRef = useRef<HTMLDivElement>(null)
@@ -236,16 +243,6 @@ function ProjectCard({
       openBranchWorkspaceForm()
     }
   }
-  const archiveWorkspace = archiveWorkspaceId
-    ? workbench.project.workspaces.find((workspace) => workspace.workspaceId === archiveWorkspaceId)
-    : null
-  const archiveWorkspaceGitBranch = archiveWorkspace
-    ? workbench.gitBranches.find(
-        (branch) =>
-          branch.name === archiveWorkspace.gitBranch &&
-          branch.worktreeDirectory === archiveWorkspace.directory
-      )
-    : null
   const closeBranchSelector = (): void => {
     setIsBranchSelectorOpen(false)
     setBranchSearchQuery('')
@@ -295,10 +292,21 @@ function ProjectCard({
       closeBranchSelector()
     }
 
+    const closeBranchSelectorOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeBranchSelector()
+      branchSelectorRootRef.current
+        ?.querySelector<HTMLButtonElement>('.default-branch-selector__toggle')
+        ?.focus()
+    }
+
     document.addEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
+    document.addEventListener('keydown', closeBranchSelectorOnEscape)
 
     return () => {
       document.removeEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
+      document.removeEventListener('keydown', closeBranchSelectorOnEscape)
     }
   }, [isBranchSelectorOpen])
 
@@ -446,27 +454,26 @@ function ProjectCard({
                           </button>
                         </TooltipLabel>
                       </div>
-                      {isBranchSelectorOpen ? (
-                        <BranchSelectorPopover
-                          anchorRef={branchSelectorRootRef}
-                          branches={workbench.gitBranches}
-                          popoverRef={branchSelectorPopoverRef}
-                          searchQuery={branchSearchQuery}
-                          onSearchQueryChange={setBranchSearchQuery}
-                          onChooseBranch={(branch) => {
-                            closeBranchSelector()
+                      <BranchSelectorPopover
+                        open={isBranchSelectorOpen}
+                        anchorRef={branchSelectorRootRef}
+                        branches={workbench.gitBranches}
+                        popoverRef={branchSelectorPopoverRef}
+                        searchQuery={branchSearchQuery}
+                        onSearchQueryChange={setBranchSearchQuery}
+                        onChooseBranch={(branch) => {
+                          closeBranchSelector()
 
-                            if (branch.isMainWorkspaceBranch) {
-                              onSelectWorkspace(workbench, workspace.workspaceId)
-                              return
-                            }
+                          if (branch.isMainWorkspaceBranch) {
+                            onSelectWorkspace(workbench, workspace.workspaceId)
+                            return
+                          }
 
-                            if (branch.isSelectableInMainWorkspace) {
-                              onCheckoutMainBranch(workbench, branch.name)
-                            }
-                          }}
-                        />
-                      ) : null}
+                          if (branch.isSelectableInMainWorkspace) {
+                            onCheckoutMainBranch(workbench, branch.name)
+                          }
+                        }}
+                      />
                     </>
                   ) : (
                     <>
@@ -519,7 +526,15 @@ function ProjectCard({
                           <WorkspaceRowMenu
                             isOpen={openWorkspaceMenuId === workspace.workspaceId}
                             workspaceName={workspace.displayName}
-                            onArchive={() => setArchiveWorkspaceId(workspace.workspaceId)}
+                            onArchive={() => {
+                              const branch =
+                                workbench.gitBranches.find(
+                                  (candidate) =>
+                                    candidate.name === workspace.gitBranch &&
+                                    candidate.worktreeDirectory === workspace.directory
+                                ) ?? null
+                              setArchivePresentation({ branch, open: true, workspace })
+                            }}
                             onClose={closeWorkspaceMenu}
                             onToggle={() => toggleWorkspaceMenu(workspace.workspaceId)}
                           />
@@ -545,33 +560,38 @@ function ProjectCard({
           </div>
         </div>
       </div>
-      {isRemoveProjectDialogOpen ? (
-        <ProjectSidebarProjectRemovalPopover
-          projectName={workbench.project.name}
-          triggerRef={removeProjectButtonRef}
-          onCancel={() => setIsRemoveProjectDialogOpen(false)}
-          onConfirm={() => {
-            setIsRemoveProjectDialogOpen(false)
-            onRemoveProject(workbench)
-          }}
-        />
-      ) : null}
-      {archiveWorkspace ? (
+      <ProjectSidebarProjectRemovalPopover
+        open={isRemoveProjectDialogOpen}
+        projectName={workbench.project.name}
+        triggerRef={removeProjectButtonRef}
+        onCancel={() => setIsRemoveProjectDialogOpen(false)}
+        onConfirm={() => {
+          setIsRemoveProjectDialogOpen(false)
+          onRemoveProject(workbench)
+        }}
+      />
+      {archivePresentation ? (
         <ArchiveWorkspaceDialog
-          workspaceName={archiveWorkspace.displayName}
-          isCurrentWorkspace={archiveWorkspace.isCurrent && isCurrentProject}
-          isLocked={archiveWorkspaceGitBranch?.isLocked ?? false}
-          lockReason={archiveWorkspaceGitBranch?.lockReason ?? null}
-          onCancel={() => setArchiveWorkspaceId(null)}
+          open={archivePresentation.open}
+          workspaceName={archivePresentation.workspace.displayName}
+          isCurrentWorkspace={archivePresentation.workspace.isCurrent && isCurrentProject}
+          isLocked={archivePresentation.branch?.isLocked ?? false}
+          lockReason={archivePresentation.branch?.lockReason ?? null}
+          onCancel={() =>
+            setArchivePresentation((current) => (current ? { ...current, open: false } : current))
+          }
+          onExitComplete={() => {
+            setArchivePresentation((current) => (current?.open ? current : null))
+          }}
           onConfirm={() => {
             onArchiveBranchWorkspace(
               workbench,
-              archiveWorkspace.workspaceId,
-              archiveWorkspaceGitBranch?.isLocked
-                ? { lockReason: archiveWorkspaceGitBranch.lockReason }
+              archivePresentation.workspace.workspaceId,
+              archivePresentation.branch?.isLocked
+                ? { lockReason: archivePresentation.branch.lockReason }
                 : undefined
             )
-            setArchiveWorkspaceId(null)
+            setArchivePresentation((current) => (current ? { ...current, open: false } : current))
           }}
         />
       ) : null}

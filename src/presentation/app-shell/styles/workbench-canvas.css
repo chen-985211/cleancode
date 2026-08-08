@@ -58,11 +58,11 @@
   font-size: 12px;
   pointer-events: auto;
   transition:
-    transform 100ms ease,
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard),
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .toolbar-button:active:not(:disabled) {
@@ -299,10 +299,10 @@
 .canvas-minimap__group-header,
 .canvas-minimap__group-member {
   transition:
-    fill 150ms ease,
-    opacity 150ms ease,
-    stroke 150ms ease,
-    stroke-width 150ms ease;
+    fill var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    stroke var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    stroke-width var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .canvas-surface--dragging-terminal .canvas-minimap__node-shell,
@@ -376,7 +376,7 @@
   opacity: 0.72;
   box-shadow: var(--cc-shadow-xs);
   backdrop-filter: blur(8px);
-  transition: opacity 150ms ease;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .canvas-minimap__panel:hover .canvas-minimap__map-controls,
@@ -476,7 +476,7 @@
     var(--cc-shadow-sm),
     inset 0 1px 0 var(--cc-highlight-inset);
   backdrop-filter: blur(18px);
-  animation: canvas-empty-panel-in 180ms ease-out both;
+  animation: canvas-empty-panel-in var(--cc-motion-duration-surface) var(--cc-easing-enter) both;
 }
 
 .canvas-empty__icon {
@@ -540,7 +540,7 @@
   gap: 11px;
   border-radius: 14px;
   padding: 10px 14px 10px 10px;
-  animation-delay: 180ms;
+  animation-delay: var(--cc-motion-duration-surface);
 }
 
 .canvas-empty--loading .canvas-empty__icon {
@@ -569,7 +569,7 @@
 }
 
 .canvas-empty__spinner {
-  animation: canvas-empty-spin 900ms linear infinite;
+  animation: canvas-empty-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 .canvas-empty h2 {
@@ -609,9 +609,9 @@
   pointer-events: auto;
   box-shadow: 0 1px 2px var(--cc-shadow-color);
   transition:
-    background 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .canvas-empty__action:hover {

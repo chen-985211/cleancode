@@ -9,12 +9,12 @@
   color: var(--cc-muted-strong);
   font: inherit;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -44,7 +44,6 @@
   overflow: hidden;
   background: var(--cc-canvas);
   color: var(--cc-foreground);
-  animation: application-settings-in 150ms ease-out;
   -webkit-app-region: no-drag;
 }
 
@@ -140,10 +139,10 @@
   font-weight: 580;
   text-align: left;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .application-settings-navigation button:hover {
@@ -197,8 +196,8 @@
   background: var(--cc-border-strong);
   padding: 2px;
   transition:
-    background 140ms ease,
-    opacity 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .application-settings-switch span {
@@ -208,7 +207,7 @@
   border-radius: 50%;
   background: var(--cc-primary-contrast);
   box-shadow: var(--cc-shadow-sm);
-  transition: transform 140ms ease;
+  transition: transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .application-settings-switch[aria-checked='true'] {
@@ -278,10 +277,10 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-settings-options label:hover {
@@ -379,11 +378,11 @@
   font-size: 12px;
   font-weight: 620;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-settings-reset-all:hover {
@@ -441,7 +440,7 @@
   column-gap: 24px;
   border-bottom: 1px solid var(--cc-divider);
   padding: 14px 18px;
-  transition: background 150ms ease;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-settings-row:last-child {
@@ -482,10 +481,10 @@
   color: var(--cc-foreground);
   font: inherit;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-recorder:hover {
@@ -600,18 +599,6 @@
   color: var(--cc-muted);
 }
 
-@keyframes application-settings-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 680px) {
   .application-settings-surface--mac .application-settings-header {
     gap: 18px;
@@ -671,10 +658,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .application-settings-surface {
-    animation: none;
-  }
-
   .application-settings-back,
   .terminal-settings-options label,
   .shortcut-settings-reset-all,

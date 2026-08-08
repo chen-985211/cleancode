@@ -163,17 +163,24 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 ### 当前节奏
 
-当前实现已经为程序化画布相机建立内部 motion token；其他界面动效新增或修改时仍应优先复用以下已有节奏，而不是引入新的近似值：
+CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方按交互含义复用，不得在普通 `transition` 或 `animation` 中重新写近似时长和 bezier。JavaScript 弹簧继续使用各 owner 的 response 与阻尼配置：
 
-| 级别     | 当前参数或范围         | 适用场景                                 |
-| -------- | ---------------------- | ---------------------------------------- |
-| 即时反馈 | 约 140–150ms           | 悬停、焦点、颜色、边框和小范围状态变化   |
-| 快速过渡 | 约 160–180ms           | 菜单、浮层、侧边栏和局部展开收起         |
-| 空间定位 | response 约 0.30–0.42s | 画布聚焦、适应视图和与距离相关的空间移动 |
-| 编排演出 | 约 300–9100ms          | 已提交的多对象工作流逐步或按层搭建与收束 |
-| 持续运动 | 线性且可停止           | 只用于 spinner、进度或确实持续进行的状态 |
+| 级别     | 当前参数或范围                                 | 适用场景                                 |
+| -------- | ---------------------------------------------- | ---------------------------------------- |
+| 按压反馈 | `--cc-motion-duration-press: 100ms`            | 按压、即时位移和最短局部反馈             |
+| 状态反馈 | `--cc-motion-duration-feedback: 150ms`         | 悬停、焦点、颜色、边框和小范围状态变化   |
+| 表面过渡 | `--cc-motion-duration-surface: 180ms`          | 菜单、浮层、侧边栏和局部展开收起         |
+| 空间定位 | response 约 `0.30–0.42s`                       | 画布聚焦、适应视图和与距离相关的空间移动 |
+| 编排演出 | 约 `300–9100ms`                                | 已提交的多对象工作流逐步或按层搭建与收束 |
+| 持续运动 | `--cc-motion-duration-spinner: 900ms` 线性循环 | 只用于 spinner 或确实持续进行的状态      |
 
 精确时长和 spring response 不是产品语义。逐步搭建允许为解释对象与依赖的先后关系采用更长的整体时间，但相邻步骤仍应快速收敛，大图必须压缩步骤间隔并设置有限的启动窗口，不能让演出时间随节点数无限增长。
+
+锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
+
+通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
+
+普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
 
 画布空白菜单、对象菜单、Agent 更多菜单和默认 Provider 菜单的进出场由 `src/presentation/app-shell/canvasMenuMotion.ts` 与 `CanvasMenuMotionProvider.tsx` 统一拥有。菜单表面从实际触发点或控件锚点以约七成的紧凑初始尺寸开始，沿透明度、显著缩放和短位移逐帧生长，约 100ms 时仍应处于可辨识的生长中段；收起使用同一 presentation 和空间关系反向缩回，不能以接近完整尺寸的短淡入淡出冒充生长。菜单是非模态浮层，画布不得随菜单 presentation 淡化、着色或模糊；一个没有视觉样式的 dismiss layer 只在菜单可交互期间接管菜单外指针。主按钮按下必须由该层捕获并关闭菜单，完整指针序列不得泄漏给 React Flow 平移或底层控件；次按钮按下由统一 coordinator 同步关闭当前意图并保留一次性输入遮罩，紧随其后的 `contextmenu` 只负责阻止原生菜单并释放遮罩，不得再次切换。该遮罩必须有超时自清理，第二次右击无论落在输入接管层还是仍在进场的菜单表面都执行同一输入路径。非即时运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring；新开、关闭、Escape、外部点击或另一菜单接管时，统一 owner 必须保留当前 presentation，并且只继承朝向新目标的速度；背离新目标的旧速度必须在重新定向时归零，使下一帧立即响应新意图，不得排队播放、重置到端点、复制第二个可交互 surface 或依赖 CSS `animation` 完成事件。关闭中的 surface 只为视觉连续性保留，必须立即 `inert`、从可访问树隐藏并停止接收指针，收敛后才释放 DOM；同一菜单反向打开必须复用该 live surface。菜单协调器同时只允许一个可交互菜单，工作区切换会清空全部在途状态。`prefers-reduced-motion` 下直接投影同一最终状态，菜单作用域、透明输入接管层、互斥、焦点和退出清理语义保持不变。spring response、收敛阈值和最长兜底时间属于统一 owner 的实现细节，不构成产品契约。
 
@@ -187,11 +194,11 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 依赖相机位置的同屏反馈必须与成功应用的 presentation frame 使用同一事实源。小地图 viewport 框与缩放百分比通过相机 owner 的轻量实时信号逐帧跟随，订阅和重渲染范围分别只覆盖框本身与百分比 `<output>`；不得为同步反馈而把程序化中间帧写回 `WorkbenchCanvas` React 状态、重渲染小地图节点或持久化 viewport。最终 viewport 仍只在有效运动完成时提交一次。
 
-画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
+画布空间对象的创建、组合展开收起和缩放细节层级由 `src/presentation/app-shell/workbenchObjectMotion.ts` 统一拥有。新对象必须先以最终节点几何进入画布，再通过外壳的裁剪、透明度和短暂边框强调从中心显露；创建过程不得缩放或逐帧改变 Terminal、Agent、xterm 网格和 resize 几何。组合拖放的专用表面反馈属于下文明确的独立 owner，不得被创建动效规则误判为禁止。创建后的程序化相机聚焦至少让对象先呈现一帧，并继续遵守统一相机 owner 的取消与最终焦点契约。
 
-组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或组合根元素上设置会改变 xterm、resize 或 React Flow 坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。
+组合的展开与收起使用相同空间关系：成员从折叠组合中心回到持久化位置，收起沿反向路径返回。BlockGraph 新状态先成为事实；离场副本只存在于 Presentation、不可交互，并在动效结束后移除。组合成员的空间 transform 只能作用于视觉表面，React Flow handle 与 resize 命中区必须留在不参与动画的最终锚点；依赖这些端点的流程线在视觉表面落位前保持暂隐，不能让 React Flow 在临时 transform 上测量并缓存端点。节点 pointer down 可以让标题内容产生至多 `1px` 的即时下沉；直接拖动只用既有阴影提高视觉层级，不得在 Terminal、Agent 或 React Flow 组合节点根上设置会改变 xterm、resize 或坐标计算的常驻 transform，也不得为松手增加持续惯性或弹跳。该限制不包括下文由组合拖放 owner 临时写入视觉外壳的尺度反馈。
 
-终端或完整流程拖入组合时，悬停反馈由组合表面的中性材质、外部阴影与内凹深度承担；不得缩放、淡出或描边被拖终端，也不得使用成功色边框或光环。松手后先提交以组合固定位置为原点的内部排版，再让新增成员从当前呈现位置平移到最终槽位、既有成员同步平移让位；组合可以改变尺寸但不得改变位置或使用根元素 transform。接纳反馈只改变组合背景、阴影和内部材质透明度，不能移动或缩放组合。`prefers-reduced-motion` 下直接投影最终排版并保留静态材质反馈。
+终端或完整流程拖入组合时，悬停反馈由组合表面的中性材质、外部阴影、内凹深度和轻微尺度共同承担；不得缩放、淡出或描边被拖终端，也不得使用成功色边框或光环。进入接纳范围时组合视觉外壳轻微放大，跨过移出边界时轻微收缩；两者使用可被反向接管的欠阻尼弹簧，从当前尺度与速度继续，不重置、不排队，也不把具体阻尼数值提升为产品契约。该 transform 只能作用于易失的视觉外壳，不得移动组合、改写持久化尺寸，或让 React Flow 节点根、handle、resize 命中区及 xterm 几何参与缩放。松手后先提交以组合固定位置为原点的内部排版，再让新增成员从当前呈现位置平移到最终槽位、既有成员同步平移让位；组合可以改变尺寸但不得改变位置。`prefers-reduced-motion` 下取消动态尺度与回弹，直接投影最终排版并保留静态材质反馈。
 
 画布直接操控使用单一原生 CSS cursor token。空白 pane、平移、框选、三类节点选择与拖动、模板放置共享同一枚紧凑的无尾纸飞机指针；不根据按下或拖动状态切换 `grab`、`grabbing`、`move` 或 `crosshair`，也不创建随 `pointermove` 更新的 DOM 光标。纸飞机轮廓由左上尖端、右侧机翼、内收折角和下方尖角组成，不得带传统系统箭头的箭杆；使用深色主体与浅色细描边同时适应明暗画布，不叠加模糊光晕。热点必须落在左上尖端并提供系统箭头回退。统一规则不得覆盖 xterm、文本编辑、连接 handle、resize、按钮禁用与等待状态的语义指针。
 
@@ -201,12 +208,12 @@ Agent terminal 首次测量和 attach 进行中使用中性、尺寸稳定的反
 
 ### 减弱动态效果
 
-CSS 必须尊重 `prefers-reduced-motion`。JavaScript 驱动的 React Flow、滚动、Web Animation 或计时动画也必须读取同一偏好，不能只依赖全局 CSS。
+CSS 必须尊重 `prefers-reduced-motion`。JavaScript 驱动的 React Flow、滚动、Web Animation 或计时动画通过 `src/presentation/app-shell/motionPreference.ts` 的单一订阅 owner 读取同一偏好，不能各自创建 `matchMedia`。偏好在运行中切换为 reduce 时，在途 motion 必须立即投影到当前意图的最终状态、清理 RAF 与最长时限，并保持既有焦点、互斥、提交次数和退出清理语义。
 
 减弱动态效果不是删除信息：
 
 - 大范围位移、缩放和旋转改为即时定位、短淡化或静态高亮。
-- 持续装饰动画停止；真实进行状态仍使用文字、图标或可访问属性表达。
+- 持续装饰动画停止；spinner 改为静态进行图标，真实进行状态仍使用文字、图标或可访问属性表达。
 - 焦点、选择、审批目标和错误状态继续清晰可辨。
 - 业务完成、焦点恢复和测试同步不得依赖动画时长。
 

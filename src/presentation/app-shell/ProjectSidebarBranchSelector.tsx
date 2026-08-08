@@ -3,8 +3,8 @@ import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { useLayoutEffect, useState, type RefObject } from 'react'
-import { createPortal } from 'react-dom'
 
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import type { WorkbenchSnapshot } from './types'
 import { useI18n } from './i18n/useI18n'
 
@@ -13,6 +13,7 @@ type GitBranchNavigationItem = WorkbenchSnapshot['gitBranches'][number]
 interface BranchSelectorPopoverProps {
   readonly anchorRef: RefObject<HTMLElement | null>
   readonly branches: readonly GitBranchNavigationItem[]
+  readonly open: boolean
   readonly popoverRef: RefObject<HTMLDivElement | null>
   readonly searchQuery: string
   readonly onSearchQueryChange: (query: string) => void
@@ -27,6 +28,7 @@ interface BranchSelectorPopoverPosition {
 export function BranchSelectorPopover({
   anchorRef,
   branches,
+  open,
   popoverRef,
   searchQuery,
   onSearchQueryChange,
@@ -41,6 +43,8 @@ export function BranchSelectorPopover({
   const orderedVisibleBranches = orderBranchSelectorItems(visibleBranches)
 
   useLayoutEffect(() => {
+    if (!open) return undefined
+
     const positionPopover = (): void => {
       const anchor = anchorRef.current
       const popover = popoverRef.current
@@ -64,14 +68,17 @@ export function BranchSelectorPopover({
       window.removeEventListener('resize', positionPopover)
       window.removeEventListener('scroll', positionPopover, true)
     }
-  }, [anchorRef, popoverRef])
+  }, [anchorRef, open, popoverRef])
 
-  return createPortal(
-    <div
-      className="branch-selector-popover"
+  return (
+    <AnchoredSurfaceMotion
+      className="branch-selector-popover anchored-surface-motion anchored-surface-motion--from-left"
       ref={popoverRef}
+      open={open}
+      portalContainer={document.body}
       role="dialog"
       aria-label={t('branchSelector.dialog')}
+      data-side="right"
       style={{
         left: position?.left ?? 0,
         top: position?.top ?? 0,
@@ -135,8 +142,7 @@ export function BranchSelectorPopover({
         <PlusIcon size={16} weight="bold" aria-hidden="true" />
         {t('branchSelector.create')}
       </button>
-    </div>,
-    document.body
+    </AnchoredSurfaceMotion>
   )
 }
 

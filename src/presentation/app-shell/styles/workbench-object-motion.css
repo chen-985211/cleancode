@@ -5,6 +5,7 @@
 
 :is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-in 360ms cubic-bezier(0.18, 0.84, 0.22, 1) both;
   will-change: opacity;
 }
@@ -20,17 +21,20 @@
   box-shadow: 0 0 22px var(--cc-shadow-color);
   content: '';
   pointer-events: none;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-accent 360ms ease-out both;
 }
 
 :is(.terminal-node, .terminal-group-node).workbench-object-motion--group-expand {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-group-expand 300ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   will-change: transform, opacity;
 }
 
 .terminal-node.workbench-object-motion--group-collapse {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-group-collapse 260ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   pointer-events: none;
   will-change: transform, opacity;
@@ -38,24 +42,27 @@
 
 .terminal-node.workbench-object-motion--group-join {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-terminal-group-join 380ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   will-change: transform;
 }
 
 .terminal-node.workbench-object-motion--group-reflow {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   will-change: transform;
 }
 
 .terminal-node.workbench-object-motion--group-leave {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   will-change: transform;
 }
 
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
-  transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform var(--cc-motion-duration-press) var(--cc-easing-standard);
 }
 
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header):active {
@@ -69,7 +76,7 @@
 }
 
 .terminal-workflow-edge {
-  transition: opacity 140ms ease;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .workbench-object-edge--motion-pending {
@@ -97,6 +104,7 @@
     .agent-console-actions__menu-anchor
   ) {
   opacity: 0;
+  /* cc-motion-owner: workbench-object */
   transition: opacity 120ms ease;
 }
 

@@ -99,9 +99,9 @@
   color: var(--cc-muted);
   opacity: 0;
   transition:
-    opacity 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .workspace-row:hover .workspace-row__menu-button,
@@ -117,8 +117,6 @@
 }
 
 .workspace-row-menu {
-  --workspace-menu-enter-y: -3px;
-
   position: fixed;
   z-index: 200;
   display: grid;
@@ -133,12 +131,9 @@
   padding: 6px;
   box-shadow: var(--cc-shadow-floating);
   transform-origin: left top;
-  animation: workspace-row-menu-in 160ms ease-out;
 }
 
 .workspace-row-menu[data-side='top'] {
-  --workspace-menu-enter-y: 3px;
-
   transform-origin: left bottom;
 }
 
@@ -173,24 +168,6 @@
 
 .workspace-row-menu__item:focus-visible {
   box-shadow: 0 0 0 1px var(--cc-border-strong) inset;
-}
-
-@keyframes workspace-row-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--workspace-menu-enter-y)) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-row-menu {
-    animation: none;
-  }
 }
 
 .project-sidebar-confirmation-dialog__backdrop {

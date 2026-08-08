@@ -110,6 +110,21 @@ describe('workbench viewport motion controller', () => {
     expect(frames.pendingTimeoutCount).toBe(0)
   })
 
+  it('settles the current viewport intent when reduced motion changes at runtime', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const instance = createViewportInstance()
+    const completion = controller.transition(instance.value, centerCommand(1_480))
+    frames.step()
+
+    controller.setReducedMotion(true, instance.value)
+
+    await expect(completion).resolves.toBe(true)
+    expect(instance.viewport).toEqual({ x: -1_000, y: 0, zoom: 1 })
+    expect(frames.pendingCount).toBe(0)
+    expect(frames.pendingTimeoutCount).toBe(0)
+  })
+
   it('uses the same anchored zoom curve at every world position', async () => {
     const canvasSize = { height: 640, width: 960 }
     const originFrames = new TestFrameScheduler()

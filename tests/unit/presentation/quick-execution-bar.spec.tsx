@@ -154,6 +154,32 @@ describe('quick execution bar', () => {
     expect(screen.queryByRole('button', { name: '清空快捷位' })).not.toBeInTheDocument()
   })
 
+  it('keeps the popover DOM inert while closing and reuses it when opening reverses', () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+      />
+    )
+
+    const trigger = screen.getByRole('button', { name: '打开快捷位 2 的操作' })
+    fireEvent.click(trigger)
+    const popover = screen.getByRole('dialog', { name: '快捷位操作' })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog', { name: '快捷位操作' })).not.toBeInTheDocument()
+    expect(popover).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(popover).toHaveAttribute('inert')
+
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBe(popover)
+  })
+
   it('clears a filled slot when it is dropped on the temporary trash target', () => {
     const onClear = vi.fn()
     render(

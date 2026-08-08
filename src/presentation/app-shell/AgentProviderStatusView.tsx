@@ -1,10 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 import type { AgentProviderAvailability } from '../../contexts/agent/application/ports/AgentProviderContribution'
 import type { AgentBlockingFeedback, AgentFeedbackIssue } from './agentProviderFeedback'
 import type { AgentProviderPanelState } from './useAgentProviderState'
 import { useI18n } from './i18n/useI18n'
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
 
@@ -139,58 +139,51 @@ export function AgentProviderStatusControl({
           ) : null}
         </button>
       </TooltipLabel>
-      {isOpen
-        ? createPortal(
-            <div
-              className="agent-provider-status-panel nodrag nowheel"
-              id={panelId}
-              role="dialog"
-              aria-label={t('agent.statusPanel', { agentName })}
-              tabIndex={-1}
-              data-side={position?.side ?? 'bottom'}
-              ref={panelRef}
-              style={{
-                left: position?.left ?? 0,
-                top: position?.top ?? 0,
-                visibility: position ? 'visible' : 'hidden'
+      <AnchoredSurfaceMotion
+        open={isOpen}
+        portalContainer={document.body}
+        className="agent-provider-status-panel anchored-surface-motion nodrag nowheel"
+        id={panelId}
+        role="dialog"
+        aria-label={t('agent.statusPanel', { agentName })}
+        tabIndex={-1}
+        data-side={position?.side ?? 'bottom'}
+        ref={panelRef}
+        style={{
+          left: position?.left ?? 0,
+          top: position?.top ?? 0,
+          visibility: position ? 'visible' : 'hidden'
+        }}
+      >
+        <div className="agent-provider-status-panel__header">
+          <strong>{t('agent.statusTitle')}</strong>
+          <TooltipLabel content={t('agent.statusClose')}>
+            <button
+              type="button"
+              aria-label={t('agent.statusClose')}
+              onClick={() => {
+                setIsOpen(false)
+                triggerRef.current?.focus()
               }}
             >
-              <div className="agent-provider-status-panel__header">
-                <strong>{t('agent.statusTitle')}</strong>
-                <TooltipLabel content={t('agent.statusClose')}>
-                  <button
-                    type="button"
-                    aria-label={t('agent.statusClose')}
-                    onClick={() => {
-                      setIsOpen(false)
-                      triggerRef.current?.focus()
-                    }}
-                  >
-                    <WorkbenchIcon role="close" size={14} />
-                  </button>
-                </TooltipLabel>
-              </div>
-              <div className="agent-provider-status-panel__issues">
-                {issues.map((issue) => (
-                  <StatusIssue
-                    issue={issue}
-                    key={issue}
-                    onNewConversation={
-                      onNewConversation ? () => runAction(onNewConversation) : undefined
-                    }
-                    onRestart={onRestart ? () => runAction(onRestart) : undefined}
-                    onRetryAttachment={
-                      onRetryAttachment ? () => runAction(onRetryAttachment) : undefined
-                    }
-                    providerName={providerName}
-                    state={state}
-                  />
-                ))}
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+              <WorkbenchIcon role="close" size={14} />
+            </button>
+          </TooltipLabel>
+        </div>
+        <div className="agent-provider-status-panel__issues">
+          {issues.map((issue) => (
+            <StatusIssue
+              issue={issue}
+              key={issue}
+              onNewConversation={onNewConversation ? () => runAction(onNewConversation) : undefined}
+              onRestart={onRestart ? () => runAction(onRestart) : undefined}
+              onRetryAttachment={onRetryAttachment ? () => runAction(onRetryAttachment) : undefined}
+              providerName={providerName}
+              state={state}
+            />
+          ))}
+        </div>
+      </AnchoredSurfaceMotion>
     </span>
   )
 }

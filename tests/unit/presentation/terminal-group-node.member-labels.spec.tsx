@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { defaultTerminalBlockSize } from '../../../src/contexts/block-graph/domain/aggregates/BlockGraph'
 import { TerminalGroupNode } from '../../../src/presentation/app-shell/TerminalGroupNode'
@@ -15,6 +15,8 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 describe('terminal group member labels', () => {
+  afterEach(() => vi.restoreAllMocks())
+
   it('hides member labels while the group is expanded', () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: false })} />)
 
@@ -326,6 +328,26 @@ describe('terminal group member labels', () => {
     )
   })
 
+  it('removes live spring scaling when reduced motion changes at runtime', () => {
+    const media = createMutableMediaQueryList(false)
+    vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
+    const { container } = render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: false,
+          members: [],
+          data: { dropFeedback: 'join', isEditing: true }
+        })}
+      />
+    )
+    const group = container.querySelector('.terminal-group-node')
+    expect(group).toHaveClass('terminal-group-drop-spring--active')
+
+    act(() => media.setMatches(true))
+
+    expect(group).not.toHaveClass('terminal-group-drop-spring--active')
+  })
+
   it('uses only the shared tooltip for a member remove action', async () => {
     render(<TerminalGroupNode {...createTerminalGroupNodeProps({ isCollapsed: true })} />)
 
@@ -538,5 +560,35 @@ function createTerminalBlock(
     launchCommand: '',
     position: { x, y: 240 },
     size: defaultTerminalBlockSize
+  }
+}
+
+function createMutableMediaQueryList(initialMatches: boolean) {
+  let matches = initialMatches
+  let listener: ((event: MediaQueryListEvent) => void) | null = null
+  const value = {
+    get matches() {
+      return matches
+    },
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: (_type: string, nextListener: EventListenerOrEventListenerObject | null) => {
+      if (typeof nextListener === 'function') {
+        listener = nextListener as (event: MediaQueryListEvent) => void
+      }
+    },
+    removeEventListener: () => {
+      listener = null
+    },
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: () => true
+  } as MediaQueryList
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      listener?.({ matches, media: value.media } as MediaQueryListEvent)
+    },
+    value
   }
 }

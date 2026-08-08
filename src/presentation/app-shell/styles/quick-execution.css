@@ -30,9 +30,9 @@
   background: var(--cc-surface-translucent);
   backdrop-filter: blur(10px);
   transition:
-    border-color 140ms ease,
-    background 140ms ease,
-    opacity 140ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .quick-execution__slot--filled {
@@ -174,8 +174,18 @@
   background: var(--cc-surface-overlay);
   padding: 4px;
   box-shadow: var(--cc-shadow-floating);
-  transform: translateX(-50%);
-  animation: quick-execution-popover-in 150ms ease-out;
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+  transform-origin: 50% 100%;
+  transition:
+    opacity var(--cc-motion-duration-surface) var(--cc-easing-enter),
+    transform var(--cc-motion-duration-surface) var(--cc-easing-enter);
+}
+
+.quick-execution__popover[data-surface-motion-state='closing'] {
+  opacity: 0;
+  transform: translate(-50%, 4px) scale(0.96);
+  transition-timing-function: var(--cc-easing-exit);
 }
 
 .quick-execution__picker-list,
@@ -248,10 +258,10 @@
   pointer-events: none;
   transform: translateY(3px) scale(0.88);
   transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    opacity 140ms ease,
-    transform 140ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .quick-execution__trash--visible {
@@ -271,15 +281,10 @@
   pointer-events: none;
 }
 
-@keyframes quick-execution-popover-in {
-  from {
+@starting-style {
+  .quick-execution__popover[data-surface-motion-state='opening'] {
     opacity: 0;
-    transform: translate(-50%, 4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translate(-50%, 4px) scale(0.96);
   }
 }
 
@@ -288,10 +293,6 @@
   .quick-execution__slot,
   .quick-execution__trash {
     transition: none;
-  }
-
-  .quick-execution__popover {
-    animation: none;
   }
 }
 

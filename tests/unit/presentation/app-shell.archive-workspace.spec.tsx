@@ -66,7 +66,12 @@ describe('app shell worktree archive', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(menu).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(menu).toHaveAttribute('inert')
     expect(trigger).toHaveFocus()
+
+    fireEvent.transitionEnd(menu, { propertyName: 'transform' })
+    expect(menu).not.toBeInTheDocument()
 
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitem', { name: '归档工作区' })).toHaveFocus()
@@ -122,6 +127,7 @@ describe('app shell worktree archive', () => {
     ).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: '归档工作区' }))
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
 
     await waitFor(() =>
       expect(archiveBranchWorkspace).toHaveBeenCalledWith({
@@ -157,11 +163,9 @@ describe('app shell worktree archive', () => {
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '归档工作区' }))
-    fireEvent.click(
-      within(await screen.findByRole('dialog', { name: '归档工作区 test' })).getByRole('button', {
-        name: '归档工作区'
-      })
-    )
+    const dialog = await screen.findByRole('dialog', { name: '归档工作区 test' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '归档工作区' }))
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
 
     expect(await screen.findByRole('alert')).toHaveTextContent('工作区有未提交更改，无法归档。')
     expect(within(projectCard).getByRole('button', { name: 'test 独立工作区' })).toBeEnabled()
@@ -194,6 +198,7 @@ describe('app shell worktree archive', () => {
     expect(within(dialog).getByText(/Git 分支 test 会被保留/)).toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: '解除锁并归档' }))
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
 
     await waitFor(() =>
       expect(archiveBranchWorkspace).toHaveBeenCalledWith({

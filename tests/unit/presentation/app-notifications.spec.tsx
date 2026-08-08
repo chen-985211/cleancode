@@ -100,10 +100,17 @@ describe('app notifications', () => {
     expect(alerts).toHaveLength(2)
     expect(alerts[0]).toHaveTextContent('流程失败')
     expect(alerts[0]).toHaveTextContent('终端“OpenCove 开发环境”运行失败。')
+    expect(alerts[0]).toHaveAttribute('data-surface-motion-state', 'opening')
+    fireEvent.transitionEnd(alerts[0], { propertyName: 'transform' })
+    expect(alerts[0]).toHaveAttribute('data-surface-motion-state', 'open')
 
     fireEvent.click(screen.getAllByRole('button', { name: '关闭“流程失败”通知' })[0])
 
     expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(alerts[0]).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(alerts[0]).toHaveAttribute('inert')
+    fireEvent.transitionEnd(alerts[0], { propertyName: 'transform' })
+    expect(alerts[0]).not.toBeInTheDocument()
   })
 
   it('dismisses a notification after its optional duration', () => {
@@ -116,10 +123,14 @@ describe('app notifications', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '发送自动关闭通知' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('项目已同步')
+    const notification = screen.getByRole('status')
+    expect(notification).toHaveTextContent('项目已同步')
 
     act(() => vi.advanceTimersByTime(1_000))
 
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(notification).toHaveAttribute('data-surface-motion-state', 'closing')
+    fireEvent.transitionEnd(notification, { propertyName: 'transform' })
     expect(screen.queryByText('项目已同步')).not.toBeInTheDocument()
   })
 
@@ -137,9 +148,14 @@ describe('app notifications', () => {
     expect(screen.getByRole('status')).toHaveTextContent('流程运行成功')
     expect(screen.queryByText('流程运行中')).not.toBeInTheDocument()
 
+    const notification = screen.getByRole('status')
     fireEvent.click(screen.getByRole('button', { name: '关闭活动通知' }))
     fireEvent.click(screen.getByRole('button', { name: '更新活动通知' }))
 
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(notification).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(notification).toHaveTextContent('流程运行成功')
+    fireEvent.transitionEnd(notification, { propertyName: 'transform' })
     expect(screen.queryByText('流程运行成功')).not.toBeInTheDocument()
   })
 

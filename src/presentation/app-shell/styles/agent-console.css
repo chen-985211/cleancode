@@ -8,8 +8,8 @@
   background: var(--cc-terminal-background);
   box-shadow: var(--cc-shadow-sm);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-console-node--selected,
@@ -84,10 +84,10 @@
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-console-actions__more:hover,
@@ -327,8 +327,6 @@ img.agent-provider-icon {
 }
 
 .agent-provider-status-panel {
-  --agent-status-enter-y: -3px;
-
   position: fixed;
   z-index: 200;
   display: grid;
@@ -340,12 +338,9 @@ img.agent-provider-icon {
   box-shadow: var(--cc-shadow-floating);
   padding: 8px;
   transform-origin: top right;
-  animation: agent-console-menu-in 160ms ease-out;
 }
 
 .agent-provider-status-panel[data-side='top'] {
-  --agent-status-enter-y: 3px;
-
   transform-origin: bottom right;
 }
 
@@ -517,23 +512,11 @@ img.agent-provider-icon {
 }
 
 .agent-provider-empty-state__spinner {
-  animation: agent-spin 900ms linear infinite;
+  animation: agent-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 @keyframes agent-spin {
   to {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes agent-console-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(var(--agent-menu-enter-y, var(--agent-status-enter-y))) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }

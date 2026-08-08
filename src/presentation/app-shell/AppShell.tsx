@@ -591,7 +591,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
             changeTerminalScrollback={changeTerminalScrollback}
             changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
             currentWorkbench={currentWorkbench}
-            currentWorkspace={currentWorkspace}
             isDesktopRuntime={isDesktopRuntime}
             resetAllBindings={resetAllBindings}
             reduceVisualNoise={reduceVisualNoise}

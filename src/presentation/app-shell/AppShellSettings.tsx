@@ -21,7 +21,6 @@ export function AppShellSettings({
   changeTerminalScrollback,
   changeTerminalWorkflowBuildMode,
   currentWorkbench,
-  currentWorkspace,
   isDesktopRuntime,
   resetAllBindings,
   reduceVisualNoise,
@@ -40,7 +39,6 @@ export function AppShellSettings({
   readonly changeTerminalScrollback: (rows: 1000 | 5000 | 10000) => void
   readonly changeTerminalWorkflowBuildMode: (mode: TerminalWorkflowBuildMode) => void
   readonly currentWorkbench: WorkbenchSnapshot | null
-  readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly isDesktopRuntime: boolean
   readonly resetAllBindings: () => void
   readonly reduceVisualNoise: boolean
@@ -55,7 +53,6 @@ export function AppShellSettings({
       <BlockTemplateSurfaces
         actions={blockTemplates}
         currentWorkbench={currentWorkbench}
-        currentWorkspace={currentWorkspace}
         isDesktopRuntime={isDesktopRuntime}
       />
       <LanguageSettingsRoot />

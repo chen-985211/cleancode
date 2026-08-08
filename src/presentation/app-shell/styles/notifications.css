@@ -41,7 +41,20 @@
   overflow: hidden;
   box-shadow: var(--cc-shadow-floating);
   backdrop-filter: blur(12px);
-  animation: notification-enter 180ms ease-out both;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition:
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-surface) var(--cc-easing-enter),
+    transform var(--cc-motion-duration-surface) var(--cc-easing-enter);
+}
+
+.notification-card[data-surface-motion-state='closing'] {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+  transition-timing-function: var(--cc-easing-exit);
+  pointer-events: none;
 }
 
 .notification-card--success {
@@ -111,10 +124,10 @@
   font-weight: 650;
   line-height: 1;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    opacity 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .notification-card__action:hover:not(:disabled) {
@@ -145,7 +158,7 @@
 }
 
 .notification-card__spinner {
-  animation: notification-spin 900ms linear infinite;
+  animation: notification-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 .notification-card__dismiss {
@@ -159,9 +172,9 @@
   background: transparent;
   color: var(--cc-muted);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .notification-card__dismiss:hover {
@@ -170,15 +183,10 @@
   color: var(--cc-foreground);
 }
 
-@keyframes notification-enter {
-  from {
+@starting-style {
+  .notification-card[data-surface-motion-state='opening'] {
     opacity: 0;
     transform: translateY(-6px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -201,10 +209,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .notification-card {
-    animation: none;
-  }
-
   .notification-card__spinner {
     animation: none;
   }

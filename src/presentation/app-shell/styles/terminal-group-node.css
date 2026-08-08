@@ -34,6 +34,7 @@
     0 16px 32px var(--cc-shadow-color),
     0 0 0 1px var(--terminal-group-border) inset,
     0 1px 0 var(--cc-neutral-overlay) inset;
+  /* cc-motion-owner: terminal-group-drop-feedback */
   transition:
     background 140ms ease-out,
     box-shadow 180ms cubic-bezier(0.2, 0.82, 0.2, 1);
@@ -54,7 +55,7 @@
   content: '';
   opacity: 0;
   pointer-events: none;
-  transition: opacity 140ms ease-out;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-enter);
 }
 
 .terminal-group-node--collapsed {
@@ -99,7 +100,7 @@
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
-  transition: color 140ms ease;
+  transition: color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-node__empty-state--action:active {
@@ -175,10 +176,10 @@
     0 1px 0 var(--cc-neutral-overlay) inset,
     0 2px 5px var(--cc-shadow-color);
   transition:
-    transform 100ms ease,
-    background 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-node__disclosure svg {
@@ -228,7 +229,7 @@
   padding: 0 0 0 2px;
   background: transparent;
   color: var(--terminal-group-muted);
-  transition: background 140ms ease;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-node__member:not(:last-child)::after {
@@ -304,9 +305,9 @@
   font: inherit;
   opacity: 0.9;
   transition:
-    background 140ms ease,
-    color 140ms ease,
-    opacity 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-node__member-remove svg {
@@ -360,8 +361,8 @@
     0 1px 2px var(--cc-shadow-color);
   outline: none;
   transition:
-    background 140ms ease,
-    box-shadow 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-name-form input:focus {

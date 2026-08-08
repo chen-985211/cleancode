@@ -85,6 +85,24 @@ describe('block template library', () => {
     expect(onBeginPlacement).toHaveBeenCalledWith(globalTemplate, true)
   })
 
+  it('keeps the closing drawer inert until its overlay exit completes', async () => {
+    renderLibrary(vi.fn())
+    const trigger = screen.getByRole('button', { name: '收藏模板' })
+    fireEvent.click(trigger)
+    const dialog = await screen.findByRole('dialog', { name: '收藏模板' })
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭收藏模板' }))
+
+    expect(screen.queryByRole('dialog', { name: '收藏模板' })).toBeNull()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('inert')
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(dialog).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
   it('explains icon-only maintenance actions with tooltips', async () => {
     renderLibrary(vi.fn())
     fireEvent.click(screen.getByRole('button', { name: '收藏模板' }))

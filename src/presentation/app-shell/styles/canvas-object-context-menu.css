@@ -57,7 +57,7 @@
   line-height: 1;
   padding: 0 18px;
   text-align: left;
-  transition: background 150ms ease;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .canvas-node-menu__item svg {

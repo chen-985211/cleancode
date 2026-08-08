@@ -14,10 +14,4 @@ export const browserViewportMotionFrameScheduler: WorkbenchViewportMotionFrameSc
   requestTimeout: (callback, delayMilliseconds) => window.setTimeout(callback, delayMilliseconds)
 }
 
-export function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-}
+export { prefersReducedMotion } from './motionPreference'

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from
 
 import type { ThemePreference } from './themePreference'
 import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
 
@@ -18,7 +19,6 @@ export function ThemeSettingsRoot() {
   const { t } = useI18n()
   const closeSettings = (): void => {
     setIsOpen(false)
-    triggerRef.current?.focus()
   }
 
   useEffect(() => {
@@ -27,13 +27,6 @@ export function ThemeSettingsRoot() {
     }
 
     closeButtonRef.current?.focus()
-    const backgroundRegions = Array.from(
-      document.querySelectorAll<HTMLElement>('.project-sidebar, .app-shell__workspace')
-    )
-    for (const region of backgroundRegions) {
-      region.inert = true
-    }
-
     const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
       if (event.key === 'Escape') {
         closeSettings()
@@ -43,9 +36,6 @@ export function ThemeSettingsRoot() {
 
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
-      for (const region of backgroundRegions) {
-        region.inert = false
-      }
     }
   }, [isOpen])
 
@@ -65,70 +55,70 @@ export function ThemeSettingsRoot() {
           <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen ? (
-        <div className="theme-settings-backdrop" onMouseDown={closeFromBackdrop}>
-          <aside
-            id="theme-settings-dialog"
-            ref={dialogRef}
-            className="theme-settings-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="theme-settings-title"
-            onKeyDown={(event) => trapDialogFocus(event, dialogRef.current)}
-          >
-            <div className="theme-settings-drawer__header">
-              <div>
-                <h2 id="theme-settings-title">{t('theme.settings')}</h2>
-                <p>{t('theme.description')}</p>
-              </div>
-              <TooltipLabel content={t('theme.close')} side="left">
-                <button
-                  ref={closeButtonRef}
-                  className="theme-settings-drawer__close"
-                  type="button"
-                  aria-label={t('theme.close')}
-                  onClick={closeSettings}
-                >
-                  <XIcon size={18} weight="bold" aria-hidden="true" />
-                </button>
-              </TooltipLabel>
+      <OverlaySurfaceMotion
+        id="theme-settings-dialog"
+        className="theme-settings-backdrop overlay-surface-motion overlay-surface-motion--drawer-right"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="theme-settings-title"
+        open={isOpen}
+        onExitComplete={() => triggerRef.current?.focus()}
+        onMouseDown={closeFromBackdrop}
+        onKeyDown={(event) => trapDialogFocus(event, dialogRef.current)}
+      >
+        <aside ref={dialogRef} className="theme-settings-drawer overlay-surface-motion__content">
+          <div className="theme-settings-drawer__header">
+            <div>
+              <h2 id="theme-settings-title">{t('theme.settings')}</h2>
+              <p>{t('theme.description')}</p>
             </div>
-            <fieldset className="theme-settings-options">
-              <legend>{t('theme.section')}</legend>
-              <div className="theme-settings-options__grid">
-                {themePreferences.map((option) => (
-                  <label className="theme-option" key={option}>
-                    <input
-                      type="radio"
-                      name="theme-preference"
-                      value={option}
-                      checked={preference === option}
-                      onChange={() => selectPreference(option)}
-                    />
-                    <span
-                      className={`theme-option__preview theme-option__preview--${option}`}
-                      aria-hidden="true"
-                    >
-                      <span className="theme-option__preview-sidebar" />
-                      <span className="theme-option__preview-content">
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      {preference === option ? (
-                        <span className="theme-option__check">
-                          <CheckIcon size={13} weight="bold" aria-hidden="true" />
-                        </span>
-                      ) : null}
+            <TooltipLabel content={t('theme.close')} side="left">
+              <button
+                ref={closeButtonRef}
+                className="theme-settings-drawer__close"
+                type="button"
+                aria-label={t('theme.close')}
+                onClick={closeSettings}
+              >
+                <XIcon size={18} weight="bold" aria-hidden="true" />
+              </button>
+            </TooltipLabel>
+          </div>
+          <fieldset className="theme-settings-options">
+            <legend>{t('theme.section')}</legend>
+            <div className="theme-settings-options__grid">
+              {themePreferences.map((option) => (
+                <label className="theme-option" key={option}>
+                  <input
+                    type="radio"
+                    name="theme-preference"
+                    value={option}
+                    checked={preference === option}
+                    onChange={() => selectPreference(option)}
+                  />
+                  <span
+                    className={`theme-option__preview theme-option__preview--${option}`}
+                    aria-hidden="true"
+                  >
+                    <span className="theme-option__preview-sidebar" />
+                    <span className="theme-option__preview-content">
+                      <span />
+                      <span />
+                      <span />
                     </span>
-                    <span className="theme-option__label">{themeLabel(option)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </aside>
-        </div>
-      ) : null}
+                    {preference === option ? (
+                      <span className="theme-option__check">
+                        <CheckIcon size={13} weight="bold" aria-hidden="true" />
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="theme-option__label">{themeLabel(option)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </aside>
+      </OverlaySurfaceMotion>
     </>
   )
 

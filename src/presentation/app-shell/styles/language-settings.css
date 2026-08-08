@@ -15,9 +15,9 @@
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -41,7 +41,6 @@
   background: var(--cc-surface-overlay);
   box-shadow: var(--cc-shadow-floating);
   padding: 6px;
-  animation: language-menu-in 160ms ease-out;
 }
 
 .language-settings-option {
@@ -62,8 +61,8 @@
   padding: 0 11px;
   text-align: left;
   transition:
-    background 150ms ease,
-    color 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .language-settings-option:hover {
@@ -83,11 +82,4 @@
 
 .language-settings-option svg {
   flex: 0 0 auto;
-}
-
-@keyframes language-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-  }
 }

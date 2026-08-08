@@ -24,9 +24,9 @@
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -60,7 +60,6 @@
   inset: 0;
   background: var(--cc-backdrop);
   backdrop-filter: blur(2px);
-  animation: theme-backdrop-in 160ms ease-out;
 }
 
 .theme-settings-drawer {
@@ -75,7 +74,6 @@
   background: var(--cc-surface-raised);
   color: var(--cc-foreground);
   box-shadow: var(--cc-shadow-floating);
-  animation: theme-drawer-in 180ms ease-out;
 }
 
 .theme-settings-drawer__header {
@@ -151,9 +149,9 @@
   background: var(--theme-preview-background);
   box-shadow: var(--cc-shadow-xs);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .theme-option:hover .theme-option__preview {
@@ -244,19 +242,6 @@
   font-size: 12px;
   font-weight: 620;
   text-align: center;
-}
-
-@keyframes theme-backdrop-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes theme-drawer-in {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
 }
 
 @media (max-width: 640px) {

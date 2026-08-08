@@ -128,6 +128,13 @@
 }
 
 :root {
+  --cc-motion-duration-press: 100ms;
+  --cc-motion-duration-feedback: 150ms;
+  --cc-motion-duration-surface: 180ms;
+  --cc-motion-duration-spinner: 900ms;
+  --cc-easing-standard: ease;
+  --cc-easing-enter: ease-out;
+  --cc-easing-exit: ease-in;
   --cc-canvas-node-radius: 20px;
   --cc-terminal-light-background: #ffffff;
   --cc-terminal-light-foreground: #243142;

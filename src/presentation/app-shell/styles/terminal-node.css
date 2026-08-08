@@ -27,8 +27,8 @@
   background: var(--terminal-shell);
   box-shadow: var(--cc-shadow-sm);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-node--running {
@@ -112,11 +112,11 @@
   color: var(--cc-muted-strong);
   box-shadow: 0 1px 2px var(--cc-shadow-color);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    transform 100ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard);
 }
 
 .terminal-node__group-select:hover:not(:disabled) {
@@ -212,10 +212,10 @@
   color: var(--cc-muted-strong);
   box-shadow: none;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-node__icon svg,

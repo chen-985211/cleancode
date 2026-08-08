@@ -38,6 +38,9 @@ describe('Agent Provider runtime status', () => {
     expect(panel).toHaveTextContent('OpenCode 会话已结束')
 
     fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Agent 1 状态' })).not.toBeInTheDocument()
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(panel).toHaveAttribute('inert')
     expect(screen.getByRole('button', { name: 'Agent 1 有 2 个状态需要处理' })).toHaveFocus()
   })
 

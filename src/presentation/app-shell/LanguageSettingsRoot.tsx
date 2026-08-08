@@ -3,6 +3,7 @@ import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { useI18n } from './i18n/useI18n'
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { supportedLocales, type Locale } from './i18n/locale'
 
@@ -50,38 +51,37 @@ export function LanguageSettingsRoot() {
           <TranslateIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen ? (
-        <div
-          id="language-settings-menu"
-          className="language-settings-menu"
-          role="menu"
-          aria-label={t('language.settings')}
-        >
-          {supportedLocales.map((optionLocale, index) => (
-            <button
-              key={optionLocale}
-              ref={(element) => {
-                if (element) {
-                  optionRefs.current.set(optionLocale, element)
-                } else {
-                  optionRefs.current.delete(optionLocale)
-                }
-              }}
-              className="language-settings-option"
-              type="button"
-              role="menuitemradio"
-              aria-checked={locale === optionLocale}
-              onClick={() => chooseLocale(optionLocale)}
-              onKeyDown={(event) => handleOptionKeyDown(event, index)}
-            >
-              <span>{languageLabel(optionLocale)}</span>
-              {locale === optionLocale ? (
-                <CheckIcon size={17} weight="bold" aria-hidden="true" />
-              ) : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <AnchoredSurfaceMotion
+        id="language-settings-menu"
+        className="language-settings-menu anchored-surface-motion"
+        role="menu"
+        aria-label={t('language.settings')}
+        open={isOpen}
+      >
+        {supportedLocales.map((optionLocale, index) => (
+          <button
+            key={optionLocale}
+            ref={(element) => {
+              if (element) {
+                optionRefs.current.set(optionLocale, element)
+              } else {
+                optionRefs.current.delete(optionLocale)
+              }
+            }}
+            className="language-settings-option"
+            type="button"
+            role="menuitemradio"
+            aria-checked={locale === optionLocale}
+            onClick={() => chooseLocale(optionLocale)}
+            onKeyDown={(event) => handleOptionKeyDown(event, index)}
+          >
+            <span>{languageLabel(optionLocale)}</span>
+            {locale === optionLocale ? (
+              <CheckIcon size={17} weight="bold" aria-hidden="true" />
+            ) : null}
+          </button>
+        ))}
+      </AnchoredSurfaceMotion>
     </div>
   )
 

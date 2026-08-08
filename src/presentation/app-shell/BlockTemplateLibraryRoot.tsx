@@ -13,6 +13,7 @@ import type {
   BlockTemplateSnapshot
 } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 
 type LibraryScopeKind = BlockTemplateScope['type']
@@ -46,11 +47,6 @@ export function BlockTemplateLibraryRoot({
     if (!isOpen) return undefined
 
     closeButtonRef.current?.focus()
-    const backgroundRegions = Array.from(
-      document.querySelectorAll<HTMLElement>('.project-sidebar, .app-shell__workspace')
-    )
-    for (const region of backgroundRegions) region.inert = true
-
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') closeLibrary()
     }
@@ -58,7 +54,6 @@ export function BlockTemplateLibraryRoot({
 
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
-      for (const region of backgroundRegions) region.inert = false
     }
   }, [isOpen])
 
@@ -109,110 +104,111 @@ export function BlockTemplateLibraryRoot({
           <StarIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen ? (
-        <div className="block-template-library-backdrop" onMouseDown={closeFromBackdrop}>
-          <aside
-            id="block-template-library-dialog"
-            className="block-template-library-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="block-template-library-title"
-          >
-            <header className="block-template-library-header">
-              <h2 id="block-template-library-title">{t('templates.title')}</h2>
-              <TooltipLabel content={t('templates.close')} side="left">
+      <OverlaySurfaceMotion
+        open={isOpen}
+        onExitComplete={() => triggerRef.current?.focus()}
+        id="block-template-library-dialog"
+        className="block-template-library-backdrop overlay-surface-motion overlay-surface-motion--drawer-right"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="block-template-library-title"
+        onMouseDown={closeFromBackdrop}
+      >
+        <aside className="block-template-library-drawer overlay-surface-motion__content">
+          <header className="block-template-library-header">
+            <h2 id="block-template-library-title">{t('templates.title')}</h2>
+            <TooltipLabel content={t('templates.close')} side="left">
+              <button
+                ref={closeButtonRef}
+                className="block-template-library-close"
+                type="button"
+                aria-label={t('templates.close')}
+                onClick={closeLibrary}
+              >
+                <XIcon size={18} weight="bold" aria-hidden="true" />
+              </button>
+            </TooltipLabel>
+          </header>
+          <div className="block-template-library-controls">
+            <div className="block-template-library-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={scopeKind === 'project'}
+                disabled={!currentProjectId}
+                onClick={() => {
+                  setErrorMessage(null)
+                  setScopeKind('project')
+                }}
+              >
+                {t('templates.scope.project')}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={scopeKind === 'global'}
+                onClick={() => {
+                  setErrorMessage(null)
+                  setScopeKind('global')
+                }}
+              >
+                {t('templates.scope.global')}
+              </button>
+            </div>
+            <label className="block-template-library-search">
+              <MagnifyingGlassIcon size={15} aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                aria-label={t('templates.search')}
+                placeholder={t('templates.search')}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="block-template-library-list">
+            {errorMessage ? (
+              <div className="block-template-library-error" role="alert">
+                <span>{errorMessage}</span>
                 <button
-                  ref={closeButtonRef}
-                  className="block-template-library-close"
                   type="button"
-                  aria-label={t('templates.close')}
-                  onClick={closeLibrary}
-                >
-                  <XIcon size={18} weight="bold" aria-hidden="true" />
-                </button>
-              </TooltipLabel>
-            </header>
-            <div className="block-template-library-controls">
-              <div className="block-template-library-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={scopeKind === 'project'}
-                  disabled={!currentProjectId}
                   onClick={() => {
                     setErrorMessage(null)
-                    setScopeKind('project')
+                    setLoadRevision((revision) => revision + 1)
                   }}
                 >
-                  {t('templates.scope.project')}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={scopeKind === 'global'}
-                  onClick={() => {
-                    setErrorMessage(null)
-                    setScopeKind('global')
-                  }}
-                >
-                  {t('templates.scope.global')}
+                  {t('templates.retry')}
                 </button>
               </div>
-              <label className="block-template-library-search">
-                <MagnifyingGlassIcon size={15} aria-hidden="true" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  aria-label={t('templates.search')}
-                  placeholder={t('templates.search')}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="block-template-library-list">
-              {errorMessage ? (
-                <div className="block-template-library-error" role="alert">
-                  <span>{errorMessage}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setErrorMessage(null)
-                      setLoadRevision((revision) => revision + 1)
-                    }}
-                  >
-                    {t('templates.retry')}
-                  </button>
-                </div>
-              ) : null}
-              {!errorMessage && visibleTemplates.length === 0 ? (
-                <p className="block-template-library-empty">
-                  {searchQuery ? t('templates.searchEmpty') : t('templates.empty')}
-                </p>
-              ) : null}
-              {visibleTemplates.map((template) => (
-                <TemplateLibraryItem
-                  key={template.id}
-                  template={template}
-                  currentProjectId={currentProjectId}
-                  isEditing={editingTemplateId === template.id}
-                  isDeletePending={deleteTemplateId === template.id}
-                  onBeginPlacement={(runAfterPlacement) => {
-                    onBeginPlacement(template, runAfterPlacement)
-                    closeLibrary()
-                  }}
-                  onCancelDelete={() => setDeleteTemplateId(null)}
-                  onCancelEdit={() => setEditingTemplateId(null)}
-                  onDelete={() => void deleteTemplate(template)}
-                  onEdit={() => setEditingTemplateId(template.id)}
-                  onMove={() => void moveTemplate(template)}
-                  onRequestDelete={() => setDeleteTemplateId(template.id)}
-                  onSave={(name, description) => void updateTemplate(template, name, description)}
-                />
-              ))}
-            </div>
-          </aside>
-        </div>
-      ) : null}
+            ) : null}
+            {!errorMessage && visibleTemplates.length === 0 ? (
+              <p className="block-template-library-empty">
+                {searchQuery ? t('templates.searchEmpty') : t('templates.empty')}
+              </p>
+            ) : null}
+            {visibleTemplates.map((template) => (
+              <TemplateLibraryItem
+                key={template.id}
+                template={template}
+                currentProjectId={currentProjectId}
+                isEditing={editingTemplateId === template.id}
+                isDeletePending={deleteTemplateId === template.id}
+                onBeginPlacement={(runAfterPlacement) => {
+                  onBeginPlacement(template, runAfterPlacement)
+                  closeLibrary()
+                }}
+                onCancelDelete={() => setDeleteTemplateId(null)}
+                onCancelEdit={() => setEditingTemplateId(null)}
+                onDelete={() => void deleteTemplate(template)}
+                onEdit={() => setEditingTemplateId(template.id)}
+                onMove={() => void moveTemplate(template)}
+                onRequestDelete={() => setDeleteTemplateId(template.id)}
+                onSave={(name, description) => void updateTemplate(template, name, description)}
+              />
+            ))}
+          </div>
+        </aside>
+      </OverlaySurfaceMotion>
     </>
   )
 
@@ -221,7 +217,6 @@ export function BlockTemplateLibraryRoot({
     setEditingTemplateId(null)
     setDeleteTemplateId(null)
     setSearchQuery('')
-    triggerRef.current?.focus()
   }
 
   function closeFromBackdrop(event: MouseEvent<HTMLDivElement>): void {

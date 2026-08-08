@@ -14,6 +14,27 @@ import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/wo
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('block template actions', () => {
+  it('retains the save presentation until its controlled exit completes', () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const { result } = renderActions(workbench)
+
+    act(() => result.current.requestSave(['terminal-a']))
+    expect(result.current.savePresentation).toMatchObject({
+      open: true,
+      projectDirectory: '/repo/app',
+      selectedBlockIds: ['terminal-a']
+    })
+
+    act(() => result.current.closeSave())
+    expect(result.current.savePresentation).toMatchObject({
+      open: false,
+      selectedBlockIds: ['terminal-a']
+    })
+
+    act(() => result.current.completeSaveExit())
+    expect(result.current.savePresentation).toBeNull()
+  })
+
   it('submits only one atomic instantiation while placement is pending', async () => {
     const workbench = createWorkbenchSnapshot('/repo/app', 'app')
     const pending = createDeferred<InstantiateResult>()

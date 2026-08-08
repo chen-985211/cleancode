@@ -70,10 +70,12 @@ describe('theme settings', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(screen.getByRole('radio', { name: '深色' })).toBeChecked()
 
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog', { name: '主题设置' })).not.toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
     expect(trigger).toHaveFocus()
   })
 
@@ -96,12 +98,34 @@ describe('theme settings', () => {
     expect(workspace.inert).toBe(true)
     expect(screen.getByRole('button', { name: '关闭主题设置' })).toHaveFocus()
 
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
 
+    expect(sidebar.inert).toBe(true)
+    expect(workspace.inert).toBe(true)
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
     expect(sidebar.inert).toBe(false)
     expect(workspace.inert).toBe(false)
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(trigger).toHaveFocus()
+  })
+
+  it('retains an inert closing drawer until the shared overlay exit completes', () => {
+    render(<ThemeSettingsRoot />)
+
+    fireEvent.click(screen.getByRole('button', { name: '主题设置' }))
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog', { name: '主题设置' })).not.toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('aria-hidden', 'true')
+    expect(dialog).toHaveAttribute('inert')
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'transform' })
+
+    expect(dialog).not.toBeInTheDocument()
   })
 
   it('keeps keyboard focus inside the theme dialog', () => {

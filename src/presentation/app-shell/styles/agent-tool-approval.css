@@ -10,7 +10,7 @@
   box-shadow:
     0 1px 0 var(--cc-highlight-inset) inset,
     var(--cc-shadow-sm);
-  animation: agent-approval-enter 180ms ease-out both;
+  animation: agent-approval-enter var(--cc-motion-duration-surface) var(--cc-easing-enter) both;
 }
 
 .agent-tool-approval-card--failed,
@@ -217,10 +217,10 @@
   font-size: 10.5px;
   font-weight: 660;
   transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   white-space: nowrap;
 }
 
@@ -330,10 +330,10 @@
   font-size: 11px;
   font-weight: 680;
   transition:
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   white-space: nowrap;
 }
 
@@ -382,7 +382,7 @@
 }
 
 .agent-tool-approval-card__spinner {
-  animation: agent-approval-spin 800ms linear infinite;
+  animation: agent-approval-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 .agent-approval-intent-handle {
@@ -397,6 +397,7 @@
   stroke: var(--cc-warning);
   stroke-width: 2;
   stroke-dasharray: 8 7;
+  /* cc-motion-owner: agent-approval-intent */
   animation: agent-approval-dash 1.1s linear infinite;
 }
 
