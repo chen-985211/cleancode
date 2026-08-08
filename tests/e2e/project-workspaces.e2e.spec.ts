@@ -147,9 +147,7 @@ describe('project workspaces e2e', () => {
         const projectName = `sidebar-project-${index}`
         const projectDirectory = join(workbench.projectDirectory, projectName)
         await mkdir(projectDirectory)
-        await electronApp.evaluate((_electron, directory) => {
-          process.env.CLEANCODE_TEST_PROJECT_DIRECTORY = directory
-        }, projectDirectory)
+        await setProjectPickerDirectory(electronApp, projectDirectory)
         await page.getByRole('button', { name: '添加项目' }).click()
         await page.getByRole('button', { name: projectName, exact: true }).waitFor()
       }
@@ -216,6 +214,23 @@ describe('project workspaces e2e', () => {
     }
   )
 })
+
+async function setProjectPickerDirectory(
+  electronApp: ElectronApplication,
+  projectDirectory: string
+): Promise<void> {
+  await pollUntilState({
+    description: `Electron project picker directory to become ${projectDirectory}`,
+    observe: () =>
+      electronApp.evaluate((_electron, directory) => {
+        process.env.CLEANCODE_TEST_PROJECT_DIRECTORY = directory
+        return process.env.CLEANCODE_TEST_PROJECT_DIRECTORY
+      }, projectDirectory),
+    accept: (directory) => directory === projectDirectory,
+    retryObservationErrors: true,
+    timeoutMs: 10_000
+  })
+}
 
 async function readSidebarTitlebarGeometry(page: Page): Promise<{
   readonly button: {

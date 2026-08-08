@@ -49,8 +49,15 @@ interface LegacyProviderLaunchLockRecord {
   readonly processId: number
 }
 
+interface ProviderMetadataWriteEnvironment {
+  readonly platform?: NodeJS.Platform
+  readonly rename?: (sourcePath: string, targetPath: string) => Promise<void>
+  readonly wait?: (durationMs: number) => Promise<void>
+}
+
 const providerLaunchLockInitializationGraceMs = 250
 const providerLaunchLockStaleAfterMs = 15_000
+const windowsProviderMetadataRenameRetryDelaysMs = [10, 20, 40, 80, 160] as const
 
 export function matchesForegroundJob(
   expected: ForegroundJobProcessIdentity,
@@ -86,7 +93,8 @@ export async function readProviderMetadata(path: string): Promise<TerminalProvid
 
 export async function atomicWriteProviderMetadata(
   path: string,
-  metadata: TerminalProviderMetadata
+  metadata: TerminalProviderMetadata,
+  environment: ProviderMetadataWriteEnvironment = {}
 ): Promise<void> {
   await mkdir(dirname(path), { mode: 0o700, recursive: true })
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
@@ -98,11 +106,38 @@ export async function atomicWriteProviderMetadata(
     } finally {
       await handle.close()
     }
-    await rename(temporary, path)
+    await replaceProviderMetadataFile(temporary, path, {
+      platform: environment.platform ?? process.platform,
+      rename: environment.rename ?? rename,
+      wait: environment.wait ?? delayProviderOperation
+    })
     await syncDirectory(dirname(path))
   } catch (error) {
     await rm(temporary, { force: true })
     throw error
+  }
+}
+
+async function replaceProviderMetadataFile(
+  sourcePath: string,
+  targetPath: string,
+  environment: Required<ProviderMetadataWriteEnvironment>
+): Promise<void> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await environment.rename(sourcePath, targetPath)
+      return
+    } catch (error) {
+      const retryDelayMs = windowsProviderMetadataRenameRetryDelaysMs[attempt]
+      if (
+        environment.platform !== 'win32' ||
+        retryDelayMs === undefined ||
+        !isTransientWindowsRenameError(error)
+      ) {
+        throw error
+      }
+      await environment.wait(retryDelayMs)
+    }
   }
 }
 
@@ -247,6 +282,11 @@ function getNodeErrorCode(error: unknown): string | null {
     typeof error.code === 'string'
     ? error.code
     : null
+}
+
+function isTransientWindowsRenameError(error: unknown): boolean {
+  const code = getNodeErrorCode(error)
+  return code === 'EACCES' || code === 'EBUSY' || code === 'EPERM'
 }
 
 async function syncDirectory(path: string): Promise<void> {

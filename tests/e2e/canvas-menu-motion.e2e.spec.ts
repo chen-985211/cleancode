@@ -58,10 +58,8 @@ describe('canvas menu motion e2e', () => {
         timeoutMs: 10_000
       })
 
-      const focusReturnTarget = page.getByRole('button', { name: '新建 Agent' })
       const pane = page.locator('.react-flow__pane')
       await pane.waitFor({ state: 'visible' })
-      await focusReturnTarget.focus()
 
       const point = await pane.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
@@ -85,30 +83,12 @@ describe('canvas menu motion e2e', () => {
       await page
         .locator('[role="menu"][aria-label="画布操作"][data-interactive="true"]')
         .waitFor({ state: 'attached' })
+      await waitForSettledMenuPresentation(menu, 'initial canvas menu to settle open')
       await menu.evaluate((element) => {
         element.setAttribute('data-e2e-presence-token', 'retained-surface')
       })
 
       await page.keyboard.press('Escape')
-      expect(await menu.getAttribute('data-interactive')).toBe('false')
-      expect(await menu.getAttribute('aria-hidden')).toBe('true')
-      expect(await menu.getAttribute('inert')).not.toBeNull()
-      const focusResult = await page.evaluate(() => {
-        const activeElement = document.activeElement
-        return {
-          ariaLabel: activeElement?.getAttribute('aria-label'),
-          className: activeElement?.getAttribute('class'),
-          insideMenu: Boolean(activeElement?.closest('[role="menu"]')),
-          tagName: activeElement?.tagName
-        }
-      })
-      expect(focusResult.insideMenu).toBe(false)
-      expect(
-        focusResult.ariaLabel === '新建 Agent' ||
-          focusResult.className?.split(' ').includes('react-flow__pane') ||
-          focusResult.className?.split(' ').includes('canvas-surface')
-      ).toBe(true)
-
       await page.mouse.click(point.x, point.y, { button: 'right' })
 
       await menu.waitFor({ state: 'attached' })

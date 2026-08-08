@@ -100,19 +100,51 @@ export async function readAuthenticatedTerminalProviderMetadata(
   readonly processId: number
 } | null> {
   const metadataPath = join(appStateDirectory, 'terminal-runtime-provider', 'provider.json')
-  let metadata: {
-    readonly authToken: string
-    readonly endpoint: string
-    readonly instanceId: string
-    readonly processId: number
-  }
+  let value: unknown
   try {
-    metadata = JSON.parse(await readFile(metadataPath, 'utf8')) as typeof metadata
+    value = JSON.parse(await readFile(metadataPath, 'utf8'))
   } catch {
     return null
   }
+  if (!isE2eProviderMetadata(value)) return null
+  const metadata = value
   const identity = await authenticateTerminalProvider(metadata).catch(() => null)
-  return identity === metadata.instanceId ? metadata : null
+  if (
+    !identity ||
+    identity.instanceId !== metadata.instanceId ||
+    !Number.isSafeInteger(identity.processId) ||
+    identity.processId <= 0 ||
+    (metadata.processId !== 0 && metadata.processId !== identity.processId)
+  ) {
+    return null
+  }
+
+  return { ...metadata, processId: identity.processId }
+}
+
+function isE2eProviderMetadata(value: unknown): value is {
+  readonly authToken: string
+  readonly endpoint: string
+  readonly instanceId: string
+  readonly processId: number
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'processId' in value &&
+    typeof value.processId === 'number' &&
+    Number.isSafeInteger(value.processId) &&
+    value.processId >= 0 &&
+    'authToken' in value &&
+    typeof value.authToken === 'string' &&
+    value.authToken.length > 0 &&
+    'endpoint' in value &&
+    typeof value.endpoint === 'string' &&
+    value.endpoint.length > 0 &&
+    'instanceId' in value &&
+    typeof value.instanceId === 'string' &&
+    value.instanceId.length > 0
+  )
 }
 
 export async function waitForProcessIdExit(processId: number, timeoutMs = 3_000): Promise<void> {
@@ -134,7 +166,7 @@ export async function waitForProcessIdExit(processId: number, timeoutMs = 3_000)
 async function authenticateTerminalProvider(metadata: {
   readonly authToken: string
   readonly endpoint: string
-}): Promise<string> {
+}): Promise<{ readonly instanceId: string; readonly processId: number }> {
   const socket = connect(metadata.endpoint)
 
   try {
@@ -190,7 +222,10 @@ function waitForSocketConnect(socket: Socket): Promise<void> {
   })
 }
 
-function waitForTerminalProviderHealthResponse(socket: Socket, requestId: string): Promise<string> {
+function waitForTerminalProviderHealthResponse(
+  socket: Socket,
+  requestId: string
+): Promise<{ readonly instanceId: string; readonly processId: number }> {
   const decoder = new TerminalProviderFrameDecoder()
 
   return new Promise((resolve, reject) => {
@@ -210,13 +245,20 @@ function waitForTerminalProviderHealthResponse(socket: Socket, requestId: string
             readonly type?: string
             readonly requestId?: string
             readonly ok?: boolean
-            readonly result?: { readonly instanceId?: string }
+            readonly result?: { readonly instanceId?: string; readonly processId?: number }
           }
           if (message.type !== 'response' || message.requestId !== requestId) continue
 
           cleanup()
-          if (message.ok && message.result?.instanceId) {
-            resolve(message.result.instanceId)
+          if (
+            message.ok &&
+            message.result?.instanceId &&
+            typeof message.result.processId === 'number'
+          ) {
+            resolve({
+              instanceId: message.result.instanceId,
+              processId: message.result.processId
+            })
           } else {
             reject(new Error('Terminal provider authentication failed during E2E cleanup.'))
           }
