@@ -169,7 +169,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 | -------- | ---------------------------------------------- | ---------------------------------------- |
 | 按压反馈 | `--cc-motion-duration-press: 100ms`            | 按压、即时位移和最短局部反馈             |
 | 状态反馈 | `--cc-motion-duration-feedback: 150ms`         | 悬停、焦点、颜色、边框和小范围状态变化   |
-| 表面过渡 | `--cc-motion-duration-surface: 180ms`          | 菜单、浮层、侧边栏和局部展开收起         |
+| 表面过渡 | `--cc-motion-duration-surface: 180ms`          | 菜单、浮层和局部展开收起                 |
 | 空间定位 | response 约 `0.30–0.42s`                       | 画布聚焦、适应视图和与距离相关的空间移动 |
 | 编排演出 | 约 `300–9100ms`                                | 已提交的多对象工作流逐步或按层搭建与收束 |
 | 持续运动 | `--cc-motion-duration-spinner: 900ms` 线性循环 | 只用于 spinner 或确实持续进行的状态      |
@@ -181,6 +181,8 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
 
 普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
+
+主侧栏由 `projectSidebarMotion.ts` 命名 owner 协调：展开和收起时，实心侧栏视觉表面保持完整固定几何并沿所属边缘进出，主工作区网格轨道由同一个欠阻尼 spring 同步让位；布局宽度必须限制在合法端点内，视觉表面可以保留很小的边界回弹来表达质量与收敛。关闭意图发生后侧栏立即退出可访问树并停止接收指针，但视觉表面只在空间运动结束后隐藏；快速反向必须从当前 presentation 与速度继续，不重置 padding、内容排版或画布节点。`prefers-reduced-motion` 下取消大范围滑动并直接投影相同端点。spring response、阻尼和收敛阈值属于 owner 的实现细节，不构成产品契约。
 
 画布空白菜单、对象菜单、Agent 更多菜单和默认 Provider 菜单的进出场由 `src/presentation/app-shell/canvasMenuMotion.ts` 与 `CanvasMenuMotionProvider.tsx` 统一拥有。菜单表面从实际触发点或控件锚点以约七成的紧凑初始尺寸开始，沿透明度、显著缩放和短位移逐帧生长，约 100ms 时仍应处于可辨识的生长中段；收起使用同一 presentation 和空间关系反向缩回，不能以接近完整尺寸的短淡入淡出冒充生长。菜单是非模态浮层，画布不得随菜单 presentation 淡化、着色或模糊；一个没有视觉样式的 dismiss layer 只在菜单可交互期间接管菜单外指针。主按钮按下必须由该层捕获并关闭菜单，完整指针序列不得泄漏给 React Flow 平移或底层控件；次按钮按下由统一 coordinator 同步关闭当前意图并保留一次性输入遮罩，紧随其后的 `contextmenu` 只负责阻止原生菜单并释放遮罩，不得再次切换。该遮罩必须有超时自清理，第二次右击无论落在输入接管层还是仍在进场的菜单表面都执行同一输入路径。非即时运动使用 `requestAnimationFrame` 驱动的临界阻尼 spring；新开、关闭、Escape、外部点击或另一菜单接管时，统一 owner 必须保留当前 presentation，并且只继承朝向新目标的速度；背离新目标的旧速度必须在重新定向时归零，使下一帧立即响应新意图，不得排队播放、重置到端点、复制第二个可交互 surface 或依赖 CSS `animation` 完成事件。关闭中的 surface 只为视觉连续性保留，必须立即 `inert`、从可访问树隐藏并停止接收指针，收敛后才释放 DOM；同一菜单反向打开必须复用该 live surface。菜单协调器同时只允许一个可交互菜单，工作区切换会清空全部在途状态。`prefers-reduced-motion` 下直接投影同一最终状态，菜单作用域、透明输入接管层、互斥、焦点和退出清理语义保持不变。spring response、收敛阈值和最长兜底时间属于统一 owner 的实现细节，不构成产品契约。
 

@@ -217,6 +217,7 @@ describe('app shell', () => {
     fireEvent.click(expandSidebar)
 
     expect(screen.getByLabelText('积木画布')).toBe(workspace)
+    expect(screen.getByLabelText('项目与分支工作区')).toBe(sidebar)
     expect(sidebar).not.toHaveAttribute('aria-hidden')
   })
 

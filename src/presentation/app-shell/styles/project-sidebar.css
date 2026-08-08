@@ -17,18 +17,39 @@
   flex: 1 1 auto;
   flex-direction: column;
   overflow: visible;
-  padding: 12px;
-  opacity: 1;
-  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+  visibility: visible;
 }
 
 .app-shell--sidebar-collapsed .project-sidebar {
-  overflow: hidden;
-  visibility: hidden;
-  padding-right: 0;
-  padding-left: 0;
-  opacity: 0;
   pointer-events: none;
+}
+
+.app-shell[data-project-sidebar-motion-state='collapsed'] .project-sidebar {
+  visibility: hidden;
+}
+
+.app-shell--sidebar-collapsed:not([data-project-sidebar-motion-state]) .project-sidebar {
+  visibility: hidden;
+}
+
+.project-sidebar__motion-surface {
+  display: flex;
+  width: var(--cc-sidebar-expanded-width);
+  min-width: var(--cc-sidebar-expanded-width);
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: visible;
+  border-right: 1px solid var(--cc-divider);
+  background: var(--cc-chrome);
+  padding: 12px;
+  box-shadow: 8px 0 24px -22px var(--cc-shadow-color);
+  transform: translate3d(var(--cc-sidebar-motion-offset), 0, 0);
+}
+
+.app-shell[data-project-sidebar-motion-state='opening'] .project-sidebar__motion-surface,
+.app-shell[data-project-sidebar-motion-state='closing'] .project-sidebar__motion-surface {
+  will-change: transform;
 }
 
 .app-shell__titlebar-navigation {

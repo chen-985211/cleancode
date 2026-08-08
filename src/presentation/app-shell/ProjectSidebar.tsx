@@ -14,6 +14,7 @@ import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
+import { useProjectSidebarMotion } from './useProjectSidebarMotion'
 import { TooltipLabel } from './Tooltip'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -75,6 +76,7 @@ export function ProjectSidebar({
   const addProjectTooltip = shortcutTooltips?.addProject ?? t('sidebar.addProject')
   const createBranchWorkspaceTooltip =
     shortcutTooltips?.createBranchWorkspace ?? t('sidebar.newBranchWorkspace')
+  const sidebarMotionRef = useProjectSidebarMotion(isCollapsed)
   const projectListRef = useRef<HTMLDivElement>(null)
   const canReorderProjects = isDesktopRuntime && !isReorderPending && workbenches.length > 1
   const projectReorder = useProjectSidebarReorder({
@@ -85,80 +87,85 @@ export function ProjectSidebar({
   })
   return (
     <aside
+      ref={sidebarMotionRef}
       id="project-sidebar"
       className="project-sidebar"
       aria-hidden={isCollapsed || undefined}
       aria-label={t('sidebar.label')}
       inert={isCollapsed}
     >
-      <div className="project-sidebar__actions">
-        <TooltipLabel content={addProjectTooltip}>
-          <button
-            className="sidebar-action"
-            type="button"
-            onClick={onAddProject}
-            disabled={!isDesktopRuntime}
-          >
-            <PlusIcon size={17} weight="bold" aria-hidden="true" />
-            {t('sidebar.addProject')}
-          </button>
-        </TooltipLabel>
-      </div>
-      {!isDesktopRuntime ? (
-        <div className="runtime-warning" role="status">
-          {t('sidebar.previewWarning')}
-        </div>
-      ) : null}
-      {actionError ? (
-        <div className="project-sidebar-alert" role="alert">
-          <span>{actionError}</span>
-          <TooltipLabel content={t('sidebar.closeAlert')}>
+      <div className="project-sidebar__motion-surface">
+        <div className="project-sidebar__actions">
+          <TooltipLabel content={addProjectTooltip}>
             <button
-              className="project-sidebar-alert__close"
+              className="sidebar-action"
               type="button"
-              aria-label={t('sidebar.closeAlert')}
-              onClick={onDismissActionError}
+              onClick={onAddProject}
+              disabled={!isDesktopRuntime}
             >
-              <XIcon size={13} weight="bold" aria-hidden="true" />
+              <PlusIcon size={17} weight="bold" aria-hidden="true" />
+              {t('sidebar.addProject')}
             </button>
           </TooltipLabel>
         </div>
-      ) : null}
-      <div className="project-sidebar__label">{t('sidebar.projects')}</div>
-      <div
-        className={
-          projectReorder.draggingProjectId ? 'project-list project-list--dragging' : 'project-list'
-        }
-        ref={projectListRef}
-      >
-        {projectReorder.dropIndicatorY !== null ? (
-          <div
-            className="project-list__drop-indicator"
-            role="presentation"
-            style={{ top: projectReorder.dropIndicatorY }}
-          >
-            <span />
-            <span />
-            <span />
+        {!isDesktopRuntime ? (
+          <div className="runtime-warning" role="status">
+            {t('sidebar.previewWarning')}
           </div>
         ) : null}
-        {workbenches.map((workbench) => (
-          <ProjectCard
-            key={workbench.project.id}
-            workbench={workbench}
-            currentWorkbench={currentWorkbench}
-            onArchiveBranchWorkspace={onArchiveBranchWorkspace}
-            onCheckoutMainBranch={onCheckoutMainBranch}
-            onCreateBranchWorkspace={onCreateBranchWorkspace}
-            onRemoveProject={onRemoveProject}
-            isDragging={projectReorder.draggingProjectId === workbench.project.id}
-            canReorder={canReorderProjects}
-            intent={intent?.projectId === workbench.project.id ? intent : null}
-            createBranchWorkspaceTooltip={createBranchWorkspaceTooltip}
-            onProjectPointerDown={projectReorder.onProjectPointerDown}
-            onSelectWorkspace={onSelectWorkspace}
-          />
-        ))}
+        {actionError ? (
+          <div className="project-sidebar-alert" role="alert">
+            <span>{actionError}</span>
+            <TooltipLabel content={t('sidebar.closeAlert')}>
+              <button
+                className="project-sidebar-alert__close"
+                type="button"
+                aria-label={t('sidebar.closeAlert')}
+                onClick={onDismissActionError}
+              >
+                <XIcon size={13} weight="bold" aria-hidden="true" />
+              </button>
+            </TooltipLabel>
+          </div>
+        ) : null}
+        <div className="project-sidebar__label">{t('sidebar.projects')}</div>
+        <div
+          className={
+            projectReorder.draggingProjectId
+              ? 'project-list project-list--dragging'
+              : 'project-list'
+          }
+          ref={projectListRef}
+        >
+          {projectReorder.dropIndicatorY !== null ? (
+            <div
+              className="project-list__drop-indicator"
+              role="presentation"
+              style={{ top: projectReorder.dropIndicatorY }}
+            >
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : null}
+          {workbenches.map((workbench) => (
+            <ProjectCard
+              key={workbench.project.id}
+              workbench={workbench}
+              currentWorkbench={currentWorkbench}
+              onArchiveBranchWorkspace={onArchiveBranchWorkspace}
+              onCheckoutMainBranch={onCheckoutMainBranch}
+              onCreateBranchWorkspace={onCreateBranchWorkspace}
+              onRemoveProject={onRemoveProject}
+              isDragging={projectReorder.draggingProjectId === workbench.project.id}
+              canReorder={canReorderProjects}
+              intent={intent?.projectId === workbench.project.id ? intent : null}
+              createBranchWorkspaceTooltip={createBranchWorkspaceTooltip}
+              onProjectPointerDown={projectReorder.onProjectPointerDown}
+              onSelectWorkspace={onSelectWorkspace}
+            />
+          ))}
+        </div>
       </div>
     </aside>
   )
