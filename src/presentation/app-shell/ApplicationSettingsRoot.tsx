@@ -40,6 +40,7 @@ import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent
 import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { CanvasSettingsPane } from './CanvasSettingsPane'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export type ApplicationSettingsPane = 'agents' | 'canvas' | 'shortcuts' | 'terminal'
 
@@ -77,6 +78,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const backButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const onCloseRef = useRef(props.onClose)
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
   const [recordingCommand, setRecordingCommand] = useState<ApplicationShortcutCommand | null>(null)
   const [selectedPane, setSelectedPane] = useState<ApplicationSettingsPane | null>(null)
   const activePane = selectedPane ?? props.initialPane ?? 'shortcuts'
@@ -118,12 +120,13 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
       <TooltipLabel content={shortcutTooltips.openSettings} side="bottom">
         <button
           ref={triggerRef}
-          className="application-settings-trigger"
+          className="application-settings-trigger app-shell-utility-button"
           type="button"
           aria-controls="application-settings-dialog"
           aria-expanded={props.isOpen}
           aria-haspopup="dialog"
           aria-label={t('settings.open')}
+          {...triggerMotionProps}
           onClick={() => {
             setSelectedPane(null)
             props.onOpen()

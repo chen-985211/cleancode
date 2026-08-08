@@ -6,12 +6,14 @@ import { useI18n } from './i18n/useI18n'
 import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { supportedLocales, type Locale } from './i18n/locale'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const optionRefs = useRef(new Map<Locale, HTMLButtonElement>())
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
   const { locale, selectLocale, t } = useI18n()
 
   const closeMenu = (): void => {
@@ -40,12 +42,13 @@ export function LanguageSettingsRoot() {
       <TooltipLabel content={t('language.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="language-settings-trigger"
+          className="language-settings-trigger app-shell-utility-button"
           type="button"
           aria-label={t('language.settings')}
           aria-controls="language-settings-menu"
           aria-expanded={isOpen}
           aria-haspopup="menu"
+          {...triggerMotionProps}
           onClick={() => setIsOpen((current) => !current)}
         >
           <TranslateIcon size={18} weight="bold" aria-hidden="true" />

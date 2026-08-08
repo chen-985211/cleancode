@@ -15,6 +15,7 @@ import type {
 import { useI18n } from './i18n/useI18n'
 import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 type LibraryScopeKind = BlockTemplateScope['type']
 
@@ -38,6 +39,7 @@ export function BlockTemplateLibraryRoot({
   const [loadRevision, setLoadRevision] = useState(0)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
   const scope = useMemo(
     () => resolveScope(scopeKind, currentProjectId),
     [currentProjectId, scopeKind]
@@ -88,13 +90,14 @@ export function BlockTemplateLibraryRoot({
       <TooltipLabel content={t('templates.title')} side="bottom">
         <button
           ref={triggerRef}
-          className="block-template-library-trigger"
+          className="block-template-library-trigger app-shell-utility-button"
           type="button"
           aria-label={t('templates.title')}
           aria-controls="block-template-library-dialog"
           aria-expanded={isOpen}
           aria-haspopup="dialog"
           disabled={!isDesktopRuntime}
+          {...triggerMotionProps}
           onClick={() => {
             setErrorMessage(null)
             setScopeKind(currentProjectId ? 'project' : 'global')

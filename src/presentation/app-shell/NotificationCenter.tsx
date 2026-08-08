@@ -5,11 +5,19 @@ import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle'
 import { WarningIcon } from '@phosphor-icons/react/dist/csr/Warning'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import type { Icon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AppNotification, AppNotificationKind } from './appNotifications'
 import { useI18n } from './i18n/useI18n'
+import {
+  completeNotificationStatusMotion,
+  createNotificationStatusMotionState,
+  synchronizeNotificationStatusMotion,
+  type NotificationStatusMotionLayer
+} from './notificationStatusMotion'
 import { TooltipLabel } from './Tooltip'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
+import { useNotificationStatusIconSpring } from './useNotificationStatusIconSpring'
 import { useSurfaceMotionPresence } from './useSurfaceMotionPresence'
 
 export interface AppNotificationPresentation {
@@ -57,6 +65,21 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
   const { t } = useI18n()
   const { notification } = presentation
   const [isActionPending, setIsActionPending] = useState(false)
+  const reducedMotion = usePrefersReducedMotion()
+  const statusInput = { notification, reducedMotion }
+  const [renderedStatus, setRenderedStatus] = useState(() =>
+    createNotificationStatusMotionState(statusInput)
+  )
+  const statusInputChanged =
+    renderedStatus.notification !== statusInput.notification ||
+    renderedStatus.reducedMotion !== statusInput.reducedMotion
+  const status = statusInputChanged
+    ? synchronizeNotificationStatusMotion(renderedStatus, statusInput)
+    : renderedStatus
+  if (statusInputChanged) setRenderedStatus(status)
+  const completeStatusLayer = useCallback((layerId: number) => {
+    setRenderedStatus((current) => completeNotificationStatusMotion(current, layerId))
+  }, [])
   const isMounted = useRef(true)
   const presence = useSurfaceMotionPresence(presentation.open, {
     onExitComplete: () => onExitComplete(notification.id)
@@ -84,7 +107,6 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
 
   if (!presence.isPresent) return null
 
-  const Icon = notification.isActivity ? CircleNotchIcon : notificationIcons[notification.kind]
   const actionLabel =
     (isActionPending || notification.action?.disabled) && notification.action?.pendingLabel
       ? notification.action.pendingLabel
@@ -112,14 +134,28 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
       {...presence.surfaceProps}
     >
       <span className="notification-card__icon" aria-hidden="true">
-        <Icon
-          className={notification.isActivity ? 'notification-card__spinner' : undefined}
-          size={17}
-          weight={notification.isActivity ? 'bold' : 'fill'}
-        />
+        {status.layers.map((layer) => (
+          <NotificationStatusIconLayer
+            key={layer.id}
+            layer={layer}
+            reducedMotion={reducedMotion}
+            onExitComplete={completeStatusLayer}
+          />
+        ))}
       </span>
       <div className="notification-card__content">
-        <strong className="notification-card__title">{notification.title}</strong>
+        <span className="notification-card__title-stage">
+          {status.layers.map((layer) => (
+            <strong
+              className="notification-card__title notification-card__title-layer"
+              data-notification-status-motion-state={layer.phase}
+              aria-hidden={layer.phase === 'outgoing' ? true : undefined}
+              key={layer.id}
+            >
+              {layer.notification.title}
+            </strong>
+          ))}
+        </span>
         {notification.message ? (
           <p className="notification-card__message">{notification.message}</p>
         ) : null}
@@ -147,6 +183,38 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
         </button>
       </TooltipLabel>
     </section>
+  )
+}
+
+interface NotificationStatusIconLayerProps {
+  readonly layer: NotificationStatusMotionLayer
+  readonly reducedMotion: boolean
+  readonly onExitComplete: (layerId: number) => void
+}
+
+function NotificationStatusIconLayer({
+  layer,
+  reducedMotion,
+  onExitComplete
+}: NotificationStatusIconLayerProps) {
+  const completeExit = useCallback(() => onExitComplete(layer.id), [layer.id, onExitComplete])
+  const rootRef = useNotificationStatusIconSpring(layer.phase, reducedMotion, completeExit)
+  const Icon = layer.notification.isActivity
+    ? CircleNotchIcon
+    : notificationIcons[layer.notification.kind]
+
+  return (
+    <span
+      ref={rootRef}
+      className={`notification-card__icon-layer notification-card__icon-layer--${layer.notification.kind}`}
+      data-notification-status-motion-state={layer.phase}
+    >
+      <Icon
+        className={layer.notification.isActivity ? 'notification-card__spinner' : undefined}
+        size={17}
+        weight={layer.notification.isActivity ? 'bold' : 'fill'}
+      />
+    </span>
   )
 }
 

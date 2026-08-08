@@ -40,7 +40,16 @@ describe('project sidebar branch workspace form', () => {
     fireEvent.click(createBranchWorkspaceButton)
     const branchNameInput = within(projectCard).getByLabelText('分支名称')
     const submitButton = within(projectCard).getByRole('button', { name: '创建 Worktree' })
+    const formSurface = branchNameInput.closest('.branch-workspace-surface')
 
+    expect(createBranchWorkspaceButton).toHaveAttribute('aria-expanded', 'true')
+    expect(formSurface).toHaveAttribute('data-surface-motion-state', 'opening')
+    expect(formSurface).toHaveAttribute('data-branch-workspace-spring-state', 'opening')
+    expect(formSurface).toHaveStyle({
+      '--branch-workspace-motion-opacity': '0',
+      '--branch-workspace-motion-scale': '0.9',
+      '--branch-workspace-motion-y': '-14px'
+    })
     expect(branchNameInput).toHaveAttribute('placeholder', '新分支名称')
     expect(within(projectCard).queryByText('同时创建独立 Git worktree')).not.toBeInTheDocument()
     expect(submitButton.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
@@ -79,20 +88,33 @@ describe('project sidebar branch workspace form', () => {
     })
 
     fireEvent.click(createBranchWorkspaceButton)
-    fireEvent.change(within(projectCard).getByLabelText('分支名称'), {
+    const branchNameInput = within(projectCard).getByLabelText('分支名称')
+    const formSurface = branchNameInput.closest('.branch-workspace-surface')
+    fireEvent.change(branchNameInput, {
       target: { value: 'feature/draft' }
     })
+    fireEvent.pointerDown(formSurface!)
+    expect(within(projectCard).getByRole('textbox', { name: '分支名称' })).toBeInTheDocument()
     fireEvent.pointerDown(document.body)
 
-    expect(within(projectCard).queryByLabelText('分支名称')).not.toBeInTheDocument()
+    expect(within(projectCard).queryByRole('textbox', { name: '分支名称' })).not.toBeInTheDocument()
+    expect(createBranchWorkspaceButton).toHaveAttribute('aria-expanded', 'false')
+    expect(formSurface).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(formSurface).toHaveAttribute('inert')
+    expect(formSurface).toBeInTheDocument()
     expect(createBranchWorkspace).not.toHaveBeenCalled()
+
+    await waitFor(() => expect(formSurface).not.toBeInTheDocument())
 
     fireEvent.click(createBranchWorkspaceButton)
     expect(within(projectCard).getByLabelText('分支名称')).toHaveValue('')
 
     fireEvent.pointerDown(createBranchWorkspaceButton)
     fireEvent.click(createBranchWorkspaceButton)
-    expect(within(projectCard).queryByLabelText('分支名称')).not.toBeInTheDocument()
+    expect(within(projectCard).queryByRole('textbox', { name: '分支名称' })).not.toBeInTheDocument()
+    const closingSurface = projectCard.querySelector('.branch-workspace-surface')
+    expect(closingSurface).toHaveAttribute('data-surface-motion-state', 'closing')
+    await waitFor(() => expect(closingSurface).not.toBeInTheDocument())
   })
 
   it('opens and focuses the current project branch form from its shortcut', async () => {
@@ -113,6 +135,28 @@ describe('project sidebar branch workspace form', () => {
     const branchNameInput = await screen.findByLabelText('分支名称')
     expect(branchNameInput).toHaveFocus()
     expect(screen.getByRole('button', { name: '收起侧边栏' })).toBeInTheDocument()
+  })
+
+  it('closes the branch workspace form with Escape and restores its trigger focus', async () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ listWorkbenches: vi.fn(async () => [workbench]) })
+    })
+    render(<AppShell />)
+    const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
+    const trigger = within(projectCard).getByRole('button', { name: '新建分支工作区' })
+
+    fireEvent.click(trigger)
+    const formSurface = within(projectCard)
+      .getByRole('textbox', { name: '分支名称' })
+      .closest('.branch-workspace-surface')
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(trigger).toHaveFocus()
+    expect(formSurface).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(formSurface).toHaveAttribute('inert')
+    await waitFor(() => expect(formSurface).not.toBeInTheDocument())
   })
 
   it('opens the project chooser from its shortcut', async () => {

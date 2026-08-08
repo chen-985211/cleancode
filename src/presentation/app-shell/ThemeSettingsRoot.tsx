@@ -7,6 +7,7 @@ import { useI18n } from './i18n/useI18n'
 import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
 
@@ -15,6 +16,9 @@ export function ThemeSettingsRoot() {
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLElement | null>(null)
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef, {
+    settleImmediately: isOpen
+  })
   const { preference, selectPreference } = useThemePreference()
   const { t } = useI18n()
   const closeSettings = (): void => {
@@ -44,12 +48,13 @@ export function ThemeSettingsRoot() {
       <TooltipLabel content={t('theme.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="theme-settings-trigger"
+          className="theme-settings-trigger app-shell-utility-button"
           type="button"
           aria-label={t('theme.settings')}
           aria-controls="theme-settings-dialog"
           aria-expanded={isOpen}
           aria-haspopup="dialog"
+          {...triggerMotionProps}
           onClick={() => setIsOpen(true)}
         >
           <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />

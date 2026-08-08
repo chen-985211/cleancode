@@ -43,11 +43,16 @@ describe('theme settings', () => {
     render(<ThemeSettingsRoot />)
 
     const trigger = screen.getByRole('button', { name: '主题设置' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    expect(trigger).toHaveAttribute('data-toolbar-utility-motion-state', 'opening')
     fireEvent.click(trigger)
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(trigger).toHaveAttribute('data-toolbar-utility-motion-state', 'open')
     expect(screen.getByRole('dialog', { name: '主题设置' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '关闭主题设置' })).toHaveFocus()
     expect(screen.getByRole('radio', { name: '系统' })).toBeChecked()

@@ -173,7 +173,8 @@
   min-height: 0;
   align-content: start;
   justify-items: center;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--cc-canvas);
   padding: clamp(32px, 4vh, 44px) clamp(32px, 4vw, 52px) 56px;
 }

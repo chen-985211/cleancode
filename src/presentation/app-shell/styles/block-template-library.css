@@ -29,7 +29,6 @@
   opacity: 0.42;
 }
 
-.block-template-library-trigger:active:not(:disabled),
 .block-template-library-close:active {
   transform: scale(0.96);
 }

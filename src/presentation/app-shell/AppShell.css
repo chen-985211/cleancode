@@ -6,6 +6,7 @@
 @import './styles/application-settings.css';
 @import './styles/canvas-settings.css';
 @import './styles/language-settings.css';
+@import './styles/app-shell-utility-button-motion.css';
 @import './styles/notifications.css';
 @import './styles/project-sidebar.css';
 @import './styles/project-sidebar-branch-workspace-form.css';

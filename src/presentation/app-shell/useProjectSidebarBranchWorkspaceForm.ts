@@ -4,6 +4,7 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
   const [isOpen, setIsOpen] = useState(false)
   const [branchName, setBranchName] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -15,23 +16,23 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     }
 
     onSubmit(normalizedBranchName)
-    setBranchName('')
     setIsOpen(false)
   }
   const close = (): void => {
-    setBranchName('')
     setIsOpen(false)
   }
   const open = useCallback((): void => {
+    setBranchName('')
     setIsOpen(true)
   }, [])
   const toggle = (): void => {
-    if (isOpen) {
+    if (!isOpen) {
       setBranchName('')
     }
 
     setIsOpen(!isOpen)
   }
+  const completeClose = useCallback((): void => setBranchName(''), [])
 
   useEffect(() => {
     if (!isOpen) {
@@ -45,19 +46,41 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
 
       if (
         target instanceof Node &&
-        (formRef.current?.contains(target) || triggerRef.current?.contains(target))
+        (surfaceRef.current?.contains(target) || triggerRef.current?.contains(target))
       ) {
         return
       }
 
-      setBranchName('')
       setIsOpen(false)
     }
 
-    document.addEventListener('pointerdown', cancelWhenClickingOutside)
+    const cancelOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setIsOpen(false)
+      triggerRef.current?.focus()
+    }
 
-    return () => document.removeEventListener('pointerdown', cancelWhenClickingOutside)
+    document.addEventListener('pointerdown', cancelWhenClickingOutside)
+    document.addEventListener('keydown', cancelOnEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', cancelWhenClickingOutside)
+      document.removeEventListener('keydown', cancelOnEscape)
+    }
   }, [isOpen])
 
-  return { branchName, close, formRef, isOpen, open, setBranchName, submit, toggle, triggerRef }
+  return {
+    branchName,
+    close,
+    completeClose,
+    formRef,
+    isOpen,
+    open,
+    setBranchName,
+    submit,
+    surfaceRef,
+    toggle,
+    triggerRef
+  }
 }

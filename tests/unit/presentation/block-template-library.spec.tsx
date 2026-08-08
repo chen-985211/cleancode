@@ -41,7 +41,9 @@ describe('block template library', () => {
     const onBeginPlacement = vi.fn()
     renderLibrary(onBeginPlacement)
 
-    fireEvent.click(screen.getByRole('button', { name: '收藏模板' }))
+    const trigger = screen.getByRole('button', { name: '收藏模板' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
+    fireEvent.click(trigger)
 
     expect(await screen.findByRole('dialog', { name: '收藏模板' })).toBeInTheDocument()
     expect(screen.queryByText('保存并复用终端、流程和组合。')).not.toBeInTheDocument()

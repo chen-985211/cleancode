@@ -134,7 +134,7 @@ describe('app notifications', () => {
     expect(screen.queryByText('项目已同步')).not.toBeInTheDocument()
   })
 
-  it('updates an existing notification in place and does not restore it after dismissal', () => {
+  it('updates an existing notification in place and does not restore it after dismissal', async () => {
     render(
       <NotificationProvider>
         <NotificationHarness />
@@ -146,9 +146,34 @@ describe('app notifications', () => {
 
     expect(screen.getAllByRole('status')).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('流程运行成功')
-    expect(screen.queryByText('流程运行中')).not.toBeInTheDocument()
-
+    const outgoingTitle = screen.getByText('流程运行中')
+    const outgoingTitleLayer = outgoingTitle.closest('.notification-card__title-layer')
+    const currentTitleLayer = screen
+      .getByText('流程运行成功')
+      .closest('.notification-card__title-layer')
     const notification = screen.getByRole('status')
+    const outgoingIconLayer = notification.querySelector(
+      '.notification-card__icon-layer[data-notification-status-motion-state="outgoing"]'
+    )
+    const currentIconLayer = notification.querySelector(
+      '.notification-card__icon-layer[data-notification-status-motion-state="current"]'
+    )
+
+    expect(outgoingTitleLayer).toHaveAttribute('data-notification-status-motion-state', 'outgoing')
+    expect(outgoingTitleLayer).toHaveAttribute('aria-hidden', 'true')
+    expect(currentTitleLayer).toHaveAttribute('data-notification-status-motion-state', 'current')
+    expect(outgoingIconLayer?.querySelector('.notification-card__spinner')).toBeInTheDocument()
+    expect(currentIconLayer?.querySelector('.notification-card__spinner')).not.toBeInTheDocument()
+    expect(outgoingIconLayer).toHaveAttribute('data-notification-icon-spring-state', 'closing')
+    expect(currentIconLayer).toHaveAttribute('data-notification-icon-spring-state', 'opening')
+    expect(currentIconLayer).toHaveStyle({
+      '--notification-icon-motion-opacity': '0',
+      '--notification-icon-motion-scale': '0.76',
+      '--notification-icon-motion-y': '6px'
+    })
+
+    await waitFor(() => expect(screen.queryByText('流程运行中')).not.toBeInTheDocument())
+
     fireEvent.click(screen.getByRole('button', { name: '关闭活动通知' }))
     fireEvent.click(screen.getByRole('button', { name: '更新活动通知' }))
 

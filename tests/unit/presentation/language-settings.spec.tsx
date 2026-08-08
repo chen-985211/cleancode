@@ -17,6 +17,7 @@ describe('language settings', () => {
     renderLanguageSettings('zh-CN')
 
     const trigger = screen.getByRole('button', { name: '语言' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 

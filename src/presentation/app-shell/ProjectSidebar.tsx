@@ -230,11 +230,13 @@ function ProjectCard({
   const {
     branchName,
     close: closeBranchWorkspaceForm,
+    completeClose: completeBranchWorkspaceFormClose,
     formRef,
     isOpen: isBranchWorkspaceFormOpen,
     open: openBranchWorkspaceForm,
     setBranchName,
     submit: submitBranchWorkspace,
+    surfaceRef: branchWorkspaceFormSurfaceRef,
     toggle: toggleBranchWorkspaceForm,
     triggerRef
   } = useProjectSidebarBranchWorkspaceForm((newBranchName) =>
@@ -358,6 +360,8 @@ function ProjectCard({
           <button
             className="project-card__branch icon-button"
             type="button"
+            aria-controls={`${workbench.project.id}-branch-workspace-form`}
+            aria-expanded={isBranchWorkspaceFormOpen}
             aria-label={t('sidebar.newBranchWorkspace')}
             ref={triggerRef}
             onClick={toggleBranchWorkspaceForm}
@@ -377,6 +381,16 @@ function ProjectCard({
           </button>
         </TooltipLabel>
       </div>
+      <ProjectSidebarBranchWorkspaceForm
+        branchName={branchName}
+        formRef={formRef}
+        open={isBranchWorkspaceFormOpen}
+        projectId={workbench.project.id}
+        surfaceRef={branchWorkspaceFormSurfaceRef}
+        onBranchNameChange={setBranchName}
+        onExitComplete={completeBranchWorkspaceFormClose}
+        onSubmit={submitBranchWorkspace}
+      />
       <div
         className={
           isExpanded
@@ -556,15 +570,6 @@ function ProjectCard({
                 </div>
               )
             })}
-            {isBranchWorkspaceFormOpen ? (
-              <ProjectSidebarBranchWorkspaceForm
-                branchName={branchName}
-                formRef={formRef}
-                projectId={workbench.project.id}
-                onBranchNameChange={setBranchName}
-                onSubmit={submitBranchWorkspace}
-              />
-            ) : null}
           </div>
         </div>
       </div>
