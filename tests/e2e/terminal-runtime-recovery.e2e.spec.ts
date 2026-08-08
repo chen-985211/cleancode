@@ -293,12 +293,6 @@ async function waitForPersistedRetainedTerminalSession(
     'terminal-runtime-provider',
     'recovery'
   )
-  const expectedFragments = [
-    `"sessionId":"${expectedSessionId}"`,
-    '"status":"running"',
-    '"retentionPolicy":"keep-after-application-exit"'
-  ]
-
   await pollUntilState({
     description: `retained terminal ${expectedSessionId} to reach its recovery checkpoint`,
     observe: async () => {
@@ -307,7 +301,7 @@ async function waitForPersistedRetainedTerminalSession(
       for (const entry of entries) {
         if (!entry.endsWith('checkpoint.json')) continue
         const contents = await readFile(join(recoveryDirectory, entry), 'utf8').catch(() => '')
-        if (expectedFragments.every((fragment) => contents.includes(fragment))) return true
+        if (isRetainedTerminalCheckpoint(contents, expectedSessionId)) return true
       }
       return false
     },
@@ -315,6 +309,26 @@ async function waitForPersistedRetainedTerminalSession(
     intervalMs: 100,
     timeoutMs: 10_000
   })
+}
+
+function isRetainedTerminalCheckpoint(contents: string, expectedSessionId: string): boolean {
+  try {
+    const checkpoint: unknown = JSON.parse(contents)
+    if (!isRecord(checkpoint) || !isRecord(checkpoint.session)) return false
+
+    return (
+      checkpoint.schemaVersion === 2 &&
+      checkpoint.session.sessionId === expectedSessionId &&
+      checkpoint.session.status === 'running' &&
+      checkpoint.session.retentionPolicy === 'keep-after-application-exit'
+    )
+  } catch {
+    return false
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 async function launchWorkbench(workbench: E2eWorkbench) {

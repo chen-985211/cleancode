@@ -1,20 +1,4 @@
-import type { Locator, Page } from 'playwright'
-
-import { pollUntilState } from './e2ePolling'
-
-type CanvasMenuMotionState = 'closed' | 'closing' | 'open' | 'opening'
-
-async function waitForCanvasMenuMotionState(
-  menu: Locator,
-  targetState: CanvasMenuMotionState
-): Promise<void> {
-  await pollUntilState({
-    accept: (motionState) => motionState === targetState,
-    description: `canvas menu motion state ${targetState}`,
-    observe: () => menu.getAttribute('data-motion-state'),
-    timeoutMs: 5_000
-  })
-}
+import type { Page } from 'playwright'
 
 export async function selectAgentProviderFromCreateMenu(
   page: Page,
@@ -28,19 +12,15 @@ export async function selectAgentProviderFromCreateMenu(
   })
 
   try {
-    await menu.waitFor({ state: 'attached', timeout: 5_000 })
-    await waitForCanvasMenuMotionState(menu, 'open')
-    await providerOption.waitFor({ state: 'visible', timeout: 5_000 })
+    await providerOption.click({ timeout: 5_000 })
   } catch (error) {
-    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
+    const renderedProviders = await page.locator('[role="menuitemradio"]').allTextContents()
     const motionState = (await menu.count()) ? await menu.getAttribute('data-motion-state') : null
     throw new Error(
-      `Provider "${providerName}" did not become selectable after the Agent menu settled. ` +
+      `Provider "${providerName}" did not become actionable from the Agent menu. ` +
         `Motion state: ${JSON.stringify(motionState)}. ` +
-        `Visible Providers: ${JSON.stringify(visibleProviders)}`,
+        `Rendered Providers: ${JSON.stringify(renderedProviders)}`,
       { cause: error }
     )
   }
-
-  await providerOption.click({ timeout: 5_000 })
 }

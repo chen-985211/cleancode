@@ -113,7 +113,7 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCreationReady(page)
       await waitForAgentCount(page, 0)
 
-      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
       await selectBlankCanvasAction(page, '新建终端积木')
       const terminalSelector = '[data-terminal-block-id]'
       await page.locator(terminalSelector).first().waitFor()
@@ -123,7 +123,7 @@ describe('workspace Agents e2e', () => {
       expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
       await waitForCreatedNodeSelection(page, terminalSelector, 'terminal')
 
-      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
       await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       const agentSelector = '[data-agent-console-node]'

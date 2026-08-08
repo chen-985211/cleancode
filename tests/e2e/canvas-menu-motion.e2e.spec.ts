@@ -14,6 +14,8 @@ import {
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
 
+const maximumMenuAnchorAxisDriftPixels = 8.5
+
 describe('canvas menu motion e2e', () => {
   let workbench: E2eWorkbench
   let electronApp: ElectronApplication
@@ -29,6 +31,11 @@ describe('canvas menu motion e2e', () => {
     page = await electronApp.firstWindow()
     resources.page = page
     await page.waitForLoadState('domcontentloaded')
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    expect(
+      await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    ).toBe(false)
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
@@ -83,6 +90,9 @@ describe('canvas menu motion e2e', () => {
       })
 
       await page.keyboard.press('Escape')
+      expect(await menu.getAttribute('data-interactive')).toBe('false')
+      expect(await menu.getAttribute('aria-hidden')).toBe('true')
+      expect(await menu.getAttribute('inert')).not.toBeNull()
       const focusResult = await page.evaluate(() => {
         const activeElement = document.activeElement
         return {
@@ -99,31 +109,13 @@ describe('canvas menu motion e2e', () => {
           focusResult.className?.split(' ').includes('canvas-surface')
       ).toBe(true)
 
-      const closePhase = await menu.getAttribute('data-motion-state')
       await page.mouse.click(point.x, point.y, { button: 'right' })
 
-      expect(closePhase).toBe('closing')
       await menu.waitFor({ state: 'attached' })
       expect(await menu.getAttribute('data-e2e-presence-token')).toBe('retained-surface')
       expect(await page.locator('[role="menu"][data-interactive="true"]').count()).toBe(1)
-      await menu.waitFor({ state: 'attached' })
-      await menu.evaluate(async (element) => {
-        await new Promise<void>((resolve, reject) => {
-          const deadline = performance.now() + 2_000
-          const observe = (): void => {
-            if ((element as HTMLElement).dataset.motionState === 'open') {
-              resolve()
-              return
-            }
-            if (performance.now() >= deadline) {
-              reject(new Error('Retargeted canvas menu did not settle open.'))
-              return
-            }
-            requestAnimationFrame(observe)
-          }
-          observe()
-        })
-      })
+      await waitForSettledMenuPresentation(menu, 'retargeted canvas menu to settle open')
+      await menu.getByRole('menuitem').first().click({ trial: true })
 
       const dismissLayerPresentation = await page
         .getByTestId('canvas-menu-dismiss-layer')
@@ -142,6 +134,8 @@ describe('canvas menu motion e2e', () => {
       })
 
       await page.keyboard.press('Escape')
+      expect(await menu.getAttribute('data-interactive')).toBe('false')
+      expect(await menu.getAttribute('aria-hidden')).toBe('true')
       await menu.waitFor({ state: 'detached' })
       expect(await page.locator('[role="menu"][data-interactive="true"]').count()).toBe(0)
     },
@@ -189,7 +183,7 @@ describe('canvas menu motion e2e', () => {
   )
 
   it(
-    'visibly grows from its pointer anchor and shrinks back along the same path',
+    'renders from its pointer anchor, becomes actionable, and retracts along the same path',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
@@ -205,123 +199,126 @@ describe('canvas menu motion e2e', () => {
       const point = await findVisibleBlankCanvasPoint(pane)
       const menu = page.locator('[role="menu"][aria-label="画布操作"]')
 
-      await beginOpeningMenuScaleSampling(page)
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const openingScales = await finishOpeningMenuScaleSampling(page, 4)
-      expect(openingScales[0]).toBeLessThan(0.8)
-      expect(openingScales.at(-1)).toBeGreaterThan(openingScales[0] ?? 0)
+      await menu.waitFor({ state: 'attached' })
+      const openingPresentation = await waitForCompactMenuPresentation(
+        menu,
+        'canvas menu to render a compact opening presentation'
+      )
+      const openPresentation = await waitForSettledMenuPresentation(
+        menu,
+        'canvas menu to settle open'
+      )
+      const firstAction = menu.getByRole('menuitem').first()
+      await firstAction.waitFor({ state: 'visible' })
+
+      expect(openingPresentation.transform).not.toBe('none')
+      expect(openingPresentation.scale).toBeLessThan(0.98)
+      expect(openingPresentation.rect.width).toBeLessThan(openPresentation.rect.width)
+      expect(openingPresentation.rect.height).toBeLessThan(openPresentation.rect.height)
+      expectPointsWithinAxisTolerance(openingPresentation.anchor, point)
+      expectPointsWithinAxisTolerance(openPresentation.anchor, point)
+      expect(openPresentation.scale).toBe(1)
+      expect(openPresentation.opacity).toBe(1)
+      expect(await firstAction.isEnabled()).toBe(true)
+      await firstAction.click({ trial: true })
 
       await page.mouse.click(point.x, point.y, { button: 'right' })
-      const interruptedClosingScales = await sampleMenuScalesForFrames(menu, 2)
-      expect(interruptedClosingScales.at(-1)).toBeLessThan(interruptedClosingScales[0] ?? 1)
+      expect(await menu.getAttribute('data-interactive')).toBe('false')
+      expect(await menu.getAttribute('aria-hidden')).toBe('true')
+      expect(await menu.getAttribute('inert')).not.toBeNull()
 
-      await page.mouse.click(point.x, point.y, { button: 'right' })
-      const interruptedOpeningScales = await sampleMenuScalesForFrames(menu, 2)
-      expect(interruptedOpeningScales.at(-1)).toBeGreaterThan(interruptedOpeningScales[0] ?? 0)
+      const closingPresentation = await waitForCompactMenuPresentation(
+        menu,
+        'canvas menu to render a compact closing presentation'
+      )
+      expect(closingPresentation.transform).not.toBe('none')
+      expect(closingPresentation.scale).toBeLessThan(0.98)
+      expect(closingPresentation.rect.width).toBeLessThan(openPresentation.rect.width)
+      expect(closingPresentation.rect.height).toBeLessThan(openPresentation.rect.height)
+      expectPointsWithinAxisTolerance(closingPresentation.anchor, point)
+      expectPointsWithinAxisTolerance(closingPresentation.anchor, openingPresentation.anchor)
 
-      await waitForMenuMotionState(menu, 'open')
-      await page.mouse.click(point.x, point.y, { button: 'right' })
-      const closingScales = await sampleMenuScalesForFrames(menu, 4)
-      expect(closingScales.at(-1)).toBeLessThan(closingScales[0] ?? 1)
       await menu.waitFor({ state: 'detached' })
+      expect(await page.locator('[role="menu"][aria-label="画布操作"]').count()).toBe(0)
     },
     electronScenarioTimeoutMs
   )
 })
 
-async function beginOpeningMenuScaleSampling(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const samplingWindow = window as typeof window & {
-      openingMenuScaleSampling?: {
-        frameId: number
-        scales: number[]
-      }
-    }
-    const sampling = { frameId: 0, scales: [] as number[] }
-    const sample = (): void => {
-      const menu = document.querySelector<HTMLElement>('[role="menu"][aria-label="画布操作"]')
-      if (menu) {
-        sampling.scales.push(Number(menu.style.getPropertyValue('--canvas-menu-scale')))
-      }
-      sampling.frameId = requestAnimationFrame(sample)
-    }
-
-    samplingWindow.openingMenuScaleSampling = sampling
-    sample()
-  })
+interface RenderedMenuPresentation {
+  readonly anchor: { readonly x: number; readonly y: number }
+  readonly opacity: number
+  readonly rect: { readonly height: number; readonly width: number }
+  readonly scale: number
+  readonly transform: string
 }
 
-async function finishOpeningMenuScaleSampling(
-  page: Page,
-  minimumSampleCount: number
-): Promise<number[]> {
-  await page.waitForFunction((expectedCount) => {
-    const samplingWindow = window as typeof window & {
-      openingMenuScaleSampling?: { scales: number[] }
-    }
-    return (samplingWindow.openingMenuScaleSampling?.scales.length ?? 0) >= expectedCount
-  }, minimumSampleCount)
-
-  return page.evaluate(() => {
-    const samplingWindow = window as typeof window & {
-      openingMenuScaleSampling?: {
-        frameId: number
-        scales: number[]
-      }
-    }
-    const sampling = samplingWindow.openingMenuScaleSampling
-    if (!sampling) throw new Error('Opening canvas menu scale sampling was not started.')
-
-    cancelAnimationFrame(sampling.frameId)
-    delete samplingWindow.openingMenuScaleSampling
-    return sampling.scales
-  })
-}
-
-async function sampleMenuScalesForFrames(menu: Locator, frameCount: number): Promise<number[]> {
-  return menu.evaluate(
-    async (element, count) =>
-      new Promise<number[]>((resolve) => {
-        const samples: number[] = []
-        const sample = (): void => {
-          samples.push(
-            Number((element as HTMLElement).style.getPropertyValue('--canvas-menu-scale'))
-          )
-          if (samples.length >= count) {
-            resolve(samples)
-            return
-          }
-          requestAnimationFrame(sample)
-        }
-        sample()
-      }),
-    frameCount
-  )
-}
-
-async function waitForMenuMotionState(
+async function waitForCompactMenuPresentation(
   menu: Locator,
-  targetState: 'closed' | 'closing' | 'open' | 'opening'
-): Promise<void> {
-  await menu.evaluate(
-    async (element, target) =>
-      new Promise<void>((resolve, reject) => {
-        const deadline = performance.now() + 2_000
-        const observe = (): void => {
-          if ((element as HTMLElement).dataset.motionState === target) {
-            resolve()
-            return
-          }
-          if (performance.now() >= deadline) {
-            reject(new Error(`Canvas menu did not settle to ${target}.`))
-            return
-          }
-          requestAnimationFrame(observe)
-        }
-        observe()
-      }),
-    targetState
-  )
+  description: string
+): Promise<RenderedMenuPresentation> {
+  return pollUntilState({
+    description,
+    observe: () => readRenderedMenuPresentation(menu),
+    accept: (presentation) =>
+      presentation.opacity > 0 &&
+      presentation.scale > 0 &&
+      presentation.scale < 0.98 &&
+      presentation.rect.width > 0 &&
+      presentation.rect.height > 0,
+    intervalMs: 10,
+    timeoutMs: 2_000
+  })
+}
+
+async function waitForSettledMenuPresentation(
+  menu: Locator,
+  description: string
+): Promise<RenderedMenuPresentation> {
+  return pollUntilState({
+    description,
+    observe: () => readRenderedMenuPresentation(menu),
+    accept: (presentation) => presentation.opacity === 1 && presentation.scale === 1,
+    intervalMs: 20,
+    timeoutMs: 2_000
+  })
+}
+
+async function readRenderedMenuPresentation(menu: Locator): Promise<RenderedMenuPresentation> {
+  return menu.evaluate((element) => {
+    const styles = getComputedStyle(element)
+    const transform = styles.transform
+    const matrix = transform === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(transform)
+    const rect = element.getBoundingClientRect()
+    const [originX = 0, originY = 0] = styles.transformOrigin
+      .split(/\s+/)
+      .map((value) => Number.parseFloat(value))
+    const scaleX = Math.hypot(matrix.a, matrix.b)
+    const scaleY = Math.hypot(matrix.c, matrix.d)
+
+    return {
+      anchor: {
+        x: rect.left + scaleX * originX,
+        y: rect.top + scaleY * originY
+      },
+      opacity: Number.parseFloat(styles.opacity),
+      rect: {
+        height: rect.height,
+        width: rect.width
+      },
+      scale: (scaleX + scaleY) / 2,
+      transform
+    }
+  })
+}
+
+function expectPointsWithinAxisTolerance(
+  first: { readonly x: number; readonly y: number },
+  second: { readonly x: number; readonly y: number }
+): void {
+  expect(Math.abs(first.x - second.x)).toBeLessThanOrEqual(maximumMenuAnchorAxisDriftPixels)
+  expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(maximumMenuAnchorAxisDriftPixels)
 }
 
 async function findVisibleBlankCanvasPoint(

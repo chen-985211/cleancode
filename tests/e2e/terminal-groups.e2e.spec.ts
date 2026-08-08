@@ -15,7 +15,8 @@ import {
 } from '../support/e2eWorkbench'
 import { pollUntilState } from '../support/e2ePolling'
 
-const screenPixelTolerance = 1
+const maximumGroupCenterDriftPixels = 1
+const maximumProjectedWidthErrorPixels = 1
 
 describe('terminal groups e2e', () => {
   let workbench: E2eWorkbench
@@ -61,13 +62,20 @@ describe('terminal groups e2e', () => {
       const graphWithEmptyGroup = await readGraph(page, workbench)
       for (const [terminalIndex, terminal] of graphWithEmptyGroup.blocks.entries()) {
         const groupMaterialBeforeDrag = await readTerminalGroupMaterial(
-          page.locator('[data-terminal-group-id]').first()
+          terminalGroupLocator(page, emptyGroup.id)
         )
         await dragTerminalIntoGroup(
           page,
+          emptyGroup.id,
           terminal.id,
           terminalIndex === 0
-            ? async ({ group, moveAway, moveBack, terminal: draggedTerminal }) => {
+            ? async ({
+                group,
+                groupCenterBeforeDrag,
+                moveAway,
+                moveBack,
+                terminal: draggedTerminal
+              }) => {
                 const engagedScale = await waitForTerminalGroupScale(
                   group,
                   (scale) => scale > 1.005,
@@ -78,9 +86,10 @@ describe('terminal groups e2e', () => {
                   (element) => getComputedStyle(element).transform
                 )
 
-                expect(await readTerminalGroupSurfaceCenterDrift(group)).toBeLessThan(
-                  screenPixelTolerance
-                )
+                const groupCenterDuringHover = await readScreenCenter(group)
+                expect(
+                  distanceBetweenScreenPoints(groupCenterBeforeDrag, groupCenterDuringHover)
+                ).toBeLessThanOrEqual(maximumGroupCenterDriftPixels)
                 expect(engagedScale).toBeGreaterThan(1.005)
                 expect(groupMaterial).toEqual(groupMaterialBeforeDrag)
                 expect(await group.locator('.terminal-group-node__drop-hint').count()).toBe(0)
@@ -106,17 +115,19 @@ describe('terminal groups e2e', () => {
             : undefined
         )
         await page.locator('.terminal-node.workbench-object-motion--group-join').first().waitFor()
-        const joinedGroup = await waitForTerminalGroup(page, workbench, (group) =>
-          group.memberBlockIds.includes(terminal.id)
+        const joinedGroup = await waitForTerminalGroup(
+          page,
+          workbench,
+          (group) => group.id === emptyGroup.id && group.memberBlockIds.includes(terminal.id)
         )
         expect(joinedGroup.position).toEqual(groupAnchor)
         expect(
           await waitForTerminalGroupRest(
-            page.locator('[data-terminal-group-id]').first(),
+            terminalGroupLocator(page, emptyGroup.id),
             'terminal group to spring closed after absorbing the terminal'
           )
         ).toBeCloseTo(1, 3)
-        await waitForTerminalVisuallyInsideGroup(page, terminal.id)
+        await waitForTerminalVisuallyInsideGroup(page, emptyGroup.id, terminal.id)
       }
       await page.getByRole('button', { name: '完成' }).click()
       await page.getByRole('button', { name: '启动项目 折叠组合' }).waitFor()
@@ -142,44 +153,53 @@ describe('terminal groups e2e', () => {
       await page.getByRole('button', { name: '启动项目 管理组合内容' }).click()
 
       const graphBeforeDrag = await readGraph(page, workbench)
-      const groupBeforeDrag = graphBeforeDrag.terminalGroups[0]!
+      const groupBeforeDrag = graphBeforeDrag.terminalGroups.find(
+        (group) => group.id === emptyGroup.id
+      )
       const terminalTwo = graphBeforeDrag.blocks.find((block) => block.name === 'Terminal 2')!
+      if (!groupBeforeDrag) {
+        throw new Error(`Terminal group ${emptyGroup.id} is missing before member resize.`)
+      }
 
-      await inspectTerminalRemovalBoundary(page, terminalTwo.id)
+      await inspectTerminalRemovalBoundary(page, groupBeforeDrag.id, terminalTwo.id)
 
-      await dragTerminalTowardGroupRightEdge(page, terminalTwo.id)
+      await dragTerminalTowardGroupRightEdge(page, groupBeforeDrag.id, terminalTwo.id)
 
       const groupAfterDrag = await waitForTerminalGroup(
         page,
         workbench,
-        (group) => group.size.width > groupBeforeDrag.size.width + 160
+        (group) =>
+          group.id === groupBeforeDrag.id && group.size.width > groupBeforeDrag.size.width + 160
       )
       const resizedProjection = await waitForTerminalGroupProjectedWidth(
         page,
+        groupAfterDrag.id,
         groupAfterDrag.size.width,
         'terminal group visible width to reflect the member drag'
       )
       expect(
         Math.abs(resizedProjection.renderedWidth - resizedProjection.expectedRenderedWidth)
-      ).toBeLessThan(screenPixelTolerance)
+      ).toBeLessThan(maximumProjectedWidthErrorPixels)
       expect(groupAfterDrag.size.width).toBeGreaterThan(groupBeforeDrag.size.width + 160)
 
-      await dragTerminalIntoGroup(page, terminalTwo.id)
+      await dragTerminalIntoGroup(page, groupAfterDrag.id, terminalTwo.id)
 
       const contractedGroup = await waitForTerminalGroup(
         page,
         workbench,
-        (group) => group.size.width < groupAfterDrag.size.width - 100
+        (group) =>
+          group.id === groupAfterDrag.id && group.size.width < groupAfterDrag.size.width - 100
       )
       const contractedProjection = await waitForTerminalGroupProjectedWidth(
         page,
+        contractedGroup.id,
         contractedGroup.size.width,
         'terminal group visible width to reflect member contraction'
       )
       expect(contractedGroup.size.width).toBeLessThan(groupAfterDrag.size.width - 100)
       expect(
         Math.abs(contractedProjection.renderedWidth - contractedProjection.expectedRenderedWidth)
-      ).toBeLessThan(screenPixelTolerance)
+      ).toBeLessThan(maximumProjectedWidthErrorPixels)
     },
     electronScenarioTimeoutMs
   )
@@ -201,9 +221,11 @@ async function createTerminalBlocks(page: Page, count: number): Promise<void> {
 
 async function dragTerminalIntoGroup(
   page: Page,
+  terminalGroupId: string,
   terminalBlockId: string,
   inspectHover?: (state: {
     readonly group: Locator
+    readonly groupCenterBeforeDrag: ScreenPoint
     readonly moveAway: () => Promise<void>
     readonly moveBack: () => Promise<void>
     readonly terminal: Locator
@@ -211,9 +233,11 @@ async function dragTerminalIntoGroup(
 ): Promise<void> {
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
+  const group = terminalGroupLocator(page, terminalGroupId)
   const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
-  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
+  const groupBox = await readRequiredBoundingBox(group)
+  const groupCenterBeforeDrag = centerOfBox(groupBox)
   const startX = headerBox.x + headerBox.width / 2
   const startY = headerBox.y + headerBox.height / 2
   const deltaX = groupBox.x + groupBox.width / 2 - (terminalBox.x + terminalBox.width / 2)
@@ -225,7 +249,8 @@ async function dragTerminalIntoGroup(
   const targetY = startY + deltaY
   await page.mouse.move(targetX, targetY, { steps: 18 })
   await inspectHover?.({
-    group: page.locator('[data-terminal-group-id]').first(),
+    group,
+    groupCenterBeforeDrag,
     moveAway: () => page.mouse.move(startX, startY, { steps: 12 }),
     moveBack: () => page.mouse.move(targetX, targetY, { steps: 12 }),
     terminal
@@ -286,9 +311,10 @@ async function readTerminalGroupMaterial(group: Locator): Promise<{
 
 async function waitForTerminalVisuallyInsideGroup(
   page: Page,
+  terminalGroupId: string,
   terminalBlockId: string
 ): Promise<void> {
-  const group = page.locator('[data-terminal-group-id]').first()
+  const group = terminalGroupLocator(page, terminalGroupId)
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
 
   await pollUntilState({
@@ -313,18 +339,21 @@ async function waitForTerminalVisuallyInsideGroup(
   })
 }
 
-function readTerminalGroupSurfaceCenterDrift(group: Locator): Promise<number> {
-  return group.evaluate((surface) => {
-    const flowNode = surface.closest('.react-flow__node-terminalGroup')
-    if (!flowNode) throw new Error('Terminal group React Flow node is unavailable.')
+async function readScreenCenter(locator: Locator): Promise<ScreenPoint> {
+  return centerOfBox(await readRequiredBoundingBox(locator))
+}
 
-    const surfaceBox = surface.getBoundingClientRect()
-    const flowNodeBox = flowNode.getBoundingClientRect()
-    return Math.hypot(
-      surfaceBox.x + surfaceBox.width / 2 - (flowNodeBox.x + flowNodeBox.width / 2),
-      surfaceBox.y + surfaceBox.height / 2 - (flowNodeBox.y + flowNodeBox.height / 2)
-    )
-  })
+function centerOfBox(box: {
+  readonly height: number
+  readonly width: number
+  readonly x: number
+  readonly y: number
+}): ScreenPoint {
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+
+function distanceBetweenScreenPoints(left: ScreenPoint, right: ScreenPoint): number {
+  return Math.hypot(left.x - right.x, left.y - right.y)
 }
 
 async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
@@ -348,32 +377,73 @@ async function waitForCanvasViewportToSettle(page: Page): Promise<void> {
 
 async function waitForTerminalGroupProjectedWidth(
   page: Page,
+  terminalGroupId: string,
   expectedCanvasWidth: number,
   description: string
 ): Promise<{ readonly expectedRenderedWidth: number; readonly renderedWidth: number }> {
-  return pollUntilState({
-    accept: ({ expectedRenderedWidth, renderedWidth }) =>
-      Math.abs(renderedWidth - expectedRenderedWidth) < screenPixelTolerance,
+  const projection = await pollUntilState<TerminalGroupWidthProjectionObservation>({
+    accept: (observation) =>
+      observation.status === 'ready' &&
+      Math.abs(observation.renderedWidth - observation.expectedRenderedWidth) <
+        maximumProjectedWidthErrorPixels,
     description,
     observe: () =>
-      page.evaluate((canvasWidth) => {
-        const group = document.querySelector<HTMLElement>('.react-flow__node-terminalGroup')
-        const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
-        if (!group || !viewport) return { expectedRenderedWidth: 0, renderedWidth: 0 }
+      page.evaluate(
+        ({ canvasWidth, groupId }) => {
+          const groupSurface = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-terminal-group-id]')
+          ).find((element) => element.dataset.terminalGroupId === groupId)
+          const group =
+            groupSurface?.closest<HTMLElement>('.react-flow__node-terminalGroup') ?? null
+          const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
+          if (!group) return { status: 'missing-group' as const, terminalGroupId: groupId }
+          if (!viewport) return { status: 'missing-viewport' as const }
 
-        const zoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
-        return {
-          expectedRenderedWidth: canvasWidth * zoom,
-          renderedWidth: group.getBoundingClientRect().width
-        }
-      }, expectedCanvasWidth),
+          const viewportTransform = getComputedStyle(viewport).transform
+          const zoom = viewportTransform === 'none' ? 1 : new DOMMatrixReadOnly(viewportTransform).a
+          const expectedRenderedWidth = canvasWidth * zoom
+          const renderedWidth = group.getBoundingClientRect().width
+          if (
+            !Number.isFinite(canvasWidth) ||
+            !Number.isFinite(zoom) ||
+            !Number.isFinite(expectedRenderedWidth) ||
+            !Number.isFinite(renderedWidth) ||
+            canvasWidth <= 0 ||
+            zoom <= 0 ||
+            expectedRenderedWidth <= 0 ||
+            renderedWidth <= 0
+          ) {
+            return {
+              status: 'invalid-geometry' as const,
+              canvasWidth,
+              expectedRenderedWidth,
+              renderedWidth,
+              zoom
+            }
+          }
+
+          return {
+            status: 'ready' as const,
+            expectedRenderedWidth,
+            renderedWidth
+          }
+        },
+        { canvasWidth: expectedCanvasWidth, groupId: terminalGroupId }
+      ),
     intervalMs: 16,
     timeoutMs: 5_000
   })
+
+  if (projection.status !== 'ready') {
+    throw new Error(`Terminal group width projection is unavailable: ${projection.status}`)
+  }
+
+  return projection
 }
 
 async function dragTerminalTowardGroupRightEdge(
   page: Page,
+  terminalGroupId: string,
   terminalBlockId: string
 ): Promise<void> {
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
@@ -382,7 +452,7 @@ async function dragTerminalTowardGroupRightEdge(
   )
   const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
-  const groupBox = await readRequiredBoundingBox(page.locator('[data-terminal-group-id]').first())
+  const groupBox = await readRequiredBoundingBox(terminalGroupLocator(page, terminalGroupId))
   const startX = headerBox.x + headerBox.width / 2
   const startY = headerBox.y + headerBox.height / 2
   const terminalCenterX = terminalBox.x + terminalBox.width / 2
@@ -394,8 +464,12 @@ async function dragTerminalTowardGroupRightEdge(
   await page.mouse.up()
 }
 
-async function inspectTerminalRemovalBoundary(page: Page, terminalBlockId: string): Promise<void> {
-  const group = page.locator('[data-terminal-group-id]').first()
+async function inspectTerminalRemovalBoundary(
+  page: Page,
+  terminalGroupId: string,
+  terminalBlockId: string
+): Promise<void> {
+  const group = terminalGroupLocator(page, terminalGroupId)
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
   const groupBox = await readRequiredBoundingBox(group)
@@ -479,6 +553,10 @@ async function readGraph(page: Page, workbench: E2eWorkbench): Promise<TerminalG
   return graph
 }
 
+function terminalGroupLocator(page: Page, terminalGroupId: string): Locator {
+  return page.locator(`[data-terminal-group-id=${JSON.stringify(terminalGroupId)}]`)
+}
+
 async function readRequiredBoundingBox(locator: Locator) {
   const box = await locator.boundingBox()
 
@@ -498,8 +576,30 @@ interface TerminalBlockRecord {
 }
 
 interface TerminalGroupRecord {
+  readonly id: string
   readonly isCollapsed: boolean
   readonly memberBlockIds: readonly string[]
   readonly position: { readonly x: number; readonly y: number }
   readonly size: { readonly width: number; readonly height: number }
 }
+
+interface ScreenPoint {
+  readonly x: number
+  readonly y: number
+}
+
+type TerminalGroupWidthProjectionObservation =
+  | { readonly status: 'missing-group'; readonly terminalGroupId: string }
+  | { readonly status: 'missing-viewport' }
+  | {
+      readonly status: 'invalid-geometry'
+      readonly canvasWidth: number
+      readonly expectedRenderedWidth: number
+      readonly renderedWidth: number
+      readonly zoom: number
+    }
+  | {
+      readonly status: 'ready'
+      readonly expectedRenderedWidth: number
+      readonly renderedWidth: number
+    }

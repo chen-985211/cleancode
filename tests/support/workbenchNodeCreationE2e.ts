@@ -1,6 +1,7 @@
 import type { Page } from 'playwright'
 
 import { resolveWorkbenchSafeViewport } from '../../src/presentation/app-shell/workbenchCanvasSafeViewport'
+import { waitForCanvasViewportZoomCommit } from './e2eCanvasViewport'
 import { pollUntilState } from './e2ePolling'
 
 export const createdWorkbenchNodeZoomUpperBound = 1.001
@@ -15,7 +16,10 @@ export interface CreatedWorkbenchNodeResult {
   readonly zoom: number
 }
 
-export async function setCanvasZoomToMaximum(page: Page): Promise<number> {
+export async function setCanvasZoomToMaximum(
+  page: Page,
+  projectDirectory: string
+): Promise<number> {
   const zoomIn = page.getByRole('button', { name: '放大画布' })
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -26,13 +30,11 @@ export async function setCanvasZoomToMaximum(page: Page): Promise<number> {
     }
 
     await zoomIn.click()
-    await page.waitForFunction((previousZoom) => {
-      const viewport = document.querySelector('.react-flow__viewport')
-
-      if (!viewport) return false
-      return new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a > previousZoom + 0.001
-    }, currentZoom)
-    await waitForCanvasZoomToPersist(page, currentZoom)
+    await waitForCanvasViewportZoomCommit(page, {
+      direction: 'increase',
+      previousZoom: currentZoom,
+      projectDirectory
+    })
   }
 
   throw new Error('Canvas did not reach its maximum zoom.')
@@ -97,34 +99,6 @@ async function readCanvasZoom(page: Page): Promise<number> {
     }
 
     return zoom
-  })
-}
-
-async function waitForCanvasZoomToPersist(page: Page, previousZoom: number): Promise<void> {
-  await pollUntilState({
-    description: 'canvas zoom animation to persist its completed viewport',
-    observe: () =>
-      page.evaluate(async () => {
-        const viewport = document.querySelector('.react-flow__viewport')
-        const api = window.cleancode
-        if (!viewport || !api) return null
-
-        const workbenches = await api.listWorkbenches()
-        const currentWorkbench =
-          workbenches.find((workbench) => workbench.isCurrentProject) ?? workbenches[0]
-
-        return {
-          currentZoom: new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a,
-          persistedZoom: currentWorkbench?.graph.viewport.zoom ?? null
-        }
-      }),
-    accept: (observation) =>
-      observation !== null &&
-      observation.persistedZoom !== null &&
-      observation.currentZoom > previousZoom + 0.001 &&
-      Math.abs(observation.currentZoom - observation.persistedZoom) <= 0.0005,
-    intervalMs: 50,
-    timeoutMs: 5_000
   })
 }
 
