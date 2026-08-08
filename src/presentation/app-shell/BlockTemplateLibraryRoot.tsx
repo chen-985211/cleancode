@@ -6,7 +6,7 @@ import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play'
 import { StarIcon } from '@phosphor-icons/react/dist/csr/Star'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import type {
   BlockTemplateScope,
@@ -15,6 +15,7 @@ import type {
 import { useI18n } from './i18n/useI18n'
 import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
+import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 type LibraryScopeKind = BlockTemplateScope['type']
@@ -39,7 +40,17 @@ export function BlockTemplateLibraryRoot({
   const [loadRevision, setLoadRevision] = useState(0)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
   const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
+  const { beginFocusRestore, cancelFocusRestore, completeFocusRestore } =
+    useInterruptibleSurfaceFocusRestore(dialogRef, triggerRef)
+  const closeLibrary = useCallback((): void => {
+    beginFocusRestore()
+    setIsOpen(false)
+    setEditingTemplateId(null)
+    setDeleteTemplateId(null)
+    setSearchQuery('')
+  }, [beginFocusRestore])
   const scope = useMemo(
     () => resolveScope(scopeKind, currentProjectId),
     [currentProjectId, scopeKind]
@@ -57,7 +68,7 @@ export function BlockTemplateLibraryRoot({
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isOpen])
+  }, [closeLibrary, isOpen])
 
   useEffect(() => {
     if (!isOpen || !scope || !window.cleancode?.listBlockTemplates) return undefined
@@ -99,6 +110,7 @@ export function BlockTemplateLibraryRoot({
           disabled={!isDesktopRuntime}
           {...triggerMotionProps}
           onClick={() => {
+            cancelFocusRestore()
             setErrorMessage(null)
             setScopeKind(currentProjectId ? 'project' : 'global')
             setIsOpen(true)
@@ -108,8 +120,10 @@ export function BlockTemplateLibraryRoot({
         </button>
       </TooltipLabel>
       <OverlaySurfaceMotion
+        ref={dialogRef}
         open={isOpen}
-        onExitComplete={() => triggerRef.current?.focus()}
+        springPreset="drawer-right"
+        onExitComplete={completeFocusRestore}
         id="block-template-library-dialog"
         className="block-template-library-backdrop overlay-surface-motion overlay-surface-motion--drawer-right"
         role="dialog"
@@ -214,13 +228,6 @@ export function BlockTemplateLibraryRoot({
       </OverlaySurfaceMotion>
     </>
   )
-
-  function closeLibrary(): void {
-    setIsOpen(false)
-    setEditingTemplateId(null)
-    setDeleteTemplateId(null)
-    setSearchQuery('')
-  }
 
   function closeFromBackdrop(event: MouseEvent<HTMLDivElement>): void {
     if (event.target === event.currentTarget) closeLibrary()

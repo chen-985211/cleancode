@@ -46,6 +46,58 @@
   }
 }
 
+.anchored-surface-motion[data-surface-spring-preset] {
+  opacity: var(--cc-surface-motion-opacity, 1);
+  transform: translate3d(
+      var(--cc-surface-motion-translate-x, 0),
+      var(--cc-surface-motion-translate-y, 0),
+      0
+    )
+    scale(var(--cc-surface-motion-scale, 1));
+  transition: none;
+  will-change: opacity, transform;
+}
+
+.anchored-surface-motion[data-surface-spring-preset='anchored-top-right'] {
+  transform: translate3d(
+    var(--cc-surface-motion-translate-x, 0),
+    var(--cc-surface-motion-translate-y, 0),
+    0
+  );
+  transform-origin: 100% 0%;
+}
+
+.overlay-surface-motion[data-surface-spring-preset][data-surface-motion-state] {
+  opacity: var(--cc-surface-motion-opacity, 1);
+  transition: none;
+  will-change: opacity;
+}
+
+.overlay-surface-motion[data-surface-spring-preset][data-surface-motion-state]
+  .overlay-surface-motion__content {
+  opacity: var(--cc-surface-motion-content-opacity, 1);
+  transform: translate3d(
+      var(--cc-surface-motion-translate-x, 0),
+      var(--cc-surface-motion-translate-y, 0),
+      0
+    )
+    scale(var(--cc-surface-motion-scale, 1));
+  transition: none;
+  will-change: opacity, transform;
+}
+
+.overlay-surface-motion--fullscreen[data-surface-spring-preset][data-surface-motion-state] {
+  opacity: var(--cc-surface-motion-opacity, 1);
+  transform: translate3d(
+      var(--cc-surface-motion-translate-x, 0),
+      var(--cc-surface-motion-translate-y, 0),
+      0
+    )
+    scale(var(--cc-surface-motion-scale, 1));
+  transition: none;
+  will-change: opacity, transform;
+}
+
 .overlay-surface-motion {
   opacity: 1;
   transition: opacity var(--cc-motion-duration-surface) var(--cc-easing-enter);

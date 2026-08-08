@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 const notificationStyles = readStyles('notifications.css')
 const branchFormStyles = readStyles('project-sidebar-branch-workspace-form.css')
+const applicationSettingsStyles = readStyles('application-settings.css')
 
 describe('status and pane motion styles', () => {
   it('uses spring-owned spatial properties while titles crossfade independently', () => {
@@ -34,6 +35,23 @@ describe('status and pane motion styles', () => {
     expect(surfaceRule).toContain('var(--branch-workspace-motion-y, 0px)')
     expect(surfaceRule).toContain('var(--branch-workspace-motion-scale, 1)')
     expect(surfaceRule).not.toContain('transition:')
+  })
+
+  it('projects settings pane spring values onto compositor-only properties', () => {
+    const contentRule = readRule(applicationSettingsStyles, '.application-settings-content')
+    const paneLayerRule = readRule(
+      applicationSettingsStyles,
+      '.application-settings-pane-transition__layer'
+    )
+
+    expect(contentRule).toContain('scrollbar-gutter: stable;')
+    expect(paneLayerRule).toContain('var(--application-settings-pane-motion-opacity, 1)')
+    expect(paneLayerRule).toContain(
+      'translate3d(var(--application-settings-pane-motion-x, 0), 0, 0)'
+    )
+    expect(applicationSettingsStyles).toContain(
+      ".application-settings-pane-transition__layer[data-application-settings-pane-role='outgoing']"
+    )
   })
 })
 

@@ -175,8 +175,38 @@
   justify-items: center;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--cc-canvas);
   padding: clamp(32px, 4vh, 44px) clamp(32px, 4vw, 52px) 56px;
+}
+
+.application-settings-pane-transition {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-areas: 'pane';
+  justify-items: center;
+}
+
+.application-settings-pane-transition__layer {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-area: pane;
+  justify-items: center;
+  opacity: var(--application-settings-pane-motion-opacity, 1);
+  transform: translate3d(var(--application-settings-pane-motion-x, 0), 0, 0);
+}
+
+.application-settings-pane-transition[data-application-settings-pane-direction]:not(
+    [data-application-settings-pane-direction='none']
+  )
+  .application-settings-pane-transition__layer {
+  will-change: opacity, transform;
+}
+
+.application-settings-pane-transition__layer[data-application-settings-pane-role='outgoing'] {
+  pointer-events: none;
 }
 
 .shortcut-settings-pane {

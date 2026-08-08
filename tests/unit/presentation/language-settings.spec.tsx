@@ -24,7 +24,9 @@ describe('language settings', () => {
     fireEvent.click(trigger)
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('menu', { name: '语言' })).toBeInTheDocument()
+    const menu = screen.getByRole('menu', { name: '语言' })
+    expect(menu).toBeInTheDocument()
+    expect(menu).toHaveAttribute('data-surface-spring-preset', 'anchored-top-right')
     expect(screen.getByRole('menuitemradio', { name: '简体中文' })).toHaveAttribute(
       'aria-checked',
       'true'
@@ -65,14 +67,24 @@ describe('language settings', () => {
   })
 
   it('closes when pointer interaction moves outside the menu', () => {
-    renderLanguageSettings('zh-CN')
+    const canvasPointerDown = vi.fn()
+    render(
+      <div onPointerDown={canvasPointerDown}>
+        <I18nProvider initialLocale="zh-CN">
+          <LanguageSettingsRoot />
+        </I18nProvider>
+      </div>
+    )
 
     const trigger = screen.getByRole('button', { name: '语言' })
     fireEvent.click(trigger)
-    fireEvent.pointerDown(document.body)
+    const dismissalLayer = document.querySelector('.language-settings-dismiss-layer')
+    expect(dismissalLayer).toBeInTheDocument()
+    fireEvent.pointerDown(dismissalLayer as Element)
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
+    expect(canvasPointerDown).not.toHaveBeenCalled()
   })
 
   it('keeps a closing menu inert until its exit finishes and reverses from the live surface', () => {
@@ -82,7 +94,7 @@ describe('language settings', () => {
     fireEvent.click(trigger)
     const liveMenu = screen.getByRole('menu', { name: '语言' })
 
-    fireEvent.pointerDown(document.body)
+    fireEvent.pointerDown(document.querySelector('.language-settings-dismiss-layer') as Element)
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(liveMenu).toHaveAttribute('data-surface-motion-state', 'closing')

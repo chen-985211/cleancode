@@ -10,7 +10,6 @@ import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const optionRefs = useRef(new Map<Locale, HTMLButtonElement>())
   const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
@@ -27,18 +26,22 @@ export function LanguageSettingsRoot() {
     }
 
     optionRefs.current.get(locale)?.focus()
-    const closeFromOutside = (event: PointerEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        closeMenu()
-      }
-    }
-
-    document.addEventListener('pointerdown', closeFromOutside)
-    return () => document.removeEventListener('pointerdown', closeFromOutside)
+    return undefined
   }, [isOpen, locale])
 
   return (
-    <div ref={rootRef} className="language-settings">
+    <div className="language-settings">
+      {isOpen ? (
+        <div
+          className="language-settings-dismiss-layer"
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            closeMenu()
+          }}
+        />
+      ) : null}
       <TooltipLabel content={t('language.settings')} side="bottom">
         <button
           ref={triggerRef}
@@ -57,6 +60,7 @@ export function LanguageSettingsRoot() {
       <AnchoredSurfaceMotion
         id="language-settings-menu"
         className="language-settings-menu anchored-surface-motion"
+        springPreset="anchored-top-right"
         role="menu"
         aria-label={t('language.settings')}
         open={isOpen}

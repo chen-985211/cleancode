@@ -1,12 +1,20 @@
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent
+} from 'react'
 
 import type { ThemePreference } from './themePreference'
 import { useI18n } from './i18n/useI18n'
 import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
+import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
@@ -19,11 +27,14 @@ export function ThemeSettingsRoot() {
   const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef, {
     settleImmediately: isOpen
   })
+  const { beginFocusRestore, cancelFocusRestore, completeFocusRestore } =
+    useInterruptibleSurfaceFocusRestore(dialogRef, triggerRef)
   const { preference, selectPreference } = useThemePreference()
   const { t } = useI18n()
-  const closeSettings = (): void => {
+  const closeSettings = useCallback((): void => {
+    beginFocusRestore()
     setIsOpen(false)
-  }
+  }, [beginFocusRestore])
 
   useEffect(() => {
     if (!isOpen) {
@@ -41,7 +52,7 @@ export function ThemeSettingsRoot() {
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [isOpen])
+  }, [closeSettings, isOpen])
 
   return (
     <>
@@ -55,7 +66,10 @@ export function ThemeSettingsRoot() {
           aria-expanded={isOpen}
           aria-haspopup="dialog"
           {...triggerMotionProps}
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            cancelFocusRestore()
+            setIsOpen(true)
+          }}
         >
           <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
         </button>
@@ -63,11 +77,12 @@ export function ThemeSettingsRoot() {
       <OverlaySurfaceMotion
         id="theme-settings-dialog"
         className="theme-settings-backdrop overlay-surface-motion overlay-surface-motion--drawer-right"
+        springPreset="drawer-right"
         role="dialog"
         aria-modal="true"
         aria-labelledby="theme-settings-title"
         open={isOpen}
-        onExitComplete={() => triggerRef.current?.focus()}
+        onExitComplete={completeFocusRestore}
         onMouseDown={closeFromBackdrop}
         onKeyDown={(event) => trapDialogFocus(event, dialogRef.current)}
       >

@@ -176,15 +176,17 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 精确时长和 spring response 不是产品语义。逐步搭建允许为解释对象与依赖的先后关系采用更长的整体时间，但相邻步骤仍应快速收敛，大图必须压缩步骤间隔并设置有限的启动窗口，不能让演出时间随节点数无限增长。
 
-锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；小地图继续复用该 presence 生命周期，但由 `minimapPanelMotion.ts` 以一条临界阻尼 spring 同步投影面板高度、底部控制行位置和方向箭头，快速反向从当前 presentation 接管，小地图内的视口平移仍保持直接操控；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
+锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；模态背景隔离租约跟随可交互的 open 意图，关闭一开始即释放该 surface 的租约，让新输入可以接管，仍处于打开状态的其他模态租约继续保持隔离；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；小地图继续复用该 presence 生命周期，但由 `minimapPanelMotion.ts` 以一条临界阻尼 spring 同步投影面板高度、底部控制行位置和方向箭头，快速反向从当前 presentation 接管，小地图内的视口平移仍保持直接操控；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
 
 同一 Notification 的运行状态更新由 `notificationStatusMotion.ts` 保留旧状态视觉层并交接到最新状态；spinner 与结果图标的短位移、缩放和透明度由临界阻尼 spring 同步投影，标题与颜色只做短交叉淡化，不能让文字产生装饰性回弹。图标 spring 收敛后才释放旧视觉层；只有最新层保留在可访问树，连续更新继续追加最新事实并让在途层从当前 presentation 退出。`prefers-reduced-motion` 下直接投影最新状态，停止 spinner，但进行中语义继续由静态图标、文字和可访问状态表达。
 
-应用右上角的收藏、语言、主题和设置入口属于同一组 utility button；按下必须在当前帧提供共同的短位移与缩放反馈，松开后由无回弹的临界阻尼 spring 从当前 presentation 恢复。鼠标、触控笔与键盘激活必须复用同一反馈，非主按钮不得触发按压态；`prefers-reduced-motion` 下仍保留即时状态反馈，但直接投影静止端点。
+应用右上角的收藏、语言、主题和设置入口属于同一组 utility button；按下必须在当前帧提供共同的短位移与缩放反馈，松开后由无回弹的临界阻尼 spring 从当前 presentation 恢复。触发后的 surface 同样必须表达来源：收藏与主题 Drawer 从所属右侧边缘进入并沿原路径退出，设置全屏表面从右侧短距离进入并退回，语言菜单从按钮的右下锚点生长并缩回。surface 的位移、缩放和透明度由同一条可反向的临界阻尼 spring 协调，不能在 JavaScript presentation 外再叠加 CSS transform transition。鼠标、触控笔与键盘激活必须复用同一反馈，非主按钮不得触发按压态；`prefers-reduced-motion` 下仍保留即时状态反馈，但直接投影静止端点。
+
+设置页的固定标题与左侧导航不参与分类切换；内容按 `快捷键 → 画布 → 终端 → Agent` 的导航顺序建立空间关系，向后选择时新内容从右侧进入、旧内容向左退出，反向选择时镜像路径。新旧内容使用独立的 X 与透明度临界阻尼 spring；连续切换必须保留每一层当前 presentation，并只继承朝向新目标的速度。退出层立即 `inert` 且从可访问树隐藏，收敛后释放；`prefers-reduced-motion` 下直接投影当前分类并清理退出层。
 
 新建分支工作区表单复用统一 surface presence，以所属项目的 “+” 按钮为固定来源，在按钮下方通过临界阻尼 spring 协调短位移、缩放和透明度，关闭时从当前 presentation 沿原路径收回；按钮必须通过 `aria-controls` 和 `aria-expanded` 表达控制关系。关闭意图发生后表单立即停止交互，spring 收敛后再清理草稿和释放 DOM；快速反向复用同一 live surface。Escape 关闭时焦点返回触发按钮，外部点击仍把焦点留给用户实际选择的目标。
 
-通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；utility button、分支表单与通知图标复用 `springProgressMotion.ts` 的逐帧生命周期和重定向，具体空间投影仍由各 owner 决定。各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
+通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；utility button、分支表单、通知图标与 surface 进出复用 `springProgressMotion.ts` 的逐帧生命周期和重定向，设置分类的多层重定向由 `applicationSettingsPaneMotion.ts` 负责，具体空间投影仍由各 owner 决定。各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
 
 普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
 

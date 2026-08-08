@@ -28,6 +28,7 @@ describe('application settings', () => {
 
     const dialog = screen.getByRole('dialog', { name: '设置' })
     expect(dialog).toHaveClass('application-settings-surface')
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'fullscreen-right')
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
     expect(screen.getByLabelText('项目区域').inert).toBe(true)
     expect(screen.getByLabelText('工作区状态').inert).toBe(true)
@@ -63,8 +64,8 @@ describe('application settings', () => {
     expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
     expect(dialog).toHaveAttribute('inert')
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
-    expect(screen.getByLabelText('项目区域').inert).toBe(true)
-    expect(screen.getByLabelText('工作区状态').inert).toBe(true)
+    expect(screen.getByLabelText('项目区域').inert).toBe(false)
+    expect(screen.getByLabelText('工作区状态').inert).toBe(false)
 
     fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
 
@@ -138,6 +139,26 @@ describe('application settings', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('打开设置 (⌘⌥O)')
   })
 
+  it('does not steal focus back when a new external intent takes over an active exit', () => {
+    render(
+      <>
+        <button type="button">外部目标</button>
+        <SettingsHarness initiallyOpen />
+      </>
+    )
+
+    const dialog = screen.getByRole('dialog', { name: '设置' })
+    const trigger = screen.getByRole('button', { name: '设置' })
+    const externalTarget = screen.getByRole('button', { name: '外部目标' })
+    fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+    fireEvent.pointerDown(externalTarget)
+    externalTarget.focus()
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(externalTarget).toHaveFocus()
+    expect(trigger).not.toHaveFocus()
+  })
+
   it('changes the shared terminal scrollback budget from the terminal settings pane', () => {
     render(<SettingsHarness initiallyOpen />)
 
@@ -153,6 +174,28 @@ describe('application settings', () => {
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
     fireEvent.click(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' }))
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).toBeChecked()
+  })
+
+  it('moves settings panes along the navigation order and keeps outgoing content inert', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '终端' }))
+
+    const transition = document.querySelector('.application-settings-pane-transition')
+    const currentPane = document.querySelector('[data-application-settings-pane-role="current"]')
+    const outgoingPane = document.querySelector('[data-application-settings-pane-role="outgoing"]')
+    expect(transition).toHaveAttribute('data-application-settings-pane-direction', 'forward')
+    expect(currentPane).toHaveAttribute('data-application-settings-pane', 'terminal')
+    expect(outgoingPane).toHaveAttribute('data-application-settings-pane', 'shortcuts')
+    expect(outgoingPane).toHaveAttribute('aria-hidden', 'true')
+    expect(outgoingPane).toHaveAttribute('inert')
+
+    fireEvent.click(screen.getByRole('button', { name: '画布' }))
+
+    expect(transition).toHaveAttribute('data-application-settings-pane-direction', 'backward')
+    expect(
+      document.querySelector('[data-application-settings-pane-role="current"]')
+    ).toHaveAttribute('data-application-settings-pane', 'canvas')
   })
 
   it('switches terminal workflow construction between progressive and parallel presentation', () => {

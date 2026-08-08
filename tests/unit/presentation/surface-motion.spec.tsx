@@ -90,7 +90,7 @@ describe('surface motion', () => {
     expect(onExitComplete).toHaveBeenCalledOnce()
   })
 
-  it('keeps #root isolated until every overlay exit has completed', () => {
+  it('keeps #root isolated while an overlay is open and releases on the final close intent', () => {
     const appRoot = document.createElement('div')
     appRoot.id = 'root'
     appRoot.setAttribute('aria-hidden', 'false')
@@ -117,10 +117,9 @@ describe('surface motion', () => {
     expect(appRoot.inert).toBe(true)
 
     rerender(<OverlayHarness firstOpen={false} secondOpen={false} />)
-    fireEvent.transitionEnd(second)
-
     expect(appRoot).toHaveAttribute('aria-hidden', 'false')
     expect(appRoot.inert).toBe(false)
+    fireEvent.transitionEnd(second)
 
     unmount()
     appRoot.remove()

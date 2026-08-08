@@ -44,6 +44,7 @@ export interface SurfaceMotionPresence {
   readonly isPresent: boolean
   readonly motionId: number
   readonly phase: SurfaceMotionPhase
+  readonly reducedMotion: boolean
   readonly surfaceProps: SurfaceMotionElementProps
 }
 
@@ -124,6 +125,7 @@ export function useSurfaceMotionPresence(
     isPresent,
     motionId: state.motionId,
     phase: state.phase,
+    reducedMotion,
     surfaceProps
   }
 }

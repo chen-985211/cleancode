@@ -53,7 +53,9 @@ describe('theme settings', () => {
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(trigger).toHaveAttribute('data-toolbar-utility-motion-state', 'open')
-    expect(screen.getByRole('dialog', { name: '主题设置' })).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'drawer-right')
     expect(screen.getByRole('button', { name: '关闭主题设置' })).toHaveFocus()
     expect(screen.getByRole('radio', { name: '系统' })).toBeChecked()
     expect(screen.getByRole('radio', { name: '浅色' })).not.toBeChecked()
@@ -84,6 +86,27 @@ describe('theme settings', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('does not steal focus back when a new external intent takes over an active exit', () => {
+    render(
+      <>
+        <button type="button">外部目标</button>
+        <ThemeSettingsRoot />
+      </>
+    )
+    const trigger = screen.getByRole('button', { name: '主题设置' })
+    const externalTarget = screen.getByRole('button', { name: '外部目标' })
+    fireEvent.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭主题设置' }))
+    fireEvent.pointerDown(externalTarget)
+    externalTarget.focus()
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(externalTarget).toHaveFocus()
+    expect(trigger).not.toHaveFocus()
+  })
+
   it('isolates the workbench while open and restores interaction after closing', () => {
     render(
       <>
@@ -106,8 +129,8 @@ describe('theme settings', () => {
     const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    expect(sidebar.inert).toBe(true)
-    expect(workspace.inert).toBe(true)
+    expect(sidebar.inert).toBe(false)
+    expect(workspace.inert).toBe(false)
     fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
     expect(sidebar.inert).toBe(false)
     expect(workspace.inert).toBe(false)

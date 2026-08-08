@@ -45,7 +45,9 @@ describe('block template library', () => {
     expect(trigger).toHaveClass('app-shell-utility-button')
     fireEvent.click(trigger)
 
-    expect(await screen.findByRole('dialog', { name: '收藏模板' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: '收藏模板' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'drawer-right')
     expect(screen.queryByText('保存并复用终端、流程和组合。')).not.toBeInTheDocument()
     expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
       scope: { type: 'project', projectId: 'project-1' }
