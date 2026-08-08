@@ -2,17 +2,21 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const styles = readFileSync(
-  resolve(process.cwd(), 'src/presentation/app-shell/styles/workbench-canvas.css'),
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-minimap.css'),
   'utf8'
 )
 
 describe('canvas minimap motion styles', () => {
-  it('anchors panel presence to its bottom-right control edge', () => {
-    const rule = readRule('.canvas-minimap__panel.anchored-surface-motion')
+  it('projects one spring presentation into panel height, opacity, and toggle direction', () => {
+    const panelRule = readRule('.canvas-minimap__panel')
+    const toggleRule = readRule('.canvas-minimap__toggle svg')
 
-    expect(rule).toContain('--cc-anchored-surface-origin: 100% 100%;')
-    expect(rule).toContain('--cc-anchored-surface-offset-x: 6px;')
-    expect(rule).toContain('--cc-anchored-surface-offset-y: 6px;')
+    expect(panelRule).toContain('height: var(--canvas-minimap-panel-height);')
+    expect(panelRule).toContain('margin-bottom: var(--canvas-minimap-panel-gap);')
+    expect(panelRule).toContain('opacity: var(--canvas-minimap-panel-opacity);')
+    expect(panelRule).not.toContain('transition:')
+    expect(toggleRule).toContain('rotate(var(--canvas-minimap-toggle-rotation))')
+    expect(styles).not.toContain('.canvas-minimap__panel.anchored-surface-motion')
   })
 })
 

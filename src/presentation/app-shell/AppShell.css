@@ -12,6 +12,7 @@
 @import './styles/project-sidebar-archive.css';
 @import './styles/project-sidebar-project-removal.css';
 @import './styles/workbench-canvas.css';
+@import './styles/canvas-minimap.css';
 @import './styles/terminal-workflow-build.css';
 @import './styles/block-template-canvas.css';
 @import './styles/workbench-node-selection.css';

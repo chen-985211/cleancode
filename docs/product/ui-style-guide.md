@@ -108,7 +108,7 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 | 清除已配置值                  | `Eraser`                                                 | 不得用 X 表达清除绑定或配置                        |
 | 删除对象                      | `Trash`                                                  | 不得用 X 表达删除                                  |
 | 断开关系、定位对象、适应画布  | `LinkBreak`、`Crosshair`、`CornersOut`                   | 定位单一对象与适应全部内容不得混用                 |
-| 小地图展开、收起              | `MapTrifold`、`CaretUp`                                  | 两者都是紧凑动作，统一使用 `bold`                  |
+| 小地图展开、收起              | `CaretDown`，随面板进度旋转为 `CaretUp`                  | 单一方向图标跟随同一 presentation，使用 `bold`     |
 | 加载、警告、错误、暂停        | `CircleNotch`、`Warning`、`WarningCircle`、`PauseCircle` | 状态必须继续由文字、结构或可访问名称提供非颜色表达 |
 
 对象身份默认使用 `regular`，紧凑动作默认使用 `bold`，主要执行动作和明确状态使用 `fill`。同一图形的 active 状态可以通过 weight 变化表达，但不得在状态切换时更换成另一种隐喻。Provider 品牌图标、CleanCode MCP 标志、小地图几何和没有标准替代的产品专属图形属于显式例外；这些例外不得扩展成第二套通用动作图标。
@@ -176,7 +176,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 精确时长和 spring response 不是产品语义。逐步搭建允许为解释对象与依赖的先后关系采用更长的整体时间，但相邻步骤仍应快速收敛，大图必须压缩步骤间隔并设置有限的启动窗口，不能让演出时间随节点数无限增长。
 
-锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；小地图面板以右下控制区为固定锚点进入和退出，小地图内的视口平移仍保持直接操控；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
+锚定菜单、Popover 与状态面板的 presence 由 `src/presentation/app-shell/SurfaceMotion.tsx` 和 `surfacePresence.ts` 统一拥有；模态抽屉、全屏设置与 Dialog 复用同一状态机及 `surfaceIsolation.ts` 的隔离租约。状态统一为 `closed → opening → open → closing → closed`：关闭意图发生时 surface 立即 `inert`、从可访问树隐藏并停止接收指针，退出收敛后才释放 DOM；退出中反向打开必须复用同一 live surface。锚定表面从触发点方向短距离进入，Tooltip 使用更轻、更短的同类语义；小地图继续复用该 presence 生命周期，但由 `minimapPanelMotion.ts` 以一条临界阻尼 spring 同步投影面板高度、底部控制行位置和方向箭头，快速反向从当前 presentation 接管，小地图内的视口平移仍保持直接操控；Drawer 从所属边缘进入，Dialog 的背景与内容同步，Notification 保留逻辑项与 live presentation 项以支持进入、内容更新和退出。嵌套模态 surface 必须引用计数背景隔离，关闭其中一个不得提前恢复底层交互。画布菜单继续使用下文更严格的 coordinator，不并入通用 surface owner。
 
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。
 

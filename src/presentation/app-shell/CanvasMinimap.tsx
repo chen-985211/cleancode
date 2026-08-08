@@ -20,7 +20,7 @@ import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
-import { AnchoredSurfaceMotion } from './SurfaceMotion'
+import { useMinimapPanelMotion } from './useMinimapPanelMotion'
 import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
 import { subscribeWorkbenchDirectZoomPresentation } from './workbenchDirectZoom'
 import { WorkbenchIcon } from './WorkbenchIcons'
@@ -104,6 +104,11 @@ export function CanvasMinimap({
   getMiniMapNodeClassName
 }: CanvasMinimapProps) {
   const { t } = useI18n()
+  const {
+    isPresent: isPanelPresent,
+    rootRef: panelMotionRootRef,
+    surfaceProps: panelMotionSurfaceProps
+  } = useMinimapPanelMotion(!isCollapsed)
   const isPanningViewportRef = useRef(false)
   const lastViewportCenterRef = useRef<MinimapViewportCenter | null>(null)
   const focusMinimapNode = useCallback(
@@ -145,109 +150,80 @@ export function CanvasMinimap({
   }
 
   return (
-    <div className={minimapClassName} data-workbench-canvas-obstruction>
-      <AnchoredSurfaceMotion
-        className="canvas-minimap__panel anchored-surface-motion"
-        open={!isCollapsed}
-      >
-        <div className="canvas-minimap__map-frame">
-          <MinimapNodeInteractionContext.Provider value={minimapNodeInteraction}>
-            <svg
-              className="canvas-minimap__map"
-              viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-              role="img"
-              aria-labelledby="canvas-minimap-title"
-              preserveAspectRatio="xMidYMid meet"
-              onPointerDown={(event) => {
-                if (event.button !== 0 || isMinimapNodeTarget(event.target)) {
-                  return
-                }
-
-                event.preventDefault()
-                isPanningViewportRef.current = true
-                event.currentTarget.setPointerCapture(event.pointerId)
-                previewViewportCenter(event)
-              }}
-              onPointerMove={(event) => {
-                if (!isPanningViewportRef.current) {
-                  return
-                }
-
-                event.preventDefault()
-                previewViewportCenter(event)
-              }}
-              onPointerUp={finishViewportPan}
-              onPointerCancel={finishViewportPan}
-            >
-              <title id="canvas-minimap-title">{t('minimap.title')}</title>
-              <rect
-                className="canvas-minimap__hit-area"
-                x={viewBox.x}
-                y={viewBox.y}
-                width={viewBox.width}
-                height={viewBox.height}
-              />
-              {viewportFrame ?? (
-                <CanvasMinimapViewportFrame viewport={canvasViewport} canvasSize={canvasSize} />
-              )}
-              {frames.map((frame) => (
-                <MinimapWorkbenchNode
-                  key={frame.node.id}
-                  id={frame.node.id}
-                  variant={resolveMinimapNodeVariant(frame.node)}
-                  kindLabel={
-                    frame.node.type === 'agentConsole'
-                      ? 'Agent'
-                      : frame.node.type === 'terminalGroup'
-                        ? t('minimap.terminalGroup')
-                        : t('minimap.terminal')
+    <div ref={panelMotionRootRef} className={minimapClassName} data-workbench-canvas-obstruction>
+      {isPanelPresent ? (
+        <div className="canvas-minimap__panel" {...panelMotionSurfaceProps}>
+          <div className="canvas-minimap__map-frame">
+            <MinimapNodeInteractionContext.Provider value={minimapNodeInteraction}>
+              <svg
+                className="canvas-minimap__map"
+                viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+                role="img"
+                aria-labelledby="canvas-minimap-title"
+                preserveAspectRatio="xMidYMid meet"
+                onPointerDown={(event) => {
+                  if (event.button !== 0 || isMinimapNodeTarget(event.target)) {
+                    return
                   }
-                  x={frame.x}
-                  y={frame.y}
-                  width={frame.width}
-                  height={frame.height}
-                  borderRadius={6}
-                  className={getMiniMapNodeClassName(frame.node)}
-                  color={getMiniMapNodeColor(frame.node)}
-                  strokeColor={getMiniMapNodeStrokeColor(frame.node)}
-                  strokeWidth={1.2}
-                  selected={Boolean(frame.node.selected)}
-                  onClick={focusMinimapNode}
+
+                  event.preventDefault()
+                  isPanningViewportRef.current = true
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  previewViewportCenter(event)
+                }}
+                onPointerMove={(event) => {
+                  if (!isPanningViewportRef.current) {
+                    return
+                  }
+
+                  event.preventDefault()
+                  previewViewportCenter(event)
+                }}
+                onPointerUp={finishViewportPan}
+                onPointerCancel={finishViewportPan}
+              >
+                <title id="canvas-minimap-title">{t('minimap.title')}</title>
+                <rect
+                  className="canvas-minimap__hit-area"
+                  x={viewBox.x}
+                  y={viewBox.y}
+                  width={viewBox.width}
+                  height={viewBox.height}
                 />
-              ))}
-            </svg>
-          </MinimapNodeInteractionContext.Provider>
-        </div>
-        <div
-          className="canvas-minimap__map-controls"
-          role="group"
-          aria-label={t('minimap.controls')}
-        >
-          <MinimapControlButton
-            label={t('minimap.collapse')}
-            tooltip={shortcutTooltips.toggleMinimap}
-            onClick={onToggleCollapsed}
-          >
-            <WorkbenchIcon role="collapse" size={13} />
-          </MinimapControlButton>
-        </div>
-      </AnchoredSurfaceMotion>
-      <div className="canvas-minimap__navigation-row">
-        {isCollapsed ? (
-          <div
-            className="canvas-minimap__map-controls canvas-minimap__map-controls--collapsed"
-            role="group"
-            aria-label={t('minimap.controls')}
-          >
-            <MinimapControlButton
-              label={t('minimap.expand')}
-              tooltip={shortcutTooltips.toggleMinimap}
-              onClick={onToggleCollapsed}
-            >
-              <WorkbenchIcon role="minimap" size={14} />
-            </MinimapControlButton>
+                {viewportFrame ?? (
+                  <CanvasMinimapViewportFrame viewport={canvasViewport} canvasSize={canvasSize} />
+                )}
+                {frames.map((frame) => (
+                  <MinimapWorkbenchNode
+                    key={frame.node.id}
+                    id={frame.node.id}
+                    variant={resolveMinimapNodeVariant(frame.node)}
+                    kindLabel={
+                      frame.node.type === 'agentConsole'
+                        ? 'Agent'
+                        : frame.node.type === 'terminalGroup'
+                          ? t('minimap.terminalGroup')
+                          : t('minimap.terminal')
+                    }
+                    x={frame.x}
+                    y={frame.y}
+                    width={frame.width}
+                    height={frame.height}
+                    borderRadius={6}
+                    className={getMiniMapNodeClassName(frame.node)}
+                    color={getMiniMapNodeColor(frame.node)}
+                    strokeColor={getMiniMapNodeStrokeColor(frame.node)}
+                    strokeWidth={1.2}
+                    selected={Boolean(frame.node.selected)}
+                    onClick={focusMinimapNode}
+                  />
+                ))}
+              </svg>
+            </MinimapNodeInteractionContext.Provider>
           </div>
-        ) : null}
+        </div>
+      ) : null}
+      <div className="canvas-minimap__navigation-row">
         <div
           className="canvas-minimap__viewport-controls"
           role="group"
@@ -279,6 +255,21 @@ export function CanvasMinimap({
             onClick={onFitCanvas}
           >
             <WorkbenchIcon role="fit-canvas" size={14} />
+          </MinimapControlButton>
+        </div>
+        <div
+          className="canvas-minimap__map-controls"
+          role="group"
+          aria-label={t('minimap.controls')}
+        >
+          <MinimapControlButton
+            className="canvas-minimap__toggle"
+            expanded={!isCollapsed}
+            label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
+            tooltip={shortcutTooltips.toggleMinimap}
+            onClick={onToggleCollapsed}
+          >
+            <WorkbenchIcon role="disclosure" size={14} />
           </MinimapControlButton>
         </div>
       </div>
@@ -403,19 +394,29 @@ function CanvasMinimapViewportFrame({
 }
 
 interface MinimapControlButtonProps {
+  readonly className?: string
+  readonly expanded?: boolean
   readonly label: string
   readonly tooltip: string
   readonly onClick: () => void
   readonly children: ReactNode
 }
 
-function MinimapControlButton({ label, tooltip, onClick, children }: MinimapControlButtonProps) {
+function MinimapControlButton({
+  className,
+  expanded,
+  label,
+  tooltip,
+  onClick,
+  children
+}: MinimapControlButtonProps) {
   return (
     <TooltipLabel content={tooltip}>
       <button
-        className="icon-button icon-button--small"
+        className={['icon-button', 'icon-button--small', className].filter(Boolean).join(' ')}
         type="button"
         aria-label={label}
+        aria-expanded={expanded}
         onClick={onClick}
       >
         {children}
