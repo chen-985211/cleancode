@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { CanvasPaneContextMenu } from './CanvasPaneContextMenu'
@@ -25,6 +25,13 @@ interface UseCanvasPaneContextMenuOptions {
   readonly onFitCanvas?: () => void
 }
 
+interface CanvasPaneContextMenuState {
+  readonly graphId: string | null
+  readonly open: boolean
+  readonly x: number
+  readonly y: number
+}
+
 export function useCanvasPaneContextMenu({
   canCreateTerminal,
   canGroupTerminals,
@@ -37,21 +44,26 @@ export function useCanvasPaneContextMenu({
   onCreateTerminalGroup,
   onFitCanvas
 }: UseCanvasPaneContextMenuOptions) {
-  const [position, setPosition] = useState<{
-    readonly graphId: string | null
-    readonly x: number
-    readonly y: number
-  } | null>(null)
-  const close = useCallback(() => setPosition(null), [])
+  const [position, setPosition] = useState<CanvasPaneContextMenuState | null>(null)
+  const openIntentRef = useRef({ graphId, open: false })
+  const close = useCallback(() => {
+    openIntentRef.current = { ...openIntentRef.current, open: false }
+    setPosition((current) => (current ? { ...current, open: false } : null))
+  }, [])
   const open = useCallback(
     (event: CanvasPaneContextMenuEvent): void => {
       event.preventDefault()
+      if (openIntentRef.current.graphId === graphId && openIntentRef.current.open) {
+        close()
+        return
+      }
       onBeforeOpen()
       if (isBlocked) {
         close()
         return
       }
-      setPosition({ graphId, x: event.clientX, y: event.clientY })
+      openIntentRef.current = { graphId, open: true }
+      setPosition({ graphId, open: true, x: event.clientX, y: event.clientY })
     },
     [close, graphId, isBlocked, onBeforeOpen]
   )
@@ -63,6 +75,7 @@ export function useCanvasPaneContextMenu({
         <CanvasPaneContextMenu
           canCreateTerminal={canCreateTerminal}
           canGroupTerminals={canGroupTerminals}
+          open={position.open}
           position={position}
           shortcutTooltips={shortcutTooltips}
           onClose={close}

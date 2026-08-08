@@ -30,6 +30,7 @@ import {
   waitForAgentProviderInstalled,
   waitForAgentTerminalReady
 } from '../support/e2eAgentRuntime'
+import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
 import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
 
@@ -73,7 +74,7 @@ describe('Claude Code Agent session e2e', () => {
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'claude-code')
       await waitForClaudeInspection(fakeClaude.reportPath)
-      await selectDefaultAgentProvider(page, 'Claude Code')
+      await selectAgentProviderFromCreateMenu(page, 'Claude Code')
       await waitForAgentCount(page, 1)
       const claudeIdentity = page.getByRole('img', { name: 'Claude Code' })
       await claudeIdentity.waitFor()
@@ -133,7 +134,7 @@ describe('Claude Code Agent session e2e', () => {
       await waitForAgentCount(page, 0)
       await waitForAgentProviderInstalled(page, 'claude-code')
       await waitForClaudeInspection(fakeClaude.reportPath)
-      await selectDefaultAgentProvider(page, 'Claude Code')
+      await selectAgentProviderFromCreateMenu(page, 'Claude Code')
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
       await firstLaunchReady
@@ -227,22 +228,6 @@ async function waitForAgentTerminals(page: Page, count: number): Promise<void> {
       Array.from(terminals).every((terminal) => terminal.querySelector('.xterm-helper-textarea'))
     )
   }, count)
-}
-
-async function selectDefaultAgentProvider(page: Page, providerName: string): Promise<void> {
-  await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  const providerOption = page.getByRole('menuitemradio', { name: providerName, exact: true })
-
-  try {
-    await providerOption.waitFor({ state: 'visible', timeout: 5_000 })
-  } catch {
-    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
-    throw new Error(
-      `Provider "${providerName}" did not become selectable. Visible Providers: ${JSON.stringify(visibleProviders)}`
-    )
-  }
-
-  await providerOption.click({ timeout: 1_000 })
 }
 
 async function waitForClaudeInspection(reportPath: string): Promise<void> {

@@ -24,6 +24,49 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     await rm(workingDirectory, { force: true, recursive: true })
   })
 
+  it.each([
+    { exitCode: 0, marker: 'windows-fast-exit-zero' },
+    { exitCode: 7, marker: 'windows-fast-exit-seven' }
+  ])(
+    'drains output before emitting one exact exit event for a fast command ending with $exitCode',
+    async ({ exitCode, marker }) => {
+      const sessionId = `windows-fast-exit-${exitCode}`
+      const eventOrder: string[] = []
+      const exitEvents: Array<number | null> = []
+      const exited = createDeferred<number | null>()
+      let output = ''
+      let markerObserved = false
+
+      await startTerminal({
+        scope: blockRunScope(sessionId),
+        workingDirectory,
+        shell: 'powershell.exe',
+        launchCommand: `[Console]::Write('${marker}'); exit ${exitCode}`,
+        sessionKind: 'workflow',
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+          if (!markerObserved && output.includes(marker)) {
+            markerObserved = true
+            eventOrder.push('output')
+          }
+        },
+        onExit: (event) => {
+          exitEvents.push(event.exitCode)
+          eventOrder.push('exit')
+          exited.resolve(event.exitCode)
+        }
+      })
+
+      await expect(exited.promise).resolves.toBe(exitCode)
+      expect(output).toContain(marker)
+      expect(eventOrder).toEqual(['output', 'exit'])
+      expect(exitEvents).toEqual([exitCode])
+    },
+    20_000
+  )
+
   it('starts an Agent job requested immediately after creating the PowerShell pty', async () => {
     let output = ''
     const started = createDeferred<void>()
@@ -266,6 +309,21 @@ function agentRunScope(sessionId: string) {
     generation: 1,
     gitBranch: 'main',
     owner: { id: 'agent-1', kind: 'agent' as const },
+    projectDirectory: 'C:\\project',
+    projectId: 'project-test',
+    runId: `run-${sessionId}`,
+    sessionId,
+    workspaceDirectory: 'C:\\project',
+    workspaceId: 'main'
+  }
+}
+
+function blockRunScope(sessionId: string) {
+  return {
+    blockId: 'terminal-1',
+    generation: 1,
+    gitBranch: 'main',
+    owner: { id: 'terminal-1', kind: 'block' as const },
     projectDirectory: 'C:\\project',
     projectId: 'project-test',
     runId: `run-${sessionId}`,

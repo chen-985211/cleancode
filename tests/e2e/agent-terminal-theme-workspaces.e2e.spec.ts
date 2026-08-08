@@ -24,6 +24,8 @@ import {
   type E2eScenarioResources,
   type E2eWorkbench
 } from '../support/e2eWorkbench'
+import { waitForAgentProviderInstalled } from '../support/e2eAgentRuntime'
+import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
@@ -105,6 +107,7 @@ describe('Agent terminal theme across workspaces e2e', () => {
       await expectDesktopRuntime(page)
       await selectTheme(page, 'light')
       await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentProviderInstalled(page, 'codex')
       await createCodexAgent(page)
       await waitForPersistedAgent(page)
 
@@ -429,8 +432,7 @@ async function waitForPersistedAgent(page: Page): Promise<void> {
 }
 
 async function createCodexAgent(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  await page.getByRole('menuitemradio', { name: 'Codex', exact: true }).click()
+  await selectAgentProviderFromCreateMenu(page, 'Codex')
 }
 
 async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {

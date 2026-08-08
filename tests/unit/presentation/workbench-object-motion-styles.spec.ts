@@ -17,6 +17,10 @@ const agentConsoleStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/styles/agent-console.css'),
   'utf8'
 )
+const themeStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/theme.css'),
+  'utf8'
+)
 
 describe('workbench object motion styles', () => {
   it('materializes new objects with clipping and opacity without animating terminal geometry', () => {
@@ -132,6 +136,39 @@ describe('workbench object motion styles', () => {
     })
   })
 
+  it('gives every canvas node shell one shared high corner radius', () => {
+    const nodeRules = [
+      readStyleRule(terminalNodeStyles, '.terminal-node'),
+      readTerminalGroupRule('.terminal-group-node'),
+      readStyleRule(agentConsoleStyles, '.agent-console-node')
+    ]
+
+    expect(themeStyles).toContain('--cc-canvas-node-radius: 20px;')
+    nodeRules.forEach((rule) => {
+      expect(rule).toContain('border-radius: var(--cc-canvas-node-radius);')
+    })
+    expect(
+      normalizeWhitespace(readStyleRule(terminalNodeStyles, '.terminal-node__header'))
+    ).toContain(
+      'border-radius: calc(var(--cc-canvas-node-radius) - 1px) calc(var(--cc-canvas-node-radius) - 1px) 0 0;'
+    )
+    expect(normalizeWhitespace(readStyleRule(terminalNodeStyles, '.terminal-frame'))).toContain(
+      'border-radius: 0 0 calc(var(--cc-canvas-node-radius) - 1px) calc(var(--cc-canvas-node-radius) - 1px);'
+    )
+    expect(readTerminalGroupRule('.terminal-group-node__header')).toContain(
+      'border-radius: var(--cc-canvas-node-radius) var(--cc-canvas-node-radius) 0 0;'
+    )
+    expect(readTerminalGroupRule('.terminal-group-node__members')).toContain(
+      'border-radius: 0 0 var(--cc-canvas-node-radius) var(--cc-canvas-node-radius);'
+    )
+    expect(readTerminalGroupRule('.terminal-group-node::after')).toContain(
+      'border-radius: 0 0 var(--cc-canvas-node-radius) var(--cc-canvas-node-radius);'
+    )
+    expect(readStyleRule(agentConsoleStyles, '.agent-console')).toContain(
+      'border-radius: calc(var(--cc-canvas-node-radius) - 1px);'
+    )
+  })
+
   it('reduces secondary controls by detail level while preserving node identity surfaces', () => {
     expect(objectMotionStyles).toContain("[data-canvas-detail='compact']")
     expect(objectMotionStyles).toContain("[data-canvas-detail='overview']")
@@ -164,4 +201,8 @@ function readTerminalGroupRule(selector: string): string {
 
 function readStyleRule(styles: string, selector: string): string {
   return styles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+}
+
+function normalizeWhitespace(styles: string): string {
+  return styles.replace(/\s+/g, ' ').trim()
 }

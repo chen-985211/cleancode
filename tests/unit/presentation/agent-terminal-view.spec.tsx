@@ -218,8 +218,12 @@ describe('Agent shared terminal view', () => {
         <Harness session={createSession()} />
       </TerminalSurfaceRegistryProvider>
     )
+    const viewport = view.container.firstElementChild as HTMLElement
 
     await waitFor(() => expect(attachTerminalView).toHaveBeenCalledOnce())
+    expect(viewport).toHaveAttribute('data-agent-terminal-session-id', 'agent-session-1')
+    expect(viewport).toHaveAttribute('data-agent-terminal-view-session-id', 'terminal-session-1')
+    expect(viewport).toHaveAttribute('data-terminal-attached-session-id', 'terminal-session-1')
     expect(terminalViewMockState.surfaces[0]?.restore).not.toHaveBeenCalled()
 
     const nextSession = createSession()
@@ -255,6 +259,9 @@ describe('Agent shared terminal view', () => {
     expect(terminalViewMockState.surfaces.at(-1)?.restore).toHaveBeenCalledWith(
       expect.objectContaining({ content: 'restored output' })
     )
+    expect(viewport).toHaveAttribute('data-agent-terminal-session-id', 'agent-session-1')
+    expect(viewport).toHaveAttribute('data-agent-terminal-view-session-id', 'terminal-session-2')
+    expect(viewport).toHaveAttribute('data-terminal-attached-session-id', 'terminal-session-2')
     view.unmount()
   })
 
@@ -281,6 +288,43 @@ describe('Agent shared terminal view', () => {
     expect(surface.detach).toHaveBeenCalledTimes(1)
     expect(surface.dispose).toHaveBeenCalledTimes(1)
   })
+
+  it('replaces the measurement attachment marker with the final Agent session identity', async () => {
+    const registry = new TerminalSurfaceRegistry(undefined, () => 'agent-view-1')
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: {
+        ...createRuntimeApi(),
+        attachTerminalView: vi.fn(async (command) => createSnapshot(command.viewId)),
+        detachTerminalView: vi.fn(async () => undefined)
+      }
+    })
+
+    const view = render(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness session={null} />
+      </TerminalSurfaceRegistryProvider>
+    )
+    const viewport = view.container.firstElementChild as HTMLElement
+    const measurementSurface = terminalViewMockState.surfaces[0]!
+
+    expect(viewport).not.toHaveAttribute('data-terminal-attached-session-id')
+    viewport.setAttribute('data-terminal-attached-session-id', 'stale-measurement')
+
+    view.rerender(
+      <TerminalSurfaceRegistryProvider registry={registry}>
+        <Harness session={createSession()} />
+      </TerminalSurfaceRegistryProvider>
+    )
+
+    await waitFor(() =>
+      expect(viewport).toHaveAttribute('data-terminal-attached-session-id', 'terminal-session-1')
+    )
+    expect(measurementSurface.detach).toHaveBeenCalledOnce()
+
+    view.unmount()
+    expect(viewport).not.toHaveAttribute('data-terminal-attached-session-id')
+  })
 })
 
 function Harness({
@@ -303,7 +347,13 @@ function Harness({
     terminalElementRef,
     workspaceKey: 'project-1\0main\0\0agent-1'
   })
-  return <div ref={terminalElementRef} />
+  return (
+    <div
+      data-agent-terminal-session-id={session?.sessionId}
+      data-agent-terminal-view-session-id={session?.runtime.terminal.viewIdentity?.sessionId}
+      ref={terminalElementRef}
+    />
+  )
 }
 
 function createSession(): AgentSessionSnapshot {

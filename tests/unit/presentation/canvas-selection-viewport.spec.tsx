@@ -62,6 +62,42 @@ describe('canvas selection viewport', () => {
     expect(setViewport).toHaveBeenCalledWith({ x: 74, y: 40, zoom: 0.35 }, { duration: 0 })
   })
 
+  it('coalesces repeated overview requests while the first request is still in flight', () => {
+    const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance, setViewport } = createReactFlowInstance([node], {
+      x: -100,
+      y: -80,
+      zoom: 0.5
+    })
+    const { result } = renderSelectionViewportHook(instance)
+
+    act(() => {
+      result.current.returnToGlobalCanvasView(null)
+      result.current.returnToGlobalCanvasView(null)
+      result.current.returnToGlobalCanvasView(null)
+    })
+
+    expect(setViewport).toHaveBeenCalledOnce()
+  })
+
+  it('does not restart overview motion after the viewport has already settled at 35%', async () => {
+    const node = createNode('terminal-1', { x: 100, y: 120 }, { width: 400, height: 300 })
+    const { instance, setViewport } = createReactFlowInstance([node], {
+      x: -100,
+      y: -80,
+      zoom: 0.5
+    })
+    const { result } = renderSelectionViewportHook(instance)
+
+    await act(async () => {
+      result.current.returnToGlobalCanvasView(null)
+      await Promise.resolve()
+    })
+    act(() => result.current.returnToGlobalCanvasView(null))
+
+    expect(setViewport).toHaveBeenCalledOnce()
+  })
+
   it.each(['missing-terminal', 'hidden-terminal'])(
     'falls back to the current viewport center when anchor %s is unavailable',
     (anchorNodeId) => {

@@ -53,6 +53,7 @@ import { QuickExecutionBar } from './QuickExecutionBar'
 import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
 import { toQuickExecutionTarget } from './quickExecutionTargets'
 import { CanvasInitialWorkbenchState, CanvasStatusbar } from './WorkbenchCanvasStates'
+import { CanvasMenuMotionProvider } from './CanvasMenuMotionProvider'
 import { useCanvasPaneContextMenu } from './useCanvasPaneContextMenu'
 import { projectTerminalWorkflowBuildOntoEdges } from './terminalWorkflowBuildEdgePresentation'
 import {
@@ -411,277 +412,285 @@ export function WorkbenchCanvas({
 
   return (
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
-      <div
-        ref={canvasSurfaceRef}
-        data-canvas-detail={canvasDetailLevel}
-        className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
-          .filter(Boolean)
-          .join(' ')}
-        onPointerDownCapture={templateInteraction.beginSelection}
-        onPointerMoveCapture={templateInteraction.continueInteraction}
-        onPointerUpCapture={templateInteraction.completeSelection}
-        onPointerCancelCapture={templateInteraction.cancelSelection}
-        onClickCapture={templateInteraction.placeFromCanvasClick}
-      >
-        <WorkbenchToolbar
-          agentProviders={agentProviders}
-          defaultAgentProviderId={defaultAgentProviderId}
-          shortcutTooltips={shortcutTooltips}
-          isDesktopRuntime={isDesktopRuntime}
-          isCreatingAgent={isCreatingAgent}
-          isAgentProviderDiscoveryPending={isAgentProviderDiscoveryPending}
-          hasWorkbench={Boolean(currentWorkbench)}
-          isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
-          selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
-          onCreateWorkspaceAgent={onCreateWorkspaceAgent}
-          onOpenAgentSettings={onOpenAgentSettings}
-          onSelectDefaultAgentProvider={onSelectDefaultAgentProvider}
-          onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
-        />
-        <ReactFlow<WorkbenchFlowNode, Edge>
-          nodes={objectContextMenu.nodes}
-          edges={objectContextMenu.edges}
-          edgeTypes={workbenchEdgeTypes}
-          isValidConnection={(connection: Connection | Edge) =>
-            isTerminalConnectionAllowedInCanvasScope(
-              currentWorkbench?.graph ?? null,
-              connection.source,
-              connection.target,
-              editingTerminalGroupId
-            )
-          }
-          onConnect={(connection) => void workflow.connect(connection)}
-          onEdgesDelete={(edges) =>
-            void workflow.deleteEdges(
-              edges.filter(
-                (edge) =>
-                  !edge.id.startsWith('approval:') &&
-                  isTerminalConnectionEditableInCanvasScope(
-                    currentWorkbench?.graph ?? null,
-                    edge.source,
-                    edge.target,
-                    editingTerminalGroupId
-                  )
+      <CanvasMenuMotionProvider resetKey={currentWorkbench?.graph.id ?? null}>
+        <div
+          ref={canvasSurfaceRef}
+          tabIndex={-1}
+          data-canvas-detail={canvasDetailLevel}
+          className={['canvas-surface', placementTemplate ? 'canvas-surface--placing-template' : '']
+            .filter(Boolean)
+            .join(' ')}
+          onPointerDownCapture={templateInteraction.beginSelection}
+          onPointerMoveCapture={templateInteraction.continueInteraction}
+          onPointerUpCapture={templateInteraction.completeSelection}
+          onPointerCancelCapture={templateInteraction.cancelSelection}
+          onClickCapture={templateInteraction.placeFromCanvasClick}
+        >
+          <WorkbenchToolbar
+            agentProviders={agentProviders}
+            defaultAgentProviderId={defaultAgentProviderId}
+            shortcutTooltips={shortcutTooltips}
+            isDesktopRuntime={isDesktopRuntime}
+            isCreatingAgent={isCreatingAgent}
+            isAgentProviderDiscoveryPending={isAgentProviderDiscoveryPending}
+            hasWorkbench={Boolean(currentWorkbench)}
+            isTerminalGroupSelectionMode={isTerminalGroupSelectionMode}
+            selectedTerminalGroupCandidateCount={selectedTerminalGroupCandidateCount}
+            onCreateWorkspaceAgent={onCreateWorkspaceAgent}
+            onOpenAgentSettings={onOpenAgentSettings}
+            onSelectDefaultAgentProvider={onSelectDefaultAgentProvider}
+            onCancelTerminalGroupSelection={onCancelTerminalGroupSelection}
+          />
+          <ReactFlow<WorkbenchFlowNode, Edge>
+            nodes={objectContextMenu.nodes}
+            edges={objectContextMenu.edges}
+            edgeTypes={workbenchEdgeTypes}
+            isValidConnection={(connection: Connection | Edge) =>
+              isTerminalConnectionAllowedInCanvasScope(
+                currentWorkbench?.graph ?? null,
+                connection.source,
+                connection.target,
+                editingTerminalGroupId
               )
-            )
-          }
-          nodeTypes={nodeTypes}
-          onInit={(instance) => {
-            reactFlowInstanceRef.current = instance
-            setViewportMotionInstance((currentInstance) => currentInstance ?? instance)
-            unsubscribeViewportMotionRef.current?.()
-            unsubscribeViewportMotionRef.current = subscribeCanvasViewportMotionCompletion({
-              instance,
-              onViewportChangeRef,
-              setCanvasViewport,
-              setViewportZoom
-            })
-
-            if (currentWorkbench) {
-              restoreCanvasViewport({
+            }
+            onConnect={(connection) => void workflow.connect(connection)}
+            onEdgesDelete={(edges) =>
+              void workflow.deleteEdges(
+                edges.filter(
+                  (edge) =>
+                    !edge.id.startsWith('approval:') &&
+                    isTerminalConnectionEditableInCanvasScope(
+                      currentWorkbench?.graph ?? null,
+                      edge.source,
+                      edge.target,
+                      editingTerminalGroupId
+                    )
+                )
+              )
+            }
+            nodeTypes={nodeTypes}
+            onInit={(instance) => {
+              reactFlowInstanceRef.current = instance
+              setViewportMotionInstance((currentInstance) => currentInstance ?? instance)
+              unsubscribeViewportMotionRef.current?.()
+              unsubscribeViewportMotionRef.current = subscribeCanvasViewportMotionCompletion({
                 instance,
-                viewport: currentWorkbench.graph.viewport,
-                graphId: currentWorkbench.graph.id,
-                restoredGraphIdRef,
-                isRestoringViewportRef,
-                setViewportZoom,
-                setCanvasViewport
+                onViewportChangeRef,
+                setCanvasViewport,
+                setViewportZoom
               })
-              return
+
+              if (currentWorkbench) {
+                restoreCanvasViewport({
+                  instance,
+                  viewport: currentWorkbench.graph.viewport,
+                  graphId: currentWorkbench.graph.id,
+                  restoredGraphIdRef,
+                  isRestoringViewportRef,
+                  setViewportZoom,
+                  setCanvasViewport
+                })
+                return
+              }
+
+              const viewport = instance.getViewport()
+
+              setViewportZoom(viewport.zoom)
+              setCanvasViewport(toCanvasViewportSnapshot(viewport))
+            }}
+            onNodesChange={(changes) =>
+              onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
             }
-
-            const viewport = instance.getViewport()
-
-            setViewportZoom(viewport.zoom)
-            setCanvasViewport(toCanvasViewportSnapshot(viewport))
-          }}
-          onNodesChange={(changes) =>
-            onNodesChange(isolateWorkbenchNodeDragChanges(changes, activeDraggedNodeRef.current))
-          }
-          onNodeClick={onNodeClick}
-          onNodeContextMenu={(event, node) => {
-            if (node.type === 'terminalGroup' && node.id === editingTerminalGroupId) {
+            onNodeClick={onNodeClick}
+            onNodeContextMenu={(event, node) => {
+              if (node.type === 'terminalGroup' && node.id === editingTerminalGroupId) {
+                objectContextMenu.close()
+                paneContextMenu.open(event)
+                return
+              }
+              paneContextMenu.close()
+              objectContextMenu.onNodeContextMenu(event, node)
+            }}
+            onPaneContextMenu={paneContextMenu.open}
+            onPaneClick={() => {
               objectContextMenu.close()
-              paneContextMenu.open(event)
-              return
-            }
-            paneContextMenu.close()
-            objectContextMenu.onNodeContextMenu(event, node)
-          }}
-          onPaneContextMenu={paneContextMenu.open}
-          onPaneClick={() => {
-            objectContextMenu.close()
-            paneContextMenu.close()
-            if (placementTemplate) return
-            templateInteraction.clearSelection()
-            onPaneClick()
-          }}
-          onNodeDragStart={(event, node) => {
-            setIsQuickExecutionDropTarget(false)
-            activeDraggedNodeRef.current = node
-            canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
-            onNodeDragStart(event, node)
-          }}
-          onNodeDrag={(event, node) => {
-            const target = resolveQuickExecutionNodeTarget(currentWorkbench?.graph ?? null, node)
-            const isDropTarget = Boolean(
-              target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
-            )
-            setIsQuickExecutionDropTarget(isDropTarget)
-            if (isDropTarget) {
-              onQuickExecutionDragPreview?.()
-              return
-            }
-            onNodeDrag(event, node)
-          }}
-          onNodeDragStop={(event, node) => {
-            try {
-              canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
+              paneContextMenu.close()
+              if (placementTemplate) return
+              templateInteraction.clearSelection()
+              onPaneClick()
+            }}
+            onNodeDragStart={(event, node) => {
+              setIsQuickExecutionDropTarget(false)
+              activeDraggedNodeRef.current = node
+              canvasSurfaceRef.current?.classList.add('canvas-surface--dragging-terminal')
+              onNodeDragStart(event, node)
+            }}
+            onNodeDrag={(event, node) => {
               const target = resolveQuickExecutionNodeTarget(currentWorkbench?.graph ?? null, node)
               const isDropTarget = Boolean(
                 target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
               )
-              setIsQuickExecutionDropTarget(false)
-              if (isDropTarget && target && onQuickExecutionNodeDrop) {
-                void onQuickExecutionNodeDrop(target, node)
+              setIsQuickExecutionDropTarget(isDropTarget)
+              if (isDropTarget) {
+                onQuickExecutionDragPreview?.()
                 return
               }
-              onNodeDragStop(event, node)
-            } finally {
-              activeDraggedNodeRef.current = null
-            }
-          }}
-          onMove={(event, viewport) =>
-            synchronizeCanvasViewportFromMove({
-              event,
-              viewport,
-              setCanvasViewport,
-              setViewportZoom
-            })
-          }
-          onMoveStart={(event) => {
-            if (event) {
-              cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
-              cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
-              onViewportInteractionStart?.()
-            }
-          }}
-          onMoveEnd={(event, viewport) =>
-            persistCanvasViewportFromMoveEnd({
-              event,
-              isRestoringViewport: isRestoringViewportRef.current,
-              onViewportChange,
-              viewport
-            })
-          }
-          defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
-          multiSelectionKeyCode={null}
-          selectionKeyCode={null}
-          minZoom={minimumCanvasZoom}
-          maxZoom={maximumCanvasZoom}
-          zoomOnScroll={false}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="var(--cc-border-strong)" gap={24} size={1} />
-          <Panel className="canvas-minimap-panel" position="top-left">
-            <CanvasMinimap
-              isCollapsed={isMinimapCollapsed}
-              nodes={minimapNodes}
-              canvasViewport={canvasViewport}
-              canvasSize={canvasSize}
-              viewportFrame={
-                <LiveCanvasMinimapViewportFrame
-                  canvasSize={canvasSize}
-                  fallbackViewport={canvasViewport}
-                  instance={viewportMotionInstance}
-                />
+              onNodeDrag(event, node)
+            }}
+            onNodeDragStop={(event, node) => {
+              try {
+                canvasSurfaceRef.current?.classList.remove('canvas-surface--dragging-terminal')
+                const target = resolveQuickExecutionNodeTarget(
+                  currentWorkbench?.graph ?? null,
+                  node
+                )
+                const isDropTarget = Boolean(
+                  target && resolveQuickExecutionDropTarget(canvasSurfaceRef.current, event)
+                )
+                setIsQuickExecutionDropTarget(false)
+                if (isDropTarget && target && onQuickExecutionNodeDrop) {
+                  void onQuickExecutionNodeDrop(target, node)
+                  return
+                }
+                onNodeDragStop(event, node)
+              } finally {
+                activeDraggedNodeRef.current = null
               }
-              viewportMotionInstance={viewportMotionInstance}
-              viewportZoom={viewportZoom}
-              shortcutTooltips={shortcutTooltips}
-              minimapNodeInteraction={minimapNodeInteraction}
-              onToggleCollapsed={onToggleMinimap}
-              onZoomOut={onZoomCanvasOut}
-              onZoomIn={onZoomCanvasIn}
-              onFitCanvas={onFitCanvas}
-              onMinimapNodeClick={onMinimapNodeClick}
-              onViewportCenterPreview={(center) => moveCanvasViewportToMinimapCenter(center, false)}
-              onViewportCenterCommit={(center) => moveCanvasViewportToMinimapCenter(center, true)}
-              getMiniMapNodeColor={getMiniMapNodeColor}
-              getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
-              getMiniMapNodeClassName={getMiniMapNodeClassName}
-            />
-          </Panel>
-        </ReactFlow>
-        {currentWorkbench &&
-        onAddQuickExecutionTarget &&
-        onBindQuickExecutionSlot &&
-        onClearQuickExecutionSlot &&
-        onReorderQuickExecutionSlots ? (
-          <QuickExecutionBar
-            isExternalDropTarget={isQuickExecutionDropTarget}
-            graph={currentWorkbench.graph}
-            onAdd={onAddQuickExecutionTarget}
-            onBind={onBindQuickExecutionSlot}
-            onClear={onClearQuickExecutionSlot}
-            onFocus={(target) =>
-              focusQuickExecutionTargetInCanvas({
-                instance: reactFlowInstanceRef.current,
-                target
+            }}
+            onMove={(event, viewport) =>
+              synchronizeCanvasViewportFromMove({
+                event,
+                viewport,
+                setCanvasViewport,
+                setViewportZoom
               })
             }
-            onReorder={onReorderQuickExecutionSlots}
-            shortcutPlatform={shortcutPlatform}
-            shortcutTooltips={shortcutTooltips}
-          />
-        ) : null}
-        {objectContextMenu.menu}
-        {paneContextMenu.menu}
-        {templateInteraction.templateSelection ? (
-          <div
-            className="block-template-selection"
-            style={{
-              left: templateInteraction.templateSelection.rect.x,
-              top: templateInteraction.templateSelection.rect.y,
-              width: templateInteraction.templateSelection.rect.width,
-              height: templateInteraction.templateSelection.rect.height
+            onMoveStart={(event) => {
+              if (event) {
+                cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
+                cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
+                onViewportInteractionStart?.()
+              }
             }}
+            onMoveEnd={(event, viewport) =>
+              persistCanvasViewportFromMoveEnd({
+                event,
+                isRestoringViewport: isRestoringViewportRef.current,
+                onViewportChange,
+                viewport
+              })
+            }
+            defaultViewport={currentWorkbench?.graph.viewport ?? defaultCanvasViewport}
+            multiSelectionKeyCode={null}
+            selectionKeyCode={null}
+            minZoom={minimumCanvasZoom}
+            maxZoom={maximumCanvasZoom}
+            zoomOnScroll={false}
+            proOptions={{ hideAttribution: true }}
           >
-            <button
-              type="button"
-              onClick={() => {
-                onRequestSaveBlockTemplate?.(templateInteraction.templateSelection!.blockIds)
-                templateInteraction.clearSelection()
+            <Background color="var(--cc-border-strong)" gap={24} size={1} />
+            <Panel className="canvas-minimap-panel" position="top-left">
+              <CanvasMinimap
+                isCollapsed={isMinimapCollapsed}
+                nodes={minimapNodes}
+                canvasViewport={canvasViewport}
+                canvasSize={canvasSize}
+                viewportFrame={
+                  <LiveCanvasMinimapViewportFrame
+                    canvasSize={canvasSize}
+                    fallbackViewport={canvasViewport}
+                    instance={viewportMotionInstance}
+                  />
+                }
+                viewportMotionInstance={viewportMotionInstance}
+                viewportZoom={viewportZoom}
+                shortcutTooltips={shortcutTooltips}
+                minimapNodeInteraction={minimapNodeInteraction}
+                onToggleCollapsed={onToggleMinimap}
+                onZoomOut={onZoomCanvasOut}
+                onZoomIn={onZoomCanvasIn}
+                onFitCanvas={onFitCanvas}
+                onMinimapNodeClick={onMinimapNodeClick}
+                onViewportCenterPreview={(center) =>
+                  moveCanvasViewportToMinimapCenter(center, false)
+                }
+                onViewportCenterCommit={(center) => moveCanvasViewportToMinimapCenter(center, true)}
+                getMiniMapNodeColor={getMiniMapNodeColor}
+                getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
+                getMiniMapNodeClassName={getMiniMapNodeClassName}
+              />
+            </Panel>
+          </ReactFlow>
+          {currentWorkbench &&
+          onAddQuickExecutionTarget &&
+          onBindQuickExecutionSlot &&
+          onClearQuickExecutionSlot &&
+          onReorderQuickExecutionSlots ? (
+            <QuickExecutionBar
+              isExternalDropTarget={isQuickExecutionDropTarget}
+              graph={currentWorkbench.graph}
+              onAdd={onAddQuickExecutionTarget}
+              onBind={onBindQuickExecutionSlot}
+              onClear={onClearQuickExecutionSlot}
+              onFocus={(target) =>
+                focusQuickExecutionTargetInCanvas({
+                  instance: reactFlowInstanceRef.current,
+                  target
+                })
+              }
+              onReorder={onReorderQuickExecutionSlots}
+              shortcutPlatform={shortcutPlatform}
+              shortcutTooltips={shortcutTooltips}
+            />
+          ) : null}
+          {objectContextMenu.menu}
+          {paneContextMenu.menu}
+          {templateInteraction.templateSelection ? (
+            <div
+              className="block-template-selection"
+              style={{
+                left: templateInteraction.templateSelection.rect.x,
+                top: templateInteraction.templateSelection.rect.y,
+                width: templateInteraction.templateSelection.rect.width,
+                height: templateInteraction.templateSelection.rect.height
               }}
             >
-              <WorkbenchIcon active role="favorite" size={14} />
-              {t('templates.saveSelection')}
-            </button>
-          </div>
-        ) : null}
-        {placementTemplate && templateInteraction.placementOrigin ? (
-          <BlockTemplatePlacementPreview
-            origin={templateInteraction.placementOrigin}
-            template={placementTemplate}
-            viewport={canvasViewport}
-          />
-        ) : null}
-        {!currentWorkbench ? (
-          <CanvasInitialWorkbenchState
-            isDesktopRuntime={isDesktopRuntime}
-            phase={initialWorkbenchLoadPhase}
-            onOpenProject={onOpenProject}
-            onRetry={onRetryInitialWorkbenchLoad}
-          />
-        ) : null}
-      </div>
-      <CanvasStatusbar
-        isDesktopRuntime={isDesktopRuntime}
-        terminalRuntimeAvailability={terminalRuntimeAvailability}
-        initialWorkbenchLoadPhase={initialWorkbenchLoadPhase}
-        currentWorkbench={currentWorkbench}
-        currentWorkspace={currentWorkspace}
-      />
+              <button
+                type="button"
+                onClick={() => {
+                  onRequestSaveBlockTemplate?.(templateInteraction.templateSelection!.blockIds)
+                  templateInteraction.clearSelection()
+                }}
+              >
+                <WorkbenchIcon active role="favorite" size={14} />
+                {t('templates.saveSelection')}
+              </button>
+            </div>
+          ) : null}
+          {placementTemplate && templateInteraction.placementOrigin ? (
+            <BlockTemplatePlacementPreview
+              origin={templateInteraction.placementOrigin}
+              template={placementTemplate}
+              viewport={canvasViewport}
+            />
+          ) : null}
+          {!currentWorkbench ? (
+            <CanvasInitialWorkbenchState
+              isDesktopRuntime={isDesktopRuntime}
+              phase={initialWorkbenchLoadPhase}
+              onOpenProject={onOpenProject}
+              onRetry={onRetryInitialWorkbenchLoad}
+            />
+          ) : null}
+        </div>
+        <CanvasStatusbar
+          isDesktopRuntime={isDesktopRuntime}
+          terminalRuntimeAvailability={terminalRuntimeAvailability}
+          initialWorkbenchLoadPhase={initialWorkbenchLoadPhase}
+          currentWorkbench={currentWorkbench}
+          currentWorkspace={currentWorkspace}
+        />
+      </CanvasMenuMotionProvider>
     </section>
   )
 }

@@ -1,14 +1,17 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
   type MouseEvent as ReactMouseEvent
 } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { CreatableAgentProviderSnapshot } from '../../contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import { AgentProviderIcon } from './AgentProviderIcon'
+import { CanvasMenuSurface } from './CanvasMenuMotionProvider'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon } from './WorkbenchIcons'
@@ -28,8 +31,17 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
   const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const [menuPosition, setMenuPosition] = useState<{
+    readonly anchorX: number
+    readonly anchorY: number
+    readonly left: number
+    readonly side: 'bottom' | 'top'
+    readonly top: number
+  } | null>(null)
+  const [isMenuPresent, setIsMenuPresent] = useState(false)
   const isDisabled = props.disabled || props.isCreating
   const defaultProvider =
     props.providers.find((provider) => provider.descriptor.id === props.defaultProviderId) ?? null
@@ -46,13 +58,56 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     )
     itemRefs.current[selectedIndex >= 0 ? selectedIndex : 0]?.focus()
     const closeOutside = (event: globalThis.PointerEvent): void => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target) &&
+        !menuRef.current?.contains(event.target)
+      ) {
         closeMenu()
       }
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
-  }, [closeMenu, isOpen, props.defaultProviderId, props.providers])
+  }, [closeMenu, isMenuPresent, isOpen, props.defaultProviderId, props.providers])
+
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined
+
+    const positionMenu = (): void => {
+      const trigger = triggerRef.current
+      const menu = menuRef.current
+      if (!trigger || !menu) return
+      const triggerRect = trigger.getBoundingClientRect()
+      const viewportPadding = 8
+      const gap = 7
+      const opensAbove =
+        triggerRect.bottom + gap + menu.offsetHeight > window.innerHeight - viewportPadding &&
+        triggerRect.top - gap - menu.offsetHeight >= viewportPadding
+      const top = opensAbove ? triggerRect.top - gap - menu.offsetHeight : triggerRect.bottom + gap
+
+      setMenuPosition({
+        anchorX: triggerRect.right,
+        anchorY: opensAbove ? triggerRect.top : triggerRect.bottom,
+        left: Math.min(
+          Math.max(viewportPadding, triggerRect.right - menu.offsetWidth),
+          Math.max(viewportPadding, window.innerWidth - menu.offsetWidth - viewportPadding)
+        ),
+        side: opensAbove ? 'top' : 'bottom',
+        top: Math.min(
+          Math.max(viewportPadding, top),
+          Math.max(viewportPadding, window.innerHeight - menu.offsetHeight - viewportPadding)
+        )
+      })
+    }
+
+    positionMenu()
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
+  }, [isMenuPresent, isOpen, props.providers.length])
 
   const openMenu = (): void => {
     setIsOpen(true)
@@ -125,8 +180,25 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
       >
         <WorkbenchIcon role="disclosure" size={14} />
       </button>
-      {isOpen ? (
-        <div aria-label={t('toolbar.chooseDefaultAgent')} className="agent-create-menu" role="menu">
+      {createPortal(
+        <CanvasMenuSurface
+          ref={menuRef}
+          anchor={{ x: menuPosition?.anchorX ?? 0, y: menuPosition?.anchorY ?? 0 }}
+          aria-label={t('toolbar.chooseDefaultAgent')}
+          className="agent-create-menu"
+          data-side={menuPosition?.side ?? 'bottom'}
+          menuId="agent-create-menu"
+          motionReady={menuPosition !== null}
+          open={isOpen}
+          role="menu"
+          style={{
+            left: menuPosition?.left ?? 0,
+            top: menuPosition?.top ?? 0,
+            visibility: menuPosition ? 'visible' : 'hidden'
+          }}
+          onRequestClose={closeMenu}
+          onPresenceChange={setIsMenuPresent}
+        >
           {props.providers.length === 0 ? (
             <div className="agent-create-menu__empty" role="status">
               {t('toolbar.noAvailableAgents')}
@@ -190,8 +262,9 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
             </span>
             <span>{t('toolbar.agentSettings')}</span>
           </button>
-        </div>
-      ) : null}
+        </CanvasMenuSurface>,
+        document.body
+      )}
     </div>
   )
 }

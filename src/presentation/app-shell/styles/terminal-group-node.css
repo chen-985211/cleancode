@@ -27,7 +27,7 @@
   flex-direction: column;
   overflow: visible;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--cc-canvas-node-radius);
   background: var(--cc-surface-translucent);
   box-shadow:
     0 3px 8px var(--cc-shadow-color),
@@ -49,7 +49,7 @@
   position: absolute;
   z-index: 0;
   inset: 44px 0 0;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 var(--cc-canvas-node-radius) var(--cc-canvas-node-radius);
   background: radial-gradient(ellipse at 50% 44%, var(--cc-neutral-overlay) 0%, transparent 68%);
   content: '';
   opacity: 0;
@@ -122,7 +122,7 @@
   align-items: center;
   gap: 10px;
   box-sizing: border-box;
-  border-radius: 10px 10px 0 0;
+  border-radius: var(--cc-canvas-node-radius) var(--cc-canvas-node-radius) 0 0;
   padding: 6px 12px 6px 15px;
   background: var(--cc-surface-overlay);
   overflow: visible;
@@ -206,7 +206,7 @@
   gap: 0;
   box-sizing: border-box;
   padding: 0 10px 0 14px;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 var(--cc-canvas-node-radius) var(--cc-canvas-node-radius);
   background: var(--terminal-group-surface);
   pointer-events: auto;
   overflow: visible;

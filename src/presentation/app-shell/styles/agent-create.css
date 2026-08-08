@@ -51,10 +51,8 @@
 }
 
 .agent-create-menu {
-  position: absolute;
-  top: calc(100% + 7px);
-  right: 0;
-  z-index: 40;
+  position: fixed;
+  z-index: 220;
   width: 224px;
   overflow: hidden;
   border: 1px solid var(--cc-border);
@@ -63,7 +61,6 @@
   box-shadow: var(--cc-shadow-floating);
   padding: 5px;
   color: var(--cc-foreground);
-  animation: agent-create-menu-in 150ms ease-out;
 }
 
 .agent-create-menu__item {
@@ -134,18 +131,6 @@
   text-align: center;
 }
 
-@keyframes agent-create-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes agent-create-spin {
   to {
     transform: rotate(360deg);
@@ -153,7 +138,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-create-menu,
   .agent-create-split__spinner,
   .agent-settings-spinner {
     animation: none;

@@ -2,6 +2,7 @@ import { useEffect, useRef, type MutableRefObject } from 'react'
 
 import type { AgentSessionSnapshot } from '../../contexts/agent/application/dto/AgentSessionProtocol'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
+import { bindTerminalSurfaceAttachmentIdentity } from './terminalSurfaceAttachmentIdentity'
 import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
 import type { AgentTerminalMeasurement } from './agentConsoleModel'
 import type { TerminalDimensions } from './types'
@@ -56,7 +57,9 @@ export function useAgentTerminalView({
         onRestoreRequired: () => undefined,
         onSearchResultsChange: () => undefined
       })
+      const releaseAttachmentIdentity = bindTerminalSurfaceAttachmentIdentity(element, null)
       return () => {
+        releaseAttachmentIdentity()
         measurementSurface.detach(element)
         measurementSurface.dispose()
       }
@@ -130,12 +133,17 @@ export function useAgentTerminalView({
       onRestoreRequired: requestRestore,
       onSearchResultsChange: () => undefined
     })
+    const releaseAttachmentIdentity = bindTerminalSurfaceAttachmentIdentity(
+      element,
+      identity.sessionId
+    )
     requestRestore()
 
     return () => {
       isReleased = true
       if (inputTimer !== null) window.clearTimeout(inputTimer)
       pendingInput = ''
+      releaseAttachmentIdentity()
       surface.detach(element)
       void api
         .detachTerminalView?.({ ...identity, viewId: lease.viewId })

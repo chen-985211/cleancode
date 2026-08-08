@@ -67,6 +67,28 @@ describe('terminal autostart runtime epoch', () => {
 
     expect(screen.getByTestId('terminal-input-disabled')).toHaveTextContent('true')
   })
+
+  it('projects an explicit failed auto-start outcome for pending focus invalidation', () => {
+    const data = createTerminalNodeData(vi.fn())
+    const { container, rerender } = renderTerminal({
+      ...data,
+      session: { ...data.session, autoStartStatus: 'pending' }
+    })
+
+    expect(container.querySelector('[data-terminal-block-id]')).toHaveAttribute(
+      'data-terminal-auto-start-status',
+      'pending'
+    )
+
+    rerenderTerminal(rerender, {
+      ...data,
+      session: { ...data.session, autoStartStatus: 'failed' }
+    })
+    expect(container.querySelector('[data-terminal-block-id]')).toHaveAttribute(
+      'data-terminal-auto-start-status',
+      'failed'
+    )
+  })
 })
 
 function renderTerminal(data: TerminalFlowNode['data']) {

@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 import { AgentCreateSplitButton } from '../../../src/presentation/app-shell/AgentCreateSplitButton'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
 import type { CreatableAgentProviderSnapshot } from '../../../src/contexts/agent/application/dto/AgentProviderDiscoverySnapshot'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 
@@ -17,7 +19,7 @@ describe('Agent create split button', () => {
     const onCreate = vi.fn()
     const onSelectDefault = vi.fn()
 
-    render(
+    renderAgentCreate(
       <AgentCreateSplitButton
         defaultProviderId="codex"
         disabled={false}
@@ -51,7 +53,7 @@ describe('Agent create split button', () => {
   it('supports roving keyboard focus and restores focus when the menu closes', () => {
     const onCreate = vi.fn()
     const onSelectDefault = vi.fn()
-    render(
+    renderAgentCreate(
       <AgentCreateSplitButton
         defaultProviderId="codex"
         disabled={false}
@@ -81,7 +83,7 @@ describe('Agent create split button', () => {
 
   it('opens Agent settings from the main segment when no Provider is available', () => {
     const onOpenAgentSettings = vi.fn()
-    render(
+    renderAgentCreate(
       <AgentCreateSplitButton
         defaultProviderId={null}
         disabled={false}
@@ -104,7 +106,7 @@ describe('Agent create split button', () => {
   })
 
   it('uses one borderless hover surface while keeping both segments transparent', () => {
-    const { container } = render(
+    const { container } = renderAgentCreate(
       <AgentCreateSplitButton
         defaultProviderId="codex"
         disabled={false}
@@ -139,6 +141,10 @@ describe('Agent create split button', () => {
     expect(hoveredButtonRule).toContain('background: transparent;')
   })
 })
+
+function renderAgentCreate(node: ReactNode) {
+  return render(<CanvasMenuMotionProvider reducedMotion>{node}</CanvasMenuMotionProvider>)
+}
 
 function createProvider(
   id: string,

@@ -23,6 +23,7 @@ import type { AgentConsoleFlowNode, WorkbenchFlowNode } from './types'
 
 interface CanvasObjectContextMenuState {
   readonly graphKey: string
+  readonly open: boolean
   readonly position: { readonly x: number; readonly y: number }
   readonly requestId: number
   readonly target: CanvasObjectContextTarget
@@ -53,10 +54,15 @@ export function useCanvasObjectContextMenu({
 } {
   const [state, setState] = useState<CanvasObjectContextMenuState | null>(null)
   const nextRequestIdRef = useRef(0)
-  const close = useCallback(() => setState(null), [])
   const graphKey = graph ? createGraphKey(graph) : null
-  const activeState = state?.graphKey === graphKey ? state : null
-  const activeAgentNode = resolveActiveAgentNode(nodes, activeState?.target ?? null)
+  const openIntentRef = useRef({ graphKey, open: false })
+  const close = useCallback(() => {
+    openIntentRef.current = { ...openIntentRef.current, open: false }
+    setState((current) => (current ? { ...current, open: false } : null))
+  }, [])
+  const menuState = state?.graphKey === graphKey ? state : null
+  const activeTarget = menuState?.open ? menuState.target : null
+  const activeAgentNode = resolveActiveAgentNode(nodes, menuState?.target ?? null)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(
@@ -72,6 +78,13 @@ export function useCanvasObjectContextMenu({
         close()
         return
       }
+
+      const nextGraphKey = createGraphKey(graph)
+      if (openIntentRef.current.graphKey === nextGraphKey && openIntentRef.current.open) {
+        event.preventDefault()
+        close()
+        return
+      }
       const target = resolveCanvasObjectContextTarget(graph, {
         nodeId: node.id,
         nodeType: node.type
@@ -82,8 +95,10 @@ export function useCanvasObjectContextMenu({
       }
 
       event.preventDefault()
+      openIntentRef.current = { graphKey: nextGraphKey, open: true }
       setState({
-        graphKey: createGraphKey(graph),
+        graphKey: nextGraphKey,
+        open: true,
         position: { x: event.clientX, y: event.clientY },
         requestId: (nextRequestIdRef.current += 1),
         target
@@ -95,12 +110,11 @@ export function useCanvasObjectContextMenu({
   return {
     close,
     edges: useMemo(
-      () => projectContextSelectionOntoEdges(edges, activeState?.target ?? null),
-      [activeState?.target, edges]
+      () => projectContextSelectionOntoEdges(edges, activeTarget),
+      [activeTarget, edges]
     ),
-    menu: activeState ? (
+    menu: menuState ? (
       <CanvasObjectContextMenu
-        key={activeState.requestId}
         agentActions={
           activeAgentNode
             ? {
@@ -110,12 +124,14 @@ export function useCanvasObjectContextMenu({
               }
             : undefined
         }
-        position={activeState.position}
-        target={activeState.target}
+        open={menuState.open}
+        position={menuState.position}
+        requestId={menuState.requestId}
+        target={menuState.target}
         onClose={close}
         onAddToQuickExecution={onRequestQuickExecutionBinding}
         onFavorite={
-          activeState.target.kind === 'agent'
+          menuState.target.kind === 'agent'
             ? undefined
             : (blockIds) => onRequestSaveBlockTemplate?.(blockIds)
         }
@@ -130,8 +146,8 @@ export function useCanvasObjectContextMenu({
       />
     ) : null,
     nodes: useMemo(
-      () => projectContextSelectionOntoNodes(nodes, activeState?.target ?? null),
-      [activeState?.target, nodes]
+      () => projectContextSelectionOntoNodes(nodes, activeTarget),
+      [activeTarget, nodes]
     ),
     onNodeContextMenu
   }

@@ -1,7 +1,13 @@
 interface ScheduleWorkbenchNodeInputActivationInput {
   readonly activate: () => boolean
+  readonly isReady?: () => boolean
+  readonly observeReadiness?: (
+    onChange: (status: WorkbenchNodeInputReadinessStatus) => void
+  ) => () => void
   readonly transitionCompletion: Promise<boolean>
 }
+
+type WorkbenchNodeInputReadinessStatus = 'invalid' | 'ready'
 
 const inputProjectionRetryInterval = 50
 const inputProjectionStabilityInterval = 100
@@ -10,22 +16,92 @@ const postTransitionFocusDelay = 20
 
 export function scheduleWorkbenchNodeInputActivation({
   activate,
+  isReady = () => true,
+  observeReadiness,
   transitionCompletion
 }: ScheduleWorkbenchNodeInputActivationInput): () => void {
   let isPending = true
   let remainingRetryTime = inputProjectionTimeout
   let stableActivationCount = 0
-  let timeoutId = 0
+  let timeoutId: number | null = null
+  let stopObservingReady: (() => void) | null = null
+
+  const stopReadinessObservation = (): void => {
+    stopObservingReady?.()
+    stopObservingReady = null
+  }
+
+  const finish = (): void => {
+    if (!isPending) {
+      return
+    }
+
+    isPending = false
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId)
+      timeoutId = null
+    }
+    stopReadinessObservation()
+  }
 
   const scheduleRetry = (delay: number): void => {
     if (remainingRetryTime <= 0) {
-      isPending = false
+      finish()
       return
     }
 
     const boundedDelay = Math.min(delay, remainingRetryTime)
     remainingRetryTime -= boundedDelay
-    timeoutId = window.setTimeout(tryActivation, boundedDelay)
+    timeoutId = window.setTimeout(() => {
+      timeoutId = null
+      tryActivation()
+    }, boundedDelay)
+  }
+
+  const waitForReadiness = (): void => {
+    stableActivationCount = 0
+
+    if (!observeReadiness) {
+      scheduleRetry(inputProjectionRetryInterval)
+      return
+    }
+
+    stopReadinessObservation()
+    let observedStatus: WorkbenchNodeInputReadinessStatus | null = null
+    let stopObservation: (() => void) | null = null
+    const continueAfterObservation = (status: WorkbenchNodeInputReadinessStatus): void => {
+      if (status === 'invalid') {
+        finish()
+        return
+      }
+      tryActivation()
+    }
+    const handleReadinessChange = (status: WorkbenchNodeInputReadinessStatus): void => {
+      if (!isPending) {
+        return
+      }
+
+      observedStatus = status
+      if (!stopObservation) {
+        return
+      }
+
+      if (stopObservingReady === stopObservation) {
+        stopObservingReady = null
+      }
+      stopObservation()
+      stopObservation = null
+      continueAfterObservation(status)
+    }
+
+    stopObservation = observeReadiness(handleReadinessChange)
+    if (observedStatus) {
+      stopObservation()
+      stopObservation = null
+      continueAfterObservation(observedStatus)
+      return
+    }
+    stopObservingReady = stopObservation
   }
 
   const tryActivation = (): void => {
@@ -33,10 +109,15 @@ export function scheduleWorkbenchNodeInputActivation({
       return
     }
 
+    if (!isReady()) {
+      waitForReadiness()
+      return
+    }
+
     if (activate()) {
       stableActivationCount += 1
       if (stableActivationCount >= 2) {
-        isPending = false
+        finish()
         return
       }
       scheduleRetry(inputProjectionStabilityInterval)
@@ -53,22 +134,15 @@ export function scheduleWorkbenchNodeInputActivation({
         return
       }
       if (!completed) {
-        isPending = false
+        finish()
         return
       }
       scheduleRetry(postTransitionFocusDelay)
     },
     () => {
-      isPending = false
+      finish()
     }
   )
 
-  return () => {
-    if (!isPending) {
-      return
-    }
-
-    isPending = false
-    window.clearTimeout(timeoutId)
-  }
+  return finish
 }

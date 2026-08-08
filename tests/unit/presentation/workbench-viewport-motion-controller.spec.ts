@@ -7,6 +7,25 @@ import {
 } from '../../../src/presentation/app-shell/workbenchViewportMotion'
 
 describe('workbench viewport motion controller', () => {
+  it('exposes the live presentation while the renderer viewport is still stale', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchViewportMotionController(frames)
+    const staleViewport = { x: 0, y: 0, zoom: 1 }
+    const instance = {
+      getViewport: () => staleViewport,
+      setViewport: vi.fn(async () => true)
+    } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    const completion = controller.transition(instance, centerCommand(1_480))
+
+    frames.step()
+
+    expect(controller.readPresentation(instance)).not.toEqual(staleViewport)
+    expect(instance.getViewport()).toEqual(staleViewport)
+
+    controller.cancel()
+    await expect(completion).resolves.toBe(false)
+  })
+
   it('presents the same spring state at the same elapsed time on 60Hz and 120Hz displays', async () => {
     const sixtyHertzFrames = new TestFrameScheduler()
     const hundredTwentyHertzFrames = new TestFrameScheduler()

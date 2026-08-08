@@ -37,6 +37,7 @@ import {
   type WorkbenchViewportMotionFrameScheduler
 } from './workbenchViewportMotionEnvironment'
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
+import { applyWorkbenchViewport } from './workbenchViewportAdapter'
 
 export { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
 
@@ -74,6 +75,7 @@ export type WorkbenchViewportMotionPresentationListener = (viewport: Viewport) =
 
 export interface WorkbenchViewportMotionController {
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
+  readonly readPresentation: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => Viewport
   readonly subscribe: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: WorkbenchViewportMotionCompletionListener
@@ -279,6 +281,9 @@ export function createWorkbenchViewportMotionController(
   } | null = null
   let nextRequestId = 1
 
+  const readPresentation = (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>): Viewport =>
+    activeMotion?.instance === instance ? activeMotion.presentation : instance.getViewport()
+
   const cancelMotionSchedule = (motion: ActiveViewportMotion): void => {
     if (motion.frameId !== null) {
       scheduler.cancelFrame(motion.frameId)
@@ -342,7 +347,7 @@ export function createWorkbenchViewportMotionController(
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     viewport: Viewport
   ): Promise<boolean> => {
-    const applied = applyViewport(instance, viewport)
+    const applied = applyWorkbenchViewport(instance, viewport)
     void applied.then((didApply) => {
       if (didApply) {
         presentationListeners.get(instance)?.forEach((listener) => listener(viewport))
@@ -462,8 +467,7 @@ export function createWorkbenchViewportMotionController(
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     command: WorkbenchViewportCommand
   ): Promise<boolean> => {
-    const currentViewport =
-      activeMotion?.instance === instance ? activeMotion.presentation : instance.getViewport()
+    const currentViewport = readPresentation(instance)
     const canvasSize = resolveCommandCanvasSize(command)
     const target = resolveWorkbenchViewportCommandTarget(instance, command, currentViewport)
     const targetCamera = resolveWorkbenchViewportCamera(target, canvasSize)
@@ -547,7 +551,7 @@ export function createWorkbenchViewportMotionController(
     })
   }
 
-  return { cancel, subscribe, subscribePresentation, transition }
+  return { cancel, readPresentation, subscribe, subscribePresentation, transition }
 }
 
 const browserViewportMotionController = createWorkbenchViewportMotionController(
@@ -560,6 +564,12 @@ export function transitionWorkbenchViewport(
 ): Promise<boolean> {
   cancelWorkbenchDirectZoom(instance)
   return browserViewportMotionController.transition(instance, command)
+}
+
+export function readWorkbenchViewportPresentation(
+  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
+): Viewport {
+  return browserViewportMotionController.readPresentation(instance)
 }
 
 export function cancelWorkbenchViewportMotion(
@@ -684,16 +694,5 @@ function resolveMotionCamera(motion: ActiveViewportMotion): WorkbenchViewportCam
     centerX: motion.centerX.value,
     centerY: motion.centerY.value,
     zoomStops: motion.zoomStops.value
-  }
-}
-
-async function applyViewport(
-  instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-  viewport: Viewport
-): Promise<boolean> {
-  try {
-    return (await instance.setViewport(viewport, { duration: 0 })) !== false
-  } catch {
-    return false
   }
 }

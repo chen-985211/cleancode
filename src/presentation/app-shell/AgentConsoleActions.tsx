@@ -16,6 +16,8 @@ import { useI18n } from './i18n/useI18n'
 import { WorkbenchIcon } from './WorkbenchIcons'
 
 interface MenuPosition {
+  readonly anchorX: number
+  readonly anchorY: number
   readonly left: number
   readonly side: 'bottom' | 'top'
   readonly top: number
@@ -44,6 +46,7 @@ export function AgentConsoleActions({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeMenuItem, setActiveMenuItem] = useState(0)
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
+  const [isMenuPresent, setIsMenuPresent] = useState(false)
   const actionsRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -72,7 +75,7 @@ export function AgentConsoleActions({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [mode])
+  }, [isMenuPresent, mode])
 
   useLayoutEffect(() => {
     if (mode !== 'menu') return undefined
@@ -100,6 +103,8 @@ export function AgentConsoleActions({
       const maximumLeft = Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding)
 
       setMenuPosition({
+        anchorX: triggerRect.right,
+        anchorY: opensAbove ? triggerRect.top : triggerRect.bottom,
         left: Math.min(Math.max(viewportPadding, triggerRect.right - menuWidth), maximumLeft),
         side: opensAbove ? 'top' : 'bottom',
         top: Math.min(Math.max(viewportPadding, preferredTop), maximumTop)
@@ -113,7 +118,7 @@ export function AgentConsoleActions({
       window.removeEventListener('resize', positionMenu)
       window.removeEventListener('scroll', positionMenu, true)
     }
-  }, [mode])
+  }, [isMenuPresent, mode])
 
   const commitRename = async (): Promise<void> => {
     const normalizedName = name.trim()
@@ -226,50 +231,60 @@ export function AgentConsoleActions({
           </span>
         ) : null}
       </div>
-      {mode === 'menu'
-        ? createPortal(
-            <CanvasNodeMenu
-              id={menuId}
-              role="menu"
-              aria-label={t('agent.actions', { agentName: agent.name })}
-              data-side={menuPosition?.side ?? 'bottom'}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                  setMode('closed')
-                }
-              }}
-              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
-              ref={menuRef}
-              style={{
-                left: menuPosition?.left ?? 0,
-                top: menuPosition?.top ?? 0,
-                visibility: menuPosition ? 'visible' : 'hidden'
-              }}
-            >
-              <CanvasNodeMenuItem
-                type="button"
-                role="menuitem"
-                tabIndex={activeMenuItem === 0 ? 0 : -1}
-                onClick={startRename}
-                onFocus={() => setActiveMenuItem(0)}
-              >
-                <WorkbenchIcon role="edit" size={14} />
-                {t('agent.rename')}
-              </CanvasNodeMenuItem>
-              <CanvasNodeMenuItem
-                type="button"
-                role="menuitem"
-                tabIndex={activeMenuItem === 1 ? 0 : -1}
-                onClick={() => void removeAgent()}
-                onFocus={() => setActiveMenuItem(1)}
-              >
-                <WorkbenchIcon role="delete" size={14} />
-                {t('agent.remove')}
-              </CanvasNodeMenuItem>
-            </CanvasNodeMenu>,
-            document.body
-          )
-        : null}
+      {createPortal(
+        <CanvasNodeMenu
+          anchor={{
+            x: menuPosition?.anchorX ?? 0,
+            y: menuPosition?.anchorY ?? 0
+          }}
+          id={menuId}
+          menuId={menuId}
+          motionReady={menuPosition !== null}
+          open={mode === 'menu'}
+          role="menu"
+          aria-label={t('agent.actions', { agentName: agent.name })}
+          data-side={menuPosition?.side ?? 'bottom'}
+          onRequestClose={() => setMode('closed')}
+          onPresenceChange={setIsMenuPresent}
+          onBlur={(event) => {
+            if (
+              mode === 'menu' &&
+              !event.currentTarget.contains(event.relatedTarget as Node | null)
+            ) {
+              setMode('closed')
+            }
+          }}
+          onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+          ref={menuRef}
+          style={{
+            left: menuPosition?.left ?? 0,
+            top: menuPosition?.top ?? 0,
+            visibility: menuPosition ? 'visible' : 'hidden'
+          }}
+        >
+          <CanvasNodeMenuItem
+            type="button"
+            role="menuitem"
+            tabIndex={activeMenuItem === 0 ? 0 : -1}
+            onClick={startRename}
+            onFocus={() => setActiveMenuItem(0)}
+          >
+            <WorkbenchIcon role="edit" size={14} />
+            {t('agent.rename')}
+          </CanvasNodeMenuItem>
+          <CanvasNodeMenuItem
+            type="button"
+            role="menuitem"
+            tabIndex={activeMenuItem === 1 ? 0 : -1}
+            onClick={() => void removeAgent()}
+            onFocus={() => setActiveMenuItem(1)}
+          >
+            <WorkbenchIcon role="delete" size={14} />
+            {t('agent.remove')}
+          </CanvasNodeMenuItem>
+        </CanvasNodeMenu>,
+        document.body
+      )}
     </div>
   )
 }

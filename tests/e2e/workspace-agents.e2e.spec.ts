@@ -27,6 +27,7 @@ import {
   prependE2ePath
 } from '../support/e2eTerminal'
 import { agentLaunchReadyTimeoutMs } from '../support/e2eAgentRuntime'
+import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import {
   ensureTerminalDomRenderer,
   readCanvasViewportTransform,
@@ -112,7 +113,7 @@ describe('workspace Agents e2e', () => {
       await waitForAgentCreationReady(page)
       await waitForAgentCount(page, 0)
 
-      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
       await selectBlankCanvasAction(page, '新建终端积木')
       const terminalSelector = '[data-terminal-block-id]'
       await page.locator(terminalSelector).first().waitFor()
@@ -120,9 +121,9 @@ describe('workspace Agents e2e', () => {
 
       expect(terminalResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
       expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
-      await waitForCreatedNodeSelection(page, terminalSelector, 'terminal')
+      await waitForCreatedNodeActivation(page, terminalSelector, 'terminal')
 
-      expect(await setCanvasZoomToMaximum(page)).toBeCloseTo(1.6, 2)
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
       await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       const agentSelector = '[data-agent-console-node]'
@@ -133,7 +134,7 @@ describe('workspace Agents e2e', () => {
       expect(await readCanvasNodeGap(page, terminalSelector, agentSelector)).toBeGreaterThanOrEqual(
         63
       )
-      await waitForCreatedNodeSelection(page, agentSelector, 'agent')
+      await waitForCreatedNodeActivation(page, agentSelector, 'agent')
     },
     electronScenarioTimeoutMs
   )
@@ -485,7 +486,7 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
   )
 }
 
-async function waitForCreatedNodeSelection(
+async function waitForCreatedNodeActivation(
   page: Page,
   selector: string,
   kind: 'agent' | 'terminal'
@@ -501,15 +502,27 @@ async function waitForCreatedNodeSelection(
     { kind, selector }
   )
 
-  if (process.platform === 'win32') {
-    // The offscreen CI BrowserWindow cannot retain native focus during the canvas transition.
-    await page.locator(`${selector} .xterm-helper-textarea`).focus()
-  }
   await page.waitForFunction(
-    ({ kind, selector }) =>
-      document.activeElement
-        ?.closest(kind === 'terminal' ? '[data-terminal-block-id]' : '[data-agent-console-node]')
-        ?.matches(selector) === true,
+    ({ kind, selector }) => {
+      const node = document.querySelector(selector)
+      const viewport = node?.querySelector<HTMLElement>(
+        kind === 'terminal' ? '.terminal-viewport' : '.agent-terminal-viewport'
+      )
+      const sessionId =
+        kind === 'terminal'
+          ? node
+              ?.querySelector<HTMLElement>('[data-terminal-output-tail="true"]')
+              ?.getAttribute('data-terminal-session-id')
+          : viewport?.getAttribute('data-agent-terminal-view-session-id')
+
+      const input = viewport?.querySelector('.xterm-helper-textarea')
+
+      return (
+        Boolean(sessionId) &&
+        viewport?.getAttribute('data-terminal-attached-session-id') === sessionId &&
+        document.activeElement === input
+      )
+    },
     { kind, selector }
   )
 }
@@ -527,19 +540,7 @@ async function createCodexAgent(page: Page): Promise<void> {
     await page.reload({ waitUntil: 'domcontentloaded' })
   }
   await waitForAgentCreationReady(page)
-  await page.getByRole('button', { name: '选择默认 Agent' }).click()
-  const codexOption = page.getByRole('menuitemradio', { name: 'Codex', exact: true })
-
-  try {
-    await codexOption.waitFor({ state: 'visible', timeout: 5_000 })
-  } catch {
-    const visibleProviders = await page.getByRole('menuitemradio').allTextContents()
-    throw new Error(
-      `Codex was installed but did not become selectable. Visible Providers: ${JSON.stringify(visibleProviders)}`
-    )
-  }
-
-  await codexOption.click({ timeout: 1_000 })
+  await selectAgentProviderFromCreateMenu(page, 'Codex')
 }
 
 async function ensureCodexProviderInstalled(page: Page): Promise<boolean> {

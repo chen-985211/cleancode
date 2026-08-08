@@ -4,7 +4,7 @@
   height: 100%;
   overflow: visible;
   border: 1px solid var(--cc-border);
-  border-radius: 12px;
+  border-radius: var(--cc-canvas-node-radius);
   background: var(--cc-terminal-background);
   box-shadow: var(--cc-shadow-sm);
   transition:
@@ -23,7 +23,7 @@
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  border-radius: inherit;
+  border-radius: calc(var(--cc-canvas-node-radius) - 1px);
   background: var(--cc-terminal-background);
 }
 

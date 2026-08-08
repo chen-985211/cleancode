@@ -290,6 +290,7 @@ export function AgentConsole({
       <div
         aria-busy={attachOperation.status === 'measuring' || attachOperation.status === 'pending'}
         className="agent-console__terminal-shell"
+        data-agent-attach-operation-status={attachOperation.status}
         role="region"
         aria-label={t('agent.cliSession', { provider: providerName })}
       >

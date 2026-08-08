@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { WorkspaceAgentSnapshot } from '../../../src/contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
 import { CanvasObjectContextMenu } from '../../../src/presentation/app-shell/CanvasObjectContextMenu'
 
 describe('Agent canvas object context menu', () => {
@@ -60,17 +61,21 @@ function renderMenu({
   readonly onRename?: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
 }): void {
   render(
-    <CanvasObjectContextMenu
-      agentActions={{ agent: reviewerAgent, onRemove, onRename }}
-      position={{ x: 100, y: 100 }}
-      target={{
-        agentId: reviewerAgent.agentId,
-        kind: 'agent',
-        selectedConnectionIds: [],
-        selectedNodeIds: [`agent:${reviewerAgent.agentId}`]
-      }}
-      onClose={onClose}
-    />
+    <CanvasMenuMotionProvider reducedMotion>
+      <CanvasObjectContextMenu
+        agentActions={{ agent: reviewerAgent, onRemove, onRename }}
+        open
+        position={{ x: 100, y: 100 }}
+        requestId={1}
+        target={{
+          agentId: reviewerAgent.agentId,
+          kind: 'agent',
+          selectedConnectionIds: [],
+          selectedNodeIds: [`agent:${reviewerAgent.agentId}`]
+        }}
+        onClose={onClose}
+      />
+    </CanvasMenuMotionProvider>
   )
 }
 

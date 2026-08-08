@@ -20,6 +20,7 @@ import {
   type TerminalSurface
 } from './terminalSurfaceRegistry'
 import { createTerminalXtermSurface } from './terminalXtermSurface'
+import { bindTerminalSurfaceAttachmentIdentity } from './terminalSurfaceAttachmentIdentity'
 import { readTerminalSourceTheme } from './terminalTheme'
 import { attachTerminalViewWithRetry, restoreTerminalViewWithRetry } from './terminalViewAttachment'
 import type { TerminalDimensions, TerminalRunIdentity, TerminalViewState } from './types'
@@ -98,6 +99,7 @@ export function TerminalViewport({
   })
   const [restoreStatus, setRestoreStatus] = useState<'failed' | 'ready' | 'restoring'>('restoring')
   const terminalSourceTheme = session.terminalSourceTheme ?? readTerminalSourceTheme()
+  const attachedSessionId = session.sessionId
   const surfaceIdentityKey = session.runIdentity
     ? createTerminalSurfaceKey(session.runIdentity)
     : null
@@ -297,6 +299,10 @@ export function TerminalViewport({
       onRestoreRequired: () => requestRestore(),
       onSearchResultsChange: setSearchResults
     })
+    const releaseAttachmentIdentity = bindTerminalSurfaceAttachmentIdentity(
+      element,
+      attachedSessionId
+    )
 
     const requestRestore = (): void => {
       setRestoreStatus('restoring')
@@ -357,6 +363,7 @@ export function TerminalViewport({
       if (requestRestoreRef.current === requestRestore) {
         requestRestoreRef.current = () => undefined
       }
+      releaseAttachmentIdentity()
       surface.detach(element)
       if (runIdentity && lease && api?.detachTerminalView) {
         void api
@@ -369,7 +376,7 @@ export function TerminalViewport({
         surfaceRef.current = null
       }
     }
-  }, [openSearch, surfaceIdentityKey, surfaceRegistry, terminalSourceTheme])
+  }, [attachedSessionId, openSearch, surfaceIdentityKey, surfaceRegistry, terminalSourceTheme])
 
   useEffect(() => {
     if (focusRequestId > 0) {

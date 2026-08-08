@@ -30,10 +30,13 @@ describe('Agent console attach lifecycle', () => {
     )
 
     expect(await screen.findByText('无法连接 Codex 会话')).toBeInTheDocument()
+    const terminalShell = screen.getByRole('region', { name: 'Codex CLI 会话' })
+    expect(terminalShell).toHaveAttribute('data-agent-attach-operation-status', 'failed')
     fireEvent.click(screen.getByRole('button', { name: '重试连接 Codex 会话' }))
 
     await waitFor(() => expect(attachAgentSession).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('无法连接 Codex 会话')).not.toBeInTheDocument())
+    expect(terminalShell).toHaveAttribute('data-agent-attach-operation-status', 'idle')
   })
 
   it('single-flights duplicate retries', async () => {

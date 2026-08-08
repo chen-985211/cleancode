@@ -22,7 +22,8 @@ import { pollUntilState } from '../support/e2ePolling'
 import {
   createE2eTerminalEnvironment,
   createE2eNodeScriptCommand,
-  readTerminalSessionId
+  readTerminalSessionId,
+  submitTerminalMetadataForm
 } from '../support/e2eTerminal'
 
 const execFileAsync = promisify(execFile)
@@ -255,16 +256,10 @@ async function createHttpServiceTerminal(
   const environmentVariable = terminal.getByRole('textbox', { name: '环境变量名称' })
   await environmentVariable.waitFor()
   await environmentVariable.fill('PORT')
-  const saveAction = terminal.getByRole('button', { name: '保存终端信息' })
-  await pollUntilState({
-    description: 'service terminal metadata save action to become enabled',
-    observe: () => saveAction.isEnabled(),
-    accept: Boolean,
-    intervalMs: 50,
-    timeoutMs: 10_000
-  })
-  await saveAction.click()
-  await terminal.getByRole('form', { name: '编辑终端信息' }).waitFor({ state: 'detached' })
+  await submitTerminalMetadataForm(
+    terminal.getByRole('form', { name: '编辑终端信息' }),
+    'Terminal 1'
+  )
 
   if (shouldStart) await launchConfiguredTerminal(page, terminal)
 

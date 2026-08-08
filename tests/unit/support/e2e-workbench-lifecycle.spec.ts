@@ -8,6 +8,11 @@ import { join } from 'node:path'
 
 import type { ElectronApplication } from 'playwright'
 
+import {
+  encodeTerminalProviderFrame,
+  TerminalProviderFrameDecoder
+} from '../../../src/contexts/run/infrastructure/provider/TerminalProviderProtocol'
+
 const { connectSocket, launchElectron } = vi.hoisted(() => ({
   connectSocket: vi.fn(),
   launchElectron: vi.fn()
@@ -321,7 +326,100 @@ describe('E2E workbench lifecycle', () => {
       await rm(directory, { force: true, recursive: true })
     }
   })
+
+  it('resolves provisional provider metadata to the authenticated health process', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'cleancode-e2e-provider-provisional-'))
+    const providerDirectory = join(directory, 'terminal-runtime-provider')
+    const socket = mockAuthenticatedProvider({ instanceId: 'test-instance', processId: 4242 })
+
+    try {
+      await mkdir(providerDirectory, { recursive: true })
+      await writeFile(
+        join(providerDirectory, 'provider.json'),
+        JSON.stringify({
+          authToken: 'test-token',
+          endpoint: '/test/provider.sock',
+          instanceId: 'test-instance',
+          processId: 0
+        }),
+        'utf8'
+      )
+
+      await expect(readAuthenticatedTerminalProviderMetadata(directory)).resolves.toEqual({
+        authToken: 'test-token',
+        endpoint: '/test/provider.sock',
+        instanceId: 'test-instance',
+        processId: 4242
+      })
+      expect(connectSocket).toHaveBeenCalledWith('/test/provider.sock')
+      expect(socket.destroy).toHaveBeenCalledOnce()
+    } finally {
+      await rm(directory, { force: true, recursive: true })
+    }
+  })
+
+  it.each([
+    { healthProcessId: 4242, metadataProcessId: 999_999 },
+    { healthProcessId: 0, metadataProcessId: 0 }
+  ])(
+    'rejects provider cleanup identity metadata=$metadataProcessId health=$healthProcessId',
+    async ({ healthProcessId, metadataProcessId }) => {
+      const directory = await mkdtemp(join(tmpdir(), 'cleancode-e2e-provider-identity-'))
+      const providerDirectory = join(directory, 'terminal-runtime-provider')
+      mockAuthenticatedProvider({ instanceId: 'test-instance', processId: healthProcessId })
+
+      try {
+        await mkdir(providerDirectory, { recursive: true })
+        await writeFile(
+          join(providerDirectory, 'provider.json'),
+          JSON.stringify({
+            authToken: 'test-token',
+            endpoint: '/test/provider.sock',
+            instanceId: 'test-instance',
+            processId: metadataProcessId
+          }),
+          'utf8'
+        )
+
+        await expect(readAuthenticatedTerminalProviderMetadata(directory)).resolves.toBeNull()
+      } finally {
+        await rm(directory, { force: true, recursive: true })
+      }
+    }
+  )
 })
+
+function mockAuthenticatedProvider(identity: {
+  readonly instanceId: string
+  readonly processId: number
+}): MutableSocket {
+  const socket = createSocket()
+  const decoder = new TerminalProviderFrameDecoder()
+
+  socket.write.mockImplementation((chunk: Buffer) => {
+    const request = decoder.push(chunk)[0] as { readonly requestId?: unknown } | undefined
+    if (typeof request?.requestId !== 'string')
+      throw new Error('Expected a provider health request.')
+    queueMicrotask(() => {
+      socket.emit(
+        'data',
+        encodeTerminalProviderFrame({
+          type: 'response',
+          requestId: request.requestId,
+          ok: true,
+          result: identity
+        })
+      )
+    })
+    return true
+  })
+  connectSocket.mockImplementation(() => {
+    queueMicrotask(() => socket.emit('connect'))
+    return socket
+  })
+
+  return socket
+}
 
 function createElectronProcess(): MutableElectronProcess {
   const electronProcess = new EventEmitter() as MutableElectronProcess

@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 import { AgentConsoleActions } from '../../../src/presentation/app-shell/AgentConsoleActions'
+import { CanvasMenuMotionProvider } from '../../../src/presentation/app-shell/CanvasMenuMotionProvider'
 
 const agent = {
   agentId: 'agent-2',
@@ -19,7 +21,7 @@ describe('Agent console actions', () => {
   it('selects the whole Agent from the title area without treating actions as selection', () => {
     const onSelect = vi.fn()
 
-    render(
+    renderActions(
       <AgentConsoleActions
         agent={agent}
         onRemove={vi.fn()}
@@ -38,8 +40,8 @@ describe('Agent console actions', () => {
     expect(onSelect).toHaveBeenCalledOnce()
   })
 
-  it('keeps secondary actions in a compact menu and starts inline rename from it', () => {
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
+  it('keeps secondary actions in a compact menu and starts inline rename from it', async () => {
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
@@ -56,13 +58,13 @@ describe('Agent console actions', () => {
     expect(menu.querySelector('.canvas-node-menu__separator')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: '重命名' }))
 
-    expect(menu).not.toBeInTheDocument()
+    await waitFor(() => expect(menu).not.toBeInTheDocument())
     expect(screen.getByRole('textbox', { name: 'Agent 名称' })).toHaveFocus()
   })
 
   it('commits a normalized inline rename when the editor loses focus', async () => {
     const onRename = vi.fn(async () => undefined)
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
 
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Agent 2，双击重命名' }))
     const input = screen.getByRole('textbox', { name: 'Agent 名称' })
@@ -75,7 +77,7 @@ describe('Agent console actions', () => {
 
   it('treats Escape as an explicit cancellation of inline rename', () => {
     const onRename = vi.fn(async () => undefined)
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={onRename} />)
 
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Agent 2，双击重命名' }))
     const input = screen.getByRole('textbox', { name: 'Agent 名称' })
@@ -87,7 +89,7 @@ describe('Agent console actions', () => {
   })
 
   it('supports roving keyboard focus in the action menu', () => {
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
     fireEvent.click(trigger)
     const rename = screen.getByRole('menuitem', { name: '重命名' })
@@ -108,7 +110,7 @@ describe('Agent console actions', () => {
   })
 
   it('closes the action menu on outside pointer down and Escape', () => {
-    render(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
 
     fireEvent.click(trigger)
@@ -122,7 +124,7 @@ describe('Agent console actions', () => {
   })
 
   it('closes the menu when keyboard focus leaves it', () => {
-    render(
+    renderActions(
       <>
         <AgentConsoleActions agent={agent} onRemove={vi.fn()} onRename={vi.fn()} />
         <button type="button">下一个控件</button>
@@ -138,7 +140,7 @@ describe('Agent console actions', () => {
 
   it('removes an Agent directly from its scoped action menu', async () => {
     const onRemove = vi.fn(async () => undefined)
-    render(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '移除' }))
@@ -156,7 +158,7 @@ describe('Agent console actions', () => {
           finishRemove = resolve
         })
     )
-    render(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
+    renderActions(<AgentConsoleActions agent={agent} onRemove={onRemove} onRename={vi.fn()} />)
     const trigger = screen.getByRole('button', { name: 'Agent 2 更多操作' })
     fireEvent.click(screen.getByRole('button', { name: 'Agent 2 更多操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '移除' }))
@@ -219,3 +221,7 @@ describe('Agent console actions', () => {
     expect(themeStyles).not.toContain('--cc-canvas-node-menu-divider')
   })
 })
+
+function renderActions(node: ReactNode) {
+  return render(<CanvasMenuMotionProvider reducedMotion>{node}</CanvasMenuMotionProvider>)
+}

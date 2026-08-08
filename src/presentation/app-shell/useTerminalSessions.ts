@@ -31,11 +31,12 @@ import {
   applyTerminalSessionSnapshot,
   applyTerminalSessionStatusSnapshot,
   launchTerminalRuntimeSession,
-  reconcileTerminalSessionSnapshots,
-  startTerminalRuntimeSession
+  projectTerminalAutoStartStatus,
+  reconcileTerminalSessionSnapshots
 } from './terminalSessionRuntime'
 import { readTerminalSourceTheme } from './terminalTheme'
 import { useTerminalRuntimeRecovery } from './useTerminalRuntimeRecovery'
+import { useTerminalStarter } from './useTerminalStarter'
 import { useTerminalViewIdentityReconciliation } from './useTerminalViewIdentityReconciliation'
 import {
   defaultTerminalDimensions,
@@ -76,7 +77,6 @@ export function useTerminalSessions({
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
-  const terminalStartsRef = useRef<Set<string>>(new Set())
   const quickLaunchesRef = useRef<Set<string>>(new Set())
   const delayedFocusTimersRef = useRef<Set<number>>(new Set())
   const isMountedRef = useRef(true)
@@ -99,7 +99,7 @@ export function useTerminalSessions({
     []
   )
 
-  const terminalStates = useTerminalRuntimeRecovery({
+  const recoveredTerminalStates = useTerminalRuntimeRecovery({
     currentProjectId,
     currentTerminalBlockIds,
     currentWorkspaceId,
@@ -107,6 +107,16 @@ export function useTerminalSessions({
     terminalStatesByKey,
     updateTerminalStates
   })
+  const terminalStates = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(recoveredTerminalStates).map(([blockId, state]) => [
+          blockId,
+          projectTerminalAutoStartStatus(state, runtimeAvailability.epoch)
+        ])
+      ),
+    [recoveredTerminalStates, runtimeAvailability.epoch]
+  )
   const runningSessionIds = useMemo(
     () =>
       Object.values(terminalStates)
@@ -250,7 +260,6 @@ export function useTerminalSessions({
       inputBuffersRef.current.clear()
       inputWriteQueuesRef.current.clear()
       terminalStartupOutputsRef.current.clear()
-      terminalStartsRef.current.clear()
       quickLaunchesRef.current.clear()
       terminalSurfaceRegistry.disposeAll()
     }
@@ -278,63 +287,21 @@ export function useTerminalSessions({
     },
     [updateTerminalStates]
   )
-
-  const startTerminal = useCallback(
-    async (
-      block: TerminalBlockSnapshot,
-      dimensions: TerminalDimensions
-    ): Promise<TerminalSessionSnapshot | undefined> => {
-      if (!currentProject || !currentWorkspace || !isRuntimeReady) {
-        return undefined
-      }
-
-      const terminalStateKey = createTerminalStateKey(
-        currentProject.id,
-        currentWorkspace.workspaceId,
-        block.id
-      )
-      const currentState = terminalStatesRef.current[terminalStateKey]
-      if (
-        terminalStartsRef.current.has(terminalStateKey) ||
-        (currentState?.status === 'running' && Boolean(currentState.sessionId))
-      ) {
-        return undefined
-      }
-
-      terminalStartsRef.current.add(terminalStateKey)
-      clearPendingTerminalInput(terminalStateKey)
-      try {
-        const session = await startTerminalRuntimeSession({
-          projectId: currentProject.id,
-          projectDirectory: currentProject.directory,
-          terminalBlockId: block.id,
-          workspaceId: currentWorkspace.workspaceId,
-          workspaceDirectory: currentWorkspace.directory,
-          gitBranch: currentWorkspace.gitBranch,
-          columns: dimensions.columns,
-          rows: dimensions.rows,
-          terminalSourceTheme: readTerminalSourceTheme()
-        })
-
-        if (session) bindTerminalSession(terminalStateKey, session)
-        return session
-      } catch (error) {
-        notifyTerminalLaunchFailure(notify, error, t)
-        return undefined
-      } finally {
-        terminalStartsRef.current.delete(terminalStateKey)
-      }
-    },
-    [
-      bindTerminalSession,
-      clearPendingTerminalInput,
-      currentProject,
-      currentWorkspace,
-      isRuntimeReady,
-      notify,
-      t
-    ]
+  const notifyTerminalStartFailure = useCallback(
+    (error: unknown) => notifyTerminalLaunchFailure(notify, error, t),
+    [notify, t]
   )
+  const startTerminal = useTerminalStarter({
+    bindTerminalSession,
+    clearPendingTerminalInput,
+    currentProject,
+    currentWorkspace,
+    isRuntimeReady,
+    onFailure: notifyTerminalStartFailure,
+    runtimeEpoch: runtimeAvailability.epoch,
+    terminalStatesRef,
+    updateTerminalStates
+  })
 
   const interruptTerminal = useCallback(
     async (block: TerminalBlockSnapshot) => {

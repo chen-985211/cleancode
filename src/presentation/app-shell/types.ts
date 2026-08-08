@@ -48,6 +48,8 @@ export interface TerminalViewState {
   readonly sessionId: string | null
   readonly status: TerminalSessionStatus
   readonly output: string
+  readonly autoStartStatus?: 'failed' | 'idle' | 'pending' | 'succeeded'
+  readonly autoStartRuntimeEpoch?: number
   readonly sessionKind?: TerminalSessionKind | null
   readonly retentionPolicy?: TerminalRetentionPolicy
   readonly recoveryKind?: TerminalRecoveryKind
@@ -211,6 +213,7 @@ export function createIdleTerminalState(): TerminalViewState {
     sessionId: null,
     status: 'idle',
     output: '',
+    autoStartStatus: 'idle',
     sessionKind: null,
     retentionPolicy: 'terminate-on-application-exit',
     recoveryKind: 'fresh',

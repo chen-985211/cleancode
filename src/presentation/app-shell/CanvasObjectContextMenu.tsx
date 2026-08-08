@@ -13,6 +13,7 @@ import type {
   CanvasObjectContextTarget,
   CanvasTerminalObjectContextTarget
 } from './canvasObjectContextTarget'
+import { restoreCanvasMenuFocus } from './canvasMenuFocus'
 import { CanvasNodeMenu, CanvasNodeMenuItem } from './CanvasNodeMenu'
 import { resolveCanvasObjectContextMenuPosition } from './canvasObjectContextMenuPosition'
 import { useI18n } from './i18n/useI18n'
@@ -24,7 +25,9 @@ interface CanvasObjectContextMenuProps {
     readonly onRemove: (agent: WorkspaceAgentSnapshot) => Promise<void>
     readonly onRename: (agent: WorkspaceAgentSnapshot, name: string) => Promise<void>
   }
+  readonly open: boolean
   readonly position: { readonly x: number; readonly y: number }
+  readonly requestId: number
   readonly target: CanvasObjectContextTarget
   readonly onClose: () => void
   readonly onFavorite?: (terminalBlockIds: readonly string[]) => void
@@ -34,7 +37,9 @@ interface CanvasObjectContextMenuProps {
 
 export function CanvasObjectContextMenu({
   agentActions,
+  open,
   position,
+  requestId,
   target,
   onClose,
   onFavorite,
@@ -43,15 +48,32 @@ export function CanvasObjectContextMenu({
 }: CanvasObjectContextMenuProps) {
   const { t } = useI18n()
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const wasOpenRef = useRef(false)
+  const [isMenuPresent, setIsMenuPresent] = useState(open)
   const [mode, setMode] = useState<'actions' | 'rename'>('actions')
   const [agentName, setAgentName] = useState(agentActions?.agent.name ?? '')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const resetKey = `${requestId}\0${agentActions?.agent.name ?? ''}`
+  const [previousResetKey, setPreviousResetKey] = useState(resetKey)
   const [resolvedPosition, setResolvedPosition] = useState<{
     readonly left: number
+    readonly mode: 'actions' | 'rename'
+    readonly pointerX: number
+    readonly pointerY: number
+    readonly requestId: number
     readonly top: number
   } | null>(null)
 
+  if (resetKey !== previousResetKey) {
+    setPreviousResetKey(resetKey)
+    setMode('actions')
+    setAgentName(agentActions?.agent.name ?? '')
+    setIsSubmitting(false)
+  }
+
   useEffect(() => {
+    if (!open) return undefined
     menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
 
     const closeOnOutsidePointerDown = (event: PointerEvent): void => {
@@ -60,7 +82,9 @@ export function CanvasObjectContextMenu({
       onClose()
     }
     const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
+      if (event.key !== 'Escape') return
+      onClose()
+      restoreCanvasMenuFocus(returnFocusRef.current)
     }
 
     document.addEventListener('pointerdown', closeOnOutsidePointerDown)
@@ -69,29 +93,41 @@ export function CanvasObjectContextMenu({
       document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [mode, onClose])
+  }, [isMenuPresent, mode, onClose, open])
+
+  useLayoutEffect(() => {
+    if (open && !wasOpenRef.current) {
+      returnFocusRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null
+    }
+    wasOpenRef.current = open
+  }, [open])
 
   useLayoutEffect(() => {
     const menu = menuRef.current
     if (!menu) return undefined
 
     const updatePosition = (): void => {
-      setResolvedPosition(
-        resolveCanvasObjectContextMenuPosition({
+      setResolvedPosition({
+        ...resolveCanvasObjectContextMenuPosition({
           menuHeight: menu.offsetHeight,
           menuWidth: menu.offsetWidth,
           pointerX: position.x,
           pointerY: position.y,
           viewportHeight: window.innerHeight,
           viewportWidth: window.innerWidth
-        })
-      )
+        }),
+        mode,
+        pointerX: position.x,
+        pointerY: position.y,
+        requestId
+      })
     }
 
     updatePosition()
     window.addEventListener('resize', updatePosition)
     return () => window.removeEventListener('resize', updatePosition)
-  }, [mode, position.x, position.y])
+  }, [isMenuPresent, mode, position.x, position.y, requestId])
 
   const renameAgent = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
@@ -125,12 +161,23 @@ export function CanvasObjectContextMenu({
       : target.kind === 'agent'
         ? t('agent.actions', { agentName: target.agentId })
         : t(`canvas.contextMenu.${target.kind}Actions`)
+  const motionReady =
+    resolvedPosition?.mode === mode &&
+    resolvedPosition.pointerX === position.x &&
+    resolvedPosition.pointerY === position.y &&
+    resolvedPosition.requestId === requestId
 
   return createPortal(
     <CanvasNodeMenu
       ref={menuRef}
+      anchor={position}
+      menuId="canvas-object-context-menu"
+      motionReady={motionReady}
+      open={open}
       role={mode === 'rename' ? 'dialog' : 'menu'}
       aria-label={mode === 'rename' ? t('agent.rename') : ariaLabel}
+      onRequestClose={onClose}
+      onPresenceChange={setIsMenuPresent}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose()
       }}
@@ -138,9 +185,9 @@ export function CanvasObjectContextMenu({
         if (mode === 'actions') keepMenuItemFocused(event, menuRef.current)
       }}
       style={{
-        left: resolvedPosition?.left ?? 0,
-        top: resolvedPosition?.top ?? 0,
-        visibility: resolvedPosition ? 'visible' : 'hidden'
+        left: motionReady ? (resolvedPosition?.left ?? 0) : 0,
+        top: motionReady ? (resolvedPosition?.top ?? 0) : 0,
+        visibility: motionReady ? 'visible' : 'hidden'
       }}
     >
       {mode === 'rename' && agentActions ? (
