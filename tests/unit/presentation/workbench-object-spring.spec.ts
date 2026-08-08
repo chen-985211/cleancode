@@ -110,14 +110,59 @@ describe('workbench object spring', () => {
     expect(surface.properties.has('--workbench-object-motion-previous-width')).toBe(false)
     expect(surface.properties.has('--workbench-object-motion-previous-height')).toBe(false)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
+    const initialShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
+    expect(initialShellInset).toBeGreaterThan(0)
 
     scheduler.advanceNextFrame(100)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeGreaterThan(0)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeLessThan(1)
+    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeGreaterThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeLessThan(
+      initialShellInset
+    )
 
     scheduler.advanceUntilIdle()
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(1)
+    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBe(0)
     expect(completed).toHaveBeenCalledWith('group-expand:group-1')
+  })
+
+  it('keeps the group shell reveal synchronized with disclosure member travel', () => {
+    const memberScheduler = createFrameScheduler()
+    const shellScheduler = createFrameScheduler()
+    const memberSurface = createSurface()
+    const shellSurface = createSurface()
+    const memberController = createWorkbenchObjectSpringController({
+      scheduler: memberScheduler
+    })
+    const shellController = createWorkbenchObjectSpringController({ scheduler: shellScheduler })
+
+    memberController.motionChanged(
+      memberSurface,
+      createMotion('group-expand', { x: -320, y: -170 }),
+      false,
+      vi.fn()
+    )
+    shellController.motionChanged(
+      shellSurface,
+      {
+        ...createMotion('group-expand', { x: 0, y: 0 }, 'group-expand:group-1'),
+        contentOpacity: { from: 0, to: 1 },
+        opacity: { from: 1, to: 1 }
+      },
+      false,
+      vi.fn()
+    )
+
+    const initialInset = readProperty(shellSurface, '--workbench-object-motion-shell-inset')
+    memberScheduler.advanceNextFrame(100)
+    shellScheduler.advanceNextFrame(100)
+
+    const memberProgress =
+      1 - Math.abs(readProperty(memberSurface, '--workbench-object-motion-x')) / 320
+    const shellProgress =
+      1 - readProperty(shellSurface, '--workbench-object-motion-shell-inset') / initialInset
+    expect(shellProgress).toBeCloseTo(memberProgress, 4)
   })
 
   it('preserves the shell reveal progress when disclosure reverses', () => {
@@ -131,11 +176,13 @@ describe('workbench object spring', () => {
     }
 
     controller.motionChanged(surface, expandMotion, false, vi.fn())
+    const initialShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
     scheduler.advanceNextFrame(80)
     const currentMaterialOpacity = readProperty(
       surface,
       '--workbench-object-motion-content-opacity'
     )
+    const currentShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
 
     controller.motionChanged(
       surface,
@@ -150,6 +197,10 @@ describe('workbench object spring', () => {
 
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeCloseTo(
       1 - currentMaterialOpacity,
+      4
+    )
+    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeCloseTo(
+      initialShellInset - currentShellInset,
       4
     )
   })
@@ -198,6 +249,7 @@ describe('workbench object spring', () => {
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(120)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(80)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBe(0)
     expect(completed).toHaveBeenCalledOnce()
     expect(scheduler.pendingFrames()).toBe(0)
   })

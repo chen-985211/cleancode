@@ -54,7 +54,7 @@
   z-index: 0;
   inset: 0;
   border-radius: var(--cc-canvas-node-radius);
-  background: var(--cc-surface-translucent);
+  background: transparent;
   box-shadow:
     0 3px 8px var(--cc-shadow-color),
     0 16px 32px var(--cc-shadow-color),
@@ -64,7 +64,15 @@
   pointer-events: none;
 }
 
-.terminal-group-node--collapsed > .terminal-group-node__material {
+.terminal-group-node__material::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--cc-surface-translucent);
+  content: '';
+}
+
+.terminal-group-node--collapsed > .terminal-group-node__material::before {
   background: var(--terminal-group-surface);
 }
 

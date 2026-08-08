@@ -3,6 +3,7 @@
   --workbench-object-motion-y: 0px;
   --workbench-object-motion-opacity: 1;
   --workbench-object-motion-content-opacity: 1;
+  --workbench-object-motion-shell-inset: 0%;
 }
 
 :is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
@@ -36,6 +37,15 @@
 .terminal-group-node.workbench-object-motion--spatial {
   transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
     scale(var(--terminal-group-drop-scale));
+}
+
+.terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse
+  )
+  > .terminal-group-node__material::before {
+  clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));
+  will-change: clip-path;
 }
 
 .terminal-group-node:is(
@@ -186,5 +196,13 @@
     opacity: 1;
     transform: none;
     animation: none;
+  }
+
+  .terminal-group-node:is(
+      .workbench-object-motion--group-expand,
+      .workbench-object-motion--group-collapse
+    )
+    > .terminal-group-node__material::before {
+    clip-path: none;
   }
 }

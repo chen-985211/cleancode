@@ -56,6 +56,7 @@ describe('workbench object motion styles', () => {
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
     const groupRule = readTerminalGroupRule('.terminal-group-node')
     const materialRule = readTerminalGroupRule('.terminal-group-node__material')
+    const materialFillRule = readTerminalGroupRule('.terminal-group-node__material::before')
 
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
     expect(spatialMotionRule).not.toContain('scaleX(')
@@ -63,8 +64,15 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toContain('var(--workbench-object-motion-content-opacity)')
     expect(objectMotionStyles).not.toContain('transform-origin: top left;')
     expect(groupRule).toContain('background: transparent;')
+    expect(materialRule).toContain('background: transparent;')
     expect(materialRule).toContain('opacity: var(--workbench-object-motion-content-opacity);')
     expect(materialRule).not.toContain('transform:')
+    expect(materialFillRule).toContain('background: var(--terminal-group-surface);')
+    expect(objectMotionStyles).toContain(
+      'clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));'
+    )
+    expect(objectMotionStyles).toContain('> .terminal-group-node__material::before')
+    expect(objectMotionStyles).toContain('will-change: clip-path;')
     expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')

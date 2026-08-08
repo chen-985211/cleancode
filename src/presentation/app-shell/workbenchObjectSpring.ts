@@ -34,10 +34,11 @@ const xProperty = '--workbench-object-motion-x'
 const yProperty = '--workbench-object-motion-y'
 const opacityProperty = '--workbench-object-motion-opacity'
 const contentOpacityProperty = '--workbench-object-motion-content-opacity'
+const shellInsetProperty = '--workbench-object-motion-shell-inset'
 const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
-const disclosureSpringDynamics = { dampingRatio: 1, response: 0.28 }
+const disclosureSpringDynamics = { dampingRatio: 1, response: 0.32 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
-const shellRevealDynamics = { dampingRatio: 1, response: 0.14 }
+const shellRevealInsetPercent = 8
 const positionSettlementThresholds = { speed: 1, value: 0.1 }
 const opacitySettlementThresholds = { speed: 0.02, value: 0.002 }
 
@@ -83,6 +84,7 @@ export function createWorkbenchObjectSpringController({
     surface.style.removeProperty(yProperty)
     surface.style.removeProperty(opacityProperty)
     surface.style.removeProperty(contentOpacityProperty)
+    surface.style.removeProperty(shellInsetProperty)
   }
 
   const present = (): void => {
@@ -91,6 +93,10 @@ export function createWorkbenchObjectSpringController({
     surface.style.setProperty(yProperty, `${round(yAxis.value)}px`)
     surface.style.setProperty(opacityProperty, `${round(opacityAxis.value)}`)
     surface.style.setProperty(contentOpacityProperty, `${round(contentOpacityAxis.value)}`)
+    surface.style.setProperty(
+      shellInsetProperty,
+      `${round((1 - contentOpacityAxis.value) * shellRevealInsetPercent)}%`
+    )
   }
 
   const complete = (): void => {
@@ -124,7 +130,7 @@ export function createWorkbenchObjectSpringController({
     contentOpacityAxis = advanceSpringAxis(
       contentOpacityAxis,
       contentOpacityTarget,
-      motion?.contentOpacity ? shellRevealDynamics : disclosureOpacityDynamics,
+      motion?.contentOpacity ? disclosureSpringDynamics : disclosureOpacityDynamics,
       elapsedSeconds
     )
 
