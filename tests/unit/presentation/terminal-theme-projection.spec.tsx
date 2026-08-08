@@ -32,13 +32,32 @@ vi.mock('../../../src/presentation/app-shell/terminalXtermSurface', () => ({
 describe('terminal theme projection', () => {
   it('keeps the Agent reading inset and xterm mount in one theme coordination boundary', () => {
     const terminalElementRef = createRef<HTMLDivElement>()
+    const baseSession = createAgentSessionSnapshot({ terminalSourceTheme: 'light' })
+    const session = {
+      ...baseSession,
+      runtime: {
+        ...baseSession.runtime,
+        terminal: {
+          ...baseSession.runtime.terminal,
+          viewIdentity: {
+            blockId: 'agent-1',
+            generation: 3,
+            owner: { id: 'agent-1', kind: 'agent' as const },
+            projectId: 'project-1',
+            runId: 'agent-terminal:agent-session-1',
+            sessionId: 'terminal-session-1',
+            workspaceId: 'main'
+          }
+        }
+      }
+    }
     const { container } = render(
       <AgentTerminalSurface
         activeOutput=""
         providerName="Fixture Agent"
         terminalElementRef={terminalElementRef}
         onFallbackInput={vi.fn()}
-        session={createAgentSessionSnapshot({ terminalSourceTheme: 'light' })}
+        session={session}
         useFallback={false}
       />
     )
@@ -51,6 +70,8 @@ describe('terminal theme projection', () => {
     expect(projection).not.toBeNull()
     expect(projection).toHaveAttribute('data-terminal-source-theme', 'light')
     expect(viewport).not.toBeNull()
+    expect(viewport).toHaveAttribute('data-agent-terminal-session-id', 'agent-session-1')
+    expect(viewport).toHaveAttribute('data-agent-terminal-view-session-id', 'terminal-session-1')
     expect(projection).toContainElement(viewport)
     expect(terminalElementRef.current).toBe(viewport)
   })

@@ -43,6 +43,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     data.objectMotion,
     data.onObjectMotionComplete
   )
+
   const terminalNodeClassName = [
     'terminal-node',
     objectMotion.className,
@@ -89,7 +90,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   )
 
   useEffect(() => {
-    if (session.isRecoveryPending) hasRequestedAutoStartRef.current = false
+    if (session.isRecoveryPending) {
+      hasRequestedAutoStartRef.current = false
+    }
   }, [session.isRecoveryPending])
 
   useEffect(() => {
@@ -176,6 +179,13 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     <div
       className={terminalAnchorClassName}
       data-terminal-block-id={block.id}
+      data-terminal-auto-start-status={
+        session.sessionId
+          ? 'succeeded'
+          : session.isRecoveryPending
+            ? 'idle'
+            : (session.autoStartStatus ?? 'idle')
+      }
       data-context-selected={data.isContextSelected || undefined}
     >
       <WorkbenchNodeResizer

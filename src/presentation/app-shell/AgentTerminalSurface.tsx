@@ -49,6 +49,7 @@ export function AgentTerminalSurface({
         data-agent-terminal-process-id={session?.runtime.terminal.processId ?? undefined}
         data-agent-terminal-session-id={session?.sessionId}
         data-agent-terminal-source-theme={session?.terminalSourceTheme}
+        data-agent-terminal-view-session-id={session?.runtime.terminal.viewIdentity?.sessionId}
         data-agent-terminal-workspace-id={session?.workspaceId}
         data-agent-terminal-workspace-name={workspaceDisplayName}
         onKeyDownCapture={preserveWindowsTextPaste}

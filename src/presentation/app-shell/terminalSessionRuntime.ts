@@ -1,7 +1,12 @@
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import type { TerminalExitEvent } from '../../contexts/run/application/ports/TerminalProcessPort'
 import { createTerminalStateKey } from './terminalSessionWorkspaceMigration'
-import type { TerminalRunIdentity, TerminalServiceEndpoint, TerminalViewState } from './types'
+import {
+  createIdleTerminalState,
+  type TerminalRunIdentity,
+  type TerminalServiceEndpoint,
+  type TerminalViewState
+} from './types'
 import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/TerminalSession'
 
 export interface StartTerminalRuntimeCommand {
@@ -21,6 +26,54 @@ export type LaunchTerminalRuntimeCommand = StartTerminalRuntimeCommand
 export interface LaunchTerminalRuntimeResult {
   readonly session: TerminalSessionSnapshot
   readonly endpoint: TerminalServiceEndpoint | null
+}
+
+export function beginTerminalAutoStart(
+  states: Record<string, TerminalViewState>,
+  terminalStateKey: string,
+  runtimeEpoch: number
+): Record<string, TerminalViewState> {
+  const current = states[terminalStateKey] ?? createIdleTerminalState()
+  return {
+    ...states,
+    [terminalStateKey]: {
+      ...current,
+      autoStartRuntimeEpoch: runtimeEpoch,
+      autoStartStatus: 'pending'
+    }
+  }
+}
+
+export function failTerminalAutoStart(
+  states: Record<string, TerminalViewState>,
+  terminalStateKey: string,
+  runtimeEpoch: number
+): Record<string, TerminalViewState> {
+  const current = states[terminalStateKey]
+  if (
+    !current ||
+    current.sessionId ||
+    current.autoStartRuntimeEpoch !== runtimeEpoch ||
+    current.autoStartStatus !== 'pending'
+  ) {
+    return states
+  }
+  return {
+    ...states,
+    [terminalStateKey]: { ...current, autoStartStatus: 'failed' }
+  }
+}
+
+export function projectTerminalAutoStartStatus(
+  state: TerminalViewState,
+  runtimeEpoch: number
+): TerminalViewState {
+  const autoStartStatus = state.sessionId
+    ? 'succeeded'
+    : state.isRecoveryPending || state.autoStartRuntimeEpoch !== runtimeEpoch
+      ? 'idle'
+      : (state.autoStartStatus ?? 'idle')
+  return state.autoStartStatus === autoStartStatus ? state : { ...state, autoStartStatus }
 }
 
 export async function startTerminalRuntimeSession(
@@ -62,6 +115,7 @@ function toTerminalViewState(
     sessionId: session.id,
     status: session.status,
     output,
+    autoStartStatus: 'succeeded',
     sessionKind: session.kind,
     retentionPolicy: session.retentionPolicy,
     recoveryKind: session.recoveryKind,
@@ -166,6 +220,7 @@ export function applyTerminalExitEvent(
       sessionId: event.sessionId,
       status: 'exited',
       output: '',
+      autoStartStatus: 'succeeded',
       sessionKind: null,
       retentionPolicy: 'terminate-on-application-exit',
       recoveryKind: 'ended',

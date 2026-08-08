@@ -142,7 +142,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       command.onExit({
         scope: command.scope,
         sessionId: command.scope.sessionId,
-        exitCode: event.exitCode
+        exitCode: normalizeNodePtyExitCode(event.exitCode)
       })
     })
 
@@ -518,4 +518,8 @@ function resolveNodePtySpawnHelperPath(): string | null {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function normalizeNodePtyExitCode(exitCode: unknown): number | null {
+  return typeof exitCode === 'number' && Number.isSafeInteger(exitCode) ? exitCode : null
 }

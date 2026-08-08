@@ -121,7 +121,7 @@ describe('workspace Agents e2e', () => {
 
       expect(terminalResult.zoom).toBeLessThanOrEqual(createdWorkbenchNodeZoomUpperBound)
       expect(Object.values(terminalResult.insets).every((inset) => inset >= -1)).toBe(true)
-      await waitForCreatedNodeSelection(page, terminalSelector, 'terminal')
+      await waitForCreatedNodeActivation(page, terminalSelector, 'terminal')
 
       expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
       await createCodexAgent(page)
@@ -134,7 +134,7 @@ describe('workspace Agents e2e', () => {
       expect(await readCanvasNodeGap(page, terminalSelector, agentSelector)).toBeGreaterThanOrEqual(
         63
       )
-      await waitForCreatedNodeSelection(page, agentSelector, 'agent')
+      await waitForCreatedNodeActivation(page, agentSelector, 'agent')
     },
     electronScenarioTimeoutMs
   )
@@ -486,7 +486,7 @@ async function waitForAgentCount(page: Page, count: number): Promise<void> {
   )
 }
 
-async function waitForCreatedNodeSelection(
+async function waitForCreatedNodeActivation(
   page: Page,
   selector: string,
   kind: 'agent' | 'terminal'
@@ -502,15 +502,27 @@ async function waitForCreatedNodeSelection(
     { kind, selector }
   )
 
-  if (process.platform === 'win32') {
-    // The offscreen CI BrowserWindow cannot retain native focus during the canvas transition.
-    await page.locator(`${selector} .xterm-helper-textarea`).focus()
-  }
   await page.waitForFunction(
-    ({ kind, selector }) =>
-      document.activeElement
-        ?.closest(kind === 'terminal' ? '[data-terminal-block-id]' : '[data-agent-console-node]')
-        ?.matches(selector) === true,
+    ({ kind, selector }) => {
+      const node = document.querySelector(selector)
+      const viewport = node?.querySelector<HTMLElement>(
+        kind === 'terminal' ? '.terminal-viewport' : '.agent-terminal-viewport'
+      )
+      const sessionId =
+        kind === 'terminal'
+          ? node
+              ?.querySelector<HTMLElement>('[data-terminal-output-tail="true"]')
+              ?.getAttribute('data-terminal-session-id')
+          : viewport?.getAttribute('data-agent-terminal-view-session-id')
+
+      const input = viewport?.querySelector('.xterm-helper-textarea')
+
+      return (
+        Boolean(sessionId) &&
+        viewport?.getAttribute('data-terminal-attached-session-id') === sessionId &&
+        document.activeElement === input
+      )
+    },
     { kind, selector }
   )
 }

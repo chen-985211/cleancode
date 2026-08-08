@@ -6,7 +6,7 @@ import type {
   TerminalGroupSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
-import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
+import { readAgentIdFromFlowNodeId, toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { focusAgentConsoleInCanvas } from './focusAgentConsoleInCanvas'
 import { focusTerminalBlockInCanvas } from './focusTerminalBlockInCanvas'
 import { readMinimapFocusCanvasSize } from './minimapFocusTransition'
@@ -20,6 +20,7 @@ import {
   transitionWorkbenchViewport,
   type WorkbenchViewportMotionIntent
 } from './workbenchViewportMotion'
+import { isExactWorkbenchNodeInputTarget } from './workbenchNodeInputActivation'
 
 interface UseMinimapNodeFocusInput {
   readonly terminalBlocksById: ReadonlyMap<string, TerminalBlockSnapshot>
@@ -51,18 +52,27 @@ export function useMinimapNodeFocus({
   setSelectedTerminalGroupId
 }: UseMinimapNodeFocusInput) {
   const cancelPendingWorkbenchInputFocusRef = useRef<(() => void) | null>(null)
+  const pendingWorkbenchInputFocusTargetRef = useRef<WorkbenchFlowNode | null>(null)
   const cancelPendingWorkbenchInputFocus = useCallback(() => {
     cancelPendingWorkbenchInputFocusRef.current?.()
     cancelPendingWorkbenchInputFocusRef.current = null
+    pendingWorkbenchInputFocusTargetRef.current = null
   }, [])
+  const rememberPendingWorkbenchInputFocus = useCallback(
+    (cancel: (() => void) | null, target: WorkbenchFlowNode): void => {
+      cancelPendingWorkbenchInputFocusRef.current = cancel
+      pendingWorkbenchInputFocusTargetRef.current = cancel ? target : null
+    },
+    []
+  )
 
   useEffect(() => () => cancelPendingWorkbenchInputFocus(), [cancelPendingWorkbenchInputFocus])
   useEffect(() => {
     const cancelAfterExternalPointer = (): void => cancelPendingWorkbenchInputFocus()
     const cancelAfterExternalFocus = (event: FocusEvent): void => {
-      const target = event.target
+      const pendingTarget = pendingWorkbenchInputFocusTargetRef.current
 
-      if (target instanceof Element && target.classList.contains('xterm-helper-textarea')) {
+      if (pendingTarget && isExactWorkbenchNodeInputTarget(pendingTarget, event.target)) {
         return
       }
       cancelPendingWorkbenchInputFocus()
@@ -88,21 +98,27 @@ export function useMinimapNodeFocus({
 
       cancelPendingWorkbenchInputFocus()
       setSelectedAgentId(null)
-      cancelPendingWorkbenchInputFocusRef.current = focusTerminalBlockInCanvas({
+      const reactFlowInstance = reactFlowInstanceRef.current
+      const focusTarget =
+        reactFlowInstance?.getNode(block.id) ??
+        ({ id: block.id, position: block.position, type: 'terminal' } as WorkbenchFlowNode)
+      const cancel = focusTerminalBlockInCanvas({
         block,
         activateTerminalInput: options.activateTerminalInput,
         motion: options.motion,
         targetZoom: options.targetZoom,
         viewportIntent: options.viewportIntent,
-        reactFlowInstance: reactFlowInstanceRef.current,
+        reactFlowInstance,
         setHoveredTerminalBlockId,
         setSelectedTerminalBlockId
       })
+      rememberPendingWorkbenchInputFocus(cancel, focusTarget)
       setSelectedTerminalGroupId(null)
     },
     [
       reactFlowInstanceRef,
       cancelPendingWorkbenchInputFocus,
+      rememberPendingWorkbenchInputFocus,
       setSelectedAgentId,
       setHoveredTerminalBlockId,
       setSelectedTerminalBlockId,
@@ -181,19 +197,29 @@ export function useMinimapNodeFocus({
   const focusAgentConsole = useCallback(
     (agent: WorkspaceAgentSnapshot) => {
       cancelPendingWorkbenchInputFocus()
-      cancelPendingWorkbenchInputFocusRef.current = focusAgentConsoleInCanvas({
+      const reactFlowInstance = reactFlowInstanceRef.current
+      const focusTarget =
+        reactFlowInstance?.getNode(toAgentFlowNodeId(agent.agentId)) ??
+        ({
+          id: toAgentFlowNodeId(agent.agentId),
+          position: agent.layout.position,
+          type: 'agentConsole'
+        } as WorkbenchFlowNode)
+      const cancel = focusAgentConsoleInCanvas({
         activateAgentInput: true,
         agent,
-        reactFlowInstance: reactFlowInstanceRef.current,
+        reactFlowInstance,
         viewportIntent: 'creation',
         setSelectedAgentId,
         setSelectedTerminalBlockIds,
         setSelectedTerminalGroupId,
         setHoveredTerminalBlockId
       })
+      rememberPendingWorkbenchInputFocus(cancel, focusTarget)
     },
     [
       cancelPendingWorkbenchInputFocus,
+      rememberPendingWorkbenchInputFocus,
       reactFlowInstanceRef,
       setHoveredTerminalBlockId,
       setSelectedAgentId,
@@ -214,7 +240,7 @@ export function useMinimapNodeFocus({
           return
         }
 
-        cancelPendingWorkbenchInputFocusRef.current = focusAgentConsoleInCanvas({
+        const cancel = focusAgentConsoleInCanvas({
           activateAgentInput: true,
           agent: node.data.agent,
           motion: {
@@ -228,6 +254,7 @@ export function useMinimapNodeFocus({
           setSelectedTerminalGroupId,
           setHoveredTerminalBlockId
         })
+        rememberPendingWorkbenchInputFocus(cancel, node)
         return
       }
 
@@ -263,6 +290,7 @@ export function useMinimapNodeFocus({
       cancelPendingWorkbenchInputFocus,
       focusTerminalGroup,
       reactFlowInstanceRef,
+      rememberPendingWorkbenchInputFocus,
       setHoveredTerminalBlockId,
       setSelectedAgentId,
       setSelectedTerminalBlockIds,

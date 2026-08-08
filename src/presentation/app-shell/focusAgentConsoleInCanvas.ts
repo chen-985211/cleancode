@@ -6,7 +6,10 @@ import { readWorkbenchCanvasCreationGeometry } from './workbenchCanvasSafeViewpo
 import { revealCreatedWorkbenchNode } from './revealCreatedWorkbenchNode'
 import { scheduleWorkbenchNodeInputActivation } from './scheduleWorkbenchNodeInputActivation'
 import type { WorkbenchFlowNode } from './types'
-import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
+import {
+  activateWorkbenchNodeInput,
+  createWorkbenchNodeInputSurfaceReadiness
+} from './workbenchNodeInputActivation'
 import {
   transitionWorkbenchViewport,
   type WorkbenchViewportCommand,
@@ -76,16 +79,25 @@ export function focusAgentConsoleInCanvas({
     return null
   }
 
+  const focusTarget =
+    node ??
+    ({
+      id: toAgentFlowNodeId(agent.agentId),
+      position,
+      type: 'agentConsole'
+    } as WorkbenchFlowNode)
+  const inputReadiness =
+    viewportIntent === 'creation' ? createWorkbenchNodeInputSurfaceReadiness(focusTarget) : null
+  const readinessOptions = inputReadiness
+    ? {
+        isReady: inputReadiness.isReady,
+        observeReadiness: inputReadiness.observe
+      }
+    : {}
+
   return scheduleWorkbenchNodeInputActivation({
-    activate: () =>
-      activateWorkbenchNodeInput(
-        node ??
-          ({
-            id: toAgentFlowNodeId(agent.agentId),
-            position,
-            type: 'agentConsole'
-          } as WorkbenchFlowNode)
-      ),
+    activate: () => activateWorkbenchNodeInput(focusTarget),
+    ...readinessOptions,
     transitionCompletion
   })
 }

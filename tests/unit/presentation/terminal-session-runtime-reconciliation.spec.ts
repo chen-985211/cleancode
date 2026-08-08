@@ -2,12 +2,44 @@ import {
   applyTerminalExitEvent,
   applyRecoveredTerminalSessionSnapshot,
   applyTerminalSessionSnapshot,
+  beginTerminalAutoStart,
+  failTerminalAutoStart,
+  projectTerminalAutoStartStatus,
   reconcileStaleTerminalViewSnapshot,
   reconcileTerminalSessionSnapshots
 } from '../../../src/presentation/app-shell/terminalSessionRuntime'
 import type { TerminalViewState } from '../../../src/presentation/app-shell/types'
 
 describe('terminal session runtime reconciliation', () => {
+  it('projects a real auto-start failure only for its current runtime epoch', () => {
+    const terminalStateKey = '["project-1","main","terminal","block-1"]'
+    const pending = beginTerminalAutoStart({}, terminalStateKey, 4)
+
+    expect(pending[terminalStateKey]).toMatchObject({
+      autoStartRuntimeEpoch: 4,
+      autoStartStatus: 'pending'
+    })
+
+    const failed = failTerminalAutoStart(pending, terminalStateKey, 4)
+    expect(projectTerminalAutoStartStatus(failed[terminalStateKey]!, 4)).toMatchObject({
+      autoStartStatus: 'failed'
+    })
+    expect(projectTerminalAutoStartStatus(failed[terminalStateKey]!, 5)).toMatchObject({
+      autoStartStatus: 'idle'
+    })
+  })
+
+  it('does not let a stale auto-start failure overwrite a newer pending epoch', () => {
+    const terminalStateKey = '["project-1","main","terminal","block-1"]'
+    const oldPending = beginTerminalAutoStart({}, terminalStateKey, 4)
+    const currentPending = beginTerminalAutoStart(oldPending, terminalStateKey, 5)
+
+    expect(failTerminalAutoStart(currentPending, terminalStateKey, 4)).toBe(currentPending)
+    expect(projectTerminalAutoStartStatus(currentPending[terminalStateKey]!, 5)).toMatchObject({
+      autoStartStatus: 'pending'
+    })
+  })
+
   it('records an exit by full scope even when the start response has not bound the session yet', () => {
     const session = sessionSnapshot('session-1', 'running')
 

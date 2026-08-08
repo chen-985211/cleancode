@@ -1,10 +1,8 @@
 diff --git a/lib/conpty_console_list_agent.js b/lib/conpty_console_list_agent.js
-index 8c4fca9022a6d6f015bca87f61625cde2278f428..9bdf4e3263bc741b3ba647649700c2c97fdffb71 100644
+index 8c4fca9022a6d6f015bca87f61625cde2278f428..01fe11fb3d2e50d962587ee9cf9e5ca4cebd8a77 100644
 --- a/lib/conpty_console_list_agent.js
 +++ b/lib/conpty_console_list_agent.js
-@@ -10,7 +10,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
- var utils_1 = require("./utils");
- var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').module.getConsoleProcessList;
+@@ -12,3 +12,10 @@ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').modu
  var shellPid = parseInt(process.argv[2], 10);
 -var consoleProcessList = getConsoleProcessList(shellPid);
 +var consoleProcessList;
@@ -16,14 +14,114 @@ index 8c4fca9022a6d6f015bca87f61625cde2278f428..9bdf4e3263bc741b3ba647649700c2c9
 +    consoleProcessList = [shellPid];
 +}
  process.send({ consoleProcessList: consoleProcessList });
- process.exit(0);
- //# sourceMappingURL=conpty_console_list_agent.js.map
+diff --git a/lib/windowsPtyAgent.js b/lib/windowsPtyAgent.js
+index a358ffb177357e177661033c1b092f9c9d0e5f5a..928bf235b982b4c832d2fa6242c20a94448030f3 100644
+--- a/lib/windowsPtyAgent.js
++++ b/lib/windowsPtyAgent.js
+@@ -36,2 +36,4 @@ var WindowsPtyAgent = /** @class */ (function () {
+         this._innerPid = 0;
++        this._hasProcessExited = false;
++        this._processExitListeners = [];
+         if (this._useConpty === undefined || this._useConpty === true) {
+@@ -119,3 +121,3 @@ var WindowsPtyAgent = /** @class */ (function () {
+         if (this._useConpty) {
+-            if (this._exitCode !== undefined) {
++            if (this._hasProcessExited) {
+                 throw new Error('Cannot resize a pty that has already exited');
+@@ -206,2 +208,19 @@ var WindowsPtyAgent = /** @class */ (function () {
+     });
++    Object.defineProperty(WindowsPtyAgent.prototype, "processExitCodeReady", {
++        get: function () {
++            return !this._useConpty || this._hasProcessExited;
++        },
++        enumerable: false,
++        configurable: true
++    });
++    WindowsPtyAgent.prototype.onProcessExit = function (listener) {
++        if (!this._useConpty) {
++            return;
++        }
++        if (this._hasProcessExited) {
++            listener(this._exitCode);
++            return;
++        }
++        this._processExitListeners.push(listener);
++    };
+     WindowsPtyAgent.prototype._getWindowsBuildNumber = function () {
+@@ -222,3 +241,10 @@ var WindowsPtyAgent = /** @class */ (function () {
+         var _this = this;
++        if (this._hasProcessExited) {
++            return;
++        }
++        this._hasProcessExited = true;
+         this._exitCode = exitCode;
++        var listeners = this._processExitListeners;
++        this._processExitListeners = [];
++        listeners.forEach(function (listener) { return listener(exitCode); });
+         if (!this._useConptyDll) {
+diff --git a/lib/windowsTerminal.js b/lib/windowsTerminal.js
+index 3c38f89d14cece8081782a9600ebc582b7c2a62a..5a1cce3e5b9a1acd3cb03e2437b140925f67da93 100644
+--- a/lib/windowsTerminal.js
++++ b/lib/windowsTerminal.js
+@@ -20,3 +20,3 @@ var __extends = (this && this.__extends) || (function () {
+ Object.defineProperty(exports, "__esModule", { value: true });
+-exports.WindowsTerminal = void 0;
++exports.WindowsTerminal = exports.WindowsTerminalExitEventCoordinator = void 0;
+ var terminal_1 = require("./terminal");
+@@ -26,2 +26,31 @@ var DEFAULT_FILE = 'cmd.exe';
+ var DEFAULT_NAME = 'Windows Shell';
++var WindowsTerminalExitEventCoordinator = /** @class */ (function () {
++    function WindowsTerminalExitEventCoordinator(_onExit) {
++        this._onExit = _onExit;
++        this._hasExitCode = false;
++        this._hasOutputClosed = false;
++        this._hasEmittedExit = false;
++    }
++    WindowsTerminalExitEventCoordinator.prototype.acceptExitCode = function (exitCode) {
++        if (this._hasExitCode) {
++            return;
++        }
++        this._exitCode = exitCode;
++        this._hasExitCode = true;
++        this._emitExitIfReady();
++    };
++    WindowsTerminalExitEventCoordinator.prototype.acceptOutputClosed = function () {
++        this._hasOutputClosed = true;
++        this._emitExitIfReady();
++    };
++    WindowsTerminalExitEventCoordinator.prototype._emitExitIfReady = function () {
++        if (this._hasEmittedExit || !this._hasExitCode || !this._hasOutputClosed) {
++            return;
++        }
++        this._hasEmittedExit = true;
++        this._onExit(this._exitCode);
++    };
++    return WindowsTerminalExitEventCoordinator;
++}());
++exports.WindowsTerminalExitEventCoordinator = WindowsTerminalExitEventCoordinator;
+ var WindowsTerminal = /** @class */ (function (_super) {
+@@ -56,2 +85,7 @@ var WindowsTerminal = /** @class */ (function (_super) {
+         _this._pty = _this._agent.pty;
++        var exitEvent = new WindowsTerminalExitEventCoordinator(function (exitCode) {
++            _this.emit('exit', exitCode);
++            _this._close();
++        });
++        _this._agent.onProcessExit(function (exitCode) { return exitEvent.acceptExitCode(exitCode); });
+         // The forked windows terminal is not available until `ready` event is
+@@ -97,4 +131,6 @@ var WindowsTerminal = /** @class */ (function (_super) {
+             _this._socket.on('close', function () {
+-                _this.emit('exit', _this._agent.exitCode);
+-                _this._close();
++                if (_this._agent.processExitCodeReady) {
++                    exitEvent.acceptExitCode(_this._agent.exitCode);
++                }
++                exitEvent.acceptOutputClosed();
+             });
 diff --git a/src/conpty_console_list_agent.ts b/src/conpty_console_list_agent.ts
 index 181ccabbbe9c4948a9725fb1db907a68e9de01fc..b0247707bbd6bdd1864783106b6674d579383d7d 100644
 --- a/src/conpty_console_list_agent.ts
 +++ b/src/conpty_console_list_agent.ts
-@@ -11,5 +11,11 @@
- const getConsoleProcessList = loadNativeModule('conpty_console_list').module.getConsoleProcessList;
+@@ -12,3 +12,9 @@ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.get
  const shellPid = parseInt(process.argv[2], 10);
 -const consoleProcessList = getConsoleProcessList(shellPid);
 +let consoleProcessList: number[];
@@ -34,4 +132,99 @@ index 181ccabbbe9c4948a9725fb1db907a68e9de01fc..b0247707bbd6bdd1864783106b6674d5
 +  consoleProcessList = [shellPid];
 +}
  process.send!({ consoleProcessList });
- process.exit(0);
+diff --git a/src/windowsPtyAgent.ts b/src/windowsPtyAgent.ts
+index d7054449516f0c9a62af351c2caa17331206d530..fe4c66d03268a4c1674a7f0605f1055148cba5da 100644
+--- a/src/windowsPtyAgent.ts
++++ b/src/windowsPtyAgent.ts
+@@ -36,2 +36,4 @@ export class WindowsPtyAgent {
+   private _exitCode: number | undefined;
++  private _hasProcessExited: boolean = false;
++  private _processExitListeners: ((exitCode: number | undefined) => void)[] = [];
+   private _conoutSocketWorker: ConoutConnection;
+@@ -125,3 +127,3 @@ export class WindowsPtyAgent {
+     if (this._useConpty) {
+-      if (this._exitCode !== undefined) {
++      if (this._hasProcessExited) {
+         throw new Error('Cannot resize a pty that has already exited');
+@@ -208 +210,16 @@ export class WindowsPtyAgent {
++  public get processExitCodeReady(): boolean {
++    return !this._useConpty || this._hasProcessExited;
++  }
++
++  public onProcessExit(listener: (exitCode: number | undefined) => void): void {
++    if (!this._useConpty) {
++      return;
++    }
++    if (this._hasProcessExited) {
++      listener(this._exitCode);
++      return;
++    }
++    this._processExitListeners.push(listener);
++  }
++
+   private _getWindowsBuildNumber(): number {
+@@ -224,3 +241,10 @@ export class WindowsPtyAgent {
+   private _$onProcessExit(exitCode: number): void {
++    if (this._hasProcessExited) {
++      return;
++    }
++    this._hasProcessExited = true;
+     this._exitCode = exitCode;
++    const listeners = this._processExitListeners;
++    this._processExitListeners = [];
++    listeners.forEach(listener => listener(exitCode));
+     if (!this._useConptyDll) {
+diff --git a/src/windowsTerminal.ts b/src/windowsTerminal.ts
+index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..1015922472a429c2376bfe97a32e9fa3019c686e 100644
+--- a/src/windowsTerminal.ts
++++ b/src/windowsTerminal.ts
+@@ -17 +17,32 @@ const DEFAULT_NAME = 'Windows Shell';
++export class WindowsTerminalExitEventCoordinator {
++  private _exitCode: number | undefined;
++  private _hasExitCode: boolean = false;
++  private _hasOutputClosed: boolean = false;
++  private _hasEmittedExit: boolean = false;
++
++  constructor(private _onExit: (exitCode: number | undefined) => void) {}
++
++  public acceptExitCode(exitCode: number | undefined): void {
++    if (this._hasExitCode) {
++      return;
++    }
++    this._exitCode = exitCode;
++    this._hasExitCode = true;
++    this._emitExitIfReady();
++  }
++
++  public acceptOutputClosed(): void {
++    this._hasOutputClosed = true;
++    this._emitExitIfReady();
++  }
++
++  private _emitExitIfReady(): void {
++    if (this._hasEmittedExit || !this._hasExitCode || !this._hasOutputClosed) {
++      return;
++    }
++    this._hasEmittedExit = true;
++    this._onExit(this._exitCode);
++  }
++}
++
+ export class WindowsTerminal extends Terminal {
+@@ -59 +90,7 @@ export class WindowsTerminal extends Terminal {
++    const exitEvent = new WindowsTerminalExitEventCoordinator(exitCode => {
++      this.emit('exit', exitCode);
++      this._close();
++    });
++    this._agent.onProcessExit(exitCode => exitEvent.acceptExitCode(exitCode));
++
+     // The forked windows terminal is not available until `ready` event is
+@@ -105,4 +142,6 @@ export class WindowsTerminal extends Terminal {
+       this._socket.on('close', () => {
+-        this.emit('exit', this._agent.exitCode);
+-        this._close();
++        if (this._agent.processExitCodeReady) {
++          exitEvent.acceptExitCode(this._agent.exitCode);
++        }
++        exitEvent.acceptOutputClosed();
+       });
