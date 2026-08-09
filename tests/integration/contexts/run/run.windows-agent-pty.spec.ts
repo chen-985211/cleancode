@@ -1,6 +1,7 @@
+import { existsSync, statSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 as pathWin32 } from 'node:path'
 
 import type { StartTerminalProcessCommand } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
@@ -67,6 +68,37 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     20_000
   )
 
+  it('starts the auto-selected ordinary PowerShell terminal and keeps it writable', async () => {
+    const sessionId = 'windows-default-powershell-session'
+    const expectedShellName = isPwshAvailable() ? 'pwsh.exe' : 'powershell.exe'
+    let output = ''
+
+    await startTerminal({
+      scope: blockRunScope(sessionId),
+      workingDirectory,
+      columns: 80,
+      rows: 24,
+      onOutput: (event) => {
+        output += event.data
+      },
+      onExit: () => undefined
+    })
+    adapter.write(
+      sessionId,
+      "$name = [IO.Path]::GetFileName((Get-Process -Id $PID).Path).ToLowerInvariant(); [Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f $name))\r"
+    )
+    await waitUntil(() => output.includes(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`))
+
+    adapter.write(
+      sessionId,
+      "[Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f 'WRITABLE'))\r"
+    )
+    await waitUntil(() => output.includes('CLEANCODE_DEFAULT_SHELL_WRITABLE'))
+
+    expect(output).toContain(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`)
+    expect(output).toContain('CLEANCODE_DEFAULT_SHELL_WRITABLE')
+  }, 40_000)
+
   it('starts an Agent job requested immediately after creating the PowerShell pty', async () => {
     let output = ''
     const started = createDeferred<void>()
@@ -75,7 +107,6 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     await startTerminal({
       scope: agentRunScope('immediate-windows-agent-session'),
       workingDirectory,
-      shell: 'powershell.exe',
       columns: 80,
       rows: 24,
       onOutput: (event) => {
@@ -316,6 +347,63 @@ function agentRunScope(sessionId: string) {
     workspaceDirectory: 'C:\\project',
     workspaceId: 'main'
   }
+}
+
+function isPwshAvailable(): boolean {
+  const programFilesRoots = [
+    process.env.ProgramW6432,
+    process.env.ProgramFiles,
+    process.env['ProgramFiles(x86)']
+  ]
+  if (
+    programFilesRoots.some(
+      (root) =>
+        root &&
+        pathWin32.isAbsolute(root) &&
+        isRealExecutable(pathWin32.join(root, 'PowerShell', '7', 'pwsh.exe'))
+    )
+  ) {
+    return true
+  }
+
+  const localAppData = process.env.LOCALAPPDATA
+  if (
+    localAppData &&
+    pathWin32.isAbsolute(localAppData) &&
+    isRealExecutable(pathWin32.join(localAppData, 'Microsoft', 'PowerShell', '7', 'pwsh.exe'))
+  ) {
+    return true
+  }
+
+  const pathValue = process.env.Path || process.env.PATH
+  for (const rawDirectory of pathValue?.split(pathWin32.delimiter) ?? []) {
+    const directory = rawDirectory.trim().replace(/^"|"$/gu, '')
+    if (!pathWin32.isAbsolute(directory)) continue
+
+    const candidate = pathWin32.join(directory, 'pwsh.exe')
+    if (
+      isRealExecutable(candidate) ||
+      (isWindowsAppExecutionAlias(candidate) && existsSync(candidate))
+    ) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function isRealExecutable(candidate: string): boolean {
+  try {
+    if (!existsSync(candidate)) return false
+    const stat = statSync(candidate)
+    return stat.isFile() && stat.size > 0
+  } catch {
+    return false
+  }
+}
+
+function isWindowsAppExecutionAlias(candidate: string): boolean {
+  return /[\\/]Microsoft[\\/]WindowsApps[\\/]/iu.test(pathWin32.normalize(candidate))
 }
 
 function blockRunScope(sessionId: string) {

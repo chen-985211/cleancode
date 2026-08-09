@@ -37,6 +37,7 @@ import {
   windowsAgentShellReadyCommand,
   windowsAgentShellReadyDeadlineMs
 } from './WindowsAgentShellReadiness'
+import { resolveTerminalShellExecutable } from './TerminalShellExecutableResolver'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
@@ -50,15 +51,28 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     ensureNodePtySpawnHelperIsExecutable()
 
     const runtimePlatform = platform()
-    const shell = command.shell || getDefaultShell()
+    const shell = await resolveTerminalShellExecutable({
+      explicitShell: command.shell,
+      platform: runtimePlatform
+    })
     const shouldWaitForWindowsAgentShell =
       runtimePlatform === 'win32' &&
       command.scope.owner?.kind === 'agent' &&
       !command.launchCommand &&
       supportsForegroundJobShell('win32', shell)
     const launch = shouldWaitForWindowsAgentShell
-      ? createTerminalProcessLaunch(shell, windowsAgentShellReadyCommand, 'interactive')
-      : createTerminalProcessLaunch(shell, command.launchCommand, command.launchMode)
+      ? createTerminalProcessLaunch(
+          shell,
+          windowsAgentShellReadyCommand,
+          'interactive',
+          runtimePlatform
+        )
+      : createTerminalProcessLaunch(
+          shell,
+          command.launchCommand,
+          command.launchMode,
+          runtimePlatform
+        )
     const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
       name: terminalEmulationName,
       cols: command.columns,
@@ -307,10 +321,6 @@ function interruptManagedWindowsForegroundJob(
     .finally(() => {
       managedProcess.foregroundJobInterruptPromise = null
     })
-}
-
-function getDefaultShell(): string {
-  return platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/sh'
 }
 
 async function stopManagedProcess(managedProcess: ManagedTerminalProcess): Promise<void> {

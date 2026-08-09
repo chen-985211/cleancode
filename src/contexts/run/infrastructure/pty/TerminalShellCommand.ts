@@ -1,3 +1,5 @@
+import { platform } from 'node:os'
+
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalLaunchMode } from '../../application/ports/TerminalProcessPort'
 
@@ -9,9 +11,10 @@ export interface TerminalProcessLaunch {
 export function createTerminalProcessLaunch(
   shell: string,
   launchCommand: string | undefined,
-  launchMode: TerminalLaunchMode = 'command'
+  launchMode: TerminalLaunchMode = 'command',
+  runtimePlatform: NodeJS.Platform = platform()
 ): TerminalProcessLaunch {
-  const arguments_ = createTerminalShellCommandArguments(shell, launchCommand)
+  const arguments_ = createTerminalShellCommandArguments(shell, launchCommand, runtimePlatform)
   if (!launchCommand || launchMode === 'command') {
     return { executable: shell, arguments: arguments_ }
   }
@@ -41,13 +44,16 @@ export function createTerminalProcessLaunch(
 
 function createTerminalShellCommandArguments(
   shell: string,
-  launchCommand: string | undefined
+  launchCommand: string | undefined,
+  runtimePlatform: NodeJS.Platform
 ): readonly string[] {
-  if (!launchCommand) {
-    return []
-  }
-
   const shellName = getShellName(shell)
+
+  if (!launchCommand) {
+    return runtimePlatform === 'win32' && (shellName === 'powershell' || shellName === 'pwsh')
+      ? ['-NoLogo', '-NoExit']
+      : []
+  }
 
   if (shellName === 'bash' || shellName === 'zsh' || shellName === 'sh') {
     return ['-lc', launchCommand]
