@@ -23,7 +23,14 @@ interface PtyExitEvent {
 }
 
 interface WindowsTerminalModule {
-  readonly WindowsTerminal: new () => unknown
+  readonly WindowsTerminal: new (
+    file?: string,
+    args?: string[],
+    options?: Record<string, unknown>
+  ) => {
+    kill(): void
+    onExit(listener: (event: PtyExitEvent) => void): IDisposable
+  }
   readonly WindowsTerminalExitEventCoordinator: new (
     onExit: (exitCode: unknown) => void
   ) => WindowsTerminalExitCoordinator
@@ -124,6 +131,10 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(agent.disposeWorker).toHaveBeenCalledOnce()
     expect(agent.destroyInput).toHaveBeenCalledOnce()
     expect(agent.destroyOutput).toHaveBeenCalledOnce()
+  })
+
+  it('observes output close when shutdown happens before ready_datapipe', () => {
+    expect(runPreReadyExitScenario()).toEqual([0])
   })
 
   it.each([
@@ -258,6 +269,56 @@ function createFailedConptySpawnHarness() {
     inputSocket,
     nativeKill,
     outputSocket
+  }
+}
+
+function runPreReadyExitScenario(): unknown[] {
+  const agentPath = nodeRequire.resolve('node-pty/lib/windowsPtyAgent')
+  const terminalPath = nodeRequire.resolve('node-pty/lib/windowsTerminal')
+  const cachedAgentModule = nodeRequire.cache[agentPath]
+  const cachedTerminalModule = nodeRequire.cache[terminalPath]
+  if (cachedAgentModule === undefined || cachedTerminalModule === undefined) {
+    throw new Error('Patched node-pty Windows modules must be loaded before the exit scenario')
+  }
+
+  const originalAgentExports = cachedAgentModule.exports
+  const outputSocket = new EventEmitter()
+  let processExitListener: ((exitCode: number) => void) | undefined
+
+  class PreReadyWindowsPtyAgent {
+    readonly exitCode = 0
+    readonly fd = 0
+    readonly innerPid = 4815
+    readonly outSocket = outputSocket
+    readonly processExitCodeReady = true
+    readonly pty = 42
+
+    onProcessExit(listener: (exitCode: number) => void): void {
+      processExitListener = listener
+    }
+
+    kill(): void {
+      processExitListener?.(this.exitCode)
+      this.outSocket.emit('close')
+    }
+  }
+
+  try {
+    cachedAgentModule.exports = { WindowsPtyAgent: PreReadyWindowsPtyAgent }
+    delete nodeRequire.cache[terminalPath]
+    const { WindowsTerminal: IsolatedWindowsTerminal } = nodeRequire(
+      terminalPath
+    ) as WindowsTerminalModule
+    const terminal = new IsolatedWindowsTerminal('powershell.exe', [], {})
+    const exits: unknown[] = []
+    terminal.onExit((event) => exits.push(event.exitCode))
+
+    terminal.kill()
+
+    return exits
+  } finally {
+    cachedAgentModule.exports = originalAgentExports
+    nodeRequire.cache[terminalPath] = cachedTerminalModule
   }
 }
 

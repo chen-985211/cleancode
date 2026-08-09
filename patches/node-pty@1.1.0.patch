@@ -2,7 +2,9 @@ diff --git a/lib/conpty_console_list_agent.js b/lib/conpty_console_list_agent.js
 index 8c4fca9022a6d6f015bca87f61625cde2278f428..01fe11fb3d2e50d962587ee9cf9e5ca4cebd8a77 100644
 --- a/lib/conpty_console_list_agent.js
 +++ b/lib/conpty_console_list_agent.js
-@@ -12,3 +12,10 @@ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').modu
+@@ -10,7 +10,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ var utils_1 = require("./utils");
+ var getConsoleProcessList = utils_1.loadNativeModule('conpty_console_list').module.getConsoleProcessList;
  var shellPid = parseInt(process.argv[2], 10);
 -var consoleProcessList = getConsoleProcessList(shellPid);
 +var consoleProcessList;
@@ -14,17 +16,26 @@ index 8c4fca9022a6d6f015bca87f61625cde2278f428..01fe11fb3d2e50d962587ee9cf9e5ca4
 +    consoleProcessList = [shellPid];
 +}
  process.send({ consoleProcessList: consoleProcessList });
+ process.exit(0);
+ //# sourceMappingURL=conpty_console_list_agent.js.map
+\ No newline at end of file
 diff --git a/lib/windowsPtyAgent.js b/lib/windowsPtyAgent.js
 index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd560129de 100644
 --- a/lib/windowsPtyAgent.js
 +++ b/lib/windowsPtyAgent.js
-@@ -36,2 +36,5 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -34,6 +34,9 @@ var WindowsPtyAgent = /** @class */ (function () {
+         this._useConptyDll = _useConptyDll;
+         this._pid = 0;
          this._innerPid = 0;
 +        this._hasProcessExited = false;
 +        this._killRequested = false;
 +        this._processExitListeners = [];
          if (this._useConpty === undefined || this._useConpty === true) {
-@@ -88,6 +91,34 @@ var WindowsPtyAgent = /** @class */ (function () {
+             this._useConpty = this._getWindowsBuildNumber() >= 18309;
+         }
+@@ -86,10 +89,38 @@ var WindowsPtyAgent = /** @class */ (function () {
+         });
+         this._inSocket.setEncoding('utf8');
          if (this._useConpty) {
 -            var connect = this._ptyNative.connect(this._pty, commandLine, cwd, env, this._useConptyDll, function (c) { return _this._$onProcessExit(c); });
 -            this._innerPid = connect.pid;
@@ -61,12 +72,20 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd
 +        catch (_d) { /* best-effort cleanup */ }
 +    };
      Object.defineProperty(WindowsPtyAgent.prototype, "inSocket", {
-@@ -119,3 +150,3 @@ var WindowsPtyAgent = /** @class */ (function () {
+         get: function () { return this._inSocket; },
+         enumerable: false,
+@@ -117,7 +148,7 @@ var WindowsPtyAgent = /** @class */ (function () {
+     });
+     WindowsPtyAgent.prototype.resize = function (cols, rows) {
          if (this._useConpty) {
 -            if (this._exitCode !== undefined) {
 +            if (this._hasProcessExited) {
                  throw new Error('Cannot resize a pty that has already exited');
-@@ -133,2 +164,17 @@ var WindowsPtyAgent = /** @class */ (function () {
+             }
+             this._ptyNative.resize(this._pty, cols, rows, this._useConptyDll);
+@@ -131,6 +162,21 @@ var WindowsPtyAgent = /** @class */ (function () {
+         }
+     };
      WindowsPtyAgent.prototype.kill = function () {
 +        if (this._killRequested) {
 +            return;
@@ -84,13 +103,21 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd
 +    };
 +    WindowsPtyAgent.prototype._killPty = function () {
          var _this = this;
-@@ -156,2 +202,5 @@ var WindowsPtyAgent = /** @class */ (function () {
+         // Tell the agent to kill the pty, this releases handles to the process
+         if (this._useConpty) {
+@@ -154,6 +200,9 @@ var WindowsPtyAgent = /** @class */ (function () {
+                 // Close the input write handle to signal the end of session.
+                 this._inSocket.destroy();
                  this._ptyNative.kill(this._pty, this._useConptyDll);
 +                // Start the drain deadline even when shutdown happens before the first
 +                // output. Later data resets the same deadline.
 +                this._conoutSocketWorker.dispose();
                  this._outSocket.on('data', function () {
-@@ -206,2 +255,19 @@ var WindowsPtyAgent = /** @class */ (function () {
+                     _this._conoutSocketWorker.dispose();
+                 });
+@@ -204,6 +253,23 @@ var WindowsPtyAgent = /** @class */ (function () {
+         enumerable: false,
+         configurable: true
      });
 +    Object.defineProperty(WindowsPtyAgent.prototype, "processExitCodeReady", {
 +        get: function () {
@@ -110,7 +137,11 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd
 +        this._processExitListeners.push(listener);
 +    };
      WindowsPtyAgent.prototype._getWindowsBuildNumber = function () {
-@@ -222,3 +288,10 @@ var WindowsPtyAgent = /** @class */ (function () {
+         var osVersion = (/(\d+)\.(\d+)\.(\d+)/g).exec(os.release());
+         var buildNumber = 0;
+@@ -220,7 +286,14 @@ var WindowsPtyAgent = /** @class */ (function () {
+      */
+     WindowsPtyAgent.prototype._$onProcessExit = function (exitCode) {
          var _this = this;
 +        if (this._hasProcessExited) {
 +            return;
@@ -121,16 +152,22 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd
 +        this._processExitListeners = [];
 +        listeners.forEach(function (listener) { return listener(exitCode); });
          if (!this._useConptyDll) {
+             this._flushDataAndCleanUp();
+             this._outSocket.on('data', function () { return _this._flushDataAndCleanUp(); });
 diff --git a/lib/windowsTerminal.js b/lib/windowsTerminal.js
-index 3c38f89d14cece8081782a9600ebc582b7c2a62a..3785ee729c7c31b081ca31fd56e2326439bb3b7c 100644
+index 3c38f89d14cece8081782a9600ebc582b7c2a62a..7437faddcbb41d2fce2babbf7de276007b57ac59 100644
 --- a/lib/windowsTerminal.js
 +++ b/lib/windowsTerminal.js
-@@ -20,3 +20,3 @@ var __extends = (this && this.__extends) || (function () {
+@@ -18,12 +18,41 @@ var __extends = (this && this.__extends) || (function () {
+     };
+ })();
  Object.defineProperty(exports, "__esModule", { value: true });
 -exports.WindowsTerminal = void 0;
 +exports.WindowsTerminal = exports.WindowsTerminalExitEventCoordinator = void 0;
  var terminal_1 = require("./terminal");
-@@ -26,2 +26,31 @@ var DEFAULT_FILE = 'cmd.exe';
+ var windowsPtyAgent_1 = require("./windowsPtyAgent");
+ var utils_1 = require("./utils");
+ var DEFAULT_FILE = 'cmd.exe';
  var DEFAULT_NAME = 'Windows Shell';
 +var WindowsTerminalExitEventCoordinator = /** @class */ (function () {
 +    function WindowsTerminalExitEventCoordinator(_onExit) {
@@ -162,11 +199,19 @@ index 3c38f89d14cece8081782a9600ebc582b7c2a62a..3785ee729c7c31b081ca31fd56e23264
 +}());
 +exports.WindowsTerminalExitEventCoordinator = WindowsTerminalExitEventCoordinator;
  var WindowsTerminal = /** @class */ (function (_super) {
-@@ -47,2 +76,3 @@ var WindowsTerminal = /** @class */ (function (_super) {
+     __extends(WindowsTerminal, _super);
+     function WindowsTerminal(file, args, opt) {
+@@ -45,6 +74,7 @@ var WindowsTerminal = /** @class */ (function (_super) {
+         var parsedEnv = _this._parseEnv(env);
+         // If the terminal is ready
          _this._isReady = false;
 +        _this._shutdownIssued = false;
          // Functions that need to run after `ready` event is emitted.
-@@ -56,2 +86,7 @@ var WindowsTerminal = /** @class */ (function (_super) {
+         _this._deferreds = [];
+         // Create new termal.
+@@ -54,6 +84,11 @@ var WindowsTerminal = /** @class */ (function (_super) {
+         _this._pid = _this._agent.innerPid;
+         _this._fd = _this._agent.fd;
          _this._pty = _this._agent.pty;
 +        var exitEvent = new WindowsTerminalExitEventCoordinator(function (exitCode) {
 +            _this.emit('exit', exitCode);
@@ -174,16 +219,64 @@ index 3c38f89d14cece8081782a9600ebc582b7c2a62a..3785ee729c7c31b081ca31fd56e23264
 +        });
 +        _this._agent.onProcessExit(function (exitCode) { return exitEvent.acceptExitCode(exitCode); });
          // The forked windows terminal is not available until `ready` event is
-@@ -97,4 +132,6 @@ var WindowsTerminal = /** @class */ (function (_super) {
-             _this._socket.on('close', function () {
+         // emitted.
+         _this._socket.on('ready_datapipe', function () {
+@@ -76,28 +111,30 @@ var WindowsTerminal = /** @class */ (function (_super) {
+                     _this._deferreds = [];
+                 }
+             });
+-            // Shutdown if `error` event is emitted.
+-            _this._socket.on('error', function (err) {
+-                // Close terminal session.
+-                _this._close();
+-                // EIO, happens when someone closes our child process: the only process
+-                // in the terminal.
+-                // node < 0.6.14: errno 5
+-                // node >= 0.6.14: read EIO
+-                if (err.code) {
+-                    if (~err.code.indexOf('errno 5') || ~err.code.indexOf('EIO'))
+-                        return;
+-                }
+-                // Throw anything else.
+-                if (_this.listeners('error').length < 2) {
+-                    throw err;
+-                }
+-            });
+-            // Cleanup after the socket is closed.
+-            _this._socket.on('close', function () {
 -                _this.emit('exit', _this._agent.exitCode);
 -                _this._close();
-+                if (_this._agent.processExitCodeReady) {
-+                    exitEvent.acceptExitCode(_this._agent.exitCode);
-+                }
-+                exitEvent.acceptOutputClosed();
-             });
-@@ -141,16 +178,23 @@ var WindowsTerminal = /** @class */ (function (_super) {
+-            });
++        });
++        // Shutdown if `error` event is emitted.
++        _this._socket.on('error', function (err) {
++            // Close terminal session.
++            _this._close();
++            // EIO, happens when someone closes our child process: the only process
++            // in the terminal.
++            // node < 0.6.14: errno 5
++            // node >= 0.6.14: read EIO
++            if (err.code) {
++                if (~err.code.indexOf('errno 5') || ~err.code.indexOf('EIO'))
++                    return;
++            }
++            // Throw anything else.
++            if (_this.listeners('error').length < 2) {
++                throw err;
++            }
++        });
++        // Cleanup after the socket is closed, including shutdown before ready_datapipe.
++        _this._socket.on('close', function () {
++            if (_this._agent.processExitCodeReady) {
++                exitEvent.acceptExitCode(_this._agent.exitCode);
++            }
++            exitEvent.acceptOutputClosed();
+         });
+         _this._file = file;
+         _this._name = name;
+@@ -139,20 +176,27 @@ var WindowsTerminal = /** @class */ (function (_super) {
+         });
+     };
      WindowsTerminal.prototype.destroy = function () {
 -        var _this = this;
 -        this._deferNoArgs(function () {
@@ -219,11 +312,15 @@ index 3c38f89d14cece8081782a9600ebc582b7c2a62a..3785ee729c7c31b081ca31fd56e23264
 +            throw error;
 +        }
      };
+     WindowsTerminal.prototype._deferNoArgs = function (deferredFn) {
+         var _this = this;
 diff --git a/src/conpty_console_list_agent.ts b/src/conpty_console_list_agent.ts
 index 181ccabbbe9c4948a9725fb1db907a68e9de01fc..b0247707bbd6bdd1864783106b6674d579383d7d 100644
 --- a/src/conpty_console_list_agent.ts
 +++ b/src/conpty_console_list_agent.ts
-@@ -12,3 +12,9 @@ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.get
+@@ -10,6 +10,12 @@ import { loadNativeModule } from './utils';
+
+ const getConsoleProcessList = loadNativeModule('conpty_console_list').module.getConsoleProcessList;
  const shellPid = parseInt(process.argv[2], 10);
 -const consoleProcessList = getConsoleProcessList(shellPid);
 +let consoleProcessList: number[];
@@ -234,18 +331,25 @@ index 181ccabbbe9c4948a9725fb1db907a68e9de01fc..b0247707bbd6bdd1864783106b6674d5
 +  consoleProcessList = [shellPid];
 +}
  process.send!({ consoleProcessList });
+ process.exit(0);
 diff --git a/src/win/conpty.cc b/src/win/conpty.cc
 index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d400385b71 100644
 --- a/src/win/conpty.cc
 +++ b/src/win/conpty.cc
-@@ -16,2 +16,6 @@
+@@ -14,6 +14,10 @@
+ #include <node_api.h>
+ #include <assert.h>
  #include <Shlwapi.h> // PathCombine, PathIsRelative
 +#include <algorithm>
 +#include <atomic>
 +#include <memory>
 +#include <mutex>
  #include <sstream>
-@@ -45,6 +49,24 @@ struct pty_baton {
+ #include <iostream>
+ #include <string>
+@@ -43,16 +47,112 @@ struct pty_baton {
+   HANDLE hIn;
+   HANDLE hOut;
    HPCON hpc;
 -
 -  HANDLE hShell;
@@ -274,7 +378,7 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +      releasePseudoConsole(_releasePseudoConsole),
 +      terminateShellOnClose(_terminateShellOnClose) {};
  };
-@@ -52,5 +74,83 @@ struct pty_baton {
+
  static std::vector<std::unique_ptr<pty_baton>> ptyHandles;
 -static volatile LONG ptyCounter;
 +static std::mutex g_ptyHandlesMutex;
@@ -360,7 +464,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +// holds g_ptyHandlesMutex.
 +static pty_baton* get_pty_baton(const std::lock_guard<std::mutex>&, int id) {
    auto it = std::find_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
-@@ -64,13 +164,77 @@ static pty_baton* get_pty_baton(int id) {
+     return ptyHandle->id == id;
+   });
+@@ -62,23 +162,88 @@ static pty_baton* get_pty_baton(int id) {
+   return nullptr;
+ }
 
 -static bool remove_pty_baton(int id) {
 -  auto it = std::remove_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
@@ -444,13 +552,19 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +};
 +
  struct ExitEvent {
-@@ -80,3 +244,4 @@ struct ExitEvent {
+   int exit_code = 0;
+ };
+
  void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
 -  std::thread *th = new std::thread;
 +  std::unique_ptr<std::thread> threadOwner = std::make_unique<std::thread>();
 +  std::thread* thread = threadOwner.get();
    // Don't use Napi::AsyncWorker which is limited by UV_THREADPOOL_SIZE.
-@@ -88,39 +253,66 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+   auto tsfn = Napi::ThreadSafeFunction::New(
+       env,
+@@ -86,49 +251,87 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+       "SetupExitCallback_resource", // Name
+       0,                            // Unlimited queue
        1,                            // Only one thread will use this initially
 -      [th](Napi::Env) {   // Finalizer used to clean threads up
 -        th->join();
@@ -551,7 +665,7 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +    throw;
 +  }
  }
-@@ -128,5 +320,16 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+
  Napi::Error errorWithCode(const Napi::CallbackInfo& info, const char* text) {
 +  const DWORD errorCode = GetLastError();
    std::stringstream errorText;
@@ -569,12 +683,18 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +  errorText << text;
 +  errorText << ", error code: " << errorCode;
    return Napi::Error::New(info.Env(), errorText.str());
-@@ -196,2 +399,4 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+ }
+
+@@ -194,13 +397,24 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+                                          HANDLE *phInput,
+                                          HANDLE *phOutput,
                                           HPCON* phPC,
 +                                         PFNCLOSEPSEUDOCONSOLE* ppfnClosePseudoConsole,
 +                                         PFNRELEASEPSEUDOCONSOLE* ppfnReleasePseudoConsole,
                                           std::wstring& inName,
-@@ -201,4 +406,13 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+                                          std::wstring& outName,
+                                          const std::wstring& pipeName,
+                                          const bool useConptyDll)
  {
 +  if (phPC == NULL || phInput == NULL || phOutput == NULL ||
 +      ppfnClosePseudoConsole == NULL || ppfnReleasePseudoConsole == NULL) {
@@ -589,7 +709,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
    HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
 -  DWORD error = GetLastError();
    bool fLoadedDll = hLibrary != nullptr;
-@@ -211,5 +425,13 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+   if (fLoadedDll)
+   {
+@@ -209,22 +423,50 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+         useConptyDll ? "ConptyCreatePseudoConsole" : "CreatePseudoConsole");
+     if (pfnCreate)
      {
 -      if (phPC == NULL || phInput == NULL || phOutput == NULL)
 -      {
@@ -606,7 +730,9 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +            (HMODULE)hLibrary,
 +            "ConptyReleasePseudoConsole");
        }
-@@ -219,10 +441,30 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+
+       bool success = createDataServerPipe(true, L"in", phInput, inName, pipeName);
+       if (!success)
        {
 -        return HRESULT_FROM_WIN32(GetLastError());
 +        const DWORD error = GetLastError();
@@ -641,13 +767,21 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +      }
 +      return result;
      }
-@@ -250,5 +492,2 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+     else
+     {
+@@ -248,9 +490,6 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+
+   Napi::Object marshal;
    std::wstring inName, outName;
 -  BOOL fSuccess = FALSE;
 -  std::unique_ptr<wchar_t[]> mutableCommandline;
 -  PROCESS_INFORMATION _piClient{};
 
-@@ -289,5 +528,20 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+   if (info.Length() != 7 ||
+       !info[0].IsString() ||
+@@ -287,38 +526,70 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+     throw Napi::Error::New(env, why);
+   }
 
 -  HANDLE hIn, hOut;
 -  HPCON hpc;
@@ -671,7 +805,8 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +      pipeName,
 +      useConptyDll);
 
-@@ -296,12 +550,3 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+   // Restore default handling of ctrl+c
+   SetConsoleCtrlHandler(NULL, FALSE);
 
 -  // Set return values
 -  marshal = Napi::Object::New(env);
@@ -685,7 +820,7 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 -  } else {
 +  if (FAILED(hr)) {
      throw Napi::Error::New(env, "Cannot launch conpty");
-@@ -309,14 +554,40 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+   }
 
 -  std::string inNameStr = path_util::wstring_to_string(inName);
 -  if (inNameStr.empty()) {
@@ -737,11 +872,19 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 -  marshal.Set("conin", Napi::String::New(env, inNameStr));
 -  marshal.Set("conout", Napi::String::New(env, outNameStr));
    return marshal;
-@@ -332,3 +603,2 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+ }
+
+@@ -330,7 +601,6 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   //    the Socket has attempted to connect to the other end, then actually
+   //    spawn the process here.
 
 -  std::stringstream errorText;
    BOOL fSuccess = FALSE;
-@@ -346,13 +616,22 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+
+   if (info.Length() != 6 ||
+@@ -344,25 +614,40 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   }
+
    const int id = info[0].As<Napi::Number>().Int32Value();
 -  const std::wstring cmdline(path_util::to_wstring(info[1].As<Napi::String>()));
 -  const std::wstring cwd(path_util::to_wstring(info[2].As<Napi::String>()));
@@ -771,19 +914,25 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +  const std::wstring cmdline(path_util::to_wstring(info[1].As<Napi::String>()));
 +  const std::wstring cwd(path_util::to_wstring(info[2].As<Napi::String>()));
 
-@@ -361,2 +640,5 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   // Prepare command line
+   std::unique_ptr<wchar_t[]> mutableCommandline = std::make_unique<wchar_t[]>(cmdline.length() + 1);
    HRESULT hr = StringCchCopyW(mutableCommandline.get(), cmdline.length() + 1, cmdline.c_str());
 +  if (FAILED(hr)) {
 +    throw Napi::Error::New(env, "Failed to prepare conpty command line");
 +  }
 
-@@ -365,2 +647,5 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   // Prepare cwd
+   std::unique_ptr<wchar_t[]> mutableCwd = std::make_unique<wchar_t[]>(cwd.length() + 1);
    hr = StringCchCopyW(mutableCwd.get(), cwd.length() + 1, cwd.c_str());
 +  if (FAILED(hr)) {
 +    throw Napi::Error::New(env, "Failed to prepare conpty working directory");
 +  }
 
-@@ -380,4 +665,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   // Prepare environment
+   std::wstring envStr;
+@@ -378,8 +663,19 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   std::vector<wchar_t> envV(envStr.cbegin(), envStr.cend());
+   LPWSTR envArg = envV.empty() ? nullptr : envV.data();
 
 -  ConnectNamedPipe(handle->hIn, nullptr);
 -  ConnectNamedPipe(handle->hOut, nullptr);
@@ -801,7 +950,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +  connectPipe(handle->hIn, "ConnectNamedPipe for conin failed");
 +  connectPipe(handle->hOut, "ConnectNamedPipe for conout failed");
 
-@@ -393,4 +689,8 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   // Attach the pseudoconsole to the client application we're creating
+   STARTUPINFOEXW siEx{0};
+@@ -391,13 +687,18 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+
+   SIZE_T size = 0;
    InitializeProcThreadAttributeList(NULL, 1, 0, &size);
 -  BYTE *attrList = new BYTE[size];
 -  siEx.lpAttributeList = reinterpret_cast<PPROC_THREAD_ATTRIBUTE_LIST>(attrList);
@@ -812,21 +965,32 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +  siEx.lpAttributeList = reinterpret_cast<PPROC_THREAD_ATTRIBUTE_LIST>(attrList.get());
 +  proc_thread_attribute_list_owner attributeListOwner;
 
-@@ -400,2 +700,3 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   fSuccess = InitializeProcThreadAttributeList(siEx.lpAttributeList, 1, 0, &size);
+   if (!fSuccess) {
+     throw errorWithCode(info, "InitializeProcThreadAttributeList failed");
    }
 +  attributeListOwner.set(siEx.lpAttributeList);
    fSuccess = UpdateProcThreadAttribute(siEx.lpAttributeList,
-@@ -411,3 +712,3 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+                                        0,
+                                        PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE,
+@@ -409,7 +710,7 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+     throw errorWithCode(info, "UpdateProcThreadAttribute failed");
+   }
 
 -  PROCESS_INFORMATION piClient{};
 +  process_information_owner process;
    fSuccess = !!CreateProcessW(
-@@ -422,3 +723,3 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+       nullptr,
+       mutableCommandline.get(),
+@@ -420,38 +721,109 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+       envArg,                       // lpEnvironment
+       mutableCwd.get(),             // lpCurrentDirectory
        &siEx.StartupInfo,            // lpStartupInfo
 -      &piClient                     // lpProcessInformation
 +      &process.value                // lpProcessInformation
    );
-@@ -427,29 +728,100 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+   if (!fSuccess) {
+     throw errorWithCode(info, "Cannot create process");
    }
 +  process.terminateOnDestruction = true;
 +  attributeListOwner.reset();
@@ -947,7 +1111,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +    throw errorWithCode(info, "Failed to duplicate conpty process handle", duplicateError);
 +  }
    return marshal;
-@@ -474,5 +846,6 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+ }
+
+@@ -472,9 +844,10 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+   SHORT rows = static_cast<SHORT>(info[2].As<Napi::Number>().Uint32Value());
+   const bool useConptyDll = info[3].As<Napi::Boolean>().Value();
 
 -  const pty_baton* handle = get_pty_baton(id);
 +  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
@@ -956,7 +1124,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 -  if (handle != nullptr) {
 +  if (handle != nullptr && handle->hpc != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -515,5 +888,6 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+     bool fLoadedDll = hLibrary != nullptr;
+     if (fLoadedDll)
+@@ -513,9 +886,10 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+     return env.Undefined();
+   }
 
 -  const pty_baton* handle = get_pty_baton(id);
 +  std::lock_guard<std::mutex> lock(g_ptyHandlesMutex);
@@ -965,7 +1137,11 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 -  if (handle != nullptr) {
 +  if (handle != nullptr && handle->hpc != nullptr) {
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
-@@ -544,22 +918,69 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+     bool fLoadedDll = hLibrary != nullptr;
+     if (fLoadedDll)
+@@ -542,26 +916,73 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+   }
+
    int id = info[0].As<Napi::Number>().Int32Value();
 -  const bool useConptyDll = info[1].As<Napi::Boolean>().Value();
 +  // The close strategy belongs to the baton created by startProcess. Do not
@@ -1050,17 +1226,25 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 -    }
 +    throw errorWithCode(info, "Failed to terminate conpty process", terminationError);
    }
+
+   return env.Undefined();
 diff --git a/src/windowsPtyAgent.ts b/src/windowsPtyAgent.ts
 index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947dbaa4bc8f6 100644
 --- a/src/windowsPtyAgent.ts
 +++ b/src/windowsPtyAgent.ts
-@@ -36,2 +36,5 @@ export class WindowsPtyAgent {
+@@ -34,6 +34,9 @@ export class WindowsPtyAgent {
+   private _innerPid: number = 0;
+   private _closeTimeout: NodeJS.Timer | undefined;
    private _exitCode: number | undefined;
 +  private _hasProcessExited: boolean = false;
 +  private _killRequested: boolean = false;
 +  private _processExitListeners: ((exitCode: number | undefined) => void)[] = [];
    private _conoutSocketWorker: ConoutConnection;
-@@ -118,4 +121,9 @@ export class WindowsPtyAgent {
+
+   private _fd: any;
+@@ -116,14 +119,30 @@ export class WindowsPtyAgent {
+     this._inSocket.setEncoding('utf8');
+
      if (this._useConpty) {
 -      const connect = (this._ptyNative as IConptyNative).connect(this._pty, commandLine, cwd, env, this._useConptyDll, c => this._$onProcessExit(c));
 -      this._innerPid = connect.pid;
@@ -1072,7 +1256,7 @@ index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947db
 +        throw error;
 +      }
      }
-@@ -123,5 +131,16 @@ export class WindowsPtyAgent {
+   }
 
 +  private _disposeFailedSpawn(): void {
 +    // Construction failed before WindowsTerminal could subscribe. Consume delayed
@@ -1090,7 +1274,11 @@ index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947db
 -      if (this._exitCode !== undefined) {
 +      if (this._hasProcessExited) {
          throw new Error('Cannot resize a pty that has already exited');
-@@ -141,2 +160,18 @@ export class WindowsPtyAgent {
+       }
+       (this._ptyNative as IConptyNative).resize(this._pty, cols, rows, this._useConptyDll);
+@@ -139,6 +158,22 @@ export class WindowsPtyAgent {
+   }
+
    public kill(): void {
 +    if (this._killRequested) {
 +      return;
@@ -1109,13 +1297,21 @@ index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947db
 +
 +  private _killPty(): void {
      // Tell the agent to kill the pty, this releases handles to the process
-@@ -161,2 +196,5 @@ export class WindowsPtyAgent {
+     if (this._useConpty) {
+       if (!this._useConptyDll) {
+@@ -159,6 +194,9 @@ export class WindowsPtyAgent {
+         // Close the input write handle to signal the end of session.
+         this._inSocket.destroy();
          (this._ptyNative as IConptyNative).kill(this._pty, this._useConptyDll);
 +        // Start the drain deadline even when shutdown happens before the first
 +        // output. Later data resets the same deadline.
 +        this._conoutSocketWorker.dispose();
          this._outSocket.on('data', () => {
-@@ -207,2 +245,17 @@ export class WindowsPtyAgent {
+           this._conoutSocketWorker.dispose();
+         });
+@@ -205,6 +243,21 @@ export class WindowsPtyAgent {
+     return winptyExitCode === -1 ? undefined : winptyExitCode;
+   }
 
 +  public get processExitCodeReady(): boolean {
 +    return !this._useConpty || this._hasProcessExited;
@@ -1133,7 +1329,11 @@ index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947db
 +  }
 +
    private _getWindowsBuildNumber(): number {
-@@ -224,3 +277,10 @@ export class WindowsPtyAgent {
+     const osVersion = (/(\d+)\.(\d+)\.(\d+)/g).exec(os.release());
+     let buildNumber: number = 0;
+@@ -222,7 +275,14 @@ export class WindowsPtyAgent {
+    * Triggered from the native side when a contpy process exits.
+    */
    private _$onProcessExit(exitCode: number): void {
 +    if (this._hasProcessExited) {
 +      return;
@@ -1144,11 +1344,15 @@ index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947db
 +    this._processExitListeners = [];
 +    listeners.forEach(listener => listener(exitCode));
      if (!this._useConptyDll) {
+       this._flushDataAndCleanUp();
+       this._outSocket.on('data', () => this._flushDataAndCleanUp());
 diff --git a/src/windowsTerminal.ts b/src/windowsTerminal.ts
-index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..f787824ac5858746b0946d8ca591a8eadc7632ed 100644
+index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..6c9964c99d946c1d8845b85b6859e02e8c6359bd 100644
 --- a/src/windowsTerminal.ts
 +++ b/src/windowsTerminal.ts
-@@ -16,4 +16,36 @@ const DEFAULT_NAME = 'Windows Shell';
+@@ -14,8 +14,40 @@ import { assign } from './utils';
+ const DEFAULT_FILE = 'cmd.exe';
+ const DEFAULT_NAME = 'Windows Shell';
 
 +export class WindowsTerminalExitEventCoordinator {
 +  private _exitCode: number | undefined;
@@ -1185,7 +1389,11 @@ index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..f787824ac5858746b0946d8ca591a8ea
    private _isReady: boolean;
 +  private _shutdownIssued: boolean = false;
    private _deferreds: { run: () => void }[];
-@@ -58,2 +90,8 @@ export class WindowsTerminal extends Terminal {
+   private _agent: WindowsPtyAgent;
+
+@@ -56,6 +88,12 @@ export class WindowsTerminal extends Terminal {
+     this._fd = this._agent.fd;
+     this._pty = this._agent.pty;
 
 +    const exitEvent = new WindowsTerminalExitEventCoordinator(exitCode => {
 +      this.emit('exit', exitCode);
@@ -1194,23 +1402,74 @@ index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..f787824ac5858746b0946d8ca591a8ea
 +    this._agent.onProcessExit(exitCode => exitEvent.acceptExitCode(exitCode));
 +
      // The forked windows terminal is not available until `ready` event is
-@@ -105,4 +143,6 @@ export class WindowsTerminal extends Terminal {
-       this._socket.on('close', () => {
+     // emitted.
+     this._socket.on('ready_datapipe', () => {
+@@ -81,32 +119,33 @@ export class WindowsTerminal extends Terminal {
+           this._deferreds = [];
+         }
+       });
++    });
+
+-      // Shutdown if `error` event is emitted.
+-      this._socket.on('error', err => {
+-        // Close terminal session.
+-        this._close();
+-
+-        // EIO, happens when someone closes our child process: the only process
+-        // in the terminal.
+-        // node < 0.6.14: errno 5
+-        // node >= 0.6.14: read EIO
+-        if ((<any>err).code) {
+-          if (~(<any>err).code.indexOf('errno 5') || ~(<any>err).code.indexOf('EIO')) return;
+-        }
++    // Shutdown if `error` event is emitted.
++    this._socket.on('error', err => {
++      // Close terminal session.
++      this._close();
+
+-        // Throw anything else.
+-        if (this.listeners('error').length < 2) {
+-          throw err;
+-        }
+-      });
++      // EIO, happens when someone closes our child process: the only process
++      // in the terminal.
++      // node < 0.6.14: errno 5
++      // node >= 0.6.14: read EIO
++      if ((<any>err).code) {
++        if (~(<any>err).code.indexOf('errno 5') || ~(<any>err).code.indexOf('EIO')) return;
++      }
+
+-      // Cleanup after the socket is closed.
+-      this._socket.on('close', () => {
 -        this.emit('exit', this._agent.exitCode);
 -        this._close();
-+        if (this._agent.processExitCodeReady) {
-+          exitEvent.acceptExitCode(this._agent.exitCode);
-+        }
-+        exitEvent.acceptOutputClosed();
-       });
-@@ -158,5 +198,3 @@ export class WindowsTerminal extends Terminal {
+-      });
++      // Throw anything else.
++      if (this.listeners('error').length < 2) {
++        throw err;
++      }
++    });
+
++    // Cleanup after the socket is closed, including shutdown before ready_datapipe.
++    this._socket.on('close', () => {
++      if (this._agent.processExitCodeReady) {
++        exitEvent.acceptExitCode(this._agent.exitCode);
++      }
++      exitEvent.acceptOutputClosed();
+     });
+
+     this._file = file;
+@@ -156,19 +195,27 @@ export class WindowsTerminal extends Terminal {
+   }
+
    public destroy(): void {
 -    this._deferNoArgs(() => {
 -      this.kill();
 -    });
 +    this.kill();
    }
-@@ -164,9 +202,19 @@ export class WindowsTerminal extends Terminal {
+
    public kill(signal?: string): void {
 -    this._deferNoArgs(() => {
 -      if (signal) {
@@ -1235,3 +1494,5 @@ index 13f6c6dbb3d7965c4699568f4704be3b6a33d947..f787824ac5858746b0946d8ca591a8ea
 +      throw error;
 +    }
    }
+
+   private _deferNoArgs<A>(deferredFn: () => void): void {
