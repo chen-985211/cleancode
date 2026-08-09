@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { access, readFile, readdir, rename } from 'node:fs/promises'
+import { access, readFile, readdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
@@ -22,6 +22,7 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eProcessOutput } from '../support/e2eDiagnostics'
 import { pollUntilState } from '../support/e2ePolling'
+import { retireWindowsInstallDirectory } from '../support/e2eWindowsInstallReplacement'
 import {
   asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
@@ -65,9 +66,10 @@ describe('terminal runtime recovery e2e', () => {
       })
     } finally {
       if (retiredInstallDirectory) {
-        await rename(retiredInstallDirectory.retired, retiredInstallDirectory.original).catch(
-          () => undefined
-        )
+        await retireWindowsInstallDirectory(
+          retiredInstallDirectory.retired,
+          retiredInstallDirectory.original
+        ).catch(() => undefined)
       }
     }
   })
@@ -283,7 +285,7 @@ describe('terminal runtime recovery e2e', () => {
 
     const original = dirname(originalExecutablePath)
     const retired = `${original}.retired`
-    await rename(original, retired)
+    await retireWindowsInstallDirectory(original, retired)
     retiredInstallDirectory = { original, retired }
     return replacementExecutablePath
   }
