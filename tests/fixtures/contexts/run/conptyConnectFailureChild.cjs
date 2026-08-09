@@ -41,7 +41,8 @@ const deadline = setTimeout(() => {
   process.stderr.write('ConPTY connect failure child did not release every failed spawn resource\n')
   process.exit(1)
 }, 30_000)
-deadline.unref()
+// Keep the watchdog referenced: once the pre-ready ConPTY sockets close, it is the
+// lifecycle anchor that lets the asynchronous exit callback finish the scenario.
 
 try {
   runFailureBatch(0)
