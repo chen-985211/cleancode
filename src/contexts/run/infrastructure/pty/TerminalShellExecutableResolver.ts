@@ -4,6 +4,9 @@ import { platform } from 'node:os'
 import { win32 as pathWin32 } from 'node:path'
 
 const PWSH_ALIAS_DISCOVERY_TIMEOUT_MS = 10_000
+const DEFAULT_PWSH_RESOLUTION_TTL_MS = 5 * 60_000
+const DEFAULT_INBOX_POWERSHELL_RESOLUTION_TTL_MS = 30_000
+const AUTOMATIC_PWSH_QUARANTINE_TTL_MS = 60_000
 
 export interface TerminalShellExecutableResolutionOptions {
   readonly explicitShell?: string
@@ -13,7 +16,17 @@ export interface TerminalShellExecutableResolutionOptions {
   readonly resolveAppExecutionAlias?: (candidate: string) => Promise<string | null> | string | null
 }
 
-let defaultWindowsShellResolution: Promise<string> | null = null
+interface DefaultWindowsShellResolutionCacheEntry {
+  readonly promise: Promise<string>
+  readonly state: {
+    expiresAt: number
+    resolvedExecutable: string | null
+  }
+  readonly token: symbol
+}
+
+let defaultWindowsShellResolution: DefaultWindowsShellResolutionCacheEntry | null = null
+const automaticPowerShellExecutableQuarantine = new Map<string, number>()
 
 export async function resolveTerminalShellExecutable(
   options: TerminalShellExecutableResolutionOptions = {}
@@ -40,10 +53,31 @@ export async function resolveTerminalShellExecutable(
     return resolveDefaultWindowsShell(environment, dependencies)
   }
 
-  // Default resolution can touch every absolute PATH entry and may launch one
-  // Store alias discovery process. Share one in-flight/result promise across all terminals.
-  defaultWindowsShellResolution ??= resolveDefaultWindowsShell(environment, dependencies)
-  return defaultWindowsShellResolution
+  return resolveCachedDefaultWindowsShell(environment, dependencies)
+}
+
+export function quarantineAutomaticWindowsPowerShellExecutable(executable: string): void {
+  if (
+    !pathWin32.isAbsolute(executable) ||
+    pathWin32.basename(executable).toLowerCase() !== 'pwsh.exe'
+  ) {
+    return
+  }
+
+  const identity = createWindowsExecutableIdentity(executable)
+  pruneExpiredAutomaticPowerShellExecutableQuarantine()
+  automaticPowerShellExecutableQuarantine.set(
+    identity,
+    Date.now() + AUTOMATIC_PWSH_QUARANTINE_TTL_MS
+  )
+
+  if (
+    defaultWindowsShellResolution?.state.resolvedExecutable &&
+    createWindowsExecutableIdentity(defaultWindowsShellResolution.state.resolvedExecutable) ===
+      identity
+  ) {
+    defaultWindowsShellResolution = null
+  }
 }
 
 interface PowerShell7ExecutableDependencies {
@@ -53,20 +87,74 @@ interface PowerShell7ExecutableDependencies {
 
 async function resolveDefaultWindowsShell(
   environment: NodeJS.ProcessEnv,
-  dependencies: PowerShell7ExecutableDependencies
+  dependencies: PowerShell7ExecutableDependencies,
+  isQuarantined: (candidate: string) => boolean = () => false
 ): Promise<string> {
   return (
-    (await resolvePowerShell7Executable(environment, dependencies)) ??
-    resolveInboxWindowsPowerShell(environment)
+    (await resolvePowerShell7Executable(environment, dependencies, isQuarantined)) ??
+    resolveInboxWindowsPowerShellExecutable(environment)
   )
+}
+
+function resolveCachedDefaultWindowsShell(
+  environment: NodeJS.ProcessEnv,
+  dependencies: PowerShell7ExecutableDependencies
+): Promise<string> {
+  const now = Date.now()
+  const cached = defaultWindowsShellResolution
+  if (
+    cached &&
+    cached.state.expiresAt > now &&
+    (!cached.state.resolvedExecutable ||
+      !isAutomaticPowerShellExecutableQuarantined(cached.state.resolvedExecutable, now))
+  ) {
+    return cached.promise
+  }
+
+  const token = Symbol('default-windows-shell-resolution')
+  const state = {
+    expiresAt: Number.POSITIVE_INFINITY,
+    resolvedExecutable: null as string | null
+  }
+  const promise = resolveDefaultWindowsShell(
+    environment,
+    dependencies,
+    isAutomaticPowerShellExecutableQuarantined
+  ).then(
+    (executable) => {
+      state.resolvedExecutable = executable
+      state.expiresAt =
+        Date.now() +
+        (pathWin32.basename(executable).toLowerCase() === 'pwsh.exe'
+          ? DEFAULT_PWSH_RESOLUTION_TTL_MS
+          : DEFAULT_INBOX_POWERSHELL_RESOLUTION_TTL_MS)
+      return executable
+    },
+    (error: unknown) => {
+      if (defaultWindowsShellResolution?.token === token) {
+        defaultWindowsShellResolution = null
+      }
+      throw error
+    }
+  )
+  const entry: DefaultWindowsShellResolutionCacheEntry = {
+    promise,
+    state,
+    token
+  }
+  defaultWindowsShellResolution = entry
+  return promise
 }
 
 async function resolvePowerShell7Executable(
   environment: NodeJS.ProcessEnv,
-  dependencies: PowerShell7ExecutableDependencies
+  dependencies: PowerShell7ExecutableDependencies,
+  isQuarantined: (candidate: string) => boolean
 ): Promise<string | null> {
   let appExecutionAlias: string | null = null
   for (const candidate of createPowerShell7Candidates(environment)) {
+    if (isQuarantined(candidate)) continue
+
     if (isWindowsAppExecutionAlias(candidate)) {
       appExecutionAlias ??= candidate
       continue
@@ -79,12 +167,35 @@ async function resolvePowerShell7Executable(
 
   if (appExecutionAlias) {
     const target = await dependencies.resolveAppExecutionAlias(appExecutionAlias)
-    if (isSafePowerShell7AliasTarget(target, dependencies.isRealExecutable)) {
+    if (
+      isSafePowerShell7AliasTarget(target, dependencies.isRealExecutable) &&
+      !isQuarantined(target)
+    ) {
       return pathWin32.normalize(target)
     }
   }
 
   return null
+}
+
+function isAutomaticPowerShellExecutableQuarantined(candidate: string, now = Date.now()): boolean {
+  const identity = createWindowsExecutableIdentity(candidate)
+  const expiresAt = automaticPowerShellExecutableQuarantine.get(identity)
+  if (!expiresAt) return false
+  if (expiresAt > now) return true
+
+  automaticPowerShellExecutableQuarantine.delete(identity)
+  return false
+}
+
+function pruneExpiredAutomaticPowerShellExecutableQuarantine(now = Date.now()): void {
+  for (const [identity, expiresAt] of automaticPowerShellExecutableQuarantine) {
+    if (expiresAt <= now) automaticPowerShellExecutableQuarantine.delete(identity)
+  }
+}
+
+function createWindowsExecutableIdentity(executable: string): string {
+  return pathWin32.normalize(executable).toLowerCase()
 }
 
 function createPowerShell7Candidates(environment: NodeJS.ProcessEnv): readonly string[] {
@@ -145,7 +256,9 @@ function isSafePowerShell7AliasTarget(
   )
 }
 
-function resolveInboxWindowsPowerShell(environment: NodeJS.ProcessEnv): string {
+export function resolveInboxWindowsPowerShellExecutable(
+  environment: NodeJS.ProcessEnv = process.env
+): string {
   const configuredSystemRoot = readEnvironmentValue(environment, ['SystemRoot', 'WINDIR'])
   const systemRoot =
     configuredSystemRoot && pathWin32.isAbsolute(configuredSystemRoot)

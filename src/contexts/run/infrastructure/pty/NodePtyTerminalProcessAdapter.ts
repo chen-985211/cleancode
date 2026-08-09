@@ -3,7 +3,7 @@ import { accessSync, chmodSync, constants, existsSync } from 'node:fs'
 import { readlink, realpath } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { platform } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, win32 as pathWin32 } from 'node:path'
 import { promisify } from 'node:util'
 
 import type { IPty } from 'node-pty'
@@ -37,56 +37,57 @@ import {
   windowsAgentShellReadyCommand,
   windowsAgentShellReadyDeadlineMs
 } from './WindowsAgentShellReadiness'
-import { resolveTerminalShellExecutable } from './TerminalShellExecutableResolver'
+import {
+  quarantineAutomaticWindowsPowerShellExecutable,
+  resolveInboxWindowsPowerShellExecutable,
+  resolveTerminalShellExecutable,
+  type TerminalShellExecutableResolutionOptions
+} from './TerminalShellExecutableResolver'
 
 const nodeRequire = createRequire(import.meta.url)
 const execFileAsync = promisify(execFile)
 const TERMINATION_GRACE_MS = 500
 const TERMINATION_FORCE_MS = 1_500
 
+export interface NodePtyTerminalProcessAdapterOptions {
+  readonly environment?: NodeJS.ProcessEnv
+  readonly resolveShellExecutable?: (
+    options?: TerminalShellExecutableResolutionOptions
+  ) => Promise<string>
+  readonly runtimePlatform?: NodeJS.Platform
+  readonly spawnPty?: typeof spawnPtyProcess
+}
+
 export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   private readonly processes = new Map<string, ManagedTerminalProcess>()
+  private readonly environment: NodeJS.ProcessEnv | undefined
+  private readonly resolveShellExecutable: (
+    options?: TerminalShellExecutableResolutionOptions
+  ) => Promise<string>
+  private readonly runtimePlatform: NodeJS.Platform
+  private readonly spawnPty: typeof spawnPtyProcess
+
+  constructor(options: NodePtyTerminalProcessAdapterOptions = {}) {
+    this.environment = options.environment
+    this.resolveShellExecutable = options.resolveShellExecutable ?? resolveTerminalShellExecutable
+    this.runtimePlatform = options.runtimePlatform ?? platform()
+    this.spawnPty = options.spawnPty ?? spawnPtyProcess
+  }
 
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     ensureNodePtySpawnHelperIsExecutable()
 
-    const runtimePlatform = platform()
-    const shell = await resolveTerminalShellExecutable({
+    const resolutionOptions: TerminalShellExecutableResolutionOptions = {
       explicitShell: command.shell,
-      platform: runtimePlatform
-    })
-    const shouldWaitForWindowsAgentShell =
-      runtimePlatform === 'win32' &&
-      command.scope.owner?.kind === 'agent' &&
-      !command.launchCommand &&
-      supportsForegroundJobShell('win32', shell)
-    const launch = shouldWaitForWindowsAgentShell
-      ? createTerminalProcessLaunch(
-          shell,
-          windowsAgentShellReadyCommand,
-          'interactive',
-          runtimePlatform
-        )
-      : createTerminalProcessLaunch(
-          shell,
-          command.launchCommand,
-          command.launchMode,
-          runtimePlatform
-        )
-    const ptyProcess = spawnPtyProcess(launch.executable, [...launch.arguments], {
-      name: terminalEmulationName,
-      cols: command.columns,
-      rows: command.rows,
-      cwd: command.workingDirectory,
-      // The bundled ConPTY preserves VT queries and mouse modes on supported Windows 10 builds.
-      ...(runtimePlatform === 'win32' ? { useConpty: true, useConptyDll: true } : {}),
-      env: createTerminalProcessEnvironment({
-        explicit: command.environment,
-        inherited: process.env,
-        platform: runtimePlatform,
-        terminalSourceTheme: command.terminalSourceTheme
-      })
-    })
+      platform: this.runtimePlatform,
+      ...(this.environment ? { environment: this.environment } : {})
+    }
+    const resolvedShell = await this.resolveShellExecutable(resolutionOptions)
+    const {
+      process: ptyProcess,
+      shell,
+      shouldWaitForWindowsAgentShell
+    } = this.spawnTerminalProcess(command, resolvedShell)
 
     let resolveExit: () => void = () => undefined
     const exited = new Promise<void>((resolve) => {
@@ -164,7 +165,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       try {
         await windowsAgentShellReadiness.waitForReady()
       } catch (error) {
-        await stopManagedProcess(managedProcess).catch(() => undefined)
+        await stopManagedProcess(managedProcess, this.runtimePlatform).catch(() => undefined)
         throw error
       }
     }
@@ -177,7 +178,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
   write(sessionId: string, input: string): void {
     const terminalProcess = this.requireProcess(sessionId)
 
-    if (platform() === 'win32' && input === '\x03' && terminalProcess.foregroundJob) {
+    if (this.runtimePlatform === 'win32' && input === '\x03' && terminalProcess.foregroundJob) {
       interruptManagedWindowsForegroundJob(terminalProcess, terminalProcess.foregroundJob)
       return
     }
@@ -186,7 +187,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
   launchForegroundJob(command: LaunchForegroundJobProcessCommand): void {
     const terminalProcess = this.requireProcess(command.sessionId)
-    if (!supportsForegroundJobShell(platform(), terminalProcess.shell)) {
+    if (!supportsForegroundJobShell(this.runtimePlatform, terminalProcess.shell)) {
       throw createExpectedAppError(
         'TERMINAL_SHELL_UNSUPPORTED',
         'Agent foreground jobs on Windows require PowerShell or PowerShell Core.',
@@ -208,14 +209,14 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         )
       },
       {
-        platform: platform(),
+        platform: this.runtimePlatform,
         shellExecutable: terminalProcess.shell,
         terminalSourceTheme: terminalProcess.terminalSourceTheme
       }
     )
     terminalProcess.foregroundJob = control
     const probe = createForegroundJobProbe(control)
-    if (platform() === 'win32' && !terminalProcess.hasObservedShellOutput) {
+    if (this.runtimePlatform === 'win32' && !terminalProcess.hasObservedShellOutput) {
       terminalProcess.pendingForegroundProbe = probe
     } else {
       terminalProcess.process.write(probe)
@@ -243,11 +244,11 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       return null
     }
 
-    if (platform() === 'win32') {
+    if (this.runtimePlatform === 'win32') {
       return normalizeExistingDirectory(terminalProcess.workingDirectory)
     }
 
-    return readProcessWorkingDirectory(terminalProcess.process.pid)
+    return readProcessWorkingDirectory(terminalProcess.process.pid, this.runtimePlatform)
   }
 
   async stop(sessionId: string): Promise<void> {
@@ -257,7 +258,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       return
     }
 
-    managedProcess.stopPromise ??= stopManagedProcess(managedProcess)
+    managedProcess.stopPromise ??= stopManagedProcess(managedProcess, this.runtimePlatform)
     await managedProcess.stopPromise
   }
 
@@ -284,6 +285,131 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
     return ptyProcess
   }
+
+  private spawnTerminalProcess(
+    command: StartTerminalProcessCommand,
+    resolvedShell: string
+  ): SpawnedTerminalProcess {
+    const candidates = createTerminalShellSpawnCandidates({
+      environment: this.environment ?? process.env,
+      explicitShell: command.shell,
+      platform: this.runtimePlatform,
+      resolvedShell
+    })
+    const failures: unknown[] = []
+
+    for (const [index, shell] of candidates.entries()) {
+      const shouldWaitForWindowsAgentShell =
+        this.runtimePlatform === 'win32' &&
+        command.scope.owner?.kind === 'agent' &&
+        !command.launchCommand &&
+        supportsForegroundJobShell('win32', shell)
+      const launch = shouldWaitForWindowsAgentShell
+        ? createTerminalProcessLaunch(
+            shell,
+            windowsAgentShellReadyCommand,
+            'interactive',
+            this.runtimePlatform
+          )
+        : createTerminalProcessLaunch(
+            shell,
+            command.launchCommand,
+            command.launchMode,
+            this.runtimePlatform
+          )
+      const spawnOptions = {
+        name: terminalEmulationName,
+        cols: command.columns,
+        rows: command.rows,
+        cwd: command.workingDirectory,
+        // The bundled ConPTY preserves VT queries and mouse modes on supported Windows 10 builds.
+        ...(this.runtimePlatform === 'win32' ? { useConpty: true, useConptyDll: true } : {}),
+        env: createTerminalProcessEnvironment({
+          explicit: command.environment,
+          inherited: process.env,
+          platform: this.runtimePlatform,
+          terminalSourceTheme: command.terminalSourceTheme
+        })
+      }
+      let ptyProcess: IPty
+
+      try {
+        ptyProcess = this.spawnPty(launch.executable, [...launch.arguments], spawnOptions)
+      } catch (error) {
+        failures.push(error)
+        const hasFallback = index + 1 < candidates.length
+        if (!hasFallback || !isAutomaticPowerShellSpawnFailure(error)) {
+          if (failures.length === 1) throw error
+          throw createTerminalShellSpawnAggregateError(candidates, failures)
+        }
+        continue
+      }
+
+      if (index > 0) {
+        quarantineAutomaticWindowsPowerShellExecutable(candidates[0] ?? '')
+      }
+      return {
+        process: ptyProcess,
+        shell,
+        shouldWaitForWindowsAgentShell
+      }
+    }
+
+    throw new Error('Terminal process spawn candidates were unexpectedly empty.')
+  }
+}
+
+interface SpawnedTerminalProcess {
+  readonly process: IPty
+  readonly shell: string
+  readonly shouldWaitForWindowsAgentShell: boolean
+}
+
+interface TerminalShellSpawnCandidatesOptions {
+  readonly environment: NodeJS.ProcessEnv
+  readonly explicitShell?: string
+  readonly platform: NodeJS.Platform
+  readonly resolvedShell: string
+}
+
+function createTerminalShellSpawnCandidates(
+  options: TerminalShellSpawnCandidatesOptions
+): readonly string[] {
+  if (
+    options.platform !== 'win32' ||
+    options.explicitShell ||
+    pathWin32.basename(options.resolvedShell).toLowerCase() !== 'pwsh.exe'
+  ) {
+    return [options.resolvedShell]
+  }
+
+  const inboxPowerShell = resolveInboxWindowsPowerShellExecutable(options.environment)
+  return options.resolvedShell.toLowerCase() === inboxPowerShell.toLowerCase()
+    ? [options.resolvedShell]
+    : [options.resolvedShell, inboxPowerShell]
+}
+
+function isAutomaticPowerShellSpawnFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+
+  return (
+    error.message.startsWith('File not found:') ||
+    /^Cannot create process, error code: \d+$/u.test(error.message)
+  )
+}
+
+function createTerminalShellSpawnAggregateError(
+  candidates: readonly string[],
+  failures: readonly unknown[]
+): AggregateError {
+  const attempts = candidates
+    .slice(0, failures.length)
+    .map((candidate, index) => `${candidate}: ${getErrorMessage(failures[index])}`)
+    .join('; ')
+  return new AggregateError(
+    failures,
+    `Unable to start an automatic PowerShell terminal. ${attempts}`
+  )
 }
 
 interface ManagedTerminalProcess {
@@ -323,8 +449,11 @@ function interruptManagedWindowsForegroundJob(
     })
 }
 
-async function stopManagedProcess(managedProcess: ManagedTerminalProcess): Promise<void> {
-  if (platform() === 'win32') {
+async function stopManagedProcess(
+  managedProcess: ManagedTerminalProcess,
+  runtimePlatform: NodeJS.Platform
+): Promise<void> {
+  if (runtimePlatform === 'win32') {
     managedProcess.process.kill()
     await waitForPromise(managedProcess.exited, TERMINATION_FORCE_MS)
     return
@@ -434,12 +563,15 @@ function isNoSuchProcessError(error: unknown): boolean {
   )
 }
 
-async function readProcessWorkingDirectory(processId: number): Promise<string | null> {
-  if (platform() === 'darwin') {
+async function readProcessWorkingDirectory(
+  processId: number,
+  runtimePlatform: NodeJS.Platform
+): Promise<string | null> {
+  if (runtimePlatform === 'darwin') {
     return readDarwinProcessWorkingDirectory(processId)
   }
 
-  if (platform() === 'linux') {
+  if (runtimePlatform === 'linux') {
     return normalizeExistingDirectory(await readLinuxProcessWorkingDirectory(processId))
   }
 
