@@ -56,6 +56,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
 
       expect(terminal.close).toHaveBeenCalledOnce()
       expect(terminal.nativeKill).toHaveBeenCalledOnce()
+      expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
       expect(terminal.deferreds).toEqual([])
     }
   )
@@ -66,6 +67,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(() => terminal.kill('SIGTERM')).toThrow('Signals not supported on windows.')
     expect(terminal.close).not.toHaveBeenCalled()
     expect(terminal.nativeKill).not.toHaveBeenCalled()
+    expect(terminal.acceptOutputClosed).not.toHaveBeenCalled()
     expect(terminal.deferreds).toEqual([])
   })
 
@@ -78,6 +80,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
 
     expect(terminal.close).toHaveBeenCalledOnce()
     expect(terminal.nativeKill).toHaveBeenCalledOnce()
+    expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
     expect(terminal.deferreds).toEqual([])
   })
 
@@ -92,6 +95,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
 
     expect(terminal.close).toHaveBeenCalledTimes(2)
     expect(terminal.nativeKill).toHaveBeenCalledTimes(2)
+    expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
   })
 
   it('settles a silent bundled ConPTY worker exactly once across repeated agent kills', () => {
@@ -133,7 +137,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(agent.destroyOutput).toHaveBeenCalledOnce()
   })
 
-  it('observes output close when shutdown happens before ready_datapipe', () => {
+  it('emits exit when shutdown happens before ready_datapipe can close output', () => {
     expect(runPreReadyExitScenario()).toEqual([0])
   })
 
@@ -177,6 +181,7 @@ describe('patched node-pty Windows terminal exit coordination', () => {
 })
 
 function createPreReadyWindowsTerminalHarness() {
+  const acceptOutputClosed = vi.fn()
   const close = vi.fn()
   const nativeKill = vi.fn()
   const deferreds: Array<{ run: () => void }> = []
@@ -184,6 +189,8 @@ function createPreReadyWindowsTerminalHarness() {
     _agent: { kill: () => void }
     _close: () => void
     _deferreds: Array<{ run: () => void }>
+    _exitEvent: { acceptOutputClosed: () => void }
+    _isDataPipeReady: boolean
     _isReady: boolean
     _shutdownIssued: boolean
     destroy(): void
@@ -192,10 +199,13 @@ function createPreReadyWindowsTerminalHarness() {
   terminal._agent = { kill: nativeKill }
   terminal._close = close
   terminal._deferreds = deferreds
+  terminal._exitEvent = { acceptOutputClosed }
+  terminal._isDataPipeReady = false
   terminal._isReady = false
   terminal._shutdownIssued = false
 
   return {
+    acceptOutputClosed,
     close,
     deferreds,
     destroy: () => terminal.destroy(),
@@ -299,7 +309,6 @@ function runPreReadyExitScenario(): unknown[] {
 
     kill(): void {
       processExitListener?.(this.exitCode)
-      this.outSocket.emit('close')
     }
   }
 
