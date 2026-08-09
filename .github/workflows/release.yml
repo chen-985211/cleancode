@@ -78,6 +78,23 @@ jobs:
             "$packaged_relative_path")
           echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
 
+      - name: Run packaged terminal smoke test on Linux
+        if: runner.os == 'Linux'
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: |
+          xvfb-run --auto-servernum pnpm test:e2e \
+            tests/e2e/run-terminal-sessions.e2e.spec.ts \
+            -t "runs shell commands from the active project workspace"
+
+      - name: Run packaged terminal smoke test
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+          DEBUG: ${{ runner.os == 'Windows' && 'pw:browser*' || '' }}
+        run: pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts -t "runs shell commands from the active project workspace"
+
       - name: Prepare packaged Windows install replacement fixture
         if: runner.os == 'Windows'
         shell: bash
@@ -98,27 +115,12 @@ jobs:
             )
           '
 
-      - name: Run packaged terminal smoke test on Linux
-        if: runner.os == 'Linux'
-        env:
-          CLEANCODE_E2E_PREBUILT: '1'
-        run: |
-          xvfb-run --auto-servernum pnpm test:e2e \
-            tests/e2e/run-terminal-sessions.e2e.spec.ts \
-            -t "runs shell commands from the active project workspace"
-
-      - name: Run packaged terminal smoke test
-        if: runner.os != 'Linux'
-        shell: bash
-        env:
-          CLEANCODE_E2E_PREBUILT: '1'
-        run: pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts -t "runs shell commands from the active project workspace"
-
       - name: Run packaged Windows Provider install-replacement smoke test
         if: runner.os == 'Windows'
         shell: bash
         env:
           CLEANCODE_E2E_PREBUILT: '1'
+          DEBUG: 'pw:browser*'
         run: pnpm test:e2e tests/e2e/terminal-runtime-recovery.e2e.spec.ts -t "warm-attaches the same retained PTY after a normal application restart"
 
       - name: Upload packaged smoke diagnostics

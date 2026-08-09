@@ -55,10 +55,7 @@ jobs:
           exit 1
       - name: Rebuild patched node-pty from source
         if: runner.os == 'Windows'
-        shell: bash
-        env:
-          npm_config_build_from_source: 'true'
-        run: pnpm rebuild node-pty
+        run: pnpm prepare:native
       - name: Run every static and structural quality gate
         run: pnpm check:quality
       - name: Run all unit, integration, and contract tests
