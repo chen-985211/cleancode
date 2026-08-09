@@ -5,6 +5,7 @@ directories:
   output: release
 
 afterPack: ./scripts/after-pack.mjs
+buildDependenciesFromSource: true
 
 files:
   - out/**/*

@@ -195,6 +195,9 @@ jobs:
           elif [ "$RUNNER_OS" = "Windows" ]; then
             pnpm exec electron --version
           fi
+      - name: Rebuild patched node-pty for Electron
+        if: runner.os == 'Windows'
+        run: pnpm prepare:native
       - name: Run E2E shard on Linux
         if: runner.os == 'Linux'
         env:

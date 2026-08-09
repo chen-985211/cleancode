@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -21,9 +21,19 @@ describe('Windows node-pty packaging', () => {
         'build',
         'Release'
       )
+      const packagedPrebuildDirectory = join(
+        fixture.appOutDir,
+        'resources',
+        'app.asar.unpacked',
+        'node_modules',
+        'node-pty',
+        'prebuilds',
+        `win32-${architecture}`
+      )
 
       try {
         await writeFixtureFile(nativeModuleDirectory, 'conpty.node', 'rebuilt native module')
+        await writeFixtureFile(packagedPrebuildDirectory, 'conpty.node', 'stale prebuild')
 
         await afterPack({
           appOutDir: fixture.appOutDir,
@@ -38,13 +48,14 @@ describe('Windows node-pty packaging', () => {
         await expect(
           readFile(join(nativeModuleDirectory, 'conpty', 'OpenConsole.exe'), 'utf8')
         ).resolves.toBe(`${architecture} console`)
+        await expect(access(packagedPrebuildDirectory)).rejects.toMatchObject({ code: 'ENOENT' })
       } finally {
         await fixture.cleanup()
       }
     }
   )
 
-  it('uses the packaged prebuild when electron-builder does not produce a rebuilt module', async () => {
+  it('rejects a packaged prebuild when electron-builder did not produce a rebuilt module', async () => {
     const fixture = await createPackagingFixture('x64')
     const nativeModuleDirectory = join(
       fixture.appOutDir,
@@ -59,16 +70,14 @@ describe('Windows node-pty packaging', () => {
     try {
       await writeFixtureFile(nativeModuleDirectory, 'conpty.node', 'prebuilt native module')
 
-      await afterPack({
-        appOutDir: fixture.appOutDir,
-        arch: 1,
-        electronPlatformName: 'win32',
-        packager: { projectDir: fixture.projectDirectory }
-      })
-
       await expect(
-        readFile(join(nativeModuleDirectory, 'conpty', 'conpty.dll'), 'utf8')
-      ).resolves.toBe('x64 conpty')
+        afterPack({
+          appOutDir: fixture.appOutDir,
+          arch: 1,
+          electronPlatformName: 'win32',
+          packager: { projectDir: fixture.projectDirectory }
+        })
+      ).rejects.toThrow('rebuilt node-pty conpty.node was not found')
     } finally {
       await fixture.cleanup()
     }
@@ -85,7 +94,7 @@ describe('Windows node-pty packaging', () => {
           electronPlatformName: 'win32',
           packager: { projectDir: fixture.projectDirectory }
         })
-      ).rejects.toThrow('Packaged node-pty conpty.node was not found')
+      ).rejects.toThrow('Packaged rebuilt node-pty conpty.node was not found')
     } finally {
       await fixture.cleanup()
     }
@@ -121,9 +130,10 @@ async function createPackagingFixture(architecture: string): Promise<{
     projectDirectory,
     'node_modules',
     'node-pty',
-    'prebuilds',
-    `win32-${architecture}`,
-    'conpty'
+    'third_party',
+    'conpty',
+    '1.23.251008001',
+    `win10-${architecture}`
   )
 
   await writeFixtureFile(sourceDirectory, 'conpty.dll', `${architecture} conpty`)

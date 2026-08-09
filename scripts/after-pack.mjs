@@ -1,5 +1,5 @@
 import { constants } from 'node:fs'
-import { access, copyFile, mkdir } from 'node:fs/promises'
+import { access, copyFile, mkdir, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const electronBuilderArchitectureNames = new Map([
@@ -16,13 +16,9 @@ export default async function afterPack(context) {
     throw new Error(`Unsupported Windows node-pty packaging architecture: ${context.arch}`)
   }
 
-  const sourceDirectory = join(
-    context.packager.projectDir,
-    'node_modules',
-    'node-pty',
-    'prebuilds',
-    `win32-${architecture}`,
-    'conpty'
+  const sourceDirectory = await findBundledConptyRuntimeDirectory(
+    join(context.packager.projectDir, 'node_modules', 'node-pty', 'third_party', 'conpty'),
+    architecture
   )
   const packagedNodePtyDirectory = join(
     context.appOutDir,
@@ -31,10 +27,16 @@ export default async function afterPack(context) {
     'node_modules',
     'node-pty'
   )
-  const nativeModuleDirectory = await findPackagedConptyNativeModuleDirectory(
-    packagedNodePtyDirectory,
-    architecture
-  )
+  const nativeModuleDirectory = join(packagedNodePtyDirectory, 'build', 'Release')
+
+  try {
+    await access(join(nativeModuleDirectory, 'conpty.node'), constants.R_OK)
+  } catch {
+    throw new Error(
+      `Packaged rebuilt node-pty conpty.node was not found for Windows ${architecture}: ${nativeModuleDirectory}`
+    )
+  }
+
   const destinationDirectory = join(nativeModuleDirectory, 'conpty')
 
   await mkdir(destinationDirectory, { recursive: true })
@@ -43,25 +45,22 @@ export default async function afterPack(context) {
       copyFile(join(sourceDirectory, fileName), join(destinationDirectory, fileName))
     )
   )
+  await rm(join(packagedNodePtyDirectory, 'prebuilds', `win32-${architecture}`), {
+    force: true,
+    recursive: true
+  })
 }
 
-async function findPackagedConptyNativeModuleDirectory(nodePtyDirectory, architecture) {
-  const candidates = [
-    join(nodePtyDirectory, 'build', 'Release'),
-    join(nodePtyDirectory, 'build', 'Debug'),
-    join(nodePtyDirectory, 'prebuilds', `win32-${architecture}`)
-  ]
+async function findBundledConptyRuntimeDirectory(conptyRootDirectory, architecture) {
+  const versions = (await readdir(conptyRootDirectory, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
 
-  for (const candidate of candidates) {
-    try {
-      await access(join(candidate, 'conpty.node'), constants.R_OK)
-      return candidate
-    } catch {
-      // Continue in node-pty's native module load order.
-    }
+  if (versions.length !== 1) {
+    throw new Error(
+      `Expected exactly one bundled node-pty ConPTY runtime version, found ${versions.length}: ${conptyRootDirectory}`
+    )
   }
 
-  throw new Error(
-    `Packaged node-pty conpty.node was not found for Windows ${architecture}: ${candidates.join(', ')}`
-  )
+  return join(conptyRootDirectory, versions[0], `win10-${architecture}`)
 }
