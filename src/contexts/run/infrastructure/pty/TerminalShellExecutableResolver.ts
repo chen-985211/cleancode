@@ -1,9 +1,10 @@
 import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
+import { readlink } from 'node:fs/promises'
 import { platform } from 'node:os'
 import { win32 as pathWin32 } from 'node:path'
 
-const PWSH_ALIAS_DISCOVERY_TIMEOUT_MS = 10_000
+const PWSH_ALIAS_DISCOVERY_TIMEOUT_MS = 2_500
 const DEFAULT_PWSH_RESOLUTION_TTL_MS = 5 * 60_000
 const DEFAULT_INBOX_POWERSHELL_RESOLUTION_TTL_MS = 30_000
 const AUTOMATIC_PWSH_QUARANTINE_TTL_MS = 60_000
@@ -41,9 +42,12 @@ export async function resolveTerminalShellExecutable(
     return environment.SHELL || '/bin/sh'
   }
 
+  const isRealExecutable = options.isRealExecutable ?? defaultIsRealExecutable
   const dependencies: PowerShell7ExecutableDependencies = {
-    isRealExecutable: options.isRealExecutable ?? defaultIsRealExecutable,
-    resolveAppExecutionAlias: options.resolveAppExecutionAlias ?? defaultResolveAppExecutionAlias
+    isRealExecutable,
+    resolveAppExecutionAlias:
+      options.resolveAppExecutionAlias ??
+      ((candidate) => defaultResolveAppExecutionAlias(candidate, isRealExecutable))
   }
   if (
     options.environment !== undefined ||
@@ -246,7 +250,7 @@ function isSafePowerShell7AliasTarget(
   target: string | null,
   isRealExecutable: (candidate: string) => boolean
 ): target is string {
-  if (!target || !pathWin32.isAbsolute(target)) return false
+  if (!target || !isWindowsDriveAbsolutePath(target)) return false
 
   const normalized = pathWin32.normalize(target)
   return (
@@ -254,6 +258,10 @@ function isSafePowerShell7AliasTarget(
     !isWindowsAppExecutionAlias(normalized) &&
     isRealExecutable(normalized)
   )
+}
+
+function isWindowsDriveAbsolutePath(candidate: string): boolean {
+  return /^[A-Za-z]:[\\/]/u.test(pathWin32.normalize(candidate))
 }
 
 export function resolveInboxWindowsPowerShellExecutable(
@@ -283,9 +291,32 @@ function defaultIsRealExecutable(candidate: string): boolean {
   }
 }
 
-function defaultResolveAppExecutionAlias(candidate: string): Promise<string | null> {
-  if (!isWindowsAppExecutionAlias(candidate)) return Promise.resolve(null)
+async function defaultResolveAppExecutionAlias(
+  candidate: string,
+  isRealExecutable: (candidate: string) => boolean
+): Promise<string | null> {
+  if (!isWindowsAppExecutionAlias(candidate)) return null
 
+  const linkTarget = await tryResolveAppExecutionAliasByReadlink(candidate)
+  if (isSafePowerShell7AliasTarget(linkTarget, isRealExecutable)) {
+    return pathWin32.normalize(linkTarget)
+  }
+
+  return discoverAppExecutionAliasByProcess(candidate)
+}
+
+async function tryResolveAppExecutionAliasByReadlink(candidate: string): Promise<string | null> {
+  try {
+    const target = await readlink(candidate)
+    return pathWin32.isAbsolute(target)
+      ? pathWin32.normalize(target)
+      : pathWin32.resolve(pathWin32.dirname(candidate), target)
+  } catch {
+    return null
+  }
+}
+
+function discoverAppExecutionAliasByProcess(candidate: string): Promise<string | null> {
   const aliasDirectory = pathWin32.dirname(candidate)
   return new Promise((resolve) => {
     execFile(
