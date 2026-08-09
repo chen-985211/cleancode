@@ -132,23 +132,22 @@ function finish() {
   completed = true
   clearTimeout(deadline)
   rmSync(directory, { force: true, recursive: true })
-  process.stdout.write(
-    `${JSON.stringify({
-      conptyNativeDirectory,
-      baselineHandleCount,
-      firstBatchHandleCount,
-      failureCount,
-      failureMessages: [...new Set(errors)],
-      nodePtyEntryPath: require.resolve('node-pty'),
-      postFailureHandleCount,
-      preReadyExitCode,
-      preReadyExitCount,
-      preReadyExitDurationMs,
-      recoveredExitCode,
-      recoveryMarkerObserved: output.includes(marker),
-      recoverySpawnCount
-    })}\n`
-  )
+  const summary = `${JSON.stringify({
+    conptyNativeDirectory,
+    baselineHandleCount,
+    firstBatchHandleCount,
+    failureCount,
+    failureMessages: [...new Set(errors)],
+    nodePtyEntryPath: require.resolve('node-pty'),
+    postFailureHandleCount,
+    preReadyExitCode,
+    preReadyExitCount,
+    preReadyExitDurationMs,
+    recoveredExitCode,
+    recoveryMarkerObserved: output.includes(marker),
+    recoverySpawnCount
+  })}\n`
+  process.stdout.write(summary, () => process.exit(0))
 }
 
 function waitForStableHandleCount(maximumHandleCount) {
@@ -206,10 +205,8 @@ function fail(error) {
   completed = true
   clearTimeout(deadline)
   rmSync(directory, { force: true, recursive: true })
-  process.stderr.write(
-    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
-  )
-  process.exitCode = 1
+  const message = `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`
+  process.stderr.write(message, () => process.exit(1))
 }
 
 function conptyOptions() {
