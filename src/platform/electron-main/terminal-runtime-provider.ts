@@ -7,11 +7,18 @@ import { spawn as spawnPtyProcess } from 'node-pty'
 import { TerminalProviderServer } from '../../contexts/run/infrastructure/provider/TerminalProviderServer'
 import { terminalProviderProtocolVersion } from '../../contexts/run/infrastructure/provider/TerminalProviderProtocol'
 import { rotateProviderLog } from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
+import {
+  createTerminalProviderHeartbeat,
+  isTerminalProviderLivenessReference,
+  type TerminalProviderHeartbeatLease,
+  type TerminalProviderLivenessReference
+} from '../../contexts/run/infrastructure/provider/TerminalProviderHeartbeat'
 import { createTerminalProcessEnvironment } from '../../contexts/run/infrastructure/pty/TerminalProcessEnvironment'
 import { resolveTerminalShellExecutable } from '../../contexts/run/infrastructure/pty/TerminalShellExecutableResolver'
 import { WindowsConptyWarmup } from '../../contexts/run/infrastructure/pty/WindowsConptyWarmup'
 
 const maxProviderLogBytes = 5 * 1024 * 1024
+const providerMetadataPublishTimeoutMs = 5_000
 let diagnosticTail: Promise<void> = Promise.resolve()
 
 interface ProviderMetadata {
@@ -20,6 +27,9 @@ interface ProviderMetadata {
   readonly instanceId: string
   readonly authToken: string
   readonly endpoint: string
+  readonly processId: number
+  readonly startedAt: string
+  readonly liveness: TerminalProviderLivenessReference
 }
 
 void startProvider().catch(async (error) => {
@@ -31,7 +41,13 @@ void startProvider().catch(async (error) => {
 
 async function startProvider(): Promise<void> {
   const metadataPath = readArgument('--metadata')
-  const metadata = await readMetadata(metadataPath)
+  const expectedInstanceId = readArgument('--instance-id')
+  const expectedHeartbeatId = readArgument('--heartbeat-id')
+  const metadata = await waitForPublishedMetadata(
+    metadataPath,
+    expectedInstanceId,
+    expectedHeartbeatId
+  )
   const stateDirectory = dirname(metadataPath)
   const conptyWarmup = new WindowsConptyWarmup({
     environment: createTerminalProcessEnvironment({
@@ -53,33 +69,68 @@ async function startProvider(): Promise<void> {
     spawnPty: (executable, args, options) => spawnPtyProcess(executable, args, options),
     workingDirectory: homedir()
   })
-  const server = new TerminalProviderServer({
-    endpoint: metadata.endpoint,
-    authToken: metadata.authToken,
-    instanceId: metadata.instanceId,
-    recoveryDirectory: join(stateDirectory, 'recovery'),
-    log: (message, details) => void writeProviderDiagnostic(message, details),
-    onExitRequested: () => {
-      conptyWarmup.dispose()
-      process.exit(0)
-    },
-    onInitialStateListed: () => conptyWarmup.schedule()
-  })
-  await server.start()
-
+  let heartbeat: TerminalProviderHeartbeatLease | null = null
+  let server: TerminalProviderServer | null = null
   let isClosing = false
-  const close = () => {
+  const close = (exitCode = 0): void => {
     if (isClosing) return
     isClosing = true
     conptyWarmup.dispose()
     const forceExit = setTimeout(() => process.exit(1), 4_500)
-    void server.close().finally(() => {
+    void Promise.allSettled([heartbeat?.close(), server?.close()]).then(async (results) => {
+      const failures = results.flatMap((result) =>
+        result.status === 'rejected' ? [result.reason] : []
+      )
+      if (failures.length > 0) {
+        await writeProviderDiagnostic('provider-close-failed', {
+          messages: failures.map((error) =>
+            error instanceof Error ? error.message : String(error)
+          )
+        })
+      }
       clearTimeout(forceExit)
-      process.exit(0)
+      process.exit(failures.length > 0 ? 1 : exitCode)
     })
   }
-  process.once('SIGTERM', close)
-  process.once('SIGINT', close)
+  heartbeat = await createTerminalProviderHeartbeat({
+    stateDirectory,
+    owner: metadata,
+    onFailure: (error) => {
+      void writeProviderDiagnostic('provider-heartbeat-failed', {
+        message: error instanceof Error ? error.message : String(error)
+      }).finally(() => close(1))
+    }
+  })
+  try {
+    server = new TerminalProviderServer({
+      endpoint: metadata.endpoint,
+      authToken: metadata.authToken,
+      instanceId: metadata.instanceId,
+      recoveryDirectory: join(stateDirectory, 'recovery'),
+      log: (message, details) => void writeProviderDiagnostic(message, details),
+      onExitRequested: () => close(),
+      onInitialStateListed: () => conptyWarmup.schedule()
+    })
+    await heartbeat.refresh()
+    await server.start()
+    await heartbeat.refresh()
+  } catch (error) {
+    conptyWarmup.dispose()
+    const cleanup = await Promise.allSettled([heartbeat.close(), server?.close()])
+    const cleanupErrors = cleanup.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : []
+    )
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        'Terminal Provider startup failed and cleanup was incomplete.'
+      )
+    }
+    throw error
+  }
+
+  process.once('SIGTERM', () => close())
+  process.once('SIGINT', () => close())
 }
 
 function readArgument(name: string): string {
@@ -103,11 +154,45 @@ async function readMetadata(path: string): Promise<ProviderMetadata> {
     !('authToken' in value) ||
     typeof value.authToken !== 'string' ||
     !('endpoint' in value) ||
-    typeof value.endpoint !== 'string'
+    typeof value.endpoint !== 'string' ||
+    !('processId' in value) ||
+    typeof value.processId !== 'number' ||
+    !Number.isSafeInteger(value.processId) ||
+    value.processId < 0 ||
+    !('startedAt' in value) ||
+    typeof value.startedAt !== 'string' ||
+    !Number.isFinite(Date.parse(value.startedAt)) ||
+    !('liveness' in value) ||
+    !isTerminalProviderLivenessReference(value.liveness)
   ) {
     throw new Error('Terminal provider metadata is invalid.')
   }
   return value as ProviderMetadata
+}
+
+async function waitForPublishedMetadata(
+  path: string,
+  expectedInstanceId: string,
+  expectedHeartbeatId: string
+): Promise<ProviderMetadata> {
+  const deadline = Date.now() + providerMetadataPublishTimeoutMs
+  for (;;) {
+    const metadata = await readMetadata(path)
+    if (
+      metadata.instanceId !== expectedInstanceId ||
+      metadata.liveness.heartbeatId !== expectedHeartbeatId
+    ) {
+      throw new Error('Terminal provider metadata generation changed before startup.')
+    }
+    if (metadata.processId === process.pid) return metadata
+    if (metadata.processId !== 0) {
+      throw new Error('Terminal provider metadata process identity is invalid.')
+    }
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for Terminal provider process metadata publication.')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
 }
 
 async function writeProviderDiagnostic(

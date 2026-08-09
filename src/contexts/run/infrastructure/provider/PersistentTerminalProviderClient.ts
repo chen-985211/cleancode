@@ -1,8 +1,7 @@
-import { randomBytes, randomUUID } from 'node:crypto'
-import { closeSync, existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { spawn } from 'node:child_process'
 
 import type {
   TerminalModelDiagnosticsSnapshot,
@@ -35,10 +34,7 @@ import {
   type TerminalRunScope
 } from '../../domain/value-objects/TerminalRunScope'
 import type { ActualServiceEndpoint } from '../../domain/value-objects/ActualServiceEndpoint'
-import {
-  createExpectedAppError,
-  isAppError
-} from '../../../../shared-kernel/application/errors/AppError'
+import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import {
   type TerminalProviderEvent,
   terminalProviderApplicationDetachProtocolVersion,
@@ -48,33 +44,38 @@ import {
 import { TerminalProviderRpcConnection } from './TerminalProviderRpcConnection'
 import {
   acquireProviderLaunchLock,
-  atomicWriteProviderMetadata,
   createProviderDiagnostics,
   createProviderUnavailableError as providerUnavailable,
-  createProviderEndpoint,
-  delayProviderOperation,
-  getProviderErrorMessage,
   isApplicationDetachReceipt,
   isProviderProcessAlive,
   isRuntimeInvalidatingProviderError,
   matchesForegroundJob,
-  openProviderProcessLog,
   providerEndpointAcceptsConnections,
   readProviderMetadata,
   removeStaleProviderMetadata,
-  rotateProviderLog,
+  runWithProviderLaunchLock,
   type TerminalProviderMetadata
 } from './PersistentTerminalProviderClientSupport'
+import {
+  claimTerminalProviderController,
+  waitForTerminalProviderLaunch
+} from './TerminalProviderLaunchReadiness'
+import {
+  launchTerminalProviderProcess,
+  type TerminalProviderProcessExitSignal,
+  type TerminalProviderProcessLaunch,
+  type TerminalProviderProcessLaunchOptions
+} from './TerminalProviderProcessLauncher'
+import { observeTerminalProviderLiveness } from './TerminalProviderHeartbeat'
 import { TerminalProviderProcessEventGate } from './TerminalProviderProcessEventGate'
 import { TerminalProviderTitleEventBridge } from './TerminalProviderTitleEventBridge'
-
-const providerStartupTimeoutMs = 5_000
-const providerControllerClaimTimeoutMs = 5_000
 
 export interface PersistentTerminalProviderClientOptions {
   readonly stateDirectory: string
   readonly providerEntryPath: string
   readonly executablePath?: string
+  readonly resolveLaunchTarget?: TerminalProviderProcessLaunchOptions['resolveLaunchTarget']
+  readonly spawnProcess?: TerminalProviderProcessLaunchOptions['spawnProcess']
   readonly onBackgroundError?: (error: unknown) => void
   readonly onRuntimeUnavailable?: (error: unknown) => void
   readonly onOutput?: (event: TerminalProcessOutputEvent) => void
@@ -415,14 +416,17 @@ export class PersistentTerminalProviderClient
       }
     }
 
-    try {
-      return await this.connectOrLaunchWithLock(metadataPath)
-    } finally {
-      await launchLock.close()
-    }
+    return runWithProviderLaunchLock(
+      launchLock,
+      (assertLeaseHealthy) => this.connectOrLaunchWithLock(metadataPath, assertLeaseHealthy),
+      (error) => this.options.onBackgroundError?.(error)
+    )
   }
 
-  private async connectOrLaunchWithLock(metadataPath: string): Promise<TerminalProviderMetadata> {
+  private async connectOrLaunchWithLock(
+    metadataPath: string,
+    assertLeaseHealthy: () => Promise<void>
+  ): Promise<TerminalProviderMetadata> {
     const hasMetadata = existsSync(metadataPath)
     const existing = await readProviderMetadata(metadataPath)
     if (hasMetadata && !existing) {
@@ -436,43 +440,62 @@ export class PersistentTerminalProviderClient
         return existing
       } catch (error) {
         if (await providerEndpointAcceptsConnections(existing.endpoint)) throw error
-        if (isProviderProcessAlive(existing.processId)) {
+        const liveness = await observeTerminalProviderLiveness(
+          this.options.stateDirectory,
+          existing,
+          isProviderProcessAlive
+        )
+        if (liveness.state !== 'dead') {
           throw providerUnavailable(
-            'Terminal provider process is present but its authenticated endpoint is unavailable.'
+            liveness.state === 'unknown'
+              ? 'Terminal provider liveness could not be authenticated safely.'
+              : 'Terminal provider process is present but its authenticated endpoint is unavailable.'
           )
         }
-        await removeStaleProviderMetadata(existing, metadataPath)
+        await assertLeaseHealthy()
+        const removed = await removeStaleProviderMetadata(existing, metadataPath, {
+          requireDeadLiveness: true
+        })
+        await assertLeaseHealthy()
+        if (!removed) {
+          throw providerUnavailable(
+            'Terminal provider metadata changed or became live while stale ownership was being reconciled.'
+          )
+        }
       }
     }
 
-    const metadata = await this.launchProvider(metadataPath)
-    return this.waitForProviderLaunch(metadataPath, metadata)
+    const launch = await this.launchProvider(metadataPath, assertLeaseHealthy)
+    try {
+      return await this.waitForProviderLaunch(metadataPath, launch.metadata, launch.exitSignal)
+    } catch (error) {
+      if (!launch.metadata.runtimeImageKey || !launch.exitSignal.hasExited()) throw error
+      this.options.onBackgroundError?.(error)
+      await assertLeaseHealthy()
+      const removed = await removeStaleProviderMetadata(launch.metadata, metadataPath)
+      await assertLeaseHealthy()
+      if (!removed) {
+        throw providerUnavailable(
+          'Terminal provider metadata changed before runtime-image fallback could start.'
+        )
+      }
+      const fallback = await this.launchProvider(metadataPath, assertLeaseHealthy, true)
+      return this.waitForProviderLaunch(metadataPath, fallback.metadata, fallback.exitSignal)
+    }
   }
 
-  private async waitForProviderLaunch(
+  private waitForProviderLaunch(
     metadataPath: string,
-    launchedMetadata?: TerminalProviderMetadata
+    launchedMetadata?: TerminalProviderMetadata,
+    exitSignal?: TerminalProviderProcessExitSignal
   ): Promise<TerminalProviderMetadata> {
-    const deadline = Date.now() + providerStartupTimeoutMs
-    let lastError: unknown = null
-    while (Date.now() < deadline) {
-      const metadata = launchedMetadata ?? (await readProviderMetadata(metadataPath))
-      if (!metadata) {
-        await delayProviderOperation(50)
-        continue
-      }
-      if (this.connection?.instanceId === metadata.instanceId) return metadata
-      try {
-        await this.connectMetadata(metadata)
-        return metadata
-      } catch (error) {
-        lastError = error
-        await delayProviderOperation(50)
-      }
-    }
-    throw providerUnavailable(
-      `Terminal provider did not become ready: ${getProviderErrorMessage(lastError)}`
-    )
+    return waitForTerminalProviderLaunch({
+      connectMetadata: (metadata) => this.connectMetadata(metadata),
+      exitSignal,
+      getCurrentConnectionInstanceId: () => this.connection?.instanceId,
+      launchedMetadata,
+      metadataPath
+    })
   }
 
   private acquireLaunchLock() {
@@ -510,7 +533,7 @@ export class PersistentTerminalProviderClient
           'Terminal provider protocol version is unsupported.'
         )
       }
-      await this.claimController(connection)
+      await claimTerminalProviderController(connection, this.controllerId)
       connection.instanceId = health.instanceId
       const previousConnection = this.connection
       this.connection = connection
@@ -521,53 +544,21 @@ export class PersistentTerminalProviderClient
     }
   }
 
-  private async claimController(connection: TerminalProviderRpcConnection): Promise<void> {
-    const deadline = Date.now() + providerControllerClaimTimeoutMs
-    while (true) {
-      try {
-        await connection.claimController(this.controllerId, process.pid)
-        return
-      } catch (error) {
-        if (!isAppError(error) || error.code !== 'TERMINAL_PROVIDER_CONTROLLER_BUSY') throw error
-        if (Date.now() >= deadline) throw error
-        const retryAfterMs = error.details?.retryAfterMs
-        await delayProviderOperation(
-          typeof retryAfterMs === 'number' ? Math.max(1, Math.min(500, retryAfterMs)) : 50
-        )
-      }
-    }
-  }
-
-  private async launchProvider(metadataPath: string): Promise<TerminalProviderMetadata> {
-    const endpoint = createProviderEndpoint(this.options.stateDirectory)
-    const metadata: TerminalProviderMetadata = {
-      schemaVersion: 1,
-      protocolVersion: terminalProviderProtocolVersion,
-      instanceId: randomUUID(),
-      authToken: randomBytes(32).toString('hex'),
-      endpoint,
-      processId: 0,
-      startedAt: new Date().toISOString()
-    }
-    await atomicWriteProviderMetadata(metadataPath, metadata)
-    const logPath = join(this.options.stateDirectory, 'provider.log')
-    rotateProviderLog(logPath)
-    const processLog = openProviderProcessLog(this.options.stateDirectory)
-    const child = spawn(
-      this.options.executablePath ?? process.execPath,
-      [this.options.providerEntryPath, '--metadata', metadataPath],
-      {
-        detached: true,
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-        stdio: ['ignore', processLog, processLog]
-      }
-    )
-    closeSync(processLog)
-    child.unref()
-    if (!child.pid) throw providerUnavailable('Terminal provider process could not be started.')
-    const launched = { ...metadata, processId: child.pid }
-    await atomicWriteProviderMetadata(metadataPath, launched)
-    return launched
+  private async launchProvider(
+    metadataPath: string,
+    assertLaunchAllowed?: () => Promise<void>,
+    useInstalledTarget = false
+  ): Promise<TerminalProviderProcessLaunch> {
+    return launchTerminalProviderProcess({
+      assertLaunchAllowed,
+      executablePath: this.options.executablePath,
+      metadataPath,
+      providerEntryPath: this.options.providerEntryPath,
+      onRuntimeImageSpawnFailure: this.options.onBackgroundError,
+      resolveLaunchTarget: useInstalledTarget ? undefined : this.options.resolveLaunchTarget,
+      spawnProcess: this.options.spawnProcess,
+      stateDirectory: this.options.stateDirectory
+    })
   }
 
   private handleEvent(event: TerminalProviderEvent): void {

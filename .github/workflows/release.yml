@@ -78,6 +78,26 @@ jobs:
             "$packaged_relative_path")
           echo "CLEANCODE_E2E_EXECUTABLE_PATH=$packaged_executable_path" >> "$GITHUB_ENV"
 
+      - name: Prepare packaged Windows install replacement fixture
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          node -e '
+            const { appendFileSync, cpSync } = require("node:fs")
+            const { basename, dirname, join } = require("node:path")
+            const replacement = process.env.CLEANCODE_E2E_EXECUTABLE_PATH
+            const fixture = join(
+              process.env.RUNNER_TEMP,
+              `cleancode-e2e-old-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}`
+            )
+            cpSync(dirname(replacement), fixture, { recursive: true })
+            appendFileSync(
+              process.env.GITHUB_ENV,
+              `CLEANCODE_E2E_REPLACEMENT_EXECUTABLE_PATH=${replacement}\n` +
+                `CLEANCODE_E2E_EXECUTABLE_PATH=${join(fixture, basename(replacement))}\n`
+            )
+          '
+
       - name: Run packaged terminal smoke test on Linux
         if: runner.os == 'Linux'
         env:
@@ -93,6 +113,13 @@ jobs:
         env:
           CLEANCODE_E2E_PREBUILT: '1'
         run: pnpm test:e2e tests/e2e/run-terminal-sessions.e2e.spec.ts -t "runs shell commands from the active project workspace"
+
+      - name: Run packaged Windows Provider install-replacement smoke test
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          CLEANCODE_E2E_PREBUILT: '1'
+        run: pnpm test:e2e tests/e2e/terminal-runtime-recovery.e2e.spec.ts -t "warm-attaches the same retained PTY after a normal application restart"
 
       - name: Upload packaged smoke diagnostics
         if: failure()

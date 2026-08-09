@@ -1,32 +1,50 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, openSync, renameSync, rmSync } from 'node:fs'
-import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises'
+import { mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import type { FileHandle } from 'node:fs/promises'
 import { connect } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { performance } from 'node:perf_hooks'
 
-import type { ForegroundJobProcessIdentity } from '../../application/ports/TerminalProcessPort'
-import type { TerminalModelDiagnosticsSnapshot } from '../../application/dto/TerminalModelSnapshot'
 import {
-  createExpectedAppError,
-  isAppError,
-  type AppError
-} from '../../../../shared-kernel/application/errors/AppError'
-import { terminalProviderProtocolVersion } from './TerminalProviderProtocol'
+  acquireFileSystemMutationLock,
+  type FileSystemMutationLockFileSystem,
+  type FileSystemMutationLockLease
+} from './FileSystemMutationLock'
+import {
+  createFileProviderLaunchLockLease,
+  type ProviderLaunchLockLease
+} from './FileProviderLaunchLockLease'
+import {
+  createProcessEpochLease,
+  isProcessEpochReference,
+  observeProcessEpoch,
+  type ProcessEpochLease,
+  type ProcessEpochObservation,
+  type ProcessEpochReference
+} from './ProcessEpochLiveness'
 
-export interface TerminalProviderMetadata {
-  readonly schemaVersion: 1
-  readonly protocolVersion: number
-  readonly instanceId: string
-  readonly authToken: string
-  readonly endpoint: string
-  readonly processId: number
-  readonly startedAt: string
-}
+export type { ProviderLaunchLockLease } from './FileProviderLaunchLockLease'
+export {
+  createProviderUnavailableError,
+  getProviderErrorMessage,
+  isRuntimeInvalidatingProviderError
+} from './TerminalProviderErrors'
+export {
+  createProviderDiagnostics,
+  isApplicationDetachReceipt,
+  matchesForegroundJob
+} from './TerminalProviderPredicates'
+export {
+  atomicWriteProviderMetadata,
+  readProviderMetadata,
+  removeStaleProviderMetadata,
+  type TerminalProviderMetadata
+} from './TerminalProviderMetadataStore'
 
-export interface ProviderLaunchLockLease {
-  close(): Promise<void>
+export interface ProviderLaunchLockEnvironment {
+  readonly fileSystem?: FileSystemMutationLockFileSystem
 }
 
 interface ProviderLaunchLockRecord {
@@ -34,6 +52,7 @@ interface ProviderLaunchLockRecord {
   readonly ownerId: string
   readonly processId: number
   readonly acquiredAt: string
+  readonly processEpoch?: ProcessEpochReference
 }
 
 interface ProviderLaunchLockSnapshot {
@@ -45,112 +64,44 @@ interface ProviderLaunchLockSnapshot {
   readonly size: number
 }
 
+interface CreatedProviderLaunchLockIdentity {
+  readonly device: number
+  readonly inode: number
+  readonly ownerId: string
+}
+
+class ProviderLaunchLockCreationError extends Error {
+  constructor(
+    readonly creationError: unknown,
+    readonly identity: CreatedProviderLaunchLockIdentity,
+    readonly cleanupErrors: readonly unknown[]
+  ) {
+    super('Terminal Provider launch lock initialization failed.', { cause: creationError })
+  }
+}
+
 interface LegacyProviderLaunchLockRecord {
   readonly processId: number
 }
 
-interface ProviderMetadataWriteEnvironment {
-  readonly platform?: NodeJS.Platform
-  readonly rename?: (sourcePath: string, targetPath: string) => Promise<void>
-  readonly wait?: (durationMs: number) => Promise<void>
-}
-
 const providerLaunchLockInitializationGraceMs = 250
-const providerLaunchLockStaleAfterMs = 15_000
-const windowsProviderMetadataRenameRetryDelaysMs = [10, 20, 40, 80, 160] as const
-
-export function matchesForegroundJob(
-  expected: ForegroundJobProcessIdentity,
-  actual: ForegroundJobProcessIdentity
-): boolean {
-  return (
-    expected.sessionId === actual.sessionId &&
-    expected.launchId === actual.launchId &&
-    expected.generation === actual.generation
-  )
+const providerLaunchLockRefreshIntervalMs = 5_000
+const providerLaunchLockStaleAfterMs = 30_000
+const providerLaunchLockMutationGuardSuffix = '.reclaim-guard'
+const providerLaunchLockNodeFileSystem: FileSystemMutationLockFileSystem = {
+  mkdir,
+  open,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  stat
 }
 
-export function isApplicationDetachReceipt(
-  value: unknown
-): value is { readonly releaseId: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'releaseId' in value &&
-    typeof value.releaseId === 'string' &&
-    value.releaseId.length > 0
-  )
-}
-
-export async function readProviderMetadata(path: string): Promise<TerminalProviderMetadata | null> {
-  try {
-    const value: unknown = JSON.parse(await readFile(path, 'utf8'))
-    return isProviderMetadata(value) ? value : null
-  } catch {
-    return null
-  }
-}
-
-export async function atomicWriteProviderMetadata(
-  path: string,
-  metadata: TerminalProviderMetadata,
-  environment: ProviderMetadataWriteEnvironment = {}
-): Promise<void> {
-  await mkdir(dirname(path), { mode: 0o700, recursive: true })
-  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
-  try {
-    const handle = await open(temporary, 'wx', 0o600)
-    try {
-      await handle.writeFile(`${JSON.stringify(metadata)}\n`, 'utf8')
-      await handle.sync()
-    } finally {
-      await handle.close()
-    }
-    await replaceProviderMetadataFile(temporary, path, {
-      platform: environment.platform ?? process.platform,
-      rename: environment.rename ?? rename,
-      wait: environment.wait ?? delayProviderOperation
-    })
-    await syncDirectory(dirname(path))
-  } catch (error) {
-    await rm(temporary, { force: true })
-    throw error
-  }
-}
-
-async function replaceProviderMetadataFile(
-  sourcePath: string,
-  targetPath: string,
-  environment: Required<ProviderMetadataWriteEnvironment>
-): Promise<void> {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await environment.rename(sourcePath, targetPath)
-      return
-    } catch (error) {
-      const retryDelayMs = windowsProviderMetadataRenameRetryDelaysMs[attempt]
-      if (
-        environment.platform !== 'win32' ||
-        retryDelayMs === undefined ||
-        !isTransientWindowsRenameError(error)
-      ) {
-        throw error
-      }
-      await environment.wait(retryDelayMs)
-    }
-  }
-}
-
-export async function removeStaleProviderMetadata(
-  metadata: TerminalProviderMetadata,
-  metadataPath: string
-): Promise<void> {
-  await rm(metadataPath, { force: true })
-  if (process.platform !== 'win32') await rm(metadata.endpoint, { force: true })
-}
-
-export function createProviderEndpoint(stateDirectory: string): string {
-  const suffix = createHash('sha256').update(stateDirectory).digest('hex').slice(0, 24)
+export function createProviderEndpoint(stateDirectory: string, generationId?: string): string {
+  const digest = createHash('sha256').update(stateDirectory)
+  if (generationId) digest.update('\0').update(generationId)
+  const suffix = digest.digest('hex').slice(0, 24)
   return process.platform === 'win32'
     ? `\\\\.\\pipe\\cleancode-terminal-${suffix}`
     : join(tmpdir(), `cleancode-terminal-${suffix}.sock`)
@@ -161,8 +112,8 @@ export function isProviderProcessAlive(processId: number): boolean {
   try {
     process.kill(processId, 0)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    return getNodeErrorCode(error) !== 'ESRCH'
   }
 }
 
@@ -200,79 +151,161 @@ export function openProviderProcessLog(stateDirectory: string): number {
 }
 
 export async function acquireProviderLaunchLock(
-  path: string
+  path: string,
+  environment: ProviderLaunchLockEnvironment = {}
 ): Promise<ProviderLaunchLockLease | null> {
+  const fileSystem = environment.fileSystem ?? providerLaunchLockNodeFileSystem
+  let initializationObservation: {
+    readonly deadlineMs: number
+    readonly snapshot: ProviderLaunchLockSnapshot
+  } | null = null
   for (;;) {
+    const mutationLock = await acquireProviderLaunchMutationLock(path, fileSystem)
+    let initializationDelayMs = 0
+    let mutationHandoffStarted = false
     try {
-      return await createLaunchLock(path)
-    } catch (error) {
-      if (getNodeErrorCode(error) !== 'EEXIST') throw error
-    }
+      await mutationLock.assertOwned()
+      const snapshot = await readLaunchLockSnapshot(path, fileSystem)
+      if (!snapshot) {
+        let lease: ProviderLaunchLockLease
+        try {
+          lease = await createLaunchLock(path, fileSystem)
+        } catch (error) {
+          if (!(error instanceof ProviderLaunchLockCreationError)) throw error
+          mutationHandoffStarted = true
+          const cleanupErrors = [...error.cleanupErrors]
+          await mutationLock.close().catch((cleanupError) => cleanupErrors.push(cleanupError))
+          await cleanupCreatedLaunchLock(path, error.identity, fileSystem).catch((cleanupError) =>
+            cleanupErrors.push(cleanupError)
+          )
+          if (cleanupErrors.length === 0) throw error.creationError
+          throw new AggregateError(
+            [error.creationError, ...cleanupErrors],
+            'Terminal Provider launch lock initialization rollback failed.'
+          )
+        }
+        mutationHandoffStarted = true
+        return finalizeProviderLaunchLockAcquisition(mutationLock, lease)
+      }
 
-    const snapshot = await readLaunchLockSnapshot(path)
-    if (!snapshot) continue
-    const ageMs = getLaunchLockAgeMs(snapshot)
-    if (!snapshot.record && ageMs < providerLaunchLockInitializationGraceMs) {
-      await delayProviderOperation(providerLaunchLockInitializationGraceMs - ageMs)
-      continue
+      const ageMs = getLaunchLockAgeMs(snapshot)
+      let shouldReclaim = false
+      if (!snapshot.record) {
+        if (
+          !initializationObservation ||
+          !isSameLaunchLockSnapshot(initializationObservation.snapshot, snapshot)
+        ) {
+          initializationObservation = {
+            deadlineMs:
+              performance.now() + Math.max(0, providerLaunchLockInitializationGraceMs - ageMs),
+            snapshot
+          }
+        }
+        initializationDelayMs = Math.max(
+          0,
+          initializationObservation.deadlineMs - performance.now()
+        )
+        shouldReclaim = initializationDelayMs === 0
+      } else {
+        const ownerState = await observeProviderLaunchLockOwner(snapshot.record)
+        if (ownerState === 'dead') {
+          shouldReclaim = true
+        } else if (!('ownerId' in snapshot.record)) {
+          return null
+        } else if (getLaunchLockAgeMs(snapshot) < providerLaunchLockStaleAfterMs) {
+          return null
+        } else {
+          // The launch heartbeat remains the final lease boundary for hung or legacy owners.
+          shouldReclaim = true
+        }
+      }
+      if (shouldReclaim) {
+        initializationObservation = null
+        const current = await readLaunchLockSnapshot(path, fileSystem)
+        if (current && isSameLaunchLockSnapshot(current, snapshot)) {
+          await mutationLock.assertOwned()
+          await fileSystem.rm(path, { force: true })
+          await mutationLock.assertOwned()
+        }
+      }
+    } finally {
+      if (!mutationHandoffStarted) await mutationLock.close()
     }
-    if (
-      ageMs < providerLaunchLockStaleAfterMs &&
-      snapshot.record &&
-      isProviderProcessAlive(snapshot.record.processId)
-    ) {
-      return null
+    if (initializationDelayMs > 0) {
+      await delayProviderOperation(initializationDelayMs)
     }
-    if (!(await removeLaunchLockSnapshot(path, snapshot))) continue
   }
+}
+
+async function finalizeProviderLaunchLockAcquisition(
+  mutationLock: FileSystemMutationLockLease,
+  lease: ProviderLaunchLockLease
+): Promise<ProviderLaunchLockLease> {
+  try {
+    await mutationLock.assertOwned()
+    await lease.assertOwned()
+    await mutationLock.assertOwned()
+    await mutationLock.close()
+    return lease
+  } catch (error) {
+    const cleanupErrors: unknown[] = []
+    await mutationLock.close().catch((cleanupError) => cleanupErrors.push(cleanupError))
+    await lease.close().catch((cleanupError) => cleanupErrors.push(cleanupError))
+    if (cleanupErrors.length === 0) throw error
+    throw new AggregateError(
+      [error, ...cleanupErrors],
+      'Terminal Provider launch lock acquisition rollback failed.'
+    )
+  }
+}
+
+function acquireProviderLaunchMutationLock(
+  path: string,
+  fileSystem: FileSystemMutationLockFileSystem
+) {
+  return acquireFileSystemMutationLock({
+    directory: `${path}${providerLaunchLockMutationGuardSuffix}`,
+    fileSystem,
+    isProcessAlive: isProviderProcessAlive
+  })
 }
 
 export function delayProviderOperation(durationMs: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, durationMs))
 }
 
-export function getProviderErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
-export function createProviderUnavailableError(message: string) {
-  return createExpectedAppError('TERMINAL_PROVIDER_UNAVAILABLE', message)
-}
-
-export function isRuntimeInvalidatingProviderError(error: unknown): error is AppError {
-  return (
-    isAppError(error) &&
-    (error.code === 'TERMINAL_PROVIDER_UNAVAILABLE' || error.code === 'COMMAND_TIMED_OUT')
-  )
-}
-
-export function createProviderDiagnostics(
-  modelCount: number,
-  attachedViewCount: number
-): TerminalModelDiagnosticsSnapshot {
-  return { attachedViewCount, lastRestoreDurationMs: 0, modelCount, pendingOutputBytes: 0 }
-}
-
-function isProviderMetadata(value: unknown): value is TerminalProviderMetadata {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'schemaVersion' in value &&
-    value.schemaVersion === 1 &&
-    'protocolVersion' in value &&
-    (value.protocolVersion === terminalProviderProtocolVersion ||
-      value.protocolVersion === terminalProviderProtocolVersion - 1) &&
-    'instanceId' in value &&
-    typeof value.instanceId === 'string' &&
-    'authToken' in value &&
-    typeof value.authToken === 'string' &&
-    'endpoint' in value &&
-    typeof value.endpoint === 'string' &&
-    'processId' in value &&
-    typeof value.processId === 'number' &&
-    'startedAt' in value &&
-    typeof value.startedAt === 'string'
-  )
+export async function runWithProviderLaunchLock<T>(
+  launchLock: ProviderLaunchLockLease,
+  operation: (assertLeaseHealthy: () => Promise<void>) => Promise<T>,
+  onRefreshError?: (error: unknown) => void
+): Promise<T> {
+  let refresh: Promise<void> | null = null
+  let refreshError: unknown
+  const timer = setInterval(() => {
+    if (refresh) return
+    refresh = launchLock
+      .refresh()
+      .catch((error) => {
+        refreshError ??= error
+        onRefreshError?.(error)
+      })
+      .finally(() => {
+        refresh = null
+      })
+  }, providerLaunchLockRefreshIntervalMs)
+  timer.unref()
+  const assertLeaseHealthy = async (): Promise<void> => {
+    await refresh
+    if (refreshError) throw refreshError
+    await launchLock.assertOwned()
+  }
+  try {
+    return await operation(assertLeaseHealthy)
+  } finally {
+    clearInterval(timer)
+    await refresh
+    await launchLock.close()
+  }
 }
 
 function getNodeErrorCode(error: unknown): string | null {
@@ -284,63 +317,157 @@ function getNodeErrorCode(error: unknown): string | null {
     : null
 }
 
-function isTransientWindowsRenameError(error: unknown): boolean {
-  const code = getNodeErrorCode(error)
-  return code === 'EACCES' || code === 'EBUSY' || code === 'EPERM'
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  let directoryHandle: FileHandle | null = null
-
+async function createLaunchLock(
+  path: string,
+  fileSystem: FileSystemMutationLockFileSystem
+): Promise<ProviderLaunchLockLease> {
+  const epochLease = await createProcessEpochLease()
+  let handle: FileHandle
   try {
-    directoryHandle = await open(path, 'r')
-    await directoryHandle.sync()
+    handle = await fileSystem.open(path, 'wx', 0o600)
   } catch (error) {
-    if (!isUnsupportedDirectorySyncError(error)) throw error
-  } finally {
-    await directoryHandle?.close().catch(() => undefined)
+    await epochLease.close().catch(() => undefined)
+    throw error
   }
-}
-
-function isUnsupportedDirectorySyncError(error: unknown): boolean {
-  const code = getNodeErrorCode(error)
-  return code !== null && ['EISDIR', 'EINVAL', 'ENOTSUP', 'EPERM'].includes(code)
-}
-
-async function createLaunchLock(path: string): Promise<ProviderLaunchLockLease> {
-  const handle = await open(path, 'wx', 0o600)
+  let identity: CreatedProviderLaunchLockIdentity | null = null
   const record: ProviderLaunchLockRecord = {
     schemaVersion: 1,
     ownerId: randomUUID(),
     processId: process.pid,
-    acquiredAt: new Date().toISOString()
+    acquiredAt: new Date().toISOString(),
+    processEpoch: epochLease.reference
   }
   try {
+    const openedFileStat = await handle.stat()
+    identity = {
+      device: openedFileStat.dev,
+      inode: openedFileStat.ino,
+      ownerId: record.ownerId
+    }
     await handle.writeFile(`${JSON.stringify(record)}\n`, 'utf8')
     await handle.sync()
-    return new FileProviderLaunchLockLease(path, handle, record.ownerId)
+    const fileStat = await handle.stat()
+    return createFileProviderLaunchLockLease({
+      assertOwned: () =>
+        assertLaunchLockAndEpochOwned(
+          path,
+          record.ownerId,
+          fileStat.dev,
+          fileStat.ino,
+          fileSystem,
+          epochLease
+        ),
+      handle,
+      ownerId: record.ownerId,
+      processEpoch: record.processEpoch,
+      release: () => releaseLaunchLockAndEpoch(path, record.ownerId, fileSystem, epochLease),
+      runRefresh: (operation) => runWithProviderLaunchMutationLock(path, fileSystem, operation)
+    })
   } catch (error) {
-    await handle.close()
-    await rm(path, { force: true })
-    throw error
+    const cleanupErrors: unknown[] = []
+    if (!identity) {
+      try {
+        const openedFileStat = await handle.stat()
+        identity = {
+          device: openedFileStat.dev,
+          inode: openedFileStat.ino,
+          ownerId: record.ownerId
+        }
+      } catch (identityError) {
+        cleanupErrors.push(identityError)
+      }
+    }
+    await handle.close().catch((cleanupError) => cleanupErrors.push(cleanupError))
+    await epochLease.close().catch((cleanupError) => cleanupErrors.push(cleanupError))
+    if (!identity) {
+      throw new AggregateError(
+        [error, ...cleanupErrors],
+        'Terminal Provider launch lock identity could not be recovered.'
+      )
+    }
+    throw new ProviderLaunchLockCreationError(error, identity, cleanupErrors)
   }
 }
 
-async function readLaunchLockSnapshot(path: string): Promise<ProviderLaunchLockSnapshot | null> {
-  const fileStat = await stat(path).catch(() => null)
-  if (!fileStat) return null
-  const content = await readFile(path, 'utf8').catch(() => null)
-  let record: ProviderLaunchLockSnapshot['record'] = null
-  if (content !== null) {
+async function runWithProviderLaunchMutationLock<T>(
+  path: string,
+  fileSystem: FileSystemMutationLockFileSystem,
+  operation: () => Promise<T>
+): Promise<T> {
+  const mutationLock = await acquireProviderLaunchMutationLock(path, fileSystem)
+  try {
+    await mutationLock.assertOwned()
+    const result = await operation()
+    await mutationLock.assertOwned()
+    return result
+  } finally {
+    await mutationLock.close()
+  }
+}
+
+async function cleanupCreatedLaunchLock(
+  path: string,
+  identity: CreatedProviderLaunchLockIdentity,
+  fileSystem: FileSystemMutationLockFileSystem
+): Promise<void> {
+  const deadline = Date.now() + 30_000
+  let lastError: unknown
+  while (Date.now() < deadline) {
     try {
-      record = readLaunchLockRecord(JSON.parse(content) as unknown)
-    } catch {
-      record = null
+      const mutationLock = await acquireProviderLaunchMutationLock(path, fileSystem)
+      try {
+        await mutationLock.assertOwned()
+        const current = await readLaunchLockSnapshot(path, fileSystem)
+        if (
+          current &&
+          current.device === identity.device &&
+          current.inode === identity.inode &&
+          (!current.record ||
+            ('ownerId' in current.record && current.record.ownerId === identity.ownerId))
+        ) {
+          await fileSystem.rm(path, { force: true })
+          await mutationLock.assertOwned()
+        }
+        return
+      } finally {
+        await mutationLock.close()
+      }
+    } catch (error) {
+      if (!isTransientProviderLockError(error)) throw error
+      lastError = error
+      await delayProviderOperation(25)
     }
   }
+  throw new Error('Timed out rolling back Terminal Provider launch lock initialization.', {
+    cause: lastError
+  })
+}
+
+async function readLaunchLockSnapshot(
+  path: string,
+  fileSystem: FileSystemMutationLockFileSystem
+): Promise<ProviderLaunchLockSnapshot | null> {
+  const initialStat = await statProviderPathIfExists(path, fileSystem)
+  if (!initialStat) return null
+  let content: string
+  try {
+    content = await fileSystem.readFile(path, 'utf8')
+  } catch (error) {
+    if (isMissingProviderPathError(error)) return null
+    throw error
+  }
+  const fileStat = await statProviderPathIfExists(path, fileSystem)
+  if (!fileStat || fileStat.dev !== initialStat.dev || fileStat.ino !== initialStat.ino) {
+    return null
+  }
+  let record: ProviderLaunchLockSnapshot['record'] = null
+  try {
+    record = readLaunchLockRecord(JSON.parse(content) as unknown)
+  } catch {
+    record = null
+  }
   return {
-    contentFingerprint:
-      content === null ? null : createHash('sha256').update(content).digest('hex'),
+    contentFingerprint: createHash('sha256').update(content).digest('hex'),
     device: fileStat.dev,
     inode: fileStat.ino,
     modifiedAtMs: fileStat.mtimeMs,
@@ -349,13 +476,28 @@ async function readLaunchLockSnapshot(path: string): Promise<ProviderLaunchLockS
   }
 }
 
-function getLaunchLockAgeMs(snapshot: ProviderLaunchLockSnapshot): number {
-  let acquiredAtMs = snapshot.modifiedAtMs
-  if (snapshot.record && 'acquiredAt' in snapshot.record) {
-    const recordedAtMs = Date.parse(snapshot.record.acquiredAt)
-    if (Number.isFinite(recordedAtMs)) acquiredAtMs = Math.min(acquiredAtMs, recordedAtMs)
+async function statProviderPathIfExists(
+  path: string,
+  fileSystem: FileSystemMutationLockFileSystem
+) {
+  try {
+    return await fileSystem.stat(path)
+  } catch (error) {
+    if (isMissingProviderPathError(error)) return null
+    throw error
   }
-  return Math.max(0, Date.now() - acquiredAtMs)
+}
+
+function isMissingProviderPathError(error: unknown): boolean {
+  return ['ENOENT', 'ENOTDIR'].includes(getNodeErrorCode(error) ?? '')
+}
+
+function getLaunchLockAgeMs(snapshot: ProviderLaunchLockSnapshot): number {
+  const now = Date.now()
+  if (snapshot.modifiedAtMs > now + providerLaunchLockRefreshIntervalMs) {
+    return providerLaunchLockStaleAfterMs
+  }
+  return Math.max(0, now - snapshot.modifiedAtMs)
 }
 
 function readLaunchLockRecord(
@@ -381,20 +523,21 @@ function readLaunchLockRecord(
       schemaVersion: 1,
       ownerId: value.ownerId,
       processId: value.processId,
-      acquiredAt: value.acquiredAt
+      acquiredAt: value.acquiredAt,
+      ...('processEpoch' in value && isProcessEpochReference(value.processEpoch)
+        ? { processEpoch: value.processEpoch }
+        : {})
     }
   }
   return { processId: value.processId }
 }
 
-async function removeLaunchLockSnapshot(
-  path: string,
-  snapshot: ProviderLaunchLockSnapshot
-): Promise<boolean> {
-  const current = await readLaunchLockSnapshot(path)
-  if (!current || !isSameLaunchLockSnapshot(current, snapshot)) return false
-  await rm(path, { force: true })
-  return true
+async function observeProviderLaunchLockOwner(
+  record: ProviderLaunchLockRecord | LegacyProviderLaunchLockRecord
+): Promise<ProcessEpochObservation | 'legacy-alive'> {
+  if (!isProviderProcessAlive(record.processId)) return 'dead'
+  if (!('processEpoch' in record) || !record.processEpoch) return 'legacy-alive'
+  return observeProcessEpoch(record.processEpoch)
 }
 
 function isSameLaunchLockSnapshot(
@@ -421,22 +564,83 @@ function isSameLaunchLockSnapshot(
   return current.record.processId === expected.record.processId
 }
 
-class FileProviderLaunchLockLease implements ProviderLaunchLockLease {
-  private isClosed = false
+async function assertLaunchLockOwned(
+  path: string,
+  ownerId: string,
+  device: number,
+  inode: number,
+  fileSystem: FileSystemMutationLockFileSystem
+): Promise<void> {
+  const current = await readLaunchLockSnapshot(path, fileSystem)
+  if (
+    !current ||
+    current.device !== device ||
+    current.inode !== inode ||
+    !current.record ||
+    !('ownerId' in current.record) ||
+    current.record.ownerId !== ownerId
+  ) {
+    throw new Error('Terminal Provider launch lock ownership was lost.')
+  }
+}
 
-  constructor(
-    private readonly path: string,
-    private readonly handle: FileHandle,
-    private readonly ownerId: string
-  ) {}
+async function assertLaunchLockAndEpochOwned(
+  path: string,
+  ownerId: string,
+  device: number,
+  inode: number,
+  fileSystem: FileSystemMutationLockFileSystem,
+  epochLease: ProcessEpochLease
+): Promise<void> {
+  await epochLease.assertActive()
+  await assertLaunchLockOwned(path, ownerId, device, inode, fileSystem)
+}
 
-  async close(): Promise<void> {
-    if (this.isClosed) return
-    this.isClosed = true
-    await this.handle.close()
-    const current = await readLaunchLockSnapshot(this.path)
-    if (current?.record && 'ownerId' in current.record && current.record.ownerId === this.ownerId) {
-      await removeLaunchLockSnapshot(this.path, current)
+async function releaseLaunchLock(
+  path: string,
+  ownerId: string,
+  fileSystem: FileSystemMutationLockFileSystem
+): Promise<void> {
+  const deadline = Date.now() + 30_000
+  let lastError: unknown
+  while (Date.now() < deadline) {
+    try {
+      const mutationLock = await acquireProviderLaunchMutationLock(path, fileSystem)
+      try {
+        await mutationLock.assertOwned()
+        const current = await readLaunchLockSnapshot(path, fileSystem)
+        if (current?.record && 'ownerId' in current.record && current.record.ownerId === ownerId) {
+          await fileSystem.rm(path, { force: true })
+          await mutationLock.assertOwned()
+        }
+        return
+      } finally {
+        await mutationLock.close()
+      }
+    } catch (error) {
+      if (!isTransientProviderLockError(error)) throw error
+      lastError = error
+      await delayProviderOperation(25)
     }
   }
+  throw new Error('Timed out releasing Terminal Provider launch lock.', { cause: lastError })
+}
+
+async function releaseLaunchLockAndEpoch(
+  path: string,
+  ownerId: string,
+  fileSystem: FileSystemMutationLockFileSystem,
+  epochLease: ProcessEpochLease
+): Promise<void> {
+  const errors: unknown[] = []
+  await releaseLaunchLock(path, ownerId, fileSystem).catch((error) => errors.push(error))
+  await epochLease.close().catch((error) => errors.push(error))
+  if (errors.length === 1) throw errors[0]
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'Terminal Provider launch lock release was incomplete.')
+  }
+}
+
+function isTransientProviderLockError(error: unknown): boolean {
+  return ['EACCES', 'EBUSY', 'EMFILE', 'ENFILE', 'EPERM'].includes(getNodeErrorCode(error) ?? '')
 }

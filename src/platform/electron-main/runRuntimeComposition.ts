@@ -24,7 +24,10 @@ import { NodeLocalPortReservationAdapter } from '../../contexts/run/infrastructu
 import { NodeTcpListenerInspectionAdapter } from '../../contexts/run/infrastructure/network/NodeTcpListenerInspectionAdapter'
 import { TerminalSessionWorkflowRuntimeAdapter } from '../../contexts/run/infrastructure/pty/TerminalSessionWorkflowRuntimeAdapter'
 import { NodeTcpReadinessAdapter } from '../../contexts/run/infrastructure/readiness/NodeTcpReadinessAdapter'
-import { PersistentTerminalProviderClient } from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
+import {
+  PersistentTerminalProviderClient,
+  type PersistentTerminalProviderClientOptions
+} from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
 import { NodeTerminalLinkFileSystemAdapter } from '../../contexts/run/infrastructure/filesystem/NodeTerminalLinkFileSystemAdapter'
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { createRunLifecycleAdapters } from './runLifecycleAdapters'
@@ -35,6 +38,9 @@ export function createRunRuntime(input: {
   readonly appStateDirectory: string
   readonly launchPlans: TerminalLaunchPlanPort
   readonly resolveManagedServiceOwner: ManagedServiceOwnerResolver
+  readonly resolveTerminalProviderLaunchTarget?: NonNullable<
+    PersistentTerminalProviderClientOptions['resolveLaunchTarget']
+  >
   readonly scopeValidation: RunRuntimeScopeValidationPort
   readonly workflowPlans: TerminalWorkflowPlanPort
 }) {
@@ -42,6 +48,7 @@ export function createRunRuntime(input: {
   const terminalProvider = new PersistentTerminalProviderClient({
     stateDirectory: join(input.appStateDirectory, 'terminal-runtime-provider'),
     providerEntryPath: join(__dirname, 'terminal-runtime-provider.js'),
+    resolveLaunchTarget: input.resolveTerminalProviderLaunchTarget,
     onBackgroundError: logProviderError,
     onRuntimeUnavailable: () =>
       lifecycle.markRuntimeUnavailable('TERMINAL_PROVIDER_UNAVAILABLE', true),
