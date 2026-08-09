@@ -11,7 +11,8 @@ import {
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode
 } from 'react'
 
 import {
@@ -31,6 +32,7 @@ import {
   createApplicationShortcutTooltipLabels
 } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalSettingsPane } from './TerminalSettingsPane'
@@ -39,8 +41,13 @@ import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent
 import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { CanvasSettingsPane } from './CanvasSettingsPane'
+import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
+import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
+import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useSelectionFeedbackMotion, useSelectionIndicatorMotion } from './useSelectionMotion'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
-export type ApplicationSettingsPane = 'agents' | 'canvas' | 'shortcuts' | 'terminal'
+export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 
 interface ApplicationSettingsRootProps {
   readonly agentProviderPreferences?: AgentProviderPreferencesSnapshot
@@ -74,11 +81,16 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const shortcutTooltips = createApplicationShortcutTooltipLabels(props.bindings, props.platform, t)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const backButtonRef = useRef<HTMLButtonElement | null>(null)
-  const dialogRef = useRef<HTMLElement | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
   const onCloseRef = useRef(props.onClose)
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
+  const { beginFocusRestore, cancelFocusRestore, completeFocusRestore } =
+    useInterruptibleSurfaceFocusRestore(dialogRef, triggerRef)
   const [recordingCommand, setRecordingCommand] = useState<ApplicationShortcutCommand | null>(null)
   const [selectedPane, setSelectedPane] = useState<ApplicationSettingsPane | null>(null)
   const activePane = selectedPane ?? props.initialPane ?? 'shortcuts'
+  const [paneSelectionContainerRef, paneSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(activePane)
   const [captureError, setCaptureError] = useState<
     { readonly command: ApplicationShortcutCommand; readonly message: string } | undefined
   >()
@@ -87,9 +99,9 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     setRecordingCommand(null)
     setCaptureError(undefined)
     setSelectedPane(null)
+    beginFocusRestore()
     onCloseRef.current()
-    triggerRef.current?.focus()
-  }, [])
+  }, [beginFocusRestore])
 
   useEffect(() => {
     onCloseRef.current = props.onClose
@@ -101,13 +113,6 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     }
 
     backButtonRef.current?.focus()
-    const backgroundRegions = Array.from(
-      document.querySelectorAll<HTMLElement>('.project-sidebar, .app-shell__workspace')
-    )
-    for (const region of backgroundRegions) {
-      region.inert = true
-    }
-
     const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
       if (event.key === 'Escape') {
         closeSettings()
@@ -117,9 +122,6 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
 
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
-      for (const region of backgroundRegions) {
-        region.inert = false
-      }
     }
   }, [closeSettings, props.isOpen])
 
@@ -128,13 +130,15 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
       <TooltipLabel content={shortcutTooltips.openSettings} side="bottom">
         <button
           ref={triggerRef}
-          className="application-settings-trigger"
+          className="application-settings-trigger app-shell-utility-button"
           type="button"
           aria-controls="application-settings-dialog"
           aria-expanded={props.isOpen}
           aria-haspopup="dialog"
           aria-label={t('settings.open')}
+          {...triggerMotionProps}
           onClick={() => {
+            cancelFocusRestore()
             setSelectedPane(null)
             props.onOpen()
           }}
@@ -142,66 +146,83 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
           <GearSixIcon size={17} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {props.isOpen ? (
-        <section
-          id="application-settings-dialog"
-          ref={dialogRef}
-          className={`application-settings-surface application-settings-surface--${props.platform}`}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="application-settings-title"
-          onKeyDown={(event) => trapSettingsFocus(event, dialogRef.current)}
-        >
-          <header className="application-settings-header">
-            <TooltipLabel content={t('settings.back')} side="right">
-              <button
-                ref={backButtonRef}
-                className="application-settings-back"
-                type="button"
-                aria-label={t('settings.back')}
-                onClick={closeSettings}
-              >
-                <ArrowLeftIcon size={18} weight="bold" aria-hidden="true" />
-              </button>
-            </TooltipLabel>
-            <h1 id="application-settings-title">{t('settings.title')}</h1>
-          </header>
-          <div className="application-settings-layout">
-            <nav className="application-settings-navigation" aria-label={t('settings.navigation')}>
-              <button
-                type="button"
-                aria-current={activePane === 'shortcuts' ? 'page' : undefined}
-                onClick={() => setSelectedPane('shortcuts')}
-              >
-                <KeyboardIcon size={17} aria-hidden="true" />
-                <span>{t('settings.shortcuts.title')}</span>
-              </button>
-              <button
-                type="button"
-                aria-current={activePane === 'canvas' ? 'page' : undefined}
-                onClick={() => setSelectedPane('canvas')}
-              >
-                <SquaresFourIcon size={17} aria-hidden="true" />
-                <span>{t('settings.canvas.title')}</span>
-              </button>
-              <button
-                type="button"
-                aria-current={activePane === 'terminal' ? 'page' : undefined}
-                onClick={() => setSelectedPane('terminal')}
-              >
-                <TerminalWindowIcon size={17} aria-hidden="true" />
-                <span>{t('settings.terminal.title')}</span>
-              </button>
-              <button
-                type="button"
-                aria-current={activePane === 'agents' ? 'page' : undefined}
-                onClick={() => setSelectedPane('agents')}
-              >
-                <RobotIcon size={17} aria-hidden="true" />
-                <span>{t('settings.agents.title')}</span>
-              </button>
-            </nav>
-            <main className="application-settings-content">
+      <OverlaySurfaceMotion
+        open={props.isOpen}
+        springPreset="fullscreen-right"
+        onExitComplete={completeFocusRestore}
+        id="application-settings-dialog"
+        ref={dialogRef}
+        className={`application-settings-surface application-settings-surface--${props.platform} overlay-surface-motion overlay-surface-motion--fullscreen`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="application-settings-title"
+        onKeyDown={(event) => trapSettingsFocus(event, dialogRef.current)}
+      >
+        <header className="application-settings-header">
+          <TooltipLabel content={t('settings.back')} side="right">
+            <button
+              ref={backButtonRef}
+              className="application-settings-back"
+              type="button"
+              aria-label={t('settings.back')}
+              onClick={closeSettings}
+            >
+              <ArrowLeftIcon size={18} weight="bold" aria-hidden="true" />
+            </button>
+          </TooltipLabel>
+          <h1 id="application-settings-title">{t('settings.title')}</h1>
+        </header>
+        <div className="application-settings-layout">
+          <nav
+            ref={paneSelectionContainerRef}
+            className="application-settings-navigation"
+            aria-label={t('settings.navigation')}
+          >
+            <span
+              ref={paneSelectionIndicatorRef}
+              className="selection-motion-indicator application-settings-navigation__selection"
+              data-selection-motion-target={activePane}
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              data-selection-motion-option="shortcuts"
+              aria-current={activePane === 'shortcuts' ? 'page' : undefined}
+              onClick={() => setSelectedPane('shortcuts')}
+            >
+              <KeyboardIcon size={17} aria-hidden="true" />
+              <span>{t('settings.shortcuts.title')}</span>
+            </button>
+            <button
+              type="button"
+              data-selection-motion-option="canvas"
+              aria-current={activePane === 'canvas' ? 'page' : undefined}
+              onClick={() => setSelectedPane('canvas')}
+            >
+              <SquaresFourIcon size={17} aria-hidden="true" />
+              <span>{t('settings.canvas.title')}</span>
+            </button>
+            <button
+              type="button"
+              data-selection-motion-option="terminal"
+              aria-current={activePane === 'terminal' ? 'page' : undefined}
+              onClick={() => setSelectedPane('terminal')}
+            >
+              <TerminalWindowIcon size={17} aria-hidden="true" />
+              <span>{t('settings.terminal.title')}</span>
+            </button>
+            <button
+              type="button"
+              data-selection-motion-option="agents"
+              aria-current={activePane === 'agents' ? 'page' : undefined}
+              onClick={() => setSelectedPane('agents')}
+            >
+              <RobotIcon size={17} aria-hidden="true" />
+              <span>{t('settings.agents.title')}</span>
+            </button>
+          </nav>
+          <main className="application-settings-content">
+            <ApplicationSettingsPaneTransition activePane={activePane}>
               {activePane === 'canvas' ? (
                 <CanvasSettingsPane
                   reduceVisualNoise={props.reduceVisualNoise}
@@ -261,12 +282,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                               <div className="shortcut-settings-row" key={command}>
                                 <div className="shortcut-settings-row__label">{action}</div>
                                 <div className="shortcut-settings-row__controls">
-                                  <button
-                                    className="shortcut-recorder"
-                                    type="button"
-                                    aria-describedby={error ? errorId : undefined}
-                                    aria-label={t('settings.shortcuts.edit', { action })}
-                                    aria-pressed={isRecording}
+                                  <ShortcutRecorder
+                                    describedBy={error ? errorId : undefined}
+                                    label={t('settings.shortcuts.edit', { action })}
+                                    selected={isRecording}
                                     onClick={() => {
                                       setRecordingCommand(command)
                                       setCaptureError(undefined)
@@ -286,7 +305,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                                         (label) => <kbd key={label}>{label}</kbd>
                                       )
                                     )}
-                                  </button>
+                                  </ShortcutRecorder>
                                   <TooltipLabel content={t('settings.shortcuts.clear', { action })}>
                                     <button
                                       className="shortcut-row-action"
@@ -350,10 +369,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                   </div>
                 </div>
               )}
-            </main>
-          </div>
-        </section>
-      ) : null}
+            </ApplicationSettingsPaneTransition>
+          </main>
+        </div>
+      </OverlaySurfaceMotion>
     </>
   )
 
@@ -400,6 +419,39 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     setRecordingCommand(null)
     setCaptureError(undefined)
   }
+}
+
+function ShortcutRecorder({
+  children,
+  describedBy,
+  label,
+  onClick,
+  onKeyDown,
+  selected
+}: {
+  readonly children: ReactNode
+  readonly describedBy?: string
+  readonly label: string
+  readonly onClick: () => void
+  readonly onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
+  readonly selected: boolean
+}) {
+  const selectionMotionRef = useSelectionFeedbackMotion(selected)
+
+  return (
+    <button
+      ref={selectionMotionRef}
+      className="shortcut-recorder"
+      type="button"
+      aria-describedby={describedBy}
+      aria-label={label}
+      aria-pressed={selected}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      {children}
+    </button>
+  )
 }
 
 function noop(): void {}

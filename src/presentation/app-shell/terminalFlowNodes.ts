@@ -96,6 +96,7 @@ interface CreateTerminalFlowNodesInput {
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
   readonly workflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
+  readonly includeCollapsedMembers?: boolean
 }
 
 export function createTerminalFlowNodes({
@@ -113,7 +114,8 @@ export function createTerminalFlowNodes({
   terminalStates,
   handlers,
   workflowNodeStatuses = {},
-  workflowBuildPresentation = null
+  workflowBuildPresentation = null,
+  includeCollapsedMembers = false
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
   const activeWorkflowRootIds = new Set(activeWorkflowRootBlockIds)
   const selectedBlockIds = new Set(
@@ -138,7 +140,7 @@ export function createTerminalFlowNodes({
     })
   )
   const terminalNodes = (graph?.blocks ?? [])
-    .filter((block) => !collapsedGroupMemberIds.has(block.id))
+    .filter((block) => includeCollapsedMembers || !collapsedGroupMemberIds.has(block.id))
     .map((block) =>
       createTerminalFlowNode({
         approvalIntent: approvalNodeIntents.get(block.id),

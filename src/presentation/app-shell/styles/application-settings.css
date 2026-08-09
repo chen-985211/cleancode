@@ -9,12 +9,12 @@
   color: var(--cc-muted-strong);
   font: inherit;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    opacity 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -44,7 +44,6 @@
   overflow: hidden;
   background: var(--cc-canvas);
   color: var(--cc-foreground);
-  animation: application-settings-in 150ms ease-out;
   -webkit-app-region: no-drag;
 }
 
@@ -117,13 +116,16 @@
 }
 
 .application-settings-navigation {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  isolation: isolate;
 }
 
 .application-settings-navigation button {
   position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -140,10 +142,10 @@
   font-weight: 580;
   text-align: left;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .application-settings-navigation button:hover {
@@ -153,19 +155,8 @@
 
 .application-settings-navigation button[aria-current='page'] {
   border-color: transparent;
-  background: var(--cc-primary-wash);
+  background: transparent;
   color: var(--cc-primary);
-}
-
-.application-settings-navigation button[aria-current='page']::before {
-  position: absolute;
-  top: 9px;
-  bottom: 9px;
-  left: 4px;
-  width: 2px;
-  border-radius: 999px;
-  background: var(--cc-primary);
-  content: '';
 }
 
 .application-settings-content {
@@ -174,9 +165,40 @@
   min-height: 0;
   align-content: start;
   justify-items: center;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--cc-canvas);
   padding: clamp(32px, 4vh, 44px) clamp(32px, 4vw, 52px) 56px;
+}
+
+.application-settings-pane-transition {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-areas: 'pane';
+  justify-items: center;
+}
+
+.application-settings-pane-transition__layer {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-area: pane;
+  justify-items: center;
+  opacity: var(--application-settings-pane-motion-opacity, 1);
+  transform: translate3d(var(--application-settings-pane-motion-x, 0), 0, 0);
+}
+
+.application-settings-pane-transition[data-application-settings-pane-direction]:not(
+    [data-application-settings-pane-direction='none']
+  )
+  .application-settings-pane-transition__layer {
+  will-change: opacity, transform;
+}
+
+.application-settings-pane-transition__layer[data-application-settings-pane-role='outgoing'] {
+  pointer-events: none;
 }
 
 .shortcut-settings-pane {
@@ -185,43 +207,6 @@
 
 .terminal-settings-pane {
   width: min(100%, 760px);
-}
-
-.application-settings-switch {
-  position: relative;
-  width: 34px;
-  height: 19px;
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 999px;
-  background: var(--cc-border-strong);
-  padding: 2px;
-  transition:
-    background 140ms ease,
-    opacity 140ms ease;
-}
-
-.application-settings-switch span {
-  display: block;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--cc-primary-contrast);
-  box-shadow: var(--cc-shadow-sm);
-  transition: transform 140ms ease;
-}
-
-.application-settings-switch[aria-checked='true'] {
-  background: var(--cc-primary);
-}
-
-.application-settings-switch[aria-checked='true'] span {
-  transform: translateX(15px);
-}
-
-.application-settings-switch:focus-visible {
-  outline: 2px solid var(--cc-ring);
-  outline-offset: 3px;
 }
 
 .terminal-settings-pane__header h2 {
@@ -252,6 +237,7 @@
 }
 
 .terminal-settings-options {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
@@ -260,9 +246,12 @@
   border-radius: 11px;
   background: var(--cc-surface-subtle);
   padding: 4px;
+  isolation: isolate;
 }
 
 .terminal-settings-options label {
+  position: relative;
+  z-index: 1;
   display: flex;
   min-width: 0;
   min-height: 42px;
@@ -278,10 +267,10 @@
   font-weight: 600;
   cursor: pointer;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-settings-options label:hover {
@@ -290,10 +279,7 @@
 }
 
 .terminal-settings-options label:has(input:checked) {
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-wash);
   color: var(--cc-primary);
-  box-shadow: var(--cc-shadow-xs);
 }
 
 .terminal-settings-options label:has(input:focus-visible) {
@@ -379,11 +365,11 @@
   font-size: 12px;
   font-weight: 620;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-settings-reset-all:hover {
@@ -441,7 +427,7 @@
   column-gap: 24px;
   border-bottom: 1px solid var(--cc-divider);
   padding: 14px 18px;
-  transition: background 150ms ease;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-settings-row:last-child {
@@ -469,6 +455,7 @@
 }
 
 .shortcut-recorder {
+  position: relative;
   display: inline-flex;
   min-width: 118px;
   min-height: 36px;
@@ -481,26 +468,18 @@
   padding: 4px 7px;
   color: var(--cc-foreground);
   font: inherit;
+  isolation: isolate;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .shortcut-recorder:hover {
   border-color: var(--cc-border);
   background: var(--cc-surface-subtle);
   box-shadow: var(--cc-shadow-xs);
-}
-
-.shortcut-recorder[aria-pressed='true'] {
-  justify-content: center;
-  border-color: var(--cc-primary-border);
-  background: var(--cc-primary-soft);
-  box-shadow:
-    0 0 0 3px var(--cc-primary-ring),
-    var(--cc-shadow-xs);
 }
 
 .shortcut-recorder:active:not([aria-pressed='true']) {
@@ -600,18 +579,6 @@
   color: var(--cc-muted);
 }
 
-@keyframes application-settings-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (max-width: 680px) {
   .application-settings-surface--mac .application-settings-header {
     gap: 18px;
@@ -671,10 +638,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .application-settings-surface {
-    animation: none;
-  }
-
   .application-settings-back,
   .terminal-settings-options label,
   .shortcut-settings-reset-all,

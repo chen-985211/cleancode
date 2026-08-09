@@ -38,28 +38,50 @@ describe('workbench object motion styles', () => {
     expect(objectBaseRule).not.toContain('scale(')
   })
 
-  it('uses symmetric group member paths and disables them for reduced motion', () => {
-    const expandKeyframes = readRule('@keyframes workbench-object-group-expand')
-    const collapseKeyframes = readRule('@keyframes workbench-object-group-collapse')
+  it('presents spring-driven group member paths without a competing CSS animation', () => {
+    const spatialMotionRule = readRule('.workbench-object-motion--spatial')
 
-    expect(expandKeyframes).toContain('var(--workbench-object-motion-x)')
-    expect(expandKeyframes).toContain('translate3d(0, 0, 0)')
-    expect(collapseKeyframes).toContain('translate3d(0, 0, 0)')
-    expect(collapseKeyframes).toContain('var(--workbench-object-motion-x)')
+    expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
+    expect(spatialMotionRule).toContain('var(--workbench-object-motion-y)')
+    expect(spatialMotionRule).toContain('var(--workbench-object-motion-opacity)')
+    expect(spatialMotionRule).not.toContain('animation:')
+    expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
+    expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-collapse')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
-  it('opens the stationary group surface while members translate into arranged slots', () => {
-    const joinKeyframes = readRule('@keyframes workbench-terminal-group-join')
-    const reflowKeyframes = readRule('@keyframes workbench-terminal-group-reflow')
+  it('reveals one final-geometry group material while members translate into arranged slots', () => {
+    const spatialMotionRule = readRule('.workbench-object-motion--spatial')
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
     const groupRule = readTerminalGroupRule('.terminal-group-node')
+    const materialRule = readTerminalGroupRule('.terminal-group-node__material')
+    const materialFillRule = readTerminalGroupRule('.terminal-group-node__material::before')
+    const collapsedMaterialFillRule = readTerminalGroupRule(
+      '.terminal-group-node--collapsed > .terminal-group-node__material::before'
+    )
 
-    expect(joinKeyframes).toContain('var(--workbench-object-motion-x)')
-    expect(joinKeyframes).not.toContain('scale(')
-    expect(joinKeyframes).not.toContain('opacity:')
-    expect(reflowKeyframes).toContain('var(--workbench-object-motion-x)')
+    expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
+    expect(spatialMotionRule).not.toContain('scaleX(')
+    expect(spatialMotionRule).not.toContain('scaleY(')
+    expect(objectMotionStyles).toContain('var(--workbench-object-motion-content-opacity)')
+    expect(objectMotionStyles).not.toContain('transform-origin: top left;')
+    expect(groupRule).toContain('background: transparent;')
+    expect(materialRule).toContain('background: transparent;')
+    expect(materialRule).toContain('opacity: var(--workbench-object-motion-content-opacity);')
+    expect(materialRule).not.toContain('transform:')
+    expect(materialFillRule).toContain('background: var(--cc-surface-translucent);')
+    expect(collapsedMaterialFillRule).toContain('background: var(--terminal-group-surface);')
+    expect(objectMotionStyles).toContain(
+      'clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));'
+    )
+    expect(objectMotionStyles).toContain('> .terminal-group-node__material::before')
+    expect(objectMotionStyles).toContain('will-change: clip-path;')
+    expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
+    expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
+    expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')
+    expect(objectMotionStyles).not.toContain('@keyframes workbench-terminal-group-join')
+    expect(objectMotionStyles).not.toContain('@keyframes workbench-terminal-group-reflow')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-join')
     expect(objectMotionStyles).toContain('.workbench-object-motion--group-reflow')
     expect(objectMotionStyles).not.toContain('.workbench-object-motion--group-accept')
@@ -73,6 +95,13 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain(
       '.canvas-surface--dragging-terminal:has(.terminal-group-node--drop-join)'
     )
+  })
+
+  it('keeps retained collapsed terminal surfaces out of interaction and paint', () => {
+    const parkedRule = readStyleRule(terminalNodeStyles, '.terminal-node-anchor--parked')
+
+    expect(parkedRule).toContain('visibility: hidden;')
+    expect(parkedRule).toContain('pointer-events: none;')
   })
 
   it('uses no text or color decoration for group join, leave, or dissolve feedback', () => {

@@ -114,6 +114,11 @@ describe('project sidebar navigation semantics', () => {
     expect(collapsedDisclosure).toHaveAttribute('aria-hidden', 'true')
     expect(collapsedDisclosure).toHaveAttribute('inert')
     expect(screen.queryByRole('button', { name: 'Git 未初始化 默认工作区' })).toBeNull()
+    const closingBranchForm = document.querySelector('.branch-workspace-surface')
+    expect(closingBranchForm).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(closingBranchForm).toHaveAttribute('inert')
+    fireEvent.transitionEnd(closingBranchForm!, { propertyName: 'transform' })
+    expect(closingBranchForm).not.toBeInTheDocument()
 
     fireEvent.click(collapseProject)
 
@@ -196,6 +201,9 @@ describe('project sidebar navigation semantics', () => {
 
     fireEvent.pointerDown(gammaTitle, { button: 0, pointerId: 2, clientX: 20, clientY: 300 })
     fireEvent.pointerMove(window, { pointerId: 2, clientX: 20, clientY: 101 })
+
+    expect(projectCards[2]!.style.getPropertyValue('--project-reorder-y')).toBe('-199px')
+
     fireEvent.pointerUp(window, { pointerId: 2, clientX: 20, clientY: 101 })
 
     expect(onReorderProject).toHaveBeenCalledWith(gamma, '/tmp/alpha-project')

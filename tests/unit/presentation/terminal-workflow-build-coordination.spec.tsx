@@ -228,6 +228,36 @@ describe('terminal workflow build coordination', () => {
     expect(result.current.terminalWorkflowBuildPresentation).toBeNull()
   })
 
+  it('settles an active build when reduced motion changes at runtime', () => {
+    const media = createMutableMediaQueryList(false)
+    vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
+    const graph = createGraph(['terminal-api'])
+    const agentNode = createAgentNode()
+    const nodeStore = createWorkbenchNodeStore([agentNode])
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceId: 'main',
+        moveWorkbenchNode: vi.fn(async () => undefined),
+        moveWorkspaceAgent: vi.fn(async () => undefined),
+        nodeStore,
+        reactFlowInstanceRef: { current: null },
+        setCurrentGraph: (nextGraph) => {
+          nodeStore.setNodes([agentNode, ...createTerminalNodes(nextGraph)])
+        }
+      })
+    )
+    act(() => result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api'])))
+    runAnimationFrame(0)
+    expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(graph.blocks[0]!.position)
+
+    act(() => media.setMatches(true))
+
+    expect(findNode(nodeStore, 'terminal-api').position).toEqual(graph.blocks[0]!.position)
+    expect(result.current.terminalWorkflowBuildPresentation).toBeNull()
+  })
+
   function runAnimationFrame(timestamp: number): void {
     const callbacks = [...animationFrames.values()]
     animationFrames.clear()
@@ -327,4 +357,34 @@ function findNode(nodeStore: ReturnType<typeof createWorkbenchNodeStore>, nodeId
   const node = nodeStore.getNodes().find((candidate) => candidate.id === nodeId)
   if (!node) throw new Error(`Expected node ${nodeId}.`)
   return node
+}
+
+function createMutableMediaQueryList(initialMatches: boolean) {
+  let matches = initialMatches
+  let listener: ((event: MediaQueryListEvent) => void) | null = null
+  const value = {
+    get matches() {
+      return matches
+    },
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: (_type: string, nextListener: EventListenerOrEventListenerObject | null) => {
+      if (typeof nextListener === 'function') {
+        listener = nextListener as (event: MediaQueryListEvent) => void
+      }
+    },
+    removeEventListener: () => {
+      listener = null
+    },
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: () => true
+  } as MediaQueryList
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      listener?.({ matches, media: value.media } as MediaQueryListEvent)
+    },
+    value
+  }
 }

@@ -41,14 +41,20 @@ describe('block template library', () => {
     const onBeginPlacement = vi.fn()
     renderLibrary(onBeginPlacement)
 
-    fireEvent.click(screen.getByRole('button', { name: '收藏模板' }))
+    const trigger = screen.getByRole('button', { name: '收藏模板' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
+    fireEvent.click(trigger)
 
-    expect(await screen.findByRole('dialog', { name: '收藏模板' })).toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: '收藏模板' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'drawer-right')
     expect(screen.queryByText('保存并复用终端、流程和组合。')).not.toBeInTheDocument()
     expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
       scope: { type: 'project', projectId: 'project-1' }
     })
     expect(screen.getByText('本地构建')).toBeInTheDocument()
+    const selectionIndicator = document.querySelector('.block-template-library-tabs__selection')
+    expect(selectionIndicator).toHaveAttribute('data-selection-motion-target', 'project')
 
     fireEvent.change(screen.getByRole('searchbox', { name: '搜索收藏模板' }), {
       target: { value: '不存在' }
@@ -74,6 +80,10 @@ describe('block template library', () => {
     fireEvent.click(screen.getByRole('tab', { name: '全局' }))
 
     expect(await screen.findByText('共享发布')).toBeInTheDocument()
+    expect(document.querySelector('.block-template-library-tabs__selection')).toHaveAttribute(
+      'data-selection-motion-target',
+      'global'
+    )
     await waitFor(() =>
       expect(window.cleancode?.listBlockTemplates).toHaveBeenCalledWith({
         scope: { type: 'global' }
@@ -83,6 +93,24 @@ describe('block template library', () => {
     fireEvent.click(screen.getByRole('button', { name: '放置并运行“共享发布”' }))
 
     expect(onBeginPlacement).toHaveBeenCalledWith(globalTemplate, true)
+  })
+
+  it('keeps the closing drawer inert until its overlay exit completes', async () => {
+    renderLibrary(vi.fn())
+    const trigger = screen.getByRole('button', { name: '收藏模板' })
+    fireEvent.click(trigger)
+    const dialog = await screen.findByRole('dialog', { name: '收藏模板' })
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭收藏模板' }))
+
+    expect(screen.queryByRole('dialog', { name: '收藏模板' })).toBeNull()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('inert')
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(dialog).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it('explains icon-only maintenance actions with tooltips', async () => {

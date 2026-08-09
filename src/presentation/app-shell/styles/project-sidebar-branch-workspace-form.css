@@ -1,12 +1,29 @@
+.branch-workspace-surface {
+  position: absolute;
+  top: 32px;
+  right: 28px;
+  z-index: 58;
+  width: min(218px, calc(100% - 36px));
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-surface-raised);
+  padding: 6px;
+  box-shadow: var(--cc-shadow-floating);
+  opacity: var(--branch-workspace-motion-opacity, 1);
+  transform: translate3d(0, var(--branch-workspace-motion-y, 0px), 0)
+    scale(var(--branch-workspace-motion-scale, 1));
+  transform-origin: top right;
+}
+
+.branch-workspace-surface[data-branch-workspace-spring-state='opening'],
+.branch-workspace-surface[data-branch-workspace-spring-state='closing'] {
+  will-change: opacity, transform;
+}
+
 .branch-workspace-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 5px;
-  margin-top: 4px;
-  border: 1px solid var(--cc-border);
-  border-radius: 8px;
-  background: var(--cc-surface-subtle);
-  padding: 6px;
 }
 
 .branch-workspace-form input {

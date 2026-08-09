@@ -51,10 +51,14 @@ describe('Agent settings pane', () => {
       'https://opencode.ai/docs/cli/'
     )
     expect(screen.getByRole('button', { name: 'Yolo' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('switch', { name: '新 Agent 默认启用 CleanCode MCP' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    )
+    const permissionSelection = document.querySelector('.agent-settings-segmented__selection')
+    expect(permissionSelection).toHaveAttribute('data-selection-motion-target', 'yolo')
+    const defaultMcpSwitch = screen.getByRole('switch', {
+      name: '新 Agent 默认启用 CleanCode MCP'
+    })
+    expect(defaultMcpSwitch).toHaveAttribute('aria-checked', 'true')
+    expect(defaultMcpSwitch).toHaveAttribute('data-selection-motion-state', 'open')
+    expect(defaultMcpSwitch.style.getPropertyValue('--cc-selection-motion-progress')).toBe('1')
     expect(screen.queryByText('选择默认 Agent，并检查本机可用的 CLI。')).not.toBeInTheDocument()
     expect(
       screen.queryByText('Yolo 会在启动时加入该 Agent 支持的免确认参数。')
@@ -64,6 +68,15 @@ describe('Agent settings pane', () => {
     ).not.toBeInTheDocument()
 
     const claudeRow = screen.getByText('Claude Code').closest('.agent-settings-row')!
+    const codexRow = screen.getByText('Codex').closest('.agent-settings-row')!
+    expect(codexRow).toHaveAttribute('data-selection-motion-state', 'open')
+    expect((codexRow as HTMLElement).style.getPropertyValue('--cc-selection-motion-progress')).toBe(
+      '1'
+    )
+    expect(within(codexRow as HTMLElement).getByRole('switch')).toHaveAttribute(
+      'data-selection-motion-state',
+      'open'
+    )
     fireEvent.click(within(claudeRow as HTMLElement).getByRole('button', { name: '设为默认' }))
     await waitFor(() => expect(claudeRow).toHaveAttribute('data-default', 'true'))
     expect(within(claudeRow as HTMLElement).getByRole('button', { name: '默认' })).toBeDisabled()

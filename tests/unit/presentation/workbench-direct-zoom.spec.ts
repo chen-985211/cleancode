@@ -206,6 +206,28 @@ describe('workbench direct zoom controller', () => {
     await vi.waitFor(() => expect(completions).toEqual([instance.viewport]))
   })
 
+  it('settles the current wheel target when reduced motion changes at runtime', async () => {
+    const frames = new TestFrameScheduler()
+    const controller = createWorkbenchDirectZoomController(frames)
+    const instance = createViewportInstance()
+    const completions: Viewport[] = []
+    controller.subscribe(instance.value, ({ viewport }) => completions.push(viewport))
+    controller.retarget(instance.value, {
+      anchor: { x: 300, y: 200 },
+      deltaZoomStops: 0.25,
+      reducedMotion: false
+    })
+    frames.step()
+
+    controller.setReducedMotion(true, instance.value)
+
+    await vi.waitFor(() => expect(instance.viewport.zoom).toBeCloseTo(2 ** 0.25, 10))
+    expect(frames.pendingCount).toBe(0)
+    expect(completions).toEqual([])
+    frames.elapseWithoutFrames(150)
+    await vi.waitFor(() => expect(completions).toEqual([instance.viewport]))
+  })
+
   it('cancels at the current presentation without a late completion', () => {
     const frames = new TestFrameScheduler()
     const controller = createWorkbenchDirectZoomController(frames)

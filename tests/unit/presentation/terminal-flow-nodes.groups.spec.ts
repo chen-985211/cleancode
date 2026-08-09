@@ -55,6 +55,24 @@ describe('terminal flow nodes for terminal groups', () => {
     expect(nodes[0]).toMatchObject({ id: 'development-group', type: 'terminalGroup' })
   })
 
+  it('can project collapsed member templates without making them visible by default', () => {
+    const nodes = createTerminalFlowNodes({
+      graph: createGraph({ isCollapsed: true }),
+      selectedTerminalBlockIds: [],
+      selectedTerminalGroupId: 'development-group',
+      hoveredTerminalBlockId: null,
+      terminalStates: createTerminalStates(),
+      handlers: createHandlers(),
+      includeCollapsedMembers: true
+    })
+
+    expect(nodes.map((node) => node.id)).toEqual([
+      'development-group',
+      'backend-terminal',
+      'frontend-terminal'
+    ])
+  })
+
   it.each([
     { memberCount: 2, expectedHeight: 160 },
     { memberCount: 5, expectedHeight: 268 },

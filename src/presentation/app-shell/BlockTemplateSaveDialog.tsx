@@ -1,6 +1,6 @@
 import { StarIcon } from '@phosphor-icons/react/dist/csr/Star'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
-import { useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import type {
   BlockGraphSnapshot,
@@ -9,17 +9,22 @@ import type {
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import { createBlockTemplate } from '../../contexts/block-graph/domain/services/BlockTemplateProjection'
 import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './SurfaceMotion'
 
 export function BlockTemplateSaveDialog({
   graph,
+  open = true,
   onCancel,
+  onExitComplete,
   onSaved,
   projectDirectory,
   selectedBlockIds,
   workspaceId
 }: {
   readonly graph: BlockGraphSnapshot
+  readonly open?: boolean
   readonly onCancel: () => void
+  readonly onExitComplete?: () => void
   readonly onSaved: (template: BlockTemplateSnapshot) => void
   readonly projectDirectory: string
   readonly selectedBlockIds: readonly string[]
@@ -45,14 +50,37 @@ export function BlockTemplateSaveDialog({
   const [scopeKind, setScopeKind] = useState<'project' | 'global'>('project')
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const nameInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const cancelOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onCancel()
+    }
+    document.addEventListener('keydown', cancelOnEscape)
+    return () => document.removeEventListener('keydown', cancelOnEscape)
+  }, [onCancel, open])
+
+  useLayoutEffect(() => {
+    if (open) nameInputRef.current?.focus()
+  }, [open])
 
   return (
-    <div className="block-template-save-backdrop">
+    <OverlaySurfaceMotion
+      className="block-template-save-backdrop overlay-surface-motion overlay-surface-motion--dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="block-template-save-title"
+      open={open}
+      onExitComplete={onExitComplete}
+      onMouseDown={(event: MouseEvent<HTMLDivElement>) => {
+        if (event.target === event.currentTarget) onCancel()
+      }}
+    >
       <form
-        className="block-template-save-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="block-template-save-title"
+        className="block-template-save-dialog overlay-surface-motion__content"
         onSubmit={(event) => {
           event.preventDefault()
           void saveTemplate()
@@ -73,7 +101,7 @@ export function BlockTemplateSaveDialog({
         <label>
           <span>{t('templates.name')}</span>
           <input
-            autoFocus
+            ref={nameInputRef}
             aria-label={t('templates.name')}
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -119,7 +147,7 @@ export function BlockTemplateSaveDialog({
           </button>
         </footer>
       </form>
-    </div>
+    </OverlaySurfaceMotion>
   )
 
   async function saveTemplate(): Promise<void> {

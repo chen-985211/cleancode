@@ -444,6 +444,8 @@ async function selectTheme(page: Page, theme: 'dark' | 'light'): Promise<void> {
     return document.documentElement.dataset.theme === expectedTheme
   }, theme)
   await page.getByRole('button', { name: '关闭主题设置' }).click()
+  await page.locator('.theme-settings-backdrop').waitFor({ state: 'detached' })
+  await page.waitForFunction(() => document.querySelector('[inert]') === null)
 }
 
 async function initializeGitProject(directory: string): Promise<void> {

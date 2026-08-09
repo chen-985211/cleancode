@@ -10,6 +10,40 @@ import {
 } from '../../../src/presentation/app-shell/applicationShortcuts'
 
 describe('application settings', () => {
+  it('projects the default navigation selection when the delayed settings surface first mounts', () => {
+    const offsetWidth = vi
+      .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.hasAttribute('data-selection-motion-option') ? 180 : 0
+      })
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.hasAttribute('data-selection-motion-option') ? 40 : 0
+      })
+
+    try {
+      render(<SettingsHarness />)
+      fireEvent.click(screen.getByRole('button', { name: '设置' }))
+
+      const navigation = screen.getByRole('navigation', { name: '设置导航' })
+      const indicator = navigation.querySelector('.application-settings-navigation__selection')
+
+      expect(navigation).toHaveAttribute('data-selection-motion-ready', 'true')
+      expect(indicator).toHaveAttribute('data-selection-motion-state', 'settled')
+      expect(
+        (indicator as HTMLElement).style.getPropertyValue('--cc-selection-motion-height')
+      ).toBe('40px')
+      expect((indicator as HTMLElement).style.getPropertyValue('--cc-selection-motion-width')).toBe(
+        '180px'
+      )
+      expect(screen.getByRole('button', { name: '快捷键' })).toHaveAttribute('aria-current', 'page')
+    } finally {
+      offsetWidth.mockRestore()
+      offsetHeight.mockRestore()
+    }
+  })
+
   it('opens as a focused full-app surface while keeping the workbench mounted and inert', () => {
     render(
       <>
@@ -22,11 +56,13 @@ describe('application settings', () => {
     )
 
     const trigger = screen.getByRole('button', { name: '设置' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
     fireEvent.pointerDown(trigger, { pointerType: 'mouse' })
     fireEvent.click(trigger)
 
     const dialog = screen.getByRole('dialog', { name: '设置' })
     expect(dialog).toHaveClass('application-settings-surface')
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'fullscreen-right')
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
     expect(screen.getByLabelText('项目区域').inert).toBe(true)
     expect(screen.getByLabelText('工作区状态').inert).toBe(true)
@@ -59,7 +95,15 @@ describe('application settings', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog', { name: '设置' })).not.toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('inert')
     expect(screen.getByText('保留的终端状态')).toBeInTheDocument()
+    expect(screen.getByLabelText('项目区域').inert).toBe(false)
+    expect(screen.getByLabelText('工作区状态').inert).toBe(false)
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(dialog).not.toBeInTheDocument()
     expect(screen.getByLabelText('项目区域').inert).toBe(false)
     expect(screen.getByLabelText('工作区状态').inert).toBe(false)
     expect(trigger).toHaveFocus()
@@ -73,9 +117,12 @@ describe('application settings', () => {
     })
     expect(within(terminalRecorder).getAllByText(/⌘|T/)).toHaveLength(2)
     expect(terminalRecorder).not.toHaveTextContent('⇧')
+    expect(terminalRecorder).toHaveAttribute('data-selection-motion-state', 'closed')
+    expect(terminalRecorder.style.getPropertyValue('--cc-selection-motion-progress')).toBe('0')
 
     fireEvent.click(terminalRecorder)
     expect(terminalRecorder).toHaveAttribute('aria-pressed', 'true')
+    expect(terminalRecorder).toHaveAttribute('data-selection-motion-state', 'opening')
     expect(terminalRecorder).toHaveTextContent('请按下新的快捷键')
 
     fireEvent.keyDown(terminalRecorder, { key: 'a', metaKey: true, shiftKey: true })
@@ -129,6 +176,26 @@ describe('application settings', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('打开设置 (⌘⌥O)')
   })
 
+  it('does not steal focus back when a new external intent takes over an active exit', () => {
+    render(
+      <>
+        <button type="button">外部目标</button>
+        <SettingsHarness initiallyOpen />
+      </>
+    )
+
+    const dialog = screen.getByRole('dialog', { name: '设置' })
+    const trigger = screen.getByRole('button', { name: '设置' })
+    const externalTarget = screen.getByRole('button', { name: '外部目标' })
+    fireEvent.click(screen.getByRole('button', { name: '返回工作区' }))
+    fireEvent.pointerDown(externalTarget)
+    externalTarget.focus()
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(externalTarget).toHaveFocus()
+    expect(trigger).not.toHaveFocus()
+  })
+
   it('changes the shared terminal scrollback budget from the terminal settings pane', () => {
     render(<SettingsHarness initiallyOpen />)
 
@@ -140,10 +207,39 @@ describe('application settings', () => {
       screen.queryByText('后台终端状态和可见终端视图使用相同的历史上限。')
     ).not.toBeInTheDocument()
     const scrollbackOptions = screen.getByRole('radiogroup', { name: '滚动历史' })
+    expect(
+      scrollbackOptions.querySelector('.terminal-settings-options__selection')
+    ).toHaveAttribute('data-selection-motion-target', '1000')
     expect(within(scrollbackOptions).getAllByRole('radio')).toHaveLength(3)
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).not.toBeChecked()
     fireEvent.click(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' }))
     expect(within(scrollbackOptions).getByRole('radio', { name: '5,000 行' })).toBeChecked()
+  })
+
+  it('moves settings panes along the navigation order and keeps outgoing content inert', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    const selectionIndicator = document.querySelector('.application-settings-navigation__selection')
+    expect(selectionIndicator).toHaveAttribute('data-selection-motion-target', 'shortcuts')
+
+    fireEvent.click(screen.getByRole('button', { name: '终端' }))
+
+    const transition = document.querySelector('.application-settings-pane-transition')
+    const currentPane = document.querySelector('[data-application-settings-pane-role="current"]')
+    const outgoingPane = document.querySelector('[data-application-settings-pane-role="outgoing"]')
+    expect(transition).toHaveAttribute('data-application-settings-pane-direction', 'forward')
+    expect(currentPane).toHaveAttribute('data-application-settings-pane', 'terminal')
+    expect(outgoingPane).toHaveAttribute('data-application-settings-pane', 'shortcuts')
+    expect(outgoingPane).toHaveAttribute('aria-hidden', 'true')
+    expect(outgoingPane).toHaveAttribute('inert')
+    expect(selectionIndicator).toHaveAttribute('data-selection-motion-target', 'terminal')
+
+    fireEvent.click(screen.getByRole('button', { name: '画布' }))
+
+    expect(transition).toHaveAttribute('data-application-settings-pane-direction', 'backward')
+    expect(
+      document.querySelector('[data-application-settings-pane-role="current"]')
+    ).toHaveAttribute('data-application-settings-pane', 'canvas')
   })
 
   it('switches terminal workflow construction between progressive and parallel presentation', () => {
@@ -168,10 +264,13 @@ describe('application settings', () => {
     ).toBeInTheDocument()
     const toggle = screen.getByRole('switch', { name: '减少视觉噪声' })
     expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(toggle).toHaveAttribute('data-selection-motion-state', 'open')
+    expect(toggle.style.getPropertyValue('--cc-selection-motion-progress')).toBe('1')
 
     fireEvent.click(toggle)
 
     expect(toggle).toHaveAttribute('aria-checked', 'false')
+    expect(toggle).toHaveAttribute('data-selection-motion-state', 'closing')
   })
 })
 

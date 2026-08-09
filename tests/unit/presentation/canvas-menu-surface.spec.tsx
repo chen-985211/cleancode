@@ -177,6 +177,22 @@ describe('canvas menu surface', () => {
     expect(scheduler.pendingFrames).toBe(0)
     expect(scheduler.pendingTimeouts).toBe(0)
   })
+
+  it('settles live menu motion when the system preference changes at runtime', () => {
+    const media = createMutableMediaQueryList(false)
+    vi.spyOn(window, 'matchMedia').mockReturnValue(media.value)
+    const scheduler = new TestFrameScheduler()
+    render(<MenuHarness scheduler={scheduler} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开菜单' }))
+    const menu = screen.getByRole('menu', { name: '测试菜单' })
+    act(() => scheduler.step())
+
+    act(() => media.setMatches(true))
+
+    expect(menu).toHaveAttribute('data-motion-state', 'open')
+    expect(scheduler.pendingFrames).toBe(0)
+    expect(scheduler.pendingTimeouts).toBe(0)
+  })
 })
 
 function readMenuScale(menu: HTMLElement): number {
@@ -299,5 +315,35 @@ class TestFrameScheduler implements CanvasMenuMotionFrameScheduler {
       this.timeouts.delete(id)
       timeout.callback()
     }
+  }
+}
+
+function createMutableMediaQueryList(initialMatches: boolean) {
+  let matches = initialMatches
+  let listener: ((event: MediaQueryListEvent) => void) | null = null
+  const value = {
+    get matches() {
+      return matches
+    },
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addEventListener: (_type: string, nextListener: EventListenerOrEventListenerObject | null) => {
+      if (typeof nextListener === 'function') {
+        listener = nextListener as (event: MediaQueryListEvent) => void
+      }
+    },
+    removeEventListener: () => {
+      listener = null
+    },
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: () => true
+  } as MediaQueryList
+  return {
+    setMatches(nextMatches: boolean) {
+      matches = nextMatches
+      listener?.({ matches, media: value.media } as MediaQueryListEvent)
+    },
+    value
   }
 }

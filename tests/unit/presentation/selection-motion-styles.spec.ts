@@ -1,0 +1,72 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const appShellStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/AppShell.css'),
+  'utf8'
+)
+const selectionStyles = readStyles('selection-motion.css')
+const settingsStyles = readStyles('application-settings.css')
+const agentSettingsStyles = readStyles('agent-settings.css')
+const libraryStyles = readStyles('block-template-library.css')
+const themeStyles = readStyles('theme-settings.css')
+
+describe('selection motion styles', () => {
+  it('projects the shared moving material with compositor-only translation', () => {
+    expect(appShellStyles).toContain("@import './styles/selection-motion.css';")
+    const indicatorRule = readRule(selectionStyles, '.selection-motion-indicator')
+
+    expect(indicatorRule).toContain('var(--cc-selection-motion-width, 0px)')
+    expect(indicatorRule).toContain('var(--cc-selection-motion-height, 0px)')
+    expect(indicatorRule).toContain('transform: translate3d(')
+    expect(indicatorRule).toContain('var(--cc-selection-motion-x, 0px)')
+    expect(indicatorRule).toContain('var(--cc-selection-motion-y, 0px)')
+    expect(indicatorRule).not.toContain('transition:')
+  })
+
+  it('uses the shared material in settings navigation and template scope tabs', () => {
+    expect(selectionStyles).toContain('.application-settings-navigation__selection')
+    expect(libraryStyles).toContain('.block-template-library-tabs__selection')
+    expect(readRule(settingsStyles, '.application-settings-navigation button')).toContain(
+      'z-index: 1;'
+    )
+    expect(readRule(libraryStyles, '.block-template-library-tabs button')).toContain('z-index: 1;')
+  })
+
+  it('keeps an initial selected material until delayed settings geometry is projected', () => {
+    expect(selectionStyles).toContain(
+      ".application-settings-navigation:not([data-selection-motion-ready='true'])"
+    )
+    expect(selectionStyles).toContain("button[aria-current='page']::before")
+  })
+
+  it('drives settings switches and stateful choices from shared spring progress', () => {
+    const switchThumbRule = readRule(selectionStyles, '.application-settings-switch span')
+
+    expect(switchThumbRule).toContain('var(--cc-selection-motion-progress, 0)')
+    expect(switchThumbRule).not.toContain('transition: transform')
+    expect(selectionStyles).toContain('.terminal-settings-options__selection')
+    expect(agentSettingsStyles).toContain('.agent-settings-segmented__selection')
+    expect(agentSettingsStyles).toContain('var(--cc-selection-motion-progress, 0)')
+  })
+
+  it('derives theme card emphasis and check presentation from shared selection progress', () => {
+    const previewRule = readRule(themeStyles, '.theme-option__preview')
+    const checkRule = readRule(themeStyles, '.theme-option__check')
+
+    expect(previewRule).toContain('var(--cc-selection-motion-progress, 0)')
+    expect(checkRule).toContain('var(--cc-selection-motion-progress, 0)')
+    expect(previewRule).not.toContain('transform var(')
+  })
+})
+
+function readStyles(fileName: string): string {
+  return readFileSync(
+    resolve(process.cwd(), 'src', 'presentation', 'app-shell', 'styles', fileName),
+    'utf8'
+  )
+}
+
+function readRule(styles: string, selector: string): string {
+  return styles.split(`${selector} {`)[1]?.split('\n}')[0] ?? ''
+}

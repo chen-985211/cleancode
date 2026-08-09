@@ -1,4 +1,10 @@
 import type { TerminalGroupDropFeedback } from './types'
+import {
+  advanceSpringAxis,
+  isSpringAxisSettled,
+  retargetSpringAxis,
+  type SpringAxis
+} from './motionSpring'
 
 export interface TerminalGroupDropSpringSurface {
   readonly classList: Pick<DOMTokenList, 'add' | 'remove'>
@@ -36,7 +42,6 @@ export const terminalGroupDropEngagedScale = 1.012
 export const terminalGroupDropRemovalScale = 0.988
 const springResponse = 0.36
 const springDampingRatio = 0.72
-const maximumFrameDeltaSeconds = 1 / 30
 const settlementThresholds = { speed: 0.0005, value: 0.00002 }
 
 const browserFrameScheduler: TerminalGroupDropSpringFrameScheduler = {
@@ -75,7 +80,7 @@ export function createTerminalGroupDropSpringController({
 
   const advanceFrame = (timestamp: number): void => {
     animationFrameId = null
-    const deltaSeconds = clamp((timestamp - lastFrameTimestamp) / 1000, 0, maximumFrameDeltaSeconds)
+    const deltaSeconds = Math.max(0, (timestamp - lastFrameTimestamp) / 1000)
     lastFrameTimestamp = timestamp
     let hasUnsettledSurface = false
 
@@ -122,7 +127,7 @@ export function createTerminalGroupDropSpringController({
 
       if (feedbackSurface && feedbackSurface !== nextSurface) {
         const previousState = surfaceStates.get(feedbackSurface)
-        if (previousState) previousState.target = restingScale
+        if (previousState) retargetSurfaceSpring(previousState, restingScale)
       }
 
       feedbackSurface = nextSurface
@@ -134,7 +139,7 @@ export function createTerminalGroupDropSpringController({
           target,
           velocity: 0
         }
-        nextState.target = target
+        retargetSurfaceSpring(nextState, target)
         surfaceStates.set(nextSurface, nextState)
         presentSurface(nextSurface, nextState)
       }
@@ -153,40 +158,35 @@ function advanceDampedScaleSpring(
   state: SurfaceSpringState,
   deltaSeconds: number
 ): SurfaceSpringState {
-  if (deltaSeconds <= 0) return state
-
-  const angularFrequency = (2 * Math.PI) / springResponse
-  const dampedFrequency = angularFrequency * Math.sqrt(1 - springDampingRatio * springDampingRatio)
-  const displacement = state.scale - state.target
-  const velocityCoefficient =
-    (state.velocity + springDampingRatio * angularFrequency * displacement) / dampedFrequency
-  const decay = Math.exp(-springDampingRatio * angularFrequency * deltaSeconds)
-  const cosine = Math.cos(dampedFrequency * deltaSeconds)
-  const sine = Math.sin(dampedFrequency * deltaSeconds)
-  const nextDisplacement = decay * (displacement * cosine + velocityCoefficient * sine)
-  const nextVelocity =
-    decay *
-    (-springDampingRatio * angularFrequency * (displacement * cosine + velocityCoefficient * sine) +
-      dampedFrequency * (-displacement * sine + velocityCoefficient * cosine))
+  const nextAxis = advanceSpringAxis(
+    toSpringAxis(state),
+    state.target,
+    { dampingRatio: springDampingRatio, response: springResponse },
+    deltaSeconds
+  )
 
   return {
-    scale: state.target + nextDisplacement,
+    scale: nextAxis.value,
     target: state.target,
-    velocity: nextVelocity
+    velocity: nextAxis.velocity
   }
 }
 
 function isScaleSpringSettled(state: SurfaceSpringState): boolean {
-  return (
-    Math.abs(state.scale - state.target) <= settlementThresholds.value &&
-    Math.abs(state.velocity) <= settlementThresholds.speed
-  )
+  return isSpringAxisSettled(toSpringAxis(state), state.target, settlementThresholds)
+}
+
+function retargetSurfaceSpring(state: SurfaceSpringState, target: number): void {
+  const axis = retargetSpringAxis(toSpringAxis(state), target, 'preserve')
+  state.scale = axis.value
+  state.target = target
+  state.velocity = axis.velocity
+}
+
+function toSpringAxis(state: SurfaceSpringState): SpringAxis {
+  return { value: state.scale, velocity: state.velocity }
 }
 
 function roundScale(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(Math.max(value, minimum), maximum)
 }

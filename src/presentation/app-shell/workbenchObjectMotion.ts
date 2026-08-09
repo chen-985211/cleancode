@@ -104,6 +104,16 @@ export function projectWorkbenchObjectMotion({
   const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
   const membershipMotion = resolveGroupMembershipMotion(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
+    if (node.type === 'terminalGroup') {
+      const currentNode = currentNodesById.get(node.id)
+      if (
+        currentNode?.type === 'terminalGroup' &&
+        currentNode.data.group.isCollapsed !== node.data.group.isCollapsed
+      ) {
+        return withObjectMotion(node, createGroupShellMotion(node, createMotionId))
+      }
+    }
+
     if (node.type === 'terminal' && membershipMotion.joinedMemberIds.has(node.id)) {
       const currentNode = currentNodesById.get(node.id)
       return withObjectMotion(
@@ -141,11 +151,30 @@ export function projectWorkbenchObjectMotion({
       )
     }
 
-    if (currentNodesById.has(node.id) || isWorkflowBuildNode(node)) {
+    const origin = expandingMemberOrigins.get(node.id)
+    const currentNode = currentNodesById.get(node.id)
+    if (
+      node.type === 'terminal' &&
+      origin &&
+      currentNode?.type === 'terminal' &&
+      (currentNode.data.objectMotion?.kind === 'group-collapse' ||
+        currentNode.data.isParkedInCollapsedGroup)
+    ) {
+      return withObjectMotion(
+        node,
+        createObjectMotion(
+          'group-expand',
+          node.id,
+          resolveOffsetFromOrigin(node, origin),
+          createMotionId
+        )
+      )
+    }
+
+    if (currentNode || isWorkflowBuildNode(node)) {
       return node
     }
 
-    const origin = expandingMemberOrigins.get(node.id)
     return withObjectMotion(
       node,
       createObjectMotion(
@@ -164,6 +193,19 @@ export function projectWorkbenchObjectMotion({
   })
 
   return { exitingNodes, nodes }
+}
+
+function createGroupShellMotion(
+  nextNode: Extract<WorkbenchFlowNode, { readonly type: 'terminalGroup' }>,
+  createMotionId: ProjectWorkbenchObjectMotionInput['createMotionId']
+): WorkbenchObjectMotion {
+  const kind = nextNode.data.group.isCollapsed ? 'group-collapse' : 'group-expand'
+
+  return {
+    ...createObjectMotion(kind, nextNode.id, { x: 0, y: 0 }, createMotionId),
+    contentOpacity: { from: 0, to: 1 },
+    opacity: { from: 1, to: 1 }
+  }
 }
 
 function resolveGroupMembershipMotion(
@@ -249,8 +291,8 @@ function resolveCollapsingMemberExits({
       const memberNode = currentNodesById.get(memberBlockId)
       if (memberNode?.type !== 'terminal') return
 
-      exitingNodes.push(
-        withObjectMotion(
+      exitingNodes.push({
+        ...withObjectMotion(
           memberNode,
           createObjectMotion(
             'group-collapse',
@@ -258,8 +300,10 @@ function resolveCollapsingMemberExits({
             resolveOffsetFromOrigin(memberNode, origin),
             createMotionId
           )
-        )
-      )
+        ),
+        draggable: false,
+        selectable: false
+      })
     })
   })
 

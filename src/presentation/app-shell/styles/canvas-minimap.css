@@ -1,0 +1,252 @@
+.canvas-minimap-panel {
+  z-index: 5;
+  margin: 12px;
+  pointer-events: auto;
+}
+
+.canvas-minimap {
+  --canvas-minimap-panel-height: 0px;
+  --canvas-minimap-panel-gap: 0px;
+  --canvas-minimap-panel-opacity: 0;
+  --canvas-minimap-toggle-rotation: 0deg;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.canvas-minimap__panel {
+  position: relative;
+  width: 184px;
+  height: var(--canvas-minimap-panel-height);
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 9px;
+  background: var(--cc-canvas);
+  margin-bottom: var(--canvas-minimap-panel-gap);
+  opacity: var(--canvas-minimap-panel-opacity);
+  box-shadow:
+    0 0 0 1px var(--cc-border) inset,
+    var(--cc-shadow-xs);
+}
+
+.canvas-minimap:is(
+    [data-canvas-minimap-motion-state='opening'],
+    [data-canvas-minimap-motion-state='closing']
+  )
+  .canvas-minimap__panel {
+  will-change: height, opacity;
+}
+
+.canvas-minimap__map-frame {
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-radius: inherit;
+  background: var(--cc-canvas);
+}
+
+.canvas-minimap__map {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  overflow: visible;
+  touch-action: none;
+}
+
+.canvas-minimap__map:active {
+  cursor: grabbing;
+}
+
+.canvas-minimap__hit-area {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.canvas-minimap__viewport-frame {
+  fill: var(--cc-foreground);
+  fill-opacity: 0.035;
+  stroke: var(--cc-muted-strong);
+  stroke-opacity: 0.62;
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.canvas-minimap__node {
+  cursor: pointer;
+  outline: none;
+}
+
+.canvas-minimap__node-shell {
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-minimap__group-ring,
+.canvas-minimap__group-shell,
+.canvas-minimap__group-header,
+.canvas-minimap__group-member {
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-minimap__node-shell,
+.canvas-minimap__node-header,
+.canvas-minimap__node-screen,
+.canvas-minimap__node-status,
+.canvas-minimap__agent-icon,
+.canvas-minimap__agent-body,
+.canvas-minimap__group-ring,
+.canvas-minimap__group-shell,
+.canvas-minimap__group-header,
+.canvas-minimap__group-member {
+  transition:
+    fill var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    stroke var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    stroke-width var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.canvas-surface--dragging-terminal .canvas-minimap__node-shell,
+.canvas-surface--dragging-terminal .canvas-minimap__node-header,
+.canvas-surface--dragging-terminal .canvas-minimap__node-screen,
+.canvas-surface--dragging-terminal .canvas-minimap__node-status,
+.canvas-surface--dragging-terminal .canvas-minimap__agent-icon,
+.canvas-surface--dragging-terminal .canvas-minimap__agent-body,
+.canvas-surface--dragging-terminal .canvas-minimap__group-ring,
+.canvas-surface--dragging-terminal .canvas-minimap__group-shell,
+.canvas-surface--dragging-terminal .canvas-minimap__group-header,
+.canvas-surface--dragging-terminal .canvas-minimap__group-member {
+  transition: none;
+}
+
+.canvas-minimap__node-header {
+  opacity: 0.36;
+}
+
+.canvas-minimap__agent-header {
+  opacity: 0.72;
+}
+
+.canvas-minimap__node-screen {
+  opacity: 0.28;
+}
+
+.canvas-minimap__node:hover .canvas-minimap__node-shell,
+.canvas-minimap__node--highlighted .canvas-minimap__node-shell,
+.canvas-minimap__node:focus-visible .canvas-minimap__node-shell {
+  stroke: var(--cc-primary);
+  stroke-width: 1.5;
+}
+
+.canvas-minimap__node:hover .canvas-minimap__node-header,
+.canvas-minimap__node--highlighted .canvas-minimap__node-header,
+.canvas-minimap__node--selected .canvas-minimap__node-header {
+  opacity: 0.52;
+}
+
+.canvas-minimap__node:hover .canvas-minimap__agent-header,
+.canvas-minimap__node--highlighted .canvas-minimap__agent-header,
+.canvas-minimap__node--selected .canvas-minimap__agent-header {
+  opacity: 0.9;
+}
+
+.canvas-minimap__node--selected .canvas-minimap__node-shell {
+  stroke: var(--cc-primary);
+  stroke-width: 1.85;
+}
+
+.canvas-minimap__node--terminal-group:hover .canvas-minimap__group-ring,
+.canvas-minimap__node--terminal-group:focus-visible .canvas-minimap__group-ring,
+.canvas-minimap__node--terminal-group.canvas-minimap__node--selected .canvas-minimap__group-ring {
+  opacity: 0.72;
+  stroke: var(--cc-primary);
+}
+
+.canvas-minimap__map-controls {
+  display: flex;
+  height: 28px;
+  box-sizing: border-box;
+  align-items: center;
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  background: var(--cc-chrome-translucent);
+  padding: 1px;
+  opacity: 1;
+  box-shadow: var(--cc-shadow-xs);
+  backdrop-filter: blur(8px);
+}
+
+.canvas-minimap__navigation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-minimap__viewport-controls {
+  display: flex;
+  height: 28px;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 1px;
+  border: 1px solid var(--cc-border);
+  border-radius: 8px;
+  background: var(--cc-chrome-translucent);
+  padding: 1px 2px;
+  color: var(--cc-muted-strong);
+  box-shadow: var(--cc-shadow-xs);
+  backdrop-filter: blur(8px);
+}
+
+.canvas-minimap__map-controls .icon-button--small,
+.canvas-minimap__viewport-controls .icon-button--small {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--cc-muted-strong);
+}
+
+.canvas-minimap__map-controls .icon-button--small:hover:not(:disabled),
+.canvas-minimap__viewport-controls .icon-button--small:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-primary);
+  box-shadow: none;
+}
+
+.canvas-minimap__toggle svg {
+  transform: rotate(var(--canvas-minimap-toggle-rotation));
+  transform-origin: center;
+}
+
+.canvas-minimap:is(
+    [data-canvas-minimap-motion-state='opening'],
+    [data-canvas-minimap-motion-state='closing']
+  )
+  .canvas-minimap__toggle
+  svg {
+  will-change: transform;
+}
+
+.canvas-minimap__viewport-controls output {
+  display: inline-flex;
+  width: 38px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: var(--cc-muted-strong);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.canvas-minimap__viewport-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--cc-divider);
+}

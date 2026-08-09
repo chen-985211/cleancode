@@ -1,17 +1,21 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import type { AppNotification, AppNotificationInput } from './appNotifications'
-import { NotificationCenter } from './NotificationCenter'
+import type { AppNotificationInput } from './appNotifications'
+import { NotificationCenter, type AppNotificationPresentation } from './NotificationCenter'
 import { NotificationContext } from './useNotifications'
 
 export function NotificationProvider({ children }: { readonly children: ReactNode }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [notifications, setNotifications] = useState<AppNotificationPresentation[]>([])
   const notificationIds = useRef(new Set<string>())
   const nextNotificationId = useRef(0)
   const dismiss = useCallback((notificationId: string) => {
     notificationIds.current.delete(notificationId)
     setNotifications((current) =>
-      current.filter((notification) => notification.id !== notificationId)
+      current.map((presentation) =>
+        presentation.notification.id === notificationId
+          ? { ...presentation, open: false }
+          : presentation
+      )
     )
   }, [])
   const notify = useCallback((notification: AppNotificationInput): string => {
@@ -19,7 +23,10 @@ export function NotificationProvider({ children }: { readonly children: ReactNod
     const id = `app-notification-${nextNotificationId.current}`
 
     notificationIds.current.add(id)
-    setNotifications((current) => [...current, { ...notification, id }])
+    setNotifications((current) => [
+      ...current,
+      { notification: { ...notification, id }, open: true }
+    ])
 
     return id
   }, [])
@@ -30,8 +37,10 @@ export function NotificationProvider({ children }: { readonly children: ReactNod
       }
 
       setNotifications((current) =>
-        current.map((item) =>
-          item.id === notificationId ? { ...notification, id: notificationId } : item
+        current.map((presentation) =>
+          presentation.notification.id === notificationId
+            ? { ...presentation, notification: { ...notification, id: notificationId } }
+            : presentation
         )
       )
       return true
@@ -39,11 +48,20 @@ export function NotificationProvider({ children }: { readonly children: ReactNod
     []
   )
   const value = useMemo(() => ({ dismiss, notify, update }), [dismiss, notify, update])
+  const removePresentedNotification = useCallback((notificationId: string): void => {
+    setNotifications((current) =>
+      current.filter((presentation) => presentation.notification.id !== notificationId)
+    )
+  }, [])
 
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      <NotificationCenter notifications={notifications} onDismiss={dismiss} />
+      <NotificationCenter
+        notifications={notifications}
+        onDismiss={dismiss}
+        onExitComplete={removePresentedNotification}
+      />
     </NotificationContext.Provider>
   )
 }

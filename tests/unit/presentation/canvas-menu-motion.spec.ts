@@ -103,6 +103,19 @@ describe('canvas menu motion', () => {
     expect(harness.current).toEqual({ phase: 'closed', progress: 0, velocity: 0 })
     expect(harness.scheduler.pendingFrames).toBe(0)
   })
+
+  it('settles the current intent when reduced motion changes at runtime', async () => {
+    const harness = createHarness()
+    const opening = harness.controller.setOpen(true)
+    harness.scheduler.step()
+
+    harness.controller.setReducedMotion(true)
+
+    await expect(opening).resolves.toBe(true)
+    expect(harness.current).toEqual({ phase: 'open', progress: 1, velocity: 0 })
+    expect(harness.scheduler.pendingFrames).toBe(0)
+    expect(harness.scheduler.pendingTimeouts).toBe(0)
+  })
 })
 
 function createHarness({ reducedMotion = false }: { readonly reducedMotion?: boolean } = {}) {

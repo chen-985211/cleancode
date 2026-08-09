@@ -1,11 +1,22 @@
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent
+} from 'react'
 
 import type { ThemePreference } from './themePreference'
 import { useI18n } from './i18n/useI18n'
+import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
+import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useSelectionFeedbackMotion } from './useSelectionMotion'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
 
@@ -14,12 +25,17 @@ export function ThemeSettingsRoot() {
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLElement | null>(null)
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef, {
+    settleImmediately: isOpen
+  })
+  const { beginFocusRestore, cancelFocusRestore, completeFocusRestore } =
+    useInterruptibleSurfaceFocusRestore(dialogRef, triggerRef)
   const { preference, selectPreference } = useThemePreference()
   const { t } = useI18n()
-  const closeSettings = (): void => {
+  const closeSettings = useCallback((): void => {
+    beginFocusRestore()
     setIsOpen(false)
-    triggerRef.current?.focus()
-  }
+  }, [beginFocusRestore])
 
   useEffect(() => {
     if (!isOpen) {
@@ -27,13 +43,6 @@ export function ThemeSettingsRoot() {
     }
 
     closeButtonRef.current?.focus()
-    const backgroundRegions = Array.from(
-      document.querySelectorAll<HTMLElement>('.project-sidebar, .app-shell__workspace')
-    )
-    for (const region of backgroundRegions) {
-      region.inert = true
-    }
-
     const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
       if (event.key === 'Escape') {
         closeSettings()
@@ -43,92 +52,75 @@ export function ThemeSettingsRoot() {
 
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
-      for (const region of backgroundRegions) {
-        region.inert = false
-      }
     }
-  }, [isOpen])
+  }, [closeSettings, isOpen])
 
   return (
     <>
       <TooltipLabel content={t('theme.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="theme-settings-trigger"
+          className="theme-settings-trigger app-shell-utility-button"
           type="button"
           aria-label={t('theme.settings')}
           aria-controls="theme-settings-dialog"
           aria-expanded={isOpen}
           aria-haspopup="dialog"
-          onClick={() => setIsOpen(true)}
+          {...triggerMotionProps}
+          onClick={() => {
+            cancelFocusRestore()
+            setIsOpen(true)
+          }}
         >
           <span className="theme-settings-trigger__palette-icon" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen ? (
-        <div className="theme-settings-backdrop" onMouseDown={closeFromBackdrop}>
-          <aside
-            id="theme-settings-dialog"
-            ref={dialogRef}
-            className="theme-settings-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="theme-settings-title"
-            onKeyDown={(event) => trapDialogFocus(event, dialogRef.current)}
-          >
-            <div className="theme-settings-drawer__header">
-              <div>
-                <h2 id="theme-settings-title">{t('theme.settings')}</h2>
-                <p>{t('theme.description')}</p>
-              </div>
-              <TooltipLabel content={t('theme.close')} side="left">
-                <button
-                  ref={closeButtonRef}
-                  className="theme-settings-drawer__close"
-                  type="button"
-                  aria-label={t('theme.close')}
-                  onClick={closeSettings}
-                >
-                  <XIcon size={18} weight="bold" aria-hidden="true" />
-                </button>
-              </TooltipLabel>
+      <OverlaySurfaceMotion
+        id="theme-settings-dialog"
+        className="theme-settings-backdrop overlay-surface-motion overlay-surface-motion--drawer-right"
+        springPreset="drawer-right"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="theme-settings-title"
+        open={isOpen}
+        onExitComplete={completeFocusRestore}
+        onMouseDown={closeFromBackdrop}
+        onKeyDown={(event) => trapDialogFocus(event, dialogRef.current)}
+      >
+        <aside ref={dialogRef} className="theme-settings-drawer overlay-surface-motion__content">
+          <div className="theme-settings-drawer__header">
+            <div>
+              <h2 id="theme-settings-title">{t('theme.settings')}</h2>
+              <p>{t('theme.description')}</p>
             </div>
-            <fieldset className="theme-settings-options">
-              <legend>{t('theme.section')}</legend>
-              <div className="theme-settings-options__grid">
-                {themePreferences.map((option) => (
-                  <label className="theme-option" key={option}>
-                    <input
-                      type="radio"
-                      name="theme-preference"
-                      value={option}
-                      checked={preference === option}
-                      onChange={() => selectPreference(option)}
-                    />
-                    <span
-                      className={`theme-option__preview theme-option__preview--${option}`}
-                      aria-hidden="true"
-                    >
-                      <span className="theme-option__preview-sidebar" />
-                      <span className="theme-option__preview-content">
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                      {preference === option ? (
-                        <span className="theme-option__check">
-                          <CheckIcon size={13} weight="bold" aria-hidden="true" />
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="theme-option__label">{themeLabel(option)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </aside>
-        </div>
-      ) : null}
+            <TooltipLabel content={t('theme.close')} side="left">
+              <button
+                ref={closeButtonRef}
+                className="theme-settings-drawer__close"
+                type="button"
+                aria-label={t('theme.close')}
+                onClick={closeSettings}
+              >
+                <XIcon size={18} weight="bold" aria-hidden="true" />
+              </button>
+            </TooltipLabel>
+          </div>
+          <fieldset className="theme-settings-options">
+            <legend>{t('theme.section')}</legend>
+            <div className="theme-settings-options__grid">
+              {themePreferences.map((option) => (
+                <ThemeOption
+                  key={option}
+                  option={option}
+                  selected={preference === option}
+                  label={themeLabel(option)}
+                  onSelect={selectPreference}
+                />
+              ))}
+            </div>
+          </fieldset>
+        </aside>
+      </OverlaySurfaceMotion>
     </>
   )
 
@@ -143,6 +135,48 @@ export function ThemeSettingsRoot() {
     if (option === 'light') return t('theme.light')
     return t('theme.dark')
   }
+}
+
+function ThemeOption({
+  label,
+  onSelect,
+  option,
+  selected
+}: {
+  readonly label: string
+  readonly onSelect: (preference: ThemePreference) => void
+  readonly option: ThemePreference
+  readonly selected: boolean
+}) {
+  const selectionMotionRef = useSelectionFeedbackMotion(selected)
+
+  return (
+    <label className="theme-option">
+      <input
+        type="radio"
+        name="theme-preference"
+        value={option}
+        checked={selected}
+        onChange={() => onSelect(option)}
+      />
+      <span
+        ref={selectionMotionRef}
+        className={`theme-option__preview theme-option__preview--${option}`}
+        aria-hidden="true"
+      >
+        <span className="theme-option__preview-sidebar" />
+        <span className="theme-option__preview-content">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="theme-option__check">
+          <CheckIcon size={13} weight="bold" aria-hidden="true" />
+        </span>
+      </span>
+      <span className="theme-option__label">{label}</span>
+    </label>
+  )
 }
 
 function trapDialogFocus(event: KeyboardEvent<HTMLElement>, dialog: HTMLElement | null): void {

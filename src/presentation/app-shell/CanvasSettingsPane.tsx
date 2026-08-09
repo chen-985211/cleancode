@@ -1,4 +1,5 @@
 import { useI18n } from './i18n/useI18n'
+import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
 
 export function CanvasSettingsPane({
   reduceVisualNoise,
@@ -21,17 +22,12 @@ export function CanvasSettingsPane({
             <strong>{t('settings.canvas.reduceVisualNoise')}</strong>
             <span id={descriptionId}>{t('settings.canvas.reduceVisualNoiseDescription')}</span>
           </span>
-          <button
-            aria-checked={reduceVisualNoise}
+          <ApplicationSettingsSwitch
+            checked={reduceVisualNoise}
             aria-describedby={descriptionId}
-            aria-label={t('settings.canvas.reduceVisualNoise')}
-            className="application-settings-switch"
-            role="switch"
-            type="button"
+            label={t('settings.canvas.reduceVisualNoise')}
             onClick={() => onReduceVisualNoiseChange(!reduceVisualNoise)}
-          >
-            <span />
-          </button>
+          />
         </div>
       </section>
     </div>

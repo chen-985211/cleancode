@@ -59,6 +59,33 @@ describe('block template save dialog', () => {
     expect(onSaved).toHaveBeenCalledOnce()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
+
+  it('retains an inert modal surface while a controlled close exits', () => {
+    const props = {
+      graph: createGraph(),
+      projectDirectory: '/repo',
+      selectedBlockIds: ['terminal-a', 'terminal-b'],
+      workspaceId: 'main',
+      onCancel: vi.fn(),
+      onSaved: vi.fn()
+    }
+    const { rerender } = render(
+      <I18nProvider initialLocale="zh-CN">
+        <BlockTemplateSaveDialog {...props} open />
+      </I18nProvider>
+    )
+    const dialog = screen.getByRole('dialog', { name: '收藏当前配置' })
+
+    rerender(
+      <I18nProvider initialLocale="zh-CN">
+        <BlockTemplateSaveDialog {...props} open={false} />
+      </I18nProvider>
+    )
+
+    expect(screen.queryByRole('dialog', { name: '收藏当前配置' })).toBeNull()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('inert')
+  })
 })
 
 function createGraph() {

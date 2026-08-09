@@ -12,6 +12,7 @@ import {
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { WorkbenchFlowNode } from './types'
+import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
 import {
   createWorkbenchViewportFlight,
   resolveWorkbenchViewportFlightPresentation,
@@ -38,6 +39,10 @@ import {
 } from './workbenchViewportMotionEnvironment'
 import { cancelWorkbenchDirectZoom } from './workbenchDirectZoom'
 import { applyWorkbenchViewport } from './workbenchViewportAdapter'
+import {
+  resolveWorkbenchCommandCanvasSize,
+  resolveWorkbenchZoomTarget
+} from './workbenchViewportMotionTarget'
 
 export { prefersReducedMotion } from './workbenchViewportMotionEnvironment'
 
@@ -76,6 +81,10 @@ export type WorkbenchViewportMotionPresentationListener = (viewport: Viewport) =
 export interface WorkbenchViewportMotionController {
   readonly cancel: (instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>) => void
   readonly readPresentation: (instance: ReactFlowInstance<WorkbenchFlowNode, Edge>) => Viewport
+  readonly setReducedMotion: (
+    reducedMotion: boolean,
+    instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  ) => void
   readonly subscribe: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: WorkbenchViewportMotionCompletionListener
@@ -194,7 +203,7 @@ export function resolveWorkbenchViewportCommandTarget(
   command: WorkbenchViewportCommand,
   currentViewport = instance.getViewport()
 ): Viewport {
-  const canvasSize = resolveCommandCanvasSize(command)
+  const canvasSize = resolveWorkbenchCommandCanvasSize(command.intent, fallbackCanvasSize)
 
   switch (command.type) {
     case 'center': {
@@ -218,7 +227,7 @@ export function resolveWorkbenchViewportCommandTarget(
       const nodes = (command.nodes ?? instance.getNodes())
         .map((node) => ('position' in node ? node : instance.getNode(node.id)))
         .filter((node): node is WorkbenchFlowNode =>
-          Boolean(node && (command.includeHiddenNodes || !node.hidden))
+          Boolean(node && (command.includeHiddenNodes || !isWorkbenchNodePresentationHidden(node)))
         )
       if (nodes.length === 0) {
         return currentViewport
@@ -235,9 +244,9 @@ export function resolveWorkbenchViewportCommandTarget(
     case 'set-viewport':
       return command.viewport
     case 'zoom-in':
-      return resolveZoomTarget(currentViewport, canvasSize, 1.2)
+      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, 1.2)
     case 'zoom-out':
-      return resolveZoomTarget(currentViewport, canvasSize, 1 / 1.2)
+      return resolveWorkbenchZoomTarget(currentViewport, canvasSize, 1 / 1.2)
   }
 }
 
@@ -468,7 +477,7 @@ export function createWorkbenchViewportMotionController(
     command: WorkbenchViewportCommand
   ): Promise<boolean> => {
     const currentViewport = readPresentation(instance)
-    const canvasSize = resolveCommandCanvasSize(command)
+    const canvasSize = resolveWorkbenchCommandCanvasSize(command.intent, fallbackCanvasSize)
     const target = resolveWorkbenchViewportCommandTarget(instance, command, currentViewport)
     const targetCamera = resolveWorkbenchViewportCamera(target, canvasSize)
     const transitionOptions = resolveWorkbenchViewportTransition({
@@ -551,7 +560,22 @@ export function createWorkbenchViewportMotionController(
     })
   }
 
-  return { cancel, readPresentation, subscribe, subscribePresentation, transition }
+  const setReducedMotion = (
+    reducedMotion: boolean,
+    instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  ): void => {
+    if (!reducedMotion || !activeMotion || (instance && activeMotion.instance !== instance)) return
+    finishMotion(activeMotion)
+  }
+
+  return {
+    cancel,
+    readPresentation,
+    setReducedMotion,
+    subscribe,
+    subscribePresentation,
+    transition
+  }
 }
 
 const browserViewportMotionController = createWorkbenchViewportMotionController(
@@ -578,6 +602,13 @@ export function cancelWorkbenchViewportMotion(
   browserViewportMotionController.cancel(instance)
 }
 
+export function setWorkbenchViewportReducedMotion(
+  reducedMotion: boolean,
+  instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+): void {
+  browserViewportMotionController.setReducedMotion(reducedMotion, instance)
+}
+
 export function subscribeWorkbenchViewportMotionCompletion(
   instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
   listener: WorkbenchViewportMotionCompletionListener
@@ -590,44 +621,6 @@ export function subscribeWorkbenchViewportMotionPresentation(
   listener: WorkbenchViewportMotionPresentationListener
 ): () => void {
   return browserViewportMotionController.subscribePresentation(instance, listener)
-}
-
-function resolveCommandCanvasSize(command: WorkbenchViewportCommand): {
-  readonly height: number
-  readonly width: number
-} {
-  if (
-    command.intent.type === 'adaptive-focus' &&
-    command.intent.canvasSize.width > 0 &&
-    command.intent.canvasSize.height > 0
-  ) {
-    return command.intent.canvasSize
-  }
-
-  const canvas = typeof document === 'undefined' ? null : document.querySelector('.react-flow')
-  if (canvas instanceof HTMLElement && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-    return { height: canvas.clientHeight, width: canvas.clientWidth }
-  }
-  return fallbackCanvasSize
-}
-
-function resolveZoomTarget(
-  currentViewport: Viewport,
-  canvasSize: { readonly height: number; readonly width: number },
-  factor: number
-): Viewport {
-  const zoom = Math.min(
-    maximumCanvasZoom,
-    Math.max(minimumCanvasZoom, currentViewport.zoom * factor)
-  )
-  const centerX = (canvasSize.width / 2 - currentViewport.x) / currentViewport.zoom
-  const centerY = (canvasSize.height / 2 - currentViewport.y) / currentViewport.zoom
-
-  return {
-    x: canvasSize.width / 2 - centerX * zoom,
-    y: canvasSize.height / 2 - centerY * zoom,
-    zoom
-  }
 }
 
 function isMotionSettled(motion: ActiveViewportMotion): boolean {

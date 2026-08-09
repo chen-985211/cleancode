@@ -10,10 +10,10 @@
   background: transparent;
   color: var(--cc-muted-strong);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
   -webkit-app-region: no-drag;
 }
 
@@ -29,7 +29,6 @@
   opacity: 0.42;
 }
 
-.block-template-library-trigger:active:not(:disabled),
 .block-template-library-close:active {
   transform: scale(0.96);
 }
@@ -40,7 +39,6 @@
   inset: 0;
   background: var(--cc-backdrop);
   backdrop-filter: blur(4px);
-  animation: theme-backdrop-in 160ms ease-out;
 }
 
 .block-template-library-drawer {
@@ -57,7 +55,6 @@
   color: var(--cc-foreground);
   box-shadow: var(--cc-shadow-floating);
   backdrop-filter: blur(20px) saturate(130%);
-  animation: theme-drawer-in 180ms ease-out;
 }
 
 .block-template-library-header {
@@ -93,15 +90,28 @@
 }
 
 .block-template-library-tabs {
+  position: relative;
   display: grid;
   min-width: 0;
   grid-template-columns: 1fr 1fr;
+  isolation: isolate;
   padding: 3px;
   border-radius: 10px;
   background: var(--cc-surface-subtle);
 }
 
+.block-template-library-tabs__selection {
+  z-index: 0;
+  border-radius: 8px;
+  background: var(--cc-surface-raised);
+  box-shadow:
+    inset 0 1px 0 var(--cc-highlight-inset),
+    var(--cc-shadow-xs);
+}
+
 .block-template-library-tabs button {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   border: 0;
   border-radius: 8px;
@@ -115,9 +125,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   transition:
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .block-template-library-tabs button:hover:not(:disabled):not([aria-selected='true']) {
@@ -125,11 +135,9 @@
 }
 
 .block-template-library-tabs button[aria-selected='true'] {
-  background: var(--cc-surface-raised);
+  background: transparent;
   color: var(--cc-foreground);
-  box-shadow:
-    inset 0 1px 0 var(--cc-highlight-inset),
-    var(--cc-shadow-xs);
+  box-shadow: none;
 }
 
 .block-template-library-search {
@@ -144,9 +152,9 @@
   background: var(--cc-surface);
   box-shadow: inset 0 1px 0 var(--cc-highlight-inset);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    color 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .block-template-library-search:focus-within {
@@ -220,9 +228,9 @@
     inset 0 1px 0 var(--cc-highlight-inset),
     var(--cc-shadow-xs);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    background 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .block-template-card[data-template-type='workflow'] {
@@ -324,11 +332,11 @@
   opacity: 0;
   transform: translateY(-2px);
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    opacity 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .block-template-card:hover .block-template-card-tools button,
@@ -377,11 +385,11 @@
   line-height: 1;
   white-space: nowrap;
   transition:
-    border-color 150ms ease,
-    background 150ms ease,
-    color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .block-template-card-actions button:hover,
@@ -634,11 +642,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .block-template-library-backdrop,
-  .block-template-library-drawer {
-    animation: none;
-  }
-
   .block-template-library-trigger,
   .block-template-library-close,
   .block-template-library-tabs button,

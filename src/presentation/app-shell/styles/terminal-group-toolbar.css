@@ -66,10 +66,10 @@
   font: inherit;
   box-shadow: none;
   transition:
-    transform 100ms ease,
-    background 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-group-node__action[data-control-surface='raised'],
@@ -229,7 +229,7 @@
 }
 
 .terminal-group-node__saving-indicator {
-  animation: terminal-group-saving-spin 900ms linear infinite;
+  animation: terminal-group-saving-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 .terminal-group-node__toolbar--editing {

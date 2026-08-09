@@ -3,14 +3,16 @@ import { TranslateIcon } from '@phosphor-icons/react/dist/csr/Translate'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 import { useI18n } from './i18n/useI18n'
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { supportedLocales, type Locale } from './i18n/locale'
+import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export function LanguageSettingsRoot() {
   const [isOpen, setIsOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const optionRefs = useRef(new Map<Locale, HTMLButtonElement>())
+  const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
   const { locale, selectLocale, t } = useI18n()
 
   const closeMenu = (): void => {
@@ -24,64 +26,69 @@ export function LanguageSettingsRoot() {
     }
 
     optionRefs.current.get(locale)?.focus()
-    const closeFromOutside = (event: PointerEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        closeMenu()
-      }
-    }
-
-    document.addEventListener('pointerdown', closeFromOutside)
-    return () => document.removeEventListener('pointerdown', closeFromOutside)
+    return undefined
   }, [isOpen, locale])
 
   return (
-    <div ref={rootRef} className="language-settings">
+    <div className="language-settings">
+      {isOpen ? (
+        <div
+          className="language-settings-dismiss-layer"
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            closeMenu()
+          }}
+        />
+      ) : null}
       <TooltipLabel content={t('language.settings')} side="bottom">
         <button
           ref={triggerRef}
-          className="language-settings-trigger"
+          className="language-settings-trigger app-shell-utility-button"
           type="button"
           aria-label={t('language.settings')}
           aria-controls="language-settings-menu"
           aria-expanded={isOpen}
           aria-haspopup="menu"
+          {...triggerMotionProps}
           onClick={() => setIsOpen((current) => !current)}
         >
           <TranslateIcon size={18} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen ? (
-        <div
-          id="language-settings-menu"
-          className="language-settings-menu"
-          role="menu"
-          aria-label={t('language.settings')}
-        >
-          {supportedLocales.map((optionLocale, index) => (
-            <button
-              key={optionLocale}
-              ref={(element) => {
-                if (element) {
-                  optionRefs.current.set(optionLocale, element)
-                } else {
-                  optionRefs.current.delete(optionLocale)
-                }
-              }}
-              className="language-settings-option"
-              type="button"
-              role="menuitemradio"
-              aria-checked={locale === optionLocale}
-              onClick={() => chooseLocale(optionLocale)}
-              onKeyDown={(event) => handleOptionKeyDown(event, index)}
-            >
-              <span>{languageLabel(optionLocale)}</span>
-              {locale === optionLocale ? (
-                <CheckIcon size={17} weight="bold" aria-hidden="true" />
-              ) : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <AnchoredSurfaceMotion
+        id="language-settings-menu"
+        className="language-settings-menu anchored-surface-motion"
+        springPreset="anchored-top-right"
+        role="menu"
+        aria-label={t('language.settings')}
+        open={isOpen}
+      >
+        {supportedLocales.map((optionLocale, index) => (
+          <button
+            key={optionLocale}
+            ref={(element) => {
+              if (element) {
+                optionRefs.current.set(optionLocale, element)
+              } else {
+                optionRefs.current.delete(optionLocale)
+              }
+            }}
+            className="language-settings-option"
+            type="button"
+            role="menuitemradio"
+            aria-checked={locale === optionLocale}
+            onClick={() => chooseLocale(optionLocale)}
+            onKeyDown={(event) => handleOptionKeyDown(event, index)}
+          >
+            <span>{languageLabel(optionLocale)}</span>
+            {locale === optionLocale ? (
+              <CheckIcon size={17} weight="bold" aria-hidden="true" />
+            ) : null}
+          </button>
+        ))}
+      </AnchoredSurfaceMotion>
     </div>
   )
 

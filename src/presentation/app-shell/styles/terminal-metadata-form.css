@@ -132,9 +132,9 @@
   outline: none;
   box-shadow: 0 1px 2px var(--cc-shadow-color);
   transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease,
-    background 150ms ease;
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-metadata-form input::placeholder {
@@ -163,8 +163,8 @@
   font-size: 11px;
   font-weight: 650;
   transition:
-    background 140ms ease,
-    color 140ms ease;
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-execution-config summary:hover {
@@ -242,11 +242,11 @@
   font-weight: 620;
   box-shadow: 0 1px 2px var(--cc-shadow-color);
   transition:
-    transform 100ms ease,
-    border-color 140ms ease,
-    background 140ms ease,
-    color 140ms ease,
-    box-shadow 140ms ease;
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard),
+    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .terminal-metadata-form__action:hover:not(:disabled) {
@@ -282,7 +282,7 @@
 }
 
 .terminal-metadata-form__saving-indicator {
-  animation: terminal-metadata-saving-spin 900ms linear infinite;
+  animation: terminal-metadata-saving-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 @keyframes terminal-metadata-saving-spin {

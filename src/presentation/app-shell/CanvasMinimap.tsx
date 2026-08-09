@@ -20,6 +20,7 @@ import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
+import { useMinimapPanelMotion } from './useMinimapPanelMotion'
 import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
 import { subscribeWorkbenchDirectZoomPresentation } from './workbenchDirectZoom'
 import { WorkbenchIcon } from './WorkbenchIcons'
@@ -103,6 +104,11 @@ export function CanvasMinimap({
   getMiniMapNodeClassName
 }: CanvasMinimapProps) {
   const { t } = useI18n()
+  const {
+    isPresent: isPanelPresent,
+    rootRef: panelMotionRootRef,
+    surfaceProps: panelMotionSurfaceProps
+  } = useMinimapPanelMotion(!isCollapsed)
   const isPanningViewportRef = useRef(false)
   const lastViewportCenterRef = useRef<MinimapViewportCenter | null>(null)
   const focusMinimapNode = useCallback(
@@ -144,9 +150,9 @@ export function CanvasMinimap({
   }
 
   return (
-    <div className={minimapClassName} data-workbench-canvas-obstruction>
-      {!isCollapsed ? (
-        <div className="canvas-minimap__panel">
+    <div ref={panelMotionRootRef} className={minimapClassName} data-workbench-canvas-obstruction>
+      {isPanelPresent ? (
+        <div className="canvas-minimap__panel" {...panelMotionSurfaceProps}>
           <div className="canvas-minimap__map-frame">
             <MinimapNodeInteractionContext.Provider value={minimapNodeInteraction}>
               <svg
@@ -215,37 +221,9 @@ export function CanvasMinimap({
               </svg>
             </MinimapNodeInteractionContext.Provider>
           </div>
-          <div
-            className="canvas-minimap__map-controls"
-            role="group"
-            aria-label={t('minimap.controls')}
-          >
-            <MinimapControlButton
-              label={t('minimap.collapse')}
-              tooltip={shortcutTooltips.toggleMinimap}
-              onClick={onToggleCollapsed}
-            >
-              <WorkbenchIcon role="collapse" size={13} />
-            </MinimapControlButton>
-          </div>
         </div>
       ) : null}
       <div className="canvas-minimap__navigation-row">
-        {isCollapsed ? (
-          <div
-            className="canvas-minimap__map-controls canvas-minimap__map-controls--collapsed"
-            role="group"
-            aria-label={t('minimap.controls')}
-          >
-            <MinimapControlButton
-              label={t('minimap.expand')}
-              tooltip={shortcutTooltips.toggleMinimap}
-              onClick={onToggleCollapsed}
-            >
-              <WorkbenchIcon role="minimap" size={14} />
-            </MinimapControlButton>
-          </div>
-        ) : null}
         <div
           className="canvas-minimap__viewport-controls"
           role="group"
@@ -277,6 +255,21 @@ export function CanvasMinimap({
             onClick={onFitCanvas}
           >
             <WorkbenchIcon role="fit-canvas" size={14} />
+          </MinimapControlButton>
+        </div>
+        <div
+          className="canvas-minimap__map-controls"
+          role="group"
+          aria-label={t('minimap.controls')}
+        >
+          <MinimapControlButton
+            className="canvas-minimap__toggle"
+            expanded={!isCollapsed}
+            label={isCollapsed ? t('minimap.expand') : t('minimap.collapse')}
+            tooltip={shortcutTooltips.toggleMinimap}
+            onClick={onToggleCollapsed}
+          >
+            <WorkbenchIcon role="disclosure" size={14} />
           </MinimapControlButton>
         </div>
       </div>
@@ -401,19 +394,29 @@ function CanvasMinimapViewportFrame({
 }
 
 interface MinimapControlButtonProps {
+  readonly className?: string
+  readonly expanded?: boolean
   readonly label: string
   readonly tooltip: string
   readonly onClick: () => void
   readonly children: ReactNode
 }
 
-function MinimapControlButton({ label, tooltip, onClick, children }: MinimapControlButtonProps) {
+function MinimapControlButton({
+  className,
+  expanded,
+  label,
+  tooltip,
+  onClick,
+  children
+}: MinimapControlButtonProps) {
   return (
     <TooltipLabel content={tooltip}>
       <button
-        className="icon-button icon-button--small"
+        className={['icon-button', 'icon-button--small', className].filter(Boolean).join(' ')}
         type="button"
         aria-label={label}
+        aria-expanded={expanded}
         onClick={onClick}
       >
         {children}

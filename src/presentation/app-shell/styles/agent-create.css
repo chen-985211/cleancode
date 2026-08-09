@@ -6,7 +6,7 @@
   border-radius: 7px;
   background: transparent;
   pointer-events: auto;
-  transition: background 150ms ease;
+  transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-create-split .toolbar-button {
@@ -45,9 +45,8 @@
   z-index: 1;
 }
 
-.agent-create-split__spinner,
-.agent-settings-spinner {
-  animation: agent-create-spin 700ms linear infinite;
+.agent-create-split__spinner {
+  animation: agent-create-spin var(--cc-motion-duration-spinner) linear infinite;
 }
 
 .agent-create-menu {
@@ -138,8 +137,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .agent-create-split__spinner,
-  .agent-settings-spinner {
+  .agent-create-split__spinner {
     animation: none;
   }
 }

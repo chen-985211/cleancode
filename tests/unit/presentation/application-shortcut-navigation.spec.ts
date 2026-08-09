@@ -263,6 +263,25 @@ describe('application shortcut navigation', () => {
     ).toBeNull()
   })
 
+  it('skips a terminal surface parked by a collapsed group', () => {
+    const selected = createNode('selected', 'terminal', 0, 0)
+    const parked = {
+      ...createNode('parked', 'terminal', 180, 0),
+      data: { isParkedInCollapsedGroup: true }
+    } as WorkbenchFlowNode
+    const visible = createNode('visible', 'terminal', 360, 0)
+
+    expect(
+      resolveDirectionalWorkbenchNode(
+        [selected, parked, visible],
+        selected.id,
+        { x: 0, y: 0, zoom: 1 },
+        { width: 960, height: 640 },
+        'right'
+      )?.id
+    ).toBe('visible')
+  })
+
   it('cycles through every project workspace in sidebar order', () => {
     const alpha = createWorkbenchSnapshot('/tmp/alpha', 'alpha', {
       workspaces: [

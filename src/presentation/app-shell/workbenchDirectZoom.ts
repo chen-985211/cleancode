@@ -37,6 +37,10 @@ export interface WorkbenchDirectZoomController {
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     input: WorkbenchDirectZoomInput
   ) => boolean
+  readonly setReducedMotion: (
+    reducedMotion: boolean,
+    instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  ) => void
   readonly subscribe: (
     instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
     listener: WorkbenchDirectZoomCompletionListener
@@ -296,7 +300,25 @@ export function createWorkbenchDirectZoomController(
     return started
   }
 
-  return { cancel, retarget, subscribe, subscribePresentation }
+  const setReducedMotion = (
+    reducedMotion: boolean,
+    instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+  ): void => {
+    const motion = activeMotion
+    if (!motion || (instance && motion.instance !== instance)) return
+    motion.reducedMotion = reducedMotion
+    if (!reducedMotion) return
+
+    if (motion.frameId !== null) {
+      scheduler.cancelFrame(motion.frameId)
+      motion.frameId = null
+    }
+    motion.presentation = motion.target
+    motion.zoomStops = { value: motion.targetZoomStops, velocity: 0 }
+    void applyPresentation(motion, motion.target)
+  }
+
+  return { cancel, retarget, setReducedMotion, subscribe, subscribePresentation }
 }
 
 function resolveDirectZoomAnchor(
@@ -349,6 +371,13 @@ export function cancelWorkbenchDirectZoom(
   instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
 ): void {
   browserDirectZoomController.cancel(instance)
+}
+
+export function setWorkbenchDirectZoomReducedMotion(
+  reducedMotion: boolean,
+  instance?: ReactFlowInstance<WorkbenchFlowNode, Edge>
+): void {
+  browserDirectZoomController.setReducedMotion(reducedMotion, instance)
 }
 
 export function subscribeWorkbenchDirectZoomCompletion(

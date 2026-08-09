@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+
 export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: string) => void) {
   const [isOpen, setIsOpen] = useState(false)
   const [branchName, setBranchName] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -15,23 +18,36 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     }
 
     onSubmit(normalizedBranchName)
-    setBranchName('')
     setIsOpen(false)
   }
   const close = (): void => {
-    setBranchName('')
     setIsOpen(false)
   }
   const open = useCallback((): void => {
+    setBranchName('')
     setIsOpen(true)
   }, [])
   const toggle = (): void => {
-    if (isOpen) {
+    if (!isOpen) {
       setBranchName('')
     }
 
     setIsOpen(!isOpen)
   }
+  const completeClose = useCallback((): void => setBranchName(''), [])
+  const dismissFromOutside = useCallback((): void => {
+    setIsOpen(false)
+    triggerRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  useOutsidePointerDismiss({
+    active: isOpen,
+    isInside: (target) =>
+      surfaceRef.current?.contains(target) === true ||
+      triggerRef.current?.contains(target) === true,
+    onDismiss: dismissFromOutside,
+    pointerPolicy: 'consume'
+  })
 
   useEffect(() => {
     if (!isOpen) {
@@ -40,24 +56,31 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
 
     formRef.current?.querySelector<HTMLInputElement>('input')?.focus()
 
-    const cancelWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (
-        target instanceof Node &&
-        (formRef.current?.contains(target) || triggerRef.current?.contains(target))
-      ) {
-        return
-      }
-
-      setBranchName('')
+    const cancelOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
       setIsOpen(false)
+      triggerRef.current?.focus()
     }
 
-    document.addEventListener('pointerdown', cancelWhenClickingOutside)
+    document.addEventListener('keydown', cancelOnEscape)
 
-    return () => document.removeEventListener('pointerdown', cancelWhenClickingOutside)
+    return () => {
+      document.removeEventListener('keydown', cancelOnEscape)
+    }
   }, [isOpen])
 
-  return { branchName, close, formRef, isOpen, open, setBranchName, submit, toggle, triggerRef }
+  return {
+    branchName,
+    close,
+    completeClose,
+    formRef,
+    isOpen,
+    open,
+    setBranchName,
+    submit,
+    surfaceRef,
+    toggle,
+    triggerRef
+  }
 }

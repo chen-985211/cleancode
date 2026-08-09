@@ -1,17 +1,23 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type AnimationEvent,
-  type CSSProperties
+  type CSSProperties,
+  type RefCallback
 } from 'react'
 
 import type { WorkbenchObjectMotion } from './types'
+import { createWorkbenchObjectSpringController } from './workbenchObjectSpring'
+import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 interface WorkbenchObjectMotionPresentation {
   readonly className: string
   readonly onAnimationEnd: (event: AnimationEvent<HTMLElement>) => void
+  readonly surfaceRef: RefCallback<HTMLElement>
   readonly style: CSSProperties | undefined
 }
 
@@ -20,7 +26,12 @@ export function useWorkbenchObjectMotionPresentation(
   onComplete?: (motionId: string) => void
 ): WorkbenchObjectMotionPresentation {
   const [presentation, setPresentation] = useState(motion)
+  const [surfaceElement, setSurfaceElement] = useState<HTMLElement | null>(null)
   const completedMotionIdRef = useRef<string | null>(null)
+  const onCompleteRef = useRef(onComplete)
+  const controller = useMemo(() => createWorkbenchObjectSpringController(), [])
+  const reducedMotion = usePrefersReducedMotion()
+  onCompleteRef.current = onComplete
 
   useLayoutEffect(() => {
     if (motion && motion.id !== presentation?.id && motion.id !== completedMotionIdRef.current) {
@@ -28,9 +39,32 @@ export function useWorkbenchObjectMotionPresentation(
     }
   }, [motion, presentation?.id])
 
+  const completeSpatialMotion = useCallback((motionId: string): void => {
+    completedMotionIdRef.current = motionId
+    setPresentation((currentPresentation) =>
+      currentPresentation?.id === motionId ? undefined : currentPresentation
+    )
+    onCompleteRef.current?.(motionId)
+  }, [])
+
+  const surfaceRef = useCallback<RefCallback<HTMLElement>>((surface) => {
+    setSurfaceElement(surface)
+  }, [])
+
+  useLayoutEffect(() => {
+    controller.motionChanged(
+      surfaceElement,
+      presentation ?? null,
+      reducedMotion,
+      completeSpatialMotion
+    )
+  }, [completeSpatialMotion, controller, presentation, reducedMotion, surfaceElement])
+
+  useEffect(() => () => controller.dispose(), [controller])
+
   const onAnimationEnd = useCallback(
     (event: AnimationEvent<HTMLElement>): void => {
-      if (!presentation || event.target !== event.currentTarget) {
+      if (!presentation || presentation.kind !== 'create' || event.target !== event.currentTarget) {
         return
       }
 
@@ -42,13 +76,16 @@ export function useWorkbenchObjectMotionPresentation(
   )
 
   return {
-    className: presentation ? `workbench-object-motion--${presentation.kind}` : '',
+    className: presentation
+      ? [
+          `workbench-object-motion--${presentation.kind}`,
+          presentation.kind === 'create' ? '' : 'workbench-object-motion--spatial'
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : '',
     onAnimationEnd,
-    style: presentation
-      ? ({
-          '--workbench-object-motion-x': `${presentation.offset.x}px`,
-          '--workbench-object-motion-y': `${presentation.offset.y}px`
-        } as CSSProperties)
-      : undefined
+    surfaceRef,
+    style: undefined
   }
 }

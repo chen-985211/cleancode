@@ -3,6 +3,7 @@ import {
   isCriticalSpringAxisSettled,
   type CriticalSpringAxis
 } from './workbenchViewportSpring'
+import { retargetSpringAxis } from './motionSpring'
 
 type CanvasMenuMotionPhase = 'closed' | 'closing' | 'open' | 'opening'
 
@@ -29,6 +30,7 @@ interface CanvasMenuMotionControllerOptions {
 export interface CanvasMenuMotionController {
   readonly dispose: () => void
   readonly reset: () => void
+  readonly setReducedMotion: (reducedMotion: boolean) => void
   readonly setOpen: (open: boolean) => Promise<boolean>
 }
 
@@ -62,6 +64,7 @@ export function createCanvasMenuMotionController({
   let lastTimestamp = scheduler.now()
   let nextRequestId = 1
   let phase: CanvasMenuMotionPhase = 'closed'
+  let prefersReducedMotion = reducedMotion
   let timeoutId: number | null = null
 
   const present = (): void => {
@@ -131,6 +134,11 @@ export function createCanvasMenuMotionController({
   return {
     dispose: reset,
     reset,
+    setReducedMotion: (nextReducedMotion) => {
+      if (prefersReducedMotion === nextReducedMotion) return
+      prefersReducedMotion = nextReducedMotion
+      if (nextReducedMotion && activeRequest) finish(activeRequest.requestId)
+    },
     setOpen: (open) => {
       if (activeRequest?.open === open) return activeRequest.promise
       if (!activeRequest && phase === (open ? 'open' : 'closed')) return Promise.resolve(true)
@@ -139,9 +147,9 @@ export function createCanvasMenuMotionController({
       invalidateActiveRequest()
       const requestId = nextRequestId++
       phase = open ? 'opening' : 'closing'
-      axis = alignVelocityWithTarget(axis, open ? 1 : 0)
+      axis = retargetSpringAxis(axis, open ? 1 : 0, 'toward-target-only')
 
-      if (reducedMotion) {
+      if (prefersReducedMotion) {
         axis = { value: open ? 1 : 0, velocity: 0 }
         phase = open ? 'open' : 'closed'
         present()
@@ -167,10 +175,4 @@ export function createCanvasMenuMotionController({
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum)
-}
-
-function alignVelocityWithTarget(axis: CriticalSpringAxis, target: number): CriticalSpringAxis {
-  const remainingDistance = target - axis.value
-  if (remainingDistance * axis.velocity >= 0) return axis
-  return { value: axis.value, velocity: 0 }
 }

@@ -14,6 +14,8 @@ import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
+import { useProjectSidebarMotion } from './useProjectSidebarMotion'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 import { TooltipLabel } from './Tooltip'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -75,90 +77,97 @@ export function ProjectSidebar({
   const addProjectTooltip = shortcutTooltips?.addProject ?? t('sidebar.addProject')
   const createBranchWorkspaceTooltip =
     shortcutTooltips?.createBranchWorkspace ?? t('sidebar.newBranchWorkspace')
+  const sidebarMotionRef = useProjectSidebarMotion(isCollapsed)
   const projectListRef = useRef<HTMLDivElement>(null)
   const canReorderProjects = isDesktopRuntime && !isReorderPending && workbenches.length > 1
   const projectReorder = useProjectSidebarReorder({
     canReorder: canReorderProjects,
     getProjectList: () => projectListRef.current,
+    isReorderPending,
     onReorderProject,
     workbenches
   })
   return (
     <aside
+      ref={sidebarMotionRef}
       id="project-sidebar"
       className="project-sidebar"
       aria-hidden={isCollapsed || undefined}
       aria-label={t('sidebar.label')}
       inert={isCollapsed}
     >
-      <div className="project-sidebar__actions">
-        <TooltipLabel content={addProjectTooltip}>
-          <button
-            className="sidebar-action"
-            type="button"
-            onClick={onAddProject}
-            disabled={!isDesktopRuntime}
-          >
-            <PlusIcon size={17} weight="bold" aria-hidden="true" />
-            {t('sidebar.addProject')}
-          </button>
-        </TooltipLabel>
-      </div>
-      {!isDesktopRuntime ? (
-        <div className="runtime-warning" role="status">
-          {t('sidebar.previewWarning')}
-        </div>
-      ) : null}
-      {actionError ? (
-        <div className="project-sidebar-alert" role="alert">
-          <span>{actionError}</span>
-          <TooltipLabel content={t('sidebar.closeAlert')}>
+      <div className="project-sidebar__motion-surface">
+        <div className="project-sidebar__actions">
+          <TooltipLabel content={addProjectTooltip}>
             <button
-              className="project-sidebar-alert__close"
+              className="sidebar-action"
               type="button"
-              aria-label={t('sidebar.closeAlert')}
-              onClick={onDismissActionError}
+              onClick={onAddProject}
+              disabled={!isDesktopRuntime}
             >
-              <XIcon size={13} weight="bold" aria-hidden="true" />
+              <PlusIcon size={17} weight="bold" aria-hidden="true" />
+              {t('sidebar.addProject')}
             </button>
           </TooltipLabel>
         </div>
-      ) : null}
-      <div className="project-sidebar__label">{t('sidebar.projects')}</div>
-      <div
-        className={
-          projectReorder.draggingProjectId ? 'project-list project-list--dragging' : 'project-list'
-        }
-        ref={projectListRef}
-      >
-        {projectReorder.dropIndicatorY !== null ? (
-          <div
-            className="project-list__drop-indicator"
-            role="presentation"
-            style={{ top: projectReorder.dropIndicatorY }}
-          >
-            <span />
-            <span />
-            <span />
+        {!isDesktopRuntime ? (
+          <div className="runtime-warning" role="status">
+            {t('sidebar.previewWarning')}
           </div>
         ) : null}
-        {workbenches.map((workbench) => (
-          <ProjectCard
-            key={workbench.project.id}
-            workbench={workbench}
-            currentWorkbench={currentWorkbench}
-            onArchiveBranchWorkspace={onArchiveBranchWorkspace}
-            onCheckoutMainBranch={onCheckoutMainBranch}
-            onCreateBranchWorkspace={onCreateBranchWorkspace}
-            onRemoveProject={onRemoveProject}
-            isDragging={projectReorder.draggingProjectId === workbench.project.id}
-            canReorder={canReorderProjects}
-            intent={intent?.projectId === workbench.project.id ? intent : null}
-            createBranchWorkspaceTooltip={createBranchWorkspaceTooltip}
-            onProjectPointerDown={projectReorder.onProjectPointerDown}
-            onSelectWorkspace={onSelectWorkspace}
-          />
-        ))}
+        {actionError ? (
+          <div className="project-sidebar-alert" role="alert">
+            <span>{actionError}</span>
+            <TooltipLabel content={t('sidebar.closeAlert')}>
+              <button
+                className="project-sidebar-alert__close"
+                type="button"
+                aria-label={t('sidebar.closeAlert')}
+                onClick={onDismissActionError}
+              >
+                <XIcon size={13} weight="bold" aria-hidden="true" />
+              </button>
+            </TooltipLabel>
+          </div>
+        ) : null}
+        <div className="project-sidebar__label">{t('sidebar.projects')}</div>
+        <div
+          className={
+            projectReorder.draggingProjectId
+              ? 'project-list project-list--dragging'
+              : 'project-list'
+          }
+          ref={projectListRef}
+        >
+          {projectReorder.dropIndicatorY !== null ? (
+            <div
+              className="project-list__drop-indicator"
+              role="presentation"
+              style={{ top: projectReorder.dropIndicatorY }}
+            >
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : null}
+          {workbenches.map((workbench) => (
+            <ProjectCard
+              key={workbench.project.id}
+              workbench={workbench}
+              currentWorkbench={currentWorkbench}
+              onArchiveBranchWorkspace={onArchiveBranchWorkspace}
+              onCheckoutMainBranch={onCheckoutMainBranch}
+              onCreateBranchWorkspace={onCreateBranchWorkspace}
+              onRemoveProject={onRemoveProject}
+              isDragging={projectReorder.draggingProjectId === workbench.project.id}
+              canReorder={canReorderProjects}
+              intent={intent?.projectId === workbench.project.id ? intent : null}
+              createBranchWorkspaceTooltip={createBranchWorkspaceTooltip}
+              onProjectPointerDown={projectReorder.onProjectPointerDown}
+              onSelectWorkspace={onSelectWorkspace}
+            />
+          ))}
+        </div>
       </div>
     </aside>
   )
@@ -186,6 +195,12 @@ interface ProjectCardProps {
   readonly onSelectWorkspace: (workbench: WorkbenchSnapshot, workspaceId: string) => void
 }
 
+interface ArchiveWorkspacePresentation {
+  readonly branch: WorkbenchSnapshot['gitBranches'][number] | null
+  readonly open: boolean
+  readonly workspace: WorkbenchSnapshot['project']['workspaces'][number]
+}
+
 function ProjectCard({
   workbench,
   currentWorkbench,
@@ -206,7 +221,8 @@ function ProjectCard({
   const [isExpanded, setIsExpanded] = useState(true)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
   const [openWorkspaceMenuId, setOpenWorkspaceMenuId] = useState<string | null>(null)
-  const [archiveWorkspaceId, setArchiveWorkspaceId] = useState<string | null>(null)
+  const [archivePresentation, setArchivePresentation] =
+    useState<ArchiveWorkspacePresentation | null>(null)
   const [isRemoveProjectDialogOpen, setIsRemoveProjectDialogOpen] = useState(false)
   const [handledIntentId, setHandledIntentId] = useState<number | null>(null)
   const branchSelectorPopoverRef = useRef<HTMLDivElement>(null)
@@ -215,11 +231,13 @@ function ProjectCard({
   const {
     branchName,
     close: closeBranchWorkspaceForm,
+    completeClose: completeBranchWorkspaceFormClose,
     formRef,
     isOpen: isBranchWorkspaceFormOpen,
     open: openBranchWorkspaceForm,
     setBranchName,
     submit: submitBranchWorkspace,
+    surfaceRef: branchWorkspaceFormSurfaceRef,
     toggle: toggleBranchWorkspaceForm,
     triggerRef
   } = useProjectSidebarBranchWorkspaceForm((newBranchName) =>
@@ -236,20 +254,16 @@ function ProjectCard({
       openBranchWorkspaceForm()
     }
   }
-  const archiveWorkspace = archiveWorkspaceId
-    ? workbench.project.workspaces.find((workspace) => workspace.workspaceId === archiveWorkspaceId)
-    : null
-  const archiveWorkspaceGitBranch = archiveWorkspace
-    ? workbench.gitBranches.find(
-        (branch) =>
-          branch.name === archiveWorkspace.gitBranch &&
-          branch.worktreeDirectory === archiveWorkspace.directory
-      )
-    : null
-  const closeBranchSelector = (): void => {
+  const closeBranchSelector = useCallback((): void => {
     setIsBranchSelectorOpen(false)
     setBranchSearchQuery('')
-  }
+  }, [])
+  const closeBranchSelectorAndRestoreFocus = useCallback((): void => {
+    closeBranchSelector()
+    branchSelectorRootRef.current
+      ?.querySelector<HTMLButtonElement>('.default-branch-selector__toggle')
+      ?.focus({ preventScroll: true })
+  }, [closeBranchSelector])
   const toggleBranchSelector = (): void => {
     if (isBranchSelectorOpen) {
       closeBranchSelector()
@@ -275,32 +289,32 @@ function ProjectCard({
     setOpenWorkspaceMenuId((menuId) => (menuId === workspaceId ? null : workspaceId))
   }, [])
 
+  useOutsidePointerDismiss({
+    active: isBranchSelectorOpen,
+    isInside: (target) =>
+      branchSelectorRootRef.current?.contains(target) === true ||
+      branchSelectorPopoverRef.current?.contains(target) === true,
+    onDismiss: closeBranchSelectorAndRestoreFocus,
+    pointerPolicy: 'consume'
+  })
+
   useEffect(() => {
     if (!isBranchSelectorOpen) {
       return undefined
     }
 
-    const closeBranchSelectorWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (target instanceof Node) {
-        if (
-          branchSelectorRootRef.current?.contains(target) ||
-          branchSelectorPopoverRef.current?.contains(target)
-        ) {
-          return
-        }
-      }
-
-      closeBranchSelector()
+    const closeBranchSelectorOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      closeBranchSelectorAndRestoreFocus()
     }
 
-    document.addEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
+    document.addEventListener('keydown', closeBranchSelectorOnEscape)
 
     return () => {
-      document.removeEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
+      document.removeEventListener('keydown', closeBranchSelectorOnEscape)
     }
-  }, [isBranchSelectorOpen])
+  }, [closeBranchSelectorAndRestoreFocus, isBranchSelectorOpen])
 
   return (
     <section
@@ -342,6 +356,8 @@ function ProjectCard({
           <button
             className="project-card__branch icon-button"
             type="button"
+            aria-controls={`${workbench.project.id}-branch-workspace-form`}
+            aria-expanded={isBranchWorkspaceFormOpen}
             aria-label={t('sidebar.newBranchWorkspace')}
             ref={triggerRef}
             onClick={toggleBranchWorkspaceForm}
@@ -361,6 +377,16 @@ function ProjectCard({
           </button>
         </TooltipLabel>
       </div>
+      <ProjectSidebarBranchWorkspaceForm
+        branchName={branchName}
+        formRef={formRef}
+        open={isBranchWorkspaceFormOpen}
+        projectId={workbench.project.id}
+        surfaceRef={branchWorkspaceFormSurfaceRef}
+        onBranchNameChange={setBranchName}
+        onExitComplete={completeBranchWorkspaceFormClose}
+        onSubmit={submitBranchWorkspace}
+      />
       <div
         className={
           isExpanded
@@ -446,27 +472,26 @@ function ProjectCard({
                           </button>
                         </TooltipLabel>
                       </div>
-                      {isBranchSelectorOpen ? (
-                        <BranchSelectorPopover
-                          anchorRef={branchSelectorRootRef}
-                          branches={workbench.gitBranches}
-                          popoverRef={branchSelectorPopoverRef}
-                          searchQuery={branchSearchQuery}
-                          onSearchQueryChange={setBranchSearchQuery}
-                          onChooseBranch={(branch) => {
-                            closeBranchSelector()
+                      <BranchSelectorPopover
+                        open={isBranchSelectorOpen}
+                        anchorRef={branchSelectorRootRef}
+                        branches={workbench.gitBranches}
+                        popoverRef={branchSelectorPopoverRef}
+                        searchQuery={branchSearchQuery}
+                        onSearchQueryChange={setBranchSearchQuery}
+                        onChooseBranch={(branch) => {
+                          closeBranchSelector()
 
-                            if (branch.isMainWorkspaceBranch) {
-                              onSelectWorkspace(workbench, workspace.workspaceId)
-                              return
-                            }
+                          if (branch.isMainWorkspaceBranch) {
+                            onSelectWorkspace(workbench, workspace.workspaceId)
+                            return
+                          }
 
-                            if (branch.isSelectableInMainWorkspace) {
-                              onCheckoutMainBranch(workbench, branch.name)
-                            }
-                          }}
-                        />
-                      ) : null}
+                          if (branch.isSelectableInMainWorkspace) {
+                            onCheckoutMainBranch(workbench, branch.name)
+                          }
+                        }}
+                      />
                     </>
                   ) : (
                     <>
@@ -519,7 +544,15 @@ function ProjectCard({
                           <WorkspaceRowMenu
                             isOpen={openWorkspaceMenuId === workspace.workspaceId}
                             workspaceName={workspace.displayName}
-                            onArchive={() => setArchiveWorkspaceId(workspace.workspaceId)}
+                            onArchive={() => {
+                              const branch =
+                                workbench.gitBranches.find(
+                                  (candidate) =>
+                                    candidate.name === workspace.gitBranch &&
+                                    candidate.worktreeDirectory === workspace.directory
+                                ) ?? null
+                              setArchivePresentation({ branch, open: true, workspace })
+                            }}
                             onClose={closeWorkspaceMenu}
                             onToggle={() => toggleWorkspaceMenu(workspace.workspaceId)}
                           />
@@ -533,45 +566,41 @@ function ProjectCard({
                 </div>
               )
             })}
-            {isBranchWorkspaceFormOpen ? (
-              <ProjectSidebarBranchWorkspaceForm
-                branchName={branchName}
-                formRef={formRef}
-                projectId={workbench.project.id}
-                onBranchNameChange={setBranchName}
-                onSubmit={submitBranchWorkspace}
-              />
-            ) : null}
           </div>
         </div>
       </div>
-      {isRemoveProjectDialogOpen ? (
-        <ProjectSidebarProjectRemovalPopover
-          projectName={workbench.project.name}
-          triggerRef={removeProjectButtonRef}
-          onCancel={() => setIsRemoveProjectDialogOpen(false)}
-          onConfirm={() => {
-            setIsRemoveProjectDialogOpen(false)
-            onRemoveProject(workbench)
-          }}
-        />
-      ) : null}
-      {archiveWorkspace ? (
+      <ProjectSidebarProjectRemovalPopover
+        open={isRemoveProjectDialogOpen}
+        projectName={workbench.project.name}
+        triggerRef={removeProjectButtonRef}
+        onCancel={() => setIsRemoveProjectDialogOpen(false)}
+        onConfirm={() => {
+          setIsRemoveProjectDialogOpen(false)
+          onRemoveProject(workbench)
+        }}
+      />
+      {archivePresentation ? (
         <ArchiveWorkspaceDialog
-          workspaceName={archiveWorkspace.displayName}
-          isCurrentWorkspace={archiveWorkspace.isCurrent && isCurrentProject}
-          isLocked={archiveWorkspaceGitBranch?.isLocked ?? false}
-          lockReason={archiveWorkspaceGitBranch?.lockReason ?? null}
-          onCancel={() => setArchiveWorkspaceId(null)}
+          open={archivePresentation.open}
+          workspaceName={archivePresentation.workspace.displayName}
+          isCurrentWorkspace={archivePresentation.workspace.isCurrent && isCurrentProject}
+          isLocked={archivePresentation.branch?.isLocked ?? false}
+          lockReason={archivePresentation.branch?.lockReason ?? null}
+          onCancel={() =>
+            setArchivePresentation((current) => (current ? { ...current, open: false } : current))
+          }
+          onExitComplete={() => {
+            setArchivePresentation((current) => (current?.open ? current : null))
+          }}
           onConfirm={() => {
             onArchiveBranchWorkspace(
               workbench,
-              archiveWorkspace.workspaceId,
-              archiveWorkspaceGitBranch?.isLocked
-                ? { lockReason: archiveWorkspaceGitBranch.lockReason }
+              archivePresentation.workspace.workspaceId,
+              archivePresentation.branch?.isLocked
+                ? { lockReason: archivePresentation.branch.lockReason }
                 : undefined
             )
-            setArchiveWorkspaceId(null)
+            setArchivePresentation((current) => (current ? { ...current, open: false } : current))
           }}
         />
       ) : null}

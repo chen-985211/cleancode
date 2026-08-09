@@ -7,6 +7,8 @@ interface ArchiveWorkspaceDialogProps {
   readonly isCurrentWorkspace: boolean
   readonly isLocked: boolean
   readonly lockReason: string | null
+  readonly open: boolean
+  readonly onExitComplete?: () => void
   readonly workspaceName: string
   readonly onCancel: () => void
   readonly onConfirm: () => void
@@ -16,6 +18,8 @@ export function ArchiveWorkspaceDialog({
   isCurrentWorkspace,
   isLocked,
   lockReason,
+  open,
+  onExitComplete,
   workspaceName,
   onCancel,
   onConfirm
@@ -42,6 +46,8 @@ export function ArchiveWorkspaceDialog({
       description={description}
       detail={detail}
       icon={<ArchiveIcon size={16} weight="bold" aria-hidden="true" />}
+      open={open}
+      onExitComplete={onExitComplete}
       title={ariaLabel}
       onCancel={onCancel}
       onConfirm={onConfirm}

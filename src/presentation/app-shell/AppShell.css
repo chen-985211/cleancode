@@ -1,16 +1,19 @@
 @import './styles/theme.css';
+@import './styles/surface-motion.css';
 @import './styles/base.css';
 @import './styles/theme-settings.css';
 @import './styles/block-template-library.css';
 @import './styles/application-settings.css';
 @import './styles/canvas-settings.css';
 @import './styles/language-settings.css';
+@import './styles/app-shell-utility-button-motion.css';
 @import './styles/notifications.css';
 @import './styles/project-sidebar.css';
 @import './styles/project-sidebar-branch-workspace-form.css';
 @import './styles/project-sidebar-archive.css';
 @import './styles/project-sidebar-project-removal.css';
 @import './styles/workbench-canvas.css';
+@import './styles/canvas-minimap.css';
 @import './styles/terminal-workflow-build.css';
 @import './styles/block-template-canvas.css';
 @import './styles/workbench-node-selection.css';
@@ -31,3 +34,4 @@
 @import './styles/agent-tool-approval-connection.css';
 @import './styles/agent-mcp-capability.css';
 @import './styles/workbench-object-motion.css';
+@import './styles/selection-motion.css';

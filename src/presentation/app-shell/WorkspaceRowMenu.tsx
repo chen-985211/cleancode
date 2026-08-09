@@ -8,10 +8,11 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent
 } from 'react'
-import { createPortal } from 'react-dom'
 
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useI18n } from './i18n/useI18n'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 interface WorkspaceRowMenuPosition {
   readonly left: number
@@ -42,29 +43,28 @@ export function WorkspaceRowMenu({
   const menuRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
+  useOutsidePointerDismiss({
+    active: isOpen,
+    isInside: (target) =>
+      triggerRef.current?.contains(target) === true || menuRef.current?.contains(target) === true,
+    onDismiss: () => {
+      onClose()
+      triggerRef.current?.focus({ preventScroll: true })
+    },
+    pointerPolicy: 'consume'
+  })
+
   useEffect(() => {
     if (!isOpen) return undefined
 
-    const closeOnOutsidePointerDown = (event: PointerEvent): void => {
-      const target = event.target
-      if (
-        target instanceof Node &&
-        (triggerRef.current?.contains(target) || menuRef.current?.contains(target))
-      ) {
-        return
-      }
-      onClose()
-    }
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       onClose()
       triggerRef.current?.focus()
     }
 
-    document.addEventListener('pointerdown', closeOnOutsidePointerDown)
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isOpen, onClose])
@@ -131,44 +131,41 @@ export function WorkspaceRowMenu({
           <DotsThreeIcon size={15} weight="bold" aria-hidden="true" />
         </button>
       </TooltipLabel>
-      {isOpen
-        ? createPortal(
-            <div
-              id={menuId}
-              className="workspace-row-menu"
-              role="menu"
-              aria-labelledby={triggerId}
-              data-side={menuPosition?.side ?? 'bottom'}
-              onBlur={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                  onClose()
-                }
-              }}
-              onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
-              ref={menuRef}
-              style={{
-                left: menuPosition?.left ?? 0,
-                top: menuPosition?.top ?? 0,
-                visibility: menuPosition ? 'visible' : 'hidden'
-              }}
-            >
-              <button
-                className="workspace-row-menu__item"
-                type="button"
-                role="menuitem"
-                tabIndex={0}
-                onClick={() => {
-                  onClose()
-                  onArchive()
-                }}
-              >
-                <ArchiveIcon size={16} weight="bold" aria-hidden="true" />
-                {t('sidebar.archiveWorkspace')}
-              </button>
-            </div>,
-            document.body
-          )
-        : null}
+      <AnchoredSurfaceMotion
+        open={isOpen}
+        portalContainer={document.body}
+        id={menuId}
+        className="workspace-row-menu anchored-surface-motion"
+        role="menu"
+        aria-labelledby={triggerId}
+        data-side={menuPosition?.side ?? 'bottom'}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            onClose()
+          }
+        }}
+        onKeyDown={(event) => moveMenuFocus(event, menuRef.current)}
+        ref={menuRef}
+        style={{
+          left: menuPosition?.left ?? 0,
+          top: menuPosition?.top ?? 0,
+          visibility: menuPosition ? 'visible' : 'hidden'
+        }}
+      >
+        <button
+          className="workspace-row-menu__item"
+          type="button"
+          role="menuitem"
+          tabIndex={0}
+          onClick={() => {
+            onClose()
+            onArchive()
+          }}
+        >
+          <ArchiveIcon size={16} weight="bold" aria-hidden="true" />
+          {t('sidebar.archiveWorkspace')}
+        </button>
+      </AnchoredSurfaceMotion>
     </>
   )
 }

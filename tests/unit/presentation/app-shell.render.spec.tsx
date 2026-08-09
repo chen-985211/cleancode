@@ -217,6 +217,7 @@ describe('app shell', () => {
     fireEvent.click(expandSidebar)
 
     expect(screen.getByLabelText('积木画布')).toBe(workspace)
+    expect(screen.getByLabelText('项目与分支工作区')).toBe(sidebar)
     expect(sidebar).not.toHaveAttribute('aria-hidden')
   })
 
@@ -465,7 +466,10 @@ describe('app shell', () => {
     expect(worktreeIndicator.querySelector('svg')).toBeInTheDocument()
     expect(within(worktreeWorkspaceButton).queryByText('worktree')).not.toBeInTheDocument()
 
-    fireEvent.click(within(projectCard).getByRole('button', { name: '选择默认工作区分支 main' }))
+    const branchTrigger = within(projectCard).getByRole('button', {
+      name: '选择默认工作区分支 main'
+    })
+    fireEvent.click(branchTrigger)
 
     const branchDialog = await screen.findByRole('dialog', { name: '选择默认工作区分支' })
     const branchOptionButtons = within(branchDialog).getAllByRole('button')
@@ -481,7 +485,7 @@ describe('app shell', () => {
 
     fireEvent.pointerDown(branchSearch)
     expect(branchDialog).toBeInTheDocument()
-    fireEvent.pointerDown(document.body)
+    firePointerSequence(document.body)
 
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: '选择默认工作区分支' })).not.toBeInTheDocument()
@@ -686,4 +690,10 @@ async function openBlankCanvasMenu(): Promise<void> {
   if (!pane) throw new Error('Expected a React Flow pane')
   fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
   await screen.findByRole('menu', { name: '画布操作' })
+}
+
+function firePointerSequence(target: Element): void {
+  fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+  fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+  fireEvent.click(target, { button: 0 })
 }

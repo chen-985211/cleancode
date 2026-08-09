@@ -49,6 +49,14 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
     data.onObjectMotionComplete
   )
   const dropSpringSurfaceRef = useTerminalGroupDropSpring(data.dropFeedback)
+  const objectMotionSurfaceRef = objectMotion.surfaceRef
+  const motionSurfaceRef = useCallback(
+    (surface: HTMLElement | null) => {
+      dropSpringSurfaceRef(surface)
+      objectMotionSurfaceRef(surface)
+    },
+    [dropSpringSurfaceRef, objectMotionSurfaceRef]
+  )
   const nameFormId = `terminal-group-name-form-${group.id}`
   const className = [
     'terminal-group-node',
@@ -100,13 +108,14 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
 
   return (
     <section
-      ref={dropSpringSurfaceRef}
+      ref={motionSurfaceRef}
       className={className}
       data-terminal-group-id={group.id}
       data-context-selected={data.isContextSelected || undefined}
       style={objectMotion.style}
       onAnimationEnd={objectMotion.onAnimationEnd}
     >
+      <div className="terminal-group-node__material" aria-hidden="true" />
       <Handle
         id={agentApprovalConnectionSourceHandleId}
         className="agent-approval-intent-handle agent-approval-connection-handle--source"

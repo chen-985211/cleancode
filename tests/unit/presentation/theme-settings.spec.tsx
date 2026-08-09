@@ -43,16 +43,31 @@ describe('theme settings', () => {
     render(<ThemeSettingsRoot />)
 
     const trigger = screen.getByRole('button', { name: '主题设置' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    expect(trigger).toHaveAttribute('data-toolbar-utility-motion-state', 'opening')
     fireEvent.click(trigger)
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('dialog', { name: '主题设置' })).toBeInTheDocument()
+    expect(trigger).toHaveAttribute('data-toolbar-utility-motion-state', 'open')
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-spring-preset', 'drawer-right')
     expect(screen.getByRole('button', { name: '关闭主题设置' })).toHaveFocus()
     expect(screen.getByRole('radio', { name: '系统' })).toBeChecked()
     expect(screen.getByRole('radio', { name: '浅色' })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: '深色' })).not.toBeChecked()
+    expect(previewFor(screen.getByRole('radio', { name: '系统' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'open'
+    )
+    expect(previewFor(screen.getByRole('radio', { name: '深色' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'closed'
+    )
     expect(screen.queryByText('颜色预设')).not.toBeInTheDocument()
     expect(screen.queryByText('字体')).not.toBeInTheDocument()
     expect(screen.queryByText('圆角')).not.toBeInTheDocument()
@@ -69,12 +84,43 @@ describe('theme settings', () => {
     expect(window.localStorage.getItem(themePreferenceStorageKey)).toBe('dark')
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(screen.getByRole('radio', { name: '深色' })).toBeChecked()
+    expect(previewFor(screen.getByRole('radio', { name: '系统' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'closing'
+    )
+    expect(previewFor(screen.getByRole('radio', { name: '深色' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'opening'
+    )
 
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(screen.queryByRole('dialog', { name: '主题设置' })).not.toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
     expect(trigger).toHaveFocus()
+  })
+
+  it('does not steal focus back when a new external intent takes over an active exit', () => {
+    render(
+      <>
+        <button type="button">外部目标</button>
+        <ThemeSettingsRoot />
+      </>
+    )
+    const trigger = screen.getByRole('button', { name: '主题设置' })
+    const externalTarget = screen.getByRole('button', { name: '外部目标' })
+    fireEvent.click(trigger)
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭主题设置' }))
+    fireEvent.pointerDown(externalTarget)
+    externalTarget.focus()
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+
+    expect(externalTarget).toHaveFocus()
+    expect(trigger).not.toHaveFocus()
   })
 
   it('isolates the workbench while open and restores interaction after closing', () => {
@@ -96,12 +142,34 @@ describe('theme settings', () => {
     expect(workspace.inert).toBe(true)
     expect(screen.getByRole('button', { name: '关闭主题设置' })).toHaveFocus()
 
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
 
     expect(sidebar.inert).toBe(false)
     expect(workspace.inert).toBe(false)
+    fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
+    expect(sidebar.inert).toBe(false)
+    expect(workspace.inert).toBe(false)
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(trigger).toHaveFocus()
+  })
+
+  it('retains an inert closing drawer until the shared overlay exit completes', () => {
+    render(<ThemeSettingsRoot />)
+
+    fireEvent.click(screen.getByRole('button', { name: '主题设置' }))
+    const dialog = screen.getByRole('dialog', { name: '主题设置' })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog', { name: '主题设置' })).not.toBeInTheDocument()
+    expect(dialog).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(dialog).toHaveAttribute('aria-hidden', 'true')
+    expect(dialog).toHaveAttribute('inert')
+
+    fireEvent.transitionEnd(dialog, { propertyName: 'transform' })
+
+    expect(dialog).not.toBeInTheDocument()
   })
 
   it('keeps keyboard focus inside the theme dialog', () => {
@@ -142,3 +210,7 @@ describe('theme settings', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 })
+
+function previewFor(input: HTMLElement): Element | null {
+  return input.nextElementSibling
+}

@@ -120,6 +120,76 @@ describe('app shell terminal group object motion', () => {
     await expectMemberMotion('group-collapse')
     expect(findCurrentGroupNode()?.data.group.isCollapsed).toBe(true)
   })
+
+  it('parks completed collapsed members without unmounting their terminal surfaces', async () => {
+    const workbench = createWorkbenchWithTerminalGroup(false)
+    const collapsedGraph = withGroupCollapsed(workbench.graph, true)
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.setTerminalGroupCollapsed.mockResolvedValue(collapsedGraph)
+    installRuntimeApi(runtimeApi)
+
+    render(<AppShell />)
+    const groupNode = await findGroupNode(false)
+
+    await act(async () => {
+      await groupNode.data.onToggleGroupCollapsed(groupNode.data.group, true)
+    })
+    await expectMemberMotion('group-collapse')
+
+    const exitingMembers = currentMemberNodes()
+    act(() => {
+      exitingMembers.forEach((member) =>
+        member.data.onObjectMotionComplete?.(member.data.objectMotion!.id)
+      )
+    })
+
+    await waitFor(() => {
+      expect(currentMemberNodes()).toHaveLength(2)
+      expect(currentMemberNodes()).toEqual([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isParkedInCollapsedGroup: true,
+            objectMotion: undefined
+          })
+        }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isParkedInCollapsedGroup: true,
+            objectMotion: undefined
+          })
+        })
+      ])
+    })
+  })
+
+  it('reverses an in-flight collapse into expansion from the retained member nodes', async () => {
+    const workbench = createWorkbenchWithTerminalGroup(false)
+    const collapsedGraph = withGroupCollapsed(workbench.graph, true)
+    const expandedGraph = withGroupCollapsed(workbench.graph, false)
+    const runtimeApi = createRuntimeApi({
+      listWorkbenches: vi.fn(async () => [workbench])
+    })
+    runtimeApi.setTerminalGroupCollapsed
+      .mockResolvedValueOnce(collapsedGraph)
+      .mockResolvedValueOnce(expandedGraph)
+    installRuntimeApi(runtimeApi)
+
+    render(<AppShell />)
+    const expandedGroup = await findGroupNode(false)
+    await act(async () => {
+      await expandedGroup.data.onToggleGroupCollapsed(expandedGroup.data.group, true)
+    })
+    await expectMemberMotion('group-collapse')
+
+    const collapsedGroup = await findGroupNode(true)
+    await act(async () => {
+      await collapsedGroup.data.onToggleGroupCollapsed(collapsedGroup.data.group, false)
+    })
+
+    await expectMemberMotion('group-expand')
+  })
 })
 
 interface MockReactFlowProps {
@@ -183,6 +253,14 @@ async function expectMemberMotion(kind: 'group-collapse' | 'group-expand'): Prom
     expect(memberNodes).toHaveLength(2)
     expect(memberNodes?.map((node) => node.data.objectMotion?.kind)).toEqual([kind, kind])
   })
+}
+
+function currentMemberNodes(): WorkbenchFlowNode[] {
+  return (
+    reactFlowProps.latest?.nodes.filter(
+      (node) => node.id === 'backend-terminal' || node.id === 'frontend-terminal'
+    ) ?? []
+  )
 }
 
 function createWorkbenchWithTerminalGroup(isCollapsed: boolean): WorkbenchSnapshot {

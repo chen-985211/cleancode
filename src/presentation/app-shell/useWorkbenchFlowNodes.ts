@@ -96,6 +96,7 @@ export function useWorkbenchFlowNodes({
   const agentToolApprovalsRef = useRef(agentToolApprovals)
   const activeObjectEntrancesRef = useRef(new Map<string, WorkbenchObjectMotion>())
   const exitingObjectNodesRef = useRef(new Map<string, WorkbenchFlowNode>())
+  const parkedCollapsedMemberNodesRef = useRef(new Map<string, WorkbenchFlowNode>())
   const nextObjectMotionIdRef = useRef(1)
 
   const completeObjectMotion = useCallback(
@@ -123,6 +124,20 @@ export function useWorkbenchFlowNodes({
       if (exitingNode?.data.objectMotion?.id !== motionId) return
 
       exitingObjectNodesRef.current.delete(nodeId)
+      if (
+        exitingNode.data.objectMotion.kind === 'group-collapse' &&
+        exitingNode.type === 'terminal'
+      ) {
+        const parkedNode = parkCollapsedTerminalNode(exitingNode)
+        parkedCollapsedMemberNodesRef.current.set(nodeId, parkedNode)
+        setNodes((nodes) =>
+          nodes.map((node) =>
+            node.id === nodeId && node.data.objectMotion?.id === motionId ? parkedNode : node
+          )
+        )
+        return
+      }
+
       setNodes((nodes) =>
         nodes.filter((node) => node.id !== nodeId || node.data.objectMotion?.id !== motionId)
       )
@@ -141,7 +156,7 @@ export function useWorkbenchFlowNodes({
     const currentAgentToolApprovals = agentToolApprovalsRef.current
 
     setNodes((currentNodes) => {
-      const terminalNodes = createTerminalFlowNodes({
+      const terminalNodeTemplates = createTerminalFlowNodes({
         approvalNodeIntents: createAgentApprovalNodeIntents(
           currentAgentToolApprovals.approvals,
           graph
@@ -156,9 +171,18 @@ export function useWorkbenchFlowNodes({
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
         terminalStates,
+        includeCollapsedMembers: true,
         workflowBuildPresentation: terminalWorkflowBuildPresentation,
         workflowNodeStatuses
       })
+      const collapsedGraphMemberIds = new Set(
+        (graph?.terminalGroups ?? [])
+          .filter((group) => group.isCollapsed)
+          .flatMap((group) => group.memberBlockIds)
+      )
+      const terminalNodes = terminalNodeTemplates.filter(
+        (node) => node.type !== 'terminal' || !collapsedGraphMemberIds.has(node.id)
+      )
       const agents = resolveWorkspaceAgents(currentWorkbench)
       const nextNodes = [
         ...agents.map((agent) =>
@@ -185,6 +209,19 @@ export function useWorkbenchFlowNodes({
       if (!shouldPreserveTransientLayout) {
         activeObjectEntrancesRef.current.clear()
         exitingObjectNodesRef.current.clear()
+        parkedCollapsedMemberNodesRef.current.clear()
+      } else {
+        const terminalTemplatesById = new Map(
+          terminalNodeTemplates
+            .filter((node) => node.type === 'terminal')
+            .map((node) => [node.id, node])
+        )
+        parkedCollapsedMemberNodesRef.current.forEach((_parkedNode, nodeId) => {
+          const template = terminalTemplatesById.get(nodeId)
+          if (template) {
+            parkedCollapsedMemberNodesRef.current.set(nodeId, parkCollapsedTerminalNode(template))
+          }
+        })
       }
 
       const motionProjection = projectWorkbenchObjectMotion({
@@ -208,6 +245,15 @@ export function useWorkbenchFlowNodes({
         if (!projectedNodeIds.has(nodeId)) activeObjectEntrancesRef.current.delete(nodeId)
       })
       projectedNodeIds.forEach((nodeId) => exitingObjectNodesRef.current.delete(nodeId))
+      projectedNodeIds.forEach((nodeId) => parkedCollapsedMemberNodesRef.current.delete(nodeId))
+      const collapsedMemberIds = new Set(
+        motionProjection.nodes
+          .filter((node) => node.type === 'terminalGroup' && node.data.group.isCollapsed)
+          .flatMap((node) => (node.type === 'terminalGroup' ? node.data.group.memberBlockIds : []))
+      )
+      parkedCollapsedMemberNodesRef.current.forEach((_node, nodeId) => {
+        if (!collapsedMemberIds.has(nodeId)) parkedCollapsedMemberNodesRef.current.delete(nodeId)
+      })
       motionProjection.exitingNodes.forEach((node) => {
         exitingObjectNodesRef.current.set(node.id, {
           ...node,
@@ -230,7 +276,11 @@ export function useWorkbenchFlowNodes({
           }
         } as WorkbenchFlowNode
       })
-      const nodesWithExits = [...nodesWithEntrances, ...exitingObjectNodesRef.current.values()]
+      const nodesWithExits = [
+        ...nodesWithEntrances,
+        ...exitingObjectNodesRef.current.values(),
+        ...parkedCollapsedMemberNodesRef.current.values()
+      ]
 
       return shouldPreserveTransientLayout
         ? preserveWorkbenchNodeTransientLayout(nodesWithExits, currentNodes, protectedLayoutNodeIds)
@@ -262,6 +312,23 @@ export function useWorkbenchFlowNodes({
     onResizeAgent,
     onSelectAgent
   ])
+}
+
+function parkCollapsedTerminalNode(node: WorkbenchFlowNode): WorkbenchFlowNode {
+  if (node.type !== 'terminal') return node
+
+  return {
+    ...node,
+    draggable: false,
+    selected: false,
+    data: {
+      ...node.data,
+      isParkedInCollapsedGroup: true,
+      isSelected: false,
+      objectMotion: undefined,
+      onObjectMotionComplete: undefined
+    }
+  }
 }
 
 function projectAgentApprovalsOntoNodes(

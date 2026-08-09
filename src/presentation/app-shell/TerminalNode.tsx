@@ -31,6 +31,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const block = data.block
   const session = data.session
   const isRunning = session.status === 'running'
+  const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
+  const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
+  const isInteractionSuppressed = isDisclosureExit || isParked
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
@@ -39,14 +42,16 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const hasRequestedAutoStartRef = useRef(false)
   const lastLaunchCommandEditRequestIdRef = useRef<number | undefined>(undefined)
   const lastDimensionsRef = useRef<TerminalDimensions | null>(null)
-  const objectMotion = useWorkbenchObjectMotionPresentation(
-    data.objectMotion,
-    data.onObjectMotionComplete
-  )
+  const {
+    className: objectMotionClassName,
+    onAnimationEnd: onObjectMotionAnimationEnd,
+    style: objectMotionStyle,
+    surfaceRef: objectMotionSurfaceRef
+  } = useWorkbenchObjectMotionPresentation(data.objectMotion, data.onObjectMotionComplete)
 
   const terminalNodeClassName = [
     'terminal-node',
-    objectMotion.className,
+    objectMotionClassName,
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
     data.isContextSelected ? 'terminal-node--context-selected' : '',
@@ -60,6 +65,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     .join(' ')
   const terminalAnchorClassName = [
     'terminal-node-anchor',
+    isParked ? 'terminal-node-anchor--parked' : '',
     data.isSelected ? 'terminal-node-anchor--selected' : '',
     data.isSelected ? 'terminal-node--selected' : '',
     data.approvalIntent ? 'terminal-node--approval-target' : ''
@@ -187,6 +193,9 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
             : (session.autoStartStatus ?? 'idle')
       }
       data-context-selected={data.isContextSelected || undefined}
+      data-terminal-parked={data.isParkedInCollapsedGroup || undefined}
+      aria-hidden={isInteractionSuppressed || undefined}
+      inert={isInteractionSuppressed || undefined}
     >
       <WorkbenchNodeResizer
         isVisible={!data.isTerminalGroupSelectionMode}
@@ -209,9 +218,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isConnectable={false}
       />
       <section
+        ref={objectMotionSurfaceRef}
         className={terminalNodeClassName}
-        style={objectMotion.style}
-        onAnimationEnd={objectMotion.onAnimationEnd}
+        style={objectMotionStyle}
+        onAnimationEnd={onObjectMotionAnimationEnd}
       >
         <TerminalHeader
           blockName={block.name}

@@ -1,7 +1,10 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { useI18n } from './i18n/useI18n'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 interface ProjectSidebarProjectRemovalPopoverProps {
+  readonly open: boolean
   readonly projectName: string
   readonly triggerRef: RefObject<HTMLButtonElement | null>
   readonly onCancel: () => void
@@ -9,6 +12,7 @@ interface ProjectSidebarProjectRemovalPopoverProps {
 }
 
 export function ProjectSidebarProjectRemovalPopover({
+  open,
   projectName,
   triggerRef,
   onCancel,
@@ -16,43 +20,59 @@ export function ProjectSidebarProjectRemovalPopover({
 }: ProjectSidebarProjectRemovalPopoverProps) {
   const { t } = useI18n()
   const rootRef = useRef<HTMLDivElement>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    const cancelWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (
-        target instanceof Node &&
-        (rootRef.current?.contains(target) || triggerRef.current?.contains(target))
-      ) {
-        return
-      }
-
-      onCancel()
-    }
-
-    document.addEventListener('pointerdown', cancelWhenClickingOutside)
-
-    return () => document.removeEventListener('pointerdown', cancelWhenClickingOutside)
+  const cancelAndRestoreFocus = useCallback((): void => {
+    onCancel()
+    triggerRef.current?.focus()
   }, [onCancel, triggerRef])
 
+  useOutsidePointerDismiss({
+    active: open,
+    isInside: (target) =>
+      rootRef.current?.contains(target) === true || triggerRef.current?.contains(target) === true,
+    onDismiss: cancelAndRestoreFocus,
+    pointerPolicy: 'consume'
+  })
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const cancelOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      cancelAndRestoreFocus()
+    }
+
+    document.addEventListener('keydown', cancelOnEscape)
+
+    return () => {
+      document.removeEventListener('keydown', cancelOnEscape)
+    }
+  }, [cancelAndRestoreFocus, open, triggerRef])
+
+  useLayoutEffect(() => {
+    if (open) cancelButtonRef.current?.focus()
+  }, [open])
+
   return (
-    <div
-      className="project-removal-popover"
+    <AnchoredSurfaceMotion
+      className="project-removal-popover anchored-surface-motion"
       ref={rootRef}
+      open={open}
       role="dialog"
       aria-label={t('projectRemoval.dialog', { projectName })}
     >
       <strong>{t('projectRemoval.title')}</strong>
       <p>{t('projectRemoval.description')}</p>
       <div className="project-removal-popover__actions">
-        <button type="button" autoFocus onClick={onCancel}>
+        <button ref={cancelButtonRef} type="button" onClick={cancelAndRestoreFocus}>
           {t('common.cancel')}
         </button>
         <button className="project-removal-popover__confirm" type="button" onClick={onConfirm}>
           {t('common.remove')}
         </button>
       </div>
-    </div>
+    </AnchoredSurfaceMotion>
   )
 }

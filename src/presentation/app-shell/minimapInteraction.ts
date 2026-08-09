@@ -8,6 +8,7 @@ import type {
 import type { TerminalSessionStatus } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
 import { readAgentIdFromFlowNodeId } from './agentConsoleFlowNode'
 import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
+import { isWorkbenchNodePresentationHidden } from './workbenchNodeVisibility'
 
 export interface MinimapNodeInteractionContextValue {
   readonly getLabel: (blockId: string) => string
@@ -42,9 +43,10 @@ export function createMinimapNodeInteraction(input: {
 export function filterMinimapNodes(nodes: readonly WorkbenchFlowNode[]): MinimapFlowNode[] {
   return nodes.filter(
     (node): node is MinimapFlowNode =>
-      node.type === 'agentConsole' ||
-      node.type === 'terminal' ||
-      (node.type === 'terminalGroup' && node.data.group.isCollapsed)
+      !isWorkbenchNodePresentationHidden(node) &&
+      (node.type === 'agentConsole' ||
+        node.type === 'terminal' ||
+        (node.type === 'terminalGroup' && node.data.group.isCollapsed))
   )
 }
 

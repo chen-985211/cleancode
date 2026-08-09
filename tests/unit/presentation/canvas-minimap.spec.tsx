@@ -96,8 +96,8 @@ describe('canvas minimap', () => {
     expect(
       screen
         .getByRole('button', { name: '收起小地图' })
-        .querySelector('[data-icon-role="collapse"]')
-    ).toHaveAttribute('data-icon-glyph', 'caret-up')
+        .querySelector('[data-icon-role="disclosure"]')
+    ).toHaveAttribute('data-icon-glyph', 'caret-down')
 
     fireEvent.click(screen.getByRole('button', { name: '放大画布' }))
     fireEvent.click(screen.getByRole('button', { name: '缩小画布' }))
@@ -233,14 +233,21 @@ describe('canvas minimap', () => {
     expect(node).toHaveFocus()
   })
 
-  it('separates the minimap toggle from the canvas viewport controls', () => {
-    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />)
+  it('keeps one directional toggle to the right of the stable viewport controls', () => {
+    const { container } = render(
+      <CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />
+    )
 
     const minimapControls = screen.getByRole('group', { name: '小地图控制' })
     const viewportControls = screen.getByRole('group', { name: '画布视图控制' })
+    const navigationRow = container.querySelector('.canvas-minimap__navigation-row')!
 
+    expect(Array.from(navigationRow.children)).toEqual([viewportControls, minimapControls])
     expect(within(minimapControls).getAllByRole('button')).toHaveLength(1)
     expect(within(minimapControls).getByRole('button', { name: '收起小地图' })).toBeInTheDocument()
+    expect(
+      container.querySelector('.canvas-minimap__panel .canvas-minimap__map-controls')
+    ).toBeNull()
     expect(
       within(viewportControls)
         .getAllByRole('button')
@@ -268,16 +275,42 @@ describe('canvas minimap', () => {
   })
 
   it('keeps the canvas viewport controls available while the minimap is collapsed', () => {
-    render(<CanvasMinimap {...createCanvasMinimapProps()} isCollapsed />)
+    const { container } = render(<CanvasMinimap {...createCanvasMinimapProps()} isCollapsed />)
 
     const minimapControls = screen.getByRole('group', { name: '小地图控制' })
     const viewportControls = screen.getByRole('group', { name: '画布视图控制' })
+    const navigationRow = container.querySelector('.canvas-minimap__navigation-row')!
 
+    expect(Array.from(navigationRow.children)).toEqual([viewportControls, minimapControls])
     expect(screen.queryByRole('img', { name: '积木导航小地图' })).not.toBeInTheDocument()
     expect(within(minimapControls).getAllByRole('button')).toHaveLength(1)
     expect(within(minimapControls).getByRole('button', { name: '展开小地图' })).toBeInTheDocument()
+    expect(
+      within(minimapControls)
+        .getByRole('button', { name: '展开小地图' })
+        .querySelector('[data-icon-role="disclosure"]')
+    ).toHaveAttribute('data-icon-glyph', 'caret-down')
     expect(within(viewportControls).getAllByRole('button')).toHaveLength(3)
     expect(within(viewportControls).getByLabelText('画布缩放比例')).toHaveTextContent('100%')
+  })
+
+  it('keeps one inert panel through a spring exit and reverses it in place', () => {
+    const props = createCanvasMinimapProps()
+    const { container, rerender } = render(<CanvasMinimap {...props} />)
+    const panel = container.querySelector<HTMLElement>('.canvas-minimap__panel')!
+
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'opening')
+
+    rerender(<CanvasMinimap {...props} isCollapsed />)
+    expect(container.querySelector('.canvas-minimap__panel')).toBe(panel)
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(panel).toHaveAttribute('aria-hidden', 'true')
+    expect(panel).toHaveAttribute('inert')
+
+    rerender(<CanvasMinimap {...props} />)
+    expect(container.querySelector('.canvas-minimap__panel')).toBe(panel)
+    expect(panel).toHaveAttribute('data-surface-motion-state', 'opening')
+    expect(panel).not.toHaveAttribute('inert')
   })
 
   it('shows the configured canvas shortcuts in control tooltips', async () => {

@@ -17,13 +17,16 @@ describe('language settings', () => {
     renderLanguageSettings('zh-CN')
 
     const trigger = screen.getByRole('button', { name: '语言' })
+    expect(trigger).toHaveClass('app-shell-utility-button')
     expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(trigger)
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('menu', { name: '语言' })).toBeInTheDocument()
+    const menu = screen.getByRole('menu', { name: '语言' })
+    expect(menu).toBeInTheDocument()
+    expect(menu).toHaveAttribute('data-surface-spring-preset', 'anchored-top-right')
     expect(screen.getByRole('menuitemradio', { name: '简体中文' })).toHaveAttribute(
       'aria-checked',
       'true'
@@ -64,14 +67,45 @@ describe('language settings', () => {
   })
 
   it('closes when pointer interaction moves outside the menu', () => {
+    const canvasPointerDown = vi.fn()
+    render(
+      <div onPointerDown={canvasPointerDown}>
+        <I18nProvider initialLocale="zh-CN">
+          <LanguageSettingsRoot />
+        </I18nProvider>
+      </div>
+    )
+
+    const trigger = screen.getByRole('button', { name: '语言' })
+    fireEvent.click(trigger)
+    const dismissalLayer = document.querySelector('.language-settings-dismiss-layer')
+    expect(dismissalLayer).toBeInTheDocument()
+    fireEvent.pointerDown(dismissalLayer as Element)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(canvasPointerDown).not.toHaveBeenCalled()
+  })
+
+  it('keeps a closing menu inert until its exit finishes and reverses from the live surface', () => {
     renderLanguageSettings('zh-CN')
 
     const trigger = screen.getByRole('button', { name: '语言' })
     fireEvent.click(trigger)
-    fireEvent.pointerDown(document.body)
+    const liveMenu = screen.getByRole('menu', { name: '语言' })
+
+    fireEvent.pointerDown(document.querySelector('.language-settings-dismiss-layer') as Element)
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    expect(liveMenu).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(liveMenu).toHaveAttribute('aria-hidden', 'true')
+    expect(liveMenu).toHaveAttribute('inert')
+
+    fireEvent.click(trigger)
+
+    expect(screen.getByRole('menu', { name: '语言' })).toBe(liveMenu)
+    expect(liveMenu).not.toHaveAttribute('aria-hidden')
+    expect(liveMenu).not.toHaveAttribute('inert')
   })
 
   it('updates neighboring application settings copy in English', () => {

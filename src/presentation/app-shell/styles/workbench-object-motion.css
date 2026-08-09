@@ -1,10 +1,14 @@
 :is(.terminal-node, .terminal-group-node, .agent-console-node) {
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
+  --workbench-object-motion-opacity: 1;
+  --workbench-object-motion-content-opacity: 1;
+  --workbench-object-motion-shell-inset: 0%;
 }
 
 :is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
   transform-origin: center;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-in 360ms cubic-bezier(0.18, 0.84, 0.22, 1) both;
   will-change: opacity;
 }
@@ -20,42 +24,44 @@
   box-shadow: 0 0 22px var(--cc-shadow-color);
   content: '';
   pointer-events: none;
+  /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-accent 360ms ease-out both;
 }
 
-:is(.terminal-node, .terminal-group-node).workbench-object-motion--group-expand {
-  transform-origin: center;
-  animation: workbench-object-group-expand 300ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+.workbench-object-motion--spatial {
+  opacity: var(--workbench-object-motion-opacity);
+  transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
   will-change: transform, opacity;
+}
+
+.terminal-group-node.workbench-object-motion--spatial {
+  transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
+    scale(var(--terminal-group-drop-scale));
+}
+
+.terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse
+  )
+  > .terminal-group-node__material::before {
+  clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));
+  will-change: clip-path;
+}
+
+.terminal-group-node:is(
+    .workbench-object-motion--group-expand,
+    .workbench-object-motion--group-collapse
+  )
+  > :not(.terminal-group-node__material) {
+  opacity: var(--workbench-object-motion-content-opacity);
 }
 
 .terminal-node.workbench-object-motion--group-collapse {
-  transform-origin: center;
-  animation: workbench-object-group-collapse 260ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
   pointer-events: none;
-  will-change: transform, opacity;
-}
-
-.terminal-node.workbench-object-motion--group-join {
-  transform-origin: center;
-  animation: workbench-terminal-group-join 380ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
-  will-change: transform;
-}
-
-.terminal-node.workbench-object-motion--group-reflow {
-  transform-origin: center;
-  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
-  will-change: transform;
-}
-
-.terminal-node.workbench-object-motion--group-leave {
-  transform-origin: center;
-  animation: workbench-terminal-group-reflow 320ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
-  will-change: transform;
 }
 
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header) {
-  transition: transform 100ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform var(--cc-motion-duration-press) var(--cc-easing-standard);
 }
 
 :is(.terminal-node__header, .terminal-group-node__header, .agent-console__header):active {
@@ -69,7 +75,7 @@
 }
 
 .terminal-workflow-edge {
-  transition: opacity 140ms ease;
+  transition: opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .workbench-object-edge--motion-pending {
@@ -97,6 +103,7 @@
     .agent-console-actions__menu-anchor
   ) {
   opacity: 0;
+  /* cc-motion-owner: workbench-object */
   transition: opacity 120ms ease;
 }
 
@@ -158,50 +165,6 @@
   }
 }
 
-@keyframes workbench-object-group-expand {
-  from {
-    opacity: 0.28;
-    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes workbench-object-group-collapse {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-
-  to {
-    opacity: 0;
-    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
-  }
-}
-
-@keyframes workbench-terminal-group-join {
-  from {
-    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
-  }
-
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes workbench-terminal-group-reflow {
-  from {
-    transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
-  }
-
-  to {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   :is(.terminal-node, .terminal-group-node, .agent-console-node) {
     transform: none;
@@ -233,5 +196,13 @@
     opacity: 1;
     transform: none;
     animation: none;
+  }
+
+  .terminal-group-node:is(
+      .workbench-object-motion--group-expand,
+      .workbench-object-motion--group-collapse
+    )
+    > .terminal-group-node__material::before {
+    clip-path: none;
   }
 }
