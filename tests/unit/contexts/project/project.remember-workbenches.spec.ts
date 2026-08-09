@@ -9,6 +9,39 @@ import { RememberProjectUseCase } from '../../../../src/contexts/project/applica
 import { SelectCurrentProjectUseCase } from '../../../../src/contexts/project/application/use-cases/SelectCurrentProjectUseCase'
 
 describe('project registry', () => {
+  it('remembers the project picker directory when a project is added', async () => {
+    const repository = new InMemoryProjectRegistryRepository()
+    const rememberProject = new RememberProjectUseCase(repository)
+
+    await rememberProject.execute({
+      directory: '/work/alpha',
+      projectPickerDirectory: '/work'
+    })
+
+    await expect(repository.get()).resolves.toEqual({
+      currentProjectDirectory: '/work/alpha',
+      projectDirectories: ['/work/alpha'],
+      projectPickerDirectory: '/work'
+    })
+  })
+
+  it('preserves the project picker directory while projects are selected, reordered, or forgotten', () => {
+    const registry = ProjectRegistry.fromSnapshot({
+      currentProjectDirectory: '/work/beta',
+      projectDirectories: ['/work/alpha', '/work/beta'],
+      projectPickerDirectory: '/work'
+    })
+      .selectCurrentProject('/work/alpha')
+      .moveProjectBefore('/work/beta', '/work/alpha')
+      .forgetProject('/work/alpha')
+
+    expect(registry.toSnapshot()).toEqual({
+      currentProjectDirectory: '/work/beta',
+      projectDirectories: ['/work/beta'],
+      projectPickerDirectory: '/work'
+    })
+  })
+
   it('remembers project directories without duplicates and keeps the newest project first', async () => {
     const repository = new InMemoryProjectRegistryRepository()
     const rememberProject = new RememberProjectUseCase(repository)

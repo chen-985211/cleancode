@@ -97,19 +97,6 @@ export function ProjectSidebar({
       inert={isCollapsed}
     >
       <div className="project-sidebar__motion-surface">
-        <div className="project-sidebar__actions">
-          <TooltipLabel content={addProjectTooltip}>
-            <button
-              className="sidebar-action"
-              type="button"
-              onClick={onAddProject}
-              disabled={!isDesktopRuntime}
-            >
-              <PlusIcon size={17} weight="bold" aria-hidden="true" />
-              {t('sidebar.addProject')}
-            </button>
-          </TooltipLabel>
-        </div>
         {!isDesktopRuntime ? (
           <div className="runtime-warning" role="status">
             {t('sidebar.previewWarning')}
@@ -130,7 +117,20 @@ export function ProjectSidebar({
             </TooltipLabel>
           </div>
         ) : null}
-        <div className="project-sidebar__label">{t('sidebar.projects')}</div>
+        <div className="project-sidebar__section-header">
+          <span className="project-sidebar__label">{t('sidebar.projects')}</span>
+          <TooltipLabel content={addProjectTooltip}>
+            <button
+              className="project-sidebar__add icon-button icon-button--small"
+              type="button"
+              aria-label={t('sidebar.addProject')}
+              onClick={onAddProject}
+              disabled={!isDesktopRuntime}
+            >
+              <PlusIcon size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </TooltipLabel>
+        </div>
         <div
           className={
             projectReorder.draggingProjectId

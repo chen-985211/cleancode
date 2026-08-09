@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 
 const notificationStyles = readStyles('notifications.css')
 const branchFormStyles = readStyles('project-sidebar-branch-workspace-form.css')
+const projectRemovalStyles = readStyles('project-sidebar-project-removal.css')
 const applicationSettingsStyles = readStyles('application-settings.css')
 
 describe('status and pane motion styles', () => {
@@ -25,8 +26,13 @@ describe('status and pane motion styles', () => {
   })
 
   it('anchors the branch workspace surface directly below its project action', () => {
+    const owningProjectCardRule = readRule(
+      branchFormStyles,
+      '.project-card:has(> .branch-workspace-surface)'
+    )
     const surfaceRule = readRule(branchFormStyles, '.branch-workspace-surface')
 
+    expect(owningProjectCardRule).toContain('z-index: 7;')
     expect(surfaceRule).toContain('position: absolute;')
     expect(surfaceRule).toContain('top: 32px;')
     expect(surfaceRule).toContain('right: 28px;')
@@ -35,6 +41,18 @@ describe('status and pane motion styles', () => {
     expect(surfaceRule).toContain('var(--branch-workspace-motion-y, 0px)')
     expect(surfaceRule).toContain('var(--branch-workspace-motion-scale, 1)')
     expect(surfaceRule).not.toContain('transition:')
+  })
+
+  it('elevates the project card that owns the project removal surface', () => {
+    const owningProjectCardRule = readRule(
+      projectRemovalStyles,
+      '.project-card:has(> .project-removal-popover)'
+    )
+    const surfaceRule = readRule(projectRemovalStyles, '.project-removal-popover')
+
+    expect(owningProjectCardRule).toContain('z-index: 7;')
+    expect(surfaceRule).toContain('position: absolute;')
+    expect(surfaceRule).toContain('z-index: 55;')
   })
 
   it('projects settings pane spring values onto compositor-only properties', () => {

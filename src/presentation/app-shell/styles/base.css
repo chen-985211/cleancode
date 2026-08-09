@@ -46,7 +46,6 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-.sidebar-action,
 .toolbar-button,
 .agent-next-action {
   display: inline-flex;
@@ -68,7 +67,6 @@ textarea:focus-visible {
     box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
-.sidebar-action:hover,
 .toolbar-button:hover:not(:disabled),
 .agent-next-action:hover:not(:disabled) {
   border-color: var(--cc-border-strong);
@@ -129,9 +127,5 @@ textarea:focus-visible {
   .app-shell--sidebar-collapsed {
     --cc-sidebar-motion-width: 0px;
     --cc-sidebar-motion-offset: -100%;
-  }
-
-  .sidebar-action {
-    font-size: 12px;
   }
 }

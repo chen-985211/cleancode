@@ -22,16 +22,19 @@ describe('project filesystem registry', () => {
     const registry = ProjectRegistry.empty()
       .rememberProject('/work/alpha')
       .rememberProject('/work/beta')
+      .rememberProjectPickerDirectory('/work')
 
     await repository.save(registry)
 
     expect(JSON.parse(await readFile(registryPath, 'utf8'))).toEqual({
       currentProjectDirectory: '/work/beta',
-      projectDirectories: ['/work/beta', '/work/alpha']
+      projectDirectories: ['/work/beta', '/work/alpha'],
+      projectPickerDirectory: '/work'
     })
     await expect(repository.get()).resolves.toEqual({
       currentProjectDirectory: '/work/beta',
-      projectDirectories: ['/work/beta', '/work/alpha']
+      projectDirectories: ['/work/beta', '/work/alpha'],
+      projectPickerDirectory: '/work'
     })
   })
 

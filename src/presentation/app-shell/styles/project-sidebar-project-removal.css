@@ -1,3 +1,7 @@
+.project-card:has(> .project-removal-popover) {
+  z-index: 7;
+}
+
 .project-removal-popover {
   position: absolute;
   top: 32px;

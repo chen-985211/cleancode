@@ -4,6 +4,42 @@ import { ProjectSidebar } from '../../../src/presentation/app-shell/ProjectSideb
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('project sidebar navigation semantics', () => {
+  it('places a compact add-project action at the far edge of the projects heading', () => {
+    const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
+    const onAddProject = vi.fn()
+
+    render(
+      <ProjectSidebar
+        workbenches={[workbench]}
+        currentWorkbench={workbench}
+        isDesktopRuntime
+        actionError={null}
+        onAddProject={onAddProject}
+        onArchiveBranchWorkspace={vi.fn()}
+        onCheckoutMainBranch={vi.fn()}
+        onCreateBranchWorkspace={vi.fn()}
+        onDismissActionError={vi.fn()}
+        onRemoveProject={vi.fn()}
+        onReorderProject={vi.fn()}
+        onSelectWorkspace={vi.fn()}
+      />
+    )
+
+    const projectsHeader = screen.getByText('项目').closest('.project-sidebar__section-header')
+
+    expect(projectsHeader).not.toBeNull()
+    const addProjectButton = within(projectsHeader as HTMLElement).getByRole('button', {
+      name: '添加项目'
+    })
+    expect(addProjectButton).toHaveClass('icon-button', 'icon-button--small')
+    expect(addProjectButton).not.toHaveTextContent('添加项目')
+    expect(addProjectButton.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
+
+    fireEvent.click(addProjectButton)
+    expect(onAddProject).toHaveBeenCalledOnce()
+    expect(document.querySelector('.project-sidebar__actions')).not.toBeInTheDocument()
+  })
+
   it('describes a project without git instead of presenting a fake main branch', () => {
     const workbench = createWorkbenchSnapshot('/tmp/non-git-project', 'non-git-project')
 

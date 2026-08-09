@@ -3,27 +3,30 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 export interface ProjectRegistrySnapshot {
   readonly currentProjectDirectory: string | null
   readonly projectDirectories: readonly string[]
+  readonly projectPickerDirectory?: string | null
 }
 
 export class ProjectRegistry {
   private constructor(
     private readonly projectDirectories: readonly string[],
-    private readonly currentProjectDirectory: string | null
+    private readonly currentProjectDirectory: string | null,
+    private readonly projectPickerDirectory: string | null
   ) {}
 
   static empty(): ProjectRegistry {
-    return new ProjectRegistry([], null)
+    return new ProjectRegistry([], null, null)
   }
 
   static fromSnapshot(
     snapshot: Pick<ProjectRegistrySnapshot, 'projectDirectories'> &
-      Partial<Pick<ProjectRegistrySnapshot, 'currentProjectDirectory'>>
+      Partial<Pick<ProjectRegistrySnapshot, 'currentProjectDirectory' | 'projectPickerDirectory'>>
   ): ProjectRegistry {
     const projectDirectories = normalizeProjectDirectories(snapshot.projectDirectories)
 
     return new ProjectRegistry(
       projectDirectories,
-      normalizeCurrentProjectDirectory(snapshot.currentProjectDirectory, projectDirectories)
+      normalizeCurrentProjectDirectory(snapshot.currentProjectDirectory, projectDirectories),
+      normalizeProjectPickerDirectory(snapshot.projectPickerDirectory)
     )
   }
 
@@ -39,13 +42,26 @@ export class ProjectRegistry {
         normalizedDirectory,
         ...this.projectDirectories.filter((entry) => entry !== normalizedDirectory)
       ],
-      normalizedDirectory
+      normalizedDirectory,
+      this.projectPickerDirectory
     )
+  }
+
+  rememberProjectPickerDirectory(directory: string): ProjectRegistry {
+    const normalizedDirectory = directory.trim()
+
+    return normalizedDirectory
+      ? new ProjectRegistry(
+          this.projectDirectories,
+          this.currentProjectDirectory,
+          normalizedDirectory
+        )
+      : this
   }
 
   selectCurrentProject(directory: string | null): ProjectRegistry {
     if (directory === null) {
-      return new ProjectRegistry(this.projectDirectories, null)
+      return new ProjectRegistry(this.projectDirectories, null, this.projectPickerDirectory)
     }
 
     const normalizedDirectory = directory.trim()
@@ -57,7 +73,11 @@ export class ProjectRegistry {
       )
     }
 
-    return new ProjectRegistry(this.projectDirectories, normalizedDirectory)
+    return new ProjectRegistry(
+      this.projectDirectories,
+      normalizedDirectory,
+      this.projectPickerDirectory
+    )
   }
 
   moveProjectBefore(directory: string, beforeDirectory: string | null): ProjectRegistry {
@@ -101,7 +121,11 @@ export class ProjectRegistry {
       return this
     }
 
-    return new ProjectRegistry(projectDirectories, this.currentProjectDirectory)
+    return new ProjectRegistry(
+      projectDirectories,
+      this.currentProjectDirectory,
+      this.projectPickerDirectory
+    )
   }
 
   forgetProject(directory: string): ProjectRegistry {
@@ -119,15 +143,26 @@ export class ProjectRegistry {
         ? (projectDirectories[0] ?? null)
         : this.currentProjectDirectory
 
-    return new ProjectRegistry(projectDirectories, currentProjectDirectory)
+    return new ProjectRegistry(
+      projectDirectories,
+      currentProjectDirectory,
+      this.projectPickerDirectory
+    )
   }
 
   toSnapshot(): ProjectRegistrySnapshot {
     return {
       currentProjectDirectory: this.currentProjectDirectory,
-      projectDirectories: this.projectDirectories
+      projectDirectories: this.projectDirectories,
+      ...(this.projectPickerDirectory
+        ? { projectPickerDirectory: this.projectPickerDirectory }
+        : {})
     }
   }
+}
+
+function normalizeProjectPickerDirectory(directory: string | null | undefined): string | null {
+  return directory?.trim() || null
 }
 
 function normalizeCurrentProjectDirectory(

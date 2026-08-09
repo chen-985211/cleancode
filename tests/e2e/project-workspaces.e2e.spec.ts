@@ -143,16 +143,34 @@ describe('project workspaces e2e', () => {
     async () => {
       await expectDesktopRuntime(page)
 
-      for (let index = 1; index <= 8; index += 1) {
+      const projectsHeader = page.locator('.project-sidebar__section-header')
+      const projectsLabel = projectsHeader.locator('.project-sidebar__label')
+      const addProjectButton = projectsHeader.getByRole('button', { name: '添加项目' })
+      const [headerBox, labelBox, addProjectBox] = await Promise.all([
+        projectsHeader.boundingBox(),
+        projectsLabel.boundingBox(),
+        addProjectButton.boundingBox()
+      ])
+      if (!headerBox || !labelBox || !addProjectBox) {
+        throw new Error('Projects heading geometry is not measurable.')
+      }
+      expect(addProjectBox.x).toBeGreaterThan(labelBox.x + labelBox.width + 100)
+      expect(addProjectBox.x + addProjectBox.width).toBeCloseTo(headerBox.x + headerBox.width, 0)
+
+      const projectList = page.locator('.project-list')
+      for (let index = 1; index <= 12; index += 1) {
         const projectName = `sidebar-project-${index}`
         const projectDirectory = join(workbench.projectDirectory, projectName)
         await mkdir(projectDirectory)
         await setProjectPickerDirectory(electronApp, projectDirectory)
         await page.getByRole('button', { name: '添加项目' }).click()
         await page.getByRole('button', { name: projectName, exact: true }).waitFor()
+        const hasOverflow = await projectList.evaluate(
+          (element) => element.scrollHeight > element.clientHeight
+        )
+        if (hasOverflow) break
       }
 
-      const projectList = page.locator('.project-list')
       const initialGeometry = await projectList.evaluate((element) => ({
         clientHeight: element.clientHeight,
         scrollHeight: element.scrollHeight,
