@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import { mkdtemp, mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,6 +9,7 @@ describe('resolveTerminalProviderRuntimeRootDirectory', () => {
   let temporaryDirectory = ''
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     if (temporaryDirectory) {
       await rm(temporaryDirectory, { force: true, recursive: true })
       temporaryDirectory = ''
@@ -68,6 +70,30 @@ describe('resolveTerminalProviderRuntimeRootDirectory', () => {
         userDataDirectory: join(aliasedTemp, 'scenario-state', 'user-data')
       })
     ).toBe(join(aliasedTemp, 'scenario-state', 'terminal-provider-host'))
+  })
+
+  it('accepts a Windows E2E state when the system temp directory uses a DOS path alias', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    vi.spyOn(realpathSync, 'native').mockImplementation((path) => {
+      if (path === 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp') {
+        return 'C:\\Users\\runneradmin\\AppData\\Local\\Temp'
+      }
+      return String(path)
+    })
+
+    expect(
+      resolveTerminalProviderRuntimeRootDirectory({
+        allowTestDirectory: true,
+        platform: 'win32',
+        providerStateDirectory:
+          'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\scenario-state\\provider',
+        testDirectory:
+          'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\scenario-state\\terminal-provider-host',
+        testStateDirectory: 'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\scenario-state',
+        temporaryDirectory: 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp',
+        userDataDirectory: 'C:\\user-data'
+      })
+    ).toBe('C:\\Users\\runneradmin\\AppData\\Local\\Temp\\scenario-state\\terminal-provider-host')
   })
 
   it.each([

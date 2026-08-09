@@ -66,7 +66,7 @@ function canonicalizeExistingDirectory(
   path: string | undefined,
   platform: NodeJS.Platform
 ): string | undefined {
-  if (!path || platform === 'win32') return path
+  if (!path || platform !== process.platform) return path
   try {
     return realpathSync.native(path)
   } catch {
