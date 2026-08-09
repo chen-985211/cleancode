@@ -36,6 +36,17 @@ describe('project sidebar motion styles', () => {
     expect(expandedRule).not.toContain('padding-left: 0;')
     expect(expandedRule).not.toContain('padding-right: 0;')
   })
+
+  it('separates the projects heading and add action across the full row', () => {
+    const sectionHeaderRule = readRule(sidebarStyles, '.project-sidebar__section-header')
+    const addProjectRule = readRule(sidebarStyles, '.project-sidebar__add')
+
+    expect(sectionHeaderRule).toContain('display: flex;')
+    expect(sectionHeaderRule).toContain('align-items: center;')
+    expect(sectionHeaderRule).toContain('justify-content: space-between;')
+    expect(sectionHeaderRule).not.toContain('width: fit-content;')
+    expect(addProjectRule).toContain('color: var(--cc-muted);')
+  })
 })
 
 function readStyle(fileName: string): string {

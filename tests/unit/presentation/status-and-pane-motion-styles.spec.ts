@@ -25,8 +25,13 @@ describe('status and pane motion styles', () => {
   })
 
   it('anchors the branch workspace surface directly below its project action', () => {
+    const owningProjectCardRule = readRule(
+      branchFormStyles,
+      '.project-card:has(> .branch-workspace-surface)'
+    )
     const surfaceRule = readRule(branchFormStyles, '.branch-workspace-surface')
 
+    expect(owningProjectCardRule).toContain('z-index: 7;')
     expect(surfaceRule).toContain('position: absolute;')
     expect(surfaceRule).toContain('top: 32px;')
     expect(surfaceRule).toContain('right: 28px;')

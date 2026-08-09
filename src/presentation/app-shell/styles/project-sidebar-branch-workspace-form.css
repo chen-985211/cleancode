@@ -1,3 +1,7 @@
+.project-card:has(> .branch-workspace-surface) {
+  z-index: 7;
+}
+
 .branch-workspace-surface {
   position: absolute;
   top: 32px;
