@@ -60,6 +60,14 @@ describe('theme settings', () => {
     expect(screen.getByRole('radio', { name: '系统' })).toBeChecked()
     expect(screen.getByRole('radio', { name: '浅色' })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: '深色' })).not.toBeChecked()
+    expect(previewFor(screen.getByRole('radio', { name: '系统' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'open'
+    )
+    expect(previewFor(screen.getByRole('radio', { name: '深色' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'closed'
+    )
     expect(screen.queryByText('颜色预设')).not.toBeInTheDocument()
     expect(screen.queryByText('字体')).not.toBeInTheDocument()
     expect(screen.queryByText('圆角')).not.toBeInTheDocument()
@@ -76,6 +84,14 @@ describe('theme settings', () => {
     expect(window.localStorage.getItem(themePreferenceStorageKey)).toBe('dark')
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
     expect(screen.getByRole('radio', { name: '深色' })).toBeChecked()
+    expect(previewFor(screen.getByRole('radio', { name: '系统' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'closing'
+    )
+    expect(previewFor(screen.getByRole('radio', { name: '深色' }))).toHaveAttribute(
+      'data-selection-motion-state',
+      'opening'
+    )
 
     const dialog = screen.getByRole('dialog', { name: '主题设置' })
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -194,3 +210,7 @@ describe('theme settings', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 })
+
+function previewFor(input: HTMLElement): Element | null {
+  return input.nextElementSibling
+}

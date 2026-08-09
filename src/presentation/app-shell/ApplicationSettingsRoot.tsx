@@ -11,7 +11,8 @@ import {
   useEffect,
   useRef,
   useState,
-  type KeyboardEvent as ReactKeyboardEvent
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode
 } from 'react'
 
 import {
@@ -43,6 +44,7 @@ import { CanvasSettingsPane } from './CanvasSettingsPane'
 import { ApplicationSettingsPaneTransition } from './ApplicationSettingsPaneTransition'
 import type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useSelectionFeedbackMotion, useSelectionIndicatorMotion } from './useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 export type { ApplicationSettingsPane } from './applicationSettingsPaneMotion'
@@ -87,6 +89,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
   const [recordingCommand, setRecordingCommand] = useState<ApplicationShortcutCommand | null>(null)
   const [selectedPane, setSelectedPane] = useState<ApplicationSettingsPane | null>(null)
   const activePane = selectedPane ?? props.initialPane ?? 'shortcuts'
+  const [paneSelectionContainerRef, paneSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(activePane)
   const [captureError, setCaptureError] = useState<
     { readonly command: ApplicationShortcutCommand; readonly message: string } | undefined
   >()
@@ -169,9 +173,20 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
           <h1 id="application-settings-title">{t('settings.title')}</h1>
         </header>
         <div className="application-settings-layout">
-          <nav className="application-settings-navigation" aria-label={t('settings.navigation')}>
+          <nav
+            ref={paneSelectionContainerRef}
+            className="application-settings-navigation"
+            aria-label={t('settings.navigation')}
+          >
+            <span
+              ref={paneSelectionIndicatorRef}
+              className="selection-motion-indicator application-settings-navigation__selection"
+              data-selection-motion-target={activePane}
+              aria-hidden="true"
+            />
             <button
               type="button"
+              data-selection-motion-option="shortcuts"
               aria-current={activePane === 'shortcuts' ? 'page' : undefined}
               onClick={() => setSelectedPane('shortcuts')}
             >
@@ -180,6 +195,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             </button>
             <button
               type="button"
+              data-selection-motion-option="canvas"
               aria-current={activePane === 'canvas' ? 'page' : undefined}
               onClick={() => setSelectedPane('canvas')}
             >
@@ -188,6 +204,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             </button>
             <button
               type="button"
+              data-selection-motion-option="terminal"
               aria-current={activePane === 'terminal' ? 'page' : undefined}
               onClick={() => setSelectedPane('terminal')}
             >
@@ -196,6 +213,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             </button>
             <button
               type="button"
+              data-selection-motion-option="agents"
               aria-current={activePane === 'agents' ? 'page' : undefined}
               onClick={() => setSelectedPane('agents')}
             >
@@ -264,12 +282,10 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                               <div className="shortcut-settings-row" key={command}>
                                 <div className="shortcut-settings-row__label">{action}</div>
                                 <div className="shortcut-settings-row__controls">
-                                  <button
-                                    className="shortcut-recorder"
-                                    type="button"
-                                    aria-describedby={error ? errorId : undefined}
-                                    aria-label={t('settings.shortcuts.edit', { action })}
-                                    aria-pressed={isRecording}
+                                  <ShortcutRecorder
+                                    describedBy={error ? errorId : undefined}
+                                    label={t('settings.shortcuts.edit', { action })}
+                                    selected={isRecording}
                                     onClick={() => {
                                       setRecordingCommand(command)
                                       setCaptureError(undefined)
@@ -289,7 +305,7 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
                                         (label) => <kbd key={label}>{label}</kbd>
                                       )
                                     )}
-                                  </button>
+                                  </ShortcutRecorder>
                                   <TooltipLabel content={t('settings.shortcuts.clear', { action })}>
                                     <button
                                       className="shortcut-row-action"
@@ -403,6 +419,39 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
     setRecordingCommand(null)
     setCaptureError(undefined)
   }
+}
+
+function ShortcutRecorder({
+  children,
+  describedBy,
+  label,
+  onClick,
+  onKeyDown,
+  selected
+}: {
+  readonly children: ReactNode
+  readonly describedBy?: string
+  readonly label: string
+  readonly onClick: () => void
+  readonly onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void
+  readonly selected: boolean
+}) {
+  const selectionMotionRef = useSelectionFeedbackMotion(selected)
+
+  return (
+    <button
+      ref={selectionMotionRef}
+      className="shortcut-recorder"
+      type="button"
+      aria-describedby={describedBy}
+      aria-label={label}
+      aria-pressed={selected}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      {children}
+    </button>
+  )
 }
 
 function noop(): void {}

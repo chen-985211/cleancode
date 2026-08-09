@@ -15,6 +15,7 @@ import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useThemePreference } from './useThemePreference'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useSelectionFeedbackMotion } from './useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 const themePreferences: readonly ThemePreference[] = ['system', 'light', 'dark']
@@ -108,32 +109,13 @@ export function ThemeSettingsRoot() {
             <legend>{t('theme.section')}</legend>
             <div className="theme-settings-options__grid">
               {themePreferences.map((option) => (
-                <label className="theme-option" key={option}>
-                  <input
-                    type="radio"
-                    name="theme-preference"
-                    value={option}
-                    checked={preference === option}
-                    onChange={() => selectPreference(option)}
-                  />
-                  <span
-                    className={`theme-option__preview theme-option__preview--${option}`}
-                    aria-hidden="true"
-                  >
-                    <span className="theme-option__preview-sidebar" />
-                    <span className="theme-option__preview-content">
-                      <span />
-                      <span />
-                      <span />
-                    </span>
-                    {preference === option ? (
-                      <span className="theme-option__check">
-                        <CheckIcon size={13} weight="bold" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="theme-option__label">{themeLabel(option)}</span>
-                </label>
+                <ThemeOption
+                  key={option}
+                  option={option}
+                  selected={preference === option}
+                  label={themeLabel(option)}
+                  onSelect={selectPreference}
+                />
               ))}
             </div>
           </fieldset>
@@ -153,6 +135,48 @@ export function ThemeSettingsRoot() {
     if (option === 'light') return t('theme.light')
     return t('theme.dark')
   }
+}
+
+function ThemeOption({
+  label,
+  onSelect,
+  option,
+  selected
+}: {
+  readonly label: string
+  readonly onSelect: (preference: ThemePreference) => void
+  readonly option: ThemePreference
+  readonly selected: boolean
+}) {
+  const selectionMotionRef = useSelectionFeedbackMotion(selected)
+
+  return (
+    <label className="theme-option">
+      <input
+        type="radio"
+        name="theme-preference"
+        value={option}
+        checked={selected}
+        onChange={() => onSelect(option)}
+      />
+      <span
+        ref={selectionMotionRef}
+        className={`theme-option__preview theme-option__preview--${option}`}
+        aria-hidden="true"
+      >
+        <span className="theme-option__preview-sidebar" />
+        <span className="theme-option__preview-content">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="theme-option__check">
+          <CheckIcon size={13} weight="bold" aria-hidden="true" />
+        </span>
+      </span>
+      <span className="theme-option__label">{label}</span>
+    </label>
+  )
 }
 
 function trapDialogFocus(event: KeyboardEvent<HTMLElement>, dialog: HTMLElement | null): void {

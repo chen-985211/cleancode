@@ -16,6 +16,7 @@ import { useI18n } from './i18n/useI18n'
 import { OverlaySurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { useInterruptibleSurfaceFocusRestore } from './useInterruptibleSurfaceFocusRestore'
+import { useSelectionIndicatorMotion } from './useSelectionMotion'
 import { useToolbarUtilityButtonMotion } from './useToolbarUtilityButtonMotion'
 
 type LibraryScopeKind = BlockTemplateScope['type']
@@ -42,6 +43,8 @@ export function BlockTemplateLibraryRoot({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const triggerMotionProps = useToolbarUtilityButtonMotion(triggerRef)
+  const [scopeSelectionContainerRef, scopeSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(scopeKind)
   const { beginFocusRestore, cancelFocusRestore, completeFocusRestore } =
     useInterruptibleSurfaceFocusRestore(dialogRef, triggerRef)
   const closeLibrary = useCallback((): void => {
@@ -147,9 +150,20 @@ export function BlockTemplateLibraryRoot({
             </TooltipLabel>
           </header>
           <div className="block-template-library-controls">
-            <div className="block-template-library-tabs" role="tablist">
+            <div
+              ref={scopeSelectionContainerRef}
+              className="block-template-library-tabs"
+              role="tablist"
+            >
+              <span
+                ref={scopeSelectionIndicatorRef}
+                className="selection-motion-indicator block-template-library-tabs__selection"
+                data-selection-motion-target={scopeKind}
+                aria-hidden="true"
+              />
               <button
                 type="button"
+                data-selection-motion-option="project"
                 role="tab"
                 aria-selected={scopeKind === 'project'}
                 disabled={!currentProjectId}
@@ -162,6 +176,7 @@ export function BlockTemplateLibraryRoot({
               </button>
               <button
                 type="button"
+                data-selection-motion-option="global"
                 role="tab"
                 aria-selected={scopeKind === 'global'}
                 onClick={() => {

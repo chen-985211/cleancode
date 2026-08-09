@@ -43,6 +43,7 @@
 }
 
 .agent-settings-segmented {
+  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
   gap: 2px;
@@ -50,9 +51,19 @@
   border-radius: 8px;
   background: var(--cc-surface-subtle);
   padding: 2px;
+  isolation: isolate;
+}
+
+.agent-settings-segmented__selection {
+  z-index: 0;
+  border-radius: 6px;
+  background: var(--cc-surface);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--cc-foreground) 12%, transparent);
 }
 
 .agent-settings-segmented button {
+  position: relative;
+  z-index: 1;
   min-width: 54px;
   height: 25px;
   border: 0;
@@ -65,9 +76,13 @@
 }
 
 .agent-settings-segmented button[aria-pressed='true'] {
+  background: transparent;
+  color: var(--cc-foreground);
+}
+
+.agent-settings-segmented:not([data-selection-motion-ready='true']) button[aria-pressed='true'] {
   background: var(--cc-surface);
   box-shadow: 0 1px 3px color-mix(in srgb, var(--cc-foreground) 12%, transparent);
-  color: var(--cc-foreground);
 }
 
 .agent-settings-catalog {
@@ -159,8 +174,25 @@
   border-top: 1px solid var(--cc-divider);
 }
 
-.agent-settings-row[data-default='true'] {
+.agent-settings-row {
+  position: relative;
+  isolation: isolate;
+}
+
+.agent-settings-row::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
   background: var(--cc-primary-wash);
+  content: '';
+  opacity: var(--cc-selection-motion-progress, 0);
+  pointer-events: none;
+}
+
+.agent-settings-row__main,
+.agent-settings-launch-editor {
+  position: relative;
+  z-index: 1;
 }
 
 .agent-settings-row[data-disabled='true'] .agent-settings-row__identity,
@@ -239,6 +271,7 @@
 
 .agent-settings-enabled {
   min-width: 47px;
+  transform: scale(calc(0.97 + var(--cc-selection-motion-progress, 0) * 0.03));
 }
 
 .agent-settings-enabled[aria-checked='false'] {
@@ -256,8 +289,8 @@
   padding: 0 8px;
 }
 
-.agent-settings-expand[aria-expanded='true'] svg {
-  transform: rotate(180deg);
+.agent-settings-expand svg {
+  transform: rotate(calc(var(--cc-selection-motion-progress, 0) * 180deg));
 }
 
 .agent-settings-launch-editor {

@@ -139,6 +139,8 @@
 }
 
 .theme-option__preview {
+  --cc-selection-motion-progress: 0;
+
   position: relative;
   display: grid;
   height: 68px;
@@ -148,20 +150,26 @@
   border-radius: 9px;
   background: var(--theme-preview-background);
   box-shadow: var(--cc-shadow-xs);
+  transform: scale(calc(1 + var(--cc-selection-motion-progress, 0) * 0.008));
   transition:
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.theme-option__preview::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border: 1px solid var(--cc-primary);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--cc-primary-ring);
+  content: '';
+  opacity: var(--cc-selection-motion-progress, 0);
+  pointer-events: none;
 }
 
 .theme-option:hover .theme-option__preview {
   border-color: var(--cc-border-strong);
-  transform: translateY(-1px);
-}
-
-.theme-option input:checked + .theme-option__preview {
-  border-color: var(--cc-primary);
-  box-shadow: 0 0 0 2px var(--cc-primary-ring);
 }
 
 .theme-option input:focus-visible + .theme-option__preview {
@@ -224,6 +232,7 @@
 
 .theme-option__check {
   position: absolute;
+  z-index: 3;
   top: 5px;
   right: 5px;
   display: inline-flex;
@@ -235,6 +244,13 @@
   background: var(--cc-primary);
   color: var(--cc-primary-contrast);
   box-shadow: var(--cc-shadow-xs);
+  opacity: var(--cc-selection-motion-progress, 0);
+  transform: scale(calc(0.72 + var(--cc-selection-motion-progress, 0) * 0.28));
+}
+
+.theme-option__preview[data-selection-motion-state='opening'],
+.theme-option__preview[data-selection-motion-state='closing'] {
+  will-change: transform;
 }
 
 .theme-option__label {
@@ -242,6 +258,11 @@
   font-size: 12px;
   font-weight: 620;
   text-align: center;
+  transition: color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.theme-option input:checked ~ .theme-option__label {
+  color: var(--cc-foreground);
 }
 
 @media (max-width: 640px) {

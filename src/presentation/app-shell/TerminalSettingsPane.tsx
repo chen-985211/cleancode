@@ -2,6 +2,7 @@ import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/
 import { terminalScrollbackOptions } from './terminalRuntimePreference'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 import { useI18n } from './i18n/useI18n'
+import { useSelectionIndicatorMotion } from './useSelectionMotion'
 
 interface TerminalSettingsPaneProps {
   readonly scrollbackRows: TerminalScrollbackRows
@@ -17,6 +18,10 @@ export function TerminalSettingsPane({
   onTerminalWorkflowBuildModeChange
 }: TerminalSettingsPaneProps) {
   const { t } = useI18n()
+  const [scrollbackSelectionContainerRef, scrollbackSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(`${scrollbackRows}`)
+  const [workflowSelectionContainerRef, workflowSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(terminalWorkflowBuildMode)
 
   return (
     <div className="terminal-settings-pane">
@@ -26,12 +31,19 @@ export function TerminalSettingsPane({
       <section className="terminal-settings-group" aria-labelledby="terminal-scrollback-title">
         <h3 id="terminal-scrollback-title">{t('settings.terminal.scrollback')}</h3>
         <div
+          ref={scrollbackSelectionContainerRef}
           className="terminal-settings-options"
           role="radiogroup"
           aria-labelledby="terminal-scrollback-title"
         >
+          <span
+            ref={scrollbackSelectionIndicatorRef}
+            className="selection-motion-indicator terminal-settings-options__selection"
+            data-selection-motion-target={scrollbackRows}
+            aria-hidden="true"
+          />
           {terminalScrollbackOptions.map((rows) => (
-            <label key={rows}>
+            <label data-selection-motion-option={rows} key={rows}>
               <input
                 type="radio"
                 name="terminal-scrollback"
@@ -46,12 +58,19 @@ export function TerminalSettingsPane({
       <section className="terminal-settings-group" aria-labelledby="terminal-workflow-build-title">
         <h3 id="terminal-workflow-build-title">{t('settings.terminal.workflowBuild')}</h3>
         <div
+          ref={workflowSelectionContainerRef}
           className="terminal-settings-options terminal-settings-options--workflow-build"
           role="radiogroup"
           aria-labelledby="terminal-workflow-build-title"
         >
+          <span
+            ref={workflowSelectionIndicatorRef}
+            className="selection-motion-indicator terminal-settings-options__selection"
+            data-selection-motion-target={terminalWorkflowBuildMode}
+            aria-hidden="true"
+          />
           {(['progressive', 'parallel'] as const).map((mode) => (
-            <label key={mode}>
+            <label data-selection-motion-option={mode} key={mode}>
               <input
                 type="radio"
                 name="terminal-workflow-build-mode"

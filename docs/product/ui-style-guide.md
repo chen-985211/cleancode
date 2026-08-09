@@ -184,6 +184,8 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 设置页的固定标题与左侧导航不参与分类切换；内容按 `快捷键 → 画布 → 终端 → Agent` 的导航顺序建立空间关系，向后选择时新内容从右侧进入、旧内容向左退出，反向选择时镜像路径。新旧内容使用独立的 X 与透明度临界阻尼 spring；连续切换必须保留每一层当前 presentation，并只继承朝向新目标的速度。退出层立即 `inert` 且从可访问树隐藏，收敛后释放；`prefers-reduced-motion` 下直接投影当前分类并清理退出层。
 
+按钮组、分段控件、选项卡和开关的选择反馈由 `selectionMotion.ts` 与 `useSelectionMotion.ts` 统一拥有。语义选中状态和对应内容必须在输入提交后立即更新，motion 只拥有选中材质的临时 presentation，不得延迟业务状态。连续、相邻且等尺寸的选项复用一个真实选中材质，从当前 X/Y presentation 与速度收敛到目标；设置分类导航、收藏范围分段选择、终端设置选项和 Agent 权限分段属于该形态。彼此分离的卡片不得让高亮材质跨越空白飞行，主题卡片、开关、快捷键录制态和 Agent Provider 状态等消费者应以同一条无回弹临界阻尼 spring 在各自边界内投影描边、位移、轻微尺度或显露进度。延迟挂载或尚无有效几何时必须保留语义选中项的完整静态材质，不能出现只有文字颜色、没有选中底板的中间态；几何就绪后再无缝交给共享 spring。快速连续选择从当前 presentation 重定向，不重播、不排队；文字和图标只做状态颜色反馈，不参与装饰性弹跳。`prefers-reduced-motion` 下直接投影同一最终选择状态。
+
 新建分支工作区表单复用统一 surface presence，以所属项目的 “+” 按钮为固定来源，在按钮下方通过临界阻尼 spring 协调短位移、缩放和透明度，关闭时从当前 presentation 沿原路径收回；按钮必须通过 `aria-controls` 和 `aria-expanded` 表达控制关系。关闭意图发生后表单立即停止交互，spring 收敛后再清理草稿和释放 DOM；快速反向复用同一 live surface。Escape 关闭时焦点返回触发按钮，外部点击仍把焦点留给用户实际选择的目标。
 
 通用弹簧解析数学、有限子步和收敛判断由 `src/presentation/app-shell/motionSpring.ts` 维护，同时支持临界阻尼与欠阻尼；utility button、分支表单、通知图标与 surface 进出复用 `springProgressMotion.ts` 的逐帧生命周期和重定向，设置分类的多层重定向由 `applicationSettingsPaneMotion.ts` 负责，具体空间投影仍由各 owner 决定。各相机、菜单和组合反馈 owner 继续决定 response、阻尼、阈值及速度重定向策略。公共层消费完整经过时间，不能用截断单帧 delta 的方式丢失后台或延迟帧时间；参数值只有在本身是算法边界时才属于测试契约。

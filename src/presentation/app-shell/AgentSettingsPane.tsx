@@ -16,8 +16,10 @@ import type {
   AgentProviderPreferencesSnapshot
 } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import { AgentProviderIcon } from './AgentProviderIcon'
+import { ApplicationSettingsSwitch } from './ApplicationSettingsSwitch'
 import { useAgentProviderCatalog } from './useAgentProviderCatalog'
 import { useI18n } from './i18n/useI18n'
+import { useSelectionFeedbackMotion, useSelectionIndicatorMotion } from './useSelectionMotion'
 
 const defaultPreferences: AgentProviderPreferencesSnapshot = {
   defaultCleancodeMcpEnabled: true,
@@ -53,6 +55,8 @@ export function AgentSettingsPane({
   const [inspections, setInspections] = useState<Record<string, InspectionState>>({})
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pendingPreference, setPendingPreference] = useState<string | null>(null)
+  const [permissionSelectionContainerRef, permissionSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(preferences.permissionMode)
 
   const inspectProviders = useCallback(
     async (providers: readonly AgentProviderDescriptor[]): Promise<void> => {
@@ -140,10 +144,21 @@ export function AgentSettingsPane({
           <span>
             <strong>{t('settings.agents.permission')}</strong>
           </span>
-          <div className="agent-settings-segmented" role="group">
+          <div
+            ref={permissionSelectionContainerRef}
+            className="agent-settings-segmented"
+            role="group"
+          >
+            <span
+              ref={permissionSelectionIndicatorRef}
+              className="selection-motion-indicator agent-settings-segmented__selection"
+              data-selection-motion-target={preferences.permissionMode}
+              aria-hidden="true"
+            />
             {(['yolo', 'manual'] as const).map((mode) => (
               <button
                 aria-pressed={preferences.permissionMode === mode}
+                data-selection-motion-option={mode}
                 disabled={settingsDisabled}
                 key={mode}
                 type="button"
@@ -158,21 +173,16 @@ export function AgentSettingsPane({
           <span>
             <strong>{t('settings.agents.defaultMcp')}</strong>
           </span>
-          <button
-            aria-checked={preferences.defaultCleancodeMcpEnabled}
-            aria-label={t('settings.agents.defaultMcp')}
-            className="application-settings-switch"
+          <ApplicationSettingsSwitch
+            checked={preferences.defaultCleancodeMcpEnabled}
+            label={t('settings.agents.defaultMcp')}
             disabled={settingsDisabled}
-            role="switch"
-            type="button"
             onClick={() =>
               void updatePreferences('defaultCleancodeMcpEnabled', {
                 defaultCleancodeMcpEnabled: !preferences.defaultCleancodeMcpEnabled
               })
             }
-          >
-            <span />
-          </button>
+          />
         </div>
       </section>
 
@@ -295,9 +305,13 @@ function InstalledAgentSettingsRow({
   const disabled = preferences.disabledProviderIds.includes(provider.id)
   const isDefault = defaultProviderId === provider.id
   const launchSummary = formatLaunchSummary(provider, preferences)
+  const enabledSelectionMotionRef = useSelectionFeedbackMotion(!disabled)
+  const defaultSelectionMotionRef = useSelectionFeedbackMotion(isDefault)
+  const expandedSelectionMotionRef = useSelectionFeedbackMotion(expanded)
 
   return (
     <article
+      ref={defaultSelectionMotionRef}
       className="agent-settings-row"
       data-default={isDefault || undefined}
       data-disabled={disabled || undefined}
@@ -312,6 +326,7 @@ function InstalledAgentSettingsRow({
         </span>
         <span className="agent-settings-row__actions">
           <button
+            ref={enabledSelectionMotionRef}
             aria-checked={!disabled}
             aria-label={t('settings.agents.enableAgent', { agent: provider.displayName })}
             className="agent-settings-enabled"
@@ -345,6 +360,7 @@ function InstalledAgentSettingsRow({
           <ProviderDocumentationLink provider={provider} />
           {provider.launch ? (
             <button
+              ref={expandedSelectionMotionRef}
               aria-expanded={expanded}
               aria-label={t('settings.agents.editLaunch', { agent: provider.displayName })}
               className="agent-settings-expand"
