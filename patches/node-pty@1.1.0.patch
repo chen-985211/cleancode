@@ -15,7 +15,7 @@ index 8c4fca9022a6d6f015bca87f61625cde2278f428..01fe11fb3d2e50d962587ee9cf9e5ca4
 +}
  process.send({ consoleProcessList: consoleProcessList });
 diff --git a/lib/windowsPtyAgent.js b/lib/windowsPtyAgent.js
-index a358ffb177357e177661033c1b092f9c9d0e5f5a..786de7a63f05a99cbd2ca4a552cb1a4522853e04 100644
+index a358ffb177357e177661033c1b092f9c9d0e5f5a..702053d8ccaf41e5616f226636264bdd560129de 100644
 --- a/lib/windowsPtyAgent.js
 +++ b/lib/windowsPtyAgent.js
 @@ -36,2 +36,5 @@ var WindowsPtyAgent = /** @class */ (function () {
@@ -24,7 +24,7 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..786de7a63f05a99cbd2ca4a552cb1a45
 +        this._killRequested = false;
 +        this._processExitListeners = [];
          if (this._useConpty === undefined || this._useConpty === true) {
-@@ -88,4 +91,27 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -88,6 +91,34 @@ var WindowsPtyAgent = /** @class */ (function () {
          if (this._useConpty) {
 -            var connect = this._ptyNative.connect(this._pty, commandLine, cwd, env, this._useConptyDll, function (c) { return _this._$onProcessExit(c); });
 -            this._innerPid = connect.pid;
@@ -33,33 +33,40 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..786de7a63f05a99cbd2ca4a552cb1a45
 +                this._innerPid = connect.pid;
 +            }
 +            catch (error) {
-+                // connect() can fail after the pseudo console, pipes, and output worker
-+                // exist. Release all three before preserving the original spawn error.
-+                try {
-+                    this._ptyNative.kill(this._pty, this._useConptyDll);
-+                }
-+                catch (_a) { /* already gone */ }
-+                try {
-+                    this._conoutSocketWorker.dispose();
-+                }
-+                catch (_b) { /* best-effort cleanup */ }
-+                try {
-+                    this._inSocket.destroy();
-+                }
-+                catch (_c) { /* best-effort cleanup */ }
-+                try {
-+                    this._outSocket.destroy();
-+                }
-+                catch (_d) { /* best-effort cleanup */ }
++                this._disposeFailedSpawn();
 +                throw error;
 +            }
          }
-@@ -119,3 +145,3 @@ var WindowsPtyAgent = /** @class */ (function () {
+     }
++    WindowsPtyAgent.prototype._disposeFailedSpawn = function () {
++        // Construction failed before WindowsTerminal could subscribe. Consume delayed
++        // pipe connection errors locally before releasing every partial spawn resource.
++        this._inSocket.on('error', function () { });
++        this._outSocket.on('error', function () { });
++        try {
++            this._ptyNative.kill(this._pty, this._useConptyDll);
++        }
++        catch (_a) { /* already gone */ }
++        try {
++            this._conoutSocketWorker.dispose();
++        }
++        catch (_b) { /* best-effort cleanup */ }
++        try {
++            this._inSocket.destroy();
++        }
++        catch (_c) { /* best-effort cleanup */ }
++        try {
++            this._outSocket.destroy();
++        }
++        catch (_d) { /* best-effort cleanup */ }
++    };
+     Object.defineProperty(WindowsPtyAgent.prototype, "inSocket", {
+@@ -119,3 +150,3 @@ var WindowsPtyAgent = /** @class */ (function () {
          if (this._useConpty) {
 -            if (this._exitCode !== undefined) {
 +            if (this._hasProcessExited) {
                  throw new Error('Cannot resize a pty that has already exited');
-@@ -133,2 +159,17 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -133,2 +164,17 @@ var WindowsPtyAgent = /** @class */ (function () {
      WindowsPtyAgent.prototype.kill = function () {
 +        if (this._killRequested) {
 +            return;
@@ -77,13 +84,13 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..786de7a63f05a99cbd2ca4a552cb1a45
 +    };
 +    WindowsPtyAgent.prototype._killPty = function () {
          var _this = this;
-@@ -156,2 +197,5 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -156,2 +202,5 @@ var WindowsPtyAgent = /** @class */ (function () {
                  this._ptyNative.kill(this._pty, this._useConptyDll);
 +                // Start the drain deadline even when shutdown happens before the first
 +                // output. Later data resets the same deadline.
 +                this._conoutSocketWorker.dispose();
                  this._outSocket.on('data', function () {
-@@ -206,2 +250,19 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -206,2 +255,19 @@ var WindowsPtyAgent = /** @class */ (function () {
      });
 +    Object.defineProperty(WindowsPtyAgent.prototype, "processExitCodeReady", {
 +        get: function () {
@@ -103,7 +110,7 @@ index a358ffb177357e177661033c1b092f9c9d0e5f5a..786de7a63f05a99cbd2ca4a552cb1a45
 +        this._processExitListeners.push(listener);
 +    };
      WindowsPtyAgent.prototype._getWindowsBuildNumber = function () {
-@@ -222,3 +283,10 @@ var WindowsPtyAgent = /** @class */ (function () {
+@@ -222,3 +288,10 @@ var WindowsPtyAgent = /** @class */ (function () {
          var _this = this;
 +        if (this._hasProcessExited) {
 +            return;
@@ -1044,7 +1051,7 @@ index 7b286d3d644c26141df516929703aa6e129df4b2..8f2a7748fb03dfb27b49a94cce88a1d4
 +    throw errorWithCode(info, "Failed to terminate conpty process", terminationError);
    }
 diff --git a/src/windowsPtyAgent.ts b/src/windowsPtyAgent.ts
-index d7054449516f0c9a62af351c2caa17331206d530..1f1b82d7c27cb8e6b4f527b891b07c0d50ff94b3 100644
+index d7054449516f0c9a62af351c2caa17331206d530..af3671ee07b49dc3ad727815478947dbaa4bc8f6 100644
 --- a/src/windowsPtyAgent.ts
 +++ b/src/windowsPtyAgent.ts
 @@ -36,2 +36,5 @@ export class WindowsPtyAgent {
@@ -1053,7 +1060,7 @@ index d7054449516f0c9a62af351c2caa17331206d530..1f1b82d7c27cb8e6b4f527b891b07c0d
 +  private _killRequested: boolean = false;
 +  private _processExitListeners: ((exitCode: number | undefined) => void)[] = [];
    private _conoutSocketWorker: ConoutConnection;
-@@ -118,4 +121,14 @@ export class WindowsPtyAgent {
+@@ -118,4 +121,9 @@ export class WindowsPtyAgent {
      if (this._useConpty) {
 -      const connect = (this._ptyNative as IConptyNative).connect(this._pty, commandLine, cwd, env, this._useConptyDll, c => this._$onProcessExit(c));
 -      this._innerPid = connect.pid;
@@ -1061,21 +1068,29 @@ index d7054449516f0c9a62af351c2caa17331206d530..1f1b82d7c27cb8e6b4f527b891b07c0d
 +        const connect = (this._ptyNative as IConptyNative).connect(this._pty, commandLine, cwd, env, this._useConptyDll, c => this._$onProcessExit(c));
 +        this._innerPid = connect.pid;
 +      } catch (error) {
-+        // connect() can fail after the pseudo console, pipes, and output worker
-+        // exist. Release all three before preserving the original spawn error.
-+        try { (this._ptyNative as IConptyNative).kill(this._pty, this._useConptyDll); } catch { /* already gone */ }
-+        try { this._conoutSocketWorker.dispose(); } catch { /* best-effort cleanup */ }
-+        try { this._inSocket.destroy(); } catch { /* best-effort cleanup */ }
-+        try { this._outSocket.destroy(); } catch { /* best-effort cleanup */ }
++        this._disposeFailedSpawn();
 +        throw error;
 +      }
      }
-@@ -125,3 +138,3 @@ export class WindowsPtyAgent {
+@@ -123,5 +131,16 @@ export class WindowsPtyAgent {
+
++  private _disposeFailedSpawn(): void {
++    // Construction failed before WindowsTerminal could subscribe. Consume delayed
++    // pipe connection errors locally before releasing every partial spawn resource.
++    this._inSocket.on('error', () => { /* failed spawn cleanup */ });
++    this._outSocket.on('error', () => { /* failed spawn cleanup */ });
++    try { (this._ptyNative as IConptyNative).kill(this._pty, this._useConptyDll); } catch { /* already gone */ }
++    try { this._conoutSocketWorker.dispose(); } catch { /* best-effort cleanup */ }
++    try { this._inSocket.destroy(); } catch { /* best-effort cleanup */ }
++    try { this._outSocket.destroy(); } catch { /* best-effort cleanup */ }
++  }
++
+   public resize(cols: number, rows: number): void {
      if (this._useConpty) {
 -      if (this._exitCode !== undefined) {
 +      if (this._hasProcessExited) {
          throw new Error('Cannot resize a pty that has already exited');
-@@ -141,2 +154,18 @@ export class WindowsPtyAgent {
+@@ -141,2 +160,18 @@ export class WindowsPtyAgent {
    public kill(): void {
 +    if (this._killRequested) {
 +      return;
@@ -1094,13 +1109,13 @@ index d7054449516f0c9a62af351c2caa17331206d530..1f1b82d7c27cb8e6b4f527b891b07c0d
 +
 +  private _killPty(): void {
      // Tell the agent to kill the pty, this releases handles to the process
-@@ -161,2 +190,5 @@ export class WindowsPtyAgent {
+@@ -161,2 +196,5 @@ export class WindowsPtyAgent {
          (this._ptyNative as IConptyNative).kill(this._pty, this._useConptyDll);
 +        // Start the drain deadline even when shutdown happens before the first
 +        // output. Later data resets the same deadline.
 +        this._conoutSocketWorker.dispose();
          this._outSocket.on('data', () => {
-@@ -207,2 +239,17 @@ export class WindowsPtyAgent {
+@@ -207,2 +245,17 @@ export class WindowsPtyAgent {
 
 +  public get processExitCodeReady(): boolean {
 +    return !this._useConpty || this._hasProcessExited;
@@ -1118,7 +1133,7 @@ index d7054449516f0c9a62af351c2caa17331206d530..1f1b82d7c27cb8e6b4f527b891b07c0d
 +  }
 +
    private _getWindowsBuildNumber(): number {
-@@ -224,3 +271,10 @@ export class WindowsPtyAgent {
+@@ -224,3 +277,10 @@ export class WindowsPtyAgent {
    private _$onProcessExit(exitCode: number): void {
 +    if (this._hasProcessExited) {
 +      return;

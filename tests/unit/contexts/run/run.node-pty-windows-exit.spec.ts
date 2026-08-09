@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { EventEmitter } from 'node:events'
 
 import type { IDisposable, IPty } from 'node-pty'
 
@@ -112,6 +113,19 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(agent.listenForDrainData).toHaveBeenCalledOnce()
   })
 
+  it('absorbs delayed pipe errors while disposing a failed ConPTY spawn', () => {
+    const agent = createFailedConptySpawnHarness()
+
+    agent.disposeFailedSpawn()
+
+    expect(() => agent.inputSocket.emit('error', new Error('input pipe missing'))).not.toThrow()
+    expect(() => agent.outputSocket.emit('error', new Error('output pipe missing'))).not.toThrow()
+    expect(agent.nativeKill).toHaveBeenCalledOnce()
+    expect(agent.disposeWorker).toHaveBeenCalledOnce()
+    expect(agent.destroyInput).toHaveBeenCalledOnce()
+    expect(agent.destroyOutput).toHaveBeenCalledOnce()
+  })
+
   it.each([
     {
       firstSignal: 'output-close' as const,
@@ -210,6 +224,40 @@ function createBundledConptyAgentHarness() {
     kill: () => agent.kill(),
     listenForDrainData,
     nativeKill
+  }
+}
+
+function createFailedConptySpawnHarness() {
+  const destroyInput = vi.fn()
+  const destroyOutput = vi.fn()
+  const disposeWorker = vi.fn()
+  const inputSocket = Object.assign(new EventEmitter(), { destroy: destroyInput })
+  const nativeKill = vi.fn()
+  const outputSocket = Object.assign(new EventEmitter(), { destroy: destroyOutput })
+  const agent = Object.create(WindowsPtyAgent.prototype) as {
+    _conoutSocketWorker: { dispose: () => void }
+    _disposeFailedSpawn(): void
+    _inSocket: EventEmitter & { destroy: () => void }
+    _outSocket: EventEmitter & { destroy: () => void }
+    _pty: number
+    _ptyNative: { kill: (pty: number, useConptyDll: boolean) => void }
+    _useConptyDll: boolean
+  }
+  agent._conoutSocketWorker = { dispose: disposeWorker }
+  agent._inSocket = inputSocket
+  agent._outSocket = outputSocket
+  agent._pty = 42
+  agent._ptyNative = { kill: nativeKill }
+  agent._useConptyDll = true
+
+  return {
+    destroyInput,
+    destroyOutput,
+    disposeFailedSpawn: () => agent._disposeFailedSpawn(),
+    disposeWorker,
+    inputSocket,
+    nativeKill,
+    outputSocket
   }
 }
 
