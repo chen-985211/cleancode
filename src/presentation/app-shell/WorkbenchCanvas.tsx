@@ -635,7 +635,8 @@ export function WorkbenchCanvas({
               onFocus={(target) =>
                 focusQuickExecutionTargetInCanvas({
                   instance: reactFlowInstanceRef.current,
-                  target
+                  target,
+                  terminalGroups: currentWorkbench.graph.terminalGroups
                 })
               }
               onReorder={onReorderQuickExecutionSlots}

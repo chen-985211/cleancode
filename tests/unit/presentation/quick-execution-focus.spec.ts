@@ -1,5 +1,6 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 
+import type { TerminalGroupSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { focusQuickExecutionTargetInCanvas } from '../../../src/presentation/app-shell/quickExecutionFocus'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 
@@ -43,11 +44,72 @@ describe('quick execution canvas focus', () => {
       setViewport
     } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
 
-    expect(focusQuickExecutionTargetInCanvas({ instance, target })).toBe(true)
+    const focusRequest = { instance, target, terminalGroups: [] }
+
+    expect(focusQuickExecutionTargetInCanvas(focusRequest)).toBe(true)
     expect(getNodesBounds).toHaveBeenCalledWith(
       expectedNodeIds.map((nodeId) => expect.objectContaining({ id: nodeId }))
     )
     expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
+  })
+
+  it.each([
+    {
+      target: { type: 'terminal' as const, terminalBlockId: 'terminal-1' },
+      terminalBlockIds: ['terminal-1']
+    },
+    {
+      target: {
+        type: 'workflow' as const,
+        terminalBlockIds: ['terminal-1', 'terminal-2']
+      },
+      terminalBlockIds: ['terminal-1', 'terminal-2']
+    }
+  ])(
+    'fits the collapsed combination that visibly represents a $target.type target',
+    ({ target, terminalBlockIds }) => {
+      const group = createTerminalGroup('combination-1', terminalBlockIds, true)
+      const groupNode = createNode(group.id, 'terminalGroup')
+      const getNodesBounds = vi.fn(() => ({ height: 100, width: 120, x: 0, y: 0 }))
+      const setViewport = vi.fn(async () => true)
+      const instance = {
+        getNode: (nodeId: string) => (nodeId === groupNode.id ? groupNode : undefined),
+        getNodesBounds,
+        getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+        setViewport
+      } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+      const focusRequest = {
+        instance,
+        target,
+        terminalGroups: [group]
+      }
+
+      expect(focusQuickExecutionTargetInCanvas(focusRequest)).toBe(true)
+      expect(getNodesBounds).toHaveBeenCalledWith([
+        expect.objectContaining({ id: 'combination-1' })
+      ])
+      expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
+    }
+  )
+
+  it('keeps members of an expanded combination as the visible focus targets', () => {
+    const terminalNode = createNode('terminal-1', 'terminal')
+    const getNodesBounds = vi.fn(() => ({ height: 100, width: 120, x: 0, y: 0 }))
+    const setViewport = vi.fn(async () => true)
+    const instance = {
+      getNode: (nodeId: string) => (nodeId === terminalNode.id ? terminalNode : undefined),
+      getNodesBounds,
+      getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
+      setViewport
+    } as unknown as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    const focusRequest = {
+      instance,
+      target: { type: 'terminal' as const, terminalBlockId: terminalNode.id },
+      terminalGroups: [createTerminalGroup('combination-1', [terminalNode.id], false)]
+    }
+
+    expect(focusQuickExecutionTargetInCanvas(focusRequest)).toBe(true)
+    expect(getNodesBounds).toHaveBeenCalledWith([expect.objectContaining({ id: terminalNode.id })])
   })
 
   it('does not move the canvas when any target node is unavailable', () => {
@@ -61,7 +123,8 @@ describe('quick execution canvas focus', () => {
     expect(
       focusQuickExecutionTargetInCanvas({
         instance,
-        target: { type: 'terminal', terminalBlockId: 'removed-terminal' }
+        target: { type: 'terminal', terminalBlockId: 'removed-terminal' },
+        terminalGroups: []
       })
     ).toBe(false)
     expect(setViewport).not.toHaveBeenCalled()
@@ -75,6 +138,22 @@ function createNode(id: string, type: 'terminal' | 'terminalGroup'): WorkbenchFl
     position: { x: 0, y: 0 },
     type
   } as WorkbenchFlowNode
+}
+
+function createTerminalGroup(
+  id: string,
+  memberBlockIds: readonly string[],
+  isCollapsed: boolean
+): TerminalGroupSnapshot {
+  return {
+    id,
+    isCollapsed,
+    memberBlockIds,
+    name: id,
+    position: { x: 0, y: 0 },
+    size: { height: 100, width: 120 },
+    type: 'terminal-group'
+  }
 }
 
 function stubReducedMotionPreference(): void {
