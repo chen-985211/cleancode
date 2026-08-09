@@ -15,6 +15,7 @@ import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchW
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
 import { useProjectSidebarMotion } from './useProjectSidebarMotion'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 import { TooltipLabel } from './Tooltip'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -253,10 +254,16 @@ function ProjectCard({
       openBranchWorkspaceForm()
     }
   }
-  const closeBranchSelector = (): void => {
+  const closeBranchSelector = useCallback((): void => {
     setIsBranchSelectorOpen(false)
     setBranchSearchQuery('')
-  }
+  }, [])
+  const closeBranchSelectorAndRestoreFocus = useCallback((): void => {
+    closeBranchSelector()
+    branchSelectorRootRef.current
+      ?.querySelector<HTMLButtonElement>('.default-branch-selector__toggle')
+      ?.focus({ preventScroll: true })
+  }, [closeBranchSelector])
   const toggleBranchSelector = (): void => {
     if (isBranchSelectorOpen) {
       closeBranchSelector()
@@ -282,43 +289,32 @@ function ProjectCard({
     setOpenWorkspaceMenuId((menuId) => (menuId === workspaceId ? null : workspaceId))
   }, [])
 
+  useOutsidePointerDismiss({
+    active: isBranchSelectorOpen,
+    isInside: (target) =>
+      branchSelectorRootRef.current?.contains(target) === true ||
+      branchSelectorPopoverRef.current?.contains(target) === true,
+    onDismiss: closeBranchSelectorAndRestoreFocus,
+    pointerPolicy: 'consume'
+  })
+
   useEffect(() => {
     if (!isBranchSelectorOpen) {
       return undefined
     }
 
-    const closeBranchSelectorWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (target instanceof Node) {
-        if (
-          branchSelectorRootRef.current?.contains(target) ||
-          branchSelectorPopoverRef.current?.contains(target)
-        ) {
-          return
-        }
-      }
-
-      closeBranchSelector()
-    }
-
     const closeBranchSelectorOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       event.preventDefault()
-      closeBranchSelector()
-      branchSelectorRootRef.current
-        ?.querySelector<HTMLButtonElement>('.default-branch-selector__toggle')
-        ?.focus()
+      closeBranchSelectorAndRestoreFocus()
     }
 
-    document.addEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
     document.addEventListener('keydown', closeBranchSelectorOnEscape)
 
     return () => {
-      document.removeEventListener('pointerdown', closeBranchSelectorWhenClickingOutside)
       document.removeEventListener('keydown', closeBranchSelectorOnEscape)
     }
-  }, [isBranchSelectorOpen])
+  }, [closeBranchSelectorAndRestoreFocus, isBranchSelectorOpen])
 
   return (
     <section

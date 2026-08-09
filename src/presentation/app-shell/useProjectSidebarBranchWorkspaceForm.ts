@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
+
 export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: string) => void) {
   const [isOpen, setIsOpen] = useState(false)
   const [branchName, setBranchName] = useState('')
@@ -33,6 +35,19 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
     setIsOpen(!isOpen)
   }
   const completeClose = useCallback((): void => setBranchName(''), [])
+  const dismissFromOutside = useCallback((): void => {
+    setIsOpen(false)
+    triggerRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  useOutsidePointerDismiss({
+    active: isOpen,
+    isInside: (target) =>
+      surfaceRef.current?.contains(target) === true ||
+      triggerRef.current?.contains(target) === true,
+    onDismiss: dismissFromOutside,
+    pointerPolicy: 'consume'
+  })
 
   useEffect(() => {
     if (!isOpen) {
@@ -41,19 +56,6 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
 
     formRef.current?.querySelector<HTMLInputElement>('input')?.focus()
 
-    const cancelWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (
-        target instanceof Node &&
-        (surfaceRef.current?.contains(target) || triggerRef.current?.contains(target))
-      ) {
-        return
-      }
-
-      setIsOpen(false)
-    }
-
     const cancelOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       event.preventDefault()
@@ -61,11 +63,9 @@ export function useProjectSidebarBranchWorkspaceForm(onSubmit: (branchName: stri
       triggerRef.current?.focus()
     }
 
-    document.addEventListener('pointerdown', cancelWhenClickingOutside)
     document.addEventListener('keydown', cancelOnEscape)
 
     return () => {
-      document.removeEventListener('pointerdown', cancelWhenClickingOutside)
       document.removeEventListener('keydown', cancelOnEscape)
     }
   }, [isOpen])

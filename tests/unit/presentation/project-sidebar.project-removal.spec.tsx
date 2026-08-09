@@ -39,7 +39,7 @@ describe('project sidebar project removal', () => {
     expect(within(dialog).getByText('停止会话并从列表移除，本地文件保留。')).toBeInTheDocument()
     expect(document.querySelector('.project-sidebar-confirmation-dialog__backdrop')).toBeNull()
 
-    fireEvent.pointerDown(document.body)
+    firePointerSequence(document.body)
 
     expect(screen.queryByRole('dialog', { name: '移除项目 alpha-project' })).not.toBeInTheDocument()
     expect(removeProject).not.toHaveBeenCalled()
@@ -75,3 +75,11 @@ describe('project sidebar project removal', () => {
     expect(await screen.findByRole('menuitem', { name: '新建终端积木' })).toBeDisabled()
   })
 })
+
+function firePointerSequence(target: Element): void {
+  fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseDown(target, { button: 0 })
+  fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseUp(target, { button: 0 })
+  fireEvent.click(target, { button: 0 })
+}

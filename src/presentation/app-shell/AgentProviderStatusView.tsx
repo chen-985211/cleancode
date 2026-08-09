@@ -7,6 +7,7 @@ import { useI18n } from './i18n/useI18n'
 import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 interface PanelPosition {
   readonly left: number
@@ -39,23 +40,26 @@ export function AgentProviderStatusControl({
   const panelRef = useRef<HTMLDivElement | null>(null)
   const panelId = `agent-status-${useId().replaceAll(':', '')}`
 
+  useOutsidePointerDismiss({
+    active: isOpen,
+    isInside: (target) =>
+      triggerRef.current?.contains(target) === true || panelRef.current?.contains(target) === true,
+    onDismiss: () => {
+      setIsOpen(false)
+      triggerRef.current?.focus({ preventScroll: true })
+    },
+    pointerPolicy: 'consume'
+  })
+
   useEffect(() => {
     if (!isOpen) return undefined
-    const closeOnOutsidePointer = (event: PointerEvent): void => {
-      const target = event.target as Node
-      if (!triggerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
-        setIsOpen(false)
-      }
-    }
     const closeOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       setIsOpen(false)
       triggerRef.current?.focus()
     }
-    document.addEventListener('pointerdown', closeOnOutsidePointer)
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer)
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isOpen])

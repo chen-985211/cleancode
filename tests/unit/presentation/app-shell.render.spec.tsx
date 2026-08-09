@@ -485,7 +485,7 @@ describe('app shell', () => {
 
     fireEvent.pointerDown(branchSearch)
     expect(branchDialog).toBeInTheDocument()
-    fireEvent.pointerDown(document.body)
+    firePointerSequence(document.body)
 
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: '选择默认工作区分支' })).not.toBeInTheDocument()
@@ -690,4 +690,10 @@ async function openBlankCanvasMenu(): Promise<void> {
   if (!pane) throw new Error('Expected a React Flow pane')
   fireEvent.contextMenu(pane, { clientX: 320, clientY: 240 })
   await screen.findByRole('menu', { name: '画布操作' })
+}
+
+function firePointerSequence(target: Element): void {
+  fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+  fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+  fireEvent.click(target, { button: 0 })
 }

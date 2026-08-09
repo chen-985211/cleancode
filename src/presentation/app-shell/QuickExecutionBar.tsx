@@ -20,6 +20,7 @@ import { useI18n } from './i18n/useI18n'
 import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { TooltipLabel } from './Tooltip'
 import { WorkbenchIcon, type WorkbenchIconRole } from './WorkbenchIcons'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
 
@@ -66,6 +67,7 @@ export function QuickExecutionBar({
   const { t } = useI18n()
   const rootRef = useRef<HTMLDivElement | null>(null)
   const popoverRef = useRef<HTMLDivElement | null>(null)
+  const popoverTriggerRef = useRef<HTMLButtonElement | null>(null)
   const draggedNumberRef = useRef<QuickExecutionSlotNumber | null>(null)
   const [popoverPresentation, setPopoverPresentation] = useState<PopoverPresentation | null>(null)
   const [draggedNumber, setDraggedNumber] = useState<QuickExecutionSlotNumber | null>(null)
@@ -88,37 +90,43 @@ export function QuickExecutionBar({
       setPopoverPresentation((current) => (current ? { ...current, open: false } : current)),
     []
   )
-  const openPopover = useCallback((content: PopoverState): void => {
+  const openPopover = useCallback((content: PopoverState, trigger?: HTMLButtonElement): void => {
+    if (trigger) popoverTriggerRef.current = trigger
     setPopoverPresentation({ content, open: true })
   }, [])
+  const closePopoverAndRestoreFocus = useCallback((): void => {
+    closePopover()
+    popoverTriggerRef.current?.focus({ preventScroll: true })
+  }, [closePopover])
   const presentedPopover = popoverPresentation?.content ?? null
   const isPopoverOpen = popoverPresentation?.open ?? false
+
+  useOutsidePointerDismiss({
+    active: isPopoverOpen,
+    isInside: (target) => rootRef.current?.contains(target) ?? false,
+    onDismiss: closePopoverAndRestoreFocus,
+    pointerPolicy: 'consume'
+  })
 
   useEffect(() => {
     if (!isPopoverOpen) return undefined
     popoverRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
 
-    const closeOnOutsidePointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Node && rootRef.current?.contains(event.target)) return
-      closePopover()
-    }
     const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') closePopover()
+      if (event.key === 'Escape') closePopoverAndRestoreFocus()
     }
 
-    document.addEventListener('pointerdown', closeOnOutsidePointerDown)
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
       document.removeEventListener('keydown', closeOnEscape)
     }
-  }, [closePopover, isPopoverOpen])
+  }, [closePopoverAndRestoreFocus, isPopoverOpen])
 
   const bind = (
     number: QuickExecutionSlotNumber | null,
     target: QuickExecutionTargetSnapshot
   ): void => {
-    closePopover()
+    closePopoverAndRestoreFocus()
     if (number) {
       void onBind(number, target)
       return
@@ -268,7 +276,9 @@ export function QuickExecutionBar({
                     className="quick-execution__content quick-execution__add"
                     type="button"
                     aria-label={t('quickExecution.addObject')}
-                    onClick={() => openPopover({ type: 'candidates', number: null })}
+                    onClick={(event) =>
+                      openPopover({ type: 'candidates', number: null }, event.currentTarget)
+                    }
                   >
                     <kbd>{slot.number}</kbd>
                     <WorkbenchIcon className="quick-execution__type-icon" role="add" size={13} />
@@ -284,7 +294,9 @@ export function QuickExecutionBar({
                     type="button"
                     draggable={false}
                     aria-label={t('quickExecution.openSlotActions', { number: slot.number })}
-                    onClick={() => openPopover({ type: 'actions', number: slot.number })}
+                    onClick={(event) =>
+                      openPopover({ type: 'actions', number: slot.number }, event.currentTarget)
+                    }
                   >
                     <WorkbenchIcon role="more" size={13} />
                   </button>

@@ -95,10 +95,15 @@ describe('project sidebar branch workspace form', () => {
     })
     fireEvent.pointerDown(formSurface!)
     expect(within(projectCard).getByRole('textbox', { name: '分支名称' })).toBeInTheDocument()
-    fireEvent.pointerDown(document.body)
+    const observeCanvasPointer = vi.fn()
+    document.body.addEventListener('pointerdown', observeCanvasPointer, { once: true })
+    firePointerSequence(document.body)
+    document.body.removeEventListener('pointerdown', observeCanvasPointer)
 
+    expect(observeCanvasPointer).not.toHaveBeenCalled()
     expect(within(projectCard).queryByRole('textbox', { name: '分支名称' })).not.toBeInTheDocument()
     expect(createBranchWorkspaceButton).toHaveAttribute('aria-expanded', 'false')
+    expect(createBranchWorkspaceButton).toHaveFocus()
     expect(formSurface).toHaveAttribute('data-surface-motion-state', 'closing')
     expect(formSurface).toHaveAttribute('inert')
     expect(formSurface).toBeInTheDocument()
@@ -259,6 +264,14 @@ describe('project sidebar branch workspace form', () => {
 
 function primaryModifier(): { readonly metaKey?: true; readonly ctrlKey?: true } {
   return isMacPlatform() ? { metaKey: true } : { ctrlKey: true }
+}
+
+function firePointerSequence(target: Element): void {
+  fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseDown(target, { button: 0 })
+  fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseUp(target, { button: 0 })
+  fireEvent.click(target, { button: 0 })
 }
 
 function isMacPlatform(): boolean {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react'
 import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { useI18n } from './i18n/useI18n'
+import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 
 interface ProjectSidebarProjectRemovalPopoverProps {
   readonly open: boolean
@@ -26,21 +27,16 @@ export function ProjectSidebarProjectRemovalPopover({
     triggerRef.current?.focus()
   }, [onCancel, triggerRef])
 
+  useOutsidePointerDismiss({
+    active: open,
+    isInside: (target) =>
+      rootRef.current?.contains(target) === true || triggerRef.current?.contains(target) === true,
+    onDismiss: cancelAndRestoreFocus,
+    pointerPolicy: 'consume'
+  })
+
   useEffect(() => {
     if (!open) return undefined
-
-    const cancelWhenClickingOutside = (event: PointerEvent): void => {
-      const target = event.target
-
-      if (
-        target instanceof Node &&
-        (rootRef.current?.contains(target) || triggerRef.current?.contains(target))
-      ) {
-        return
-      }
-
-      cancelAndRestoreFocus()
-    }
 
     const cancelOnEscape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
@@ -48,11 +44,9 @@ export function ProjectSidebarProjectRemovalPopover({
       cancelAndRestoreFocus()
     }
 
-    document.addEventListener('pointerdown', cancelWhenClickingOutside)
     document.addEventListener('keydown', cancelOnEscape)
 
     return () => {
-      document.removeEventListener('pointerdown', cancelWhenClickingOutside)
       document.removeEventListener('keydown', cancelOnEscape)
     }
   }, [cancelAndRestoreFocus, open, triggerRef])

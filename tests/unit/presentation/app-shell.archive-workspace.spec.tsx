@@ -75,7 +75,7 @@ describe('app shell worktree archive', () => {
 
     fireEvent.keyDown(trigger, { key: 'ArrowDown' })
     expect(screen.getByRole('menuitem', { name: '归档工作区' })).toHaveFocus()
-    fireEvent.pointerDown(document.body)
+    firePointerSequence(document.body)
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
@@ -209,6 +209,14 @@ describe('app shell worktree archive', () => {
     )
   })
 })
+
+function firePointerSequence(target: Element): void {
+  fireEvent.pointerDown(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseDown(target, { button: 0 })
+  fireEvent.pointerUp(target, { button: 0, pointerId: 1 })
+  fireEvent.mouseUp(target, { button: 0 })
+  fireEvent.click(target, { button: 0 })
+}
 
 function createWorkbenchWithTestWorktree(testIsCurrent: boolean, lockReason: string | null = null) {
   return createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project', {
