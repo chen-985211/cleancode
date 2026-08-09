@@ -5,6 +5,7 @@ import { ProjectRegistryTransactionCoordinator } from './ProjectRegistryTransact
 
 export interface RememberProjectCommand {
   readonly directory: string
+  readonly projectPickerDirectory?: string
 }
 
 export class RememberProjectUseCase {
@@ -21,7 +22,10 @@ export class RememberProjectUseCase {
     command: RememberProjectCommand
   ): Promise<ProjectRegistrySnapshot> {
     const registry = ProjectRegistry.fromSnapshot(await this.projectRegistryRepository.get())
-    const rememberedRegistry = registry.rememberProject(command.directory)
+    const rememberedProjectRegistry = registry.rememberProject(command.directory)
+    const rememberedRegistry = command.projectPickerDirectory
+      ? rememberedProjectRegistry.rememberProjectPickerDirectory(command.projectPickerDirectory)
+      : rememberedProjectRegistry
 
     await this.projectRegistryRepository.save(rememberedRegistry)
 

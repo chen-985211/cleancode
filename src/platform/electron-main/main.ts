@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
@@ -93,6 +94,7 @@ import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerBlockTemplateIpcHandlers } from './blockTemplateIpcHandlers'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
+import { openProjectDirectoryPicker, resolveProjectPickerDirectory } from './projectDirectoryPicker'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
@@ -476,11 +478,19 @@ async function selectProjectDirectory(): Promise<string | null> {
     return process.env.CLEANCODE_TEST_PROJECT_DIRECTORY
   }
 
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory', 'createDirectory']
-  })
+  const registry = await new ListRememberedProjectsUseCase(getProjectRegistryRepository()).execute()
 
-  return result.canceled ? null : (result.filePaths[0] ?? null)
+  return openProjectDirectoryPicker({
+    defaultDirectory: registry.projectPickerDirectory ?? null,
+    isDirectory: async (directory) => {
+      try {
+        return (await stat(directory)).isDirectory()
+      } catch {
+        return false
+      }
+    },
+    showOpenDialog: (options) => dialog.showOpenDialog(options)
+  })
 }
 
 async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapshot> {
@@ -525,7 +535,10 @@ async function getDefaultGraphForAgent(command: {
 }
 
 async function rememberProject(directory: string): Promise<void> {
-  await rememberProjectUseCase.execute({ directory })
+  await rememberProjectUseCase.execute({
+    directory,
+    projectPickerDirectory: resolveProjectPickerDirectory(directory)
+  })
 }
 
 async function selectCurrentProject(directory: string | null): Promise<void> {

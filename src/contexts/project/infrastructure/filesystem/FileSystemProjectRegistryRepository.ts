@@ -48,7 +48,10 @@ function parseProjectRegistry(metadata: string): ProjectRegistrySnapshot {
       typeof parsed.currentProjectDirectory === 'string' ? parsed.currentProjectDirectory : null,
     projectDirectories: parsed.projectDirectories.filter(
       (directory): directory is string => typeof directory === 'string'
-    )
+    ),
+    ...(typeof parsed.projectPickerDirectory === 'string'
+      ? { projectPickerDirectory: parsed.projectPickerDirectory }
+      : {})
   }
 }
 
