@@ -3,9 +3,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, win32 as pathWin32 } from 'node:path'
 
+import { spawn as spawnPtyProcess } from 'node-pty'
+
 import type { StartTerminalProcessCommand } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import { createTerminalProcessEnvironment } from '../../../../src/contexts/run/infrastructure/pty/TerminalProcessEnvironment'
+import { resolveTerminalShellExecutable } from '../../../../src/contexts/run/infrastructure/pty/TerminalShellExecutableResolver'
+import { WindowsConptyWarmup } from '../../../../src/contexts/run/infrastructure/pty/WindowsConptyWarmup'
 import { createDeferred } from '../../../fixtures/deferred'
 
 describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process adapter', () => {
@@ -24,6 +29,45 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     model.disposeAll()
     await rm(workingDirectory, { force: true, recursive: true })
   })
+
+  it('lets the hidden PowerShell ConPTY warmup exit naturally', async () => {
+    const exited = createDeferred<void>()
+    let killCount = 0
+    const warmup = new WindowsConptyWarmup({
+      environment: createTerminalProcessEnvironment({
+        explicit: undefined,
+        inherited: process.env,
+        platform: 'win32'
+      }),
+      resolvePowerShellExecutable: () =>
+        resolveTerminalShellExecutable({
+          platform: 'win32',
+          resolveAppExecutionAlias: () => null
+        }),
+      runtimePlatform: 'win32',
+      spawnPty: (executable, args, options) => {
+        const process = spawnPtyProcess(executable, args, options)
+        process.onExit(() => exited.resolve())
+        return {
+          kill: () => {
+            killCount += 1
+            process.kill()
+          },
+          onExit: (listener) => process.onExit(listener)
+        }
+      },
+      timeoutMs: 5_000,
+      workingDirectory
+    })
+
+    try {
+      warmup.start()
+      await exited.promise
+      expect(killCount).toBe(0)
+    } finally {
+      warmup.dispose()
+    }
+  }, 20_000)
 
   it.each([
     { exitCode: 0, marker: 'windows-fast-exit-zero' },

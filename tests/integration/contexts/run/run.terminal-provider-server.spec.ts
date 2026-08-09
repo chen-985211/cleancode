@@ -149,6 +149,38 @@ describe('terminal provider server', () => {
     second.close()
   })
 
+  it('notifies the first authorized session listing once without affecting its response', async () => {
+    const onInitialStateListed = vi.fn(() => {
+      throw new Error('warmup scheduling unavailable')
+    })
+    server = createServer(new RecordingProcessPort(), undefined, undefined, onInitialStateListed)
+    await server.start()
+    const client = await TestProviderClient.connect(endpoint, 'secret-token')
+
+    await expect(client.request('listSessions')).rejects.toMatchObject({
+      code: 'TERMINAL_PROVIDER_UNAVAILABLE'
+    })
+    expect(onInitialStateListed).not.toHaveBeenCalled()
+
+    await claimController(client)
+    await expect(client.request('listSessions')).resolves.toMatchObject({ sessions: [] })
+    await expect(client.request('listSessions')).resolves.toMatchObject({ sessions: [] })
+
+    expect(onInitialStateListed).toHaveBeenCalledTimes(1)
+    client.close()
+  })
+
+  it('shares one close promise across concurrent shutdown callers', async () => {
+    server = createServer(new RecordingProcessPort())
+    await server.start()
+
+    const firstClose = server.close()
+    const secondClose = server.close()
+
+    expect(secondClose).toBe(firstClose)
+    await expect(firstClose).resolves.toBeUndefined()
+  })
+
   it('captures PTY output emitted before process startup returns', async () => {
     const processes = new RecordingProcessPort('eager startup output\r\n')
     server = createServer(processes)
@@ -509,7 +541,8 @@ describe('terminal provider server', () => {
   function createServer(
     processes: TerminalProcessPort,
     store?: FileTerminalRecoveryStore,
-    outputPersistenceBatchWindowMs?: number
+    outputPersistenceBatchWindowMs?: number,
+    onInitialStateListed?: () => void
   ) {
     return new TerminalProviderServer({
       endpoint,
@@ -518,7 +551,8 @@ describe('terminal provider server', () => {
       recoveryDirectory: join(rootDirectory, 'recovery'),
       processes,
       store,
-      outputPersistenceBatchWindowMs
+      outputPersistenceBatchWindowMs,
+      onInitialStateListed
     })
   }
 })

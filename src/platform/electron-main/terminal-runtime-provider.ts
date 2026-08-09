@@ -1,9 +1,15 @@
 import { appendFile, readFile, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+
+import { spawn as spawnPtyProcess } from 'node-pty'
 
 import { TerminalProviderServer } from '../../contexts/run/infrastructure/provider/TerminalProviderServer'
 import { terminalProviderProtocolVersion } from '../../contexts/run/infrastructure/provider/TerminalProviderProtocol'
 import { rotateProviderLog } from '../../contexts/run/infrastructure/provider/PersistentTerminalProviderClientSupport'
+import { createTerminalProcessEnvironment } from '../../contexts/run/infrastructure/pty/TerminalProcessEnvironment'
+import { resolveTerminalShellExecutable } from '../../contexts/run/infrastructure/pty/TerminalShellExecutableResolver'
+import { WindowsConptyWarmup } from '../../contexts/run/infrastructure/pty/WindowsConptyWarmup'
 
 const maxProviderLogBytes = 5 * 1024 * 1024
 let diagnosticTail: Promise<void> = Promise.resolve()
@@ -27,13 +33,37 @@ async function startProvider(): Promise<void> {
   const metadataPath = readArgument('--metadata')
   const metadata = await readMetadata(metadataPath)
   const stateDirectory = dirname(metadataPath)
+  const conptyWarmup = new WindowsConptyWarmup({
+    environment: createTerminalProcessEnvironment({
+      explicit: undefined,
+      inherited: process.env,
+      platform: 'win32'
+    }),
+    onFailure: (phase, error) =>
+      void writeProviderDiagnostic('conpty-warmup-failed', {
+        message: error instanceof Error ? error.message : String(error),
+        phase
+      }),
+    resolvePowerShellExecutable: () =>
+      resolveTerminalShellExecutable({
+        platform: 'win32',
+        resolveAppExecutionAlias: () => null
+      }),
+    runtimePlatform: process.platform,
+    spawnPty: (executable, args, options) => spawnPtyProcess(executable, args, options),
+    workingDirectory: homedir()
+  })
   const server = new TerminalProviderServer({
     endpoint: metadata.endpoint,
     authToken: metadata.authToken,
     instanceId: metadata.instanceId,
     recoveryDirectory: join(stateDirectory, 'recovery'),
     log: (message, details) => void writeProviderDiagnostic(message, details),
-    onExitRequested: () => process.exit(0)
+    onExitRequested: () => {
+      conptyWarmup.dispose()
+      process.exit(0)
+    },
+    onInitialStateListed: () => conptyWarmup.schedule()
   })
   await server.start()
 
@@ -41,6 +71,7 @@ async function startProvider(): Promise<void> {
   const close = () => {
     if (isClosing) return
     isClosing = true
+    conptyWarmup.dispose()
     const forceExit = setTimeout(() => process.exit(1), 4_500)
     void server.close().finally(() => {
       clearTimeout(forceExit)
