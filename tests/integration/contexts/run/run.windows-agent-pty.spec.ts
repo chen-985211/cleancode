@@ -1,4 +1,3 @@
-import { existsSync, statSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, win32 as pathWin32 } from 'node:path'
@@ -8,6 +7,10 @@ import { spawn as spawnPtyProcess } from 'node-pty'
 import type { StartTerminalProcessCommand } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import { HeadlessTerminalModelAdapter } from '../../../../src/contexts/run/infrastructure/terminal-model/HeadlessTerminalModelAdapter'
 import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
+import {
+  createWindowsPowerShellLaunchArguments,
+  encodePowerShellCommand
+} from '../../../../src/contexts/run/infrastructure/pty/PowerShellUtf8Bootstrap'
 import { createTerminalProcessEnvironment } from '../../../../src/contexts/run/infrastructure/pty/TerminalProcessEnvironment'
 import { resolveTerminalShellExecutable } from '../../../../src/contexts/run/infrastructure/pty/TerminalShellExecutableResolver'
 import { WindowsConptyWarmup } from '../../../../src/contexts/run/infrastructure/pty/WindowsConptyWarmup'
@@ -112,67 +115,226 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
     20_000
   )
 
-  it('starts the auto-selected ordinary PowerShell terminal and keeps it writable', async () => {
-    const sessionId = 'windows-default-powershell-session'
-    const expectedShellName = isPwshAvailable() ? 'pwsh.exe' : 'powershell.exe'
-    let output = ''
+  it.each([
+    { label: 'auto-selected PowerShell', shell: undefined },
+    { label: 'inbox Windows PowerShell 5.1', shell: inboxWindowsPowerShellExecutable() }
+  ])(
+    'starts $label with UTF-8 encodings and native child output',
+    async ({ label, shell }) => {
+      const sessionId = `windows-utf8-${label === 'auto-selected PowerShell' ? 'auto' : 'inbox'}`
+      const expectedShell = shell ?? (await resolveTerminalShellExecutable())
+      const expectedShellName = pathWin32.basename(expectedShell).toLowerCase()
+      const expectedUtf8Output = 'CLEANCODE_UTF8_CHILD_OUTPUT:中文✅🚀:END'
+      let output = ''
 
-    await startTerminal({
-      scope: blockRunScope(sessionId),
-      workingDirectory,
-      columns: 80,
-      rows: 24,
-      onOutput: (event) => {
-        output += event.data
-      },
-      onExit: () => undefined
+      try {
+        await startTerminal({
+          scope: blockRunScope(sessionId),
+          workingDirectory,
+          ...(shell ? { shell } : {}),
+          columns: 80,
+          rows: 24,
+          onOutput: (event) => {
+            output += event.data
+          },
+          onExit: () => undefined
+        })
+        adapter.write(
+          sessionId,
+          "$name = [IO.Path]::GetFileName((Get-Process -Id $PID).Path).ToLowerInvariant(); [Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f $name))\r"
+        )
+        await waitUntil(
+          () => output.includes(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`),
+          30_000
+        )
+
+        adapter.write(
+          sessionId,
+          "[Console]::WriteLine(('CLEANCODE_UTF8_ENCODINGS:{0}|{1}|{2}' -f [Console]::InputEncoding.WebName, [Console]::OutputEncoding.WebName, $OutputEncoding.WebName))\r"
+        )
+        await waitUntil(() => output.includes('CLEANCODE_UTF8_ENCODINGS:utf-8|utf-8|utf-8'), 30_000)
+
+        adapter.write(sessionId, createPowerShellUtf8NodeOutputCommand(`${expectedUtf8Output}\r\n`))
+        await waitUntil(() => output.includes(expectedUtf8Output), 30_000)
+
+        adapter.write(
+          sessionId,
+          "[Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f 'WRITABLE'))\r"
+        )
+        await waitUntil(() => output.includes('CLEANCODE_DEFAULT_SHELL_WRITABLE'), 30_000)
+
+        expect(output).toContain(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`)
+        expect(output).toContain('CLEANCODE_UTF8_ENCODINGS:utf-8|utf-8|utf-8')
+        expect(output).toContain(expectedUtf8Output)
+        expect(output).toContain('CLEANCODE_DEFAULT_SHELL_WRITABLE')
+      } finally {
+        await adapter.stop(sessionId)
+      }
+    },
+    40_000
+  )
+
+  it.each([
+    { label: 'auto-selected PowerShell', shell: undefined },
+    { label: 'inbox Windows PowerShell 5.1', shell: inboxWindowsPowerShellExecutable() }
+  ])(
+    'preserves prologue parsing and interactive scope in $label',
+    async ({ label, shell }) => {
+      const sessionId = `windows-prologue-${label === 'auto-selected PowerShell' ? 'auto' : 'inbox'}`
+      const marker = 'CLEANCODE_PROLOGUE_READY'
+      const launchCommand = [
+        'using namespace System.Text',
+        `param([string] $Value = '${marker}')`,
+        '$cleancodeScopedValue = $Value',
+        'function Get-CleancodeScopedValue { $cleancodeScopedValue }',
+        "Write-Output ('{0}|{1}' -f $Value, [UTF8Encoding].FullName)"
+      ].join('\n')
+      let output = ''
+
+      try {
+        await startTerminal({
+          scope: blockRunScope(sessionId),
+          workingDirectory,
+          ...(shell ? { shell } : {}),
+          launchCommand,
+          launchMode: 'interactive',
+          columns: 80,
+          rows: 24,
+          onOutput: (event) => {
+            output += event.data
+          },
+          onExit: () => undefined
+        })
+        await waitUntil(() => output.includes(`${marker}|System.Text.UTF8Encoding`), 30_000)
+
+        adapter.write(
+          sessionId,
+          "Write-Output ('CLEANCODE_SCOPE:{0}' -f (Get-CleancodeScopedValue))\r"
+        )
+        await waitUntil(() => output.includes(`CLEANCODE_SCOPE:${marker}`), 30_000)
+
+        expect(output).toContain(`${marker}|System.Text.UTF8Encoding`)
+        expect(output).toContain(`CLEANCODE_SCOPE:${marker}`)
+      } finally {
+        await adapter.stop(sessionId)
+      }
+    },
+    40_000
+  )
+
+  it('executes the generated startup command after entering ConstrainedLanguage', async () => {
+    const marker = 'CLEANCODE_CONSTRAINED_LANGUAGE_READY'
+    const launchArguments = createWindowsPowerShellLaunchArguments(
+      `param([string] $Value = '${marker}'); Write-Output $Value`,
+      false
+    )
+    const startupScript = decodeEncodedPowerShellArgument(launchArguments)
+    const bootstrapOnlyScript = decodeEncodedPowerShellArgument(
+      createWindowsPowerShellLaunchArguments(undefined, false)
+    )
+    const constrainedScript = [
+      '$ExecutionContext.SessionState.LanguageMode = "ConstrainedLanguage"',
+      `Microsoft.PowerShell.Utility\\Invoke-Expression -Command ${quotePowerShellString(bootstrapOnlyScript)}`,
+      "Write-Output ('CLEANCODE_CONSTRAINED_BOOTSTRAP_STATUS:{0}' -f $?)",
+      `Microsoft.PowerShell.Utility\\Invoke-Expression -Command ${quotePowerShellString(startupScript)}`
+    ].join('\n')
+    const exited = createDeferred<number>()
+    let hasExited = false
+    let output = ''
+    const ptyProcess = spawnPtyProcess(
+      inboxWindowsPowerShellExecutable(),
+      ['-NoLogo', '-EncodedCommand', encodePowerShellCommand(constrainedScript)],
+      {
+        name: 'xterm-256color',
+        cols: 80,
+        rows: 24,
+        cwd: workingDirectory,
+        env: createTerminalProcessEnvironment({
+          explicit: undefined,
+          inherited: process.env,
+          platform: 'win32'
+        }),
+        useConpty: true,
+        useConptyDll: true
+      }
+    )
+    ptyProcess.onData((data) => {
+      output += data
     })
-    adapter.write(
-      sessionId,
-      "$name = [IO.Path]::GetFileName((Get-Process -Id $PID).Path).ToLowerInvariant(); [Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f $name))\r"
-    )
-    await waitUntil(() => output.includes(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`))
+    ptyProcess.onExit((event) => {
+      hasExited = true
+      exited.resolve(event.exitCode)
+    })
 
-    adapter.write(
-      sessionId,
-      "[Console]::WriteLine(('CLEANCODE_DEFAULT_SHELL_{0}' -f 'WRITABLE'))\r"
-    )
-    await waitUntil(() => output.includes('CLEANCODE_DEFAULT_SHELL_WRITABLE'))
+    try {
+      await waitUntil(() => output.includes(marker), 15_000)
+      await waitUntil(() => hasExited, 5_000)
+      await expect(exited.promise).resolves.toBe(0)
+      expect(output).toContain(marker)
+      expect(output).toContain('CLEANCODE_CONSTRAINED_BOOTSTRAP_STATUS:True')
+      expect(output).not.toMatch(/Cannot create type|Write-Error/u)
+    } finally {
+      if (!hasExited) {
+        ptyProcess.kill()
+        await waitUntil(() => hasExited, 5_000)
+      }
+    }
+  }, 30_000)
 
-    expect(output).toContain(`CLEANCODE_DEFAULT_SHELL_${expectedShellName}`)
-    expect(output).toContain('CLEANCODE_DEFAULT_SHELL_WRITABLE')
-  }, 40_000)
-
-  it('starts an Agent job requested immediately after creating the PowerShell pty', async () => {
+  it('preserves UTF-8 output and lifecycle for an immediate Agent foreground job', async () => {
+    const sessionId = 'immediate-windows-agent-session'
+    const expectedUtf8Output = 'CLEANCODE_AGENT_UTF8_OUTPUT:你好世界🌍🤖:END'
     let output = ''
+    let startedCount = 0
+    let terminalExited = false
     const started = createDeferred<void>()
     const exited = createDeferred<number | null>()
 
-    await startTerminal({
-      scope: agentRunScope('immediate-windows-agent-session'),
-      workingDirectory,
-      columns: 80,
-      rows: 24,
-      onOutput: (event) => {
-        output += event.data
-      },
-      onExit: () => undefined
-    })
-    adapter.launchForegroundJob({
-      args: ['-NoLogo', '-NoProfile', '-Command', "Write-Output 'immediate-agent-ready'"],
-      environment: {},
-      executable: 'powershell.exe',
-      generation: 1,
-      launchId: 'immediate-launch',
-      onExit: (event) => exited.resolve(event.exitCode),
-      onStarted: () => started.resolve(),
-      sessionId: 'immediate-windows-agent-session'
-    })
+    try {
+      await startTerminal({
+        scope: agentRunScope(sessionId),
+        workingDirectory,
+        columns: 80,
+        rows: 24,
+        onOutput: (event) => {
+          output += event.data
+        },
+        onExit: () => {
+          terminalExited = true
+        }
+      })
+      adapter.launchForegroundJob({
+        args: ['-e', createUtf8NodeOutputScript(`${expectedUtf8Output}\r\n`)],
+        environment: {},
+        executable: process.execPath,
+        generation: 1,
+        launchId: 'immediate-utf8-launch',
+        onExit: (event) => exited.resolve(event.exitCode),
+        onStarted: () => {
+          startedCount += 1
+          started.resolve()
+        },
+        sessionId
+      })
 
-    await started.promise
-    await waitUntil(() => output.includes('immediate-agent-ready'))
-    await expect(exited.promise).resolves.toBe(0)
-  }, 20_000)
+      await started.promise
+      await waitUntil(() => output.includes(expectedUtf8Output), 30_000)
+      await expect(exited.promise).resolves.toBe(0)
+
+      adapter.write(
+        sessionId,
+        "[Console]::WriteLine(('CLEANCODE_AGENT_OUTER_{0}' -f 'WRITABLE'))\r"
+      )
+      await waitUntil(() => output.includes('CLEANCODE_AGENT_OUTER_WRITABLE'), 30_000)
+
+      expect(startedCount).toBe(1)
+      expect(output).toContain(expectedUtf8Output)
+      expect(output).toContain('CLEANCODE_AGENT_OUTER_WRITABLE')
+      expect(terminalExited).toBe(false)
+    } finally {
+      await adapter.stop(sessionId)
+    }
+  }, 40_000)
 
   it.each([
     { terminalSourceTheme: 'light' as const, expectedConsoleColors: 'Black|White' },
@@ -393,61 +555,9 @@ function agentRunScope(sessionId: string) {
   }
 }
 
-function isPwshAvailable(): boolean {
-  const programFilesRoots = [
-    process.env.ProgramW6432,
-    process.env.ProgramFiles,
-    process.env['ProgramFiles(x86)']
-  ]
-  if (
-    programFilesRoots.some(
-      (root) =>
-        root &&
-        pathWin32.isAbsolute(root) &&
-        isRealExecutable(pathWin32.join(root, 'PowerShell', '7', 'pwsh.exe'))
-    )
-  ) {
-    return true
-  }
-
-  const localAppData = process.env.LOCALAPPDATA
-  if (
-    localAppData &&
-    pathWin32.isAbsolute(localAppData) &&
-    isRealExecutable(pathWin32.join(localAppData, 'Microsoft', 'PowerShell', '7', 'pwsh.exe'))
-  ) {
-    return true
-  }
-
-  const pathValue = process.env.Path || process.env.PATH
-  for (const rawDirectory of pathValue?.split(pathWin32.delimiter) ?? []) {
-    const directory = rawDirectory.trim().replace(/^"|"$/gu, '')
-    if (!pathWin32.isAbsolute(directory)) continue
-
-    const candidate = pathWin32.join(directory, 'pwsh.exe')
-    if (
-      isRealExecutable(candidate) ||
-      (isWindowsAppExecutionAlias(candidate) && existsSync(candidate))
-    ) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function isRealExecutable(candidate: string): boolean {
-  try {
-    if (!existsSync(candidate)) return false
-    const stat = statSync(candidate)
-    return stat.isFile() && stat.size > 0
-  } catch {
-    return false
-  }
-}
-
-function isWindowsAppExecutionAlias(candidate: string): boolean {
-  return /[\\/]Microsoft[\\/]WindowsApps[\\/]/iu.test(pathWin32.normalize(candidate))
+function inboxWindowsPowerShellExecutable(): string {
+  const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows'
+  return pathWin32.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 }
 
 function blockRunScope(sessionId: string) {
@@ -465,6 +575,16 @@ function blockRunScope(sessionId: string) {
   }
 }
 
+function decodeEncodedPowerShellArgument(arguments_: readonly string[]): string {
+  const encodedCommandIndex = arguments_.indexOf('-EncodedCommand')
+  if (encodedCommandIndex < 0) throw new Error('Expected an encoded PowerShell command')
+  return Buffer.from(arguments_[encodedCommandIndex + 1] ?? '', 'base64').toString('utf16le')
+}
+
+function quotePowerShellString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
+}
+
 function createWindowsMouseModeProbeScript(): string {
   return [
     'process.stdout.write(',
@@ -472,6 +592,24 @@ function createWindowsMouseModeProbeScript(): string {
     '  () => process.exit(0)',
     ')'
   ].join('')
+}
+
+function createPowerShellUtf8NodeOutputCommand(output: string): string {
+  const encodedExecutable = Buffer.from(process.execPath, 'utf8').toString('base64')
+  const encodedOutput = Buffer.from(output, 'utf8').toString('base64')
+
+  return (
+    [
+      '$cleancodeUtf8 = [System.Text.Encoding]::UTF8',
+      `$cleancodeNode = $cleancodeUtf8.GetString([System.Convert]::FromBase64String('${encodedExecutable}'))`,
+      `& $cleancodeNode -e "process.stdout.write(Buffer.from('${encodedOutput}','base64'))"`
+    ].join('; ') + '\r'
+  )
+}
+
+function createUtf8NodeOutputScript(output: string): string {
+  const encodedOutput = Buffer.from(output, 'utf8').toString('base64')
+  return `process.stdout.write(Buffer.from('${encodedOutput}','base64'))`
 }
 
 async function waitUntil(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {

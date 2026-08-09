@@ -85,6 +85,8 @@ node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；mac
 
 Windows Provider 在首次会话对账响应路径之后异步启动不进入会话模型的短命 PowerShell helper，预热随包 ConPTY DLL；helper 失败不阻断真实终端，也不引入 `cmd.exe` 产品 fallback。
 
+Windows PowerShell/Profile 正常加载后由启动 bootstrap 在 `FullLanguage` 中 best-effort 把 Console 输入输出与 native pipeline 固定为 UTF-8；AppLocker/WDAC 强制的受限语言模式静默跳过受限构造器。同一设置在每次 Agent 前台任务 started 之前重申。输出继续原样进入 Provider 权威模型和 renderer，不增加前端过滤。
+
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
 受管本地服务使用 Node.js `net.Server` 在 `127.0.0.1` 上预留固定、首选或操作系统动态端口，并在启动 PTY 前通过显式环境变量或安全命令参数后缀注入实际端口。预留句柄不能移交给任意项目进程，因此释放预留到目标进程监听之间仍存在竞争；Run 使用有限分配/激活重试和监听所有权校验收束该窗口，不引入新的第三方依赖。

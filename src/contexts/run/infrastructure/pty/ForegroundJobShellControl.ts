@@ -8,6 +8,7 @@ import type {
   LaunchForegroundJobProcessCommand
 } from '../../application/ports/TerminalProcessPort'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import { getPowerShellUtf8Bootstrap } from './PowerShellUtf8Bootstrap'
 
 const posixMarkerStart = '\x1eCLEANCODE_JOB:'
 const posixMarkerEnd = '\x1f'
@@ -181,6 +182,9 @@ function createPowerShellLaunchScript(
       ...environment,
       '$cleancodeJobExitCode = 130',
       'try {',
+      ...getPowerShellUtf8Bootstrap()
+        .split('\n')
+        .map((line) => `  ${line}`),
       `  [Console]::ForegroundColor = [ConsoleColor]::${consoleColors.foreground}`,
       `  [Console]::BackgroundColor = [ConsoleColor]::${consoleColors.background}`,
       `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
