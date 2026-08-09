@@ -62,7 +62,7 @@ describe('resolveTerminalProviderRuntimeRootDirectory', () => {
     expect(
       resolveTerminalProviderRuntimeRootDirectory({
         allowTestDirectory: true,
-        platform: 'darwin',
+        platform: process.platform,
         providerStateDirectory: join(aliasedTemp, 'scenario-state', 'provider'),
         testDirectory: join(aliasedTemp, 'scenario-state', 'terminal-provider-host'),
         testStateDirectory: join(aliasedTemp, 'scenario-state'),

@@ -87,7 +87,6 @@ import { AgentWorkspaceCreationScopeAdapter } from './agentWorkspaceCreationScop
 import { createProjectLifecycleUseCases } from './projectLifecycleUseCases'
 import { createRunRuntimeScopeValidation } from './runRuntimeScopeValidationAdapter'
 import { createRunRuntime } from './runRuntimeComposition'
-import { startApplicationAfterElectronReady } from './applicationStartup'
 import { createDisabledAgentSessionSnapshot } from './createDisabledAgentSessionSnapshot'
 import { createMainWindow } from './createMainWindow'
 import { resolveElectronWindowPolicy } from './electronWindowPolicy'
@@ -631,7 +630,17 @@ function logProviderRuntimeImagePruneError(error: unknown): void {
 }
 
 if (isPrimaryAppInstance) {
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
+    try {
+      await initializeRunRuntime()
+    } catch (error) {
+      consoleLogger.error({
+        scope: 'run.terminal-provider',
+        operation: 'initializeRuntime',
+        outcome: 'failure',
+        error: { message: error instanceof Error ? error.message : String(error) }
+      })
+    }
     const appIconPath = resolveAppIconPath({
       fileExists: existsSync,
       isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
@@ -643,21 +652,11 @@ if (isPrimaryAppInstance) {
       app.dock?.setIcon(appIconPath)
     }
 
+    createMainWindow({ appIconPath, policy: electronWindowPolicy })
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createMainWindow({ appIconPath, policy: electronWindowPolicy })
-      }
-    })
-    void startApplicationAfterElectronReady({
-      createWindow: () => createMainWindow({ appIconPath, policy: electronWindowPolicy }),
-      initializeRunRuntime,
-      onRunRuntimeInitializationFailure: (error) => {
-        consoleLogger.error({
-          scope: 'run.terminal-provider',
-          operation: 'initializeRuntime',
-          outcome: 'failure',
-          error: { message: error instanceof Error ? error.message : String(error) }
-        })
       }
     })
   })
