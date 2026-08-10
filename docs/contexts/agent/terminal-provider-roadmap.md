@@ -444,7 +444,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 当前验证证据
 
-2026-07-22 在 `feature/agent-terminal-providers` 分支完成以下 macOS 本机验证；这些证据不替代尚未执行的 Linux/Windows 原生 runner：
+2026-07-22 在 `feature/agent-terminal-providers` 分支完成以下 macOS 本机验证；这些是当时的基线证据，不替代后续远端三平台门禁：
 
 - 全部依赖、文档、行数、日志、主题、国际化、格式、Lint、TypeScript、依赖方向、未使用代码和 diff 门禁通过。
 - Unit：179 个测试文件、826 项测试通过。
@@ -452,7 +452,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 - Contract：11 个测试文件、68 项测试通过。
 - Electron E2E：11 个测试文件、43 项测试通过；其中包含多 Agent、固定 Provider 创建、Claude 空会话与首次输入后的恢复边界、画布取消选择时的 xterm 视觉稳定、`Ctrl+C` 后回到同一 shell、跨工作区主题/进程复用、普通终端、恢复、工作流、端口和 worktree 回归。
 - `pnpm build` 成功生成 Electron main、Terminal Provider、preload 和 renderer 产物。
-- 三平台 workflow 已加入仓库，但尚未在远端 Windows/Linux runner 执行，因此阶段 3、4、7 和全路线仍保持“实施中”。
+- 2026-08-10，远端 [Full cross-platform quality workflow](https://github.com/chen-985211/cleancode/actions/runs/31378114134) 已在 macOS、Linux 和 Windows 完整成功；同日 [Electron E2E workflow](https://github.com/chen-985211/cleancode/actions/runs/31377521733) 也曾在三平台全部成功。当前 `main` 的后续 [Electron E2E workflow](https://github.com/chen-985211/cleancode/actions/runs/31378114057) 仍有 macOS 与 Windows 失败，因此阶段 3、4、7 和全路线继续保持“实施中”；当前阻塞是最新 E2E 汇总尚未全绿，不再是 Windows/Linux runner 从未执行。
 
 ## 阶段 0：当前行为证据
 
@@ -554,7 +554,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 阶段 3：Agent terminal 与前台任务
 
-状态：实施中。生产实现已完成，等待三平台原生门禁通过。
+状态：实施中。生产实现与三平台原生质量门禁已完成；当前 `main` 的最新三平台 E2E 汇总尚未全绿。
 
 ### 阶段目标
 
@@ -597,7 +597,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 阶段 4：Codex 迁移与行为对等
 
-状态：实施中。生产实现已完成，等待 Windows Provider 检测和 ConPTY 对等验收。
+状态：实施中。生产实现、Windows Provider 检测和 ConPTY 原生质量验收已完成；当前 `main` 的最新三平台 E2E 汇总尚未全绿。
 
 ### 阶段目标
 
@@ -715,7 +715,7 @@ PowerShell 脚本文本 unit、伪造进程或其他平台上的 `win32` 条件�
 
 ## 阶段 7：Provider 扩展契约稳定化
 
-状态：实施中。Provider 契约已完成，等待 Windows npm shim 和三平台基础终端门禁通过。
+状态：实施中。Provider 契约、Windows npm shim 和三平台基础终端质量门禁已完成；当前 `main` 的最新三平台 E2E 汇总尚未全绿。
 
 ### 阶段目标
 

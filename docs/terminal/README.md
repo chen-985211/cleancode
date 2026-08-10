@@ -15,7 +15,7 @@
 - 服务端口租约和实际端点由 [Run](../contexts/run/service-port-management.md) 拥有。
 - 终端积木、组合、连接和执行配置由 [BlockGraph](../contexts/block-graph/block-graph.md) 拥有。
 - 稳定用户交互由 [UI 契约](../product/ui-contract.md) 拥有。
-- Agent 身份、thread、MCP 和 Agent PTY 生命周期仍由 [Agent](../contexts/agent/agent-session.md) 拥有。
+- Agent 身份、Provider session binding、Provider launch 和 MCP 由 [Agent](../contexts/agent/agent-session.md) 拥有；Agent terminal 的 shell、PTY、权威模型、视图和前台任务由 [Run](../contexts/run/terminal-session.md) 拥有。
 
 本目录只维护跨层终端专项知识、实施路线和技术证据，不复制上述文档中的稳定业务规则。
 
