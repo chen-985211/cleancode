@@ -7,6 +7,11 @@ import type {
 import type { TerminalDimensions } from './types'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import type { TerminalRendererState } from './terminalRendererController'
+import type {
+  TerminalZoomRasterCoordinator,
+  TerminalZoomRasterPriority
+} from './terminalZoomRasterCoordinator'
+import type { TerminalRasterScale } from './terminalZoomRasterPolicy'
 
 export interface TerminalSurfaceAttachment {
   readonly element: HTMLDivElement
@@ -39,7 +44,17 @@ export interface TerminalSurfaceRegistryDiagnostics extends TerminalSurfaceDiagn
   readonly webglSurfaceCount: number
 }
 
+export interface TerminalSurfaceRasterTarget {
+  getRasterPriority(): TerminalZoomRasterPriority
+  getRasterScale(): TerminalRasterScale
+  getRasterCost(scale: TerminalRasterScale): number
+  onRasterCostChange?(listener: () => void): () => void
+  onRasterPriorityChange?(listener: () => void): () => void
+  setRasterScale(scale: TerminalRasterScale): void
+}
+
 export interface TerminalSurface {
+  readonly rasterTarget?: TerminalSurfaceRasterTarget
   attach(attachment: TerminalSurfaceAttachment): void
   detach(element: HTMLDivElement): void
   dispose(): void
@@ -65,12 +80,17 @@ type TerminalViewIdFactory = () => string
 export class TerminalSurfaceRegistry {
   private readonly views = new Map<
     string,
-    { readonly identityKey: string; readonly surface: TerminalSurface }
+    {
+      readonly identityKey: string
+      readonly surface: TerminalSurface
+      readonly unregisterRasterTarget: () => void
+    }
   >()
 
   constructor(
     private readonly defaultFactory?: TerminalSurfaceFactory,
-    private readonly createViewId: TerminalViewIdFactory = createDefaultViewId
+    private readonly createViewId: TerminalViewIdFactory = createDefaultViewId,
+    private readonly rasterCoordinator?: Pick<TerminalZoomRasterCoordinator, 'register'>
   ) {}
 
   create(
@@ -81,7 +101,15 @@ export class TerminalSurfaceRegistry {
 
     const viewId = this.createUniqueViewId()
     const surface = factory()
-    this.views.set(viewId, { identityKey: createTerminalSurfaceKey(identity), surface })
+    const unregisterRasterTarget = surface.rasterTarget
+      ? (this.rasterCoordinator?.register({ id: viewId, ...surface.rasterTarget }) ??
+        (() => undefined))
+      : () => undefined
+    this.views.set(viewId, {
+      identityKey: createTerminalSurfaceKey(identity),
+      surface,
+      unregisterRasterTarget
+    })
     return { viewId, surface }
   }
 
@@ -96,11 +124,15 @@ export class TerminalSurfaceRegistry {
     const view = this.views.get(viewId)
     if (!view) return
     this.views.delete(viewId)
+    view.unregisterRasterTarget()
     view.surface.dispose()
   }
 
   disposeAll(): void {
-    for (const view of this.views.values()) view.surface.dispose()
+    for (const view of this.views.values()) {
+      view.unregisterRasterTarget()
+      view.surface.dispose()
+    }
     this.views.clear()
   }
 

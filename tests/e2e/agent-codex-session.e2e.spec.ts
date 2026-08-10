@@ -24,11 +24,24 @@ import {
   agentLaunchReadyTimeoutMs,
   waitForAgentLaunchReady,
   waitForAgentProviderInstalled,
-  waitForAgentTerminalReady
+  waitForAgentTerminalReady,
+  stopAgentLaunchForShellSetup,
+  writeAgentTerminalInput
 } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
 import { pollUntilState } from '../support/e2ePolling'
-import { createE2eTerminalEnvironment, prependE2ePath } from '../support/e2eTerminal'
+import {
+  asE2eTerminalInput,
+  createE2ePrintCommand,
+  createE2eTerminalEnvironment,
+  prependE2ePath
+} from '../support/e2eTerminal'
+import {
+  readXtermInkRatio,
+  readXtermRasterProjection,
+  waitForXtermPaint
+} from '../support/terminalRasterE2e'
+import { setCanvasZoomToMaximum } from '../support/workbenchNodeCreationE2e'
 
 describe('Codex Agent session e2e', () => {
   let electronApp: ElectronApplication
@@ -58,6 +71,72 @@ describe('Codex Agent session e2e', () => {
       taskName: task.name
     })
   })
+
+  it(
+    'keeps the Agent WebGL surface visible while raising its backing density',
+    async () => {
+      await expectDesktopRuntime(page)
+      const launchReady = waitForAgentLaunchReady(page)
+      await configureCodexExecutable(page, fakeCodex.executablePath)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await waitForAgentCount(page, 0)
+      await waitForAgentProviderInstalled(page, 'codex')
+      await selectAgentProviderFromCreateMenu(page, 'Codex')
+      await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
+      await launchReady
+
+      const terminal = page.locator('[data-agent-console-node] .agent-terminal-viewport').first()
+      await stopAgentLaunchForShellSetup(page, terminal)
+      const visualMarker = Array.from(
+        { length: 6 },
+        (_, index) => `__AGENT_RASTER_VISIBLE_${index}__ ${'MW'.repeat(18)}`
+      ).join('\n')
+      await writeAgentTerminalInput(
+        page,
+        terminal,
+        asE2eTerminalInput(createE2ePrintCommand(visualMarker))
+      )
+      const initialProjection = await pollUntilState({
+        description: 'Agent baseline WebGL backing store',
+        observe: () => readXtermRasterProjection(terminal),
+        accept: (projection) =>
+          projection !== null && projection.renderer === 'webgl' && projection.rasterScale === 1,
+        intervalMs: 50,
+        timeoutMs: 10_000
+      })
+      const beforeInkRatio = await pollUntilState({
+        description: 'visible Agent terminal pixels before canvas zoom',
+        observe: () => readXtermInkRatio(page, terminal),
+        accept: (ratio) => ratio > 0.02,
+        intervalMs: 50,
+        timeoutMs: 10_000
+      })
+
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
+      const zoomedProjection = await pollUntilState({
+        description: 'Agent high-density WebGL backing store',
+        observe: () => readXtermRasterProjection(terminal),
+        accept: (projection) =>
+          projection !== null &&
+          projection.renderer === 'webgl' &&
+          projection.rasterScale === 1.75 &&
+          projection.zoom >= 1.599,
+        intervalMs: 50,
+        timeoutMs: 10_000
+      })
+      await waitForXtermPaint(page)
+      const afterInkRatio = await readXtermInkRatio(page, terminal)
+
+      expect(initialProjection).not.toBeNull()
+      expect(zoomedProjection).not.toBeNull()
+      expect(zoomedProjection!.backingDensity).toBeGreaterThanOrEqual(
+        zoomedProjection!.devicePixelRatio * 0.98
+      )
+      expect(afterInkRatio).toBeGreaterThanOrEqual(beforeInkRatio! * 0.6)
+    },
+    electronScenarioTimeoutMs
+  )
 
   it(
     'restores a Codex session selected through /resume even when no later turn completes',

@@ -1,10 +1,13 @@
-import type { IDisposable, ITerminalAddon } from '@xterm/xterm'
+import type { IDisposable } from '@xterm/xterm'
+
+import type { TerminalRasterScale } from './terminalZoomRasterPolicy'
 
 export type TerminalRendererState = 'dom' | 'webgl'
 
 interface TerminalRendererAddon {
   dispose(): void
   onContextLoss(listener: () => void): IDisposable
+  setRasterScale(scale: TerminalRasterScale): void
 }
 
 interface TerminalRendererHost {
@@ -26,6 +29,7 @@ export class TerminalRendererController {
   private isDisposed = false
   private activationId = 0
   private currentState: TerminalRendererState = 'dom'
+  private rasterScale: TerminalRasterScale = 1
   private readonly loadAddon: () => Promise<TerminalRendererAddon>
   private readonly onStateChange: (state: TerminalRendererState) => void
   private readonly scheduleRefresh: (refresh: () => void) => void
@@ -40,6 +44,12 @@ export class TerminalRendererController {
     return this.currentState
   }
 
+  setRasterScale(scale: TerminalRasterScale): void {
+    if (this.isDisposed || scale === this.rasterScale) return
+    this.addon?.setRasterScale(scale)
+    this.rasterScale = scale
+  }
+
   async activate(terminal: TerminalRendererHost): Promise<void> {
     if (this.isDisposed || this.addon) return
     const activationId = ++this.activationId
@@ -51,6 +61,12 @@ export class TerminalRendererController {
         return
       }
 
+      try {
+        addon.setRasterScale(this.rasterScale)
+      } catch {
+        addon.dispose()
+        return
+      }
       const contextLossSubscription = addon.onContextLoss(() => this.fallBackToDom())
       try {
         terminal.loadAddon(addon)
@@ -117,5 +133,5 @@ function scheduleRendererRefresh(refresh: () => void): void {
 
 async function loadWebglAddon(): Promise<TerminalRendererAddon> {
   const { WebglAddon } = await import('@xterm/addon-webgl')
-  return new WebglAddon() as ITerminalAddon & TerminalRendererAddon
+  return new WebglAddon()
 }

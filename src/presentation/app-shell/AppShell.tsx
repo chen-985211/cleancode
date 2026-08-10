@@ -173,6 +173,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     startTerminal,
     terminalStates,
     terminalSurfaceRegistry,
+    terminalZoomRasterCoordinator,
     terminateTerminalSession,
     toggleTerminalRetention,
     terminateWorkbenchTerminalSessions,
@@ -686,6 +687,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
             onNodeDragStop={commitWorkbenchNodeDrag}
             onViewportChange={updateGraphViewport}
             onViewportInteractionStart={cancelLayoutFocus}
+            terminalZoomRasterCoordinator={terminalZoomRasterCoordinator}
             onMinimapNodeClick={focusWorkbenchNode}
             getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}

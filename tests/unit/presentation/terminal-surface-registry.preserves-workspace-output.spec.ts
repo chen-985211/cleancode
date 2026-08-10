@@ -78,9 +78,36 @@ describe('terminal surface registry disposable views', () => {
     expect(first.surface.setScrollbackRows).toHaveBeenCalledWith(5000)
     expect(second.surface.setScrollbackRows).toHaveBeenCalledWith(5000)
   })
+
+  it('registers and releases the optional raster capability with the shared coordinator', () => {
+    const unregister = vi.fn()
+    const rasterCoordinator = { register: vi.fn(() => unregister) }
+    const surface = createFakeSurface()
+    const rasterTarget = {
+      getRasterCost: vi.fn(() => 96_000),
+      getRasterPriority: vi.fn(() => 'visible' as const),
+      getRasterScale: vi.fn(() => 1 as const),
+      setRasterScale: vi.fn()
+    }
+    surface.rasterTarget = rasterTarget
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => 'view-raster',
+      rasterCoordinator
+    )
+
+    const lease = registry.create(createIdentity())
+
+    expect(rasterCoordinator.register).toHaveBeenCalledWith({ id: lease.viewId, ...rasterTarget })
+
+    registry.release(lease.viewId)
+
+    expect(unregister).toHaveBeenCalledOnce()
+  })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
+  rasterTarget?: TerminalSurface['rasterTarget']
   readonly detach: Mock<TerminalSurface['detach']>
   readonly dispose: Mock<TerminalSurface['dispose']>
   readonly restore: Mock<TerminalSurface['restore']>

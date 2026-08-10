@@ -21,15 +21,18 @@ interface CanvasViewportPersistence {
 
 interface SynchronizeCanvasViewportFromMoveInput extends CanvasViewportProjection {
   readonly event: unknown
+  readonly onRasterZoomChange?: (zoom: number) => void
   readonly viewport: Viewport
 }
 
 export function synchronizeCanvasViewportFromMove({
   event,
+  onRasterZoomChange,
   viewport,
   setViewportZoom,
   setCanvasViewport
 }: SynchronizeCanvasViewportFromMoveInput): void {
+  onRasterZoomChange?.(viewport.zoom)
   if (!event) {
     return
   }
@@ -42,15 +45,18 @@ export function synchronizeCanvasViewportFromMove({
 interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistence {
   readonly event: unknown
   readonly isRestoringViewport: boolean
+  readonly onRasterInteractionEnd?: (zoom: number) => void
   readonly viewport: Viewport
 }
 
 export function persistCanvasViewportFromMoveEnd({
   event,
   isRestoringViewport,
+  onRasterInteractionEnd,
   viewport,
   onViewportChange
 }: PersistCanvasViewportFromMoveEndInput): void {
+  onRasterInteractionEnd?.(viewport.zoom)
   if (!event || isRestoringViewport) {
     return
   }

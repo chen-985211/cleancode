@@ -24,6 +24,7 @@ import type { TerminalDimensions } from './types'
 import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/TerminalRuntimeSettings'
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
+import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'
 
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
@@ -47,6 +48,10 @@ class XtermTerminalSurface implements TerminalSurface {
       if (this.element) this.element.dataset.terminalRenderer = state
     }
   })
+  private readonly xtermRasterTarget = new TerminalXtermRasterTarget((scale) =>
+    this.rendererController.setRasterScale(scale)
+  )
+  readonly rasterTarget = this.xtermRasterTarget.target
   private readonly pendingOutputs: SequencedTerminalOutput[] = []
   private readonly idleResolvers = new Set<() => void>()
   private element: HTMLDivElement | null = null
@@ -112,6 +117,7 @@ class XtermTerminalSurface implements TerminalSurface {
     if (this.element && this.element !== attachment.element) this.detach(this.element)
 
     this.element = attachment.element
+    this.xtermRasterTarget.attach(attachment.element)
     this.element.dataset.terminalRenderer = this.rendererController.state
     this.element.dataset.terminalRendererReady = String(this.isRendererActivationSettled)
     this.element.dataset.terminalSourceTheme = this.terminalSourceTheme
@@ -162,6 +168,7 @@ class XtermTerminalSurface implements TerminalSurface {
     element.removeEventListener('pointerdown', this.focus, true)
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    this.xtermRasterTarget.detach(element)
     this.terminal.element?.remove()
     this.element = null
   }

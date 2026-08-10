@@ -22,6 +22,7 @@ import type { NotifyApp } from './appNotifications'
 import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
+import { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
 import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention
@@ -73,7 +74,10 @@ export function useTerminalSessions({
     {}
   )
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
-  const [terminalSurfaceRegistry] = useState(() => new TerminalSurfaceRegistry())
+  const [terminalZoomRasterCoordinator] = useState(() => new TerminalZoomRasterCoordinator())
+  const [terminalSurfaceRegistry] = useState(
+    () => new TerminalSurfaceRegistry(undefined, undefined, terminalZoomRasterCoordinator)
+  )
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
   const terminalStartupOutputsRef = useRef<Map<string, string>>(new Map())
@@ -262,8 +266,13 @@ export function useTerminalSessions({
       terminalStartupOutputsRef.current.clear()
       quickLaunchesRef.current.clear()
       terminalSurfaceRegistry.disposeAll()
+      queueMicrotask(() => {
+        // React StrictMode immediately replays effects with the same stateful owners. Defer the
+        // terminal check by one microtask so only a real unmount disposes the shared coordinator.
+        if (!isMountedRef.current) terminalZoomRasterCoordinator.dispose()
+      })
     }
-  }, [terminalSurfaceRegistry])
+  }, [terminalSurfaceRegistry, terminalZoomRasterCoordinator])
 
   useTerminalSessionEvents({
     clearPendingTerminalInput,
@@ -641,6 +650,7 @@ export function useTerminalSessions({
     startTerminal,
     terminalStates,
     terminalSurfaceRegistry,
+    terminalZoomRasterCoordinator,
     terminalStatesRef,
     terminateTerminalSession,
     toggleTerminalRetention,
