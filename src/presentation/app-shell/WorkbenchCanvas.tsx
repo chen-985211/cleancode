@@ -78,6 +78,10 @@ import {
   resolveTerminalCreationGroupId,
   toWorkbenchFlowPosition
 } from './workbenchCanvasInteractionTargets'
+import {
+  useWorkbenchCanvasViewportRestoration,
+  type TerminalZoomRasterCanvasCoordinator
+} from './useWorkbenchCanvasViewportRestoration'
 
 type CurrentWorkspace = WorkbenchSnapshot['project']['workspaces'][number]
 
@@ -175,6 +179,7 @@ interface WorkbenchCanvasProps {
   ) => void
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly onViewportInteractionStart?: () => void
+  readonly terminalZoomRasterCoordinator?: TerminalZoomRasterCanvasCoordinator
   readonly onMinimapNodeClick: (blockId: string) => void
   readonly getMiniMapNodeColor: (node: MinimapFlowNode) => string
   readonly getMiniMapNodeStrokeColor: (node: MinimapFlowNode) => string
@@ -237,6 +242,7 @@ export function WorkbenchCanvas({
   onNodeDragStop,
   onViewportChange,
   onViewportInteractionStart,
+  terminalZoomRasterCoordinator,
   onMinimapNodeClick,
   getMiniMapNodeColor,
   getMiniMapNodeStrokeColor,
@@ -388,27 +394,15 @@ export function WorkbenchCanvas({
     return () => resizeObserver.disconnect()
   }, [canvasSizeRef])
 
-  useEffect(() => {
-    const instance = reactFlowInstanceRef.current
-
-    if (
-      !instance ||
-      !currentWorkbench ||
-      restoredGraphIdRef.current === currentWorkbench.graph.id
-    ) {
-      return
-    }
-
-    restoreCanvasViewport({
-      instance,
-      viewport: currentWorkbench.graph.viewport,
-      graphId: currentWorkbench.graph.id,
-      restoredGraphIdRef,
-      isRestoringViewportRef,
-      setViewportZoom,
-      setCanvasViewport
-    })
-  }, [currentWorkbench, reactFlowInstanceRef])
+  useWorkbenchCanvasViewportRestoration({
+    currentWorkbench,
+    isRestoringViewportRef,
+    reactFlowInstanceRef,
+    restoredGraphIdRef,
+    setCanvasViewport,
+    setViewportZoom,
+    terminalZoomRasterCoordinator
+  })
 
   return (
     <section className="app-shell__workspace" aria-label={t('canvas.label')}>
@@ -481,6 +475,9 @@ export function WorkbenchCanvas({
               })
 
               if (currentWorkbench) {
+                terminalZoomRasterCoordinator?.updateCanvasZoom(
+                  currentWorkbench.graph.viewport.zoom
+                )
                 restoreCanvasViewport({
                   instance,
                   viewport: currentWorkbench.graph.viewport,
@@ -495,6 +492,7 @@ export function WorkbenchCanvas({
 
               const viewport = instance.getViewport()
 
+              terminalZoomRasterCoordinator?.updateCanvasZoom(viewport.zoom)
               setViewportZoom(viewport.zoom)
               setCanvasViewport(toCanvasViewportSnapshot(viewport))
             }}
@@ -560,12 +558,14 @@ export function WorkbenchCanvas({
             onMove={(event, viewport) =>
               synchronizeCanvasViewportFromMove({
                 event,
+                onRasterZoomChange: (zoom) => terminalZoomRasterCoordinator?.updateCanvasZoom(zoom),
                 viewport,
                 setCanvasViewport,
                 setViewportZoom
               })
             }
             onMoveStart={(event) => {
+              terminalZoomRasterCoordinator?.beginInteraction()
               if (event) {
                 cancelWorkbenchViewportMotion(reactFlowInstanceRef.current ?? undefined)
                 cancelWorkbenchDirectZoom(reactFlowInstanceRef.current ?? undefined)
@@ -576,6 +576,8 @@ export function WorkbenchCanvas({
               persistCanvasViewportFromMoveEnd({
                 event,
                 isRestoringViewport: isRestoringViewportRef.current,
+                onRasterInteractionEnd: (zoom) =>
+                  terminalZoomRasterCoordinator?.endInteraction(zoom),
                 onViewportChange,
                 viewport
               })

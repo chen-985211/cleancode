@@ -5,6 +5,7 @@ describe('terminal renderer controller', () => {
     let loseContext: () => void = () => undefined
     const addon = {
       dispose: vi.fn(),
+      setRasterScale: vi.fn(),
       onContextLoss: vi.fn((listener: () => void) => {
         loseContext = listener
         return { dispose: vi.fn() }
@@ -43,9 +44,10 @@ describe('terminal renderer controller', () => {
 
     let resolveAddon: (addon: {
       dispose(): void
+      setRasterScale(scale: number): void
       onContextLoss(listener: () => void): { dispose(): void }
     }) => void = () => undefined
-    const addon = { dispose: vi.fn(), onContextLoss: vi.fn() }
+    const addon = { dispose: vi.fn(), setRasterScale: vi.fn(), onContextLoss: vi.fn() }
     const pending = new TerminalRendererController({
       loadAddon: () => new Promise((resolve) => (resolveAddon = resolve)),
       onStateChange: vi.fn()
@@ -56,5 +58,51 @@ describe('terminal renderer controller', () => {
     await activation
 
     expect(addon.dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies only the latest raster scale without resizing the terminal grid', async () => {
+    const addon = {
+      dispose: vi.fn(),
+      onContextLoss: vi.fn(() => ({ dispose: vi.fn() })),
+      setRasterScale: vi.fn()
+    }
+    const terminal = { loadAddon: vi.fn(), refresh: vi.fn(), rows: 24 }
+    const controller = new TerminalRendererController({ loadAddon: async () => addon })
+
+    controller.setRasterScale(1.25)
+    controller.setRasterScale(1.5)
+    await controller.activate(terminal)
+
+    expect(addon.setRasterScale).toHaveBeenCalledOnce()
+    expect(addon.setRasterScale).toHaveBeenCalledWith(1.5)
+    expect(addon.setRasterScale.mock.invocationCallOrder[0]).toBeLessThan(
+      terminal.loadAddon.mock.invocationCallOrder[0]!
+    )
+
+    controller.setRasterScale(1.5)
+    controller.setRasterScale(1.75)
+
+    expect(addon.setRasterScale).toHaveBeenCalledTimes(2)
+    expect(addon.setRasterScale).toHaveBeenLastCalledWith(1.75)
+    expect(terminal.refresh).not.toHaveBeenCalled()
+  })
+
+  it('keeps the previous scale retryable when a live renderer rejects an upgrade', async () => {
+    const addon = {
+      dispose: vi.fn(),
+      onContextLoss: vi.fn(() => ({ dispose: vi.fn() })),
+      setRasterScale: vi.fn()
+    }
+    const controller = new TerminalRendererController({ loadAddon: async () => addon })
+    await controller.activate({ loadAddon: vi.fn(), refresh: vi.fn(), rows: 24 })
+    addon.setRasterScale.mockClear()
+    addon.setRasterScale.mockImplementationOnce(() => {
+      throw new Error('texture allocation failed')
+    })
+
+    expect(() => controller.setRasterScale(1.75)).toThrow('texture allocation failed')
+    controller.setRasterScale(1.75)
+
+    expect(addon.setRasterScale).toHaveBeenCalledTimes(2)
   })
 })

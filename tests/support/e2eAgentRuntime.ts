@@ -1,4 +1,4 @@
-import type { Page } from 'playwright'
+import type { Locator, Page } from 'playwright'
 
 import type { AgentRuntimeChangedEvent } from '../../src/contexts/agent/application/dto/AgentSessionProtocol'
 import { pollUntilState } from './e2ePolling'
@@ -234,4 +234,73 @@ export async function waitForAgentTerminalReady(
   } finally {
     await snapshotHandle.dispose()
   }
+}
+
+export async function stopAgentLaunchForShellSetup(
+  page: Page,
+  terminal: Locator,
+  timeoutMs = agentLaunchReadyTimeoutMs
+): Promise<void> {
+  const sessionId = await terminal.getAttribute('data-agent-terminal-session-id')
+  if (!sessionId) throw new Error('Agent terminal session identity is unavailable.')
+
+  await page.evaluate(
+    ({ sessionId, timeoutMs }) =>
+      new Promise<void>((resolve, reject) => {
+        const api = window.cleancode
+        if (!api) {
+          reject(new Error('CleanCode desktop API is unavailable.'))
+          return
+        }
+
+        let unsubscribe = (): void => undefined
+        let lastEvent: unknown = null
+        const timeout = window.setTimeout(() => {
+          unsubscribe()
+          reject(
+            new Error(
+              `Timed out waiting for the Agent launch to exit after ${timeoutMs}ms. Last runtime event: ${JSON.stringify(lastEvent)}`
+            )
+          )
+        }, timeoutMs)
+        unsubscribe = api.onAgentRuntimeChanged((event) => {
+          if (event.sessionId === sessionId) lastEvent = event
+          if (
+            event.sessionId !== sessionId ||
+            event.runtime.terminal.status !== 'running' ||
+            (event.runtime.launch.status !== 'exited' && event.runtime.launch.status !== 'stopped')
+          ) {
+            return
+          }
+
+          window.clearTimeout(timeout)
+          unsubscribe()
+          resolve()
+        })
+        void api.writeAgentSession({ input: '\x03', sessionId }).catch((error: unknown) => {
+          window.clearTimeout(timeout)
+          unsubscribe()
+          reject(error)
+        })
+      }),
+    { sessionId, timeoutMs }
+  )
+}
+
+export async function writeAgentTerminalInput(
+  page: Page,
+  terminal: Locator,
+  input: string
+): Promise<void> {
+  const sessionId = await terminal.getAttribute('data-agent-terminal-session-id')
+  if (!sessionId) throw new Error('Agent terminal session identity is unavailable.')
+
+  await page.evaluate(
+    async ({ input, sessionId }) => {
+      const api = window.cleancode
+      if (!api) throw new Error('CleanCode desktop API is unavailable.')
+      await api.writeAgentSession({ input, sessionId })
+    },
+    { input, sessionId }
+  )
 }

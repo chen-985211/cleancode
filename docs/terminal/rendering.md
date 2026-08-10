@@ -203,9 +203,17 @@ xterm 6 的用户滚动由 `.xterm-scrollable-element` 和内部 scroll model �
 3. 降级不得 reset xterm、重新 attach view、替换 session、重放 snapshot 或清空搜索和粘贴状态。
 4. surface 使用 `data-terminal-renderer` 暴露当前 `dom` / `webgl` 状态，并在异步 addon 激活完成后把 `data-terminal-renderer-ready` 置为 `true`；registry 诊断同时统计两类 surface，便于测试和故障定位。
 
+React Flow 放大节点时，不能长期把原始 WebGL backing store 交给 compositor 插值，也不能在每个缩放手势帧里重新分配 canvas。当前 surface 使用两阶段策略：手势期间只更新外层 transform；视口停稳后，根据画布 zoom 选择 `1`、`1.25`、`1.5`、`1.75` 的离散 raster scale，再在浏览器 idle slice 中逐个重建可见终端。焦点终端优先，未聚焦但可见的终端随后处理；离开 viewport 或被 parked 样式隐藏的终端回到 `1x`。调度器按 backing pixels 使用窗口级硬预算，并对同优先级终端逐级公平分配倍率，避免多个大终端同时抢占 GPU 内存。
+
+额外 raster scale 只能影响 device backing geometry 和 glyph atlas，CSS canvas、CSS cell、FitAddon 与 PTY 行列仍由真实 browser DPR 决定。倍率切换会清空 WebGL canvas 和 render model，因此 resize 后必须无条件请求完整 viewport redraw，不能等待下一段 PTY 输出、光标闪烁或 ResizeObserver 偶然触发恢复。倍率提交是事务式的：重建失败时恢复上一倍率并允许有界重试；连续失败后回到 `1x`，不能让失败倍率成为同值重试的 no-op。
+
+这项能力通过 `pnpm-workspace.yaml` 中的精确版本 `patchedDependencies` 修补 `@xterm/addon-webgl`。包的 CommonJS main、ESM module 和类型声明必须同时暴露相同契约；入口契约测试负责防止构建器切换入口后静默退回未修补实现。升级 addon 时应先确认上游能力和实际 bundle 入口，再重建或删除本地补丁。
+
+idle 调度同样属于正确性边界。`setRasterScale` 不在缩放事件或 animation frame 回调内执行；每个可用 idle slice 最多处理一个 surface，并为焦点任务设置较短 timeout、普通可见任务设置较长 timeout。这样 resize 清空发生在已经完成的 paint 之后，其请求的完整 redraw 可以在下一次 paint 前运行，既避免交互卡顿，也避免把空 backing store 呈现成一帧白屏。
+
 终端搜索是 xterm buffer 上的局部投影。snapshot restore 会 reset 可见终端，因此 restore 完成后必须用当前查询重新建立匹配；关闭搜索则清除 decorations 并恢复终端焦点。粘贴进度、确认和链接反馈是 React 局部覆盖层，不得改变 xterm 网格或拦截无关终端输入。
 
-验证 renderer 改动时至少覆盖中文、emoji、组合字符、搜索命中、context loss 后的可见输出，以及降级后的 PTY 粘贴。真实 GPU/context 和 xterm 输入链路由 [`terminal-daily-interactions.e2e.spec.ts`](../../tests/e2e/terminal-daily-interactions.e2e.spec.ts) 证明；渲染选择与释放分支由 [`terminal-renderer-controller.spec.ts`](../../tests/unit/presentation/terminal-renderer-controller.spec.ts) 覆盖。
+验证 renderer 改动时至少覆盖中文、emoji、组合字符、搜索命中、context loss 后的可见输出，以及降级后的 PTY 粘贴。真实 GPU/context 和 xterm 输入链路由 [`terminal-daily-interactions.e2e.spec.ts`](../../tests/e2e/terminal-daily-interactions.e2e.spec.ts) 证明；[`agent-codex-session.e2e.spec.ts`](../../tests/e2e/agent-codex-session.e2e.spec.ts) 进一步证明共享修复经过 Agent attach 生命周期后仍保持可见；渲染选择与释放分支由 [`terminal-renderer-controller.spec.ts`](../../tests/unit/presentation/terminal-renderer-controller.spec.ts) 覆盖。
 
 ## 画布缩放下的鼠标坐标
 

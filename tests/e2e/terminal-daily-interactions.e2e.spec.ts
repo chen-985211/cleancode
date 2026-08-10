@@ -19,6 +19,7 @@ import {
 import { pollUntilState } from '../support/e2ePolling'
 import {
   asE2eTerminalInput,
+  createE2eNodeCommand,
   createE2ePrintCommand,
   createE2eTerminalEnvironment,
   readTerminalSessionId,
@@ -26,6 +27,13 @@ import {
   waitForTerminalShellReady,
   writeTerminalCommand
 } from '../support/e2eTerminal'
+import { setCanvasZoomToMaximum } from '../support/workbenchNodeCreationE2e'
+import {
+  readWebgl2Availability,
+  readXtermInkRatio,
+  readXtermRasterProjection,
+  readXtermRendererState
+} from '../support/terminalRasterE2e'
 
 describe('terminal daily interactions e2e', () => {
   let workbench: E2eWorkbench
@@ -119,6 +127,108 @@ describe('terminal daily interactions e2e', () => {
     },
     electronScenarioTimeoutMs
   )
+
+  it(
+    'raises the WebGL backing density after canvas zoom without resizing the PTY grid',
+    async () => {
+      await createRunningTerminal(page)
+      const sessionId = await readTerminalSessionId(page, 'Terminal 1')
+      const terminalViewport = page
+        .locator('[data-terminal-block-id]')
+        .filter({ has: page.locator(`[data-terminal-session-id="${sessionId}"]`) })
+        .locator('.terminal-viewport')
+      const beforeDimensions = await probeTerminalDimensions(page, sessionId, 'BEFORE')
+      const rendererState = await pollUntilState({
+        description: 'focused terminal renderer activation',
+        observe: () => readXtermRendererState(terminalViewport),
+        accept: (state) => state.ready && ['dom', 'webgl'].includes(state.renderer),
+        intervalMs: 50,
+        timeoutMs: 10_000
+      })
+      const webgl2Available = await readWebgl2Availability(page)
+      if (rendererState.renderer !== 'webgl' && webgl2Available) {
+        throw new Error(`Expected terminal WebGL renderer, received ${rendererState.renderer}.`)
+      }
+      const initialRasterProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'focused terminal baseline WebGL backing store',
+              observe: () => readXtermRasterProjection(terminalViewport),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1 &&
+                projection.backingWidth > 0,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
+      const visualMarker = Array.from(
+        { length: 6 },
+        (_, index) => `__RASTER_VISIBLE_${index}__ ${'MW'.repeat(18)}`
+      ).join('\n')
+      await writeTerminalCommand(
+        page,
+        'Terminal 1',
+        asE2eTerminalInput(createE2ePrintCommand(visualMarker))
+      )
+      await waitForTerminalOutput(page, 'Terminal 1', '__RASTER_VISIBLE_5__')
+      await pollUntilState({
+        description: 'visible terminal pixels before canvas zoom',
+        observe: () => readXtermInkRatio(page, terminalViewport),
+        accept: (ratio) => ratio > 0.01,
+        intervalMs: 50,
+        retryObservationErrors: true,
+        timeoutMs: 10_000
+      })
+      const beforeCssGeometry =
+        rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
+
+      expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
+
+      const rasterProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'focused terminal WebGL backing store to cover the maximum canvas zoom',
+              observe: () => readXtermRasterProjection(terminalViewport),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1.75 &&
+                projection.zoom >= 1.599 &&
+                projection.backingDensity >= projection.devicePixelRatio * 0.98,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
+      const afterInkRatio = await pollUntilState({
+        description: 'visible terminal pixels after canvas zoom',
+        observe: () => readXtermInkRatio(page, terminalViewport),
+        accept: (ratio) => ratio > 0.01,
+        intervalMs: 50,
+        retryObservationErrors: true,
+        timeoutMs: 10_000
+      })
+      const afterCssGeometry =
+        rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
+      const afterDimensions = await probeTerminalDimensions(page, sessionId, 'AFTER')
+
+      if (rendererState.renderer === 'webgl') {
+        expect(rasterProjection).not.toBeNull()
+        expect(initialRasterProjection).not.toBeNull()
+        expect(beforeCssGeometry).not.toBeNull()
+        expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
+        expect(afterCssGeometry).toEqual(beforeCssGeometry)
+      } else {
+        expect(rendererState.renderer).toBe('dom')
+        expect(webgl2Available).toBe(false)
+      }
+      expect(afterInkRatio).toBeGreaterThan(0.01)
+      expect(afterDimensions).toEqual(beforeDimensions)
+      expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
+    },
+    electronScenarioTimeoutMs
+  )
 })
 
 async function createRunningTerminal(page: Page): Promise<void> {
@@ -135,4 +245,70 @@ async function createRunningTerminal(page: Page): Promise<void> {
     accept: Boolean,
     timeoutMs: 5_000
   })
+}
+
+async function probeTerminalDimensions(
+  page: Page,
+  sessionId: string,
+  phase: 'BEFORE' | 'AFTER'
+): Promise<{ readonly columns: number; readonly rows: number }> {
+  const marker = `__RASTER_SIZE_${phase}__`
+  await writeTerminalCommand(
+    page,
+    'Terminal 1',
+    asE2eTerminalInput(
+      createE2eNodeCommand(
+        `process.stdout.write(${JSON.stringify(marker)} + process.stdout.rows + 'x' + process.stdout.columns + '__\\n')`
+      )
+    )
+  )
+  const dimensions = await pollUntilState({
+    description: `${phase.toLowerCase()} terminal dimensions for session ${sessionId}`,
+    observe: () =>
+      page.evaluate(
+        ({ marker, sessionId }) => {
+          const output = Array.from(
+            document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
+          ).find((element) => element.dataset.terminalSessionId === sessionId)
+          const match = output?.textContent?.match(new RegExp(`${marker}(\\d+)x(\\d+)__`, 'u'))
+          return match ? { rows: Number(match[1]), columns: Number(match[2]) } : null
+        },
+        { marker, sessionId }
+      ),
+    accept: (value) => value !== null && value.columns > 0 && value.rows > 0,
+    timeoutMs: 10_000
+  })
+
+  if (!dimensions) throw new Error(`Unable to read ${phase.toLowerCase()} terminal dimensions.`)
+  return dimensions
+}
+
+function readTerminalCssGeometry(
+  page: Page,
+  sessionId: string
+): Promise<{
+  readonly canvasHeight: string
+  readonly canvasWidth: string
+  readonly screenHeight: string
+  readonly screenWidth: string
+} | null> {
+  return page.evaluate((sessionId) => {
+    const output = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
+    ).find((element) => element.dataset.terminalSessionId === sessionId)
+    const screen = output
+      ?.closest('[data-terminal-block-id]')
+      ?.querySelector<HTMLElement>('.terminal-viewport .xterm-screen')
+    const canvas = Array.from(screen?.querySelectorAll('canvas') ?? []).find((entry) =>
+      entry.getContext('webgl2')
+    )
+    if (!screen || !canvas) return null
+
+    return {
+      canvasHeight: canvas.style.height,
+      canvasWidth: canvas.style.width,
+      screenHeight: screen.style.height,
+      screenWidth: screen.style.width
+    }
+  }, sessionId)
 }

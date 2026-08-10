@@ -83,11 +83,31 @@ describe('workbench canvas viewport events', () => {
     expect(projection.setViewportZoom).not.toHaveBeenCalled()
     expect(projection.onViewportChange).not.toHaveBeenCalled()
   })
+
+  it('reports programmatic zoom frames and completion without treating them as persistence', () => {
+    const projection = createViewportProjection()
+    const viewport = { x: -120, y: 30, zoom: 1.6 }
+
+    synchronizeCanvasViewportFromMove({ event: null, viewport, ...projection })
+    persistCanvasViewportFromMoveEnd({
+      event: null,
+      isRestoringViewport: false,
+      viewport,
+      ...projection
+    })
+
+    expect(projection.onRasterZoomChange).toHaveBeenCalledWith(1.6)
+    expect(projection.onRasterInteractionEnd).toHaveBeenCalledWith(1.6)
+    expect(projection.setCanvasViewport).not.toHaveBeenCalled()
+    expect(projection.onViewportChange).not.toHaveBeenCalled()
+  })
 })
 
 function createViewportProjection() {
   return {
     onViewportChange: vi.fn(),
+    onRasterInteractionEnd: vi.fn(),
+    onRasterZoomChange: vi.fn(),
     setCanvasViewport: vi.fn(),
     setViewportZoom: vi.fn()
   }
