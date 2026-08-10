@@ -56,12 +56,22 @@ export async function prepareNativeDependencies({
   if (!invocation) return
 
   await runInvocation(invocation, 'Windows native dependency rebuild')
+  await verifyPreparedNativeDependencies({ platform })
+}
+
+export async function verifyPreparedNativeDependencies({
+  architecture = process.arch,
+  platform = process.platform,
+  projectDirectory = process.cwd()
+} = {}) {
+  if (platform !== 'win32') return
+
   await import('./prepare-packaging.mjs')
 
   await Promise.all(
     resolveNodePtyNativeFallbackDirectories({
-      architecture: process.arch,
-      projectDirectory: process.cwd()
+      architecture,
+      projectDirectory
     }).map((directory) => rm(directory, { force: true, recursive: true }))
   )
 
@@ -105,5 +115,9 @@ async function runInvocation(invocation, description, env = process.env) {
 
 const entryPath = process.argv[1] ? resolve(process.argv[1]) : undefined
 if (entryPath === fileURLToPath(import.meta.url)) {
-  await prepareNativeDependencies()
+  if (process.argv.includes('--verify-only')) {
+    await verifyPreparedNativeDependencies()
+  } else {
+    await prepareNativeDependencies()
+  }
 }

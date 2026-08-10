@@ -49,7 +49,11 @@ electron-builder 负责把这些入口、生产依赖和 Electron runtime 组装
 `node-pty` 是生产原生依赖，必须在目标操作系统安装并由 electron-builder 按目标 Electron
 版本处理；Windows 开发、E2E 和打包必须从应用补丁后的源码重建，打包只接受
 `build/Release/conpty.node` 并移除同架构 prebuild，禁止在重建模块不可用时静默加载未打补丁的
-原生文件。其原生模块、helper 和 Windows 辅助文件显式位于 `app.asar.unpacked`。macOS
+原生文件。CI 可以用覆盖架构、lockfile、补丁、Electron builder 配置和 native 脚本的精确 cache
+key 复用该重建结果；同一次 E2E 的 shards 和 packaged smoke 通过带平台、架构、Electron 与
+`node-pty` 版本 manifest 的短期 artifact 共享产物，每个消费者恢复后仍删除 fallback 并重新
+probe，且不得跨系统复用。其原生模块、helper 和 Windows 辅助文件显式位于
+`app.asar.unpacked`。macOS
 打包前同时校验 arm64/x64 `spawn-helper` 的执行权限，避免 Universal 应用只修正构建宿主架构。
 
 `.github/workflows/release.yml` 在三个目标系统分别构建 unpacked 应用，使用打包后的真实可执行
@@ -124,7 +128,8 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Unit 测试通过 Vitest projects 按运行时需求分组：Presentation 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境，避免为不消费 DOM 的文件重复创建浏览器模拟环境。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。

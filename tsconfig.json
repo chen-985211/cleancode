@@ -20,6 +20,7 @@
   "include": [
     "electron.vite.config.ts",
     "vitest.config.ts",
+    "vitest.unit.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
