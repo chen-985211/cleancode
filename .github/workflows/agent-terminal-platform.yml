@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: full-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Full quality / ${{ matrix.id }}
@@ -22,8 +26,6 @@ jobs:
             os: ubuntu-24.04
           - id: macos
             os: macos-15
-          - id: windows
-            os: windows-2025
 
     steps:
       - uses: actions/checkout@v6
@@ -53,8 +55,119 @@ jobs:
             sleep $((attempt * 10))
           done
           exit 1
+      - name: Restore prepared Windows node-pty cache
+        id: windows-node-pty-cache
+        if: runner.os == 'Windows'
+        uses: actions/cache@v5
+        with:
+          path: .cache/windows-node-pty-electron
+          key: windows-node-pty-electron-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'electron-builder.yml', 'scripts/prepare-native-dependencies.mjs', 'scripts/prepare-packaging.mjs', 'scripts/verify-node-pty-native.mjs', 'scripts/windows-node-pty-native-artifact.mjs') }}
+      - name: Rebuild patched node-pty from source
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm prepare:native
+      - name: Export prepared Windows node-pty artifact
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm native:artifact:export
+      - name: Restore cached Windows node-pty artifact
+        if: runner.os == 'Windows' && steps.windows-node-pty-cache.outputs.cache-hit == 'true'
+        run: pnpm native:artifact:restore
+      - name: Verify prepared Windows node-pty artifact
+        if: runner.os == 'Windows'
+        run: pnpm verify:native
       - name: Run every static and structural quality gate
         run: pnpm check:quality
       - name: Run all unit, integration, and contract tests
         run: pnpm test:core:ci
       - run: pnpm build
+
+  windows-static:
+    name: Full quality / windows / static and build
+    runs-on: windows-2025
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - name: Run every static and structural quality gate
+        run: pnpm check:quality
+      - run: pnpm build
+
+  windows-core:
+    name: Full quality / windows / core shard ${{ matrix.shard }}
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+          version: 10.33.0
+      - uses: actions/setup-node@v6
+        with:
+          cache: pnpm
+          node-version: 24
+
+      - run: pnpm install --frozen-lockfile
+      - name: Install Electron binary with retry
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4; do
+            if node node_modules/electron/install.js && pnpm exec electron --version; then
+              exit 0
+            fi
+            sleep $((attempt * 10))
+          done
+          exit 1
+      - name: Restore prepared Windows node-pty cache
+        id: windows-node-pty-cache
+        uses: actions/cache@v5
+        with:
+          path: .cache/windows-node-pty-electron
+          key: windows-node-pty-electron-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'electron-builder.yml', 'scripts/prepare-native-dependencies.mjs', 'scripts/prepare-packaging.mjs', 'scripts/verify-node-pty-native.mjs', 'scripts/windows-node-pty-native-artifact.mjs') }}
+      - name: Rebuild patched node-pty from source
+        if: steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm prepare:native
+      - name: Export prepared Windows node-pty artifact
+        if: steps.windows-node-pty-cache.outputs.cache-hit != 'true'
+        run: pnpm native:artifact:export
+      - name: Restore cached Windows node-pty artifact
+        if: steps.windows-node-pty-cache.outputs.cache-hit == 'true'
+        run: pnpm native:artifact:restore
+      - name: Verify prepared Windows node-pty artifact
+        run: pnpm verify:native
+      - name: Run unit test shard
+        run: pnpm test:unit --shard=${{ matrix.shard }}/2
+      - name: Run integration test shard serially
+        run: pnpm test:integration:ci --shard=${{ matrix.shard }}/2
+      - name: Run contract test shard
+        run: pnpm test:contract --shard=${{ matrix.shard }}/2
+
+  windows:
+    name: Full quality / windows
+    if: ${{ always() }}
+    needs: [windows-static, windows-core]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Require every Windows quality job
+        env:
+          STATIC_RESULT: ${{ needs.windows-static.result }}
+          CORE_RESULT: ${{ needs.windows-core.result }}
+        run: |
+          test "$STATIC_RESULT" = "success"
+          test "$CORE_RESULT" = "success"

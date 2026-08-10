@@ -60,6 +60,7 @@ export interface TerminalProviderServerOptions {
   readonly outputPersistenceBatchWindowMs?: number
   readonly shutdownConcurrency?: number
   readonly onExitRequested?: () => void
+  readonly onInitialStateListed?: () => void
   readonly log?: (message: string, details?: Readonly<Record<string, unknown>>) => void
 }
 
@@ -76,6 +77,8 @@ export class TerminalProviderServer {
   private server: Server | null = null
   private exitTimer: ReturnType<typeof setTimeout> | null = null
   private isClosing = false
+  private closePromise: Promise<void> | null = null
+  private hasListedInitialState = false
 
   constructor(private readonly options: TerminalProviderServerOptions) {
     this.processes = options.processes ?? new NodePtyTerminalProcessAdapter()
@@ -136,9 +139,14 @@ export class TerminalProviderServer {
     this.log('provider-ready', { instanceId: this.options.instanceId })
   }
 
-  async close(): Promise<void> {
-    if (this.isClosing) return
+  close(): Promise<void> {
+    if (this.closePromise) return this.closePromise
     this.isClosing = true
+    this.closePromise = Promise.resolve().then(() => this.performClose())
+    return this.closePromise
+  }
+
+  private async performClose(): Promise<void> {
     if (this.exitTimer) clearTimeout(this.exitTimer)
     this.exitTimer = null
     await Promise.allSettled(
@@ -192,8 +200,8 @@ export class TerminalProviderServer {
         }
       case 'claimController':
         return this.controllerLifecycle.claim(socket, input.controllerId, input.processId)
-      case 'listSessions':
-        return {
+      case 'listSessions': {
+        const result = {
           sessions: [...this.sessions.values()]
             .filter(({ quarantined, snapshot }) => !quarantined && snapshot.status !== 'idle')
             .map(({ snapshot }) => snapshot),
@@ -213,6 +221,9 @@ export class TerminalProviderServer {
               : []
           )
         }
+        this.notifyInitialStateListed()
+        return result
+      }
       case 'createModel': {
         const identity = input.command.identity
         const existingIdentity = this.modelIdentities.get(identity.sessionId)
@@ -625,6 +636,16 @@ export class TerminalProviderServer {
       }
       void this.close().finally(() => this.options.onExitRequested?.())
     }, 50)
+  }
+
+  private notifyInitialStateListed(): void {
+    if (this.hasListedInitialState) return
+    this.hasListedInitialState = true
+    try {
+      this.options.onInitialStateListed?.()
+    } catch (error) {
+      this.log('initial-state-listener-failed', { message: getErrorMessage(error) })
+    }
   }
 
   private broadcast(event: TerminalProviderEvent): void {

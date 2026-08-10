@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { EventEmitter } from 'node:events'
 
 import type { IDisposable, IPty } from 'node-pty'
 
@@ -22,17 +23,124 @@ interface PtyExitEvent {
 }
 
 interface WindowsTerminalModule {
+  readonly WindowsTerminal: new (
+    file?: string,
+    args?: string[],
+    options?: Record<string, unknown>
+  ) => {
+    kill(): void
+    onExit(listener: (event: PtyExitEvent) => void): IDisposable
+  }
   readonly WindowsTerminalExitEventCoordinator: new (
     onExit: (exitCode: unknown) => void
   ) => WindowsTerminalExitCoordinator
 }
 
+interface WindowsPtyAgentModule {
+  readonly WindowsPtyAgent: new () => unknown
+}
+
 const nodeRequire = createRequire(import.meta.url)
-const { WindowsTerminalExitEventCoordinator } = nodeRequire(
+const { WindowsTerminal, WindowsTerminalExitEventCoordinator } = nodeRequire(
   'node-pty/lib/windowsTerminal'
 ) as WindowsTerminalModule
+const { WindowsPtyAgent } = nodeRequire('node-pty/lib/windowsPtyAgent') as WindowsPtyAgentModule
 
 describe('patched node-pty Windows terminal exit coordination', () => {
+  it.each(['kill', 'destroy'] as const)(
+    'runs %s immediately before the first ConPTY output instead of deferring shutdown',
+    (method) => {
+      const terminal = createPreReadyWindowsTerminalHarness()
+
+      terminal[method]()
+
+      expect(terminal.close).toHaveBeenCalledOnce()
+      expect(terminal.nativeKill).toHaveBeenCalledOnce()
+      expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
+      expect(terminal.deferreds).toEqual([])
+    }
+  )
+
+  it('rejects Windows signals before queuing any pre-ready shutdown work', () => {
+    const terminal = createPreReadyWindowsTerminalHarness()
+
+    expect(() => terminal.kill('SIGTERM')).toThrow('Signals not supported on windows.')
+    expect(terminal.close).not.toHaveBeenCalled()
+    expect(terminal.nativeKill).not.toHaveBeenCalled()
+    expect(terminal.acceptOutputClosed).not.toHaveBeenCalled()
+    expect(terminal.deferreds).toEqual([])
+  })
+
+  it('coalesces repeated kill and destroy calls into one pre-ready shutdown', () => {
+    const terminal = createPreReadyWindowsTerminalHarness()
+
+    terminal.kill()
+    terminal.destroy()
+    terminal.kill()
+
+    expect(terminal.close).toHaveBeenCalledOnce()
+    expect(terminal.nativeKill).toHaveBeenCalledOnce()
+    expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
+    expect(terminal.deferreds).toEqual([])
+  })
+
+  it('allows a terminal shutdown retry when the native agent rejects the first close', () => {
+    const terminal = createPreReadyWindowsTerminalHarness()
+    terminal.nativeKill.mockImplementationOnce(() => {
+      throw new Error('duplicate handle failed')
+    })
+
+    expect(() => terminal.kill()).toThrow('duplicate handle failed')
+    expect(() => terminal.kill()).not.toThrow()
+
+    expect(terminal.close).toHaveBeenCalledTimes(2)
+    expect(terminal.nativeKill).toHaveBeenCalledTimes(2)
+    expect(terminal.acceptOutputClosed).toHaveBeenCalledOnce()
+  })
+
+  it('settles a silent bundled ConPTY worker exactly once across repeated agent kills', () => {
+    const agent = createBundledConptyAgentHarness()
+
+    agent.kill()
+    agent.kill()
+
+    expect(agent.destroyInput).toHaveBeenCalledOnce()
+    expect(agent.nativeKill).toHaveBeenCalledOnce()
+    expect(agent.disposeWorker).toHaveBeenCalledOnce()
+    expect(agent.listenForDrainData).toHaveBeenCalledOnce()
+  })
+
+  it('allows an agent kill retry after a native process-handle failure', () => {
+    const agent = createBundledConptyAgentHarness()
+    agent.nativeKill.mockImplementationOnce(() => {
+      throw new Error('duplicate handle failed')
+    })
+
+    expect(() => agent.kill()).toThrow('duplicate handle failed')
+    expect(() => agent.kill()).not.toThrow()
+
+    expect(agent.nativeKill).toHaveBeenCalledTimes(2)
+    expect(agent.disposeWorker).toHaveBeenCalledOnce()
+    expect(agent.listenForDrainData).toHaveBeenCalledOnce()
+  })
+
+  it('absorbs delayed pipe errors while disposing a failed ConPTY spawn', () => {
+    const agent = createFailedConptySpawnHarness()
+
+    agent.disposeFailedSpawn()
+
+    expect(() => agent.inputSocket.emit('error', new Error('input pipe missing'))).not.toThrow()
+    expect(() => agent.outputSocket.emit('error', new Error('output pipe missing'))).not.toThrow()
+    expect(agent.nativeKill).toHaveBeenCalledOnce()
+    expect(agent.disposeWorker).toHaveBeenCalledOnce()
+    expect(agent.destroyInput).toHaveBeenCalledOnce()
+    expect(agent.destroyOutput).toHaveBeenCalledOnce()
+  })
+
+  it('emits exit when shutdown happens before ready_datapipe can close output', () => {
+    expect(runPreReadyExitScenario()).toEqual([0])
+  })
+
   it.each([
     {
       firstSignal: 'output-close' as const,
@@ -71,6 +179,157 @@ describe('patched node-pty Windows terminal exit coordination', () => {
     expect(exits).toEqual([undefined])
   })
 })
+
+function createPreReadyWindowsTerminalHarness() {
+  const acceptOutputClosed = vi.fn()
+  const close = vi.fn()
+  const nativeKill = vi.fn()
+  const deferreds: Array<{ run: () => void }> = []
+  const terminal = Object.create(WindowsTerminal.prototype) as {
+    _agent: { kill: () => void }
+    _close: () => void
+    _deferreds: Array<{ run: () => void }>
+    _exitEvent: { acceptOutputClosed: () => void }
+    _isDataPipeReady: boolean
+    _isReady: boolean
+    _shutdownIssued: boolean
+    destroy(): void
+    kill(signal?: string): void
+  }
+  terminal._agent = { kill: nativeKill }
+  terminal._close = close
+  terminal._deferreds = deferreds
+  terminal._exitEvent = { acceptOutputClosed }
+  terminal._isDataPipeReady = false
+  terminal._isReady = false
+  terminal._shutdownIssued = false
+
+  return {
+    acceptOutputClosed,
+    close,
+    deferreds,
+    destroy: () => terminal.destroy(),
+    kill: (signal?: string) => terminal.kill(signal),
+    nativeKill
+  }
+}
+
+function createBundledConptyAgentHarness() {
+  const destroyInput = vi.fn()
+  const disposeWorker = vi.fn()
+  const listenForDrainData = vi.fn()
+  const nativeKill = vi.fn()
+  const agent = Object.create(WindowsPtyAgent.prototype) as {
+    _conoutSocketWorker: { dispose: () => void }
+    _inSocket: { destroy: () => void }
+    _killRequested: boolean
+    _outSocket: { on: (event: string, listener: () => void) => void }
+    _pty: number
+    _ptyNative: { kill: (pty: number, useConptyDll: boolean) => void }
+    _useConpty: boolean
+    _useConptyDll: boolean
+    kill(): void
+  }
+  agent._conoutSocketWorker = { dispose: disposeWorker }
+  agent._inSocket = { destroy: destroyInput }
+  agent._killRequested = false
+  agent._outSocket = { on: listenForDrainData }
+  agent._pty = 42
+  agent._ptyNative = { kill: nativeKill }
+  agent._useConpty = true
+  agent._useConptyDll = true
+
+  return {
+    destroyInput,
+    disposeWorker,
+    kill: () => agent.kill(),
+    listenForDrainData,
+    nativeKill
+  }
+}
+
+function createFailedConptySpawnHarness() {
+  const destroyInput = vi.fn()
+  const destroyOutput = vi.fn()
+  const disposeWorker = vi.fn()
+  const inputSocket = Object.assign(new EventEmitter(), { destroy: destroyInput })
+  const nativeKill = vi.fn()
+  const outputSocket = Object.assign(new EventEmitter(), { destroy: destroyOutput })
+  const agent = Object.create(WindowsPtyAgent.prototype) as {
+    _conoutSocketWorker: { dispose: () => void }
+    _disposeFailedSpawn(): void
+    _inSocket: EventEmitter & { destroy: () => void }
+    _outSocket: EventEmitter & { destroy: () => void }
+    _pty: number
+    _ptyNative: { kill: (pty: number, useConptyDll: boolean) => void }
+    _useConptyDll: boolean
+  }
+  agent._conoutSocketWorker = { dispose: disposeWorker }
+  agent._inSocket = inputSocket
+  agent._outSocket = outputSocket
+  agent._pty = 42
+  agent._ptyNative = { kill: nativeKill }
+  agent._useConptyDll = true
+
+  return {
+    destroyInput,
+    destroyOutput,
+    disposeFailedSpawn: () => agent._disposeFailedSpawn(),
+    disposeWorker,
+    inputSocket,
+    nativeKill,
+    outputSocket
+  }
+}
+
+function runPreReadyExitScenario(): unknown[] {
+  const agentPath = nodeRequire.resolve('node-pty/lib/windowsPtyAgent')
+  const terminalPath = nodeRequire.resolve('node-pty/lib/windowsTerminal')
+  const cachedAgentModule = nodeRequire.cache[agentPath]
+  const cachedTerminalModule = nodeRequire.cache[terminalPath]
+  if (cachedAgentModule === undefined || cachedTerminalModule === undefined) {
+    throw new Error('Patched node-pty Windows modules must be loaded before the exit scenario')
+  }
+
+  const originalAgentExports = cachedAgentModule.exports
+  const outputSocket = new EventEmitter()
+  let processExitListener: ((exitCode: number) => void) | undefined
+
+  class PreReadyWindowsPtyAgent {
+    readonly exitCode = 0
+    readonly fd = 0
+    readonly innerPid = 4815
+    readonly outSocket = outputSocket
+    readonly processExitCodeReady = true
+    readonly pty = 42
+
+    onProcessExit(listener: (exitCode: number) => void): void {
+      processExitListener = listener
+    }
+
+    kill(): void {
+      processExitListener?.(this.exitCode)
+    }
+  }
+
+  try {
+    cachedAgentModule.exports = { WindowsPtyAgent: PreReadyWindowsPtyAgent }
+    delete nodeRequire.cache[terminalPath]
+    const { WindowsTerminal: IsolatedWindowsTerminal } = nodeRequire(
+      terminalPath
+    ) as WindowsTerminalModule
+    const terminal = new IsolatedWindowsTerminal('powershell.exe', [], {})
+    const exits: unknown[] = []
+    terminal.onExit((event) => exits.push(event.exitCode))
+
+    terminal.kill()
+
+    return exits
+  } finally {
+    cachedAgentModule.exports = originalAgentExports
+    nodeRequire.cache[terminalPath] = cachedTerminalModule
+  }
+}
 
 describe('NodePtyTerminalProcessAdapter exit boundary', () => {
   beforeEach(() => {

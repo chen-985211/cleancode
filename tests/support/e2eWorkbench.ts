@@ -46,6 +46,7 @@ export interface E2eScenarioResources {
 
 export interface LaunchAppOptions {
   readonly environment?: NodeJS.ProcessEnv
+  readonly executablePath?: string
 }
 
 export async function createE2eWorkbench(prefix: string): Promise<E2eWorkbench> {
@@ -98,6 +99,7 @@ export async function readAuthenticatedTerminalProviderMetadata(
   readonly endpoint: string
   readonly instanceId: string
   readonly processId: number
+  readonly runtimeImageKey?: string
 } | null> {
   const metadataPath = join(appStateDirectory, 'terminal-runtime-provider', 'provider.json')
   let value: unknown
@@ -127,6 +129,7 @@ function isE2eProviderMetadata(value: unknown): value is {
   readonly endpoint: string
   readonly instanceId: string
   readonly processId: number
+  readonly runtimeImageKey?: string
 } {
   return (
     typeof value === 'object' &&
@@ -143,7 +146,8 @@ function isE2eProviderMetadata(value: unknown): value is {
     value.endpoint.length > 0 &&
     'instanceId' in value &&
     typeof value.instanceId === 'string' &&
-    value.instanceId.length > 0
+    value.instanceId.length > 0 &&
+    (!('runtimeImageKey' in value) || typeof value.runtimeImageKey === 'string')
   )
 }
 
@@ -326,7 +330,8 @@ export async function launchApp(
   options: LaunchAppOptions = {}
 ): Promise<ElectronApplication> {
   const runElectronInBackground = process.env.CLEANCODE_E2E_VISIBLE !== '1'
-  const packagedExecutablePath = process.env.CLEANCODE_E2E_EXECUTABLE_PATH?.trim()
+  const packagedExecutablePath =
+    options.executablePath?.trim() || process.env.CLEANCODE_E2E_EXECUTABLE_PATH?.trim()
   const electronApplication = await electron.launch({
     args: [
       ...(packagedExecutablePath ? [] : ['.']),
@@ -341,6 +346,10 @@ export async function launchApp(
         CLEANCODE_TEST_DISABLE_SINGLE_INSTANCE_LOCK: '1',
         CLEANCODE_TEST_PROJECT_DIRECTORY: workbench.projectDirectory,
         CLEANCODE_TEST_APP_STATE_DIRECTORY: workbench.appStateDirectory,
+        CLEANCODE_TEST_TERMINAL_PROVIDER_RUNTIME_DIRECTORY: join(
+          workbench.appStateDirectory,
+          'terminal-provider-host'
+        ),
         CLEANCODE_TEST_PROJECT_REGISTRY_PATH: join(
           workbench.registryDirectory,
           'project-registry.json'

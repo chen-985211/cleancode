@@ -97,6 +97,11 @@ import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { openProjectDirectoryPicker, resolveProjectPickerDirectory } from './projectDirectoryPicker'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
 import { registerTerminalWorkflowIpcHandlers } from './terminalWorkflowIpcHandlers'
+import {
+  createElectronArchiveFileSystem,
+  resolveTerminalProviderRuntimeRootDirectory,
+  TerminalProviderRuntimeImageManager
+} from './terminalProviderRuntimeImage'
 import { loadRememberedWorkbenchList } from './loadRememberedWorkbenchList'
 import { createManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntimeShutdown'
@@ -128,6 +133,31 @@ if (acquiresSingleInstanceLock) {
 }
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
+const terminalProviderStateDirectoryPath = join(appStateDirectoryPath, 'terminal-runtime-provider')
+const terminalProviderEntryPath = join(__dirname, 'terminal-runtime-provider.js')
+const terminalProviderRuntimeImage = new TerminalProviderRuntimeImageManager({
+  archiveFileSystem: createElectronArchiveFileSystem(),
+  applicationVersion: app.getVersion(),
+  architecture: process.arch,
+  electronVersion: process.versions.electron ?? 'unknown',
+  executablePath: process.execPath,
+  isPackaged: app.isPackaged,
+  platform: process.platform,
+  providerEntryPath: terminalProviderEntryPath,
+  providerStateDirectory: terminalProviderStateDirectoryPath,
+  resourcesPath: process.resourcesPath,
+  runtimeRootDirectory: resolveTerminalProviderRuntimeRootDirectory({
+    allowTestDirectory: ['0', '1'].includes(process.env.CLEANCODE_TEST_BACKGROUND_E2E ?? ''),
+    localAppDataDirectory: process.env.LOCALAPPDATA,
+    platform: process.platform,
+    providerStateDirectory: terminalProviderStateDirectoryPath,
+    testDirectory: process.env.CLEANCODE_TEST_TERMINAL_PROVIDER_RUNTIME_DIRECTORY,
+    testStateDirectory: appStateDirectoryPath,
+    temporaryDirectory: app.getPath('temp'),
+    userDataDirectory: app.getPath('userData')
+  }),
+  onFailure: logProviderRuntimeImageMaterializationError
+})
 consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
@@ -200,6 +230,11 @@ const {
   appStateDirectory: appStateDirectoryPath,
   launchPlans: new BlockGraphTerminalLaunchPlanAdapter(getTerminalLaunchPlanUseCase),
   resolveManagedServiceOwner,
+  resolveTerminalProviderLaunchTarget: async () => {
+    const target = await terminalProviderRuntimeImage.resolveLaunchTarget()
+    void terminalProviderRuntimeImage.pruneUnusedImages().catch(logProviderRuntimeImagePruneError)
+    return target
+  },
   scopeValidation: createRunRuntimeScopeValidation(
     getProjectRegistryRepository(),
     projectRepository
@@ -574,6 +609,24 @@ function getAppStateDirectoryPath(): string {
     process.env.CLEANCODE_TEST_APP_STATE_DIRECTORY ??
     join(app.getPath('userData'), 'project-state-v2')
   )
+}
+
+function logProviderRuntimeImageMaterializationError(error: unknown): void {
+  consoleLogger.warn({
+    scope: 'run.terminal-provider',
+    operation: 'materializeRuntimeImage',
+    outcome: 'failure',
+    error: { message: error instanceof Error ? error.message : String(error) }
+  })
+}
+
+function logProviderRuntimeImagePruneError(error: unknown): void {
+  consoleLogger.warn({
+    scope: 'run.terminal-provider',
+    operation: 'pruneRuntimeImages',
+    outcome: 'failure',
+    error: { message: error instanceof Error ? error.message : String(error) }
+  })
 }
 
 if (isPrimaryAppInstance) {

@@ -47,7 +47,13 @@ electron-builder 负责把这些入口、生产依赖和 Electron runtime 组装
 
 当前目标矩阵为 macOS Universal DMG/ZIP、Windows x64 NSIS 和 Linux x64 AppImage/DEB。
 `node-pty` 是生产原生依赖，必须在目标操作系统安装并由 electron-builder 按目标 Electron
-版本处理；其原生模块、helper 和 Windows 辅助文件显式位于 `app.asar.unpacked`。macOS
+版本处理；Windows 开发、E2E 和打包必须从应用补丁后的源码重建，打包只接受
+`build/Release/conpty.node` 并移除同架构 prebuild，禁止在重建模块不可用时静默加载未打补丁的
+原生文件。CI 可以用覆盖架构、lockfile、补丁、Electron builder 配置和 native 脚本的精确 cache
+key 复用该重建结果；同一次 E2E 的 shards 和 packaged smoke 通过带平台、架构、Electron 与
+`node-pty` 版本 manifest 的短期 artifact 共享产物，每个消费者恢复后仍删除 fallback 并重新
+probe，且不得跨系统复用。其原生模块、helper 和 Windows 辅助文件显式位于
+`app.asar.unpacked`。macOS
 打包前同时校验 arm64/x64 `spawn-helper` 的执行权限，避免 Universal 应用只修正构建宿主架构。
 
 `.github/workflows/release.yml` 在三个目标系统分别构建 unpacked 应用，使用打包后的真实可执行
@@ -79,7 +85,15 @@ React 负责应用外壳和界面组件，React Flow 负责节点式画布。当
 
 ## 终端与运行时
 
-node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 固定使用 node-pty 随包的 ConPTY DLL，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。随包 DLL 在终端能力握手后保留 OSC 查询、鼠标模式等 VT 控制序列，避免旧版系统 ConPTY 只输出 screen buffer 差异而丢失 renderer 和权威模型必须消费的模式。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 通过 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。两种可见终端都通过共享 React `TerminalThemeProjection` 协调源主题与当前应用主题：wrapper 使用当前应用主题的终端背景并承载上、左、下阅读留白，直接子 viewport 使用源 palette，并且只在源主题与当前主题不一致时应用 mismatch filter。搜索、粘贴、错误、节点边框和其他第一方 chrome 均位于被过滤子树之外。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖；普通 PTY 在合并显式命令环境前移除这一 Provider 私有标记，避免把下游 Electron 项目切换为 Node 模式。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+node-pty 用于普通交互终端、工作流命令 PTY 和 Agent terminal；macOS/Linux 使用系统 PTY，Windows 固定使用 node-pty 随包的 ConPTY DLL，因此 Windows 最低运行边界为支持 ConPTY 的 Windows 10 1809 或更高版本。Windows 原生补丁以互斥所有权保护全局 ConPTY handle 集合，隔离子进程压力门禁同时并发 resize、clear 和 close，并要求实际加载 `build/Release` 重建模块；ConPTY 的关闭函数在创建时绑定，锁只保护 handle 的认领和移除，可能阻塞的伪控制台、pipe 和进程关闭在锁外执行。同步连接或 `CreateProcessW` 失败会回收未发布 baton、HPCON、pipe、输出 Worker 和 socket，首个输出前的重复 stop/destroy 也只触发一次 native shutdown。Windows 未显式指定 shell 时优先把真实 PowerShell 7 `pwsh.exe` 绝对路径作为默认 shell，无法解析时回退系统 Windows PowerShell 绝对路径；Store Alias 优先通过异步 readlink 取得并校验真实 package executable，只有读链失败或目标不安全时才启动最长 2.5 秒的非交互 discovery helper。自动 `pwsh.exe` 遇到同步文件缺失或 `CreateProcess` 错误时只再尝试一次系统 PowerShell，成功后短期隔离坏路径，自动链不包含 `cmd.exe`。解析结果使用可恢复的有界缓存，普通 PowerShell terminal 使用 `-NoLogo -NoExit` 且保留 Profile 加载。随包 DLL 在终端能力握手后保留 OSC 查询、鼠标模式等 VT 控制序列，避免旧版系统 ConPTY 只输出 screen buffer 差异而丢失 renderer 和权威模型必须消费的模式。Agent CLI 作为长期 shell 内的受管前台任务运行：macOS/Linux 使用 POSIX 子脚本，Windows 通过 PowerShell/PowerShell Core 子脚本，并保持 CLI 退出与外层 terminal 退出分离。renderer 中的 xterm.js 统一负责普通终端与 Agent terminal 的渲染和输入；两者使用 fit、search、Unicode 11、web-links 和 WebGL addons 提供尺寸、检索、统一字宽、安全链接发现与可降级加速，其中 WebGL 初始化失败或 context loss 时保留内置 DOM renderer。两种可见终端都通过共享 React `TerminalThemeProjection` 协调源主题与当前应用主题：wrapper 使用当前应用主题的终端背景并承载上、左、下阅读留白，直接子 viewport 使用源 palette，并且只在源主题与当前主题不一致时应用 mismatch filter。搜索、粘贴、错误、节点边框和其他第一方 chrome 均位于被过滤子树之外。独立本地 Terminal Provider 进程使用 `@xterm/headless`、serialize 和 Unicode 11 addons 维护权威屏幕模型、输出 sequence、前台任务控制和恢复 checkpoint；Electron main 通过协议版本、随机 token、Provider instance 和单 controller 本机长度帧协议代理应用层端口。Provider 入口由 electron-vite 的 main 多入口构建，并以 `ELECTRON_RUN_AS_NODE=1` 的 detached Electron 可执行文件启动，不新增守护进程依赖；普通 PTY 在合并显式命令环境前移除这一 Provider 私有标记，避免把下游 Electron 项目切换为 Node 模式。具体所有权和交接协议见[终端会话生命周期](../contexts/run/terminal-session.md)。任务/服务编排见[终端依赖工作流](../contexts/run/terminal-workflow.md)。
+
+Windows 发布包只在确实需要启动新 Provider 时，把 Provider 的最小自包含运行闭包物化到 `%LOCALAPPDATA%/CleanCode/terminal-provider-host/<profile-id>/<content-key>`：签名 `CleanCode.exe` 的改名副本、Node 模式必需的 `icudtl.dat`/`v8_context_snapshot.bin`、可选 `snapshot_blob.bin`、`app.asar` 和对应的 unpacked `node-pty`/ConPTY runtime。物理 ASAR 必须通过 Electron `original-fs` 读取和复制，不能让 ASAR shim 把 archive 根解释为虚拟目录。稳定 `profile-id` 从 Provider 状态目录生成，使显式 profile 之间不会互相回收镜像；改名后的 `cleancode-terminal-provider.exe` 与安装目录解耦，避免 NSIS 更新按旧安装路径或 `CleanCode.exe` 镜像名终止仍拥有保留 PTY 的 Provider。冷路径内容键覆盖应用版本、Electron/架构、完整 ASAR、Electron 数据和经过架构过滤的完整 `node-pty` 闭包；发布使用带 owner/PID/heartbeat/进程 epoch 的跨进程租约、唯一 staging、marker-last 和同卷原子 rename，并在发布前按内容摘要校验整个复制闭包，残缺或关键文件失效的镜像先隔离再重建。后续主进程通过 schema v2 marker 校验构建身份、精确 Provider 入口及源/镜像文件的 size、mtime、ctime，只做目录枚举与 stat；任一指纹不匹配才回到完整内容校验与修复，避免普通启动重复读取并哈希 Electron host、ASAR 和 native runtime。启动/发布锁的生命周期变更由非空目录 guard 串行化；PID 与本机命名管道或私有 Unix socket 中的唯一 lease 共同标识进程 epoch，避免 PID 复用误判。guard 以唯一候选原子发布并通过固定 fence + 唯一退役目录安全回收；精确活跃的 guard 不可强抢，启动/发布租约以 stale heartbeat 作为挂起进程的最终恢复边界。warm 校验、发布与 prune 共用逐镜像发布锁并在返回或删除前再次验证 lease。物化失败只记录诊断并回退安装目录；迁移 host 遭 AppLocker、WDAC、AV 或缺失拒绝 spawn 时也只允许一次安装目录 host 回退，不引入其他 shell 或 Provider。metadata 记录实际 `runtimeImageKey`；当前构建和经 generation heartbeat 认证为 alive/starting 的旧镜像不会被清理，unknown liveness 会跳过整轮清理。其他镜像从首次失去 current/pin 保护时写入 retirement marker，完整保留至少 24 小时；warm、发布或重新 pin 会清除 marker，因此启动目标解析到 provisional metadata 发布之间也由新一轮宽限保护。NSIS 更新不得删除该目录；普通新安装默认固定为 current-user，显式 all-users 与既有 machine-wide 安装仍保留原作用域。只有真实卸载才用 `/T /F` 终止改名 Provider 的完整进程树并清理执行卸载账户的镜像；legacy machine-wide 卸载不会遍历或删除其他用户 profile，可能留下不再执行的惰性缓存。
+
+每次实际 spawn 都使用新的 Provider generation，并把 `instanceId + heartbeatId` 作为 metadata、argv、generation 专属 endpoint 与 heartbeat 文件的共同 fence。Provider 核对已发布 metadata 的真实 PID 和 generation 后先创建 heartbeat，再启动服务；pulse 与启动互不阻塞。回收方只在读到的文件身份、内容和时间戳仍未变化时条件撤销 heartbeat，瞬时 I/O 失败在跨过 stale 边界前不关闭 owner，撤销后旧进程不能重建。认证连接和 endpoint 都失败后，新客户端才以 heartbeat 区分 alive/starting/dead/unknown：stale heartbeat 即使遇到 PID 复用也可安全回收，未知或损坏身份继续失败关闭。metadata 写入/删除和迟到子进程终止都受 generation guard 保护；runtime image prune 使用同一分类，保留 alive/starting，释放 dead，unknown 时跳过整轮清理；无 heartbeat 的旧 metadata 仍按 PID 保守兼容。
+
+Windows Provider 在首次会话对账响应路径之后异步启动不进入会话模型的短命 PowerShell helper，预热随包 ConPTY DLL；helper 失败不阻断真实终端，也不引入 `cmd.exe` 产品 fallback。
+
+Windows PowerShell/Profile 正常加载后由启动 bootstrap 在 `FullLanguage` 中 best-effort 把 Console 输入输出与 native pipeline 固定为 UTF-8；AppLocker/WDAC 强制的受限语言模式静默跳过受限构造器。同一设置在每次 Agent 前台任务 started 之前重申。输出继续原样进入 Provider 权威模型和 renderer，不增加前端过滤。
 
 任务完成以真实命令进程退出码为准，不解析 shell 提示符。服务就绪通过 Node.js 网络能力探测本机 TCP 端口，或按字面量匹配 PTY 输出；这些能力通过 Run 应用层端口提供。
 
@@ -114,7 +128,8 @@ CleanCode MCP 与 Provider launch 使用独立状态轴：支持该能力的 Pro
 - ESLint：检查 TypeScript、React、Node.js 脚本和测试代码。
 - Prettier：统一代码、配置和 Markdown 格式。
 - Vitest、Testing Library、Playwright：覆盖单元、集成、契约和端到端行为。
-- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
+- Unit 测试通过 Vitest projects 按运行时需求分组：Presentation 使用 jsdom，其余 unit 使用 Node 环境；integration 和 contract 也使用 Node 环境，避免为不消费 DOM 的文件重复创建浏览器模拟环境。
+- Electron E2E 由 Vitest 编排 Playwright；本地调用在 suite 级 global setup 中只构建一次桌面产物并串行执行。CI 在 Ubuntu 24.04、macOS 15 和 Windows 2025 分别构建系统原生 `out` artifact，每个平台再分到三个隔离 shard；Windows build job 额外分发经过 probe 的 native artifact，独立 packaged smoke job 复用相同产物并与源码 shards 并行。Linux 通过 Xvfb 提供显示服务器，每个 shard 内仍串行。`pnpm test:e2e:smoke` 提供本地关键路径反馈，`pnpm test:e2e` 运行完整套件。两者默认以屏幕外非激活的真实 Electron 窗口运行并关闭 renderer 后台节流，显式可见诊断入口复用同一套测试。每个场景隔离应用状态和 Provider，清理时用认证 health 证据定位 Provider，失败诊断连同 Provider 日志保留在本地 `test-results/`。
 - Preview 打包矩阵额外通过 Playwright `executablePath` 启动 unpacked 应用，复用确定性终端场景证明 ASAR、独立 Provider、`node-pty` 和平台原生 Electron 可执行文件能够组合运行；这条验证不替代三平台完整源码 E2E。
 - dependency-cruiser：检查循环依赖、不可解析依赖和 DDD/Clean Architecture 依赖方向。
 - Knip：检查未使用文件、导出、依赖和脚本配置。

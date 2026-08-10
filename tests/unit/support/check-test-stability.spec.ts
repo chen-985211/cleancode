@@ -58,6 +58,17 @@ describe('test stability quality gate', () => {
       )
       await writeSourceFile(
         directory,
+        'tests/fixtures/BadFixture.cjs',
+        [
+          'async function waitForFixture() {',
+          '  await new Promise((resolve) => setTimeout(resolve, 50))',
+          '}',
+          'module.exports = { waitForFixture }',
+          ''
+        ].join('\n')
+      )
+      await writeSourceFile(
+        directory,
         'vitest.e2e.config.ts',
         ['export default {', '  test: { retry: 2 }', '}', ''].join('\n')
       )
@@ -90,6 +101,11 @@ describe('test stability quality gate', () => {
         }),
         expect.objectContaining({
           filePath: 'tests/e2e/PromisedTimer.e2e.spec.ts',
+          line: 2,
+          rule: 'no-raw-test-sleep'
+        }),
+        expect.objectContaining({
+          filePath: 'tests/fixtures/BadFixture.cjs',
           line: 2,
           rule: 'no-raw-test-sleep'
         }),

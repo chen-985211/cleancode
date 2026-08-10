@@ -1,7 +1,7 @@
 // @vitest-environment node
 
-import { readFile, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { access, readFile, readdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 import type { ElectronApplication, Page } from 'playwright'
 import { expect } from 'vitest'
@@ -22,6 +22,7 @@ import {
 } from '../support/e2eWorkbench'
 import { readE2eProcessOutput } from '../support/e2eDiagnostics'
 import { pollUntilState } from '../support/e2ePolling'
+import { retireWindowsInstallDirectory } from '../support/e2eWindowsInstallReplacement'
 import {
   asE2eTerminalInput,
   configureAndStartTerminalLaunchCommand,
@@ -43,9 +44,11 @@ describe('terminal runtime recovery e2e', () => {
   let electronApp: ElectronApplication
   let page: Page
   let resources: E2eScenarioResources
+  let retiredInstallDirectory: { readonly original: string; readonly retired: string } | null
 
   beforeEach(async () => {
     resources = {}
+    retiredInstallDirectory = null
     workbench = await createE2eWorkbench('cleancode-terminal-recovery-e2e')
     resources.workbench = workbench
     ;({ electronApp, page } = await launchWorkbench(workbench))
@@ -55,11 +58,20 @@ describe('terminal runtime recovery e2e', () => {
   }, electronLaunchTimeoutMs)
 
   afterEach(async ({ task }) => {
-    await teardownE2eScenario({
-      resources,
-      taskFailed: task.result?.state === 'fail',
-      taskName: task.name
-    })
+    try {
+      await teardownE2eScenario({
+        resources,
+        taskFailed: task.result?.state === 'fail',
+        taskName: task.name
+      })
+    } finally {
+      if (retiredInstallDirectory) {
+        await retireWindowsInstallDirectory(
+          retiredInstallDirectory.retired,
+          retiredInstallDirectory.original
+        ).catch(() => undefined)
+      }
+    }
   })
 
   it(
@@ -67,6 +79,11 @@ describe('terminal runtime recovery e2e', () => {
     { tags: 'smoke', timeout: electronScenarioTimeoutMs },
     async () => {
       const sessionId = await retainTerminal(page)
+      const providerBeforeRestart = await readAuthenticatedTerminalProviderMetadata(
+        workbench.appStateDirectory
+      )
+      expect(providerBeforeRestart).not.toBeNull()
+      await expectPackagedWindowsProviderRuntimeImage(workbench, providerBeforeRestart!)
       await writeTerminalCommand(
         page,
         'Terminal 1',
@@ -76,6 +93,11 @@ describe('terminal runtime recovery e2e', () => {
 
       await restartApplication()
 
+      const providerAfterRestart = await readAuthenticatedTerminalProviderMetadata(
+        workbench.appStateDirectory
+      )
+      expect(providerAfterRestart?.processId).toBe(providerBeforeRestart!.processId)
+      expect(providerAfterRestart?.runtimeImageKey).toBe(providerBeforeRestart!.runtimeImageKey)
       await waitForTerminalSessionId(page, 'Terminal 1', sessionId)
       await waitForTerminalOutput(page, 'Terminal 1', 'WARM_TICK')
       await writeTerminalCommand(page, 'Terminal 1', '\u0003')
@@ -243,9 +265,29 @@ describe('terminal runtime recovery e2e', () => {
     await closeElectronApp(electronApp)
     resources.electronApp = undefined
     resources.page = undefined
-    ;({ electronApp, page } = await launchWorkbench(workbench))
+    const replacementExecutablePath = await retirePackagedWindowsInstallForReplacement()
+    ;({ electronApp, page } = await launchWorkbench(workbench, replacementExecutablePath))
     resources.electronApp = electronApp
     resources.page = page
+  }
+
+  async function retirePackagedWindowsInstallForReplacement(): Promise<string | undefined> {
+    const originalExecutablePath = process.env.CLEANCODE_E2E_EXECUTABLE_PATH?.trim()
+    const replacementExecutablePath = process.env.CLEANCODE_E2E_REPLACEMENT_EXECUTABLE_PATH?.trim()
+    if (
+      process.platform !== 'win32' ||
+      !originalExecutablePath ||
+      !replacementExecutablePath ||
+      dirname(originalExecutablePath) === dirname(replacementExecutablePath)
+    ) {
+      return undefined
+    }
+
+    const original = dirname(originalExecutablePath)
+    const retired = `${original}.retired`
+    await retireWindowsInstallDirectory(original, retired)
+    retiredInstallDirectory = { original, retired }
+    return replacementExecutablePath
   }
 
   async function retireCurrentTerminal(): Promise<void> {
@@ -256,6 +298,40 @@ describe('terminal runtime recovery e2e', () => {
     )
   }
 })
+
+async function expectPackagedWindowsProviderRuntimeImage(
+  workbench: E2eWorkbench,
+  provider: { readonly runtimeImageKey?: string }
+): Promise<void> {
+  if (process.platform !== 'win32' || !process.env.CLEANCODE_E2E_EXECUTABLE_PATH) return
+
+  expect(provider.runtimeImageKey).toBeTruthy()
+  const imageDirectory = join(
+    workbench.appStateDirectory,
+    'terminal-provider-host',
+    provider.runtimeImageKey!
+  )
+  await Promise.all([
+    expect(
+      access(join(imageDirectory, 'cleancode-terminal-provider.exe'))
+    ).resolves.toBeUndefined(),
+    expect(access(join(imageDirectory, 'resources', 'app.asar'))).resolves.toBeUndefined(),
+    expect(
+      access(
+        join(
+          imageDirectory,
+          'resources',
+          'app.asar.unpacked',
+          'node_modules',
+          'node-pty',
+          'build',
+          'Release',
+          'conpty.node'
+        )
+      )
+    ).resolves.toBeUndefined()
+  ])
+}
 
 async function waitForPersistedTerminalHistory(
   workbench: E2eWorkbench,
@@ -331,12 +407,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-async function launchWorkbench(workbench: E2eWorkbench) {
+async function launchWorkbench(workbench: E2eWorkbench, executablePath?: string) {
   let electronApp: ElectronApplication | undefined
 
   try {
     electronApp = await launchApp(workbench, {
-      environment: createE2eTerminalEnvironment()
+      environment: createE2eTerminalEnvironment(),
+      executablePath
     })
     const page = await electronApp.firstWindow()
     await page.waitForLoadState('domcontentloaded')

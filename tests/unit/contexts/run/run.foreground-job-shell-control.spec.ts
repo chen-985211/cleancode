@@ -59,6 +59,19 @@ describe('foreground job shell control', () => {
     expect(script).not.toContain(command.args[1])
     expect(script).not.toContain(command.environment.CLEANCODE_SECRET)
 
+    const mainTryIndex = script.indexOf('try {')
+    const consoleOutputEncodingIndex = script.indexOf('[Console]::OutputEncoding')
+    const consoleInputEncodingIndex = script.indexOf('[Console]::InputEncoding')
+    const powershellOutputEncodingIndex = script.indexOf('$OutputEncoding =')
+    const foregroundIndex = script.indexOf('[Console]::ForegroundColor')
+    const startedIndex = script.indexOf('CLEANCODE_JOB:fixedtoken:started')
+
+    expect(consoleOutputEncodingIndex).toBeGreaterThan(mainTryIndex)
+    expect(consoleInputEncodingIndex).toBeGreaterThan(consoleOutputEncodingIndex)
+    expect(powershellOutputEncodingIndex).toBeGreaterThan(consoleInputEncodingIndex)
+    expect(foregroundIndex).toBeGreaterThan(powershellOutputEncodingIndex)
+    expect(startedIndex).toBeGreaterThan(foregroundIndex)
+
     disposeForegroundJobShellControl(control)
     expect(existsSync(control.scriptDirectory)).toBe(false)
   })

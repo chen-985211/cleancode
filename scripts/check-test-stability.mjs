@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 
 import ts from 'typescript'
 
-const checkedExtensions = new Set(['.js', '.jsx', '.mjs', '.ts', '.tsx'])
+const checkedExtensions = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx'])
 const checkedDirectories = ['tests/e2e', 'tests/fixtures', 'tests/support']
 const allowedRawSleepFiles = new Set(['tests/support/e2ePolling.ts'])
 const actionCallNamePattern = /^(?:create|execute|launch|open|run|start)(?:[A-Z_]|$)/u

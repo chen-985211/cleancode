@@ -5,6 +5,7 @@ directories:
   output: release
 
 afterPack: ./scripts/after-pack.mjs
+buildDependenciesFromSource: true
 
 files:
   - out/**/*
@@ -51,4 +52,5 @@ linux:
 nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  include: ./scripts/windows-terminal-provider-uninstall.nsh
   oneClick: false

@@ -8,6 +8,7 @@ import type { RunLifecycleService } from '../../../src/contexts/run/application/
 import type { ManagedServiceLauncher } from '../../../src/contexts/run/application/services/ManagedServiceLauncher'
 import type { ManagedServiceOwnerResolver } from '../../../src/platform/electron-main/managedServiceOwnerResolver'
 import { createRunRuntime } from '../../../src/platform/electron-main/runRuntimeComposition'
+import type { PersistentTerminalProviderClientOptions } from '../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
 
 const electronMocks = vi.hoisted(() => ({
   getAllWindows: vi.fn(),
@@ -30,6 +31,19 @@ describe('Run runtime composition', () => {
 
     expect(dependencies.lifecycle).toBe(runtime.lifecycle)
     expect(dependencies.managedServices).toBe(runtime.managedServices)
+  })
+
+  it('passes the packaged Provider runtime image resolver to the Provider client', () => {
+    const resolveTerminalProviderLaunchTarget = vi.fn(async () => ({
+      executablePath: 'C:\\runtime\\provider.exe',
+      providerEntryPath: 'C:\\runtime\\provider.js',
+      runtimeImageKey: 'runtime-key'
+    }))
+    const runtime = createRuntime(async () => null, resolveTerminalProviderLaunchTarget)
+
+    expect(readProviderOptions(runtime.sessions).resolveLaunchTarget).toBe(
+      resolveTerminalProviderLaunchTarget
+    )
   })
 
   it('starts behind the runtime reconciliation gate and publishes each availability epoch', () => {
@@ -101,15 +115,28 @@ describe('Run runtime composition', () => {
 })
 
 function createRuntime(
-  resolveManagedServiceOwner: ManagedServiceOwnerResolver = async () => null
+  resolveManagedServiceOwner: ManagedServiceOwnerResolver = async () => null,
+  resolveTerminalProviderLaunchTarget?: NonNullable<
+    PersistentTerminalProviderClientOptions['resolveLaunchTarget']
+  >
 ): ReturnType<typeof createRunRuntime> {
   return createRunRuntime({
     appStateDirectory: '/tmp/cleancode-runtime-composition-test',
     launchPlans: unusedLaunchPlans,
     resolveManagedServiceOwner,
+    resolveTerminalProviderLaunchTarget,
     scopeValidation: { validate: async () => undefined },
     workflowPlans: unusedWorkflowPlans
   })
+}
+
+function readProviderOptions(sessions: unknown): PersistentTerminalProviderClientOptions {
+  const terminalProcessPort = (
+    sessions as {
+      readonly terminalProcessPort: { readonly options: PersistentTerminalProviderClientOptions }
+    }
+  ).terminalProcessPort
+  return terminalProcessPort.options
 }
 
 function readWorkflowDependencies(workflow: unknown): {

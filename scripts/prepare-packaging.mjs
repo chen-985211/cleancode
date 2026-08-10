@@ -1,12 +1,15 @@
 import { constants } from 'node:fs'
-import { access, chmod, copyFile, mkdir, readFile } from 'node:fs/promises'
+import { access, chmod, copyFile, mkdir, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const conptyRuntimeFiles = ['conpty.dll', 'OpenConsole.exe']
 
 async function copyIfChanged(sourcePath, destinationPath) {
   try {
-    const [source, destination] = await Promise.all([readFile(sourcePath), readFile(destinationPath)])
+    const [source, destination] = await Promise.all([
+      readFile(sourcePath),
+      readFile(destinationPath)
+    ])
     if (source.equals(destination)) {
       return
     }
@@ -26,7 +29,18 @@ if (process.platform === 'win32') {
   }
 
   const nodePtyDirectory = join(process.cwd(), 'node_modules', 'node-pty')
-  const sourceDirectory = join(nodePtyDirectory, 'prebuilds', `win32-${architecture}`, 'conpty')
+  const conptyRootDirectory = join(nodePtyDirectory, 'third_party', 'conpty')
+  const conptyVersions = (await readdir(conptyRootDirectory, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+
+  if (conptyVersions.length !== 1) {
+    throw new Error(
+      `Expected exactly one bundled node-pty ConPTY runtime version, found ${conptyVersions.length}: ${conptyRootDirectory}`
+    )
+  }
+
+  const sourceDirectory = join(conptyRootDirectory, conptyVersions[0], `win10-${architecture}`)
   const destinationDirectory = join(nodePtyDirectory, 'build', 'Release', 'conpty')
 
   await mkdir(destinationDirectory, { recursive: true })
