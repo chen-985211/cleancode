@@ -2,60 +2,23 @@ import {
   registerAgentIpcHandlers,
   type AgentIpcHandlersInput
 } from '../../../../src/platform/electron-main/agentIpcHandlers'
-import type { IpcInvokeResult, IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandler'
-import type { Logger } from '../../../../src/platform/logging/Logger'
-
-class FakeIpcMain implements IpcMainLike {
-  private readonly handlers = new Map<
-    string,
-    (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
-  >()
-
-  handle(
-    channel: string,
-    listener: (event: unknown, command?: unknown) => Promise<IpcInvokeResult<unknown>>
-  ): void {
-    this.handlers.set(channel, listener)
-  }
-
-  invoke<TResult>(
-    channel: string,
-    command?: unknown,
-    event: unknown = createSenderEvent()
-  ): Promise<IpcInvokeResult<TResult>> {
-    const handler = this.handlers.get(channel)
-
-    if (!handler) {
-      throw new Error(`No handler registered for ${channel}`)
-    }
-
-    return handler(event, command) as Promise<IpcInvokeResult<TResult>>
-  }
-}
-
-class SilentLogger implements Logger {
-  debug(event: Parameters<Logger['debug']>[0]): void {
-    this.ignore(event)
-  }
-
-  info(event: Parameters<Logger['info']>[0]): void {
-    this.ignore(event)
-  }
-
-  warn(event: Parameters<Logger['warn']>[0]): void {
-    this.ignore(event)
-  }
-
-  error(event: Parameters<Logger['error']>[0]): void {
-    this.ignore(event)
-  }
-
-  private ignore(event: Parameters<Logger['debug']>[0]): void {
-    void event
-  }
-}
+import type { IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandler'
+import { createSender, FakeIpcMain, SilentLogger } from './agentIpcContractHarness'
 
 describe('agent IPC contract', () => {
+  it('lists current terminal Agent activity snapshots through a dedicated channel', async () => {
+    const ipcMain = new FakeIpcMain()
+    const listAgentActivities = vi.fn(() => [])
+
+    registerAgentIpcHandlers(createAgentIpcHandlersInput({ ipcMain, listAgentActivities }))
+
+    await expect(ipcMain.invoke('cleancode:list-agent-activities')).resolves.toEqual({
+      ok: true,
+      value: []
+    })
+    expect(listAgentActivities).toHaveBeenCalledOnce()
+  })
+
   it('reads and updates validated Agent Provider preferences through typed channels', async () => {
     const ipcMain = new FakeIpcMain()
     const getAgentProviderPreferences = vi.fn(async () => createAgentProviderPreferences())
@@ -160,6 +123,7 @@ describe('agent IPC contract', () => {
         'cleancode:attach-agent-session',
         {
           agentId: 'agent-2',
+          agentName: 'Review Agent',
           columns: 100,
           gitBranch: 'feature/login',
           projectDirectory: '/repo/app',
@@ -190,6 +154,7 @@ describe('agent IPC contract', () => {
     expect(attachAgentSession).toHaveBeenCalledWith(
       expect.objectContaining({
         agentId: 'agent-2',
+        agentName: 'Review Agent',
         columns: 100,
         gitBranch: 'feature/login',
         projectDirectory: '/repo/app',
@@ -221,6 +186,37 @@ describe('agent IPC contract', () => {
       'cleancode:agent-graph-updated',
       expect.objectContaining({ sessionId: 'agent-session-1' })
     )
+  })
+
+  it('updates only the metadata of an existing Agent session', async () => {
+    const ipcMain = new FakeIpcMain()
+    const updateAgentSessionMetadata = vi.fn(() => true)
+    registerAgentIpcHandlers(createAgentIpcHandlersInput({ ipcMain, updateAgentSessionMetadata }))
+
+    await expect(
+      ipcMain.invoke('cleancode:update-agent-session-metadata', {
+        agentId: 'agent-2',
+        agentName: 'Review Agent',
+        sessionId: 'agent-session-1'
+      })
+    ).resolves.toEqual({ ok: true, value: true })
+    expect(updateAgentSessionMetadata).toHaveBeenCalledWith({
+      agentId: 'agent-2',
+      agentName: 'Review Agent',
+      sessionId: 'agent-session-1'
+    })
+
+    await expect(
+      ipcMain.invoke('cleancode:update-agent-session-metadata', {
+        agentId: 'agent-2',
+        agentName: ' Review Agent ',
+        sessionId: 'agent-session-1'
+      })
+    ).resolves.toMatchObject({
+      error: { code: 'INVALID_IPC_COMMAND', isExpected: true },
+      ok: false
+    })
+    expect(updateAgentSessionMetadata).toHaveBeenCalledOnce()
   })
 
   it('rejects an invalid terminal source theme before attaching an Agent session', async () => {
@@ -518,12 +514,14 @@ function createAgentIpcHandlersInput(input: {
   readonly disposeProjectAgentSessions?: AgentIpcHandlersInput['disposeProjectAgentSessions']
   readonly inspectAgentProvider?: AgentIpcHandlersInput['inspectAgentProvider']
   readonly getAgentProviderPreferences?: AgentIpcHandlersInput['getAgentProviderPreferences']
+  readonly listAgentActivities?: AgentIpcHandlersInput['listAgentActivities']
   readonly listAgentProviders?: AgentIpcHandlersInput['listAgentProviders']
   readonly ipcMain: IpcMainLike
   readonly rejectAgentTool?: AgentIpcHandlersInput['rejectAgentTool']
   readonly removeWorkspaceAgent?: AgentIpcHandlersInput['removeWorkspaceAgent']
   readonly renameWorkspaceAgent?: AgentIpcHandlersInput['renameWorkspaceAgent']
   readonly resizeAgentSession?: AgentIpcHandlersInput['resizeAgentSession']
+  readonly updateAgentSessionMetadata?: AgentIpcHandlersInput['updateAgentSessionMetadata']
   readonly writeAgentSession?: AgentIpcHandlersInput['writeAgentSession']
   readonly updateWorkspaceAgentLayout?: AgentIpcHandlersInput['updateWorkspaceAgentLayout']
   readonly updateWorkspaceAgentMcpCapability?: AgentIpcHandlersInput['updateWorkspaceAgentMcpCapability']
@@ -557,6 +555,7 @@ function createAgentIpcHandlersInput(input: {
     getAgentProviderPreferences:
       input.getAgentProviderPreferences ?? (async () => createAgentProviderPreferences()),
     ipcMain: input.ipcMain,
+    listAgentActivities: input.listAgentActivities ?? (() => []),
     listAgentProviders:
       input.listAgentProviders ??
       (() => [
@@ -584,6 +583,7 @@ function createAgentIpcHandlersInput(input: {
     renameWorkspaceAgent:
       input.renameWorkspaceAgent ?? (async () => createWorkspaceAgentSnapshot('agent-1')),
     resizeAgentSession: input.resizeAgentSession ?? (() => undefined),
+    updateAgentSessionMetadata: input.updateAgentSessionMetadata ?? (() => true),
     writeAgentSession: input.writeAgentSession ?? (() => undefined),
     updateWorkspaceAgentLayout:
       input.updateWorkspaceAgentLayout ?? (async () => createWorkspaceAgentSnapshot('agent-1')),
@@ -647,18 +647,4 @@ function createRuntime(agentId: string, projectId: string, workspaceId: string, 
       }
     }
   }
-}
-
-function createSender(): {
-  readonly isDestroyed: () => boolean
-  readonly send: ReturnType<typeof vi.fn>
-} {
-  return {
-    isDestroyed: () => false,
-    send: vi.fn()
-  }
-}
-
-function createSenderEvent(): { readonly sender: ReturnType<typeof createSender> } {
-  return { sender: createSender() }
 }

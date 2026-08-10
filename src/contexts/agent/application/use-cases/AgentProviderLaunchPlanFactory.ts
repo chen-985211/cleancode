@@ -11,11 +11,18 @@ export async function createManagedAgentLaunchPlan(command: {
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged: NonNullable<CreateAgentLaunchPlanCommand['onActivityChanged']>
   readonly onProviderSessionIdentified: CreateAgentLaunchPlanCommand['onProviderSessionIdentified']
+  readonly onTurnCompleted: NonNullable<CreateAgentLaunchPlanCommand['onTurnCompleted']>
   readonly provider: AgentProviderContribution
   readonly session: ManagedAgentSession
 }): Promise<AgentLaunchPlan> {
-  const { launchProfile, onActivityChanged, onProviderSessionIdentified, provider, session } =
-    command
+  const {
+    launchProfile,
+    onActivityChanged,
+    onProviderSessionIdentified,
+    onTurnCompleted,
+    provider,
+    session
+  } = command
   const artifacts = new AgentLaunchArtifactScope()
   session.launchArtifacts = artifacts
   try {
@@ -30,6 +37,7 @@ export async function createManagedAgentLaunchPlan(command: {
       ...(launchProfile ? { launchProfile } : {}),
       onActivityChanged,
       onProviderSessionIdentified,
+      onTurnCompleted,
       providerSessionRef: session.providerSessionRef ?? undefined,
       workspaceDirectory: session.workspaceDirectory
     })

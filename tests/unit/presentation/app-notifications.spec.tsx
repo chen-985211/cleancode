@@ -80,6 +80,140 @@ function NotificationHarness({ onStop = async () => undefined }: { onStop?: () =
   )
 }
 
+function SemanticNotificationHarness() {
+  const { notify } = useNotifications()
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            identity: { key: 'agent:workspace-1', occurrenceId: 'turn-1', revision: 1 },
+            kind: 'info',
+            message: '正在处理',
+            title: 'Agent 正在回答'
+          })
+        }
+      >
+        发布 Agent 消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            identity: { key: 'agent:workspace-1', occurrenceId: 'turn-1', revision: 2 },
+            kind: 'success',
+            message: '回答已完成',
+            title: 'Agent 已完成'
+          })
+        }
+      >
+        更新同一 Agent 消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            identity: { key: 'agent:workspace-1', occurrenceId: 'turn-1', revision: 3 },
+            kind: 'success',
+            title: 'Agent 已完成（重复）'
+          })
+        }
+      >
+        重放同一 Agent 消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            identity: { key: 'agent:workspace-1', occurrenceId: 'turn-2', revision: 1 },
+            kind: 'info',
+            title: 'Agent 正在回答新消息'
+          })
+        }
+      >
+        发布下一条 Agent 消息
+      </button>
+    </div>
+  )
+}
+
+function SemanticLifecycleHarness({
+  onFirstAction = async () => undefined,
+  onSecondAction = async () => undefined
+}: {
+  readonly onFirstAction?: () => Promise<void>
+  readonly onSecondAction?: () => Promise<void>
+}) {
+  const { notify } = useNotifications()
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            autoDismissMs: 1_000,
+            identity: { key: 'semantic-lifecycle', occurrenceId: 'first' },
+            kind: 'info',
+            title: '第一条语义消息'
+          })
+        }
+      >
+        发布第一条定时消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            autoDismissMs: 1_000,
+            identity: { key: 'semantic-lifecycle', occurrenceId: 'second' },
+            kind: 'info',
+            title: '第二条语义消息'
+          })
+        }
+      >
+        发布第二条定时消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            action: {
+              label: '执行第一条动作',
+              pendingLabel: '第一条动作进行中…',
+              onClick: onFirstAction
+            },
+            identity: { key: 'semantic-action', occurrenceId: 'first' },
+            kind: 'info',
+            title: '第一条可操作消息'
+          })
+        }
+      >
+        发布第一条可操作消息
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            action: {
+              label: '执行第二条动作',
+              pendingLabel: '第二条动作进行中…',
+              onClick: onSecondAction
+            },
+            identity: { key: 'semantic-action', occurrenceId: 'second' },
+            kind: 'info',
+            title: '第二条可操作消息'
+          })
+        }
+      >
+        发布第二条可操作消息
+      </button>
+    </div>
+  )
+}
+
 describe('app notifications', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -209,5 +343,101 @@ describe('app notifications', () => {
     finishStop?.()
 
     await waitFor(() => expect(screen.getByRole('button', { name: '停止本次运行' })).toBeEnabled())
+  })
+
+  it('deduplicates a semantic occurrence, keeps it acknowledged, and reopens for the next one', () => {
+    render(
+      <NotificationProvider>
+        <SemanticNotificationHarness />
+      </NotificationProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '发布 Agent 消息' }))
+
+    const notification = screen.getByRole('status')
+
+    fireEvent.click(screen.getByRole('button', { name: '更新同一 Agent 消息' }))
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByRole('status')).toBe(notification)
+    expect(notification).toHaveTextContent('回答已完成')
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭“Agent 已完成”通知' }))
+    fireEvent.transitionEnd(notification, { propertyName: 'transform' })
+    fireEvent.click(screen.getByRole('button', { name: '重放同一 Agent 消息' }))
+
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.queryByText('Agent 已完成（重复）')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '发布下一条 Agent 消息' }))
+
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+    expect(screen.getByRole('status')).toHaveTextContent('Agent 正在回答新消息')
+  })
+
+  it('starts a fresh auto-dismiss window for each semantic occurrence', () => {
+    vi.useFakeTimers()
+    render(
+      <NotificationProvider>
+        <SemanticLifecycleHarness />
+      </NotificationProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '发布第一条定时消息' }))
+    act(() => vi.advanceTimersByTime(750))
+    fireEvent.click(screen.getByRole('button', { name: '发布第二条定时消息' }))
+
+    act(() => vi.advanceTimersByTime(250))
+    expect(screen.getByRole('status')).toHaveTextContent('第二条语义消息')
+
+    act(() => vi.advanceTimersByTime(749))
+    expect(screen.getByRole('status')).toHaveTextContent('第二条语义消息')
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('isolates pending actions between semantic occurrences and ignores an old promise result', async () => {
+    let finishFirstAction: (() => void) | undefined
+    let finishSecondAction: (() => void) | undefined
+    const onFirstAction = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirstAction = resolve
+        })
+    )
+    const onSecondAction = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSecondAction = resolve
+        })
+    )
+    render(
+      <NotificationProvider>
+        <SemanticLifecycleHarness onFirstAction={onFirstAction} onSecondAction={onSecondAction} />
+      </NotificationProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '发布第一条可操作消息' }))
+    fireEvent.click(screen.getByRole('button', { name: '执行第一条动作' }))
+    expect(screen.getByRole('button', { name: '第一条动作进行中…' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: '发布第二条可操作消息' }))
+    expect(screen.getByRole('button', { name: '执行第二条动作' })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('button', { name: '执行第二条动作' }))
+    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toBeDisabled()
+
+    await act(async () => {
+      finishFirstAction?.()
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toBeDisabled()
+
+    await act(async () => {
+      finishSecondAction?.()
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('button', { name: '执行第二条动作' })).toBeEnabled()
   })
 })

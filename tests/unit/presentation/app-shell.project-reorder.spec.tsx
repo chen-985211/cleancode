@@ -5,6 +5,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { NotifiedAppShell } from '../../fixtures/presentation/NotifiedAppShell'
 
 describe('app shell project reordering', () => {
   beforeEach(() => {
@@ -78,7 +79,7 @@ describe('app shell project reordering', () => {
       })
     })
 
-    render(<AppShell />)
+    render(<NotifiedAppShell />)
     await screen.findByRole('button', { name: 'beta-project' })
 
     const projectList = document.querySelector<HTMLElement>('.project-list')!
@@ -92,7 +93,11 @@ describe('app shell project reordering', () => {
     fireEvent.pointerMove(window, { pointerId: 2, clientX: 20, clientY: 101 })
     fireEvent.pointerUp(window, { pointerId: 2, clientX: 20, clientY: 101 })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('项目排序失败，请重试。')
+    const notificationViewport = await screen.findByLabelText('通知')
+    expect(within(notificationViewport).getByRole('alert')).toHaveTextContent(
+      '项目排序失败，请重试。'
+    )
+    expect(document.querySelector('.project-sidebar-alert')).toBeNull()
     expect(
       [...document.querySelectorAll<HTMLElement>('.project-card__name')].map(
         (element) => element.textContent

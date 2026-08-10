@@ -1,9 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import { CreateWorkspaceAgentUseCase } from '../../contexts/agent/application/use-cases/CreateWorkspaceAgentUseCase'
 import { DiscoverCreatableAgentProvidersUseCase } from '../../contexts/agent/application/use-cases/DiscoverCreatableAgentProvidersUseCase'
 import { ExecuteAgentToolUseCase } from '../../contexts/agent/application/use-cases/ExecuteAgentToolUseCase'
@@ -67,7 +67,6 @@ import { ListGitBranchNavigationUseCase } from '../../contexts/project/applicati
 import { ListRememberedProjectsUseCase } from '../../contexts/project/application/use-cases/ListRememberedProjectsUseCase'
 import { ProjectWorkspaceTransactionCoordinator } from '../../contexts/project/application/use-cases/ProjectWorkspaceTransactionCoordinator'
 import { ValidateProjectWorkspaceScopeUseCase } from '../../contexts/project/application/use-cases/ValidateProjectWorkspaceScopeUseCase'
-import type { GitBranchNavigationItemSnapshot } from '../../contexts/project/application/dto/GitBranchNavigationSnapshot'
 import type { ProjectSnapshot } from '../../contexts/project/application/dto/ProjectSnapshot'
 import { FileSystemBranchWorkspaceDirectoryResolver } from '../../contexts/project/infrastructure/filesystem/FileSystemBranchWorkspaceDirectoryResolver'
 import { FileSystemProjectRegistryRepository } from '../../contexts/project/infrastructure/filesystem/FileSystemProjectRegistryRepository'
@@ -108,13 +107,12 @@ import { createApplicationRuntimeShutdownCoordinator } from './applicationRuntim
 import { registerWindowFullScreenStateIpc } from './windowFullScreenState'
 import { configureElectronRuntimeDataDirectories } from './runtimeDataDirectoryBootstrap'
 import { shouldAcquireSingleInstanceLock } from './singleInstancePolicy'
-
-interface WorkbenchSnapshot {
-  readonly agents: readonly WorkspaceAgentSnapshot[]
-  readonly project: ProjectSnapshot
-  readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
-  readonly graph: BlockGraphSnapshot
-}
+import { createMainAgentActivityRuntime } from './mainAgentActivityRuntime'
+import {
+  logProviderRuntimeImageMaterializationError,
+  logProviderRuntimeImagePruneError
+} from './terminalProviderRuntimeLogging'
+import type { WorkbenchSnapshot } from './WorkbenchSnapshot'
 
 configureElectronRuntimeDataDirectories(app)
 
@@ -133,8 +131,9 @@ if (acquiresSingleInstanceLock) {
 }
 
 const appStateDirectoryPath = getAppStateDirectoryPath()
+const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 const terminalProviderStateDirectoryPath = join(appStateDirectoryPath, 'terminal-runtime-provider')
-const terminalProviderEntryPath = join(__dirname, 'terminal-runtime-provider.js')
+const terminalProviderEntryPath = join(mainModuleDirectory, 'terminal-runtime-provider.js')
 const terminalProviderRuntimeImage = new TerminalProviderRuntimeImageManager({
   archiveFileSystem: createElectronArchiveFileSystem(),
   applicationVersion: app.getVersion(),
@@ -213,6 +212,11 @@ const instantiateBlockTemplateUseCase = new InstantiateBlockTemplateUseCase(
 )
 const buildTerminalWorkflowPlanUseCase = new BuildTerminalWorkflowPlanUseCase(graphRepository)
 const getTerminalLaunchPlanUseCase = new GetTerminalLaunchPlanUseCase(graphRepository)
+const agentActivityRuntime = createMainAgentActivityRuntime({
+  appStateDirectory: appStateDirectoryPath,
+  logger: consoleLogger,
+  runtimeExecutable: process.execPath
+})
 const {
   getRuntimeAvailability: getTerminalRuntimeAvailability,
   initialize: initializeRunRuntime,
@@ -228,6 +232,7 @@ const {
   workspaceRuns
 } = createRunRuntime({
   appStateDirectory: appStateDirectoryPath,
+  launchEnvironmentPreparation: agentActivityRuntime.launchEnvironmentPreparation,
   launchPlans: new BlockGraphTerminalLaunchPlanAdapter(getTerminalLaunchPlanUseCase),
   resolveManagedServiceOwner,
   resolveTerminalProviderLaunchTarget: async () => {
@@ -239,8 +244,10 @@ const {
     getProjectRegistryRepository(),
     projectRepository
   ),
+  terminalSessionLifecycleObserver: agentActivityRuntime.terminalSessionLifecycleObserver,
   workflowPlans: new BlockGraphTerminalWorkflowPlanAdapter(buildTerminalWorkflowPlanUseCase)
 })
+agentActivityRuntime.bindTerminalSessions(terminalSessionService)
 const deleteBlockUseCase = new DeleteBlockUseCase(graphRepository, terminalRuns)
 const deleteTerminalScopeUseCase = new DeleteTerminalScopeUseCase(graphRepository, terminalRuns)
 const defaultAgentProviderId = 'codex'
@@ -331,7 +338,8 @@ const agentSessionService = new AgentSessionService(
     projectRepository
   ),
   agentProviderAvailability,
-  agentProviderPreferencesRepository
+  agentProviderPreferencesRepository,
+  agentActivityRuntime.registry
 )
 const workspaceAgentLifecycleAdapter = createAgentLifecycle(agentSessionService)
 const {
@@ -485,12 +493,15 @@ registerAgentIpcHandlers({
       : disposeRuntime(() => agentSessionService.disposeProject(projectDirectory)),
   getAgentProviderPreferences: () => getAgentProviderPreferencesUseCase.execute(),
   inspectAgentProvider: (providerId) => inspectAgentProviderUseCase.execute(providerId),
+  listAgentActivities: () => agentActivityRuntime.list(),
   listAgentProviders: () => listAgentProvidersUseCase.execute(),
   ipcMain,
   logger: consoleLogger,
   rejectAgentTool: (approvalId) => agentSessionService.rejectTool({ approvalId }),
   removeWorkspaceAgent: (command) => removeWorkspaceAgentUseCase.execute(command),
   renameWorkspaceAgent: (command) => renameWorkspaceAgentUseCase.execute(command),
+  updateAgentSessionMetadata: (command) =>
+    isAgentAutostartDisabledForTest ? false : agentSessionService.updateMetadata(command),
   resizeAgentSession: (sessionId, columns, rows) => {
     if (!isAgentAutostartDisabledForTest) {
       agentSessionService.resize({ columns, rows, sessionId })
@@ -611,24 +622,6 @@ function getAppStateDirectoryPath(): string {
   )
 }
 
-function logProviderRuntimeImageMaterializationError(error: unknown): void {
-  consoleLogger.warn({
-    scope: 'run.terminal-provider',
-    operation: 'materializeRuntimeImage',
-    outcome: 'failure',
-    error: { message: error instanceof Error ? error.message : String(error) }
-  })
-}
-
-function logProviderRuntimeImagePruneError(error: unknown): void {
-  consoleLogger.warn({
-    scope: 'run.terminal-provider',
-    operation: 'pruneRuntimeImages',
-    outcome: 'failure',
-    error: { message: error instanceof Error ? error.message : String(error) }
-  })
-}
-
 if (isPrimaryAppInstance) {
   void app.whenReady().then(async () => {
     try {
@@ -641,10 +634,11 @@ if (isPrimaryAppInstance) {
         error: { message: error instanceof Error ? error.message : String(error) }
       })
     }
+    agentActivityRuntime.initializeFailOpen()
     const appIconPath = resolveAppIconPath({
       fileExists: existsSync,
       isDevelopment: Boolean(process.env.ELECTRON_RENDERER_URL),
-      mainDirectory: __dirname,
+      mainDirectory: mainModuleDirectory,
       projectDirectory: process.cwd()
     })
 
@@ -671,7 +665,8 @@ app.on('window-all-closed', () => {
 let isReadyToQuit = false
 let isPreparingToQuit = false
 const applicationRuntimeShutdown = createApplicationRuntimeShutdownCoordinator({
-  completeAgentSessions: () => agentSessionService.completeApplicationShutdown(),
+  completeAgentSessions: () =>
+    agentSessionService.completeApplicationShutdown().finally(() => agentActivityRuntime.dispose()),
   completeTerminalWorkflows: () => terminalWorkflowService.completeApplicationShutdown(),
   disposeRunLifecycle: () => runLifecycleService.prepareApplicationShutdown(),
   disposeTerminalSessions: () => terminalSessionService.prepareApplicationShutdown(),

@@ -9,6 +9,7 @@ describe('Gemini Agent Provider contribution', () => {
   it('creates a client-assigned session and injects launch-scoped CleanCode MCP settings', async () => {
     const contribution = requireGeminiContribution()
     const artifacts = new AgentLaunchArtifactScope()
+    const onActivityChanged = vi.fn()
     const onProviderSessionIdentified = vi.fn()
     const plan = (await contribution.launcher.createLaunchPlan({
       artifacts,
@@ -16,6 +17,7 @@ describe('Gemini Agent Provider contribution', () => {
         bearerToken: 'gemini-secret',
         serverUrl: 'http://127.0.0.1:43121/mcp/gemini'
       },
+      onActivityChanged,
       onProviderSessionIdentified,
       workspaceDirectory: '/repo/worktree'
     })) as AgentLaunchPlan & {
@@ -28,7 +30,7 @@ describe('Gemini Agent Provider contribution', () => {
     artifacts.seal()
 
     expect(contribution.descriptor.capabilities).toEqual({
-      activityTracking: false,
+      activityTracking: true,
       cleancodeMcp: true,
       launchInstructions: false,
       resume: true,
@@ -52,6 +54,8 @@ describe('Gemini Agent Provider contribution', () => {
     const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
     expect(settings).toMatchObject({
       hooks: {
+        AfterAgent: expect.any(Array),
+        BeforeAgent: expect.any(Array),
         SessionStart: [
           {
             hooks: [
@@ -100,6 +104,20 @@ describe('Gemini Agent Provider contribution', () => {
       })
     )
     expect(onProviderSessionIdentified).toHaveBeenCalledTimes(4)
+
+    for (const hookEventName of ['BeforeAgent', 'AfterAgent']) {
+      await fetch(plan.env.CLEANCODE_GEMINI_HOOK_URL!, {
+        body: JSON.stringify({
+          cwd: '/repo/worktree',
+          hook_event_name: hookEventName,
+          session_id: '660e8400-e29b-41d4-a716-446655440001'
+        }),
+        headers: { Authorization: `Bearer ${plan.env.CLEANCODE_GEMINI_HOOK_TOKEN}` },
+        method: 'POST'
+      })
+    }
+    await vi.waitFor(() => expect(onActivityChanged).toHaveBeenLastCalledWith('idle'))
+    expect(onActivityChanged).toHaveBeenCalledWith('working')
 
     await artifacts.dispose()
     await expect(readFile(settingsPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })

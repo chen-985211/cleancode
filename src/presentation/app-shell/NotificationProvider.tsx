@@ -1,58 +1,62 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { AppNotificationInput } from './appNotifications'
-import { NotificationCenter, type AppNotificationPresentation } from './NotificationCenter'
+import {
+  completeAppMessageExit,
+  createAppMessageStore,
+  dismissAppMessage,
+  publishAppMessage,
+  updateAppMessage,
+  type AppMessageStore
+} from './appMessageStore'
+import { NotificationCenter } from './NotificationCenter'
 import { NotificationContext } from './useNotifications'
 
 export function NotificationProvider({ children }: { readonly children: ReactNode }) {
-  const [notifications, setNotifications] = useState<AppNotificationPresentation[]>([])
-  const notificationIds = useRef(new Set<string>())
-  const nextNotificationId = useRef(0)
-  const dismiss = useCallback((notificationId: string) => {
-    notificationIds.current.delete(notificationId)
-    setNotifications((current) =>
-      current.map((presentation) =>
-        presentation.notification.id === notificationId
-          ? { ...presentation, open: false }
-          : presentation
-      )
-    )
-  }, [])
-  const notify = useCallback((notification: AppNotificationInput): string => {
-    nextNotificationId.current += 1
-    const id = `app-notification-${nextNotificationId.current}`
+  const [messageStore, setMessageStore] = useState(createAppMessageStore)
+  const messageStoreRef = useRef(messageStore)
+  const commit = useCallback((nextStore: AppMessageStore): void => {
+    if (nextStore === messageStoreRef.current) return
 
-    notificationIds.current.add(id)
-    setNotifications((current) => [
-      ...current,
-      { notification: { ...notification, id }, open: true }
-    ])
-
-    return id
+    messageStoreRef.current = nextStore
+    setMessageStore(nextStore)
   }, [])
+  const dismiss = useCallback(
+    (notificationId: string) => {
+      commit(dismissAppMessage(messageStoreRef.current, notificationId))
+    },
+    [commit]
+  )
+  const notify = useCallback(
+    (notification: AppNotificationInput): string => {
+      const result = publishAppMessage(messageStoreRef.current, notification)
+      commit(result.store)
+      return result.notificationId
+    },
+    [commit]
+  )
   const update = useCallback(
     (notificationId: string, notification: AppNotificationInput): boolean => {
-      if (!notificationIds.current.has(notificationId)) {
-        return false
-      }
-
-      setNotifications((current) =>
-        current.map((presentation) =>
-          presentation.notification.id === notificationId
-            ? { ...presentation, notification: { ...notification, id: notificationId } }
-            : presentation
-        )
-      )
-      return true
+      const result = updateAppMessage(messageStoreRef.current, notificationId, notification)
+      commit(result.store)
+      return result.updated
     },
-    []
+    [commit]
   )
   const value = useMemo(() => ({ dismiss, notify, update }), [dismiss, notify, update])
-  const removePresentedNotification = useCallback((notificationId: string): void => {
-    setNotifications((current) =>
-      current.filter((presentation) => presentation.notification.id !== notificationId)
-    )
-  }, [])
+  const completeExit = useCallback(
+    (notificationId: string, exitToken: number): void => {
+      commit(completeAppMessageExit(messageStoreRef.current, notificationId, exitToken))
+    },
+    [commit]
+  )
+  const notifications = messageStore.messages
+    .filter((message) => message.phase !== 'hidden')
+    .map((message) => ({
+      exitToken: message.exitToken,
+      notification: message.notification,
+      open: message.phase === 'open'
+    }))
 
   return (
     <NotificationContext.Provider value={value}>
@@ -60,7 +64,7 @@ export function NotificationProvider({ children }: { readonly children: ReactNod
       <NotificationCenter
         notifications={notifications}
         onDismiss={dismiss}
-        onExitComplete={removePresentedNotification}
+        onExitComplete={completeExit}
       />
     </NotificationContext.Provider>
   )

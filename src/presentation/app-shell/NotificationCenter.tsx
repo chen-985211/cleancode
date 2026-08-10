@@ -20,7 +20,8 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 import { useNotificationStatusIconSpring } from './useNotificationStatusIconSpring'
 import { useSurfaceMotionPresence } from './useSurfaceMotionPresence'
 
-export interface AppNotificationPresentation {
+interface AppNotificationPresentation {
+  readonly exitToken: number
   readonly notification: AppNotification
   readonly open: boolean
 }
@@ -28,7 +29,7 @@ export interface AppNotificationPresentation {
 interface NotificationCenterProps {
   readonly notifications: readonly AppNotificationPresentation[]
   readonly onDismiss: (notificationId: string) => void
-  readonly onExitComplete: (notificationId: string) => void
+  readonly onExitComplete: (notificationId: string, exitToken: number) => void
 }
 
 export function NotificationCenter({
@@ -58,13 +59,14 @@ export function NotificationCenter({
 interface NotificationCardProps {
   readonly presentation: AppNotificationPresentation
   readonly onDismiss: (notificationId: string) => void
-  readonly onExitComplete: (notificationId: string) => void
+  readonly onExitComplete: (notificationId: string, exitToken: number) => void
 }
 
 function NotificationCard({ presentation, onDismiss, onExitComplete }: NotificationCardProps) {
   const { t } = useI18n()
   const { notification } = presentation
-  const [isActionPending, setIsActionPending] = useState(false)
+  const occurrenceKey = createNotificationOccurrenceKey(notification)
+  const occurrenceKeyRef = useRef(occurrenceKey)
   const reducedMotion = usePrefersReducedMotion()
   const statusInput = { notification, reducedMotion }
   const [renderedStatus, setRenderedStatus] = useState(() =>
@@ -80,51 +82,27 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
   const completeStatusLayer = useCallback((layerId: number) => {
     setRenderedStatus((current) => completeNotificationStatusMotion(current, layerId))
   }, [])
-  const isMounted = useRef(true)
   const presence = useSurfaceMotionPresence(presentation.open, {
-    onExitComplete: () => onExitComplete(notification.id)
+    onExitComplete: () => onExitComplete(notification.id, presentation.exitToken)
   })
 
   useEffect(() => {
-    isMounted.current = true
-    return () => {
-      isMounted.current = false
-    }
-  }, [])
+    occurrenceKeyRef.current = occurrenceKey
+  }, [occurrenceKey])
 
   useEffect(() => {
     if (!presentation.open || !notification.autoDismissMs || notification.autoDismissMs <= 0) {
       return undefined
     }
 
-    const timeoutId = window.setTimeout(
-      () => onDismiss(notification.id),
-      notification.autoDismissMs
-    )
+    const timeoutId = window.setTimeout(() => {
+      if (occurrenceKeyRef.current === occurrenceKey) onDismiss(notification.id)
+    }, notification.autoDismissMs)
 
     return () => window.clearTimeout(timeoutId)
-  }, [notification.autoDismissMs, notification.id, onDismiss, presentation.open])
+  }, [notification.autoDismissMs, notification.id, occurrenceKey, onDismiss, presentation.open])
 
   if (!presence.isPresent) return null
-
-  const actionLabel =
-    (isActionPending || notification.action?.disabled) && notification.action?.pendingLabel
-      ? notification.action.pendingLabel
-      : notification.action?.label
-  const handleAction = async () => {
-    if (!notification.action || notification.action.disabled || isActionPending) {
-      return
-    }
-
-    setIsActionPending(true)
-    try {
-      await notification.action.onClick()
-    } finally {
-      if (isMounted.current) {
-        setIsActionPending(false)
-      }
-    }
-  }
 
   return (
     <section
@@ -159,24 +137,17 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
         {notification.message ? (
           <p className="notification-card__message">{notification.message}</p>
         ) : null}
-        {notification.action && actionLabel ? (
-          <div className="notification-card__actions">
-            <button
-              className={`notification-card__action notification-card__action--${notification.action.tone ?? 'default'}`}
-              type="button"
-              disabled={notification.action.disabled || isActionPending}
-              onClick={() => void handleAction()}
-            >
-              {actionLabel}
-            </button>
-          </div>
+        {notification.action ? (
+          <NotificationActionButton action={notification.action} key={occurrenceKey} />
         ) : null}
       </div>
       <TooltipLabel content={t('notifications.dismissTitle')}>
         <button
           className="notification-card__dismiss"
           type="button"
-          aria-label={t('notifications.dismiss', { title: notification.title })}
+          aria-label={t('notifications.dismiss', {
+            title: notification.accessibleLabel ?? notification.title
+          })}
           onClick={() => onDismiss(notification.id)}
         >
           <XIcon size={15} weight="bold" aria-hidden="true" />
@@ -184,6 +155,56 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
       </TooltipLabel>
     </section>
   )
+}
+
+function NotificationActionButton({
+  action
+}: {
+  readonly action: NonNullable<AppNotification['action']>
+}) {
+  const [isPending, setIsPending] = useState(false)
+  const isMounted = useRef(true)
+
+  useEffect(() => {
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
+
+  const label =
+    (isPending || action.disabled) && action.pendingLabel ? action.pendingLabel : action.label
+  if (!label) return null
+
+  const handleAction = async (): Promise<void> => {
+    if (action.disabled || isPending) return
+
+    setIsPending(true)
+    try {
+      await action.onClick()
+    } finally {
+      if (isMounted.current) setIsPending(false)
+    }
+  }
+
+  return (
+    <div className="notification-card__actions">
+      <button
+        className={`notification-card__action notification-card__action--${action.tone ?? 'default'}`}
+        type="button"
+        disabled={action.disabled || isPending}
+        onClick={() => void handleAction()}
+      >
+        {label}
+      </button>
+    </div>
+  )
+}
+
+function createNotificationOccurrenceKey(notification: AppNotification): string {
+  return notification.identity
+    ? JSON.stringify([notification.identity.key, notification.identity.occurrenceId])
+    : notification.id
 }
 
 interface NotificationStatusIconLayerProps {

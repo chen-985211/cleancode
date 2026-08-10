@@ -241,6 +241,7 @@ function createClaudeHooks(command: string, args: readonly string[]) {
   return {
     Notification: [handler],
     PermissionRequest: [handler],
+    PreToolUse: [handler],
     SessionEnd: [handler],
     SessionStart: [{ matcher: 'startup|resume|clear|compact', ...handler }],
     Stop: [handler],

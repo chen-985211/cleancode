@@ -295,6 +295,7 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
 
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
+    notifications,
     replaceWorkbench,
     setHoveredTerminalBlockId,
     setSelectedTerminalBlockId,
@@ -302,14 +303,8 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     forgetWorkspaceTerminalStates
   })
 
-  const {
-    addProject,
-    dismissProjectActionError,
-    isReorderingProject,
-    projectActionError,
-    removeProject,
-    reorderProject
-  } = useProjectActions({
+  const { addProject, isReorderingProject, removeProject, reorderProject } = useProjectActions({
+    notifications,
     rememberWorkbench,
     setCurrentWorkbench,
     setHoveredTerminalBlockId,
@@ -613,16 +608,11 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
               isDesktopRuntime={isDesktopRuntime}
               intent={shortcutNavigation.projectSidebarIntent}
               shortcutTooltips={shortcutTooltips}
-              actionError={projectActionError ?? branchWorkspaceActions.branchWorkspaceActionError}
               isReorderPending={isReorderingProject}
               onAddProject={addProject}
               onArchiveBranchWorkspace={branchWorkspaceActions.archiveBranchWorkspace}
               onCheckoutMainBranch={branchWorkspaceActions.checkoutMainBranch}
               onCreateBranchWorkspace={branchWorkspaceActions.createBranchWorkspace}
-              onDismissActionError={() => {
-                dismissProjectActionError()
-                branchWorkspaceActions.dismissBranchWorkspaceActionError()
-              }}
               onRemoveProject={removeProject}
               onReorderProject={reorderProject}
               onSelectWorkspace={branchWorkspaceActions.selectWorkspace}

@@ -9,10 +9,23 @@ import type { TerminalLinkIdentity } from '../dto/TerminalLink'
 import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
+import type { TerminalLaunchEnvironmentPreparationPort } from '../ports/TerminalLaunchEnvironmentPreparationPort'
+import type { TerminalSessionLifecycleObserverPort } from '../ports/TerminalSessionLifecycleObserverPort'
+import type { StartTerminalSessionCommand } from './TerminalSessionCommands'
 
 export interface TerminalSessionTerminationOperation {
   readonly promise: Promise<TerminalSessionSnapshot>
   readonly preserveHistory: boolean
+}
+
+export function acceptTerminalFallbackOutput(
+  sequences: Map<string, number>,
+  sessionId: string,
+  data: string
+) {
+  const sequence = (sequences.get(sessionId) ?? 0) + 1
+  sequences.set(sessionId, sequence)
+  return { data, sequence }
 }
 
 export function enqueueTerminalSlotOperation<T>(
@@ -35,6 +48,68 @@ export function enqueueTerminalSlotOperation<T>(
 
 export function getTerminalSessionErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+export function listTerminalSessionSnapshots(
+  sessions: ReadonlyMap<string, TerminalSession>,
+  sessionIds: readonly string[] = [...sessions.keys()]
+): TerminalSessionSnapshot[] {
+  return sessionIds.flatMap((sessionId) => {
+    const session = sessions.get(sessionId)
+    return session ? [session.toSnapshot()] : []
+  })
+}
+
+export function observeTerminalEnded(
+  observer: TerminalSessionLifecycleObserverPort | undefined,
+  scope: Parameters<TerminalSessionLifecycleObserverPort['terminalEnded']>[0]
+): void {
+  try {
+    observer?.terminalEnded(scope)
+  } catch {
+    // An optional projection cannot alter the terminal lifecycle fact it observes.
+  }
+}
+
+export async function prepareTerminalSessionLaunch(input: {
+  readonly command: StartTerminalSessionCommand
+  readonly launchEnvironmentPreparation?: TerminalLaunchEnvironmentPreparationPort
+  readonly scope: TerminalRunOwner & {
+    readonly generation: number
+    readonly runId: string
+    readonly sessionId: string
+  }
+  readonly sessionKind: TerminalSessionSnapshot['kind']
+}): Promise<{
+  readonly environment: Readonly<Record<string, string>> | undefined
+  readonly launchCommand: string | undefined
+  readonly shell: string | undefined
+}> {
+  let launchCommand = input.command.launchCommand
+  let environment = input.command.environment
+  let shell = input.command.shell
+
+  if (input.command.prepareLaunch) {
+    const prepared = await input.command.prepareLaunch(input.scope)
+    launchCommand = prepared.launchCommand
+    environment = prepared.environment
+  }
+  if (input.command.agentActivityIntegration && input.launchEnvironmentPreparation) {
+    const prepared = await input.launchEnvironmentPreparation.prepare({
+      environment,
+      launchCommand,
+      launchMode: input.command.launchMode,
+      shell,
+      scope: input.scope,
+      sessionKind: input.sessionKind,
+      workingDirectory: input.command.workingDirectory
+    })
+    launchCommand = prepared.launchCommand
+    environment = prepared.environment
+    shell = prepared.shell ?? shell
+  }
+
+  return { environment, launchCommand, shell }
 }
 
 export function throwTerminalSessionCleanupFailures(

@@ -6,6 +6,7 @@ import type {
   AgentToolApprovalDecisionResult,
   AgentToolApprovalRequest
 } from '../../contexts/agent/application/dto/AgentSessionProtocol'
+import type { TerminalAgentActivitySnapshot } from '../../contexts/agent/application/dto/AgentActivityProtocol'
 import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dto/WorkspaceAgentSnapshot'
 import type { AgentProviderPreferencesSnapshot } from '../../contexts/agent/domain/aggregates/AgentProviderPreferences'
 import type { UpdateAgentProviderPreferencesCommand } from '../../contexts/agent/application/use-cases/UpdateAgentProviderPreferencesUseCase'
@@ -30,6 +31,7 @@ export interface AgentIpcHandlersInput {
   readonly approveAgentTool: (approvalId: string) => Promise<AgentToolApprovalDecisionResult>
   readonly attachAgentSession: (command: {
     readonly agentId: string
+    readonly agentName?: string
     readonly columns?: number
     readonly gitBranch?: string | null
     readonly onGraphUpdated: (event: AgentGraphUpdatedEvent) => void
@@ -65,6 +67,7 @@ export interface AgentIpcHandlersInput {
   readonly disposeProjectAgentSessions: (projectDirectory: string) => Promise<void>
   readonly inspectAgentProvider: (providerId: string) => Promise<AgentProviderAvailability>
   readonly getAgentProviderPreferences: () => Promise<AgentProviderPreferencesSnapshot>
+  readonly listAgentActivities: () => readonly TerminalAgentActivitySnapshot[]
   readonly listAgentProviders: () => readonly AgentProviderDescriptor[]
   readonly ipcMain: IpcMainLike
   readonly logger: Logger
@@ -81,6 +84,11 @@ export interface AgentIpcHandlersInput {
     readonly workspaceId: string
   }) => Promise<WorkspaceAgentSnapshot>
   readonly resizeAgentSession: (sessionId: string, columns: number, rows: number) => void
+  readonly updateAgentSessionMetadata: (command: {
+    readonly agentId: string
+    readonly agentName: string
+    readonly sessionId: string
+  }) => boolean
   readonly writeAgentSession: (sessionId: string, input: string) => void
   readonly updateWorkspaceAgentLayout: (command: {
     readonly agentId: string
@@ -150,9 +158,36 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
     scope: 'agent'
   })
 
+  registerIpcHandler<void, readonly TerminalAgentActivitySnapshot[]>({
+    channel: 'cleancode:list-agent-activities',
+    handler: () => input.listAgentActivities(),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'listAgentActivities',
+    scope: 'agent'
+  })
+
+  registerIpcHandler<
+    { readonly agentId: string; readonly agentName: string; readonly sessionId: string },
+    boolean
+  >({
+    channel: 'cleancode:update-agent-session-metadata',
+    handler: (command) =>
+      input.updateAgentSessionMetadata({
+        agentId: readRequiredString(command.agentId, 'agentId'),
+        agentName: readRequiredString(command.agentName, 'agentName'),
+        sessionId: readRequiredString(command.sessionId, 'sessionId')
+      }),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'updateAgentSessionMetadata',
+    scope: 'agent'
+  })
+
   registerIpcHandler<
     {
       readonly agentId: string
+      readonly agentName?: string
       readonly columns?: number
       readonly gitBranch?: string | null
       readonly projectDirectory: string
@@ -174,6 +209,7 @@ export function registerAgentIpcHandlers(input: AgentIpcHandlersInput): void {
 
       return input.attachAgentSession({
         agentId: command.agentId,
+        agentName: command.agentName,
         columns: command.columns,
         gitBranch: command.gitBranch,
         onGraphUpdated: (graphEvent) =>

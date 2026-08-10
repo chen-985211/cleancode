@@ -28,6 +28,7 @@ export interface AttachTerminalViewCommand extends TerminalViewIdentityCommand {
 }
 
 export interface StartTerminalSessionCommand {
+  readonly agentActivityIntegration?: boolean
   readonly projectId: string
   readonly projectDirectory: string
   readonly terminalBlockId: string

@@ -52,6 +52,7 @@ type CodexTelemetryFactory = (command: {
   readonly environment: Readonly<Record<string, string>>
   readonly executable: string
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+  readonly onTurnCompleted?: () => void
   readonly workspaceDirectory: string
 }) => Promise<CodexTelemetryRuntime>
 
@@ -183,6 +184,7 @@ class CodexTelemetryContribution implements AgentTelemetryContribution {
       environment: command.launchProfile?.environment ?? {},
       executable,
       onProviderSessionIdentified: command.onProviderSessionIdentified,
+      onTurnCompleted: command.onTurnCompleted,
       workspaceDirectory: command.workspaceDirectory
     })
     command.artifacts.track('codex-notify-reporter', runtime)
@@ -309,6 +311,7 @@ async function createCodexTelemetryRuntime(
     readonly environment: Readonly<Record<string, string>>
     readonly executable: string
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+    readonly onTurnCompleted?: () => void
     readonly workspaceDirectory: string
   },
   runtimeExecutable: string,
@@ -322,6 +325,7 @@ async function createCodexTelemetryRuntime(
         kind: 'codex-thread',
         value: threadId
       }),
+    onTurnCompleted: command.onTurnCompleted,
     resolveThreadIdPrefix: (prefix) =>
       resolveThreadPrefix({
         appServerArgs: command.appServerArgs,

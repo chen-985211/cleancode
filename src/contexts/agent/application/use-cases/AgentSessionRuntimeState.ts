@@ -46,6 +46,7 @@ interface ManagedAgentMcpRegistration extends AgentMcpRegistration {
 
 export interface AttachAgentSessionCommand extends AgentSessionCallbacks {
   readonly agentId: string
+  readonly agentName?: string
   readonly columns?: number
   readonly gitBranch?: string | null
   readonly persistenceMode?: 'ephemeral' | 'persistent'
@@ -67,6 +68,7 @@ export interface AgentSessionCallbacks {
 
 export interface ManagedAgentSession {
   readonly agentId: string
+  agentName?: string
   callbacks: AgentSessionCallbacks
   cleancodeMcpEnabled: boolean
   columns: number

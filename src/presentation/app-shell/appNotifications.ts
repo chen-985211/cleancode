@@ -1,5 +1,11 @@
 export type AppNotificationKind = 'info' | 'success' | 'warning' | 'error'
 
+export interface AppNotificationIdentity {
+  readonly key: string
+  readonly occurrenceId: string
+  readonly revision?: number
+}
+
 interface AppNotificationAction {
   readonly disabled?: boolean
   readonly label: string
@@ -9,8 +15,10 @@ interface AppNotificationAction {
 }
 
 export interface AppNotificationInput {
+  readonly accessibleLabel?: string
   readonly action?: AppNotificationAction
   readonly autoDismissMs?: number
+  readonly identity?: AppNotificationIdentity
   readonly isActivity?: boolean
   readonly kind: AppNotificationKind
   readonly message?: string

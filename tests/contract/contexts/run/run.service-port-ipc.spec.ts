@@ -48,6 +48,7 @@ describe('managed terminal service IPC contract', () => {
     })
     expect(startTerminal).toHaveBeenCalledWith({
       ...emptyStartCommand,
+      agentActivityIntegration: true,
       workingDirectory: emptyStartCommand.workspaceDirectory,
       onExit: expect.any(Function),
       onOutput: expect.any(Function)
