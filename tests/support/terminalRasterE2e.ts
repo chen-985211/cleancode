@@ -10,13 +10,19 @@ export interface XtermRasterProjection {
   readonly zoom: number
 }
 
-export function waitForXtermPaint(page: Page): Promise<void> {
-  return page.evaluate(
-    () =>
-      new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      })
-  )
+export interface XtermRendererState {
+  readonly ready: boolean
+  readonly renderer: string
+}
+
+export function readWebgl2Availability(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const capabilityCanvas = document.createElement('canvas')
+    const webgl2 = capabilityCanvas.getContext('webgl2')
+    const available = webgl2 !== null
+    webgl2?.getExtension('WEBGL_lose_context')?.loseContext()
+    return available
+  })
 }
 
 export async function readXtermInkRatio(page: Page, terminal: Locator): Promise<number> {
@@ -92,4 +98,11 @@ export function readXtermRasterProjection(
       zoom
     }
   })
+}
+
+export function readXtermRendererState(terminal: Locator): Promise<XtermRendererState> {
+  return terminal.evaluate((element) => ({
+    ready: (element as HTMLElement).dataset.terminalRendererReady === 'true',
+    renderer: (element as HTMLElement).dataset.terminalRenderer ?? ''
+  }))
 }

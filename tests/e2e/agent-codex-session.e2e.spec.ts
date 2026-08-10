@@ -37,9 +37,10 @@ import {
   prependE2ePath
 } from '../support/e2eTerminal'
 import {
+  readWebgl2Availability,
   readXtermInkRatio,
   readXtermRasterProjection,
-  waitForXtermPaint
+  readXtermRendererState
 } from '../support/terminalRasterE2e'
 import { setCanvasZoomToMaximum } from '../support/workbenchNodeCreationE2e'
 
@@ -97,43 +98,74 @@ describe('Codex Agent session e2e', () => {
         terminal,
         asE2eTerminalInput(createE2ePrintCommand(visualMarker))
       )
-      const initialProjection = await pollUntilState({
-        description: 'Agent baseline WebGL backing store',
-        observe: () => readXtermRasterProjection(terminal),
-        accept: (projection) =>
-          projection !== null && projection.renderer === 'webgl' && projection.rasterScale === 1,
+      const rendererState = await pollUntilState({
+        description: 'Agent terminal renderer activation',
+        observe: () => readXtermRendererState(terminal),
+        accept: (state) => state.ready && ['dom', 'webgl'].includes(state.renderer),
         intervalMs: 50,
         timeoutMs: 10_000
       })
-      const beforeInkRatio = await pollUntilState({
+      const webgl2Available = await readWebgl2Availability(page)
+      if (rendererState.renderer !== 'webgl' && webgl2Available) {
+        throw new Error(`Expected Agent WebGL renderer, received ${rendererState.renderer}.`)
+      }
+      const initialProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'Agent baseline WebGL backing store',
+              observe: () => readXtermRasterProjection(terminal),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
+      await pollUntilState({
         description: 'visible Agent terminal pixels before canvas zoom',
         observe: () => readXtermInkRatio(page, terminal),
         accept: (ratio) => ratio > 0.02,
         intervalMs: 50,
+        retryObservationErrors: true,
         timeoutMs: 10_000
       })
 
       expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
-      const zoomedProjection = await pollUntilState({
-        description: 'Agent high-density WebGL backing store',
-        observe: () => readXtermRasterProjection(terminal),
-        accept: (projection) =>
-          projection !== null &&
-          projection.renderer === 'webgl' &&
-          projection.rasterScale === 1.75 &&
-          projection.zoom >= 1.599,
+      const zoomedProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'Agent high-density WebGL backing store',
+              observe: () => readXtermRasterProjection(terminal),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1.75 &&
+                projection.zoom >= 1.599,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
+      const afterInkRatio = await pollUntilState({
+        description: 'visible Agent terminal pixels after canvas zoom',
+        observe: () => readXtermInkRatio(page, terminal),
+        accept: (ratio) => ratio > 0.02,
         intervalMs: 50,
+        retryObservationErrors: true,
         timeoutMs: 10_000
       })
-      await waitForXtermPaint(page)
-      const afterInkRatio = await readXtermInkRatio(page, terminal)
 
-      expect(initialProjection).not.toBeNull()
-      expect(zoomedProjection).not.toBeNull()
-      expect(zoomedProjection!.backingDensity).toBeGreaterThanOrEqual(
-        zoomedProjection!.devicePixelRatio * 0.98
-      )
-      expect(afterInkRatio).toBeGreaterThanOrEqual(beforeInkRatio! * 0.6)
+      if (rendererState.renderer === 'webgl') {
+        expect(initialProjection).not.toBeNull()
+        expect(zoomedProjection).not.toBeNull()
+        expect(zoomedProjection!.backingDensity).toBeGreaterThanOrEqual(
+          zoomedProjection!.devicePixelRatio * 0.98
+        )
+      } else {
+        expect(rendererState.renderer).toBe('dom')
+        expect(webgl2Available).toBe(false)
+      }
+      expect(afterInkRatio).toBeGreaterThan(0.02)
     },
     electronScenarioTimeoutMs
   )

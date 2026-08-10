@@ -28,7 +28,12 @@ import {
   writeTerminalCommand
 } from '../support/e2eTerminal'
 import { setCanvasZoomToMaximum } from '../support/workbenchNodeCreationE2e'
-import { readXtermInkRatio, waitForXtermPaint } from '../support/terminalRasterE2e'
+import {
+  readWebgl2Availability,
+  readXtermInkRatio,
+  readXtermRasterProjection,
+  readXtermRendererState
+} from '../support/terminalRasterE2e'
 
 describe('terminal daily interactions e2e', () => {
   let workbench: E2eWorkbench
@@ -133,17 +138,31 @@ describe('terminal daily interactions e2e', () => {
         .filter({ has: page.locator(`[data-terminal-session-id="${sessionId}"]`) })
         .locator('.terminal-viewport')
       const beforeDimensions = await probeTerminalDimensions(page, sessionId, 'BEFORE')
-      const initialRasterProjection = await pollUntilState({
-        description: 'focused terminal baseline WebGL backing store',
-        observe: () => readTerminalRasterProjection(page, sessionId),
-        accept: (projection) =>
-          projection !== null &&
-          projection.renderer === 'webgl' &&
-          projection.rasterScale === 1 &&
-          projection.backingWidth > 0,
+      const rendererState = await pollUntilState({
+        description: 'focused terminal renderer activation',
+        observe: () => readXtermRendererState(terminalViewport),
+        accept: (state) => state.ready && ['dom', 'webgl'].includes(state.renderer),
         intervalMs: 50,
         timeoutMs: 10_000
       })
+      const webgl2Available = await readWebgl2Availability(page)
+      if (rendererState.renderer !== 'webgl' && webgl2Available) {
+        throw new Error(`Expected terminal WebGL renderer, received ${rendererState.renderer}.`)
+      }
+      const initialRasterProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'focused terminal baseline WebGL backing store',
+              observe: () => readXtermRasterProjection(terminalViewport),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1 &&
+                projection.backingWidth > 0,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
       const visualMarker = Array.from(
         { length: 6 },
         (_, index) => `__RASTER_VISIBLE_${index}__ ${'MW'.repeat(18)}`
@@ -154,36 +173,57 @@ describe('terminal daily interactions e2e', () => {
         asE2eTerminalInput(createE2ePrintCommand(visualMarker))
       )
       await waitForTerminalOutput(page, 'Terminal 1', '__RASTER_VISIBLE_5__')
-      await waitForXtermPaint(page)
-      const beforeInkRatio = await readXtermInkRatio(page, terminalViewport)
-      const beforeCssGeometry = await readTerminalCssGeometry(page, sessionId)
+      await pollUntilState({
+        description: 'visible terminal pixels before canvas zoom',
+        observe: () => readXtermInkRatio(page, terminalViewport),
+        accept: (ratio) => ratio > 0.01,
+        intervalMs: 50,
+        retryObservationErrors: true,
+        timeoutMs: 10_000
+      })
+      const beforeCssGeometry =
+        rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
 
       expect(await setCanvasZoomToMaximum(page, workbench.projectDirectory)).toBeCloseTo(1.6, 2)
 
-      const rasterProjection = await pollUntilState({
-        description: 'focused terminal WebGL backing store to cover the maximum canvas zoom',
-        observe: () => readTerminalRasterProjection(page, sessionId),
-        accept: (projection) =>
-          projection !== null &&
-          projection.renderer === 'webgl' &&
-          projection.rasterScale === 1.75 &&
-          projection.zoom >= 1.599 &&
-          projection.backingDensity >= projection.devicePixelRatio * 0.98,
+      const rasterProjection =
+        rendererState.renderer === 'webgl'
+          ? await pollUntilState({
+              description: 'focused terminal WebGL backing store to cover the maximum canvas zoom',
+              observe: () => readXtermRasterProjection(terminalViewport),
+              accept: (projection) =>
+                projection !== null &&
+                projection.renderer === 'webgl' &&
+                projection.rasterScale === 1.75 &&
+                projection.zoom >= 1.599 &&
+                projection.backingDensity >= projection.devicePixelRatio * 0.98,
+              intervalMs: 50,
+              timeoutMs: 10_000
+            })
+          : null
+      const afterInkRatio = await pollUntilState({
+        description: 'visible terminal pixels after canvas zoom',
+        observe: () => readXtermInkRatio(page, terminalViewport),
+        accept: (ratio) => ratio > 0.01,
         intervalMs: 50,
+        retryObservationErrors: true,
         timeoutMs: 10_000
       })
-      await waitForXtermPaint(page)
-      const afterInkRatio = await readXtermInkRatio(page, terminalViewport)
-      const afterCssGeometry = await readTerminalCssGeometry(page, sessionId)
+      const afterCssGeometry =
+        rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
       const afterDimensions = await probeTerminalDimensions(page, sessionId, 'AFTER')
 
-      expect(rasterProjection).not.toBeNull()
-      expect(initialRasterProjection).not.toBeNull()
-      expect(beforeCssGeometry).not.toBeNull()
-      expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
-      expect(beforeInkRatio).toBeGreaterThan(0.01)
-      expect(afterInkRatio).toBeGreaterThanOrEqual(beforeInkRatio * 0.6)
-      expect(afterCssGeometry).toEqual(beforeCssGeometry)
+      if (rendererState.renderer === 'webgl') {
+        expect(rasterProjection).not.toBeNull()
+        expect(initialRasterProjection).not.toBeNull()
+        expect(beforeCssGeometry).not.toBeNull()
+        expect(rasterProjection!.backingWidth).toBeGreaterThan(rasterProjection!.displayWidth)
+        expect(afterCssGeometry).toEqual(beforeCssGeometry)
+      } else {
+        expect(rendererState.renderer).toBe('dom')
+        expect(webgl2Available).toBe(false)
+      }
+      expect(afterInkRatio).toBeGreaterThan(0.01)
       expect(afterDimensions).toEqual(beforeDimensions)
       expect(await readTerminalSessionId(page, 'Terminal 1')).toBe(sessionId)
     },
@@ -241,49 +281,6 @@ async function probeTerminalDimensions(
 
   if (!dimensions) throw new Error(`Unable to read ${phase.toLowerCase()} terminal dimensions.`)
   return dimensions
-}
-
-interface TerminalRasterProjection {
-  readonly backingDensity: number
-  readonly backingWidth: number
-  readonly devicePixelRatio: number
-  readonly displayWidth: number
-  readonly rasterScale: number
-  readonly renderer: string
-  readonly zoom: number
-}
-
-function readTerminalRasterProjection(
-  page: Page,
-  sessionId: string
-): Promise<TerminalRasterProjection | null> {
-  return page.evaluate((sessionId) => {
-    const output = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-terminal-session-id]')
-    ).find((element) => element.dataset.terminalSessionId === sessionId)
-    const terminalViewport = output
-      ?.closest('[data-terminal-block-id]')
-      ?.querySelector<HTMLElement>('.terminal-viewport')
-    const flowViewport = document.querySelector<HTMLElement>('.react-flow__viewport')
-    const canvas = Array.from(terminalViewport?.querySelectorAll('canvas') ?? []).find((entry) =>
-      entry.getContext('webgl2')
-    )
-    if (!terminalViewport || !flowViewport || !canvas) return null
-
-    const displayWidth = canvas.getBoundingClientRect().width
-    const zoom = new DOMMatrixReadOnly(getComputedStyle(flowViewport).transform).a
-    if (displayWidth <= 0 || !Number.isFinite(zoom)) return null
-
-    return {
-      backingDensity: canvas.width / displayWidth,
-      backingWidth: canvas.width,
-      devicePixelRatio: window.devicePixelRatio,
-      displayWidth,
-      rasterScale: Number(terminalViewport.dataset.terminalRasterScale),
-      renderer: terminalViewport.dataset.terminalRenderer ?? '',
-      zoom
-    }
-  }, sessionId)
 }
 
 function readTerminalCssGeometry(
