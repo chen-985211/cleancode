@@ -175,24 +175,33 @@ export function projectWorkbenchObjectMotion({
       return node
     }
 
+    const motion = createObjectMotion(
+      origin ? 'group-expand' : 'create',
+      node.id,
+      origin ? resolveOffsetFromOrigin(node, origin) : { x: 0, y: 0 },
+      createMotionId
+    )
+
     return withObjectMotion(
       node,
-      createObjectMotion(
-        origin ? 'group-expand' : 'create',
-        node.id,
-        origin ? resolveOffsetFromOrigin(node, origin) : { x: 0, y: 0 },
-        createMotionId
-      )
+      !origin && node.type !== 'terminalGroup' ? { ...motion, scale: { from: 0, to: 1 } } : motion
     )
   })
-  const exitingNodes = resolveCollapsingMemberExits({
+  const collapsingMemberExits = resolveCollapsingMemberExits({
     createMotionId,
     currentNodesById,
     nextNodes,
     nextNodesById
   })
+  const collapsingMemberIds = new Set(collapsingMemberExits.map((node) => node.id))
+  const deletedObjectExits = resolveDeletedObjectExits({
+    collapsingMemberIds,
+    createMotionId,
+    currentNodes,
+    nextNodesById
+  })
 
-  return { exitingNodes, nodes }
+  return { exitingNodes: [...collapsingMemberExits, ...deletedObjectExits], nodes }
 }
 
 function createGroupShellMotion(
@@ -308,6 +317,50 @@ function resolveCollapsingMemberExits({
   })
 
   return exitingNodes
+}
+
+function resolveDeletedObjectExits({
+  collapsingMemberIds,
+  createMotionId,
+  currentNodes,
+  nextNodesById
+}: {
+  readonly collapsingMemberIds: ReadonlySet<string>
+  readonly createMotionId: ProjectWorkbenchObjectMotionInput['createMotionId']
+  readonly currentNodes: readonly WorkbenchFlowNode[]
+  readonly nextNodesById: ReadonlyMap<string, WorkbenchFlowNode>
+}): WorkbenchFlowNode[] {
+  return currentNodes.flatMap((node): WorkbenchFlowNode[] => {
+    if (node.type !== 'terminal' && node.type !== 'agentConsole') return []
+    if (nextNodesById.has(node.id) || collapsingMemberIds.has(node.id)) return []
+    if (
+      node.type === 'terminal' &&
+      (node.data.isParkedInCollapsedGroup || node.data.objectMotion?.kind === 'group-collapse')
+    ) {
+      return []
+    }
+    if (node.data.objectMotion?.kind === 'delete') return [node]
+
+    const objectMotion: WorkbenchObjectMotion = {
+      ...createObjectMotion('delete', node.id, { x: 0, y: 0 }, createMotionId),
+      scale: { from: 1, to: 0 }
+    }
+
+    return [
+      {
+        ...node,
+        draggable: false,
+        selectable: false,
+        selected: false,
+        data: {
+          ...node.data,
+          isContextSelected: false,
+          isSelected: false,
+          objectMotion
+        }
+      } as WorkbenchFlowNode
+    ]
+  })
 }
 
 function createObjectMotion(

@@ -87,12 +87,19 @@ export interface WorkbenchNodeLayoutInput {
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 export type WorkbenchObjectMotionKind =
-  'create' | 'group-collapse' | 'group-expand' | 'group-join' | 'group-leave' | 'group-reflow'
+  | 'create'
+  | 'delete'
+  | 'group-collapse'
+  | 'group-expand'
+  | 'group-join'
+  | 'group-leave'
+  | 'group-reflow'
 
 export interface WorkbenchObjectMotion {
   readonly id: string
   readonly kind: WorkbenchObjectMotionKind
   readonly offset: { readonly x: number; readonly y: number }
+  readonly scale?: { readonly from: number; readonly to: number }
   readonly opacity?: { readonly from: number; readonly to: number }
   readonly contentOpacity?: { readonly from: number; readonly to: number }
 }

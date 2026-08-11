@@ -6,6 +6,105 @@ import {
 import type { WorkbenchObjectMotion } from '../../../src/presentation/app-shell/types'
 
 describe('workbench object spring', () => {
+  it('materializes a created object from the center without changing layout geometry', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      createPresenceMotion('create', { from: 0, to: 1 }),
+      false,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0)
+    scheduler.advanceNextFrame(80)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(1)
+
+    scheduler.advanceUntilIdle()
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
+    expect(completed).toHaveBeenCalledOnce()
+    expect(completed).toHaveBeenCalledWith('create:terminal-1')
+  })
+
+  it('collapses a deleted object into its center before completing', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      createPresenceMotion('delete', { from: 1, to: 0 }),
+      false,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
+    scheduler.advanceNextFrame(80)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(1)
+
+    scheduler.advanceUntilIdle()
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0)
+    expect(completed).toHaveBeenCalledOnce()
+    expect(completed).toHaveBeenCalledWith('delete:terminal-1')
+  })
+
+  it('redirects an in-flight creation into deletion from the live scale', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      createPresenceMotion('create', { from: 0, to: 1 }),
+      false,
+      completed
+    )
+    scheduler.advanceNextFrame(80)
+    const scaleBeforeDelete = readProperty(surface, '--workbench-object-motion-scale')
+
+    controller.motionChanged(
+      surface,
+      createPresenceMotion('delete', { from: 1, to: 0 }),
+      false,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeCloseTo(
+      scaleBeforeDelete,
+      4
+    )
+    scheduler.advanceNextFrame()
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeLessThan(scaleBeforeDelete)
+    scheduler.advanceUntilIdle()
+    expect(completed).toHaveBeenCalledOnce()
+    expect(completed).toHaveBeenCalledWith('delete:terminal-1')
+  })
+
+  it('settles a deleted object immediately at the same center endpoint for reduced motion', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      createPresenceMotion('delete', { from: 1, to: 0 }),
+      true,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0)
+    expect(completed).toHaveBeenCalledOnce()
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
+
   it('moves an expanding member from the committed group origin to its final position', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
@@ -261,6 +360,13 @@ function createMotion(
   id = `${kind}:terminal-1`
 ): WorkbenchObjectMotion {
   return { id, kind, offset }
+}
+
+function createPresenceMotion(
+  kind: 'create' | 'delete',
+  scale: NonNullable<WorkbenchObjectMotion['scale']>
+): WorkbenchObjectMotion {
+  return { ...createMotion(kind, { x: 0, y: 0 }), scale }
 }
 
 function readProperty(surface: ReturnType<typeof createSurface>, property: string): number {

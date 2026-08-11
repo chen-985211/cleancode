@@ -32,8 +32,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const session = data.session
   const isRunning = session.status === 'running'
   const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
+  const isPresenceMotion = Boolean(data.objectMotion?.scale)
+  const isPresenceExit = data.objectMotion?.kind === 'delete'
   const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
-  const isInteractionSuppressed = isDisclosureExit || isParked
+  const isInteractionSuppressed = isDisclosureExit || isPresenceExit || isParked
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
@@ -51,7 +53,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   const terminalNodeClassName = [
     'terminal-node',
-    objectMotionClassName,
+    isPresenceMotion ? '' : objectMotionClassName,
     isRunning ? 'terminal-node--running' : '',
     data.isSelected ? 'terminal-node--selected' : '',
     data.isContextSelected ? 'terminal-node--context-selected' : '',
@@ -65,6 +67,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
     .join(' ')
   const terminalAnchorClassName = [
     'terminal-node-anchor',
+    isPresenceMotion ? objectMotionClassName : '',
     isParked ? 'terminal-node-anchor--parked' : '',
     data.isSelected ? 'terminal-node-anchor--selected' : '',
     data.isSelected ? 'terminal-node--selected' : '',
@@ -76,6 +79,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const handleDimensionsChange = useCallback(
     (dimensions: TerminalDimensions) => {
       lastDimensionsRef.current = dimensions
+      if (isInteractionSuppressed) return
 
       if (session.status === 'running') {
         data.onResize(block, dimensions)
@@ -92,7 +96,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         data.onStart(block, dimensions)
       }
     },
-    [block, data, session.isRecoveryPending, session.sessionId, session.status]
+    [
+      block,
+      data,
+      isInteractionSuppressed,
+      session.isRecoveryPending,
+      session.sessionId,
+      session.status
+    ]
   )
 
   useEffect(() => {
@@ -102,6 +113,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   }, [session.isRecoveryPending])
 
   useEffect(() => {
+    if (isInteractionSuppressed) return
     if (
       session.status === 'idle' &&
       !session.sessionId &&
@@ -117,7 +129,14 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
       hasRequestedAutoStartRef.current = true
       data.onStart(block, dimensions)
     }
-  }, [block, data, session.isRecoveryPending, session.sessionId, session.status])
+  }, [
+    block,
+    data,
+    isInteractionSuppressed,
+    session.isRecoveryPending,
+    session.sessionId,
+    session.status
+  ])
 
   const startEditingMetadata = useCallback(() => {
     setShouldFocusLaunchCommand(false)
@@ -183,7 +202,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
 
   return (
     <div
+      ref={isPresenceMotion ? objectMotionSurfaceRef : undefined}
       className={terminalAnchorClassName}
+      style={isPresenceMotion ? objectMotionStyle : undefined}
+      onAnimationEnd={isPresenceMotion ? onObjectMotionAnimationEnd : undefined}
       data-terminal-block-id={block.id}
       data-terminal-auto-start-status={
         session.sessionId
@@ -218,10 +240,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
         isConnectable={false}
       />
       <section
-        ref={objectMotionSurfaceRef}
+        ref={isPresenceMotion ? undefined : objectMotionSurfaceRef}
         className={terminalNodeClassName}
-        style={objectMotionStyle}
-        onAnimationEnd={onObjectMotionAnimationEnd}
+        style={isPresenceMotion ? undefined : objectMotionStyle}
+        onAnimationEnd={isPresenceMotion ? undefined : onObjectMotionAnimationEnd}
       >
         <TerminalHeader
           blockName={block.name}

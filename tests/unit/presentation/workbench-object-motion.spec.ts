@@ -44,11 +44,106 @@ describe('workbench object motion', () => {
           objectMotion: {
             id: 'create:terminal-1',
             kind: 'create',
-            offset: { x: 0, y: 0 }
+            offset: { x: 0, y: 0 },
+            scale: { from: 0, to: 1 }
           }
         })
       })
     ])
+  })
+
+  it('keeps terminal-group creation on its existing non-scaling presentation', () => {
+    const group = createGroupNode('group-1', false, [], {
+      height: 360,
+      width: 640,
+      x: 640,
+      y: 360
+    })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [],
+      isContinuingGraph: true,
+      nextNodes: [group],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes[0]?.data.objectMotion).toEqual({
+      id: 'create:group-1',
+      kind: 'create',
+      offset: { x: 0, y: 0 }
+    })
+  })
+
+  it.each([
+    { name: 'terminal', node: createTerminalNode('terminal-1', { x: 640, y: 360 }) },
+    { name: 'agent', node: createAgentNode('agent-1', { x: 640, y: 360 }) }
+  ])('keeps a deleted $name as an inert presentation-only center exit', ({ node }) => {
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [node],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes).toEqual([])
+    expect(projection.exitingNodes).toEqual([
+      expect.objectContaining({
+        id: node.id,
+        draggable: false,
+        selectable: false,
+        selected: false,
+        data: expect.objectContaining({
+          objectMotion: {
+            id: `delete:${node.id}`,
+            kind: 'delete',
+            offset: { x: 0, y: 0 },
+            scale: { from: 1, to: 0 }
+          }
+        })
+      })
+    ])
+  })
+
+  it('preserves an in-flight delete motion across unrelated graph projections', () => {
+    const terminal = createTerminalNode('terminal-1', { x: 640, y: 360 })
+    const deletingTerminal = {
+      ...terminal,
+      data: {
+        ...terminal.data,
+        objectMotion: {
+          id: 'delete:terminal-1:existing',
+          kind: 'delete' as const,
+          offset: { x: 0, y: 0 },
+          scale: { from: 1, to: 0 }
+        }
+      }
+    } as WorkbenchFlowNode
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [deletingTerminal],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: false
+    })
+
+    expect(projection.exitingNodes).toEqual([deletingTerminal])
+  })
+
+  it('does not retain deleted objects when reduced motion is requested', () => {
+    const terminal = createTerminalNode('terminal-1', { x: 640, y: 360 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [terminal],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: true
+    })
+
+    expect(projection).toEqual({ exitingNodes: [], nodes: [] })
   })
 
   it('does not replay creation motion while restoring the initial graph projection', () => {
@@ -412,6 +507,28 @@ function createTerminalNode(
     position,
     style: { height: 100, width: 200 },
     type: 'terminal'
+  } as unknown as WorkbenchFlowNode
+}
+
+function createAgentNode(
+  agentId: string,
+  position: { readonly x: number; readonly y: number }
+): WorkbenchFlowNode {
+  const id = `agent:${agentId}`
+  return {
+    data: {
+      agent: {
+        agentId,
+        layout: {
+          position,
+          size: { height: 360, width: 420 }
+        }
+      }
+    },
+    id,
+    position,
+    style: { height: 360, width: 420 },
+    type: 'agentConsole'
   } as unknown as WorkbenchFlowNode
 }
 

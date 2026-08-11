@@ -23,19 +23,31 @@ const themeStyles = readFileSync(
 )
 
 describe('workbench object motion styles', () => {
-  it('materializes new objects with clipping and opacity without animating terminal geometry', () => {
+  it('materializes terminals and Agents from their center without changing layout geometry', () => {
     const createKeyframes = readRule('@keyframes workbench-object-create-in')
     const accentKeyframes = readRule('@keyframes workbench-object-create-accent')
     const objectBaseRule = readRule(
-      ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
+      ':is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node)'
     )
+    const spatialMotionRule = readRule('.workbench-object-motion--spatial')
 
     expect(createKeyframes).toContain('opacity:')
     expect(createKeyframes).not.toContain('clip-path:')
     expect(accentKeyframes).toContain('clip-path:')
     expect(`${createKeyframes}${accentKeyframes}`).not.toMatch(/\b(width|height):/)
     expect(`${createKeyframes}${accentKeyframes}`).not.toContain('scale(')
-    expect(objectBaseRule).not.toContain('scale(')
+    expect(objectBaseRule).toContain('--workbench-object-motion-scale: 1;')
+    expect(objectMotionStyles).toContain('--workbench-object-motion-scale: 0;')
+    expect(spatialMotionRule).toContain('scale(var(--workbench-object-motion-scale))')
+    expect(objectMotionStyles).toContain(
+      '.terminal-group-node.workbench-object-motion--create::before'
+    )
+    expect(objectMotionStyles).not.toContain(
+      '.terminal-node.workbench-object-motion--create::before'
+    )
+    expect(objectMotionStyles).not.toContain(
+      '.agent-console-node.workbench-object-motion--create::before'
+    )
   })
 
   it('presents spring-driven group member paths without a competing CSS animation', () => {
@@ -143,7 +155,7 @@ describe('workbench object motion styles', () => {
 
   it('keeps ordinary pointer hover free of node transforms', () => {
     const objectBaseRule = readRule(
-      ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
+      ':is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node)'
     )
     const nodeRules = [
       readStyleRule(terminalNodeStyles, '.terminal-node'),

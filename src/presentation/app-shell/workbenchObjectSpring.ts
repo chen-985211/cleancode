@@ -35,12 +35,16 @@ const yProperty = '--workbench-object-motion-y'
 const opacityProperty = '--workbench-object-motion-opacity'
 const contentOpacityProperty = '--workbench-object-motion-content-opacity'
 const shellInsetProperty = '--workbench-object-motion-shell-inset'
+const scaleProperty = '--workbench-object-motion-scale'
 const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
 const disclosureSpringDynamics = { dampingRatio: 1, response: 0.32 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
+const presenceCreateSpringDynamics = { dampingRatio: 1, response: 0.34 }
+const presenceDeleteSpringDynamics = { dampingRatio: 1, response: 0.26 }
 const shellRevealInsetPercent = 8
 const positionSettlementThresholds = { speed: 1, value: 0.1 }
 const opacitySettlementThresholds = { speed: 0.02, value: 0.002 }
+const scaleSettlementThresholds = { speed: 0.02, value: 0.002 }
 
 const browserFrameScheduler: WorkbenchObjectSpringFrameScheduler = {
   cancelFrame: (frameId) => {
@@ -66,10 +70,12 @@ export function createWorkbenchObjectSpringController({
   let yAxis: SpringAxis = { value: 0, velocity: 0 }
   let opacityAxis: SpringAxis = { value: 1, velocity: 0 }
   let contentOpacityAxis: SpringAxis = { value: 1, velocity: 0 }
+  let scaleAxis: SpringAxis = { value: 1, velocity: 0 }
   let xTarget = 0
   let yTarget = 0
   let opacityTarget = 1
   let contentOpacityTarget = 1
+  let scaleTarget = 1
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
 
@@ -85,6 +91,7 @@ export function createWorkbenchObjectSpringController({
     surface.style.removeProperty(opacityProperty)
     surface.style.removeProperty(contentOpacityProperty)
     surface.style.removeProperty(shellInsetProperty)
+    surface.style.removeProperty(scaleProperty)
   }
 
   const present = (): void => {
@@ -93,6 +100,7 @@ export function createWorkbenchObjectSpringController({
     surface.style.setProperty(yProperty, `${round(yAxis.value)}px`)
     surface.style.setProperty(opacityProperty, `${round(opacityAxis.value)}`)
     surface.style.setProperty(contentOpacityProperty, `${round(contentOpacityAxis.value)}`)
+    surface.style.setProperty(scaleProperty, `${round(scaleAxis.value)}`)
     surface.style.setProperty(
       shellInsetProperty,
       `${round((1 - contentOpacityAxis.value) * shellRevealInsetPercent)}%`
@@ -133,17 +141,25 @@ export function createWorkbenchObjectSpringController({
       motion?.contentOpacity ? disclosureSpringDynamics : disclosureOpacityDynamics,
       elapsedSeconds
     )
+    scaleAxis = advanceSpringAxis(
+      scaleAxis,
+      scaleTarget,
+      motion?.kind === 'delete' ? presenceDeleteSpringDynamics : presenceCreateSpringDynamics,
+      elapsedSeconds
+    )
 
     if (
       isSpringAxisSettled(xAxis, xTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(yAxis, yTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(opacityAxis, opacityTarget, opacitySettlementThresholds) &&
-      isSpringAxisSettled(contentOpacityAxis, contentOpacityTarget, opacitySettlementThresholds)
+      isSpringAxisSettled(contentOpacityAxis, contentOpacityTarget, opacitySettlementThresholds) &&
+      isSpringAxisSettled(scaleAxis, scaleTarget, scaleSettlementThresholds)
     ) {
       xAxis = { value: xTarget, velocity: 0 }
       yAxis = { value: yTarget, velocity: 0 }
       opacityAxis = { value: opacityTarget, velocity: 0 }
       contentOpacityAxis = { value: contentOpacityTarget, velocity: 0 }
+      scaleAxis = { value: scaleTarget, velocity: 0 }
       present()
       complete()
       return
@@ -162,10 +178,12 @@ export function createWorkbenchObjectSpringController({
       velocity: 0
     }
     contentOpacityAxis = { value: nextMotion.contentOpacity?.from ?? 1, velocity: 0 }
+    scaleAxis = { value: nextMotion.scale?.from ?? 1, velocity: 0 }
     xTarget = collapsesToOffset ? nextMotion.offset.x : 0
     yTarget = collapsesToOffset ? nextMotion.offset.y : 0
     opacityTarget = nextMotion.opacity?.to ?? (collapsesToOffset ? 0 : 1)
     contentOpacityTarget = nextMotion.contentOpacity?.to ?? 1
+    scaleTarget = nextMotion.scale?.to ?? 1
   }
 
   const retargetMotion = (nextMotion: WorkbenchObjectMotion): void => {
@@ -186,6 +204,7 @@ export function createWorkbenchObjectSpringController({
     yTarget = collapsesToOffset ? nextMotion.offset.y : 0
     opacityTarget = nextMotion.opacity?.to ?? (collapsesToOffset ? 0 : 1)
     contentOpacityTarget = nextMotion.contentOpacity?.to ?? 1
+    scaleTarget = nextMotion.scale?.to ?? 1
     xAxis = retargetSpringAxis(xAxis, xTarget, 'preserve')
     yAxis = retargetSpringAxis(yAxis, yTarget, 'preserve')
     opacityAxis = retargetSpringAxis(opacityAxis, opacityTarget, 'preserve')
@@ -194,6 +213,7 @@ export function createWorkbenchObjectSpringController({
       : nextMotion.contentOpacity
         ? { value: nextMotion.contentOpacity.from, velocity: 0 }
         : retargetSpringAxis(contentOpacityAxis, contentOpacityTarget, 'preserve')
+    scaleAxis = retargetSpringAxis(scaleAxis, scaleTarget, 'toward-target-only')
   }
 
   return {
@@ -214,7 +234,7 @@ export function createWorkbenchObjectSpringController({
       onComplete = nextOnComplete
       if (!surface) return
 
-      if (!nextMotion || nextMotion.kind === 'create') {
+      if (!nextMotion || (nextMotion.kind === 'create' && !nextMotion.scale)) {
         cancelFrame()
         motion = null
         clearSurface()
@@ -233,6 +253,7 @@ export function createWorkbenchObjectSpringController({
         yAxis = { value: yTarget, velocity: 0 }
         opacityAxis = { value: opacityTarget, velocity: 0 }
         contentOpacityAxis = { value: contentOpacityTarget, velocity: 0 }
+        scaleAxis = { value: scaleTarget, velocity: 0 }
         present()
         complete()
         return
