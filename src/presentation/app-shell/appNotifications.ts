@@ -17,6 +17,11 @@ interface AppNotificationAction {
   readonly tone?: 'default' | 'danger'
 }
 
+interface AppNotificationActivation {
+  readonly label: string
+  readonly onClick: () => Promise<void> | void
+}
+
 export interface AppNotificationSource {
   readonly detail?: string
   readonly label: string
@@ -30,6 +35,7 @@ interface AppNotificationTitleStatus {
 export interface AppNotificationInput {
   readonly accessibleLabel?: string
   readonly action?: AppNotificationAction
+  readonly activation?: AppNotificationActivation
   readonly autoDismissMs?: number
   readonly identity?: AppNotificationIdentity
   readonly isActivity?: boolean

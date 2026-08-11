@@ -602,6 +602,7 @@ export const enMessages = {
   'notifications.dismiss': 'Dismiss “{title}” notification',
   'notifications.dismissTitle': 'Dismiss notification',
   'agentActivity.turnCompleted': 'Turn completed',
+  'agentActivity.focusSource': 'Focus {agentName} in {source}',
   'agentActivity.waitingInput': '{agentName} is waiting for input',
   'agentActivity.waitingApproval': '{agentName} is waiting for approval',
   'workflow.operationFailedTitle': 'Workflow action failed',

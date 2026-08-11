@@ -79,6 +79,33 @@ describe('branch workspace action notifications', () => {
     expect(new Set(occurrenceIds).size).toBe(4)
   })
 
+  it('reports whether a workspace selection was selected, failed, or superseded', async () => {
+    const workbench = createWorkbench()
+    const firstAttempt = createDeferred<ReturnType<typeof createWorkbench>>()
+    const secondAttempt = createDeferred<ReturnType<typeof createWorkbench>>()
+    const switchBranchWorkspace = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('switch failed'))
+      .mockImplementationOnce(() => firstAttempt.promise)
+      .mockImplementationOnce(() => secondAttempt.promise)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ switchBranchWorkspace })
+    })
+    const { result } = renderBranchWorkspaceActions(workbench, createNotifications())
+
+    await expect(
+      result.current.selectWorkspaceWithResult(workbench, 'feature-alpha')
+    ).resolves.toBe('failed')
+
+    const older = result.current.selectWorkspaceWithResult(workbench, 'feature-alpha')
+    const newer = result.current.selectWorkspaceWithResult(workbench, 'feature-beta')
+    secondAttempt.resolve(workbench)
+    await expect(newer).resolves.toBe('selected')
+    firstAttempt.resolve(workbench)
+    await expect(older).resolves.toBe('superseded')
+  })
+
   it('clears only the matching previous error when a new attempt succeeds', async () => {
     const workbench = createWorkbench()
     const switched = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')

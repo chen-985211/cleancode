@@ -33,7 +33,7 @@
   --notification-soft: var(--cc-primary-soft);
 
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   flex: 0 0 62px;
   width: 100%;
   height: 62px;
@@ -57,6 +57,43 @@
     background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     opacity var(--cc-motion-duration-surface) var(--cc-easing-enter),
     transform var(--cc-motion-duration-surface) var(--cc-easing-enter);
+}
+
+.notification-card__body {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.notification-card__body--interactive {
+  cursor: pointer;
+  transition:
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+.notification-card__body--interactive:hover {
+  background: var(--cc-surface-subtle);
+}
+
+.notification-card__body--interactive:active {
+  background: var(--notification-soft);
+}
+
+.notification-card__body--interactive:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--cc-primary-border);
 }
 
 .notification-card[data-surface-motion-state='closing'] {

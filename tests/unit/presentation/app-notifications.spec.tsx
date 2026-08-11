@@ -1,10 +1,16 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode, useRef } from 'react'
 
 import { NotificationProvider } from '../../../src/presentation/app-shell/NotificationProvider'
 import { useNotifications } from '../../../src/presentation/app-shell/useNotifications'
 
-function NotificationHarness({ onStop = async () => undefined }: { onStop?: () => Promise<void> }) {
+function NotificationHarness({
+  onActivate = () => undefined,
+  onStop = async () => undefined
+}: {
+  onActivate?: () => void
+  onStop?: () => Promise<void>
+}) {
   const { dismiss, notify, update } = useNotifications()
   const activityNotificationId = useRef<string | null>(null)
 
@@ -33,6 +39,22 @@ function NotificationHarness({ onStop = async () => undefined }: { onStop?: () =
         }
       >
         发送自动关闭通知
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          notify({
+            activation: {
+              label: '定位到 Agent 3',
+              onClick: onActivate
+            },
+            kind: 'success',
+            source: { label: 'pi · main' },
+            title: 'Agent 3'
+          })
+        }
+      >
+        发送可导航通知
       </button>
       <button
         type="button"
@@ -278,6 +300,35 @@ describe('app notifications', () => {
     expect(notification).toHaveAttribute('data-surface-motion-state', 'closing')
     fireEvent.transitionEnd(notification, { propertyName: 'transform' })
     expect(screen.queryByText('项目已同步')).not.toBeInTheDocument()
+  })
+
+  it('keeps notification navigation separate from trailing controls', () => {
+    const onActivate = vi.fn()
+    render(
+      <NotificationProvider>
+        <NotificationHarness onActivate={onActivate} />
+      </NotificationProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '发送可导航通知' }))
+
+    const notification = screen.getByRole('status')
+    const navigationButton = within(notification).getByRole('button', {
+      name: '定位到 Agent 3'
+    })
+    const dismissButton = within(notification).getByRole('button', {
+      name: '关闭“Agent 3”通知'
+    })
+
+    expect(navigationButton).toHaveClass('notification-card__body--interactive')
+    expect(navigationButton).toHaveAttribute('title', '定位到 Agent 3')
+    expect(navigationButton).not.toContainElement(dismissButton)
+
+    fireEvent.click(navigationButton)
+    expect(onActivate).toHaveBeenCalledOnce()
+
+    fireEvent.click(dismissButton)
+    expect(onActivate).toHaveBeenCalledOnce()
   })
 
   it('updates an existing notification in place and does not restore it after dismissal', async () => {

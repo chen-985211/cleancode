@@ -6,6 +6,7 @@ import type {
 } from '../../../src/contexts/agent/application/dto/AgentActivityProtocol'
 import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { AgentActivityObserver } from '../../../src/presentation/app-shell/AgentActivityObserver'
+import type { AgentActivityNavigationTarget } from '../../../src/presentation/app-shell/agentActivityNavigation'
 import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
 import { translate } from '../../../src/presentation/app-shell/i18n/messages'
 import { useI18n } from '../../../src/presentation/app-shell/i18n/useI18n'
@@ -212,6 +213,58 @@ describe('Agent activity notifications', () => {
     expect(screen.getByRole('status')).toHaveTextContent('cleancode · feat/notifications')
     expect(screen.getByRole('status')).not.toHaveTextContent('Codex')
     expect(screen.getByLabelText('Turn completed')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'Focus Agent 6 in cleancode · feat/notifications'
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('navigates completed cards to either a managed Agent or a terminal-launched Agent', async () => {
+    const onNavigate = vi.fn<(target: AgentActivityNavigationTarget) => void>()
+    const runtime = installAgentActivityRuntime([createSnapshot({ revision: 1, status: 'idle' })])
+    renderObserver(onNavigate)
+
+    await waitFor(() => expect(screen.getByTestId('agent-activity')).toHaveTextContent('idle'))
+    act(() =>
+      runtime.emitCompletion(
+        createCompletion({
+          agentName: 'Agent 6',
+          completionId: 'managed-completion',
+          terminal: { owner: { id: 'agent-6', kind: 'agent' } },
+          terminalRevision: 1
+        })
+      )
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '定位到 Agent 6（project · main）' }))
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      target: {
+        objectId: 'agent-6',
+        objectKind: 'agent',
+        projectId: 'project-1',
+        workspaceId: 'workspace-1'
+      }
+    })
+
+    act(() =>
+      runtime.emitCompletion(
+        createCompletion({
+          completionId: 'terminal-completion',
+          invocationId: 'terminal-invocation',
+          terminalRevision: 1
+        })
+      )
+    )
+    fireEvent.click(screen.getByRole('button', { name: '定位到 Agent（project · main）' }))
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      target: {
+        objectId: 'terminal-1',
+        objectKind: 'terminal',
+        projectId: 'project-1',
+        workspaceId: 'workspace-1'
+      }
+    })
   })
 
   it('updates a waiting card source after rename without creating or reviving an occurrence', async () => {
@@ -265,11 +318,11 @@ describe('Agent activity notifications', () => {
   })
 })
 
-function renderObserver() {
+function renderObserver(onNavigate: (target: AgentActivityNavigationTarget) => void = vi.fn()) {
   return render(
     <I18nProvider initialLocale="zh-CN">
       <NotificationProvider>
-        <AgentActivityObserver>
+        <AgentActivityObserver onNavigate={onNavigate}>
           <LocaleSwitcher />
           <AgentActivityProbe />
         </AgentActivityObserver>

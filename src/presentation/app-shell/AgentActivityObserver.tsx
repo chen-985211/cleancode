@@ -7,6 +7,7 @@ import type {
 } from '../../contexts/agent/application/dto/AgentActivityProtocol'
 import { AgentProviderIcon } from './AgentProviderIcon'
 import { AgentActivityStore, type AgentActivityNotificationProjection } from './agentActivityStore'
+import type { AgentActivityNavigationTarget } from './agentActivityNavigation'
 import { useI18n } from './i18n/useI18n'
 import { AgentActivityStoreContext } from './useAgentActivitySnapshots'
 import { useNotifications } from './useNotifications'
@@ -32,7 +33,12 @@ interface PublishedAgentActivityNotification {
 
 const publishedNotificationLimit = 256
 
-export function AgentActivityObserver({ children }: { readonly children: ReactNode }) {
+interface AgentActivityObserverProps {
+  readonly children: ReactNode
+  readonly onNavigate: (target: AgentActivityNavigationTarget) => void
+}
+
+export function AgentActivityObserver({ children, onNavigate }: AgentActivityObserverProps) {
   const [store] = useState(() => new AgentActivityStore())
   const notifications = useNotifications()
   const { t } = useI18n()
@@ -40,26 +46,28 @@ export function AgentActivityObserver({ children }: { readonly children: ReactNo
   const notificationsRef = useRef(notifications)
   const publishedNotificationsRef = useRef(new Map<string, PublishedAgentActivityNotification>())
   const providerCatalogRef = useRef(providerCatalog)
+  const navigateRef = useRef(onNavigate)
   const translateRef = useRef(t)
 
   useEffect(() => {
     notificationsRef.current = notifications
+    navigateRef.current = onNavigate
     providerCatalogRef.current = providerCatalog
     translateRef.current = t
-  }, [notifications, providerCatalog, t])
+  }, [notifications, onNavigate, providerCatalog, t])
 
   useEffect(() => {
     for (const [messageKey, published] of publishedNotificationsRef.current) {
       if (
         !notifications.update(
           published.id,
-          createNotificationInput(published.projection, t, providerCatalog)
+          createNotificationInput(published.projection, t, providerCatalog, onNavigate)
         )
       ) {
         publishedNotificationsRef.current.delete(messageKey)
       }
     }
-  }, [notifications, providerCatalog, t])
+  }, [notifications, onNavigate, providerCatalog, t])
 
   useEffect(() => {
     const api = resolveAgentActivityApi()
@@ -81,7 +89,8 @@ export function AgentActivityObserver({ children }: { readonly children: ReactNo
           notificationsRef.current,
           publishedNotificationsRef.current,
           translateRef.current,
-          providerCatalogRef.current
+          providerCatalogRef.current,
+          navigateRef.current
         )
       }
     }
@@ -138,7 +147,8 @@ function projectNotification(
   notifications: Notifications,
   publishedNotifications: Map<string, PublishedAgentActivityNotification>,
   t: Translate,
-  providerCatalog: AgentProviderCatalogState
+  providerCatalog: AgentProviderCatalogState,
+  onNavigate: (target: AgentActivityNavigationTarget) => void
 ): void {
   if (projection.type === 'attention_resolved') {
     const published = publishedNotifications.get(projection.messageKey)
@@ -150,7 +160,9 @@ function projectNotification(
   }
 
   if (projection.type === 'turn_completed') {
-    const id = notifications.notify(createNotificationInput(projection, t, providerCatalog))
+    const id = notifications.notify(
+      createNotificationInput(projection, t, providerCatalog, onNavigate)
+    )
     rememberPublishedNotification(
       publishedNotifications,
       projection.messageIdentity.key,
@@ -160,7 +172,9 @@ function projectNotification(
     return
   }
 
-  const id = notifications.notify(createNotificationInput(projection, t, providerCatalog))
+  const id = notifications.notify(
+    createNotificationInput(projection, t, providerCatalog, onNavigate)
+  )
   rememberPublishedNotification(
     publishedNotifications,
     projection.messageIdentity.key,
@@ -172,7 +186,8 @@ function projectNotification(
 function createNotificationInput(
   projection: Exclude<AgentActivityNotificationProjection, { type: 'attention_resolved' }>,
   t: Translate,
-  providerCatalog: AgentProviderCatalogState
+  providerCatalog: AgentProviderCatalogState,
+  onNavigate: (target: AgentActivityNavigationTarget) => void
 ) {
   const source = formatAgentActivitySource(projection.source, providerCatalog)
   const agentName = projection.source.agentName ?? 'Agent'
@@ -187,6 +202,13 @@ function createNotificationInput(
     accessibleLabel: [title, turnCompletedLabel, source.providerName, source.label]
       .filter(Boolean)
       .join(' — '),
+    activation: {
+      label: t('agentActivity.focusSource', { agentName, source: source.label }),
+      onClick: () =>
+        onNavigate({
+          target: projection.source.target
+        })
+    },
     identity: projection.messageIdentity,
     kind: isTurnCompleted ? ('success' as const) : ('warning' as const),
     leadingIcon: <AgentProviderIcon icon={source.providerIcon} />,

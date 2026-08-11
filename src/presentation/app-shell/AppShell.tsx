@@ -36,7 +36,7 @@ import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommi
 import { workbenchNodeTypes } from './workbenchNodeTypes'
 import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
-import { ignoreAppNotifications, type AppNotificationController } from './appNotifications'
+import { ignoreAppNotifications } from './appNotifications'
 import { AgentProviderStateProvider } from './AgentProviderStateProvider'
 import { resolveShortcutPlatform, type ShortcutPlatform } from './applicationShortcuts'
 import { createApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
@@ -64,9 +64,15 @@ import { useAppShellNodeDragActions } from './useAppShellNodeDragActions'
 import { useCanvasViewportActions } from './useCanvasViewportActions'
 import { useCanvasSelectionViewport } from './useCanvasSelectionViewport'
 import { ProjectSidebarToggle } from './ProjectSidebarToggle'
+import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
+import { useAgentActivityNotificationNavigation } from './useAgentActivityNotificationNavigation'
+import { useProjectSidebarVisibility } from './useProjectSidebarVisibility'
 
-type AppShellProps = { readonly notifications?: AppNotificationController }
-export function AppShell({ notifications = ignoreAppNotifications }: AppShellProps = {}) {
+export function AppShell({
+  agentActivityNavigationRequest = null,
+  notifications = ignoreAppNotifications,
+  onAgentActivityNavigationHandled = ignoreAgentActivityNavigationHandled
+}: AppShellProps = {}) {
   const isDesktopRuntime = Boolean(window.cleancode)
   const { t } = useI18n()
   const [workbenches, setWorkbenches] = useState<WorkbenchSnapshot[]>([])
@@ -77,7 +83,12 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null)
   const [hoveredTerminalBlockId, setHoveredTerminalBlockId] = useState<string | null>(null)
   const applicationSettings = useApplicationSettingsNavigation()
-  const [isProjectSidebarCollapsed, setIsProjectSidebarCollapsed] = useState(false)
+  const {
+    isProjectSidebarCollapsed,
+    projectSidebarToggleRef,
+    revealProjectSidebar,
+    toggleProjectSidebar
+  } = useProjectSidebarVisibility()
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
@@ -93,14 +104,6 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
   const [layoutCommitQueue] = useState(createWorkbenchNodeLayoutCommitQueue)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>(null)
   const canvasSizeRef = useRef({ width: 0, height: 0 })
-  const projectSidebarToggleRef = useRef<HTMLButtonElement | null>(null)
-  const toggleProjectSidebar = useCallback((): void => {
-    if (!isProjectSidebarCollapsed && document.activeElement?.closest('#project-sidebar')) {
-      projectSidebarToggleRef.current?.focus()
-    }
-    setIsProjectSidebarCollapsed((collapsed) => !collapsed)
-  }, [isProjectSidebarCollapsed])
-  const revealProjectSidebar = useCallback((): void => setIsProjectSidebarCollapsed(false), [])
   const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
     useWorkbenchGraphIndex(currentWorkbench)
   const currentTerminalBlockIds = useMemo(() => graph?.blocks.map((block) => block.id), [graph])
@@ -147,13 +150,10 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
   })
-  const activateWorkbenchNodeInputFromShortcut = useCallback(
-    (node: WorkbenchFlowNode): void => {
-      cancelPendingWorkbenchInputFocus()
-      activateWorkbenchNodeInput(node)
-    },
-    [cancelPendingWorkbenchInputFocus]
-  )
+  const activateWorkbenchNodeInputFromShortcut = (node: WorkbenchFlowNode): void => {
+    cancelPendingWorkbenchInputFocus()
+    activateWorkbenchNodeInput(node)
+  }
   const { launchCommandEditRequest, requestTerminalLaunchCommand } =
     useTerminalLaunchCommandRequest({
       currentWorkspace,
@@ -508,6 +508,16 @@ export function AppShell({ notifications = ignoreAppNotifications }: AppShellPro
     onRenameAgent: renameWorkspaceAgent,
     onResizeAgent: resizeWorkspaceAgent,
     onSelectAgent: workbenchNodeSelection.selectAgentFromTitle
+  })
+  useAgentActivityNotificationNavigation({
+    currentWorkbench,
+    focusWorkbenchNode,
+    nodeStore,
+    onHandled: onAgentActivityNavigationHandled,
+    reactFlowInstanceRef,
+    request: agentActivityNavigationRequest,
+    selectWorkspace: branchWorkspaceActions.selectWorkspaceWithResult,
+    workbenches
   })
   const blockTemplates = useBlockTemplateActions({
     currentWorkbench,

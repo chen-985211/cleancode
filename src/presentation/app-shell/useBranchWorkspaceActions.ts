@@ -40,6 +40,8 @@ interface PublishedWorkspaceActionError {
   readonly titleKey: WorkspaceActionTitleKey
 }
 
+export type WorkspaceSelectionResult = 'failed' | 'selected' | 'superseded'
+
 export function useBranchWorkspaceActions({
   currentWorkbench,
   notifications,
@@ -176,8 +178,11 @@ export function useBranchWorkspaceActions({
     [settleCurrentActionAttempt]
   )
 
-  const selectWorkspace = useCallback(
-    async (workbench: WorkbenchSnapshot, workspaceId: string): Promise<void> => {
+  const selectWorkspaceWithResult = useCallback(
+    async (
+      workbench: WorkbenchSnapshot,
+      workspaceId: string
+    ): Promise<WorkspaceSelectionResult> => {
       const key = createWorkspaceActionKey(workbench.project.id, 'select', workspaceId)
 
       if (currentWorkbench?.project.id === workbench.project.id) {
@@ -189,7 +194,7 @@ export function useBranchWorkspaceActions({
           const occurrenceId = beginSelectionAttempt(key)
           settleSelectionAttempt(key, occurrenceId)
           dismissPublishedActionError(key)
-          return
+          return 'selected'
         }
       }
 
@@ -201,15 +206,16 @@ export function useBranchWorkspaceActions({
           workspaceId
         })
 
-        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
+        if (!isCurrentSelectionAttempt(key, occurrenceId)) return 'superseded'
         if (switchedWorkbench) {
           window.dispatchEvent(new CustomEvent(manualWorkspaceSelectionBrowserEventName))
           clearCurrentBlockSelection()
           replaceWorkbench(switchedWorkbench)
         }
         if (settleSelectionAttempt(key, occurrenceId)) dismissPublishedActionError(key)
+        return switchedWorkbench ? 'selected' : 'failed'
       } catch (error) {
-        if (!isCurrentSelectionAttempt(key, occurrenceId)) return
+        if (!isCurrentSelectionAttempt(key, occurrenceId)) return 'superseded'
         currentSelectionAttemptRef.current = null
         publishActionError({
           error,
@@ -218,6 +224,7 @@ export function useBranchWorkspaceActions({
           occurrenceId,
           titleKey: 'workspaceAction.selectFailedTitle'
         })
+        return 'failed'
       }
     },
     [
@@ -230,6 +237,12 @@ export function useBranchWorkspaceActions({
       replaceWorkbench,
       settleSelectionAttempt
     ]
+  )
+  const selectWorkspace = useCallback(
+    async (workbench: WorkbenchSnapshot, workspaceId: string): Promise<void> => {
+      await selectWorkspaceWithResult(workbench, workspaceId)
+    },
+    [selectWorkspaceWithResult]
   )
 
   const createBranchWorkspace = useCallback(
@@ -369,7 +382,8 @@ export function useBranchWorkspaceActions({
     archiveBranchWorkspace,
     checkoutMainBranch,
     createBranchWorkspace,
-    selectWorkspace
+    selectWorkspace,
+    selectWorkspaceWithResult
   }
 }
 

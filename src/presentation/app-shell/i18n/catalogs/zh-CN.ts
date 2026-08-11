@@ -569,6 +569,7 @@ export const zhCNMessages = {
   'notifications.dismiss': '关闭“{title}”通知',
   'notifications.dismissTitle': '关闭通知',
   'agentActivity.turnCompleted': '本轮已完成',
+  'agentActivity.focusSource': '定位到 {agentName}（{source}）',
   'agentActivity.waitingInput': '{agentName} 等待输入',
   'agentActivity.waitingApproval': '{agentName} 等待审批',
   'workflow.operationFailedTitle': '流程操作失败',

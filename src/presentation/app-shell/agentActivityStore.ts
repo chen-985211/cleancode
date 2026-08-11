@@ -4,6 +4,10 @@ import type {
   TerminalAgentActivitySnapshot
 } from '../../contexts/agent/application/dto/AgentActivityProtocol'
 import type { AppNotificationIdentity } from './appNotifications'
+import {
+  createCanvasObjectIdentity,
+  type CanvasObjectIdentity
+} from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
 
 export type AgentActivityNotificationProjection =
   | {
@@ -28,6 +32,7 @@ interface AgentActivityNotificationSource {
   readonly projectDirectory: string
   readonly projectId: string
   readonly providerId: string
+  readonly target: CanvasObjectIdentity
   readonly workspaceDirectory: string
   readonly workspaceId: string
 }
@@ -192,6 +197,7 @@ function createSnapshotSource(
     projectDirectory: snapshot.terminal.projectDirectory,
     projectId: snapshot.terminal.projectId,
     providerId: invocation?.providerId ?? 'agent',
+    target: resolveNavigationTarget(snapshot.terminal),
     workspaceDirectory: snapshot.terminal.workspaceDirectory,
     workspaceId: snapshot.terminal.workspaceId
   }
@@ -206,9 +212,20 @@ function createIdentitySource(
     projectDirectory: identity.terminal.projectDirectory,
     projectId: identity.terminal.projectId,
     providerId: identity.providerId,
+    target: resolveNavigationTarget(identity.terminal),
     workspaceDirectory: identity.terminal.workspaceDirectory,
     workspaceId: identity.terminal.workspaceId
   }
+}
+
+function resolveNavigationTarget(terminal: AgentActivityTerminalScope): CanvasObjectIdentity {
+  const owner = terminal.owner ?? { id: terminal.blockId, kind: 'block' }
+  return createCanvasObjectIdentity({
+    objectId: owner.id,
+    objectKind: owner.kind === 'agent' ? 'agent' : 'terminal',
+    projectId: terminal.projectId,
+    workspaceId: terminal.workspaceId
+  })
 }
 
 function rememberBoundedIdentity(identities: Set<string>, identity: string, limit: number): void {

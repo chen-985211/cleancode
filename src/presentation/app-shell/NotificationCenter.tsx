@@ -19,7 +19,8 @@ import {
   completeNotificationStatusMotion,
   createNotificationStatusMotionState,
   synchronizeNotificationStatusMotion,
-  type NotificationStatusMotionLayer
+  type NotificationStatusMotionLayer,
+  type NotificationStatusMotionState
 } from './notificationStatusMotion'
 import { TooltipLabel } from './Tooltip'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
@@ -118,13 +119,53 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
       aria-atomic="true"
       {...presence.surfaceProps}
     >
+      <NotificationBody
+        notification={notification}
+        reducedMotion={reducedMotion}
+        status={status}
+        onStatusExitComplete={completeStatusLayer}
+      />
+      <div className="notification-card__controls">
+        {notification.action ? (
+          <NotificationActionButton action={notification.action} key={occurrenceKey} />
+        ) : null}
+        <TooltipLabel content={t('notifications.dismissTitle')}>
+          <button
+            className="notification-card__dismiss"
+            type="button"
+            aria-label={t('notifications.dismiss', {
+              title: notification.accessibleLabel ?? notification.title
+            })}
+            onClick={() => onDismiss(notification.id)}
+          >
+            <XIcon size={15} weight="bold" aria-hidden="true" />
+          </button>
+        </TooltipLabel>
+      </div>
+    </section>
+  )
+}
+
+function NotificationBody({
+  notification,
+  onStatusExitComplete,
+  reducedMotion,
+  status
+}: {
+  readonly notification: AppNotification
+  readonly onStatusExitComplete: (layerId: number) => void
+  readonly reducedMotion: boolean
+  readonly status: NotificationStatusMotionState
+}) {
+  const content = (
+    <>
       <span className="notification-card__icon" aria-hidden="true">
         {status.layers.map((layer) => (
           <NotificationStatusIconLayer
             key={layer.id}
             layer={layer}
             reducedMotion={reducedMotion}
-            onExitComplete={completeStatusLayer}
+            onExitComplete={onStatusExitComplete}
           />
         ))}
       </span>
@@ -163,24 +204,21 @@ function NotificationCard({ presentation, onDismiss, onExitComplete }: Notificat
           {notification.source ? <NotificationSource source={notification.source} /> : null}
         </div>
       </div>
-      <div className="notification-card__controls">
-        {notification.action ? (
-          <NotificationActionButton action={notification.action} key={occurrenceKey} />
-        ) : null}
-        <TooltipLabel content={t('notifications.dismissTitle')}>
-          <button
-            className="notification-card__dismiss"
-            type="button"
-            aria-label={t('notifications.dismiss', {
-              title: notification.accessibleLabel ?? notification.title
-            })}
-            onClick={() => onDismiss(notification.id)}
-          >
-            <XIcon size={15} weight="bold" aria-hidden="true" />
-          </button>
-        </TooltipLabel>
-      </div>
-    </section>
+    </>
+  )
+
+  return notification.activation ? (
+    <button
+      className="notification-card__body notification-card__body--interactive"
+      type="button"
+      aria-label={notification.activation.label}
+      title={notification.activation.label}
+      onClick={() => void notification.activation?.onClick()}
+    >
+      {content}
+    </button>
+  ) : (
+    <div className="notification-card__body">{content}</div>
   )
 }
 

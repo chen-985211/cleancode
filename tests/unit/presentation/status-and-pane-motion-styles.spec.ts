@@ -9,6 +9,7 @@ const applicationSettingsStyles = readStyles('application-settings.css')
 describe('status and pane motion styles', () => {
   it('keeps every notification on one fixed card geometry and surface', () => {
     const cardRule = readRule(notificationStyles, '.notification-card')
+    const bodyRule = readRule(notificationStyles, '.notification-card__body')
     const iconRule = readRule(notificationStyles, '.notification-card__icon')
     const dismissRule = readRule(notificationStyles, '.notification-card__dismiss')
     const actionRule = readRule(notificationStyles, '.notification-card__action')
@@ -26,6 +27,9 @@ describe('status and pane motion styles', () => {
     expect(cardRule).toContain('background: var(--cc-surface);')
     expect(cardRule).toContain('box-shadow: var(--cc-shadow-xs);')
     expect(cardRule).not.toContain('backdrop-filter')
+    expect(bodyRule).toContain('grid-template-columns: 24px minmax(0, 1fr);')
+    expect(bodyRule).toContain('background: transparent;')
+    expect(bodyRule).toContain('height: 100%;')
     expect(iconRule).toContain('width: 24px;')
     expect(iconRule).toContain('height: 24px;')
     expect(dismissRule).toContain('width: 24px;')
