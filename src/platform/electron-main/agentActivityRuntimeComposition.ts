@@ -136,7 +136,11 @@ export function createAgentActivityRuntime(input: {
     initializationGateway = gateway
     try {
       assertNotDisposed(disposed)
-      const environment = new TerminalAgentActivityEnvironmentService({ assets, signer })
+      const environment = new TerminalAgentActivityEnvironmentService({
+        assets,
+        platform: process.platform,
+        signer
+      })
       await environment.initialize(gateway.url)
       assertNotDisposed(disposed)
       const initialized = {

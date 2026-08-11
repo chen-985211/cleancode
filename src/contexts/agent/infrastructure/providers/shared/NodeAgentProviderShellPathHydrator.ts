@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { delimiter } from 'node:path'
+import { posix, win32 } from 'node:path'
 
 import type {
   AgentProviderDetectionEnvironmentPort,
@@ -25,7 +25,7 @@ export type AgentProviderShellPathProbe = (
 
 interface NodeAgentProviderShellPathHydratorOptions {
   readonly environment?: NodeJS.ProcessEnv
-  readonly platform?: NodeJS.Platform
+  readonly platform: NodeJS.Platform
   readonly probe?: AgentProviderShellPathProbe
   readonly timeoutMs?: number
 }
@@ -37,14 +37,16 @@ interface CachedHydration {
 
 export class NodeAgentProviderShellPathHydrator implements AgentProviderDetectionEnvironmentPort {
   private readonly environment: NodeJS.ProcessEnv
+  private readonly pathDelimiter: string
   private readonly platform: NodeJS.Platform
   private readonly probe: AgentProviderShellPathProbe
   private readonly timeoutMs: number
   private hydration: CachedHydration | null = null
 
-  constructor(options: NodeAgentProviderShellPathHydratorOptions = {}) {
+  constructor(options: NodeAgentProviderShellPathHydratorOptions) {
     this.environment = options.environment ?? process.env
-    this.platform = options.platform ?? process.platform
+    this.pathDelimiter = options.platform === 'win32' ? win32.delimiter : posix.delimiter
+    this.platform = options.platform
     this.probe = options.probe ?? startShellPathProbe
     this.timeoutMs = options.timeoutMs ?? defaultTimeoutMs
   }
@@ -84,8 +86,10 @@ export class NodeAgentProviderShellPathHydrator implements AgentProviderDetectio
 
     const output = await readProbeOutput(handle, this.timeoutMs)
     if (output === null) return
-    const segments = parseCapturedShellPath(output)
-    if (segments.length > 0) mergeShellPathSegments(this.environment, segments)
+    const segments = parseCapturedShellPath(output, this.pathDelimiter)
+    if (segments.length > 0) {
+      mergeShellPathSegments(this.environment, segments, this.pathDelimiter)
+    }
   }
 }
 
@@ -116,7 +120,7 @@ function readProbeOutput(
   })
 }
 
-function parseCapturedShellPath(output: string): readonly string[] {
+function parseCapturedShellPath(output: string, pathDelimiter: string): readonly string[] {
   const cleaned = output.replace(ansiEscapeSequence, '')
   const start = cleaned.indexOf(shellPathSentinel)
   if (start < 0) return []
@@ -128,7 +132,7 @@ function parseCapturedShellPath(output: string): readonly string[] {
   return [
     ...new Set(
       value
-        .split(delimiter)
+        .split(pathDelimiter)
         .map((segment) => segment.trim())
         .filter(Boolean)
     )
@@ -137,15 +141,16 @@ function parseCapturedShellPath(output: string): readonly string[] {
 
 function mergeShellPathSegments(
   environment: NodeJS.ProcessEnv,
-  shellSegments: readonly string[]
+  shellSegments: readonly string[],
+  pathDelimiter: string
 ): void {
-  const inheritedSegments = (environment.PATH ?? '').split(delimiter).filter(Boolean)
+  const inheritedSegments = (environment.PATH ?? '').split(pathDelimiter).filter(Boolean)
   const preferredSegments = [...new Set(shellSegments)]
   const preferred = new Set(preferredSegments)
   environment.PATH = [
     ...preferredSegments,
     ...inheritedSegments.filter((segment) => !preferred.has(segment))
-  ].join(delimiter)
+  ].join(pathDelimiter)
 }
 
 function startShellPathProbe(

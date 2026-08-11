@@ -13,7 +13,7 @@ interface TerminalAgentActivityEnvironmentServiceOptions {
   readonly assets: TerminalAgentTelemetryAssetPort
   readonly inheritedPath?: string
   readonly inheritedShell?: string
-  readonly platform?: NodeJS.Platform
+  readonly platform: NodeJS.Platform
   readonly signer: AgentHookIdentitySigner
 }
 
@@ -31,7 +31,7 @@ export class TerminalAgentActivityEnvironmentService {
   private readonly platform: NodeJS.Platform
 
   constructor(private readonly options: TerminalAgentActivityEnvironmentServiceOptions) {
-    this.platform = options.platform ?? process.platform
+    this.platform = options.platform
     this.path = this.platform === 'win32' ? win32 : posix
     this.inheritedPath =
       options.inheritedPath ?? readEnvironmentPath(process.env, this.platform) ?? ''

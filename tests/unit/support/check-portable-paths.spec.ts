@@ -88,6 +88,57 @@ describe('portable path quality gate', () => {
     }
   })
 
+  it('rejects ambient host separators in deterministic unit and contract tests', async () => {
+    const directory = await createFixtureRepository()
+
+    try {
+      await writeSourceFile(
+        directory,
+        'tests/unit/Bad.spec.ts',
+        [
+          "import { delimiter as hostDelimiter } from 'node:path'",
+          "expect(['/usr/bin', '/bin'].join(hostDelimiter)).toBe('/usr/bin:/bin')",
+          ''
+        ].join('\n')
+      )
+      await writeSourceFile(
+        directory,
+        'tests/contract/Bad.spec.ts',
+        [
+          "import * as hostPath from 'node:path'",
+          "expect(['workspace', 'state'].join(hostPath.sep)).toBe('workspace/state')",
+          ''
+        ].join('\n')
+      )
+      await writeSourceFile(
+        directory,
+        'tests/integration/Native.spec.ts',
+        [
+          "import { delimiter } from 'node:path'",
+          'expect(process.env.PATH?.split(delimiter)).toBeDefined()',
+          ''
+        ].join('\n')
+      )
+
+      expect(collectPortablePathViolations({ cwd: directory })).toEqual([
+        {
+          filePath: 'tests/contract/Bad.spec.ts',
+          line: 2,
+          rule: 'no-ambient-path-separator',
+          message: 'Use an explicit posix or win32 path API in deterministic tests.'
+        },
+        {
+          filePath: 'tests/unit/Bad.spec.ts',
+          line: 1,
+          rule: 'no-ambient-path-separator',
+          message: 'Use an explicit posix or win32 path API in deterministic tests.'
+        }
+      ])
+    } finally {
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
+
   it('allows path APIs, static fixtures, URLs, and explicitly normalized POSIX paths', async () => {
     const directory = await createFixtureRepository()
 

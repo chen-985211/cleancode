@@ -264,7 +264,7 @@ const updateAgentProviderPreferencesUseCase = new UpdateAgentProviderPreferences
 )
 const agentProviderAvailability = new AgentProviderAvailabilityService(
   agentProviderRegistry,
-  new NodeAgentProviderShellPathHydrator()
+  new NodeAgentProviderShellPathHydrator({ platform: process.platform })
 )
 const discoverCreatableAgentProvidersUseCase = new DiscoverCreatableAgentProvidersUseCase(
   agentProviderAvailability

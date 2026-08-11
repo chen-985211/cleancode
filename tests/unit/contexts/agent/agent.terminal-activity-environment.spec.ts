@@ -1,4 +1,4 @@
-import { delimiter } from 'node:path'
+import { posix } from 'node:path'
 
 import type { AgentActivityTerminalScope } from '../../../../src/contexts/agent/application/dto/AgentActivityProtocol'
 import { AgentHookIdentitySigner } from '../../../../src/contexts/agent/infrastructure/terminal-activity/AgentHookIdentitySigner'
@@ -24,6 +24,7 @@ describe('terminal Agent activity environment', () => {
       },
       inheritedPath: '/usr/local/bin:/usr/bin',
       inheritedShell: '/bin/zsh',
+      platform: 'linux',
       signer
     })
 
@@ -41,7 +42,7 @@ describe('terminal Agent activity environment', () => {
       CLEANCODE_AGENT_ACTIVITY_ORIGINAL_ZDOTDIR: '/user/zsh',
       CLEANCODE_AGENT_ACTIVITY_MANIFEST: '/state/agent-activity/gateway.json',
       EXISTING: 'value',
-      PATH: `/state/agent-activity/assets-v1/bin${delimiter}/custom/bin:/usr/bin`
+      PATH: `/state/agent-activity/assets-v1/bin${posix.delimiter}/custom/bin:/usr/bin`
     })
     expect(prepared.environment?.ELECTRON_RUN_AS_NODE).toBeUndefined()
     const encodedScope = prepared.environment?.CLEANCODE_AGENT_ACTIVITY_SCOPE

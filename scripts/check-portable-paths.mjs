@@ -84,6 +84,7 @@ function findFileViolations(cwd, filePath) {
   const violations = []
   const reportedPositions = new Set()
   const hasCanonicalPosixContract = declaresCanonicalPosixSeparator(sourceText)
+  const ambientPathObjects = collectAmbientPathObjects(sourceFile, filePath)
 
   function report(node, rule, message) {
     const position = node.getStart(sourceFile)
@@ -101,6 +102,15 @@ function findFileViolations(cwd, filePath) {
 
   function visit(node) {
     if (
+      isAmbientPathSeparatorImport(node, filePath) ||
+      isAmbientPathSeparatorAccess(node, ambientPathObjects)
+    ) {
+      report(
+        node,
+        'no-ambient-path-separator',
+        'Use an explicit posix or win32 path API in deterministic tests.'
+      )
+    } else if (
       ts.isTemplateExpression(node) &&
       hasManualTemplatePathSeparator(node, hasCanonicalPosixContract)
     ) {
@@ -128,6 +138,63 @@ function findFileViolations(cwd, filePath) {
 
   visit(sourceFile)
   return violations
+}
+
+function isAmbientPathSeparatorImport(node, filePath) {
+  if (!isDeterministicTest(filePath) || !ts.isImportDeclaration(node)) return false
+  if (!ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== 'node:path') {
+    return false
+  }
+
+  const namedBindings = node.importClause?.namedBindings
+  if (!namedBindings || !ts.isNamedImports(namedBindings)) return false
+  return namedBindings.elements.some((element) =>
+    ['delimiter', 'sep'].includes(element.propertyName?.text ?? element.name.text)
+  )
+}
+
+function collectAmbientPathObjects(sourceFile, filePath) {
+  if (!isDeterministicTest(filePath)) return new Set()
+  const bindings = new Set()
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue
+    if (
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      statement.moduleSpecifier.text !== 'node:path'
+    ) {
+      continue
+    }
+
+    const importClause = statement.importClause
+    if (importClause?.name) bindings.add(importClause.name.text)
+    if (importClause?.namedBindings && ts.isNamespaceImport(importClause.namedBindings)) {
+      bindings.add(importClause.namedBindings.name.text)
+    }
+  }
+
+  return bindings
+}
+
+function isAmbientPathSeparatorAccess(node, ambientPathObjects) {
+  if (ts.isPropertyAccessExpression(node)) {
+    return (
+      ts.isIdentifier(node.expression) &&
+      ambientPathObjects.has(node.expression.text) &&
+      ['delimiter', 'sep'].includes(node.name.text)
+    )
+  }
+  if (!ts.isElementAccessExpression(node) || !ts.isIdentifier(node.expression)) return false
+  const key = node.argumentExpression
+  return (
+    ambientPathObjects.has(node.expression.text) &&
+    ts.isStringLiteralLike(key) &&
+    ['delimiter', 'sep'].includes(key.text)
+  )
+}
+
+function isDeterministicTest(filePath) {
+  return filePath.startsWith('tests/unit/') || filePath.startsWith('tests/contract/')
 }
 
 function hasManualTemplatePathSeparator(node, hasCanonicalPosixContract) {
