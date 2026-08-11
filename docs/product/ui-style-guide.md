@@ -89,6 +89,8 @@ cleancode 是画布优先的本地开发工作台。应用自身的 chrome 应�
 
 高频紧凑工具条优先使用图标按钮，并提供 Tooltip、`aria-label` 或等效可访问名称。主要动作、破坏性确认和无法仅靠图标理解的动作使用可见文字。
 
+应用通知只使用一种卡片几何与表面样式：所有信息、活动、成功、警告和错误通知共享同一宽高、内边距、图标尺寸、关闭入口、不透明表面和贴边阴影，只通过语义色与图标区分类型。第一行表达对象或状态，第二行表达来源或摘要；超出单行的文字省略，但 Tooltip、`title` 或可访问名称必须保留全文。单一动作使用统一图标按钮，进入卡片最右侧固定控制轨并位于关闭按钮之前，不占用两行内容骨架；Tooltip、`title` 与可访问名称必须保留完整动作语义。Agent、工作流或其他生产者不得选择密度或复制另一套卡片样式。
+
 新增跨界面组件抽象前必须证明至少有两个真实调用方共享相同语义和交互。不得为了减少 CSS 或文件数量提前建立无明确职责的通用组件。
 
 第一方通用界面图标统一采用 Phosphor Icons（`@phosphor-icons/react`）。非画布消费者按具体图标的 CSR 路径导入，画布相关消费者进入下述 `WorkbenchIcons` 语义边界；不得重新引入 Lucide 或另一套并行的通用动作图标库。Provider 品牌图标、CleanCode MCP 标志和产品专属几何继续作为显式例外。
@@ -180,7 +182,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 锚定 surface 通过 `useOutsidePointerDismiss.ts` 统一接管外部 `pointerdown` 的关闭时序，不得在各组件的 document 冒泡监听器中自行关闭。关闭必须在捕获阶段同步提交，使 surface 在底层画布或控件处理同一次输入前已经进入 `closing` 与 `inert`。调用方必须显式选择输入所有权：画布上的临时菜单、选择器、状态面板和就地表单使用 consume 策略，接管该次指针及其兼容事件直到序列结束，不能把同一次按下、抬起或点击泄漏给 React Flow；只有产品明确要求一次手势同时激活外部目标时才使用 passthrough。拥有可见层级边界的菜单或模态 surface 仍可使用专用 dismiss layer 或 coordinator。输入所有权不改变退出 spring、DOM 保留或快速反向规则。
 
-同一 Notification 的运行状态更新由 `notificationStatusMotion.ts` 保留旧状态视觉层并交接到最新状态；spinner 与结果图标的短位移、缩放和透明度由临界阻尼 spring 同步投影，标题与颜色只做短交叉淡化，不能让文字产生装饰性回弹。图标 spring 收敛后才释放旧视觉层；只有最新层保留在可访问树，连续更新继续追加最新事实并让在途层从当前 presentation 退出。`prefers-reduced-motion` 下直接投影最新状态，停止 spinner，但进行中语义继续由静态图标、文字和可访问状态表达。
+同一 Notification 的运行状态更新由 `notificationStatusMotion.ts` 保留旧状态视觉层并交接到最新状态；spinner 与结果图标的短位移、缩放和透明度由临界阻尼 spring 同步投影，标题与颜色只做短交叉淡化，不能让文字产生装饰性回弹。图标 spring 收敛后才释放旧视觉层；只有最新层保留在可访问树，连续更新继续追加最新事实并让在途层从当前 presentation 退出。可导航消息把图标和两行内容放进一个真实、透明的正文按钮，最右侧动作与关闭按钮仍是外层卡片的兄弟控件；不得在 section 上伪造 button role、形成嵌套按钮或增加第二层常驻底板。正文 hover 只使用轻微表面色，focus-visible 使用不改变几何的内嵌焦点环，active 不缩放卡片或内容。`prefers-reduced-motion` 下直接投影最新状态，停止 spinner，但进行中语义继续由静态图标、文字和可访问状态表达。
 
 应用右上角的收藏、语言、主题和设置入口属于同一组 utility button；按下必须在当前帧提供共同的短位移与缩放反馈，松开后由无回弹的临界阻尼 spring 从当前 presentation 恢复。触发后的 surface 同样必须表达来源：收藏与主题 Drawer 从所属右侧边缘进入并沿原路径退出，设置全屏表面从右侧短距离进入并退回，语言菜单从按钮的右下锚点生长并缩回。surface 的位移、缩放和透明度由同一条可反向的临界阻尼 spring 协调，不能在 JavaScript presentation 外再叠加 CSS transform transition。鼠标、触控笔与键盘激活必须复用同一反馈，非主按钮不得触发按压态；`prefers-reduced-motion` 下仍保留即时状态反馈，但直接投影静止端点。
 

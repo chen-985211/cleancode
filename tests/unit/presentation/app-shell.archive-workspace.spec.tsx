@@ -4,6 +4,7 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { NotifiedAppShell } from '../../fixtures/presentation/NotifiedAppShell'
 import { createClientAppError } from '../../../src/shared-kernel/application/errors/AppError'
 import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 
@@ -158,7 +159,7 @@ describe('app shell worktree archive', () => {
       })
     })
 
-    render(<AppShell />)
+    render(<NotifiedAppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '打开 test 工作区菜单' }))
@@ -167,10 +168,14 @@ describe('app shell worktree archive', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '归档工作区' }))
     fireEvent.transitionEnd(dialog, { propertyName: 'opacity' })
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('工作区有未提交更改，无法归档。')
+    const notificationViewport = await screen.findByLabelText('通知')
+    expect(within(notificationViewport).getByRole('alert')).toHaveTextContent(
+      '工作区有未提交更改，无法归档。'
+    )
+    expect(document.querySelector('.project-sidebar-alert')).toBeNull()
     expect(within(projectCard).getByRole('button', { name: 'test 独立工作区' })).toBeEnabled()
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭提示' }))
+    fireEvent.click(within(notificationViewport).getByRole('button', { name: /关闭.*通知/ }))
 
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   })

@@ -9,6 +9,7 @@ import type { ManagedServiceLauncher } from '../../../src/contexts/run/applicati
 import type { ManagedServiceOwnerResolver } from '../../../src/platform/electron-main/managedServiceOwnerResolver'
 import { createRunRuntime } from '../../../src/platform/electron-main/runRuntimeComposition'
 import type { PersistentTerminalProviderClientOptions } from '../../../src/contexts/run/infrastructure/provider/PersistentTerminalProviderClient'
+import type { TerminalLaunchEnvironmentPreparationPort } from '../../../src/contexts/run/application/ports/TerminalLaunchEnvironmentPreparationPort'
 
 const electronMocks = vi.hoisted(() => ({
   getAllWindows: vi.fn(),
@@ -44,6 +45,15 @@ describe('Run runtime composition', () => {
     expect(readProviderOptions(runtime.sessions).resolveLaunchTarget).toBe(
       resolveTerminalProviderLaunchTarget
     )
+  })
+
+  it('injects optional interactive terminal environment preparation into the session boundary', () => {
+    const launchEnvironmentPreparation: TerminalLaunchEnvironmentPreparationPort = {
+      prepare: vi.fn(async (command) => command)
+    }
+    const runtime = createRuntime(async () => null, undefined, launchEnvironmentPreparation)
+
+    expect(readLaunchEnvironmentPreparation(runtime.sessions)).toBe(launchEnvironmentPreparation)
   })
 
   it('starts behind the runtime reconciliation gate and publishes each availability epoch', () => {
@@ -118,16 +128,28 @@ function createRuntime(
   resolveManagedServiceOwner: ManagedServiceOwnerResolver = async () => null,
   resolveTerminalProviderLaunchTarget?: NonNullable<
     PersistentTerminalProviderClientOptions['resolveLaunchTarget']
-  >
+  >,
+  launchEnvironmentPreparation?: TerminalLaunchEnvironmentPreparationPort
 ): ReturnType<typeof createRunRuntime> {
   return createRunRuntime({
     appStateDirectory: '/tmp/cleancode-runtime-composition-test',
     launchPlans: unusedLaunchPlans,
+    launchEnvironmentPreparation,
     resolveManagedServiceOwner,
     resolveTerminalProviderLaunchTarget,
     scopeValidation: { validate: async () => undefined },
     workflowPlans: unusedWorkflowPlans
   })
+}
+
+function readLaunchEnvironmentPreparation(
+  sessions: unknown
+): TerminalLaunchEnvironmentPreparationPort | undefined {
+  return (
+    sessions as {
+      readonly launchEnvironmentPreparation?: TerminalLaunchEnvironmentPreparationPort
+    }
+  ).launchEnvironmentPreparation
 }
 
 function readProviderOptions(sessions: unknown): PersistentTerminalProviderClientOptions {

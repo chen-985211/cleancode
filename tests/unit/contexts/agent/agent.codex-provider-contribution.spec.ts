@@ -303,6 +303,7 @@ describe('Codex Agent Provider contribution', () => {
 
   it('relays both legacy argv notifications and SessionEnd stdin before the relay exits', async () => {
     const identified = vi.fn()
+    const completed = vi.fn()
     const resolveHookTrust = vi.fn(async (input: CodexSessionEndHookTrustInput) => {
       void input
       return null
@@ -314,6 +315,7 @@ describe('Codex Agent Provider contribution', () => {
     const artifacts = new AgentLaunchArtifactScope()
     const plan = await contribution.launcher.createLaunchPlan({
       artifacts,
+      onTurnCompleted: completed,
       onProviderSessionIdentified: identified,
       workspaceDirectory: process.cwd()
     })
@@ -345,6 +347,7 @@ describe('Codex Agent Provider contribution', () => {
         kind: 'codex-thread',
         value: '0190d8a1-8b7d-7d75-9f62-7a663ef87e33'
       })
+      expect(completed).toHaveBeenCalledOnce()
 
       await runRelay(notifyCommand, plan.env, {
         stdinPayload: JSON.stringify({
@@ -358,6 +361,7 @@ describe('Codex Agent Provider contribution', () => {
         kind: 'codex-thread',
         value: '0290d8a1-8b7d-7d75-9f62-7a663ef87e44'
       })
+      expect(completed).toHaveBeenCalledOnce()
     } finally {
       await artifacts.dispose()
     }

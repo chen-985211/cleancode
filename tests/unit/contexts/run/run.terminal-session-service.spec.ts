@@ -4,6 +4,7 @@ import { RunLifecycleService } from '../../../../src/contexts/run/application/us
 import { TerminalSessionService } from '../../../../src/contexts/run/application/use-cases/TerminalSessionService'
 import type { TerminalProcessPort } from '../../../../src/contexts/run/application/ports/TerminalProcessPort'
 import type { RunRuntimeScopeValidationPort } from '../../../../src/contexts/run/application/ports/RunRuntimeScopeValidationPort'
+import type { TerminalLaunchEnvironmentPreparationPort } from '../../../../src/contexts/run/application/ports/TerminalLaunchEnvironmentPreparationPort'
 import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
 describe('terminal session service', () => {
@@ -111,6 +112,76 @@ describe('terminal session service', () => {
 
     expect(replacement.generation).toBe(2)
     expect(terminalProcessPort.starts).toHaveLength(1)
+  })
+
+  it('prepares an explicitly opted-in interactive terminal after its run identity exists', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const prepare = vi.fn<TerminalLaunchEnvironmentPreparationPort['prepare']>(async (command) => ({
+      environment: { ...command.environment, CLEANCODE_AGENT_ACTIVITY: 'enabled' },
+      launchCommand: command.launchCommand,
+      shell: '/private/activity-shell'
+    }))
+    const service = new TerminalSessionService(
+      terminalProcessPort,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { prepare }
+    )
+
+    const session = await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      agentActivityIntegration: true,
+      environment: { EXISTING: 'value' },
+      terminalBlockId: 'block-1',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    expect(prepare).toHaveBeenCalledWith({
+      environment: { EXISTING: 'value' },
+      launchCommand: undefined,
+      launchMode: undefined,
+      shell: '/bin/sh',
+      scope: expect.objectContaining({
+        blockId: 'block-1',
+        generation: 1,
+        projectId: 'project-app',
+        runId: session.runId,
+        sessionId: session.sessionId,
+        workspaceId: 'main'
+      }),
+      sessionKind: 'interactive',
+      workingDirectory: '/work/app'
+    })
+    expect(terminalProcessPort.starts[0]?.environment).toMatchObject({
+      CLEANCODE_AGENT_ACTIVITY: 'enabled',
+      EXISTING: 'value'
+    })
+    expect(terminalProcessPort.starts[0]?.shell).toBe('/private/activity-shell')
+  })
+
+  it('does not prepare terminal launch environments without an explicit capability opt-in', async () => {
+    const terminalProcessPort = new RecordingTerminalProcessPort()
+    const prepare = vi.fn<TerminalLaunchEnvironmentPreparationPort['prepare']>()
+    const service = new TerminalSessionService(
+      terminalProcessPort,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { prepare }
+    )
+
+    await service.start({
+      ...runOwner('/work/app', 'project-app'),
+      terminalBlockId: 'block-1',
+      onOutput: () => undefined,
+      onExit: () => undefined
+    })
+
+    expect(prepare).not.toHaveBeenCalled()
   })
 
   it('reports a failed terminal instead of pretending a process is running', async () => {

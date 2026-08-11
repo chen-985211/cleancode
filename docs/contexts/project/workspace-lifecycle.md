@@ -94,6 +94,8 @@ Git worktree 是否锁定及锁定原因属于真实 Git 的瞬时状态，不�
 
 Renderer 发起自动同步时必须绑定请求开始时的 workbench 快照；响应返回前只要当前 workbench 已被终端图修改、Agent 布局、手动工作区切换或其他动作替换，就丢弃该响应并等待下一轮同步。后台读取不得用陈旧的整份 workbench 覆盖较新的图或当前工作区状态。
 
+应用消息中的显式来源定位复用同一工作区选择 attempt 与稳定 `projectId + workspaceId`，不得另建绕过选择 fencing 的切换路径。选择调用必须向定位协调器区分 `selected / superseded / failed`：只有当前 attempt 的成功结果可以继续等待目标画布投影；失败或被侧栏、快捷键等更新选择取代时立即结清定位请求，不能在用户以后进入该工作区时迟到转移焦点。
+
 Agent 运行时如何按稳定工作区身份复用，见 [Agent 与会话生命周期](../agent/agent-session.md)；Run 的精确作用域、硬清理和端口资源语义见[终端会话生命周期](../run/terminal-session.md)与[本地服务端口治理](../run/service-port-management.md)。
 
 ## 状态与持久化

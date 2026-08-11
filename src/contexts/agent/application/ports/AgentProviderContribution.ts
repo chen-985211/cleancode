@@ -130,6 +130,7 @@ export interface CreateAgentLaunchPlanCommand {
   readonly launchProfile?: AgentProviderLaunchProfile
   readonly onActivityChanged?: (activity: AgentActivityStatus) => void
   readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+  readonly onTurnCompleted?: () => void
   readonly providerSessionRef?: ProviderSessionRefSnapshot
   readonly workspaceDirectory: string
 }
@@ -162,6 +163,7 @@ export interface AgentTelemetryContribution {
     readonly artifacts: AgentLaunchArtifactRegistrar
     readonly onActivityChanged?: (activity: AgentActivityStatus) => void
     readonly onProviderSessionIdentified: (sessionRef: ProviderSessionRefSnapshot) => void
+    readonly onTurnCompleted?: () => void
     readonly workspaceDirectory: string
   }): Promise<{
     readonly args: readonly string[]

@@ -19,6 +19,7 @@ export class CodexThreadIdentityReporter {
   private constructor(
     private readonly server: Server,
     private readonly onThreadIdentified: (threadId: string) => void,
+    private readonly onTurnCompleted: () => void,
     private readonly resolveThreadIdPrefix: CodexThreadIdPrefixResolver,
     readonly token: string,
     readonly url: string
@@ -26,6 +27,7 @@ export class CodexThreadIdentityReporter {
 
   static async start(input: {
     readonly onThreadIdentified: (threadId: string) => void
+    readonly onTurnCompleted?: () => void
     readonly resolveThreadIdPrefix?: CodexThreadIdPrefixResolver
   }): Promise<CodexThreadIdentityReporter> {
     const token = randomBytes(24).toString('hex')
@@ -45,6 +47,7 @@ export class CodexThreadIdentityReporter {
         const notification = parseNotification(body)
         const threadId = readCodexThreadId(notification)
         if (threadId) reporter?.acceptReportedThreadId(threadId)
+        if (notification?.type === 'agent-turn-complete') reporter?.onTurnCompleted()
 
         response.writeHead(204).end()
       })
@@ -73,6 +76,7 @@ export class CodexThreadIdentityReporter {
     reporter = new CodexThreadIdentityReporter(
       server,
       input.onThreadIdentified,
+      input.onTurnCompleted ?? (() => undefined),
       input.resolveThreadIdPrefix ?? (async () => null),
       token,
       `http://127.0.0.1:${address.port}/codex-thread`

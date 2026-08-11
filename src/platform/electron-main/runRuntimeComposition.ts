@@ -1,9 +1,12 @@
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { BrowserWindow, shell } from 'electron'
 
 import type { RunRuntimeScopeValidationPort } from '../../contexts/run/application/ports/RunRuntimeScopeValidationPort'
 import type { TerminalLaunchPlanPort } from '../../contexts/run/application/ports/TerminalLaunchPlanPort'
+import type { TerminalLaunchEnvironmentPreparationPort } from '../../contexts/run/application/ports/TerminalLaunchEnvironmentPreparationPort'
+import type { TerminalSessionLifecycleObserverPort } from '../../contexts/run/application/ports/TerminalSessionLifecycleObserverPort'
 import type { TerminalWorkflowEvent } from '../../contexts/run/application/ports/TerminalWorkflowEventPublisherPort'
 import type { TerminalWorkflowPlanPort } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
 import { LocalPortAllocator } from '../../contexts/run/application/services/LocalPortAllocator'
@@ -34,8 +37,12 @@ import { createRunLifecycleAdapters } from './runLifecycleAdapters'
 import type { ManagedServiceOwnerResolver } from './managedServiceOwnerResolver'
 import { projectTerminalPortConflict } from './terminalPortConflictProjection'
 
+const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
+
 export function createRunRuntime(input: {
   readonly appStateDirectory: string
+  readonly launchEnvironmentPreparation?: TerminalLaunchEnvironmentPreparationPort
+  readonly terminalSessionLifecycleObserver?: TerminalSessionLifecycleObserverPort
   readonly launchPlans: TerminalLaunchPlanPort
   readonly resolveManagedServiceOwner: ManagedServiceOwnerResolver
   readonly resolveTerminalProviderLaunchTarget?: NonNullable<
@@ -47,7 +54,7 @@ export function createRunRuntime(input: {
   const lifecycle = new RunLifecycleService({ initialRuntimePhase: 'initializing' })
   const terminalProvider = new PersistentTerminalProviderClient({
     stateDirectory: join(input.appStateDirectory, 'terminal-runtime-provider'),
-    providerEntryPath: join(__dirname, 'terminal-runtime-provider.js'),
+    providerEntryPath: join(mainModuleDirectory, 'terminal-runtime-provider.js'),
     resolveLaunchTarget: input.resolveTerminalProviderLaunchTarget,
     onBackgroundError: logProviderError,
     onRuntimeUnavailable: () =>
@@ -59,7 +66,9 @@ export function createRunRuntime(input: {
     input.scopeValidation,
     lifecycle,
     terminalProvider,
-    terminalProvider
+    terminalProvider,
+    input.launchEnvironmentPreparation,
+    input.terminalSessionLifecycleObserver
   )
   const readiness = new NodeTcpReadinessAdapter()
   const leases = new ServicePortLeaseRegistry()

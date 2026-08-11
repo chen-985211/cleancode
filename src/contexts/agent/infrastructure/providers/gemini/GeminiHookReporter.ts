@@ -3,6 +3,7 @@ import { realpath } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
 import { resolve } from 'node:path'
 
+import type { AgentActivityStatus } from '../../../application/dto/AgentSessionProtocol'
 import type { AgentRuntimeArtifact } from '../../../application/ports/AgentProviderContribution'
 
 interface GeminiHookPayload {
@@ -19,6 +20,7 @@ export class GeminiHookReporter implements AgentRuntimeArtifact {
   ) {}
 
   static async start(input: {
+    readonly onActivityChanged: (activity: AgentActivityStatus) => void
     readonly onSessionIdentified: (sessionId: string) => void
     readonly workspaceDirectory: string
   }): Promise<GeminiHookReporter> {
@@ -51,14 +53,19 @@ export class GeminiHookReporter implements AgentRuntimeArtifact {
         const payload = parsePayload(body)
         if (
           payload &&
-          payload.hook_event_name === 'SessionStart' &&
           isUuid(payload.session_id) &&
           typeof payload.cwd === 'string' &&
-          (await resolveRealPath(payload.cwd)) === expectedDirectory &&
-          payload.session_id !== lastReportedSessionId
+          (await resolveRealPath(payload.cwd)) === expectedDirectory
         ) {
-          lastReportedSessionId = payload.session_id
-          input.onSessionIdentified(payload.session_id)
+          if (
+            payload.hook_event_name === 'SessionStart' &&
+            payload.session_id !== lastReportedSessionId
+          ) {
+            lastReportedSessionId = payload.session_id
+            input.onSessionIdentified(payload.session_id)
+          }
+          const activity = mapActivity(payload.hook_event_name)
+          if (activity) input.onActivityChanged(activity)
         }
         response.writeHead(204).end()
       })
@@ -81,6 +88,13 @@ export class GeminiHookReporter implements AgentRuntimeArtifact {
   async dispose(): Promise<void> {
     await new Promise<void>((resolveClosed) => this.server.close(() => resolveClosed()))
   }
+}
+
+function mapActivity(hookEventName: unknown): AgentActivityStatus | null {
+  if (hookEventName === 'BeforeAgent') return 'working'
+  if (hookEventName === 'AfterAgent' || hookEventName === 'SessionStart') return 'idle'
+  if (hookEventName === 'SessionEnd') return 'unavailable'
+  return null
 }
 
 function parsePayload(body: string): GeminiHookPayload | null {

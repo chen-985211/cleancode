@@ -1,20 +1,50 @@
+import type { ReactNode } from 'react'
+
 export type AppNotificationKind = 'info' | 'success' | 'warning' | 'error'
+
+export interface AppNotificationIdentity {
+  readonly key: string
+  readonly occurrenceId: string
+  readonly revision?: number
+}
 
 interface AppNotificationAction {
   readonly disabled?: boolean
+  readonly icon: 'retry' | 'stop'
   readonly label: string
   readonly onClick: () => Promise<void> | void
   readonly pendingLabel?: string
   readonly tone?: 'default' | 'danger'
 }
 
+interface AppNotificationActivation {
+  readonly label: string
+  readonly onClick: () => Promise<void> | void
+}
+
+export interface AppNotificationSource {
+  readonly detail?: string
+  readonly label: string
+}
+
+interface AppNotificationTitleStatus {
+  readonly icon: ReactNode
+  readonly label: string
+}
+
 export interface AppNotificationInput {
+  readonly accessibleLabel?: string
   readonly action?: AppNotificationAction
+  readonly activation?: AppNotificationActivation
   readonly autoDismissMs?: number
+  readonly identity?: AppNotificationIdentity
   readonly isActivity?: boolean
   readonly kind: AppNotificationKind
+  readonly leadingIcon?: ReactNode
   readonly message?: string
+  readonly source?: AppNotificationSource
   readonly title: string
+  readonly titleStatus?: AppNotificationTitleStatus
 }
 
 export interface AppNotification extends AppNotificationInput {

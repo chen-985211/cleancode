@@ -160,6 +160,54 @@ describe('Agent console attach lifecycle', () => {
       sessionId: 'second-session'
     })
   })
+
+  it('sends a running Agent rename as metadata without attaching another launch', async () => {
+    const workbench = createWorkbenchSnapshot('/repo/app', 'app')
+    const agent = {
+      agentId: 'agent-1',
+      cleancodeMcpEnabled: true,
+      layout: { position: { x: 320, y: 140 }, size: { height: 520, width: 440 } },
+      name: 'Agent 1',
+      projectId: workbench.project.id,
+      providerId: 'codex',
+      workspaceId: workbench.project.workspaces[0]!.workspaceId
+    }
+    const attachAgentSession = vi.fn(async () =>
+      createAgentSessionSnapshot({ agentId: agent.agentId, sessionId: 'running-session' })
+    )
+    const updateAgentSessionMetadata = vi.fn(async () => true)
+    Object.defineProperty(window, 'cleancode', {
+      configurable: true,
+      value: createRuntimeApi({ attachAgentSession, updateAgentSessionMetadata })
+    })
+
+    const { rerender } = render(
+      <AgentConsole
+        agent={agent}
+        currentWorkbench={workbench}
+        currentWorkspace={workbench.project.workspaces[0]}
+      />
+    )
+    await waitFor(() => expect(attachAgentSession).toHaveBeenCalledOnce())
+    expect(updateAgentSessionMetadata).not.toHaveBeenCalled()
+
+    rerender(
+      <AgentConsole
+        agent={{ ...agent, name: 'Renamed Agent' }}
+        currentWorkbench={workbench}
+        currentWorkspace={workbench.project.workspaces[0]}
+      />
+    )
+
+    await waitFor(() =>
+      expect(updateAgentSessionMetadata).toHaveBeenCalledWith({
+        agentId: 'agent-1',
+        agentName: 'Renamed Agent',
+        sessionId: 'running-session'
+      })
+    )
+    expect(attachAgentSession).toHaveBeenCalledOnce()
+  })
 })
 
 function deferred<T>() {

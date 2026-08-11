@@ -43,12 +43,17 @@ import type {
   StartTerminalSessionCommand,
   TerminalViewIdentityCommand
 } from './TerminalSessionCommands'
+import type { TerminalLaunchEnvironmentPreparationPort } from '../ports/TerminalLaunchEnvironmentPreparationPort'
 import {
+  acceptTerminalFallbackOutput,
   assertCurrentTerminalViewIdentity,
   createTerminalSessionId,
   createTerminalSessionOwner,
   enqueueTerminalSlotOperation,
   getTerminalSessionErrorMessage,
+  listTerminalSessionSnapshots,
+  observeTerminalEnded,
+  prepareTerminalSessionLaunch,
   readTerminalModelDiagnostics,
   requireTerminalModelPort,
   settleTerminalViewRelease,
@@ -78,7 +83,9 @@ export class TerminalSessionService {
     private readonly scopeValidation: RunRuntimeScopeValidationPort = noopRunRuntimeScopeValidationPort,
     private readonly lifecycle?: RunLifecycleService,
     private readonly terminalModelPort?: TerminalModelPort,
-    private readonly runtimeProvider?: TerminalRuntimeProviderPort
+    private readonly runtimeProvider?: TerminalRuntimeProviderPort,
+    private readonly launchEnvironmentPreparation?: TerminalLaunchEnvironmentPreparationPort,
+    private readonly lifecycleObserver?: Parameters<typeof observeTerminalEnded>[0]
   ) {
     this.foregroundJobCoordinator = new TerminalForegroundJobCoordinator(
       terminalProcessPort,
@@ -170,8 +177,7 @@ export class TerminalSessionService {
       }
       this.runtimeProvider.bindRecoveredSession(session.scope, {
         onOutput: (event) => {
-          if (!this.isCurrentRunningSession(slotKey, session) || event.sequence === undefined)
-            return
+          if (!this.isCurrentSession(slotKey, session) || event.sequence === undefined) return
           callbacks.onOutput({ ...event, sequence: event.sequence })
         },
         onExit: (event) => {
@@ -180,6 +186,7 @@ export class TerminalSessionService {
           if (this.sessionIdsBySlot.get(slotKey) === session.id) {
             this.sessionIdsBySlot.delete(slotKey)
           }
+          if (wasCurrent) observeTerminalEnded(this.lifecycleObserver, session.scope)
           if (wasCurrent) callbacks.onExit(event)
         }
       })
@@ -211,14 +218,11 @@ export class TerminalSessionService {
   }
 
   listSessions(sessionIds: readonly string[]): TerminalSessionSnapshot[] {
-    return sessionIds.flatMap((sessionId) => {
-      const session = this.sessions.get(sessionId)
-      return session ? [session.toSnapshot()] : []
-    })
+    return listTerminalSessionSnapshots(this.sessions, sessionIds)
   }
 
   listAllSessions(): TerminalSessionSnapshot[] {
-    return [...this.sessions.values()].map((session) => session.toSnapshot())
+    return listTerminalSessionSnapshots(this.sessions)
   }
 
   async setRetentionPolicy(
@@ -302,24 +306,25 @@ export class TerminalSessionService {
     this.sessionIdsBySlot.set(slotKey, session.id)
     this.restorableSessionIdsBySlot.set(slotKey, session.id)
 
-    let launchCommand = command.launchCommand
-    let environment = command.environment
-    if (command.prepareLaunch) {
-      try {
-        const prepared = await command.prepareLaunch(session.scope)
-        launchCommand = prepared.launchCommand
-        environment = prepared.environment
-      } catch (error) {
-        session.markFailed({ reason: getTerminalSessionErrorMessage(error) })
-        if (this.sessionIdsBySlot.get(slotKey) === session.id) {
-          this.sessionIdsBySlot.delete(slotKey)
-        }
-        if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
-          this.restorableSessionIdsBySlot.delete(slotKey)
-        }
-        throw error
+    let preparedLaunch
+    try {
+      preparedLaunch = await prepareTerminalSessionLaunch({
+        command,
+        launchEnvironmentPreparation: this.launchEnvironmentPreparation,
+        scope: session.scope,
+        sessionKind: session.kind
+      })
+    } catch (error) {
+      session.markFailed({ reason: getTerminalSessionErrorMessage(error) })
+      if (this.sessionIdsBySlot.get(slotKey) === session.id) {
+        this.sessionIdsBySlot.delete(slotKey)
       }
+      if (this.restorableSessionIdsBySlot.get(slotKey) === session.id) {
+        this.restorableSessionIdsBySlot.delete(slotKey)
+      }
+      throw error
     }
+    const { environment, launchCommand, shell } = preparedLaunch
 
     let processHandle
 
@@ -331,12 +336,12 @@ export class TerminalSessionService {
         workingDirectory: command.workingDirectory,
         terminalSourceTheme: session.terminalSourceTheme,
         onQueryResponse: (response) => {
-          if (this.isCurrentRunningSession(slotKey, session)) {
+          if (this.isCurrentSession(slotKey, session)) {
             this.terminalProcessPort.write(session.id, response)
           }
         },
         onFlowControlChange: (isPaused) => {
-          if (!this.isCurrentRunningSession(slotKey, session)) return
+          if (!this.isCurrentSession(slotKey, session)) return
           if (isPaused) this.terminalProcessPort.pauseOutput(session.id)
           else this.terminalProcessPort.resumeOutput(session.id)
         },
@@ -346,7 +351,7 @@ export class TerminalSessionService {
         scope: session.scope,
         workingDirectory: command.workingDirectory,
         terminalSourceTheme: session.terminalSourceTheme,
-        shell: command.shell,
+        shell,
         launchCommand,
         launchMode: command.launchMode,
         sessionKind: session.kind,
@@ -354,12 +359,16 @@ export class TerminalSessionService {
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         onOutput: (event) => {
-          if (this.isCurrentStartingOrRunningSession(slotKey, session)) {
+          if (this.isCurrentSession(slotKey, session, true)) {
             const output =
               event.sequence === undefined
                 ? this.terminalModelPort
                   ? this.terminalModelPort.acceptOutput(session.scope, event.data)
-                  : this.acceptFallbackOutput(session.id, event.data)
+                  : acceptTerminalFallbackOutput(
+                      this.fallbackOutputSequences,
+                      session.id,
+                      event.data
+                    )
                 : { data: event.data, sequence: event.sequence }
             command.onOutput({ ...event, sequence: output.sequence })
           }
@@ -371,9 +380,8 @@ export class TerminalSessionService {
           if (this.sessionIdsBySlot.get(slotKey) === session.id) {
             this.sessionIdsBySlot.delete(slotKey)
           }
-          if (!wasStopping && wasCurrentGeneration) {
-            command.onExit(event)
-          }
+          if (!wasStopping && wasCurrentGeneration) command.onExit(event)
+          if (wasCurrentGeneration) observeTerminalEnded(this.lifecycleObserver, session.scope)
         }
       })
     } catch (error) {
@@ -624,6 +632,7 @@ export class TerminalSessionService {
 
       if (session.status === 'stopping') {
         session.markExited({ exitCode: null })
+        observeTerminalEnded(this.lifecycleObserver, session.scope)
       }
       if (this.sessionIdsBySlot.get(slotKey) === session.id) {
         this.sessionIdsBySlot.delete(slotKey)
@@ -650,13 +659,9 @@ export class TerminalSessionService {
     return termination
   }
 
-  private isCurrentRunningSession(slotKey: string, session: TerminalSession): boolean {
-    return session.status === 'running' && this.isCurrentGeneration(slotKey, session)
-  }
-
-  private isCurrentStartingOrRunningSession(slotKey: string, session: TerminalSession): boolean {
+  private isCurrentSession(slotKey: string, session: TerminalSession, acceptIdle = false): boolean {
     return (
-      (session.status === 'idle' || session.status === 'running') &&
+      (session.status === 'running' || (acceptIdle && session.status === 'idle')) &&
       this.isCurrentGeneration(slotKey, session)
     )
   }
@@ -670,12 +675,6 @@ export class TerminalSessionService {
       restorableSessionId: this.restorableSessionIdsBySlot.get(slotKey)
     })
     return session
-  }
-
-  private acceptFallbackOutput(sessionId: string, data: string) {
-    const sequence = (this.fallbackOutputSequences.get(sessionId) ?? 0) + 1
-    this.fallbackOutputSequences.set(sessionId, sequence)
-    return { data, sequence }
   }
 
   private async retireTerminalModel(identity: TerminalRunScope): Promise<void> {

@@ -29,6 +29,9 @@ import {
 import { AgentApplicationShutdownCoordinator } from './AgentApplicationShutdownCoordinator'
 import { AgentProviderLaunchShutdownCoordinator } from './AgentProviderLaunchShutdownCoordinator'
 import { createManagedAgentLaunchPlan } from './AgentProviderLaunchPlanFactory'
+import { AgentActivityRegistry } from '../services/AgentActivityRegistry'
+import { ManagedAgentActivityRegistry } from './ManagedAgentActivityRegistry'
+import * as Interaction from './AgentSessionInteractionCoordinator'
 import { AgentProviderSessionPersistenceCoordinator } from './AgentProviderSessionPersistenceCoordinator'
 import { disposeOtherAgentSessionScopes } from './AgentSessionCollection'
 import { AgentToolInvocationCoordinator } from './AgentToolInvocationCoordinator'
@@ -77,6 +80,8 @@ export class AgentSessionService {
   private readonly applicationShutdown: AgentApplicationShutdownCoordinator
   private readonly persistence: AgentProviderSessionPersistenceCoordinator
   private readonly providerLaunchShutdown: AgentProviderLaunchShutdownCoordinator
+  private readonly managedActivity: ManagedAgentActivityRegistry
+  private readonly interactions: Interaction.Coordinator
   private readonly toolInvocations: AgentToolInvocationCoordinator
   private readonly runtimeCoordinator = new AgentSessionRuntimeCoordinator()
   private isApplicationShuttingDown = false
@@ -90,8 +95,15 @@ export class AgentSessionService {
     private readonly defaultProviderId: string,
     private readonly scopeValidation: AgentRuntimeScopeValidationPort = allowAgentRuntimeScope,
     private readonly providerAvailability = new AgentProviderAvailabilityService(providers),
-    private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository
+    private readonly providerPreferences: AgentProviderPreferencesRepository = defaultAgentProviderPreferencesRepository,
+    activityRegistry: AgentActivityRegistry = new AgentActivityRegistry()
   ) {
+    this.managedActivity = new ManagedAgentActivityRegistry(activityRegistry)
+    this.interactions = new Interaction.Coordinator(
+      terminalRuntime,
+      this.managedActivity,
+      (sessionId) => this.findSessionById(sessionId)
+    )
     this.toolInvocations = new AgentToolInvocationCoordinator(toolExecution)
     this.approvalCoordinator = new AgentToolApprovalCoordinator(this.toolInvocations, (sessionId) =>
       this.findSessionById(sessionId)
@@ -105,7 +117,10 @@ export class AgentSessionService {
       disposeMcpServer: () => this.mcpServerPort.dispose(),
       forgetSession: (sessionId) => this.toolInvocations.forgetSession(sessionId),
       listSessions: () => [...this.sessions.values()],
-      releaseTerminalReferences: () => this.terminalRuntime.releaseApplicationShutdown(),
+      releaseTerminalReferences: () => {
+        this.managedActivity.releaseAll()
+        this.terminalRuntime.releaseApplicationShutdown()
+      },
       requestProviderShutdown: (session) => this.providerLaunchShutdown.request(session),
       settleTools: (session) => this.settleSessionToolCalls(session),
       stopAdmission: () => {
@@ -132,6 +147,9 @@ export class AgentSessionService {
     const scopeSnapshot = await validateAgentRuntimeScope(command, scope, this.scopeValidation)
     const sessionKey = scope.key
     const existingSession = this.sessions.get(sessionKey)
+    if (existingSession && command.agentName) {
+      this.interactions.updateAgentName(existingSession, command.agentName)
+    }
     if (
       existingSession &&
       existingSession.isTerminalRunning &&
@@ -220,6 +238,7 @@ export class AgentSessionService {
     const cleancodeMcpEnabled = workspaceAgent?.cleancodeMcpEnabled ?? mcpSupported
     const session: ManagedAgentSession = {
       agentId: command.agentId,
+      agentName: command.agentName ?? workspaceAgent?.name,
       callbacks: createAgentSessionCallbacks(command),
       cleancodeMcpEnabled,
       columns: command.columns ?? 88,
@@ -255,22 +274,10 @@ export class AgentSessionService {
     }
     return toAgentSessionSnapshot(session)
   }
-  write(command: { readonly input: string; readonly sessionId: string }): void {
-    this.terminalRuntime.write(command.sessionId, command.input)
-  }
-  resize(command: {
-    readonly columns: number
-    readonly rows: number
-    readonly sessionId: string
-  }): void {
-    const session = this.findSessionById(command.sessionId)
-    if (!session) {
-      return
-    }
-    session.columns = command.columns
-    session.rows = command.rows
-    this.terminalRuntime.resize(command.sessionId, command.columns, command.rows)
-  }
+  readonly write = (command: Interaction.WriteCommand): void => this.interactions.write(command)
+  readonly resize = (command: Interaction.ResizeCommand): void => this.interactions.resize(command)
+  readonly updateMetadata = (command: Interaction.MetadataCommand): boolean =>
+    this.interactions.updateMetadata(command)
   async suspendWorkspaceDirectory(
     workspaceDirectory: string
   ): Promise<AgentRuntimeSuspensionLease> {
@@ -528,6 +535,7 @@ export class AgentSessionService {
         gitBranch: session.gitBranch,
         onTerminalExit: (exitCode) => {
           if (session.sessionId !== processSessionId) return
+          this.managedActivity.releaseTerminal(processSessionId)
           exitObserved = true
           const shouldCloseTools = !session.isStopping
           if (shouldCloseTools) this.beginSessionToolClosing(session)
@@ -543,6 +551,7 @@ export class AgentSessionService {
         workspaceId: session.workspaceId
       })
       if (exitObserved || !recordAgentTerminalRunning(session, processSessionId, handle)) return
+      this.managedActivity.registerTerminal(session, handle.viewIdentity)
       if (this.isApplicationShuttingDown) {
         this.beginSessionToolClosing(session)
         return
@@ -571,24 +580,25 @@ export class AgentSessionService {
       activity: 'unavailable',
       launch: { exitCode: null, failureKind: null, launchId: null, status: 'launching' }
     })
-    const isCurrentProviderLaunch = (): boolean =>
-      session.sessionId === processSessionId &&
-      session.providerLaunchGeneration === providerLaunchGeneration
+    const managedActivity = this.managedActivity.beginProviderLaunch(
+      session,
+      providerLaunchGeneration,
+      provider.descriptor.capabilities.activityTracking
+    )
     const persistProviderSessionRef = (sessionRef: ProviderSessionRefSnapshot): void => {
-      if (!isCurrentProviderLaunch()) return
+      if (!managedActivity.isCurrent()) return
       this.persistence.persist(session, sessionRef, providerLaunchGeneration)
     }
     const plan = await createManagedAgentLaunchPlan({
       ...(launchProfile ? { launchProfile } : {}),
-      onActivityChanged: (activity) => {
-        if (!isCurrentProviderLaunch()) return
-        transitionAgentRuntime(session, { activity })
-      },
+      onActivityChanged: managedActivity.recordStatus,
       onProviderSessionIdentified: persistProviderSessionRef,
+      onTurnCompleted: managedActivity.recordTurnCompleted,
       provider,
       session
     })
     if (!canLaunchAgentProvider(session, processSessionId)) {
+      managedActivity.recordExit()
       await disposeAgentLaunchArtifacts(session)
       return
     }
@@ -596,6 +606,9 @@ export class AgentSessionService {
       const lifecycle = createAgentLaunchRuntimeController({
         attempt: providerLaunchGeneration,
         onStartedAccepted: () => {
+          if (provider.descriptor.capabilities.activityTracking) {
+            managedActivity.recordStatus('idle')
+          }
           if (plan.providerSessionRefOnStarted) {
             persistProviderSessionRef(plan.providerSessionRefOnStarted)
           }
@@ -615,6 +628,7 @@ export class AgentSessionService {
       )
       const launch = this.terminalRuntime.launch({
         onExit: (event) => {
+          managedActivity.recordExit()
           markProviderLaunchExited()
           lifecycle.onExit(event)
         },
@@ -624,6 +638,7 @@ export class AgentSessionService {
       })
       lifecycle.bind(launch)
     } catch (error) {
+      managedActivity.recordExit()
       this.providerLaunchShutdown.forget(session)
       await disposeAgentLaunchArtifacts(session)
       throw error
@@ -669,17 +684,14 @@ export class AgentSessionService {
     this.sessions.delete(sessionKey)
     this.toolInvocations.forgetSession(session.sessionId)
   }
-
   private findSessionById(sessionId: string): ManagedAgentSession | undefined {
     return [...this.sessions.values()].find((candidate) => candidate.sessionId === sessionId)
   }
-
   private beginSessionToolClosing(session: ManagedAgentSession): void {
     session.isStopping = true
     this.toolInvocations.beginSessionClosing(session.sessionId)
     unregisterAgentMcpEndpoint(session)
   }
-
   private async settleSessionToolCalls(session: ManagedAgentSession): Promise<void> {
     await this.approvalCoordinator.cancelSession(session.sessionId)
     await this.toolInvocations.waitForSession(session.sessionId)

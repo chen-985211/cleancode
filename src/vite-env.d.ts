@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 import type {
+  AgentTurnCompletedEvent,
+  TerminalAgentActivitySnapshot
+} from './contexts/agent/application/dto/AgentActivityProtocol'
+import type {
   AgentGraphUpdatedEvent,
   AgentRuntimeChangedEvent,
   AgentSessionSnapshot,
@@ -104,9 +108,11 @@ declare global {
       discoverCreatableAgentProviders(command?: {
         readonly refresh?: boolean
       }): Promise<readonly CreatableAgentProviderSnapshot[]>
+      listAgentActivities(): Promise<readonly TerminalAgentActivitySnapshot[]>
       listAgentProviders(): Promise<readonly AgentProviderDescriptor[]>
       attachAgentSession(command: {
         readonly agentId: string
+        readonly agentName?: string
         readonly columns?: number
         readonly gitBranch?: string | null
         readonly persistenceMode?: 'ephemeral' | 'persistent'
@@ -119,6 +125,11 @@ declare global {
         readonly workspaceDirectory: string
         readonly workspaceId: string
       }): Promise<AgentSessionSnapshot>
+      updateAgentSessionMetadata(command: {
+        readonly agentId: string
+        readonly agentName: string
+        readonly sessionId: string
+      }): Promise<boolean>
       createWorkspaceAgent(command: {
         readonly agentId: string
         readonly gitBranch: string | null
@@ -170,6 +181,10 @@ declare global {
         readonly approvalId: string
       }): Promise<AgentToolApprovalDecisionResult>
       rejectAgentTool(command: { readonly approvalId: string }): Promise<void>
+      onAgentActivityChanged(
+        listener: (snapshot: TerminalAgentActivitySnapshot) => void
+      ): () => void
+      onAgentTurnCompleted(listener: (completion: AgentTurnCompletedEvent) => void): () => void
       onAgentRuntimeChanged(listener: (event: AgentRuntimeChangedEvent) => void): () => void
       onAgentGraphUpdated(listener: (event: AgentGraphUpdatedEvent) => void): () => void
       onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void

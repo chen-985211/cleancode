@@ -1,4 +1,4 @@
-import { delimiter } from 'node:path'
+import { posix } from 'node:path'
 
 import {
   NodeAgentProviderShellPathHydrator,
@@ -9,7 +9,7 @@ describe('Agent Provider shell PATH hydrator', () => {
   it('reads a banner-safe POSIX login-shell PATH and merges it ahead of inherited entries', async () => {
     const probe = createProbe()
     const environment = {
-      PATH: ['/usr/bin', '/shared/bin'].join(delimiter),
+      PATH: ['/usr/bin', '/shared/bin'].join(posix.delimiter),
       SHELL: '/bin/zsh'
     }
     const hydrator = new NodeAgentProviderShellPathHydrator({
@@ -29,12 +29,12 @@ describe('Agent Provider shell PATH hydrator', () => {
 
     probe.resolve(
       `startup banner\n\u001b[31m__CLEANCODE_AGENT_SHELL_PATH__${['/agent/bin', '/shared/bin'].join(
-        delimiter
+        posix.delimiter
       )}__CLEANCODE_AGENT_SHELL_PATH__\u001b[0m\n`
     )
     await hydration
 
-    expect(environment.PATH).toBe(['/agent/bin', '/shared/bin', '/usr/bin'].join(delimiter))
+    expect(environment.PATH).toBe(['/agent/bin', '/shared/bin', '/usr/bin'].join(posix.delimiter))
   })
 
   it('caches a completed probe and shares one in-flight forced refresh', async () => {
@@ -63,7 +63,7 @@ describe('Agent Provider shell PATH hydrator', () => {
     secondProbe.resolve('__CLEANCODE_AGENT_SHELL_PATH__/second/bin__CLEANCODE_AGENT_SHELL_PATH__')
     await Promise.all([refreshed, sharedRefresh])
 
-    expect(environment.PATH).toBe(['/second/bin', '/first/bin', '/usr/bin'].join(delimiter))
+    expect(environment.PATH).toBe(['/second/bin', '/first/bin', '/usr/bin'].join(posix.delimiter))
   })
 
   it('cancels a timed-out shell probe and preserves the inherited PATH', async () => {

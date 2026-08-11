@@ -292,6 +292,7 @@ describe('additional Agent Provider contributions', () => {
     const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as {
       readonly hooks: Readonly<Record<string, readonly { hooks: readonly unknown[] }[]>>
     }
+    expect(settings.hooks).toHaveProperty('PreToolUse')
     for (const handlers of Object.values(settings.hooks)) {
       expect(handlers[0]?.hooks[0]).toMatchObject({
         args: [expect.stringMatching(/relay\.mjs$/)],
@@ -406,6 +407,12 @@ describe('additional Agent Provider contributions', () => {
         hook_event_name: 'PermissionRequest',
         session_id: '550e8400-e29b-41d4-a716-446655440000'
       })
+      await publishClaudeHook(reporter, {
+        cwd: process.cwd(),
+        hook_event_name: 'PreToolUse',
+        session_id: '550e8400-e29b-41d4-a716-446655440000'
+      })
+      expect(onActivityChanged).toHaveBeenLastCalledWith('working')
       expect(onSessionIdentified).toHaveBeenNthCalledWith(1, '550e8400-e29b-41d4-a716-446655440000')
       expect(onSessionIdentified).toHaveBeenNthCalledWith(2, '660e8400-e29b-41d4-a716-446655440001')
       await publishClaudeHook(reporter, {

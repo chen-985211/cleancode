@@ -29,7 +29,7 @@ export interface GeminiAgentProviderContributionOptions {
 export class GeminiAgentProviderContribution implements AgentProviderContribution {
   readonly descriptor = {
     capabilities: {
-      activityTracking: false,
+      activityTracking: true,
       cleancodeMcp: true,
       launchInstructions: false,
       resume: true,
@@ -123,7 +123,7 @@ interface GeminiTelemetryPreparation {
 }
 
 class GeminiTelemetryContribution implements AgentTelemetryContribution {
-  readonly signals = { activity: false, sessionIdentity: true } as const
+  readonly signals = { activity: true, sessionIdentity: true } as const
 
   constructor(private readonly runtimeExecutable: string) {}
 
@@ -136,6 +136,7 @@ class GeminiTelemetryContribution implements AgentTelemetryContribution {
     settingsFragment: Readonly<Record<string, unknown>> = {}
   ): Promise<GeminiTelemetryPreparation> {
     const reporter = await GeminiHookReporter.start({
+      onActivityChanged: command.onActivityChanged ?? (() => undefined),
       onSessionIdentified: (sessionId) =>
         command.onProviderSessionIdentified({
           formatVersion: 1,
@@ -156,20 +157,7 @@ class GeminiTelemetryContribution implements AgentTelemetryContribution {
       'cleancode-gemini-settings-',
       'settings.json',
       JSON.stringify({
-        hooks: {
-          SessionStart: [
-            {
-              hooks: [
-                {
-                  command: createHookCommand(this.runtimeExecutable, relay.path),
-                  name: 'cleancode-session-reporter',
-                  timeout: 5_000,
-                  type: 'command'
-                }
-              ]
-            }
-          ]
-        },
+        hooks: createGeminiHooks(this.runtimeExecutable, relay.path),
         ...settingsFragment
       })
     )
@@ -183,6 +171,25 @@ class GeminiTelemetryContribution implements AgentTelemetryContribution {
         GEMINI_CLI_SYSTEM_SETTINGS_PATH: settings.path
       }
     }
+  }
+}
+
+function createGeminiHooks(runtimeExecutable: string, relayPath: string) {
+  const handler = {
+    hooks: [
+      {
+        command: createHookCommand(runtimeExecutable, relayPath),
+        name: 'cleancode-agent-activity-reporter',
+        timeout: 5_000,
+        type: 'command'
+      }
+    ]
+  }
+  return {
+    AfterAgent: [handler],
+    BeforeAgent: [handler],
+    SessionEnd: [handler],
+    SessionStart: [handler]
   }
 }
 

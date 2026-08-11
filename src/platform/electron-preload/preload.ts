@@ -34,9 +34,12 @@ const cleancodeApi = {
     invokeCleancode('cleancode:update-agent-provider-preferences', command),
   discoverCreatableAgentProviders: (command?: unknown) =>
     invokeCleancode('cleancode:discover-creatable-agent-providers', command),
+  listAgentActivities: () => invokeCleancode('cleancode:list-agent-activities'),
   listAgentProviders: () => invokeCleancode('cleancode:list-agent-providers'),
   attachAgentSession: (command: unknown) =>
     invokeCleancode('cleancode:attach-agent-session', command),
+  updateAgentSessionMetadata: (command: unknown) =>
+    invokeCleancode('cleancode:update-agent-session-metadata', command),
   createWorkspaceAgent: (command: unknown) =>
     invokeCleancode('cleancode:create-workspace-agent', command),
   renameWorkspaceAgent: (command: unknown) =>
@@ -59,6 +62,10 @@ const cleancodeApi = {
   rejectAgentTool: (command: unknown) => invokeCleancode('cleancode:reject-agent-tool', command),
   onAgentRuntimeChanged: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-runtime-changed', listener),
+  onAgentActivityChanged: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-activity-changed', listener),
+  onAgentTurnCompleted: (listener: (event: unknown) => void) =>
+    subscribeRendererEvent('cleancode:agent-turn-completed', listener),
   onAgentGraphUpdated: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-graph-updated', listener),
   onAgentToolApprovalRequested: (listener: (event: unknown) => void) =>

@@ -7,6 +7,41 @@ const projectRemovalStyles = readStyles('project-sidebar-project-removal.css')
 const applicationSettingsStyles = readStyles('application-settings.css')
 
 describe('status and pane motion styles', () => {
+  it('keeps every notification on one fixed card geometry and surface', () => {
+    const cardRule = readRule(notificationStyles, '.notification-card')
+    const bodyRule = readRule(notificationStyles, '.notification-card__body')
+    const iconRule = readRule(notificationStyles, '.notification-card__icon')
+    const dismissRule = readRule(notificationStyles, '.notification-card__dismiss')
+    const actionRule = readRule(notificationStyles, '.notification-card__action')
+    const controlsRule = readRule(notificationStyles, '.notification-card__controls')
+
+    expect(notificationStyles).toContain('width: min(300px, calc(100vw - 82px));')
+    expect(notificationStyles).toContain(
+      'width: min(300px, calc(100vw - var(--cc-shell-control-inset) * 2 - 2px));'
+    )
+    expect(notificationStyles).not.toContain('.notification-card--compact')
+    expect(cardRule).toContain('flex: 0 0 62px;')
+    expect(cardRule).toContain('height: 62px;')
+    expect(cardRule).toContain('min-height: 62px;')
+    expect(cardRule).toContain('max-height: 62px;')
+    expect(cardRule).toContain('background: var(--cc-surface);')
+    expect(cardRule).toContain('box-shadow: var(--cc-shadow-xs);')
+    expect(cardRule).not.toContain('backdrop-filter')
+    expect(bodyRule).toContain('grid-template-columns: 24px minmax(0, 1fr);')
+    expect(bodyRule).toContain('background: transparent;')
+    expect(bodyRule).toContain('height: 100%;')
+    expect(iconRule).toContain('width: 24px;')
+    expect(iconRule).toContain('height: 24px;')
+    expect(dismissRule).toContain('width: 24px;')
+    expect(dismissRule).toContain('height: 24px;')
+    expect(actionRule).toContain('width: 24px;')
+    expect(actionRule).toContain('height: 24px;')
+    expect(controlsRule).toContain('gap: 4px;')
+    expect(notificationStyles).toContain(
+      'max-height: calc(100vh - var(--notification-viewport-top) - 12px);'
+    )
+  })
+
   it('uses spring-owned spatial properties while titles crossfade independently', () => {
     const iconLayerRule = readRule(notificationStyles, '.notification-card__icon-layer')
     const outgoingRule = readRule(

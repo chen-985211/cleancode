@@ -195,7 +195,7 @@ export function useMinimapNodeFocus({
   )
 
   const focusAgentConsole = useCallback(
-    (agent: WorkspaceAgentSnapshot) => {
+    (agent: WorkspaceAgentSnapshot, viewportIntent: 'creation' | 'navigation' = 'creation') => {
       cancelPendingWorkbenchInputFocus()
       const reactFlowInstance = reactFlowInstanceRef.current
       const focusTarget =
@@ -209,7 +209,7 @@ export function useMinimapNodeFocus({
         activateAgentInput: true,
         agent,
         reactFlowInstance,
-        viewportIntent: 'creation',
+        viewportIntent,
         setSelectedAgentId,
         setSelectedTerminalBlockIds,
         setSelectedTerminalGroupId,

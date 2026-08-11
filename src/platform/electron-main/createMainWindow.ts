@@ -1,5 +1,6 @@
 import { BrowserWindow, shell } from 'electron'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { consoleLogger } from '../logging/ConsoleLogSink'
 import { bindElectronExternalNavigationPolicy } from './electronExternalNavigationPolicy'
@@ -7,6 +8,8 @@ import type { ElectronWindowPolicy } from './electronWindowPolicy'
 import { bindElectronPageZoomStartup } from './electronPageZoomPolicy'
 import { resolveWindowFrameOptions, shouldRemoveDefaultWindowMenu } from './windowFrameOptions'
 import { bindWindowFullScreenState } from './windowFullScreenState'
+
+const mainModuleDirectory = dirname(fileURLToPath(import.meta.url))
 
 export function createMainWindow(input: {
   readonly appIconPath: string | undefined
@@ -30,7 +33,7 @@ export function createMainWindow(input: {
     ...resolveWindowFrameOptions(process.platform),
     webPreferences: {
       backgroundThrottling: input.policy.backgroundThrottling,
-      preload: join(__dirname, '../preload/preload.mjs'),
+      preload: join(mainModuleDirectory, '../preload/preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
@@ -61,7 +64,7 @@ export function createMainWindow(input: {
       void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
       return
     }
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void mainWindow.loadFile(join(mainModuleDirectory, '../renderer/index.html'))
   }
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     if (details.reason === 'clean-exit' || mainWindow.isDestroyed()) return

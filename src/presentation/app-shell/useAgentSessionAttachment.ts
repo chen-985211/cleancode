@@ -30,6 +30,7 @@ export type AgentAttachOperation =
   | { readonly mode: AgentAttachMode; readonly status: 'failed' }
 
 interface AgentSessionBinding {
+  readonly agentName: string
   readonly session: AgentSessionSnapshot
   readonly workspaceKey: string
 }
@@ -58,6 +59,7 @@ export function useAgentSessionAttachment({
     null
   )
   const isMountedRef = useRef(true)
+  const metadataRequestSequenceRef = useRef(0)
   const operationRef = useRef<AgentAttachOperation>(operation)
   const pendingRuntimeEventsRef = useRef(new Map<string, AgentRuntimeChangedEvent>())
   const requestSequenceRef = useRef(0)
@@ -76,6 +78,7 @@ export function useAgentSessionAttachment({
   useLayoutEffect(() => {
     scopeGenerationRef.current += 1
     requestSequenceRef.current += 1
+    metadataRequestSequenceRef.current += 1
     inFlightRef.current = null
     pendingRuntimeEventsRef.current.clear()
     restartRequestRef.current = null
@@ -91,6 +94,7 @@ export function useAgentSessionAttachment({
     return () => {
       isMountedRef.current = false
       requestSequenceRef.current += 1
+      metadataRequestSequenceRef.current += 1
     }
   }, [])
 
@@ -146,6 +150,7 @@ export function useAgentSessionAttachment({
     void api
       .attachAgentSession({
         agentId: activeAgent.agentId,
+        agentName: activeAgent.name,
         columns: measuredDimensions.columns,
         gitBranch,
         persistenceMode,
@@ -165,7 +170,11 @@ export function useAgentSessionAttachment({
           ? applyAgentRuntimeEvent(nextSession, pendingRuntimeEvent)
           : nextSession
         pendingRuntimeEventsRef.current.delete(nextSession.sessionId)
-        sessionBindingRef.current = { session: committedSession, workspaceKey: currentWorkspaceKey }
+        sessionBindingRef.current = {
+          agentName: activeAgent.name,
+          session: committedSession,
+          workspaceKey: currentWorkspaceKey
+        }
         setSession(committedSession)
         setOperation({ status: 'idle' })
 
@@ -199,6 +208,7 @@ export function useAgentSessionAttachment({
     }
   }, [
     activeAgent.agentId,
+    activeAgent.name,
     activeAgent.providerId,
     attachAttempt,
     currentWorkspaceKey,
@@ -212,6 +222,48 @@ export function useAgentSessionAttachment({
     workspaceDirectory,
     workspaceId
   ])
+
+  useEffect(() => {
+    const api = window.cleancode
+    const activeBinding = sessionBindingRef.current
+    if (
+      !api?.updateAgentSessionMetadata ||
+      !currentWorkspaceKey ||
+      activeBinding?.workspaceKey !== currentWorkspaceKey ||
+      activeBinding.agentName === activeAgent.name
+    ) {
+      return undefined
+    }
+
+    const requestId = ++metadataRequestSequenceRef.current
+    const sessionId = activeBinding.session.sessionId
+    void api
+      .updateAgentSessionMetadata({
+        agentId: activeAgent.agentId,
+        agentName: activeAgent.name,
+        sessionId
+      })
+      .then((accepted) => {
+        if (
+          !accepted ||
+          !isMountedRef.current ||
+          metadataRequestSequenceRef.current !== requestId
+        ) {
+          return
+        }
+        const currentBinding = sessionBindingRef.current
+        if (
+          currentBinding?.workspaceKey !== currentWorkspaceKey ||
+          currentBinding.session.sessionId !== sessionId
+        ) {
+          return
+        }
+        sessionBindingRef.current = { ...currentBinding, agentName: activeAgent.name }
+      })
+      .catch(() => undefined)
+
+    return undefined
+  }, [activeAgent.agentId, activeAgent.name, currentWorkspaceKey, session?.sessionId])
 
   const requestAttach = useCallback(
     (mode: AgentAttachMode) => {
@@ -248,11 +300,15 @@ export function useAgentSessionAttachment({
         ? applyAgentRuntimeEvent(nextSession, pendingRuntimeEvent)
         : nextSession
       pendingRuntimeEventsRef.current.delete(nextSession.sessionId)
-      sessionBindingRef.current = { session: committedSession, workspaceKey: currentWorkspaceKey }
+      sessionBindingRef.current = {
+        agentName: activeAgent.name,
+        session: committedSession,
+        workspaceKey: currentWorkspaceKey
+      }
       setSession(committedSession)
       setOperation({ status: 'idle' })
     },
-    [currentWorkspaceKey, setOperation]
+    [activeAgent.name, currentWorkspaceKey, setOperation]
   )
 
   const writeInput = useCallback((input: string) => {

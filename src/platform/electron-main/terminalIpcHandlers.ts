@@ -50,6 +50,7 @@ export interface TerminalIpcHandlersInput {
   readonly getTerminalRuntimeAvailability?: () => TerminalRuntimeAvailabilitySnapshot
   readonly retryTerminalRuntime?: () => Promise<TerminalRuntimeAvailabilitySnapshot>
   readonly startTerminal: (command: {
+    readonly agentActivityIntegration: true
     readonly projectId: string
     readonly projectDirectory: string
     readonly terminalBlockId: string
@@ -178,6 +179,7 @@ export function registerTerminalIpcHandlers(
 
       return input.startTerminal({
         ...startCommand,
+        agentActivityIntegration: true,
         workingDirectory: startCommand.workspaceDirectory,
         onOutput: () => undefined,
         onExit: (exitEvent) => {

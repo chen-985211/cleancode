@@ -34,6 +34,7 @@ describe('terminal runtime availability', () => {
     expect(notifications.update).toHaveBeenCalled()
 
     const notification = vi.mocked(notifications.notify).mock.calls[0]?.[0]
+    expect(notification?.action?.icon).toBe('retry')
     await act(async () => notification?.action?.onClick())
 
     expect(retryTerminalRuntime).toHaveBeenCalledOnce()

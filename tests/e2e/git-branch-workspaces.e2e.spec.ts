@@ -171,6 +171,29 @@ describe('git branch workspaces e2e', () => {
   )
 
   it(
+    'shows an existing Git branch error in the global notification system instead of the sidebar',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+
+      const projectCard = page.getByRole('group', {
+        name: `项目 ${basename(workbench.projectDirectory)}`
+      })
+      await projectCard.getByRole('button', { name: '新建分支工作区' }).click()
+      await projectCard.getByLabel('分支名称').fill('main')
+      await projectCard.getByRole('button', { name: '创建 Worktree' }).click()
+
+      const notificationViewport = page.getByLabel('通知', { exact: true })
+      const errorAlert = notificationViewport.getByRole('alert')
+      await errorAlert.getByText('创建分支工作区失败', { exact: true }).waitFor()
+      await errorAlert.getByText('无法创建分支工作区。', { exact: true }).waitFor()
+
+      expect(await projectCard.getByRole('alert').count()).toBe(0)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
     'keeps bounded terminal scrollback and background output across worktree switches',
     async () => {
       await expectDesktopRuntime(page)

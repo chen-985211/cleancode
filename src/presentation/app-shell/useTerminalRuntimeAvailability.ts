@@ -102,6 +102,7 @@ function createUnavailableNotification(
       : t('terminalRuntime.unavailableMessage'),
     action: availability.retryable
       ? {
+          icon: 'retry',
           label: t('terminalRuntime.retry'),
           pendingLabel: t('terminalRuntime.retrying'),
           onClick: async () => {

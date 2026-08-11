@@ -56,6 +56,7 @@ describe('terminal workflow notifications', () => {
     expect(createWorkflowRunNotification(run, { isStopping: false, onStop })).toEqual({
       action: {
         disabled: false,
+        icon: 'stop',
         label: '停止本次运行',
         onClick: onStop,
         pendingLabel: '正在停止…',
@@ -63,7 +64,7 @@ describe('terminal workflow notifications', () => {
       },
       isActivity: true,
       kind: 'info',
-      message: '从“依赖就绪”开始 · 涉及 2 个终端',
+      source: { label: '从“依赖就绪”开始 · 涉及 2 个终端' },
       title: '流程运行中'
     })
   })
@@ -76,19 +77,34 @@ describe('terminal workflow notifications', () => {
         isStopping: false,
         onStop: vi.fn()
       })
-    ).toMatchObject({ isActivity: true, kind: 'info', title: '流程服务已就绪' })
+    ).toMatchObject({
+      isActivity: true,
+      kind: 'info',
+      source: { label: '从“依赖就绪”开始 · 涉及 1 个终端' },
+      title: '流程服务已就绪'
+    })
     expect(
       createWorkflowRunNotification(workflowRun('succeeded', nodes, 'succeeded'), {
         isStopping: false,
         onStop: vi.fn()
       })
-    ).toMatchObject({ autoDismissMs: 4_000, kind: 'success', title: '流程运行成功' })
+    ).toMatchObject({
+      autoDismissMs: 4_000,
+      kind: 'success',
+      source: { label: '从“依赖就绪”开始 · 涉及 1 个终端' },
+      title: '流程运行成功'
+    })
     expect(
       createWorkflowRunNotification(workflowRun('stopped', nodes, 'stopped'), {
         isStopping: false,
         onStop: vi.fn()
       })
-    ).toMatchObject({ autoDismissMs: 4_000, kind: 'warning', title: '流程已停止' })
+    ).toMatchObject({
+      autoDismissMs: 4_000,
+      kind: 'warning',
+      source: { label: '从“依赖就绪”开始 · 涉及 1 个终端' },
+      title: '流程已停止'
+    })
   })
 })
 

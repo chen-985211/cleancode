@@ -231,7 +231,9 @@ describe('Agent console CleanCode MCP toggle', () => {
     await waitFor(() => expect(window.cleancode?.attachAgentSession).toHaveBeenCalled())
     fireEvent.click(screen.getByRole('switch', { name: 'CleanCode MCP' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('未能切换 CleanCode MCP，请重试。')
+    const notification = await screen.findByRole('status')
+    expect(notification).toHaveTextContent('未能切换 CleanCode MCP，请重试。')
+    expect(notification).toHaveClass('notification-card--uniform')
     expect(container.querySelector('.agent-mcp-capability__error')).toBeNull()
   })
 
@@ -306,9 +308,9 @@ describe('Agent console CleanCode MCP toggle', () => {
     )
 
     fireEvent.click(await screen.findByRole('button', { name: '重新连接 CleanCode MCP' }))
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      '未能重新连接 CleanCode MCP，请重试。'
-    )
+    const notification = await screen.findByRole('status')
+    expect(notification).toHaveTextContent('未能重新连接 CleanCode MCP，请重试。')
+    expect(notification).toHaveClass('notification-card--uniform')
   })
 })
 

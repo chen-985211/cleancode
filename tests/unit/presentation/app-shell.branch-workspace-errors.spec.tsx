@@ -4,8 +4,8 @@ import {
   createRuntimeApi,
   createWorkbenchSnapshot
 } from '../../fixtures/presentation/appShellFixtures'
+import { NotifiedAppShell } from '../../fixtures/presentation/NotifiedAppShell'
 import { createClientAppError } from '../../../src/shared-kernel/application/errors/AppError'
-import { AppShell } from '../../../src/presentation/app-shell/AppShell'
 
 describe('app shell branch workspace errors', () => {
   beforeEach(() => {
@@ -36,7 +36,7 @@ describe('app shell branch workspace errors', () => {
       })
     })
 
-    render(<AppShell />)
+    render(<NotifiedAppShell />)
     const projectCard = await screen.findByRole('group', { name: '项目 alpha-project' })
 
     fireEvent.click(within(projectCard).getByRole('button', { name: '新建分支工作区' }))
@@ -51,8 +51,10 @@ describe('app shell branch workspace errors', () => {
         branchName: 'main'
       })
     )
-    expect(await screen.findByRole('alert')).toHaveTextContent(
+    const notificationViewport = await screen.findByLabelText('通知')
+    expect(within(notificationViewport).getByRole('alert')).toHaveTextContent(
       'Git 分支已存在，无法创建同名工作区。'
     )
+    expect(document.querySelector('.project-sidebar-alert')).toBeNull()
   })
 })

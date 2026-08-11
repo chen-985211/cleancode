@@ -3,7 +3,6 @@ import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
-import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
@@ -37,7 +36,6 @@ interface ProjectSidebarProps {
     ApplicationShortcutTooltipLabels,
     'addProject' | 'createBranchWorkspace'
   >
-  readonly actionError: string | null
   readonly onAddProject: () => void
   readonly onArchiveBranchWorkspace: (
     workbench: WorkbenchSnapshot,
@@ -46,7 +44,6 @@ interface ProjectSidebarProps {
   ) => void
   readonly onCheckoutMainBranch: (workbench: WorkbenchSnapshot, branchName: string) => void
   readonly onCreateBranchWorkspace: (workbench: WorkbenchSnapshot, branchName: string) => void
-  readonly onDismissActionError: () => void
   readonly onRemoveProject: (workbench: WorkbenchSnapshot) => void
   readonly onReorderProject: (
     workbench: WorkbenchSnapshot,
@@ -63,12 +60,10 @@ export function ProjectSidebar({
   isReorderPending = false,
   intent = null,
   shortcutTooltips,
-  actionError,
   onAddProject,
   onArchiveBranchWorkspace,
   onCheckoutMainBranch,
   onCreateBranchWorkspace,
-  onDismissActionError,
   onRemoveProject,
   onReorderProject,
   onSelectWorkspace
@@ -100,21 +95,6 @@ export function ProjectSidebar({
         {!isDesktopRuntime ? (
           <div className="runtime-warning" role="status">
             {t('sidebar.previewWarning')}
-          </div>
-        ) : null}
-        {actionError ? (
-          <div className="project-sidebar-alert" role="alert">
-            <span>{actionError}</span>
-            <TooltipLabel content={t('sidebar.closeAlert')}>
-              <button
-                className="project-sidebar-alert__close"
-                type="button"
-                aria-label={t('sidebar.closeAlert')}
-                onClick={onDismissActionError}
-              >
-                <XIcon size={13} weight="bold" aria-hidden="true" />
-              </button>
-            </TooltipLabel>
           </div>
         ) : null}
         <div className="project-sidebar__section-header">

@@ -113,6 +113,7 @@ async function acceptPayload(
 function mapActivity(payload: ClaudeCodeHookPayload): AgentActivityStatus | null {
   if (payload.hook_event_name === 'UserPromptSubmit') return 'working'
   if (payload.hook_event_name === 'PermissionRequest') return 'waiting_approval'
+  if (payload.hook_event_name === 'PreToolUse') return 'working'
   if (payload.hook_event_name === 'Stop') return 'idle'
   if (payload.hook_event_name === 'SessionEnd') return 'unavailable'
   if (payload.hook_event_name !== 'Notification') return null
