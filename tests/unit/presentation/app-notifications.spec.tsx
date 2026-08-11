@@ -39,6 +39,7 @@ function NotificationHarness({ onStop = async () => undefined }: { onStop?: () =
         onClick={() => {
           activityNotificationId.current = notify({
             action: {
+              icon: 'stop',
               label: '停止本次运行',
               pendingLabel: '正在停止…',
               onClick: onStop,
@@ -47,7 +48,7 @@ function NotificationHarness({ onStop = async () => undefined }: { onStop?: () =
             isActivity: true,
             kind: 'info',
             title: '流程运行中',
-            message: '从“依赖就绪”开始 · 涉及 2 个终端'
+            source: { label: '从“依赖就绪”开始 · 涉及 2 个终端' }
           })
         }}
       >
@@ -61,7 +62,7 @@ function NotificationHarness({ onStop = async () => undefined }: { onStop?: () =
             autoDismissMs: 4_000,
             kind: 'success',
             title: '流程运行成功',
-            message: '从“依赖就绪”开始 · 2 个终端已完成'
+            source: { label: '从“依赖就绪”开始 · 2 个终端已完成' }
           })
         }}
       >
@@ -181,6 +182,7 @@ function SemanticLifecycleHarness({
         onClick={() =>
           notify({
             action: {
+              icon: 'retry',
               label: '执行第一条动作',
               pendingLabel: '第一条动作进行中…',
               onClick: onFirstAction
@@ -198,6 +200,7 @@ function SemanticLifecycleHarness({
         onClick={() =>
           notify({
             action: {
+              icon: 'retry',
               label: '执行第二条动作',
               pendingLabel: '第二条动作进行中…',
               onClick: onSecondAction
@@ -232,8 +235,17 @@ describe('app notifications', () => {
     const alerts = screen.getAllByRole('alert')
 
     expect(alerts).toHaveLength(2)
+    expect(alerts[0]).toHaveClass('notification-card--uniform')
     expect(alerts[0]).toHaveTextContent('流程失败')
     expect(alerts[0]).toHaveTextContent('终端“OpenCove 开发环境”运行失败。')
+    expect(alerts[0].querySelector('.notification-card__title-copy')).toHaveAttribute(
+      'title',
+      '流程失败'
+    )
+    expect(alerts[0].querySelector('.notification-card__message')).toHaveAttribute(
+      'title',
+      '终端“OpenCove 开发环境”运行失败。'
+    )
     expect(alerts[0]).toHaveAttribute('data-surface-motion-state', 'opening')
     fireEvent.transitionEnd(alerts[0], { propertyName: 'transform' })
     expect(alerts[0]).toHaveAttribute('data-surface-motion-state', 'open')
@@ -276,6 +288,19 @@ describe('app notifications', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '发送活动通知' }))
+    const activeNotification = screen.getByRole('status')
+    const stopButton = screen.getByRole('button', { name: '停止本次运行' })
+    const dismissButton = screen.getByRole('button', { name: '关闭“流程运行中”通知' })
+
+    expect(activeNotification).toHaveClass('notification-card--uniform')
+    expect(activeNotification.querySelector('.notification-card__source-label')).toHaveTextContent(
+      '从“依赖就绪”开始 · 涉及 2 个终端'
+    )
+    expect(stopButton).not.toHaveTextContent(/\S/)
+    expect(stopButton).toHaveAttribute('data-notification-action-icon', 'stop')
+    expect(stopButton.querySelector('.notification-card__action-icon')).toBeInTheDocument()
+    expect(stopButton.closest('.notification-card__controls')).toContainElement(dismissButton)
+
     fireEvent.click(screen.getByRole('button', { name: '更新活动通知' }))
 
     expect(screen.getAllByRole('status')).toHaveLength(1)
@@ -338,11 +363,23 @@ describe('app notifications', () => {
     fireEvent.click(screen.getByRole('button', { name: '停止本次运行' }))
 
     expect(onStop).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: '正在停止…' })).toBeDisabled()
+    const pendingStopButton = screen.getByRole('button', { name: '正在停止…' })
+    expect(pendingStopButton).not.toHaveTextContent(/\S/)
+    expect(pendingStopButton).toHaveAttribute('data-notification-action-icon', 'loading')
+    expect(
+      pendingStopButton.querySelector('.notification-card__action-spinner')
+    ).toBeInTheDocument()
+    expect(pendingStopButton).toHaveAttribute('aria-busy', 'true')
+    expect(pendingStopButton).toHaveAttribute('aria-disabled', 'true')
 
     finishStop?.()
 
-    await waitFor(() => expect(screen.getByRole('button', { name: '停止本次运行' })).toBeEnabled())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '停止本次运行' })).toHaveAttribute(
+        'aria-disabled',
+        'false'
+      )
+    )
   })
 
   it('deduplicates a semantic occurrence, keeps it acknowledged, and reopens for the next one', () => {
@@ -420,19 +457,28 @@ describe('app notifications', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '发布第一条可操作消息' }))
     fireEvent.click(screen.getByRole('button', { name: '执行第一条动作' }))
-    expect(screen.getByRole('button', { name: '第一条动作进行中…' })).toBeDisabled()
+    const firstPendingAction = screen.getByRole('button', { name: '第一条动作进行中…' })
+    expect(firstPendingAction).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(firstPendingAction)
+    expect(onFirstAction).toHaveBeenCalledTimes(1)
 
     fireEvent.click(screen.getByRole('button', { name: '发布第二条可操作消息' }))
     expect(screen.getByRole('button', { name: '执行第二条动作' })).toBeEnabled()
 
     fireEvent.click(screen.getByRole('button', { name: '执行第二条动作' }))
-    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
 
     await act(async () => {
       finishFirstAction?.()
       await Promise.resolve()
     })
-    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '第二条动作进行中…' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
 
     await act(async () => {
       finishSecondAction?.()

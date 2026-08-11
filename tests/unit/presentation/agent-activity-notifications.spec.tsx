@@ -4,6 +4,7 @@ import type {
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
 } from '../../../src/contexts/agent/application/dto/AgentActivityProtocol'
+import type { AgentProviderDescriptor } from '../../../src/contexts/agent/application/ports/AgentProviderContribution'
 import { AgentActivityObserver } from '../../../src/presentation/app-shell/AgentActivityObserver'
 import { I18nProvider } from '../../../src/presentation/app-shell/i18n/I18nProvider'
 import { translate } from '../../../src/presentation/app-shell/i18n/messages'
@@ -25,7 +26,7 @@ describe('Agent activity notifications', () => {
       expect(screen.getByTestId('agent-activity')).toHaveTextContent('waiting_input')
     )
 
-    expect(screen.queryByText('Agent 正在等待输入')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent 等待输入')).not.toBeInTheDocument()
 
     act(() => runtime.emitActivity(createSnapshot({ revision: 2, status: 'working' })))
 
@@ -35,8 +36,12 @@ describe('Agent activity notifications', () => {
     act(() => runtime.emitActivity(createSnapshot({ revision: 3, status: 'waiting_approval' })))
 
     const attentionNotification = screen.getByRole('status')
-    expect(attentionNotification).toHaveTextContent('Agent 正在等待审批')
-    expect(attentionNotification).toHaveTextContent('Agent · main')
+    expect(attentionNotification).toHaveTextContent('Agent 等待审批')
+    expect(attentionNotification).toHaveTextContent('project · main')
+    expect(attentionNotification).not.toHaveTextContent('/tmp/project')
+    expect(attentionNotification).not.toHaveTextContent('Agent · main')
+    expect(attentionNotification).toHaveAccessibleName('Agent 等待审批 — Agent — project · main')
+    expect(attentionNotification).toHaveClass('notification-card--uniform')
 
     act(() => runtime.emitActivity(createSnapshot({ revision: 3, status: 'waiting_approval' })))
     expect(screen.getAllByRole('status')).toHaveLength(1)
@@ -52,15 +57,22 @@ describe('Agent activity notifications', () => {
     )
 
     expect(screen.getAllByRole('status')).toHaveLength(2)
-    const completionNotification = screen
-      .getByText('Agent 已完成本轮回答')
-      .closest('[role="status"]')
+    const completionNotification = screen.getByLabelText('本轮已完成').closest('[role="status"]')
     expect(completionNotification).not.toBeNull()
     expect(completionNotification).not.toBe(attentionNotification)
-    expect(completionNotification).toHaveTextContent('Provider Neutral · main')
+    expect(completionNotification).toHaveTextContent('Agent')
+    expect(completionNotification).toHaveTextContent('project · main')
+    expect(completionNotification).not.toHaveTextContent('已回复')
+    expect(completionNotification).not.toHaveTextContent('/tmp/project')
+    expect(completionNotification).not.toHaveTextContent('Provider Neutral')
+    expect(completionNotification).toHaveAccessibleName(
+      'Agent — 本轮已完成 — Provider Neutral — project · main'
+    )
+    expect(completionNotification).toHaveClass('notification-card--uniform')
+    expect(completionNotification?.querySelector('.agent-provider-icon')).not.toBeNull()
     expect(
       screen.getByRole('button', {
-        name: '关闭“Agent 已完成本轮回答 — Provider Neutral · main”通知'
+        name: '关闭“Agent — 本轮已完成 — Provider Neutral — project · main”通知'
       })
     ).toBeInTheDocument()
 
@@ -100,7 +112,7 @@ describe('Agent activity notifications', () => {
     expect(runtime.listAgentActivities).toHaveBeenCalledOnce()
 
     act(() => runtime.emitActivity(createSnapshot({ revision: 2, status: 'waiting_input' })))
-    expect(screen.queryByText('Agent 正在等待输入')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent 等待输入')).not.toBeInTheDocument()
 
     await act(async () => {
       resolveBaseline?.([createSnapshot({ revision: 1, status: 'idle' })])
@@ -108,7 +120,7 @@ describe('Agent activity notifications', () => {
     })
 
     expect(screen.getByTestId('agent-activity')).toHaveTextContent('waiting_input')
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 正在等待输入')
+    expect(screen.getByRole('status')).toHaveTextContent('Agent 等待输入')
   })
 
   it('notifies a queued waiting fact even when the baseline already contains its revision', async () => {
@@ -121,7 +133,7 @@ describe('Agent activity notifications', () => {
     const waiting = createSnapshot({ revision: 2, status: 'waiting_input' })
 
     act(() => runtime.emitActivity(waiting))
-    expect(screen.queryByText('Agent 正在等待输入')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent 等待输入')).not.toBeInTheDocument()
 
     await act(async () => {
       resolveBaseline?.([waiting])
@@ -130,7 +142,7 @@ describe('Agent activity notifications', () => {
 
     expect(screen.getByTestId('agent-activity')).toHaveTextContent('waiting_input')
     expect(screen.getAllByRole('status')).toHaveLength(1)
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 正在等待输入')
+    expect(screen.getByRole('status')).toHaveTextContent('Agent 等待输入')
   })
 
   it('replays a queued completion that cannot be represented by the baseline snapshot', async () => {
@@ -146,7 +158,7 @@ describe('Agent activity notifications', () => {
         createCompletion({ completionId: 'queued-completion', terminalRevision: 2 })
       )
     )
-    expect(screen.queryByText('Agent 已完成本轮回答')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('本轮已完成')).not.toBeInTheDocument()
 
     await act(async () => {
       resolveBaseline?.([createSnapshot({ revision: 5, status: 'working' })])
@@ -155,11 +167,20 @@ describe('Agent activity notifications', () => {
 
     expect(screen.getByTestId('agent-activity')).toHaveTextContent('working')
     expect(screen.getAllByRole('status')).toHaveLength(1)
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 已完成本轮回答')
+    expect(screen.getByRole('status')).toHaveTextContent('Agent')
+    expect(screen.getByRole('status')).not.toHaveTextContent('已回复')
+    expect(screen.getByLabelText('本轮已完成')).toBeInTheDocument()
   })
 
   it('identifies the Agent source and retranslates a retained notification on locale change', async () => {
-    const runtime = installAgentActivityRuntime([createSnapshot({ revision: 1, status: 'idle' })])
+    const terminal = {
+      gitBranch: 'feat/notifications',
+      projectDirectory: '/Users/nature/Development/cleancode',
+      workspaceDirectory: '/Users/nature/.cleancode/worktrees/notifications'
+    } as const
+    const runtime = installAgentActivityRuntime([
+      createSnapshot({ revision: 1, status: 'idle', terminal })
+    ])
     renderObserver()
 
     await waitFor(() => expect(screen.getByTestId('agent-activity')).toHaveTextContent('idle'))
@@ -169,19 +190,28 @@ describe('Agent activity notifications', () => {
           agentName: 'Agent 6',
           completionId: 'completion-localized',
           providerId: 'codex',
+          terminal,
           terminalRevision: 1
         })
       )
     )
 
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 已完成本轮回答')
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 6 · Codex · main')
+    const notification = screen.getByRole('status')
+    expect(notification).toHaveTextContent('Agent 6')
+    expect(notification).toHaveTextContent('cleancode · feat/notifications')
+    expect(notification).not.toHaveTextContent('已回复')
+    expect(notification).not.toHaveTextContent('/Users/nature/.cleancode/worktrees/notifications')
+    expect(notification).not.toHaveTextContent('Codex')
+    expect(screen.getByLabelText('本轮已完成')).toBeInTheDocument()
+    expect(notification.querySelector('.agent-provider-icon')).not.toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to English' }))
 
-    expect(screen.getByRole('status')).toHaveTextContent('Agent finished this turn')
-    expect(screen.getByRole('status')).toHaveTextContent('Agent 6 · Codex · main')
-    expect(screen.getByText('Agent 已完成本轮回答')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent('Agent 6')
+    expect(screen.getByRole('status')).not.toHaveTextContent('replied')
+    expect(screen.getByRole('status')).toHaveTextContent('cleancode · feat/notifications')
+    expect(screen.getByRole('status')).not.toHaveTextContent('Codex')
+    expect(screen.getByLabelText('Turn completed')).toBeInTheDocument()
   })
 
   it('updates a waiting card source after rename without creating or reviving an occurrence', async () => {
@@ -195,7 +225,9 @@ describe('Agent activity notifications', () => {
       )
     )
     const notification = screen.getByRole('status')
-    expect(notification).toHaveTextContent('Agent 1 · Codex · main')
+    expect(notification).toHaveTextContent('Agent 1 等待输入')
+    expect(notification).toHaveTextContent('project · main')
+    expect(notification).not.toHaveTextContent('Codex')
 
     act(() =>
       runtime.emitActivity(
@@ -203,11 +235,13 @@ describe('Agent activity notifications', () => {
       )
     )
     expect(screen.getAllByRole('status')).toEqual([notification])
-    expect(notification).toHaveTextContent('Renamed Agent · Codex · main')
+    expect(notification).toHaveTextContent('Renamed Agent 等待输入')
+    expect(notification).toHaveTextContent('project · main')
+    expect(notification).not.toHaveTextContent('Codex')
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: '关闭“Agent 正在等待输入 — Renamed Agent · Codex · main”通知'
+        name: '关闭“Renamed Agent 等待输入 — Codex — project · main”通知'
       })
     )
     expect(screen.queryByRole('status')).toBeNull()
@@ -221,9 +255,13 @@ describe('Agent activity notifications', () => {
   })
 
   it('provides matching English notification copy', () => {
-    expect(translate('en', 'agentActivity.turnCompleted')).toBe('Agent finished this turn')
-    expect(translate('en', 'agentActivity.waitingInput')).toBe('Agent is waiting for input')
-    expect(translate('en', 'agentActivity.waitingApproval')).toBe('Agent is waiting for approval')
+    expect(translate('en', 'agentActivity.turnCompleted')).toBe('Turn completed')
+    expect(translate('en', 'agentActivity.waitingInput', { agentName: 'Agent 6' })).toBe(
+      'Agent 6 is waiting for input'
+    )
+    expect(translate('en', 'agentActivity.waitingApproval', { agentName: 'Agent 6' })).toBe(
+      'Agent 6 is waiting for approval'
+    )
   })
 })
 
@@ -263,6 +301,7 @@ function installAgentActivityRuntime(
   const unsubscribeActivity = vi.fn()
   const unsubscribeCompletion = vi.fn()
   const listAgentActivities = vi.fn(async () => baseline)
+  const listAgentProviders = vi.fn(async () => testAgentProviders)
   const onActivityChanged = vi.fn((listener: (snapshot: TerminalAgentActivitySnapshot) => void) => {
     activityListener = listener
     return unsubscribeActivity
@@ -277,6 +316,7 @@ function installAgentActivityRuntime(
     value: {
       appName: 'cleancode',
       listAgentActivities,
+      listAgentProviders,
       onAgentActivityChanged: onActivityChanged,
       onAgentTurnCompleted: onTurnCompleted
     }
@@ -286,6 +326,7 @@ function installAgentActivityRuntime(
     emitActivity: (snapshot: TerminalAgentActivitySnapshot) => activityListener?.(snapshot),
     emitCompletion: (completion: AgentTurnCompletedEvent) => completionListener?.(completion),
     listAgentActivities,
+    listAgentProviders,
     onActivityChanged,
     onTurnCompleted,
     unsubscribeActivity,
@@ -296,11 +337,13 @@ function installAgentActivityRuntime(
 function createSnapshot({
   agentName,
   revision,
-  status
+  status,
+  terminal
 }: {
   readonly agentName?: string
   readonly revision: number
   readonly status: TerminalAgentActivitySnapshot['status']
+  readonly terminal?: Partial<TerminalAgentActivitySnapshot['terminal']>
 }): TerminalAgentActivitySnapshot {
   return {
     invocations: [
@@ -332,7 +375,8 @@ function createSnapshot({
       runId: 'run-1',
       sessionId: 'session-1',
       workspaceDirectory: '/tmp/project',
-      workspaceId: 'workspace-1'
+      workspaceId: 'workspace-1',
+      ...terminal
     }
   }
 }
@@ -342,12 +386,14 @@ function createCompletion({
   completionId,
   invocationId = 'invocation-1',
   providerId = 'provider-neutral',
+  terminal,
   terminalRevision
 }: {
   readonly agentName?: string
   readonly completionId: string
   readonly invocationId?: string
   readonly providerId?: string
+  readonly terminal?: Partial<AgentTurnCompletedEvent['identity']['terminal']>
   readonly terminalRevision: number
 }): AgentTurnCompletedEvent {
   return {
@@ -366,9 +412,39 @@ function createCompletion({
           }
         : {}),
       providerId,
-      terminal: createSnapshot({ revision: terminalRevision, status: 'idle' }).terminal
+      terminal: {
+        ...createSnapshot({ revision: terminalRevision, status: 'idle' }).terminal,
+        ...terminal
+      }
     },
     reason: 'reported',
     terminalRevision
+  }
+}
+
+const testProviderIcon = {
+  paths: [{ d: 'M2 2h20v20H2z' }],
+  viewBox: '0 0 24 24'
+} as const
+
+const testAgentProviders: readonly AgentProviderDescriptor[] = [
+  createTestProvider('agent', 'Agent'),
+  createTestProvider('codex', 'Codex'),
+  createTestProvider('provider-neutral', 'Provider Neutral')
+]
+
+function createTestProvider(id: string, displayName: string): AgentProviderDescriptor {
+  return {
+    capabilities: {
+      activityTracking: true,
+      cleancodeMcp: false,
+      launchInstructions: false,
+      resume: false,
+      sessionIdentityCapture: false,
+      sessionRefCodec: false
+    },
+    displayName,
+    icon: testProviderIcon,
+    id
   }
 }

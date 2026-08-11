@@ -25,8 +25,11 @@ export type AgentActivityNotificationProjection =
 interface AgentActivityNotificationSource {
   readonly agentName?: string
   readonly gitBranch: string | null
+  readonly projectDirectory: string
+  readonly projectId: string
   readonly providerId: string
   readonly workspaceDirectory: string
+  readonly workspaceId: string
 }
 
 const completedIdentityHistoryLimit = 1_024
@@ -186,8 +189,11 @@ function createSnapshotSource(
   return {
     ...(invocation?.managed?.agentName ? { agentName: invocation.managed.agentName } : {}),
     gitBranch: snapshot.terminal.gitBranch,
+    projectDirectory: snapshot.terminal.projectDirectory,
+    projectId: snapshot.terminal.projectId,
     providerId: invocation?.providerId ?? 'agent',
-    workspaceDirectory: snapshot.terminal.workspaceDirectory
+    workspaceDirectory: snapshot.terminal.workspaceDirectory,
+    workspaceId: snapshot.terminal.workspaceId
   }
 }
 
@@ -197,8 +203,11 @@ function createIdentitySource(
   return {
     ...(identity.managed?.agentName ? { agentName: identity.managed.agentName } : {}),
     gitBranch: identity.terminal.gitBranch,
+    projectDirectory: identity.terminal.projectDirectory,
+    projectId: identity.terminal.projectId,
     providerId: identity.providerId,
-    workspaceDirectory: identity.terminal.workspaceDirectory
+    workspaceDirectory: identity.terminal.workspaceDirectory,
+    workspaceId: identity.terminal.workspaceId
   }
 }
 

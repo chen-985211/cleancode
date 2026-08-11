@@ -55,7 +55,7 @@ export function createWorkflowRunNotification(
     return {
       autoDismissMs: 4_000,
       kind: 'success',
-      message: scopeMessage,
+      source: { label: scopeMessage },
       title: t('workflow.succeededTitle')
     }
   }
@@ -64,7 +64,7 @@ export function createWorkflowRunNotification(
     return {
       autoDismissMs: 4_000,
       kind: 'warning',
-      message: scopeMessage,
+      source: { label: scopeMessage },
       title: t('workflow.stoppedTitle')
     }
   }
@@ -72,6 +72,7 @@ export function createWorkflowRunNotification(
   return {
     action: {
       disabled: isStopping,
+      icon: 'stop',
       label: t('workflow.stopAction'),
       onClick: onStop,
       pendingLabel: t('workflow.stoppingAction'),
@@ -79,7 +80,7 @@ export function createWorkflowRunNotification(
     },
     isActivity: true,
     kind: 'info',
-    message: scopeMessage,
+    source: { label: scopeMessage },
     title: run.status === 'ready' ? t('workflow.readyTitle') : t('workflow.runningTitle')
   }
 }

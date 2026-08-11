@@ -1,14 +1,20 @@
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import type {
   AgentTurnCompletedEvent,
   TerminalAgentActivitySnapshot
 } from '../../contexts/agent/application/dto/AgentActivityProtocol'
+import { AgentProviderIcon } from './AgentProviderIcon'
 import { AgentActivityStore, type AgentActivityNotificationProjection } from './agentActivityStore'
 import { useI18n } from './i18n/useI18n'
 import { AgentActivityStoreContext } from './useAgentActivitySnapshots'
 import { useNotifications } from './useNotifications'
-import { formatProviderDisplayName } from './useAgentProviderCatalog'
+import {
+  formatProviderDisplayName,
+  useAgentProviderCatalog,
+  type AgentProviderCatalogState
+} from './useAgentProviderCatalog'
 
 type AgentActivityRendererApi = Pick<
   NonNullable<Window['cleancode']>,
@@ -30,22 +36,30 @@ export function AgentActivityObserver({ children }: { readonly children: ReactNo
   const [store] = useState(() => new AgentActivityStore())
   const notifications = useNotifications()
   const { t } = useI18n()
+  const providerCatalog = useAgentProviderCatalog()
   const notificationsRef = useRef(notifications)
   const publishedNotificationsRef = useRef(new Map<string, PublishedAgentActivityNotification>())
+  const providerCatalogRef = useRef(providerCatalog)
   const translateRef = useRef(t)
 
   useEffect(() => {
     notificationsRef.current = notifications
+    providerCatalogRef.current = providerCatalog
     translateRef.current = t
-  }, [notifications, t])
+  }, [notifications, providerCatalog, t])
 
   useEffect(() => {
     for (const [messageKey, published] of publishedNotificationsRef.current) {
-      if (!notifications.update(published.id, createNotificationInput(published.projection, t))) {
+      if (
+        !notifications.update(
+          published.id,
+          createNotificationInput(published.projection, t, providerCatalog)
+        )
+      ) {
         publishedNotificationsRef.current.delete(messageKey)
       }
     }
-  }, [notifications, t])
+  }, [notifications, providerCatalog, t])
 
   useEffect(() => {
     const api = resolveAgentActivityApi()
@@ -66,7 +80,8 @@ export function AgentActivityObserver({ children }: { readonly children: ReactNo
           projection,
           notificationsRef.current,
           publishedNotificationsRef.current,
-          translateRef.current
+          translateRef.current,
+          providerCatalogRef.current
         )
       }
     }
@@ -122,7 +137,8 @@ function projectNotification(
   projection: AgentActivityNotificationProjection,
   notifications: Notifications,
   publishedNotifications: Map<string, PublishedAgentActivityNotification>,
-  t: Translate
+  t: Translate,
+  providerCatalog: AgentProviderCatalogState
 ): void {
   if (projection.type === 'attention_resolved') {
     const published = publishedNotifications.get(projection.messageKey)
@@ -134,7 +150,7 @@ function projectNotification(
   }
 
   if (projection.type === 'turn_completed') {
-    const id = notifications.notify(createNotificationInput(projection, t))
+    const id = notifications.notify(createNotificationInput(projection, t, providerCatalog))
     rememberPublishedNotification(
       publishedNotifications,
       projection.messageIdentity.key,
@@ -144,7 +160,7 @@ function projectNotification(
     return
   }
 
-  const id = notifications.notify(createNotificationInput(projection, t))
+  const id = notifications.notify(createNotificationInput(projection, t, providerCatalog))
   rememberPublishedNotification(
     publishedNotifications,
     projection.messageIdentity.key,
@@ -155,31 +171,60 @@ function projectNotification(
 
 function createNotificationInput(
   projection: Exclude<AgentActivityNotificationProjection, { type: 'attention_resolved' }>,
-  t: Translate
+  t: Translate,
+  providerCatalog: AgentProviderCatalogState
 ) {
-  const source = formatAgentActivitySource(projection.source)
-  const title =
-    projection.type === 'turn_completed'
-      ? t('agentActivity.turnCompleted')
-      : projection.status === 'waiting_approval'
-        ? t('agentActivity.waitingApproval')
-        : t('agentActivity.waitingInput')
+  const source = formatAgentActivitySource(projection.source, providerCatalog)
+  const agentName = projection.source.agentName ?? 'Agent'
+  const isTurnCompleted = projection.type === 'turn_completed'
+  const turnCompletedLabel = isTurnCompleted ? t('agentActivity.turnCompleted') : null
+  const title = isTurnCompleted
+    ? agentName
+    : projection.status === 'waiting_approval'
+      ? t('agentActivity.waitingApproval', { agentName })
+      : t('agentActivity.waitingInput', { agentName })
   return {
-    accessibleLabel: `${title} — ${source}`,
+    accessibleLabel: [title, turnCompletedLabel, source.providerName, source.label]
+      .filter(Boolean)
+      .join(' — '),
     identity: projection.messageIdentity,
-    kind: projection.type === 'turn_completed' ? ('success' as const) : ('warning' as const),
-    message: source,
-    title
+    kind: isTurnCompleted ? ('success' as const) : ('warning' as const),
+    leadingIcon: <AgentProviderIcon icon={source.providerIcon} />,
+    source: {
+      label: source.label
+    },
+    title,
+    ...(turnCompletedLabel
+      ? {
+          titleStatus: {
+            icon: <CheckIcon size={13} weight="bold" aria-hidden="true" />,
+            label: turnCompletedLabel
+          }
+        }
+      : {})
   }
 }
 
 function formatAgentActivitySource(
-  source: Extract<AgentActivityNotificationProjection, { type: 'attention' }>['source']
-): string {
-  const providerName = formatProviderDisplayName(source.providerId)
+  source: Extract<AgentActivityNotificationProjection, { type: 'attention' }>['source'],
+  providerCatalog: AgentProviderCatalogState
+) {
+  const provider =
+    providerCatalog.status === 'ready'
+      ? (providerCatalog.providers.find((candidate) => candidate.id === source.providerId) ?? null)
+      : null
+  const projectName = getPathBasename(source.projectDirectory) ?? source.projectId
   const workspaceName =
-    source.gitBranch ?? source.workspaceDirectory.split(/[\\/]/).filter(Boolean).at(-1)
-  return [source.agentName, providerName, workspaceName].filter(Boolean).join(' · ')
+    source.gitBranch ?? getPathBasename(source.workspaceDirectory) ?? source.workspaceId
+  return {
+    label: `${projectName} · ${workspaceName}`,
+    providerIcon: provider?.icon ?? null,
+    providerName: provider?.displayName ?? formatProviderDisplayName(source.providerId)
+  }
+}
+
+function getPathBasename(directory: string): string | null {
+  return directory.split(/[\\/]/).filter(Boolean).at(-1) ?? null
 }
 
 function rememberPublishedNotification(

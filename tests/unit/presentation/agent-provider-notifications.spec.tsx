@@ -19,6 +19,7 @@ describe('Agent Provider notifications', () => {
     )
     expect(screen.getAllByRole('status')).toHaveLength(1)
     expect(screen.getByRole('status')).toHaveTextContent('未能保存恢复信息')
+    expect(screen.getByRole('status')).toHaveClass('notification-card--uniform')
 
     rerender(
       <NotificationProvider>
