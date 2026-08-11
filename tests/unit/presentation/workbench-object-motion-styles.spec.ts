@@ -60,6 +60,9 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toMatch(
       /\.terminal-node:is\(\s*\.workbench-object-motion--group-expand,\s*\.workbench-object-motion--group-collapse\s*\)/
     )
+    expect(objectMotionStyles).toMatch(
+      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
+    )
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-collapse')
@@ -68,6 +71,9 @@ describe('workbench object motion styles', () => {
 
   it('morphs one group material between committed geometries while members move', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
+    const expandingHeaderRule = readRule(
+      '.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header'
+    )
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
     const groupRule = readTerminalGroupRule('.terminal-group-node')
@@ -94,8 +100,22 @@ describe('workbench object motion styles', () => {
       /translate3d\(\s*var\(--workbench-object-motion-shell-x\),\s*var\(--workbench-object-motion-shell-y\),\s*0\s*\)/
     )
     expect(objectMotionStyles).toContain('will-change: transform, width, height;')
+    expect(expandingHeaderRule).toContain('width: var(--workbench-object-motion-shell-width);')
+    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-x)')
+    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-y)')
+    expect(expandingHeaderRule).toContain('will-change: transform, width;')
+    expect(expandingHeaderRule).toContain('overflow: hidden;')
+    expect(expandingHeaderRule).toContain('transition: none;')
+    expect(expandingHeaderRule).not.toContain('scale(')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-shell-inset')
     expect(objectMotionStyles).not.toContain('> .terminal-group-node__material::before')
+    expect(objectMotionStyles).toContain('> .terminal-group-node__members--motion-exit')
+    expect(objectMotionStyles).toContain(
+      'opacity: calc(1 - var(--workbench-object-motion-content-opacity));'
+    )
+    expect(objectMotionStyles).toMatch(
+      /workbench-object-motion--group-expand[\s\S]*> \.terminal-group-node__header[\s\S]*> :not\(\.terminal-group-node__title\)/
+    )
     expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')

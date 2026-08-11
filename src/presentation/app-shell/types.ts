@@ -106,6 +106,7 @@ export interface WorkbenchObjectMotion {
   readonly id: string
   readonly kind: WorkbenchObjectMotionKind
   readonly offset: { readonly x: number; readonly y: number }
+  readonly contentDelayMs?: number
   readonly delayMs?: number
   readonly scale?: { readonly from: number; readonly to: number }
   readonly opacity?: { readonly from: number; readonly to: number }

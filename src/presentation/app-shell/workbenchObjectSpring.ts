@@ -88,6 +88,7 @@ export function createWorkbenchObjectSpringController({
   let shellWidthTarget = 0
   let shellHeightTarget = 0
   let delayRemainingSeconds = 0
+  let contentDelayRemainingSeconds = 0
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
 
@@ -159,6 +160,11 @@ export function createWorkbenchObjectSpringController({
       scheduleFrame()
       return
     }
+    const contentActiveElapsedSeconds = Math.max(
+      0,
+      activeElapsedSeconds - contentDelayRemainingSeconds
+    )
+    contentDelayRemainingSeconds = Math.max(0, contentDelayRemainingSeconds - activeElapsedSeconds)
 
     const positionDynamics = resolvePositionDynamics(motion)
     xAxis = advanceSpringAxis(xAxis, xTarget, positionDynamics, activeElapsedSeconds)
@@ -166,14 +172,18 @@ export function createWorkbenchObjectSpringController({
     opacityAxis = advanceSpringAxis(
       opacityAxis,
       opacityTarget,
-      isDisclosureMotion(motion) ? disclosureOpacityDynamics : spatialSpringDynamics,
+      motion?.kind === 'group-expand'
+        ? positionDynamics
+        : isDisclosureMotion(motion)
+          ? disclosureOpacityDynamics
+          : spatialSpringDynamics,
       activeElapsedSeconds
     )
     contentOpacityAxis = advanceSpringAxis(
       contentOpacityAxis,
       contentOpacityTarget,
       motion?.contentOpacity ? positionDynamics : disclosureOpacityDynamics,
-      activeElapsedSeconds
+      contentActiveElapsedSeconds
     )
     scaleAxis = advanceSpringAxis(
       scaleAxis,
@@ -269,6 +279,7 @@ export function createWorkbenchObjectSpringController({
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
     delayRemainingSeconds = (nextMotion.delayMs ?? 0) / 1000
+    contentDelayRemainingSeconds = (nextMotion.contentDelayMs ?? 0) / 1000
   }
 
   const retargetMotion = (nextMotion: WorkbenchObjectMotion): void => {
@@ -295,6 +306,7 @@ export function createWorkbenchObjectSpringController({
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
     delayRemainingSeconds = 0
+    contentDelayRemainingSeconds = 0
     const retargetPolicy = isDisclosureMotion(nextMotion) ? 'toward-target-only' : 'preserve'
     xAxis = retargetSpringAxis(xAxis, xTarget, retargetPolicy)
     yAxis = retargetSpringAxis(yAxis, yTarget, retargetPolicy)

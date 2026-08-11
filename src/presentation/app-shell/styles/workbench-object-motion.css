@@ -68,12 +68,51 @@
   will-change: transform, width, height;
 }
 
-.terminal-group-node:is(
-    .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
-  )
+.terminal-group-node.workbench-object-motion--group-collapse
   > :not(.terminal-group-node__material) {
   opacity: var(--workbench-object-motion-content-opacity);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+  width: var(--workbench-object-motion-shell-width);
+  overflow: hidden;
+  transform: translate3d(
+    var(--workbench-object-motion-shell-x),
+    var(--workbench-object-motion-shell-y),
+    0
+  );
+  transition: none;
+  will-change: transform, width;
+}
+
+.terminal-group-node.workbench-object-motion--group-expand
+  > :not(
+    .terminal-group-node__material,
+    .terminal-group-node__header,
+    .terminal-group-node__members--motion-exit
+  ),
+.terminal-group-node.workbench-object-motion--group-expand
+  > .terminal-group-node__header
+  > :not(.terminal-group-node__title) {
+  opacity: var(--workbench-object-motion-content-opacity);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand
+  > .terminal-group-node__members--motion-exit {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  width: var(--workbench-object-motion-shell-width);
+  height: calc(var(--workbench-object-motion-shell-height) - 44px);
+  flex: none;
+  opacity: calc(1 - var(--workbench-object-motion-content-opacity));
+  pointer-events: none;
+  transform: translate3d(
+    var(--workbench-object-motion-shell-x),
+    var(--workbench-object-motion-shell-y),
+    0
+  );
+  overflow: hidden;
 }
 
 .terminal-node:is(
@@ -81,6 +120,10 @@
   .workbench-object-motion--group-collapse
 ) {
   transform-origin: center;
+}
+
+.terminal-node.workbench-object-motion--group-expand > * {
+  opacity: var(--workbench-object-motion-content-opacity);
 }
 
 .terminal-node.workbench-object-motion--group-collapse {
@@ -235,5 +278,19 @@
     width: 100%;
     height: 100%;
     transform: none;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+    width: 100%;
+    transform: none;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-expand
+    > .terminal-group-node__members--motion-exit {
+    display: none;
+  }
+
+  .terminal-node.workbench-object-motion--group-expand > * {
+    opacity: 1;
   }
 }

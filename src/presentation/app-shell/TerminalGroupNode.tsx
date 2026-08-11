@@ -44,6 +44,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const [draftName, setDraftName] = useState(group.name)
   const nameInputRef = useRef<HTMLInputElement | null>(null)
   const trimmedDraftName = draftName.trim()
+  const isExpanding = data.objectMotion?.kind === 'group-expand'
   const objectMotion = useWorkbenchObjectMotionPresentation(
     data.objectMotion,
     data.onObjectMotionComplete
@@ -69,6 +70,14 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   ]
     .filter(Boolean)
     .join(' ')
+  const memberRows = data.memberBlocks.map((block) => (
+    <MemberRow
+      key={block.id}
+      block={block}
+      state={data.memberStates[block.id]}
+      onRemove={() => void data.onRemoveTerminalFromGroup(group, block)}
+    />
+  ))
 
   const saveName = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -212,15 +221,14 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       ) : null}
 
       {group.isCollapsed ? (
-        <div className="terminal-group-node__members">
-          {data.memberBlocks.map((block) => (
-            <MemberRow
-              key={block.id}
-              block={block}
-              state={data.memberStates[block.id]}
-              onRemove={() => void data.onRemoveTerminalFromGroup(group, block)}
-            />
-          ))}
+        <div className="terminal-group-node__members">{memberRows}</div>
+      ) : isExpanding ? (
+        <div
+          className="terminal-group-node__members terminal-group-node__members--motion-exit"
+          aria-hidden="true"
+          inert
+        >
+          {memberRows}
         </div>
       ) : null}
       {!group.isCollapsed && group.memberBlockIds.length === 0 ? (

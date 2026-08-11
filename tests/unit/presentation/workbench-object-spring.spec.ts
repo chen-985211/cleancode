@@ -113,25 +113,34 @@ describe('workbench object spring', () => {
 
     const motion: WorkbenchObjectMotion = {
       ...createMotion('group-expand', { x: -320, y: -170 }),
+      contentDelayMs: 48,
+      contentOpacity: { from: 0, to: 1 },
       delayMs: 60,
+      opacity: { from: 0, to: 1 },
       scale: { from: 0.88, to: 1 }
     }
     controller.motionChanged(surface, motion, false, completed)
 
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-320)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-170)
-    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeCloseTo(0.28)
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
 
     scheduler.advanceNextFrame(40)
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-320)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
+    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
 
     scheduler.advanceNextFrame(40)
     expect(readProperty(surface, '--workbench-object-motion-x')).toBeGreaterThan(-320)
     expect(readProperty(surface, '--workbench-object-motion-x')).toBeLessThan(0)
-    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeGreaterThan(0.28)
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeGreaterThan(0)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.88)
+    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
+
+    scheduler.advanceNextFrame(40)
+    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeGreaterThan(0)
 
     scheduler.advanceUntilIdle()
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(0)

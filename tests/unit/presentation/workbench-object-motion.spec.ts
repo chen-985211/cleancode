@@ -185,10 +185,13 @@ describe('workbench object motion', () => {
 
     expect(projection.exitingNodes).toEqual([])
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
+      contentDelayMs: 48,
+      contentOpacity: { from: 0, to: 1 },
       delayMs: 0,
       id: 'group-expand:terminal-1',
       kind: 'group-expand',
       offset: { x: -320, y: -170 },
+      opacity: { from: 0, to: 1 },
       scale: { from: 0.88, to: 1 }
     })
   })

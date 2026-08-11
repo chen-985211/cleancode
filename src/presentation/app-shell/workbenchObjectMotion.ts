@@ -26,6 +26,7 @@ interface WorkbenchObjectFrameScheduler {
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
 const groupMemberCollapsedScale = 0.88
+const groupMemberContentDelayMs = 48
 const groupDisclosureCascadeStepMs = 12
 const groupDisclosureMaximumCascadeMs = 60
 
@@ -193,7 +194,10 @@ export function projectWorkbenchObjectMotion({
       expandingMemberMotion
         ? {
             ...motion,
+            contentDelayMs: groupMemberContentDelayMs,
+            contentOpacity: { from: 0, to: 1 },
             delayMs: expandingMemberMotion.delayMs,
+            opacity: { from: 0, to: 1 },
             scale: { from: groupMemberCollapsedScale, to: 1 }
           }
         : node.type !== 'terminalGroup'
@@ -243,6 +247,13 @@ function createGroupMemberMotion(
   return {
     ...createObjectMotion(kind, node.id, resolveOffsetFromOrigin(node, origin), createMotionId),
     delayMs,
+    ...(kind === 'group-expand'
+      ? {
+          contentDelayMs: groupMemberContentDelayMs,
+          contentOpacity: { from: 0, to: 1 },
+          opacity: { from: 0, to: 1 }
+        }
+      : {}),
     scale:
       kind === 'group-expand'
         ? { from: groupMemberCollapsedScale, to: 1 }
