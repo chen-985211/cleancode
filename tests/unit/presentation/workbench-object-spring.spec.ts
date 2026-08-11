@@ -111,26 +111,33 @@ describe('workbench object spring', () => {
     const completed = vi.fn()
     const controller = createWorkbenchObjectSpringController({ scheduler })
 
-    controller.motionChanged(
-      surface,
-      createMotion('group-expand', { x: -320, y: -170 }),
-      false,
-      completed
-    )
+    const motion: WorkbenchObjectMotion = {
+      ...createMotion('group-expand', { x: -320, y: -170 }),
+      delayMs: 60,
+      scale: { from: 0.88, to: 1 }
+    }
+    controller.motionChanged(surface, motion, false, completed)
 
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-320)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-170)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeCloseTo(0.28)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
 
-    scheduler.advanceNextFrame(100)
+    scheduler.advanceNextFrame(40)
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-320)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
+
+    scheduler.advanceNextFrame(40)
     expect(readProperty(surface, '--workbench-object-motion-x')).toBeGreaterThan(-320)
     expect(readProperty(surface, '--workbench-object-motion-x')).toBeLessThan(0)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeGreaterThan(0.28)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.88)
 
     scheduler.advanceUntilIdle()
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(0)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(0)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(1)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
     expect(completed).toHaveBeenCalledOnce()
     expect(completed).toHaveBeenCalledWith('group-expand:terminal-1')
   })
@@ -180,7 +187,10 @@ describe('workbench object spring', () => {
 
     controller.motionChanged(
       surface,
-      createMotion('group-collapse', { x: -280, y: -140 }),
+      {
+        ...createMotion('group-collapse', { x: -280, y: -140 }),
+        scale: { from: 1, to: 0.88 }
+      },
       false,
       completed
     )
@@ -189,40 +199,45 @@ describe('workbench object spring', () => {
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-280)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-140)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
     expect(completed).toHaveBeenCalledOnce()
   })
 
-  it('reveals one final-geometry group material without scaling the live shell', () => {
+  it('morphs one group material between world rects without scaling the live shell', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
     const completed = vi.fn()
     const controller = createWorkbenchObjectSpringController({ scheduler })
-    const motion: WorkbenchObjectMotion = {
-      ...createMotion('group-expand', { x: 0, y: 0 }, 'group-expand:group-1'),
-      contentOpacity: { from: 0, to: 1 },
-      opacity: { from: 1, to: 1 }
-    }
+    const motion = createShellMotion(
+      'group-expand',
+      { height: 180, width: 320, x: 100, y: 100 },
+      { height: 458, width: 984, x: 140, y: 120 }
+    )
 
     controller.motionChanged(surface, motion, false, completed)
 
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(1)
-    expect(surface.properties.has('--workbench-object-motion-previous-width')).toBe(false)
-    expect(surface.properties.has('--workbench-object-motion-previous-height')).toBe(false)
+    expect(readProperty(surface, '--workbench-object-motion-shell-x')).toBe(-40)
+    expect(readProperty(surface, '--workbench-object-motion-shell-y')).toBe(-20)
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBe(320)
+    expect(readProperty(surface, '--workbench-object-motion-shell-height')).toBe(180)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
-    const initialShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
-    expect(initialShellInset).toBeGreaterThan(0)
 
     scheduler.advanceNextFrame(100)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeGreaterThan(0)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeLessThan(1)
-    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeGreaterThan(0)
-    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeLessThan(
-      initialShellInset
-    )
+    expect(readProperty(surface, '--workbench-object-motion-shell-x')).toBeGreaterThan(-40)
+    expect(readProperty(surface, '--workbench-object-motion-shell-x')).toBeLessThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBeGreaterThan(320)
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBeLessThan(984)
 
     scheduler.advanceUntilIdle()
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(1)
-    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-x')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-y')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBe(984)
+    expect(readProperty(surface, '--workbench-object-motion-shell-height')).toBe(458)
     expect(completed).toHaveBeenCalledWith('group-expand:group-1')
   })
 
@@ -238,70 +253,138 @@ describe('workbench object spring', () => {
 
     memberController.motionChanged(
       memberSurface,
-      createMotion('group-expand', { x: -320, y: -170 }),
+      {
+        ...createMotion('group-expand', { x: -320, y: -170 }),
+        scale: { from: 0.88, to: 1 }
+      },
       false,
       vi.fn()
     )
     shellController.motionChanged(
       shellSurface,
-      {
-        ...createMotion('group-expand', { x: 0, y: 0 }, 'group-expand:group-1'),
-        contentOpacity: { from: 0, to: 1 },
-        opacity: { from: 1, to: 1 }
-      },
+      createShellMotion(
+        'group-expand',
+        { height: 180, width: 320, x: 100, y: 100 },
+        { height: 458, width: 984, x: 100, y: 100 }
+      ),
       false,
       vi.fn()
     )
 
-    const initialInset = readProperty(shellSurface, '--workbench-object-motion-shell-inset')
     memberScheduler.advanceNextFrame(100)
     shellScheduler.advanceNextFrame(100)
 
     const memberProgress =
       1 - Math.abs(readProperty(memberSurface, '--workbench-object-motion-x')) / 320
     const shellProgress =
-      1 - readProperty(shellSurface, '--workbench-object-motion-shell-inset') / initialInset
+      (readProperty(shellSurface, '--workbench-object-motion-shell-width') - 320) / (984 - 320)
     expect(shellProgress).toBeCloseTo(memberProgress, 4)
   })
 
-  it('preserves the shell reveal progress when disclosure reverses', () => {
+  it('preserves the material world rect when disclosure reverses across root geometry', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
     const controller = createWorkbenchObjectSpringController({ scheduler })
-    const expandMotion: WorkbenchObjectMotion = {
-      ...createMotion('group-expand', { x: 0, y: 0 }, 'group-expand:group-1'),
-      contentOpacity: { from: 0, to: 1 },
-      opacity: { from: 1, to: 1 }
-    }
+    const collapsedRect = { height: 180, width: 320, x: 100, y: 100 }
+    const expandedRect = { height: 458, width: 984, x: 140, y: 120 }
+    const expandMotion = createShellMotion('group-expand', collapsedRect, expandedRect)
 
     controller.motionChanged(surface, expandMotion, false, vi.fn())
-    const initialShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
     scheduler.advanceNextFrame(80)
-    const currentMaterialOpacity = readProperty(
-      surface,
-      '--workbench-object-motion-content-opacity'
-    )
-    const currentShellInset = readProperty(surface, '--workbench-object-motion-shell-inset')
+    const worldXBeforeReverse =
+      expandedRect.x + readProperty(surface, '--workbench-object-motion-shell-x')
+    const worldYBeforeReverse =
+      expandedRect.y + readProperty(surface, '--workbench-object-motion-shell-y')
+    const widthBeforeReverse = readProperty(surface, '--workbench-object-motion-shell-width')
 
     controller.motionChanged(
       surface,
-      {
-        ...createMotion('group-collapse', { x: 0, y: 0 }, 'group-collapse:group-1'),
-        contentOpacity: { from: 0, to: 1 },
-        opacity: { from: 1, to: 1 }
-      },
+      createShellMotion('group-collapse', expandedRect, collapsedRect),
       false,
       vi.fn()
     )
 
-    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBeCloseTo(
-      1 - currentMaterialOpacity,
+    expect(
+      collapsedRect.x + readProperty(surface, '--workbench-object-motion-shell-x')
+    ).toBeCloseTo(worldXBeforeReverse, 4)
+    expect(
+      collapsedRect.y + readProperty(surface, '--workbench-object-motion-shell-y')
+    ).toBeCloseTo(worldYBeforeReverse, 4)
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBeCloseTo(
+      widthBeforeReverse,
       4
     )
-    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBeCloseTo(
-      initialShellInset - currentShellInset,
-      4
+    scheduler.advanceNextFrame()
+    expect(readProperty(surface, '--workbench-object-motion-shell-width')).toBeLessThan(
+      widthBeforeReverse
     )
+  })
+
+  it('cancels a fresh cascade delay when an in-flight member reverses', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('group-expand', { x: -320, y: -170 }),
+        scale: { from: 0.88, to: 1 }
+      },
+      false,
+      vi.fn()
+    )
+    scheduler.advanceNextFrame(80)
+    const xBeforeReverse = readProperty(surface, '--workbench-object-motion-x')
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('group-collapse', { x: -320, y: -170 }, 'group-collapse:terminal-1'),
+        delayMs: 60,
+        scale: { from: 1, to: 0.88 }
+      },
+      false,
+      vi.fn()
+    )
+    scheduler.advanceNextFrame()
+
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBeLessThan(xBeforeReverse)
+  })
+
+  it('makes collapse settle faster than expansion over the same distance', () => {
+    const expandScheduler = createFrameScheduler()
+    const collapseScheduler = createFrameScheduler()
+    const expandSurface = createSurface()
+    const collapseSurface = createSurface()
+    const expandController = createWorkbenchObjectSpringController({
+      scheduler: expandScheduler
+    })
+    const collapseController = createWorkbenchObjectSpringController({
+      scheduler: collapseScheduler
+    })
+
+    expandController.motionChanged(
+      expandSurface,
+      createMotion('group-expand', { x: -320, y: 0 }),
+      false,
+      vi.fn()
+    )
+    collapseController.motionChanged(
+      collapseSurface,
+      createMotion('group-collapse', { x: -320, y: 0 }),
+      false,
+      vi.fn()
+    )
+    expandScheduler.advanceNextFrame(80)
+    collapseScheduler.advanceNextFrame(80)
+
+    const expandProgress =
+      1 - Math.abs(readProperty(expandSurface, '--workbench-object-motion-x')) / 320
+    const collapseProgress = Math.abs(
+      readProperty(collapseSurface, '--workbench-object-motion-x') / 320
+    )
+    expect(collapseProgress).toBeGreaterThan(expandProgress)
   })
 
   it('consumes a delayed frame without changing the elapsed-time result', () => {
@@ -348,7 +431,6 @@ describe('workbench object spring', () => {
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(120)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(80)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
-    expect(readProperty(surface, '--workbench-object-motion-shell-inset')).toBe(0)
     expect(completed).toHaveBeenCalledOnce()
     expect(scheduler.pendingFrames()).toBe(0)
   })
@@ -367,6 +449,19 @@ function createPresenceMotion(
   scale: NonNullable<WorkbenchObjectMotion['scale']>
 ): WorkbenchObjectMotion {
   return { ...createMotion(kind, { x: 0, y: 0 }), scale }
+}
+
+function createShellMotion(
+  kind: 'group-collapse' | 'group-expand',
+  from: NonNullable<WorkbenchObjectMotion['shellRect']>['from'],
+  to: NonNullable<WorkbenchObjectMotion['shellRect']>['to']
+): WorkbenchObjectMotion {
+  return {
+    ...createMotion(kind, { x: 0, y: 0 }, `${kind}:group-1`),
+    contentOpacity: { from: 0, to: 1 },
+    opacity: { from: 1, to: 1 },
+    shellRect: { from, to }
+  }
 }
 
 function readProperty(surface: ReturnType<typeof createSurface>, property: string): number {

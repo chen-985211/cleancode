@@ -101,6 +101,44 @@ describe('workbench object node presence', () => {
     expect(surface).toHaveAttribute('aria-hidden', 'true')
     expect(surface).toHaveAttribute('inert')
   })
+
+  it('scales a disclosing group member on its visual surface without moving handles or resize controls', () => {
+    const { container } = render(
+      <TerminalNode
+        id="terminal-1"
+        type="terminal"
+        data={{
+          ...createTerminalNodeData(vi.fn()),
+          objectMotion: {
+            id: 'group-expand:terminal-1',
+            kind: 'group-expand',
+            offset: { x: -320, y: -170 },
+            scale: { from: 0.88, to: 1 }
+          }
+        }}
+        dragging={false}
+        zIndex={0}
+        selectable={false}
+        deletable
+        selected={false}
+        draggable={false}
+        isConnectable={false}
+        positionAbsoluteX={420}
+        positionAbsoluteY={270}
+      />
+    )
+
+    const anchor = container.querySelector('.terminal-node-anchor')
+    const surface = container.querySelector('.terminal-node')
+
+    expect(surface).toHaveClass(
+      'workbench-object-motion--group-expand',
+      'workbench-object-motion--spatial'
+    )
+    expect(anchor).not.toHaveClass('workbench-object-motion--group-expand')
+    expect(anchor?.querySelector('.terminal-node__handle')).not.toBeNull()
+    expect(anchor?.querySelector('.terminal-node__resize-handle')).not.toBeNull()
+  })
 })
 
 function createTerminalNodeData(onStart: () => void): TerminalFlowNode['data'] {

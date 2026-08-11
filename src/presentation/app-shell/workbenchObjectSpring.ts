@@ -34,14 +34,17 @@ const xProperty = '--workbench-object-motion-x'
 const yProperty = '--workbench-object-motion-y'
 const opacityProperty = '--workbench-object-motion-opacity'
 const contentOpacityProperty = '--workbench-object-motion-content-opacity'
-const shellInsetProperty = '--workbench-object-motion-shell-inset'
+const shellXProperty = '--workbench-object-motion-shell-x'
+const shellYProperty = '--workbench-object-motion-shell-y'
+const shellWidthProperty = '--workbench-object-motion-shell-width'
+const shellHeightProperty = '--workbench-object-motion-shell-height'
 const scaleProperty = '--workbench-object-motion-scale'
 const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
-const disclosureSpringDynamics = { dampingRatio: 1, response: 0.32 }
+const groupExpandSpringDynamics = { dampingRatio: 1, response: 0.36 }
+const groupCollapseSpringDynamics = { dampingRatio: 1, response: 0.3 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
 const presenceCreateSpringDynamics = { dampingRatio: 1, response: 0.34 }
 const presenceDeleteSpringDynamics = { dampingRatio: 1, response: 0.26 }
-const shellRevealInsetPercent = 8
 const positionSettlementThresholds = { speed: 1, value: 0.1 }
 const opacitySettlementThresholds = { speed: 0.02, value: 0.002 }
 const scaleSettlementThresholds = { speed: 0.02, value: 0.002 }
@@ -71,11 +74,20 @@ export function createWorkbenchObjectSpringController({
   let opacityAxis: SpringAxis = { value: 1, velocity: 0 }
   let contentOpacityAxis: SpringAxis = { value: 1, velocity: 0 }
   let scaleAxis: SpringAxis = { value: 1, velocity: 0 }
+  let shellXAxis: SpringAxis = { value: 0, velocity: 0 }
+  let shellYAxis: SpringAxis = { value: 0, velocity: 0 }
+  let shellWidthAxis: SpringAxis = { value: 0, velocity: 0 }
+  let shellHeightAxis: SpringAxis = { value: 0, velocity: 0 }
   let xTarget = 0
   let yTarget = 0
   let opacityTarget = 1
   let contentOpacityTarget = 1
   let scaleTarget = 1
+  let shellXTarget = 0
+  let shellYTarget = 0
+  let shellWidthTarget = 0
+  let shellHeightTarget = 0
+  let delayRemainingSeconds = 0
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
 
@@ -90,7 +102,10 @@ export function createWorkbenchObjectSpringController({
     surface.style.removeProperty(yProperty)
     surface.style.removeProperty(opacityProperty)
     surface.style.removeProperty(contentOpacityProperty)
-    surface.style.removeProperty(shellInsetProperty)
+    surface.style.removeProperty(shellXProperty)
+    surface.style.removeProperty(shellYProperty)
+    surface.style.removeProperty(shellWidthProperty)
+    surface.style.removeProperty(shellHeightProperty)
     surface.style.removeProperty(scaleProperty)
   }
 
@@ -101,10 +116,23 @@ export function createWorkbenchObjectSpringController({
     surface.style.setProperty(opacityProperty, `${round(opacityAxis.value)}`)
     surface.style.setProperty(contentOpacityProperty, `${round(contentOpacityAxis.value)}`)
     surface.style.setProperty(scaleProperty, `${round(scaleAxis.value)}`)
-    surface.style.setProperty(
-      shellInsetProperty,
-      `${round((1 - contentOpacityAxis.value) * shellRevealInsetPercent)}%`
-    )
+    if (motion?.shellRect) {
+      surface.style.setProperty(
+        shellXProperty,
+        `${round(shellXAxis.value - motion.shellRect.to.x)}px`
+      )
+      surface.style.setProperty(
+        shellYProperty,
+        `${round(shellYAxis.value - motion.shellRect.to.y)}px`
+      )
+      surface.style.setProperty(shellWidthProperty, `${round(shellWidthAxis.value)}px`)
+      surface.style.setProperty(shellHeightProperty, `${round(shellHeightAxis.value)}px`)
+    } else {
+      surface.style.removeProperty(shellXProperty)
+      surface.style.removeProperty(shellYProperty)
+      surface.style.removeProperty(shellWidthProperty)
+      surface.style.removeProperty(shellHeightProperty)
+    }
   }
 
   const complete = (): void => {
@@ -124,42 +152,83 @@ export function createWorkbenchObjectSpringController({
     animationFrameId = null
     const elapsedSeconds = Math.max(0, (timestamp - lastFrameTimestamp) / 1000)
     lastFrameTimestamp = timestamp
-    const positionDynamics = isDisclosureMotion(motion)
-      ? disclosureSpringDynamics
-      : spatialSpringDynamics
-    xAxis = advanceSpringAxis(xAxis, xTarget, positionDynamics, elapsedSeconds)
-    yAxis = advanceSpringAxis(yAxis, yTarget, positionDynamics, elapsedSeconds)
+    const activeElapsedSeconds = Math.max(0, elapsedSeconds - delayRemainingSeconds)
+    delayRemainingSeconds = Math.max(0, delayRemainingSeconds - elapsedSeconds)
+    if (activeElapsedSeconds === 0) {
+      present()
+      scheduleFrame()
+      return
+    }
+
+    const positionDynamics = resolvePositionDynamics(motion)
+    xAxis = advanceSpringAxis(xAxis, xTarget, positionDynamics, activeElapsedSeconds)
+    yAxis = advanceSpringAxis(yAxis, yTarget, positionDynamics, activeElapsedSeconds)
     opacityAxis = advanceSpringAxis(
       opacityAxis,
       opacityTarget,
       isDisclosureMotion(motion) ? disclosureOpacityDynamics : spatialSpringDynamics,
-      elapsedSeconds
+      activeElapsedSeconds
     )
     contentOpacityAxis = advanceSpringAxis(
       contentOpacityAxis,
       contentOpacityTarget,
-      motion?.contentOpacity ? disclosureSpringDynamics : disclosureOpacityDynamics,
-      elapsedSeconds
+      motion?.contentOpacity ? positionDynamics : disclosureOpacityDynamics,
+      activeElapsedSeconds
     )
     scaleAxis = advanceSpringAxis(
       scaleAxis,
       scaleTarget,
-      motion?.kind === 'delete' ? presenceDeleteSpringDynamics : presenceCreateSpringDynamics,
-      elapsedSeconds
+      isDisclosureMotion(motion)
+        ? positionDynamics
+        : motion?.kind === 'delete'
+          ? presenceDeleteSpringDynamics
+          : presenceCreateSpringDynamics,
+      activeElapsedSeconds
     )
+    if (motion?.shellRect) {
+      shellXAxis = advanceSpringAxis(
+        shellXAxis,
+        shellXTarget,
+        positionDynamics,
+        activeElapsedSeconds
+      )
+      shellYAxis = advanceSpringAxis(
+        shellYAxis,
+        shellYTarget,
+        positionDynamics,
+        activeElapsedSeconds
+      )
+      shellWidthAxis = advanceSpringAxis(
+        shellWidthAxis,
+        shellWidthTarget,
+        positionDynamics,
+        activeElapsedSeconds
+      )
+      shellHeightAxis = advanceSpringAxis(
+        shellHeightAxis,
+        shellHeightTarget,
+        positionDynamics,
+        activeElapsedSeconds
+      )
+    }
 
     if (
       isSpringAxisSettled(xAxis, xTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(yAxis, yTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(opacityAxis, opacityTarget, opacitySettlementThresholds) &&
       isSpringAxisSettled(contentOpacityAxis, contentOpacityTarget, opacitySettlementThresholds) &&
-      isSpringAxisSettled(scaleAxis, scaleTarget, scaleSettlementThresholds)
+      isSpringAxisSettled(scaleAxis, scaleTarget, scaleSettlementThresholds) &&
+      isShellMotionSettled()
     ) {
       xAxis = { value: xTarget, velocity: 0 }
       yAxis = { value: yTarget, velocity: 0 }
       opacityAxis = { value: opacityTarget, velocity: 0 }
       contentOpacityAxis = { value: contentOpacityTarget, velocity: 0 }
       scaleAxis = { value: scaleTarget, velocity: 0 }
+      shellXAxis = { value: shellXTarget, velocity: 0 }
+      shellYAxis = { value: shellYTarget, velocity: 0 }
+      shellWidthAxis = { value: shellWidthTarget, velocity: 0 }
+      shellHeightAxis = { value: shellHeightTarget, velocity: 0 }
       present()
       complete()
       return
@@ -168,6 +237,13 @@ export function createWorkbenchObjectSpringController({
     present()
     scheduleFrame()
   }
+
+  const isShellMotionSettled = (): boolean =>
+    !motion?.shellRect ||
+    (isSpringAxisSettled(shellXAxis, shellXTarget, positionSettlementThresholds) &&
+      isSpringAxisSettled(shellYAxis, shellYTarget, positionSettlementThresholds) &&
+      isSpringAxisSettled(shellWidthAxis, shellWidthTarget, positionSettlementThresholds) &&
+      isSpringAxisSettled(shellHeightAxis, shellHeightTarget, positionSettlementThresholds))
 
   const initializeMotion = (nextMotion: WorkbenchObjectMotion): void => {
     const collapsesToOffset = nextMotion.kind === 'group-collapse'
@@ -179,11 +255,20 @@ export function createWorkbenchObjectSpringController({
     }
     contentOpacityAxis = { value: nextMotion.contentOpacity?.from ?? 1, velocity: 0 }
     scaleAxis = { value: nextMotion.scale?.from ?? 1, velocity: 0 }
+    shellXAxis = { value: nextMotion.shellRect?.from.x ?? 0, velocity: 0 }
+    shellYAxis = { value: nextMotion.shellRect?.from.y ?? 0, velocity: 0 }
+    shellWidthAxis = { value: nextMotion.shellRect?.from.width ?? 0, velocity: 0 }
+    shellHeightAxis = { value: nextMotion.shellRect?.from.height ?? 0, velocity: 0 }
     xTarget = collapsesToOffset ? nextMotion.offset.x : 0
     yTarget = collapsesToOffset ? nextMotion.offset.y : 0
     opacityTarget = nextMotion.opacity?.to ?? (collapsesToOffset ? 0 : 1)
     contentOpacityTarget = nextMotion.contentOpacity?.to ?? 1
     scaleTarget = nextMotion.scale?.to ?? 1
+    shellXTarget = nextMotion.shellRect?.to.x ?? 0
+    shellYTarget = nextMotion.shellRect?.to.y ?? 0
+    shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
+    shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
+    delayRemainingSeconds = (nextMotion.delayMs ?? 0) / 1000
   }
 
   const retargetMotion = (nextMotion: WorkbenchObjectMotion): void => {
@@ -205,8 +290,14 @@ export function createWorkbenchObjectSpringController({
     opacityTarget = nextMotion.opacity?.to ?? (collapsesToOffset ? 0 : 1)
     contentOpacityTarget = nextMotion.contentOpacity?.to ?? 1
     scaleTarget = nextMotion.scale?.to ?? 1
-    xAxis = retargetSpringAxis(xAxis, xTarget, 'preserve')
-    yAxis = retargetSpringAxis(yAxis, yTarget, 'preserve')
+    shellXTarget = nextMotion.shellRect?.to.x ?? 0
+    shellYTarget = nextMotion.shellRect?.to.y ?? 0
+    shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
+    shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
+    delayRemainingSeconds = 0
+    const retargetPolicy = isDisclosureMotion(nextMotion) ? 'toward-target-only' : 'preserve'
+    xAxis = retargetSpringAxis(xAxis, xTarget, retargetPolicy)
+    yAxis = retargetSpringAxis(yAxis, yTarget, retargetPolicy)
     opacityAxis = retargetSpringAxis(opacityAxis, opacityTarget, 'preserve')
     contentOpacityAxis = reversesShellReveal
       ? { value: 1 - contentOpacityAxis.value, velocity: -contentOpacityAxis.velocity }
@@ -214,6 +305,23 @@ export function createWorkbenchObjectSpringController({
         ? { value: nextMotion.contentOpacity.from, velocity: 0 }
         : retargetSpringAxis(contentOpacityAxis, contentOpacityTarget, 'preserve')
     scaleAxis = retargetSpringAxis(scaleAxis, scaleTarget, 'toward-target-only')
+    if (nextMotion.shellRect) {
+      if (motion?.shellRect) {
+        shellXAxis = retargetSpringAxis(shellXAxis, shellXTarget, 'toward-target-only')
+        shellYAxis = retargetSpringAxis(shellYAxis, shellYTarget, 'toward-target-only')
+        shellWidthAxis = retargetSpringAxis(shellWidthAxis, shellWidthTarget, 'toward-target-only')
+        shellHeightAxis = retargetSpringAxis(
+          shellHeightAxis,
+          shellHeightTarget,
+          'toward-target-only'
+        )
+      } else {
+        shellXAxis = { value: nextMotion.shellRect.from.x, velocity: 0 }
+        shellYAxis = { value: nextMotion.shellRect.from.y, velocity: 0 }
+        shellWidthAxis = { value: nextMotion.shellRect.from.width, velocity: 0 }
+        shellHeightAxis = { value: nextMotion.shellRect.from.height, velocity: 0 }
+      }
+    }
   }
 
   return {
@@ -254,6 +362,10 @@ export function createWorkbenchObjectSpringController({
         opacityAxis = { value: opacityTarget, velocity: 0 }
         contentOpacityAxis = { value: contentOpacityTarget, velocity: 0 }
         scaleAxis = { value: scaleTarget, velocity: 0 }
+        shellXAxis = { value: shellXTarget, velocity: 0 }
+        shellYAxis = { value: shellYTarget, velocity: 0 }
+        shellWidthAxis = { value: shellWidthTarget, velocity: 0 }
+        shellHeightAxis = { value: shellHeightTarget, velocity: 0 }
         present()
         complete()
         return
@@ -267,6 +379,15 @@ export function createWorkbenchObjectSpringController({
 
 function isDisclosureMotion(motion: WorkbenchObjectMotion | null): boolean {
   return motion?.kind === 'group-collapse' || motion?.kind === 'group-expand'
+}
+
+function resolvePositionDynamics(motion: WorkbenchObjectMotion | null): {
+  readonly dampingRatio: number
+  readonly response: number
+} {
+  if (motion?.kind === 'group-collapse') return groupCollapseSpringDynamics
+  if (motion?.kind === 'group-expand') return groupExpandSpringDynamics
+  return spatialSpringDynamics
 }
 
 function round(value: number): number {

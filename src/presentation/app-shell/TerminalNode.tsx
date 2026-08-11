@@ -32,7 +32,8 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const session = data.session
   const isRunning = session.status === 'running'
   const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
-  const isPresenceMotion = Boolean(data.objectMotion?.scale)
+  const isPresenceMotion =
+    data.objectMotion?.kind === 'create' || data.objectMotion?.kind === 'delete'
   const isPresenceExit = data.objectMotion?.kind === 'delete'
   const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
   const isInteractionSuppressed = isDisclosureExit || isPresenceExit || isParked

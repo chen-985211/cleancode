@@ -185,13 +185,15 @@ describe('workbench object motion', () => {
 
     expect(projection.exitingNodes).toEqual([])
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
+      delayMs: 0,
       id: 'group-expand:terminal-1',
       kind: 'group-expand',
-      offset: { x: -320, y: -170 }
+      offset: { x: -320, y: -170 },
+      scale: { from: 0.88, to: 1 }
     })
   })
 
-  it('reveals one group shell at its final geometry', () => {
+  it('morphs one group material from the previous world rect to the committed rect', () => {
     const currentNodes = [
       createGroupNode('group-1', true, ['terminal-1'], {
         height: 180,
@@ -222,11 +224,14 @@ describe('workbench object motion', () => {
         id: 'group-expand:group-1',
         kind: 'group-expand',
         contentOpacity: { from: 0, to: 1 },
-        opacity: { from: 1, to: 1 }
+        opacity: { from: 1, to: 1 },
+        shellRect: {
+          from: { height: 180, width: 320, x: 100, y: 100 },
+          to: { height: 458, width: 984, x: 100, y: 100 }
+        }
       })
     )
     expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('scale')
-    expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('shellTransition')
   })
 
   it('retargets a collapsing member into expansion without snapping its live presentation', () => {
@@ -296,7 +301,11 @@ describe('workbench object motion', () => {
         data: expect.objectContaining({
           objectMotion: expect.objectContaining({
             id: 'group-collapse:group-1',
-            kind: 'group-collapse'
+            kind: 'group-collapse',
+            shellRect: {
+              from: { height: 600, width: 1_000, x: 100, y: 100 },
+              to: { height: 160, width: 360, x: 100, y: 100 }
+            }
           })
         })
       })
@@ -309,13 +318,58 @@ describe('workbench object motion', () => {
         position: terminal.position,
         data: expect.objectContaining({
           objectMotion: {
+            delayMs: 0,
             id: 'group-collapse:terminal-1',
             kind: 'group-collapse',
-            offset: { x: -320, y: -170 }
+            offset: { x: -320, y: -170 },
+            scale: { from: 1, to: 0.88 }
           }
         })
       })
     ])
+  })
+
+  it('mirrors a bounded member cascade between expansion and collapse', () => {
+    const memberIds = Array.from({ length: 8 }, (_, index) => `terminal-${index + 1}`)
+    const collapsedGroup = createGroupNode('group-1', true, memberIds, {
+      height: 180,
+      width: 320,
+      x: 100,
+      y: 100
+    })
+    const expandedGroup = createGroupNode('group-1', false, memberIds, {
+      height: 600,
+      width: 1_000,
+      x: 100,
+      y: 100
+    })
+    const terminals = memberIds.map((id, index) =>
+      createTerminalNode(id, { x: 420 + index * 24, y: 260 + index * 12 })
+    )
+
+    const expansion = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [collapsedGroup],
+      isContinuingGraph: true,
+      nextNodes: [expandedGroup, ...terminals],
+      reducedMotion: false
+    })
+    const collapse = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [expandedGroup, ...terminals],
+      isContinuingGraph: true,
+      nextNodes: [collapsedGroup],
+      reducedMotion: false
+    })
+    const expandDelays = expansion.nodes
+      .filter((node) => node.type === 'terminal')
+      .map((node) => node.data.objectMotion?.delayMs)
+    const collapseDelays = collapse.exitingNodes.map((node) => node.data.objectMotion?.delayMs)
+
+    expect(expandDelays[0]).toBe(0)
+    expect(expandDelays.at(-1)).toBe(60)
+    expect(collapseDelays).toEqual([...expandDelays].reverse())
+    expect(expandDelays.every((delay) => delay !== undefined && delay <= 60)).toBe(true)
   })
 
   it('absorbs a newly joined terminal while existing group members make room', () => {
