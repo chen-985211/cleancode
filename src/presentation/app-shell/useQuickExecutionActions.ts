@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react'
+import type { Edge, ReactFlowInstance } from '@xyflow/react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 
 import type {
   QuickExecutionSlotNumber,
@@ -6,17 +7,24 @@ import type {
   TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkflowPlanScope } from '../../contexts/run/application/ports/TerminalWorkflowPlanPort'
-import { quickExecutionTargetKey, executeQuickExecutionTarget } from './quickExecutionTargets'
+import {
+  executeQuickExecutionTarget,
+  quickExecutionTargetKey,
+  resolveQuickExecutionBinding
+} from './quickExecutionTargets'
 import type { AppNotificationController } from './appNotifications'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { useI18n } from './i18n/useI18n'
-import type { WorkbenchSnapshot } from './types'
+import { focusQuickExecutionTargetInCanvas } from './quickExecutionFocus'
+import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
+import { useCanvasQuickExecutionFollowPreference } from './useCanvasQuickExecutionFollowPreference'
 
 export function useQuickExecutionActions({
   currentWorkbench,
   currentWorkspace,
   notifications,
   quickLaunchTerminal,
+  reactFlowInstanceRef,
   requestTerminalLaunchCommand,
   setCurrentGraph,
   startScope,
@@ -25,13 +33,19 @@ export function useQuickExecutionActions({
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
   readonly notifications: AppNotificationController
-  readonly quickLaunchTerminal: (block: TerminalBlockSnapshot) => Promise<unknown> | unknown
+  readonly quickLaunchTerminal: (
+    block: TerminalBlockSnapshot,
+    options?: { readonly shouldFocus?: boolean }
+  ) => Promise<unknown> | unknown
+  readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly requestTerminalLaunchCommand: (blockId: string) => void
   readonly setCurrentGraph: (graph: WorkbenchSnapshot['graph']) => void
   readonly startScope: (scope: TerminalWorkflowPlanScope) => Promise<unknown> | unknown
   readonly startTerminalCombination: (terminalGroupId: string) => Promise<unknown> | unknown
 }) {
   const { t } = useI18n()
+  const { changeFollowQuickExecutionTarget, followQuickExecutionTarget } =
+    useCanvasQuickExecutionFollowPreference()
   const executingTargetsRef = useRef(new Set<string>())
   const projectDirectory = currentWorkbench?.project.directory ?? null
   const workspaceId = currentWorkspace?.workspaceId ?? null
@@ -130,9 +144,16 @@ export function useQuickExecutionActions({
 
       executingTargetsRef.current.add(key)
       try {
+        if (followQuickExecutionTarget && resolveQuickExecutionBinding(graph, target).isAvailable) {
+          focusQuickExecutionTargetInCanvas({
+            instance: reactFlowInstanceRef.current,
+            target,
+            terminalGroups: graph.terminalGroups
+          })
+        }
         await executeQuickExecutionTarget({
           graph,
-          quickLaunchTerminal,
+          quickLaunchTerminal: (block) => quickLaunchTerminal(block, { shouldFocus: false }),
           requestTerminalLaunchCommand,
           startScope,
           startTerminalCombination,
@@ -150,8 +171,10 @@ export function useQuickExecutionActions({
     },
     [
       currentWorkbench?.graph,
+      followQuickExecutionTarget,
       notifications,
       quickLaunchTerminal,
+      reactFlowInstanceRef,
       requestTerminalLaunchCommand,
       startScope,
       startTerminalCombination,
@@ -173,9 +196,11 @@ export function useQuickExecutionActions({
     addTarget,
     bindSlot: (number: QuickExecutionSlotNumber, target: QuickExecutionTargetSnapshot) =>
       updateSlot(number, target),
+    changeFollowQuickExecutionTarget,
     clearSlot: (number: QuickExecutionSlotNumber) => updateSlot(number, null),
     executeSlot,
     executeTarget,
+    followQuickExecutionTarget,
     reorderSlots
   }
 }

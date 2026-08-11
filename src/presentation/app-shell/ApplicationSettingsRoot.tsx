@@ -68,6 +68,8 @@ interface ApplicationSettingsRootProps {
   ) => Promise<void> | void
   readonly onAgentProvidersRefresh?: () => Promise<void> | void
   readonly onResetAll: () => void
+  readonly followQuickExecutionTarget: boolean
+  readonly onFollowQuickExecutionTargetChange: (followQuickExecutionTarget: boolean) => void
   readonly reduceVisualNoise: boolean
   readonly onReduceVisualNoiseChange: (reduceVisualNoise: boolean) => void
   readonly terminalScrollbackRows: TerminalScrollbackRows
@@ -225,6 +227,8 @@ export function ApplicationSettingsRoot(props: ApplicationSettingsRootProps) {
             <ApplicationSettingsPaneTransition activePane={activePane}>
               {activePane === 'canvas' ? (
                 <CanvasSettingsPane
+                  followQuickExecutionTarget={props.followQuickExecutionTarget}
+                  onFollowQuickExecutionTargetChange={props.onFollowQuickExecutionTargetChange}
                   reduceVisualNoise={props.reduceVisualNoise}
                   onReduceVisualNoiseChange={props.onReduceVisualNoiseChange}
                 />

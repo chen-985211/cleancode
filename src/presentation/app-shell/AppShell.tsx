@@ -67,7 +67,6 @@ import { ProjectSidebarToggle } from './ProjectSidebarToggle'
 import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
 import { useAgentActivityNotificationNavigation } from './useAgentActivityNotificationNavigation'
 import { useProjectSidebarVisibility } from './useProjectSidebarVisibility'
-
 export function AppShell({
   agentActivityNavigationRequest = null,
   notifications = ignoreAppNotifications,
@@ -274,6 +273,7 @@ export function AppShell({
     currentWorkspace,
     notifications,
     quickLaunchTerminal,
+    reactFlowInstanceRef,
     requestTerminalLaunchCommand,
     setCurrentGraph,
     startScope: terminalWorkflow.startScope,
@@ -292,7 +292,6 @@ export function AppShell({
     setCurrentGraph,
     workbenches
   })
-
   const branchWorkspaceActions = useBranchWorkspaceActions({
     currentWorkbench,
     notifications,
@@ -302,7 +301,6 @@ export function AppShell({
     terminateWorkspaceTerminalSessions,
     forgetWorkspaceTerminalStates
   })
-
   const { addProject, isReorderingProject, removeProject, reorderProject } = useProjectActions({
     notifications,
     rememberWorkbench,
@@ -593,10 +591,12 @@ export function AppShell({
             bindings={bindings}
             blockTemplates={blockTemplates}
             changeBinding={changeBinding}
+            changeFollowQuickExecutionTarget={quickExecution.changeFollowQuickExecutionTarget}
             changeReduceVisualNoise={changeReduceVisualNoise}
             changeTerminalScrollback={changeTerminalScrollback}
             changeTerminalWorkflowBuildMode={changeTerminalWorkflowBuildMode}
             currentWorkbench={currentWorkbench}
+            followQuickExecutionTarget={quickExecution.followQuickExecutionTarget}
             isDesktopRuntime={isDesktopRuntime}
             resetAllBindings={resetAllBindings}
             reduceVisualNoise={reduceVisualNoise}
