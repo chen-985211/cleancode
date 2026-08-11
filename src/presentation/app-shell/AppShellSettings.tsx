@@ -17,10 +17,12 @@ export function AppShellSettings({
   bindings,
   blockTemplates,
   changeBinding,
+  changeFollowQuickExecutionTarget,
   changeReduceVisualNoise,
   changeTerminalScrollback,
   changeTerminalWorkflowBuildMode,
   currentWorkbench,
+  followQuickExecutionTarget,
   isDesktopRuntime,
   resetAllBindings,
   reduceVisualNoise,
@@ -35,10 +37,12 @@ export function AppShellSettings({
   readonly changeBinding: (
     ...args: Parameters<ReturnType<typeof useApplicationShortcutPreference>['changeBinding']>
   ) => void
+  readonly changeFollowQuickExecutionTarget: (followQuickExecutionTarget: boolean) => void
   readonly changeReduceVisualNoise: (reduceVisualNoise: boolean) => void
   readonly changeTerminalScrollback: (rows: 1000 | 5000 | 10000) => void
   readonly changeTerminalWorkflowBuildMode: (mode: TerminalWorkflowBuildMode) => void
   readonly currentWorkbench: WorkbenchSnapshot | null
+  readonly followQuickExecutionTarget: boolean
   readonly isDesktopRuntime: boolean
   readonly resetAllBindings: () => void
   readonly reduceVisualNoise: boolean
@@ -71,6 +75,8 @@ export function AppShellSettings({
         onAgentProviderPreferencesChange={agentCreation.agentProviderPreferences.update}
         onAgentProvidersRefresh={() => agentCreation.creatableAgentProviders.refresh(true)}
         onResetAll={resetAllBindings}
+        followQuickExecutionTarget={followQuickExecutionTarget}
+        onFollowQuickExecutionTargetChange={changeFollowQuickExecutionTarget}
         reduceVisualNoise={reduceVisualNoise}
         onReduceVisualNoiseChange={changeReduceVisualNoise}
         terminalScrollbackRows={terminalScrollbackRows}

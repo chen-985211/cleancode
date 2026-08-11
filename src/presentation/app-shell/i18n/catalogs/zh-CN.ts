@@ -100,6 +100,9 @@ export const zhCNMessages = {
   'settings.canvas.reduceVisualNoise': '减少视觉噪声',
   'settings.canvas.reduceVisualNoiseDescription':
     '缩小画布时隐藏次要描述和操作；悬停、聚焦或选中时重新显示。',
+  'settings.canvas.followQuickExecutionTarget': '快捷执行后跟随目标',
+  'settings.canvas.followQuickExecutionTargetDescription':
+    '使用快捷键执行后，将对应终端、流程或组合定位到画布视野中。',
   'settings.terminal.title': '终端',
   'settings.terminal.scrollback': '滚动历史',
   'settings.terminal.scrollbackRows': '{rows} 行',

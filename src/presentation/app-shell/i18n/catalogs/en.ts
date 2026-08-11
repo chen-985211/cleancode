@@ -102,6 +102,9 @@ export const enMessages = {
   'settings.canvas.reduceVisualNoise': 'Reduce visual noise',
   'settings.canvas.reduceVisualNoiseDescription':
     'Hide secondary descriptions and actions when zoomed out; reveal them on hover, focus, or selection.',
+  'settings.canvas.followQuickExecutionTarget': 'Follow quick execution targets',
+  'settings.canvas.followQuickExecutionTargetDescription':
+    'After running a keyboard shortcut, bring its terminal, workflow, or combination into view.',
   'settings.terminal.title': 'Terminal',
   'settings.terminal.scrollback': 'Scrollback history',
   'settings.terminal.scrollbackRows': '{rows} lines',

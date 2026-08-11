@@ -445,7 +445,7 @@ async function writeInterruptibleFakeProvider(path: string): Promise<void> {
 async function writeSignalIgnoringFakeProvider(path: string): Promise<void> {
   await writeFile(
     path,
-    `#!${process.execPath}\nconst { writeFileSync } = require('node:fs');\nwriteFileSync(process.env.CAPTURE_PATH, JSON.stringify({ invocationId: process.env.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID ?? null, processId: process.pid }));\nprocess.stdout.write('signal-ignoring-provider-ready\\n');\nfor (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.on(signal, () => writeFileSync(process.env.SIGNAL_CAPTURE_PATH, signal));\nsetInterval(() => {}, 1000);\n`
+    `#!${process.execPath}\nconst { writeFileSync } = require('node:fs');\nfor (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.on(signal, () => writeFileSync(process.env.SIGNAL_CAPTURE_PATH, signal));\nwriteFileSync(process.env.CAPTURE_PATH, JSON.stringify({ invocationId: process.env.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID ?? null, processId: process.pid }));\nprocess.stdout.write('signal-ignoring-provider-ready\\n');\nsetInterval(() => {}, 1000);\n`
   )
   await chmod(path, 0o700)
 }

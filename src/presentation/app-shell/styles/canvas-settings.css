@@ -30,6 +30,10 @@
   padding: 12px 16px;
 }
 
+.canvas-settings-row + .canvas-settings-row {
+  border-top: 1px solid var(--cc-border);
+}
+
 .canvas-settings-row__copy {
   display: grid;
   min-width: 0;

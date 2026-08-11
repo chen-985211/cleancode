@@ -188,7 +188,7 @@ export function useTerminalWorkflow({
   )
 
   const stop = useCallback(async () => {
-    if (!currentWorkbench || !currentWorkspace || isStoppingRef.current) return
+    if (!projectDirectory || !workspaceId || isStoppingRef.current) return
 
     isStoppingRef.current = true
     setIsStopping(true)
@@ -196,8 +196,8 @@ export function useTerminalWorkflow({
       await performAction(notify, t, async () => {
         setRun(
           (await window.cleancode?.stopTerminalWorkflow({
-            projectDirectory: currentWorkbench.project.directory,
-            workspaceId: currentWorkspace.workspaceId
+            projectDirectory,
+            workspaceId
           })) ?? null
         )
       })
@@ -205,7 +205,7 @@ export function useTerminalWorkflow({
       isStoppingRef.current = false
       setIsStopping(false)
     }
-  }, [currentWorkbench, currentWorkspace, notify, t])
+  }, [notify, projectDirectory, t, workspaceId])
 
   useTerminalWorkflowNotifications({
     isStopping,

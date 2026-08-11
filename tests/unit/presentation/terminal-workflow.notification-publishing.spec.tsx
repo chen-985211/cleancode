@@ -64,6 +64,44 @@ describe('terminal workflow notification publishing', () => {
     await waitFor(() => expect(notifications.update).toHaveBeenCalledTimes(2))
   })
 
+  it('does not update an active notification when only the canvas viewport changes', async () => {
+    let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
+    const notifications = createNotificationController()
+    const workbench = createWorkbenchSnapshot('/project', 'Project')
+    window.cleancode = createWorkflowRuntime({
+      onEvent: (listener) => {
+        publishEvent = listener
+      }
+    })
+    const setCurrentGraph = vi.fn()
+    const { rerender } = renderHook(
+      ({ currentWorkbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench,
+          currentWorkspace: currentWorkbench.project.workspaces[0],
+          notifications,
+          setCurrentGraph
+        }),
+      { initialProps: { currentWorkbench: workbench } }
+    )
+
+    await waitFor(() => expect(publishEvent).toBeTypeOf('function'))
+    act(() => publishEvent?.({ type: 'run-updated', run: workflowRun('run-1', 'ready') }))
+    await waitFor(() => expect(notifications.notify).toHaveBeenCalledOnce())
+
+    rerender({
+      currentWorkbench: {
+        ...workbench,
+        graph: {
+          ...workbench.graph,
+          viewport: { x: 240, y: -120, zoom: 0.8 }
+        }
+      }
+    })
+
+    expect(notifications.update).not.toHaveBeenCalled()
+  })
+
   it('restores a dismissed activity only when the run later fails', async () => {
     let publishEvent: ((event: TerminalWorkflowEvent) => void) | undefined
     const notifications = createNotificationController({ updateResult: false })
@@ -338,6 +376,36 @@ describe('terminal workflow notification publishing', () => {
     await act(async () => firstStop)
 
     expect(result.current.isStopping).toBe(false)
+  })
+
+  it('stops the workflow in the latest project and workspace scope', async () => {
+    const stop = vi.fn(async () => null)
+    const firstWorkbench = createWorkbenchSnapshot('/first-project', 'First')
+    const latestWorkbench = createWorkbenchSnapshot('/latest-project', 'Latest', {
+      workspaceDirectory: '/latest-project-feature',
+      workspaceId: 'feature'
+    })
+    const notifications = createNotificationController()
+    const setCurrentGraph = vi.fn()
+    window.cleancode = createWorkflowRuntime({ stop })
+    const { result, rerender } = renderHook(
+      ({ currentWorkbench }) =>
+        useTerminalWorkflow({
+          currentWorkbench,
+          currentWorkspace: currentWorkbench.project.workspaces[0],
+          notifications,
+          setCurrentGraph
+        }),
+      { initialProps: { currentWorkbench: firstWorkbench } }
+    )
+
+    rerender({ currentWorkbench: latestWorkbench })
+    await act(() => result.current.stop())
+
+    expect(stop).toHaveBeenCalledWith({
+      projectDirectory: '/latest-project',
+      workspaceId: 'feature'
+    })
   })
 })
 

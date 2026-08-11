@@ -272,6 +272,22 @@ describe('application settings', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(toggle).toHaveAttribute('data-selection-motion-state', 'closing')
   })
+
+  it('lets the user disable quick execution target following from canvas settings', () => {
+    render(<SettingsHarness initiallyOpen />)
+
+    fireEvent.click(screen.getByRole('button', { name: '画布' }))
+
+    expect(
+      screen.getByText('使用快捷键执行后，将对应终端、流程或组合定位到画布视野中。')
+    ).toBeInTheDocument()
+    const toggle = screen.getByRole('switch', { name: '快捷执行后跟随目标' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
 })
 
 function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: boolean }) {
@@ -284,6 +300,7 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
     'parallel' | 'progressive'
   >('progressive')
   const [reduceVisualNoise, setReduceVisualNoise] = useState(true)
+  const [followQuickExecutionTarget, setFollowQuickExecutionTarget] = useState(true)
 
   const changeBinding = (
     command: ApplicationShortcutCommand,
@@ -303,6 +320,8 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
       onResetAll={() => setBindings(defaultApplicationShortcutBindings)}
       reduceVisualNoise={reduceVisualNoise}
       onReduceVisualNoiseChange={setReduceVisualNoise}
+      followQuickExecutionTarget={followQuickExecutionTarget}
+      onFollowQuickExecutionTargetChange={setFollowQuickExecutionTarget}
       terminalScrollbackRows={terminalScrollbackRows}
       onTerminalScrollbackChange={setTerminalScrollbackRows}
       terminalWorkflowBuildMode={terminalWorkflowBuildMode}

@@ -36,13 +36,12 @@ describe.runIf(process.platform !== 'win32')('POSIX pty terminal process adapter
       onExit: () => undefined
     })
 
-    adapter.write('session-1', 'printf "cleancode-pty-ok\\n"\r')
+    adapter.write('session-1', 'printf "cleancode-%s\\n" "pty-ok"\r')
 
     await waitUntil(() => output.includes('cleancode-pty-ok'))
     await adapter.stop('session-1')
 
     expect(processHandle.processId).toBeGreaterThan(0)
-    expect(output).toContain('printf "cleancode-pty-ok\\n"')
     expect(output).toContain('cleancode-pty-ok')
   }, 10_000)
 

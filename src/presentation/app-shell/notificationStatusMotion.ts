@@ -30,9 +30,12 @@ export function synchronizeNotificationStatusMotion(
   state: NotificationStatusMotionState,
   input: NotificationStatusMotionInput
 ): NotificationStatusMotionState {
-  const notificationChanged = state.notification !== input.notification
+  const notificationReplaced = state.notification !== input.notification
+  const statusPresentationChanged =
+    notificationReplaced &&
+    hasNotificationStatusPresentationChanged(state.notification, input.notification)
   const preferenceChanged = state.reducedMotion !== input.reducedMotion
-  if (!notificationChanged && !preferenceChanged) return state
+  if (!notificationReplaced && !preferenceChanged) return state
 
   if (input.reducedMotion) {
     const currentLayer =
@@ -50,7 +53,15 @@ export function synchronizeNotificationStatusMotion(
     }
   }
 
-  if (!notificationChanged) return { ...state, reducedMotion: false }
+  if (!statusPresentationChanged) {
+    return {
+      ...state,
+      ...input,
+      layers: state.layers.map((layer) =>
+        layer.phase === 'current' ? { ...layer, notification: input.notification } : layer
+      )
+    }
+  }
 
   return {
     ...input,
@@ -63,6 +74,19 @@ export function synchronizeNotificationStatusMotion(
     ],
     nextLayerId: state.nextLayerId + 1
   }
+}
+
+function hasNotificationStatusPresentationChanged(
+  current: AppNotification,
+  incoming: AppNotification
+): boolean {
+  return (
+    current.kind !== incoming.kind ||
+    current.title !== incoming.title ||
+    Boolean(current.isActivity) !== Boolean(incoming.isActivity) ||
+    (current.leadingIcon !== undefined) !== (incoming.leadingIcon !== undefined) ||
+    (current.titleStatus?.label ?? null) !== (incoming.titleStatus?.label ?? null)
+  )
 }
 
 export function completeNotificationStatusMotion(

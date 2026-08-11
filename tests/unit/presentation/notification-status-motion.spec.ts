@@ -58,6 +58,66 @@ describe('notification status motion', () => {
 
     expect(reduced.layers).toMatchObject([{ notification: succeeded, phase: 'current' }])
   })
+
+  it('adopts non-status notification updates without replaying the status transition', () => {
+    const stop = vi.fn()
+    const ready = createNotification('run', {
+      action: { icon: 'stop', label: '停止', onClick: stop },
+      isActivity: true,
+      kind: 'info',
+      source: { label: '从“依赖就绪”开始' },
+      title: '流程服务已就绪'
+    })
+    const refreshed = createNotification('run', {
+      action: { icon: 'stop', label: '停止本次运行', onClick: vi.fn() },
+      isActivity: true,
+      kind: 'info',
+      message: '最新详情',
+      source: { label: '从“依赖就绪”开始 · 涉及 2 个终端' },
+      title: '流程服务已就绪'
+    })
+
+    const synchronized = synchronizeNotificationStatusMotion(
+      createNotificationStatusMotionState({ notification: ready, reducedMotion: false }),
+      { notification: refreshed, reducedMotion: false }
+    )
+
+    expect(synchronized.notification).toBe(refreshed)
+    expect(synchronized.layers).toEqual([{ id: 0, notification: refreshed, phase: 'current' }])
+    expect(synchronized.nextLayerId).toBe(1)
+  })
+
+  it.each<{
+    readonly changes: Partial<Omit<AppNotification, 'id'>>
+    readonly dimension: string
+  }>([
+    { changes: { title: '流程服务已就绪' }, dimension: 'title' },
+    { changes: { kind: 'success' }, dimension: 'kind' },
+    { changes: { isActivity: false }, dimension: 'activity state' },
+    { changes: { leadingIcon: 'provider icon' }, dimension: 'leading icon shape' },
+    {
+      changes: { titleStatus: { icon: 'status icon', label: '已完成' } },
+      dimension: 'title status'
+    }
+  ])('creates a status transition when $dimension changes', ({ changes }) => {
+    const runningInput = {
+      isActivity: true,
+      kind: 'info' as const,
+      title: '流程运行中'
+    }
+    const running = createNotification('run', runningInput)
+    const changed = createNotification('run', { ...runningInput, ...changes })
+
+    const synchronized = synchronizeNotificationStatusMotion(
+      createNotificationStatusMotionState({ notification: running, reducedMotion: false }),
+      { notification: changed, reducedMotion: false }
+    )
+
+    expect(synchronized.layers).toMatchObject([
+      { notification: running, phase: 'outgoing' },
+      { notification: changed, phase: 'current' }
+    ])
+  })
 })
 
 function createNotification(id: string, input: Omit<AppNotification, 'id'>): AppNotification {
