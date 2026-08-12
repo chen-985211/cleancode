@@ -29,7 +29,7 @@ describe('app shell initial workbench load', () => {
 
     expect(screen.getByRole('status', { name: '正在恢复上次的工作台' })).toBeInTheDocument()
     expect(screen.getByText('正在恢复项目')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
   })
 
   it('shows the empty workspace only after restoration completes without projects', async () => {
@@ -44,11 +44,11 @@ describe('app shell initial workbench load', () => {
 
     render(<AppShell />)
 
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
 
     await act(async () => restoration.resolve([]))
 
-    expect(await screen.findByRole('heading', { name: '打开项目开始使用' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'CleanCode' })).toBeInTheDocument()
   })
 
   it('never exposes the empty workspace while restoring a remembered project', async () => {
@@ -64,12 +64,12 @@ describe('app shell initial workbench load', () => {
 
     render(<AppShell />)
 
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
 
     await act(async () => restoration.resolve([workbench]))
     await screen.findByText('alpha-project')
 
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
   })
 
   it('does not let a late restoration replace a project opened by the user', async () => {
@@ -93,7 +93,7 @@ describe('app shell initial workbench load', () => {
 
     expect(screen.getByText('opened-project')).toBeInTheDocument()
     expect(screen.queryByText('restored-project')).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
   })
 
   it('shows a retryable error without pretending the workspace is empty', async () => {
@@ -111,7 +111,7 @@ describe('app shell initial workbench load', () => {
     render(<AppShell />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('无法恢复项目')
-    expect(screen.queryByRole('heading', { name: '打开项目开始使用' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
 

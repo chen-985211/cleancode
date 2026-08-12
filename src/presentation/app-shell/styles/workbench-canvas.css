@@ -241,6 +241,52 @@
   animation: canvas-empty-panel-in var(--cc-motion-duration-surface) var(--cc-easing-enter) both;
 }
 
+.canvas-empty--welcome {
+  background: radial-gradient(circle at 50% 48%, var(--cc-primary-canvas-mark) 0, transparent 34%);
+}
+
+.canvas-empty__welcome {
+  display: flex;
+  width: min(560px, calc(100% - 32px));
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.canvas-empty__brand {
+  margin: 0;
+  color: var(--cc-foreground);
+  font-size: clamp(52px, 6vw, 82px);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  text-rendering: geometricPrecision;
+  animation: canvas-empty-brand-tracking var(--cc-motion-duration-brand-reveal)
+    var(--cc-easing-enter) both;
+  animation-delay: var(--cc-motion-delay-brand-reveal);
+}
+
+.canvas-empty--welcome .canvas-empty__action {
+  margin-top: 24px;
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-translucent);
+  color: var(--cc-foreground);
+  box-shadow:
+    var(--cc-shadow-xs),
+    inset 0 1px 0 var(--cc-highlight-inset);
+}
+
+.canvas-empty--welcome .canvas-empty__action:hover {
+  border-color: var(--cc-border-strong);
+  background: var(--cc-surface-raised);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.canvas-empty--welcome .canvas-empty__action:active {
+  background: var(--cc-surface-subtle);
+  box-shadow: var(--cc-shadow-xs);
+}
+
 .canvas-empty__icon {
   display: inline-flex;
   width: 46px;
@@ -405,6 +451,22 @@
   }
 }
 
+@keyframes canvas-empty-brand-tracking {
+  0% {
+    opacity: 0;
+    letter-spacing: -0.42em;
+  }
+
+  42% {
+    opacity: 0.62;
+  }
+
+  100% {
+    opacity: 1;
+    letter-spacing: -0.035em;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .canvas-empty__panel {
     animation: none;
@@ -416,6 +478,11 @@
 
   .canvas-empty__action {
     transition: none;
+  }
+
+  .canvas-empty__brand {
+    letter-spacing: -0.035em;
+    animation: none;
   }
 }
 

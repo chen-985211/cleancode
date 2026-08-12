@@ -467,7 +467,7 @@ async function waitForSidebarVisibilityState(
 }
 
 async function expectEmptyProjectStateWithoutPreviewData(page: Page): Promise<void> {
-  await page.getByRole('heading', { name: '打开项目开始使用' }).waitFor()
+  await page.getByRole('heading', { name: 'CleanCode' }).waitFor()
   expect(await page.getByRole('button', { name: '打开项目' }).count()).toBe(1)
   expect(await page.getByText('添加数据库终端').count()).toBe(0)
   expect(await page.getByText('添加测试终端').count()).toBe(0)
