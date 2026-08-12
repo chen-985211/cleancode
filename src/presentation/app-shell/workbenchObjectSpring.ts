@@ -300,7 +300,8 @@ export function createWorkbenchObjectSpringController({
     if (
       nextMotion.kind === 'group-join' ||
       nextMotion.kind === 'group-leave' ||
-      nextMotion.kind === 'group-reflow'
+      nextMotion.kind === 'group-reflow' ||
+      nextMotion.kind === 'canvas-arrange'
     ) {
       xAxis = { ...xAxis, value: xAxis.value + nextMotion.offset.x }
       yAxis = { ...yAxis, value: yAxis.value + nextMotion.offset.y }

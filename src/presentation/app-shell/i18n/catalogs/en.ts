@@ -286,6 +286,7 @@ export const enMessages = {
   'canvas.arrangement.toolbar': 'Arrange selected canvas objects',
   'canvas.arrangement.stack': 'Stack selected objects',
   'canvas.arrangement.expand': 'Expand stacked objects',
+  'canvas.arrangement.collapse': 'Collapse stacked objects',
   'canvas.arrangement.grid': 'Arrange selected objects in a grid',
   'canvas.arrangement.failedTitle': 'Could not arrange canvas objects',
   'canvas.arrangement.failed': 'The previous layout was restored. Try again.',

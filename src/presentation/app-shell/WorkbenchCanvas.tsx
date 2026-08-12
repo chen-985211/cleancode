@@ -655,7 +655,6 @@ export function WorkbenchCanvas({
           </ReactFlow>
           <WorkbenchCanvasBottomControls
             arrangement={canvasArrangement.arrangement}
-            clearArrangementSelection={templateInteraction.clearSelection}
             currentWorkbench={currentWorkbench}
             isArrangementPending={isCanvasArrangementPending}
             isQuickExecutionDropTarget={isQuickExecutionDropTarget}

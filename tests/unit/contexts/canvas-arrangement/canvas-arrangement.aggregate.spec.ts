@@ -11,6 +11,7 @@ describe('canvas arrangement aggregate', () => {
     const stack = arrangement.createStack({
       id: 'stack-1',
       anchor: { x: 120, y: 80 },
+      presentation: 'stacked',
       items: [
         terminal('terminal-1'),
         workflow('terminal-2', 'terminal-3'),
@@ -25,6 +26,7 @@ describe('canvas arrangement aggregate', () => {
       combination('group-1'),
       agent('agent-1')
     ])
+    expect(stack.presentation).toBe('stacked')
     expect(arrangement.toSnapshot()).toEqual({
       projectId: 'project-1',
       workspaceId: 'main',
@@ -32,7 +34,7 @@ describe('canvas arrangement aggregate', () => {
     })
   })
 
-  it('removes the selected stack when it is expanded', () => {
+  it('spreads and collapses the same stack without removing its members', () => {
     const arrangement = CanvasArrangement.fromSnapshot({
       projectId: 'project-1',
       workspaceId: 'main',
@@ -40,15 +42,18 @@ describe('canvas arrangement aggregate', () => {
         {
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
+          presentation: 'stacked',
           items: [terminal('terminal-1'), agent('agent-1')]
         }
       ]
     })
 
-    const removed = arrangement.removeStack('stack-1')
+    const spread = arrangement.setStackPresentation('stack-1', 'spread')
 
-    expect(removed.id).toBe('stack-1')
-    expect(arrangement.toSnapshot().stacks).toEqual([])
+    expect(spread.presentation).toBe('spread')
+    expect(spread.items).toEqual([terminal('terminal-1'), agent('agent-1')])
+    expect(arrangement.toSnapshot().stacks).toHaveLength(1)
+    expect(arrangement.setStackPresentation('stack-1', 'stacked').presentation).toBe('stacked')
   })
 
   it('moves a stack anchor without changing its ordered members', () => {
@@ -59,6 +64,7 @@ describe('canvas arrangement aggregate', () => {
         {
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
+          presentation: 'spread',
           items: [terminal('terminal-1'), agent('agent-1')]
         }
       ]
@@ -69,6 +75,7 @@ describe('canvas arrangement aggregate', () => {
     expect(moved).toEqual({
       id: 'stack-1',
       anchor: { x: 420, y: 280 },
+      presentation: 'spread',
       items: [terminal('terminal-1'), agent('agent-1')]
     })
   })
@@ -81,6 +88,7 @@ describe('canvas arrangement aggregate', () => {
         {
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
+          presentation: 'spread',
           items: [terminal('terminal-1'), agent('agent-1')]
         }
       ]
@@ -89,6 +97,7 @@ describe('canvas arrangement aggregate', () => {
     arrangement.createMergedStack({
       id: 'stack-2',
       anchor: { x: 300, y: 200 },
+      presentation: 'stacked',
       items: [terminal('terminal-1'), agent('agent-1'), combination('group-1')]
     })
 
@@ -96,6 +105,7 @@ describe('canvas arrangement aggregate', () => {
       {
         id: 'stack-2',
         anchor: { x: 300, y: 200 },
+        presentation: 'stacked',
         items: [terminal('terminal-1'), agent('agent-1'), combination('group-1')]
       }
     ])
@@ -109,6 +119,7 @@ describe('canvas arrangement aggregate', () => {
         {
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
+          presentation: 'stacked',
           items: [terminal('terminal-1'), agent('agent-1')]
         }
       ]
@@ -118,6 +129,7 @@ describe('canvas arrangement aggregate', () => {
       arrangement.createMergedStack({
         id: 'stack-2',
         anchor: { x: 300, y: 200 },
+        presentation: 'stacked',
         items: [terminal('terminal-1'), combination('group-1')]
       })
     ).toThrow('Canvas stack merge must include every member of an existing stack.')
@@ -131,6 +143,7 @@ describe('canvas arrangement aggregate', () => {
     arrangement.createStack({
       id: 'stack-1',
       anchor: { x: 120, y: 80 },
+      presentation: 'stacked',
       items: [terminal('terminal-1'), agent('agent-1')]
     })
 
@@ -138,6 +151,7 @@ describe('canvas arrangement aggregate', () => {
       arrangement.createStack({
         id: 'stack-2',
         anchor: { x: 300, y: 300 },
+        presentation: 'stacked',
         items: [agent('agent-1'), combination('group-1')]
       })
     ).toThrow('Canvas object already belongs to another stack.')
@@ -145,6 +159,7 @@ describe('canvas arrangement aggregate', () => {
       arrangement.createStack({
         id: 'stack-2',
         anchor: { x: 300, y: 300 },
+        presentation: 'stacked',
         items: [terminal('terminal-2'), terminal('terminal-2')]
       })
     ).toThrow('Canvas stack members must be unique.')
@@ -152,6 +167,7 @@ describe('canvas arrangement aggregate', () => {
       arrangement.createStack({
         id: 'stack-2',
         anchor: { x: 300, y: 300 },
+        presentation: 'stacked',
         items: [workflow('terminal-3'), combination('group-1')]
       })
     ).toThrow('Canvas workflow reference requires at least two terminal IDs.')
@@ -159,6 +175,7 @@ describe('canvas arrangement aggregate', () => {
       arrangement.createStack({
         id: 'stack-2',
         anchor: { x: Number.NaN, y: 300 },
+        presentation: 'stacked',
         items: [terminal('terminal-3'), combination('group-1')]
       })
     ).toThrow('Canvas stack anchor must use finite coordinates.')
@@ -172,11 +189,13 @@ describe('canvas arrangement aggregate', () => {
         {
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
+          presentation: 'spread',
           items: [terminal('terminal-1'), agent('agent-1'), combination('group-1')]
         },
         {
           id: 'stack-2',
           anchor: { x: 400, y: 80 },
+          presentation: 'stacked',
           items: [terminal('terminal-2'), agent('agent-2')]
         }
       ]
@@ -193,6 +212,7 @@ describe('canvas arrangement aggregate', () => {
       {
         id: 'stack-1',
         anchor: { x: 120, y: 80 },
+        presentation: 'spread',
         items: [terminal('terminal-1'), agent('agent-1')]
       }
     ])

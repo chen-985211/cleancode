@@ -90,6 +90,7 @@ describe('canvas arrangement selection', () => {
         {
           id: 'stack-1',
           anchor: { x: 100, y: 100 },
+          presentation: 'spread',
           items: [
             { kind: 'terminal', terminalId: 'terminal-a' },
             { kind: 'agent', agentId: 'agent-1' }

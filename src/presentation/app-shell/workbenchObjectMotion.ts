@@ -2,13 +2,16 @@ import type { Edge } from '@xyflow/react'
 
 import { resolveNodeSize } from './resolveNodeSize'
 import type { WorkbenchFlowNode, WorkbenchObjectMotion, WorkbenchObjectMotionKind } from './types'
+import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
 
 export type WorkbenchCanvasDetailLevel = 'compact' | 'full' | 'overview'
 
 interface ProjectWorkbenchObjectMotionInput {
+  readonly canvasArrangementMotion?: CanvasArrangementMotionChoreography | null
   readonly createMotionId: (kind: WorkbenchObjectMotionKind, nodeId: string) => string
   readonly currentNodes: readonly WorkbenchFlowNode[]
   readonly isContinuingGraph: boolean
+  readonly isCanvasArrangementPending?: boolean
   readonly nextNodes: readonly WorkbenchFlowNode[]
   readonly reducedMotion: boolean
 }
@@ -49,6 +52,7 @@ export function projectWorkbenchObjectMotionOntoEdges(
       .filter(
         (node) =>
           node.data.objectMotion?.kind === 'group-expand' ||
+          node.data.objectMotion?.kind === 'canvas-arrange' ||
           node.data.objectMotion?.kind === 'group-join' ||
           node.data.objectMotion?.kind === 'group-leave' ||
           node.data.objectMotion?.kind === 'group-reflow'
@@ -92,8 +96,10 @@ export function scheduleWorkbenchCreatedObjectFocus(
 }
 
 export function projectWorkbenchObjectMotion({
+  canvasArrangementMotion = null,
   createMotionId,
   currentNodes,
+  isCanvasArrangementPending = false,
   isContinuingGraph,
   nextNodes,
   reducedMotion
@@ -173,6 +179,15 @@ export function projectWorkbenchObjectMotion({
           createMotionId
         )
       )
+    }
+
+    if (currentNode && isCanvasArrangementPending) {
+      const offset = resolveOffsetFromNode(node, currentNode)
+      if (offset.x !== 0 || offset.y !== 0) {
+        const motion = createObjectMotion('canvas-arrange', node.id, offset, createMotionId)
+        const delayMs = canvasArrangementMotion?.delayByNodeId[node.id] ?? 0
+        return withObjectMotion(node, delayMs > 0 ? { ...motion, delayMs } : motion)
+      }
     }
 
     if (currentNode || isWorkflowBuildNode(node)) {

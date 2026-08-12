@@ -65,6 +65,22 @@ export function useBlockTemplateCanvasInteraction({
   }, [placementTemplate])
 
   useEffect(() => {
+    if (!graph) return
+    setCanvasSelection((selection) => {
+      if (!selection || selection.rect !== null) return selection
+      const currentItemsByKey = new Map(
+        listCanvasArrangementItems(graph, nodes).map((item) => [item.key, item])
+      )
+      const currentItems = selection.items.map((item) => currentItemsByKey.get(item.key))
+      if (currentItems.some((item) => item === undefined)) return null
+      const nextItems = currentItems as CanvasArrangementSelectionItem[]
+      return nextItems.every((item, index) => hasSameGeometry(item, selection.items[index]!))
+        ? selection
+        : { items: nextItems, rect: null }
+    })
+  }, [graph, nodes])
+
+  useEffect(() => {
     if (!placementTemplate || !onCancelPlacement) return undefined
     const cancelOnEscape = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onCancelPlacement()
@@ -216,4 +232,18 @@ export function useBlockTemplateCanvasInteraction({
     placementOrigin,
     placeFromCanvasClick
   }
+}
+
+function hasSameGeometry(
+  left: CanvasArrangementSelectionItem,
+  right: CanvasArrangementSelectionItem
+): boolean {
+  return (
+    left.position.x === right.position.x &&
+    left.position.y === right.position.y &&
+    left.size.width === right.size.width &&
+    left.size.height === right.size.height &&
+    left.nodeIds.length === right.nodeIds.length &&
+    left.nodeIds.every((nodeId, index) => nodeId === right.nodeIds[index])
+  )
 }

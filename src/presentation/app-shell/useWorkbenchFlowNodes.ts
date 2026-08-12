@@ -27,10 +27,12 @@ import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBui
 import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
 import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
+import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
 interface UseWorkbenchFlowNodesInput {
+  readonly canvasArrangementMotion?: CanvasArrangementMotionChoreography | null
   readonly agentToolApprovals: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
@@ -68,6 +70,7 @@ interface UseWorkbenchFlowNodesInput {
 }
 
 export function useWorkbenchFlowNodes({
+  canvasArrangementMotion = null,
   agentToolApprovals,
   currentWorkbench,
   currentWorkspace,
@@ -229,12 +232,14 @@ export function useWorkbenchFlowNodes({
       }
 
       const motionProjection = projectWorkbenchObjectMotion({
+        canvasArrangementMotion,
         createMotionId: (kind, nodeId) => {
           const motionId = `workbench-object-motion-${nextObjectMotionIdRef.current}-${kind}-${nodeId}`
           nextObjectMotionIdRef.current += 1
           return motionId
         },
         currentNodes,
+        isCanvasArrangementPending: canvasArrangementMotion !== null,
         isContinuingGraph: shouldPreserveTransientLayout,
         nextNodes,
         reducedMotion: prefersReducedMotion()
@@ -291,6 +296,7 @@ export function useWorkbenchFlowNodes({
         : nodesWithExits
     })
   }, [
+    canvasArrangementMotion,
     currentWorkbench,
     currentWorkspace,
     completeObjectMotion,

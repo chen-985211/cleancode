@@ -2,6 +2,7 @@ import { createExpectedAppError } from '../../../../shared-kernel/application/er
 import type {
   CanvasArrangementItemReference,
   CanvasArrangementSnapshot,
+  CanvasStackPresentation,
   CanvasStackSnapshot
 } from './CanvasArrangementTypes'
 
@@ -9,6 +10,7 @@ export interface CreateCanvasStackInput {
   readonly id: string
   readonly anchor: { readonly x: number; readonly y: number }
   readonly items: readonly CanvasArrangementItemReference[]
+  readonly presentation: CanvasStackPresentation
 }
 
 export class CanvasArrangement {
@@ -30,7 +32,7 @@ export class CanvasArrangement {
     const arrangement = CanvasArrangement.create(snapshot)
 
     for (const stack of snapshot.stacks) {
-      arrangement.createStack(stack)
+      arrangement.appendStack(stack)
     }
 
     return arrangement
@@ -52,6 +54,10 @@ export class CanvasArrangement {
   }
 
   createStack(input: CreateCanvasStackInput): CanvasStackSnapshot {
+    return this.appendStack(input)
+  }
+
+  private appendStack(input: CreateCanvasStackInput): CanvasStackSnapshot {
     const id = requireText(input.id, 'stackId')
     if (this.stacks.some((stack) => stack.id === id)) {
       invalid('Canvas stack ID must be unique.')
@@ -68,6 +74,7 @@ export class CanvasArrangement {
     if (new Set(itemKeys).size !== itemKeys.length) {
       invalid('Canvas stack members must be unique.')
     }
+    const presentation = normalizePresentation(input.presentation)
 
     const occupiedKeys = new Set(
       this.stacks.flatMap((stack) => stack.items.map(CanvasArrangement.itemKey))
@@ -79,7 +86,8 @@ export class CanvasArrangement {
     const stack: CanvasStackSnapshot = Object.freeze({
       id,
       anchor: Object.freeze({ ...input.anchor }),
-      items: Object.freeze(items)
+      items: Object.freeze(items),
+      presentation
     })
     this.stacks = [...this.stacks, stack]
     return stack
@@ -124,6 +132,22 @@ export class CanvasArrangement {
     return stack
   }
 
+  setStackPresentation(
+    stackId: string,
+    presentation: CanvasStackPresentation
+  ): CanvasStackSnapshot {
+    const index = this.stacks.findIndex((stack) => stack.id === stackId)
+    if (index === -1) {
+      throw createExpectedAppError('CANVAS_STACK_NOT_FOUND', 'Canvas stack was not found.')
+    }
+    const updated = Object.freeze({
+      ...this.stacks[index],
+      presentation: normalizePresentation(presentation)
+    })
+    this.stacks = this.stacks.map((stack, stackIndex) => (stackIndex === index ? updated : stack))
+    return updated
+  }
+
   moveStack(
     stackId: string,
     anchor: { readonly x: number; readonly y: number }
@@ -135,7 +159,11 @@ export class CanvasArrangement {
     if (index === -1) {
       throw createExpectedAppError('CANVAS_STACK_NOT_FOUND', 'Canvas stack was not found.')
     }
-    const moved = Object.freeze({ ...this.stacks[index], anchor: Object.freeze({ ...anchor }) })
+    const previous = this.stacks[index]
+    const moved = Object.freeze({
+      ...previous,
+      anchor: Object.freeze({ ...anchor })
+    })
     this.stacks = this.stacks.map((stack, stackIndex) => (stackIndex === index ? moved : stack))
     return moved
   }
@@ -158,7 +186,12 @@ export class CanvasArrangement {
       }
       if (items.length !== stack.items.length) {
         changed = true
-        nextStacks.push(Object.freeze({ ...stack, items: Object.freeze(items) }))
+        nextStacks.push(
+          Object.freeze({
+            ...stack,
+            items: Object.freeze(items)
+          })
+        )
         continue
       }
       nextStacks.push(stack)
@@ -177,12 +210,20 @@ export class CanvasArrangement {
           Object.freeze({
             id: stack.id,
             anchor: Object.freeze({ ...stack.anchor }),
-            items: Object.freeze(stack.items.map(copyItem))
+            items: Object.freeze(stack.items.map(copyItem)),
+            presentation: stack.presentation
           })
         )
       )
     })
   }
+}
+
+function normalizePresentation(presentation: CanvasStackPresentation): CanvasStackPresentation {
+  if (presentation !== 'spread' && presentation !== 'stacked') {
+    invalid('Canvas stack presentation is invalid.')
+  }
+  return presentation
 }
 
 function normalizeItem(item: CanvasArrangementItemReference): CanvasArrangementItemReference {

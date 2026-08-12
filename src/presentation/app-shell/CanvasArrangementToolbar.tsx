@@ -1,15 +1,17 @@
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { TooltipLabel } from './Tooltip'
 
 export function CanvasArrangementToolbar({
   isPending,
-  isStacked,
+  stackPresentation,
   labels,
   onGrid,
   onToggleStack
 }: {
   readonly isPending: boolean
-  readonly isStacked: boolean
+  readonly stackPresentation: 'spread' | 'stacked' | null
   readonly labels: {
+    readonly collapse: string
     readonly expand: string
     readonly grid: string
     readonly stack: string
@@ -18,6 +20,13 @@ export function CanvasArrangementToolbar({
   readonly onGrid: () => void
   readonly onToggleStack: () => void
 }) {
+  const stackLabel =
+    stackPresentation === 'stacked'
+      ? labels.expand
+      : stackPresentation === 'spread'
+        ? labels.collapse
+        : labels.stack
+
   return (
     <div
       className="canvas-arrangement-toolbar"
@@ -26,17 +35,16 @@ export function CanvasArrangementToolbar({
       role="toolbar"
       aria-label={labels.toolbar}
     >
-      <button
-        type="button"
-        aria-label={isStacked ? labels.expand : labels.stack}
-        disabled={isPending}
-        onClick={onToggleStack}
-      >
-        <WorkbenchIcon active={isStacked} role="arrangement-stack" size={19} />
-      </button>
-      <button type="button" aria-label={labels.grid} disabled={isPending} onClick={onGrid}>
-        <WorkbenchIcon role="arrangement-grid" size={18} />
-      </button>
+      <TooltipLabel content={stackLabel}>
+        <button type="button" aria-label={stackLabel} disabled={isPending} onClick={onToggleStack}>
+          <WorkbenchIcon active={stackPresentation !== null} role="arrangement-stack" size={19} />
+        </button>
+      </TooltipLabel>
+      <TooltipLabel content={labels.grid}>
+        <button type="button" aria-label={labels.grid} disabled={isPending} onClick={onGrid}>
+          <WorkbenchIcon role="arrangement-grid" size={18} />
+        </button>
+      </TooltipLabel>
     </div>
   )
 }

@@ -75,6 +75,8 @@ const cleancodeApi = {
   moveCanvasStack: (command: unknown) => invokeCleancode('cleancode:move-canvas-stack', command),
   removeCanvasStack: (command: unknown) =>
     invokeCleancode('cleancode:remove-canvas-stack', command),
+  setCanvasStackPresentation: (command: unknown) =>
+    invokeCleancode('cleancode:set-canvas-stack-presentation', command),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
   addQuickExecutionTarget: (command: unknown) =>

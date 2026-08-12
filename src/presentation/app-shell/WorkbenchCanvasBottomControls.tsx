@@ -19,13 +19,12 @@ import { QuickExecutionBar } from './QuickExecutionBar'
 import type { WorkbenchFlowNode, WorkbenchSnapshot } from './types'
 
 export type ArrangeCanvasSelectionHandler = (
-  action: 'expand' | 'grid' | 'stack',
+  action: 'grid' | 'stack' | 'toggle-stack',
   items: readonly CanvasArrangementSelectionItem[]
 ) => Promise<void> | void
 
 export function WorkbenchCanvasBottomControls({
   arrangement,
-  clearArrangementSelection,
   currentWorkbench,
   isArrangementPending,
   isQuickExecutionDropTarget,
@@ -40,7 +39,6 @@ export function WorkbenchCanvasBottomControls({
   shortcutTooltips
 }: {
   readonly arrangement: CanvasArrangementSnapshot
-  readonly clearArrangementSelection: () => void
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isArrangementPending: boolean
   readonly isQuickExecutionDropTarget: boolean
@@ -95,9 +93,9 @@ export function WorkbenchCanvasBottomControls({
       ) : null}
       <CanvasArrangementOverlay
         arrangement={arrangement}
-        clearSelection={clearArrangementSelection}
         isPending={isArrangementPending}
         labels={{
+          collapse: t('canvas.arrangement.collapse'),
           expand: t('canvas.arrangement.expand'),
           grid: t('canvas.arrangement.grid'),
           stack: t('canvas.arrangement.stack'),

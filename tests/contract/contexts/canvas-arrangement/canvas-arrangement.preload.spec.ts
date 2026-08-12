@@ -22,6 +22,7 @@ const api = electronMocks.exposeInMainWorld.mock.calls[0]?.[1] as {
   createCanvasStack(command: unknown): Promise<unknown>
   moveCanvasStack(command: unknown): Promise<unknown>
   removeCanvasStack(command: unknown): Promise<unknown>
+  setCanvasStackPresentation(command: unknown): Promise<unknown>
 }
 
 describe('canvas arrangement preload contract', () => {
@@ -30,7 +31,8 @@ describe('canvas arrangement preload contract', () => {
   it.each([
     ['createCanvasStack', 'cleancode:create-canvas-stack'],
     ['moveCanvasStack', 'cleancode:move-canvas-stack'],
-    ['removeCanvasStack', 'cleancode:remove-canvas-stack']
+    ['removeCanvasStack', 'cleancode:remove-canvas-stack'],
+    ['setCanvasStackPresentation', 'cleancode:set-canvas-stack-presentation']
   ] as const)('forwards %s through its dedicated channel', async (method, channel) => {
     const command = { stackId: 'stack-1' }
     const snapshot = { projectId: 'project-1', workspaceId: 'main', stacks: [] }

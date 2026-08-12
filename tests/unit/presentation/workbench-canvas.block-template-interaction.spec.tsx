@@ -81,6 +81,7 @@ describe('workbench canvas Command selection and block template placement', () =
       ])
     )
     expect(onRequestSaveBlockTemplate).not.toHaveBeenCalled()
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBeInTheDocument()
   })
 
   it('previews every intersecting object while dragging and removes only the marquee on release', () => {
@@ -147,6 +148,7 @@ describe('workbench canvas Command selection and block template placement', () =
           {
             id: 'stack-1',
             anchor: { x: 100, y: 100 },
+            presentation: 'spread',
             items: [
               { kind: 'terminal', terminalId: 'terminal-a' },
               { kind: 'terminal', terminalId: 'terminal-b' }
@@ -229,7 +231,7 @@ function renderCanvas({
 }: {
   readonly onPaneClick?: () => void
   readonly onArrangeCanvasSelection?: (
-    action: 'expand' | 'grid' | 'stack',
+    action: 'grid' | 'stack' | 'toggle-stack',
     items: readonly unknown[]
   ) => void
   readonly canvasArrangement?: CanvasArrangementSnapshot

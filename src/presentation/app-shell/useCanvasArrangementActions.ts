@@ -1,9 +1,12 @@
 import { useCallback, useState } from 'react'
 
-import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type {
+  CanvasArrangementSnapshot,
+  CanvasStackSnapshot
+} from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import {
-  createExpandedCanvasLayout,
   createGridCanvasLayout,
+  createSpreadCanvasLayout,
   createStackedCanvasLayout,
   type CanvasArrangementLayout
 } from '../../contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
@@ -11,9 +14,14 @@ import type { WorkspaceAgentSnapshot } from '../../contexts/agent/application/dt
 import type { WorkbenchSnapshot } from './types'
 import type { CanvasArrangementSelectionItem } from './canvasArrangementSelection'
 import {
+  canvasArrangementItemKey,
   findCanvasArrangementStack,
   findCanvasArrangementStacks
 } from './canvasArrangementSelection'
+import {
+  createCanvasArrangementMotionChoreography,
+  type CanvasArrangementMotionChoreography
+} from './canvasArrangementMotion'
 
 interface UseCanvasArrangementActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -45,6 +53,8 @@ export function useCanvasArrangementActions({
   setCurrentGraph
 }: UseCanvasArrangementActionsInput) {
   const [isPending, setIsPending] = useState(false)
+  const [motionChoreography, setMotionChoreography] =
+    useState<CanvasArrangementMotionChoreography | null>(null)
   const commitLayouts = useCallback(
     async (
       selectedItems: readonly CanvasArrangementSelectionItem[],
@@ -145,7 +155,7 @@ export function useCanvasArrangementActions({
 
   const arrange = useCallback(
     async (
-      action: 'expand' | 'grid' | 'stack',
+      action: 'grid' | 'stack' | 'toggle-stack',
       items: readonly CanvasArrangementSelectionItem[]
     ): Promise<void> => {
       if (isPending || !currentWorkbench || !currentWorkspace || items.length < 2) return
@@ -156,6 +166,7 @@ export function useCanvasArrangementActions({
       const overlappingStacks = findCanvasArrangementStacks(arrangement, items)
       const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
 
+      setMotionChoreography({ delayByNodeId: {} })
       setIsPending(true)
       try {
         if (action === 'stack') {
@@ -167,6 +178,7 @@ export function useCanvasArrangementActions({
               items: items.map((item) => item.reference),
               projectDirectory: currentWorkbench.project.directory,
               projectId: currentWorkbench.project.id,
+              presentation: 'stacked',
               stackId: createStackId(),
               workspaceId: currentWorkspace.workspaceId
             })
@@ -178,10 +190,38 @@ export function useCanvasArrangementActions({
           return
         }
 
-        if (action === 'expand') {
+        if (action === 'toggle-stack') {
           if (!existingStack) return
-          const plan = createExpandedCanvasLayout(items, existingStack.anchor)
-          await commitAndRemoveStacks(items, plan.layouts, [existingStack])
+          const stackItems = orderItemsForStack(items, existingStack)
+          const stackPreviousLayouts = stackItems.map((item) => ({
+            key: item.key,
+            position: item.position
+          }))
+          const presentation = existingStack.presentation === 'stacked' ? 'spread' : 'stacked'
+          setMotionChoreography(
+            createCanvasArrangementMotionChoreography(
+              withCombinationMembers(stackItems, currentWorkbench.graph),
+              presentation
+            )
+          )
+          const plan =
+            presentation === 'spread'
+              ? createSpreadCanvasLayout(stackItems, existingStack.anchor)
+              : createStackedCanvasLayout(stackItems, existingStack.anchor)
+          await commitLayoutsWithRollback(stackItems, plan.layouts, stackPreviousLayouts)
+          try {
+            const updated = await api.setCanvasStackPresentation({
+              presentation,
+              projectDirectory: currentWorkbench.project.directory,
+              projectId: currentWorkbench.project.id,
+              stackId: existingStack.id,
+              workspaceId: currentWorkspace.workspaceId
+            })
+            setCurrentArrangement(updated)
+          } catch (error) {
+            await commitLayouts(stackItems, stackPreviousLayouts)
+            throw error
+          }
           return
         }
 
@@ -194,6 +234,7 @@ export function useCanvasArrangementActions({
       } catch {
         notify({ kind: 'error', message: failureMessage, title: failureTitle })
       } finally {
+        setMotionChoreography(null)
         setIsPending(false)
       }
 
@@ -225,6 +266,7 @@ export function useCanvasArrangementActions({
               items: stack.items,
               projectDirectory: currentWorkbench!.project.directory,
               projectId: currentWorkbench!.project.id,
+              presentation: stack.presentation,
               stackId: stack.id,
               workspaceId: currentWorkspace!.workspaceId
             })
@@ -302,7 +344,35 @@ export function useCanvasArrangementActions({
     ]
   )
 
-  return { arrange, isPending, moveStack }
+  return { arrange, isPending, motionChoreography, moveStack }
+}
+
+function withCombinationMembers(
+  items: readonly CanvasArrangementSelectionItem[],
+  graph: WorkbenchSnapshot['graph']
+): readonly { readonly nodeIds: readonly string[] }[] {
+  const groupMembersById = new Map(
+    graph.terminalGroups.map((group) => [group.id, group.memberBlockIds] as const)
+  )
+  return items.map((item) => ({
+    nodeIds:
+      item.reference.kind === 'combination'
+        ? [
+            ...new Set([
+              ...item.nodeIds,
+              ...(groupMembersById.get(item.reference.terminalGroupId) ?? [])
+            ])
+          ]
+        : item.nodeIds
+  }))
+}
+
+function orderItemsForStack(
+  items: readonly CanvasArrangementSelectionItem[],
+  stack: CanvasStackSnapshot
+): readonly CanvasArrangementSelectionItem[] {
+  const itemsByKey = new Map(items.map((item) => [item.key, item]))
+  return stack.items.map((reference) => itemsByKey.get(canvasArrangementItemKey(reference))!)
 }
 
 function emptyArrangement(workbench: WorkbenchSnapshot): CanvasArrangementSnapshot {

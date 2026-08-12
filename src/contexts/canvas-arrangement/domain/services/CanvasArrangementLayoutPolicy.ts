@@ -18,57 +18,58 @@ export interface StackedCanvasLayoutPlan {
 
 const arrangementGap = 48
 const stackOffset = 10
-const fanArcOffset = 24
 
 export function createStackedCanvasLayout(
-  input: readonly CanvasArrangementLayoutItem[]
+  input: readonly CanvasArrangementLayoutItem[],
+  existingAnchor?: { readonly x: number; readonly y: number }
 ): StackedCanvasLayoutPlan {
-  const items = normalizeItems(input)
-  const bounds = mergeBounds(items)
+  const items = normalizeItems(input, existingAnchor === undefined)
   const maximumWidth = Math.max(...items.map((item) => item.size.width))
   const maximumHeight = Math.max(...items.map((item) => item.size.height))
   const spread = stackOffset * (items.length - 1)
-  const anchor = {
-    x: bounds.left + bounds.width / 2 - (maximumWidth + spread) / 2,
-    y: bounds.top + bounds.height / 2 - (maximumHeight + spread) / 2
-  }
+  const anchor = existingAnchor ?? createStackAnchor(items, maximumWidth, maximumHeight, spread)
+  validateAnchor(anchor)
 
   return {
     anchor,
     layouts: items.map((item, index) => ({
       key: item.key,
-      position: { x: anchor.x + index * stackOffset, y: anchor.y + index * stackOffset }
+      position: {
+        x: anchor.x + (maximumWidth - item.size.width) / 2 + index * stackOffset,
+        y: anchor.y + (maximumHeight - item.size.height) / 2 + index * stackOffset
+      }
     }))
   }
 }
 
-export function createExpandedCanvasLayout(
+export function createSpreadCanvasLayout(
   input: readonly CanvasArrangementLayoutItem[],
   anchor: { readonly x: number; readonly y: number }
 ): { readonly layouts: readonly CanvasArrangementLayout[] } {
-  const items = normalizeItems(input)
-  if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) {
-    invalid('Canvas arrangement anchor must use finite coordinates.')
-  }
+  const items = normalizeItems(input, false)
+  validateAnchor(anchor)
   const maximumWidth = Math.max(...items.map((item) => item.size.width))
   const maximumHeight = Math.max(...items.map((item) => item.size.height))
-  const center = { x: anchor.x + maximumWidth / 2, y: anchor.y + maximumHeight / 2 }
-  const totalWidth =
-    items.reduce((sum, item) => sum + item.size.width, 0) + arrangementGap * (items.length - 1)
-  const middleIndex = (items.length - 1) / 2
-  let nextX = center.x - totalWidth / 2
+  const minimumWidth = Math.min(...items.map((item) => item.size.width))
+  const minimumHeight = Math.min(...items.map((item) => item.size.height))
+  const stepX = Math.min(
+    Math.min(72, Math.max(24, Math.round(maximumWidth * 0.058))),
+    Math.max(1, Math.round(minimumWidth * 0.35))
+  )
+  const stepY = Math.min(
+    Math.min(52, Math.max(18, Math.round(maximumHeight * 0.064))),
+    Math.max(1, Math.round(minimumHeight * 0.3))
+  )
 
   return {
     layouts: items.map((item, index) => {
-      const layout = {
+      return {
         key: item.key,
         position: {
-          x: nextX,
-          y: center.y - item.size.height / 2 + Math.abs(index - middleIndex) * fanArcOffset
+          x: Math.round(anchor.x + (maximumWidth - item.size.width) / 2 + index * stepX),
+          y: Math.round(anchor.y + (maximumHeight - item.size.height) / 2 + index * stepY)
         }
       }
-      nextX += item.size.width + arrangementGap
-      return layout
     })
   }
 }
@@ -76,7 +77,7 @@ export function createExpandedCanvasLayout(
 export function createGridCanvasLayout(input: readonly CanvasArrangementLayoutItem[]): {
   readonly layouts: readonly CanvasArrangementLayout[]
 } {
-  const items = normalizeItems(input)
+  const items = normalizeItems(input, true)
   const bounds = mergeBounds(items)
   const columnCount = Math.ceil(Math.sqrt(items.length))
   const rowCount = Math.ceil(items.length / columnCount)
@@ -113,7 +114,8 @@ export function createGridCanvasLayout(input: readonly CanvasArrangementLayoutIt
 }
 
 function normalizeItems(
-  input: readonly CanvasArrangementLayoutItem[]
+  input: readonly CanvasArrangementLayoutItem[],
+  sortVisually: boolean
 ): CanvasArrangementLayoutItem[] {
   if (input.length < 2) {
     invalid('Canvas arrangement requires at least two objects.')
@@ -130,12 +132,33 @@ function normalizeItems(
   if (new Set(items.map((item) => item.key)).size !== items.length) {
     invalid('Canvas arrangement object keys must be unique.')
   }
-  return items.sort(
-    (left, right) =>
-      left.position.y - right.position.y ||
-      left.position.x - right.position.x ||
-      left.key.localeCompare(right.key)
-  )
+  return sortVisually
+    ? items.sort(
+        (left, right) =>
+          left.position.y - right.position.y ||
+          left.position.x - right.position.x ||
+          left.key.localeCompare(right.key)
+      )
+    : items
+}
+
+function createStackAnchor(
+  items: readonly CanvasArrangementLayoutItem[],
+  maximumWidth: number,
+  maximumHeight: number,
+  spread: number
+) {
+  const bounds = mergeBounds(items)
+  return {
+    x: bounds.left + bounds.width / 2 - (maximumWidth + spread) / 2,
+    y: bounds.top + bounds.height / 2 - (maximumHeight + spread) / 2
+  }
+}
+
+function validateAnchor(anchor: { readonly x: number; readonly y: number }): void {
+  if (!Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) {
+    invalid('Canvas stack anchor must use finite coordinates.')
+  }
 }
 
 function mergeBounds(items: readonly CanvasArrangementLayoutItem[]) {

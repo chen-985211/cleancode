@@ -3,7 +3,6 @@ import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useMemo, useRef, useState } from 'react'
-
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
@@ -476,6 +475,7 @@ export function AppShell({
   )
   useWorkbenchFlowNodes({
     agentToolApprovals,
+    canvasArrangementMotion: canvasArrangement.motionChoreography,
     currentWorkbench,
     currentWorkspace,
     graph,

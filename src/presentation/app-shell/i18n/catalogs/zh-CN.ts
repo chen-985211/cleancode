@@ -276,6 +276,7 @@ export const zhCNMessages = {
   'canvas.arrangement.toolbar': '整理所选画布对象',
   'canvas.arrangement.stack': '堆叠所选对象',
   'canvas.arrangement.expand': '展开堆叠对象',
+  'canvas.arrangement.collapse': '收拢堆叠对象',
   'canvas.arrangement.grid': '将所选对象排列为网格',
   'canvas.arrangement.failedTitle': '无法整理画布对象',
   'canvas.arrangement.failed': '已恢复整理前的布局，请重试。',

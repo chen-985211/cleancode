@@ -89,6 +89,7 @@ export interface WorkbenchNodeLayoutInput {
 export type TerminalGroupDropFeedback = 'join' | 'leave' | 'dissolve'
 
 export type WorkbenchObjectMotionKind =
+  | 'canvas-arrange'
   | 'create'
   | 'delete'
   | 'group-collapse'

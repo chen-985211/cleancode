@@ -5,6 +5,7 @@ import type {
 import type { CreateCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/CreateCanvasStackUseCase'
 import type { RemoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/RemoveCanvasStackUseCase'
 import type { MoveCanvasStackCommand } from '../../contexts/canvas-arrangement/application/use-cases/MoveCanvasStackUseCase'
+import type { SetCanvasStackPresentationCommand } from '../../contexts/canvas-arrangement/application/use-cases/SetCanvasStackPresentationUseCase'
 import { createExpectedAppError } from '../../shared-kernel/application/errors/AppError'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import { registerIpcHandler } from '../ipc/registerIpcHandler'
@@ -16,11 +17,22 @@ export interface CanvasArrangementIpcHandlersInput {
   readonly logger: Logger
   readonly moveStack: (command: MoveCanvasStackCommand) => Promise<CanvasArrangementSnapshot>
   readonly removeStack: (command: RemoveCanvasStackCommand) => Promise<CanvasArrangementSnapshot>
+  readonly setStackPresentation: (
+    command: SetCanvasStackPresentationCommand
+  ) => Promise<CanvasArrangementSnapshot>
 }
 
 export function registerCanvasArrangementIpcHandlers(
   input: CanvasArrangementIpcHandlersInput
 ): void {
+  registerIpcHandler<unknown, CanvasArrangementSnapshot>({
+    channel: 'cleancode:set-canvas-stack-presentation',
+    handler: (command) => input.setStackPresentation(readSetStackPresentationCommand(command)),
+    ipcMain: input.ipcMain,
+    logger: input.logger,
+    operation: 'setCanvasStackPresentation',
+    scope: 'canvas.arrangement'
+  })
   registerIpcHandler<unknown, CanvasArrangementSnapshot>({
     channel: 'cleancode:move-canvas-stack',
     handler: (command) => input.moveStack(readMoveStackCommand(command)),
@@ -72,6 +84,7 @@ function readCreateStackCommand(command: unknown): CreateCanvasStackCommand {
       'items',
       'projectDirectory',
       'projectId',
+      'presentation',
       'stackId',
       'workspaceId'
     ]) ||
@@ -80,20 +93,45 @@ function readCreateStackCommand(command: unknown): CreateCanvasStackCommand {
     command.items.length < 2 ||
     !isNonEmptyString(command.projectDirectory) ||
     !isNonEmptyString(command.projectId) ||
+    (command.presentation !== 'spread' && command.presentation !== 'stacked') ||
     !isNonEmptyString(command.stackId) ||
     !isNonEmptyString(command.workspaceId)
   ) {
     invalidCommand()
   }
 
+  const items = command.items.map(readItem)
+
   return {
     anchor: command.anchor,
-    items: command.items.map(readItem),
+    items,
     projectDirectory: command.projectDirectory,
     projectId: command.projectId,
+    presentation: command.presentation,
     stackId: command.stackId,
     workspaceId: command.workspaceId
   }
+}
+
+function readSetStackPresentationCommand(command: unknown): SetCanvasStackPresentationCommand {
+  if (
+    !isRecord(command) ||
+    !hasExactKeys(command, [
+      'presentation',
+      'projectDirectory',
+      'projectId',
+      'stackId',
+      'workspaceId'
+    ]) ||
+    (command.presentation !== 'spread' && command.presentation !== 'stacked') ||
+    !isNonEmptyString(command.projectDirectory) ||
+    !isNonEmptyString(command.projectId) ||
+    !isNonEmptyString(command.stackId) ||
+    !isNonEmptyString(command.workspaceId)
+  ) {
+    invalidCommand()
+  }
+  return command as unknown as SetCanvasStackPresentationCommand
 }
 
 function readRemoveStackCommand(command: unknown): RemoveCanvasStackCommand {

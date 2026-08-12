@@ -6,6 +6,7 @@ import { GetCanvasArrangementUseCase } from '../../contexts/canvas-arrangement/a
 import { MoveCanvasStackUseCase } from '../../contexts/canvas-arrangement/application/use-cases/MoveCanvasStackUseCase'
 import { ReconcileCanvasArrangementUseCase } from '../../contexts/canvas-arrangement/application/use-cases/ReconcileCanvasArrangementUseCase'
 import { RemoveCanvasStackUseCase } from '../../contexts/canvas-arrangement/application/use-cases/RemoveCanvasStackUseCase'
+import { SetCanvasStackPresentationUseCase } from '../../contexts/canvas-arrangement/application/use-cases/SetCanvasStackPresentationUseCase'
 import { FileSystemCanvasArrangementRepository } from '../../contexts/canvas-arrangement/infrastructure/persistence/FileSystemCanvasArrangementRepository'
 import type { IpcMainLike } from '../ipc/registerIpcHandler'
 import type { Logger } from '../logging/Logger'
@@ -19,6 +20,7 @@ export function createCanvasArrangementRuntime(storageDirectory: string) {
   const moveStack = new MoveCanvasStackUseCase(repository)
   const reconcileArrangement = new ReconcileCanvasArrangementUseCase(repository)
   const removeStack = new RemoveCanvasStackUseCase(repository)
+  const setStackPresentation = new SetCanvasStackPresentationUseCase(repository)
 
   return {
     registerIpcHandlers(ipcMain: IpcMainLike, logger: Logger): void {
@@ -27,7 +29,8 @@ export function createCanvasArrangementRuntime(storageDirectory: string) {
         ipcMain,
         logger,
         moveStack: (command) => moveStack.execute(command),
-        removeStack: (command) => removeStack.execute(command)
+        removeStack: (command) => removeStack.execute(command),
+        setStackPresentation: (command) => setStackPresentation.execute(command)
       })
     },
     async loadWorkspace(input: {

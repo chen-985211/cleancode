@@ -1,6 +1,6 @@
 import {
-  createExpandedCanvasLayout,
   createGridCanvasLayout,
+  createSpreadCanvasLayout,
   createStackedCanvasLayout
 } from '../../../../src/contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
 import type { CanvasArrangementLayoutItem } from '../../../../src/contexts/canvas-arrangement/domain/services/CanvasArrangementLayoutPolicy'
@@ -16,27 +16,57 @@ describe('canvas arrangement layout policy', () => {
 
     expect(result.anchor).toEqual({ x: 235, y: 205 })
     expect(result.layouts).toEqual([
-      layout('terminal:terminal-1', 235, 205),
-      layout('workflow:terminal-2,terminal-3', 245, 215),
-      layout('agent:agent-1', 255, 225),
+      layout('terminal:terminal-1', 505, 385),
+      layout('workflow:terminal-2,terminal-3', 275, 365),
+      layout('agent:agent-1', 375, 295),
       layout('combination:group-1', 265, 235)
     ])
   })
 
-  it('expands a stack around its current anchor instead of restoring old coordinates', () => {
-    const result = createExpandedCanvasLayout(
+  it('spreads one stack along one ordered diagonal while keeping the objects overlapped', () => {
+    const stackedItems = [
+      item('terminal:terminal-1', 505, 385, 420, 240),
+      item('workflow:terminal-2,terminal-3', 275, 365, 900, 300),
+      item('agent:agent-1', 375, 295, 720, 460),
+      item('combination:group-1', 265, 235, 960, 600)
+    ]
+    const result = createSpreadCanvasLayout(stackedItems, { x: 235, y: 205 })
+
+    expect(result.layouts).toEqual([
+      layout('terminal:terminal-1', 505, 385),
+      layout('workflow:terminal-2,terminal-3', 321, 393),
+      layout('agent:agent-1', 467, 351),
+      layout('combination:group-1', 403, 319)
+    ])
+    expect(
+      hasOverlap(result.layouts[0]!, stackedItems[0]!, result.layouts[1]!, stackedItems[1]!)
+    ).toBe(true)
+    expect(
+      result.layouts.map((layout, index) => movementFrom(stackedItems[index]!, layout))
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 46, y: 28 },
+      { x: 92, y: 56 },
+      { x: 138, y: 84 }
+    ])
+  })
+
+  it('collapses a spread stack back to the same anchor without restoring historical positions', () => {
+    const result = createStackedCanvasLayout(
       [
-        item('terminal:terminal-1', 270, 70, 420, 240),
-        item('workflow:terminal-2,terminal-3', 280, 80, 900, 300),
-        item('agent:agent-1', 290, 90, 720, 460)
+        item('terminal:terminal-1', 505, 385, 420, 240),
+        item('workflow:terminal-2,terminal-3', 321, 393, 900, 300),
+        item('agent:agent-1', 467, 351, 720, 460),
+        item('combination:group-1', 403, 319, 960, 600)
       ],
-      { x: 270, y: 70 }
+      { x: 235, y: 205 }
     )
 
     expect(result.layouts).toEqual([
-      layout('terminal:terminal-1', -348, 204),
-      layout('workflow:terminal-2,terminal-3', 120, 150),
-      layout('agent:agent-1', 1_068, 94)
+      layout('terminal:terminal-1', 505, 385),
+      layout('workflow:terminal-2,terminal-3', 275, 365),
+      layout('agent:agent-1', 375, 295),
+      layout('combination:group-1', 265, 235)
     ])
   })
 
@@ -81,4 +111,28 @@ function item(
 
 function layout(key: string, x: number, y: number) {
   return { key, position: { x, y } }
+}
+
+function movementFrom(
+  item: CanvasArrangementLayoutItem,
+  target: ReturnType<typeof layout>
+): { readonly x: number; readonly y: number } {
+  return {
+    x: target.position.x - item.position.x,
+    y: target.position.y - item.position.y
+  }
+}
+
+function hasOverlap(
+  leftLayout: ReturnType<typeof layout>,
+  leftItem: CanvasArrangementLayoutItem,
+  rightLayout: ReturnType<typeof layout>,
+  rightItem: CanvasArrangementLayoutItem
+): boolean {
+  return (
+    leftLayout.position.x < rightLayout.position.x + rightItem.size.width &&
+    leftLayout.position.x + leftItem.size.width > rightLayout.position.x &&
+    leftLayout.position.y < rightLayout.position.y + rightItem.size.height &&
+    leftLayout.position.y + leftItem.size.height > rightLayout.position.y
+  )
 }
