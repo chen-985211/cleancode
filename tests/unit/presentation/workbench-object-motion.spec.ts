@@ -185,13 +185,14 @@ describe('workbench object motion', () => {
 
     expect(projection.exitingNodes).toEqual([])
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
-      contentDelayMs: 48,
+      contentDelayMs: 220,
       contentOpacity: { from: 0, to: 1 },
       delayMs: 0,
       id: 'group-expand:terminal-1',
       kind: 'group-expand',
       offset: { x: -320, y: -170 },
       opacity: { from: 0, to: 1 },
+      opacityDelayMs: 160,
       scale: { from: 0.88, to: 1 }
     })
   })
@@ -325,14 +326,14 @@ describe('workbench object motion', () => {
             id: 'group-collapse:terminal-1',
             kind: 'group-collapse',
             offset: { x: -320, y: -170 },
-            scale: { from: 1, to: 0.88 }
+            opacity: { from: 0, to: 0 }
           }
         })
       })
     ])
   })
 
-  it('mirrors a bounded member cascade between expansion and collapse', () => {
+  it('starts every expanding member with the shell while collapse hides them immediately', () => {
     const memberIds = Array.from({ length: 8 }, (_, index) => `terminal-${index + 1}`)
     const collapsedGroup = createGroupNode('group-1', true, memberIds, {
       height: 180,
@@ -369,9 +370,14 @@ describe('workbench object motion', () => {
       .map((node) => node.data.objectMotion?.delayMs)
     const collapseDelays = collapse.exitingNodes.map((node) => node.data.objectMotion?.delayMs)
 
-    expect(expandDelays[0]).toBe(0)
-    expect(expandDelays.at(-1)).toBe(60)
-    expect(collapseDelays).toEqual([...expandDelays].reverse())
+    expect(expandDelays).toEqual(memberIds.map(() => 0))
+    expect(collapseDelays).toEqual(memberIds.map(() => 0))
+    expect(
+      collapse.exitingNodes.every(
+        (node) =>
+          node.data.objectMotion?.opacity?.from === 0 && node.data.objectMotion.opacity.to === 0
+      )
+    ).toBe(true)
     expect(expandDelays.every((delay) => delay !== undefined && delay <= 60)).toBe(true)
   })
 

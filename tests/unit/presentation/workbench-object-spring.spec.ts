@@ -113,10 +113,11 @@ describe('workbench object spring', () => {
 
     const motion: WorkbenchObjectMotion = {
       ...createMotion('group-expand', { x: -320, y: -170 }),
-      contentDelayMs: 48,
+      contentDelayMs: 220,
       contentOpacity: { from: 0, to: 1 },
-      delayMs: 60,
+      delayMs: 0,
       opacity: { from: 0, to: 1 },
+      opacityDelayMs: 160,
       scale: { from: 0.88, to: 1 }
     }
     controller.motionChanged(surface, motion, false, completed)
@@ -127,16 +128,21 @@ describe('workbench object spring', () => {
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
     expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
 
-    scheduler.advanceNextFrame(40)
-    expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-320)
-    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
+    scheduler.advanceNextFrame(80)
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBeGreaterThan(-320)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.88)
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
+
+    scheduler.advanceNextFrame(80)
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBeGreaterThan(-320)
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBeLessThan(0)
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.88)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
 
     scheduler.advanceNextFrame(40)
-    expect(readProperty(surface, '--workbench-object-motion-x')).toBeGreaterThan(-320)
-    expect(readProperty(surface, '--workbench-object-motion-x')).toBeLessThan(0)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeGreaterThan(0)
-    expect(readProperty(surface, '--workbench-object-motion-scale')).toBeGreaterThan(0.88)
     expect(readProperty(surface, '--workbench-object-motion-content-opacity')).toBe(0)
 
     scheduler.advanceNextFrame(40)
@@ -188,7 +194,7 @@ describe('workbench object spring', () => {
     expect(completed).toHaveBeenCalledWith('group-reflow:terminal-1')
   })
 
-  it('projects a collapsing exit to its final invisible endpoint before completing', () => {
+  it('keeps a directly hidden collapsing exit invisible while its lifecycle settles', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
     const completed = vi.fn()
@@ -198,18 +204,50 @@ describe('workbench object spring', () => {
       surface,
       {
         ...createMotion('group-collapse', { x: -280, y: -140 }),
-        scale: { from: 1, to: 0.88 }
+        opacity: { from: 0, to: 0 }
       },
       false,
       completed
     )
+
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
     scheduler.advanceUntilIdle()
 
     expect(readProperty(surface, '--workbench-object-motion-x')).toBe(-280)
     expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-140)
     expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
-    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(0.88)
+    expect(readProperty(surface, '--workbench-object-motion-scale')).toBe(1)
     expect(completed).toHaveBeenCalledOnce()
+  })
+
+  it('hides an expanding member immediately when disclosure reverses into collapse', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('group-expand', { x: -280, y: -140 }),
+        opacity: { from: 0, to: 1 }
+      },
+      false,
+      vi.fn()
+    )
+    scheduler.advanceNextFrame(80)
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBeGreaterThan(0)
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('group-collapse', { x: -280, y: -140 }, 'group-collapse:terminal-1'),
+        opacity: { from: 0, to: 0 }
+      },
+      false,
+      vi.fn()
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-opacity')).toBe(0)
   })
 
   it('morphs one group material between world rects without scaling the live shell', () => {

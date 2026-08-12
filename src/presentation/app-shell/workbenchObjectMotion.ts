@@ -26,9 +26,8 @@ interface WorkbenchObjectFrameScheduler {
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
 const groupMemberCollapsedScale = 0.88
-const groupMemberContentDelayMs = 48
-const groupDisclosureCascadeStepMs = 12
-const groupDisclosureMaximumCascadeMs = 60
+const groupMemberOpacityDelayMs = 160
+const groupMemberContentDelayMs = 220
 
 export function resolveWorkbenchCanvasDetailLevel(
   zoom: number,
@@ -196,8 +195,9 @@ export function projectWorkbenchObjectMotion({
             ...motion,
             contentDelayMs: groupMemberContentDelayMs,
             contentOpacity: { from: 0, to: 1 },
-            delayMs: expandingMemberMotion.delayMs,
+            delayMs: 0,
             opacity: { from: 0, to: 1 },
+            opacityDelayMs: groupMemberOpacityDelayMs,
             scale: { from: groupMemberCollapsedScale, to: 1 }
           }
         : node.type !== 'terminalGroup'
@@ -251,13 +251,11 @@ function createGroupMemberMotion(
       ? {
           contentDelayMs: groupMemberContentDelayMs,
           contentOpacity: { from: 0, to: 1 },
-          opacity: { from: 0, to: 1 }
+          opacity: { from: 0, to: 1 },
+          opacityDelayMs: groupMemberOpacityDelayMs,
+          scale: { from: groupMemberCollapsedScale, to: 1 }
         }
-      : {}),
-    scale:
-      kind === 'group-expand'
-        ? { from: groupMemberCollapsedScale, to: 1 }
-        : { from: 1, to: groupMemberCollapsedScale }
+      : { opacity: { from: 0, to: 0 } })
   }
 }
 
@@ -305,11 +303,11 @@ function resolveExpandingMemberMotions(
   nextNodes: readonly WorkbenchFlowNode[]
 ): ReadonlyMap<
   string,
-  { readonly delayMs: number; readonly origin: { readonly x: number; readonly y: number } }
+  { readonly delayMs: 0; readonly origin: { readonly x: number; readonly y: number } }
 > {
   const motions = new Map<
     string,
-    { readonly delayMs: number; readonly origin: { readonly x: number; readonly y: number } }
+    { readonly delayMs: 0; readonly origin: { readonly x: number; readonly y: number } }
   >()
 
   nextNodes.forEach((node) => {
@@ -320,10 +318,9 @@ function resolveExpandingMemberMotions(
     }
 
     const origin = resolveNodeCenter(currentNode)
-    const memberCount = node.data.group.memberBlockIds.length
-    node.data.group.memberBlockIds.forEach((memberBlockId, index) =>
+    node.data.group.memberBlockIds.forEach((memberBlockId) =>
       motions.set(memberBlockId, {
-        delayMs: resolveGroupDisclosureDelay(index, memberCount),
+        delayMs: 0,
         origin
       })
     )
@@ -351,8 +348,7 @@ function resolveCollapsingMemberExits({
     if (currentNode?.type !== 'terminalGroup' || currentNode.data.group.isCollapsed) return
 
     const origin = resolveNodeCenter(node)
-    const memberCount = node.data.group.memberBlockIds.length
-    node.data.group.memberBlockIds.forEach((memberBlockId, index) => {
+    node.data.group.memberBlockIds.forEach((memberBlockId) => {
       if (nextNodesById.has(memberBlockId)) return
       const memberNode = currentNodesById.get(memberBlockId)
       if (memberNode?.type !== 'terminal') return
@@ -360,13 +356,7 @@ function resolveCollapsingMemberExits({
       exitingNodes.push({
         ...withObjectMotion(
           memberNode,
-          createGroupMemberMotion(
-            'group-collapse',
-            memberNode,
-            origin,
-            resolveGroupDisclosureDelay(memberCount - index - 1, memberCount),
-            createMotionId
-          )
+          createGroupMemberMotion('group-collapse', memberNode, origin, 0, createMotionId)
         ),
         draggable: false,
         selectable: false
@@ -375,15 +365,6 @@ function resolveCollapsingMemberExits({
   })
 
   return exitingNodes
-}
-
-function resolveGroupDisclosureDelay(index: number, memberCount: number): number {
-  if (memberCount <= 1) return 0
-  const cascadeDuration = Math.min(
-    groupDisclosureMaximumCascadeMs,
-    (memberCount - 1) * groupDisclosureCascadeStepMs
-  )
-  return Math.round((index * cascadeDuration) / (memberCount - 1))
 }
 
 function resolveDeletedObjectExits({

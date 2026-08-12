@@ -52,6 +52,7 @@ describe('workbench object motion styles', () => {
 
   it('presents spring-driven group member paths without a competing CSS animation', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
+    const collapsingMemberRule = readRule('.terminal-node.workbench-object-motion--group-collapse')
 
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-y)')
@@ -63,6 +64,9 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).toMatch(
       /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
     )
+    expect(collapsingMemberRule).toContain('visibility: hidden;')
+    expect(collapsingMemberRule).toContain('opacity: 0;')
+    expect(collapsingMemberRule).toContain('pointer-events: none;')
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-collapse')

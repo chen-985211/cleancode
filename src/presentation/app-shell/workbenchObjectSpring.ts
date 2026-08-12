@@ -43,6 +43,7 @@ const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
 const groupExpandSpringDynamics = { dampingRatio: 1, response: 0.36 }
 const groupCollapseSpringDynamics = { dampingRatio: 1, response: 0.3 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
+const disclosureRevealDynamics = { dampingRatio: 1, response: 0.12 }
 const presenceCreateSpringDynamics = { dampingRatio: 1, response: 0.34 }
 const presenceDeleteSpringDynamics = { dampingRatio: 1, response: 0.26 }
 const positionSettlementThresholds = { speed: 1, value: 0.1 }
@@ -88,6 +89,7 @@ export function createWorkbenchObjectSpringController({
   let shellWidthTarget = 0
   let shellHeightTarget = 0
   let delayRemainingSeconds = 0
+  let opacityDelayRemainingSeconds = 0
   let contentDelayRemainingSeconds = 0
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
@@ -160,6 +162,11 @@ export function createWorkbenchObjectSpringController({
       scheduleFrame()
       return
     }
+    const opacityActiveElapsedSeconds = Math.max(
+      0,
+      activeElapsedSeconds - opacityDelayRemainingSeconds
+    )
+    opacityDelayRemainingSeconds = Math.max(0, opacityDelayRemainingSeconds - activeElapsedSeconds)
     const contentActiveElapsedSeconds = Math.max(
       0,
       activeElapsedSeconds - contentDelayRemainingSeconds
@@ -173,16 +180,22 @@ export function createWorkbenchObjectSpringController({
       opacityAxis,
       opacityTarget,
       motion?.kind === 'group-expand'
-        ? positionDynamics
+        ? motion.opacityDelayMs
+          ? disclosureRevealDynamics
+          : positionDynamics
         : isDisclosureMotion(motion)
           ? disclosureOpacityDynamics
           : spatialSpringDynamics,
-      activeElapsedSeconds
+      opacityActiveElapsedSeconds
     )
     contentOpacityAxis = advanceSpringAxis(
       contentOpacityAxis,
       contentOpacityTarget,
-      motion?.contentOpacity ? positionDynamics : disclosureOpacityDynamics,
+      motion?.contentDelayMs
+        ? disclosureRevealDynamics
+        : motion?.contentOpacity
+          ? positionDynamics
+          : disclosureOpacityDynamics,
       contentActiveElapsedSeconds
     )
     scaleAxis = advanceSpringAxis(
@@ -279,6 +292,7 @@ export function createWorkbenchObjectSpringController({
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
     delayRemainingSeconds = (nextMotion.delayMs ?? 0) / 1000
+    opacityDelayRemainingSeconds = (nextMotion.opacityDelayMs ?? 0) / 1000
     contentDelayRemainingSeconds = (nextMotion.contentDelayMs ?? 0) / 1000
   }
 
@@ -306,11 +320,18 @@ export function createWorkbenchObjectSpringController({
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
     delayRemainingSeconds = 0
+    opacityDelayRemainingSeconds = 0
     contentDelayRemainingSeconds = 0
     const retargetPolicy = isDisclosureMotion(nextMotion) ? 'toward-target-only' : 'preserve'
+    const hidesImmediately =
+      nextMotion.kind === 'group-collapse' &&
+      nextMotion.opacity?.from === 0 &&
+      nextMotion.opacity.to === 0
     xAxis = retargetSpringAxis(xAxis, xTarget, retargetPolicy)
     yAxis = retargetSpringAxis(yAxis, yTarget, retargetPolicy)
-    opacityAxis = retargetSpringAxis(opacityAxis, opacityTarget, 'preserve')
+    opacityAxis = hidesImmediately
+      ? { value: 0, velocity: 0 }
+      : retargetSpringAxis(opacityAxis, opacityTarget, 'preserve')
     contentOpacityAxis = reversesShellReveal
       ? { value: 1 - contentOpacityAxis.value, velocity: -contentOpacityAxis.velocity }
       : nextMotion.contentOpacity

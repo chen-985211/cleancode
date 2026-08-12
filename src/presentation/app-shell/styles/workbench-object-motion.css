@@ -127,6 +127,8 @@
 }
 
 .terminal-node.workbench-object-motion--group-collapse {
+  visibility: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
