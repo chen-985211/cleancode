@@ -37,6 +37,35 @@ describe('terminal group member labels', () => {
     expect(screen.queryByRole('button', { name: 'Frontend 移出组合' })).not.toBeInTheDocument()
   })
 
+  it('retains an inert visual member summary only while expansion is in flight', () => {
+    const { container } = render(
+      <TerminalGroupNode
+        {...createTerminalGroupNodeProps({
+          isCollapsed: false,
+          data: {
+            objectMotion: {
+              contentOpacity: { from: 0, to: 1 },
+              id: 'group-expand:development-group',
+              kind: 'group-expand',
+              offset: { x: 0, y: 0 },
+              shellRect: {
+                from: { height: 150, width: 360, x: 288, y: 164 },
+                to: { height: 458, width: 984, x: 288, y: 164 }
+              }
+            }
+          }
+        })}
+      />
+    )
+
+    const outgoingSummary = container.querySelector('.terminal-group-node__members--motion-exit')
+
+    expect(outgoingSummary).toHaveAttribute('aria-hidden', 'true')
+    expect(outgoingSummary).toHaveAttribute('inert')
+    expect(outgoingSummary?.querySelectorAll('.terminal-group-node__member')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Backend 移出组合' })).not.toBeInTheDocument()
+  })
+
   it('enters group-space editing through the manage-contents action', () => {
     const onEditGroup = vi.fn()
 

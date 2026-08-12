@@ -23,35 +23,61 @@ const themeStyles = readFileSync(
 )
 
 describe('workbench object motion styles', () => {
-  it('materializes new objects with clipping and opacity without animating terminal geometry', () => {
+  it('materializes terminals and Agents from their center without changing layout geometry', () => {
     const createKeyframes = readRule('@keyframes workbench-object-create-in')
     const accentKeyframes = readRule('@keyframes workbench-object-create-accent')
     const objectBaseRule = readRule(
-      ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
+      ':is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node)'
     )
+    const spatialMotionRule = readRule('.workbench-object-motion--spatial')
 
     expect(createKeyframes).toContain('opacity:')
     expect(createKeyframes).not.toContain('clip-path:')
     expect(accentKeyframes).toContain('clip-path:')
     expect(`${createKeyframes}${accentKeyframes}`).not.toMatch(/\b(width|height):/)
     expect(`${createKeyframes}${accentKeyframes}`).not.toContain('scale(')
-    expect(objectBaseRule).not.toContain('scale(')
+    expect(objectBaseRule).toContain('--workbench-object-motion-scale: 1;')
+    expect(objectMotionStyles).toContain('--workbench-object-motion-scale: 0;')
+    expect(spatialMotionRule).toContain('scale(var(--workbench-object-motion-scale))')
+    expect(objectMotionStyles).toContain(
+      '.terminal-group-node.workbench-object-motion--create::before'
+    )
+    expect(objectMotionStyles).not.toContain(
+      '.terminal-node.workbench-object-motion--create::before'
+    )
+    expect(objectMotionStyles).not.toContain(
+      '.agent-console-node.workbench-object-motion--create::before'
+    )
   })
 
   it('presents spring-driven group member paths without a competing CSS animation', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
+    const collapsingMemberRule = readRule('.terminal-node.workbench-object-motion--group-collapse')
 
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-x)')
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-y)')
     expect(spatialMotionRule).toContain('var(--workbench-object-motion-opacity)')
+    expect(spatialMotionRule).toContain('scale(var(--workbench-object-motion-scale))')
+    expect(objectMotionStyles).toMatch(
+      /\.terminal-node:is\(\s*\.workbench-object-motion--group-expand,\s*\.workbench-object-motion--group-collapse\s*\)/
+    )
+    expect(objectMotionStyles).toMatch(
+      /\.terminal-node\.workbench-object-motion--group-expand\s*>\s*\*/
+    )
+    expect(collapsingMemberRule).toContain('visibility: hidden;')
+    expect(collapsingMemberRule).toContain('opacity: 0;')
+    expect(collapsingMemberRule).toContain('pointer-events: none;')
     expect(spatialMotionRule).not.toContain('animation:')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-expand')
     expect(objectMotionStyles).not.toContain('@keyframes workbench-object-group-collapse')
     expect(objectMotionStyles).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
-  it('reveals one final-geometry group material while members translate into arranged slots', () => {
+  it('morphs one group material between committed geometries while members move', () => {
     const spatialMotionRule = readRule('.workbench-object-motion--spatial')
+    const expandingHeaderRule = readRule(
+      '.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header'
+    )
     const dropTargetRule = readTerminalGroupRule('.terminal-group-node--drop-join')
     const dropTargetDepthRule = readTerminalGroupRule('.terminal-group-node--drop-join::after')
     const groupRule = readTerminalGroupRule('.terminal-group-node')
@@ -68,15 +94,32 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain('transform-origin: top left;')
     expect(groupRule).toContain('background: transparent;')
     expect(materialRule).toContain('background: transparent;')
-    expect(materialRule).toContain('opacity: var(--workbench-object-motion-content-opacity);')
+    expect(materialRule).not.toContain('opacity: var(--workbench-object-motion-content-opacity);')
     expect(materialRule).not.toContain('transform:')
     expect(materialFillRule).toContain('background: var(--cc-surface-translucent);')
     expect(collapsedMaterialFillRule).toContain('background: var(--terminal-group-surface);')
-    expect(objectMotionStyles).toContain(
-      'clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));'
+    expect(objectMotionStyles).toContain('width: var(--workbench-object-motion-shell-width);')
+    expect(objectMotionStyles).toContain('height: var(--workbench-object-motion-shell-height);')
+    expect(objectMotionStyles).toMatch(
+      /translate3d\(\s*var\(--workbench-object-motion-shell-x\),\s*var\(--workbench-object-motion-shell-y\),\s*0\s*\)/
     )
-    expect(objectMotionStyles).toContain('> .terminal-group-node__material::before')
-    expect(objectMotionStyles).toContain('will-change: clip-path;')
+    expect(objectMotionStyles).toContain('will-change: transform, width, height;')
+    expect(expandingHeaderRule).toContain('width: var(--workbench-object-motion-shell-width);')
+    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-x)')
+    expect(expandingHeaderRule).toContain('var(--workbench-object-motion-shell-y)')
+    expect(expandingHeaderRule).toContain('will-change: transform, width;')
+    expect(expandingHeaderRule).toContain('overflow: hidden;')
+    expect(expandingHeaderRule).toContain('transition: none;')
+    expect(expandingHeaderRule).not.toContain('scale(')
+    expect(objectMotionStyles).not.toContain('--workbench-object-motion-shell-inset')
+    expect(objectMotionStyles).not.toContain('> .terminal-group-node__material::before')
+    expect(objectMotionStyles).toContain('> .terminal-group-node__members--motion-exit')
+    expect(objectMotionStyles).toContain(
+      'opacity: calc(1 - var(--workbench-object-motion-content-opacity));'
+    )
+    expect(objectMotionStyles).toMatch(
+      /workbench-object-motion--group-expand[\s\S]*> \.terminal-group-node__header[\s\S]*> :not\(\.terminal-group-node__title\)/
+    )
     expect(terminalGroupStyles).not.toContain('.terminal-group-node__material--previous')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-width')
     expect(objectMotionStyles).not.toContain('--workbench-object-motion-previous-height')
@@ -143,7 +186,7 @@ describe('workbench object motion styles', () => {
 
   it('keeps ordinary pointer hover free of node transforms', () => {
     const objectBaseRule = readRule(
-      ':is(.terminal-node, .terminal-group-node, .agent-console-node)'
+      ':is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node)'
     )
     const nodeRules = [
       readStyleRule(terminalNodeStyles, '.terminal-node'),

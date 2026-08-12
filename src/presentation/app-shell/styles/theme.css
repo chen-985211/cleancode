@@ -131,6 +131,8 @@
   --cc-motion-duration-press: 100ms;
   --cc-motion-duration-feedback: 150ms;
   --cc-motion-duration-surface: 180ms;
+  --cc-motion-delay-brand-reveal: 280ms;
+  --cc-motion-duration-brand-reveal: 700ms;
   --cc-motion-duration-spinner: 900ms;
   --cc-easing-standard: ease;
   --cc-easing-enter: ease-out;

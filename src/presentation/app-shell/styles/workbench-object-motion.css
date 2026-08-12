@@ -1,21 +1,18 @@
-:is(.terminal-node, .terminal-group-node, .agent-console-node) {
+:is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node) {
   --workbench-object-motion-x: 0px;
   --workbench-object-motion-y: 0px;
   --workbench-object-motion-opacity: 1;
   --workbench-object-motion-content-opacity: 1;
-  --workbench-object-motion-shell-inset: 0%;
+  --workbench-object-motion-scale: 1;
 }
 
-:is(.terminal-node, .terminal-group-node, .agent-console-node).workbench-object-motion--create {
-  transform-origin: center;
+.terminal-group-node.workbench-object-motion--create {
   /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-in 360ms cubic-bezier(0.18, 0.84, 0.22, 1) both;
   will-change: opacity;
 }
 
-.terminal-node.workbench-object-motion--create::before,
-.terminal-group-node.workbench-object-motion--create::before,
-.agent-console-node.workbench-object-motion--create::before {
+.terminal-group-node.workbench-object-motion--create::before {
   position: absolute;
   z-index: 8;
   inset: -1px;
@@ -30,33 +27,108 @@
 
 .workbench-object-motion--spatial {
   opacity: var(--workbench-object-motion-opacity);
-  transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0);
+  transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
+    scale(var(--workbench-object-motion-scale));
   will-change: transform, opacity;
 }
 
 .terminal-group-node.workbench-object-motion--spatial {
   transform: translate3d(var(--workbench-object-motion-x), var(--workbench-object-motion-y), 0)
-    scale(var(--terminal-group-drop-scale));
+    scale(var(--workbench-object-motion-scale)) scale(var(--terminal-group-drop-scale));
+}
+
+:is(.terminal-node-anchor, .agent-console-node):is(
+  .workbench-object-motion--create,
+  .workbench-object-motion--delete
+) {
+  transform-origin: center;
+}
+
+:is(.terminal-node-anchor, .agent-console-node).workbench-object-motion--create {
+  --workbench-object-motion-scale: 0;
+}
+
+:is(.terminal-node-anchor, .agent-console-node).workbench-object-motion--delete {
+  pointer-events: none;
 }
 
 .terminal-group-node:is(
     .workbench-object-motion--group-expand,
     .workbench-object-motion--group-collapse
   )
-  > .terminal-group-node__material::before {
-  clip-path: inset(var(--workbench-object-motion-shell-inset) round var(--cc-canvas-node-radius));
-  will-change: clip-path;
+  > .terminal-group-node__material {
+  inset: 0 auto auto 0;
+  width: var(--workbench-object-motion-shell-width);
+  height: var(--workbench-object-motion-shell-height);
+  transform: translate3d(
+    var(--workbench-object-motion-shell-x),
+    var(--workbench-object-motion-shell-y),
+    0
+  );
+  will-change: transform, width, height;
 }
 
-.terminal-group-node:is(
-    .workbench-object-motion--group-expand,
-    .workbench-object-motion--group-collapse
-  )
+.terminal-group-node.workbench-object-motion--group-collapse
   > :not(.terminal-group-node__material) {
   opacity: var(--workbench-object-motion-content-opacity);
 }
 
+.terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+  width: var(--workbench-object-motion-shell-width);
+  overflow: hidden;
+  transform: translate3d(
+    var(--workbench-object-motion-shell-x),
+    var(--workbench-object-motion-shell-y),
+    0
+  );
+  transition: none;
+  will-change: transform, width;
+}
+
+.terminal-group-node.workbench-object-motion--group-expand
+  > :not(
+    .terminal-group-node__material,
+    .terminal-group-node__header,
+    .terminal-group-node__members--motion-exit
+  ),
+.terminal-group-node.workbench-object-motion--group-expand
+  > .terminal-group-node__header
+  > :not(.terminal-group-node__title) {
+  opacity: var(--workbench-object-motion-content-opacity);
+}
+
+.terminal-group-node.workbench-object-motion--group-expand
+  > .terminal-group-node__members--motion-exit {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  width: var(--workbench-object-motion-shell-width);
+  height: calc(var(--workbench-object-motion-shell-height) - 44px);
+  flex: none;
+  opacity: calc(1 - var(--workbench-object-motion-content-opacity));
+  pointer-events: none;
+  transform: translate3d(
+    var(--workbench-object-motion-shell-x),
+    var(--workbench-object-motion-shell-y),
+    0
+  );
+  overflow: hidden;
+}
+
+.terminal-node:is(
+  .workbench-object-motion--group-expand,
+  .workbench-object-motion--group-collapse
+) {
+  transform-origin: center;
+}
+
+.terminal-node.workbench-object-motion--group-expand > * {
+  opacity: var(--workbench-object-motion-content-opacity);
+}
+
 .terminal-node.workbench-object-motion--group-collapse {
+  visibility: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
@@ -166,7 +238,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :is(.terminal-node, .terminal-group-node, .agent-console-node) {
+  :is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node) {
     transform: none;
     transition: none;
   }
@@ -178,6 +250,7 @@
 
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--delete,
     .workbench-object-motion--group-expand,
     .workbench-object-motion--group-collapse,
     .workbench-object-motion--group-join,
@@ -186,6 +259,7 @@
   ),
   :is(
     .workbench-object-motion--create,
+    .workbench-object-motion--delete,
     .workbench-object-motion--group-expand,
     .workbench-object-motion--group-collapse,
     .workbench-object-motion--group-join,
@@ -202,7 +276,23 @@
       .workbench-object-motion--group-expand,
       .workbench-object-motion--group-collapse
     )
-    > .terminal-group-node__material::before {
-    clip-path: none;
+    > .terminal-group-node__material {
+    width: 100%;
+    height: 100%;
+    transform: none;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-expand > .terminal-group-node__header {
+    width: 100%;
+    transform: none;
+  }
+
+  .terminal-group-node.workbench-object-motion--group-expand
+    > .terminal-group-node__members--motion-exit {
+    display: none;
+  }
+
+  .terminal-node.workbench-object-motion--group-expand > * {
+    opacity: 1;
   }
 }

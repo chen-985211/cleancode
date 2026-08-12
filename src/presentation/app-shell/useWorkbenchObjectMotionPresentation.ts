@@ -34,6 +34,10 @@ export function useWorkbenchObjectMotionPresentation(
   onCompleteRef.current = onComplete
 
   useLayoutEffect(() => {
+    if (!motion && presentation?.kind === 'delete') {
+      setPresentation(undefined)
+      return
+    }
     if (motion && motion.id !== presentation?.id && motion.id !== completedMotionIdRef.current) {
       setPresentation(motion)
     }
@@ -64,22 +68,29 @@ export function useWorkbenchObjectMotionPresentation(
 
   const onAnimationEnd = useCallback(
     (event: AnimationEvent<HTMLElement>): void => {
-      if (!presentation || presentation.kind !== 'create' || event.target !== event.currentTarget) {
+      if (
+        !presentation ||
+        presentation.kind !== 'create' ||
+        presentation.scale ||
+        event.target !== event.currentTarget
+      ) {
         return
       }
 
       completedMotionIdRef.current = presentation.id
       setPresentation(undefined)
-      onComplete?.(presentation.id)
+      onCompleteRef.current?.(presentation.id)
     },
-    [onComplete, presentation]
+    [presentation]
   )
 
   return {
     className: presentation
       ? [
           `workbench-object-motion--${presentation.kind}`,
-          presentation.kind === 'create' ? '' : 'workbench-object-motion--spatial'
+          presentation.kind === 'create' && !presentation.scale
+            ? ''
+            : 'workbench-object-motion--spatial'
         ]
           .filter(Boolean)
           .join(' ')

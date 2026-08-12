@@ -44,11 +44,106 @@ describe('workbench object motion', () => {
           objectMotion: {
             id: 'create:terminal-1',
             kind: 'create',
-            offset: { x: 0, y: 0 }
+            offset: { x: 0, y: 0 },
+            scale: { from: 0, to: 1 }
           }
         })
       })
     ])
+  })
+
+  it('keeps terminal-group creation on its existing non-scaling presentation', () => {
+    const group = createGroupNode('group-1', false, [], {
+      height: 360,
+      width: 640,
+      x: 640,
+      y: 360
+    })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [],
+      isContinuingGraph: true,
+      nextNodes: [group],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes[0]?.data.objectMotion).toEqual({
+      id: 'create:group-1',
+      kind: 'create',
+      offset: { x: 0, y: 0 }
+    })
+  })
+
+  it.each([
+    { name: 'terminal', node: createTerminalNode('terminal-1', { x: 640, y: 360 }) },
+    { name: 'agent', node: createAgentNode('agent-1', { x: 640, y: 360 }) }
+  ])('keeps a deleted $name as an inert presentation-only center exit', ({ node }) => {
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [node],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes).toEqual([])
+    expect(projection.exitingNodes).toEqual([
+      expect.objectContaining({
+        id: node.id,
+        draggable: false,
+        selectable: false,
+        selected: false,
+        data: expect.objectContaining({
+          objectMotion: {
+            id: `delete:${node.id}`,
+            kind: 'delete',
+            offset: { x: 0, y: 0 },
+            scale: { from: 1, to: 0 }
+          }
+        })
+      })
+    ])
+  })
+
+  it('preserves an in-flight delete motion across unrelated graph projections', () => {
+    const terminal = createTerminalNode('terminal-1', { x: 640, y: 360 })
+    const deletingTerminal = {
+      ...terminal,
+      data: {
+        ...terminal.data,
+        objectMotion: {
+          id: 'delete:terminal-1:existing',
+          kind: 'delete' as const,
+          offset: { x: 0, y: 0 },
+          scale: { from: 1, to: 0 }
+        }
+      }
+    } as WorkbenchFlowNode
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [deletingTerminal],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: false
+    })
+
+    expect(projection.exitingNodes).toEqual([deletingTerminal])
+  })
+
+  it('does not retain deleted objects when reduced motion is requested', () => {
+    const terminal = createTerminalNode('terminal-1', { x: 640, y: 360 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [terminal],
+      isContinuingGraph: true,
+      nextNodes: [],
+      reducedMotion: true
+    })
+
+    expect(projection).toEqual({ exitingNodes: [], nodes: [] })
   })
 
   it('does not replay creation motion while restoring the initial graph projection', () => {
@@ -90,13 +185,19 @@ describe('workbench object motion', () => {
 
     expect(projection.exitingNodes).toEqual([])
     expect(projection.nodes[1]?.data.objectMotion).toEqual({
+      contentDelayMs: 220,
+      contentOpacity: { from: 0, to: 1 },
+      delayMs: 0,
       id: 'group-expand:terminal-1',
       kind: 'group-expand',
-      offset: { x: -320, y: -170 }
+      offset: { x: -320, y: -170 },
+      opacity: { from: 0, to: 1 },
+      opacityDelayMs: 160,
+      scale: { from: 0.88, to: 1 }
     })
   })
 
-  it('reveals one group shell at its final geometry', () => {
+  it('morphs one group material from the previous world rect to the committed rect', () => {
     const currentNodes = [
       createGroupNode('group-1', true, ['terminal-1'], {
         height: 180,
@@ -127,11 +228,14 @@ describe('workbench object motion', () => {
         id: 'group-expand:group-1',
         kind: 'group-expand',
         contentOpacity: { from: 0, to: 1 },
-        opacity: { from: 1, to: 1 }
+        opacity: { from: 1, to: 1 },
+        shellRect: {
+          from: { height: 180, width: 320, x: 100, y: 100 },
+          to: { height: 458, width: 984, x: 100, y: 100 }
+        }
       })
     )
     expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('scale')
-    expect(projection.nodes[0]?.data.objectMotion).not.toHaveProperty('shellTransition')
   })
 
   it('retargets a collapsing member into expansion without snapping its live presentation', () => {
@@ -201,7 +305,11 @@ describe('workbench object motion', () => {
         data: expect.objectContaining({
           objectMotion: expect.objectContaining({
             id: 'group-collapse:group-1',
-            kind: 'group-collapse'
+            kind: 'group-collapse',
+            shellRect: {
+              from: { height: 600, width: 1_000, x: 100, y: 100 },
+              to: { height: 160, width: 360, x: 100, y: 100 }
+            }
           })
         })
       })
@@ -214,13 +322,63 @@ describe('workbench object motion', () => {
         position: terminal.position,
         data: expect.objectContaining({
           objectMotion: {
+            delayMs: 0,
             id: 'group-collapse:terminal-1',
             kind: 'group-collapse',
-            offset: { x: -320, y: -170 }
+            offset: { x: -320, y: -170 },
+            opacity: { from: 0, to: 0 }
           }
         })
       })
     ])
+  })
+
+  it('starts every expanding member with the shell while collapse hides them immediately', () => {
+    const memberIds = Array.from({ length: 8 }, (_, index) => `terminal-${index + 1}`)
+    const collapsedGroup = createGroupNode('group-1', true, memberIds, {
+      height: 180,
+      width: 320,
+      x: 100,
+      y: 100
+    })
+    const expandedGroup = createGroupNode('group-1', false, memberIds, {
+      height: 600,
+      width: 1_000,
+      x: 100,
+      y: 100
+    })
+    const terminals = memberIds.map((id, index) =>
+      createTerminalNode(id, { x: 420 + index * 24, y: 260 + index * 12 })
+    )
+
+    const expansion = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [collapsedGroup],
+      isContinuingGraph: true,
+      nextNodes: [expandedGroup, ...terminals],
+      reducedMotion: false
+    })
+    const collapse = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [expandedGroup, ...terminals],
+      isContinuingGraph: true,
+      nextNodes: [collapsedGroup],
+      reducedMotion: false
+    })
+    const expandDelays = expansion.nodes
+      .filter((node) => node.type === 'terminal')
+      .map((node) => node.data.objectMotion?.delayMs)
+    const collapseDelays = collapse.exitingNodes.map((node) => node.data.objectMotion?.delayMs)
+
+    expect(expandDelays).toEqual(memberIds.map(() => 0))
+    expect(collapseDelays).toEqual(memberIds.map(() => 0))
+    expect(
+      collapse.exitingNodes.every(
+        (node) =>
+          node.data.objectMotion?.opacity?.from === 0 && node.data.objectMotion.opacity.to === 0
+      )
+    ).toBe(true)
+    expect(expandDelays.every((delay) => delay !== undefined && delay <= 60)).toBe(true)
   })
 
   it('absorbs a newly joined terminal while existing group members make room', () => {
@@ -412,6 +570,28 @@ function createTerminalNode(
     position,
     style: { height: 100, width: 200 },
     type: 'terminal'
+  } as unknown as WorkbenchFlowNode
+}
+
+function createAgentNode(
+  agentId: string,
+  position: { readonly x: number; readonly y: number }
+): WorkbenchFlowNode {
+  const id = `agent:${agentId}`
+  return {
+    data: {
+      agent: {
+        agentId,
+        layout: {
+          position,
+          size: { height: 360, width: 420 }
+        }
+      }
+    },
+    id,
+    position,
+    style: { height: 360, width: 420 },
+    type: 'agentConsole'
   } as unknown as WorkbenchFlowNode
 }
 

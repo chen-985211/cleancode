@@ -26,6 +26,51 @@ describe('workbench object motion presentation', () => {
     expect(result.current.className).toBe('')
   })
 
+  it.each(['create', 'delete'] as const)(
+    'routes a scaling %s presentation through the shared spring surface',
+    (kind) => {
+      const onComplete = vi.fn()
+      const { result } = renderHook(() =>
+        useWorkbenchObjectMotionPresentation(
+          createMotion(
+            kind,
+            { x: 0, y: 0 },
+            { from: kind === 'create' ? 0 : 1, to: kind === 'create' ? 1 : 0 }
+          ),
+          onComplete
+        )
+      )
+
+      expect(result.current.className).toBe(
+        `workbench-object-motion--${kind} workbench-object-motion--spatial`
+      )
+
+      act(() => result.current.onAnimationEnd(createAnimationEvent(false)))
+
+      expect(onComplete).not.toHaveBeenCalled()
+      expect(result.current.className).toBe(
+        `workbench-object-motion--${kind} workbench-object-motion--spatial`
+      )
+    }
+  )
+
+  it('cancels a delete presentation when the authoritative node reappears', () => {
+    const initialProps: { readonly motion?: WorkbenchObjectMotion } = {
+      motion: createMotion('delete', { x: 0, y: 0 }, { from: 1, to: 0 })
+    }
+    const { result, rerender } = renderHook(
+      ({ motion }: { readonly motion?: WorkbenchObjectMotion }) =>
+        useWorkbenchObjectMotionPresentation(motion),
+      { initialProps }
+    )
+
+    expect(result.current.className).toContain('workbench-object-motion--delete')
+
+    rerender({ motion: undefined })
+
+    expect(result.current.className).toBe('')
+  })
+
   it('exposes a spring surface for group motion without projecting a fixed CSS endpoint', () => {
     const onComplete = vi.fn()
     const { result } = renderHook(() =>
@@ -62,9 +107,10 @@ describe('workbench object motion presentation', () => {
 
 function createMotion(
   kind: WorkbenchObjectMotion['kind'],
-  offset = { x: 0, y: 0 }
+  offset = { x: 0, y: 0 },
+  scale?: WorkbenchObjectMotion['scale']
 ): WorkbenchObjectMotion {
-  return { id: 'motion-1', kind, offset }
+  return { id: 'motion-1', kind, offset, scale }
 }
 
 function createAnimationEvent(nested: boolean): AnimationEvent<HTMLElement> {

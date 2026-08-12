@@ -25,6 +25,9 @@ interface WorkbenchObjectFrameScheduler {
 
 const compactCanvasZoom = 0.78
 const overviewCanvasZoom = 0.52
+const groupMemberCollapsedScale = 0.88
+const groupMemberOpacityDelayMs = 160
+const groupMemberContentDelayMs = 220
 
 export function resolveWorkbenchCanvasDetailLevel(
   zoom: number,
@@ -101,7 +104,7 @@ export function projectWorkbenchObjectMotion({
 
   const currentNodesById = new Map(currentNodes.map((node) => [node.id, node]))
   const nextNodesById = new Map(nextNodes.map((node) => [node.id, node]))
-  const expandingMemberOrigins = resolveExpandingMemberOrigins(currentNodesById, nextNodes)
+  const expandingMemberMotions = resolveExpandingMemberMotions(currentNodesById, nextNodes)
   const membershipMotion = resolveGroupMembershipMotion(currentNodesById, nextNodes)
   const nodes = nextNodes.map((node) => {
     if (node.type === 'terminalGroup') {
@@ -110,7 +113,7 @@ export function projectWorkbenchObjectMotion({
         currentNode?.type === 'terminalGroup' &&
         currentNode.data.group.isCollapsed !== node.data.group.isCollapsed
       ) {
-        return withObjectMotion(node, createGroupShellMotion(node, createMotionId))
+        return withObjectMotion(node, createGroupShellMotion(currentNode, node, createMotionId))
       }
     }
 
@@ -151,21 +154,22 @@ export function projectWorkbenchObjectMotion({
       )
     }
 
-    const origin = expandingMemberOrigins.get(node.id)
+    const expandingMemberMotion = expandingMemberMotions.get(node.id)
     const currentNode = currentNodesById.get(node.id)
     if (
       node.type === 'terminal' &&
-      origin &&
+      expandingMemberMotion &&
       currentNode?.type === 'terminal' &&
       (currentNode.data.objectMotion?.kind === 'group-collapse' ||
         currentNode.data.isParkedInCollapsedGroup)
     ) {
       return withObjectMotion(
         node,
-        createObjectMotion(
+        createGroupMemberMotion(
           'group-expand',
-          node.id,
-          resolveOffsetFromOrigin(node, origin),
+          node,
+          expandingMemberMotion.origin,
+          expandingMemberMotion.delayMs,
           createMotionId
         )
       )
@@ -175,27 +179,51 @@ export function projectWorkbenchObjectMotion({
       return node
     }
 
+    const motion = createObjectMotion(
+      expandingMemberMotion ? 'group-expand' : 'create',
+      node.id,
+      expandingMemberMotion
+        ? resolveOffsetFromOrigin(node, expandingMemberMotion.origin)
+        : { x: 0, y: 0 },
+      createMotionId
+    )
+
     return withObjectMotion(
       node,
-      createObjectMotion(
-        origin ? 'group-expand' : 'create',
-        node.id,
-        origin ? resolveOffsetFromOrigin(node, origin) : { x: 0, y: 0 },
-        createMotionId
-      )
+      expandingMemberMotion
+        ? {
+            ...motion,
+            contentDelayMs: groupMemberContentDelayMs,
+            contentOpacity: { from: 0, to: 1 },
+            delayMs: 0,
+            opacity: { from: 0, to: 1 },
+            opacityDelayMs: groupMemberOpacityDelayMs,
+            scale: { from: groupMemberCollapsedScale, to: 1 }
+          }
+        : node.type !== 'terminalGroup'
+          ? { ...motion, scale: { from: 0, to: 1 } }
+          : motion
     )
   })
-  const exitingNodes = resolveCollapsingMemberExits({
+  const collapsingMemberExits = resolveCollapsingMemberExits({
     createMotionId,
     currentNodesById,
     nextNodes,
     nextNodesById
   })
+  const collapsingMemberIds = new Set(collapsingMemberExits.map((node) => node.id))
+  const deletedObjectExits = resolveDeletedObjectExits({
+    collapsingMemberIds,
+    createMotionId,
+    currentNodes,
+    nextNodesById
+  })
 
-  return { exitingNodes, nodes }
+  return { exitingNodes: [...collapsingMemberExits, ...deletedObjectExits], nodes }
 }
 
 function createGroupShellMotion(
+  currentNode: Extract<WorkbenchFlowNode, { readonly type: 'terminalGroup' }>,
   nextNode: Extract<WorkbenchFlowNode, { readonly type: 'terminalGroup' }>,
   createMotionId: ProjectWorkbenchObjectMotionInput['createMotionId']
 ): WorkbenchObjectMotion {
@@ -204,7 +232,30 @@ function createGroupShellMotion(
   return {
     ...createObjectMotion(kind, nextNode.id, { x: 0, y: 0 }, createMotionId),
     contentOpacity: { from: 0, to: 1 },
-    opacity: { from: 1, to: 1 }
+    opacity: { from: 1, to: 1 },
+    shellRect: { from: resolveNodeRect(currentNode), to: resolveNodeRect(nextNode) }
+  }
+}
+
+function createGroupMemberMotion(
+  kind: 'group-collapse' | 'group-expand',
+  node: Extract<WorkbenchFlowNode, { readonly type: 'terminal' }>,
+  origin: { readonly x: number; readonly y: number },
+  delayMs: number,
+  createMotionId: ProjectWorkbenchObjectMotionInput['createMotionId']
+): WorkbenchObjectMotion {
+  return {
+    ...createObjectMotion(kind, node.id, resolveOffsetFromOrigin(node, origin), createMotionId),
+    delayMs,
+    ...(kind === 'group-expand'
+      ? {
+          contentDelayMs: groupMemberContentDelayMs,
+          contentOpacity: { from: 0, to: 1 },
+          opacity: { from: 0, to: 1 },
+          opacityDelayMs: groupMemberOpacityDelayMs,
+          scale: { from: groupMemberCollapsedScale, to: 1 }
+        }
+      : { opacity: { from: 0, to: 0 } })
   }
 }
 
@@ -247,11 +298,17 @@ function resolveGroupMembershipMotion(
   return { departedMemberIds, joinedMemberIds, reflowedMemberIds }
 }
 
-function resolveExpandingMemberOrigins(
+function resolveExpandingMemberMotions(
   currentNodesById: ReadonlyMap<string, WorkbenchFlowNode>,
   nextNodes: readonly WorkbenchFlowNode[]
-): ReadonlyMap<string, { readonly x: number; readonly y: number }> {
-  const origins = new Map<string, { readonly x: number; readonly y: number }>()
+): ReadonlyMap<
+  string,
+  { readonly delayMs: 0; readonly origin: { readonly x: number; readonly y: number } }
+> {
+  const motions = new Map<
+    string,
+    { readonly delayMs: 0; readonly origin: { readonly x: number; readonly y: number } }
+  >()
 
   nextNodes.forEach((node) => {
     if (node.type !== 'terminalGroup' || node.data.group.isCollapsed) return
@@ -261,10 +318,15 @@ function resolveExpandingMemberOrigins(
     }
 
     const origin = resolveNodeCenter(currentNode)
-    node.data.group.memberBlockIds.forEach((memberBlockId) => origins.set(memberBlockId, origin))
+    node.data.group.memberBlockIds.forEach((memberBlockId) =>
+      motions.set(memberBlockId, {
+        delayMs: 0,
+        origin
+      })
+    )
   })
 
-  return origins
+  return motions
 }
 
 function resolveCollapsingMemberExits({
@@ -294,12 +356,7 @@ function resolveCollapsingMemberExits({
       exitingNodes.push({
         ...withObjectMotion(
           memberNode,
-          createObjectMotion(
-            'group-collapse',
-            memberNode.id,
-            resolveOffsetFromOrigin(memberNode, origin),
-            createMotionId
-          )
+          createGroupMemberMotion('group-collapse', memberNode, origin, 0, createMotionId)
         ),
         draggable: false,
         selectable: false
@@ -308,6 +365,50 @@ function resolveCollapsingMemberExits({
   })
 
   return exitingNodes
+}
+
+function resolveDeletedObjectExits({
+  collapsingMemberIds,
+  createMotionId,
+  currentNodes,
+  nextNodesById
+}: {
+  readonly collapsingMemberIds: ReadonlySet<string>
+  readonly createMotionId: ProjectWorkbenchObjectMotionInput['createMotionId']
+  readonly currentNodes: readonly WorkbenchFlowNode[]
+  readonly nextNodesById: ReadonlyMap<string, WorkbenchFlowNode>
+}): WorkbenchFlowNode[] {
+  return currentNodes.flatMap((node): WorkbenchFlowNode[] => {
+    if (node.type !== 'terminal' && node.type !== 'agentConsole') return []
+    if (nextNodesById.has(node.id) || collapsingMemberIds.has(node.id)) return []
+    if (
+      node.type === 'terminal' &&
+      (node.data.isParkedInCollapsedGroup || node.data.objectMotion?.kind === 'group-collapse')
+    ) {
+      return []
+    }
+    if (node.data.objectMotion?.kind === 'delete') return [node]
+
+    const objectMotion: WorkbenchObjectMotion = {
+      ...createObjectMotion('delete', node.id, { x: 0, y: 0 }, createMotionId),
+      scale: { from: 1, to: 0 }
+    }
+
+    return [
+      {
+        ...node,
+        draggable: false,
+        selectable: false,
+        selected: false,
+        data: {
+          ...node.data,
+          isContextSelected: false,
+          isSelected: false,
+          objectMotion
+        }
+      } as WorkbenchFlowNode
+    ]
+  })
 }
 
 function createObjectMotion(
@@ -345,6 +446,16 @@ function resolveOffsetFromNode(
 }
 
 function resolveNodeCenter(node: WorkbenchFlowNode): { readonly x: number; readonly y: number } {
+  const rect = resolveNodeRect(node)
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+}
+
+function resolveNodeRect(node: WorkbenchFlowNode): {
+  readonly height: number
+  readonly width: number
+  readonly x: number
+  readonly y: number
+} {
   const fallbackSize =
     node.type === 'terminal'
       ? node.data.block.size
@@ -354,10 +465,7 @@ function resolveNodeCenter(node: WorkbenchFlowNode): { readonly x: number; reado
   const width = resolveNodeSize(node.style?.width, node.measured?.width ?? fallbackSize.width)
   const height = resolveNodeSize(node.style?.height, node.measured?.height ?? fallbackSize.height)
 
-  return {
-    x: node.position.x + width / 2,
-    y: node.position.y + height / 2
-  }
+  return { height, width, x: node.position.x, y: node.position.y }
 }
 
 function isWorkflowBuildNode(node: WorkbenchFlowNode): boolean {

@@ -68,6 +68,20 @@ function CanvasEmptyState({
 }) {
   const { t } = useI18n()
 
+  if (isDesktopRuntime) {
+    return (
+      <div className="canvas-empty canvas-empty--welcome">
+        <div className="canvas-empty__welcome">
+          <h1 className="canvas-empty__brand">{t('canvas.emptyBrand')}</h1>
+          <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
+            <WorkbenchIcon role="open-project" size={14} />
+            {t('canvas.openProject')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="canvas-empty">
       <div className="canvas-empty__panel">
@@ -75,21 +89,8 @@ function CanvasEmptyState({
           <WorkbenchIcon role="canvas" size={21} />
         </span>
         <div className="canvas-empty__copy">
-          {isDesktopRuntime ? (
-            <>
-              <h2>{t('canvas.emptyTitle')}</h2>
-              <p>{t('canvas.emptyDescription')}</p>
-            </>
-          ) : (
-            <p>{t('canvas.emptyPreview')}</p>
-          )}
+          <p>{t('canvas.emptyPreview')}</p>
         </div>
-        {isDesktopRuntime ? (
-          <button className="canvas-empty__action" type="button" onClick={onOpenProject}>
-            <WorkbenchIcon role="open-project" size={14} />
-            {t('canvas.openProject')}
-          </button>
-        ) : null}
       </div>
     </div>
   )
