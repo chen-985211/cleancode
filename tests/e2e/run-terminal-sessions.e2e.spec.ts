@@ -407,6 +407,16 @@ async function createRunningTerminal(page: Page): Promise<void> {
   await selectBlankCanvasAction(page, '新建终端积木')
   await readTerminalSessionId(page, 'Terminal 1')
   await waitForTerminalShellReady(page, 'Terminal 1')
+  const terminalBlock = page.locator('[data-terminal-block-id]').first()
+  await pollUntilState({
+    description: 'terminal creation motion to settle',
+    observe: () =>
+      terminalBlock.evaluate(
+        (element) => !element.classList.contains('workbench-object-motion--create')
+      ),
+    accept: Boolean,
+    timeoutMs: 5_000
+  })
   const terminalInput = page.getByLabel('Terminal input')
   await terminalInput.focus()
   await pollUntilState({
