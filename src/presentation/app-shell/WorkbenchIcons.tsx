@@ -4,6 +4,7 @@ import { ArrowsInSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsInSimpl
 import { ArrowsOutSimpleIcon } from '@phosphor-icons/react/dist/csr/ArrowsOutSimple'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/csr/CaretDown'
 import { CaretUpIcon } from '@phosphor-icons/react/dist/csr/CaretUp'
+import { CardsIcon } from '@phosphor-icons/react/dist/csr/Cards'
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check'
 import { CircleNotchIcon } from '@phosphor-icons/react/dist/csr/CircleNotch'
 import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy'
@@ -43,6 +44,8 @@ const workbenchIconDefinitions = {
   add: [PlusIcon, 'plus', 'bold'],
   agent: [RobotIcon, 'robot', 'regular'],
   approval: [ShieldWarningIcon, 'shield-warning', 'fill'],
+  'arrangement-grid': [SquaresFourIcon, 'squares-four', 'regular'],
+  'arrangement-stack': [CardsIcon, 'cards', 'regular'],
   canvas: [SquaresFourIcon, 'squares-four', 'regular'],
   close: [XIcon, 'x', 'bold'],
   collapse: [CaretUpIcon, 'caret-up', 'bold'],

@@ -17,7 +17,7 @@
 - 当前工作区固定编号 `1` 至 `5` 的快捷执行位及其终端、流程或组合引用。
 - 独立于工作区图的终端、流程和组合模板快照，以及把模板实例化到目标图的规则。
 
-Agent 控制台不是 BlockGraph 积木；Preview、HTTP、测试、文件节点、通用视觉分组和插件积木尚未实现。
+Agent 控制台不是 BlockGraph 积木；跨终端、完整流程、终端组合与 Agent 的视觉堆叠由独立 [CanvasArrangement 上下文](../canvas-arrangement/canvas-arrangement.md)拥有。Preview、HTTP、测试、文件节点、会改变成员或执行语义的通用分组以及插件积木尚未实现。
 
 ## 身份与事实所有权
 
@@ -154,6 +154,7 @@ BlockGraph 当前支持对精确终端作用域执行确定性布局。该能力
 - Run 上下文拥有 `TerminalLaunchPlanPort`，其 BlockGraph 适配器调用 `GetTerminalLaunchPlanUseCase` 获得单终端不可变启动计划；直接启动和组合启动不从表现层拼接命令或端口配置。
 - BlockGraph 拥有 `TerminalRunLifecyclePort`，删除单个终端、完整流程或组合时由 Platform 把一个精确终端集合适配到 Run 的公开 lifecycle 服务；BlockGraph 不读取或操作 Run 内部进程和租约。
 - Agent 上下文拥有 `AgentBlockGraphToolPort`，其 BlockGraph 适配器把原生 MCP 工具转换为本上下文用例；Agent 不直接写 JSON 或调用聚合。
+- CanvasArrangement 只引用 BlockGraph DTO 中的规范终端、完整流程与终端组合身份；对象位置、依赖、组合成员和模板仍由 BlockGraph 拥有。
 - Platform 只在 composition root 装配端口与用例，不拥有积木图规则。
 
 完整协作关系见[上下文地图](../../engineering/context-map.md)。

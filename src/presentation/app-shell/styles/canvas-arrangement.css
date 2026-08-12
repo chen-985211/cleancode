@@ -1,0 +1,100 @@
+.canvas-arrangement-selection {
+  position: absolute;
+  z-index: 35;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--cc-primary) 8%, transparent);
+  pointer-events: none;
+}
+
+:is(
+  .react-flow__node-terminal,
+  .react-flow__node-terminalGroup,
+  .react-flow__node-agentConsole
+)::after {
+  position: absolute;
+  inset: -4px;
+  border: 1px solid color-mix(in srgb, var(--cc-primary) 72%, var(--cc-surface));
+  border-radius: calc(var(--cc-canvas-node-radius) + 4px);
+  box-shadow:
+    0 0 0 3px var(--cc-primary-ring),
+    var(--cc-shadow-node);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.992);
+  transition:
+    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+}
+
+:is(
+    .react-flow__node-terminal,
+    .react-flow__node-terminalGroup,
+    .react-flow__node-agentConsole
+  ).canvas-arrangement-node--selected::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.canvas-arrangement-toolbar {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  z-index: 36;
+  display: flex;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--cc-border-strong) 72%, transparent);
+  border-radius: 12px;
+  padding: 3px;
+  background: var(--cc-surface-translucent);
+  box-shadow: var(--cc-shadow-floating);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+
+.canvas-arrangement-toolbar button {
+  display: inline-flex;
+  width: 38px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--cc-muted-strong);
+  transition:
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    transform var(--cc-motion-duration-press) var(--cc-easing-standard);
+}
+
+.canvas-arrangement-toolbar button:hover,
+.canvas-arrangement-toolbar button:focus-visible {
+  background: var(--cc-surface-subtle);
+  color: var(--cc-foreground);
+}
+
+.canvas-arrangement-toolbar button:focus-visible {
+  outline: 2px solid var(--cc-ring);
+  outline-offset: -2px;
+}
+
+.canvas-arrangement-toolbar button:active {
+  transform: translate3d(0, 1px, 0);
+}
+
+.canvas-arrangement-toolbar button:disabled {
+  opacity: 0.48;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .react-flow__node-terminal,
+    .react-flow__node-terminalGroup,
+    .react-flow__node-agentConsole
+  )::after,
+  .canvas-arrangement-toolbar button {
+    transition: none;
+  }
+}

@@ -134,6 +134,7 @@ Clean Architecture 用于定义代码分层、依赖方向、用例入口、端�
 
 - 项目上下文：负责项目、本地项目目录、项目登记簿、分支工作区和 Git 分支绑定。
 - 积木图上下文：负责终端积木、终端组合、viewport、依赖连接、图校验和图变更。
+- 画布视觉整理上下文：负责跨终端、完整流程、终端组合与 Agent 的视觉堆叠身份、有序成员和锚点；不拥有对象自身位置或结构。
 - 运行上下文：负责 block/agent 类型化终端 owner、PTY 会话、权威终端模型与视图、前台任务、终端工作流计划、服务端口租约、运行状态和失败传播。
 - Agent 上下文：负责工作区 Agent、固定 Provider、Provider session ref、Agent launch/activity、原生 MCP、工具调用、审批、审计和权限约束。
 
@@ -164,6 +165,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - `Project`：项目上下文的项目与分支工作区聚合根。
 - `ProjectRegistry`：项目上下文的最近项目目录与当前项目选择登记簿聚合根。
 - `BlockGraph`：积木图上下文的聚合根。
+- `CanvasArrangement`：画布视觉整理上下文的聚合根，负责一个物理工作区内的视觉堆叠关系。
 - `TerminalSession`：运行上下文的类型化 owner PTY 会话聚合根。
 - `ForegroundJob`：长期交互 shell 中一次受管前台任务的技术聚合。
 - `WorkflowRun`：运行上下文的终端依赖工作流聚合根。
@@ -193,6 +195,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - 项目、项目目录、稳定工作区 ID、工作区类型/目录/显示名和 Git 分支绑定的唯一事实来源：`Project` 聚合。
 - 最近项目目录列表与当前项目选择的唯一事实来源：`ProjectRegistry` 聚合。
 - 积木图结构的唯一事实来源：`BlockGraph` 聚合。
+- 跨类型画布对象的视觉堆叠身份、有序成员与锚点的唯一事实来源：`CanvasArrangement` 聚合。成员对象自身位置仍分别由 `BlockGraph` 与 `AgentSession` 拥有。
 - 普通终端和 Agent terminal 的 PTY 会话生命周期、类型化 owner 与终端运行身份的唯一事实来源：Run 上下文的 `TerminalSession` 聚合。
 - 终端依赖工作流运行生命周期的唯一事实来源：`WorkflowRun` 聚合。
 - 当前终端运行的 `sessionId + runId + generation` 与退出保留/恢复资格由 Run 上下文解释。live PTY 与权威终端模型可由独立 Provider 跨 Electron 应用进程持有；版本化 checkpoint 和有界输出记录是 Run 基础设施恢复资料，不是已提交业务状态。端口租约与实际端点仍是易失运行时事实，warm attach 后必须重新验证监听所有权；端口策略和注入方式仍是 BlockGraph 持久化的服务意图。
@@ -201,7 +204,7 @@ Plugin 是规划中的候选上下文，预期负责积木能力声明、自定�
 - Agent 对话恢复绑定的唯一事实来源：`AgentSession` 聚合及其仓储。绑定键由项目、稳定工作区 ID 和 `agentId` 组成，绑定值是版本化 Provider session ref。
 - Provider 对话正文的唯一事实来源：对应 CLI 自身；cleancode 不复制或解析对话正文。
 - Agent terminal 的 PTY、权威屏幕、sequence 和视图由 Run 拥有；当前 Provider launch、activity、MCP URL/Token、Hook 和审批属于 Agent 易失状态。
-- 选择、悬停、拖动中尺寸等临时交互状态的唯一事实来源：表现层状态。已经提交的积木图布局由 `BlockGraph` 聚合拥有，已经提交的 Agent 画布布局由 `AgentSession` 聚合拥有。
+- 选择、悬停、拖动中尺寸和整理选择框等临时交互状态的唯一事实来源：表现层状态。已经提交的积木图布局由 `BlockGraph` 聚合拥有，已经提交的 Agent 画布布局由 `AgentSession` 聚合拥有；CanvasArrangement 只引用这些对象并持久化视觉堆叠关系。
 - 技术能力实现的唯一事实来源：基础设施层适配器。
 
 表现层允许缓存视图模型，基础设施层允许缓存外部资源，但缓存不得成为业务判断依据。所有业务判断必须回到应用层用例和领域层规则。
@@ -282,6 +285,7 @@ cleancode
   ├─ 限界上下文
   │   ├─ 项目上下文
   │   ├─ 积木图上下文
+  │   ├─ 画布视觉整理上下文
   │   ├─ 运行上下文
   │   ├─ Agent 上下文
   │   └─ Plugin（规划中，尚无当前实现）
@@ -343,6 +347,16 @@ src/
       presentation/
         view-models/
         components/
+    canvas-arrangement/
+      domain/
+        aggregates/
+        services/
+      application/
+        use-cases/
+        ports/
+        dto/
+      infrastructure/
+        persistence/
     run/
       domain/
         aggregates/

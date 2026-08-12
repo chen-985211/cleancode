@@ -28,6 +28,7 @@ import type { TerminalSourceTheme } from '../../contexts/run/domain/aggregates/T
 import type { WorkflowRunNodeStatus } from '../../contexts/run/application/dto/WorkflowRunSnapshot'
 import type { TerminalExecutionConfigSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { CanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
+import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 
 export type {
   ManagedTerminalServiceOwner,
@@ -38,6 +39,7 @@ export type {
 
 export interface WorkbenchSnapshot {
   readonly agents?: readonly WorkspaceAgentSnapshot[]
+  readonly canvasArrangement?: CanvasArrangementSnapshot
   readonly isCurrentProject?: boolean
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]

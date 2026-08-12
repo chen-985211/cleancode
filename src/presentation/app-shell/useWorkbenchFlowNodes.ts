@@ -26,6 +26,7 @@ import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
+import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
@@ -184,24 +185,27 @@ export function useWorkbenchFlowNodes({
         (node) => node.type !== 'terminal' || !collapsedGraphMemberIds.has(node.id)
       )
       const agents = resolveWorkspaceAgents(currentWorkbench)
-      const nextNodes = [
-        ...agents.map((agent) =>
-          createAgentConsoleFlowNode({
-            agent,
-            approvalController: currentAgentToolApprovals,
-            currentWorkbench,
-            currentWorkspace: currentWorkspace ?? null,
-            isSelected: selectedAgentId === agent.agentId,
-            onGraphUpdated: onAgentGraphUpdated,
-            onMcpCapabilityChange,
-            onRemove: onRemoveAgent,
-            onRename: onRenameAgent,
-            onResize: onResizeAgent,
-            onSelect: () => onSelectAgent(agent.agentId)
-          })
-        ),
-        ...terminalNodes
-      ]
+      const nextNodes = projectCanvasArrangementStackingOntoNodes(
+        currentWorkbench?.canvasArrangement,
+        [
+          ...agents.map((agent) =>
+            createAgentConsoleFlowNode({
+              agent,
+              approvalController: currentAgentToolApprovals,
+              currentWorkbench,
+              currentWorkspace: currentWorkspace ?? null,
+              isSelected: selectedAgentId === agent.agentId,
+              onGraphUpdated: onAgentGraphUpdated,
+              onMcpCapabilityChange,
+              onRemove: onRemoveAgent,
+              onRename: onRenameAgent,
+              onResize: onResizeAgent,
+              onSelect: () => onSelectAgent(agent.agentId)
+            })
+          ),
+          ...terminalNodes
+        ]
+      )
       const graphId = graph?.id ?? null
       const shouldPreserveTransientLayout = graphIdUsedForNodesRef.current === graphId
       graphIdUsedForNodesRef.current = graphId

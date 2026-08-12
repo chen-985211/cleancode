@@ -1,9 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import type * as ReactFlowModule from '@xyflow/react'
 import type { ReactNode } from 'react'
 
 import type { BlockTemplateSnapshot } from '../../../src/contexts/block-graph/application/dto/BlockTemplateSnapshot'
+import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
+import type { CanvasArrangementSelectionItem } from '../../../src/presentation/app-shell/canvasArrangementSelection'
 import { createTerminalFlowNodes } from '../../../src/presentation/app-shell/terminalFlowNodes'
+import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCanvas'
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
@@ -33,20 +36,28 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       return React.createElement(
         'div',
         { className: 'react-flow__pane', 'data-testid': 'pane' },
-        props.children
+        props.children,
+        props.nodes?.map((node) =>
+          React.createElement('div', {
+            className: ['react-flow__node', node.className].filter(Boolean).join(' '),
+            'data-testid': `flow-node-${node.id}`,
+            key: node.id
+          })
+        )
       )
     }
   }
 })
 
-describe('workbench canvas block template interaction', () => {
+describe('workbench canvas Command selection and block template placement', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
   })
 
-  it('enters lasso selection only for Command-drag on macOS blank canvas', () => {
+  it('replaces Command-drag favorite with restrained stack and grid actions', () => {
+    const onArrangeCanvasSelection = vi.fn()
     const onRequestSaveBlockTemplate = vi.fn()
-    renderCanvas({ onRequestSaveBlockTemplate })
+    renderCanvas({ onArrangeCanvasSelection, onRequestSaveBlockTemplate })
     const pane = screen.getByTestId('pane')
 
     fireEvent.pointerDown(pane, {
@@ -56,11 +67,54 @@ describe('workbench canvas block template interaction', () => {
       metaKey: true,
       pointerId: 1
     })
-    fireEvent.pointerMove(pane, { clientX: 350, clientY: 250, pointerId: 1 })
-    fireEvent.pointerUp(pane, { clientX: 350, clientY: 250, pointerId: 1 })
+    fireEvent.pointerMove(pane, { clientX: 600, clientY: 500, pointerId: 1 })
+    fireEvent.pointerUp(pane, { clientX: 600, clientY: 500, pointerId: 1 })
 
-    fireEvent.click(screen.getByRole('button', { name: '收藏所选内容' }))
-    expect(onRequestSaveBlockTemplate).toHaveBeenCalledWith(['terminal-a'])
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBeInTheDocument()
+    expect(screen.queryByText('收藏所选内容')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '堆叠所选对象' }))
+    expect(onArrangeCanvasSelection).toHaveBeenCalledWith(
+      'stack',
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'terminal:terminal-a' }),
+        expect.objectContaining({ key: 'terminal:terminal-b' })
+      ])
+    )
+    expect(onRequestSaveBlockTemplate).not.toHaveBeenCalled()
+  })
+
+  it('previews every intersecting object while dragging and removes only the marquee on release', () => {
+    renderCanvas({ onArrangeCanvasSelection: vi.fn() })
+    const pane = screen.getByTestId('pane')
+
+    fireEvent.pointerDown(pane, {
+      button: 0,
+      clientX: 290,
+      clientY: 200,
+      metaKey: true,
+      pointerId: 1
+    })
+    fireEvent.pointerMove(pane, { clientX: 460, clientY: 360, pointerId: 1 })
+
+    expect(document.querySelector('.canvas-arrangement-selection')).toBeInTheDocument()
+    expect(screen.getByTestId('flow-node-terminal-a')).toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
+    expect(screen.getByTestId('flow-node-terminal-b')).toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
+    expect(screen.queryByRole('toolbar', { name: '整理所选画布对象' })).not.toBeInTheDocument()
+
+    fireEvent.pointerUp(pane, { clientX: 460, clientY: 360, pointerId: 1 })
+
+    expect(document.querySelector('.canvas-arrangement-selection')).not.toBeInTheDocument()
+    expect(screen.getByTestId('flow-node-terminal-a')).toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
+    expect(screen.getByTestId('flow-node-terminal-b')).toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBeInTheDocument()
   })
 
   it('places the whole template at the nearest free origin and stays quiet', () => {
@@ -81,10 +135,74 @@ describe('workbench canvas block template interaction', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByText(/碰撞|重叠|避让/)).not.toBeInTheDocument()
   })
+
+  it('previews a stack as one draggable object and restores every member when commit fails', async () => {
+    const onMoveCanvasStack = vi.fn(async () => false)
+    const onCancelNodeDrag = vi.fn()
+    const nodeStore = renderCanvas({
+      canvasArrangement: {
+        projectId: 'project-1',
+        workspaceId: 'main',
+        stacks: [
+          {
+            id: 'stack-1',
+            anchor: { x: 100, y: 100 },
+            items: [
+              { kind: 'terminal', terminalId: 'terminal-a' },
+              { kind: 'terminal', terminalId: 'terminal-b' }
+            ]
+          }
+        ]
+      },
+      onCancelNodeDrag,
+      onMoveCanvasStack
+    })
+    const activeNode = nodeStore.getNodes().find((node) => node.id === 'terminal-a')!
+    const movedNode = { ...activeNode, position: { x: 150, y: 140 } }
+
+    act(() => {
+      reactFlowProps.latest?.onNodeDragStart?.({} as MouseEvent, activeNode)
+      reactFlowProps.latest?.onNodeDrag?.({} as MouseEvent, movedNode)
+    })
+
+    expect(nodeStore.getNodes().find((node) => node.id === 'terminal-a')?.position).toEqual({
+      x: 150,
+      y: 140
+    })
+    expect(nodeStore.getNodes().find((node) => node.id === 'terminal-b')?.position).toEqual({
+      x: 500,
+      y: 390
+    })
+
+    await act(async () => {
+      reactFlowProps.latest?.onNodeDragStop?.({} as MouseEvent, movedNode)
+      await Promise.resolve()
+    })
+
+    expect(onCancelNodeDrag).toHaveBeenCalledWith('terminal-a')
+    expect(onMoveCanvasStack).toHaveBeenCalledWith(
+      'stack-1',
+      { x: 100, y: 100 },
+      { x: 150, y: 140 },
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'terminal:terminal-a' }),
+        expect.objectContaining({ key: 'terminal:terminal-b' })
+      ])
+    )
+    expect(nodeStore.getNodes().find((node) => node.id === 'terminal-a')?.position).toEqual({
+      x: 100,
+      y: 100
+    })
+    expect(nodeStore.getNodes().find((node) => node.id === 'terminal-b')?.position).toEqual({
+      x: 450,
+      y: 350
+    })
+  })
 })
 
 interface MockReactFlowProps {
   readonly children?: ReactNode
+  readonly nodes?: readonly WorkbenchFlowNode[]
   readonly onInit?: (instance: {
     readonly getViewport: () => { readonly x: number; readonly y: number; readonly zoom: number }
     readonly setViewport: () => Promise<void>
@@ -94,19 +212,38 @@ interface MockReactFlowProps {
     }
   }) => void
   readonly onPaneClick?: (event: MouseEvent) => void
+  readonly onNodeDrag?: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
+  readonly onNodeDragStop?: (event: MouseEvent, node: WorkbenchFlowNode) => void
 }
 
 function renderCanvas({
   onPaneClick = vi.fn(),
+  onArrangeCanvasSelection,
+  canvasArrangement = { projectId: 'project-1', workspaceId: 'main', stacks: [] },
+  onCancelNodeDrag,
+  onMoveCanvasStack,
   onPlaceBlockTemplate,
   onRequestSaveBlockTemplate,
   placementTemplate
 }: {
   readonly onPaneClick?: () => void
+  readonly onArrangeCanvasSelection?: (
+    action: 'expand' | 'grid' | 'stack',
+    items: readonly unknown[]
+  ) => void
+  readonly canvasArrangement?: CanvasArrangementSnapshot
+  readonly onCancelNodeDrag?: (nodeId: string) => void
+  readonly onMoveCanvasStack?: (
+    stackId: string,
+    previousAnchor: { readonly x: number; readonly y: number },
+    nextAnchor: { readonly x: number; readonly y: number },
+    items: readonly CanvasArrangementSelectionItem[]
+  ) => Promise<boolean> | boolean
   readonly onPlaceBlockTemplate?: (origin: { readonly x: number; readonly y: number }) => void
   readonly onRequestSaveBlockTemplate?: (blockIds: readonly string[]) => void
   readonly placementTemplate?: BlockTemplateSnapshot
-}): void {
+}) {
   const graph = createGraph()
   const nodes = createTerminalFlowNodes({
     graph,
@@ -126,6 +263,7 @@ function renderCanvas({
     terminalStates: {}
   })
 
+  const nodeStore = createWorkbenchNodeStore(nodes)
   render(
     <WorkbenchCanvas
       shortcutPlatform="mac"
@@ -158,6 +296,7 @@ function renderCanvas({
       isMinimapCollapsed={false}
       currentWorkbench={{
         agents: [],
+        canvasArrangement,
         gitBranches: [],
         graph,
         project: {
@@ -184,13 +323,15 @@ function renderCanvas({
         displayName: 'main',
         isCurrent: true
       }}
-      nodeStore={createWorkbenchNodeStore(nodes)}
+      nodeStore={nodeStore}
       nodeTypes={{}}
       reactFlowInstanceRef={{ current: null }}
       minimapNodeInteraction={{ getLabel: (id) => id, setHoveredBlockId: vi.fn() }}
       placementTemplate={placementTemplate}
       onPlaceBlockTemplate={onPlaceBlockTemplate}
       onRequestSaveBlockTemplate={onRequestSaveBlockTemplate}
+      onArrangeCanvasSelection={onArrangeCanvasSelection}
+      onMoveCanvasStack={onMoveCanvasStack}
       onCreateTerminalBlock={vi.fn()}
       onCreateWorkspaceAgent={vi.fn()}
       onZoomCanvasIn={vi.fn()}
@@ -208,6 +349,7 @@ function renderCanvas({
       onPaneClick={onPaneClick}
       onNodeDrag={vi.fn()}
       onNodeDragStart={vi.fn()}
+      onCancelNodeDrag={onCancelNodeDrag}
       onNodeDragStop={vi.fn()}
       onViewportChange={vi.fn()}
       onMinimapNodeClick={vi.fn()}
@@ -217,6 +359,7 @@ function renderCanvas({
       getMiniMapNodeClassName={() => ''}
     />
   )
+  return nodeStore
 }
 
 function createGraph() {

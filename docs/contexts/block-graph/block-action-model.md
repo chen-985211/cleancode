@@ -4,7 +4,7 @@
 
 本文维护当前已实现终端积木与终端组合动作的功能意图、作用对象和语义边界。未来积木类型、通用动作描述器和混合组合只记录在 [UI 路线图](../../product/ui-roadmap.md)，不是本文的当前事实。
 
-终端、流程、顶层执行单元与组合定义以[画布语义契约](../../product/canvas-semantic-contract.md)为准；积木结构规则以[积木图模型](block-graph.md)为准；终端工作流运行语义以[终端依赖工作流](../run/terminal-workflow.md)为准；稳定用户交互以 [UI 契约](../../product/ui-contract.md)为准。
+终端、流程、顶层执行单元与组合定义以[画布语义契约](../../product/canvas-semantic-contract.md)为准；积木结构规则以[积木图模型](block-graph.md)为准；跨类型堆叠与网格排列由[画布视觉整理](../canvas-arrangement/canvas-arrangement.md)拥有，不是 BlockGraph 动作；终端工作流运行语义以[终端依赖工作流](../run/terminal-workflow.md)为准；稳定用户交互以 [UI 契约](../../product/ui-contract.md)为准。
 
 ## 动作定义
 
@@ -61,7 +61,6 @@
 | 收藏终端         | 保存可复用快照   | 右键命中的独立终端     | terminal       |
 | 收藏流程         | 保存可复用快照   | 右键终端所在完整流程   | workflow       |
 | 收藏组合         | 保存可复用快照   | 右键命中的组合全部成员 | terminal group |
-| 收藏             | 保存可复用快照   | 框选终端及内部依赖     | block template |
 | 放置             | 实例化快照       | 当前项目的目标工作区   | block template |
 | 放置并运行       | 实例化后运行计划 | 本次新建的精确终端集合 | block template |
 

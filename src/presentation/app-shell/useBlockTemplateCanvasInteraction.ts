@@ -10,18 +10,22 @@ import {
 
 import type { BlockGraphSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
+import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { ShortcutPlatform } from './applicationShortcuts'
 import {
-  isBlockTemplateSelectionModifier,
-  normalizeBlockTemplateSelectionRect,
-  resolveBlockTemplateSelectionBlockIds,
-  type BlockTemplateSelectionRect
-} from './blockTemplateSelection'
+  isCanvasArrangementSelectionModifier,
+  listCanvasArrangementItems,
+  normalizeCanvasArrangementSelectionRect,
+  resolveCanvasArrangementSelectionFromCandidates,
+  type CanvasArrangementSelection,
+  type CanvasArrangementSelectionItem
+} from './canvasArrangementSelection'
 import { resolveBlockTemplatePlacement } from './blockTemplatePlacement'
 import type { WorkbenchFlowNode } from './types'
 import { createWorkbenchNodeOccupancy } from './workbenchNodeOccupancy'
 
 export function useBlockTemplateCanvasInteraction({
+  arrangement,
   graph,
   nodes,
   onCancelPlacement,
@@ -30,6 +34,7 @@ export function useBlockTemplateCanvasInteraction({
   reactFlowInstanceRef,
   shortcutPlatform
 }: {
+  readonly arrangement: CanvasArrangementSnapshot
   readonly graph: BlockGraphSnapshot | null
   readonly nodes: readonly WorkbenchFlowNode[]
   readonly onCancelPlacement?: () => void
@@ -40,20 +45,18 @@ export function useBlockTemplateCanvasInteraction({
 }) {
   const selectionDragRef = useRef<{
     readonly pointerId: number
+    readonly candidates: readonly CanvasArrangementSelectionItem[]
     readonly startClient: { readonly x: number; readonly y: number }
     readonly startLocal: { readonly x: number; readonly y: number }
   } | null>(null)
-  const [templateSelection, setTemplateSelection] = useState<{
-    readonly blockIds: readonly string[]
-    readonly rect: BlockTemplateSelectionRect
-  } | null>(null)
+  const [canvasSelection, setCanvasSelection] = useState<CanvasArrangementSelection | null>(null)
   const [placementOrigin, setPlacementOrigin] = useState<{
     readonly x: number
     readonly y: number
   } | null>(null)
 
   useEffect(() => {
-    setTemplateSelection(null)
+    setCanvasSelection(null)
     setPlacementOrigin(null)
   }, [graph?.id])
 
@@ -75,7 +78,7 @@ export function useBlockTemplateCanvasInteraction({
       placementTemplate ||
       event.button !== 0 ||
       !graph ||
-      !isBlockTemplateSelectionModifier(event, shortcutPlatform) ||
+      !isCanvasArrangementSelectionModifier(event, shortcutPlatform) ||
       !(event.target as Element).closest('.react-flow__pane')
     ) {
       return
@@ -84,10 +87,11 @@ export function useBlockTemplateCanvasInteraction({
     const bounds = event.currentTarget.getBoundingClientRect()
     selectionDragRef.current = {
       pointerId: event.pointerId,
+      candidates: listCanvasArrangementItems(graph, nodes),
       startClient: { x: event.clientX, y: event.clientY },
       startLocal: { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
     }
-    setTemplateSelection(null)
+    setCanvasSelection(null)
     event.currentTarget.setPointerCapture?.(event.pointerId)
     event.preventDefault()
     event.stopPropagation()
@@ -97,12 +101,13 @@ export function useBlockTemplateCanvasInteraction({
     const drag = selectionDragRef.current
     if (drag?.pointerId === event.pointerId) {
       const bounds = event.currentTarget.getBoundingClientRect()
-      setTemplateSelection({
-        blockIds: [],
-        rect: normalizeBlockTemplateSelectionRect(drag.startLocal, {
-          x: event.clientX - bounds.left,
-          y: event.clientY - bounds.top
-        })
+      const rect = normalizeCanvasArrangementSelectionRect(drag.startLocal, {
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top
+      })
+      setCanvasSelection({
+        items: resolveSelectionItems(drag.startClient, { x: event.clientX, y: event.clientY }),
+        rect
       })
       event.preventDefault()
       event.stopPropagation()
@@ -119,32 +124,29 @@ export function useBlockTemplateCanvasInteraction({
 
   function completeSelection(event: ReactPointerEvent<HTMLDivElement>): void {
     const drag = selectionDragRef.current
-    if (!drag || drag.pointerId !== event.pointerId || !graph) return
+    if (!drag || drag.pointerId !== event.pointerId) return
 
     selectionDragRef.current = null
     event.currentTarget.releasePointerCapture?.(event.pointerId)
     const instance = reactFlowInstanceRef.current
-    const bounds = event.currentTarget.getBoundingClientRect()
     if (!instance) {
-      setTemplateSelection(null)
+      setCanvasSelection(null)
       return
     }
     const start = instance.screenToFlowPosition(drag.startClient)
     const end = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY })
-    const blockIds = resolveBlockTemplateSelectionBlockIds({
-      graph,
-      selection: normalizeBlockTemplateSelectionRect(start, end)
+    const items = resolveCanvasArrangementSelectionFromCandidates({
+      arrangement,
+      candidates: drag.candidates,
+      selection: normalizeCanvasArrangementSelectionRect(start, end)
     })
 
-    setTemplateSelection(
-      blockIds.length === 0
+    setCanvasSelection(
+      items.length === 0
         ? null
         : {
-            blockIds,
-            rect: normalizeBlockTemplateSelectionRect(drag.startLocal, {
-              x: event.clientX - bounds.left,
-              y: event.clientY - bounds.top
-            })
+            items,
+            rect: null
           }
     )
     event.preventDefault()
@@ -154,7 +156,7 @@ export function useBlockTemplateCanvasInteraction({
   function cancelSelection(event: ReactPointerEvent<HTMLDivElement>): void {
     if (selectionDragRef.current?.pointerId !== event.pointerId) return
     selectionDragRef.current = null
-    setTemplateSelection(null)
+    setCanvasSelection(null)
   }
 
   function placeFromCanvasClick(event: MouseEvent<HTMLDivElement>): void {
@@ -187,14 +189,31 @@ export function useBlockTemplateCanvasInteraction({
     })
   }
 
+  function resolveSelectionItems(
+    startClient: { readonly x: number; readonly y: number },
+    endClient: { readonly x: number; readonly y: number }
+  ): CanvasArrangementSelection['items'] {
+    const instance = reactFlowInstanceRef.current
+    if (!instance || !graph) return []
+
+    return resolveCanvasArrangementSelectionFromCandidates({
+      arrangement,
+      candidates: selectionDragRef.current?.candidates ?? [],
+      selection: normalizeCanvasArrangementSelectionRect(
+        instance.screenToFlowPosition(startClient),
+        instance.screenToFlowPosition(endClient)
+      )
+    })
+  }
+
   return {
     beginSelection,
     cancelSelection,
-    clearSelection: () => setTemplateSelection(null),
+    canvasSelection,
+    clearSelection: () => setCanvasSelection(null),
     completeSelection,
     continueInteraction,
     placementOrigin,
-    placeFromCanvasClick,
-    templateSelection
+    placeFromCanvasClick
   }
 }

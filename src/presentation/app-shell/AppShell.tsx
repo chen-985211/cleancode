@@ -2,12 +2,11 @@ import '@xyflow/react/dist/style.css'
 import '@xterm/xterm/css/xterm.css'
 import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import { useCallback, useMemo, useRef, useState, type SetStateAction } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import { createMinimapNodeInteraction } from './minimapInteraction'
 import { ProjectSidebar } from './ProjectSidebar'
-import { updateGraphViewportInWorkbench } from './updateGraphViewportInWorkbench'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
 import { useTerminalGroupDragActions } from './useTerminalGroupDragActions'
@@ -34,7 +33,6 @@ import { TerminalSurfaceRegistryProvider } from './TerminalSurfaceRegistryProvid
 import { WorkbenchCanvas } from './WorkbenchCanvas'
 import { createWorkbenchNodeLayoutCommitQueue } from './workbenchNodeLayoutCommitQueue'
 import { workbenchNodeTypes } from './workbenchNodeTypes'
-import { putWorkbenchFirst } from './workbenchListUpdates'
 import { useAgentLayoutCoordination } from './useAgentLayoutCoordination'
 import { ignoreAppNotifications } from './appNotifications'
 import { AgentProviderStateProvider } from './AgentProviderStateProvider'
@@ -67,6 +65,12 @@ import { ProjectSidebarToggle } from './ProjectSidebarToggle'
 import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
 import { useAgentActivityNotificationNavigation } from './useAgentActivityNotificationNavigation'
 import { useProjectSidebarVisibility } from './useProjectSidebarVisibility'
+import { useAppShellCanvasArrangement } from './useAppShellCanvasArrangement'
+import {
+  useAppShellGraphViewportUpdate,
+  useSingleTerminalBlockSelectionBridge,
+  useWorkbenchListUpdates
+} from './useAppShellWorkbenchStateAdapters'
 export function AppShell({
   agentActivityNavigationRequest = null,
   notifications = ignoreAppNotifications,
@@ -106,16 +110,10 @@ export function AppShell({
   const { currentWorkspace, graph, terminalBlocksById, terminalGroupsById } =
     useWorkbenchGraphIndex(currentWorkbench)
   const currentTerminalBlockIds = useMemo(() => graph?.blocks.map((block) => block.id), [graph])
-  const setSelectedTerminalBlockId = useCallback((value: SetStateAction<string | null>) => {
-    if (value === null) {
-      setSelectedTerminalGroupId(null)
-    }
-    setSelectedTerminalBlockIds((currentIds) => {
-      const currentId = currentIds[0] ?? null
-      const nextId = typeof value === 'function' ? value(currentId) : value
-      return nextId ? [nextId] : []
-    })
-  }, [])
+  const setSelectedTerminalBlockId = useSingleTerminalBlockSelectionBridge(
+    setSelectedTerminalBlockIds,
+    setSelectedTerminalGroupId
+  )
   const {
     beginTerminalGroupSelection,
     cancelTerminalGroupSelection,
@@ -197,16 +195,10 @@ export function AppShell({
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
     hoveredTerminalBlockId
   })
-  const rememberWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
-    setWorkbenches((entries) => putWorkbenchFirst(entries, workbench))
-    setCurrentWorkbench(workbench)
-  }, [])
-  const replaceWorkbench = useCallback((workbench: WorkbenchSnapshot): void => {
-    setWorkbenches((entries) =>
-      entries.map((entry) => (entry.project.id === workbench.project.id ? workbench : entry))
-    )
-    setCurrentWorkbench(workbench)
-  }, [])
+  const { rememberWorkbench, replaceWorkbench } = useWorkbenchListUpdates(
+    setCurrentWorkbench,
+    setWorkbenches
+  )
   const setCurrentGraph = useCurrentGraphState({
     currentWorkbench,
     setCurrentWorkbench,
@@ -244,6 +236,15 @@ export function AppShell({
     reserveWorkbenchNodeCreation,
     setCurrentWorkbench,
     setSelectedAgentId,
+    setWorkbenches
+  })
+  const canvasArrangement = useAppShellCanvasArrangement({
+    currentWorkbench,
+    currentWorkspace,
+    moveWorkspaceAgent,
+    notify: notifications.notify,
+    setCurrentGraph,
+    setCurrentWorkbench,
     setWorkbenches
   })
   useProjectGitStateSynchronization({ currentWorkbench, replaceWorkbench })
@@ -418,15 +419,10 @@ export function AppShell({
     startTerminalCombination,
     terminalBlocksById
   })
-  const updateGraphViewport = useCallback(
-    (viewport: WorkbenchSnapshot['graph']['viewport']) =>
-      updateGraphViewportInWorkbench({
-        currentWorkbench,
-        currentWorkspace,
-        viewport,
-        setCurrentGraph
-      }),
-    [currentWorkbench, currentWorkspace, setCurrentGraph]
+  const updateGraphViewport = useAppShellGraphViewportUpdate(
+    currentWorkbench,
+    currentWorkspace,
+    setCurrentGraph
   )
   const terminalFlowNodeHandlers = useMemo(
     () => ({
@@ -653,6 +649,9 @@ export function AppShell({
             onCancelBlockTemplatePlacement={blockTemplates.cancelPlacement}
             onPlaceBlockTemplate={blockTemplates.place}
             onRequestSaveBlockTemplate={blockTemplates.requestSave}
+            isCanvasArrangementPending={canvasArrangement.isPending}
+            onArrangeCanvasSelection={canvasArrangement.arrange}
+            onMoveCanvasStack={canvasArrangement.moveStack}
             onDeleteTerminalScope={blockActions.deleteTerminalScope}
             onAddQuickExecutionTarget={quickExecution.addTarget}
             onBindQuickExecutionSlot={quickExecution.bindSlot}
@@ -684,6 +683,7 @@ export function AppShell({
             onPaneClick={workbenchNodeSelection.clearWorkbenchSelection}
             onNodeDrag={previewTerminalGroupDrop}
             onNodeDragStart={onNodeDragStart}
+            onCancelNodeDrag={cancelNodeDrag}
             onNodeDragStop={commitWorkbenchNodeDrag}
             onViewportChange={updateGraphViewport}
             onViewportInteractionStart={cancelLayoutFocus}
