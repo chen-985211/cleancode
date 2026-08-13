@@ -81,6 +81,38 @@ describe('Agent create split button', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('moves one menu highlight between pointer and keyboard targets', () => {
+    renderAgentCreate(
+      <AgentCreateSplitButton
+        defaultProviderId="codex"
+        disabled={false}
+        isCreating={false}
+        providers={providers}
+        shortcutTooltip="新建 Agent (⌘⇧A)"
+        onCreate={vi.fn()}
+        onOpenAgentSettings={vi.fn()}
+        onSelectDefault={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '选择默认 Agent' }))
+    const menu = screen.getByRole('menu')
+    const claude = screen.getByRole('menuitemradio', { name: 'Claude Code' })
+    const settings = screen.getByRole('menuitem', { name: 'Agent 设置…' })
+    const highlight = menu.querySelector<HTMLElement>('.agent-create-menu__highlight')
+
+    expect(highlight).not.toBeNull()
+    setMenuItemGeometry(claude, 43)
+    setMenuItemGeometry(settings, 96)
+
+    fireEvent.pointerEnter(claude)
+    expect(highlight).toHaveAttribute('data-visible', 'true')
+    expect(highlight).toHaveAttribute('data-target-y', '43')
+
+    settings.focus()
+    expect(highlight).toHaveAttribute('data-target-y', '96')
+  })
+
   it('opens Agent settings from the main segment when no Provider is available', () => {
     const onOpenAgentSettings = vi.fn()
     renderAgentCreate(
@@ -146,6 +178,8 @@ describe('Agent create split button', () => {
       styles
         .split('.agent-create-menu__item:hover,\n.agent-create-menu__item:focus-visible {')[1]
         ?.split('}')[0] ?? ''
+    const menuHighlightRule =
+      styles.split('.agent-create-menu__highlight {')[1]?.split('}')[0] ?? ''
     const activeButtonRule =
       styles
         .split('.agent-create-split .toolbar-button:active:not(:disabled) {')[1]
@@ -166,13 +200,24 @@ describe('Agent create split button', () => {
     expect(triggerRule).toContain('width: 38px;')
     expect(hoverRule).toContain('background: var(--cc-agent-create-hover);')
     expect(hoveredButtonRule).toContain('background: transparent;')
-    expect(menuItemInteractionRule).toContain('background: var(--cc-agent-create-hover);')
+    expect(menuItemInteractionRule).toContain('background: transparent;')
+    expect(menuHighlightRule).toContain('background: var(--cc-agent-create-hover);')
+    expect(menuHighlightRule).toContain(
+      'transform: translate3d(0, var(--cc-agent-create-menu-highlight-y, 0px), 0);'
+    )
     expect(activeButtonRule).toContain('transform: none;')
   })
 })
 
 function renderAgentCreate(node: ReactNode) {
   return render(<CanvasMenuMotionProvider reducedMotion>{node}</CanvasMenuMotionProvider>)
+}
+
+function setMenuItemGeometry(item: HTMLElement, offsetTop: number): void {
+  Object.defineProperties(item, {
+    offsetHeight: { configurable: true, value: 38 },
+    offsetTop: { configurable: true, value: offsetTop }
+  })
 }
 
 function createProvider(
