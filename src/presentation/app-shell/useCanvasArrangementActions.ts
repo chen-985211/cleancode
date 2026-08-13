@@ -155,7 +155,7 @@ export function useCanvasArrangementActions({
 
   const arrange = useCallback(
     async (
-      action: 'grid' | 'stack' | 'toggle-stack',
+      action: 'detach-stack' | 'grid' | 'stack',
       items: readonly CanvasArrangementSelectionItem[]
     ): Promise<void> => {
       if (isPending || !currentWorkbench || !currentWorkspace || items.length < 2) return
@@ -166,10 +166,16 @@ export function useCanvasArrangementActions({
       const overlappingStacks = findCanvasArrangementStacks(arrangement, items)
       const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
 
-      setMotionChoreography({ delayByNodeId: {} })
+      setMotionChoreography(null)
       setIsPending(true)
       try {
         if (action === 'stack') {
+          setMotionChoreography(
+            createCanvasArrangementMotionChoreography(
+              withCombinationMembers(items, currentWorkbench.graph),
+              'attach'
+            )
+          )
           const plan = createStackedCanvasLayout(items)
           await commitLayoutsWithRollback(items, plan.layouts, previousLayouts)
           try {
@@ -178,7 +184,6 @@ export function useCanvasArrangementActions({
               items: items.map((item) => item.reference),
               projectDirectory: currentWorkbench.project.directory,
               projectId: currentWorkbench.project.id,
-              presentation: 'stacked',
               stackId: createStackId(),
               workspaceId: currentWorkspace.workspaceId
             })
@@ -190,28 +195,23 @@ export function useCanvasArrangementActions({
           return
         }
 
-        if (action === 'toggle-stack') {
+        if (action === 'detach-stack') {
           if (!existingStack) return
           const stackItems = orderItemsForStack(items, existingStack)
           const stackPreviousLayouts = stackItems.map((item) => ({
             key: item.key,
             position: item.position
           }))
-          const presentation = existingStack.presentation === 'stacked' ? 'spread' : 'stacked'
           setMotionChoreography(
             createCanvasArrangementMotionChoreography(
               withCombinationMembers(stackItems, currentWorkbench.graph),
-              presentation
+              'detach'
             )
           )
-          const plan =
-            presentation === 'spread'
-              ? createSpreadCanvasLayout(stackItems, existingStack.anchor)
-              : createStackedCanvasLayout(stackItems, existingStack.anchor)
+          const plan = createSpreadCanvasLayout(stackItems, existingStack.anchor)
           await commitLayoutsWithRollback(stackItems, plan.layouts, stackPreviousLayouts)
           try {
-            const updated = await api.setCanvasStackPresentation({
-              presentation,
+            const updated = await api.removeCanvasStack({
               projectDirectory: currentWorkbench.project.directory,
               projectId: currentWorkbench.project.id,
               stackId: existingStack.id,
@@ -266,7 +266,6 @@ export function useCanvasArrangementActions({
               items: stack.items,
               projectDirectory: currentWorkbench!.project.directory,
               projectId: currentWorkbench!.project.id,
-              presentation: stack.presentation,
               stackId: stack.id,
               workspaceId: currentWorkspace!.workspaceId
             })

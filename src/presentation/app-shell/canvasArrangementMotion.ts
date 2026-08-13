@@ -1,14 +1,15 @@
 export interface CanvasArrangementMotionChoreography {
   readonly delayByNodeId: Readonly<Record<string, number>>
+  readonly kind: 'attach' | 'detach'
 }
 
 const cardRevealIntervalMs = 42
 
 export function createCanvasArrangementMotionChoreography(
   items: readonly { readonly nodeIds: readonly string[] }[],
-  presentation: 'spread' | 'stacked'
+  direction: 'attach' | 'detach'
 ): CanvasArrangementMotionChoreography {
-  const motionOrder = presentation === 'spread' ? [...items].reverse() : [...items]
+  const motionOrder = direction === 'detach' ? [...items].reverse() : [...items]
   const delayByNodeId: Record<string, number> = {}
 
   motionOrder.forEach((item, index) => {
@@ -17,5 +18,5 @@ export function createCanvasArrangementMotionChoreography(
     })
   })
 
-  return { delayByNodeId }
+  return { delayByNodeId, kind: direction }
 }

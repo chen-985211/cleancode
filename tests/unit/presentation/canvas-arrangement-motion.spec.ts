@@ -8,24 +8,26 @@ describe('canvas arrangement motion choreography', () => {
   ]
 
   it('reveals the top card first and then walks down the stack', () => {
-    expect(createCanvasArrangementMotionChoreography(items, 'spread')).toEqual({
+    expect(createCanvasArrangementMotionChoreography(items, 'detach')).toEqual({
       delayByNodeId: {
         bottom: 84,
         'middle-a': 42,
         'middle-b': 42,
         top: 0
-      }
+      },
+      kind: 'detach'
     })
   })
 
-  it('collapses in the opposite order so the top card lands last', () => {
-    expect(createCanvasArrangementMotionChoreography(items, 'stacked')).toEqual({
+  it('attaches in the opposite order so the top card lands last', () => {
+    expect(createCanvasArrangementMotionChoreography(items, 'attach')).toEqual({
       delayByNodeId: {
         bottom: 0,
         'middle-a': 42,
         'middle-b': 42,
         top: 84
-      }
+      },
+      kind: 'attach'
     })
   })
 })

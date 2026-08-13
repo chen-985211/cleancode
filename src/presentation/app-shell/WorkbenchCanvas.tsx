@@ -459,7 +459,8 @@ export function WorkbenchCanvas({
           <ReactFlow<WorkbenchFlowNode, Edge>
             nodes={projectCanvasArrangementSelectionOntoNodes(
               objectContextMenu.nodes,
-              templateInteraction.canvasSelection?.items ?? []
+              templateInteraction.canvasSelection?.items ?? [],
+              canvasArrangement.arrangement
             )}
             edges={objectContextMenu.edges}
             edgeTypes={workbenchEdgeTypes}

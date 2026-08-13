@@ -15,7 +15,6 @@ describe('canvas arrangement stacking projection', () => {
         {
           id: 'stack-1',
           anchor: { x: 100, y: 100 },
-          presentation: 'stacked',
           items: [
             { kind: 'terminal', terminalId: 'terminal-1' },
             { kind: 'combination', terminalGroupId: 'group-1' },
@@ -49,7 +48,6 @@ describe('canvas arrangement stacking projection', () => {
         {
           id: 'stack-1',
           anchor: { x: 100, y: 100 },
-          presentation: 'spread',
           items: [
             { kind: 'workflow', terminalIds: ['terminal-1', 'terminal-2'] },
             { kind: 'combination', terminalGroupId: 'group-1' },

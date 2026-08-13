@@ -1,14 +1,12 @@
 import type {
   CanvasArrangementItemReference,
-  CanvasArrangementSnapshot,
-  CanvasStackPresentation
+  CanvasArrangementSnapshot
 } from '../dto/CanvasArrangementSnapshot'
 import type { CanvasArrangementRepository } from '../ports/CanvasArrangementRepository'
 
 export interface CreateCanvasStackCommand {
   readonly anchor: { readonly x: number; readonly y: number }
   readonly items: readonly CanvasArrangementItemReference[]
-  readonly presentation: CanvasStackPresentation
   readonly projectDirectory: string
   readonly projectId: string
   readonly stackId: string
@@ -26,8 +24,7 @@ export class CreateCanvasStackUseCase {
         arrangement.createMergedStack({
           anchor: command.anchor,
           id: command.stackId,
-          items: command.items,
-          presentation: command.presentation
+          items: command.items
         })
     )
     return transaction.snapshot

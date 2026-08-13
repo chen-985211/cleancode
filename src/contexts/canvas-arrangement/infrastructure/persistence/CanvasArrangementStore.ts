@@ -22,7 +22,7 @@ export function parseCanvasArrangementStore(
   if (!isRecord(parsed) || !hasExactKeys(parsed, ['version', 'arrangement'])) {
     corrupted(path)
   }
-  if (parsed.version !== 1 && parsed.version !== 2) {
+  if (parsed.version !== 1 && parsed.version !== 2 && parsed.version !== 3) {
     throw createExpectedAppError(
       'CANVAS_ARRANGEMENT_VERSION_UNSUPPORTED',
       'Unsupported canvas arrangement store version.',
@@ -47,10 +47,10 @@ export function parseCanvasArrangementStore(
 }
 
 export function serializeCanvasArrangementStore(snapshot: CanvasArrangementSnapshot): string {
-  return `${JSON.stringify({ version: 2, arrangement: snapshot }, null, 2)}\n`
+  return `${JSON.stringify({ version: 3, arrangement: snapshot }, null, 2)}\n`
 }
 
-function validateArrangement(value: unknown, version: 1 | 2): CanvasArrangementSnapshot {
+function validateArrangement(value: unknown, version: 1 | 2 | 3): CanvasArrangementSnapshot {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, ['projectId', 'workspaceId', 'stacks']) ||
@@ -64,12 +64,14 @@ function validateArrangement(value: unknown, version: 1 | 2): CanvasArrangementS
   return {
     projectId: value.projectId,
     workspaceId: value.workspaceId,
-    stacks: value.stacks.map((stack) => validateStack(stack, version))
+    stacks: value.stacks
+      .map((stack) => validateStack(stack, version))
+      .filter((stack): stack is CanvasStackSnapshot => stack !== null)
   }
 }
 
-function validateStack(value: unknown, version: 1 | 2): CanvasStackSnapshot {
-  const keys = version === 1 ? ['id', 'anchor', 'items'] : ['id', 'anchor', 'items', 'presentation']
+function validateStack(value: unknown, version: 1 | 2 | 3): CanvasStackSnapshot | null {
+  const keys = version === 2 ? ['id', 'anchor', 'items', 'presentation'] : ['id', 'anchor', 'items']
   if (
     !isRecord(value) ||
     !hasExactKeys(value, keys) ||
@@ -80,19 +82,12 @@ function validateStack(value: unknown, version: 1 | 2): CanvasStackSnapshot {
   ) {
     throw new TypeError('Invalid canvas stack snapshot.')
   }
-  return {
+  const stack = {
     id: value.id,
     anchor: value.anchor,
-    items: value.items.map(validateItem),
-    presentation: version === 2 ? readPresentation(value.presentation) : 'stacked'
+    items: value.items.map(validateItem)
   }
-}
-
-function readPresentation(value: unknown): 'spread' | 'stacked' {
-  if (value !== 'spread' && value !== 'stacked') {
-    throw new TypeError('Invalid canvas stack presentation.')
-  }
-  return value
+  return version === 2 && value.presentation === 'spread' ? null : stack
 }
 
 function validateItem(value: unknown): CanvasArrangementItemReference {

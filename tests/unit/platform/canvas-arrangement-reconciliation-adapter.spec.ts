@@ -12,7 +12,6 @@ describe('canvas arrangement reconciliation adapter', () => {
         {
           id: 'stack-1',
           anchor: { x: 0, y: 0 },
-          presentation: 'spread',
           items: [
             { kind: 'workflow', terminalIds: ['terminal-a', 'terminal-b'] },
             { kind: 'terminal', terminalId: 'terminal-c' },

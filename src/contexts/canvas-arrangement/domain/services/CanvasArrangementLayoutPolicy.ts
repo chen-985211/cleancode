@@ -24,10 +24,7 @@ export function createStackedCanvasLayout(
   existingAnchor?: { readonly x: number; readonly y: number }
 ): StackedCanvasLayoutPlan {
   const items = normalizeItems(input, existingAnchor === undefined)
-  const maximumWidth = Math.max(...items.map((item) => item.size.width))
-  const maximumHeight = Math.max(...items.map((item) => item.size.height))
-  const spread = stackOffset * (items.length - 1)
-  const anchor = existingAnchor ?? createStackAnchor(items, maximumWidth, maximumHeight, spread)
+  const anchor = existingAnchor ?? createStackAnchor(items)
   validateAnchor(anchor)
 
   return {
@@ -35,8 +32,8 @@ export function createStackedCanvasLayout(
     layouts: items.map((item, index) => ({
       key: item.key,
       position: {
-        x: anchor.x + (maximumWidth - item.size.width) / 2 + index * stackOffset,
-        y: anchor.y + (maximumHeight - item.size.height) / 2 + index * stackOffset
+        x: anchor.x + index * stackOffset,
+        y: anchor.y + index * stackOffset
       }
     }))
   }
@@ -66,8 +63,8 @@ export function createSpreadCanvasLayout(
       return {
         key: item.key,
         position: {
-          x: Math.round(anchor.x + (maximumWidth - item.size.width) / 2 + index * stepX),
-          y: Math.round(anchor.y + (maximumHeight - item.size.height) / 2 + index * stepY)
+          x: Math.round(anchor.x + index * stepX),
+          y: Math.round(anchor.y + index * stepY)
         }
       }
     })
@@ -142,16 +139,15 @@ function normalizeItems(
     : items
 }
 
-function createStackAnchor(
-  items: readonly CanvasArrangementLayoutItem[],
-  maximumWidth: number,
-  maximumHeight: number,
-  spread: number
-) {
+function createStackAnchor(items: readonly CanvasArrangementLayoutItem[]) {
   const bounds = mergeBounds(items)
+  const stackWidth = Math.max(...items.map((item, index) => item.size.width + index * stackOffset))
+  const stackHeight = Math.max(
+    ...items.map((item, index) => item.size.height + index * stackOffset)
+  )
   return {
-    x: bounds.left + bounds.width / 2 - (maximumWidth + spread) / 2,
-    y: bounds.top + bounds.height / 2 - (maximumHeight + spread) / 2
+    x: bounds.left + bounds.width / 2 - stackWidth / 2,
+    y: bounds.top + bounds.height / 2 - stackHeight / 2
   }
 }
 

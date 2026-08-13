@@ -198,7 +198,6 @@ declare global {
         readonly items: readonly CanvasArrangementItemReference[]
         readonly projectDirectory: string
         readonly projectId: string
-        readonly presentation: 'spread' | 'stacked'
         readonly stackId: string
         readonly workspaceId: string
       }): Promise<CanvasArrangementSnapshot>
@@ -210,13 +209,6 @@ declare global {
         readonly workspaceId: string
       }): Promise<CanvasArrangementSnapshot>
       removeCanvasStack(command: {
-        readonly projectDirectory: string
-        readonly projectId: string
-        readonly stackId: string
-        readonly workspaceId: string
-      }): Promise<CanvasArrangementSnapshot>
-      setCanvasStackPresentation(command: {
-        readonly presentation: 'spread' | 'stacked'
         readonly projectDirectory: string
         readonly projectId: string
         readonly stackId: string

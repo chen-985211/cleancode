@@ -27,7 +27,6 @@ describe('canvas arrangement filesystem persistence', () => {
         arrangement.createStack({
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
-          presentation: 'spread',
           items: [
             { kind: 'terminal', terminalId: 'terminal-1' },
             { kind: 'agent', agentId: 'agent-1' }
@@ -55,7 +54,6 @@ describe('canvas arrangement filesystem persistence', () => {
             arrangement.createStack({
               id: `stack-${number}`,
               anchor: { x: number * 100, y: 80 },
-              presentation: 'stacked',
               items: [
                 { kind: 'terminal', terminalId: `terminal-${number}-a` },
                 { kind: 'terminal', terminalId: `terminal-${number}-b` }
@@ -76,7 +74,7 @@ describe('canvas arrangement filesystem persistence', () => {
     await writeFile(
       filePath,
       JSON.stringify({
-        version: 3,
+        version: 4,
         arrangement: { projectId: 'project-1', workspaceId: 'main', stacks: [] }
       })
     )
@@ -111,12 +109,12 @@ describe('canvas arrangement filesystem persistence', () => {
     )
 
     expect(contents).toEqual({
-      version: 2,
+      version: 3,
       arrangement: { projectId: 'project-1', workspaceId: 'main', stacks: [] }
     })
   })
 
-  it('migrates a version-one stack to the collapsed presentation', async () => {
+  it('restores a version-one stack as an attached relation', async () => {
     const filePath = arrangementPath(stateDirectory, '/project', 'main')
     await mkdir(resolve(filePath, '..'), { recursive: true })
     await writeFile(
@@ -143,7 +141,68 @@ describe('canvas arrangement filesystem persistence', () => {
     const repository = new FileSystemCanvasArrangementRepository(stateDirectory)
     const restored = await repository.findWorkspaceSnapshot('/project', 'main')
 
-    expect(restored?.stacks[0]?.presentation).toBe('stacked')
+    expect(restored?.stacks).toEqual([
+      {
+        id: 'stack-1',
+        anchor: { x: 120, y: 80 },
+        items: [
+          { kind: 'terminal', terminalId: 'terminal-1' },
+          { kind: 'agent', agentId: 'agent-1' }
+        ]
+      }
+    ])
+  })
+
+  it('keeps attached version-two stacks and treats spread stacks as already detached', async () => {
+    const filePath = arrangementPath(stateDirectory, '/project', 'main')
+    await mkdir(resolve(filePath, '..'), { recursive: true })
+    await writeFile(
+      filePath,
+      JSON.stringify({
+        version: 2,
+        arrangement: {
+          projectId: 'project-1',
+          workspaceId: 'main',
+          stacks: [
+            {
+              id: 'attached-stack',
+              anchor: { x: 120, y: 80 },
+              presentation: 'stacked',
+              items: [
+                { kind: 'terminal', terminalId: 'terminal-1' },
+                { kind: 'agent', agentId: 'agent-1' }
+              ]
+            },
+            {
+              id: 'detached-stack',
+              anchor: { x: 320, y: 180 },
+              presentation: 'spread',
+              items: [
+                { kind: 'terminal', terminalId: 'terminal-2' },
+                { kind: 'agent', agentId: 'agent-2' }
+              ]
+            }
+          ]
+        }
+      })
+    )
+
+    const repository = new FileSystemCanvasArrangementRepository(stateDirectory)
+
+    await expect(repository.findWorkspaceSnapshot('/project', 'main')).resolves.toEqual({
+      projectId: 'project-1',
+      workspaceId: 'main',
+      stacks: [
+        {
+          id: 'attached-stack',
+          anchor: { x: 120, y: 80 },
+          items: [
+            { kind: 'terminal', terminalId: 'terminal-1' },
+            { kind: 'agent', agentId: 'agent-1' }
+          ]
+        }
+      ]
+    })
   })
 
   it('persists stale-member cleanup when a workspace is restored', async () => {
@@ -155,7 +214,6 @@ describe('canvas arrangement filesystem persistence', () => {
         arrangement.createStack({
           id: 'stack-1',
           anchor: { x: 120, y: 80 },
-          presentation: 'spread',
           items: [
             { kind: 'terminal', terminalId: 'terminal-1' },
             { kind: 'agent', agentId: 'agent-1' },

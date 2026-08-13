@@ -72,7 +72,7 @@ describe('workbench canvas Command selection and block template placement', () =
 
     expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBeInTheDocument()
     expect(screen.queryByText('收藏所选内容')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '堆叠所选对象' }))
+    fireEvent.click(screen.getByRole('button', { name: '吸附所选对象' }))
     expect(onArrangeCanvasSelection).toHaveBeenCalledWith(
       'stack',
       expect.arrayContaining([
@@ -148,7 +148,6 @@ describe('workbench canvas Command selection and block template placement', () =
           {
             id: 'stack-1',
             anchor: { x: 100, y: 100 },
-            presentation: 'spread',
             items: [
               { kind: 'terminal', terminalId: 'terminal-a' },
               { kind: 'terminal', terminalId: 'terminal-b' }
@@ -231,7 +230,7 @@ function renderCanvas({
 }: {
   readonly onPaneClick?: () => void
   readonly onArrangeCanvasSelection?: (
-    action: 'grid' | 'stack' | 'toggle-stack',
+    action: 'detach-stack' | 'grid' | 'stack',
     items: readonly unknown[]
   ) => void
   readonly canvasArrangement?: CanvasArrangementSnapshot

@@ -9,12 +9,11 @@ describe('canvas arrangement toolbar', () => {
       <TooltipProvider delayDuration={0}>
         <CanvasArrangementToolbar
           isPending={false}
-          stackPresentation={null}
+          isStacked={false}
           labels={{
-            collapse: '收拢堆叠',
-            expand: '展开堆叠',
+            detach: '解除吸附',
             grid: '网格排列',
-            stack: '堆叠所选对象',
+            stack: '吸附所选对象',
             toolbar: '整理所选画布对象'
           }}
           onGrid={vi.fn()}
@@ -23,20 +22,19 @@ describe('canvas arrangement toolbar', () => {
       </TooltipProvider>
     )
 
-    await expectTooltip('堆叠所选对象')
+    await expectTooltip('吸附所选对象')
     await expectTooltip('网格排列')
   })
 
-  it('switches the stack action from spread to collapse without adding visible copy', () => {
+  it('switches the stack action to detach without adding visible copy', () => {
     render(
       <CanvasArrangementToolbar
         isPending={false}
-        stackPresentation="spread"
+        isStacked
         labels={{
-          collapse: '收拢堆叠',
-          expand: '展开堆叠',
+          detach: '解除吸附',
           grid: '网格排列',
-          stack: '堆叠所选对象',
+          stack: '吸附所选对象',
           toolbar: '整理所选画布对象'
         }}
         onGrid={vi.fn()}
@@ -44,8 +42,8 @@ describe('canvas arrangement toolbar', () => {
       />
     )
 
-    expect(screen.getByRole('button', { name: '收拢堆叠' })).toBeInTheDocument()
-    expect(screen.queryByText('收拢堆叠')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '解除吸附' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('解除吸附')).not.toBeInTheDocument()
   })
 })
 

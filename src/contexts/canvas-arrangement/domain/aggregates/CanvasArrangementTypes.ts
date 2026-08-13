@@ -16,13 +16,10 @@ export type CanvasArrangementItemReference =
       readonly agentId: string
     }
 
-export type CanvasStackPresentation = 'spread' | 'stacked'
-
 export interface CanvasStackSnapshot {
   readonly id: string
   readonly anchor: { readonly x: number; readonly y: number }
   readonly items: readonly CanvasArrangementItemReference[]
-  readonly presentation: CanvasStackPresentation
 }
 
 export interface CanvasArrangementSnapshot {

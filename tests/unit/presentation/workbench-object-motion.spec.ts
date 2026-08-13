@@ -167,7 +167,10 @@ describe('workbench object motion', () => {
     const projection = projectWorkbenchObjectMotion({
       createMotionId,
       currentNodes: [currentTerminal],
-      canvasArrangementMotion: { delayByNodeId: { 'terminal-1': 84 } },
+      canvasArrangementMotion: {
+        delayByNodeId: { 'terminal-1': 84 },
+        kind: 'detach'
+      },
       isCanvasArrangementPending: true,
       isContinuingGraph: true,
       nextNodes: [nextTerminal],
@@ -182,7 +185,8 @@ describe('workbench object motion', () => {
             id: 'canvas-arrange:terminal-1',
             kind: 'canvas-arrange',
             offset: { x: -160, y: -90 },
-            delayMs: 84
+            delayMs: 84,
+            positionDynamics: 'drop'
           }
         })
       })

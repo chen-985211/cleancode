@@ -94,11 +94,20 @@ export function resolveCanvasArrangementSelectionFromCandidates({
 
 export function projectCanvasArrangementSelectionOntoNodes(
   nodes: WorkbenchFlowNode[],
-  items: readonly CanvasArrangementSelectionItem[]
+  items: readonly CanvasArrangementSelectionItem[],
+  arrangement?: CanvasArrangementSnapshot
 ): WorkbenchFlowNode[] {
   if (items.length === 0) return nodes
 
-  const selectedNodeIds = new Set(items.flatMap((item) => item.nodeIds))
+  const selectedStack = arrangement ? findCanvasArrangementStack(arrangement, items) : null
+  const visibleSelectionItems = selectedStack
+    ? items.filter(
+        (item) =>
+          item.key ===
+          canvasArrangementItemKey(selectedStack.items[selectedStack.items.length - 1]!)
+      )
+    : items
+  const selectedNodeIds = new Set(visibleSelectionItems.flatMap((item) => item.nodeIds))
   return nodes.map((node) =>
     selectedNodeIds.has(node.id)
       ? {

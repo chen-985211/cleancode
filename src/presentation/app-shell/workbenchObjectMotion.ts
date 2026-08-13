@@ -186,7 +186,13 @@ export function projectWorkbenchObjectMotion({
       if (offset.x !== 0 || offset.y !== 0) {
         const motion = createObjectMotion('canvas-arrange', node.id, offset, createMotionId)
         const delayMs = canvasArrangementMotion?.delayByNodeId[node.id] ?? 0
-        return withObjectMotion(node, delayMs > 0 ? { ...motion, delayMs } : motion)
+        return withObjectMotion(node, {
+          ...motion,
+          ...(delayMs > 0 ? { delayMs } : {}),
+          ...(canvasArrangementMotion?.kind === 'detach'
+            ? { positionDynamics: 'drop' as const }
+            : {})
+        })
       }
     }
 

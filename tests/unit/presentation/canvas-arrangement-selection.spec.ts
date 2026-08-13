@@ -3,6 +3,7 @@ import type { CanvasArrangementSnapshot } from '../../../src/contexts/canvas-arr
 import {
   canvasArrangementItemKey,
   isCanvasArrangementSelectionModifier,
+  projectCanvasArrangementSelectionOntoNodes,
   resolveCanvasArrangementSelectionItems
 } from '../../../src/presentation/app-shell/canvasArrangementSelection'
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
@@ -90,7 +91,6 @@ describe('canvas arrangement selection', () => {
         {
           id: 'stack-1',
           anchor: { x: 100, y: 100 },
-          presentation: 'spread',
           items: [
             { kind: 'terminal', terminalId: 'terminal-a' },
             { kind: 'agent', agentId: 'agent-1' }
@@ -114,7 +114,68 @@ describe('canvas arrangement selection', () => {
       'agent:agent-1'
     ])
   })
+
+  it('uses only the top object as the visible selection proxy for a tight stack', () => {
+    const arrangement: CanvasArrangementSnapshot = {
+      projectId: 'project-1',
+      workspaceId: 'main',
+      stacks: [
+        {
+          id: 'stack-1',
+          anchor: { x: 100, y: 100 },
+          items: [
+            { kind: 'terminal', terminalId: 'terminal-a' },
+            { kind: 'agent', agentId: 'agent-1' }
+          ]
+        }
+      ]
+    }
+    const items = [
+      selectionItem('terminal-a', { kind: 'terminal', terminalId: 'terminal-a' }),
+      selectionItem('agent:agent-1', { kind: 'agent', agentId: 'agent-1' })
+    ]
+
+    const projected = projectCanvasArrangementSelectionOntoNodes(
+      [terminalNode('terminal-a', 100, 100, 100, 80), agentNode('agent-1', 110, 110, 180, 140)],
+      items,
+      arrangement
+    )
+
+    expect(projected.find((node) => node.id === 'terminal-a')?.className).toBeUndefined()
+    expect(projected.find((node) => node.id === 'agent:agent-1')?.className).toContain(
+      'canvas-arrangement-node--selected'
+    )
+  })
+
+  it('keeps every selected object outlined when there is no stack relation', () => {
+    const nodes = [
+      terminalNode('terminal-a', 100, 100, 100, 80),
+      agentNode('agent-1', 110, 110, 180, 140)
+    ]
+    const items = [
+      selectionItem('terminal-a', { kind: 'terminal', terminalId: 'terminal-a' }),
+      selectionItem('agent:agent-1', { kind: 'agent', agentId: 'agent-1' })
+    ]
+    const projected = projectCanvasArrangementSelectionOntoNodes(nodes, items)
+
+    expect(
+      projected.every((node) => node.className?.includes('canvas-arrangement-node--selected'))
+    ).toBe(true)
+  })
 })
+
+function selectionItem(
+  nodeId: string,
+  reference: CanvasArrangementSnapshot['stacks'][number]['items'][number]
+) {
+  return {
+    key: canvasArrangementItemKey(reference),
+    nodeIds: [nodeId],
+    position: { x: 0, y: 0 },
+    reference,
+    size: { width: 100, height: 80 }
+  }
+}
 
 function createGraph(): BlockGraph {
   const graph = BlockGraph.createDefault({ projectId: 'project-1', workspaceId: 'main' })

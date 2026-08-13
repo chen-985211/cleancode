@@ -3,20 +3,21 @@ import type { IpcMainLike } from '../../../../src/platform/ipc/registerIpcHandle
 import type { Logger } from '../../../../src/platform/logging/Logger'
 
 describe('canvas arrangement IPC contract', () => {
-  it('creates, moves, spreads, and removes a validated mixed canvas stack', async () => {
+  it('creates, moves, and removes a validated mixed canvas stack', async () => {
     const ipcMain = new FakeIpcMain()
     const createStack = vi.fn(async () => snapshot('stack-1'))
     const moveStack = vi.fn(async () => snapshot('stack-1', { x: 300, y: 240 }))
     const removeStack = vi.fn(async () => snapshot())
-    const setStackPresentation = vi.fn(async () => snapshot('stack-1', undefined, 'spread'))
     registerCanvasArrangementIpcHandlers({
       createStack,
       ipcMain,
       logger: silentLogger,
       moveStack,
-      removeStack,
-      setStackPresentation
+      removeStack
     })
+    await expect(ipcMain.invoke('cleancode:set-canvas-stack-presentation', {})).rejects.toThrow(
+      'Missing handler: cleancode:set-canvas-stack-presentation'
+    )
 
     const command = {
       anchor: { x: 100, y: 80 },
@@ -28,7 +29,6 @@ describe('canvas arrangement IPC contract', () => {
       ],
       projectDirectory: '/project',
       projectId: 'project-1',
-      presentation: 'stacked',
       stackId: 'stack-1',
       workspaceId: 'main'
     }
@@ -51,18 +51,6 @@ describe('canvas arrangement IPC contract', () => {
     )
     expect(moveStack).toHaveBeenCalledWith(moveCommand)
 
-    const presentationCommand = {
-      presentation: 'spread',
-      projectDirectory: '/project',
-      projectId: 'project-1',
-      stackId: 'stack-1',
-      workspaceId: 'main'
-    }
-    await expect(
-      ipcMain.invoke('cleancode:set-canvas-stack-presentation', presentationCommand)
-    ).resolves.toMatchObject({ ok: true, value: { stacks: [{ presentation: 'spread' }] } })
-    expect(setStackPresentation).toHaveBeenCalledWith(presentationCommand)
-
     await expect(
       ipcMain.invoke('cleancode:remove-canvas-stack', {
         projectDirectory: '/project',
@@ -81,8 +69,7 @@ describe('canvas arrangement IPC contract', () => {
       ipcMain,
       logger: silentLogger,
       moveStack: vi.fn(async () => snapshot()),
-      removeStack: vi.fn(async () => snapshot()),
-      setStackPresentation: vi.fn(async () => snapshot())
+      removeStack: vi.fn(async () => snapshot())
     })
 
     for (const command of [
@@ -94,7 +81,6 @@ describe('canvas arrangement IPC contract', () => {
         ],
         projectDirectory: '/project',
         projectId: 'project-1',
-        presentation: 'stacked',
         stackId: 'stack-1',
         workspaceId: 'main'
       },
@@ -106,7 +92,6 @@ describe('canvas arrangement IPC contract', () => {
         ],
         projectDirectory: '/project',
         projectId: 'project-1',
-        presentation: 'stacked',
         stackId: 'stack-1',
         workspaceId: 'main'
       },
@@ -118,7 +103,6 @@ describe('canvas arrangement IPC contract', () => {
         ],
         projectDirectory: '/project',
         projectId: 'project-1',
-        presentation: 'stacked',
         stackId: 'stack-1',
         workspaceId: 'main'
       },
@@ -130,7 +114,7 @@ describe('canvas arrangement IPC contract', () => {
         ],
         projectDirectory: '/project',
         projectId: 'project-1',
-        presentation: 'unknown',
+        presentation: 'stacked',
         stackId: 'stack-1',
         workspaceId: 'main'
       }
@@ -146,11 +130,7 @@ describe('canvas arrangement IPC contract', () => {
   })
 })
 
-function snapshot(
-  stackId?: string,
-  anchor = { x: 100, y: 80 },
-  presentation: 'spread' | 'stacked' = 'stacked'
-) {
+function snapshot(stackId?: string, anchor = { x: 100, y: 80 }) {
   return {
     projectId: 'project-1',
     workspaceId: 'main',
@@ -159,7 +139,6 @@ function snapshot(
           {
             id: stackId,
             anchor,
-            presentation,
             items: [
               { kind: 'terminal' as const, terminalId: 'terminal-1' },
               { kind: 'agent' as const, agentId: 'agent-1' }

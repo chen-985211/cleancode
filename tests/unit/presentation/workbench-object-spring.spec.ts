@@ -462,6 +462,40 @@ describe('workbench object spring', () => {
     )
   })
 
+  it('releases a detached canvas card under gravity before a restrained landing rebound', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('canvas-arrange', { x: -24, y: -18 }),
+        positionDynamics: 'drop'
+      },
+      false,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-18)
+    scheduler.advanceNextFrame(50)
+    const firstDropPosition = readProperty(surface, '--workbench-object-motion-y')
+    scheduler.advanceNextFrame(50)
+    const secondDropPosition = readProperty(surface, '--workbench-object-motion-y')
+
+    expect(firstDropPosition).toBeCloseTo(-15.75, 1)
+    expect(secondDropPosition).toBeCloseTo(-9, 1)
+    expect(secondDropPosition - firstDropPosition).toBeGreaterThan(firstDropPosition + 18)
+
+    scheduler.advanceNextFrame(50)
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBeLessThan(0)
+    scheduler.advanceUntilIdle()
+
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBe(0)
+    expect(completed).toHaveBeenCalledOnce()
+  })
+
   it('completes immediately at the same endpoint for reduced motion', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
