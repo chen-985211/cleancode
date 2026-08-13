@@ -75,4 +75,32 @@ describe('workbench icon semantics', () => {
       'fill'
     )
   })
+
+  it('switches the canvas arrangement action between the stack and unstack product assets', () => {
+    const { container, rerender } = render(
+      <WorkbenchIcon active={false} role="arrangement-stack" size={19} />
+    )
+
+    const stackIcon = container.querySelector('[data-icon-role="arrangement-stack"]')
+    expect(stackIcon?.querySelectorAll('[data-canvas-card]')).toHaveLength(2)
+    expect(stackIcon?.querySelector('[data-canvas-unstack-slash]')).not.toBeInTheDocument()
+    expect(stackIcon).toMatchObject({
+      dataset: expect.objectContaining({
+        iconGlyph: 'canvas-stack',
+        iconWeight: 'regular'
+      })
+    })
+
+    rerender(<WorkbenchIcon active role="arrangement-stack" size={19} />)
+
+    const unstackIcon = container.querySelector('[data-icon-role="arrangement-stack"]')
+    expect(unstackIcon?.querySelectorAll('[data-canvas-card]')).toHaveLength(2)
+    expect(unstackIcon?.querySelector('[data-canvas-unstack-slash]')).toBeInTheDocument()
+    expect(unstackIcon).toMatchObject({
+      dataset: expect.objectContaining({
+        iconGlyph: 'canvas-unstack',
+        iconWeight: 'regular'
+      })
+    })
+  })
 })

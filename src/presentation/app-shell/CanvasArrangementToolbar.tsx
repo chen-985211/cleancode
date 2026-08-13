@@ -37,7 +37,7 @@ export function CanvasArrangementToolbar({
           disabled={isPending}
           onClick={onToggleStack}
         >
-          <WorkbenchIcon active={isStacked} role="arrangement-stack" size={19} />
+          <WorkbenchIcon active={isStacked} role="arrangement-stack" size={20} />
         </button>
       </TooltipLabel>
       <TooltipLabel content={labels.grid}>
