@@ -256,17 +256,41 @@
   align-items: center;
 }
 
+@property --cc-canvas-brand-sweep-position {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 117%;
+}
+
 .canvas-empty__brand {
+  --cc-canvas-brand-sweep-position: 117%;
+
   margin: 0;
-  color: var(--cc-foreground);
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--cc-foreground) 0%,
+    var(--cc-foreground) calc(var(--cc-canvas-brand-sweep-position) - 17%),
+    var(--cc-brand-sweep-violet) calc(var(--cc-canvas-brand-sweep-position) - 17%),
+    var(--cc-brand-sweep-pink) var(--cc-canvas-brand-sweep-position),
+    var(--cc-brand-sweep-gold) calc(var(--cc-canvas-brand-sweep-position) + 17%),
+    transparent calc(var(--cc-canvas-brand-sweep-position) + 17%),
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-clip: text;
   font-size: clamp(52px, 6vw, 82px);
   font-weight: 720;
   letter-spacing: -0.035em;
   line-height: 1;
   text-rendering: geometricPrecision;
-  animation: canvas-empty-brand-tracking var(--cc-motion-duration-brand-reveal)
-    var(--cc-easing-enter) both;
-  animation-delay: var(--cc-motion-delay-brand-reveal);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    canvas-empty-brand-tracking var(--cc-motion-duration-brand-reveal) var(--cc-easing-enter)
+      var(--cc-motion-delay-brand-reveal) both,
+    canvas-empty-brand-sweep var(--cc-motion-duration-brand-sweep) var(--cc-easing-brand-sweep)
+      var(--cc-motion-delay-brand-sweep) infinite;
 }
 
 .canvas-empty--welcome .canvas-empty__action {
@@ -470,6 +494,17 @@
   }
 }
 
+@keyframes canvas-empty-brand-sweep {
+  0% {
+    --cc-canvas-brand-sweep-position: -17%;
+  }
+
+  65%,
+  100% {
+    --cc-canvas-brand-sweep-position: 117%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .canvas-empty__panel {
     animation: none;
@@ -484,7 +519,10 @@
   }
 
   .canvas-empty__brand {
+    color: var(--cc-foreground);
+    background: none;
     letter-spacing: -0.035em;
+    -webkit-text-fill-color: currentcolor;
     animation: none;
   }
 }

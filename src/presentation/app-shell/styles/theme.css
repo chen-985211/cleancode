@@ -32,6 +32,9 @@
   --cc-primary-wash: rgb(47 103 216 / 10%);
   --cc-selection-overlay: rgb(47 103 216 / 5%);
   --cc-primary-canvas-mark: rgb(47 103 216 / 6%);
+  --cc-brand-sweep-violet: #a97cf8;
+  --cc-brand-sweep-pink: #f38cb8;
+  --cc-brand-sweep-gold: #fdcc92;
   --cc-success: #238a55;
   --cc-success-strong: #176e41;
   --cc-success-soft: #e8f6ee;
@@ -101,6 +104,9 @@
   --cc-primary-wash: rgb(117 160 245 / 13%);
   --cc-selection-overlay: rgb(117 160 245 / 7%);
   --cc-primary-canvas-mark: rgb(117 160 245 / 9%);
+  --cc-brand-sweep-violet: #a97cf8;
+  --cc-brand-sweep-pink: #f38cb8;
+  --cc-brand-sweep-gold: #fdcc92;
   --cc-success: #52c488;
   --cc-success-strong: #72d6a1;
   --cc-success-soft: #173628;
@@ -137,10 +143,13 @@
   --cc-motion-duration-surface: 180ms;
   --cc-motion-delay-brand-reveal: 280ms;
   --cc-motion-duration-brand-reveal: 700ms;
+  --cc-motion-delay-brand-sweep: 1480ms;
+  --cc-motion-duration-brand-sweep: 2300ms;
   --cc-motion-duration-spinner: 900ms;
   --cc-easing-standard: ease;
   --cc-easing-enter: ease-out;
   --cc-easing-exit: ease-in;
+  --cc-easing-brand-sweep: cubic-bezier(0.65, 0, 0.35, 1);
   --cc-canvas-node-radius: 20px;
   --cc-terminal-light-background: #ffffff;
   --cc-terminal-light-foreground: #243142;
