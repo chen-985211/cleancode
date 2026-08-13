@@ -4,6 +4,96 @@ import { ProjectSidebar } from '../../../src/presentation/app-shell/ProjectSideb
 import { createWorkbenchSnapshot } from '../../fixtures/presentation/appShellFixtures'
 
 describe('project sidebar navigation semantics', () => {
+  it('moves one shared selection material between workspaces while semantic selection updates immediately', () => {
+    const createWorkspaceWorkbench = (currentWorkspaceId: string) =>
+      createWorkbenchSnapshot('/tmp/motion-project', 'motion-project', {
+        workspaceId: currentWorkspaceId,
+        workspaces: [
+          {
+            workspaceId: 'main',
+            workspaceKind: 'default',
+            displayName: 'main',
+            directory: '/tmp/motion-project',
+            gitBranch: 'main',
+            isCurrent: currentWorkspaceId === 'main'
+          },
+          {
+            workspaceId: 'feature',
+            workspaceKind: 'linked-worktree',
+            displayName: 'feat/like',
+            directory: '/tmp/motion-project-feature',
+            gitBranch: 'feat/like',
+            isCurrent: currentWorkspaceId === 'feature'
+          }
+        ]
+      })
+    const offsetWidth = vi
+      .spyOn(HTMLElement.prototype, 'offsetWidth', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.hasAttribute('data-selection-motion-option') ? 224 : 0
+      })
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.hasAttribute('data-selection-motion-option') ? 32 : 0
+      })
+    const offsetTop = vi
+      .spyOn(HTMLElement.prototype, 'offsetTop', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.dataset.selectionMotionOption === 'feature' ? 34 : 0
+      })
+
+    try {
+      const mainWorkbench = createWorkspaceWorkbench('main')
+      const props = {
+        currentWorkbench: mainWorkbench,
+        isDesktopRuntime: true,
+        onAddProject: vi.fn(),
+        onArchiveBranchWorkspace: vi.fn(),
+        onCheckoutMainBranch: vi.fn(),
+        onCreateBranchWorkspace: vi.fn(),
+        onRemoveProject: vi.fn(),
+        onReorderProject: vi.fn(),
+        onSelectWorkspace: vi.fn(),
+        workbenches: [mainWorkbench]
+      }
+      const { rerender } = render(<ProjectSidebar {...props} />)
+      const workspaceList = document.querySelector('.workspace-list')
+      const indicator = workspaceList?.querySelector('.workspace-list__selection')
+
+      expect(workspaceList).toHaveAttribute('data-selection-motion-ready', 'true')
+      expect(indicator).toHaveAttribute('data-selection-motion-target', 'main')
+      expect(indicator).toHaveAttribute('data-selection-motion-state', 'settled')
+      expect(screen.getByRole('button', { name: 'main 默认工作区' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+
+      const featureWorkbench = createWorkspaceWorkbench('feature')
+      rerender(
+        <ProjectSidebar
+          {...props}
+          currentWorkbench={featureWorkbench}
+          workbenches={[featureWorkbench]}
+        />
+      )
+
+      expect(indicator).toHaveAttribute('data-selection-motion-target', 'feature')
+      expect(indicator).toHaveAttribute('data-selection-motion-state', 'moving')
+      expect(screen.getByRole('button', { name: 'feat/like 独立工作区' })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+      expect(screen.getByRole('button', { name: 'main 默认工作区' })).not.toHaveAttribute(
+        'aria-current'
+      )
+    } finally {
+      offsetWidth.mockRestore()
+      offsetHeight.mockRestore()
+      offsetTop.mockRestore()
+    }
+  })
+
   it('places a compact add-project action at the far edge of the projects heading', () => {
     const workbench = createWorkbenchSnapshot('/tmp/alpha-project', 'alpha-project')
     const onAddProject = vi.fn()

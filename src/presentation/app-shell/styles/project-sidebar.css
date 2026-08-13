@@ -368,10 +368,12 @@
 }
 
 .workspace-list {
+  position: relative;
   min-height: 0;
   margin-left: 9px;
   border-left: 1px solid var(--cc-border);
   padding: 2px 0 0 9px;
+  isolation: isolate;
   transform: translateY(0);
   transition: transform var(--cc-motion-duration-surface) var(--cc-easing-standard);
 }
@@ -394,6 +396,7 @@
 
 .workspace-group {
   position: relative;
+  z-index: 1;
 }
 
 .workspace-group + .workspace-group {
@@ -425,6 +428,16 @@
   background: var(--cc-primary-soft);
   color: var(--cc-primary-hover);
   font-weight: 620;
+}
+
+.workspace-list[data-selection-motion-ready='true'] .workspace-row--active,
+.workspace-list[data-selection-motion-ready='true'] .workspace-row--active:hover,
+.workspace-list[data-selection-motion-ready='true'] .workspace-row--active:focus-within {
+  background: transparent;
+}
+
+.workspace-list:not([data-selection-motion-ready='true']) .workspace-row--active {
+  background: var(--cc-primary-soft);
 }
 
 .default-branch-selector {
