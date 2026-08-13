@@ -4,6 +4,56 @@ import type { BlockGraphSnapshot } from '../../../src/contexts/block-graph/appli
 import { QuickExecutionBar } from '../../../src/presentation/app-shell/QuickExecutionBar'
 
 describe('quick execution bar', () => {
+  it('keeps the bottom surface inert through exit and reuses it when the handoff reverses', () => {
+    const props = {
+      graph: createGraph(),
+      onAdd: vi.fn(),
+      onBind: vi.fn(),
+      onClear: vi.fn(),
+      onFocus: vi.fn(),
+      onReorder: vi.fn()
+    }
+    const { rerender } = render(<QuickExecutionBar {...props} open />)
+    const bar = document.querySelector<HTMLElement>('[data-quick-execution-bar]')!
+
+    expect(bar).toHaveAttribute('data-surface-spring-preset', 'bottom-control')
+    expect(bar).not.toHaveAttribute('aria-hidden')
+
+    rerender(<QuickExecutionBar {...props} open={false} />)
+
+    expect(document.querySelector('[data-quick-execution-bar]')).toBe(bar)
+    expect(bar).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(bar).toHaveAttribute('aria-hidden', 'true')
+    expect(bar).toHaveAttribute('inert')
+
+    rerender(<QuickExecutionBar {...props} open />)
+
+    expect(document.querySelector('[data-quick-execution-bar]')).toBe(bar)
+    expect(bar).toHaveAttribute('data-surface-motion-state', 'opening')
+    expect(bar).not.toHaveAttribute('aria-hidden')
+    expect(bar).not.toHaveAttribute('inert')
+  })
+
+  it('dismisses an open slot popover when arrangement controls take over', () => {
+    const props = {
+      graph: createGraph(),
+      onAdd: vi.fn(),
+      onBind: vi.fn(),
+      onClear: vi.fn(),
+      onFocus: vi.fn(),
+      onReorder: vi.fn()
+    }
+    const { rerender } = render(<QuickExecutionBar {...props} open />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开快捷位 2 的操作' }))
+    expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBeInTheDocument()
+
+    rerender(<QuickExecutionBar {...props} open={false} />)
+    rerender(<QuickExecutionBar {...props} open />)
+
+    expect(screen.queryByRole('dialog', { name: '快捷位操作' })).not.toBeInTheDocument()
+  })
+
   it('adds a canvas object without asking the user to choose a slot', () => {
     const onAdd = vi.fn()
     render(

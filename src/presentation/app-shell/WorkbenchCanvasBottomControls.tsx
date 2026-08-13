@@ -62,8 +62,7 @@ export function WorkbenchCanvasBottomControls({
 }) {
   const { t } = useI18n()
   const hasArrangementSelection = (selection?.items.length ?? 0) >= 2
-  const canShowQuickExecution =
-    !hasArrangementSelection &&
+  const canRenderQuickExecution =
     currentWorkbench &&
     onAddQuickExecutionTarget &&
     onBindQuickExecutionSlot &&
@@ -72,10 +71,11 @@ export function WorkbenchCanvasBottomControls({
 
   return (
     <>
-      {canShowQuickExecution ? (
+      {canRenderQuickExecution ? (
         <QuickExecutionBar
           isExternalDropTarget={isQuickExecutionDropTarget}
           graph={currentWorkbench.graph}
+          open={!hasArrangementSelection}
           onAdd={onAddQuickExecutionTarget}
           onBind={onBindQuickExecutionSlot}
           onClear={onClearQuickExecutionSlot}

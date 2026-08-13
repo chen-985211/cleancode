@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import type { CanvasArrangementSnapshot } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import { CanvasArrangementToolbar } from './CanvasArrangementToolbar'
 import {
@@ -29,6 +31,11 @@ export function CanvasArrangementOverlay({
 }) {
   const isActionable = selection?.rect === null && selection.items.length >= 2
   const selectedStack = selection ? findCanvasArrangementStack(arrangement, selection.items) : null
+  const selectedIsStacked = selectedStack !== null
+  const [presentedIsStacked, setPresentedIsStacked] = useState(selectedIsStacked)
+  const isStackPresentationChanged = isActionable && presentedIsStacked !== selectedIsStacked
+  if (isStackPresentationChanged) setPresentedIsStacked(selectedIsStacked)
+  const resolvedIsStacked = isStackPresentationChanged ? selectedIsStacked : presentedIsStacked
   const requestArrangement = (action: 'detach-stack' | 'grid' | 'stack'): void => {
     if (!selection || selection.items.length < 2 || !onArrange) return
     void onArrange(action, selection.items)
@@ -36,15 +43,14 @@ export function CanvasArrangementOverlay({
 
   return (
     <>
-      {isActionable ? (
-        <CanvasArrangementToolbar
-          isPending={isPending}
-          isStacked={selectedStack !== null}
-          labels={labels}
-          onGrid={() => requestArrangement('grid')}
-          onToggleStack={() => requestArrangement(selectedStack ? 'detach-stack' : 'stack')}
-        />
-      ) : null}
+      <CanvasArrangementToolbar
+        isPending={isPending}
+        isStacked={resolvedIsStacked}
+        labels={labels}
+        onGrid={() => requestArrangement('grid')}
+        onToggleStack={() => requestArrangement(selectedStack ? 'detach-stack' : 'stack')}
+        open={isActionable}
+      />
       {selection?.rect ? (
         <div
           className="canvas-arrangement-selection"

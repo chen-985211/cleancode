@@ -1,3 +1,4 @@
+import { AnchoredSurfaceMotion } from './SurfaceMotion'
 import { WorkbenchIcon } from './WorkbenchIcons'
 import { TooltipLabel } from './Tooltip'
 
@@ -6,7 +7,8 @@ export function CanvasArrangementToolbar({
   isStacked,
   labels,
   onGrid,
-  onToggleStack
+  onToggleStack,
+  open = true
 }: {
   readonly isPending: boolean
   readonly isStacked: boolean
@@ -18,16 +20,20 @@ export function CanvasArrangementToolbar({
   }
   readonly onGrid: () => void
   readonly onToggleStack: () => void
+  readonly open?: boolean
 }) {
   const stackLabel = isStacked ? labels.detach : labels.stack
 
   return (
-    <div
+    <AnchoredSurfaceMotion
       className="canvas-arrangement-toolbar"
       data-canvas-arrangement-toolbar
       data-workbench-canvas-obstruction
+      data-side="top"
+      open={open}
       role="toolbar"
       aria-label={labels.toolbar}
+      springPreset="bottom-control"
     >
       <TooltipLabel content={stackLabel}>
         <button
@@ -45,6 +51,6 @@ export function CanvasArrangementToolbar({
           <WorkbenchIcon role="arrangement-grid" size={18} />
         </button>
       </TooltipLabel>
-    </div>
+    </AnchoredSurfaceMotion>
   )
 }

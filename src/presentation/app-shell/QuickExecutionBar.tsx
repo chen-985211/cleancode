@@ -27,6 +27,7 @@ type QuickExecutionShortcutCommand = `quickExecution${QuickExecutionSlotNumber}`
 interface QuickExecutionBarProps {
   readonly isExternalDropTarget?: boolean
   readonly graph: BlockGraphSnapshot
+  readonly open?: boolean
   readonly onAdd: (target: QuickExecutionTargetSnapshot) => Promise<void> | void
   readonly onBind: (
     number: QuickExecutionSlotNumber,
@@ -56,6 +57,7 @@ interface PopoverPresentation {
 export function QuickExecutionBar({
   isExternalDropTarget = false,
   graph,
+  open = true,
   onAdd,
   onBind,
   onClear,
@@ -70,6 +72,7 @@ export function QuickExecutionBar({
   const popoverTriggerRef = useRef<HTMLButtonElement | null>(null)
   const draggedNumberRef = useRef<QuickExecutionSlotNumber | null>(null)
   const [popoverPresentation, setPopoverPresentation] = useState<PopoverPresentation | null>(null)
+  const [renderedOpen, setRenderedOpen] = useState(open)
   const [draggedNumber, setDraggedNumber] = useState<QuickExecutionSlotNumber | null>(null)
   const [reorderTargetNumber, setReorderTargetNumber] = useState<QuickExecutionSlotNumber | null>(
     null
@@ -90,6 +93,11 @@ export function QuickExecutionBar({
       setPopoverPresentation((current) => (current ? { ...current, open: false } : current)),
     []
   )
+  const openChanged = renderedOpen !== open
+  if (openChanged) {
+    setRenderedOpen(open)
+    if (!open && popoverPresentation) setPopoverPresentation(null)
+  }
   const openPopover = useCallback((content: PopoverState, trigger?: HTMLButtonElement): void => {
     if (trigger) popoverTriggerRef.current = trigger
     setPopoverPresentation({ content, open: true })
@@ -98,8 +106,8 @@ export function QuickExecutionBar({
     closePopover()
     popoverTriggerRef.current?.focus({ preventScroll: true })
   }, [closePopover])
-  const presentedPopover = popoverPresentation?.content ?? null
-  const isPopoverOpen = popoverPresentation?.open ?? false
+  const presentedPopover = openChanged && !open ? null : (popoverPresentation?.content ?? null)
+  const isPopoverOpen = open && (popoverPresentation?.open ?? false)
 
   useOutsidePointerDismiss({
     active: isPopoverOpen,
@@ -154,14 +162,17 @@ export function QuickExecutionBar({
   }
 
   return (
-    <div
+    <AnchoredSurfaceMotion
       ref={rootRef}
       className={['quick-execution', isExternalDropTarget ? 'quick-execution--drop-target' : '']
         .filter(Boolean)
         .join(' ')}
       data-quick-execution-bar
       data-workbench-canvas-obstruction
+      data-side="top"
       aria-label={t('quickExecution.label')}
+      open={open}
+      springPreset="bottom-control"
     >
       <AnchoredSurfaceMotion
         open={isPopoverOpen}
@@ -347,7 +358,7 @@ export function QuickExecutionBar({
           size={18}
         />
       </div>
-    </div>
+    </AnchoredSurfaceMotion>
   )
 }
 

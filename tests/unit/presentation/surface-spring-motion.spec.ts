@@ -7,6 +7,7 @@ import type { SpringProgressMotionFrameScheduler } from '../../../src/presentati
 describe('surface spring motion', () => {
   it.each([
     ['anchored-top-right', '--cc-surface-motion-translate-x', 1],
+    ['bottom-control', '--cc-surface-motion-translate-y', 1],
     ['drawer-right', '--cc-surface-motion-translate-x', 1],
     ['fullscreen-right', '--cc-surface-motion-translate-x', 1]
   ] as const)('enters the %s surface from its trigger-side origin', (preset, property, sign) => {
@@ -81,6 +82,39 @@ describe('surface spring motion', () => {
     expect(Math.abs(readNumber(root, '--cc-surface-motion-translate-y'))).toBeLessThanOrEqual(6)
   })
 
+  it('hands bottom controls upward from a restrained shared anchor', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'bottom-control',
+      scheduler
+    })
+
+    controller.intentChanged(root, {
+      onSettled: vi.fn(),
+      reducedMotion: false,
+      visible: true
+    })
+
+    expect(readNumber(root, '--cc-surface-motion-translate-x')).toBe(0)
+    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBeGreaterThan(0)
+    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBeLessThanOrEqual(6)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBeGreaterThanOrEqual(0.97)
+
+    scheduler.advanceNextFrame(80)
+    const opacityBeforeReversal = readNumber(root, '--cc-surface-motion-opacity')
+    const translationBeforeReversal = readNumber(root, '--cc-surface-motion-translate-y')
+
+    controller.intentChanged(root, {
+      onSettled: vi.fn(),
+      reducedMotion: false,
+      visible: false
+    })
+
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(opacityBeforeReversal)
+    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBe(translationBeforeReversal)
+  })
+
   it('continuously projects a closing drawer until it reaches the hidden endpoint', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
@@ -136,6 +170,26 @@ describe('surface spring motion', () => {
     expect(readNumber(root, '--cc-surface-motion-translate-x')).toBe(0)
     expect(scheduler.pendingFrames()).toBe(0)
     expect(settled).toHaveBeenCalledOnce()
+  })
+
+  it('removes bottom-control translation and scale immediately for reduced motion', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createSurfaceSpringMotionController({
+      preset: 'bottom-control',
+      scheduler
+    })
+
+    controller.intentChanged(root, {
+      onSettled: vi.fn(),
+      reducedMotion: true,
+      visible: true
+    })
+
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
+    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBe(0)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+    expect(scheduler.pendingFrames()).toBe(0)
   })
 })
 

@@ -53,6 +53,15 @@
   transform: translateX(-50%);
 }
 
+.canvas-arrangement-toolbar[data-surface-spring-preset='bottom-control'] {
+  opacity: var(--cc-surface-motion-opacity, 1);
+  transform: translate3d(-50%, var(--cc-surface-motion-translate-y, 0), 0)
+    scale(var(--cc-surface-motion-scale, 1));
+  transform-origin: 50% 100%;
+  transition: none;
+  will-change: opacity, transform;
+}
+
 .canvas-arrangement-toolbar button {
   display: inline-flex;
   width: 38px;

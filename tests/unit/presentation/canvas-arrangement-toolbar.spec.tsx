@@ -4,6 +4,38 @@ import { CanvasArrangementToolbar } from '../../../src/presentation/app-shell/Ca
 import { TooltipProvider } from '../../../src/presentation/app-shell/Tooltip'
 
 describe('canvas arrangement toolbar', () => {
+  it('keeps the arrangement surface inert through exit and reuses it when selection returns', () => {
+    const props = {
+      isPending: false,
+      isStacked: false,
+      labels: {
+        detach: '解除吸附',
+        grid: '网格排列',
+        stack: '吸附所选对象',
+        toolbar: '整理所选画布对象'
+      },
+      onGrid: vi.fn(),
+      onToggleStack: vi.fn()
+    }
+    const { rerender } = render(<CanvasArrangementToolbar {...props} open />)
+    const toolbar = screen.getByRole('toolbar', { name: '整理所选画布对象' })
+
+    expect(toolbar).toHaveAttribute('data-surface-spring-preset', 'bottom-control')
+
+    rerender(<CanvasArrangementToolbar {...props} open={false} />)
+
+    expect(document.querySelector('[data-canvas-arrangement-toolbar]')).toBe(toolbar)
+    expect(toolbar).toHaveAttribute('data-surface-motion-state', 'closing')
+    expect(toolbar).toHaveAttribute('aria-hidden', 'true')
+    expect(toolbar).toHaveAttribute('inert')
+
+    rerender(<CanvasArrangementToolbar {...props} open />)
+
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBe(toolbar)
+    expect(toolbar).toHaveAttribute('data-surface-motion-state', 'opening')
+    expect(toolbar).not.toHaveAttribute('inert')
+  })
+
   it('explains both restrained icon actions with shared tooltips', async () => {
     render(
       <TooltipProvider delayDuration={0}>
