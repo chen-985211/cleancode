@@ -3,20 +3,21 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  border-radius: 7px;
+  border-radius: 999px;
   background: transparent;
   pointer-events: auto;
   transition: background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .agent-create-split .toolbar-button {
+  height: 38px;
   border-color: transparent;
   background: transparent;
 }
 
 .agent-create-split__main {
-  border-radius: 7px 3px 3px 7px;
-  padding-right: 9px;
+  border-radius: 999px 3px 3px 999px;
+  padding: 0 14px;
 }
 
 .agent-create-split__main .agent-provider-icon {
@@ -25,18 +26,22 @@
 }
 
 .agent-create-split__trigger {
-  width: 28px;
+  width: 38px;
   padding: 0;
-  border-radius: 3px 7px 7px 3px;
+  border-radius: 3px 999px 999px 3px;
 }
 
 .agent-create-split[data-disabled='false']:hover {
-  background: var(--cc-surface-subtle);
+  background: var(--cc-agent-create-hover);
 }
 
 .agent-create-split[data-disabled='false']:hover .toolbar-button:not(:disabled) {
   border-color: transparent;
   background: transparent;
+}
+
+.agent-create-split .toolbar-button:active:not(:disabled) {
+  transform: none;
 }
 
 .agent-create-split__main:focus-visible,
@@ -82,7 +87,7 @@
 
 .agent-create-menu__item:hover,
 .agent-create-menu__item:focus-visible {
-  background: var(--cc-surface-hover);
+  background: var(--cc-agent-create-hover);
 }
 
 .agent-create-menu__item:focus-visible {
