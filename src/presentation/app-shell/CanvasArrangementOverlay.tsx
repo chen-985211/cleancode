@@ -13,7 +13,9 @@ export function CanvasArrangementOverlay({
   isPending,
   labels,
   onArrange,
-  selection
+  onToolbarExitComplete,
+  selection,
+  toolbarOpen
 }: {
   readonly arrangement: CanvasArrangementSnapshot
   readonly isPending: boolean
@@ -27,13 +29,16 @@ export function CanvasArrangementOverlay({
     action: 'detach-stack' | 'grid' | 'stack',
     items: readonly CanvasArrangementSelectionItem[]
   ) => Promise<void> | void
+  readonly onToolbarExitComplete?: () => void
   readonly selection: CanvasArrangementSelection | null
+  readonly toolbarOpen?: boolean
 }) {
-  const isActionable = selection?.rect === null && selection.items.length >= 2
+  const hasSelection = (selection?.items.length ?? 0) > 0
+  const canArrange = selection?.rect === null && selection.items.length >= 2
   const selectedStack = selection ? findCanvasArrangementStack(arrangement, selection.items) : null
   const selectedIsStacked = selectedStack !== null
   const [presentedIsStacked, setPresentedIsStacked] = useState(selectedIsStacked)
-  const isStackPresentationChanged = isActionable && presentedIsStacked !== selectedIsStacked
+  const isStackPresentationChanged = hasSelection && presentedIsStacked !== selectedIsStacked
   if (isStackPresentationChanged) setPresentedIsStacked(selectedIsStacked)
   const resolvedIsStacked = isStackPresentationChanged ? selectedIsStacked : presentedIsStacked
   const requestArrangement = (action: 'detach-stack' | 'grid' | 'stack'): void => {
@@ -44,12 +49,14 @@ export function CanvasArrangementOverlay({
   return (
     <>
       <CanvasArrangementToolbar
+        canArrange={canArrange}
         isPending={isPending}
         isStacked={resolvedIsStacked}
         labels={labels}
         onGrid={() => requestArrangement('grid')}
+        onExitComplete={onToolbarExitComplete}
         onToggleStack={() => requestArrangement(selectedStack ? 'detach-stack' : 'stack')}
-        open={isActionable}
+        open={toolbarOpen ?? hasSelection}
       />
       {selection?.rect ? (
         <div

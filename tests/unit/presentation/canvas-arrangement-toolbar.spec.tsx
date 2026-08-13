@@ -6,6 +6,7 @@ import { TooltipProvider } from '../../../src/presentation/app-shell/Tooltip'
 describe('canvas arrangement toolbar', () => {
   it('keeps the arrangement surface inert through exit and reuses it when selection returns', () => {
     const props = {
+      canArrange: true,
       isPending: false,
       isStacked: false,
       labels: {
@@ -40,6 +41,7 @@ describe('canvas arrangement toolbar', () => {
     render(
       <TooltipProvider delayDuration={0}>
         <CanvasArrangementToolbar
+          canArrange
           isPending={false}
           isStacked={false}
           labels={{
@@ -61,6 +63,7 @@ describe('canvas arrangement toolbar', () => {
   it('switches the stack action to detach without adding visible copy', () => {
     render(
       <CanvasArrangementToolbar
+        canArrange
         isPending={false}
         isStacked
         labels={{

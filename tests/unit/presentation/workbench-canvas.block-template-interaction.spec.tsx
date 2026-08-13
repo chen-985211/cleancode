@@ -90,12 +90,12 @@ describe('workbench canvas Command selection and block template placement', () =
 
     fireEvent.pointerDown(pane, {
       button: 0,
-      clientX: 290,
-      clientY: 200,
+      clientX: 80,
+      clientY: 80,
       metaKey: true,
       pointerId: 1
     })
-    fireEvent.pointerMove(pane, { clientX: 460, clientY: 360, pointerId: 1 })
+    fireEvent.pointerMove(pane, { clientX: 600, clientY: 500, pointerId: 1 })
 
     expect(document.querySelector('.canvas-arrangement-selection')).toBeInTheDocument()
     expect(screen.getByTestId('flow-node-terminal-a')).toHaveClass(
@@ -104,9 +104,25 @@ describe('workbench canvas Command selection and block template placement', () =
     expect(screen.getByTestId('flow-node-terminal-b')).toHaveClass(
       'canvas-arrangement-node--selected'
     )
+    const toolbar = screen.getByRole('toolbar', { name: '整理所选画布对象' })
+    expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(2)
+
+    fireEvent.pointerMove(pane, { clientX: 90, clientY: 90, pointerId: 1 })
+
+    expect(screen.getByTestId('flow-node-terminal-a')).not.toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
+    expect(screen.getByTestId('flow-node-terminal-b')).not.toHaveClass(
+      'canvas-arrangement-node--selected'
+    )
     expect(screen.queryByRole('toolbar', { name: '整理所选画布对象' })).not.toBeInTheDocument()
 
-    fireEvent.pointerUp(pane, { clientX: 460, clientY: 360, pointerId: 1 })
+    fireEvent.pointerMove(pane, { clientX: 600, clientY: 500, pointerId: 1 })
+
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBe(toolbar)
+    expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(2)
+
+    fireEvent.pointerUp(pane, { clientX: 600, clientY: 500, pointerId: 1 })
 
     expect(document.querySelector('.canvas-arrangement-selection')).not.toBeInTheDocument()
     expect(screen.getByTestId('flow-node-terminal-a')).toHaveClass(
@@ -115,7 +131,8 @@ describe('workbench canvas Command selection and block template placement', () =
     expect(screen.getByTestId('flow-node-terminal-b')).toHaveClass(
       'canvas-arrangement-node--selected'
     )
-    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBeInTheDocument()
+    expect(screen.getByRole('toolbar', { name: '整理所选画布对象' })).toBe(toolbar)
+    expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(0)
   })
 
   it('places the whole template at the nearest free origin and stays quiet', () => {

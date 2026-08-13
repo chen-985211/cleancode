@@ -1,5 +1,5 @@
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
-import type { MutableRefObject } from 'react'
+import { useCallback, useState, type MutableRefObject } from 'react'
 
 import type {
   QuickExecutionSlotNumber,
@@ -22,6 +22,14 @@ export type ArrangeCanvasSelectionHandler = (
   action: 'detach-stack' | 'grid' | 'stack',
   items: readonly CanvasArrangementSelectionItem[]
 ) => Promise<void> | void
+
+type CanvasBottomControl = 'arrangement' | 'quick-execution'
+
+interface CanvasBottomControlHandoffState {
+  readonly active: CanvasBottomControl | null
+  readonly quickExecutionAvailable: boolean
+  readonly requested: CanvasBottomControl | null
+}
 
 export function WorkbenchCanvasBottomControls({
   arrangement,
@@ -61,13 +69,22 @@ export function WorkbenchCanvasBottomControls({
   readonly shortcutTooltips: Partial<ApplicationShortcutTooltipLabels>
 }) {
   const { t } = useI18n()
-  const hasArrangementSelection = (selection?.items.length ?? 0) >= 2
+  const hasCanvasSelection = (selection?.items.length ?? 0) > 0
   const canRenderQuickExecution =
     currentWorkbench &&
     onAddQuickExecutionTarget &&
     onBindQuickExecutionSlot &&
     onClearQuickExecutionSlot &&
     onReorderQuickExecutionSlots
+  const requestedBottomControl: CanvasBottomControl | null = hasCanvasSelection
+    ? 'arrangement'
+    : canRenderQuickExecution
+      ? 'quick-execution'
+      : null
+  const bottomControlHandoff = useCanvasBottomControlHandoff({
+    quickExecutionAvailable: Boolean(canRenderQuickExecution),
+    requested: requestedBottomControl
+  })
 
   return (
     <>
@@ -75,7 +92,8 @@ export function WorkbenchCanvasBottomControls({
         <QuickExecutionBar
           isExternalDropTarget={isQuickExecutionDropTarget}
           graph={currentWorkbench.graph}
-          open={!hasArrangementSelection}
+          onExitComplete={() => bottomControlHandoff.completeExit('quick-execution')}
+          open={bottomControlHandoff.quickExecutionOpen}
           onAdd={onAddQuickExecutionTarget}
           onBind={onBindQuickExecutionSlot}
           onClear={onClearQuickExecutionSlot}
@@ -101,8 +119,58 @@ export function WorkbenchCanvasBottomControls({
           toolbar: t('canvas.arrangement.toolbar')
         }}
         onArrange={onArrange}
+        onToolbarExitComplete={() => bottomControlHandoff.completeExit('arrangement')}
         selection={selection}
+        toolbarOpen={bottomControlHandoff.arrangementOpen}
       />
     </>
   )
+}
+
+function useCanvasBottomControlHandoff({
+  quickExecutionAvailable,
+  requested
+}: {
+  readonly quickExecutionAvailable: boolean
+  readonly requested: CanvasBottomControl | null
+}): {
+  readonly arrangementOpen: boolean
+  readonly completeExit: (control: CanvasBottomControl) => void
+  readonly quickExecutionOpen: boolean
+} {
+  const input = { quickExecutionAvailable, requested }
+  const [renderedState, setRenderedState] = useState<CanvasBottomControlHandoffState>(() => ({
+    active: requested,
+    ...input
+  }))
+  const inputChanged =
+    renderedState.requested !== requested ||
+    renderedState.quickExecutionAvailable !== quickExecutionAvailable
+  const state = inputChanged
+    ? synchronizeCanvasBottomControlHandoff(renderedState, input)
+    : renderedState
+  if (inputChanged) setRenderedState(state)
+
+  const completeExit = useCallback((control: CanvasBottomControl): void => {
+    setRenderedState((current) =>
+      current.active === control ? { ...current, active: current.requested } : current
+    )
+  }, [])
+
+  return {
+    arrangementOpen: state.active === 'arrangement' && requested === 'arrangement',
+    completeExit,
+    quickExecutionOpen: state.active === 'quick-execution' && requested === 'quick-execution'
+  }
+}
+
+function synchronizeCanvasBottomControlHandoff(
+  state: CanvasBottomControlHandoffState,
+  input: Omit<CanvasBottomControlHandoffState, 'active'>
+): CanvasBottomControlHandoffState {
+  const activeIsUnavailable = state.active === 'quick-execution' && !input.quickExecutionAvailable
+  return {
+    ...input,
+    active: state.active === null || activeIsUnavailable ? input.requested : state.active
+  }
 }

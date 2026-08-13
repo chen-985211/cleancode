@@ -7,7 +7,6 @@ import type { SpringProgressMotionFrameScheduler } from '../../../src/presentati
 describe('surface spring motion', () => {
   it.each([
     ['anchored-top-right', '--cc-surface-motion-translate-x', 1],
-    ['bottom-control', '--cc-surface-motion-translate-y', 1],
     ['drawer-right', '--cc-surface-motion-translate-x', 1],
     ['fullscreen-right', '--cc-surface-motion-translate-x', 1]
   ] as const)('enters the %s surface from its trigger-side origin', (preset, property, sign) => {
@@ -82,37 +81,50 @@ describe('surface spring motion', () => {
     expect(Math.abs(readNumber(root, '--cc-surface-motion-translate-y'))).toBeLessThanOrEqual(6)
   })
 
-  it('hands bottom controls upward from a restrained shared anchor', () => {
+  it('hands bottom controls upward and dismisses them downward without scaling', () => {
     const scheduler = createFrameScheduler()
     const root = createRoot()
     const controller = createSurfaceSpringMotionController({
       preset: 'bottom-control',
       scheduler
     })
+    const settled = vi.fn()
 
     controller.intentChanged(root, {
-      onSettled: vi.fn(),
+      onSettled: settled,
       reducedMotion: false,
       visible: true
     })
 
     expect(readNumber(root, '--cc-surface-motion-translate-x')).toBe(0)
-    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBeGreaterThan(0)
-    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBeLessThanOrEqual(6)
-    expect(readNumber(root, '--cc-surface-motion-scale')).toBeGreaterThanOrEqual(0.97)
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe('calc(100% + 12px)')
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
 
     scheduler.advanceNextFrame(80)
-    const opacityBeforeReversal = readNumber(root, '--cc-surface-motion-opacity')
-    const translationBeforeReversal = readNumber(root, '--cc-surface-motion-translate-y')
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
+    expect(readBottomTranslationPercent(root)).toBeGreaterThan(0)
+    expect(readBottomTranslationPercent(root)).toBeLessThan(35)
+
+    scheduler.advanceUntilIdle()
+    expect(root.properties.get('--cc-surface-motion-translate-y')).toBe('calc(0% + 0px)')
+    settled.mockClear()
 
     controller.intentChanged(root, {
-      onSettled: vi.fn(),
+      onSettled: settled,
       reducedMotion: false,
       visible: false
     })
 
-    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(opacityBeforeReversal)
-    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBe(translationBeforeReversal)
+    expect(readBottomTranslationPercent(root)).toBe(0)
+    scheduler.advanceNextFrame(40)
+    expect(readBottomTranslationPercent(root)).toBeGreaterThan(0)
+    expect(readBottomTranslationPercent(root)).toBeLessThan(100)
+    expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
+    expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
+
+    scheduler.advanceNextFrame(160)
+    expect(settled).toHaveBeenCalledOnce()
   })
 
   it('continuously projects a closing drawer until it reaches the hidden endpoint', () => {
@@ -187,7 +199,7 @@ describe('surface spring motion', () => {
     })
 
     expect(readNumber(root, '--cc-surface-motion-opacity')).toBe(1)
-    expect(readNumber(root, '--cc-surface-motion-translate-y')).toBe(0)
+    expect(readBottomTranslationPercent(root)).toBe(0)
     expect(readNumber(root, '--cc-surface-motion-scale')).toBe(1)
     expect(scheduler.pendingFrames()).toBe(0)
   })
@@ -204,6 +216,12 @@ function readNumber(root: ReturnType<typeof createRoot>, property: string): numb
 
 function readTranslationPercent(root: ReturnType<typeof createRoot>): number {
   return readNumber(root, '--cc-surface-motion-translate-x')
+}
+
+function readBottomTranslationPercent(root: ReturnType<typeof createRoot>): number {
+  return Number.parseFloat(
+    root.properties.get('--cc-surface-motion-translate-y')?.match(/calc\(([-\d.]+)%/)?.[1] ?? '0'
+  )
 }
 
 function createRoot(): SurfaceSpringMotionRoot & {

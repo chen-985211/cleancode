@@ -35,6 +35,7 @@ interface QuickExecutionBarProps {
   ) => Promise<void> | void
   readonly onClear: (number: QuickExecutionSlotNumber) => Promise<void> | void
   readonly onFocus: (target: QuickExecutionTargetSnapshot) => void
+  readonly onExitComplete?: () => void
   readonly onReorder: (
     sourceNumber: QuickExecutionSlotNumber,
     destinationNumber: QuickExecutionSlotNumber
@@ -61,6 +62,7 @@ export function QuickExecutionBar({
   onAdd,
   onBind,
   onClear,
+  onExitComplete,
   onFocus,
   onReorder,
   shortcutPlatform = 'mac',
@@ -171,6 +173,7 @@ export function QuickExecutionBar({
       data-workbench-canvas-obstruction
       data-side="top"
       aria-label={t('quickExecution.label')}
+      onExitComplete={onExitComplete}
       open={open}
       springPreset="bottom-control"
     >

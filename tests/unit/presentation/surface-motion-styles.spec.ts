@@ -87,8 +87,11 @@ describe('surface motion styles', () => {
       const rule = readRule(styles, selector)
 
       expect(rule).toContain('translate3d(-50%, var(--cc-surface-motion-translate-y, 0), 0)')
-      expect(rule).toContain('scale(var(--cc-surface-motion-scale, 1))')
+      expect(rule).toContain('opacity: 1')
+      expect(rule).not.toContain('opacity: var(')
+      expect(rule).not.toContain('scale(')
       expect(rule).toContain('transition: none')
+      expect(rule).toContain('will-change: transform')
     }
   )
 })
