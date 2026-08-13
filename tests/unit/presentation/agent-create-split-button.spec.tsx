@@ -68,8 +68,13 @@ describe('Agent create split button', () => {
 
     const trigger = screen.getByRole('button', { name: '选择默认 Agent' })
     fireEvent.click(trigger)
+    const menu = screen.getByRole('menu')
     const codex = screen.getByRole('menuitemradio', { name: 'Codex' })
     const claude = screen.getByRole('menuitemradio', { name: 'Claude Code' })
+
+    expect(menu).toHaveFocus()
+    expect(codex).not.toHaveFocus()
+    fireEvent.keyDown(menu, { key: 'ArrowDown' })
     expect(codex).toHaveFocus()
 
     fireEvent.keyDown(codex, { key: 'ArrowDown' })
@@ -102,6 +107,8 @@ describe('Agent create split button', () => {
     const highlight = menu.querySelector<HTMLElement>('.agent-create-menu__highlight')
 
     expect(highlight).not.toBeNull()
+    expect(highlight).not.toHaveAttribute('data-visible')
+    expect(highlight).not.toHaveAttribute('data-target-y')
     setMenuItemGeometry(claude, 43)
     setMenuItemGeometry(settings, 96)
 
@@ -109,7 +116,13 @@ describe('Agent create split button', () => {
     expect(highlight).toHaveAttribute('data-visible', 'true')
     expect(highlight).toHaveAttribute('data-target-y', '43')
 
+    fireEvent.pointerLeave(menu)
+    expect(highlight).not.toHaveAttribute('data-visible')
+    expect(highlight).not.toHaveAttribute('data-target-y')
+    expect(highlight?.style.getPropertyValue('--cc-agent-create-menu-highlight-y')).toBe('43px')
+
     settings.focus()
+    expect(highlight).toHaveAttribute('data-visible', 'true')
     expect(highlight).toHaveAttribute('data-target-y', '96')
   })
 

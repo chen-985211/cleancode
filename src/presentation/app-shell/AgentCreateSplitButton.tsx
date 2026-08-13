@@ -69,10 +69,15 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     [highlightMotion]
   )
 
-  const restoreFocusedMenuHighlight = useCallback((): void => {
+  const handleMenuPointerLeave = useCallback((): void => {
     const focusedItem = itemRefs.current.find((item) => item === document.activeElement)
-    if (focusedItem) activateMenuHighlight(focusedItem)
-  }, [activateMenuHighlight])
+    if (focusedItem) {
+      activateMenuHighlight(focusedItem)
+      return
+    }
+    const highlight = highlightRef.current
+    if (highlight) highlightMotion.hide(highlight)
+  }, [activateMenuHighlight, highlightMotion])
 
   useLayoutEffect(() => {
     highlightMotion.setReducedMotion(reducedMotion)
@@ -82,10 +87,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
 
   useEffect(() => {
     if (!isOpen) return undefined
-    const selectedIndex = props.providers.findIndex(
-      (provider) => provider.descriptor.id === props.defaultProviderId
-    )
-    itemRefs.current[selectedIndex >= 0 ? selectedIndex : 0]?.focus()
+    menuRef.current?.focus({ preventScroll: true })
     const closeOutside = (event: globalThis.PointerEvent): void => {
       if (
         event.target instanceof Node &&
@@ -97,7 +99,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
-  }, [closeMenu, isMenuPresent, isOpen, props.defaultProviderId, props.providers])
+  }, [closeMenu, isMenuPresent, isOpen])
 
   useLayoutEffect(() => {
     if (!isOpen) return undefined
@@ -173,6 +175,24 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
     itemRefs.current[nextIndex]?.focus()
   }
 
+  const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.target !== event.currentTarget) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMenu()
+      return
+    }
+    const nextIndex =
+      event.key === 'ArrowDown' || event.key === 'Home'
+        ? 0
+        : event.key === 'ArrowUp' || event.key === 'End'
+          ? props.providers.length
+          : null
+    if (nextIndex === null) return
+    event.preventDefault()
+    itemRefs.current[nextIndex]?.focus()
+  }
+
   return (
     <div className="agent-create-split" data-disabled={isDisabled} ref={rootRef}>
       <TooltipLabel content={props.shortcutTooltip} side="bottom">
@@ -220,6 +240,7 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           motionReady={menuPosition !== null}
           open={isOpen}
           role="menu"
+          tabIndex={-1}
           style={{
             left: menuPosition?.left ?? 0,
             top: menuPosition?.top ?? 0,
@@ -227,7 +248,8 @@ export function AgentCreateSplitButton(props: AgentCreateSplitButtonProps) {
           }}
           onRequestClose={closeMenu}
           onPresenceChange={setIsMenuPresent}
-          onPointerLeave={restoreFocusedMenuHighlight}
+          onPointerLeave={handleMenuPointerLeave}
+          onKeyDown={handleMenuKeyDown}
         >
           <span ref={highlightRef} aria-hidden="true" className="agent-create-menu__highlight" />
           {props.providers.length === 0 ? (

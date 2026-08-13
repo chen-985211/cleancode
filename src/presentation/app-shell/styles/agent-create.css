@@ -67,6 +67,10 @@
   color: var(--cc-foreground);
 }
 
+.agent-create-menu:focus {
+  outline: none;
+}
+
 .agent-create-menu__highlight {
   position: absolute;
   z-index: 0;

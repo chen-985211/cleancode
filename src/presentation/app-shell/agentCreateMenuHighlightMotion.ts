@@ -28,6 +28,7 @@ interface AgentCreateMenuHighlightGeometry {
 
 export interface AgentCreateMenuHighlightMotionController {
   readonly dispose: () => void
+  readonly hide: (root: AgentCreateMenuHighlightMotionRoot) => void
   readonly moveTo: (
     root: AgentCreateMenuHighlightMotionRoot,
     geometry: AgentCreateMenuHighlightGeometry
@@ -116,6 +117,16 @@ export function createAgentCreateMenuHighlightMotionController({
       cancelFrame()
       clearRoot()
       root = null
+      initialized = false
+    },
+    hide: (currentRoot) => {
+      if (currentRoot !== root) return
+      cancelFrame()
+      root.removeAttribute(visibleAttribute)
+      root.removeAttribute(motionStateAttribute)
+      root.removeAttribute(targetYAttribute)
+      axis = { value: axis.value, velocity: 0 }
+      target = axis.value
       initialized = false
     },
     moveTo: (nextRoot, geometry) => {

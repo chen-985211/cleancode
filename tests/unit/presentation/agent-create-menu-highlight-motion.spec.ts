@@ -50,6 +50,26 @@ describe('Agent create menu highlight motion', () => {
     expect(readY(root)).toBe(119)
     expect(scheduler.pendingFrames()).toBe(0)
   })
+
+  it('clears a stale pointer highlight and lands the next target without a ghost transition', () => {
+    const scheduler = createFrameScheduler()
+    const root = createRoot()
+    const controller = createAgentCreateMenuHighlightMotionController({ scheduler })
+
+    controller.moveTo(root, { height: 38, top: 5 })
+    controller.moveTo(root, { height: 38, top: 81 })
+    expect(scheduler.pendingFrames()).toBe(1)
+
+    controller.hide(root)
+    expect(root.attributes.has('data-visible')).toBe(false)
+    expect(root.attributes.has('data-target-y')).toBe(false)
+    expect(readY(root)).toBe(5)
+    expect(scheduler.pendingFrames()).toBe(0)
+
+    controller.moveTo(root, { height: 38, top: 119 })
+    expect(readY(root)).toBe(119)
+    expect(scheduler.pendingFrames()).toBe(0)
+  })
 })
 
 function readY(root: ReturnType<typeof createRoot>): number {
