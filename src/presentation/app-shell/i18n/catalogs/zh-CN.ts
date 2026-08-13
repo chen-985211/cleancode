@@ -407,7 +407,6 @@ export const zhCNMessages = {
   'workflow.status.stopped': '已停止',
   'terminal.output': '{blockName} 文本输出',
   'terminal.view.restoreFailed': '终端显示暂时不可用',
-  'terminal.view.retry': '重试终端显示',
   'terminal.search.controls': '终端搜索控制',
   'terminal.search.input': '搜索终端输出',
   'terminal.search.placeholder': '搜索',

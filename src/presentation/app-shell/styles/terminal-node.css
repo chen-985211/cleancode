@@ -503,33 +503,31 @@
   background: var(--cc-warning-soft);
   color: var(--cc-warning-strong);
   box-shadow: var(--cc-shadow-sm);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 11px;
   transform: translate(-50%, -50%);
 }
 
-.terminal-restore-failure span {
+.terminal-restore-failure__copy {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.terminal-restore-failure button {
+.terminal-restore-failure__icon {
   display: grid;
   width: 24px;
   height: 24px;
   flex: 0 0 24px;
   place-items: center;
-  padding: 0;
-  border: 0;
   border-radius: 5px;
-  background: transparent;
-  color: inherit;
 }
 
-.terminal-restore-failure button:hover {
-  background: color-mix(in srgb, currentColor 10%, transparent);
+.terminal-restore-failure:hover {
+  background: color-mix(in srgb, var(--cc-warning-soft) 90%, currentColor);
 }
 
-.terminal-restore-failure button:focus-visible {
+.terminal-restore-failure:focus-visible {
   outline: 2px solid var(--cc-ring);
   outline-offset: 1px;
 }

@@ -283,17 +283,21 @@ describe('terminal viewport daily interactions', () => {
     expect(await workspace.findByRole('status')).toHaveTextContent('终端不接受图片数据')
   })
 
-  it('offers a view-only retry after terminal restoration fails', async () => {
+  it('offers to restart with an empty terminal session after terminal restoration fails', async () => {
+    const onRestart = vi.fn()
     attachTerminalView
       .mockRejectedValueOnce(new Error('Unexpected attachment failure.'))
       .mockImplementation(async (command) => snapshot(command.viewId))
-    const workspace = renderViewport()
+    const workspace = renderViewport(undefined, undefined, onRestart)
 
     expect(await workspace.findByRole('alert')).toHaveTextContent('终端显示暂时不可用')
-    fireEvent.click(workspace.getByRole('button', { name: '重试终端显示' }))
+    const restartButton = workspace.getByRole('button', { name: '重开空终端会话' })
+    expect(restartButton).toHaveClass('terminal-restore-failure')
+    expect(restartButton).toHaveTextContent('终端显示暂时不可用')
+    fireEvent.click(workspace.getByText('终端显示暂时不可用'))
 
-    await waitFor(() => expect(attachTerminalView).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(workspace.queryByRole('alert')).toBeNull())
+    expect(onRestart).toHaveBeenCalledOnce()
+    expect(attachTerminalView).toHaveBeenCalledOnce()
   })
 
   it('reports a stale identity without retrying the same terminal view', async () => {
@@ -314,7 +318,11 @@ describe('terminal viewport daily interactions', () => {
   })
 })
 
-function renderViewport(onPaste = vi.fn(async () => undefined), onViewIdentityStale = vi.fn()) {
+function renderViewport(
+  onPaste = vi.fn(async () => undefined),
+  onViewIdentityStale = vi.fn(),
+  onRestart = vi.fn()
+) {
   return render(
     <TerminalSurfaceRegistryProvider registry={new TerminalSurfaceRegistry()}>
       <TerminalViewport
@@ -322,6 +330,7 @@ function renderViewport(onPaste = vi.fn(async () => undefined), onViewIdentitySt
         session={runningState()}
         focusRequestId={0}
         onViewIdentityStale={onViewIdentityStale}
+        onRestart={onRestart}
         onDimensionsChange={vi.fn()}
         onInput={vi.fn()}
         onPaste={onPaste}

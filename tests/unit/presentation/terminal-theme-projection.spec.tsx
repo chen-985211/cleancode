@@ -91,6 +91,7 @@ describe('terminal theme projection', () => {
           focusRequestId={0}
           onDimensionsChange={vi.fn()}
           onInput={vi.fn()}
+          onRestart={vi.fn()}
           session={{
             output: '',
             sessionId: null,

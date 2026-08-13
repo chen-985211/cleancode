@@ -41,6 +41,7 @@ interface TerminalViewportProps {
   readonly isResizeSuspended?: boolean
   readonly isInputDisabled?: boolean
   readonly onViewIdentityStale?: (identity: TerminalRunIdentity) => void
+  readonly onRestart: () => void
   readonly onDimensionsChange: (dimensions: TerminalDimensions) => void
   readonly onInput: (block: TerminalBlockSnapshot, input: string) => void
   readonly onPaste?: (block: TerminalBlockSnapshot, input: string) => Promise<void>
@@ -67,6 +68,7 @@ export function TerminalViewport({
   isResizeSuspended = false,
   isInputDisabled = false,
   onViewIdentityStale = () => undefined,
+  onRestart,
   onDimensionsChange,
   onInput,
   onPaste = async () => undefined
@@ -446,15 +448,20 @@ export function TerminalViewport({
         </div>
       ) : null}
       {restoreStatus === 'failed' ? (
-        <div className="terminal-restore-failure" role="alert">
-          <span>{t('terminal.view.restoreFailed')}</span>
+        <div role="alert">
           <button
+            className="terminal-restore-failure"
             type="button"
-            aria-label={t('terminal.view.retry')}
-            title={t('terminal.view.retry')}
-            onClick={() => requestRestoreRef.current()}
+            aria-label={t('terminal.action.restartEmpty')}
+            title={t('terminal.action.restartEmptyDescription')}
+            onClick={onRestart}
           >
-            <WorkbenchIcon role="restart" size={14} />
+            <span className="terminal-restore-failure__copy">
+              {t('terminal.view.restoreFailed')}
+            </span>
+            <span className="terminal-restore-failure__icon" aria-hidden="true">
+              <WorkbenchIcon role="restart" size={14} />
+            </span>
           </button>
         </div>
       ) : null}

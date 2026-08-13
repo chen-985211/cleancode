@@ -565,6 +565,7 @@ function renderTerminalViewport({
         onDimensionsChange={onDimensionsChange}
         onInput={vi.fn()}
         onPaste={onPaste}
+        onRestart={vi.fn()}
       />
     </TerminalSurfaceRegistryProvider>
   )
@@ -592,6 +593,7 @@ function rerenderTerminalViewport(
         isResizeSuspended={isResizeSuspended}
         onDimensionsChange={onDimensionsChange}
         onInput={vi.fn()}
+        onRestart={vi.fn()}
       />
     </TerminalSurfaceRegistryProvider>
   )
