@@ -14,6 +14,7 @@ import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchW
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
 import { useProjectSidebarMotion } from './useProjectSidebarMotion'
+import { useSelectionIndicatorMotion } from './useSelectionMotion'
 import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 import { TooltipLabel } from './Tooltip'
 import { WorkspaceRowMenu } from './WorkspaceRowMenu'
@@ -197,6 +198,11 @@ function ProjectCard({
 }: ProjectCardProps) {
   const { t } = useI18n()
   const isCurrentProject = currentWorkbench?.project.id === workbench.project.id
+  const currentWorkspaceId = isCurrentProject
+    ? (workbench.project.workspaces.find((workspace) => workspace.isCurrent)?.workspaceId ?? null)
+    : null
+  const [workspaceSelectionContainerRef, workspaceSelectionIndicatorRef] =
+    useSelectionIndicatorMotion(currentWorkspaceId ?? '')
   const [isBranchSelectorOpen, setIsBranchSelectorOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
   const [branchSearchQuery, setBranchSearchQuery] = useState('')
@@ -377,7 +383,15 @@ function ProjectCard({
         inert={!isExpanded ? true : undefined}
       >
         <div className="project-card__disclosure-content">
-          <div id={workspaceListId} className="workspace-list">
+          <div ref={workspaceSelectionContainerRef} id={workspaceListId} className="workspace-list">
+            {currentWorkspaceId ? (
+              <span
+                ref={workspaceSelectionIndicatorRef}
+                className="selection-motion-indicator workspace-list__selection"
+                data-selection-motion-target={currentWorkspaceId}
+                aria-hidden="true"
+              />
+            ) : null}
             {workbench.project.workspaces.map((workspace) => {
               const isActiveWorkspace = workspace.isCurrent && isCurrentProject
               const boundBranchName = workspace.gitBranch ?? workspace.displayName
@@ -404,6 +418,7 @@ function ProjectCard({
               return (
                 <div
                   className="workspace-group"
+                  data-selection-motion-option={workspace.workspaceId}
                   key={workspace.workspaceId}
                   ref={isDefaultWorkspace ? branchSelectorRootRef : undefined}
                 >
