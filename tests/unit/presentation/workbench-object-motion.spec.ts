@@ -160,6 +160,55 @@ describe('workbench object motion', () => {
     expect(projection).toEqual({ exitingNodes: [], nodes: [terminal] })
   })
 
+  it('animates persisted canvas arrangement positions from their previous visual centers', () => {
+    const currentTerminal = createTerminalNode('terminal-1', { x: 100, y: 120 })
+    const nextTerminal = createTerminalNode('terminal-1', { x: 260, y: 210 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [currentTerminal],
+      canvasArrangementMotion: {
+        delayByNodeId: { 'terminal-1': 84 },
+        kind: 'detach'
+      },
+      isCanvasArrangementPending: true,
+      isContinuingGraph: true,
+      nextNodes: [nextTerminal],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes[0]).toEqual(
+      expect.objectContaining({
+        position: nextTerminal.position,
+        data: expect.objectContaining({
+          objectMotion: {
+            id: 'canvas-arrange:terminal-1',
+            kind: 'canvas-arrange',
+            offset: { x: -160, y: -90 },
+            delayMs: 84,
+            positionDynamics: 'drop'
+          }
+        })
+      })
+    )
+  })
+
+  it('does not animate ordinary persisted moves outside a canvas arrangement action', () => {
+    const currentTerminal = createTerminalNode('terminal-1', { x: 100, y: 120 })
+    const nextTerminal = createTerminalNode('terminal-1', { x: 260, y: 210 })
+
+    const projection = projectWorkbenchObjectMotion({
+      createMotionId,
+      currentNodes: [currentTerminal],
+      isCanvasArrangementPending: false,
+      isContinuingGraph: true,
+      nextNodes: [nextTerminal],
+      reducedMotion: false
+    })
+
+    expect(projection.nodes[0]?.data.objectMotion).toBeUndefined()
+  })
+
   it('expands group members from the collapsed group center', () => {
     const collapsedGroup = createGroupNode('group-1', true, ['terminal-1'], {
       height: 160,

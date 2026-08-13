@@ -9,6 +9,14 @@ const languageSettingsStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/styles/language-settings.css'),
   'utf8'
 )
+const quickExecutionStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/quick-execution.css'),
+  'utf8'
+)
+const canvasArrangementStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/styles/canvas-arrangement.css'),
+  'utf8'
+)
 
 describe('surface motion styles', () => {
   it('uses semantic timing for anchored enter, exit, and trigger-relative direction', () => {
@@ -66,6 +74,26 @@ describe('surface motion styles', () => {
     expect(languageMaterialRule).toContain('scale(var(--cc-surface-motion-scale, 1))')
     expect(languageMaterialRule).toContain('will-change: transform;')
   })
+
+  it.each([
+    [quickExecutionStyles, ".quick-execution[data-surface-spring-preset='bottom-control']"],
+    [
+      canvasArrangementStyles,
+      ".canvas-arrangement-toolbar[data-surface-spring-preset='bottom-control']"
+    ]
+  ])(
+    'keeps a bottom control centered while its shared surface spring moves vertically',
+    (styles, selector) => {
+      const rule = readRule(styles, selector)
+
+      expect(rule).toContain('translate3d(-50%, var(--cc-surface-motion-translate-y, 0), 0)')
+      expect(rule).toContain('opacity: 1')
+      expect(rule).not.toContain('opacity: var(')
+      expect(rule).not.toContain('scale(')
+      expect(rule).toContain('transition: none')
+      expect(rule).toContain('will-change: transform')
+    }
+  )
 })
 
 function readRule(styles: string, selector: string): string {

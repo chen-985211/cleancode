@@ -8,6 +8,13 @@
   pointer-events: auto;
 }
 
+.quick-execution[data-surface-spring-preset='bottom-control'] {
+  opacity: 1;
+  transform: translate3d(-50%, var(--cc-surface-motion-translate-y, 0), 0);
+  transition: none;
+  will-change: transform;
+}
+
 .quick-execution__slots {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

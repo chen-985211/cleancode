@@ -26,10 +26,13 @@ import type { AgentToolApprovalController } from './agentToolApprovalTypes'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
+import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
+import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
 interface UseWorkbenchFlowNodesInput {
+  readonly canvasArrangementMotion?: CanvasArrangementMotionChoreography | null
   readonly agentToolApprovals: AgentToolApprovalController
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: WorkbenchSnapshot['project']['workspaces'][number] | undefined
@@ -67,6 +70,7 @@ interface UseWorkbenchFlowNodesInput {
 }
 
 export function useWorkbenchFlowNodes({
+  canvasArrangementMotion = null,
   agentToolApprovals,
   currentWorkbench,
   currentWorkspace,
@@ -184,24 +188,27 @@ export function useWorkbenchFlowNodes({
         (node) => node.type !== 'terminal' || !collapsedGraphMemberIds.has(node.id)
       )
       const agents = resolveWorkspaceAgents(currentWorkbench)
-      const nextNodes = [
-        ...agents.map((agent) =>
-          createAgentConsoleFlowNode({
-            agent,
-            approvalController: currentAgentToolApprovals,
-            currentWorkbench,
-            currentWorkspace: currentWorkspace ?? null,
-            isSelected: selectedAgentId === agent.agentId,
-            onGraphUpdated: onAgentGraphUpdated,
-            onMcpCapabilityChange,
-            onRemove: onRemoveAgent,
-            onRename: onRenameAgent,
-            onResize: onResizeAgent,
-            onSelect: () => onSelectAgent(agent.agentId)
-          })
-        ),
-        ...terminalNodes
-      ]
+      const nextNodes = projectCanvasArrangementStackingOntoNodes(
+        currentWorkbench?.canvasArrangement,
+        [
+          ...agents.map((agent) =>
+            createAgentConsoleFlowNode({
+              agent,
+              approvalController: currentAgentToolApprovals,
+              currentWorkbench,
+              currentWorkspace: currentWorkspace ?? null,
+              isSelected: selectedAgentId === agent.agentId,
+              onGraphUpdated: onAgentGraphUpdated,
+              onMcpCapabilityChange,
+              onRemove: onRemoveAgent,
+              onRename: onRenameAgent,
+              onResize: onResizeAgent,
+              onSelect: () => onSelectAgent(agent.agentId)
+            })
+          ),
+          ...terminalNodes
+        ]
+      )
       const graphId = graph?.id ?? null
       const shouldPreserveTransientLayout = graphIdUsedForNodesRef.current === graphId
       graphIdUsedForNodesRef.current = graphId
@@ -225,12 +232,14 @@ export function useWorkbenchFlowNodes({
       }
 
       const motionProjection = projectWorkbenchObjectMotion({
+        canvasArrangementMotion,
         createMotionId: (kind, nodeId) => {
           const motionId = `workbench-object-motion-${nextObjectMotionIdRef.current}-${kind}-${nodeId}`
           nextObjectMotionIdRef.current += 1
           return motionId
         },
         currentNodes,
+        isCanvasArrangementPending: canvasArrangementMotion !== null,
         isContinuingGraph: shouldPreserveTransientLayout,
         nextNodes,
         reducedMotion: prefersReducedMotion()
@@ -287,6 +296,7 @@ export function useWorkbenchFlowNodes({
         : nodesWithExits
     })
   }, [
+    canvasArrangementMotion,
     currentWorkbench,
     currentWorkspace,
     completeObjectMotion,

@@ -70,6 +70,11 @@ const cleancodeApi = {
     subscribeRendererEvent('cleancode:agent-graph-updated', listener),
   onAgentToolApprovalRequested: (listener: (event: unknown) => void) =>
     subscribeRendererEvent('cleancode:agent-tool-approval-requested', listener),
+  createCanvasStack: (command: unknown) =>
+    invokeCleancode('cleancode:create-canvas-stack', command),
+  moveCanvasStack: (command: unknown) => invokeCleancode('cleancode:move-canvas-stack', command),
+  removeCanvasStack: (command: unknown) =>
+    invokeCleancode('cleancode:remove-canvas-stack', command),
   createTerminalBlock: (command: unknown) =>
     invokeCleancode('cleancode:create-terminal-block', command),
   addQuickExecutionTarget: (command: unknown) =>

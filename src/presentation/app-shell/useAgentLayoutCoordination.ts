@@ -92,11 +92,16 @@ export function useAgentLayoutCoordination({
     )
   }, [])
   const onNodeDragStart = useCallback(
-    (_event: globalThis.MouseEvent | TouchEvent, node: WorkbenchFlowNode): void => {
+    (
+      _event: globalThis.MouseEvent | TouchEvent,
+      node: WorkbenchFlowNode,
+      protectedNodeIds?: readonly string[]
+    ): void => {
       clearTerminalGroupDropPreview()
-      const protectedNodeIds = resolveDragProtectedNodeIds(node, nodeStore.getNodes())
-      terminalWorkflowBuild.interruptNodes(protectedNodeIds)
-      updateDragProtection(node.id, protectedNodeIds)
+      const resolvedNodeIds =
+        protectedNodeIds ?? resolveDragProtectedNodeIds(node, nodeStore.getNodes())
+      terminalWorkflowBuild.interruptNodes(resolvedNodeIds)
+      updateDragProtection(node.id, resolvedNodeIds)
     },
     [
       clearTerminalGroupDropPreview,

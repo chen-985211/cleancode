@@ -13,6 +13,10 @@ import type {
   AgentToolApprovalRequest
 } from './contexts/agent/application/dto/AgentSessionProtocol'
 import type { WorkspaceAgentSnapshot } from './contexts/agent/application/dto/WorkspaceAgentSnapshot'
+import type {
+  CanvasArrangementItemReference,
+  CanvasArrangementSnapshot
+} from './contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import type { UpdateWorkspaceAgentMcpCapabilityResult } from './contexts/agent/application/use-cases/UpdateWorkspaceAgentMcpCapabilityUseCase'
 import type {
   AgentProviderAvailability,
@@ -58,6 +62,7 @@ import type {
 
 interface WorkbenchSnapshot {
   readonly agents: readonly WorkspaceAgentSnapshot[]
+  readonly canvasArrangement: CanvasArrangementSnapshot
   readonly isCurrentProject?: boolean
   readonly project: ProjectSnapshot
   readonly gitBranches: readonly GitBranchNavigationItemSnapshot[]
@@ -188,6 +193,27 @@ declare global {
       onAgentRuntimeChanged(listener: (event: AgentRuntimeChangedEvent) => void): () => void
       onAgentGraphUpdated(listener: (event: AgentGraphUpdatedEvent) => void): () => void
       onAgentToolApprovalRequested(listener: (event: AgentToolApprovalRequest) => void): () => void
+      createCanvasStack(command: {
+        readonly anchor: { readonly x: number; readonly y: number }
+        readonly items: readonly CanvasArrangementItemReference[]
+        readonly projectDirectory: string
+        readonly projectId: string
+        readonly stackId: string
+        readonly workspaceId: string
+      }): Promise<CanvasArrangementSnapshot>
+      moveCanvasStack(command: {
+        readonly anchor: { readonly x: number; readonly y: number }
+        readonly projectDirectory: string
+        readonly projectId: string
+        readonly stackId: string
+        readonly workspaceId: string
+      }): Promise<CanvasArrangementSnapshot>
+      removeCanvasStack(command: {
+        readonly projectDirectory: string
+        readonly projectId: string
+        readonly stackId: string
+        readonly workspaceId: string
+      }): Promise<CanvasArrangementSnapshot>
       createTerminalBlock(command: {
         readonly projectDirectory: string
         readonly workspaceId: string

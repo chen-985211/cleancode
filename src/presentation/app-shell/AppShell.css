@@ -16,6 +16,7 @@
 @import './styles/canvas-minimap.css';
 @import './styles/terminal-workflow-build.css';
 @import './styles/block-template-canvas.css';
+@import './styles/canvas-arrangement.css';
 @import './styles/workbench-node-selection.css';
 @import './styles/workbench-node-resizer.css';
 @import './styles/tooltips.css';

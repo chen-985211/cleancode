@@ -143,6 +143,7 @@ renderer 只按完整 runtime identity、generation 和 revision 对账。attach
 - 创建：从可创建发现结果中选择一次，并在保存前刷新验证 Provider 仍为 `installed` 且没有被用户禁用；MCP 初始值读取应用级新建默认并受 Provider capability 限制。失败不保存 Agent 且保留选择流程，不提供 Provider 切换。
 - 列出：工作区从未初始化时原子建立空工作区；既有 Agent 不按 CLI 可用性或启用偏好过滤，只有显式创建命令会加入 Agent。
 - 重命名/布局：只修改目标 Agent 的稳定事实。
+- 视觉整理：CanvasArrangement 可以用稳定 Agent ID 把 Agent 控制台纳入跨类型堆叠，但整体拖动和展开/网格仍通过本上下文布局入口提交 Agent 位置；堆叠关系不改变 Agent 身份、Provider、会话或运行状态。
 - 删除：停止目标 launch 和 terminal，取消审批、注销 MCP、删除定义和对话绑定；其他 Agent 不受影响。
 - 重新启动：在同一 Agent terminal 创建新 generation；Provider 支持恢复时使用该 Agent 的 session ref。
 - 新对话：清除该 Agent 的 session ref，在同一 Agent terminal 创建新 launch。

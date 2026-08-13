@@ -40,6 +40,14 @@ const shellWidthProperty = '--workbench-object-motion-shell-width'
 const shellHeightProperty = '--workbench-object-motion-shell-height'
 const scaleProperty = '--workbench-object-motion-scale'
 const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
+const canvasGridMinimumResponse = 0.36
+const canvasGridMaximumResponse = 0.52
+const canvasGridDistanceResponseDivisor = 160
+const canvasDropHorizontalDynamics = { dampingRatio: 1, response: 0.34 }
+const canvasDropLandingDynamics = { dampingRatio: 1, response: 0.24 }
+const canvasDropGravity = 1_800
+const canvasDropReboundRatio = 0.28
+const canvasDropMaximumReboundSpeed = 96
 const groupExpandSpringDynamics = { dampingRatio: 1, response: 0.36 }
 const groupCollapseSpringDynamics = { dampingRatio: 1, response: 0.3 }
 const disclosureOpacityDynamics = { dampingRatio: 1, response: 0.18 }
@@ -91,6 +99,7 @@ export function createWorkbenchObjectSpringController({
   let delayRemainingSeconds = 0
   let opacityDelayRemainingSeconds = 0
   let contentDelayRemainingSeconds = 0
+  let isDropFalling = false
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
 
@@ -174,8 +183,18 @@ export function createWorkbenchObjectSpringController({
     contentDelayRemainingSeconds = Math.max(0, contentDelayRemainingSeconds - activeElapsedSeconds)
 
     const positionDynamics = resolvePositionDynamics(motion)
-    xAxis = advanceSpringAxis(xAxis, xTarget, positionDynamics, activeElapsedSeconds)
-    yAxis = advanceSpringAxis(yAxis, yTarget, positionDynamics, activeElapsedSeconds)
+    const xPositionDynamics = resolveAxisPositionDynamics(motion, 'x', positionDynamics)
+    const yPositionDynamics = resolveAxisPositionDynamics(motion, 'y', positionDynamics)
+    xAxis = advanceSpringAxis(
+      xAxis,
+      xTarget,
+      motion?.positionDynamics === 'drop' ? canvasDropHorizontalDynamics : xPositionDynamics,
+      activeElapsedSeconds
+    )
+    yAxis =
+      motion?.positionDynamics === 'drop'
+        ? advanceDropYAxis(activeElapsedSeconds)
+        : advanceSpringAxis(yAxis, yTarget, yPositionDynamics, activeElapsedSeconds)
     opacityAxis = advanceSpringAxis(
       opacityAxis,
       opacityTarget,
@@ -237,6 +256,7 @@ export function createWorkbenchObjectSpringController({
 
     if (
       isSpringAxisSettled(xAxis, xTarget, positionSettlementThresholds) &&
+      !isDropFalling &&
       isSpringAxisSettled(yAxis, yTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(opacityAxis, opacityTarget, opacitySettlementThresholds) &&
       isSpringAxisSettled(contentOpacityAxis, contentOpacityTarget, opacitySettlementThresholds) &&
@@ -268,6 +288,45 @@ export function createWorkbenchObjectSpringController({
       isSpringAxisSettled(shellWidthAxis, shellWidthTarget, positionSettlementThresholds) &&
       isSpringAxisSettled(shellHeightAxis, shellHeightTarget, positionSettlementThresholds))
 
+  const advanceDropYAxis = (elapsedSeconds: number): SpringAxis => {
+    if (!isDropFalling) {
+      return advanceSpringAxis(yAxis, yTarget, canvasDropLandingDynamics, elapsedSeconds)
+    }
+
+    const distanceToImpact = yTarget - yAxis.value
+    if (distanceToImpact <= 0) {
+      isDropFalling = false
+      return advanceSpringAxis(yAxis, yTarget, canvasDropLandingDynamics, elapsedSeconds)
+    }
+
+    const impactTime =
+      (Math.sqrt(yAxis.velocity * yAxis.velocity + 2 * canvasDropGravity * distanceToImpact) -
+        yAxis.velocity) /
+      canvasDropGravity
+    if (impactTime > elapsedSeconds) {
+      return {
+        value:
+          yAxis.value +
+          yAxis.velocity * elapsedSeconds +
+          0.5 * canvasDropGravity * elapsedSeconds * elapsedSeconds,
+        velocity: yAxis.velocity + canvasDropGravity * elapsedSeconds
+      }
+    }
+
+    const impactVelocity = yAxis.velocity + canvasDropGravity * impactTime
+    const reboundVelocity = -Math.min(
+      canvasDropMaximumReboundSpeed,
+      impactVelocity * canvasDropReboundRatio
+    )
+    isDropFalling = false
+    return advanceSpringAxis(
+      { value: yTarget, velocity: reboundVelocity },
+      yTarget,
+      canvasDropLandingDynamics,
+      elapsedSeconds - impactTime
+    )
+  }
+
   const initializeMotion = (nextMotion: WorkbenchObjectMotion): void => {
     const collapsesToOffset = nextMotion.kind === 'group-collapse'
     xAxis = { value: collapsesToOffset ? 0 : nextMotion.offset.x, velocity: 0 }
@@ -291,6 +350,7 @@ export function createWorkbenchObjectSpringController({
     shellYTarget = nextMotion.shellRect?.to.y ?? 0
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
+    isDropFalling = nextMotion.positionDynamics === 'drop' && yAxis.value < yTarget
     delayRemainingSeconds = (nextMotion.delayMs ?? 0) / 1000
     opacityDelayRemainingSeconds = (nextMotion.opacityDelayMs ?? 0) / 1000
     contentDelayRemainingSeconds = (nextMotion.contentDelayMs ?? 0) / 1000
@@ -300,7 +360,8 @@ export function createWorkbenchObjectSpringController({
     if (
       nextMotion.kind === 'group-join' ||
       nextMotion.kind === 'group-leave' ||
-      nextMotion.kind === 'group-reflow'
+      nextMotion.kind === 'group-reflow' ||
+      nextMotion.kind === 'canvas-arrange'
     ) {
       xAxis = { ...xAxis, value: xAxis.value + nextMotion.offset.x }
       yAxis = { ...yAxis, value: yAxis.value + nextMotion.offset.y }
@@ -319,6 +380,7 @@ export function createWorkbenchObjectSpringController({
     shellYTarget = nextMotion.shellRect?.to.y ?? 0
     shellWidthTarget = nextMotion.shellRect?.to.width ?? 0
     shellHeightTarget = nextMotion.shellRect?.to.height ?? 0
+    isDropFalling = nextMotion.positionDynamics === 'drop' && yAxis.value < yTarget
     delayRemainingSeconds = 0
     opacityDelayRemainingSeconds = 0
     contentDelayRemainingSeconds = 0
@@ -390,6 +452,7 @@ export function createWorkbenchObjectSpringController({
 
       if (reducedMotion) {
         cancelFrame()
+        isDropFalling = false
         xAxis = { value: xTarget, velocity: 0 }
         yAxis = { value: yTarget, velocity: 0 }
         opacityAxis = { value: opacityTarget, velocity: 0 }
@@ -421,6 +484,22 @@ function resolvePositionDynamics(motion: WorkbenchObjectMotion | null): {
   if (motion?.kind === 'group-collapse') return groupCollapseSpringDynamics
   if (motion?.kind === 'group-expand') return groupExpandSpringDynamics
   return spatialSpringDynamics
+}
+
+function resolveAxisPositionDynamics(
+  motion: WorkbenchObjectMotion | null,
+  axis: 'x' | 'y',
+  fallback: { readonly dampingRatio: number; readonly response: number }
+): { readonly dampingRatio: number; readonly response: number } {
+  if (motion?.positionDynamics !== 'grid') return fallback
+  const distance = Math.abs(motion.offset[axis])
+  return {
+    dampingRatio: 1,
+    response: Math.min(
+      canvasGridMaximumResponse,
+      canvasGridMinimumResponse + Math.sqrt(distance) / canvasGridDistanceResponseDivisor
+    )
+  }
 }
 
 function round(value: number): number {

@@ -92,6 +92,7 @@ import { resolveElectronWindowPolicy } from './electronWindowPolicy'
 import { resolveAppIconPath } from './appIconPath'
 import { registerBlockGraphIpcHandlers } from './blockGraphIpcHandlers'
 import { registerBlockTemplateIpcHandlers } from './blockTemplateIpcHandlers'
+import { createCanvasArrangementRuntime } from './canvasArrangementRuntimeComposition'
 import { registerProjectIpcHandlers } from './projectIpcHandlers'
 import { openProjectDirectoryPicker, resolveProjectPickerDirectory } from './projectDirectoryPicker'
 import { registerTerminalIpcHandlers } from './terminalIpcHandlers'
@@ -161,6 +162,7 @@ consoleLogger.configureFile(join(appStateDirectoryPath, 'logs', 'main.log'))
 const projectRepository = new FileSystemProjectRepository(appStateDirectoryPath)
 let projectRegistryRepository: FileSystemProjectRegistryRepository | null = null
 const graphRepository = new FileSystemBlockGraphRepository(appStateDirectoryPath)
+const canvasArrangementRuntime = createCanvasArrangementRuntime(appStateDirectoryPath)
 const blockTemplateRepository = new FileSystemBlockTemplateRepository(
   join(appStateDirectoryPath, 'block-template-library.json')
 )
@@ -435,7 +437,7 @@ registerBlockTemplateIpcHandlers({
   saveBlockTemplate: (command) => saveBlockTemplateUseCase.execute(command),
   updateBlockTemplate: (command) => updateBlockTemplateUseCase.execute(command)
 })
-
+canvasArrangementRuntime.registerIpcHandlers(ipcMain, consoleLogger)
 const terminalViewLifecycle = registerTerminalIpcHandlers({
   attachTerminalView: (command) => terminalSessionService.attachView(command),
   detachTerminalView: (command) => terminalSessionService.detachView(command),
@@ -541,14 +543,12 @@ async function selectProjectDirectory(): Promise<string | null> {
 
 async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapshot> {
   const currentWorkspace = project.workspaces.find((workspace) => workspace.isCurrent)
-
   if (!currentWorkspace) {
     throw createExpectedAppError(
       'PROJECT_HAS_NO_CURRENT_WORKSPACE',
       'Project has no current branch workspace.'
     )
   }
-
   const graph = await getDefaultGraphUseCase.execute({
     projectId: project.id,
     projectDirectory: project.directory,
@@ -558,13 +558,19 @@ async function loadWorkbench(project: ProjectSnapshot): Promise<WorkbenchSnapsho
     projectId: project.id,
     workspaceId: currentWorkspace.workspaceId
   })
+  const canvasArrangement = await canvasArrangementRuntime.loadWorkspace({
+    agents,
+    graph,
+    projectDirectory: project.directory,
+    projectId: project.id,
+    workspaceId: currentWorkspace.workspaceId
+  })
   const gitBranches = (
     await listGitBranchNavigationUseCase.execute({
       projectDirectory: project.directory
     })
   ).branches
-
-  return { agents, project, gitBranches, graph }
+  return { agents, canvasArrangement, project, gitBranches, graph }
 }
 
 async function getDefaultGraphForAgent(command: {

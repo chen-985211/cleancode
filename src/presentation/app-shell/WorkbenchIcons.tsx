@@ -39,10 +39,30 @@ import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle'
 import { XIcon } from '@phosphor-icons/react/dist/csr/X'
 import type { Icon, IconProps, IconWeight } from '@phosphor-icons/react'
 
+import { CanvasArrangementStackIcon, CanvasArrangementUnstackIcon } from './CanvasArrangementIcons'
+
+type WorkbenchIconDefinition = readonly [
+  icon: Icon,
+  glyph: string,
+  defaultWeight: IconWeight,
+  activeWeight?: IconWeight,
+  activeIcon?: Icon,
+  activeGlyph?: string
+]
+
 const workbenchIconDefinitions = {
   add: [PlusIcon, 'plus', 'bold'],
   agent: [RobotIcon, 'robot', 'regular'],
   approval: [ShieldWarningIcon, 'shield-warning', 'fill'],
+  'arrangement-grid': [SquaresFourIcon, 'squares-four', 'regular'],
+  'arrangement-stack': [
+    CanvasArrangementStackIcon,
+    'canvas-stack',
+    'regular',
+    undefined,
+    CanvasArrangementUnstackIcon,
+    'canvas-unstack'
+  ],
   canvas: [SquaresFourIcon, 'squares-four', 'regular'],
   close: [XIcon, 'x', 'bold'],
   collapse: [CaretUpIcon, 'caret-up', 'bold'],
@@ -81,7 +101,7 @@ const workbenchIconDefinitions = {
   workflow: [FlowArrowIcon, 'flow-arrow', 'regular'],
   'zoom-in': [PlusIcon, 'plus', 'bold'],
   'zoom-out': [MinusIcon, 'minus', 'bold']
-} satisfies Record<string, readonly [Icon, string, IconWeight, IconWeight?]>
+} satisfies Record<string, WorkbenchIconDefinition>
 
 export type WorkbenchIconRole = keyof typeof workbenchIconDefinitions
 
@@ -91,7 +111,10 @@ export interface WorkbenchIconProps extends Omit<IconProps, 'alt' | 'mirrored' |
 }
 
 export function WorkbenchIcon({ active = false, role, ...props }: WorkbenchIconProps) {
-  const [IconComponent, glyph, defaultWeight, activeWeight] = workbenchIconDefinitions[role]
+  const [DefaultIcon, defaultGlyph, defaultWeight, activeWeight, ActiveIcon, activeGlyph] =
+    workbenchIconDefinitions[role] as WorkbenchIconDefinition
+  const IconComponent = active && ActiveIcon ? ActiveIcon : DefaultIcon
+  const glyph = active && activeGlyph ? activeGlyph : defaultGlyph
   const weight = active && activeWeight ? activeWeight : defaultWeight
 
   return (

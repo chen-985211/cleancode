@@ -462,6 +462,69 @@ describe('workbench object spring', () => {
     )
   })
 
+  it('releases a detached canvas card under gravity before a restrained landing rebound', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('canvas-arrange', { x: -24, y: -18 }),
+        positionDynamics: 'drop'
+      },
+      false,
+      completed
+    )
+
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBe(-18)
+    scheduler.advanceNextFrame(50)
+    const firstDropPosition = readProperty(surface, '--workbench-object-motion-y')
+    scheduler.advanceNextFrame(50)
+    const secondDropPosition = readProperty(surface, '--workbench-object-motion-y')
+
+    expect(firstDropPosition).toBeCloseTo(-15.75, 1)
+    expect(secondDropPosition).toBeCloseTo(-9, 1)
+    expect(secondDropPosition - firstDropPosition).toBeGreaterThan(firstDropPosition + 18)
+
+    scheduler.advanceNextFrame(50)
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBeLessThan(0)
+    scheduler.advanceUntilIdle()
+
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBe(0)
+    expect(completed).toHaveBeenCalledOnce()
+  })
+
+  it('lets a grid item curve naturally by adapting each axis to its travel distance', () => {
+    const scheduler = createFrameScheduler()
+    const surface = createSurface()
+    const completed = vi.fn()
+    const controller = createWorkbenchObjectSpringController({ scheduler })
+
+    controller.motionChanged(
+      surface,
+      {
+        ...createMotion('canvas-arrange', { x: -900, y: -100 }),
+        positionDynamics: 'grid'
+      },
+      false,
+      completed
+    )
+    scheduler.advanceNextFrame(50)
+
+    const xProgress = 1 - Math.abs(readProperty(surface, '--workbench-object-motion-x')) / 900
+    const yProgress = 1 - Math.abs(readProperty(surface, '--workbench-object-motion-y')) / 100
+    expect(xProgress).toBeGreaterThan(0)
+    expect(yProgress).toBeGreaterThan(0)
+    expect(xProgress).toBeLessThan(yProgress)
+
+    scheduler.advanceUntilIdle()
+    expect(readProperty(surface, '--workbench-object-motion-x')).toBe(0)
+    expect(readProperty(surface, '--workbench-object-motion-y')).toBe(0)
+    expect(completed).toHaveBeenCalledOnce()
+  })
+
   it('completes immediately at the same endpoint for reduced motion', () => {
     const scheduler = createFrameScheduler()
     const surface = createSurface()
