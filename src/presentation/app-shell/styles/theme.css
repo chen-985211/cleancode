@@ -145,11 +145,13 @@
   --cc-motion-duration-brand-reveal: 700ms;
   --cc-motion-delay-brand-sweep: 1480ms;
   --cc-motion-duration-brand-sweep: 2300ms;
+  --cc-motion-duration-loading-shimmer-wave: 1600ms;
   --cc-motion-duration-spinner: 900ms;
   --cc-easing-standard: ease;
   --cc-easing-enter: ease-out;
   --cc-easing-exit: ease-in;
   --cc-easing-brand-sweep: cubic-bezier(0.65, 0, 0.35, 1);
+  --cc-easing-loading-shimmer-wave: ease-in-out;
   --cc-canvas-node-radius: 20px;
   --cc-terminal-light-background: #ffffff;
   --cc-terminal-light-foreground: #243142;

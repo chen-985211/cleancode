@@ -67,10 +67,32 @@ describe('workbench canvas empty state styles', () => {
     expect(hoverRule).not.toContain('var(--cc-primary')
   })
 
+  it('presents project restoration as unframed shimmer-wave text', () => {
+    const loadingTextRule = readRule('.canvas-empty__loading-text')
+    const characterRule = readRule('.canvas-empty__loading-character').replace(/\s+/g, ' ')
+    const waveKeyframes = readRule('@keyframes canvas-empty-text-shimmer-wave')
+
+    expect(canvasStyles).not.toContain('.canvas-empty--loading .canvas-empty__panel')
+    expect(canvasStyles).not.toContain('.canvas-empty__spinner')
+    expect(loadingTextRule).not.toContain('border:')
+    expect(loadingTextRule).not.toContain('background:')
+    expect(loadingTextRule).not.toContain('box-shadow:')
+    expect(themeStyles).toContain('--cc-motion-duration-loading-shimmer-wave: 1600ms;')
+    expect(themeStyles).toContain('--cc-easing-loading-shimmer-wave: ease-in-out;')
+    expect(characterRule).toContain(
+      'animation: canvas-empty-text-shimmer-wave var(--cc-motion-duration-loading-shimmer-wave) var(--cc-easing-loading-shimmer-wave) infinite;'
+    )
+    expect(characterRule).toContain('animation-delay: var(--cc-loading-shimmer-delay);')
+    expect(waveKeyframes).toContain('translate3d(2px, -2px, 10px)')
+    expect(waveKeyframes).toContain('scale(1.1)')
+    expect(waveKeyframes).toContain('rotateY(10deg)')
+  })
+
   it('projects the final wordmark immediately when reduced motion is requested', () => {
     const reducedMotion = canvasStyles.split('@media (prefers-reduced-motion: reduce)')[1] ?? ''
 
     expect(reducedMotion).toContain('.canvas-empty__brand')
+    expect(reducedMotion).toContain('.canvas-empty__loading-character')
     expect(reducedMotion).toContain('animation: none;')
     expect(reducedMotion).toContain('background: none;')
     expect(reducedMotion).toContain('-webkit-text-fill-color: currentcolor;')
