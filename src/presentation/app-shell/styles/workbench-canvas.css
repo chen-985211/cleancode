@@ -40,6 +40,9 @@
 
 .app-shell__toolbar-group--agent {
   flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--cc-agent-create-surface);
+  padding: 0;
 }
 
 .app-shell__toolbar-group--terminal-group-editing {
