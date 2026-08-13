@@ -78,15 +78,105 @@ describe('canvas arrangement actions', () => {
     expect(hook.notify).toHaveBeenCalledOnce()
     expect(hook.setCurrentArrangement).not.toHaveBeenCalled()
   })
+
+  it('keeps every grid item responsive while distance shapes its spring', async () => {
+    const arrangement = emptyArrangement()
+    const moveResolvers: Array<(graph: WorkbenchSnapshot['graph']) => void> = []
+    const moveBlock = vi.fn(
+      () =>
+        new Promise<WorkbenchSnapshot['graph']>((resolve) => {
+          moveResolvers.push(resolve)
+        })
+    )
+    installCanvasApi({ moveBlock })
+    const hook = renderActions(arrangement)
+    let arrangePromise: Promise<void> | undefined
+
+    act(() => {
+      arrangePromise = hook.result.current.arrange('grid', selectionItems())
+    })
+
+    expect(hook.result.current.motionChoreography).toEqual({
+      delayByNodeId: { 'terminal-1': 0, 'terminal-2': 0 },
+      kind: 'grid'
+    })
+
+    await act(async () => {
+      moveResolvers.forEach((resolve) => resolve(workbench(arrangement).graph))
+      await arrangePromise
+    })
+    expect(hook.result.current.isPending).toBe(false)
+  })
+
+  it('keeps a direct grid choreography alive through the projection frame', async () => {
+    const arrangement = emptyArrangement()
+    const frames: FrameRequestCallback[] = []
+    const requestAnimationFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        frames.push(callback)
+        return frames.length
+      })
+    installCanvasApi({ moveBlock: vi.fn(async () => workbench(arrangement).graph) })
+    const hook = renderActions(arrangement)
+
+    await act(() => hook.result.current.arrange('grid', selectionItems()))
+
+    expect(hook.result.current.motionChoreography?.kind).toBe('grid')
+    act(() => frames.shift()?.(16))
+    expect(hook.result.current.motionChoreography?.kind).toBe('grid')
+    act(() => frames.shift()?.(32))
+    expect(hook.result.current.motionChoreography).toBeNull()
+    requestAnimationFrame.mockRestore()
+  })
+
+  it('compacts a workflow dependency before placing the complete workflow in the grid', async () => {
+    const arrangement = emptyArrangement()
+    const snapshot = workflowWorkbench(arrangement)
+    const moveBlock = vi.fn(
+      async (command: {
+        readonly blockId: string
+        readonly position: { readonly x: number; readonly y: number }
+      }) => {
+        void command
+        return snapshot.graph
+      }
+    )
+    installCanvasApi({ moveBlock })
+    const hook = renderActionsForWorkbench(snapshot)
+
+    await act(() =>
+      hook.result.current.arrange('grid', [
+        {
+          key: 'workflow:terminal-1,terminal-2',
+          nodeIds: ['terminal-1', 'terminal-2'],
+          position: { x: 0, y: 0 },
+          reference: { kind: 'workflow', terminalIds: ['terminal-1', 'terminal-2'] },
+          size: { height: 80, width: 1_400 }
+        },
+        selectionItem('terminal-3', 0, 400)
+      ])
+    )
+
+    const positions = new Map(
+      moveBlock.mock.calls.map(([command]) => [command.blockId, command.position] as const)
+    )
+    expect(positions.get('terminal-2')!.x - positions.get('terminal-1')!.x).toBe(164)
+    expect(positions.get('terminal-2')!.y).toBe(positions.get('terminal-1')!.y)
+  })
 })
 
 function renderActions(arrangement: CanvasArrangementSnapshot) {
+  return renderActionsForWorkbench(workbench(arrangement))
+}
+
+function renderActionsForWorkbench(snapshot: WorkbenchSnapshot) {
   const setCurrentArrangement = vi.fn()
   const notify = vi.fn()
   const hook = renderHook(() =>
     useCanvasArrangementActions({
-      currentWorkbench: workbench(arrangement),
-      currentWorkspace: workbench(arrangement).project.workspaces[0],
+      currentWorkbench: snapshot,
+      currentWorkspace: snapshot.project.workspaces[0],
       failureMessage: 'Failed',
       failureTitle: 'Arrangement',
       moveWorkspaceAgent: vi.fn(async () => undefined),
@@ -176,6 +266,22 @@ function workbench(arrangement: CanvasArrangementSnapshot): WorkbenchSnapshot {
           workspaceKind: 'default'
         }
       ]
+    }
+  } as unknown as WorkbenchSnapshot
+}
+
+function workflowWorkbench(arrangement: CanvasArrangementSnapshot): WorkbenchSnapshot {
+  const snapshot = workbench(arrangement)
+  return {
+    ...snapshot,
+    graph: {
+      ...snapshot.graph,
+      blocks: [
+        { id: 'terminal-1', position: { x: 0, y: 0 }, size: { height: 80, width: 100 } },
+        { id: 'terminal-2', position: { x: 1_300, y: 0 }, size: { height: 80, width: 100 } },
+        { id: 'terminal-3', position: { x: 0, y: 400 }, size: { height: 80, width: 100 } }
+      ],
+      connections: [{ sourceBlockId: 'terminal-1', targetBlockId: 'terminal-2' }]
     }
   } as unknown as WorkbenchSnapshot
 }

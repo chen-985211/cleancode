@@ -16,7 +16,21 @@ export interface StackedCanvasLayoutPlan {
   readonly layouts: readonly CanvasArrangementLayout[]
 }
 
+interface GridShelf {
+  readonly height: number
+  readonly items: readonly CanvasArrangementLayoutItem[]
+  readonly width: number
+}
+
+interface GridShelfPlan {
+  readonly height: number
+  readonly shelves: readonly GridShelf[]
+  readonly width: number
+}
+
 const arrangementGap = 48
+const gridAspectPenaltyWeight = 0.6
+const gridScoreTolerance = 1e-9
 const stackOffset = 10
 
 export function createStackedCanvasLayout(
@@ -74,40 +88,143 @@ export function createSpreadCanvasLayout(
 export function createGridCanvasLayout(input: readonly CanvasArrangementLayoutItem[]): {
   readonly layouts: readonly CanvasArrangementLayout[]
 } {
-  const items = normalizeItems(input, true)
+  const items = sortGridItems(normalizeItems(input, true))
   const bounds = mergeBounds(items)
-  const columnCount = Math.ceil(Math.sqrt(items.length))
-  const rowCount = Math.ceil(items.length / columnCount)
-  const columnWidths = Array.from({ length: columnCount }, () => 0)
-  const rowHeights = Array.from({ length: rowCount }, () => 0)
-
-  items.forEach((item, index) => {
-    const column = index % columnCount
-    const row = Math.floor(index / columnCount)
-    columnWidths[column] = Math.max(columnWidths[column] ?? 0, item.size.width)
-    rowHeights[row] = Math.max(rowHeights[row] ?? 0, item.size.height)
-  })
-
-  const gridWidth = sum(columnWidths) + arrangementGap * (columnCount - 1)
-  const gridHeight = sum(rowHeights) + arrangementGap * (rowCount - 1)
+  const plan = createGridShelfPlan(items)
   const gridOrigin = {
-    x: bounds.left + bounds.width / 2 - gridWidth / 2,
-    y: bounds.top + bounds.height / 2 - gridHeight / 2
+    x: bounds.left + bounds.width / 2 - plan.width / 2,
+    y: bounds.top + bounds.height / 2 - plan.height / 2
   }
+  const layouts: CanvasArrangementLayout[] = []
+  let shelfY = gridOrigin.y
 
-  return {
-    layouts: items.map((item, index) => {
-      const column = index % columnCount
-      const row = Math.floor(index / columnCount)
-      return {
+  for (const shelf of plan.shelves) {
+    let itemX = gridOrigin.x
+    for (const item of shelf.items) {
+      layouts.push({
         key: item.key,
         position: {
-          x: gridOrigin.x + sum(columnWidths.slice(0, column)) + arrangementGap * column,
-          y: gridOrigin.y + sum(rowHeights.slice(0, row)) + arrangementGap * row
+          x: itemX,
+          y: shelfY + shelf.height - item.size.height
         }
-      }
-    })
+      })
+      itemX += item.size.width + arrangementGap
+    }
+    shelfY += shelf.height + arrangementGap
   }
+
+  return { layouts }
+}
+
+function sortGridItems(
+  visuallyOrderedItems: readonly CanvasArrangementLayoutItem[]
+): CanvasArrangementLayoutItem[] {
+  return visuallyOrderedItems
+    .map((item, visualIndex) => ({ item, visualIndex }))
+    .sort(
+      (left, right) =>
+        itemArea(right.item) - itemArea(left.item) ||
+        Math.max(right.item.size.width, right.item.size.height) -
+          Math.max(left.item.size.width, left.item.size.height) ||
+        left.visualIndex - right.visualIndex
+    )
+    .map(({ item }) => item)
+}
+
+function createGridShelfPlan(items: readonly CanvasArrangementLayoutItem[]): GridShelfPlan {
+  const contentArea = sum(items.map(itemArea))
+  const candidateWidths = createGridCandidateWidths(items)
+  let bestPlan: GridShelfPlan | null = null
+  let bestScore = Number.POSITIVE_INFINITY
+
+  for (const candidateWidth of candidateWidths) {
+    const shelves = packGridShelves(items, candidateWidth)
+    const width = Math.max(...shelves.map((shelf) => shelf.width))
+    const height = sum(shelves.map((shelf) => shelf.height)) + arrangementGap * (shelves.length - 1)
+    const plan = { height, shelves, width }
+    const score = gridPlanScore(plan, contentArea)
+    if (isBetterGridPlan(plan, score, bestPlan, bestScore)) {
+      bestPlan = plan
+      bestScore = score
+    }
+  }
+
+  return bestPlan!
+}
+
+function createGridCandidateWidths(
+  items: readonly CanvasArrangementLayoutItem[]
+): readonly number[] {
+  const widths = new Set<number>()
+  for (let start = 0; start < items.length; start += 1) {
+    let width = 0
+    for (let end = start; end < items.length; end += 1) {
+      width += items[end]!.size.width + (end === start ? 0 : arrangementGap)
+      widths.add(width)
+    }
+  }
+  return [...widths].sort((left, right) => left - right)
+}
+
+function packGridShelves(
+  items: readonly CanvasArrangementLayoutItem[],
+  maximumWidth: number
+): readonly GridShelf[] {
+  const shelves: GridShelf[] = []
+  let shelfItems: CanvasArrangementLayoutItem[] = []
+  let shelfWidth = 0
+  let shelfHeight = 0
+
+  const finishShelf = (): void => {
+    if (shelfItems.length === 0) return
+    shelves.push({ height: shelfHeight, items: shelfItems, width: shelfWidth })
+    shelfItems = []
+    shelfWidth = 0
+    shelfHeight = 0
+  }
+
+  for (const item of items) {
+    const nextWidth =
+      shelfItems.length === 0 ? item.size.width : shelfWidth + arrangementGap + item.size.width
+    if (shelfItems.length > 0 && nextWidth > maximumWidth) finishShelf()
+    shelfWidth =
+      shelfItems.length === 0 ? item.size.width : shelfWidth + arrangementGap + item.size.width
+    shelfHeight = Math.max(shelfHeight, item.size.height)
+    shelfItems.push(item)
+  }
+  finishShelf()
+  return shelves
+}
+
+function gridPlanScore(plan: GridShelfPlan, contentArea: number): number {
+  const footprintCost = (plan.width * plan.height) / contentArea
+  const aspectCost = Math.abs(Math.log(plan.width / plan.height))
+  return footprintCost + aspectCost * gridAspectPenaltyWeight
+}
+
+function isBetterGridPlan(
+  candidate: GridShelfPlan,
+  candidateScore: number,
+  current: GridShelfPlan | null,
+  currentScore: number
+): boolean {
+  if (!current || candidateScore < currentScore - gridScoreTolerance) return true
+  if (Math.abs(candidateScore - currentScore) > gridScoreTolerance) return false
+
+  const candidateArea = candidate.width * candidate.height
+  const currentArea = current.width * current.height
+  if (candidateArea !== currentArea) return candidateArea < currentArea
+  const candidateAspect = Math.abs(Math.log(candidate.width / candidate.height))
+  const currentAspect = Math.abs(Math.log(current.width / current.height))
+  if (candidateAspect !== currentAspect) return candidateAspect < currentAspect
+  if (candidate.shelves.length !== current.shelves.length) {
+    return candidate.shelves.length < current.shelves.length
+  }
+  return candidate.width < current.width
+}
+
+function itemArea(item: CanvasArrangementLayoutItem): number {
+  return item.size.width * item.size.height
 }
 
 function normalizeItems(

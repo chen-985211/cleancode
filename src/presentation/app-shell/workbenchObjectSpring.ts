@@ -40,6 +40,9 @@ const shellWidthProperty = '--workbench-object-motion-shell-width'
 const shellHeightProperty = '--workbench-object-motion-shell-height'
 const scaleProperty = '--workbench-object-motion-scale'
 const spatialSpringDynamics = { dampingRatio: 1, response: 0.36 }
+const canvasGridMinimumResponse = 0.36
+const canvasGridMaximumResponse = 0.52
+const canvasGridDistanceResponseDivisor = 160
 const canvasDropHorizontalDynamics = { dampingRatio: 1, response: 0.34 }
 const canvasDropLandingDynamics = { dampingRatio: 1, response: 0.24 }
 const canvasDropGravity = 1_800
@@ -180,16 +183,18 @@ export function createWorkbenchObjectSpringController({
     contentDelayRemainingSeconds = Math.max(0, contentDelayRemainingSeconds - activeElapsedSeconds)
 
     const positionDynamics = resolvePositionDynamics(motion)
+    const xPositionDynamics = resolveAxisPositionDynamics(motion, 'x', positionDynamics)
+    const yPositionDynamics = resolveAxisPositionDynamics(motion, 'y', positionDynamics)
     xAxis = advanceSpringAxis(
       xAxis,
       xTarget,
-      motion?.positionDynamics === 'drop' ? canvasDropHorizontalDynamics : positionDynamics,
+      motion?.positionDynamics === 'drop' ? canvasDropHorizontalDynamics : xPositionDynamics,
       activeElapsedSeconds
     )
     yAxis =
       motion?.positionDynamics === 'drop'
         ? advanceDropYAxis(activeElapsedSeconds)
-        : advanceSpringAxis(yAxis, yTarget, positionDynamics, activeElapsedSeconds)
+        : advanceSpringAxis(yAxis, yTarget, yPositionDynamics, activeElapsedSeconds)
     opacityAxis = advanceSpringAxis(
       opacityAxis,
       opacityTarget,
@@ -479,6 +484,22 @@ function resolvePositionDynamics(motion: WorkbenchObjectMotion | null): {
   if (motion?.kind === 'group-collapse') return groupCollapseSpringDynamics
   if (motion?.kind === 'group-expand') return groupExpandSpringDynamics
   return spatialSpringDynamics
+}
+
+function resolveAxisPositionDynamics(
+  motion: WorkbenchObjectMotion | null,
+  axis: 'x' | 'y',
+  fallback: { readonly dampingRatio: number; readonly response: number }
+): { readonly dampingRatio: number; readonly response: number } {
+  if (motion?.positionDynamics !== 'grid') return fallback
+  const distance = Math.abs(motion.offset[axis])
+  return {
+    dampingRatio: 1,
+    response: Math.min(
+      canvasGridMaximumResponse,
+      canvasGridMinimumResponse + Math.sqrt(distance) / canvasGridDistanceResponseDivisor
+    )
+  }
 }
 
 function round(value: number): number {

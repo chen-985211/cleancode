@@ -30,4 +30,16 @@ describe('canvas arrangement motion choreography', () => {
       kind: 'attach'
     })
   })
+
+  it('starts every grid item immediately and lets distance shape the motion', () => {
+    expect(createCanvasArrangementMotionChoreography(items, 'grid')).toEqual({
+      delayByNodeId: {
+        bottom: 0,
+        'middle-a': 0,
+        'middle-b': 0,
+        top: 0
+      },
+      kind: 'grid'
+    })
+  })
 })

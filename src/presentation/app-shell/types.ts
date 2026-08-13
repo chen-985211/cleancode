@@ -109,7 +109,7 @@ export interface WorkbenchObjectMotion {
   readonly id: string
   readonly kind: WorkbenchObjectMotionKind
   readonly offset: { readonly x: number; readonly y: number }
-  readonly positionDynamics?: 'drop'
+  readonly positionDynamics?: 'drop' | 'grid'
   readonly contentDelayMs?: number
   readonly delayMs?: number
   readonly opacityDelayMs?: number

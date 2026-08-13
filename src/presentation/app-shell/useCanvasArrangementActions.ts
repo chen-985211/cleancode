@@ -1,11 +1,10 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type {
   CanvasArrangementSnapshot,
   CanvasStackSnapshot
 } from '../../contexts/canvas-arrangement/application/dto/CanvasArrangementSnapshot'
 import {
-  createGridCanvasLayout,
   createSpreadCanvasLayout,
   createStackedCanvasLayout,
   type CanvasArrangementLayout
@@ -22,6 +21,7 @@ import {
   createCanvasArrangementMotionChoreography,
   type CanvasArrangementMotionChoreography
 } from './canvasArrangementMotion'
+import { createCanvasArrangementGridPlan } from './canvasArrangementGridPlanning'
 
 interface UseCanvasArrangementActionsInput {
   readonly currentWorkbench: WorkbenchSnapshot | null
@@ -55,10 +55,43 @@ export function useCanvasArrangementActions({
   const [isPending, setIsPending] = useState(false)
   const [motionChoreography, setMotionChoreography] =
     useState<CanvasArrangementMotionChoreography | null>(null)
+  const motionCleanupFrameIdsRef = useRef<number[]>([])
+  const motionCleanupSequenceRef = useRef(0)
+  const clearMotionChoreography = useCallback((): void => {
+    motionCleanupSequenceRef.current += 1
+    motionCleanupFrameIdsRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId))
+    motionCleanupFrameIdsRef.current = []
+    setMotionChoreography(null)
+  }, [])
+  const scheduleMotionChoreographyCleanup = useCallback((): void => {
+    motionCleanupSequenceRef.current += 1
+    const sequence = motionCleanupSequenceRef.current
+    motionCleanupFrameIdsRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId))
+    motionCleanupFrameIdsRef.current = []
+    // Flow nodes project from committed graph state in a passive effect. Keep the
+    // choreography through that paint and the following presentation frame.
+    const firstFrameId = window.requestAnimationFrame(() => {
+      const secondFrameId = window.requestAnimationFrame(() => {
+        if (motionCleanupSequenceRef.current !== sequence) return
+        motionCleanupFrameIdsRef.current = []
+        setMotionChoreography(null)
+      })
+      motionCleanupFrameIdsRef.current = [secondFrameId]
+    })
+    motionCleanupFrameIdsRef.current = [firstFrameId]
+  }, [])
+  useEffect(
+    () => () => {
+      motionCleanupSequenceRef.current += 1
+      motionCleanupFrameIdsRef.current.forEach((frameId) => window.cancelAnimationFrame(frameId))
+    },
+    []
+  )
   const commitLayouts = useCallback(
     async (
       selectedItems: readonly CanvasArrangementSelectionItem[],
-      layouts: readonly CanvasArrangementLayout[]
+      layouts: readonly CanvasArrangementLayout[],
+      nodePositionsById: ReadonlyMap<string, { readonly x: number; readonly y: number }> = new Map()
     ): Promise<void> => {
       if (!currentWorkbench || !currentWorkspace || !window.cleancode) return
       const layoutsByKey = new Map(layouts.map((layout) => [layout.key, layout.position]))
@@ -110,7 +143,7 @@ export function useCanvasArrangementActions({
               blockId: block.id,
               projectDirectory: currentWorkbench.project.directory,
               workspaceId: currentWorkspace.workspaceId,
-              position: {
+              position: nodePositionsById.get(nodeId) ?? {
                 x: block.position.x + delta.x,
                 y: block.position.y + delta.y
               }
@@ -141,10 +174,11 @@ export function useCanvasArrangementActions({
     async (
       selectedItems: readonly CanvasArrangementSelectionItem[],
       layouts: readonly CanvasArrangementLayout[],
-      rollbackLayouts: readonly CanvasArrangementLayout[]
+      rollbackLayouts: readonly CanvasArrangementLayout[],
+      nodePositionsById?: ReadonlyMap<string, { readonly x: number; readonly y: number }>
     ): Promise<void> => {
       try {
-        await commitLayouts(selectedItems, layouts)
+        await commitLayouts(selectedItems, layouts, nodePositionsById)
       } catch (error) {
         await commitLayouts(selectedItems, rollbackLayouts).catch(() => undefined)
         throw error
@@ -165,8 +199,9 @@ export function useCanvasArrangementActions({
       const existingStack = findCanvasArrangementStack(arrangement, items)
       const overlappingStacks = findCanvasArrangementStacks(arrangement, items)
       const previousLayouts = items.map((item) => ({ key: item.key, position: item.position }))
+      let completedSuccessfully = false
 
-      setMotionChoreography(null)
+      clearMotionChoreography()
       setIsPending(true)
       try {
         if (action === 'stack') {
@@ -188,6 +223,7 @@ export function useCanvasArrangementActions({
               workspaceId: currentWorkspace.workspaceId
             })
             setCurrentArrangement(updated)
+            completedSuccessfully = true
           } catch (error) {
             await commitLayouts(items, previousLayouts)
             throw error
@@ -218,6 +254,7 @@ export function useCanvasArrangementActions({
               workspaceId: currentWorkspace.workspaceId
             })
             setCurrentArrangement(updated)
+            completedSuccessfully = true
           } catch (error) {
             await commitLayouts(stackItems, stackPreviousLayouts)
             throw error
@@ -225,25 +262,39 @@ export function useCanvasArrangementActions({
           return
         }
 
-        const plan = createGridCanvasLayout(items)
+        const plan = createCanvasArrangementGridPlan(items, currentWorkbench.graph)
+        setMotionChoreography(
+          createCanvasArrangementMotionChoreography(
+            withCombinationMembers(items, currentWorkbench.graph),
+            'grid'
+          )
+        )
         if (overlappingStacks.length > 0) {
-          await commitAndRemoveStacks(items, plan.layouts, overlappingStacks)
+          await commitAndRemoveStacks(
+            items,
+            plan.layouts,
+            overlappingStacks,
+            plan.nodePositionsById
+          )
         } else {
-          await commitLayouts(items, plan.layouts)
+          await commitLayouts(items, plan.layouts, plan.nodePositionsById)
         }
+        completedSuccessfully = true
       } catch {
         notify({ kind: 'error', message: failureMessage, title: failureTitle })
       } finally {
-        setMotionChoreography(null)
+        if (completedSuccessfully) scheduleMotionChoreographyCleanup()
+        else clearMotionChoreography()
         setIsPending(false)
       }
 
       async function commitAndRemoveStacks(
         selectedItems: readonly CanvasArrangementSelectionItem[],
         layouts: readonly CanvasArrangementLayout[],
-        stacks: CanvasArrangementSnapshot['stacks']
+        stacks: CanvasArrangementSnapshot['stacks'],
+        nodePositionsById: ReadonlyMap<string, { readonly x: number; readonly y: number }>
       ): Promise<void> {
-        await commitLayoutsWithRollback(selectedItems, layouts, previousLayouts)
+        await commitLayoutsWithRollback(selectedItems, layouts, previousLayouts, nodePositionsById)
         const removedStacks: CanvasArrangementSnapshot['stacks'][number][] = []
         try {
           let updated = arrangement
@@ -280,10 +331,12 @@ export function useCanvasArrangementActions({
       currentWorkspace,
       commitLayouts,
       commitLayoutsWithRollback,
+      clearMotionChoreography,
       failureMessage,
       failureTitle,
       isPending,
       notify,
+      scheduleMotionChoreographyCleanup,
       setCurrentArrangement
     ]
   )

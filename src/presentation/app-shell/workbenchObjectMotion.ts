@@ -191,7 +191,9 @@ export function projectWorkbenchObjectMotion({
           ...(delayMs > 0 ? { delayMs } : {}),
           ...(canvasArrangementMotion?.kind === 'detach'
             ? { positionDynamics: 'drop' as const }
-            : {})
+            : canvasArrangementMotion?.kind === 'grid'
+              ? { positionDynamics: 'grid' as const }
+              : {})
         })
       }
     }

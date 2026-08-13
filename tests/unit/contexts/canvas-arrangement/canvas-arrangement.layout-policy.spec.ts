@@ -70,7 +70,7 @@ describe('canvas arrangement layout policy', () => {
     ])
   })
 
-  it('arranges mixed sizes into a centered near-square grid without overlap', () => {
+  it('sorts mixed sizes by footprint and packs them into centered shelves without overlap', () => {
     const result = createGridCanvasLayout([
       item('agent:agent-1', 700, 80, 720, 460),
       item('terminal:terminal-1', 40, 40, 420, 240),
@@ -79,10 +79,46 @@ describe('canvas arrangement layout policy', () => {
     ])
 
     expect(result.layouts).toEqual([
-      layout('terminal:terminal-1', -134, 46),
-      layout('workflow:terminal-2,terminal-3', 634, 46),
-      layout('agent:agent-1', -134, 394),
-      layout('combination:group-1', 634, 394)
+      layout('combination:group-1', 46, -208),
+      layout('agent:agent-1', 46, 440),
+      layout('workflow:terminal-2,terminal-3', 46, 948),
+      layout('terminal:terminal-1', 994, 1_008)
+    ])
+  })
+
+  it('reuses each shelf width instead of inheriting oversized columns from another row', () => {
+    const input = [
+      item('combination:group-1', 0, 0, 800, 270),
+      item('agent:agent-1', 900, 0, 360, 270),
+      item('agent:agent-2', 1_700, 0, 360, 220),
+      item('terminal:terminal-1', 0, 400, 320, 200),
+      item('terminal:terminal-2', 900, 400, 320, 200),
+      item('terminal:terminal-3', 1_400, 400, 320, 200)
+    ]
+    const result = createGridCanvasLayout(input)
+
+    expect(result.layouts).toEqual([
+      layout('combination:group-1', 502, -118),
+      layout('agent:agent-1', 502, 200),
+      layout('agent:agent-2', 910, 250),
+      layout('terminal:terminal-1', 502, 518),
+      layout('terminal:terminal-2', 870, 518),
+      layout('terminal:terminal-3', 1_238, 518)
+    ])
+    expect(layoutBounds(result.layouts, input)).toEqual({ height: 836, width: 1_056 })
+  })
+
+  it('preserves visual reading order when objects have the same footprint', () => {
+    const result = createGridCanvasLayout([
+      item('terminal:third', 700, 400, 320, 200),
+      item('terminal:second', 500, 40, 320, 200),
+      item('terminal:first', 40, 40, 320, 200)
+    ])
+
+    expect(result.layouts.map((entry) => entry.key)).toEqual([
+      'terminal:first',
+      'terminal:second',
+      'terminal:third'
     ])
   })
 
@@ -135,4 +171,20 @@ function hasOverlap(
     leftLayout.position.y < rightLayout.position.y + rightItem.size.height &&
     leftLayout.position.y + leftItem.size.height > rightLayout.position.y
   )
+}
+
+function layoutBounds(
+  layouts: readonly ReturnType<typeof layout>[],
+  items: readonly CanvasArrangementLayoutItem[]
+): { readonly height: number; readonly width: number } {
+  const itemByKey = new Map(items.map((item) => [item.key, item]))
+  const left = Math.min(...layouts.map((entry) => entry.position.x))
+  const top = Math.min(...layouts.map((entry) => entry.position.y))
+  const right = Math.max(
+    ...layouts.map((entry) => entry.position.x + itemByKey.get(entry.key)!.size.width)
+  )
+  const bottom = Math.max(
+    ...layouts.map((entry) => entry.position.y + itemByKey.get(entry.key)!.size.height)
+  )
+  return { height: bottom - top, width: right - left }
 }
