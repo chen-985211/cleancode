@@ -13,7 +13,8 @@ import type {
   TerminalSearchDirection,
   TerminalSearchResults,
   TerminalSurface,
-  TerminalSurfaceAttachment
+  TerminalSurfaceAttachment,
+  TerminalSurfaceWorkloadTarget
 } from './terminalSurfaceRegistry'
 import {
   readCanonicalTerminalSearchTheme,
@@ -25,6 +26,7 @@ import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'
+import { takeTerminalOutputBatch } from './terminalWorkloadScheduler'
 
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
@@ -52,8 +54,23 @@ class XtermTerminalSurface implements TerminalSurface {
     this.rendererController.setRasterScale(scale)
   )
   readonly rasterTarget = this.xtermRasterTarget.target
+  readonly workloadTarget: TerminalSurfaceWorkloadTarget = {
+    drainOutput: (maximumBatchBytes) => this.drainOutput(maximumBatchBytes),
+    getOutputPriority: () => this.xtermRasterTarget.target.getRasterPriority(),
+    hasPendingInitialization: () => this.hasPendingRendererInitialization(),
+    hasPendingOutput: () => this.hasPendingOutput(),
+    onNonCriticalWorkChange: (listener) => this.subscribeNonCriticalWork(listener),
+    onOutputPendingChange: (listener) => this.subscribePendingOutput(listener),
+    onOutputPriorityChange: (listener) =>
+      this.xtermRasterTarget.target.onRasterPriorityChange?.(listener) ?? (() => undefined),
+    onTerminalInput: (listener) => this.subscribeTerminalInput(listener),
+    runInitialization: () => this.activateRenderer()
+  }
   private readonly pendingOutputs: SequencedTerminalOutput[] = []
   private readonly idleResolvers = new Set<() => void>()
+  private readonly nonCriticalWorkListeners = new Set<() => void>()
+  private readonly pendingOutputListeners = new Set<() => void>()
+  private readonly terminalInputListeners = new Set<() => void>()
   private element: HTMLDivElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private dataSubscription: IDisposable | null = null
@@ -64,6 +81,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private isResizeSuspended = false
   private hasDeferredResizeFit = false
   private isOpened = false
+  private isRendererActivationStarted = false
   private isRendererActivationSettled = false
   private isDisposed = false
   private isRestoring = true
@@ -132,26 +150,16 @@ class XtermTerminalSurface implements TerminalSurface {
 
     if (!this.isOpened) {
       this.terminal.open(attachment.element)
-      const terminal = this.terminal
-      void this.rendererController
-        .activate({
-          get rows() {
-            return terminal.rows
-          },
-          loadAddon: (addon) =>
-            terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
-          refresh: (start, end) => terminal.refresh(start, end)
-        })
-        .finally(() => {
-          this.isRendererActivationSettled = true
-          if (this.element) this.element.dataset.terminalRendererReady = 'true'
-        })
       installTerminalSelectionCopy(this.terminal, { onOpenSearch: () => this.onOpenSearch() })
-      this.dataSubscription = this.terminal.onData((input) => this.onInput(input))
+      this.dataSubscription = this.terminal.onData((input) => {
+        for (const listener of this.terminalInputListeners) listener()
+        this.onInput(input)
+      })
       this.searchSubscription = this.searchAddon.onDidChangeResults((results) =>
         this.onSearchResultsChange(results)
       )
       this.isOpened = true
+      this.notifyNonCriticalWorkChange()
     }
 
     this.fitAndReportDimensions()
@@ -231,7 +239,7 @@ class XtermTerminalSurface implements TerminalSurface {
 
     this.hasSnapshot = true
     this.isRestoring = false
-    this.drainPendingOutputs()
+    this.notifyPendingOutputChange()
     this.fitAndReportDimensions()
     if (this.searchQuery) this.find(this.searchQuery, 'incremental')
     return 'ready'
@@ -275,7 +283,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.pendingOutputs.push(output)
     this.pendingOutputBytes += byteLength
     this.lastQueuedSequence = output.sequence
-    if (!this.isRestoring) this.drainPendingOutputs()
+    this.notifyPendingOutputChange()
   }
 
   dispose(): void {
@@ -284,6 +292,8 @@ class XtermTerminalSurface implements TerminalSurface {
     this.isDisposed = true
     this.pendingOutputs.length = 0
     this.pendingOutputBytes = 0
+    this.notifyPendingOutputChange()
+    this.notifyNonCriticalWorkChange()
     this.resolveIdleWaiters()
     this.dataSubscription?.dispose()
     this.searchSubscription?.dispose()
@@ -292,28 +302,81 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.dispose()
   }
 
-  private drainPendingOutputs(): void {
-    if (this.isDisposed || this.isRestoring || this.isWriteInFlight) return
-    const output = this.pendingOutputs.shift()
-    if (!output) {
-      this.resolveIdleWaiters()
-      return
-    }
-
-    this.pendingOutputBytes = Math.max(
-      0,
-      this.pendingOutputBytes - new TextEncoder().encode(output.data).byteLength
+  private async drainOutput(
+    maximumBatchBytes: number | null
+  ): Promise<{ bytesWritten: number; durationMs: number } | null> {
+    if (!this.hasPendingOutput()) return null
+    const firstOutput = this.pendingOutputs[0]
+    if (!firstOutput) return null
+    const batch = takeTerminalOutputBatch(
+      this.pendingOutputs,
+      maximumBatchBytes ?? encodeByteLength(firstOutput.data)
     )
+    if (!batch) return null
+
+    const consumedOutputs = this.pendingOutputs.splice(0, batch.consumedCount)
+    const consumedBytes = consumedOutputs.reduce(
+      (total, output) => total + encodeByteLength(output.data),
+      0
+    )
+    this.pendingOutputBytes = Math.max(0, this.pendingOutputBytes - consumedBytes)
     this.isWriteInFlight = true
-    this.terminal.write(output.data, () => {
-      this.isWriteInFlight = false
-      this.expectedSequence = output.sequence
-      this.resolveIdleWaiters()
-      if (this.pendingOutputs.length === 0 && this.searchQuery) {
-        this.find(this.searchQuery, 'incremental')
-      }
-      this.drainPendingOutputs()
+    this.notifyPendingOutputChange()
+    const startedAt = performance.now()
+
+    return new Promise((resolve) => {
+      this.terminal.write(batch.data, () => {
+        const durationMs = Math.max(0, performance.now() - startedAt)
+        this.isWriteInFlight = false
+        this.expectedSequence = batch.sequence
+        this.resolveIdleWaiters()
+        if (this.pendingOutputs.length === 0 && this.searchQuery) {
+          this.find(this.searchQuery, 'incremental')
+        }
+        this.notifyPendingOutputChange()
+        resolve({ bytesWritten: batch.byteLength, durationMs })
+      })
     })
+  }
+
+  private hasPendingOutput(): boolean {
+    return (
+      !this.isDisposed &&
+      !this.isRestoring &&
+      !this.isWriteInFlight &&
+      this.pendingOutputs.length > 0
+    )
+  }
+
+  private hasPendingRendererInitialization(): boolean {
+    return (
+      !this.isDisposed &&
+      this.isOpened &&
+      !this.isRendererActivationStarted &&
+      !this.isRendererActivationSettled
+    )
+  }
+
+  private async activateRenderer(): Promise<boolean> {
+    if (!this.hasPendingRendererInitialization()) return false
+    this.isRendererActivationStarted = true
+    this.notifyNonCriticalWorkChange()
+    const terminal = this.terminal
+    try {
+      await this.rendererController.activate({
+        get rows() {
+          return terminal.rows
+        },
+        loadAddon: (addon) =>
+          terminal.loadAddon(addon as unknown as Parameters<XTerm['loadAddon']>[0]),
+        refresh: (start, end) => terminal.refresh(start, end)
+      })
+      return true
+    } finally {
+      this.isRendererActivationSettled = true
+      if (this.element) this.element.dataset.terminalRendererReady = 'true'
+      this.notifyNonCriticalWorkChange()
+    }
   }
 
   private requestRestore(): void {
@@ -321,6 +384,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.clearPendingOutputs(this.expectedSequence)
     this.hasSnapshot = false
     this.isRestoring = true
+    this.notifyPendingOutputChange()
     this.onRestoreRequired()
   }
 
@@ -329,6 +393,7 @@ class XtermTerminalSurface implements TerminalSurface {
     this.pendingOutputBytes = 0
     this.expectedSequence = sequence
     this.lastQueuedSequence = sequence
+    this.notifyPendingOutputChange()
   }
 
   private recalculatePendingState(snapshotSequence: number): void {
@@ -352,6 +417,29 @@ class XtermTerminalSurface implements TerminalSurface {
 
   private writeToTerminal(output: string): Promise<void> {
     return new Promise((resolve) => this.terminal.write(output, resolve))
+  }
+
+  private subscribePendingOutput(listener: () => void): () => void {
+    this.pendingOutputListeners.add(listener)
+    return () => this.pendingOutputListeners.delete(listener)
+  }
+
+  private subscribeNonCriticalWork(listener: () => void): () => void {
+    this.nonCriticalWorkListeners.add(listener)
+    return () => this.nonCriticalWorkListeners.delete(listener)
+  }
+
+  private subscribeTerminalInput(listener: () => void): () => void {
+    this.terminalInputListeners.add(listener)
+    return () => this.terminalInputListeners.delete(listener)
+  }
+
+  private notifyPendingOutputChange(): void {
+    for (const listener of this.pendingOutputListeners) listener()
+  }
+
+  private notifyNonCriticalWorkChange(): void {
+    for (const listener of this.nonCriticalWorkListeners) listener()
   }
 
   private readonly requestFitAndReportDimensions = (): void => {
@@ -383,6 +471,10 @@ class XtermTerminalSurface implements TerminalSurface {
     this.lastReportedDimensions = dimensions
     this.onDimensionsChange(dimensions)
   }
+}
+
+function encodeByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength
 }
 
 function hasContiguousSequence(

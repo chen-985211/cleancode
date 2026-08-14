@@ -12,6 +12,15 @@ import type {
   TerminalZoomRasterPriority
 } from './terminalZoomRasterCoordinator'
 import type { TerminalRasterScale } from './terminalZoomRasterPolicy'
+import {
+  TerminalWorkloadScheduler,
+  type TerminalWorkloadDiagnostics,
+  type TerminalWorkloadTarget
+} from './terminalWorkloadScheduler'
+/*
+ * The registry owns a local scheduler only for isolated surfaces and tests. AppShell injects the
+ * window-wide scheduler so Terminal and Agent views share one frame budget.
+ */
 
 export interface TerminalSurfaceAttachment {
   readonly element: HTMLDivElement
@@ -38,7 +47,8 @@ interface TerminalSurfaceDiagnostics {
   readonly rendererState: TerminalRendererState
 }
 
-export interface TerminalSurfaceRegistryDiagnostics extends TerminalSurfaceDiagnostics {
+export interface TerminalSurfaceRegistryDiagnostics
+  extends TerminalSurfaceDiagnostics, TerminalWorkloadDiagnostics {
   readonly surfaceCount: number
   readonly domSurfaceCount: number
   readonly webglSurfaceCount: number
@@ -53,8 +63,11 @@ export interface TerminalSurfaceRasterTarget {
   setRasterScale(scale: TerminalRasterScale): void
 }
 
+export type TerminalSurfaceWorkloadTarget = Omit<TerminalWorkloadTarget, 'id'>
+
 export interface TerminalSurface {
   readonly rasterTarget?: TerminalSurfaceRasterTarget
+  readonly workloadTarget?: TerminalSurfaceWorkloadTarget
   attach(attachment: TerminalSurfaceAttachment): void
   detach(element: HTMLDivElement): void
   dispose(): void
@@ -83,15 +96,22 @@ export class TerminalSurfaceRegistry {
     {
       readonly identityKey: string
       readonly surface: TerminalSurface
+      readonly unregisterWorkloadTarget: () => void
       readonly unregisterRasterTarget: () => void
     }
   >()
+  private readonly workloadScheduler: Pick<TerminalWorkloadScheduler, 'getDiagnostics' | 'register'>
+  private readonly ownedWorkloadScheduler: TerminalWorkloadScheduler | null
 
   constructor(
     private readonly defaultFactory?: TerminalSurfaceFactory,
     private readonly createViewId: TerminalViewIdFactory = createDefaultViewId,
-    private readonly rasterCoordinator?: Pick<TerminalZoomRasterCoordinator, 'register'>
-  ) {}
+    private readonly rasterCoordinator?: Pick<TerminalZoomRasterCoordinator, 'register'>,
+    workloadScheduler?: Pick<TerminalWorkloadScheduler, 'getDiagnostics' | 'register'>
+  ) {
+    this.ownedWorkloadScheduler = workloadScheduler ? null : new TerminalWorkloadScheduler()
+    this.workloadScheduler = workloadScheduler ?? this.ownedWorkloadScheduler!
+  }
 
   create(
     identity: TerminalRunIdentity,
@@ -105,9 +125,14 @@ export class TerminalSurfaceRegistry {
       ? (this.rasterCoordinator?.register({ id: viewId, ...surface.rasterTarget }) ??
         (() => undefined))
       : () => undefined
+    const unregisterWorkloadTarget = surface.workloadTarget
+      ? (this.workloadScheduler?.register({ id: viewId, ...surface.workloadTarget }) ??
+        (() => undefined))
+      : () => undefined
     this.views.set(viewId, {
       identityKey: createTerminalSurfaceKey(identity),
       surface,
+      unregisterWorkloadTarget,
       unregisterRasterTarget
     })
     return { viewId, surface }
@@ -124,16 +149,19 @@ export class TerminalSurfaceRegistry {
     const view = this.views.get(viewId)
     if (!view) return
     this.views.delete(viewId)
+    view.unregisterWorkloadTarget()
     view.unregisterRasterTarget()
     view.surface.dispose()
   }
 
   disposeAll(): void {
     for (const view of this.views.values()) {
+      view.unregisterWorkloadTarget()
       view.unregisterRasterTarget()
       view.surface.dispose()
     }
     this.views.clear()
+    this.ownedWorkloadScheduler?.dispose()
   }
 
   setScrollbackRows(rows: TerminalScrollbackRows): void {
@@ -150,12 +178,14 @@ export class TerminalSurfaceRegistry {
       if (diagnostics.rendererState === 'webgl') webglSurfaceCount += 1
       else domSurfaceCount += 1
     }
+    const workloadDiagnostics = this.workloadScheduler.getDiagnostics()
     return {
       surfaceCount: this.views.size,
       pendingOutputBytes,
       rendererState: webglSurfaceCount > 0 ? 'webgl' : 'dom',
       domSurfaceCount,
-      webglSurfaceCount
+      webglSurfaceCount,
+      ...workloadDiagnostics
     }
   }
 

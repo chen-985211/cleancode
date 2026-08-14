@@ -191,6 +191,36 @@ describe('project sidebar motion', () => {
       4
     )
   })
+
+  it('publishes one interaction window for opening, reversal, and settlement', () => {
+    const scheduler = createFrameScheduler()
+    const elements = createElements()
+    const activity: boolean[] = []
+    const controller = createProjectSidebarMotionController({
+      onMotionActiveChange: (isActive) => activity.push(isActive),
+      scheduler
+    })
+
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: true,
+      reducedMotion: false
+    })
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: false,
+      reducedMotion: false
+    })
+    scheduler.advanceNextFrame()
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: true,
+      reducedMotion: false
+    })
+    scheduler.advanceUntilIdle()
+
+    expect(activity).toEqual([true, false])
+  })
 })
 
 function readTranslation(surface: ReturnType<typeof createSurface>): number {

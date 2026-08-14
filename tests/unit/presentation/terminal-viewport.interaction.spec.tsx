@@ -284,7 +284,7 @@ describe('terminal viewport interaction', () => {
     const viewId = await waitForAttachedViewId()
     act(() => terminalSurfaceRegistry.write(createOutputEvent(viewId, 1, 'agent output\n')))
 
-    expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
+    await waitFor(() => expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n'))
     expect(terminal.focus).not.toHaveBeenCalled()
     expect(helperTextareaFocus).not.toHaveBeenCalled()
   })

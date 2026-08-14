@@ -92,7 +92,6 @@ export function AppShell({
     revealProjectSidebar,
     toggleProjectSidebar
   } = useProjectSidebarVisibility()
-  const projectSidebarMotion = useProjectSidebarMotion(isProjectSidebarCollapsed)
   const [shortcutPlatform] = useState<ShortcutPlatform>(() => resolveShortcutPlatform())
   const isWindowFullScreen = useWindowFullScreenState()
   const terminalRuntimeAvailability = useTerminalRuntimeAvailability(notifications)
@@ -170,7 +169,7 @@ export function AppShell({
     startTerminal,
     terminalStates,
     terminalSurfaceRegistry,
-    terminalZoomRasterCoordinator,
+    terminalZoomRasterCoordinator: terminalRendering,
     terminateTerminalSession,
     toggleTerminalRetention,
     terminateWorkbenchTerminalSessions,
@@ -185,6 +184,7 @@ export function AppShell({
     notify: notifications.notify,
     runtimeAvailability: terminalRuntimeAvailability
   })
+  const projectSidebarMotion = useProjectSidebarMotion(isProjectSidebarCollapsed, terminalRendering)
   const { changeTerminalScrollback, terminalScrollbackRows } =
     useTerminalRuntimePreference(terminalSurfaceRegistry)
   const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
@@ -687,7 +687,7 @@ export function AppShell({
             onNodeDragStop={commitWorkbenchNodeDrag}
             onViewportChange={updateGraphViewport}
             onViewportInteractionStart={cancelLayoutFocus}
-            terminalZoomRasterCoordinator={terminalZoomRasterCoordinator}
+            terminalZoomRasterCoordinator={terminalRendering}
             onMinimapNodeClick={focusWorkbenchNode}
             getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}

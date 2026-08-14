@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 
 import { createProjectSidebarMotionController } from './projectSidebarMotion'
+import type { TerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 const fallbackExpandedWidth = 280
@@ -13,13 +14,25 @@ export interface ProjectSidebarMotionRefs {
   readonly titlebarRef: RefObject<HTMLDivElement | null>
 }
 
-export function useProjectSidebarMotion(isCollapsed: boolean): ProjectSidebarMotionRefs {
+export function useProjectSidebarMotion(
+  isCollapsed: boolean,
+  workloadCoordinator?: Pick<TerminalRenderingWorkloadCoordinator, 'setSidebarMotionActive'>
+): ProjectSidebarMotionRefs {
   const sidebarRef = useRef<HTMLDivElement | null>(null)
   const titlebarRef = useRef<HTMLDivElement | null>(null)
   const spatialRef = useRef<HTMLDivElement | null>(null)
   const centerRef = useRef<HTMLDivElement | null>(null)
   const statusbarRef = useRef<HTMLElement | null>(null)
-  const controller = useMemo(() => createProjectSidebarMotionController(), [])
+  const workloadCoordinatorRef = useRef(workloadCoordinator)
+  workloadCoordinatorRef.current = workloadCoordinator
+  const controller = useMemo(
+    () =>
+      createProjectSidebarMotionController({
+        onMotionActiveChange: (isActive) =>
+          workloadCoordinatorRef.current?.setSidebarMotionActive(isActive)
+      }),
+    []
+  )
   const reducedMotion = usePrefersReducedMotion()
 
   useLayoutEffect(() => {

@@ -32,6 +32,7 @@ interface ProjectSidebarMotionIntent {
 }
 
 interface ProjectSidebarMotionControllerOptions {
+  readonly onMotionActiveChange?: (isActive: boolean) => void
   readonly scheduler?: ProjectSidebarMotionFrameScheduler
 }
 
@@ -65,6 +66,7 @@ const browserFrameScheduler: ProjectSidebarMotionFrameScheduler = {
 }
 
 export function createProjectSidebarMotionController({
+  onMotionActiveChange = () => undefined,
   scheduler = browserFrameScheduler
 }: ProjectSidebarMotionControllerOptions = {}): ProjectSidebarMotionController {
   let elements: ProjectSidebarMotionElements | null = null
@@ -74,6 +76,13 @@ export function createProjectSidebarMotionController({
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
   let presentationState: 'collapsed' | 'closing' | 'expanded' | 'opening' | null = null
+  let isMotionActive = false
+
+  const setMotionActive = (nextIsActive: boolean): void => {
+    if (nextIsActive === isMotionActive) return
+    isMotionActive = nextIsActive
+    onMotionActiveChange(nextIsActive)
+  }
 
   const cancelFrame = (): void => {
     if (animationFrameId !== null) scheduler.cancelFrame(animationFrameId)
@@ -102,6 +111,7 @@ export function createProjectSidebarMotionController({
       setPresentationState(elements, state)
       presentationState = state
     }
+    setMotionActive(state === 'opening' || state === 'closing')
   }
 
   const scheduleFrame = (): void => {
@@ -140,6 +150,7 @@ export function createProjectSidebarMotionController({
   return {
     dispose: () => {
       cancelFrame()
+      setMotionActive(false)
       clearElements()
       elements = null
     },

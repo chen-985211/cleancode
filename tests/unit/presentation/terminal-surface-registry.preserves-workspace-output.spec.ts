@@ -31,7 +31,12 @@ describe('terminal surface registry disposable views', () => {
       pendingOutputBytes: 0,
       rendererState: 'dom',
       domSurfaceCount: 1,
-      webglSurfaceCount: 0
+      webglSurfaceCount: 0,
+      lastDeferReason: null,
+      lastDrainDurationMs: 0,
+      lastInputToOutputLatencyMs: 0,
+      oldestPendingOutputAgeMs: 0,
+      pendingOutputTargetCount: 0
     })
   })
 
@@ -104,10 +109,59 @@ describe('terminal surface registry disposable views', () => {
 
     expect(unregister).toHaveBeenCalledOnce()
   })
+
+  it('registers and releases output plus initialization work with the shared scheduler', () => {
+    const unregister = vi.fn()
+    const workloadScheduler = {
+      getDiagnostics: vi.fn(() => ({
+        lastDeferReason: 'interaction' as const,
+        lastDrainDurationMs: 2,
+        lastInputToOutputLatencyMs: 4,
+        oldestPendingOutputAgeMs: 12,
+        pendingOutputTargetCount: 1
+      })),
+      register: vi.fn(() => unregister)
+    }
+    const surface = createFakeSurface()
+    const workloadTarget = {
+      drainOutput: vi.fn(async () => null),
+      getOutputPriority: vi.fn(() => 'visible' as const),
+      hasPendingOutput: vi.fn(() => false),
+      onOutputPendingChange: vi.fn(() => () => undefined),
+      onOutputPriorityChange: vi.fn(() => () => undefined),
+      onTerminalInput: vi.fn(() => () => undefined)
+    }
+    surface.workloadTarget = workloadTarget
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => 'view-workload',
+      undefined,
+      workloadScheduler
+    )
+
+    const lease = registry.create(createIdentity())
+
+    expect(workloadScheduler.register).toHaveBeenCalledWith({
+      id: lease.viewId,
+      ...workloadTarget
+    })
+    expect(registry.getDiagnostics()).toMatchObject({
+      lastDeferReason: 'interaction',
+      lastDrainDurationMs: 2,
+      lastInputToOutputLatencyMs: 4,
+      oldestPendingOutputAgeMs: 12,
+      pendingOutputTargetCount: 1
+    })
+
+    registry.release(lease.viewId)
+
+    expect(unregister).toHaveBeenCalledOnce()
+  })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
   rasterTarget?: TerminalSurface['rasterTarget']
+  workloadTarget?: TerminalSurface['workloadTarget']
   readonly detach: Mock<TerminalSurface['detach']>
   readonly dispose: Mock<TerminalSurface['dispose']>
   readonly restore: Mock<TerminalSurface['restore']>

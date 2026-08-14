@@ -79,7 +79,7 @@ flowchart LR
 | 轮次 | 名称                     | 核心结果                                         | 主要收益场景                       | 状态                 |
 | ---- | ------------------------ | ------------------------------------------------ | ---------------------------------- | -------------------- |
 | 1    | 画布逐帧路径瘦身         | viewport 实时值不再驱动整个画布 React 树逐帧更新 | 平移、缩放、相机运动、侧边栏动效   | 实现完成，设备待验收 |
-| 2    | 终端与 Agent 重负载调度  | 输出与非关键初始化按可见性、优先级和帧预算执行   | 刷日志、批量创建 Terminal 或 Agent | 尚未开始             |
+| 2    | 终端与 Agent 重负载调度  | 输出与非关键初始化按可见性、优先级和帧预算执行   | 刷日志、批量创建 Terminal 或 Agent | 实现完成，设备待验收 |
 | 3    | 节点级增量更新与离屏治理 | 单节点变化局部提交，离屏对象安全降载             | 多节点、多终端、长时间运行的大画布 | 尚未开始             |
 
 三轮按风险递增推进。每轮都必须单独建立改造前基线、完成目标验证并保留可回退边界；不得把三轮合并成一次无法归因的整体重构。第一轮完成后即可独立交付，后续轮次是否全部实施应依据真实 trace，而不是预先假设每一项都必要。
@@ -181,6 +181,22 @@ flowchart LR
 - renderer 输出调度只有一个顺序 owner，现有队列、背压和快照边界保持清晰。
 - 可见性、聚焦和交互优先级有确定性测试，后台工作不会无限积压或泄漏。
 - 第一轮性能场景无回退，终端专项回归、完整门禁与跨平台 Electron 验收通过。
+
+### 第二轮实现证据
+
+第二轮代码与自动化验证于 2026-08-14 完成：
+
+- `TerminalWorkloadScheduler` 成为 renderer 窗口内唯一的终端重负载时机 owner；普通 Terminal 与 Agent terminal 通过共享 `TerminalSurfaceRegistry` 注册到同一调度器，Run 的权威模型、输出 sequence、IPC 视图协议和 1 MiB 恢复队列保持不变。
+- 每个 xterm surface 继续按完整 sequence 验证输入片段。调度器第一次只提交一个完整来源片段，取得真实 xterm write callback 耗时后，再结合实际 RAF 间隔或 `IdleDeadline.timeRemaining()` 估算下一批字节预算；相邻完整片段可以合并，但不会拆开来源片段或按固定条数、固定刷新率 drain。
+- focused、visible、hidden 优先级直接读取既有 `TerminalXtermRasterTarget`，复用同一个 `IntersectionObserver`、焦点和 parked/隐藏判断；没有新增第二套可见性事实。同优先级使用轮转顺序，后台输出在持续交互期间仍保留有界 starvation turn。
+- 画布 viewport 操作、侧边栏 opening/closing spring 和 xterm 输入都会进入共享交互窗口。交互期间 focused 输出继续按显示帧推进，visible/hidden 输出让到 idle 或有界后台追赶；交互完成后调度器立即恢复正常优先级。
+- xterm `open` 后先使用内置 DOM renderer 建立可输入 surface；WebGL addon 激活变为非关键初始化，按 focused/visible/hidden 顺序每个 idle slice 最多执行一个，并在画布或侧边栏交互期间暂停。既有 WebGL 加载失败、context loss、DOM fallback、session、buffer 和输入链路不变。
+- 第一轮已经把小地图静态节点投影与实时 viewport 分离，既有 raster coordinator 也已经按可见性、交互和 idle slice 管理离散倍率；本轮直接复用这两个 owner。图布局、会话与持久化提交继续沿原有完成边界执行，没有为了空闲调度延迟业务事实或建立第二套提交队列。
+- 开发诊断只记录 pending output bytes、pending target 数量、最老等待时间、最近 drain 耗时、同 target 输入到下一次输出的延迟和调度让步原因；不采集或记录终端正文。
+- Unit/component 覆盖 focused 优先、visible/hidden 顺序、同级公平、实际耗时自适应预算、交互让步、后台饥饿上限、输入帧保护、初始化错峰、取消清理、ANSI/Unicode/CJK/emoji 完整合并、精确 view 路由和 sidebar/canvas 交互窗口。
+- 实现未新增依赖、IPC、持久化格式、固定帧率、Provider 分支、xterm 私有 API 或 terminal surface 卸载策略。
+
+当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率下的持续 PTY 输出、多个后台终端、批量 Terminal/Agent 创建和并发画布/侧边栏操作 trace，因此第二轮状态标记为“实现完成，设备待验收”，自动化验证不能替代真实 GPU、xterm 和平台调度验收。首轮设备 trace 也将用于校准当前帧预算比例与后台追赶上限；在取得同 fixture 证据前不得把这些实现参数升级为长期产品契约。
 
 ## 第三轮：节点级增量更新与离屏治理
 
