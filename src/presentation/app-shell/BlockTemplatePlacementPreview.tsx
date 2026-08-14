@@ -1,8 +1,26 @@
 import type { BlockTemplateSnapshot } from '../../contexts/block-graph/application/dto/BlockTemplateSnapshot'
 import { resolveBlockTemplateBounds } from './blockTemplatePlacement'
 import type { WorkbenchSnapshot } from './types'
+import {
+  useWorkbenchCanvasViewport,
+  type WorkbenchCanvasViewportStore
+} from './workbenchCanvasViewportStore'
 
-export function BlockTemplatePlacementPreview({
+export function LiveBlockTemplatePlacementPreview({
+  origin,
+  template,
+  viewportStore
+}: {
+  readonly origin: { readonly x: number; readonly y: number }
+  readonly template: BlockTemplateSnapshot
+  readonly viewportStore: WorkbenchCanvasViewportStore
+}) {
+  const viewport = useWorkbenchCanvasViewport(viewportStore)
+
+  return <BlockTemplatePlacementPreview origin={origin} template={template} viewport={viewport} />
+}
+
+function BlockTemplatePlacementPreview({
   origin,
   template,
   viewport

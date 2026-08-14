@@ -13,11 +13,7 @@ import {
   maximumCanvasZoom,
   minimumCanvasZoom
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import {
-  CanvasMinimap,
-  LiveCanvasMinimapViewportFrame,
-  type MinimapViewportCenter
-} from './CanvasMinimap'
+import { CanvasMinimap, type MinimapViewportCenter } from './CanvasMinimap'
 import { isolateWorkbenchNodeDragChanges } from './isolateWorkbenchNodeDragChanges'
 import { filterMinimapNodes } from './minimapInteraction'
 import type { WorkbenchFlowNode } from './types'
@@ -27,12 +23,9 @@ import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
-import {
-  projectWorkbenchObjectMotionOntoEdges,
-  resolveWorkbenchCanvasDetailLevel
-} from './workbenchObjectMotion'
+import { projectWorkbenchObjectMotionOntoEdges } from './workbenchObjectMotion'
 import { useWorkbenchNodes } from './workbenchNodeStore'
-import { BlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
+import { LiveBlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
 import { projectCanvasArrangementSelectionOntoNodes } from './canvasArrangementSelection'
 import { CanvasArrangementSelectionOverlay } from './CanvasArrangementOverlay'
@@ -56,8 +49,7 @@ import {
   persistCanvasViewportFromMoveEnd,
   restoreCanvasViewport,
   subscribeCanvasViewportMotionCompletion,
-  synchronizeCanvasViewportFromMove,
-  toCanvasViewportSnapshot
+  synchronizeCanvasViewportFromMove
 } from './workbenchCanvasViewport'
 import {
   resolveQuickExecutionDropTarget,
@@ -67,6 +59,10 @@ import {
 } from './workbenchCanvasInteractionTargets'
 import { useWorkbenchCanvasViewportRestoration } from './useWorkbenchCanvasViewportRestoration'
 import type { WorkbenchCanvasProps } from './workbenchCanvasProps'
+import {
+  createWorkbenchCanvasViewportStore,
+  useWorkbenchCanvasDetailLevel
+} from './workbenchCanvasViewportStore'
 
 export function WorkbenchCanvas({
   approvalIntents = [],
@@ -205,9 +201,10 @@ export function WorkbenchCanvas({
       onCreateTerminalGroup(toWorkbenchFlowPosition(reactFlowInstanceRef.current, screenPosition))
     }
   })
-  const [viewportZoom, setViewportZoom] = useState(1)
-  const canvasDetailLevel = resolveWorkbenchCanvasDetailLevel(viewportZoom, reduceVisualNoise)
-  const [canvasViewport, setCanvasViewport] = useState(defaultCanvasViewport)
+  const [viewportStore] = useState(() =>
+    createWorkbenchCanvasViewportStore(currentWorkbench?.graph.viewport ?? defaultCanvasViewport)
+  )
+  const canvasDetailLevel = useWorkbenchCanvasDetailLevel(viewportStore, reduceVisualNoise)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
   const [viewportMotionInstance, setViewportMotionInstance] = useState<ReactFlowInstance<
     WorkbenchFlowNode,
@@ -249,8 +246,7 @@ export function WorkbenchCanvas({
       instance,
       persistViewport,
       onViewportChange,
-      setCanvasViewport,
-      setViewportZoom
+      projectCanvasViewport: viewportStore.setViewport
     })
   }
   useEffect(() => {
@@ -300,8 +296,7 @@ export function WorkbenchCanvas({
     isRestoringViewportRef,
     reactFlowInstanceRef,
     restoredGraphIdRef,
-    setCanvasViewport,
-    setViewportZoom,
+    projectCanvasViewport: viewportStore.setViewport,
     terminalZoomRasterCoordinator
   })
 
@@ -381,8 +376,7 @@ export function WorkbenchCanvas({
                 unsubscribeViewportMotionRef.current = subscribeCanvasViewportMotionCompletion({
                   instance,
                   onViewportChangeRef,
-                  setCanvasViewport,
-                  setViewportZoom
+                  projectCanvasViewport: viewportStore.setViewport
                 })
 
                 if (currentWorkbench) {
@@ -395,8 +389,7 @@ export function WorkbenchCanvas({
                     graphId: currentWorkbench.graph.id,
                     restoredGraphIdRef,
                     isRestoringViewportRef,
-                    setViewportZoom,
-                    setCanvasViewport
+                    projectCanvasViewport: viewportStore.setViewport
                   })
                   return
                 }
@@ -404,8 +397,7 @@ export function WorkbenchCanvas({
                 const viewport = instance.getViewport()
 
                 terminalZoomRasterCoordinator?.updateCanvasZoom(viewport.zoom)
-                setViewportZoom(viewport.zoom)
-                setCanvasViewport(toCanvasViewportSnapshot(viewport))
+                viewportStore.setViewport(viewport)
               }}
               onNodesChange={(changes) =>
                 onNodesChange(
@@ -476,14 +468,12 @@ export function WorkbenchCanvas({
                   activeDraggedNodeRef.current = null
                 }
               }}
-              onMove={(event, viewport) =>
+              onMove={(_event, viewport) =>
                 synchronizeCanvasViewportFromMove({
-                  event,
                   onRasterZoomChange: (zoom) =>
                     terminalZoomRasterCoordinator?.updateCanvasZoom(zoom),
                   viewport,
-                  setCanvasViewport,
-                  setViewportZoom
+                  projectCanvasViewport: viewportStore.setViewport
                 })
               }
               onMoveStart={(event) => {
@@ -517,17 +507,8 @@ export function WorkbenchCanvas({
                 <CanvasMinimap
                   isCollapsed={isMinimapCollapsed}
                   nodes={minimapNodes}
-                  canvasViewport={canvasViewport}
                   canvasSize={canvasSize}
-                  viewportFrame={
-                    <LiveCanvasMinimapViewportFrame
-                      canvasSize={canvasSize}
-                      fallbackViewport={canvasViewport}
-                      instance={viewportMotionInstance}
-                    />
-                  }
-                  viewportMotionInstance={viewportMotionInstance}
-                  viewportZoom={viewportZoom}
+                  viewportStore={viewportStore}
                   shortcutTooltips={shortcutTooltips}
                   minimapNodeInteraction={minimapNodeInteraction}
                   onToggleCollapsed={onToggleMinimap}
@@ -548,10 +529,10 @@ export function WorkbenchCanvas({
               </Panel>
             </ReactFlow>
             {placementTemplate && templateInteraction.placementOrigin ? (
-              <BlockTemplatePlacementPreview
+              <LiveBlockTemplatePlacementPreview
                 origin={templateInteraction.placementOrigin}
                 template={placementTemplate}
-                viewport={canvasViewport}
+                viewportStore={viewportStore}
               />
             ) : null}
             <CanvasArrangementSelectionOverlay selection={templateInteraction.canvasSelection} />

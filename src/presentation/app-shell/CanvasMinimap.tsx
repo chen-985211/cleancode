@@ -1,9 +1,8 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import {
+  memo,
   useCallback,
-  useEffect,
+  useMemo,
   useRef,
-  useState,
   type MouseEvent,
   type PointerEvent,
   type ReactNode
@@ -16,14 +15,17 @@ import {
   type MinimapNodeInteractionContextValue
 } from './minimapInteraction'
 import { MinimapWorkbenchNode } from './MinimapWorkbenchNode'
-import type { MinimapFlowNode, WorkbenchFlowNode } from './types'
+import type { MinimapFlowNode } from './types'
 import type { ApplicationShortcutTooltipLabels } from './applicationShortcutTooltips'
 import { useI18n } from './i18n/useI18n'
 import { TooltipLabel } from './Tooltip'
 import { useMinimapPanelMotion } from './useMinimapPanelMotion'
-import { subscribeWorkbenchViewportMotionPresentation } from './workbenchViewportMotion'
-import { subscribeWorkbenchDirectZoomPresentation } from './workbenchDirectZoom'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import {
+  useWorkbenchCanvasViewport,
+  useWorkbenchCanvasZoomPercent,
+  type WorkbenchCanvasViewportStore
+} from './workbenchCanvasViewportStore'
 
 interface CanvasSize {
   readonly width: number
@@ -38,11 +40,8 @@ export interface MinimapViewportCenter {
 interface CanvasMinimapProps {
   readonly isCollapsed: boolean
   readonly nodes: MinimapFlowNode[]
-  readonly canvasViewport: CanvasViewportSnapshot
   readonly canvasSize: CanvasSize
-  readonly viewportFrame?: ReactNode
-  readonly viewportMotionInstance?: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
-  readonly viewportZoom: number
+  readonly viewportStore: WorkbenchCanvasViewportStore
   readonly shortcutTooltips: Pick<
     ApplicationShortcutTooltipLabels,
     'fitCanvas' | 'toggleMinimap' | 'zoomCanvasIn' | 'zoomCanvasOut'
@@ -85,11 +84,8 @@ const minimapMinimumHeight = 440
 export function CanvasMinimap({
   isCollapsed,
   nodes,
-  canvasViewport,
   canvasSize,
-  viewportFrame,
-  viewportMotionInstance,
-  viewportZoom,
+  viewportStore,
   shortcutTooltips,
   minimapNodeInteraction,
   onToggleCollapsed,
@@ -115,8 +111,8 @@ export function CanvasMinimap({
     (_event: MouseEvent<SVGGElement>, blockId: string): void => onMinimapNodeClick(blockId),
     [onMinimapNodeClick]
   )
-  const frames = nodes.map(toMinimapFrame)
-  const viewBox = resolveMinimapViewBox(frames)
+  const frames = useMemo(() => nodes.map(toMinimapFrame), [nodes])
+  const viewBox = useMemo(() => resolveMinimapViewBox(frames), [frames])
   const minimapClassName = ['canvas-minimap', isCollapsed ? 'canvas-minimap--collapsed' : '']
     .filter(Boolean)
     .join(' ')
@@ -190,34 +186,19 @@ export function CanvasMinimap({
                   width={viewBox.width}
                   height={viewBox.height}
                 />
-                {viewportFrame ?? (
-                  <CanvasMinimapViewportFrame viewport={canvasViewport} canvasSize={canvasSize} />
-                )}
-                {frames.map((frame) => (
-                  <MinimapWorkbenchNode
-                    key={frame.node.id}
-                    id={frame.node.id}
-                    variant={resolveMinimapNodeVariant(frame.node)}
-                    kindLabel={
-                      frame.node.type === 'agentConsole'
-                        ? 'Agent'
-                        : frame.node.type === 'terminalGroup'
-                          ? t('minimap.terminalGroup')
-                          : t('minimap.terminal')
-                    }
-                    x={frame.x}
-                    y={frame.y}
-                    width={frame.width}
-                    height={frame.height}
-                    borderRadius={6}
-                    className={getMiniMapNodeClassName(frame.node)}
-                    color={getMiniMapNodeColor(frame.node)}
-                    strokeColor={getMiniMapNodeStrokeColor(frame.node)}
-                    strokeWidth={1.2}
-                    selected={Boolean(frame.node.selected)}
-                    onClick={focusMinimapNode}
-                  />
-                ))}
+                <LiveCanvasMinimapViewportFrame
+                  canvasSize={canvasSize}
+                  viewportStore={viewportStore}
+                />
+                <MinimapStaticNodeLayer
+                  frames={frames}
+                  terminalGroupLabel={t('minimap.terminalGroup')}
+                  terminalLabel={t('minimap.terminal')}
+                  focusMinimapNode={focusMinimapNode}
+                  getMiniMapNodeColor={getMiniMapNodeColor}
+                  getMiniMapNodeStrokeColor={getMiniMapNodeStrokeColor}
+                  getMiniMapNodeClassName={getMiniMapNodeClassName}
+                />
               </svg>
             </MinimapNodeInteractionContext.Provider>
           </div>
@@ -236,11 +217,7 @@ export function CanvasMinimap({
           >
             <WorkbenchIcon role="zoom-out" size={14} />
           </MinimapControlButton>
-          <LiveCanvasMinimapZoomLevel
-            baseline={canvasViewport}
-            fallbackZoom={viewportZoom}
-            instance={viewportMotionInstance ?? null}
-          />
+          <LiveCanvasMinimapZoomLevel viewportStore={viewportStore} />
           <MinimapControlButton
             label={t('minimap.zoomInTitle')}
             tooltip={shortcutTooltips.zoomCanvasIn}
@@ -277,97 +254,69 @@ export function CanvasMinimap({
   )
 }
 
-function LiveCanvasMinimapZoomLevel({
-  baseline,
-  fallbackZoom,
-  instance
+const MinimapStaticNodeLayer = memo(function MinimapStaticNodeLayer({
+  frames,
+  terminalGroupLabel,
+  terminalLabel,
+  focusMinimapNode,
+  getMiniMapNodeColor,
+  getMiniMapNodeStrokeColor,
+  getMiniMapNodeClassName
 }: {
-  readonly baseline: CanvasViewportSnapshot
-  readonly fallbackZoom: number
-  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
+  readonly frames: readonly MinimapFrame[]
+  readonly terminalGroupLabel: string
+  readonly terminalLabel: string
+  readonly focusMinimapNode: (event: MouseEvent<SVGGElement>, blockId: string) => void
+  readonly getMiniMapNodeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeStrokeColor: (node: MinimapFlowNode) => string
+  readonly getMiniMapNodeClassName: (node: MinimapFlowNode) => string
+}) {
+  return frames.map((frame) => (
+    <MinimapWorkbenchNode
+      key={frame.node.id}
+      id={frame.node.id}
+      variant={resolveMinimapNodeVariant(frame.node)}
+      kindLabel={
+        frame.node.type === 'agentConsole'
+          ? 'Agent'
+          : frame.node.type === 'terminalGroup'
+            ? terminalGroupLabel
+            : terminalLabel
+      }
+      x={frame.x}
+      y={frame.y}
+      width={frame.width}
+      height={frame.height}
+      borderRadius={6}
+      className={getMiniMapNodeClassName(frame.node)}
+      color={getMiniMapNodeColor(frame.node)}
+      strokeColor={getMiniMapNodeStrokeColor(frame.node)}
+      strokeWidth={1.2}
+      selected={Boolean(frame.node.selected)}
+      onClick={focusMinimapNode}
+    />
+  ))
+})
+
+function LiveCanvasMinimapZoomLevel({
+  viewportStore
+}: {
+  readonly viewportStore: WorkbenchCanvasViewportStore
 }) {
   const { t } = useI18n()
-  const [presentation, setPresentation] = useState<{
-    readonly baseline: CanvasViewportSnapshot
-    readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-    readonly zoom: number
-  } | null>(null)
+  const zoomPercent = useWorkbenchCanvasZoomPercent(viewportStore)
 
-  useEffect(() => {
-    if (!instance) return undefined
-
-    const projectPresentation = (viewport: CanvasViewportSnapshot): void => {
-      setPresentation({ baseline, instance, zoom: viewport.zoom })
-    }
-    const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionPresentation(
-      instance,
-      projectPresentation
-    )
-    const unsubscribeDirect = subscribeWorkbenchDirectZoomPresentation(
-      instance,
-      projectPresentation
-    )
-
-    return () => {
-      unsubscribeProgrammatic()
-      unsubscribeDirect()
-    }
-  }, [baseline, instance])
-
-  const zoom =
-    presentation?.baseline === baseline && presentation.instance === instance
-      ? presentation.zoom
-      : fallbackZoom
-
-  return <output aria-label={t('minimap.zoomLevel')}>{Math.round(zoom * 100)}%</output>
+  return <output aria-label={t('minimap.zoomLevel')}>{zoomPercent}%</output>
 }
 
 export function LiveCanvasMinimapViewportFrame({
   canvasSize,
-  fallbackViewport,
-  instance
+  viewportStore
 }: {
   readonly canvasSize: CanvasSize
-  readonly fallbackViewport: CanvasViewportSnapshot
-  readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge> | null
+  readonly viewportStore: WorkbenchCanvasViewportStore
 }) {
-  const [presentation, setPresentation] = useState<{
-    readonly baseline: CanvasViewportSnapshot
-    readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
-    readonly viewport: CanvasViewportSnapshot
-  } | null>(null)
-
-  useEffect(() => {
-    if (!instance) {
-      return undefined
-    }
-
-    const projectPresentation = (viewport: CanvasViewportSnapshot): void => {
-      setPresentation({
-        baseline: fallbackViewport,
-        instance,
-        viewport
-      })
-    }
-    const unsubscribeProgrammatic = subscribeWorkbenchViewportMotionPresentation(
-      instance,
-      projectPresentation
-    )
-    const unsubscribeDirect = subscribeWorkbenchDirectZoomPresentation(
-      instance,
-      projectPresentation
-    )
-
-    return () => {
-      unsubscribeProgrammatic()
-      unsubscribeDirect()
-    }
-  }, [fallbackViewport, instance])
-
-  const viewport =
-    presentation?.baseline === fallbackViewport && presentation.instance === instance
-      ? presentation.viewport
-      : fallbackViewport
+  const viewport = useWorkbenchCanvasViewport(viewportStore)
 
   return <CanvasMinimapViewportFrame viewport={viewport} canvasSize={canvasSize} />
 }

@@ -1,4 +1,3 @@
-import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 
 import {
@@ -6,54 +5,18 @@ import {
   LiveCanvasMinimapViewportFrame
 } from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
+import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
 import {
   createIdleTerminalState,
   type TerminalFlowNode,
-  type TerminalGroupFlowNode,
-  type WorkbenchFlowNode
+  type TerminalGroupFlowNode
 } from '../../../src/presentation/app-shell/types'
-
-const liveViewportMotion = vi.hoisted(() => ({
-  directListener: null as
-    ((viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void) | null,
-  listener: null as
-    ((viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void) | null
-}))
-
-vi.mock('../../../src/presentation/app-shell/workbenchDirectZoom', () => ({
-  subscribeWorkbenchDirectZoomPresentation: (
-    _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-    listener: (viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void
-  ) => {
-    liveViewportMotion.directListener = listener
-    return () => {
-      liveViewportMotion.directListener = null
-    }
-  }
-}))
-
-vi.mock('../../../src/presentation/app-shell/workbenchViewportMotion', () => ({
-  subscribeWorkbenchViewportMotionPresentation: (
-    _instance: ReactFlowInstance<WorkbenchFlowNode, Edge>,
-    listener: (viewport: { readonly x: number; readonly y: number; readonly zoom: number }) => void
-  ) => {
-    liveViewportMotion.listener = listener
-    return () => {
-      liveViewportMotion.listener = null
-    }
-  }
-}))
 
 describe('canvas minimap', () => {
   const restoreSvgGeometry = installSvgGeometryMocks()
 
   afterAll(() => {
     restoreSvgGeometry()
-  })
-
-  beforeEach(() => {
-    liveViewportMotion.directListener = null
-    liveViewportMotion.listener = null
   })
 
   it('routes controls and terminal node activation through presentation callbacks', () => {
@@ -68,9 +31,8 @@ describe('canvas minimap', () => {
       <CanvasMinimap
         isCollapsed={false}
         nodes={[createTerminalFlowNode()]}
-        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
-        viewportZoom={1.51}
+        viewportStore={createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1.51 })}
         shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={minimapNodeInteraction}
         onToggleCollapsed={onToggleCollapsed}
@@ -235,7 +197,10 @@ describe('canvas minimap', () => {
 
   it('keeps one directional toggle to the right of the stable viewport controls', () => {
     const { container } = render(
-      <CanvasMinimap {...createCanvasMinimapProps()} viewportZoom={0.7} />
+      <CanvasMinimap
+        {...createCanvasMinimapProps()}
+        viewportStore={createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 0.7 })}
+      />
     )
 
     const minimapControls = screen.getByRole('group', { name: '小地图控制' })
@@ -257,21 +222,52 @@ describe('canvas minimap', () => {
   })
 
   it('keeps the zoom level synchronized with live viewport presentations', () => {
-    const instance = {} as ReactFlowInstance<WorkbenchFlowNode, Edge>
-    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportMotionInstance={instance} />)
+    const viewportStore = createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })
+    render(<CanvasMinimap {...createCanvasMinimapProps()} viewportStore={viewportStore} />)
 
     const zoomLevel = screen.getByLabelText('画布缩放比例')
     expect(zoomLevel).toHaveTextContent('100%')
 
     act(() => {
-      liveViewportMotion.directListener?.({ x: -120, y: 48, zoom: 1.37 })
+      viewportStore.setViewport({ x: -120, y: 48, zoom: 1.37 })
     })
     expect(zoomLevel).toHaveTextContent('137%')
 
     act(() => {
-      liveViewportMotion.listener?.({ x: -180, y: 72, zoom: 1.25 })
+      viewportStore.setViewport({ x: -180, y: 72, zoom: 1.25 })
     })
     expect(zoomLevel).toHaveTextContent('125%')
+  })
+
+  it('updates live viewport leaves without reprojecting static minimap nodes', () => {
+    const viewportStore = createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })
+    const getMiniMapNodeColor = vi.fn(() => '#22c55e')
+    const getMiniMapNodeStrokeColor = vi.fn(() => '#d3dbe8')
+    const getMiniMapNodeClassName = vi.fn(() => 'canvas-minimap__node')
+    const props = {
+      ...createCanvasMinimapProps(),
+      viewportStore,
+      getMiniMapNodeColor,
+      getMiniMapNodeStrokeColor,
+      getMiniMapNodeClassName
+    }
+    const { container, rerender } = render(<CanvasMinimap {...props} />)
+
+    getMiniMapNodeColor.mockClear()
+    getMiniMapNodeStrokeColor.mockClear()
+    getMiniMapNodeClassName.mockClear()
+
+    rerender(<CanvasMinimap {...props} />)
+
+    act(() => {
+      viewportStore.setViewport({ x: -120, y: 48, zoom: 1.25 })
+    })
+
+    expect(container.querySelector('.canvas-minimap__viewport-frame')).toHaveAttribute('x', '96')
+    expect(screen.getByLabelText('画布缩放比例')).toHaveTextContent('125%')
+    expect(getMiniMapNodeColor).not.toHaveBeenCalled()
+    expect(getMiniMapNodeStrokeColor).not.toHaveBeenCalled()
+    expect(getMiniMapNodeClassName).not.toHaveBeenCalled()
   })
 
   it('keeps the canvas viewport controls available while the minimap is collapsed', () => {
@@ -350,9 +346,8 @@ describe('canvas minimap', () => {
       <CanvasMinimap
         isCollapsed={false}
         nodes={[createCollapsedTerminalGroupFlowNode()]}
-        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
-        viewportZoom={1}
+        viewportStore={createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })}
         shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={minimapNodeInteraction}
         onToggleCollapsed={vi.fn()}
@@ -390,9 +385,8 @@ describe('canvas minimap', () => {
       <CanvasMinimap
         isCollapsed={false}
         nodes={[createCollapsedTerminalGroupFlowNode({ selected: false })]}
-        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
-        viewportZoom={1}
+        viewportStore={createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })}
         shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={createMinimapNodeInteraction()}
         onToggleCollapsed={vi.fn()}
@@ -423,9 +417,12 @@ describe('canvas minimap', () => {
       <CanvasMinimap
         isCollapsed={false}
         nodes={[createTerminalFlowNode()]}
-        canvasViewport={{ x: -120, y: 48, zoom: 1.25 }}
         canvasSize={{ width: 960, height: 640 }}
-        viewportZoom={1.25}
+        viewportStore={createWorkbenchCanvasViewportStore({
+          x: -120,
+          y: 48,
+          zoom: 1.25
+        })}
         shortcutTooltips={canvasShortcutTooltips}
         minimapNodeInteraction={createMinimapNodeInteraction()}
         onToggleCollapsed={vi.fn()}
@@ -456,13 +453,12 @@ describe('canvas minimap', () => {
   })
 
   it('keeps the viewport frame synchronized with the live React Flow viewport', () => {
-    const instance = {} as ReactFlowInstance<WorkbenchFlowNode, Edge>
+    const viewportStore = createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })
     const { container } = render(
       <svg>
         <LiveCanvasMinimapViewportFrame
           canvasSize={{ width: 960, height: 640 }}
-          fallbackViewport={{ x: 0, y: 0, zoom: 1 }}
-          instance={instance}
+          viewportStore={viewportStore}
         />
       </svg>
     )
@@ -475,7 +471,7 @@ describe('canvas minimap', () => {
     expect(viewportFrame).toHaveAttribute('height', '640')
 
     act(() => {
-      liveViewportMotion.listener?.({ x: -120, y: 48, zoom: 1.25 })
+      viewportStore.setViewport({ x: -120, y: 48, zoom: 1.25 })
     })
 
     expect(viewportFrame).toHaveAttribute('x', '96')
@@ -484,7 +480,7 @@ describe('canvas minimap', () => {
     expect(viewportFrame).toHaveAttribute('height', '512')
 
     act(() => {
-      liveViewportMotion.directListener?.({ x: -240, y: 96, zoom: 1.5 })
+      viewportStore.setViewport({ x: -240, y: 96, zoom: 1.5 })
     })
 
     expect(viewportFrame).toHaveAttribute('x', '160')
@@ -498,9 +494,8 @@ function createCanvasMinimapProps() {
   return {
     isCollapsed: false,
     nodes: [createTerminalFlowNode()],
-    canvasViewport: { x: 0, y: 0, zoom: 1 },
     canvasSize: { width: 960, height: 640 },
-    viewportZoom: 1,
+    viewportStore: createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 }),
     shortcutTooltips: canvasShortcutTooltips,
     minimapNodeInteraction: createMinimapNodeInteraction(),
     onToggleCollapsed: vi.fn(),

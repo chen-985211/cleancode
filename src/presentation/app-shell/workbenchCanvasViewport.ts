@@ -11,8 +11,7 @@ import {
 import { subscribeWorkbenchDirectZoomCompletion } from './workbenchDirectZoom'
 
 interface CanvasViewportProjection {
-  readonly setViewportZoom: (zoom: number) => void
-  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+  readonly projectCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
 }
 
 interface CanvasViewportPersistence {
@@ -20,26 +19,17 @@ interface CanvasViewportPersistence {
 }
 
 interface SynchronizeCanvasViewportFromMoveInput extends CanvasViewportProjection {
-  readonly event: unknown
   readonly onRasterZoomChange?: (zoom: number) => void
   readonly viewport: Viewport
 }
 
 export function synchronizeCanvasViewportFromMove({
-  event,
   onRasterZoomChange,
   viewport,
-  setViewportZoom,
-  setCanvasViewport
+  projectCanvasViewport
 }: SynchronizeCanvasViewportFromMoveInput): void {
   onRasterZoomChange?.(viewport.zoom)
-  if (!event) {
-    return
-  }
-
-  const canvasViewport = toCanvasViewportSnapshot(viewport)
-  setViewportZoom(canvasViewport.zoom)
-  setCanvasViewport(canvasViewport)
+  projectCanvasViewport(toCanvasViewportSnapshot(viewport))
 }
 
 interface PersistCanvasViewportFromMoveEndInput extends CanvasViewportPersistence {
@@ -76,20 +66,17 @@ interface CommitCanvasViewportInput extends CanvasViewportProjection, CanvasView
 function commitCanvasViewport({
   viewport,
   onViewportChange,
-  setViewportZoom,
-  setCanvasViewport
+  projectCanvasViewport
 }: CommitCanvasViewportInput): void {
   const canvasViewport = toCanvasViewportSnapshot(viewport)
-  setViewportZoom(canvasViewport.zoom)
-  setCanvasViewport(canvasViewport)
+  projectCanvasViewport(canvasViewport)
   onViewportChange(canvasViewport)
 }
 
 export function commitCompletedCanvasViewportMotion({
   completion,
   onViewportChange,
-  setViewportZoom,
-  setCanvasViewport
+  projectCanvasViewport
 }: CommitCompletedCanvasViewportMotionInput): void {
   if (completion.intent.type === 'instant') {
     return
@@ -98,16 +85,14 @@ export function commitCompletedCanvasViewportMotion({
   commitCanvasViewport({
     viewport: completion.viewport,
     onViewportChange,
-    setViewportZoom,
-    setCanvasViewport
+    projectCanvasViewport
   })
 }
 
 export function subscribeCanvasViewportMotionCompletion({
   instance,
   onViewportChangeRef,
-  setViewportZoom,
-  setCanvasViewport
+  projectCanvasViewport
 }: CanvasViewportProjection & {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly onViewportChangeRef: MutableRefObject<CanvasViewportPersistence['onViewportChange']>
@@ -118,16 +103,14 @@ export function subscribeCanvasViewportMotionCompletion({
       commitCompletedCanvasViewportMotion({
         completion,
         onViewportChange: onViewportChangeRef.current,
-        setCanvasViewport,
-        setViewportZoom
+        projectCanvasViewport
       })
   )
   const unsubscribeDirect = subscribeWorkbenchDirectZoomCompletion(instance, ({ viewport }) =>
     commitCanvasViewport({
       viewport,
       onViewportChange: onViewportChangeRef.current,
-      setCanvasViewport,
-      setViewportZoom
+      projectCanvasViewport
     })
   )
 
@@ -143,8 +126,7 @@ interface RestoreCanvasViewportInput {
   readonly graphId: string
   readonly restoredGraphIdRef: MutableRefObject<string | null>
   readonly isRestoringViewportRef: MutableRefObject<boolean>
-  readonly setViewportZoom: (zoom: number) => void
-  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
+  readonly projectCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
 }
 
 export function restoreCanvasViewport({
@@ -153,13 +135,11 @@ export function restoreCanvasViewport({
   graphId,
   restoredGraphIdRef,
   isRestoringViewportRef,
-  setViewportZoom,
-  setCanvasViewport
+  projectCanvasViewport
 }: RestoreCanvasViewportInput): void {
   restoredGraphIdRef.current = graphId
   isRestoringViewportRef.current = true
-  setViewportZoom(viewport.zoom)
-  setCanvasViewport(viewport)
+  projectCanvasViewport(viewport)
 
   void transitionWorkbenchViewport(instance, {
     intent: { type: 'instant' },
@@ -172,9 +152,7 @@ export function restoreCanvasViewport({
   })
 }
 
-export function toCanvasViewportSnapshot(
-  viewport: Viewport
-): WorkbenchSnapshot['graph']['viewport'] {
+function toCanvasViewportSnapshot(viewport: Viewport): WorkbenchSnapshot['graph']['viewport'] {
   return {
     x: viewport.x,
     y: viewport.y,
@@ -188,8 +166,7 @@ interface CenterCanvasViewportOnMinimapPointInput {
   readonly instance: ReactFlowInstance<WorkbenchFlowNode, Edge>
   readonly persistViewport: boolean
   readonly onViewportChange: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
-  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
-  readonly setViewportZoom: (zoom: number) => void
+  readonly projectCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
 }
 
 export function centerCanvasViewportOnMinimapPoint({
@@ -198,8 +175,7 @@ export function centerCanvasViewportOnMinimapPoint({
   instance,
   persistViewport,
   onViewportChange,
-  setCanvasViewport,
-  setViewportZoom
+  projectCanvasViewport
 }: CenterCanvasViewportOnMinimapPointInput): void {
   const zoom = instance.getZoom()
   const viewport = {
@@ -208,8 +184,7 @@ export function centerCanvasViewportOnMinimapPoint({
     zoom
   }
 
-  setViewportZoom(zoom)
-  setCanvasViewport(viewport)
+  projectCanvasViewport(viewport)
   void transitionWorkbenchViewport(instance, {
     intent: { type: 'instant' },
     type: 'set-viewport',

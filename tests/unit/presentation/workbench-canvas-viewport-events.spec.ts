@@ -5,7 +5,7 @@ import {
 } from '../../../src/presentation/app-shell/workbenchCanvasViewport'
 
 describe('workbench canvas viewport events', () => {
-  it('keeps programmatic spring frames out of React state and commits the settled target once', () => {
+  it('projects programmatic spring frames without persisting and commits the settled target once', () => {
     const projection = createViewportProjection()
     const frames = [
       { x: -40, y: 10, zoom: 0.98 },
@@ -13,24 +13,17 @@ describe('workbench canvas viewport events', () => {
       { x: -200, y: 50, zoom: 0.85 }
     ]
 
-    for (const event of [null, undefined]) {
-      for (const viewport of frames) {
-        synchronizeCanvasViewportFromMove({
-          event,
-          viewport,
-          ...projection
-        })
-        persistCanvasViewportFromMoveEnd({
-          event,
-          isRestoringViewport: false,
-          viewport,
-          ...projection
-        })
-      }
+    for (const viewport of frames) {
+      synchronizeCanvasViewportFromMove({ viewport, ...projection })
+      persistCanvasViewportFromMoveEnd({
+        event: null,
+        isRestoringViewport: false,
+        viewport,
+        ...projection
+      })
     }
 
-    expect(projection.setCanvasViewport).not.toHaveBeenCalled()
-    expect(projection.setViewportZoom).not.toHaveBeenCalled()
+    expect(projection.projectCanvasViewport).toHaveBeenCalledTimes(3)
     expect(projection.onViewportChange).not.toHaveBeenCalled()
 
     commitCompletedCanvasViewportMotion({
@@ -41,10 +34,8 @@ describe('workbench canvas viewport events', () => {
       ...projection
     })
 
-    expect(projection.setCanvasViewport).toHaveBeenCalledOnce()
-    expect(projection.setCanvasViewport).toHaveBeenCalledWith(frames.at(-1))
-    expect(projection.setViewportZoom).toHaveBeenCalledOnce()
-    expect(projection.setViewportZoom).toHaveBeenCalledWith(0.85)
+    expect(projection.projectCanvasViewport).toHaveBeenCalledTimes(4)
+    expect(projection.projectCanvasViewport).toHaveBeenLastCalledWith(frames.at(-1))
     expect(projection.onViewportChange).toHaveBeenCalledOnce()
     expect(projection.onViewportChange).toHaveBeenCalledWith(frames.at(-1))
   })
@@ -54,7 +45,7 @@ describe('workbench canvas viewport events', () => {
     const viewport = { x: -180, y: 60, zoom: 0.8 }
     const event = new MouseEvent('mousemove')
 
-    synchronizeCanvasViewportFromMove({ event, viewport, ...projection })
+    synchronizeCanvasViewportFromMove({ viewport, ...projection })
     persistCanvasViewportFromMoveEnd({
       event,
       isRestoringViewport: false,
@@ -62,8 +53,7 @@ describe('workbench canvas viewport events', () => {
       ...projection
     })
 
-    expect(projection.setCanvasViewport).toHaveBeenCalledWith(viewport)
-    expect(projection.setViewportZoom).toHaveBeenCalledWith(0.8)
+    expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
     expect(projection.onViewportChange).toHaveBeenCalledOnce()
     expect(projection.onViewportChange).toHaveBeenCalledWith(viewport)
   })
@@ -79,8 +69,7 @@ describe('workbench canvas viewport events', () => {
       ...projection
     })
 
-    expect(projection.setCanvasViewport).not.toHaveBeenCalled()
-    expect(projection.setViewportZoom).not.toHaveBeenCalled()
+    expect(projection.projectCanvasViewport).not.toHaveBeenCalled()
     expect(projection.onViewportChange).not.toHaveBeenCalled()
   })
 
@@ -88,7 +77,7 @@ describe('workbench canvas viewport events', () => {
     const projection = createViewportProjection()
     const viewport = { x: -120, y: 30, zoom: 1.6 }
 
-    synchronizeCanvasViewportFromMove({ event: null, viewport, ...projection })
+    synchronizeCanvasViewportFromMove({ viewport, ...projection })
     persistCanvasViewportFromMoveEnd({
       event: null,
       isRestoringViewport: false,
@@ -98,7 +87,7 @@ describe('workbench canvas viewport events', () => {
 
     expect(projection.onRasterZoomChange).toHaveBeenCalledWith(1.6)
     expect(projection.onRasterInteractionEnd).toHaveBeenCalledWith(1.6)
-    expect(projection.setCanvasViewport).not.toHaveBeenCalled()
+    expect(projection.projectCanvasViewport).toHaveBeenCalledWith(viewport)
     expect(projection.onViewportChange).not.toHaveBeenCalled()
   })
 })
@@ -108,7 +97,6 @@ function createViewportProjection() {
     onViewportChange: vi.fn(),
     onRasterInteractionEnd: vi.fn(),
     onRasterZoomChange: vi.fn(),
-    setCanvasViewport: vi.fn(),
-    setViewportZoom: vi.fn()
+    projectCanvasViewport: vi.fn()
   }
 }

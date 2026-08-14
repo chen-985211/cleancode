@@ -15,16 +15,14 @@ export function useWorkbenchCanvasViewportRestoration({
   isRestoringViewportRef,
   reactFlowInstanceRef,
   restoredGraphIdRef,
-  setCanvasViewport,
-  setViewportZoom,
+  projectCanvasViewport,
   terminalZoomRasterCoordinator
 }: {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isRestoringViewportRef: MutableRefObject<boolean>
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly restoredGraphIdRef: MutableRefObject<string | null>
-  readonly setCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
-  readonly setViewportZoom: (zoom: number) => void
+  readonly projectCanvasViewport: (viewport: WorkbenchSnapshot['graph']['viewport']) => void
   readonly terminalZoomRasterCoordinator?: TerminalZoomRasterCanvasCoordinator
 }): void {
   useEffect(() => {
@@ -44,16 +42,14 @@ export function useWorkbenchCanvasViewportRestoration({
       graphId: currentWorkbench.graph.id,
       restoredGraphIdRef,
       isRestoringViewportRef,
-      setViewportZoom,
-      setCanvasViewport
+      projectCanvasViewport
     })
   }, [
     currentWorkbench,
     isRestoringViewportRef,
     reactFlowInstanceRef,
     restoredGraphIdRef,
-    setCanvasViewport,
-    setViewportZoom,
+    projectCanvasViewport,
     terminalZoomRasterCoordinator
   ])
 }

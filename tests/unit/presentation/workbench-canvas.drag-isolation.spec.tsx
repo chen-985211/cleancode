@@ -16,7 +16,8 @@ import { WorkbenchCanvas } from '../../../src/presentation/app-shell/WorkbenchCa
 import { createWorkbenchNodeStore } from '../../../src/presentation/app-shell/workbenchNodeStore'
 
 const reactFlowProps = vi.hoisted(() => ({
-  latest: null as MockReactFlowProps | null
+  latest: null as MockReactFlowProps | null,
+  renderCount: 0
 }))
 const viewportMotionSpies = vi.hoisted(() => ({
   cancel: vi.fn()
@@ -46,6 +47,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     Panel: ({ children }: { readonly children?: ReactNode }) =>
       React.createElement('div', null, children),
     ReactFlow: (props: MockReactFlowProps) => {
+      reactFlowProps.renderCount += 1
       reactFlowProps.latest = props
       return React.createElement('div', null, props.children)
     }
@@ -55,6 +57,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 describe('workbench canvas drag isolation', () => {
   beforeEach(() => {
     reactFlowProps.latest = null
+    reactFlowProps.renderCount = 0
     viewportMotionSpies.cancel.mockClear()
     directZoomSpies.cancel.mockClear()
   })
@@ -162,13 +165,56 @@ describe('workbench canvas drag isolation', () => {
 
     expect(reactFlowProps.latest?.zoomOnScroll).toBe(false)
   })
+
+  it('keeps viewport presentation frames out of the React Flow tree until detail changes', () => {
+    const { agentNode, terminalNode } = createNodes()
+
+    renderCanvas([agentNode, terminalNode], vi.fn())
+    const initialRenderCount = reactFlowProps.renderCount
+    const initialNodes = reactFlowProps.latest?.nodes
+
+    act(() => {
+      reactFlowProps.latest?.onMove?.(new MouseEvent('mousemove'), {
+        x: -80,
+        y: 40,
+        zoom: 0.96
+      })
+      reactFlowProps.latest?.onMove?.(new MouseEvent('mousemove'), {
+        x: -160,
+        y: 80,
+        zoom: 0.9
+      })
+    })
+
+    expect(reactFlowProps.renderCount).toBe(initialRenderCount)
+    expect(reactFlowProps.latest?.nodes).toBe(initialNodes)
+
+    act(() => {
+      reactFlowProps.latest?.onMove?.(new MouseEvent('mousemove'), {
+        x: -240,
+        y: 120,
+        zoom: 0.72
+      })
+    })
+
+    expect(reactFlowProps.renderCount).toBe(initialRenderCount + 1)
+    expect(document.querySelector('.canvas-surface')).toHaveAttribute(
+      'data-canvas-detail',
+      'compact'
+    )
+  })
 })
 
 interface MockReactFlowProps {
   readonly children?: ReactNode
   readonly multiSelectionKeyCode?: string | null
+  readonly nodes?: WorkbenchFlowNode[]
   readonly onNodeDragStart?: (event: MouseEvent, node: WorkbenchFlowNode) => void
   readonly onNodesChange?: (changes: NodeChange<WorkbenchFlowNode>[]) => void
+  readonly onMove?: (
+    event: MouseEvent | null,
+    viewport: { readonly x: number; readonly y: number; readonly zoom: number }
+  ) => void
   readonly onPaneClick?: () => void
   readonly onMoveStart?: (event: MouseEvent | null) => void
   readonly selectionKeyCode?: string | null
