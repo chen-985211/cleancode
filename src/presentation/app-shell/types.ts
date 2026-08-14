@@ -122,8 +122,15 @@ export interface WorkbenchObjectMotion {
   }
 }
 
+interface WorkbenchObjectPresence {
+  readonly id: string
+  readonly phase: 'pending' | 'entering'
+}
+
 interface WorkbenchObjectMotionNodeData {
+  readonly isObjectLayoutChoreographed?: boolean
   readonly objectMotion?: WorkbenchObjectMotion
+  readonly objectPresence?: WorkbenchObjectPresence
   readonly onObjectMotionComplete?: (motionId: string) => void
 }
 

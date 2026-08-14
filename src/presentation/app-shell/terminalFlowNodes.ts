@@ -203,6 +203,10 @@ function createTerminalFlowNode({
   workflowBuildPresentation
 }: CreateTerminalFlowNodeInput): TerminalFlowNode {
   const buildInitialPosition = workflowBuildPresentation?.initialPositionsByBlockId?.get(block.id)
+  const objectPresence = resolveWorkflowBuildObjectPresence(workflowBuildPresentation, block.id, {
+    enteringIds: workflowBuildPresentation?.enteringTerminalBlockIds,
+    pendingIds: workflowBuildPresentation?.pendingTerminalBlockIds
+  })
   return {
     id: block.id,
     type: 'terminal',
@@ -214,11 +218,7 @@ function createTerminalFlowNode({
       width: block.size.width,
       height: block.size.height
     },
-    className: workflowBuildPresentation?.pendingTerminalBlockIds.has(block.id)
-      ? 'terminal-workflow-build-node--pending'
-      : workflowBuildPresentation?.enteringTerminalBlockIds.has(block.id)
-        ? 'terminal-workflow-build-node--entering'
-        : undefined,
+    className: undefined,
     data: {
       identity: createCanvasObjectIdentity({
         projectId,
@@ -236,6 +236,8 @@ function createTerminalFlowNode({
       isActiveWorkflowRoot,
       isStoppingWorkflow,
       launchCommandEditRequestId,
+      isObjectLayoutChoreographed: workflowBuildPresentation?.terminalBlockIds.has(block.id),
+      objectPresence,
       workflowStatus,
       ...handlers,
       onSelect: (additive) => handlers.onSelect?.(block, additive)
@@ -272,6 +274,10 @@ function createTerminalGroupFlowNode({
   const size = group.isCollapsed
     ? createCollapsedTerminalGroupSize(memberBlocks.length)
     : group.size
+  const objectPresence = resolveWorkflowBuildObjectPresence(workflowBuildPresentation, group.id, {
+    enteringIds: workflowBuildPresentation?.enteringTerminalGroupIds,
+    pendingIds: workflowBuildPresentation?.pendingTerminalGroupIds
+  })
 
   return {
     id: group.id,
@@ -284,11 +290,7 @@ function createTerminalGroupFlowNode({
       width: size.width,
       height: size.height
     },
-    className: workflowBuildPresentation?.pendingTerminalGroupIds.has(group.id)
-      ? 'terminal-workflow-build-group--pending'
-      : workflowBuildPresentation?.enteringTerminalGroupIds.has(group.id)
-        ? 'terminal-workflow-build-group--entering'
-        : undefined,
+    className: undefined,
     data: {
       identity: createCanvasObjectIdentity({
         projectId: graph!.projectId,
@@ -307,6 +309,8 @@ function createTerminalGroupFlowNode({
       ),
       isEditing,
       isSelected: selectedTerminalGroupId === group.id,
+      isObjectLayoutChoreographed: workflowBuildPresentation?.terminalGroupIds.has(group.id),
+      objectPresence,
       dropFeedback: resolveTerminalGroupDropFeedback(group.id, terminalGroupDropAction),
       onStartGroup: handlers.onStartGroup ?? noopTerminalGroupAction,
       onStopGroup: handlers.onStopGroup ?? noopTerminalGroupAction,
@@ -318,6 +322,23 @@ function createTerminalGroupFlowNode({
       onDissolveGroup: handlers.onDissolveGroup ?? noopTerminalGroupPromiseAction
     }
   }
+}
+
+function resolveWorkflowBuildObjectPresence(
+  presentation: TerminalWorkflowBuildPresentation | null,
+  nodeId: string,
+  stages: {
+    readonly enteringIds?: ReadonlySet<string>
+    readonly pendingIds?: ReadonlySet<string>
+  }
+) {
+  const phase = stages.pendingIds?.has(nodeId)
+    ? ('pending' as const)
+    : stages.enteringIds?.has(nodeId)
+      ? ('entering' as const)
+      : null
+
+  return phase && presentation ? { id: `${presentation.operationId}:${nodeId}`, phase } : undefined
 }
 
 function noopTerminalGroupAction(): void {}

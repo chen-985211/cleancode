@@ -201,6 +201,56 @@ describe('workbench layout focus', () => {
     expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
     expect(getNodesBounds).not.toHaveBeenCalled()
   })
+
+  it('does not magnify a workflow focus beyond readable canvas scale', async () => {
+    const canvas = document.createElement('div')
+    canvas.className = 'react-flow'
+    Object.defineProperties(canvas, {
+      clientHeight: { configurable: true, value: 1_200 },
+      clientWidth: { configurable: true, value: 1_920 }
+    })
+    document.body.append(canvas)
+
+    const agentNode = createSizedAgentNode()
+    const terminalNode = createTerminalNode({ x: 380, y: 120 })
+    const nodes = [agentNode, terminalNode]
+    const setViewport = vi.fn(async () => true)
+    const instance = createReactFlowInstance(
+      new Map(nodes.map((node) => [node.id, node])),
+      vi.fn(() => ({ height: 0, width: 0, x: 0, y: 0 })),
+      setViewport
+    )
+    const request: WorkbenchLayoutFocusRequest = {
+      affectedNodeIds: ['terminal-1'],
+      expectedNodeLayouts: [
+        {
+          nodeId: 'terminal-1',
+          position: { x: 520, y: 40 },
+          size: { width: 420, height: 306 }
+        }
+      ],
+      focusNodeIds: ['agent:agent-1', 'terminal-1'],
+      focusTarget: 'committed-layouts',
+      operationId: 'workflow-call-readable-zoom'
+    }
+
+    render(
+      <Harness
+        instance={instance}
+        nodes={nodes}
+        onHandled={vi.fn()}
+        protectedNodeIds={new Set()}
+        request={request}
+      />
+    )
+
+    await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
+    expect(setViewport).toHaveBeenCalledWith(expect.objectContaining({ zoom: 1 }), {
+      duration: 0
+    })
+
+    canvas.remove()
+  })
 })
 
 function Harness({

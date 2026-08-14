@@ -44,7 +44,7 @@ interface AgentToolAnnotations {
 export const cleancodeMcpDeveloperInstructions = [
   'CleanCode canvas routing is mandatory while the built-in cleancode MCP server is enabled. Treat unqualified requests about “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal dependencies, and specifically “启动项目的终端组合” as requests to create or modify persisted CleanCode canvas terminal blocks, groups, execution configuration, and dependency connections, not as requests to run project processes directly.',
   canvasExecutionSemanticInstructions,
-  'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands. For one or more new configured terminals requested together, including a multi-terminal dependency workflow, use create_terminal_workflow once with the complete definitions, connections, and optional combination; it atomically validates and arranges the new scope near existing canvas content. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group; do not assemble existing membership through create_terminal_group memberBlockIds. Keep update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated create/configure/connect/arrange calls.',
+  'Call inspect_graph before reading repository files or using shell commands. You may inspect repository files after inspect_graph only to determine launch commands and real execution stages. For one or more new configured terminals requested together, use exactly one atomic creation tool that arranges near existing canvas content: create_terminal for exactly one configured terminal, create_terminal_workflow only for one workflow containing at least two dependency-connected terminals, or create_terminal_set for multiple independent top-level terminals or workflows. When the user explicitly requests a workflow, you must use create_terminal_workflow and must not silently downgrade to create_terminal or create_terminal_set. For a start-project workflow, repository-supported dependency installation or setup followed by the development service are legitimate stages. If two real stages cannot be identified, ask the user which stages they intend and do not invent fake steps. Omit terminalGroup by default. Include it only when the user explicitly asks for a terminal group, combination, or container; multiple related terminals and dependencies alone do not imply a group. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group only when the user explicitly requests grouping; do not assemble existing membership through create_terminal_group memberBlockIds. Keep update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated create/configure/connect/arrange calls.',
   'When a terminal starts a local HTTP, HTTPS, or TCP development service, inspect its existing launch path before choosing a managed port. For parallel projects and worktrees, use preferred with the conventional port as the recommended default, or auto when no conventional port matters. Both require a verified binding: environment only when the existing project already reads that variable, or argument with a safe template such as --port {port} only when the existing CLI or task wrapper accepts it. Do not invent a variable or select fixed + none merely because logs or defaults mention a port; reserve fixed for an explicit immutable-port requirement. Run replaces the binding with the actual allocated port at launch, and readiness plus the displayed endpoint follow that actual port.',
   'The current CleanCode MCP can author and inspect a terminal workflow but cannot start it. Never use shell processes, package scripts, .vscode tasks, aliases, or project configuration as a substitute for CleanCode canvas objects, and do not claim that a created workflow or terminal was started. Only interpret the request as source-code implementation work when the user explicitly names terminal source code, a Terminal component, xterm, PTY, or terminal module implementation.'
 ].join('\n')
@@ -52,7 +52,7 @@ export const cleancodeMcpDeveloperInstructions = [
 export const cleancodeMcpInstructions = [
   'CleanCode canvas scope / CleanCode 画布语义：while this MCP server is enabled, unqualified requests such as “终端”, “整理终端”, “终端布局”, “终端组合”, “终端工作流”, terminal organization, terminal layout, or terminal dependencies mean persisted CleanCode canvas objects, not repository code. Call inspect_graph before reading or searching repository files. Only treat explicit source-code terms such as “终端源码”, “Terminal component”, xterm, PTY, or terminal module implementation as project-code work.',
   canvasExecutionSemanticInstructions,
-  'For canvas work, inspect first. Use create_terminal_workflow once for one or more new configured terminals requested together, including a complete dependency workflow; it atomically creates definitions, internal dependencies, an optional combination, deterministic layout near existing canvas content, and a validated plan. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group; do not assemble existing membership through create_terminal_group memberBlockIds. Use update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated tool calls. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
+  'For canvas work, inspect first. For one or more new configured terminals requested together, use exactly one atomic creation tool that arranges near existing canvas content: create_terminal for exactly one configured terminal, create_terminal_workflow only for one workflow containing at least two dependency-connected terminals, or create_terminal_set for multiple independent top-level terminals or workflows. When the user explicitly requests a workflow, you must use create_terminal_workflow and must not silently downgrade to create_terminal or create_terminal_set. For a start-project workflow, repository-supported dependency installation or setup followed by the development service are legitimate stages. If two real stages cannot be identified, ask the user which stages they intend and do not invent fake steps. Omit terminalGroup by default. Include it only when the user explicitly asks for a terminal group, combination, or container; multiple related terminals and dependencies alone do not imply a group. Use create_block only for one empty visual terminal. For existing terminals or workflows, create an empty combination and use move_terminal_workflow_to_group only when the user explicitly requests grouping; do not assemble existing membership through create_terminal_group memberBlockIds. Use update_terminal_execution_config, connect_terminal_blocks, create_terminal_group, move_terminal_workflow_to_group, arrange_terminal_layout, and inspect_terminal_workflow_plan for edits to existing canvas objects. Do not split one new workflow across repeated tool calls. Terminal groups are visual organization and are not workflow nodes. These tools do not start PTYs or workflow runs, so do not claim that authoring or inspection started anything.',
   'For a local HTTP, HTTPS, or TCP development service that may run in parallel projects or worktrees, prefer preferred with its conventional port and a verified environment or argument binding; use auto when no conventional port matters. Environment injection is valid only when the existing project already reads the named variable, and an argument template such as --port {port} is valid only when the existing CLI or wrapper accepts it. Use fixed, especially fixed + none, only for an explicit immutable-port contract. At runtime CleanCode injects the actual allocated port and validates readiness against that actual port.',
   'Do not create .vscode/tasks.json, package scripts, shell aliases, or project config as a substitute for CleanCode canvas objects. The Provider launch integration may allow these CleanCode MCP tools directly when that Provider supports a tool allowlist. This does not change the Provider sandbox or approval policy for shell commands, files, Git, network access, or other MCP servers. Deletion tools still require independent CleanCode UI approval, as does disconnecting a dependency.'
 ].join('\n')
@@ -95,7 +95,7 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Create one empty visual terminal block on the cleancode canvas. Omit position to place it intelligently near existing canvas content, or provide position to use those exact coordinates. For a configured terminal or multiple terminals requested together, use one create_terminal_workflow call instead.',
+      'Create one empty visual terminal block on the cleancode canvas. Omit position to place it intelligently near existing canvas content, or provide position to use those exact coordinates. Use create_terminal for one configured terminal, create_terminal_workflow for one dependency workflow, or create_terminal_set for multiple independent execution units.',
     graphChanged: true,
     inputSchema: objectSchema(
       {
@@ -114,88 +114,43 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
     description:
-      'Atomically create, configure, connect, optionally combine, arrange, and validate one or more new CleanCode terminals requested together. Use one call for a configured terminal or complete workflow instead of exposing repeated create/configure/connect/arrange tool delays. Refs exist only inside this call and are returned with their persisted block IDs.',
+      'Atomically create, configure, arrange, and validate exactly one configured CleanCode terminal. Use this when the repository has one real launch unit. Do not use it when the user explicitly requested a workflow; ask for clarification if no real multi-stage workflow can be identified. Omit terminalGroup by default and include it only when the user explicitly requested a group, combination, or container.',
     graphChanged: true,
     inputSchema: objectSchema(
       {
-        connections: {
-          items: objectSchema(
-            {
-              sourceRef: { minLength: 1, type: 'string' },
-              targetRef: { minLength: 1, type: 'string' }
-            },
-            ['sourceRef', 'targetRef']
-          ),
-          type: 'array',
-          uniqueItems: true
-        },
-        terminalGroup: objectSchema(
-          {
-            memberRefs: {
-              items: { minLength: 1, type: 'string' },
-              minItems: 1,
-              type: 'array',
-              uniqueItems: true
-            },
-            name: { minLength: 1, type: 'string' }
-          },
-          ['name', 'memberRefs']
-        ),
-        terminals: {
-          items: objectSchema(
-            {
-              description: { type: 'string' },
-              executionConfig: terminalExecutionConfigSchema(),
-              launchCommand: { minLength: 1, type: 'string' },
-              name: { minLength: 1, type: 'string' },
-              ref: { minLength: 1, type: 'string' },
-              size: terminalBlockSizeSchema()
-            },
-            ['ref', 'name', 'launchCommand']
-          ),
-          minItems: 1,
-          type: 'array'
+        description: { type: 'string' },
+        executionConfig: terminalExecutionConfigSchema(),
+        launchCommand: { minLength: 1, type: 'string' },
+        name: { minLength: 1, type: 'string' },
+        size: terminalBlockSizeSchema(),
+        terminalGroup: {
+          ...objectSchema({ name: { minLength: 1, type: 'string' } }, ['name']),
+          description:
+            'Optional terminal group to create only when the user explicitly requested a group, combination, or container.'
         }
       },
-      ['terminals', 'connections']
+      ['name', 'launchCommand']
     ),
+    name: 'create_terminal',
+    output: terminalStructureCreatedOutputSchema('terminal')
+  }),
+  graphTool({
+    annotations: nonDestructiveWriteToolAnnotations,
+    description:
+      'Atomically create, configure, connect, arrange, and validate one new CleanCode terminal workflow. A workflow must contain one connected dependency graph with at least two terminals. Use this tool only when the user requested a workflow and real execution stages were identified; it cannot create or silently fall back to a single terminal. Omit terminalGroup by default and include it only when the user explicitly requested a group, combination, or container. Refs exist only inside this call and are returned with their persisted block IDs.',
+    graphChanged: true,
+    inputSchema: terminalStructureInputSchema({ minimumConnections: 1, minimumTerminals: 2 }),
     name: 'create_terminal_workflow',
-    output: objectSchema(
-      {
-        arrangedBlockIds: { items: { type: 'string' }, type: 'array' },
-        arrangedTerminalGroupIds: { items: { type: 'string' }, type: 'array' },
-        createdConnections: {
-          items: objectSchema(
-            {
-              connectionId: { type: 'string' },
-              sourceRef: { type: 'string' },
-              targetRef: { type: 'string' }
-            },
-            ['connectionId', 'sourceRef', 'targetRef']
-          ),
-          type: 'array'
-        },
-        createdTerminalGroupId: { oneOf: [{ type: 'string' }, { type: 'null' }] },
-        createdTerminals: {
-          items: objectSchema({ blockId: { type: 'string' }, ref: { type: 'string' } }, [
-            'ref',
-            'blockId'
-          ]),
-          type: 'array'
-        },
-        plan: terminalWorkflowPlanSnapshotSchema(),
-        type: { const: 'terminal_workflow_created' }
-      },
-      [
-        'type',
-        'createdTerminals',
-        'createdConnections',
-        'createdTerminalGroupId',
-        'arrangedBlockIds',
-        'arrangedTerminalGroupIds',
-        'plan'
-      ]
-    )
+    output: terminalStructureCreatedOutputSchema('workflow')
+  }),
+  graphTool({
+    annotations: nonDestructiveWriteToolAnnotations,
+    description:
+      'Atomically create, configure, connect, arrange, and validate multiple independent top-level execution units requested together. Use this for multiple independent terminals, workflows, or a mixture; do not describe the result as one workflow. Omit terminalGroup by default and include it only when the user explicitly requested a group, combination, or container. Refs exist only inside this call and are returned with their persisted block IDs.',
+    graphChanged: true,
+    inputSchema: terminalStructureInputSchema({ minimumConnections: 0, minimumTerminals: 2 }),
+    name: 'create_terminal_set',
+    output: terminalStructureCreatedOutputSchema('multiple')
   }),
   graphTool({
     annotations: nonDestructiveWriteToolAnnotations,
@@ -429,6 +384,17 @@ export interface CreateTerminalWorkflowAgentToolInput {
   }[]
 }
 
+interface CreateTerminalAgentToolInput {
+  readonly description?: string
+  readonly executionConfig?: AgentTerminalExecutionConfigSnapshot
+  readonly launchCommand: string
+  readonly name: string
+  readonly size?: AgentTerminalBlockSizeSnapshot
+  readonly terminalGroup?: { readonly name: string }
+}
+
+type CreateTerminalSetAgentToolInput = CreateTerminalWorkflowAgentToolInput
+
 export interface UpdateBlockAgentToolInput {
   readonly blockId: string
   readonly description?: string
@@ -496,6 +462,8 @@ export interface AgentToolInputByName {
   readonly arrange_terminal_layout: ArrangeTerminalLayoutAgentToolInput
   readonly connect_terminal_blocks: ConnectTerminalBlocksAgentToolInput
   readonly create_block: CreateBlockAgentToolInput
+  readonly create_terminal: CreateTerminalAgentToolInput
+  readonly create_terminal_set: CreateTerminalSetAgentToolInput
   readonly create_terminal_workflow: CreateTerminalWorkflowAgentToolInput
   readonly create_terminal_group: CreateTerminalGroupAgentToolInput
   readonly delete_block: DeleteBlockAgentToolInput
@@ -529,6 +497,7 @@ export type AgentToolOutput =
       readonly createdTerminalGroupId: string | null
       readonly createdTerminals: readonly { readonly blockId: string; readonly ref: string }[]
       readonly plan: AgentTerminalWorkflowPlanSnapshot
+      readonly structureType: 'multiple' | 'terminal' | 'workflow'
       readonly type: 'terminal_workflow_created'
     }
   | {
@@ -582,6 +551,103 @@ export interface AgentToolErrorSnapshot {
 
 export function isAgentToolName(value: string): value is AgentToolName {
   return agentToolDefinitions.some((tool) => tool.name === value)
+}
+
+function terminalStructureInputSchema(input: {
+  readonly minimumConnections: number
+  readonly minimumTerminals: number
+}): AgentToolObjectJsonSchema {
+  return objectSchema(
+    {
+      connections: {
+        items: objectSchema(
+          {
+            sourceRef: { minLength: 1, type: 'string' },
+            targetRef: { minLength: 1, type: 'string' }
+          },
+          ['sourceRef', 'targetRef']
+        ),
+        minItems: input.minimumConnections,
+        type: 'array',
+        uniqueItems: true
+      },
+      terminalGroup: {
+        ...objectSchema(
+          {
+            memberRefs: {
+              items: { minLength: 1, type: 'string' },
+              minItems: 1,
+              type: 'array',
+              uniqueItems: true
+            },
+            name: { minLength: 1, type: 'string' }
+          },
+          ['name', 'memberRefs']
+        ),
+        description:
+          'Optional terminal group to create only when the user explicitly requested a group, combination, or container.'
+      },
+      terminals: {
+        items: objectSchema(
+          {
+            description: { type: 'string' },
+            executionConfig: terminalExecutionConfigSchema(),
+            launchCommand: { minLength: 1, type: 'string' },
+            name: { minLength: 1, type: 'string' },
+            ref: { minLength: 1, type: 'string' },
+            size: terminalBlockSizeSchema()
+          },
+          ['ref', 'name', 'launchCommand']
+        ),
+        minItems: input.minimumTerminals,
+        type: 'array'
+      }
+    },
+    ['terminals', 'connections']
+  )
+}
+
+function terminalStructureCreatedOutputSchema(
+  structureType: 'multiple' | 'terminal' | 'workflow'
+): AgentToolObjectJsonSchema {
+  return objectSchema(
+    {
+      arrangedBlockIds: { items: { type: 'string' }, type: 'array' },
+      arrangedTerminalGroupIds: { items: { type: 'string' }, type: 'array' },
+      createdConnections: {
+        items: objectSchema(
+          {
+            connectionId: { type: 'string' },
+            sourceRef: { type: 'string' },
+            targetRef: { type: 'string' }
+          },
+          ['connectionId', 'sourceRef', 'targetRef']
+        ),
+        type: 'array'
+      },
+      createdTerminalGroupId: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+      createdTerminals: {
+        items: objectSchema({ blockId: { type: 'string' }, ref: { type: 'string' } }, [
+          'ref',
+          'blockId'
+        ]),
+        type: 'array'
+      },
+      plan: terminalWorkflowPlanSnapshotSchema(),
+      structureType: { const: structureType },
+      type: { const: 'terminal_workflow_created' }
+    },
+    [
+      'type',
+      'createdTerminals',
+      'createdConnections',
+      'createdTerminalGroupId',
+      'arrangedBlockIds',
+      'arrangedTerminalGroupIds',
+      'plan',
+      'structureType'
+    ]
+  )
 }
 
 function graphTool(input: {

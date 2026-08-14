@@ -47,7 +47,7 @@ describe('cleancode HTTP MCP server', () => {
       expect.objectContaining({
         result: expect.objectContaining({
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: 'cleancode-agent-tools', version: '0.5.0' }
+          serverInfo: { name: 'cleancode-agent-tools', version: '0.6.0' }
         })
       })
     )
@@ -56,7 +56,9 @@ describe('cleancode HTTP MCP server', () => {
     expect(readToolNames(toolsList)).toEqual([
       'inspect_graph',
       'create_block',
+      'create_terminal',
       'create_terminal_workflow',
+      'create_terminal_set',
       'update_block',
       'delete_block',
       'create_terminal_group',

@@ -167,10 +167,7 @@ function resizeExpandedTerminalGroupShells(
       return memberNode ? [memberNode] : []
     })
 
-    if (
-      isTerminalWorkflowBuildPresentationNode(node) ||
-      memberNodes.some(isTerminalWorkflowBuildPresentationNode)
-    ) {
+    if (isObjectLayoutChoreographed(node) || memberNodes.some(isObjectLayoutChoreographed)) {
       return node
     }
 
@@ -182,8 +179,8 @@ function resizeExpandedTerminalGroupShells(
   })
 }
 
-function isTerminalWorkflowBuildPresentationNode(node: WorkbenchFlowNode): boolean {
-  return typeof node.className === 'string' && node.className.startsWith('terminal-workflow-build-')
+function isObjectLayoutChoreographed(node: WorkbenchFlowNode): boolean {
+  return Boolean(node.data.isObjectLayoutChoreographed)
 }
 
 function resizeTerminalGroupShell(

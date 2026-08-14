@@ -107,14 +107,25 @@ describe('workbench node changes', () => {
       handlers: createHandlers()
     }).map((node): WorkbenchFlowNode => {
       if (node.id === 'development-group') {
-        return { ...node, className: 'terminal-workflow-build-group--entering' }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            isObjectLayoutChoreographed: true,
+            objectPresence: { id: 'operation-1:development-group', phase: 'entering' }
+          }
+        } as WorkbenchFlowNode
       }
       if (node.id === 'frontend-terminal') {
         return {
           ...node,
-          className: 'terminal-workflow-build-node--entering',
+          data: {
+            ...node.data,
+            isObjectLayoutChoreographed: true,
+            objectPresence: { id: 'operation-1:frontend-terminal', phase: 'entering' }
+          },
           position: { x: 1_520, y: 900 }
-        }
+        } as WorkbenchFlowNode
       }
       return node
     })

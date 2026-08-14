@@ -14,7 +14,9 @@ describe('agent tool protocol', () => {
     expect(agentToolDefinitions.map((tool) => tool.name)).toEqual([
       'inspect_graph',
       'create_block',
+      'create_terminal',
       'create_terminal_workflow',
+      'create_terminal_set',
       'update_block',
       'delete_block',
       'create_terminal_group',
@@ -57,6 +59,10 @@ describe('agent tool protocol', () => {
       type: 'object'
     })
     expect(readSchemaProperty(createWorkflow.inputSchema, 'terminals')).toMatchObject({
+      minItems: 2,
+      type: 'array'
+    })
+    expect(readSchemaProperty(createWorkflow.inputSchema, 'connections')).toMatchObject({
       minItems: 1,
       type: 'array'
     })
@@ -346,12 +352,39 @@ describe('agent tool protocol', () => {
     for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
       expect(instructions).toContain('one or more new configured terminals requested together')
       expect(instructions).toContain('Use create_block only for one empty visual terminal')
+      expect(instructions).toContain('create_terminal for exactly one configured terminal')
+      expect(instructions).toContain('create_terminal_workflow only for one workflow')
+      expect(instructions).toContain('create_terminal_set for multiple independent')
+      expect(instructions).toContain('must not silently downgrade')
+      expect(instructions).toContain('do not invent fake steps')
     }
 
     expect(requireTool('create_block').description).toContain('one empty visual terminal')
-    expect(requireTool('create_terminal_workflow').description).toContain(
-      'one or more new CleanCode terminals requested together'
+    expect(requireTool('create_terminal').description).toContain(
+      'exactly one configured CleanCode terminal'
     )
+    expect(requireTool('create_terminal_workflow').description).toContain(
+      'A workflow must contain one connected dependency graph with at least two terminals'
+    )
+    expect(requireTool('create_terminal_set').description).toContain(
+      'multiple independent top-level execution units'
+    )
+  })
+
+  it('creates a workflow group only from explicit user intent', () => {
+    const createWorkflow = requireTool('create_terminal_workflow')
+    const terminalGroupSchema = readSchemaProperty(
+      createWorkflow.inputSchema,
+      'terminalGroup'
+    ) as AgentToolJsonSchema
+
+    for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
+      expect(instructions).toContain('Omit terminalGroup by default')
+      expect(instructions).toContain('explicitly asks')
+      expect(instructions).toContain('dependencies alone do not imply a group')
+    }
+    expect(createWorkflow.description).toContain('Omit terminalGroup by default')
+    expect(terminalGroupSchema.description).toContain('explicitly requested')
   })
 
   it('projects the canonical canvas execution semantics into MCP and Provider instructions', () => {
@@ -396,6 +429,16 @@ describe('agent tool protocol', () => {
         readOnlyHint: false
       },
       create_terminal_workflow: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      create_terminal: {
+        destructiveHint: false,
+        openWorldHint: false,
+        readOnlyHint: false
+      },
+      create_terminal_set: {
         destructiveHint: false,
         openWorldHint: false,
         readOnlyHint: false

@@ -63,6 +63,9 @@ describe('terminal workflow build coordination', () => {
 
     expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(initialApiPosition)
     expect(findNode(nodeStore, 'terminal-web').position).not.toEqual(initialWebPosition)
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toEqual(
+      new Set()
+    )
     expect(result.current.terminalWorkflowBuildPresentation?.pendingConnectionIds).toContain(
       'connection-api-web'
     )

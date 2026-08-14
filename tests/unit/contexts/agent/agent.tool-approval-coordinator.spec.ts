@@ -454,6 +454,7 @@ function completedWorkflowCreationResult(toolCallId: string): AgentToolExecution
         { blockId: 'terminal-web', ref: 'web' }
       ],
       plan: { graphId: 'graph-1', nodes: [], workspaceId: 'main' },
+      structureType: 'workflow',
       type: 'terminal_workflow_created'
     },
     status: 'completed',

@@ -60,6 +60,27 @@ describe('resolve workbench layout focus request', () => {
     })
   })
 
+  it('keeps the invoking Agent and every created terminal in the workflow focus scope', () => {
+    const graph = { ...createGraph(), terminalGroups: [] }
+
+    expect(
+      resolveWorkbenchLayoutFocusRequest({
+        originAgentNodeId: 'agent:agent-1',
+        change: {
+          blockIds: ['backend', 'worker'],
+          connectionIds: ['backend-worker'],
+          kind: 'terminal_build_created',
+          operationId: 'tool-call-3',
+          terminalGroupIds: []
+        },
+        graph
+      })
+    ).toMatchObject({
+      focusNodeIds: ['agent:agent-1', 'backend', 'worker'],
+      focusTarget: 'committed-layouts'
+    })
+  })
+
   it('does not request focus for an ordinary graph update', () => {
     expect(
       resolveWorkbenchLayoutFocusRequest({

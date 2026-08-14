@@ -140,21 +140,41 @@ export class ExecuteAgentToolUseCase {
         )
       case 'create_block':
         return this.createTerminalBlock(command, context, invocation.input)
-      case 'create_terminal_workflow': {
-        const result = await this.blockGraphTools.createTerminalWorkflow(context, {
-          ...invocation.input,
-          ...(await this.resolveWorkspaceLayout(command))
-        })
-        return completedGraphResult(command.toolCallId, result.graph, {
-          arrangedBlockIds: result.arrangedBlockIds,
-          arrangedTerminalGroupIds: result.arrangedTerminalGroupIds,
-          createdConnections: result.createdConnections,
-          createdTerminalGroupId: result.createdTerminalGroupId,
-          createdTerminals: result.createdTerminals,
-          plan: result.plan,
-          type: 'terminal_workflow_created'
-        })
-      }
+      case 'create_terminal':
+        return this.createTerminalStructure(
+          command,
+          context,
+          {
+            connections: [],
+            ...(invocation.input.terminalGroup
+              ? {
+                  terminalGroup: {
+                    memberRefs: ['terminal'],
+                    name: invocation.input.terminalGroup.name
+                  }
+                }
+              : {}),
+            terminals: [
+              {
+                ...(invocation.input.description !== undefined
+                  ? { description: invocation.input.description }
+                  : {}),
+                ...(invocation.input.executionConfig
+                  ? { executionConfig: invocation.input.executionConfig }
+                  : {}),
+                launchCommand: invocation.input.launchCommand,
+                name: invocation.input.name,
+                ref: 'terminal',
+                ...(invocation.input.size ? { size: invocation.input.size } : {})
+              }
+            ]
+          },
+          'terminal'
+        )
+      case 'create_terminal_workflow':
+        return this.createTerminalStructure(command, context, invocation.input, 'workflow')
+      case 'create_terminal_set':
+        return this.createTerminalStructure(command, context, invocation.input, 'multiple')
       case 'update_block':
         return completedGraphResult(
           command.toolCallId,
@@ -264,6 +284,28 @@ export class ExecuteAgentToolUseCase {
     return completedGraphResult(command.toolCallId, graph, {
       createdBlockId: findNewTerminalBlockId(beforeGraph, graph),
       type: 'block_graph'
+    })
+  }
+
+  private async createTerminalStructure(
+    command: ExecuteAgentToolCommand,
+    context: AgentToolContext,
+    input: AgentToolInputByName['create_terminal_workflow'],
+    structureType: 'multiple' | 'terminal' | 'workflow'
+  ): Promise<CompletedGraphToolResult> {
+    const result = await this.blockGraphTools.createTerminalWorkflow(context, {
+      ...input,
+      ...(await this.resolveWorkspaceLayout(command))
+    })
+    return completedGraphResult(command.toolCallId, result.graph, {
+      arrangedBlockIds: result.arrangedBlockIds,
+      arrangedTerminalGroupIds: result.arrangedTerminalGroupIds,
+      createdConnections: result.createdConnections,
+      createdTerminalGroupId: result.createdTerminalGroupId,
+      createdTerminals: result.createdTerminals,
+      plan: result.plan,
+      structureType,
+      type: 'terminal_workflow_created'
     })
   }
 

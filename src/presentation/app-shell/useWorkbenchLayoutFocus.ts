@@ -28,6 +28,8 @@ interface UseWorkbenchLayoutFocusInput {
   readonly request: WorkbenchLayoutFocusRequest | null
 }
 
+const maximumWorkbenchLayoutFocusZoom = 1
+
 export function useWorkbenchLayoutFocus({
   nodeStore,
   onHandled,
@@ -88,11 +90,13 @@ export function useWorkbenchLayoutFocus({
         ? transitionWorkbenchViewport(reactFlowInstance, {
             bounds: committedBounds,
             intent: { type: 'spatial' },
+            maxZoom: maximumWorkbenchLayoutFocusZoom,
             padding: 0.24,
             type: 'fit-bounds'
           })
         : transitionWorkbenchViewport(reactFlowInstance, {
             intent: { type: 'spatial' },
+            maxZoom: maximumWorkbenchLayoutFocusZoom,
             nodes: resolvedFocusNodes,
             padding: 0.24,
             type: 'fit-view'

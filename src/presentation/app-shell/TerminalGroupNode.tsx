@@ -62,6 +62,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
   const className = [
     'terminal-group-node',
     objectMotion.className,
+    data.objectPresence?.phase === 'pending' ? 'workbench-object-presence--pending' : '',
     group.isCollapsed ? 'terminal-group-node--collapsed' : '',
     data.isEditing ? 'terminal-group-node--editing' : '',
     data.isContextSelected ? 'terminal-group-node--context-selected' : '',
@@ -121,6 +122,8 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       className={className}
       data-terminal-group-id={group.id}
       data-context-selected={data.isContextSelected || undefined}
+      aria-hidden={data.objectPresence?.phase === 'pending' || undefined}
+      inert={data.objectPresence?.phase === 'pending' || undefined}
       style={objectMotion.style}
       onAnimationEnd={objectMotion.onAnimationEnd}
     >
