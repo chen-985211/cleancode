@@ -33,6 +33,7 @@ import { useI18n } from './i18n/useI18n'
 import { useTerminalGroupDropSpring } from './useTerminalGroupDropSpring'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { useTerminalState } from './terminalStateStore'
 
 export const TerminalGroupNode = memo(function TerminalGroupNode({
   data
@@ -76,6 +77,7 @@ export const TerminalGroupNode = memo(function TerminalGroupNode({
       key={block.id}
       block={block}
       state={data.memberStates[block.id]}
+      stateStore={data.terminalStateStore}
       onRemove={() => void data.onRemoveTerminalFromGroup(group, block)}
     />
   ))
@@ -501,11 +503,12 @@ function IconButton({
 interface MemberRowProps {
   readonly block: TerminalBlockSnapshot
   readonly state: TerminalViewState | undefined
+  readonly stateStore: TerminalGroupFlowNode['data']['terminalStateStore']
   readonly onRemove: () => void
 }
 
-function MemberRow({ block, state, onRemove }: MemberRowProps) {
-  const status = state?.status ?? 'idle'
+function MemberRow({ block, state, stateStore, onRemove }: MemberRowProps) {
+  const status = useTerminalState(stateStore, block.id, state).status
   const { t } = useI18n()
 
   return (

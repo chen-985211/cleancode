@@ -1,0 +1,5 @@
+[data-terminal-surface-priority='hidden'] .agent-provider-empty-state__spinner,
+[data-terminal-surface-priority='hidden'] .agent-tool-approval-card__spinner,
+[data-terminal-surface-priority='hidden'] .terminal-metadata-form__saving-indicator {
+  animation-play-state: paused;
+}

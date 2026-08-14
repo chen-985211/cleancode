@@ -76,11 +76,11 @@ flowchart LR
   R3 -. "稠密大画布" .-> G
 ```
 
-| 轮次 | 名称                     | 核心结果                                         | 主要收益场景                       | 状态                 |
-| ---- | ------------------------ | ------------------------------------------------ | ---------------------------------- | -------------------- |
-| 1    | 画布逐帧路径瘦身         | viewport 实时值不再驱动整个画布 React 树逐帧更新 | 平移、缩放、相机运动、侧边栏动效   | 实现完成，设备待验收 |
-| 2    | 终端与 Agent 重负载调度  | 输出与非关键初始化按可见性、优先级和帧预算执行   | 刷日志、批量创建 Terminal 或 Agent | 实现完成，设备待验收 |
-| 3    | 节点级增量更新与离屏治理 | 单节点变化局部提交，离屏对象安全降载             | 多节点、多终端、长时间运行的大画布 | 尚未开始             |
+| 轮次 | 名称                     | 核心结果                                         | 主要收益场景                       | 状态                         |
+| ---- | ------------------------ | ------------------------------------------------ | ---------------------------------- | ---------------------------- |
+| 1    | 画布逐帧路径瘦身         | viewport 实时值不再驱动整个画布 React 树逐帧更新 | 平移、缩放、相机运动、侧边栏动效   | 实现完成，设备待验收         |
+| 2    | 终端与 Agent 重负载调度  | 输出与非关键初始化按可见性、优先级和帧预算执行   | 刷日志、批量创建 Terminal 或 Agent | 实现完成，设备待验收         |
+| 3    | 节点级增量更新与离屏治理 | 单节点变化局部提交，离屏对象安全降载             | 多节点、多终端、长时间运行的大画布 | 实现完成，设备与 soak 待验收 |
 
 三轮按风险递增推进。每轮都必须单独建立改造前基线、完成目标验证并保留可回退边界；不得把三轮合并成一次无法归因的整体重构。第一轮完成后即可独立交付，后续轮次是否全部实施应依据真实 trace，而不是预先假设每一项都必要。
 
@@ -240,6 +240,21 @@ flowchart LR
 - 每类节点只有一个数据投影 owner，静态图事实、运行状态与 presentation motion 的失效边界可被测试证明。
 - 所有离屏优化都有明确资源上限、恢复路径与清理路径；未能证明 surface 连续性的虚拟化方案保持关闭。
 - 三轮性能矩阵、完整门禁、跨平台 Electron 验收与长时间运行检查通过。
+
+### 第三轮实现证据
+
+第三轮代码与目标自动化验证于 2026-08-15 完成：
+
+- renderer 窗口内建立按 terminal ID 订阅的状态投影 store。普通 Terminal 节点和折叠组合成员行直接订阅自身 runtime 状态；单个 session、状态或输出引用变化只通知对应 selector，不再触发整组 React Flow 节点投影。外部 store 接入后，`useWorkbenchFlowNodes` 的结构投影依赖中不再包含 terminal runtime record。
+- 被折叠组合停放的 Terminal 节点暂停 runtime 订阅，组合成员行继续作为必要消费者显示状态；组合重新展开时直接读取 store 的最新值，不建立积压队列，也不改变 Run session、输出或缓冲区事实。
+- 节点投影在完成既有瞬时几何、CanvasArrangement 堆叠和对象 motion 投影后，按稳定节点身份协调引用。Terminal、terminal group 与 Agent 分别使用显式事实维度比较；图事实、选择、workflow 状态或 motion 变化只替换受影响节点，未变化节点和已稳定的动作回调继续复用。实现没有使用全局深比较，也不把缓存作为业务判断来源。
+- xterm 的 focused、visible、hidden 事实继续由既有 raster target 和同一个 `IntersectionObserver` 拥有，并投影到所属 Terminal 或 Agent 节点。离屏 surface 沿用第二轮的输出、初始化与 raster 降级，节点内无限装饰 spinner 在 hidden 期间暂停；返回可见后按同一状态继续呈现。
+- surface registry 诊断增加 focused、visible、hidden surface 数量，并继续提供总 surface、DOM/WebGL renderer、pending output 和调度等待指标，供节点数量、可见节点数量和活跃输出数量三个维度的 trace 与 soak 使用；诊断不记录终端正文。
+- terminal surface lease/detach 已完成风险评估但保持关闭。当前 disposable view 已能证明精确 view 身份、释放与重新 attach 的 session/buffer 主路径，但尚未证明离屏 detach 后搜索状态、滚动位置和所有 renderer 细节连续；因此没有启用 React Flow 可见节点卸载、xterm surface 缓存或过期淘汰，也没有修改现有 surface 生命周期。
+- Unit/component 使用 240 个 terminal selector 与 320 个跨类型节点的确定性压力矩阵，覆盖单 selector 通知、订阅清理、parked 暂停/恢复、三类节点引用稳定、单节点图事实变化、selection/motion 正交更新、runtime 更新不调用节点结构投影、Terminal/Agent 共用可见性投影和 surface 优先级诊断。
+- 实现未新增依赖、IPC、持久化格式、固定帧率、React Flow/xterm 私有 API、Provider 分支或 terminal surface 保留策略；BlockGraph、AgentSession、Run 与 CanvasArrangement 的事实 owner 和提交入口不变。
+
+当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率下的稠密画布 trace，以及长时间多输出、反复离屏/返回、工作区切换后的内存、GPU context、surface 和 pending output soak 数据。因此第三轮状态标记为“实现完成，设备与 soak 待验收”；自动化压力矩阵只能证明失效边界和清理，不得替代真实 Electron、GPU 与长期资源验收。
 
 ## 跨轮性能证据
 

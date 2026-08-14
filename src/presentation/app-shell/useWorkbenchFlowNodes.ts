@@ -28,6 +28,8 @@ import { projectWorkbenchObjectMotion } from './workbenchObjectMotion'
 import { prefersReducedMotion } from './workbenchViewportMotion'
 import { projectCanvasArrangementStackingOntoNodes } from './canvasArrangementStackingProjection'
 import type { CanvasArrangementMotionChoreography } from './canvasArrangementMotion'
+import { createTerminalStateStore, type TerminalStateStore } from './terminalStateStore'
+import { reconcileWorkbenchNodeProjection } from './workbenchNodeProjectionReconciler'
 
 type TerminalFlowNodeHandlers = Parameters<typeof createTerminalFlowNodes>[0]['handlers']
 
@@ -47,7 +49,8 @@ interface UseWorkbenchFlowNodesInput {
   readonly protectedLayoutNodeIds: ReadonlySet<string>
   readonly onAgentGraphUpdated: (event: AgentGraphUpdatedEvent) => void
   readonly setNodes: Dispatch<SetStateAction<WorkbenchFlowNode[]>>
-  readonly terminalStates: Record<string, TerminalViewState>
+  readonly terminalStates?: Record<string, TerminalViewState>
+  readonly terminalStateStore?: TerminalStateStore
   readonly activeWorkflowRootBlockIds?: readonly string[]
   readonly isStoppingWorkflow?: boolean
   readonly launchCommandEditRequest?: {
@@ -84,7 +87,8 @@ export function useWorkbenchFlowNodes({
   protectedLayoutNodeIds,
   onAgentGraphUpdated,
   setNodes,
-  terminalStates,
+  terminalStates = {},
+  terminalStateStore: providedTerminalStateStore,
   activeWorkflowRootBlockIds,
   isStoppingWorkflow,
   launchCommandEditRequest,
@@ -102,6 +106,14 @@ export function useWorkbenchFlowNodes({
   const exitingObjectNodesRef = useRef(new Map<string, WorkbenchFlowNode>())
   const parkedCollapsedMemberNodesRef = useRef(new Map<string, WorkbenchFlowNode>())
   const nextObjectMotionIdRef = useRef(1)
+  const fallbackTerminalStateStoreRef = useRef<TerminalStateStore | null>(null)
+  fallbackTerminalStateStoreRef.current ??= createTerminalStateStore(terminalStates)
+  const terminalStateStore = providedTerminalStateStore ?? fallbackTerminalStateStoreRef.current
+  const fallbackTerminalStates = providedTerminalStateStore ? null : terminalStates
+
+  useLayoutEffect(() => {
+    if (fallbackTerminalStates) terminalStateStore.replaceStates(fallbackTerminalStates)
+  }, [fallbackTerminalStates, terminalStateStore])
 
   const completeObjectMotion = useCallback(
     (nodeId: string, motionId: string): void => {
@@ -174,7 +186,7 @@ export function useWorkbenchFlowNodes({
         isTerminalGroupSelectionMode,
         selectedTerminalBlockIds,
         selectedTerminalGroupId,
-        terminalStates,
+        terminalStateStore,
         includeCollapsedMembers: true,
         workflowBuildPresentation: terminalWorkflowBuildPresentation,
         workflowNodeStatuses
@@ -203,7 +215,7 @@ export function useWorkbenchFlowNodes({
               onRemove: onRemoveAgent,
               onRename: onRenameAgent,
               onResize: onResizeAgent,
-              onSelect: () => onSelectAgent(agent.agentId)
+              onSelect: onSelectAgent
             })
           ),
           ...terminalNodes
@@ -291,9 +303,10 @@ export function useWorkbenchFlowNodes({
         ...parkedCollapsedMemberNodesRef.current.values()
       ]
 
-      return shouldPreserveTransientLayout
+      const projectedNodes = shouldPreserveTransientLayout
         ? preserveWorkbenchNodeTransientLayout(nodesWithExits, currentNodes, protectedLayoutNodeIds)
         : nodesWithExits
+      return reconcileWorkbenchNodeProjection(projectedNodes, currentNodes)
     })
   }, [
     canvasArrangementMotion,
@@ -313,7 +326,7 @@ export function useWorkbenchFlowNodes({
     protectedLayoutNodeIds,
     onAgentGraphUpdated,
     setNodes,
-    terminalStates,
+    terminalStateStore,
     workflowNodeStatuses,
     terminalWorkflowBuildPresentation,
     onRemoveAgent,

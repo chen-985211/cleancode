@@ -34,5 +34,6 @@
 @import './styles/agent-tool-approval.css';
 @import './styles/agent-tool-approval-connection.css';
 @import './styles/agent-mcp-capability.css';
+@import './styles/terminal-surface-visibility.css';
 @import './styles/workbench-object-motion.css';
 @import './styles/selection-motion.css';

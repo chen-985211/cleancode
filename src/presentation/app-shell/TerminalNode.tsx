@@ -26,17 +26,18 @@ import {
 import { useI18n } from './i18n/useI18n'
 import { useWorkbenchObjectMotionPresentation } from './useWorkbenchObjectMotionPresentation'
 import { WorkbenchIcon } from './WorkbenchIcons'
+import { useTerminalState } from './terminalStateStore'
 
 export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   const block = data.block
-  const session = data.session
+  const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
+  const session = useTerminalState(data.terminalStateStore, block.id, data.session, !isParked)
   const isRunning = session.status === 'running'
   const isDisclosureExit = data.objectMotion?.kind === 'group-collapse'
   const isPresenceMotion =
     data.objectMotion?.kind === 'create' || data.objectMotion?.kind === 'delete'
   const isPresenceExit = data.objectMotion?.kind === 'delete'
   const isPresencePending = data.objectPresence?.phase === 'pending'
-  const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
   const isInteractionSuppressed =
     isDisclosureExit || isPresenceExit || isPresencePending || isParked
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
@@ -265,7 +266,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
           workflowStatus={data.workflowStatus}
           isActiveWorkflowRoot={Boolean(data.isActiveWorkflowRoot)}
           isStoppingWorkflow={Boolean(data.isStoppingWorkflow)}
-          onSelect={(additive) => data.onSelect?.(additive)}
+          onSelect={(additive) => data.onSelect?.(block, additive)}
           onToggleTerminalGroupCandidate={() => data.onToggleTerminalGroupCandidate(block)}
           onStartEditing={startEditingMetadata}
           onStop={stopTerminal}

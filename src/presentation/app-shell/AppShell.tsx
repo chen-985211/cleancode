@@ -167,7 +167,7 @@ export function AppShell({
     restartTerminal,
     runningSessionIds,
     startTerminal,
-    terminalStates,
+    terminalStateProjection,
     terminalSurfaceRegistry,
     terminalZoomRasterCoordinator: terminalRendering,
     terminateTerminalSession,
@@ -191,7 +191,7 @@ export function AppShell({
     useTerminalWorkflowBuildPreference()
   const { changeReduceVisualNoise, reduceVisualNoise } = useCanvasVisualNoisePreference()
   const minimapAppearance = useTerminalMinimapAppearance({
-    terminalStates,
+    terminalStates: terminalStateProjection.states,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
     hoveredTerminalBlockId
   })
@@ -486,7 +486,7 @@ export function AppShell({
     terminalWorkflowBuildPresentation,
     onAgentGraphUpdated,
     setNodes: nodeStore.setNodes,
-    terminalStates,
+    terminalStateStore: terminalStateProjection.store,
     activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
     isStoppingWorkflow: terminalWorkflow.isStopping,
     launchCommandEditRequest:

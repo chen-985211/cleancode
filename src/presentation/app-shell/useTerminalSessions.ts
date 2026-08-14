@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SetStateAction
+} from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
@@ -24,6 +32,7 @@ import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
 import { TerminalWorkloadScheduler } from './terminalWorkloadScheduler'
+import { createTerminalStateStore } from './terminalStateStore'
 import { createTerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
 import {
   inheritTerminalRetention,
@@ -75,6 +84,7 @@ export function useTerminalSessions({
   const [terminalStatesByKey, setTerminalStatesByKey] = useState<Record<string, TerminalViewState>>(
     {}
   )
+  const [terminalStateStore] = useState(createTerminalStateStore)
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
   const [terminalZoomRasterCoordinator] = useState(() => new TerminalZoomRasterCoordinator())
   const [terminalWorkloadScheduler] = useState(() => new TerminalWorkloadScheduler())
@@ -136,6 +146,9 @@ export function useTerminalSessions({
       ),
     [recoveredTerminalStates, runtimeAvailability.epoch]
   )
+  useLayoutEffect(() => {
+    terminalStateStore.replaceStates(terminalStates)
+  }, [terminalStateStore, terminalStates])
   const runningSessionIds = useMemo(
     () =>
       Object.values(terminalStates)
@@ -666,7 +679,7 @@ export function useTerminalSessions({
     moveTerminalSessionToWorkspace,
     setTerminalStates: updateTerminalStates,
     startTerminal,
-    terminalStates,
+    terminalStateProjection: { states: terminalStates, store: terminalStateStore },
     terminalSurfaceRegistry,
     terminalZoomRasterCoordinator: terminalRenderingWorkloadCoordinator,
     terminalStatesRef,

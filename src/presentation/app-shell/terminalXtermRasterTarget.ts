@@ -5,6 +5,7 @@ export class TerminalXtermRasterTarget {
   private element: HTMLDivElement | null = null
   private intersectionObserver: IntersectionObserver | null = null
   private mutationObserver: MutationObserver | null = null
+  private presentationOwner: HTMLElement | null = null
   private resizeObserver: ResizeObserver | null = null
   private isFocused = false
   private isIntersecting = false
@@ -35,6 +36,7 @@ export class TerminalXtermRasterTarget {
   attach(element: HTMLDivElement): void {
     this.detach(this.element)
     this.element = element
+    this.presentationOwner = findTerminalPresentationOwner(element)
     element.addEventListener('focusin', this.handleFocusIn)
     element.addEventListener('focusout', this.handleFocusOut)
     element.ownerDocument.defaultView?.addEventListener('resize', this.handleGeometryChange)
@@ -59,7 +61,7 @@ export class TerminalXtermRasterTarget {
     }
 
     if (typeof MutationObserver !== 'undefined') {
-      const presentationOwner = element.closest<HTMLElement>('[data-terminal-block-id]')
+      const presentationOwner = this.presentationOwner
       if (presentationOwner) {
         this.mutationObserver = new MutationObserver(() => {
           if (this.element !== element) return
@@ -89,6 +91,8 @@ export class TerminalXtermRasterTarget {
     this.mutationObserver = null
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    if (this.presentationOwner) delete this.presentationOwner.dataset.terminalSurfacePriority
+    this.presentationOwner = null
     this.element = null
     this.isFocused = false
     this.isIntersecting = false
@@ -128,8 +132,12 @@ export class TerminalXtermRasterTarget {
         : this.isFocused
           ? 'focused'
           : 'visible'
-    if (nextPriority === this.priority) return
+    const didChange = nextPriority !== this.priority
     this.priority = nextPriority
+    if (this.presentationOwner) {
+      this.presentationOwner.dataset.terminalSurfacePriority = nextPriority
+    }
+    if (!didChange) return
     for (const listener of this.priorityListeners) listener()
   }
 
@@ -162,6 +170,10 @@ export class TerminalXtermRasterTarget {
     const height = Math.ceil(geometry.height * geometry.devicePixelRatio * scale)
     return width * height
   }
+}
+
+function findTerminalPresentationOwner(element: HTMLElement): HTMLElement | null {
+  return element.closest<HTMLElement>('[data-terminal-block-id], [data-agent-console-node]')
 }
 
 interface RasterGeometry {

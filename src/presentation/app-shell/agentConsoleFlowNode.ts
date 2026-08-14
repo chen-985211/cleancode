@@ -27,7 +27,7 @@ interface CreateAgentConsoleFlowNodeInput {
     agent: WorkspaceAgentSnapshot,
     layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
-  readonly onSelect?: () => void
+  readonly onSelect?: (agentId: string) => void
 }
 
 export function createAgentConsoleFlowNode({

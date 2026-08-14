@@ -41,6 +41,35 @@ describe('terminal xterm raster target', () => {
     expect(onPriorityChange).toHaveBeenCalledTimes(2)
   })
 
+  it('projects the shared visibility priority onto the terminal node owner', () => {
+    const { anchor, target, viewport } = createAttachedTarget(intersectionObservers)
+    const input = document.createElement('textarea')
+    viewport.append(input)
+
+    expect(anchor.dataset.terminalSurfacePriority).toBe('visible')
+
+    input.focus()
+    expect(anchor.dataset.terminalSurfacePriority).toBe('focused')
+
+    intersectionObservers[0]?.emit(false)
+    expect(anchor.dataset.terminalSurfacePriority).toBe('hidden')
+
+    target.detach(viewport)
+    expect(anchor.dataset.terminalSurfacePriority).toBeUndefined()
+  })
+
+  it('uses the same visibility projection for an Agent terminal owner', () => {
+    const { anchor } = createAttachedTarget(intersectionObservers, {
+      ownerAttribute: 'agent'
+    })
+
+    expect(anchor.dataset.agentConsoleNode).toBe('agent-1')
+    expect(anchor.dataset.terminalSurfacePriority).toBe('visible')
+
+    intersectionObservers[0]?.emit(false)
+    expect(anchor.dataset.terminalSurfacePriority).toBe('hidden')
+  })
+
   it('keeps a parked visibility-hidden terminal hidden even when it intersects, then announces its return', async () => {
     const style = document.createElement('style')
     style.dataset.testTerminalRasterStyle = 'true'
@@ -137,13 +166,22 @@ describe('terminal xterm raster target', () => {
 
 function createAttachedTarget(
   intersectionObservers: FakeIntersectionObserver[],
-  { width = 400, height = 240 } = {}
+  {
+    height = 240,
+    ownerAttribute = 'terminal',
+    width = 400
+  }: {
+    readonly height?: number
+    readonly ownerAttribute?: 'agent' | 'terminal'
+    readonly width?: number
+  } = {}
 ) {
   const canvas = document.createElement('div')
   canvas.className = 'canvas-surface'
   const anchor = document.createElement('div')
   anchor.className = 'terminal-node-anchor'
-  anchor.dataset.terminalBlockId = 'terminal-block'
+  if (ownerAttribute === 'agent') anchor.dataset.agentConsoleNode = 'agent-1'
+  else anchor.dataset.terminalBlockId = 'terminal-block'
   const viewport = document.createElement('div')
   defineElementSize(viewport, width, height)
   anchor.append(viewport)

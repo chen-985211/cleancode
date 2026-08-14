@@ -51,6 +51,9 @@ export interface TerminalSurfaceRegistryDiagnostics
   extends TerminalSurfaceDiagnostics, TerminalWorkloadDiagnostics {
   readonly surfaceCount: number
   readonly domSurfaceCount: number
+  readonly focusedSurfaceCount: number
+  readonly hiddenSurfaceCount: number
+  readonly visibleSurfaceCount: number
   readonly webglSurfaceCount: number
 }
 
@@ -171,12 +174,19 @@ export class TerminalSurfaceRegistry {
   getDiagnostics(): TerminalSurfaceRegistryDiagnostics {
     let pendingOutputBytes = 0
     let domSurfaceCount = 0
+    let focusedSurfaceCount = 0
+    let hiddenSurfaceCount = 0
+    let visibleSurfaceCount = 0
     let webglSurfaceCount = 0
     for (const view of this.views.values()) {
       const diagnostics = view.surface.getDiagnostics()
       pendingOutputBytes += diagnostics.pendingOutputBytes
       if (diagnostics.rendererState === 'webgl') webglSurfaceCount += 1
       else domSurfaceCount += 1
+      const rasterPriority = view.surface.rasterTarget?.getRasterPriority()
+      if (rasterPriority === 'focused') focusedSurfaceCount += 1
+      if (rasterPriority === 'visible') visibleSurfaceCount += 1
+      if (rasterPriority === 'hidden') hiddenSurfaceCount += 1
     }
     const workloadDiagnostics = this.workloadScheduler.getDiagnostics()
     return {
@@ -184,6 +194,9 @@ export class TerminalSurfaceRegistry {
       pendingOutputBytes,
       rendererState: webglSurfaceCount > 0 ? 'webgl' : 'dom',
       domSurfaceCount,
+      focusedSurfaceCount,
+      hiddenSurfaceCount,
+      visibleSurfaceCount,
       webglSurfaceCount,
       ...workloadDiagnostics
     }

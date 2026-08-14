@@ -31,6 +31,9 @@ describe('terminal surface registry disposable views', () => {
       pendingOutputBytes: 0,
       rendererState: 'dom',
       domSurfaceCount: 1,
+      focusedSurfaceCount: 0,
+      hiddenSurfaceCount: 0,
+      visibleSurfaceCount: 0,
       webglSurfaceCount: 0,
       lastDeferReason: null,
       lastDrainDurationMs: 0,
@@ -108,6 +111,42 @@ describe('terminal surface registry disposable views', () => {
     registry.release(lease.viewId)
 
     expect(unregister).toHaveBeenCalledOnce()
+  })
+
+  it('reports focused, visible, and hidden surface counts from the shared raster owner', () => {
+    let nextViewId = 0
+    let nextSurface = 0
+    const priorities = ['focused', 'visible', 'hidden'] as const
+    const registry = new TerminalSurfaceRegistry(
+      () => {
+        const surface = createFakeSurface()
+        const priority = priorities[nextSurface++]!
+        surface.rasterTarget = {
+          getRasterCost: vi.fn(() => 96_000),
+          getRasterPriority: vi.fn(() => priority),
+          getRasterScale: vi.fn(() => 1 as const),
+          setRasterScale: vi.fn()
+        }
+        return surface
+      },
+      () => `view-${++nextViewId}`
+    )
+
+    priorities.forEach((_priority, index) =>
+      registry.create({
+        ...createIdentity(),
+        generation: index + 1,
+        runId: `run-${index + 1}`,
+        sessionId: `session-${index + 1}`
+      })
+    )
+
+    expect(registry.getDiagnostics()).toMatchObject({
+      focusedSurfaceCount: 1,
+      hiddenSurfaceCount: 1,
+      surfaceCount: 3,
+      visibleSurfaceCount: 1
+    })
   })
 
   it('registers and releases output plus initialization work with the shared scheduler', () => {
