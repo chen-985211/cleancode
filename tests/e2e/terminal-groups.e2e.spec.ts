@@ -172,6 +172,8 @@ describe('terminal groups e2e', () => {
       expect(await page.getByRole('button', { name: '聚焦终端组合 启动项目' }).count()).toBe(0)
 
       await page.getByRole('button', { name: '启动项目 管理组合内容' }).click()
+      await page.getByRole('button', { name: '缩小画布' }).click()
+      await waitForCanvasViewportToSettle(page)
 
       const graphBeforeDrag = await readGraph(page, workbench)
       const groupBeforeDrag = graphBeforeDrag.terminalGroups.find(
@@ -255,6 +257,7 @@ async function dragTerminalIntoGroup(
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
   const group = terminalGroupLocator(page, terminalGroupId)
+  await terminalHeader.hover()
   const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
   const groupBox = await readRequiredBoundingBox(group)
@@ -471,6 +474,7 @@ async function dragTerminalTowardGroupRightEdge(
   const terminalHeader = page.locator(
     `[data-terminal-block-id="${terminalBlockId}"] .terminal-node__header`
   )
+  await terminalHeader.hover()
   const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
   const groupBox = await readRequiredBoundingBox(terminalGroupLocator(page, terminalGroupId))
@@ -493,6 +497,7 @@ async function inspectTerminalRemovalBoundary(
   const group = terminalGroupLocator(page, terminalGroupId)
   const terminal = page.locator(`[data-terminal-block-id="${terminalBlockId}"]`)
   const terminalHeader = terminal.locator('.terminal-node__header')
+  await terminalHeader.hover()
   const groupBox = await readRequiredBoundingBox(group)
   const terminalBox = await readRequiredBoundingBox(terminal)
   const headerBox = await readRequiredBoundingBox(terminalHeader)
