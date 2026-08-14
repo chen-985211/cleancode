@@ -152,7 +152,13 @@ describe('workbench layout focus', () => {
 
   it('frames committed workflow bounds while terminals are still at entering positions', async () => {
     const getNodesBounds = vi.fn(() => ({ height: 0, width: 0, x: 0, y: 0 }))
-    const setViewport = vi.fn(async () => true)
+    let resolveViewport: (applied: boolean) => void = () => undefined
+    const setViewport = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveViewport = resolve
+        })
+    )
     const onHandled = vi.fn()
     const agentNode = createSizedAgentNode()
     const enteringTerminalNode = createTerminalNode({ x: 380, y: 340 })
@@ -187,9 +193,13 @@ describe('workbench layout focus', () => {
     )
 
     await waitFor(() => expect(setViewport).toHaveBeenCalledOnce())
+    expect(onHandled).not.toHaveBeenCalled()
+
+    resolveViewport(true)
+
+    await waitFor(() => expect(onHandled).toHaveBeenCalledWith('workflow-call-1'))
     expect(setViewport).toHaveBeenCalledWith(expect.any(Object), { duration: 0 })
     expect(getNodesBounds).not.toHaveBeenCalled()
-    expect(onHandled).toHaveBeenCalledWith('workflow-call-1')
   })
 })
 

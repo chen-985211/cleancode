@@ -242,15 +242,15 @@ describe('application settings', () => {
     ).toHaveAttribute('data-application-settings-pane', 'canvas')
   })
 
-  it('switches terminal workflow construction between progressive and parallel presentation', () => {
+  it('switches terminal construction between progressive and simultaneous presentation', () => {
     render(<SettingsHarness initiallyOpen />)
 
     fireEvent.click(screen.getByRole('button', { name: '终端' }))
 
-    const buildModeOptions = screen.getByRole('radiogroup', { name: '工作流搭建动效' })
+    const buildModeOptions = screen.getByRole('radiogroup', { name: '终端搭建动效' })
     expect(within(buildModeOptions).getByRole('radio', { name: /逐步搭建/ })).toBeChecked()
-    fireEvent.click(within(buildModeOptions).getByRole('radio', { name: /并行进入/ }))
-    expect(within(buildModeOptions).getByRole('radio', { name: /并行进入/ })).toBeChecked()
+    fireEvent.click(within(buildModeOptions).getByRole('radio', { name: /整体搭建/ }))
+    expect(within(buildModeOptions).getByRole('radio', { name: /整体搭建/ })).toBeChecked()
   })
 
   it('lets the user control canvas visual noise with an accessible switch', () => {
@@ -297,7 +297,7 @@ function SettingsHarness({ initiallyOpen = false }: { readonly initiallyOpen?: b
   )
   const [terminalScrollbackRows, setTerminalScrollbackRows] = useState<1000 | 5000 | 10000>(1000)
   const [terminalWorkflowBuildMode, setTerminalWorkflowBuildMode] = useState<
-    'parallel' | 'progressive'
+    'progressive' | 'simultaneous'
   >('progressive')
   const [reduceVisualNoise, setReduceVisualNoise] = useState(true)
   const [followQuickExecutionTarget, setFollowQuickExecutionTarget] = useState(true)

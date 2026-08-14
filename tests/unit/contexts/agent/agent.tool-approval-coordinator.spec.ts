@@ -112,7 +112,41 @@ describe('Agent tool approval coordinator', () => {
     })
   })
 
-  it('publishes one atomic workflow creation event after the committed graph result', async () => {
+  it('publishes one terminal build event for a single created terminal', async () => {
+    const session = createManagedSession()
+    const coordinator = new AgentToolApprovalCoordinator(
+      {
+        cancel: vi.fn(),
+        execute: vi.fn(async () => completedBlockCreationResult('block-operation-1'))
+      },
+      () => session
+    )
+
+    await coordinator.execute(session, {
+      input: { name: 'API', type: 'terminal' },
+      sessionId: session.sessionId,
+      toolCallId: 'block-operation-1',
+      toolName: 'create_block'
+    })
+
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledOnce()
+    expect(session.callbacks.onGraphUpdated).toHaveBeenCalledWith({
+      agentId: 'agent-1',
+      change: {
+        blockIds: ['terminal-api'],
+        connectionIds: [],
+        kind: 'terminal_build_created',
+        operationId: 'block-operation-1',
+        terminalGroupIds: []
+      },
+      graph: fakeGraph,
+      projectDirectory: '/repo/app',
+      sessionId: 'agent-session-1',
+      workspaceId: 'main'
+    })
+  })
+
+  it('publishes one terminal build event after an atomic workflow is committed', async () => {
     const session = createManagedSession()
     const coordinator = new AgentToolApprovalCoordinator(
       {
@@ -135,7 +169,7 @@ describe('Agent tool approval coordinator', () => {
       change: {
         blockIds: ['terminal-api', 'terminal-web'],
         connectionIds: ['connection-api-web'],
-        kind: 'terminal_workflow_created',
+        kind: 'terminal_build_created',
         operationId: 'workflow-operation-1',
         terminalGroupIds: ['terminal-group-dev']
       },
@@ -421,6 +455,19 @@ function completedWorkflowCreationResult(toolCallId: string): AgentToolExecution
       ],
       plan: { graphId: 'graph-1', nodes: [], workspaceId: 'main' },
       type: 'terminal_workflow_created'
+    },
+    status: 'completed',
+    toolCallId
+  }
+}
+
+function completedBlockCreationResult(toolCallId: string): AgentToolExecutionResult {
+  return {
+    graph: fakeGraph,
+    graphChanged: true,
+    output: {
+      createdBlockId: 'terminal-api',
+      type: 'block_graph'
     },
     status: 'completed',
     toolCallId

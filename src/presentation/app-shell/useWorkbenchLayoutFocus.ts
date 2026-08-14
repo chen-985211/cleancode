@@ -63,6 +63,7 @@ export function useWorkbenchLayoutFocus({
 
     let animationFrame = 0
     let isCanceled = false
+    let didFinishFocus = false
     let isFocusScheduled = false
     const focusWhenProjected = (): void => {
       if (isCanceled || handledOperationIdsRef.current.has(request.operationId)) return
@@ -83,22 +84,27 @@ export function useWorkbenchLayoutFocus({
           ? resolveCommittedFocusBounds(resolvedFocusNodes, request.expectedNodeLayouts)
           : null
 
-      if (committedBounds) {
-        void transitionWorkbenchViewport(reactFlowInstance, {
-          bounds: committedBounds,
-          intent: { type: 'spatial' },
-          padding: 0.24,
-          type: 'fit-bounds'
+      const focusCompletion = committedBounds
+        ? transitionWorkbenchViewport(reactFlowInstance, {
+            bounds: committedBounds,
+            intent: { type: 'spatial' },
+            padding: 0.24,
+            type: 'fit-bounds'
+          })
+        : transitionWorkbenchViewport(reactFlowInstance, {
+            intent: { type: 'spatial' },
+            nodes: resolvedFocusNodes,
+            padding: 0.24,
+            type: 'fit-view'
+          })
+
+      void focusCompletion
+        .catch(() => false)
+        .then(() => {
+          if (isCanceled) return
+          didFinishFocus = true
+          onHandled(request.operationId)
         })
-      } else {
-        void transitionWorkbenchViewport(reactFlowInstance, {
-          intent: { type: 'spatial' },
-          nodes: resolvedFocusNodes,
-          padding: 0.24,
-          type: 'fit-view'
-        })
-      }
-      onHandled(request.operationId)
     }
 
     const scheduleFocusWhenProjected = (): void => {
@@ -126,6 +132,7 @@ export function useWorkbenchLayoutFocus({
 
     return () => {
       isCanceled = true
+      if (!didFinishFocus) handledOperationIdsRef.current.delete(request.operationId)
       unsubscribe()
       window.cancelAnimationFrame(animationFrame)
     }

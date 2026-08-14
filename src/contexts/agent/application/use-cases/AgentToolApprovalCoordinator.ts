@@ -172,20 +172,28 @@ export class AgentToolApprovalCoordinator {
             connectionIds: result.output.createdConnections.map(
               (connection) => connection.connectionId
             ),
-            kind: 'terminal_workflow_created' as const,
+            kind: 'terminal_build_created' as const,
             operationId: result.toolCallId,
             terminalGroupIds: result.output.createdTerminalGroupId
               ? [result.output.createdTerminalGroupId]
               : []
           }
-        : result.output.arrangedBlockIds && result.output.arrangedTerminalGroupIds
+        : result.output.type === 'block_graph' && result.output.createdBlockId
           ? {
-              blockIds: result.output.arrangedBlockIds,
-              kind: 'terminal_layout_arranged' as const,
+              blockIds: [result.output.createdBlockId],
+              connectionIds: [],
+              kind: 'terminal_build_created' as const,
               operationId: result.toolCallId,
-              terminalGroupIds: result.output.arrangedTerminalGroupIds
+              terminalGroupIds: []
             }
-          : undefined
+          : result.output.arrangedBlockIds && result.output.arrangedTerminalGroupIds
+            ? {
+                blockIds: result.output.arrangedBlockIds,
+                kind: 'terminal_layout_arranged' as const,
+                operationId: result.toolCallId,
+                terminalGroupIds: result.output.arrangedTerminalGroupIds
+              }
+            : undefined
 
     try {
       session.callbacks.onGraphUpdated({

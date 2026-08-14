@@ -193,7 +193,7 @@ Provider MCP 配置中的工具允许范围不替代这层产品审批。破坏�
 - `structuredContent`：遵循每个工具公开的 `outputSchema`。成功图工具包含 `status`、稳定的 `toolCallId`、`graphChanged`、工具输出和最新图快照；计划检查返回计划而不复制图快照；失败返回结构化 `error`。
 - `isError`：完成时为 `false`；取消或失败时为 `true`。`awaiting_approval` 是应用内部状态，实际 MCP 调用会保持等待，不把它作为最终外部结果返回。
 
-只有 `graphChanged: true` 的成功变更才通过回调把最新图快照通知表现层；`inspect_graph`、计划检查和幂等布局不得触发伪更新。显式布局、组合创建和组合成员移动成功时，布局事件携带 `terminal_layout_arranged`、原始 `toolCallId` 和实际排列的终端/组合 ID。原子工作流成功只发布一个 `terminal_workflow_created` 事件，携带本次终端、连接、组合 ID 和原始 `toolCallId`；表现层只能在收到这份已提交事实后演出，不得用动画预告未提交修改。事件元数据不持久化，也不改变 BlockGraph 事实。
+只有 `graphChanged: true` 的成功变更才通过回调把最新图快照通知表现层；`inspect_graph`、计划检查和幂等布局不得触发伪更新。显式布局、组合创建和组合成员移动成功时，布局事件携带 `terminal_layout_arranged`、原始 `toolCallId` 和实际排列的终端/组合 ID。单个 `create_block` 成功与原子 `create_terminal_workflow` 成功都发布统一的 `terminal_build_created` 事件；前者携带单个终端 ID，后者携带本次终端、连接与组合 ID，两者都保留原始 `toolCallId`。表现层只能在收到这份已提交事实后先聚焦、再按用户偏好演出，不得用动画预告未提交修改。事件元数据和聚焦/搭建阶段不持久化，也不改变 BlockGraph 事实。
 
 ## 状态所有权与持久化
 

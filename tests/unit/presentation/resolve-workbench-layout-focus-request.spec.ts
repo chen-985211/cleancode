@@ -41,7 +41,7 @@ describe('resolve workbench layout focus request', () => {
         change: {
           blockIds: ['worker'],
           connectionIds: [],
-          kind: 'terminal_workflow_created',
+          kind: 'terminal_build_created',
           operationId: 'tool-call-2',
           terminalGroupIds: []
         },

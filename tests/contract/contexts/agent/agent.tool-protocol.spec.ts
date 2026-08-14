@@ -342,6 +342,18 @@ describe('agent tool protocol', () => {
     expect(cleancodeMcpInstructions).toContain('not workflow nodes')
   })
 
+  it('routes configured terminals from one request through one atomic workflow call', () => {
+    for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
+      expect(instructions).toContain('one or more new configured terminals requested together')
+      expect(instructions).toContain('Use create_block only for one empty visual terminal')
+    }
+
+    expect(requireTool('create_block').description).toContain('one empty visual terminal')
+    expect(requireTool('create_terminal_workflow').description).toContain(
+      'one or more new CleanCode terminals requested together'
+    )
+  })
+
   it('projects the canonical canvas execution semantics into MCP and Provider instructions', () => {
     for (const instructions of [cleancodeMcpDeveloperInstructions, cleancodeMcpInstructions]) {
       expect(instructions).toContain(canvasExecutionSemanticInstructions)

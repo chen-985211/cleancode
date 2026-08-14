@@ -82,7 +82,7 @@ export type AgentGraphChange =
   | {
       readonly blockIds: readonly string[]
       readonly connectionIds: readonly string[]
-      readonly kind: 'terminal_workflow_created'
+      readonly kind: 'terminal_build_created'
       readonly operationId: string
       readonly terminalGroupIds: readonly string[]
     }

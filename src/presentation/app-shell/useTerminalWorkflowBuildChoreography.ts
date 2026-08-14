@@ -29,6 +29,7 @@ export interface TerminalWorkflowBuildPresentation {
 interface ActiveBuild {
   readonly choreography: TerminalWorkflowBuildChoreography
   readonly interruptedNodeIds: Set<string>
+  isStarted: boolean
   presentationSignature: string
   startedAt: number | null
 }
@@ -72,9 +73,9 @@ export function useTerminalWorkflowBuildChoreography({
   )
 
   const begin = useCallback(
-    (event: AgentGraphUpdatedEvent): void => {
+    (event: AgentGraphUpdatedEvent, originNodeId?: string): void => {
       cancelActiveBuild(true)
-      if (event.change?.kind !== 'terminal_workflow_created') return
+      if (event.change?.kind !== 'terminal_build_created') return
 
       const createdNodeIds = new Set([...event.change.blockIds, ...event.change.terminalGroupIds])
       const canvasNodes = nodeStore
@@ -86,6 +87,7 @@ export function useTerminalWorkflowBuildChoreography({
         change: event.change,
         graph: event.graph,
         mode: terminalWorkflowBuildMode,
+        originNodeId,
         reducedMotion: prefersReducedMotion()
       })
 
@@ -94,10 +96,28 @@ export function useTerminalWorkflowBuildChoreography({
       const activeBuild: ActiveBuild = {
         choreography,
         interruptedNodeIds: new Set(),
+        isStarted: false,
         presentationSignature: '',
         startedAt: null
       }
       activeBuildRef.current = activeBuild
+      projectAwaitingFocusPresentation(activeBuild, setPresentation)
+    },
+    [cancelActiveBuild, nodeStore, terminalWorkflowBuildMode]
+  )
+
+  const start = useCallback(
+    (operationId?: string): void => {
+      const activeBuild = activeBuildRef.current
+      if (
+        !activeBuild ||
+        activeBuild.isStarted ||
+        (operationId !== undefined && activeBuild.choreography.operationId !== operationId)
+      ) {
+        return
+      }
+
+      activeBuild.isStarted = true
       projectPresentation(activeBuild, 0, setPresentation)
 
       const animate = (timestamp: number): void => {
@@ -137,7 +157,7 @@ export function useTerminalWorkflowBuildChoreography({
 
       animationFrameRef.current = window.requestAnimationFrame(animate)
     },
-    [cancelActiveBuild, nodeStore, terminalWorkflowBuildMode]
+    [nodeStore]
   )
 
   const interruptNodes = useCallback((nodeIds: readonly string[]): void => {
@@ -164,10 +184,11 @@ export function useTerminalWorkflowBuildChoreography({
     []
   )
 
-  return { begin, interruptNodes, presentation }
+  return { begin, interruptNodes, presentation, start }
 }
 
 function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
+  readonly nodeId: string
   readonly position: { readonly x: number; readonly y: number }
   readonly size: { readonly height: number; readonly width: number }
 }> {
@@ -183,6 +204,7 @@ function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
 
   return [
     {
+      nodeId: node.id,
       position: node.position,
       size: {
         height: resolveNodeSize(node.style?.height, persistedSize.height),
@@ -190,6 +212,29 @@ function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
       }
     }
   ]
+}
+
+function projectAwaitingFocusPresentation(
+  activeBuild: ActiveBuild,
+  setPresentation: (presentation: TerminalWorkflowBuildPresentation | null) => void
+): void {
+  const { choreography } = activeBuild
+  activeBuild.presentationSignature = 'awaiting-focus'
+  setPresentation({
+    enteringConnectionIds: new Set(),
+    enteringTerminalBlockIds: new Set(),
+    enteringTerminalGroupIds: new Set(),
+    initialPositionsByBlockId: new Map(
+      choreography.terminalStages.map((stage) => [stage.blockId, stage.initialPosition])
+    ),
+    operationId: choreography.operationId,
+    pendingConnectionIds: new Set(choreography.connectionStages.map((stage) => stage.connectionId)),
+    pendingTerminalBlockIds: new Set(choreography.terminalStages.map((stage) => stage.blockId)),
+    pendingTerminalGroupIds: new Set(
+      choreography.groupStages.map((stage) => stage.terminalGroupId)
+    ),
+    terminalBlockIds: new Set(choreography.terminalStages.map((stage) => stage.blockId))
+  })
 }
 
 function resolveAnimatedPosition(

@@ -105,12 +105,13 @@ export const zhCNMessages = {
   'settings.terminal.title': '终端',
   'settings.terminal.scrollback': '滚动历史',
   'settings.terminal.scrollbackRows': '{rows} 行',
-  'settings.terminal.workflowBuild': '工作流搭建动效',
+  'settings.terminal.workflowBuild': '终端搭建动效',
   'settings.terminal.workflowBuild.progressive': '逐步搭建',
   'settings.terminal.workflowBuild.progressiveDescription':
     '依次显示终端与依赖，让工作流从小到大展开。',
-  'settings.terminal.workflowBuild.parallel': '并行进入',
-  'settings.terminal.workflowBuild.parallelDescription': '按依赖层同时显示终端，更快完成搭建。',
+  'settings.terminal.workflowBuild.simultaneous': '整体搭建',
+  'settings.terminal.workflowBuild.simultaneousDescription':
+    '同时显示全部终端与依赖，更快完成搭建。',
   'settings.agents.title': 'Agent',
   'settings.agents.preferences': 'Agent 默认设置',
   'settings.agents.permission': '智能体权限',

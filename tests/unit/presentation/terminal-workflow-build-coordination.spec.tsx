@@ -25,7 +25,7 @@ describe('terminal workflow build coordination', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('places dependency layers from the Agent edge as one continuous committed presentation', () => {
+  it('builds every terminal together from the Agent edge after focus is released', () => {
     const graph = createGraph(['terminal-api', 'terminal-web'])
     const agentNode = createAgentNode()
     const nodeStore = createWorkbenchNodeStore([agentNode])
@@ -41,13 +41,14 @@ describe('terminal workflow build coordination', () => {
         setCurrentGraph: (nextGraph) => {
           nodeStore.setNodes([agentNode, ...createTerminalNodes(nextGraph)])
         },
-        terminalWorkflowBuildMode: 'parallel'
+        terminalWorkflowBuildMode: 'simultaneous'
       })
     )
 
     act(() =>
       result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api', 'terminal-web']))
     )
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(0)
 
     const initialApiPosition = findNode(nodeStore, 'terminal-api').position
@@ -61,7 +62,7 @@ describe('terminal workflow build coordination', () => {
     runAnimationFrame(120)
 
     expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(initialApiPosition)
-    expect(findNode(nodeStore, 'terminal-web').position).toEqual(initialWebPosition)
+    expect(findNode(nodeStore, 'terminal-web').position).not.toEqual(initialWebPosition)
     expect(result.current.terminalWorkflowBuildPresentation?.pendingConnectionIds).toContain(
       'connection-api-web'
     )
@@ -100,6 +101,7 @@ describe('terminal workflow build coordination', () => {
     )
 
     act(() => result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api'])))
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(0)
     nodeStore.setNodes((nodes) =>
       nodes.map((node) =>
@@ -137,6 +139,7 @@ describe('terminal workflow build coordination', () => {
     act(() =>
       result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api', 'terminal-web']))
     )
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(0)
 
     expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toContain(
@@ -165,6 +168,45 @@ describe('terminal workflow build coordination', () => {
     )
   })
 
+  it('keeps every created terminal pending until the focus attempt is released', () => {
+    const graph = createGraph(['terminal-api', 'terminal-web'])
+    const agentNode = createAgentNode()
+    const nodeStore = createWorkbenchNodeStore([agentNode])
+    const { result } = renderHook(() =>
+      useAgentLayoutCoordination({
+        clearTerminalGroupDropPreview: vi.fn(),
+        currentProjectId: 'project-1',
+        currentWorkspaceId: 'main',
+        moveWorkbenchNode: vi.fn(async () => undefined),
+        moveWorkspaceAgent: vi.fn(async () => undefined),
+        nodeStore,
+        reactFlowInstanceRef: { current: null },
+        setCurrentGraph: (nextGraph) => {
+          nodeStore.setNodes([agentNode, ...createTerminalNodes(nextGraph)])
+        },
+        terminalWorkflowBuildMode: 'progressive'
+      })
+    )
+
+    act(() =>
+      result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api', 'terminal-web']))
+    )
+
+    expect(result.current.terminalWorkflowBuildPresentation?.pendingTerminalBlockIds).toEqual(
+      new Set(['terminal-api', 'terminal-web'])
+    )
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toEqual(
+      new Set()
+    )
+
+    act(() => result.current.cancelLayoutFocus())
+    runAnimationFrame(0)
+
+    expect(result.current.terminalWorkflowBuildPresentation?.enteringTerminalBlockIds).toContain(
+      'terminal-api'
+    )
+  })
+
   it('settles the previous build before a newer committed graph starts', () => {
     const firstGraph = createGraph(['terminal-api'])
     const secondGraph = createGraph(['terminal-api', 'terminal-worker'])
@@ -186,10 +228,12 @@ describe('terminal workflow build coordination', () => {
     )
 
     act(() => result.current.onAgentGraphUpdated(createEvent(firstGraph, ['terminal-api'])))
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(0)
     act(() => result.current.onAgentGraphUpdated(createEvent(secondGraph, ['terminal-worker'])))
 
     expect(findNode(nodeStore, 'terminal-api').position).toEqual(secondGraph.blocks[0]!.position)
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(20)
     expect(findNode(nodeStore, 'terminal-worker').position).not.toEqual(
       secondGraph.blocks[1]!.position
@@ -249,6 +293,7 @@ describe('terminal workflow build coordination', () => {
       })
     )
     act(() => result.current.onAgentGraphUpdated(createEvent(graph, ['terminal-api'])))
+    act(() => result.current.cancelLayoutFocus())
     runAnimationFrame(0)
     expect(findNode(nodeStore, 'terminal-api').position).not.toEqual(graph.blocks[0]!.position)
 
@@ -281,7 +326,7 @@ function createEvent(
             createdBlockIdSet.has(connection.targetBlockId)
         )
         .map((connection) => connection.id),
-      kind: 'terminal_workflow_created',
+      kind: 'terminal_build_created',
       operationId: `operation-${createdBlockIds.at(-1)}`,
       terminalGroupIds: []
     },

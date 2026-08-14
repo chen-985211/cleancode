@@ -50,14 +50,11 @@ export function resolveWorkbenchLayoutFocusRequest({
     affectedNodeIds: uniqueIds([...change.blockIds, ...change.terminalGroupIds]),
     expectedNodeLayouts,
     focusNodeIds: uniqueIds([
-      ...(change.kind === 'terminal_workflow_created' && originAgentNodeId
-        ? [originAgentNodeId]
-        : []),
+      ...(change.kind === 'terminal_build_created' && originAgentNodeId ? [originAgentNodeId] : []),
       ...visibleGroups.map((group) => group.id),
       ...visibleUngroupedBlocks.map((block) => block.id)
     ]),
-    focusTarget:
-      change.kind === 'terminal_workflow_created' ? 'committed-layouts' : 'projected-nodes',
+    focusTarget: change.kind === 'terminal_build_created' ? 'committed-layouts' : 'projected-nodes',
     operationId: change.operationId
   }
 }

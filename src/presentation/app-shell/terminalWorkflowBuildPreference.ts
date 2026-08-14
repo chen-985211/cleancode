@@ -1,6 +1,6 @@
 const terminalWorkflowBuildPreferenceStorageKey = 'cleancode.terminal-workflow-build-preference'
 
-export type TerminalWorkflowBuildMode = 'parallel' | 'progressive'
+export type TerminalWorkflowBuildMode = 'progressive' | 'simultaneous'
 
 export const defaultTerminalWorkflowBuildMode: TerminalWorkflowBuildMode = 'progressive'
 
@@ -20,9 +20,16 @@ export function readTerminalWorkflowBuildPreference(
       readonly version?: unknown
     }
 
-    return value.version === 1 && isTerminalWorkflowBuildMode(value.mode)
-      ? { mode: value.mode }
-      : { mode: defaultTerminalWorkflowBuildMode }
+    if (value.version === 2 && isTerminalWorkflowBuildMode(value.mode)) {
+      return { mode: value.mode }
+    }
+    if (value.version === 1 && value.mode === 'parallel') {
+      return { mode: 'simultaneous' }
+    }
+    if (value.version === 1 && value.mode === 'progressive') {
+      return { mode: 'progressive' }
+    }
+    return { mode: defaultTerminalWorkflowBuildMode }
   } catch {
     return { mode: defaultTerminalWorkflowBuildMode }
   }
@@ -34,10 +41,10 @@ export function writeTerminalWorkflowBuildPreference(
 ): void {
   storage.setItem(
     terminalWorkflowBuildPreferenceStorageKey,
-    JSON.stringify({ mode: preference.mode, version: 1 })
+    JSON.stringify({ mode: preference.mode, version: 2 })
   )
 }
 
 function isTerminalWorkflowBuildMode(value: unknown): value is TerminalWorkflowBuildMode {
-  return value === 'parallel' || value === 'progressive'
+  return value === 'progressive' || value === 'simultaneous'
 }
