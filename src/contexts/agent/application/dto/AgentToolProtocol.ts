@@ -10,7 +10,11 @@ import type {
   AgentTerminalWorkflowPlanSnapshot
 } from './AgentTerminalWorkflowProtocol'
 import { canvasExecutionSemanticInstructions } from '../../../../shared-kernel/domain/policies/CanvasExecutionSemantics'
-import { objectSchema, type AgentToolJsonSchema } from './AgentToolJsonSchema'
+import {
+  objectSchema,
+  type AgentToolJsonSchema,
+  type AgentToolObjectJsonSchema
+} from './AgentToolJsonSchema'
 import {
   blockGraphOutputSchema,
   graphToolResultSchema,
@@ -25,9 +29,9 @@ import {
 export interface AgentToolDefinition {
   readonly annotations: AgentToolAnnotations
   readonly description: string
-  readonly inputSchema: AgentToolJsonSchema
+  readonly inputSchema: AgentToolObjectJsonSchema
   readonly name: AgentToolName
-  readonly outputSchema: AgentToolJsonSchema
+  readonly outputSchema: AgentToolObjectJsonSchema
   readonly requiresApproval: boolean
 }
 
@@ -272,7 +276,8 @@ export const agentToolDefinitions: readonly AgentToolDefinition[] = [
           },
           ['blockId', 'targetTerminalGroupId', 'position']
         )
-      ]
+      ],
+      type: 'object'
     },
     name: 'move_terminal_workflow_to_group',
     output: objectSchema(
@@ -584,7 +589,7 @@ function graphTool(input: {
   readonly canceled?: boolean
   readonly description: string
   readonly graphChanged: boolean | 'dynamic'
-  readonly inputSchema: AgentToolJsonSchema
+  readonly inputSchema: AgentToolObjectJsonSchema
   readonly name: AgentToolName
   readonly output: AgentToolJsonSchema
 }): AgentToolDefinition {

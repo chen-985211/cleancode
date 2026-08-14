@@ -18,6 +18,10 @@ export interface AgentToolJsonSchema {
   readonly uniqueItems?: boolean
 }
 
+export interface AgentToolObjectJsonSchema extends AgentToolJsonSchema {
+  readonly type: 'object'
+}
+
 export interface AgentToolJsonSchemaIssue {
   readonly path: string
   readonly reason: string
@@ -26,7 +30,7 @@ export interface AgentToolJsonSchemaIssue {
 export function objectSchema(
   properties: Readonly<Record<string, AgentToolJsonSchema>>,
   required: readonly string[] = []
-): AgentToolJsonSchema {
+): AgentToolObjectJsonSchema {
   return {
     additionalProperties: false,
     properties,
