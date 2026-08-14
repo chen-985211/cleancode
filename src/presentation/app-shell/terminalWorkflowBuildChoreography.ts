@@ -5,11 +5,9 @@ import type {
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalWorkflowBuildMode } from './terminalWorkflowBuildPreference'
 
-const maximumLaunchWindowMs = 1_400
-const preferredLayerGapMs = 280
-const parallelTerminalSettleMs = 760
-const parallelConnectionRevealLeadMs = 260
-const parallelGroupRevealLeadMs = 700
+const simultaneousTerminalSettleMs = 760
+const simultaneousConnectionRevealLeadMs = 260
+const simultaneousGroupRevealLeadMs = 700
 const progressiveMaximumLaunchWindowMs = 8_000
 const progressivePreferredStepGapMs = 780
 const progressiveTerminalSettleMs = 520
@@ -19,6 +17,7 @@ const groupRevealDurationMs = 300
 const buildOriginGap = 32
 
 interface LayoutRect {
+  readonly nodeId: string
   readonly position: BlockPositionSnapshot
   readonly size: { readonly height: number; readonly width: number }
 }
@@ -56,6 +55,7 @@ interface CreateTerminalWorkflowBuildChoreographyInput {
   readonly change: AgentGraphChange
   readonly graph: BlockGraphSnapshot
   readonly mode: TerminalWorkflowBuildMode
+  readonly originNodeId?: string
   readonly reducedMotion: boolean
 }
 
@@ -64,9 +64,10 @@ export function createTerminalWorkflowBuildChoreography({
   change,
   graph,
   mode,
+  originNodeId,
   reducedMotion
 }: CreateTerminalWorkflowBuildChoreographyInput): TerminalWorkflowBuildChoreography | null {
-  if (change.kind !== 'terminal_workflow_created') return null
+  if (change.kind !== 'terminal_build_created') return null
 
   const createdBlockIds = new Set(change.blockIds)
   const blocks = change.blockIds.flatMap((blockId) => {
@@ -83,14 +84,16 @@ export function createTerminalWorkflowBuildChoreography({
       blocks.reduce((sum, block) => sum + block.position.y + block.size.height / 2, 0) /
       blocks.length
   }
-  const sourceNode = resolveClosestCanvasNode(canvasNodes, targetCenter)
+  const sourceNode =
+    canvasNodes.find((node) => node.nodeId === originNodeId) ??
+    resolveClosestCanvasNode(canvasNodes, targetCenter)
   const origin = sourceNode
     ? resolveTerminalWorkflowBuildOrigin({ source: sourceNode, targetCenter })
     : { x: Math.round(targetCenter.x), y: Math.round(targetCenter.y) }
   const terminalStages =
     mode === 'progressive'
       ? createProgressiveTerminalStages({ blocks, createdBlockIds, graph, origin, reducedMotion })
-      : createParallelTerminalStages({ blocks, createdBlockIds, graph, origin, reducedMotion })
+      : createSimultaneousTerminalStages({ blocks, origin, reducedMotion })
   const delayByBlockId = new Map(
     terminalStages.map((stage) => [stage.blockId, stage.delayMs] as const)
   )
@@ -111,13 +114,13 @@ export function createTerminalWorkflowBuildChoreography({
           ) +
           (mode === 'progressive'
             ? progressiveConnectionRevealLeadMs
-            : parallelConnectionRevealLeadMs)
+            : simultaneousConnectionRevealLeadMs)
     }))
   const latestTerminalDelay = Math.max(0, ...terminalStages.map((stage) => stage.delayMs))
   const groupRevealLeadMs =
-    mode === 'progressive' ? progressiveGroupRevealLeadMs : parallelGroupRevealLeadMs
+    mode === 'progressive' ? progressiveGroupRevealLeadMs : simultaneousGroupRevealLeadMs
   const terminalSettleMs =
-    mode === 'progressive' ? progressiveTerminalSettleMs : parallelTerminalSettleMs
+    mode === 'progressive' ? progressiveTerminalSettleMs : simultaneousTerminalSettleMs
   const groupRevealAtMs = reducedMotion ? 0 : latestTerminalDelay + groupRevealLeadMs
   const groupStages = change.terminalGroupIds.map((terminalGroupId) => ({
     revealAtMs: groupRevealAtMs,
@@ -141,27 +144,15 @@ export function createTerminalWorkflowBuildChoreography({
   }
 }
 
-function createParallelTerminalStages({
+function createSimultaneousTerminalStages({
   blocks,
-  createdBlockIds,
-  graph,
   origin,
   reducedMotion
 }: {
   readonly blocks: BlockGraphSnapshot['blocks']
-  readonly createdBlockIds: ReadonlySet<string>
-  readonly graph: BlockGraphSnapshot
   readonly origin: BlockPositionSnapshot
   readonly reducedMotion: boolean
 }): TerminalWorkflowBuildTerminalStage[] {
-  const layerByBlockId = resolveDependencyLayers(
-    graph,
-    blocks.map((block) => block.id),
-    createdBlockIds
-  )
-  const maximumLayer = Math.max(0, ...layerByBlockId.values())
-  const layerGapMs =
-    maximumLayer === 0 ? 0 : Math.min(preferredLayerGapMs, maximumLaunchWindowMs / maximumLayer)
   const targetCenter = resolveBlocksCenter(blocks)
   const direction = normalizeVector({ x: targetCenter.x - origin.x, y: targetCenter.y - origin.y })
   const perpendicular = { x: -direction.y, y: direction.x }
@@ -171,8 +162,8 @@ function createParallelTerminalStages({
 
     return {
       blockId: block.id,
-      delayMs: reducedMotion ? 0 : Math.round((layerByBlockId.get(block.id) ?? 0) * layerGapMs),
-      durationMs: reducedMotion ? 0 : parallelTerminalSettleMs,
+      delayMs: 0,
+      durationMs: reducedMotion ? 0 : simultaneousTerminalSettleMs,
       initialPosition: reducedMotion
         ? block.position
         : {
@@ -306,7 +297,7 @@ export function resolveTerminalWorkflowBuildOrigin({
   source,
   targetCenter
 }: {
-  readonly source: LayoutRect
+  readonly source: Pick<LayoutRect, 'position' | 'size'>
   readonly targetCenter: BlockPositionSnapshot
 }): BlockPositionSnapshot {
   const center = {
@@ -356,49 +347,6 @@ function squaredDistanceToRegion(point: BlockPositionSnapshot, region: LayoutRec
   )
 
   return horizontalDistance ** 2 + verticalDistance ** 2
-}
-
-function resolveDependencyLayers(
-  graph: BlockGraphSnapshot,
-  orderedBlockIds: readonly string[],
-  includedBlockIds: ReadonlySet<string>
-): ReadonlyMap<string, number> {
-  const layerByBlockId = new Map(orderedBlockIds.map((blockId) => [blockId, 0]))
-  const incomingCount = new Map(orderedBlockIds.map((blockId) => [blockId, 0]))
-  const outgoingByBlockId = new Map(orderedBlockIds.map((blockId) => [blockId, [] as string[]]))
-
-  for (const connection of graph.connections ?? []) {
-    if (
-      !includedBlockIds.has(connection.sourceBlockId) ||
-      !includedBlockIds.has(connection.targetBlockId)
-    ) {
-      continue
-    }
-    outgoingByBlockId.get(connection.sourceBlockId)?.push(connection.targetBlockId)
-    incomingCount.set(
-      connection.targetBlockId,
-      (incomingCount.get(connection.targetBlockId) ?? 0) + 1
-    )
-  }
-
-  const queue = orderedBlockIds.filter((blockId) => incomingCount.get(blockId) === 0)
-  for (let index = 0; index < queue.length; index += 1) {
-    const sourceBlockId = queue[index]!
-    for (const targetBlockId of outgoingByBlockId.get(sourceBlockId) ?? []) {
-      layerByBlockId.set(
-        targetBlockId,
-        Math.max(
-          layerByBlockId.get(targetBlockId) ?? 0,
-          (layerByBlockId.get(sourceBlockId) ?? 0) + 1
-        )
-      )
-      const remaining = (incomingCount.get(targetBlockId) ?? 1) - 1
-      incomingCount.set(targetBlockId, remaining)
-      if (remaining === 0) queue.push(targetBlockId)
-    }
-  }
-
-  return layerByBlockId
 }
 
 function normalizeVector(vector: BlockPositionSnapshot): BlockPositionSnapshot {

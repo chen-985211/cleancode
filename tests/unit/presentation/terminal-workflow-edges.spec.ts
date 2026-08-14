@@ -82,10 +82,11 @@ describe('terminal workflow edges', () => {
       pendingConnectionIds: new Set(['b-c']),
       pendingTerminalBlockIds: new Set(['c']),
       pendingTerminalGroupIds: new Set(),
-      terminalBlockIds: new Set(['a', 'b', 'c'])
+      terminalBlockIds: new Set(['a', 'b', 'c']),
+      terminalGroupIds: new Set()
     })
 
-    expect(projected[0]?.className).toContain('terminal-workflow-edge--build-entering')
-    expect(projected[1]?.className).toContain('terminal-workflow-edge--build-pending')
+    expect(projected[0]?.className).toContain('workbench-object-edge--create')
+    expect(projected[1]?.className).toContain('workbench-object-edge--presence-pending')
   })
 })

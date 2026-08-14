@@ -6,6 +6,23 @@
   --workbench-object-motion-scale: 1;
 }
 
+.workbench-object-presence--pending,
+.workbench-object-edge--presence-pending {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.workbench-object-edge--create {
+  /* cc-motion-owner: workbench-object */
+  animation: workbench-object-edge-create-fade-in 300ms ease-out both;
+}
+
+.workbench-object-edge--create .react-flow__edge-path {
+  stroke-dasharray: 10 8;
+  /* cc-motion-owner: workbench-object */
+  animation: workbench-object-edge-create-draw 420ms ease-out both;
+}
+
 .terminal-group-node.workbench-object-motion--create {
   /* cc-motion-owner: workbench-object */
   animation: workbench-object-create-in 360ms cubic-bezier(0.18, 0.84, 0.22, 1) both;
@@ -237,7 +254,30 @@
   }
 }
 
+@keyframes workbench-object-edge-create-draw {
+  from {
+    stroke-dashoffset: 28;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes workbench-object-edge-create-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .workbench-object-edge--create,
+  .workbench-object-edge--create .react-flow__edge-path {
+    animation: none;
+  }
+
   :is(.terminal-node-anchor, .terminal-node, .terminal-group-node, .agent-console-node) {
     transform: none;
     transition: none;

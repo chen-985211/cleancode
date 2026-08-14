@@ -19,15 +19,24 @@ describe('terminal workflow build preference', () => {
     ).toEqual({ mode: 'progressive' })
   })
 
-  it('round-trips progressive and parallel modes through the versioned preference', () => {
+  it('migrates the previous parallel preference to simultaneous construction', () => {
+    expect(
+      readTerminalWorkflowBuildPreference(
+        createStorage(JSON.stringify({ mode: 'parallel', version: 1 }))
+      )
+    ).toEqual({ mode: 'simultaneous' })
+  })
+
+  it('round-trips progressive and simultaneous modes through the versioned preference', () => {
     const values = new Map<string, string>()
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => values.set(key, value)
     }
 
-    writeTerminalWorkflowBuildPreference({ mode: 'parallel' }, storage)
-    expect(readTerminalWorkflowBuildPreference(storage)).toEqual({ mode: 'parallel' })
+    writeTerminalWorkflowBuildPreference({ mode: 'simultaneous' }, storage)
+    expect(readTerminalWorkflowBuildPreference(storage)).toEqual({ mode: 'simultaneous' })
+    expect([...values.values()]).toEqual([JSON.stringify({ mode: 'simultaneous', version: 2 })])
   })
 })
 

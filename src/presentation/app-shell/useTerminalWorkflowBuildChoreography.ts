@@ -24,11 +24,19 @@ export interface TerminalWorkflowBuildPresentation {
   readonly pendingTerminalBlockIds: ReadonlySet<string>
   readonly pendingTerminalGroupIds: ReadonlySet<string>
   readonly terminalBlockIds: ReadonlySet<string>
+  readonly terminalGroupIds: ReadonlySet<string>
 }
 
 interface ActiveBuild {
   readonly choreography: TerminalWorkflowBuildChoreography
+  readonly enteringTerminalBlockIds: Set<string>
+  readonly enteringTerminalGroupIds: Set<string>
   readonly interruptedNodeIds: Set<string>
+  readonly triggeredTerminalBlockIds: Set<string>
+  readonly triggeredTerminalGroupIds: Set<string>
+  enteringTerminalBlockIdsAtMs: number | null
+  enteringTerminalGroupIdsAtMs: number | null
+  isStarted: boolean
   presentationSignature: string
   startedAt: number | null
 }
@@ -72,9 +80,9 @@ export function useTerminalWorkflowBuildChoreography({
   )
 
   const begin = useCallback(
-    (event: AgentGraphUpdatedEvent): void => {
+    (event: AgentGraphUpdatedEvent, originNodeId?: string): void => {
       cancelActiveBuild(true)
-      if (event.change?.kind !== 'terminal_workflow_created') return
+      if (event.change?.kind !== 'terminal_build_created') return
 
       const createdNodeIds = new Set([...event.change.blockIds, ...event.change.terminalGroupIds])
       const canvasNodes = nodeStore
@@ -86,6 +94,7 @@ export function useTerminalWorkflowBuildChoreography({
         change: event.change,
         graph: event.graph,
         mode: terminalWorkflowBuildMode,
+        originNodeId,
         reducedMotion: prefersReducedMotion()
       })
 
@@ -93,11 +102,35 @@ export function useTerminalWorkflowBuildChoreography({
 
       const activeBuild: ActiveBuild = {
         choreography,
+        enteringTerminalBlockIds: new Set(),
+        enteringTerminalGroupIds: new Set(),
+        enteringTerminalBlockIdsAtMs: null,
+        enteringTerminalGroupIdsAtMs: null,
         interruptedNodeIds: new Set(),
+        isStarted: false,
         presentationSignature: '',
-        startedAt: null
+        startedAt: null,
+        triggeredTerminalBlockIds: new Set(),
+        triggeredTerminalGroupIds: new Set()
       }
       activeBuildRef.current = activeBuild
+      projectAwaitingFocusPresentation(activeBuild, setPresentation)
+    },
+    [cancelActiveBuild, nodeStore, terminalWorkflowBuildMode]
+  )
+
+  const start = useCallback(
+    (operationId?: string): void => {
+      const activeBuild = activeBuildRef.current
+      if (
+        !activeBuild ||
+        activeBuild.isStarted ||
+        (operationId !== undefined && activeBuild.choreography.operationId !== operationId)
+      ) {
+        return
+      }
+
+      activeBuild.isStarted = true
       projectPresentation(activeBuild, 0, setPresentation)
 
       const animate = (timestamp: number): void => {
@@ -137,7 +170,7 @@ export function useTerminalWorkflowBuildChoreography({
 
       animationFrameRef.current = window.requestAnimationFrame(animate)
     },
-    [cancelActiveBuild, nodeStore, terminalWorkflowBuildMode]
+    [nodeStore]
   )
 
   const interruptNodes = useCallback((nodeIds: readonly string[]): void => {
@@ -164,10 +197,11 @@ export function useTerminalWorkflowBuildChoreography({
     []
   )
 
-  return { begin, interruptNodes, presentation }
+  return { begin, interruptNodes, presentation, start }
 }
 
 function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
+  readonly nodeId: string
   readonly position: { readonly x: number; readonly y: number }
   readonly size: { readonly height: number; readonly width: number }
 }> {
@@ -183,6 +217,7 @@ function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
 
   return [
     {
+      nodeId: node.id,
       position: node.position,
       size: {
         height: resolveNodeSize(node.style?.height, persistedSize.height),
@@ -190,6 +225,30 @@ function resolveCanvasNodeLayout(node: WorkbenchFlowNode): Array<{
       }
     }
   ]
+}
+
+function projectAwaitingFocusPresentation(
+  activeBuild: ActiveBuild,
+  setPresentation: (presentation: TerminalWorkflowBuildPresentation | null) => void
+): void {
+  const { choreography } = activeBuild
+  activeBuild.presentationSignature = 'awaiting-focus'
+  setPresentation({
+    enteringConnectionIds: new Set(),
+    enteringTerminalBlockIds: new Set(),
+    enteringTerminalGroupIds: new Set(),
+    initialPositionsByBlockId: new Map(
+      choreography.terminalStages.map((stage) => [stage.blockId, stage.initialPosition])
+    ),
+    operationId: choreography.operationId,
+    pendingConnectionIds: new Set(choreography.connectionStages.map((stage) => stage.connectionId)),
+    pendingTerminalBlockIds: new Set(choreography.terminalStages.map((stage) => stage.blockId)),
+    pendingTerminalGroupIds: new Set(
+      choreography.groupStages.map((stage) => stage.terminalGroupId)
+    ),
+    terminalBlockIds: new Set(choreography.terminalStages.map((stage) => stage.blockId)),
+    terminalGroupIds: new Set(choreography.groupStages.map((stage) => stage.terminalGroupId))
+  })
 }
 
 function resolveAnimatedPosition(
@@ -242,18 +301,51 @@ function projectPresentation(
   const enteringConnectionIds = activeBuild.choreography.connectionStages
     .filter((stage) => elapsedMs >= stage.revealAtMs)
     .map((stage) => stage.connectionId)
+  const newlyEnteringTerminalBlockIds = activeBuild.choreography.terminalStages
+    .filter(
+      (stage) =>
+        elapsedMs >= stage.delayMs && !activeBuild.triggeredTerminalBlockIds.has(stage.blockId)
+    )
+    .map((stage) => stage.blockId)
+  if (newlyEnteringTerminalBlockIds.length > 0) {
+    newlyEnteringTerminalBlockIds.forEach((blockId) =>
+      activeBuild.triggeredTerminalBlockIds.add(blockId)
+    )
+    activeBuild.enteringTerminalBlockIds.clear()
+    newlyEnteringTerminalBlockIds.forEach((blockId) =>
+      activeBuild.enteringTerminalBlockIds.add(blockId)
+    )
+    activeBuild.enteringTerminalBlockIdsAtMs = elapsedMs
+  } else if (activeBuild.enteringTerminalBlockIdsAtMs !== elapsedMs) {
+    activeBuild.enteringTerminalBlockIds.clear()
+  }
   const pendingTerminalBlockIds = activeBuild.choreography.terminalStages
-    .filter((stage) => elapsedMs < stage.delayMs)
+    .filter((stage) => !activeBuild.triggeredTerminalBlockIds.has(stage.blockId))
     .map((stage) => stage.blockId)
-  const enteringTerminalBlockIds = activeBuild.choreography.terminalStages
-    .filter((stage) => elapsedMs >= stage.delayMs)
-    .map((stage) => stage.blockId)
+  const enteringTerminalBlockIds = [...activeBuild.enteringTerminalBlockIds]
+  const newlyEnteringTerminalGroupIds = activeBuild.choreography.groupStages
+    .filter(
+      (stage) =>
+        elapsedMs >= stage.revealAtMs &&
+        !activeBuild.triggeredTerminalGroupIds.has(stage.terminalGroupId)
+    )
+    .map((stage) => stage.terminalGroupId)
+  if (newlyEnteringTerminalGroupIds.length > 0) {
+    newlyEnteringTerminalGroupIds.forEach((terminalGroupId) =>
+      activeBuild.triggeredTerminalGroupIds.add(terminalGroupId)
+    )
+    activeBuild.enteringTerminalGroupIds.clear()
+    newlyEnteringTerminalGroupIds.forEach((terminalGroupId) =>
+      activeBuild.enteringTerminalGroupIds.add(terminalGroupId)
+    )
+    activeBuild.enteringTerminalGroupIdsAtMs = elapsedMs
+  } else if (activeBuild.enteringTerminalGroupIdsAtMs !== elapsedMs) {
+    activeBuild.enteringTerminalGroupIds.clear()
+  }
   const pendingTerminalGroupIds = activeBuild.choreography.groupStages
-    .filter((stage) => elapsedMs < stage.revealAtMs)
+    .filter((stage) => !activeBuild.triggeredTerminalGroupIds.has(stage.terminalGroupId))
     .map((stage) => stage.terminalGroupId)
-  const enteringTerminalGroupIds = activeBuild.choreography.groupStages
-    .filter((stage) => elapsedMs >= stage.revealAtMs)
-    .map((stage) => stage.terminalGroupId)
+  const enteringTerminalGroupIds = [...activeBuild.enteringTerminalGroupIds]
   const signature = [
     pendingConnectionIds.join(','),
     enteringConnectionIds.join(','),
@@ -275,6 +367,11 @@ function projectPresentation(
     pendingConnectionIds: new Set(pendingConnectionIds),
     pendingTerminalBlockIds: new Set(pendingTerminalBlockIds),
     pendingTerminalGroupIds: new Set(pendingTerminalGroupIds),
-    terminalBlockIds: new Set(activeBuild.choreography.terminalStages.map((stage) => stage.blockId))
+    terminalBlockIds: new Set(
+      activeBuild.choreography.terminalStages.map((stage) => stage.blockId)
+    ),
+    terminalGroupIds: new Set(
+      activeBuild.choreography.groupStages.map((stage) => stage.terminalGroupId)
+    )
   })
 }

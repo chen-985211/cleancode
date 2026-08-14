@@ -35,8 +35,10 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const isPresenceMotion =
     data.objectMotion?.kind === 'create' || data.objectMotion?.kind === 'delete'
   const isPresenceExit = data.objectMotion?.kind === 'delete'
+  const isPresencePending = data.objectPresence?.phase === 'pending'
   const isParked = Boolean(data.isParkedInCollapsedGroup && !data.objectMotion)
-  const isInteractionSuppressed = isDisclosureExit || isPresenceExit || isParked
+  const isInteractionSuppressed =
+    isDisclosureExit || isPresenceExit || isPresencePending || isParked
   const [isEditingMetadata, setIsEditingMetadata] = useState(false)
   const [shouldFocusLaunchCommand, setShouldFocusLaunchCommand] = useState(false)
   const [focusRequestId, setFocusRequestId] = useState(0)
@@ -69,6 +71,7 @@ export const TerminalNode = memo(function TerminalNode({ data }: NodeProps<Termi
   const terminalAnchorClassName = [
     'terminal-node-anchor',
     isPresenceMotion ? objectMotionClassName : '',
+    isPresencePending ? 'workbench-object-presence--pending' : '',
     isParked ? 'terminal-node-anchor--parked' : '',
     data.isSelected ? 'terminal-node-anchor--selected' : '',
     data.isSelected ? 'terminal-node--selected' : '',

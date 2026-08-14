@@ -21,6 +21,10 @@ const themeStyles = readFileSync(
   resolve(process.cwd(), 'src/presentation/app-shell/styles/theme.css'),
   'utf8'
 )
+const appShellStyles = readFileSync(
+  resolve(process.cwd(), 'src/presentation/app-shell/AppShell.css'),
+  'utf8'
+)
 
 describe('workbench object motion styles', () => {
   it('materializes terminals and Agents from their center without changing layout geometry', () => {
@@ -48,6 +52,15 @@ describe('workbench object motion styles', () => {
     expect(objectMotionStyles).not.toContain(
       '.agent-console-node.workbench-object-motion--create::before'
     )
+  })
+
+  it('keeps staged presence and connection drawing inside the shared atomic motion owner', () => {
+    expect(objectMotionStyles).toContain('.workbench-object-presence--pending')
+    expect(objectMotionStyles).toContain('.workbench-object-edge--presence-pending')
+    expect(objectMotionStyles).toContain('.workbench-object-edge--create')
+    expect(objectMotionStyles).not.toContain('terminal-workflow-node-build-in')
+    expect(objectMotionStyles).not.toContain('terminal-workflow-group-build-in')
+    expect(appShellStyles).not.toContain("@import './styles/terminal-workflow-build.css';")
   })
 
   it('presents spring-driven group member paths without a competing CSS animation', () => {

@@ -1,4 +1,8 @@
-import { objectSchema, type AgentToolJsonSchema } from './AgentToolJsonSchema'
+import {
+  objectSchema,
+  type AgentToolJsonSchema,
+  type AgentToolObjectJsonSchema
+} from './AgentToolJsonSchema'
 
 const stringSchema: AgentToolJsonSchema = { type: 'string' }
 const finiteNumberSchema: AgentToolJsonSchema = { type: 'number' }
@@ -223,7 +227,7 @@ export function terminalWorkflowPlanScopeSchema(): AgentToolJsonSchema {
 
 export function blockGraphOutputSchema(
   optionalProperties: Readonly<Record<string, AgentToolJsonSchema>> = {}
-): AgentToolJsonSchema {
+): AgentToolObjectJsonSchema {
   return objectSchema({ type: { const: 'block_graph' }, ...optionalProperties }, ['type'])
 }
 
@@ -231,7 +235,7 @@ export function graphToolResultSchema(input: {
   readonly canceled: boolean
   readonly graphChanged: boolean | 'dynamic'
   readonly output: AgentToolJsonSchema
-}): AgentToolJsonSchema {
+}): AgentToolObjectJsonSchema {
   return {
     oneOf: [
       objectSchema(
@@ -252,7 +256,7 @@ export function graphToolResultSchema(input: {
   }
 }
 
-export function terminalWorkflowPlanResultSchema(): AgentToolJsonSchema {
+export function terminalWorkflowPlanResultSchema(): AgentToolObjectJsonSchema {
   return {
     oneOf: [
       objectSchema(

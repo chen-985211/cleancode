@@ -251,9 +251,52 @@ describe('execute Agent layout tools', () => {
           { blockId: 'terminal-api', ref: 'api' },
           { blockId: 'terminal-web', ref: 'web' }
         ],
+        structureType: 'workflow',
         type: 'terminal_workflow_created'
       },
       status: 'completed'
+    })
+  })
+
+  it('reports a one-node atomic creation as a terminal instead of a workflow', async () => {
+    const blockGraphTools = createBlockGraphTools()
+    vi.mocked(blockGraphTools.createTerminalWorkflow).mockResolvedValue({
+      arrangedBlockIds: ['terminal-dev'],
+      arrangedTerminalGroupIds: [],
+      createdConnections: [],
+      createdTerminalGroupId: null,
+      createdTerminals: [{ blockId: 'terminal-dev', ref: 'dev' }],
+      graph: fakeGraph,
+      plan: { graphId: 'graph-1', nodes: [], workspaceId: 'main' }
+    })
+    const executeTool = createExecuteTool(
+      blockGraphTools,
+      new RecordingAgentAuditRepository(),
+      createAgentSessionRepository([
+        createAgent('agent-1', { x: 980, y: 180 }, { height: 460, width: 720 })
+      ])
+    )
+
+    const result = await executeTool.execute({
+      agentId: 'agent-1',
+      input: {
+        launchCommand: 'pnpm dev',
+        name: 'Development server'
+      },
+      projectDirectory: '/tmp/project',
+      projectId: 'project-1',
+      sessionId: 'agent-session-1',
+      toolCallId: 'tool-call-create-terminal',
+      toolName: 'create_terminal',
+      workspaceId: 'main'
+    })
+
+    expect(result).toMatchObject({
+      output: {
+        createdTerminals: [{ blockId: 'terminal-dev', ref: 'dev' }],
+        structureType: 'terminal',
+        type: 'terminal_workflow_created'
+      }
     })
   })
 

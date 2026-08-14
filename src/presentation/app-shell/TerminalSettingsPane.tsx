@@ -69,7 +69,7 @@ export function TerminalSettingsPane({
             data-selection-motion-target={terminalWorkflowBuildMode}
             aria-hidden="true"
           />
-          {(['progressive', 'parallel'] as const).map((mode) => (
+          {(['progressive', 'simultaneous'] as const).map((mode) => (
             <label data-selection-motion-option={mode} key={mode}>
               <input
                 type="radio"

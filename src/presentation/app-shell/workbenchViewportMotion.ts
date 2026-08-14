@@ -107,7 +107,8 @@ type WorkbenchFitViewOptions = Omit<
 type WorkbenchFitBoundsOptions = Omit<
   NonNullable<Parameters<ReactFlowInstance<WorkbenchFlowNode, Edge>['fitBounds']>[1]>,
   'duration' | 'ease' | 'interpolate'
->
+> &
+  Pick<FitViewOptions<WorkbenchFlowNode>, 'maxZoom' | 'minZoom'>
 
 export type WorkbenchViewportCommand =
   | {
@@ -219,8 +220,8 @@ export function resolveWorkbenchViewportCommandTarget(
         command.bounds,
         canvasSize.width,
         canvasSize.height,
-        minimumCanvasZoom,
-        maximumCanvasZoom,
+        command.minZoom ?? minimumCanvasZoom,
+        command.maxZoom ?? maximumCanvasZoom,
         command.padding ?? 0.1
       )
     case 'fit-view': {

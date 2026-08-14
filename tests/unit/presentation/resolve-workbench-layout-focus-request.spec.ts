@@ -41,7 +41,7 @@ describe('resolve workbench layout focus request', () => {
         change: {
           blockIds: ['worker'],
           connectionIds: [],
-          kind: 'terminal_workflow_created',
+          kind: 'terminal_build_created',
           operationId: 'tool-call-2',
           terminalGroupIds: []
         },
@@ -56,6 +56,27 @@ describe('resolve workbench layout focus request', () => {
         }
       ],
       focusNodeIds: ['agent:agent-1', 'worker'],
+      focusTarget: 'committed-layouts'
+    })
+  })
+
+  it('keeps the invoking Agent and every created terminal in the workflow focus scope', () => {
+    const graph = { ...createGraph(), terminalGroups: [] }
+
+    expect(
+      resolveWorkbenchLayoutFocusRequest({
+        originAgentNodeId: 'agent:agent-1',
+        change: {
+          blockIds: ['backend', 'worker'],
+          connectionIds: ['backend-worker'],
+          kind: 'terminal_build_created',
+          operationId: 'tool-call-3',
+          terminalGroupIds: []
+        },
+        graph
+      })
+    ).toMatchObject({
+      focusNodeIds: ['agent:agent-1', 'backend', 'worker'],
       focusTarget: 'committed-layouts'
     })
   })

@@ -10,9 +10,9 @@ export function projectTerminalWorkflowBuildOntoEdges(
 
   return edges.map((edge) => {
     const buildClassName = presentation.pendingConnectionIds.has(edge.id)
-      ? 'terminal-workflow-edge--build-pending'
+      ? 'workbench-object-edge--presence-pending'
       : presentation.enteringConnectionIds.has(edge.id)
-        ? 'terminal-workflow-edge--build-entering'
+        ? 'workbench-object-edge--create'
         : null
 
     return buildClassName

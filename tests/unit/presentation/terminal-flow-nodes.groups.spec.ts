@@ -166,7 +166,7 @@ describe('terminal flow nodes for terminal groups', () => {
     })
   })
 
-  it('projects build staging onto committed terminal and group nodes', () => {
+  it('projects build timing as generic object-presence intent', () => {
     const nodes = createTerminalFlowNodes({
       graph: createGraph({ isCollapsed: false }),
       handlers: createHandlers(),
@@ -180,19 +180,23 @@ describe('terminal flow nodes for terminal groups', () => {
         pendingConnectionIds: new Set(),
         pendingTerminalBlockIds: new Set(['frontend-terminal']),
         pendingTerminalGroupIds: new Set(['development-group']),
-        terminalBlockIds: new Set(['backend-terminal', 'frontend-terminal'])
+        terminalBlockIds: new Set(['backend-terminal', 'frontend-terminal']),
+        terminalGroupIds: new Set(['development-group'])
       }
     })
 
-    expect(nodes.find((node) => node.id === 'development-group')?.className).toBe(
-      'terminal-workflow-build-group--pending'
-    )
-    expect(nodes.find((node) => node.id === 'backend-terminal')?.className).toBe(
-      'terminal-workflow-build-node--entering'
-    )
-    expect(nodes.find((node) => node.id === 'frontend-terminal')?.className).toBe(
-      'terminal-workflow-build-node--pending'
-    )
+    expect(nodes.find((node) => node.id === 'development-group')).toMatchObject({
+      className: undefined,
+      data: { objectPresence: { id: 'operation-1:development-group', phase: 'pending' } }
+    })
+    expect(nodes.find((node) => node.id === 'backend-terminal')).toMatchObject({
+      className: undefined,
+      data: { objectPresence: { id: 'operation-1:backend-terminal', phase: 'entering' } }
+    })
+    expect(nodes.find((node) => node.id === 'frontend-terminal')).toMatchObject({
+      className: undefined,
+      data: { objectPresence: { id: 'operation-1:frontend-terminal', phase: 'pending' } }
+    })
   })
 })
 

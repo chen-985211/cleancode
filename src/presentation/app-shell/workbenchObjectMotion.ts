@@ -198,7 +198,14 @@ export function projectWorkbenchObjectMotion({
       }
     }
 
-    if (currentNode || isWorkflowBuildNode(node)) {
+    if (node.data.objectPresence?.phase === 'entering') {
+      return withObjectMotion(
+        node,
+        createAtomicObjectCreationMotion(node, node.data.objectPresence.id)
+      )
+    }
+
+    if (currentNode || node.data.objectPresence?.phase === 'pending') {
       return node
     }
 
@@ -223,9 +230,7 @@ export function projectWorkbenchObjectMotion({
             opacityDelayMs: groupMemberOpacityDelayMs,
             scale: { from: groupMemberCollapsedScale, to: 1 }
           }
-        : node.type !== 'terminalGroup'
-          ? { ...motion, scale: { from: 0, to: 1 } }
-          : motion
+        : createAtomicObjectCreationMotion(node, motion.id)
     )
   })
   const collapsingMemberExits = resolveCollapsingMemberExits({
@@ -443,6 +448,15 @@ function createObjectMotion(
   return { id: createMotionId(kind, nodeId), kind, offset }
 }
 
+function createAtomicObjectCreationMotion(
+  node: WorkbenchFlowNode,
+  id: string
+): WorkbenchObjectMotion {
+  const motion: WorkbenchObjectMotion = { id, kind: 'create', offset: { x: 0, y: 0 } }
+
+  return node.type === 'terminalGroup' ? motion : { ...motion, scale: { from: 0, to: 1 } }
+}
+
 function withObjectMotion(
   node: WorkbenchFlowNode,
   objectMotion: WorkbenchObjectMotion
@@ -489,8 +503,4 @@ function resolveNodeRect(node: WorkbenchFlowNode): {
   const height = resolveNodeSize(node.style?.height, node.measured?.height ?? fallbackSize.height)
 
   return { height, width, x: node.position.x, y: node.position.y }
-}
-
-function isWorkflowBuildNode(node: WorkbenchFlowNode): boolean {
-  return typeof node.className === 'string' && node.className.startsWith('terminal-workflow-build-')
 }

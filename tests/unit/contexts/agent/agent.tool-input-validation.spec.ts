@@ -18,12 +18,17 @@ describe('agent tool input validation', () => {
         name: 'Build',
         type: 'terminal'
       },
+      create_terminal: {
+        executionConfig: {
+          mode: 'service',
+          readiness: { text: 'ready', type: 'output' },
+          readinessTimeoutMs: 30_000
+        },
+        launchCommand: 'pnpm dev',
+        name: 'Development server'
+      },
       create_terminal_workflow: {
         connections: [{ sourceRef: 'api', targetRef: 'web' }],
-        terminalGroup: {
-          memberRefs: ['api', 'web', 'worker'],
-          name: 'Development'
-        },
         terminals: [
           {
             executionConfig: {
@@ -36,6 +41,25 @@ describe('agent tool input validation', () => {
               readiness: { type: 'tcp' },
               readinessTimeoutMs: 30_000
             },
+            launchCommand: 'pnpm api',
+            name: 'API',
+            ref: 'api'
+          },
+          {
+            launchCommand: 'pnpm web',
+            name: 'Web',
+            ref: 'web'
+          }
+        ]
+      },
+      create_terminal_set: {
+        connections: [{ sourceRef: 'api', targetRef: 'web' }],
+        terminalGroup: {
+          memberRefs: ['api', 'web', 'worker'],
+          name: 'Development'
+        },
+        terminals: [
+          {
             launchCommand: 'pnpm api',
             name: 'API',
             ref: 'api'
@@ -87,6 +111,22 @@ describe('agent tool input validation', () => {
     for (const toolName of Object.keys(validInputs) as AgentToolName[]) {
       expect(parseAgentToolInput(toolName, validInputs[toolName])).toEqual(validInputs[toolName])
     }
+
+    expect(
+      parseAgentToolInput('create_terminal', {
+        launchCommand: 'pnpm dev',
+        name: 'Development server'
+      })
+    ).toMatchObject({ launchCommand: 'pnpm dev' })
+    expect(
+      parseAgentToolInput('create_terminal_workflow', {
+        connections: [{ sourceRef: 'install', targetRef: 'dev' }],
+        terminals: [
+          { launchCommand: 'pnpm install', name: 'Install', ref: 'install' },
+          { launchCommand: 'pnpm dev', name: 'Development server', ref: 'dev' }
+        ]
+      })
+    ).toMatchObject({ connections: [{ sourceRef: 'install', targetRef: 'dev' }] })
 
     expect(
       parseAgentToolInput('create_block', {
@@ -230,7 +270,7 @@ describe('agent tool input validation', () => {
           connections: [],
           terminals: []
         }),
-      '$.terminals'
+      '$.connections'
     )
     expectInvalidInput(
       () =>
@@ -310,6 +350,40 @@ describe('agent tool input validation', () => {
           }
         }),
       expect.stringContaining('$.executionConfig')
+    )
+  })
+
+  it('keeps terminal, workflow, and multiple creation behind distinct structure gates', () => {
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('create_terminal_workflow', {
+          connections: [],
+          terminals: [{ launchCommand: 'pnpm dev', name: 'Development server', ref: 'dev' }]
+        }),
+      '$.connections'
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('create_terminal_workflow', {
+          connections: [{ sourceRef: 'install', targetRef: 'dev' }],
+          terminals: [
+            { launchCommand: 'pnpm install', name: 'Install', ref: 'install' },
+            { launchCommand: 'pnpm dev', name: 'Development server', ref: 'dev' },
+            { launchCommand: 'pnpm test', name: 'Tests', ref: 'test' }
+          ]
+        }),
+      '$.connections'
+    )
+    expectInvalidInput(
+      () =>
+        parseAgentToolInput('create_terminal_set', {
+          connections: [{ sourceRef: 'install', targetRef: 'dev' }],
+          terminals: [
+            { launchCommand: 'pnpm install', name: 'Install', ref: 'install' },
+            { launchCommand: 'pnpm dev', name: 'Development server', ref: 'dev' }
+          ]
+        }),
+      '$.connections'
     )
   })
 

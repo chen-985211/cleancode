@@ -67,23 +67,29 @@ export function useAgentLayoutCoordination({
 
   const onAgentGraphUpdated = useCallback(
     (event: AgentGraphUpdatedEvent): void => {
-      terminalWorkflowBuild.begin(event)
+      const originAgentNodeId = toAgentFlowNodeId(event.agentId)
+      terminalWorkflowBuild.begin(event, originAgentNodeId)
       setCurrentGraph(event.graph)
       const request = resolveWorkbenchLayoutFocusRequest({
         change: event.change,
         graph: event.graph,
-        originAgentNodeId: toAgentFlowNodeId(event.agentId)
+        originAgentNodeId
       })
 
       if (request) setLayoutFocusRequest(request)
+      else terminalWorkflowBuild.start(event.change?.operationId)
     },
-    [setCurrentGraph, terminalWorkflowBuild.begin]
+    [setCurrentGraph, terminalWorkflowBuild.begin, terminalWorkflowBuild.start]
   )
-  const handleLayoutFocusHandled = useCallback((operationId: string): void => {
-    setLayoutFocusRequest((currentRequest) =>
-      currentRequest?.operationId === operationId ? null : currentRequest
-    )
-  }, [])
+  const handleLayoutFocusHandled = useCallback(
+    (operationId: string): void => {
+      terminalWorkflowBuild.start(operationId)
+      setLayoutFocusRequest((currentRequest) =>
+        currentRequest?.operationId === operationId ? null : currentRequest
+      )
+    },
+    [terminalWorkflowBuild.start]
+  )
   const updateDragProtection = useCallback((nodeId: string, nodeIds: readonly string[] | null) => {
     if (nodeIds) dragProtectionByNodeIdRef.current.set(nodeId, nodeIds)
     else dragProtectionByNodeIdRef.current.delete(nodeId)
@@ -140,9 +146,10 @@ export function useAgentLayoutCoordination({
     [clearTerminalGroupDropPreview, updateDragProtection]
   )
   const cancelLayoutFocus = useCallback((): void => {
+    terminalWorkflowBuild.start(layoutFocusRequest?.operationId)
     setLayoutFocusRequest(null)
     onCancelLayoutFocus?.()
-  }, [onCancelLayoutFocus])
+  }, [layoutFocusRequest?.operationId, onCancelLayoutFocus, terminalWorkflowBuild.start])
 
   useEffect(() => {
     dragProtectionByNodeIdRef.current.clear()

@@ -6,33 +6,35 @@ import {
 } from '../../../src/presentation/app-shell/terminalWorkflowBuildChoreography'
 
 describe('terminal workflow build choreography', () => {
-  it('launches dependency layers in parallel within a bounded window', () => {
+  it('launches every terminal simultaneously without dependency-layer delay', () => {
     const graph = createGraph(20)
     const choreography = createTerminalWorkflowBuildChoreography({
       canvasNodes: [
         {
+          nodeId: 'agent:agent-1',
           position: { x: 40, y: 100 },
           size: { height: 480, width: 520 }
         }
       ],
       change: createChange(graph),
       graph,
-      mode: 'parallel',
+      mode: 'simultaneous',
+      originNodeId: 'agent:agent-1',
       reducedMotion: false
     })
 
     expect(choreography).not.toBeNull()
     expect(choreography!.terminalStages[0]?.delayMs).toBe(0)
-    expect(choreography!.terminalStages.at(-1)?.delayMs).toBe(1_400)
+    expect(choreography!.terminalStages.at(-1)?.delayMs).toBe(0)
     expect(choreography!.terminalStages.every((stage) => stage.durationMs === 760)).toBe(true)
-    expect(choreography!.totalDurationMs).toBe(2_160)
+    expect(choreography!.totalDurationMs).toBe(760)
 
     const parallelGraph = createParallelGraph()
     const parallel = createTerminalWorkflowBuildChoreography({
       canvasNodes: [],
       change: createChange(parallelGraph),
       graph: parallelGraph,
-      mode: 'parallel',
+      mode: 'simultaneous',
       reducedMotion: false
     })!
     const delayByBlockId = new Map(
@@ -40,8 +42,8 @@ describe('terminal workflow build choreography', () => {
     )
 
     expect(delayByBlockId.get('terminal-api')).toBe(delayByBlockId.get('terminal-worker'))
-    expect(delayByBlockId.get('terminal-web')).toBe(280)
-    expect(parallel.connectionStages[0]?.revealAtMs).toBe(540)
+    expect(delayByBlockId.get('terminal-web')).toBe(0)
+    expect(parallel.connectionStages[0]?.revealAtMs).toBe(260)
   })
 
   it('lets the final terminals settle before the group closes around them', () => {
@@ -50,14 +52,14 @@ describe('terminal workflow build choreography', () => {
       canvasNodes: [],
       change: { ...createChange(graph), terminalGroupIds: ['group-development'] },
       graph,
-      mode: 'parallel',
+      mode: 'simultaneous',
       reducedMotion: false
     })!
 
     expect(choreography.groupStages).toEqual([
-      { revealAtMs: 980, terminalGroupId: 'group-development' }
+      { revealAtMs: 700, terminalGroupId: 'group-development' }
     ])
-    expect(choreography.totalDurationMs).toBe(1_280)
+    expect(choreography.totalDurationMs).toBe(1_000)
   })
 
   it('starts at the Agent edge nearest the final workflow centroid', () => {
@@ -72,7 +74,7 @@ describe('terminal workflow build choreography', () => {
     ).toEqual({ x: 632, y: 279 })
   })
 
-  it('starts at the closest pre-existing canvas node instead of the invoking Agent', () => {
+  it('uses the invoking Agent as the build origin instead of a closer unrelated node', () => {
     const createdGraph = createParallelGraph()
     const contextNode = {
       description: '',
@@ -93,19 +95,27 @@ describe('terminal workflow build choreography', () => {
     const choreography = createTerminalWorkflowBuildChoreography({
       canvasNodes: [
         {
+          nodeId: 'agent:agent-1',
           position: { x: -1_200, y: 0 },
           size: { height: 480, width: 520 }
         },
-        contextNode
+        { ...contextNode, nodeId: contextNode.id }
       ],
       change,
       graph,
       mode: 'progressive',
+      originNodeId: 'agent:agent-1',
       reducedMotion: false
     })!
 
     expect(choreography.origin).toEqual(
-      resolveTerminalWorkflowBuildOrigin({ source: contextNode, targetCenter })
+      resolveTerminalWorkflowBuildOrigin({
+        source: {
+          position: { x: -1_200, y: 0 },
+          size: { height: 480, width: 520 }
+        },
+        targetCenter
+      })
     )
   })
 
@@ -223,7 +233,7 @@ function createChange(graph: BlockGraphSnapshot): NonNullable<AgentGraphUpdatedE
   return {
     blockIds: graph.blocks.map((block) => block.id),
     connectionIds: (graph.connections ?? []).map((connection) => connection.id),
-    kind: 'terminal_workflow_created',
+    kind: 'terminal_build_created',
     operationId: 'workflow-operation-1',
     terminalGroupIds: []
   }

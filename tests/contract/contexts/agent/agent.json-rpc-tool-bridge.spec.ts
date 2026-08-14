@@ -1,3 +1,5 @@
+import { ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js'
+
 import { CleancodeAgentJsonRpcToolBridge } from '../../../../src/contexts/agent/infrastructure/rpc/CleancodeAgentJsonRpcToolBridge'
 import { createExpectedAppError } from '../../../../src/shared-kernel/application/errors/AppError'
 
@@ -21,7 +23,7 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
       jsonrpc: '2.0',
       result: expect.objectContaining({
         instructions: expect.stringMatching(/arrange_terminal_layout[\s\S]*preferred/),
-        serverInfo: { name: 'cleancode-agent-tools', version: '0.5.0' }
+        serverInfo: { name: 'cleancode-agent-tools', version: '0.6.0' }
       })
     })
   })
@@ -134,6 +136,26 @@ describe('cleancode agent JSON-RPC tool bridge', () => {
     expect(result.tools.map((tool) => tool.name)).not.toEqual(
       expect.arrayContaining(['list_project_files', 'read_project_file', 'run_shell_command'])
     )
+  })
+
+  it('returns a complete tool catalog that conforms to the MCP wire contract', async () => {
+    const bridge = new CleancodeAgentJsonRpcToolBridge({
+      executeMcpTool: vi.fn(),
+      projectDirectory: '/tmp/project',
+      sessionId: 'agent-session-1',
+      workspaceId: 'main'
+    })
+
+    const response = await bridge.handle({
+      id: 'protocol-contract',
+      jsonrpc: '2.0',
+      method: 'tools/list'
+    })
+
+    if (!response || !('result' in response)) {
+      throw new Error('Expected tools/list result.')
+    }
+    expect(() => ListToolsResultSchema.parse(response.result)).not.toThrow()
   })
 
   it('calls agent tools through the application use case', async () => {

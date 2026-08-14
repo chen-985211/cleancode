@@ -173,6 +173,7 @@ describe('workbench viewport motion', () => {
     const fitBounds = resolveWorkbenchViewportCommandTarget(instance, {
       bounds: { height: 300, width: 400, x: 50, y: 60 },
       intent: { type: 'spatial' },
+      maxZoom: 1,
       padding: 0.24,
       type: 'fit-bounds'
     })
@@ -198,7 +199,7 @@ describe('workbench viewport motion', () => {
       960,
       640,
       0.35,
-      1.6,
+      1,
       0.24
     )
     expect(center).toEqual({ x: 372, y: 248, zoom: 0.9 })
