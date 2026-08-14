@@ -50,6 +50,7 @@ describe('terminal surface attachment identity', () => {
         focusRequestId={0}
         onDimensionsChange={vi.fn()}
         onInput={vi.fn()}
+        onRestart={vi.fn()}
         session={{
           output: '',
           sessionId: 'terminal-session-1',

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { useI18n } from './i18n/useI18n'
 import type { WorkbenchSnapshot } from './types'
@@ -28,14 +30,7 @@ export function CanvasInitialWorkbenchState({
 
     return (
       <div className="canvas-empty canvas-empty--loading" role="status" aria-label={label}>
-        <div className="canvas-empty__panel">
-          <span className="canvas-empty__icon" aria-hidden="true">
-            <WorkbenchIcon className="canvas-empty__spinner" role="loading" size={20} />
-          </span>
-          <div className="canvas-empty__copy">
-            <p>{label}</p>
-          </div>
-        </div>
+        <CanvasLoadingShimmerText>{label}</CanvasLoadingShimmerText>
       </div>
     )
   }
@@ -56,6 +51,28 @@ export function CanvasInitialWorkbenchState({
         </button>
       </div>
     </div>
+  )
+}
+
+function CanvasLoadingShimmerText({ children }: { readonly children: string }) {
+  const characters = Array.from(children)
+
+  return (
+    <p className="canvas-empty__loading-text" aria-hidden="true">
+      {characters.map((character, index) => (
+        <span
+          className="canvas-empty__loading-character"
+          key={`${index}-${character}`}
+          style={
+            {
+              '--cc-loading-shimmer-delay': `${Number((index / characters.length).toFixed(3))}s`
+            } as CSSProperties
+          }
+        >
+          {character}
+        </span>
+      ))}
+    </p>
   )
 }
 

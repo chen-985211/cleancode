@@ -243,18 +243,18 @@ async function resolveExpectedFocusedZoom(page: Page, node: Locator): Promise<nu
   const geometry = await page.evaluate((targetNode) => {
     const canvas = document.querySelector<HTMLElement>('.react-flow')
     const viewport = document.querySelector<HTMLElement>('.react-flow__viewport')
-    if (!canvas || !viewport || !targetNode) {
+    const flowNode = targetNode?.closest<HTMLElement>('.react-flow__node')
+    if (!canvas || !viewport || !flowNode) {
       throw new Error('Canvas focus geometry is unavailable.')
     }
 
     const zoom = new DOMMatrixReadOnly(getComputedStyle(viewport).transform).a
     const canvasBounds = canvas.getBoundingClientRect()
-    const nodeBounds = targetNode.getBoundingClientRect()
 
     return {
       canvasSize: { height: canvasBounds.height, width: canvasBounds.width },
       currentZoom: zoom,
-      nodeSize: { height: nodeBounds.height / zoom, width: nodeBounds.width / zoom }
+      nodeSize: { height: flowNode.offsetHeight, width: flowNode.offsetWidth }
     }
   }, nodeElement)
 

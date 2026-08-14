@@ -27,7 +27,16 @@ describe('app shell initial workbench load', () => {
 
     render(<AppShell />)
 
-    expect(screen.getByRole('status', { name: '正在恢复上次的工作台' })).toBeInTheDocument()
+    const loadingState = screen.getByRole('status', { name: '正在恢复上次的工作台' })
+    const shimmerText = loadingState.querySelector('.canvas-empty__loading-text')
+
+    expect(loadingState).toHaveClass('canvas-empty--loading')
+    expect(loadingState.querySelector('.canvas-empty__panel')).not.toBeInTheDocument()
+    expect(loadingState.querySelector('.canvas-empty__icon')).not.toBeInTheDocument()
+    expect(shimmerText).toHaveTextContent('正在恢复上次的工作台')
+    const shimmerCharacters = shimmerText?.querySelectorAll('.canvas-empty__loading-character')
+    expect(shimmerCharacters).toHaveLength(10)
+    expect(shimmerCharacters?.item(9)).toHaveStyle('--cc-loading-shimmer-delay: 0.9s')
     expect(screen.getByText('正在恢复项目')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'CleanCode' })).not.toBeInTheDocument()
   })
