@@ -7,11 +7,13 @@ import { TooltipLabel } from './Tooltip'
 export function ProjectSidebarToggle({
   buttonRef,
   isCollapsed,
+  motionSurfaceRef,
   shortcutTooltip,
   onToggle
 }: {
   readonly buttonRef: Ref<HTMLButtonElement>
   readonly isCollapsed: boolean
+  readonly motionSurfaceRef: Ref<HTMLDivElement>
   readonly shortcutTooltip: string
   readonly onToggle: () => void
 }) {
@@ -19,6 +21,11 @@ export function ProjectSidebarToggle({
 
   return (
     <nav className="app-shell__titlebar-navigation" aria-label={t('app.windowNavigation')}>
+      <div
+        ref={motionSurfaceRef}
+        className="app-shell__titlebar-navigation-surface"
+        aria-hidden="true"
+      />
       <span className="app-shell__titlebar-traffic-light-pad" aria-hidden="true" />
       <TooltipLabel content={shortcutTooltip} side="bottom">
         <button

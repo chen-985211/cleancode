@@ -5,23 +5,44 @@ import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
 const fallbackExpandedWidth = 280
 
-export function useProjectSidebarMotion(isCollapsed: boolean): RefObject<HTMLElement | null> {
-  const sidebarRef = useRef<HTMLElement | null>(null)
+export interface ProjectSidebarMotionRefs {
+  readonly centerRef: RefObject<HTMLDivElement | null>
+  readonly sidebarRef: RefObject<HTMLDivElement | null>
+  readonly spatialRef: RefObject<HTMLDivElement | null>
+  readonly statusbarRef: RefObject<HTMLElement | null>
+  readonly titlebarRef: RefObject<HTMLDivElement | null>
+}
+
+export function useProjectSidebarMotion(isCollapsed: boolean): ProjectSidebarMotionRefs {
+  const sidebarRef = useRef<HTMLDivElement | null>(null)
+  const titlebarRef = useRef<HTMLDivElement | null>(null)
+  const spatialRef = useRef<HTMLDivElement | null>(null)
+  const centerRef = useRef<HTMLDivElement | null>(null)
+  const statusbarRef = useRef<HTMLElement | null>(null)
   const controller = useMemo(() => createProjectSidebarMotionController(), [])
   const reducedMotion = usePrefersReducedMotion()
 
   useLayoutEffect(() => {
     const root = sidebarRef.current?.closest<HTMLElement>('.app-shell') ?? null
-    controller.intentChanged(root, {
-      expandedWidth: readExpandedWidth(root),
-      isCollapsed,
-      reducedMotion
-    })
+    controller.intentChanged(
+      {
+        center: centerRef.current,
+        sidebar: sidebarRef.current,
+        spatial: spatialRef.current,
+        statusbar: statusbarRef.current,
+        titlebar: titlebarRef.current
+      },
+      {
+        expandedWidth: readExpandedWidth(root),
+        isCollapsed,
+        reducedMotion
+      }
+    )
   }, [controller, isCollapsed, reducedMotion])
 
   useEffect(() => () => controller.dispose(), [controller])
 
-  return sidebarRef
+  return { centerRef, sidebarRef, spatialRef, statusbarRef, titlebarRef }
 }
 
 function readExpandedWidth(root: HTMLElement | null): number {

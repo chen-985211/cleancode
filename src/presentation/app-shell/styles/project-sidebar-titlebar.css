@@ -1,0 +1,88 @@
+.app-shell__titlebar-navigation {
+  position: relative;
+  z-index: 11;
+  display: flex;
+  width: 100%;
+  height: var(--cc-titlebar-height);
+  min-height: var(--cc-titlebar-height);
+  flex: 0 0 var(--cc-titlebar-height);
+  align-items: center;
+  overflow: visible;
+  background: transparent;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.app-shell__titlebar-navigation-surface {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: var(--cc-sidebar-expanded-width);
+  height: var(--cc-titlebar-height);
+  background: var(--cc-chrome);
+  box-shadow: inset -1px 0 var(--cc-divider);
+  pointer-events: none;
+}
+
+.app-shell__titlebar-navigation-surface[data-project-sidebar-motion-state='collapsed'] {
+  visibility: hidden;
+  transform: translate3d(calc(-1 * var(--cc-sidebar-expanded-width)), 0, 0);
+}
+
+.app-shell--sidebar-collapsed
+  .app-shell__titlebar-navigation-surface:not([data-project-sidebar-motion-state]) {
+  visibility: hidden;
+  transform: translate3d(calc(-1 * var(--cc-sidebar-expanded-width)), 0, 0);
+}
+
+.app-shell__titlebar-navigation-surface[data-project-sidebar-motion-state='opening'],
+.app-shell__titlebar-navigation-surface[data-project-sidebar-motion-state='closing'] {
+  will-change: transform;
+}
+
+.app-shell--sidebar-collapsed .app-shell__titlebar-navigation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+}
+
+.app-shell__titlebar-traffic-light-pad {
+  width: 12px;
+  height: 100%;
+  flex: 0 0 12px;
+}
+
+.app-shell--mac .app-shell__titlebar-traffic-light-pad {
+  width: 80px;
+  flex-basis: 80px;
+}
+
+.app-shell--window-full-screen .app-shell__titlebar-traffic-light-pad {
+  width: 0;
+  flex-basis: 0;
+}
+
+.project-sidebar-toggle {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 4px 8px;
+  color: var(--cc-muted);
+  transition:
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
+    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+  -webkit-app-region: no-drag;
+}
+
+.project-sidebar-toggle:hover {
+  background: var(--cc-neutral-overlay);
+  color: var(--cc-foreground);
+}

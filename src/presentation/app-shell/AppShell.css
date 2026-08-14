@@ -9,6 +9,7 @@
 @import './styles/app-shell-utility-button-motion.css';
 @import './styles/notifications.css';
 @import './styles/project-sidebar.css';
+@import './styles/project-sidebar-titlebar.css';
 @import './styles/project-sidebar-branch-workspace-form.css';
 @import './styles/project-sidebar-archive.css';
 @import './styles/project-sidebar-project-removal.css';

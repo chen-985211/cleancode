@@ -9,24 +9,17 @@
 
 .app-shell {
   --cc-sidebar-expanded-width: 280px;
-  --cc-sidebar-motion-width: var(--cc-sidebar-expanded-width);
-  --cc-sidebar-motion-offset: 0%;
   position: relative;
   display: grid;
   width: 100%;
   min-width: 0;
   height: 100%;
   min-height: 0;
-  grid-template-columns: var(--cc-sidebar-motion-width) minmax(440px, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   background: var(--cc-background);
   color: var(--cc-foreground);
   /* cc-motion-owner: project-sidebar-motion */
-}
-
-.app-shell--sidebar-collapsed {
-  --cc-sidebar-motion-width: 0px;
-  --cc-sidebar-motion-offset: -100%;
 }
 
 button {
@@ -121,11 +114,6 @@ textarea:focus-visible {
 
 @media (max-width: 1120px) {
   .app-shell {
-    grid-template-columns: var(--cc-sidebar-motion-width) minmax(400px, 1fr);
-  }
-
-  .app-shell--sidebar-collapsed {
-    --cc-sidebar-motion-width: 0px;
-    --cc-sidebar-motion-offset: -100%;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

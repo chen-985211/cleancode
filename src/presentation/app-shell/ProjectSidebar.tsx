@@ -3,7 +3,7 @@ import { FoldersIcon } from '@phosphor-icons/react/dist/csr/Folders'
 import { GitBranchIcon } from '@phosphor-icons/react/dist/csr/GitBranch'
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus'
 import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type Ref } from 'react'
 
 import { BranchSelectorPopover } from './ProjectSidebarBranchSelector'
 import { ArchiveWorkspaceDialog } from './ArchiveWorkspaceDialog'
@@ -13,7 +13,6 @@ import type { WorkbenchSnapshot } from './types'
 import { useProjectSidebarBranchWorkspaceForm } from './useProjectSidebarBranchWorkspaceForm'
 import { useI18n } from './i18n/useI18n'
 import { useProjectSidebarReorder } from './useProjectSidebarReorder'
-import { useProjectSidebarMotion } from './useProjectSidebarMotion'
 import { useSelectionIndicatorMotion } from './useSelectionMotion'
 import { useOutsidePointerDismiss } from './useOutsidePointerDismiss'
 import { TooltipLabel } from './Tooltip'
@@ -31,6 +30,7 @@ interface ProjectSidebarProps {
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly isCollapsed?: boolean
   readonly isDesktopRuntime: boolean
+  readonly motionSurfaceRef?: Ref<HTMLDivElement>
   readonly isReorderPending?: boolean
   readonly intent?: ProjectSidebarIntent | null
   readonly shortcutTooltips?: Pick<
@@ -58,6 +58,7 @@ export function ProjectSidebar({
   currentWorkbench,
   isCollapsed = false,
   isDesktopRuntime,
+  motionSurfaceRef,
   isReorderPending = false,
   intent = null,
   shortcutTooltips,
@@ -73,7 +74,6 @@ export function ProjectSidebar({
   const addProjectTooltip = shortcutTooltips?.addProject ?? t('sidebar.addProject')
   const createBranchWorkspaceTooltip =
     shortcutTooltips?.createBranchWorkspace ?? t('sidebar.newBranchWorkspace')
-  const sidebarMotionRef = useProjectSidebarMotion(isCollapsed)
   const projectListRef = useRef<HTMLDivElement>(null)
   const canReorderProjects = isDesktopRuntime && !isReorderPending && workbenches.length > 1
   const projectReorder = useProjectSidebarReorder({
@@ -85,14 +85,13 @@ export function ProjectSidebar({
   })
   return (
     <aside
-      ref={sidebarMotionRef}
       id="project-sidebar"
       className="project-sidebar"
       aria-hidden={isCollapsed || undefined}
       aria-label={t('sidebar.label')}
       inert={isCollapsed}
     >
-      <div className="project-sidebar__motion-surface">
+      <div ref={motionSurfaceRef} className="project-sidebar__motion-surface">
         {!isDesktopRuntime ? (
           <div className="runtime-warning" role="status">
             {t('sidebar.previewWarning')}

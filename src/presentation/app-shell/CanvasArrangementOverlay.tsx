@@ -15,6 +15,7 @@ export function CanvasArrangementOverlay({
   onArrange,
   onToolbarExitComplete,
   selection,
+  showSelection = true,
   toolbarOpen
 }: {
   readonly arrangement: CanvasArrangementSnapshot
@@ -31,6 +32,7 @@ export function CanvasArrangementOverlay({
   ) => Promise<void> | void
   readonly onToolbarExitComplete?: () => void
   readonly selection: CanvasArrangementSelection | null
+  readonly showSelection?: boolean
   readonly toolbarOpen?: boolean
 }) {
   const hasSelection = (selection?.items.length ?? 0) > 0
@@ -58,17 +60,25 @@ export function CanvasArrangementOverlay({
         onToggleStack={() => requestArrangement(selectedStack ? 'detach-stack' : 'stack')}
         open={toolbarOpen ?? hasSelection}
       />
-      {selection?.rect ? (
-        <div
-          className="canvas-arrangement-selection"
-          style={{
-            left: selection.rect.x,
-            top: selection.rect.y,
-            width: selection.rect.width,
-            height: selection.rect.height
-          }}
-        />
-      ) : null}
+      {showSelection ? <CanvasArrangementSelectionOverlay selection={selection} /> : null}
     </>
   )
+}
+
+export function CanvasArrangementSelectionOverlay({
+  selection
+}: {
+  readonly selection: CanvasArrangementSelection | null
+}) {
+  return selection?.rect ? (
+    <div
+      className="canvas-arrangement-selection"
+      style={{
+        left: selection.rect.x,
+        top: selection.rect.y,
+        width: selection.rect.width,
+        height: selection.rect.height
+      }}
+    />
+  ) : null
 }

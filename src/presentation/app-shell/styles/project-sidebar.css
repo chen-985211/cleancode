@@ -1,8 +1,11 @@
 .project-sidebar-column {
-  position: relative;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
   z-index: 10;
   display: flex;
-  width: 100%;
+  width: var(--cc-sidebar-expanded-width);
   min-width: 0;
   min-height: 0;
   flex-direction: column;
@@ -24,14 +27,6 @@
   pointer-events: none;
 }
 
-.app-shell[data-project-sidebar-motion-state='collapsed'] .project-sidebar {
-  visibility: hidden;
-}
-
-.app-shell--sidebar-collapsed:not([data-project-sidebar-motion-state]) .project-sidebar {
-  visibility: hidden;
-}
-
 .project-sidebar__motion-surface {
   display: flex;
   width: var(--cc-sidebar-expanded-width);
@@ -44,74 +39,26 @@
   background: var(--cc-chrome);
   padding: 12px;
   box-shadow: 8px 0 24px -22px var(--cc-shadow-color);
-  transform: translate3d(var(--cc-sidebar-motion-offset), 0, 0);
 }
 
-.app-shell[data-project-sidebar-motion-state='opening'] .project-sidebar__motion-surface,
-.app-shell[data-project-sidebar-motion-state='closing'] .project-sidebar__motion-surface {
+.project-sidebar__motion-surface[data-project-sidebar-motion-state='collapsed'] {
+  visibility: hidden;
+  transform: translate3d(calc(-1 * var(--cc-sidebar-expanded-width)), 0, 0);
+}
+
+.app-shell--sidebar-collapsed
+  .project-sidebar__motion-surface:not([data-project-sidebar-motion-state]) {
+  visibility: hidden;
+  transform: translate3d(calc(-1 * var(--cc-sidebar-expanded-width)), 0, 0);
+}
+
+.project-sidebar__motion-surface[data-project-sidebar-motion-state='opening'],
+.project-sidebar__motion-surface[data-project-sidebar-motion-state='closing'] {
   will-change: transform;
-}
-
-.app-shell__titlebar-navigation {
-  z-index: 11;
-  display: flex;
-  width: 100%;
-  height: var(--cc-titlebar-height);
-  min-height: var(--cc-titlebar-height);
-  flex: 0 0 var(--cc-titlebar-height);
-  align-items: center;
-  overflow: hidden;
-  background: transparent;
-  user-select: none;
-  -webkit-app-region: drag;
 }
 
 .app-shell--sidebar-collapsed .project-sidebar-column {
   width: 0;
-}
-
-.app-shell--sidebar-collapsed .app-shell__titlebar-navigation {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: max-content;
-}
-
-.app-shell__titlebar-traffic-light-pad {
-  width: 12px;
-  height: 100%;
-  flex: 0 0 12px;
-}
-
-.app-shell--mac .app-shell__titlebar-traffic-light-pad {
-  width: 80px;
-  flex-basis: 80px;
-}
-
-.app-shell--window-full-screen .app-shell__titlebar-traffic-light-pad {
-  width: 0;
-  flex-basis: 0;
-}
-
-.project-sidebar-toggle {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  padding: 4px 8px;
-  color: var(--cc-muted);
-  transition:
-    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    color var(--cc-motion-duration-feedback) var(--cc-easing-standard);
-  -webkit-app-region: no-drag;
-}
-
-.project-sidebar-toggle:hover {
-  background: var(--cc-neutral-overlay);
-  color: var(--cc-foreground);
 }
 
 .app-shell--sidebar-collapsed .canvas-minimap-panel {
