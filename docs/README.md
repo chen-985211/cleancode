@@ -56,6 +56,7 @@ docs/
 - [UI 契约](product/ui-contract.md)：当前长期有效的信息架构、对象语义、用户能力、交互不变量和反馈行为。
 - [UI Style Guide](product/ui-style-guide.md)：表现层共享的视觉角色、组件选择、状态呈现、动效方法和 UI 评审规则。
 - [画布动效演进路线图](product/canvas-motion-roadmap.md)：画布相机、可打断空间运动和对象反馈的阶段顺序与验收边界。
+- [画布交互性能演进路线图](product/canvas-performance-roadmap.md)：保留高刷新率动效的前提下，逐帧路径、终端负载和节点级更新的三轮优化顺序。
 - [UI 路线图](product/ui-roadmap.md)：尚未确认或尚未实现的产品方向，不是当前功能清单。
 
 ## 工程文档
