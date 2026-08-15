@@ -79,7 +79,12 @@ describe('terminal daily interactions e2e', () => {
       await page.keyboard.press(process.platform === 'darwin' ? 'Meta+f' : 'Control+f')
       const search = page.getByRole('searchbox', { name: '搜索终端输出' })
       await search.fill('SEARCH_TARGET')
-      await page.getByText('1 / 2', { exact: true }).waitFor()
+      await pollUntilState({
+        description: 'terminal search to find both matches',
+        observe: () => page.locator('.terminal-search__results').textContent(),
+        accept: (results) => /^[12] \/ 2$/u.test(results?.trim() ?? ''),
+        timeoutMs: 10_000
+      })
 
       if (process.env.CLEANCODE_CAPTURE_PHASE_TWO_VISUAL === '1') {
         const resultDirectory = join(process.cwd(), 'test-results')
@@ -137,7 +142,6 @@ describe('terminal daily interactions e2e', () => {
         .locator('[data-terminal-block-id]')
         .filter({ has: page.locator(`[data-terminal-session-id="${sessionId}"]`) })
         .locator('.terminal-viewport')
-      const beforeDimensions = await probeTerminalDimensions(page, sessionId, 'BEFORE')
       const rendererState = await pollUntilState({
         description: 'focused terminal renderer activation',
         observe: () => readXtermRendererState(terminalViewport),
@@ -181,6 +185,7 @@ describe('terminal daily interactions e2e', () => {
         retryObservationErrors: true,
         timeoutMs: 10_000
       })
+      const beforeDimensions = await probeTerminalDimensions(page, sessionId, 'BEFORE')
       const beforeCssGeometry =
         rendererState.renderer === 'webgl' ? await readTerminalCssGeometry(page, sessionId) : null
 
