@@ -46,6 +46,7 @@ export function useBlockTemplateCanvasInteraction({
   const selectionDragRef = useRef<{
     readonly pointerId: number
     readonly candidates: readonly CanvasArrangementSelectionItem[]
+    readonly surface: HTMLElement
     readonly startClient: { readonly x: number; readonly y: number }
     readonly startLocal: { readonly x: number; readonly y: number }
   } | null>(null)
@@ -100,10 +101,12 @@ export function useBlockTemplateCanvasInteraction({
       return
     }
 
-    const bounds = event.currentTarget.getBoundingClientRect()
+    const surface = resolveCanvasSelectionSurface(event.currentTarget)
+    const bounds = surface.getBoundingClientRect()
     selectionDragRef.current = {
       pointerId: event.pointerId,
       candidates: listCanvasArrangementItems(graph, nodes),
+      surface,
       startClient: { x: event.clientX, y: event.clientY },
       startLocal: { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
     }
@@ -116,7 +119,7 @@ export function useBlockTemplateCanvasInteraction({
   function continueInteraction(event: ReactPointerEvent<HTMLDivElement>): void {
     const drag = selectionDragRef.current
     if (drag?.pointerId === event.pointerId) {
-      const bounds = event.currentTarget.getBoundingClientRect()
+      const bounds = drag.surface.getBoundingClientRect()
       const rect = normalizeCanvasArrangementSelectionRect(drag.startLocal, {
         x: event.clientX - bounds.left,
         y: event.clientY - bounds.top
@@ -245,5 +248,12 @@ function hasSameGeometry(
     left.size.height === right.size.height &&
     left.nodeIds.length === right.nodeIds.length &&
     left.nodeIds.every((nodeId, index) => nodeId === right.nodeIds[index])
+  )
+}
+
+function resolveCanvasSelectionSurface(canvasSurface: HTMLDivElement): HTMLElement {
+  return (
+    canvasSurface.querySelector<HTMLElement>('.workbench-canvas__spatial-motion-surface') ??
+    canvasSurface
   )
 }
