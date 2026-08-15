@@ -88,7 +88,6 @@ vi.mock('@xterm/xterm', () => ({
     })
     readonly getSelection = vi.fn(() => this.selection)
     readonly hasSelection = vi.fn(() => this.selection.length > 0)
-
     readonly write = vi.fn((_output: string, callback?: () => void) => {
       callback?.()
     })
@@ -113,6 +112,7 @@ vi.mock('@xterm/xterm', () => ({
     })
 
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
+    readonly parser = { registerOscHandler: vi.fn(() => ({ dispose: vi.fn() })) }
     readonly dispose = vi.fn()
     readonly refresh = vi.fn()
     readonly registerLinkProvider = vi.fn(

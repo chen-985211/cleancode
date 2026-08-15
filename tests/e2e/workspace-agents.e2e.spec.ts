@@ -4,6 +4,7 @@ import type { ElectronApplication, Page } from 'playwright'
 
 import {
   installFakeCodexCli,
+  readFakeCodexCliReports,
   type FakeCodexCliFixture
 } from '../fixtures/contexts/agent/fakeCodexCli'
 
@@ -28,6 +29,7 @@ import {
 } from '../support/e2eTerminal'
 import { stopAgentLaunchForShellSetup, writeAgentTerminalInput } from '../support/e2eAgentRuntime'
 import { selectAgentProviderFromCreateMenu } from '../support/e2eCanvasMenu'
+import { pollUntilState } from '../support/e2ePolling'
 import {
   ensureTerminalDomRenderer,
   readCanvasViewportTransform,
@@ -140,39 +142,99 @@ describe('workspace Agents e2e', () => {
   )
 
   it(
-    'keeps the Agent terminal scrollbar on the right edge of its content frame',
+    'keeps the Agent terminal grid and scrollbar aligned with its content frame',
     async () => {
       await expectDesktopRuntime(page)
       await page.getByRole('button', { name: '添加项目' }).click()
       await createCodexAgent(page)
       await waitForAgentCount(page, 1)
       await waitForAgentTerminals(page, 1)
+      const terminal = page.locator('.agent-terminal-viewport').first()
+      await page.waitForFunction(
+        () =>
+          document.querySelector<HTMLElement>('.agent-terminal-viewport')?.dataset
+            .terminalRendererReady === 'true'
+      )
 
-      const rightInsets = await page
-        .locator('.agent-terminal-viewport')
-        .first()
-        .evaluate((element) => {
-          const terminalShell = element.closest('.agent-console__terminal-shell')
-          const scrollbarViewport = element.querySelector('.xterm-viewport')
+      const rightInsets = await terminal.evaluate((element) => {
+        const terminalElement = element as HTMLElement
+        const terminalShell = terminalElement.closest('.agent-console__terminal-shell')
+        const scrollbarViewport = terminalElement.querySelector('.xterm-viewport')
+        const terminalScreen = terminalElement.querySelector('.xterm-screen')
+        const helperTextarea = terminalElement.querySelector('.xterm-helper-textarea')
 
-          if (!terminalShell || !scrollbarViewport) {
-            throw new Error('Agent terminal layout is incomplete.')
-          }
+        if (!terminalShell || !scrollbarViewport || !terminalScreen || !helperTextarea) {
+          throw new Error('Agent terminal layout is incomplete.')
+        }
 
-          const shellRight = terminalShell.getBoundingClientRect().right
+        const shellRight = terminalShell.getBoundingClientRect().right
+        const terminalBounds = terminalElement.getBoundingClientRect()
+        const presentationScale = terminalBounds.width / terminalElement.offsetWidth
+        const cellWidth = helperTextarea.getBoundingClientRect().width
+        const xtermDefaultScrollbarWidth = 15
+        const fitScrollbarReservation = xtermDefaultScrollbarWidth * presentationScale
 
-          return {
-            scrollbar: shellRight - scrollbarViewport.getBoundingClientRect().right,
-            terminal: shellRight - element.getBoundingClientRect().right,
-            thumbBorder: Number.parseFloat(
-              getComputedStyle(scrollbarViewport, '::-webkit-scrollbar-thumb').borderRightWidth
-            )
-          }
-        })
+        if (!Number.isFinite(cellWidth) || cellWidth <= 0) {
+          throw new Error('Agent terminal cell geometry is invalid.')
+        }
+
+        return {
+          maximumScreen: cellWidth + fitScrollbarReservation + 1,
+          screen: shellRight - terminalScreen.getBoundingClientRect().right,
+          scrollbar: shellRight - scrollbarViewport.getBoundingClientRect().right,
+          terminal: shellRight - terminalBounds.right,
+          thumbBorder: Number.parseFloat(
+            getComputedStyle(scrollbarViewport, '::-webkit-scrollbar-thumb').borderRightWidth
+          )
+        }
+      })
 
       expect(rightInsets.terminal).toBeLessThanOrEqual(1)
       expect(rightInsets.scrollbar).toBeLessThanOrEqual(1)
+      expect(rightInsets.screen).toBeLessThanOrEqual(rightInsets.maximumScreen)
       expect(rightInsets.thumbBorder).toBe(0)
+    },
+    electronScenarioTimeoutMs
+  )
+
+  it(
+    'keeps terminal color-query responses out of Codex input while visual output is deferred',
+    async () => {
+      await expectDesktopRuntime(page)
+      await page.getByRole('button', { name: '添加项目' }).click()
+      await createCodexAgent(page)
+      await waitForAgentCount(page, 1)
+      await waitForAgentTerminals(page, 1)
+      const terminal = page.locator('.agent-terminal-viewport').first()
+      await waitForTerminalDomText(terminal, 'CC_E2E_CODEX_READY')
+
+      await page.getByRole('button', { name: '收起侧边栏' }).click()
+      await page
+        .locator('.project-sidebar__motion-surface[data-project-sidebar-motion-state="closing"]')
+        .waitFor()
+      await page.waitForFunction(
+        () =>
+          document.querySelector<HTMLElement>('[data-agent-console-node]')?.dataset
+            .terminalSurfacePriority === 'visible'
+      )
+      await writeAgentTerminalInput(page, terminal, '/color-query\r')
+
+      const reports = await pollUntilState({
+        description: 'fake Codex color query to reach a terminal response state',
+        observe: () => readFakeCodexCliReports(fakeCodex.reportPath),
+        accept: (currentReports) =>
+          currentReports.some(
+            (report) =>
+              report.kind === 'color-query-response' || report.kind === 'color-query-timeout'
+          ),
+        timeoutMs: 10_000
+      })
+
+      expect(reports.some((report) => report.kind === 'color-query-response')).toBe(true)
+      expect(reports.some((report) => report.kind === 'color-query-timeout')).toBe(false)
+      expect(reports.some((report) => report.kind === 'unexpected-color-response-input')).toBe(
+        false
+      )
     },
     electronScenarioTimeoutMs
   )

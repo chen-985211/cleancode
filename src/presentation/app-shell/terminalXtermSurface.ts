@@ -126,6 +126,8 @@ class XtermTerminalSurface implements TerminalSurface {
     this.terminal.loadAddon(this.unicodeAddon)
     this.terminal.loadAddon(this.webLinksAddon)
     this.terminal.unicode.activeVersion = '11'
+    this.registerColorQueryHandler(10)
+    this.registerColorQueryHandler(11)
     this.fileLinkProviderSubscription = this.terminal.registerLinkProvider(
       createTerminalFileLinkProvider(this.terminal, (target) => this.onOpenLink(target))
     )
@@ -360,6 +362,10 @@ class XtermTerminalSurface implements TerminalSurface {
     )
   }
 
+  private registerColorQueryHandler(code: 10 | 11): void {
+    this.terminal.parser.registerOscHandler(code, (data) => data === '?')
+  }
+
   private async activateRenderer(): Promise<boolean> {
     if (!this.hasPendingRendererInitialization()) return false
     this.isRendererActivationStarted = true
@@ -379,6 +385,7 @@ class XtermTerminalSurface implements TerminalSurface {
       this.isRendererActivationSettled = true
       if (this.element) this.element.dataset.terminalRendererReady = 'true'
       this.notifyNonCriticalWorkChange()
+      this.requestFitAndReportDimensions()
     }
   }
 

@@ -2,14 +2,18 @@ import type { TerminalSnapshot } from '../../../src/contexts/run/application/dto
 import { createTerminalXtermSurface } from '../../../src/presentation/app-shell/terminalXtermSurface'
 
 const xtermState = vi.hoisted(() => ({
+  fitDimensions: [] as Array<{ readonly columns: number; readonly rows: number }>,
   terminals: [] as Array<{
     readonly loadAddon: ReturnType<typeof vi.fn>
+    readonly processOsc: (code: number, data: string) => boolean
     readonly write: ReturnType<typeof vi.fn>
   }>
 }))
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class FakeTerminal {
+    private readonly oscHandlers = new Map<number, (data: string) => boolean>()
+    private dataListener: ((data: string) => void) | null = null
     readonly attachCustomKeyEventHandler = vi.fn()
     readonly buffer = { active: { getLine: vi.fn() } }
     readonly dispose = vi.fn()
@@ -20,13 +24,29 @@ vi.mock('@xterm/xterm', () => ({
       addon.activate?.(this)
     )
     readonly modes = { bracketedPasteMode: false }
-    readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
+    readonly onData = vi.fn((listener: (data: string) => void) => {
+      this.dataListener = listener
+      return { dispose: vi.fn() }
+    })
     readonly open = vi.fn((element: HTMLElement) => {
       const terminalElement = document.createElement('div')
       element.append(terminalElement)
       this.element = terminalElement
     })
     readonly options: Record<string, unknown>
+    readonly parser = {
+      registerOscHandler: vi.fn((code: number, handler: (data: string) => boolean) => {
+        this.oscHandlers.set(code, handler)
+        return { dispose: vi.fn() }
+      })
+    }
+    readonly processOsc = (code: number, data: string): boolean => {
+      const handled = this.oscHandlers.get(code)?.(data) ?? false
+      if (!handled && data === '?') {
+        this.dataListener?.(`\u001b]${code};rgb:ffff/ffff/ffff\u001b\\`)
+      }
+      return handled
+    }
     readonly refresh = vi.fn()
     readonly registerLinkProvider = vi.fn(() => ({ dispose: vi.fn() }))
     readonly reset = vi.fn()
@@ -49,7 +69,16 @@ vi.mock('@xterm/xterm', () => ({
 
 vi.mock('@xterm/addon-fit', () => ({
   FitAddon: class FakeFitAddon {
-    fit = vi.fn()
+    private terminal: { resize(columns: number, rows: number): void } | null = null
+
+    activate(terminal: { resize(columns: number, rows: number): void }): void {
+      this.terminal = terminal
+    }
+
+    fit = vi.fn(() => {
+      const dimensions = xtermState.fitDimensions.shift()
+      if (dimensions) this.terminal?.resize(dimensions.columns, dimensions.rows)
+    })
   }
 }))
 vi.mock('@xterm/addon-search', () => ({
@@ -74,6 +103,7 @@ vi.mock('@xterm/addon-webgl', () => ({
 
 describe('terminal xterm workload target', () => {
   beforeEach(() => {
+    xtermState.fitDimensions = []
     xtermState.terminals = []
     globalThis.ResizeObserver = class FakeResizeObserver {
       observe(): void {}
@@ -127,6 +157,95 @@ describe('terminal xterm workload target', () => {
     expect(onPendingOutputChange).toHaveBeenCalledTimes(1)
 
     unsubscribe?.()
+    surface.dispose()
+  })
+
+  it('consumes renderer OSC color queries without forwarding a second terminal response', () => {
+    const onInput = vi.fn()
+    const surface = createTerminalXtermSurface('light')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange: vi.fn(),
+      onInput,
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    const terminal = xtermState.terminals[0]!
+
+    expect(terminal.processOsc(10, '?')).toBe(true)
+    expect(terminal.processOsc(11, '?')).toBe(true)
+    expect(onInput).not.toHaveBeenCalled()
+    expect(terminal.processOsc(10, 'rgb:ffff/ffff/ffff')).toBe(false)
+
+    surface.dispose()
+  })
+
+  it('refits after deferred renderer initialization without waiting for a host resize', async () => {
+    const animationFrames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      animationFrames.push(callback)
+      return animationFrames.length
+    })
+    xtermState.fitDimensions.push({ columns: 80, rows: 24 }, { columns: 100, rows: 30 })
+    const onDimensionsChange = vi.fn()
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange,
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    expect(onDimensionsChange).toHaveBeenLastCalledWith({ columns: 80, rows: 24 })
+    onDimensionsChange.mockClear()
+
+    await surface.workloadTarget?.runInitialization?.()
+    for (const callback of animationFrames.splice(0)) callback(performance.now())
+
+    expect(onDimensionsChange).toHaveBeenCalledTimes(1)
+    expect(onDimensionsChange).toHaveBeenLastCalledWith({ columns: 100, rows: 30 })
+    surface.dispose()
+  })
+
+  it('does not schedule a deferred renderer refit after the surface detaches', async () => {
+    const animationFrames: FrameRequestCallback[] = []
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      animationFrames.push(callback)
+      return animationFrames.length
+    })
+    const onDimensionsChange = vi.fn()
+    const surface = createTerminalXtermSurface('dark')
+    const element = document.createElement('div')
+    document.body.append(element)
+    surface.attach({
+      element,
+      isResizeSuspended: false,
+      onDimensionsChange,
+      onInput: vi.fn(),
+      onOpenLink: vi.fn(),
+      onOpenSearch: vi.fn(),
+      onRestoreRequired: vi.fn(),
+      onSearchResultsChange: vi.fn()
+    })
+    onDimensionsChange.mockClear()
+
+    const initialization = surface.workloadTarget?.runInitialization?.()
+    surface.detach(element)
+    await initialization
+
+    expect(animationFrames).toHaveLength(0)
+    expect(onDimensionsChange).not.toHaveBeenCalled()
     surface.dispose()
   })
 })
