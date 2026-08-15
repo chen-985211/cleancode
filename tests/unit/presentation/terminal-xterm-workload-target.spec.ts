@@ -114,6 +114,21 @@ describe('terminal xterm workload target', () => {
     expect(element).toHaveAttribute('data-terminal-renderer-ready', 'true')
     surface.dispose()
   })
+
+  it('notifies the scheduler only when drainable output availability changes', async () => {
+    const surface = createTerminalXtermSurface('dark')
+    await surface.restore(createSnapshot())
+    const onPendingOutputChange = vi.fn()
+    const unsubscribe = surface.workloadTarget?.onOutputPendingChange(onPendingOutputChange)
+
+    surface.write({ sequence: 1, data: 'first' })
+    surface.write({ sequence: 2, data: 'second' })
+
+    expect(onPendingOutputChange).toHaveBeenCalledTimes(1)
+
+    unsubscribe?.()
+    surface.dispose()
+  })
 })
 
 function createSnapshot(): TerminalSnapshot {

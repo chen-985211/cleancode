@@ -378,22 +378,35 @@ export interface TerminalOutputBatch {
   readonly sequence: number
 }
 
+export interface MeasuredTerminalOutput extends SequencedTerminalOutput {
+  readonly byteLength: number
+}
+
+const terminalOutputEncoder = new TextEncoder()
+
+export function measureTerminalOutput(output: SequencedTerminalOutput): MeasuredTerminalOutput {
+  return {
+    ...output,
+    byteLength: encodeByteLength(output.data)
+  }
+}
+
 export function takeTerminalOutputBatch(
-  outputs: readonly SequencedTerminalOutput[],
+  outputs: readonly MeasuredTerminalOutput[],
   maximumBatchBytes: number
 ): TerminalOutputBatch | null {
   const first = outputs[0]
   if (!first) return null
   const normalizedLimit = normalizeBatchLimit(maximumBatchBytes)
   const dataParts = [first.data]
-  let conservativeByteLength = encodeByteLength(first.data)
+  let conservativeByteLength = first.byteLength
   let consumedCount = 1
   let sequence = first.sequence
 
   for (let index = 1; index < outputs.length; index += 1) {
     const output = outputs[index]
     if (!output) continue
-    const outputByteLength = encodeByteLength(output.data)
+    const outputByteLength = output.byteLength
     if (conservativeByteLength + outputByteLength > normalizedLimit) break
     dataParts.push(output.data)
     conservativeByteLength += outputByteLength
@@ -452,7 +465,7 @@ function normalizeBatchLimit(maximumBatchBytes: number): number {
 }
 
 function encodeByteLength(value: string): number {
-  return new TextEncoder().encode(value).byteLength
+  return terminalOutputEncoder.encode(value).byteLength
 }
 
 function priorityRank(priority: TerminalWorkloadPriority): number {

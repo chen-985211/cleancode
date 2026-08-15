@@ -1,4 +1,5 @@
 import {
+  measureTerminalOutput,
   TerminalWorkloadScheduler,
   takeTerminalOutputBatch,
   type TerminalWorkloadSchedulerHost,
@@ -235,7 +236,7 @@ describe('terminal output batching', () => {
       { sequence: 2, data: '你' },
       { sequence: 3, data: '\ud83d' },
       { sequence: 4, data: '\ude80\u001b[0m' }
-    ]
+    ].map(measureTerminalOutput)
 
     expect(takeTerminalOutputBatch(outputs, Number.POSITIVE_INFINITY)).toEqual({
       byteLength: new TextEncoder().encode('\u001b[31m你🚀\u001b[0m').byteLength,
@@ -251,7 +252,7 @@ describe('terminal output batching', () => {
         [
           { sequence: 4, data: 'complete-fragment' },
           { sequence: 5, data: 'next' }
-        ],
+        ].map(measureTerminalOutput),
         4
       )
     ).toEqual({
@@ -259,6 +260,20 @@ describe('terminal output batching', () => {
       consumedCount: 1,
       data: 'complete-fragment',
       sequence: 4
+    })
+  })
+
+  it('reuses the conservative byte length measured when each source fragment entered the queue', () => {
+    const first = measureTerminalOutput({ sequence: 1, data: '\ud83d' })
+    const second = measureTerminalOutput({ sequence: 2, data: '\ude80' })
+
+    expect(first.byteLength).toBe(3)
+    expect(second.byteLength).toBe(3)
+    expect(takeTerminalOutputBatch([first, second], 5)).toEqual({
+      byteLength: 3,
+      consumedCount: 1,
+      data: '\ud83d',
+      sequence: 1
     })
   })
 })

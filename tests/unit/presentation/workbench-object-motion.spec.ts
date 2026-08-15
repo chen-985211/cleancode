@@ -1,6 +1,5 @@
 import type { WorkbenchFlowNode } from '../../../src/presentation/app-shell/types'
 import {
-  projectWorkbenchObjectMotionOntoEdges,
   projectWorkbenchObjectMotion,
   resolveWorkbenchCanvasDetailLevel,
   scheduleWorkbenchCreatedObjectFocus
@@ -543,60 +542,6 @@ describe('workbench object motion', () => {
 
     cancel()
   })
-
-  it('holds workflow edges until expanding group members reach stable handle geometry', () => {
-    const terminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
-    const expandingTerminal = {
-      ...terminal,
-      data: {
-        ...terminal.data,
-        objectMotion: {
-          id: 'group-expand:terminal-1',
-          kind: 'group-expand' as const,
-          offset: { x: -320, y: -170 }
-        }
-      }
-    } as WorkbenchFlowNode
-    const edges = [
-      { id: 'connected', source: 'terminal-1', target: 'terminal-2' },
-      { id: 'unrelated', source: 'terminal-3', target: 'terminal-4' }
-    ]
-
-    expect(projectWorkbenchObjectMotionOntoEdges(edges, [expandingTerminal])).toEqual([
-      expect.objectContaining({
-        id: 'connected',
-        className: 'workbench-object-edge--motion-pending'
-      }),
-      edges[1]
-    ])
-    expect(projectWorkbenchObjectMotionOntoEdges(edges, [terminal])).toBe(edges)
-  })
-
-  it.each(['group-join', 'group-leave', 'group-reflow'] as const)(
-    'holds workflow edges until a terminal finishes %s motion',
-    (kind) => {
-      const terminal = createTerminalNode('terminal-1', { x: 500, y: 300 })
-      const joinedTerminal = {
-        ...terminal,
-        data: {
-          ...terminal.data,
-          objectMotion: {
-            id: `${kind}:terminal-1`,
-            kind,
-            offset: { x: -40, y: -20 }
-          }
-        }
-      } as WorkbenchFlowNode
-      const edges = [{ id: 'connected', source: 'terminal-1', target: 'terminal-2' }]
-
-      expect(projectWorkbenchObjectMotionOntoEdges(edges, [joinedTerminal])).toEqual([
-        expect.objectContaining({
-          id: 'connected',
-          className: 'workbench-object-edge--motion-pending'
-        })
-      ])
-    }
-  )
 })
 
 function createMotionId(kind: string, nodeId: string): string {

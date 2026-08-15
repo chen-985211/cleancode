@@ -26,7 +26,11 @@ import type { TerminalScrollbackRows } from '../../contexts/run/application/dto/
 import { TerminalRendererController } from './terminalRendererController'
 import { createTerminalFileLinkProvider, hasOpenModifier } from './terminalFileLinks'
 import { TerminalXtermRasterTarget } from './terminalXtermRasterTarget'
-import { takeTerminalOutputBatch } from './terminalWorkloadScheduler'
+import {
+  measureTerminalOutput,
+  takeTerminalOutputBatch,
+  type MeasuredTerminalOutput
+} from './terminalWorkloadScheduler'
 
 const terminalSurfaceScrollbackRows = 1000
 const terminalPendingOutputLimitBytes = 1024 * 1024
@@ -66,7 +70,7 @@ class XtermTerminalSurface implements TerminalSurface {
     onTerminalInput: (listener) => this.subscribeTerminalInput(listener),
     runInitialization: () => this.activateRenderer()
   }
-  private readonly pendingOutputs: SequencedTerminalOutput[] = []
+  private readonly pendingOutputs: MeasuredTerminalOutput[] = []
   private readonly idleResolvers = new Set<() => void>()
   private readonly nonCriticalWorkListeners = new Set<() => void>()
   private readonly pendingOutputListeners = new Set<() => void>()
@@ -86,6 +90,7 @@ class XtermTerminalSurface implements TerminalSurface {
   private isDisposed = false
   private isRestoring = true
   private isWriteInFlight = false
+  private lastPublishedHasPendingOutput = false
   private hasSnapshot = false
   private restoreRequired = false
   private expectedSequence = 0
@@ -220,6 +225,7 @@ class XtermTerminalSurface implements TerminalSurface {
   async restore(snapshot: TerminalSnapshot): Promise<TerminalRestoreResult> {
     if (this.isDisposed) return 'retry'
     this.isRestoring = true
+    this.notifyPendingOutputChange()
     await this.waitForIdle()
     if (this.isDisposed) return 'retry'
 
@@ -273,15 +279,15 @@ class XtermTerminalSurface implements TerminalSurface {
       return
     }
 
-    const byteLength = new TextEncoder().encode(output.data).byteLength
-    if (this.pendingOutputBytes + byteLength > terminalPendingOutputLimitBytes) {
+    const measuredOutput = measureTerminalOutput(output)
+    if (this.pendingOutputBytes + measuredOutput.byteLength > terminalPendingOutputLimitBytes) {
       if (this.hasSnapshot) this.requestRestore()
       else this.restoreRequired = true
       return
     }
 
-    this.pendingOutputs.push(output)
-    this.pendingOutputBytes += byteLength
+    this.pendingOutputs.push(measuredOutput)
+    this.pendingOutputBytes += measuredOutput.byteLength
     this.lastQueuedSequence = output.sequence
     this.notifyPendingOutputChange()
   }
@@ -310,15 +316,12 @@ class XtermTerminalSurface implements TerminalSurface {
     if (!firstOutput) return null
     const batch = takeTerminalOutputBatch(
       this.pendingOutputs,
-      maximumBatchBytes ?? encodeByteLength(firstOutput.data)
+      maximumBatchBytes ?? firstOutput.byteLength
     )
     if (!batch) return null
 
     const consumedOutputs = this.pendingOutputs.splice(0, batch.consumedCount)
-    const consumedBytes = consumedOutputs.reduce(
-      (total, output) => total + encodeByteLength(output.data),
-      0
-    )
+    const consumedBytes = consumedOutputs.reduce((total, output) => total + output.byteLength, 0)
     this.pendingOutputBytes = Math.max(0, this.pendingOutputBytes - consumedBytes)
     this.isWriteInFlight = true
     this.notifyPendingOutputChange()
@@ -398,7 +401,7 @@ class XtermTerminalSurface implements TerminalSurface {
 
   private recalculatePendingState(snapshotSequence: number): void {
     this.pendingOutputBytes = this.pendingOutputs.reduce(
-      (total, output) => total + new TextEncoder().encode(output.data).byteLength,
+      (total, output) => total + output.byteLength,
       0
     )
     this.lastQueuedSequence = this.pendingOutputs.at(-1)?.sequence ?? snapshotSequence
@@ -435,6 +438,9 @@ class XtermTerminalSurface implements TerminalSurface {
   }
 
   private notifyPendingOutputChange(): void {
+    const hasPendingOutput = this.hasPendingOutput()
+    if (hasPendingOutput === this.lastPublishedHasPendingOutput) return
+    this.lastPublishedHasPendingOutput = hasPendingOutput
     for (const listener of this.pendingOutputListeners) listener()
   }
 
@@ -473,12 +479,8 @@ class XtermTerminalSurface implements TerminalSurface {
   }
 }
 
-function encodeByteLength(value: string): number {
-  return new TextEncoder().encode(value).byteLength
-}
-
 function hasContiguousSequence(
-  outputs: readonly SequencedTerminalOutput[],
+  outputs: readonly MeasuredTerminalOutput[],
   snapshotSequence: number
 ): boolean {
   return outputs.every((output, index) => output.sequence === snapshotSequence + index + 1)

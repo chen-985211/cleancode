@@ -1,12 +1,12 @@
 import type { TerminalSurfaceRasterTarget } from './terminalSurfaceRegistry'
+import { observeTerminalRasterElement } from './terminalRasterObserverHub'
 import type { TerminalRasterScale } from './terminalZoomRasterPolicy'
 
 export class TerminalXtermRasterTarget {
   private element: HTMLDivElement | null = null
-  private intersectionObserver: IntersectionObserver | null = null
   private mutationObserver: MutationObserver | null = null
+  private observerCleanup: (() => void) | null = null
   private presentationOwner: HTMLElement | null = null
-  private resizeObserver: ResizeObserver | null = null
   private isFocused = false
   private isIntersecting = false
   private isPresentationVisible = false
@@ -39,7 +39,6 @@ export class TerminalXtermRasterTarget {
     this.presentationOwner = findTerminalPresentationOwner(element)
     element.addEventListener('focusin', this.handleFocusIn)
     element.addEventListener('focusout', this.handleFocusOut)
-    element.ownerDocument.defaultView?.addEventListener('resize', this.handleGeometryChange)
     this.isFocused = element.contains(element.ownerDocument.activeElement)
     this.isIntersecting = element.isConnected
     this.isPresentationVisible = isElementPresentationVisible(element)
@@ -47,18 +46,14 @@ export class TerminalXtermRasterTarget {
     this.refreshRasterGeometry()
     element.dataset.terminalRasterScale = String(this.scale)
 
-    if (typeof IntersectionObserver !== 'undefined') {
-      const root = element.closest('.canvas-surface')
-      this.intersectionObserver = new IntersectionObserver(
-        (entries) => {
-          if (this.element !== element) return
-          this.isIntersecting = entries.some((entry) => entry.isIntersecting)
-          this.refreshPriority()
-        },
-        { root }
-      )
-      this.intersectionObserver.observe(element)
-    }
+    this.observerCleanup = observeTerminalRasterElement(element, {
+      onGeometryChange: this.handleGeometryChange,
+      onIntersectionChange: (isIntersecting) => {
+        if (this.element !== element) return
+        this.isIntersecting = isIntersecting
+        this.refreshPriority()
+      }
+    })
 
     if (typeof MutationObserver !== 'undefined') {
       const presentationOwner = this.presentationOwner
@@ -73,24 +68,16 @@ export class TerminalXtermRasterTarget {
         observeTerminalPresentationOwner(this.mutationObserver, presentationOwner)
       }
     }
-
-    if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(this.handleGeometryChange)
-      this.resizeObserver.observe(element)
-    }
   }
 
   detach(element: HTMLDivElement | null): void {
     if (!element || this.element !== element) return
     element.removeEventListener('focusin', this.handleFocusIn)
     element.removeEventListener('focusout', this.handleFocusOut)
-    element.ownerDocument.defaultView?.removeEventListener('resize', this.handleGeometryChange)
-    this.intersectionObserver?.disconnect()
-    this.intersectionObserver = null
+    this.observerCleanup?.()
+    this.observerCleanup = null
     this.mutationObserver?.disconnect()
     this.mutationObserver = null
-    this.resizeObserver?.disconnect()
-    this.resizeObserver = null
     if (this.presentationOwner) delete this.presentationOwner.dataset.terminalSurfacePriority
     this.presentationOwner = null
     this.element = null

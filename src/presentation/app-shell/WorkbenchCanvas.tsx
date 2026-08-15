@@ -23,7 +23,7 @@ import { createAgentApprovalIntentEdges } from './agentApprovalPresentation'
 import { projectAgentConnectionApprovalsOntoWorkflowEdges } from './agentApprovalConnectionProjection'
 import { workbenchEdgeTypes } from './workbenchNodeTypes'
 import { useI18n } from './i18n/useI18n'
-import { projectWorkbenchObjectMotionOntoEdges } from './workbenchObjectMotion'
+import { createWorkbenchObjectMotionEdgeProjector } from './workbenchObjectMotion'
 import { useWorkbenchNodes } from './workbenchNodeStore'
 import { LiveBlockTemplatePlacementPreview } from './BlockTemplatePlacementPreview'
 import { useBlockTemplateCanvasInteraction } from './useBlockTemplateCanvasInteraction'
@@ -135,6 +135,11 @@ export function WorkbenchCanvas({
   getMiniMapNodeClassName
 }: WorkbenchCanvasProps) {
   const { t } = useI18n()
+  const motionEdgeProjectorRef = useRef<ReturnType<
+    typeof createWorkbenchObjectMotionEdgeProjector
+  > | null>(null)
+  const motionEdgeProjector = (motionEdgeProjectorRef.current ??=
+    createWorkbenchObjectMotionEdgeProjector())
   const nodes = useWorkbenchNodes(nodeStore)
   const minimapNodes = useMemo(() => filterMinimapNodes(nodes), [nodes])
   const workflow = terminalWorkflow ?? inactiveTerminalWorkflowController
@@ -156,8 +161,8 @@ export function WorkbenchCanvas({
     [approvalEdges, workflowEdges]
   )
   const edges = useMemo(
-    () => projectWorkbenchObjectMotionOntoEdges(baseEdges, nodes),
-    [baseEdges, nodes]
+    () => motionEdgeProjector.project(baseEdges, nodes),
+    [baseEdges, motionEdgeProjector, nodes]
   )
   const [isQuickExecutionDropTarget, setIsQuickExecutionDropTarget] = useState(false)
   const canvasArrangement = useWorkbenchCanvasArrangement({

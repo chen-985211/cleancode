@@ -47,28 +47,57 @@ export function projectWorkbenchObjectMotionOntoEdges(
   edges: Edge[],
   nodes: readonly WorkbenchFlowNode[]
 ): Edge[] {
-  const movingNodeIds = new Set(
-    nodes
-      .filter(
-        (node) =>
-          node.data.objectMotion?.kind === 'group-expand' ||
-          node.data.objectMotion?.kind === 'canvas-arrange' ||
-          node.data.objectMotion?.kind === 'group-join' ||
-          node.data.objectMotion?.kind === 'group-leave' ||
-          node.data.objectMotion?.kind === 'group-reflow'
-      )
-      .map((node) => node.id)
-  )
+  return projectWorkbenchObjectMotionEdges(edges, nodes)
+}
+
+export interface WorkbenchObjectMotionEdgeProjector {
+  project(edges: Edge[], nodes: readonly WorkbenchFlowNode[]): Edge[]
+}
+
+export function createWorkbenchObjectMotionEdgeProjector(): WorkbenchObjectMotionEdgeProjector {
+  const projectedBySource = new WeakMap<
+    Edge,
+    { readonly className?: string; readonly edge: Edge }
+  >()
+
+  return {
+    project: (edges, nodes) => projectWorkbenchObjectMotionEdges(edges, nodes, projectedBySource)
+  }
+}
+
+function projectWorkbenchObjectMotionEdges(
+  edges: Edge[],
+  nodes: readonly WorkbenchFlowNode[],
+  projectedBySource?: WeakMap<Edge, { readonly className?: string; readonly edge: Edge }>
+): Edge[] {
+  const movingNodeIds = new Set<string>()
+  for (const node of nodes) {
+    const kind = node.data.objectMotion?.kind
+    if (
+      kind === 'group-expand' ||
+      kind === 'canvas-arrange' ||
+      kind === 'group-join' ||
+      kind === 'group-leave' ||
+      kind === 'group-reflow'
+    ) {
+      movingNodeIds.add(node.id)
+    }
+  }
   if (movingNodeIds.size === 0) return edges
 
   return edges.map((edge) => {
     const isMotionPending = movingNodeIds.has(edge.source) || movingNodeIds.has(edge.target)
     if (!isMotionPending) return edge
 
+    const cached = projectedBySource?.get(edge)
+    if (cached && cached.className === edge.className) return cached.edge
+
     const classNames = new Set(edge.className?.split(/\s+/).filter(Boolean) ?? [])
     classNames.add('workbench-object-edge--motion-pending')
 
-    return { ...edge, className: [...classNames].join(' ') }
+    const projectedEdge = { ...edge, className: [...classNames].join(' ') }
+    projectedBySource?.set(edge, { className: edge.className, edge: projectedEdge })
+    return projectedEdge
   })
 }
 

@@ -254,6 +254,12 @@ flowchart LR
 - Unit/component 使用 240 个 terminal selector 与 320 个跨类型节点的确定性压力矩阵，覆盖单 selector 通知、订阅清理、parked 暂停/恢复、三类节点引用稳定、单节点图事实变化、selection/motion 正交更新、runtime 更新不调用节点结构投影、Terminal/Agent 共用可见性投影和 surface 优先级诊断。
 - 实现未新增依赖、IPC、持久化格式、固定帧率、React Flow/xterm 私有 API、Provider 分支或 terminal surface 保留策略；BlockGraph、AgentSession、Run 与 CanvasArrangement 的事实 owner 和提交入口不变。
 
+第三轮完成后的低风险热路径收口于 2026-08-15 完成：
+
+- 终端输出片段在进入 surface 队列时只计算一次保守 UTF-8 字节长度，后续积压统计、批次上限与消费扣减复用该结果；合并批次仍对最终字符串计算精确字节长度，跨片段 surrogate、ANSI、Unicode、sequence 与输出顺序不变。`onOutputPendingChange` 只在是否存在可排出工作发生变化时通知，不再让同一积压周期内的每个小片段重复唤醒调度器。
+- 画布对象 motion 的 Edge 投影按稳定基础 Edge 身份复用已生成的运动态引用；无关节点状态变化仍可产生新的节点数组，但不会让正在等待端点稳定的关联连线重复获得等价对象。运动结束后直接恢复规范基础 Edge，连线 class 与显露时机不变。
+- 同一画布下的 xterm raster target 共享公开 `IntersectionObserver`、`ResizeObserver` 与窗口 resize 通道，回调仍按 element 分发；单 surface 清理执行 `unobserve`，最后一个 surface 清理时才断开底层 observer 与窗口监听。表现 owner 的属性观察、focused/visible/hidden 规则、raster cost 和 surface 生命周期没有改变。
+
 当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率下的稠密画布 trace，以及长时间多输出、反复离屏/返回、工作区切换后的内存、GPU context、surface 和 pending output soak 数据。因此第三轮状态标记为“实现完成，设备与 soak 待验收”；自动化压力矩阵只能证明失效边界和清理，不得替代真实 Electron、GPU 与长期资源验收。
 
 ## 跨轮性能证据
