@@ -41,6 +41,35 @@ describe('terminal xterm raster target', () => {
     expect(onPriorityChange).toHaveBeenCalledTimes(2)
   })
 
+  it('projects the shared visibility priority onto the terminal node owner', () => {
+    const { anchor, target, viewport } = createAttachedTarget(intersectionObservers)
+    const input = document.createElement('textarea')
+    viewport.append(input)
+
+    expect(anchor.dataset.terminalSurfacePriority).toBe('visible')
+
+    input.focus()
+    expect(anchor.dataset.terminalSurfacePriority).toBe('focused')
+
+    intersectionObservers[0]?.emit(false)
+    expect(anchor.dataset.terminalSurfacePriority).toBe('hidden')
+
+    target.detach(viewport)
+    expect(anchor.dataset.terminalSurfacePriority).toBeUndefined()
+  })
+
+  it('uses the same visibility projection for an Agent terminal owner', () => {
+    const { anchor } = createAttachedTarget(intersectionObservers, {
+      ownerAttribute: 'agent'
+    })
+
+    expect(anchor.dataset.agentConsoleNode).toBe('agent-1')
+    expect(anchor.dataset.terminalSurfacePriority).toBe('visible')
+
+    intersectionObservers[0]?.emit(false)
+    expect(anchor.dataset.terminalSurfacePriority).toBe('hidden')
+  })
+
   it('keeps a parked visibility-hidden terminal hidden even when it intersects, then announces its return', async () => {
     const style = document.createElement('style')
     style.dataset.testTerminalRasterStyle = 'true'
@@ -95,6 +124,33 @@ describe('terminal xterm raster target', () => {
     expect(onCostChange).toHaveBeenCalledOnce()
   })
 
+  it('shares canvas visibility, geometry, and window resize observation across terminal surfaces', () => {
+    const addWindowListener = vi.spyOn(window, 'addEventListener')
+    const removeWindowListener = vi.spyOn(window, 'removeEventListener')
+    const canvas = document.createElement('div')
+    canvas.className = 'canvas-surface'
+    document.body.append(canvas)
+    const first = createAttachedTarget(intersectionObservers, { canvas })
+    const second = createAttachedTarget(intersectionObservers, { canvas })
+
+    expect(intersectionObservers).toHaveLength(1)
+    expect(resizeObservers).toHaveLength(1)
+    expect(addWindowListener.mock.calls.filter(([event]) => event === 'resize')).toHaveLength(1)
+
+    first.target.detach(first.viewport)
+
+    expect(intersectionObservers[0]?.unobserve).toHaveBeenCalledWith(first.viewport)
+    expect(resizeObservers[0]?.unobserve).toHaveBeenCalledWith(first.viewport)
+    expect(intersectionObservers[0]?.disconnect).not.toHaveBeenCalled()
+    expect(resizeObservers[0]?.disconnect).not.toHaveBeenCalled()
+
+    second.target.detach(second.viewport)
+
+    expect(intersectionObservers[0]?.disconnect).toHaveBeenCalledOnce()
+    expect(resizeObservers[0]?.disconnect).toHaveBeenCalledOnce()
+    expect(removeWindowListener.mock.calls.filter(([event]) => event === 'resize')).toHaveLength(1)
+  })
+
   it('disconnects every observer and listener on detach', async () => {
     const mutationDisconnect = vi.spyOn(MutationObserver.prototype, 'disconnect')
     const removeWindowListener = vi.spyOn(window, 'removeEventListener')
@@ -137,18 +193,29 @@ describe('terminal xterm raster target', () => {
 
 function createAttachedTarget(
   intersectionObservers: FakeIntersectionObserver[],
-  { width = 400, height = 240 } = {}
+  {
+    canvas: existingCanvas,
+    height = 240,
+    ownerAttribute = 'terminal',
+    width = 400
+  }: {
+    readonly canvas?: HTMLDivElement
+    readonly height?: number
+    readonly ownerAttribute?: 'agent' | 'terminal'
+    readonly width?: number
+  } = {}
 ) {
-  const canvas = document.createElement('div')
-  canvas.className = 'canvas-surface'
+  const canvas = existingCanvas ?? document.createElement('div')
+  if (!existingCanvas) canvas.className = 'canvas-surface'
   const anchor = document.createElement('div')
   anchor.className = 'terminal-node-anchor'
-  anchor.dataset.terminalBlockId = 'terminal-block'
+  if (ownerAttribute === 'agent') anchor.dataset.agentConsoleNode = 'agent-1'
+  else anchor.dataset.terminalBlockId = 'terminal-block'
   const viewport = document.createElement('div')
   defineElementSize(viewport, width, height)
   anchor.append(viewport)
   canvas.append(anchor)
-  document.body.append(canvas)
+  if (!canvas.isConnected) document.body.append(canvas)
   const target = new TerminalXtermRasterTarget(vi.fn())
   target.attach(viewport)
   intersectionObservers[0]?.emit(true)
@@ -159,22 +226,26 @@ function createIntersectionObserverConstructor(instances: FakeIntersectionObserv
   return class {
     readonly disconnect = vi.fn()
     private readonly callback: IntersectionObserverCallback
+    private readonly elements = new Set<Element>()
 
     constructor(callback: IntersectionObserverCallback) {
       this.callback = callback
       instances.push(this as unknown as FakeIntersectionObserver)
     }
 
-    observe = vi.fn()
-    unobserve = vi.fn()
+    observe = vi.fn((element: Element) => this.elements.add(element))
+    unobserve = vi.fn((element: Element) => this.elements.delete(element))
     takeRecords = vi.fn(() => [])
     readonly root = null
     readonly rootMargin = '0px'
     readonly thresholds = [0]
 
-    emit(isIntersecting: boolean): void {
+    emit(isIntersecting: boolean, target?: Element): void {
+      const targets = target ? [target] : [...this.elements]
       this.callback(
-        [{ isIntersecting } as IntersectionObserverEntry],
+        targets.map(
+          (element) => ({ isIntersecting, target: element }) as IntersectionObserverEntry
+        ),
         this as unknown as IntersectionObserver
       )
     }
@@ -183,28 +254,34 @@ function createIntersectionObserverConstructor(instances: FakeIntersectionObserv
 
 interface FakeIntersectionObserver {
   readonly disconnect: ReturnType<typeof vi.fn>
-  emit(isIntersecting: boolean): void
+  readonly unobserve: ReturnType<typeof vi.fn>
+  emit(isIntersecting: boolean, target?: Element): void
 }
 
 function createResizeObserverConstructor(instances: FakeResizeObserver[]) {
   return class {
     readonly disconnect = vi.fn()
+    private readonly elements = new Set<Element>()
 
     constructor(private readonly callback: ResizeObserverCallback) {
       instances.push(this as unknown as FakeResizeObserver)
     }
 
-    observe = vi.fn()
-    unobserve = vi.fn()
+    observe = vi.fn((element: Element) => this.elements.add(element))
+    unobserve = vi.fn((element: Element) => this.elements.delete(element))
 
     emit(): void {
-      this.callback([], this as unknown as ResizeObserver)
+      this.callback(
+        [...this.elements].map((target) => ({ target }) as ResizeObserverEntry),
+        this as unknown as ResizeObserver
+      )
     }
   } as unknown as typeof ResizeObserver
 }
 
 interface FakeResizeObserver {
   readonly disconnect: ReturnType<typeof vi.fn>
+  readonly unobserve: ReturnType<typeof vi.fn>
   emit(): void
 }
 

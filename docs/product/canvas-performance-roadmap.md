@@ -1,0 +1,374 @@
+# 画布交互性能演进路线图
+
+## 文档地位
+
+本文记录 cleancode 在保留丝滑动效的前提下，继续优化画布、节点、普通终端与 Agent 控制台交互性能的三轮实施顺序、边界和验收方法。
+
+本文是实施路线，不是当前能力清单。尚未完成的条目不得被表现层、测试或其他文档当作已经存在的产品行为。已经稳定交付的用户行为迁入 [UI 契约](ui-contract.md)，共享动效与性能原则迁入 [UI Style Guide](ui-style-guide.md)。
+
+本文不重新定义当前事实：
+
+- 画布对象、viewport、节点位置、尺寸、组合和连接事实以[积木图模型](../contexts/block-graph/block-graph.md)为准。
+- 用户可依赖的选择、定位、缩放、输入激活与终端交互结果以 [UI 契约](ui-contract.md)为准。
+- 画布相机、空间对象动效、可打断运动与 reduced motion 以[画布动效演进路线图](canvas-motion-roadmap.md)和 [UI Style Guide](ui-style-guide.md)为准。
+- 普通终端输出顺序、背压、快照、隐藏投递和恢复以[普通终端运行时演进路线图](../terminal/runtime-roadmap.md)为准。
+- Agent 身份、Provider session binding 与运行时会话事实以 [Agent 与会话生命周期](../contexts/agent/agent-session.md)为准。
+- 开发阶段、TDD、门禁和跨平台验收以[开发协作规范](../engineering/development.md)与[测试规范](../testing/testing.md)为准。
+
+路线图不设置精确交付日期。状态只表达阶段是否尚未开始、实施中或已经完成。
+
+## 背景与当前基线
+
+现有实现已经解决第一类明显卡顿：程序化画布相机使用基于真实时间的 `requestAnimationFrame` spring；侧边栏展开收回在运动期间以 compositor transform 为主；新 Terminal、Agent 和组合节点以最终几何进入画布，不逐帧修改 xterm 网格或 React Flow 节点尺寸。因此，动效不依赖硬编码刷新率，60Hz、120Hz 与更高刷新率共享同一物理时间线。
+
+下一阶段的主要矛盾不再是动画曲线本身，而是动画帧与其他主线程工作竞争：
+
+1. 用户拖动或缩放 viewport 时，顶层 React 状态和画布消费者仍可能按输入频率更新。
+2. 小地图静态节点投影与动态 viewport 框可能在同一更新链路中重复工作。
+3. 大量 xterm 输出、终端创建和渲染器初始化可能与画布动效争用帧预算。
+4. 单个 Terminal 或 Agent 状态变化仍可能触发整组节点投影与无关节点更新。
+5. 离屏节点和终端 surface 的降载空间存在，但不能以破坏 session、缓冲区或恢复连续性为代价直接卸载。
+
+高刷新率会放大这些竞争。在 240Hz 显示器上，一次刷新间隔约为 `4.17ms`；优化目标不是强制每次业务工作都塞入这个间隔，而是把逐帧路径限制为必要的 presentation write，并把可延后的工作分片、合并或移到空闲时间。
+
+## 目标体验
+
+三轮完成后，用户应当形成以下稳定预期：
+
+1. 侧边栏展开收回、画布平移缩放和程序化相机运动保持现有节奏、路径与可打断能力，不通过锁帧、缩短时长或跳过中间帧换取性能。
+2. 持续终端输出、创建 Terminal 或 Agent、更新小地图时，不明显阻塞画布直接操控和终端输入。
+3. 一个节点的状态变化只更新必要消费者，节点数量增加时无关 React 工作不会按整图线性放大。
+4. 可见和聚焦对象优先获得渲染预算；后台对象可以延后追赶，但最终内容、顺序与当前事实一致。
+5. Windows 高刷新率设备不再因 React commit、xterm 输出或初始化尖峰形成容易感知的连续掉帧；macOS 现有手感不退化。
+
+## 全程不变量
+
+所有轮次都必须保持以下不变量：
+
+1. 优化只改变计算和呈现调度，不改变 BlockGraph、Run、Agent 或 Project 的业务事实与持久化格式。
+2. 不设置固定 `60fps`、`120fps` 或其他帧率上限；逐帧动效继续使用浏览器刷新节奏和真实 elapsed time。
+3. 不修改现有 motion token、spring 参数、最终 viewport、最终节点几何、选择、焦点和输入激活结果，除非另行完成产品确认。
+4. 普通终端与 Agent 控制台的有效输出不得丢失、重复或乱序；当前运行身份、缓冲区和恢复语义不得因可见性优化改变。
+5. 用户直接操控和当前聚焦终端始终优先于后台投影、持久化、小地图静态计算和非关键渲染器初始化。
+6. 所有队列、缓存、重试、延迟任务和 surface 保留都必须有界，并在工作区切换、对象删除和组件释放时可取消、可清理。
+7. reduced motion 继续改变运动表现而不改变最终结果；性能优化不能建立第二套 reduced-motion 判断。
+8. 不依赖 React Flow、xterm 或 Electron 的私有 API；依赖升级后仍可通过公开契约回归。
+
+## 统一语言与职责
+
+- **交互帧路径**：用户直接操控或程序化动效期间，为生成下一可见帧必须同步完成的工作。
+- **静态投影**：只在节点集合、几何或样式事实变化时需要重新计算的画布或小地图数据。
+- **实时投影**：viewport 框、缩放读数、CSS transform 等需要跟随 presentation value 更新的轻量结果。
+- **帧预算工作**：保持顺序但允许分片到多个帧的输出、投影或初始化任务。
+- **后台追赶**：不可见或未聚焦对象在不影响当前交互的时机处理已经积累的有界工作。
+- **Surface 保留**：对象暂时离屏或隐藏时保留终端视图身份与必要资源，不等同于保留业务会话事实。
+
+根级 Presentation 拥有 viewport、React 投影与交互帧调度策略。Run 继续拥有普通终端会话和输出事实；Agent 继续拥有 Agent 身份与 Provider 会话事实；两类节点可以复用已证明安全的表现层调度基础，但不得合并领域身份、生命周期或动作语义。
+
+## 路线总览
+
+```mermaid
+flowchart LR
+  R1["第一轮<br/>画布逐帧路径瘦身"] --> R2["第二轮<br/>终端与 Agent 重负载调度"]
+  R2 --> R3["第三轮<br/>节点级增量更新与离屏治理"]
+  R3 --> D{"真实 trace 或 soak<br/>证明现有余量不足？"}
+  D -. "否：保持待命" .-> S["当前基线<br/>继续设备验收"]
+  D -- "是：完成可行性门禁" --> R4["第四阶段<br/>渲染虚拟化与线程隔离"]
+  R1 -. "建立基线与观测" .-> G["跨平台性能证据<br/>Windows 60/144/240Hz + macOS"]
+  R2 -. "输出与创建压力" .-> G
+  R3 -. "稠密大画布" .-> G
+  R4 -. "资源驻留与长期压力" .-> G
+```
+
+| 阶段 | 名称                     | 核心结果                                         | 主要收益场景                       | 状态                         |
+| ---- | ------------------------ | ------------------------------------------------ | ---------------------------------- | ---------------------------- |
+| 1    | 画布逐帧路径瘦身         | viewport 实时值不再驱动整个画布 React 树逐帧更新 | 平移、缩放、相机运动、侧边栏动效   | 实现完成，设备待验收         |
+| 2    | 终端与 Agent 重负载调度  | 输出与非关键初始化按可见性、优先级和帧预算执行   | 刷日志、批量创建 Terminal 或 Agent | 实现完成，设备待验收         |
+| 3    | 节点级增量更新与离屏治理 | 单节点变化局部提交，离屏对象安全降载             | 多节点、多终端、长时间运行的大画布 | 实现完成，设备与 soak 待验收 |
+| 4    | 渲染虚拟化与线程隔离     | 重型 surface 按需驻留，可迁移计算离开 UI 主线程  | 超大画布、资源压力与长期高输出     | 条件触发，当前不启动         |
+
+前三轮按风险递增推进。每轮都必须单独建立改造前基线、完成目标验证并保留可回退边界；不得把多轮合并成一次无法归因的整体重构。第四阶段不是前三轮的自动延续，只在触发条件成立并完成单独可行性门禁后启动。
+
+## 第一轮：画布逐帧路径瘦身
+
+### 阶段目标
+
+把 viewport presentation value 与顶层 `WorkbenchCanvas` React 状态解耦，使平移、缩放和程序化相机运动只更新真正依赖实时值的叶子消费者。节点集合、React Flow 配置与小地图静态节点层不因每个 viewport 输入事件重复投影。
+
+### 计划能力
+
+1. 建立统一、轻量的 viewport presentation store，覆盖直接操控、程序化 spring、即时恢复与小地图拖动预览。
+2. 使用细粒度 selector 或命令式公开写入，让小地图 viewport 框与缩放读数订阅必要字段；不得让实时值回流为整棵画布的逐帧 React state。
+3. 只在 `full`、`compact`、`overview` 等细节层级阈值发生跨越时更新 React 投影，不按每个 zoom 浮点变化重复提交。
+4. 把小地图拆分为节点静态层和 viewport 实时层；节点 frame、viewBox 与样式只在节点或画布边界变化时重新计算。
+5. 为 viewport 发布次数、React commit、节点投影耗时、小地图投影耗时和长任务建立开发期观测，不把诊断计数写入业务状态或持久化。
+
+### 第一轮非目标
+
+- 不重写 React Flow 内部 pan/zoom 引擎，也不访问其私有 store。
+- 不调整现有相机 spring、侧边栏 spring、节点创建 motion 或小地图视觉样式。
+- 不修改 viewport 持久化频率以外的 Project 或 BlockGraph 语义；只有最终稳定结果可以沿现有入口提交。
+- 不在本轮处理 xterm 输出分片和终端 surface 虚拟化。
+
+### 第一轮验收
+
+1. 连续 viewport presentation frame 不重新构造 React Flow `nodes`，也不触发小地图静态节点层重复计算。
+2. zoom 在同一细节层级内变化时不产生层级 React state 更新；跨越阈值时只提交一次对应结果。
+3. 直接操控、程序化相机、即时恢复和小地图拖动的最终 viewport 与当前实现一致。
+4. 侧边栏展开收回期间同时拖动或缩放画布，不出现新的几何跳变、持久化风暴或输入接管延迟。
+5. reduced motion、工作区切换、运动取消和迟到完成身份继续满足画布动效路线的不变量。
+
+### 第一轮验证
+
+- Unit：viewport store 的 selector 通知矩阵、相同值去重、阈值跨越、取消与最终提交。
+- Unit/component：以 render/投影副作用次数为 oracle，证明实时 viewport 不重算静态节点层和 React Flow 节点集合。
+- 性能 trace：空画布、中等节点和稠密节点下分别执行平移、缩放、程序化定位与侧边栏开合。
+- 真实设备：至少记录 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率；未执行的平台或刷新率必须标记为未验收。
+
+### 第一轮退出条件
+
+- 逐帧 viewport owner 唯一，所有实时消费者通过同一公开入口接入。
+- 改造前后 trace 使用同一项目 fixture、操作序列、窗口尺寸与输出负载，可以比较 React commit 和主线程帧工作。
+- 目标 unit、Presentation 回归、完整门禁与真实设备检查通过。
+
+### 第一轮实现证据
+
+第一轮代码与自动化验证于 2026-08-14 完成：
+
+- `workbenchCanvasViewportStore.ts` 成为根级 Presentation 的 viewport presentation value owner；相同 viewport 去重，所有订阅者只消费可丢弃屏幕值，不接管 BlockGraph 的最终 viewport 事实。
+- 用户直接操控、程序化相机与 direct zoom、即时恢复、小地图拖动预览和初始化统一写入同一个 store；只有既有完成边界继续调用 `onViewportChange`，中间帧不持久化。
+- `WorkbenchCanvas` 不再为每个 viewport frame 设置 `canvasViewport` 和 `viewportZoom` React state。画布根组件只订阅 `full`、`compact`、`overview` 细节层级 selector；同一层级内的平移和缩放不会重新渲染 React Flow 树，跨阈值时才提交新的层级。
+- 小地图节点 frame 与 viewBox 按 `nodes` memoize，静态节点层使用独立 memoized 叶子；实时 viewport 框与整数缩放读数直接订阅 store。模板放置预览也作为独立叶子订阅，不把实时 viewport 重新带回画布根组件。
+- Unit/component 使用 store 通知次数、细节层级 render 次数、React Flow render 次数和小地图颜色/样式投影次数作为 oracle，覆盖相同值去重、同层级多帧、阈值跨越、程序化与直接操控投影、最终持久化和静态层隔离。
+- 实现未新增依赖、IPC、持久化格式、固定帧率、React Flow 私有 API 或新的 motion 参数。
+
+当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率的同 fixture 性能 trace，因此第一轮状态标记为“实现完成，设备待验收”，不得仅凭自动化测试宣称跨设备阶段验收完成。
+
+## 第二轮：终端与 Agent 重负载调度
+
+### 阶段目标
+
+让大量终端输出、终端视图 attach、渲染器初始化和创建后的非关键工作遵守可见性优先级与有界帧预算，避免它们在动画或直接操控期间长时间占用主线程。
+
+### 计划能力
+
+1. 为 renderer 侧 xterm 输出建立顺序保持的调度器：合并可安全合并的相邻片段，并以时间预算分片 drain，不用固定条数或固定帧率假设代替真实耗时。
+2. 聚焦且可见的终端优先；可见但未聚焦终端次之；离屏或隐藏终端使用后台追赶。优先级只影响处理时机，不改变 sequence、内容和最终屏幕状态。
+3. 当用户拖动画布、缩放、打开侧边栏或输入终端时，暂停或缩小非关键后台预算；交互结束后有界恢复，不产生无限饥饿。
+4. 把非聚焦对象的 WebGL addon 激活、部分 raster 升级、小地图非实时重算和非关键持久化安排到首个可见节点 frame 之后或空闲时段。
+5. 复用现有可见性与 raster 优先级事实，不建立与 `IntersectionObserver`、终端 raster coordinator 竞争的第二套可见性判断。
+6. 记录 pending output bytes、最老片段等待时间、单次 drain 耗时、输入到回显延迟和调度降级原因，并保证诊断有界且不记录敏感输出正文。
+
+### 第二轮非目标
+
+- 不改变 Provider、PTY、Run 用例、IPC 输出协议、terminal sequence 或背压所有权。
+- 不把 Agent 控制台合并为普通终端，也不修改 Agent thread、Provider 或 MCP 语义。
+- 不通过丢弃后台输出、降低当前终端字符正确性或禁止 WebGL 换取帧率。
+- 不直接卸载离屏 xterm surface；surface 生命周期和恢复风险留到第三轮评估。
+
+### 第二轮验收
+
+1. 相同身份与 sequence 的输出在空闲、持续动画、用户输入和后台追赶四种条件下得到一致的最终 xterm buffer。
+2. 输出合并和分片不产生丢失、重复、乱序、CJK/emoji 破坏或 ANSI 边界错误。
+3. 聚焦终端输入与回显不会被其他终端的大量输出长期阻塞；后台终端在交互结束后可以有界追赶。
+4. 批量创建 Terminal 或 Agent 时，节点外壳和输入可用性优先出现，非关键渲染初始化不会形成连续长任务尖峰。
+5. WebGL 初始化失败、context loss 与 DOM fallback 继续保持同一 session、buffer 和输入链路。
+
+### 第二轮验证
+
+- Unit：输出调度器的顺序、合并边界、时间预算、优先级切换、饥饿上限、取消和清理。
+- Unit/integration：真实 xterm 或最小适配器验证 ANSI、Unicode、CJK/emoji、连续大输出和 context fallback。
+- E2E：只有低层测试无法证明真实 Electron、xterm、GPU、持续 PTY 输出与画布动效组合风险时，增加一个最小代表性重负载主路径。
+- 性能 trace：单个聚焦终端刷日志、多个后台终端刷日志、连续创建 Terminal/Agent，并同时执行侧边栏和画布操作。
+
+### 第二轮退出条件
+
+- renderer 输出调度只有一个顺序 owner，现有队列、背压和快照边界保持清晰。
+- 可见性、聚焦和交互优先级有确定性测试，后台工作不会无限积压或泄漏。
+- 第一轮性能场景无回退，终端专项回归、完整门禁与跨平台 Electron 验收通过。
+
+### 第二轮实现证据
+
+第二轮代码与自动化验证于 2026-08-14 完成：
+
+- `TerminalWorkloadScheduler` 成为 renderer 窗口内唯一的终端重负载时机 owner；普通 Terminal 与 Agent terminal 通过共享 `TerminalSurfaceRegistry` 注册到同一调度器，Run 的权威模型、输出 sequence、IPC 视图协议和 1 MiB 恢复队列保持不变。
+- 每个 xterm surface 继续按完整 sequence 验证输入片段。调度器第一次只提交一个完整来源片段，取得真实 xterm write callback 耗时后，再结合实际 RAF 间隔或 `IdleDeadline.timeRemaining()` 估算下一批字节预算；相邻完整片段可以合并，但不会拆开来源片段或按固定条数、固定刷新率 drain。
+- focused、visible、hidden 优先级直接读取既有 `TerminalXtermRasterTarget`，复用同一个 `IntersectionObserver`、焦点和 parked/隐藏判断；没有新增第二套可见性事实。同优先级使用轮转顺序，后台输出在持续交互期间仍保留有界 starvation turn。
+- 画布 viewport 操作、侧边栏 opening/closing spring 和 xterm 输入都会进入共享交互窗口。交互期间 focused 输出继续按显示帧推进，visible/hidden 输出让到 idle 或有界后台追赶；交互完成后调度器立即恢复正常优先级。
+- xterm `open` 后先使用内置 DOM renderer 建立可输入 surface；WebGL addon 激活变为非关键初始化，按 focused/visible/hidden 顺序每个 idle slice 最多执行一个，并在画布或侧边栏交互期间暂停。既有 WebGL 加载失败、context loss、DOM fallback、session、buffer 和输入链路不变。
+- 第一轮已经把小地图静态节点投影与实时 viewport 分离，既有 raster coordinator 也已经按可见性、交互和 idle slice 管理离散倍率；本轮直接复用这两个 owner。图布局、会话与持久化提交继续沿原有完成边界执行，没有为了空闲调度延迟业务事实或建立第二套提交队列。
+- 开发诊断只记录 pending output bytes、pending target 数量、最老等待时间、最近 drain 耗时、同 target 输入到下一次输出的延迟和调度让步原因；不采集或记录终端正文。
+- Unit/component 覆盖 focused 优先、visible/hidden 顺序、同级公平、实际耗时自适应预算、交互让步、后台饥饿上限、输入帧保护、初始化错峰、取消清理、ANSI/Unicode/CJK/emoji 完整合并、精确 view 路由和 sidebar/canvas 交互窗口。
+- 实现未新增依赖、IPC、持久化格式、固定帧率、Provider 分支、xterm 私有 API 或 terminal surface 卸载策略。
+
+当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率下的持续 PTY 输出、多个后台终端、批量 Terminal/Agent 创建和并发画布/侧边栏操作 trace，因此第二轮状态标记为“实现完成，设备待验收”，自动化验证不能替代真实 GPU、xterm 和平台调度验收。首轮设备 trace 也将用于校准当前帧预算比例与后台追赶上限；在取得同 fixture 证据前不得把这些实现参数升级为长期产品契约。
+
+## 第三轮：节点级增量更新与离屏治理
+
+### 阶段目标
+
+让 Terminal、Agent、组合和其他画布对象按节点身份进行局部投影与提交；在节点很多或对象离屏时，减少无关 React、样式和终端表面工作，同时保持对象身份、session、输出和恢复连续性。
+
+### 计划能力
+
+1. 把整组节点模板重建拆为节点级 selector、缓存或增量 patch；单个 Terminal 或 Agent 状态变化只替换必要节点数据。
+2. 稳定未变化节点的对象引用和回调身份，使 memoized node component 能实际跳过无关 render。
+3. 区分图事实变化、节点运行状态、临时对象 motion 和 viewport 细节投影，避免其中一个维度变化使所有维度失效。
+4. 对离屏节点暂停装饰性动画、非关键测量和低优先级表面工作，但保留选择、连接、布局和恢复所需的最小几何事实。
+5. 评估带宽限、数量上限与过期策略的 terminal surface lease；只有能够证明同一 session、buffer、滚动历史、搜索状态和清理语义时，才允许进一步虚拟化或暂时 detach。
+6. 以节点数量、可见节点数量和活跃输出节点数量三个独立维度建立压力 fixture，避免只用总节点数解释性能。
+
+### 第三轮非目标
+
+- 不修改 BlockGraph 节点 schema、Agent 身份或 Run session 生命周期。
+- 不假设“离屏”等于“可销毁”，也不以重新创建 xterm surface 掩盖资源治理问题。
+- 不为了减少 render 合并 Terminal 与 Agent 的节点数据模型。
+- 不以全局深比较替代正确的状态切分；深比较本身不得成为新的逐帧热点。
+
+### 第三轮验收
+
+1. 一个节点的非几何状态变化不会重建其他节点模板，也不会触发无关 Terminal 或 Agent node render。
+2. 节点增加时，单节点更新成本主要由受影响节点和必要消费者决定，不随整图节点数近似线性增长。
+3. 离屏降载不改变节点位置、连接端点、选择、组合、session 身份、终端缓冲区和返回可见后的最终内容。
+4. 工作区切换、节点删除、运行退休和应用退出能清理所有 selector、observer、idle callback、surface lease 与缓存。
+5. 长时间运行后，内存、GPU context、pending output 和保留 surface 数量均保持有界。
+
+### 第三轮验证
+
+- Unit/component：节点引用稳定性、单节点 patch、selector 通知矩阵、motion 与运行状态正交更新。
+- Integration：surface attach/detach、可见性切换、WebGL/DOM renderer、缓冲区和滚动历史连续性。
+- E2E：保留现有跨 worktree、终端日常交互和运行时恢复主路径；只有 surface 生命周期新增组合风险时才扩展最小代表性场景。
+- 压力与 soak：稠密画布、多活跃输出节点、反复离屏/返回、工作区切换与长时间运行，观察 React commit、内存、GPU context 和积压上限。
+
+### 第三轮退出条件
+
+- 每类节点只有一个数据投影 owner，静态图事实、运行状态与 presentation motion 的失效边界可被测试证明。
+- 所有离屏优化都有明确资源上限、恢复路径与清理路径；未能证明 surface 连续性的虚拟化方案保持关闭。
+- 三轮性能矩阵、完整门禁、跨平台 Electron 验收与长时间运行检查通过。
+
+### 第三轮实现证据
+
+第三轮代码与目标自动化验证于 2026-08-15 完成：
+
+- renderer 窗口内建立按 terminal ID 订阅的状态投影 store。普通 Terminal 节点和折叠组合成员行直接订阅自身 runtime 状态；单个 session、状态或输出引用变化只通知对应 selector，不再触发整组 React Flow 节点投影。外部 store 接入后，`useWorkbenchFlowNodes` 的结构投影依赖中不再包含 terminal runtime record。
+- 被折叠组合停放的 Terminal 节点暂停 runtime 订阅，组合成员行继续作为必要消费者显示状态；组合重新展开时直接读取 store 的最新值，不建立积压队列，也不改变 Run session、输出或缓冲区事实。
+- 节点投影在完成既有瞬时几何、CanvasArrangement 堆叠和对象 motion 投影后，按稳定节点身份协调引用。Terminal、terminal group 与 Agent 分别使用显式事实维度比较；图事实、选择、workflow 状态或 motion 变化只替换受影响节点，未变化节点和已稳定的动作回调继续复用。实现没有使用全局深比较，也不把缓存作为业务判断来源。
+- xterm 的 focused、visible、hidden 事实继续由既有 raster target 和同一个 `IntersectionObserver` 拥有，并投影到所属 Terminal 或 Agent 节点。离屏 surface 沿用第二轮的输出、初始化与 raster 降级，节点内无限装饰 spinner 在 hidden 期间暂停；返回可见后按同一状态继续呈现。
+- surface registry 诊断增加 focused、visible、hidden surface 数量，并继续提供总 surface、DOM/WebGL renderer、pending output 和调度等待指标，供节点数量、可见节点数量和活跃输出数量三个维度的 trace 与 soak 使用；诊断不记录终端正文。
+- terminal surface lease/detach 已完成风险评估但保持关闭。当前 disposable view 已能证明精确 view 身份、释放与重新 attach 的 session/buffer 主路径，但尚未证明离屏 detach 后搜索状态、滚动位置和所有 renderer 细节连续；因此没有启用 React Flow 可见节点卸载、xterm surface 缓存或过期淘汰，也没有修改现有 surface 生命周期。
+- Unit/component 使用 240 个 terminal selector 与 320 个跨类型节点的确定性压力矩阵，覆盖单 selector 通知、订阅清理、parked 暂停/恢复、三类节点引用稳定、单节点图事实变化、selection/motion 正交更新、runtime 更新不调用节点结构投影、Terminal/Agent 共用可见性投影和 surface 优先级诊断。
+- 实现未新增依赖、IPC、持久化格式、固定帧率、React Flow/xterm 私有 API、Provider 分支或 terminal surface 保留策略；BlockGraph、AgentSession、Run 与 CanvasArrangement 的事实 owner 和提交入口不变。
+
+第三轮完成后的低风险热路径收口于 2026-08-15 完成：
+
+- 终端输出片段在进入 surface 队列时只计算一次保守 UTF-8 字节长度，后续积压统计、批次上限与消费扣减复用该结果；合并批次仍对最终字符串计算精确字节长度，跨片段 surrogate、ANSI、Unicode、sequence 与输出顺序不变。`onOutputPendingChange` 只在是否存在可排出工作发生变化时通知，不再让同一积压周期内的每个小片段重复唤醒调度器。
+- 画布对象 motion 的 Edge 投影按稳定基础 Edge 身份复用已生成的运动态引用；无关节点状态变化仍可产生新的节点数组，但不会让正在等待端点稳定的关联连线重复获得等价对象。运动结束后直接恢复规范基础 Edge，连线 class 与显露时机不变。
+- 同一画布下的 xterm raster target 共享公开 `IntersectionObserver`、`ResizeObserver` 与窗口 resize 通道，回调仍按 element 分发；单 surface 清理执行 `unobserve`，最后一个 surface 清理时才断开底层 observer 与窗口监听。表现 owner 的属性观察、focused/visible/hidden 规则、raster cost 和 surface 生命周期没有改变。
+
+当前仍缺少 Windows 60Hz、144Hz、240Hz 与 macOS 原生刷新率下的稠密画布 trace，以及长时间多输出、反复离屏/返回、工作区切换后的内存、GPU context、surface 和 pending output soak 数据。因此第三轮状态标记为“实现完成，设备与 soak 待验收”；自动化压力矩阵只能证明失效边界和清理，不得替代真实 Electron、GPU 与长期资源验收。
+
+## 第四阶段：渲染虚拟化与线程隔离（条件触发）
+
+### 当前决策
+
+第四阶段当前不启动。2026-08-15 的实际使用反馈表明，前三轮与低风险热路径收口后，Windows 高刷新率环境中的侧边栏、画布和节点导航已经流畅，当前常用规模没有证据支持立即承担 surface 生命周期与跨线程架构风险。该反馈是阶段停止依据之一，不替代固定矩阵 trace 或跨平台验收。
+
+不同显示器刷新率造成的均匀运动采样差异不是第四阶段触发条件。只有可重复的停顿、输入延迟、资源增长或后台积压，并且 trace 能把问题定位到现有主线程计算或重型 surface 驻留时，才进入本阶段。
+
+### 启动条件
+
+启动前至少满足以下一项，并保留可复现 fixture、设备信息与改造前证据：
+
+1. 固定场景矩阵在受支持原生平台上出现可重复的连续 missed frame、long task 或输入回显延迟，前三轮 owner 已不能通过局部调度或增量投影消除。
+2. 节点总数、可见节点数和活跃输出节点数分离测试证明，离屏 xterm surface、DOM、WebGL context、observer 或 renderer 内存随长期运行持续增长，现有清理与降载不能维持有界。
+3. 多终端长期输出、反复离屏/返回或工作区切换的 soak 出现持续 pending output、GPU 资源无法释放、renderer 内存回落失败或恢复连续性问题。
+4. 新的真实产品规模明显超过前三轮固定 fixture，且用户常用路径已经出现稳定可复现的性能退化，而不是单台设备刷新率或缩放设置带来的主观差异。
+
+### 候选能力
+
+1. 将所有画布对象拆为始终保留的轻量几何投影与按需驻留的重型 surface；选择、连线、布局、焦点目标和恢复身份继续由轻量层完整表达。
+2. 只为可见区域及有界 overscan 范围挂载或预热 Terminal/Agent surface，并使用滞回避免视口边缘反复 attach/detach；当前聚焦、输入中、运动中或恢复中的对象不得回收。
+3. 为 surface lease 建立明确数量上限、过期策略、清理入口和诊断；只有同一 session、buffer、滚动位置、搜索状态与 renderer 状态能够被测试证明连续时，才允许启用离屏 detach。
+4. 把不依赖 DOM、React Flow 或 xterm renderer 的纯输出整理、差异计算和静态投影迁移到 Worker；UI 主线程只接收有序、有界、可取消的最终 presentation batch。
+5. Worker、surface lease 与现有帧预算调度共享同一个优先级事实；不得建立第二套 focused/visible/hidden、sequence、viewport 或 reduced-motion owner。
+
+### 不变量与非目标
+
+- 不修改现有 spring、response、路径、最终 viewport、节点几何、选择、焦点、输入激活与 reduced-motion 结果。
+- 不改变 BlockGraph、Run、Agent、Project 的事实 owner、IPC 或持久化格式；不得把离屏解释为 session 可销毁。
+- 不以固定帧率、跳过可见中间帧、降低清晰度、永久 GPU layer、私有 API 或关闭 fallback 换取基准数据。
+- 不把完整 xterm、React Flow DOM 或平台对象强行迁入 Worker；只迁移能够由公开契约证明为纯计算的工作。
+- 当前体验足够时不做预防性虚拟化，不为尚未出现的规模提前增加恢复和资源生命周期复杂度。
+
+### 可行性与验证门禁
+
+1. 先完成原生 Windows 与 macOS 的改造前 trace、长期 soak 和资源基线，明确瓶颈属于 surface 驻留、主线程纯计算还是 GPU 合成；结论不明确时保持待命。
+2. surface 方案必须先用 disposable view 验证 attach/detach 后的 session identity、buffer、滚动历史、搜索、选择、输入法、DOM/WebGL renderer、context loss 和清理矩阵，再进入生产路径。
+3. Worker 方案必须证明 sequence 顺序、取消、工作区切换、对象删除、进程退出、异常恢复和积压上限；跨线程批次不能成为第二个输出事实来源。
+4. Unit/component 覆盖 lease 状态机、overscan/滞回、优先级、引用稳定与清理；integration 覆盖真实 surface 和 renderer 连续性；E2E 只补低层无法证明的最小返回可见与工作区切换主路径。
+5. 完成独立 Large Change Spec、可行性检查、Plan、TDD、完整门禁与跨平台原生验收后，才能把状态从“条件触发”改为“实施中”。新增依赖、IPC 或运行时能力时重新按对应 owner 路由。
+
+## 跨轮性能证据
+
+### 固定场景矩阵
+
+每轮开始前必须冻结可重复的项目 fixture 和操作序列，至少覆盖：
+
+| 维度     | 场景                                               |
+| -------- | -------------------------------------------------- |
+| 画布密度 | 空画布、中等节点、稠密节点                         |
+| 直接操控 | 连续平移、触控板/滚轮缩放、快速接管程序化运动      |
+| 外壳动效 | 侧边栏连续展开收回、新节点创建、组合展开收起       |
+| 输出负载 | 无输出、单个聚焦终端持续输出、多个后台终端持续输出 |
+| 创建负载 | 单个 Terminal、连续 Terminal、连续 Agent、混合创建 |
+| 可见性   | 全部可见、部分离屏、工作区切换后返回               |
+| 设备     | Windows 60Hz/144Hz/240Hz、macOS 原生刷新率         |
+
+### 观测指标
+
+性能判断至少结合以下证据，不以单个平均 FPS 作为结论：
+
+- 刷新间隔、连续 missed frame 和主线程 long task 分布。
+- React commit 次数、commit 耗时和触发组件。
+- viewport 发布、节点模板投影、小地图静态投影的次数与耗时。
+- xterm pending bytes、最老输出等待时间、单次 drain 耗时与输入回显延迟。
+- 终端 surface、WebGL context、observer、idle callback 和缓存数量。
+- 长时间运行后的 renderer 内存、GPU 资源、输出积压与清理结果。
+
+性能报告必须同时给出改造前基线、改造后结果、fixture、设备刷新率、窗口尺寸、节点数量和输出负载。macOS 结果不能代替 Windows 验收，60Hz 结果也不能推导 240Hz 已验收。
+
+### 阶段停止条件
+
+每轮完成后根据真实证据决定下一轮范围：
+
+1. 如果第一轮已经消除直接操控中的主要 React 热点，第二轮只处理输出和创建压力，不继续重写画布架构。
+2. 如果第二轮后常用规模已经满足体验目标，第三轮只处理 trace 证明存在的节点级或离屏热点。
+3. 如果某项优化降低平均耗时却引入输入延迟、输出错误、恢复不连续或内存增长，该项不得进入下一轮基线。
+4. 如果前三轮与低风险收口已经满足当前产品规模，第四阶段保持待命；主观刷新率差异或未复现的偶发感觉不能替代启动证据。
+
+## 测试策略
+
+最低有效层级优先为 unit 和 component：使用通知次数、投影次数、对象引用、队列顺序和调度副作用作为稳定 oracle，不把具体设备 FPS、单次毫秒数或像素级中间帧固化为单元测试契约。
+
+真实 Electron、GPU、xterm、PTY 持续输出和高刷新率组合无法由 jsdom 证明，因此性能 trace 与跨平台真实设备检查是阶段验收证据。E2E 只保留最小代表性主路径；调度边界、优先级矩阵、错误分支和清理必须下沉到 unit、integration 或 contract。
+
+生产代码改动完成后运行 `pnpm pre-commit`。涉及 Electron 构建、运行时装配或打包时追加 `pnpm build`。Windows、Linux 与 macOS 的支持状态只能由对应原生 runner 或真实设备证明。
+
+## 风险与回退
+
+- 外部 viewport store 如果形成第二个最终状态 owner，会造成 React Flow、持久化与小地图分叉；它只能拥有可丢弃 presentation value，最终事实继续沿现有入口提交。
+- 输出分片如果按字符、字节或时间错误切割，可能破坏 ANSI、Unicode 或 xterm write 回调顺序；合并必须以完整输出片段为边界，sequence 是唯一排序依据。
+- 过度优先前台可能让后台永远无法追赶；每个优先级都必须有界，并在交互结束后恢复预算。
+- 节点级缓存如果失效维度不完整，会产生陈旧状态；缓存 key 与 selector 必须由明确事实维度驱动，不能依赖经验性的深比较。
+- 直接启用 React Flow 可见节点卸载或销毁离屏 xterm 可能导致 surface 重建、buffer 恢复和滚动位置回退；第三轮在证明 surface lease 前不得采用。
+- 永久 `will-change`、无上限 GPU layer、关闭 WebGL fallback 或隐藏内容可以暂时改善 trace，却会增加内存、兼容性或可访问性风险，均不属于本路线方案。
+
+每轮必须能独立回退到上一轮的公开边界，不回滚 BlockGraph 数据、Run session、Agent 身份或用户布局。
+
+## 维护规则
+
+- 每轮开始时补充实际基线、选定改动范围和可行性结论；完成时更新状态、完成证据和剩余热点。
+- 已交付的用户不变量迁入 UI 契约；跨组件稳定的动效与性能规则迁入 UI Style Guide；终端运行时事实迁入终端专项或 Run owner 文档。
+- 路线图只保留阶段顺序、实施证据和未完成方向，不复制生产代码结构或把当前组件名升级为长期产品契约。
+- 新增依赖、私有 API、持久化、IPC、跨上下文端口或终端 surface 生命周期变化时，必须重新完成 Large Change 的 Spec、可行性检查和 Plan。
+- 性能参数必须来源于可重复 trace；不得因单台设备的主观手感新增固定帧率、固定批量或无设备上下文的毫秒阈值。

@@ -393,9 +393,7 @@ class ManagedTerminalModel {
   private registerColorQueryHandler(code: 10 | 11): void {
     this.terminal.parser.registerOscHandler(code, (data) => {
       if (data !== '?') return false
-      if (!this.activeView) {
-        this.onQueryResponse(createTerminalOscColorResponse(code, this.terminalSourceTheme))
-      }
+      this.onQueryResponse(createTerminalOscColorResponse(code, this.terminalSourceTheme))
       return true
     })
   }

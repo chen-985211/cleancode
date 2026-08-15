@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, Ref } from 'react'
 
 import type { TerminalRuntimeAvailabilitySnapshot } from '../../contexts/run/application/dto/TerminalRuntimeAvailability'
 import { useI18n } from './i18n/useI18n'
@@ -119,6 +119,7 @@ interface CanvasStatusbarProps {
   readonly initialWorkbenchLoadPhase: InitialWorkbenchLoadPhase
   readonly currentWorkbench: WorkbenchSnapshot | null
   readonly currentWorkspace: CurrentWorkspace | undefined
+  readonly motionRef?: Ref<HTMLElement>
 }
 
 export function CanvasStatusbar({
@@ -126,11 +127,12 @@ export function CanvasStatusbar({
   terminalRuntimeAvailability,
   initialWorkbenchLoadPhase,
   currentWorkbench,
-  currentWorkspace
+  currentWorkspace,
+  motionRef
 }: CanvasStatusbarProps) {
   const { t } = useI18n()
   return (
-    <footer className="app-shell__statusbar">
+    <footer ref={motionRef} className="app-shell__statusbar">
       <span
         className={`status-dot${terminalRuntimeAvailability.phase === 'ready' ? ' status-dot--running' : ''}`}
       />

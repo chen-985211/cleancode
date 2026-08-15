@@ -107,6 +107,34 @@ describe('workbench node occupancy', () => {
 })
 
 describe('workbench safe viewport', () => {
+  it('reserves a full-height left canvas obstruction', () => {
+    expect(
+      resolveWorkbenchSafeViewport({
+        canvasRect: { left: 100, top: 50, right: 1_300, bottom: 850 },
+        obstructionRects: [{ left: 100, top: 50, right: 380, bottom: 850 }]
+      })
+    ).toEqual({
+      x: 304,
+      y: 24,
+      width: 872,
+      height: 752
+    })
+  })
+
+  it('reserves a full-height right canvas obstruction', () => {
+    expect(
+      resolveWorkbenchSafeViewport({
+        canvasRect: { left: 100, top: 50, right: 1_300, bottom: 850 },
+        obstructionRects: [{ left: 1_020, top: 50, right: 1_300, bottom: 850 }]
+      })
+    ).toEqual({
+      x: 24,
+      y: 24,
+      width: 872,
+      height: 752
+    })
+  })
+
   it('uses the lowest canvas obstruction and a uniform screen margin', () => {
     expect(
       resolveWorkbenchSafeViewport({

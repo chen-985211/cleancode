@@ -135,6 +135,33 @@ describe('workbench canvas Command selection and block template placement', () =
     expect(toolbar.querySelectorAll('button:disabled')).toHaveLength(0)
   })
 
+  it('keeps the marquee aligned to the spatial canvas when the sidebar is expanded', () => {
+    renderCanvas({ onArrangeCanvasSelection: vi.fn() })
+    const pane = screen.getByTestId('pane')
+    const canvasSurface = document.querySelector<HTMLElement>('.canvas-surface')!
+    const spatialSurface = document.querySelector<HTMLElement>(
+      '.workbench-canvas__spatial-motion-surface'
+    )!
+    vi.spyOn(canvasSurface, 'getBoundingClientRect').mockReturnValue(createRect(0, 0, 1_200, 800))
+    vi.spyOn(spatialSurface, 'getBoundingClientRect').mockReturnValue(createRect(280, 0, 920, 800))
+
+    fireEvent.pointerDown(pane, {
+      button: 0,
+      clientX: 320,
+      clientY: 80,
+      metaKey: true,
+      pointerId: 1
+    })
+    fireEvent.pointerMove(pane, { clientX: 600, clientY: 500, pointerId: 1 })
+
+    expect(document.querySelector<HTMLElement>('.canvas-arrangement-selection')).toHaveStyle({
+      left: '40px',
+      top: '80px',
+      width: '280px',
+      height: '420px'
+    })
+  })
+
   it('places the whole template at the nearest free origin and stays quiet', () => {
     const onPlaceBlockTemplate = vi.fn(async () => undefined)
     const onPaneClick = vi.fn()
@@ -432,5 +459,19 @@ function createTemplate(): BlockTemplateSnapshot {
       }
     ],
     connections: []
+  }
+}
+
+function createRect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    bottom: top + height,
+    height,
+    left,
+    right: left + width,
+    top,
+    width,
+    x: left,
+    y: top,
+    toJSON: () => undefined
   }
 }

@@ -20,18 +20,35 @@ export function resolveWorkbenchSafeViewport({
   readonly margin?: number
 }): WorkbenchScreenRect {
   const normalizedMargin = Math.max(0, margin)
-  const left = canvasRect.left + normalizedMargin
-  const right = canvasRect.right - normalizedMargin
   const canvasVerticalCenter = (canvasRect.top + canvasRect.bottom) / 2
   const intersectingObstructions = obstructionRects.filter((rect) =>
     intersectsCanvas(rect, canvasRect)
   )
-  const topObstructionBottom = intersectingObstructions
+  const sideObstructions = intersectingObstructions.filter(
+    (rect) =>
+      spansVerticalCenter(rect, canvasVerticalCenter) &&
+      (rect.left <= canvasRect.left || rect.right >= canvasRect.right)
+  )
+  const leftObstructionRight = sideObstructions
+    .filter((rect) => rect.left <= canvasRect.left && rect.right < canvasRect.right)
+    .reduce((furthestRight, rect) => Math.max(furthestRight, rect.right), canvasRect.left)
+  const rightObstructionLeft = sideObstructions
+    .filter((rect) => rect.right >= canvasRect.right && rect.left > canvasRect.left)
+    .reduce((furthestLeft, rect) => Math.min(furthestLeft, rect.left), canvasRect.right)
+  const verticalObstructions = intersectingObstructions.filter(
+    (rect) => !sideObstructions.includes(rect)
+  )
+  const topObstructionBottom = verticalObstructions
     .filter((rect) => (rect.top + rect.bottom) / 2 <= canvasVerticalCenter)
     .reduce((lowestBottom, rect) => Math.max(lowestBottom, rect.bottom), canvasRect.top)
-  const bottomObstructionTop = intersectingObstructions
+  const bottomObstructionTop = verticalObstructions
     .filter((rect) => (rect.top + rect.bottom) / 2 > canvasVerticalCenter)
     .reduce((highestTop, rect) => Math.min(highestTop, rect.top), canvasRect.bottom)
+  const left = Math.max(canvasRect.left + normalizedMargin, leftObstructionRight + normalizedMargin)
+  const right = Math.min(
+    canvasRect.right - normalizedMargin,
+    rightObstructionLeft - normalizedMargin
+  )
   const top = Math.max(canvasRect.top + normalizedMargin, topObstructionBottom + normalizedMargin)
   const bottom = Math.min(
     canvasRect.bottom - normalizedMargin,
@@ -61,9 +78,15 @@ export function readWorkbenchCanvasCreationGeometry(): {
   }
 
   const measuredCanvasRect = canvas.getBoundingClientRect()
+  const measuredSurfaceRect = canvas
+    .closest<HTMLElement>('.canvas-surface')
+    ?.getBoundingClientRect()
+  const measuredVisibleCanvasRect = measuredSurfaceRect
+    ? intersectRects(measuredCanvasRect, measuredSurfaceRect)
+    : measuredCanvasRect
   const canvasRect =
-    measuredCanvasRect.width > 0 && measuredCanvasRect.height > 0
-      ? measuredCanvasRect
+    measuredVisibleCanvasRect.width > 0 && measuredVisibleCanvasRect.height > 0
+      ? measuredVisibleCanvasRect
       : resolvePreLayoutCanvasRect(canvas)
   const obstructionRects = Array.from(
     document.querySelectorAll<HTMLElement>(`[${workbenchCanvasObstructionAttribute}]`)
@@ -75,6 +98,29 @@ export function readWorkbenchCanvasCreationGeometry(): {
       height: canvasRect.height
     },
     safeViewport: resolveWorkbenchSafeViewport({ canvasRect, obstructionRects })
+  }
+}
+
+function spansVerticalCenter(rect: ClientRect, canvasVerticalCenter: number): boolean {
+  return rect.top <= canvasVerticalCenter && rect.bottom >= canvasVerticalCenter
+}
+
+function intersectRects(
+  first: DOMRect,
+  second: DOMRect
+): ClientRect & { readonly width: number; readonly height: number } {
+  const left = Math.max(first.left, second.left)
+  const top = Math.max(first.top, second.top)
+  const right = Math.min(first.right, second.right)
+  const bottom = Math.min(first.bottom, second.bottom)
+
+  return {
+    bottom,
+    height: Math.max(0, bottom - top),
+    left,
+    right,
+    top,
+    width: Math.max(0, right - left)
   }
 }
 

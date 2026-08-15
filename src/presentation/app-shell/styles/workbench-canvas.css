@@ -16,7 +16,7 @@
   right: var(--cc-shell-control-inset);
   z-index: 6;
   display: flex;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - var(--cc-canvas-sidebar-inset, 0px) - 24px);
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: flex-start;
@@ -125,8 +125,36 @@
   min-width: 0;
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: clip;
   background: var(--cc-canvas);
+}
+
+.workbench-canvas__spatial-motion-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.workbench-canvas__spatial-motion-surface[data-project-sidebar-motion-state='expanded'] {
+  left: var(--cc-sidebar-expanded-width);
+  right: 0;
+}
+
+.workbench-canvas__center-motion-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.workbench-canvas__center-motion-surface[data-project-sidebar-motion-state='expanded'] {
+  left: var(--cc-sidebar-expanded-width);
+  right: 0;
+}
+
+.workbench-canvas__spatial-motion-surface > .react-flow {
+  position: absolute;
+  inset: 0;
 }
 
 .react-flow {
@@ -530,6 +558,11 @@
   padding: 0 12px;
   color: var(--cc-muted);
   font-size: 11px;
+}
+
+.app-shell__statusbar[data-project-sidebar-motion-state='expanded'] {
+  width: calc(100% - var(--cc-sidebar-expanded-width));
+  margin-left: var(--cc-sidebar-expanded-width);
 }
 
 .app-shell__statusbar .status-dot {

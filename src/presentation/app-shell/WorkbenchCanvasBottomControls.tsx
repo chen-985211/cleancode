@@ -43,6 +43,7 @@ export function WorkbenchCanvasBottomControls({
   onReorderQuickExecutionSlots,
   reactFlowInstanceRef,
   selection,
+  showArrangementSelection = true,
   shortcutPlatform,
   shortcutTooltips
 }: {
@@ -65,6 +66,7 @@ export function WorkbenchCanvasBottomControls({
   ) => Promise<void> | void
   readonly reactFlowInstanceRef: MutableRefObject<ReactFlowInstance<WorkbenchFlowNode, Edge> | null>
   readonly selection: CanvasArrangementSelection | null
+  readonly showArrangementSelection?: boolean
   readonly shortcutPlatform: ShortcutPlatform
   readonly shortcutTooltips: Partial<ApplicationShortcutTooltipLabels>
 }) {
@@ -121,6 +123,7 @@ export function WorkbenchCanvasBottomControls({
         onArrange={onArrange}
         onToolbarExitComplete={() => bottomControlHandoff.completeExit('arrangement')}
         selection={selection}
+        showSelection={showArrangementSelection}
         toolbarOpen={bottomControlHandoff.arrangementOpen}
       />
     </>

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type SetStateAction
+} from 'react'
 
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
 import type { TerminalSessionSnapshot } from '../../contexts/run/application/dto/TerminalSessionSnapshot'
@@ -23,6 +31,9 @@ import { notifyTerminalLaunchFailure } from './terminalSessionNotifications'
 import { resolveUserFacingErrorMessage } from './appErrorMessages'
 import { TerminalSurfaceRegistry } from './terminalSurfaceRegistry'
 import { TerminalZoomRasterCoordinator } from './terminalZoomRasterCoordinator'
+import { TerminalWorkloadScheduler } from './terminalWorkloadScheduler'
+import { createTerminalStateStore } from './terminalStateStore'
+import { createTerminalRenderingWorkloadCoordinator } from './terminalRenderingWorkloadCoordinator'
 import {
   inheritTerminalRetention,
   shouldInheritTerminalRetention
@@ -73,10 +84,24 @@ export function useTerminalSessions({
   const [terminalStatesByKey, setTerminalStatesByKey] = useState<Record<string, TerminalViewState>>(
     {}
   )
+  const [terminalStateStore] = useState(createTerminalStateStore)
   const terminalStatesRef = useRef<Record<string, TerminalViewState>>({})
   const [terminalZoomRasterCoordinator] = useState(() => new TerminalZoomRasterCoordinator())
+  const [terminalWorkloadScheduler] = useState(() => new TerminalWorkloadScheduler())
+  const [terminalRenderingWorkloadCoordinator] = useState(() =>
+    createTerminalRenderingWorkloadCoordinator(
+      terminalZoomRasterCoordinator,
+      terminalWorkloadScheduler
+    )
+  )
   const [terminalSurfaceRegistry] = useState(
-    () => new TerminalSurfaceRegistry(undefined, undefined, terminalZoomRasterCoordinator)
+    () =>
+      new TerminalSurfaceRegistry(
+        undefined,
+        undefined,
+        terminalZoomRasterCoordinator,
+        terminalWorkloadScheduler
+      )
   )
   const inputBuffersRef = useRef<Map<string, TerminalInputBuffer>>(new Map())
   const inputWriteQueuesRef = useRef<Map<string, Promise<void>>>(new Map())
@@ -121,6 +146,9 @@ export function useTerminalSessions({
       ),
     [recoveredTerminalStates, runtimeAvailability.epoch]
   )
+  useLayoutEffect(() => {
+    terminalStateStore.replaceStates(terminalStates)
+  }, [terminalStateStore, terminalStates])
   const runningSessionIds = useMemo(
     () =>
       Object.values(terminalStates)
@@ -269,10 +297,13 @@ export function useTerminalSessions({
       queueMicrotask(() => {
         // React StrictMode immediately replays effects with the same stateful owners. Defer the
         // terminal check by one microtask so only a real unmount disposes the shared coordinator.
-        if (!isMountedRef.current) terminalZoomRasterCoordinator.dispose()
+        if (!isMountedRef.current) {
+          terminalZoomRasterCoordinator.dispose()
+          terminalWorkloadScheduler.dispose()
+        }
       })
     }
-  }, [terminalSurfaceRegistry, terminalZoomRasterCoordinator])
+  }, [terminalSurfaceRegistry, terminalWorkloadScheduler, terminalZoomRasterCoordinator])
 
   useTerminalSessionEvents({
     clearPendingTerminalInput,
@@ -648,9 +679,9 @@ export function useTerminalSessions({
     moveTerminalSessionToWorkspace,
     setTerminalStates: updateTerminalStates,
     startTerminal,
-    terminalStates,
+    terminalStateProjection: { states: terminalStates, store: terminalStateStore },
     terminalSurfaceRegistry,
-    terminalZoomRasterCoordinator,
+    terminalZoomRasterCoordinator: terminalRenderingWorkloadCoordinator,
     terminalStatesRef,
     terminateTerminalSession,
     toggleTerminalRetention,

@@ -88,7 +88,6 @@ vi.mock('@xterm/xterm', () => ({
     })
     readonly getSelection = vi.fn(() => this.selection)
     readonly hasSelection = vi.fn(() => this.selection.length > 0)
-
     readonly write = vi.fn((_output: string, callback?: () => void) => {
       callback?.()
     })
@@ -113,6 +112,7 @@ vi.mock('@xterm/xterm', () => ({
     })
 
     readonly onData = vi.fn(() => ({ dispose: vi.fn() }))
+    readonly parser = { registerOscHandler: vi.fn(() => ({ dispose: vi.fn() })) }
     readonly dispose = vi.fn()
     readonly refresh = vi.fn()
     readonly registerLinkProvider = vi.fn(
@@ -284,7 +284,7 @@ describe('terminal viewport interaction', () => {
     const viewId = await waitForAttachedViewId()
     act(() => terminalSurfaceRegistry.write(createOutputEvent(viewId, 1, 'agent output\n')))
 
-    expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n')
+    await waitFor(() => expect(terminal.write.mock.calls.at(-1)?.[0]).toBe('agent output\n'))
     expect(terminal.focus).not.toHaveBeenCalled()
     expect(helperTextareaFocus).not.toHaveBeenCalled()
   })

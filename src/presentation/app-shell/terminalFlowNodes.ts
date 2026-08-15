@@ -8,19 +8,19 @@ import {
   type TerminalGroupDropAction
 } from './terminalGroupDropTarget'
 import type { AgentApprovalNodeIntent } from './agentToolApprovalTypes'
+import { createTerminalStateStore, type TerminalStateStore } from './terminalStateStore'
 import type { TerminalWorkflowBuildPresentation } from './useTerminalWorkflowBuildChoreography'
 import { createCanvasObjectIdentity } from '../../shared-kernel/domain/value-objects/CanvasObjectIdentity'
-import {
-  createIdleTerminalState,
-  type TerminalDefinitionInput,
-  type TerminalDimensions,
-  type TerminalFlowNode,
-  type TerminalGroupFlowNode,
-  type TerminalGroupMetadataInput,
-  type TerminalViewState,
-  type WorkbenchNodeLayoutInput,
-  type WorkbenchFlowNode,
-  type WorkbenchSnapshot
+import type {
+  TerminalDefinitionInput,
+  TerminalDimensions,
+  TerminalFlowNode,
+  TerminalGroupFlowNode,
+  TerminalGroupMetadataInput,
+  TerminalViewState,
+  WorkbenchNodeLayoutInput,
+  WorkbenchFlowNode,
+  WorkbenchSnapshot
 } from './types'
 
 const collapsedTerminalGroupWidth = 360
@@ -92,7 +92,8 @@ interface CreateTerminalFlowNodesInput {
     readonly blockId: string
     readonly requestId: number
   } | null
-  readonly terminalStates: Record<string, TerminalViewState>
+  readonly terminalStates?: Record<string, TerminalViewState>
+  readonly terminalStateStore?: TerminalStateStore
   readonly handlers: TerminalFlowNodeHandlers & Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowNodeStatuses?: Readonly<Record<string, WorkflowRunNodeStatus>>
   readonly workflowBuildPresentation?: TerminalWorkflowBuildPresentation | null
@@ -111,12 +112,14 @@ export function createTerminalFlowNodes({
   activeWorkflowRootBlockIds = [],
   isStoppingWorkflow = false,
   launchCommandEditRequest = null,
-  terminalStates,
+  terminalStates = {},
+  terminalStateStore: providedTerminalStateStore,
   handlers,
   workflowNodeStatuses = {},
   workflowBuildPresentation = null,
   includeCollapsedMembers = false
 }: CreateTerminalFlowNodesInput): WorkbenchFlowNode[] {
+  const terminalStateStore = providedTerminalStateStore ?? createTerminalStateStore(terminalStates)
   const activeWorkflowRootIds = new Set(activeWorkflowRootBlockIds)
   const selectedBlockIds = new Set(
     selectedTerminalBlockIds ?? (selectedTerminalBlockId ? [selectedTerminalBlockId] : [])
@@ -135,7 +138,7 @@ export function createTerminalFlowNodes({
       selectedTerminalGroupId: selectedTerminalGroupId ?? null,
       isEditing: isTerminalGroupSelectionMode && selectedTerminalGroupId === group.id,
       terminalGroupDropAction,
-      terminalStates,
+      terminalStateStore,
       workflowBuildPresentation
     })
   )
@@ -158,7 +161,7 @@ export function createTerminalFlowNodes({
             : undefined,
         isSelected: selectedBlockIds.has(block.id),
         isTerminalGroupSelectionMode: false,
-        terminalStates,
+        terminalStateStore,
         workflowBuildPresentation,
         workflowStatus: workflowNodeStatuses[block.id]
       })
@@ -172,7 +175,7 @@ interface CreateTerminalFlowNodeInput {
   readonly block: TerminalBlockSnapshot
   readonly projectId: string
   readonly workspaceId: string
-  readonly terminalStates: Record<string, TerminalViewState>
+  readonly terminalStateStore: TerminalStateStore
   readonly handlers: TerminalFlowNodeHandlers
   readonly isSelected: boolean
   readonly isTerminalGroupSelectionMode: boolean
@@ -190,7 +193,7 @@ function createTerminalFlowNode({
   block,
   projectId,
   workspaceId,
-  terminalStates,
+  terminalStateStore,
   handlers,
   isSelected,
   isTerminalGroupSelectionMode,
@@ -228,7 +231,8 @@ function createTerminalFlowNode({
       }),
       approvalIntent,
       block,
-      session: terminalStates[block.id] ?? createIdleTerminalState(),
+      session: terminalStateStore.getState(block.id),
+      terminalStateStore,
       isSelected,
       isTerminalGroupSelectionMode,
       canSelectForTerminalGroup,
@@ -239,8 +243,7 @@ function createTerminalFlowNode({
       isObjectLayoutChoreographed: workflowBuildPresentation?.terminalBlockIds.has(block.id),
       objectPresence,
       workflowStatus,
-      ...handlers,
-      onSelect: (additive) => handlers.onSelect?.(block, additive)
+      ...handlers
     }
   }
 }
@@ -252,7 +255,7 @@ interface CreateTerminalGroupFlowNodeInput {
   readonly selectedTerminalGroupId: string | null
   readonly isEditing: boolean
   readonly terminalGroupDropAction: TerminalGroupDropAction
-  readonly terminalStates: Record<string, TerminalViewState>
+  readonly terminalStateStore: TerminalStateStore
   readonly handlers: Partial<TerminalGroupFlowNodeHandlers>
   readonly workflowBuildPresentation: TerminalWorkflowBuildPresentation | null
 }
@@ -264,7 +267,7 @@ function createTerminalGroupFlowNode({
   selectedTerminalGroupId,
   isEditing,
   terminalGroupDropAction,
-  terminalStates,
+  terminalStateStore,
   handlers,
   workflowBuildPresentation
 }: CreateTerminalGroupFlowNodeInput): TerminalGroupFlowNode {
@@ -302,11 +305,9 @@ function createTerminalGroupFlowNode({
       group,
       memberBlocks,
       memberStates: Object.fromEntries(
-        memberBlocks.map((block) => [
-          block.id,
-          terminalStates[block.id] ?? createIdleTerminalState()
-        ])
+        memberBlocks.map((block) => [block.id, terminalStateStore.getState(block.id)])
       ),
+      terminalStateStore,
       isEditing,
       isSelected: selectedTerminalGroupId === group.id,
       isObjectLayoutChoreographed: workflowBuildPresentation?.terminalGroupIds.has(group.id),

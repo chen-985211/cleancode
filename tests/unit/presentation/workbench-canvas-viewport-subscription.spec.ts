@@ -41,15 +41,13 @@ describe('workbench canvas viewport completion subscription', () => {
     const staleOnViewportChange = vi.fn()
     const currentOnViewportChange = vi.fn()
     const onViewportChangeRef = { current: staleOnViewportChange }
-    const setCanvasViewport = vi.fn()
-    const setViewportZoom = vi.fn()
+    const projectCanvasViewport = vi.fn()
     const instance = {} as ReactFlowInstance<WorkbenchFlowNode, Edge>
 
     subscribeCanvasViewportMotionCompletion({
       instance,
       onViewportChangeRef,
-      setCanvasViewport,
-      setViewportZoom
+      projectCanvasViewport
     })
     onViewportChangeRef.current = currentOnViewportChange
     motionSubscriptions.programmaticListener?.({
@@ -63,7 +61,6 @@ describe('workbench canvas viewport completion subscription', () => {
     expect(staleOnViewportChange).not.toHaveBeenCalled()
     expect(currentOnViewportChange).toHaveBeenNthCalledWith(1, { x: -40, y: 20, zoom: 1.2 })
     expect(currentOnViewportChange).toHaveBeenNthCalledWith(2, { x: -80, y: 40, zoom: 1.3 })
-    expect(setCanvasViewport).toHaveBeenCalledTimes(2)
-    expect(setViewportZoom).toHaveBeenCalledTimes(2)
+    expect(projectCanvasViewport).toHaveBeenCalledTimes(2)
   })
 })

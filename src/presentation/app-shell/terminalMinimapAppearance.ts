@@ -79,7 +79,9 @@ function resolveMinimapNodeStatus(
     return terminalStates[node.id]?.status ?? 'idle'
   }
 
-  const memberStatuses = Object.values(node.data.memberStates).map((state) => state.status)
+  const memberStatuses = node.data.group.memberBlockIds.map(
+    (blockId) => terminalStates[blockId]?.status ?? 'idle'
+  )
 
   if (memberStatuses.includes('failed')) {
     return 'failed'

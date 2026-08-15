@@ -51,6 +51,7 @@
   box-shadow: var(--cc-shadow-floating);
   backdrop-filter: blur(12px);
   transform: translateX(-50%);
+  pointer-events: auto;
 }
 
 .canvas-arrangement-toolbar[data-surface-spring-preset='bottom-control'] {

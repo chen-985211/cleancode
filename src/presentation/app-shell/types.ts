@@ -63,6 +63,16 @@ export interface TerminalViewState {
   readonly servicePortState?: 'bound' | 'releasing' | 'quarantined' | null
 }
 
+export interface TerminalStateStore {
+  readonly getDiagnostics: () => {
+    readonly listenerCount: number
+    readonly stateCount: number
+  }
+  readonly getState: (terminalId: string) => TerminalViewState
+  readonly replaceStates: (states: Readonly<Record<string, TerminalViewState>>) => void
+  readonly subscribe: (terminalId: string, listener: () => void) => () => void
+}
+
 export interface TerminalDimensions {
   readonly columns: number
   readonly rows: number
@@ -139,6 +149,7 @@ interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotio
   readonly approvalIntent?: AgentApprovalNodeIntent
   readonly block: TerminalBlockSnapshot
   readonly session: TerminalViewState
+  readonly terminalStateStore?: TerminalStateStore
   readonly isContextSelected?: boolean
   readonly isSelected: boolean
   readonly isTerminalGroupSelectionMode: boolean
@@ -175,7 +186,7 @@ interface TerminalNodeData extends Record<string, unknown>, WorkbenchObjectMotio
     block: TerminalBlockSnapshot,
     layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
-  readonly onSelect?: (additive: boolean) => void
+  readonly onSelect?: (block: TerminalBlockSnapshot, additive: boolean) => void
   readonly onToggleTerminalGroupCandidate: (block: TerminalBlockSnapshot) => void
 }
 
@@ -188,6 +199,7 @@ interface TerminalGroupNodeData extends Record<string, unknown>, WorkbenchObject
   readonly isContextSelected?: boolean
   readonly memberBlocks: readonly TerminalBlockSnapshot[]
   readonly memberStates: Record<string, TerminalViewState>
+  readonly terminalStateStore?: TerminalStateStore
   readonly isEditing?: boolean
   readonly isSelected: boolean
   readonly dropFeedback: TerminalGroupDropFeedback | null
@@ -229,7 +241,7 @@ interface AgentConsoleNodeData extends Record<string, unknown>, WorkbenchObjectM
     agent: WorkspaceAgentSnapshot,
     layout: WorkbenchNodeLayoutInput
   ) => Promise<void>
-  readonly onSelect?: () => void
+  readonly onSelect?: (agentId: string) => void
 }
 
 export type AgentConsoleFlowNode = Node<AgentConsoleNodeData, 'agentConsole'>

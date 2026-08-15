@@ -31,7 +31,15 @@ describe('terminal surface registry disposable views', () => {
       pendingOutputBytes: 0,
       rendererState: 'dom',
       domSurfaceCount: 1,
-      webglSurfaceCount: 0
+      focusedSurfaceCount: 0,
+      hiddenSurfaceCount: 0,
+      visibleSurfaceCount: 0,
+      webglSurfaceCount: 0,
+      lastDeferReason: null,
+      lastDrainDurationMs: 0,
+      lastInputToOutputLatencyMs: 0,
+      oldestPendingOutputAgeMs: 0,
+      pendingOutputTargetCount: 0
     })
   })
 
@@ -104,10 +112,95 @@ describe('terminal surface registry disposable views', () => {
 
     expect(unregister).toHaveBeenCalledOnce()
   })
+
+  it('reports focused, visible, and hidden surface counts from the shared raster owner', () => {
+    let nextViewId = 0
+    let nextSurface = 0
+    const priorities = ['focused', 'visible', 'hidden'] as const
+    const registry = new TerminalSurfaceRegistry(
+      () => {
+        const surface = createFakeSurface()
+        const priority = priorities[nextSurface++]!
+        surface.rasterTarget = {
+          getRasterCost: vi.fn(() => 96_000),
+          getRasterPriority: vi.fn(() => priority),
+          getRasterScale: vi.fn(() => 1 as const),
+          setRasterScale: vi.fn()
+        }
+        return surface
+      },
+      () => `view-${++nextViewId}`
+    )
+
+    priorities.forEach((_priority, index) =>
+      registry.create({
+        ...createIdentity(),
+        generation: index + 1,
+        runId: `run-${index + 1}`,
+        sessionId: `session-${index + 1}`
+      })
+    )
+
+    expect(registry.getDiagnostics()).toMatchObject({
+      focusedSurfaceCount: 1,
+      hiddenSurfaceCount: 1,
+      surfaceCount: 3,
+      visibleSurfaceCount: 1
+    })
+  })
+
+  it('registers and releases output plus initialization work with the shared scheduler', () => {
+    const unregister = vi.fn()
+    const workloadScheduler = {
+      getDiagnostics: vi.fn(() => ({
+        lastDeferReason: 'interaction' as const,
+        lastDrainDurationMs: 2,
+        lastInputToOutputLatencyMs: 4,
+        oldestPendingOutputAgeMs: 12,
+        pendingOutputTargetCount: 1
+      })),
+      register: vi.fn(() => unregister)
+    }
+    const surface = createFakeSurface()
+    const workloadTarget = {
+      drainOutput: vi.fn(async () => null),
+      getOutputPriority: vi.fn(() => 'visible' as const),
+      hasPendingOutput: vi.fn(() => false),
+      onOutputPendingChange: vi.fn(() => () => undefined),
+      onOutputPriorityChange: vi.fn(() => () => undefined),
+      onTerminalInput: vi.fn(() => () => undefined)
+    }
+    surface.workloadTarget = workloadTarget
+    const registry = new TerminalSurfaceRegistry(
+      () => surface,
+      () => 'view-workload',
+      undefined,
+      workloadScheduler
+    )
+
+    const lease = registry.create(createIdentity())
+
+    expect(workloadScheduler.register).toHaveBeenCalledWith({
+      id: lease.viewId,
+      ...workloadTarget
+    })
+    expect(registry.getDiagnostics()).toMatchObject({
+      lastDeferReason: 'interaction',
+      lastDrainDurationMs: 2,
+      lastInputToOutputLatencyMs: 4,
+      oldestPendingOutputAgeMs: 12,
+      pendingOutputTargetCount: 1
+    })
+
+    registry.release(lease.viewId)
+
+    expect(unregister).toHaveBeenCalledOnce()
+  })
 })
 
 interface FakeTerminalSurface extends TerminalSurface {
   rasterTarget?: TerminalSurface['rasterTarget']
+  workloadTarget?: TerminalSurface['workloadTarget']
   readonly detach: Mock<TerminalSurface['detach']>
   readonly dispose: Mock<TerminalSurface['dispose']>
   readonly restore: Mock<TerminalSurface['restore']>

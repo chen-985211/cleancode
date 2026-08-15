@@ -199,7 +199,7 @@ CSS 动效通过 `theme.css` 的语义 token 选择节奏与曲线；调用方�
 
 普通布局属性不得仅为“看起来平滑”而持续补间。需要空间连续性的局部 disclosure 可以使用受控的 grid 轨道过渡；涉及主工作台、xterm 或 React Flow 测量的网格变化必须作为命名 owner 例外审查，优先让视觉表面使用 `transform` 与 `opacity`，并验证动画期间输入、resize 和测量稳定。
 
-主侧栏由 `projectSidebarMotion.ts` 命名 owner 协调：展开和收起时，实心侧栏视觉表面保持完整固定几何并沿所属边缘进出，主工作区网格轨道由同一个欠阻尼 spring 同步让位；布局宽度必须限制在合法端点内，视觉表面可以保留很小的边界回弹来表达质量与收敛。关闭意图发生后侧栏立即退出可访问树并停止接收指针，但视觉表面只在空间运动结束后隐藏；快速反向必须从当前 presentation 与速度继续，不重置 padding、内容排版或画布节点。`prefers-reduced-motion` 下取消大范围滑动并直接投影相同端点。spring response、阻尼和收敛阈值属于 owner 的实现细节，不构成产品契约。
+主侧栏由 `projectSidebarMotion.ts` 命名 owner 协调：展开和收起的运动期间，应用网格与全尺寸画布外壳保持稳定，标题栏 chrome 与侧栏正文两个实心视觉表面以固定几何共享同一份位移 presentation，沿所属边缘作为一个整体进出；折叠按钮留在窗口安全区，不跟随视觉表面离场。同一个欠阻尼 spring 只通过合成器 `transform` 同步投影上述两个侧栏表面、画布空间层、状态栏和居中画布控件，其中空间层与状态栏让出完整侧栏宽度，居中控件移动一半宽度。逐帧 presentation 不得改写网格轨道、画布尺寸、React 状态或继承型 CSS 变量；只有 spring 到达展开端点时才一次性提交扣除侧栏后的真实可见边界，关闭开始时可以一次性恢复全宽，因为新增区域仍在应用裁剪边界之外。端点提交后必须移除这些大面积 transform，让 React Flow 与 xterm 回到普通像素投影；画布外壳使用不可编程滚动的裁剪方式，不能让焦点或 `scrollIntoView` 把隐藏溢出的 motion surface 滚进侧栏区域。逻辑可用宽度只在侧栏意图端点变化时更新，创建与聚焦继续以画布裁剪后的当前可见矩形为准。空间让位进度必须限制在合法端点内，侧栏视觉表面可以保留很小的边界回弹来表达质量与收敛。关闭意图发生后侧栏立即退出可访问树并停止接收指针，但视觉表面只在空间运动结束后隐藏；快速反向必须从当前 presentation 与速度继续，不重置 padding、内容排版、React Flow、xterm 或 Agent surface。`prefers-reduced-motion` 下取消大范围滑动并直接投影相同端点。spring response、阻尼和收敛阈值属于 owner 的实现细节，不构成产品契约。
 
 项目卡片排序由 `useProjectSidebarReorder.ts` 接管输入，并由 `projectReorderMotion.ts` 统一拥有位移 presentation。被抓住的卡片必须逐像素跟随指针，滚动发生时也保持同一抓取点；其他卡片按被拖对象的实际外高让位并使用无回弹的临界阻尼 spring。松手后在持久化结果未返回前保留当前 presentation；权威顺序到达时使用 FLIP 从当前屏幕位置收敛到新布局，失败、Escape 或失焦则从当前位置返回原布局。该层不得预测或写回项目顺序；`prefers-reduced-motion` 下保留直接拖动并即时投影让位和最终端点。
 

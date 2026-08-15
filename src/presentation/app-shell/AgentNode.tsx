@@ -78,7 +78,7 @@ export const AgentNode = memo(function AgentNode({
         onMcpCapabilityChange={data.onMcpCapabilityChange}
         onRemove={data.onRemove}
         onRename={data.onRename}
-        onSelect={data.onSelect}
+        onSelect={() => data.onSelect?.(data.agent.agentId)}
       />
       {selected || data.isContextSelected ? <WorkbenchNodeSelectionVeil /> : null}
     </section>

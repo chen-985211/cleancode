@@ -96,70 +96,56 @@ describe('headless terminal model', () => {
     expect(queryResponses).toEqual(['\u001b[1;1R', '\u001b[1;1R'])
   })
 
-  it('answers OSC foreground and background queries from the pinned source theme only while hidden', async () => {
-    const queryResponses: string[] = []
-    const adapter = new HeadlessTerminalModelAdapter()
-    const identity = createIdentity()
-    const command = {
-      identity,
-      columns: 80,
-      rows: 24,
-      workingDirectory: '/work/app',
-      terminalSourceTheme: 'dark' as const,
-      onQueryResponse: (response: string) => queryResponses.push(response),
-      onFlowControlChange: () => undefined
+  it.each([
+    {
+      background: '\u001b]11;rgb:0000/0000/0000\u001b\\',
+      foreground: '\u001b]10;rgb:d6d6/dede/e8e8\u001b\\',
+      theme: 'dark' as const
+    },
+    {
+      background: '\u001b]11;rgb:ffff/ffff/ffff\u001b\\',
+      foreground: '\u001b]10;rgb:2424/3131/4242\u001b\\',
+      theme: 'light' as const
     }
+  ])(
+    'answers OSC foreground and background queries from the pinned $theme source theme across view ownership',
+    async ({ background, foreground, theme }) => {
+      const queryResponses: string[] = []
+      const adapter = new HeadlessTerminalModelAdapter()
+      const identity = createIdentity()
+      adapter.create({
+        identity,
+        columns: 80,
+        rows: 24,
+        workingDirectory: '/work/app',
+        terminalSourceTheme: theme,
+        onQueryResponse: (response) => queryResponses.push(response),
+        onFlowControlChange: () => undefined
+      })
 
-    adapter.create(command)
-    adapter.acceptOutput(identity, '\u001b]10;?\u001b\\\u001b]11;?\u0007')
-    await adapter.flush(identity)
+      adapter.acceptOutput(identity, '\u001b]10;?\u0007\u001b]11;?\u001b\\')
+      await adapter.flush(identity)
+      expect(queryResponses).toEqual([foreground, background])
 
-    expect(queryResponses).toEqual([
-      '\u001b]10;rgb:d6d6/dede/e8e8\u001b\\',
-      '\u001b]11;rgb:0000/0000/0000\u001b\\'
-    ])
+      const snapshot = await adapter.attachView({
+        identity,
+        viewId: 'view-1',
+        onOutput: () => undefined
+      })
+      adapter.acceptOutput(identity, '\u001b]10;')
+      adapter.acceptOutput(identity, '?\u001b\\\u001b]11;?\u0007')
+      await adapter.flush(identity)
 
-    const snapshot = await adapter.attachView({
-      identity,
-      viewId: 'view-1',
-      onOutput: () => undefined
-    })
-    adapter.acceptOutput(identity, '\u001b]11;?\u001b\\')
-    await adapter.flush(identity)
+      expect(snapshot.terminalSourceTheme).toBe(theme)
+      expect(queryResponses).toEqual([foreground, background, foreground, background])
 
-    expect(snapshot.terminalSourceTheme).toBe('dark')
-    expect(queryResponses).toHaveLength(2)
+      await adapter.detachView(identity, 'view-1')
+      adapter.acceptOutput(identity, '\u001b]11;?\u001b\\')
+      await adapter.flush(identity)
 
-    await adapter.detachView(identity, 'view-1')
-    adapter.acceptOutput(identity, '\u001b]11;?\u001b\\')
-    await adapter.flush(identity)
-
-    expect(queryResponses.at(-1)).toBe('\u001b]11;rgb:0000/0000/0000\u001b\\')
-    expect(queryResponses).toHaveLength(3)
-  })
-
-  it('answers light source-theme queries with the canonical light palette', async () => {
-    const queryResponses: string[] = []
-    const adapter = new HeadlessTerminalModelAdapter()
-    const identity = createIdentity()
-    adapter.create({
-      identity,
-      columns: 80,
-      rows: 24,
-      workingDirectory: '/work/app',
-      terminalSourceTheme: 'light',
-      onQueryResponse: (response) => queryResponses.push(response),
-      onFlowControlChange: () => undefined
-    })
-
-    adapter.acceptOutput(identity, '\u001b]10;?\u0007\u001b]11;?\u001b\\')
-    await adapter.flush(identity)
-
-    expect(queryResponses).toEqual([
-      '\u001b]10;rgb:2424/3131/4242\u001b\\',
-      '\u001b]11;rgb:ffff/ffff/ffff\u001b\\'
-    ])
-  })
+      expect(queryResponses).toEqual([foreground, background, foreground, background, background])
+    }
+  )
 
   it('rejects stale identities and releases every model idempotently', async () => {
     const adapter = new HeadlessTerminalModelAdapter()

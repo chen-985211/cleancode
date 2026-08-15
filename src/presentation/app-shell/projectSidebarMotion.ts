@@ -5,10 +5,18 @@ import {
   type SpringAxis
 } from './motionSpring'
 
-export interface ProjectSidebarMotionRoot {
+export interface ProjectSidebarMotionSurface {
   readonly style: Pick<CSSStyleDeclaration, 'removeProperty' | 'setProperty'>
   readonly removeAttribute: (name: string) => unknown
   readonly setAttribute: (name: string, value: string) => unknown
+}
+
+export interface ProjectSidebarMotionElements {
+  readonly sidebar: ProjectSidebarMotionSurface | null
+  readonly titlebar: ProjectSidebarMotionSurface | null
+  readonly spatial: ProjectSidebarMotionSurface | null
+  readonly center: ProjectSidebarMotionSurface | null
+  readonly statusbar?: ProjectSidebarMotionSurface | null
 }
 
 export interface ProjectSidebarMotionFrameScheduler {
@@ -24,23 +32,24 @@ interface ProjectSidebarMotionIntent {
 }
 
 interface ProjectSidebarMotionControllerOptions {
+  readonly onMotionActiveChange?: (isActive: boolean) => void
   readonly scheduler?: ProjectSidebarMotionFrameScheduler
 }
 
 export interface ProjectSidebarMotionController {
   readonly dispose: () => void
   readonly intentChanged: (
-    root: ProjectSidebarMotionRoot | null,
+    elements: ProjectSidebarMotionElements,
     intent: ProjectSidebarMotionIntent
   ) => void
 }
 
-const widthProperty = '--cc-sidebar-motion-width'
-const offsetProperty = '--cc-sidebar-motion-offset'
+const transformProperty = 'transform'
 const stateAttribute = 'data-project-sidebar-motion-state'
 const springDynamics = { dampingRatio: 0.78, response: 0.42 }
 const settlementThresholds = { speed: 0.001, value: 0.0001 }
 const surfaceProgressBounds = { maximum: 1.025, minimum: -0.025 }
+export const projectSidebarExpandedWidth = 280
 
 const browserFrameScheduler: ProjectSidebarMotionFrameScheduler = {
   cancelFrame: (frameId) => {
@@ -57,14 +66,23 @@ const browserFrameScheduler: ProjectSidebarMotionFrameScheduler = {
 }
 
 export function createProjectSidebarMotionController({
+  onMotionActiveChange = () => undefined,
   scheduler = browserFrameScheduler
 }: ProjectSidebarMotionControllerOptions = {}): ProjectSidebarMotionController {
-  let root: ProjectSidebarMotionRoot | null = null
+  let elements: ProjectSidebarMotionElements | null = null
   let axis: SpringAxis = { value: 1, velocity: 0 }
   let target = 1
   let expandedWidth = 280
   let animationFrameId: number | null = null
   let lastFrameTimestamp = scheduler.now()
+  let presentationState: 'collapsed' | 'closing' | 'expanded' | 'opening' | null = null
+  let isMotionActive = false
+
+  const setMotionActive = (nextIsActive: boolean): void => {
+    if (nextIsActive === isMotionActive) return
+    isMotionActive = nextIsActive
+    onMotionActiveChange(nextIsActive)
+  }
 
   const cancelFrame = (): void => {
     if (animationFrameId !== null) scheduler.cancelFrame(animationFrameId)
@@ -72,16 +90,28 @@ export function createProjectSidebarMotionController({
   }
 
   const present = (state: 'collapsed' | 'closing' | 'expanded' | 'opening'): void => {
-    if (!root) return
+    if (!elements) return
     const layoutProgress = clamp(axis.value, 0, 1)
     const surfaceProgress = clamp(
       axis.value,
       surfaceProgressBounds.minimum,
       surfaceProgressBounds.maximum
     )
-    root.style.setProperty(widthProperty, `${round(expandedWidth * layoutProgress)}px`)
-    root.style.setProperty(offsetProperty, `${round((surfaceProgress - 1) * 100)}%`)
-    root.setAttribute(stateAttribute, state)
+    const spatialOffset = expandedWidth * layoutProgress
+    if (state === 'collapsed' || state === 'expanded') {
+      clearTranslations(elements)
+    } else {
+      setTranslation(elements.sidebar, expandedWidth * (surfaceProgress - 1))
+      setTranslation(elements.titlebar, expandedWidth * (surfaceProgress - 1))
+      setTranslation(elements.spatial, spatialOffset)
+      setTranslation(elements.center, spatialOffset / 2)
+      setTranslation(elements.statusbar ?? null, spatialOffset)
+    }
+    if (presentationState !== state) {
+      setPresentationState(elements, state)
+      presentationState = state
+    }
+    setMotionActive(state === 'opening' || state === 'closing')
   }
 
   const scheduleFrame = (): void => {
@@ -106,27 +136,32 @@ export function createProjectSidebarMotionController({
     scheduleFrame()
   }
 
-  const clearRoot = (): void => {
-    if (!root) return
-    root.style.removeProperty(widthProperty)
-    root.style.removeProperty(offsetProperty)
-    root.removeAttribute(stateAttribute)
+  const clearElements = (): void => {
+    if (!elements) return
+    clearTranslations(elements)
+    elements.sidebar?.removeAttribute(stateAttribute)
+    elements.titlebar?.removeAttribute(stateAttribute)
+    elements.spatial?.removeAttribute(stateAttribute)
+    elements.center?.removeAttribute(stateAttribute)
+    elements.statusbar?.removeAttribute(stateAttribute)
+    presentationState = null
   }
 
   return {
     dispose: () => {
       cancelFrame()
-      clearRoot()
-      root = null
+      setMotionActive(false)
+      clearElements()
+      elements = null
     },
-    intentChanged: (nextRoot, intent) => {
+    intentChanged: (nextElements, intent) => {
       const nextTarget = intent.isCollapsed ? 0 : 1
       const nextExpandedWidth = resolveExpandedWidth(intent.expandedWidth)
 
-      if (nextRoot !== root) {
+      if (!hasSameElements(elements, nextElements)) {
         cancelFrame()
-        clearRoot()
-        root = nextRoot
+        clearElements()
+        elements = nextElements
         expandedWidth = nextExpandedWidth
         target = nextTarget
         axis = { value: target, velocity: 0 }
@@ -135,7 +170,6 @@ export function createProjectSidebarMotionController({
       }
 
       expandedWidth = nextExpandedWidth
-      if (!root) return
 
       if (intent.reducedMotion) {
         cancelFrame()
@@ -158,8 +192,44 @@ export function createProjectSidebarMotionController({
   }
 }
 
+function hasSameElements(
+  current: ProjectSidebarMotionElements | null,
+  next: ProjectSidebarMotionElements
+): boolean {
+  return (
+    current?.sidebar === next.sidebar &&
+    current.titlebar === next.titlebar &&
+    current.spatial === next.spatial &&
+    current.center === next.center &&
+    current.statusbar === next.statusbar
+  )
+}
+
+function setTranslation(element: ProjectSidebarMotionSurface | null, offset: number): void {
+  element?.style.setProperty(transformProperty, `translate3d(${round(offset)}px, 0, 0)`)
+}
+
+function clearTranslations(elements: ProjectSidebarMotionElements): void {
+  elements.sidebar?.style.removeProperty(transformProperty)
+  elements.titlebar?.style.removeProperty(transformProperty)
+  elements.spatial?.style.removeProperty(transformProperty)
+  elements.center?.style.removeProperty(transformProperty)
+  elements.statusbar?.style.removeProperty(transformProperty)
+}
+
+function setPresentationState(
+  elements: ProjectSidebarMotionElements,
+  state: 'collapsed' | 'closing' | 'expanded' | 'opening'
+): void {
+  elements.sidebar?.setAttribute(stateAttribute, state)
+  elements.titlebar?.setAttribute(stateAttribute, state)
+  elements.spatial?.setAttribute(stateAttribute, state)
+  elements.center?.setAttribute(stateAttribute, state)
+  elements.statusbar?.setAttribute(stateAttribute, state)
+}
+
 function resolveExpandedWidth(value: number): number {
-  return Number.isFinite(value) && value > 0 ? value : 280
+  return Number.isFinite(value) && value > 0 ? value : projectSidebarExpandedWidth
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {

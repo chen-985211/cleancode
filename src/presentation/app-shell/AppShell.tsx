@@ -4,7 +4,7 @@ import './AppShell.css'
 import type { Edge, ReactFlowInstance } from '@xyflow/react'
 import { useMemo, useRef, useState } from 'react'
 import type { TerminalBlockSnapshot } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
-import { createMinimapNodeInteraction } from './minimapInteraction'
+import * as derived from './appShellDerived'
 import { ProjectSidebar } from './ProjectSidebar'
 import { useBranchWorkspaceActions } from './useBranchWorkspaceActions'
 import { useTerminalGroupActions } from './useTerminalGroupActions'
@@ -48,7 +48,6 @@ import { useCanvasVisualNoisePreference } from './useCanvasVisualNoisePreference
 import { useTerminalRuntimeAvailability } from './useTerminalRuntimeAvailability'
 import { toAgentFlowNodeId } from './agentConsoleFlowNode'
 import { createWorkbenchNodeStore } from './workbenchNodeStore'
-import { activateWorkbenchNodeInput } from './workbenchNodeInputActivation'
 import { useAgentCreationProviders } from './useAgentCreationProviders'
 import { useApplicationSettingsNavigation } from './useApplicationSettingsNavigation'
 import { useWorkbenchNodeCreationActions } from './useWorkbenchNodeCreationActions'
@@ -64,6 +63,8 @@ import { ProjectSidebarToggle } from './ProjectSidebarToggle'
 import { ignoreAgentActivityNavigationHandled, type AppShellProps } from './appShellTypes'
 import { useAgentActivityNotificationNavigation } from './useAgentActivityNotificationNavigation'
 import { useProjectSidebarVisibility } from './useProjectSidebarVisibility'
+import { useProjectSidebarMotion } from './useProjectSidebarMotion'
+import { projectSidebarExpandedWidth } from './projectSidebarMotion'
 import { useAppShellCanvasArrangement } from './useAppShellCanvasArrangement'
 import {
   useAppShellGraphViewportUpdate,
@@ -146,10 +147,9 @@ export function AppShell({
     setSelectedTerminalBlockIds,
     setSelectedTerminalGroupId
   })
-  const activateWorkbenchNodeInputFromShortcut = (node: WorkbenchFlowNode): void => {
-    cancelPendingWorkbenchInputFocus()
-    activateWorkbenchNodeInput(node)
-  }
+  const activateWorkbenchNodeInputFromShortcut = derived.createNodeInputActivator(
+    cancelPendingWorkbenchInputFocus
+  )
   const { launchCommandEditRequest, requestTerminalLaunchCommand } =
     useTerminalLaunchCommandRequest({
       currentWorkspace,
@@ -167,9 +167,9 @@ export function AppShell({
     restartTerminal,
     runningSessionIds,
     startTerminal,
-    terminalStates,
+    terminalStateProjection,
     terminalSurfaceRegistry,
-    terminalZoomRasterCoordinator,
+    terminalZoomRasterCoordinator: terminalRendering,
     terminateTerminalSession,
     toggleTerminalRetention,
     terminateWorkbenchTerminalSessions,
@@ -184,13 +184,14 @@ export function AppShell({
     notify: notifications.notify,
     runtimeAvailability: terminalRuntimeAvailability
   })
+  const projectSidebarMotion = useProjectSidebarMotion(isProjectSidebarCollapsed, terminalRendering)
   const { changeTerminalScrollback, terminalScrollbackRows } =
     useTerminalRuntimePreference(terminalSurfaceRegistry)
   const { changeTerminalWorkflowBuildMode, terminalWorkflowBuildMode } =
     useTerminalWorkflowBuildPreference()
   const { changeReduceVisualNoise, reduceVisualNoise } = useCanvasVisualNoisePreference()
   const minimapAppearance = useTerminalMinimapAppearance({
-    terminalStates,
+    terminalStates: terminalStateProjection.states,
     selectedTerminalBlockId: selectedTerminalBlockIds[0] ?? null,
     hoveredTerminalBlockId
   })
@@ -391,15 +392,11 @@ export function AppShell({
     onUserAction: cancelLayoutFocus,
     reactFlowInstanceRef
   })
-  const minimapNodeInteraction = useMemo(
-    () =>
-      createMinimapNodeInteraction({
-        agents: currentWorkbench?.agents,
-        setHoveredBlockId: setHoveredTerminalBlockId,
-        terminalBlocksById,
-        terminalGroupsById
-      }),
-    [currentWorkbench?.agents, terminalBlocksById, terminalGroupsById]
+  const minimapNodeInteraction = derived.useMinimapNodeInteraction(
+    currentWorkbench?.agents,
+    setHoveredTerminalBlockId,
+    terminalBlocksById,
+    terminalGroupsById
   )
   const resizeTerminalBlock = useTerminalBlockResizeAction({
     currentWorkbench,
@@ -489,7 +486,7 @@ export function AppShell({
     terminalWorkflowBuildPresentation,
     onAgentGraphUpdated,
     setNodes: nodeStore.setNodes,
-    terminalStates,
+    terminalStateStore: terminalStateProjection.store,
     activeWorkflowRootBlockIds: terminalWorkflow.activeRootBlockIds,
     isStoppingWorkflow: terminalWorkflow.isStopping,
     launchCommandEditRequest:
@@ -523,8 +520,7 @@ export function AppShell({
     setCurrentGraph,
     terminalWorkflow
   })
-  const hasMultipleWorkspaces =
-    workbenches.reduce((count, workbench) => count + workbench.project.workspaces.length, 0) > 1
+  const hasMultipleWorkspaces = derived.hasMultipleWorkspaces(workbenches)
   const applicationShortcutActions = useAppShellShortcutActions({
     addProject,
     createAgent: createWorkspaceAgent,
@@ -532,13 +528,11 @@ export function AppShell({
     createTerminal: createTerminalBlock,
     executeQuickExecutionSlot: quickExecution.executeSlot,
     fitCanvas,
-    groupTerminals: () => {
-      const instance = reactFlowInstanceRef.current
-      if (!instance) return
-      void blockActions.createTerminalGroup(
-        instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
-      )
-    },
+    groupTerminals: () =>
+      derived.createGroupAtWindowCenter(
+        reactFlowInstanceRef.current,
+        blockActions.createTerminalGroup
+      ),
     hasMultipleWorkspaces,
     hasWorkbench: Boolean(currentWorkbench),
     isDesktopRuntime,
@@ -604,6 +598,7 @@ export function AppShell({
             <ProjectSidebarToggle
               buttonRef={projectSidebarToggleRef}
               isCollapsed={isProjectSidebarCollapsed}
+              motionSurfaceRef={projectSidebarMotion.titlebarRef}
               shortcutTooltip={shortcutTooltips.toggleSidebar}
               onToggle={toggleProjectSidebar}
             />
@@ -612,6 +607,7 @@ export function AppShell({
               currentWorkbench={currentWorkbench}
               isCollapsed={isProjectSidebarCollapsed}
               isDesktopRuntime={isDesktopRuntime}
+              motionSurfaceRef={projectSidebarMotion.sidebarRef}
               intent={shortcutNavigation.projectSidebarIntent}
               shortcutTooltips={shortcutTooltips}
               isReorderPending={isReorderingProject}
@@ -638,7 +634,11 @@ export function AppShell({
             nodeStore={nodeStore}
             nodeTypes={workbenchNodeTypes}
             canvasSizeRef={canvasSizeRef}
+            canvasLeftInset={isProjectSidebarCollapsed ? 0 : projectSidebarExpandedWidth}
+            centerMotionRef={projectSidebarMotion.centerRef}
             reactFlowInstanceRef={reactFlowInstanceRef}
+            spatialMotionRef={projectSidebarMotion.spatialRef}
+            statusbarMotionRef={projectSidebarMotion.statusbarRef}
             minimapNodeInteraction={minimapNodeInteraction}
             reduceVisualNoise={reduceVisualNoise}
             terminalWorkflow={terminalWorkflow}
@@ -687,7 +687,7 @@ export function AppShell({
             onNodeDragStop={commitWorkbenchNodeDrag}
             onViewportChange={updateGraphViewport}
             onViewportInteractionStart={cancelLayoutFocus}
-            terminalZoomRasterCoordinator={terminalZoomRasterCoordinator}
+            terminalZoomRasterCoordinator={terminalRendering}
             onMinimapNodeClick={focusWorkbenchNode}
             getMiniMapNodeColor={minimapAppearance.getMiniMapNodeColor}
             getMiniMapNodeStrokeColor={minimapAppearance.getMiniMapNodeStrokeColor}

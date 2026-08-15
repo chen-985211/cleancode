@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { CanvasMinimap } from '../../../src/presentation/app-shell/CanvasMinimap'
 import type { MinimapNodeInteractionContextValue } from '../../../src/presentation/app-shell/minimapInteraction'
 import type { AgentConsoleFlowNode } from '../../../src/presentation/app-shell/types'
+import { createWorkbenchCanvasViewportStore } from '../../../src/presentation/app-shell/workbenchCanvasViewportStore'
 
 describe('Agent minimap navigation', () => {
   it('renders a neutral content-free Agent node and routes activation', () => {
@@ -11,9 +12,8 @@ describe('Agent minimap navigation', () => {
       <CanvasMinimap
         isCollapsed={false}
         nodes={[createAgentConsoleFlowNode()]}
-        canvasViewport={{ x: 0, y: 0, zoom: 1 }}
         canvasSize={{ width: 960, height: 640 }}
-        viewportZoom={1}
+        viewportStore={createWorkbenchCanvasViewportStore({ x: 0, y: 0, zoom: 1 })}
         shortcutTooltips={{
           fitCanvas: '适应画布 (⌘1)',
           toggleMinimap: '收起或展开小地图 (⌘⇧M)',

@@ -284,7 +284,7 @@ flowchart LR
 
 - React Flow 基于 D3 transition 的 Promise 在被新过渡打断时可能无法按旧调用方预期完成；第一阶段只统一入口，第三阶段再引入显式取消身份。
 - 在 macOS 触控板已有惯性事件上叠加自定义惯性会产生双重滑动；路线不为直接操控追加惯性。
-- 自定义 spring 已把程序化中间帧与 `WorkbenchCanvas` React 状态、viewport IPC 持久化隔离；React Flow 自身仍会在每帧同步内部 transform store，后续真实终端高输出场景继续用性能 trace 检查该剩余预算，不引入对其私有 pan/zoom API 的依赖。
+- 自定义 spring 已把程序化中间帧与 `WorkbenchCanvas` React 状态、viewport IPC 持久化隔离；React Flow 自身仍会在每帧同步内部 transform store。后续逐帧路径隔离、真实终端高输出与稠密节点治理统一移交给[画布交互性能演进路线图](canvas-performance-roadmap.md)，且不引入对 React Flow 私有 pan/zoom API 的依赖。
 - 远距离空间飞行如果不设界会把稠密终端画布缩成不可读全景；第三阶段把拉远限制为当前 zoom、目标 zoom 和画布最小 zoom 共同允许的最多 `0.75` 个 zoom stop，后续真实使用反馈如需调参仍只修改统一 owner。
 - 任一阶段都可以回退到前一阶段的统一入口与当前节奏，不回滚 BlockGraph 数据或用户布局。
 

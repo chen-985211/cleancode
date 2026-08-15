@@ -26,6 +26,7 @@ interface FakeTerminal {
       activate(event: MouseEvent, target: string): void
     }
   }
+  parser: { registerOscHandler(code: number, handler: (data: string) => boolean): unknown }
 }
 
 interface FakeBufferLine {
@@ -54,6 +55,9 @@ vi.mock('@xterm/xterm', () => ({
       provideLinks(line: number, callback: (links: unknown[]) => void): void
     } | null = null
     readonly focus = vi.fn()
+    readonly parser = {
+      registerOscHandler: vi.fn(() => ({ dispose: vi.fn() }))
+    }
 
     constructor(options: Record<string, unknown>) {
       this.options = options

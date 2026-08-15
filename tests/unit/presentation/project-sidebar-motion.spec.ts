@@ -1,124 +1,174 @@
 import {
   createProjectSidebarMotionController,
+  type ProjectSidebarMotionElements,
   type ProjectSidebarMotionFrameScheduler,
-  type ProjectSidebarMotionRoot
+  type ProjectSidebarMotionSurface
 } from '../../../src/presentation/app-shell/projectSidebarMotion'
 
 describe('project sidebar motion', () => {
-  it('moves a complete surface with a perceptible spring and settles at the expanded endpoint', () => {
+  it('moves compositor surfaces with a perceptible spring and settles at the expanded endpoint', () => {
     const scheduler = createFrameScheduler()
-    const root = createRoot()
+    const elements = createElements()
     const controller = createProjectSidebarMotionController({ scheduler })
 
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: true,
       reducedMotion: false
     })
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: false,
       reducedMotion: false
     })
 
-    expect(root.attributes.get('data-project-sidebar-motion-state')).toBe('opening')
+    expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('opening')
+    expect(elements.titlebar.attributes.get('data-project-sidebar-motion-state')).toBe('opening')
     scheduler.advanceNextFrame(100)
-    expect(readWidth(root)).toBeGreaterThan(100)
-    expect(readWidth(root)).toBeLessThan(280)
+    expect(readTranslation(elements.spatial)).toBeGreaterThan(100)
+    expect(readTranslation(elements.spatial)).toBeLessThan(280)
+    expect(readTranslation(elements.center)).toBeCloseTo(readTranslation(elements.spatial) / 2, 4)
+    expect(readTranslation(elements.titlebar)).toBeCloseTo(readTranslation(elements.sidebar), 4)
 
-    const offsets = advanceAndReadOffsets(scheduler, root)
-    expect(Math.max(...offsets)).toBeGreaterThan(0)
-    expect(readWidth(root)).toBe(280)
-    expect(readOffset(root)).toBe(0)
-    expect(root.attributes.get('data-project-sidebar-motion-state')).toBe('expanded')
+    const sidebarOffsets = advanceAndReadTranslations(scheduler, elements.sidebar)
+    expect(Math.max(...sidebarOffsets)).toBeGreaterThan(0)
+    expect(elements.spatial.properties.has('transform')).toBe(false)
+    expect(elements.center.properties.has('transform')).toBe(false)
+    expect(elements.statusbar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.properties.has('transform')).toBe(false)
+    expect(elements.titlebar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('expanded')
+    expect(elements.titlebar.attributes.get('data-project-sidebar-motion-state')).toBe('expanded')
+    expect(elements.spatial.attributes.get('data-project-sidebar-motion-state')).toBe('expanded')
     expect(scheduler.pendingFrames()).toBe(0)
+  })
+
+  it('only writes compositor transforms while the spring is running', () => {
+    const scheduler = createFrameScheduler()
+    const elements = createElements()
+    const controller = createProjectSidebarMotionController({ scheduler })
+
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: true,
+      reducedMotion: false
+    })
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: false,
+      reducedMotion: false
+    })
+    scheduler.advanceNextFrame()
+
+    for (const surface of [
+      elements.sidebar,
+      elements.titlebar,
+      elements.spatial,
+      elements.center,
+      elements.statusbar
+    ]) {
+      expect([...surface.properties.keys()]).toEqual(['transform'])
+      expect(surface.properties.get('transform')).toContain('translate3d(')
+    }
   })
 
   it('reverses from the current presentation without resetting its position', () => {
     const scheduler = createFrameScheduler()
-    const root = createRoot()
+    const elements = createElements()
     const controller = createProjectSidebarMotionController({ scheduler })
 
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: true,
       reducedMotion: false
     })
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: false,
       reducedMotion: false
     })
     scheduler.advanceNextFrame()
     scheduler.advanceNextFrame()
-    const widthBeforeReversal = readWidth(root)
-    const offsetBeforeReversal = readOffset(root)
+    const spatialOffsetBeforeReversal = readTranslation(elements.spatial)
+    const sidebarOffsetBeforeReversal = readTranslation(elements.sidebar)
+    const titlebarOffsetBeforeReversal = readTranslation(elements.titlebar)
 
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: true,
       reducedMotion: false
     })
 
-    expect(readWidth(root)).toBe(widthBeforeReversal)
-    expect(readOffset(root)).toBe(offsetBeforeReversal)
-    expect(root.attributes.get('data-project-sidebar-motion-state')).toBe('closing')
+    expect(readTranslation(elements.spatial)).toBe(spatialOffsetBeforeReversal)
+    expect(readTranslation(elements.sidebar)).toBe(sidebarOffsetBeforeReversal)
+    expect(readTranslation(elements.titlebar)).toBe(titlebarOffsetBeforeReversal)
+    expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('closing')
+    expect(elements.titlebar.attributes.get('data-project-sidebar-motion-state')).toBe('closing')
+    expect(elements.spatial.attributes.get('data-project-sidebar-motion-state')).toBe('closing')
     scheduler.advanceNextFrame()
-    expect(readWidth(root)).toBeGreaterThan(widthBeforeReversal)
+    expect(readTranslation(elements.spatial)).toBeGreaterThan(spatialOffsetBeforeReversal)
     scheduler.advanceUntilIdle()
-    expect(readWidth(root)).toBe(0)
-    expect(readOffset(root)).toBe(-100)
-    expect(root.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
+    expect(elements.spatial.properties.has('transform')).toBe(false)
+    expect(elements.center.properties.has('transform')).toBe(false)
+    expect(elements.statusbar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.properties.has('transform')).toBe(false)
+    expect(elements.titlebar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
+    expect(elements.titlebar.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
   })
 
   it('projects the requested endpoint immediately when reduced motion is active or changes', () => {
     const scheduler = createFrameScheduler()
-    const root = createRoot()
+    const elements = createElements()
     const controller = createProjectSidebarMotionController({ scheduler })
 
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: false,
       reducedMotion: false
     })
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: true,
       reducedMotion: false
     })
     scheduler.advanceNextFrame()
-    expect(readWidth(root)).toBeGreaterThan(0)
+    expect(readTranslation(elements.spatial)).toBeGreaterThan(0)
 
-    controller.intentChanged(root, {
+    controller.intentChanged(elements, {
       expandedWidth: 280,
       isCollapsed: true,
       reducedMotion: true
     })
 
-    expect(readWidth(root)).toBe(0)
-    expect(readOffset(root)).toBe(-100)
-    expect(root.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
+    expect(elements.spatial.properties.has('transform')).toBe(false)
+    expect(elements.center.properties.has('transform')).toBe(false)
+    expect(elements.statusbar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.properties.has('transform')).toBe(false)
+    expect(elements.titlebar.properties.has('transform')).toBe(false)
+    expect(elements.sidebar.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
+    expect(elements.titlebar.attributes.get('data-project-sidebar-motion-state')).toBe('collapsed')
     expect(scheduler.pendingFrames()).toBe(0)
   })
 
   it('consumes all elapsed time when a rendering frame is delayed', () => {
     const regularScheduler = createFrameScheduler()
     const delayedScheduler = createFrameScheduler()
-    const regularRoot = createRoot()
-    const delayedRoot = createRoot()
+    const regularElements = createElements()
+    const delayedElements = createElements()
     const regularController = createProjectSidebarMotionController({ scheduler: regularScheduler })
     const delayedController = createProjectSidebarMotionController({ scheduler: delayedScheduler })
 
-    for (const [controller, root] of [
-      [regularController, regularRoot],
-      [delayedController, delayedRoot]
+    for (const [controller, elements] of [
+      [regularController, regularElements],
+      [delayedController, delayedElements]
     ] as const) {
-      controller.intentChanged(root, {
+      controller.intentChanged(elements, {
         expandedWidth: 280,
         isCollapsed: true,
         reducedMotion: false
       })
-      controller.intentChanged(root, {
+      controller.intentChanged(elements, {
         expandedWidth: 280,
         isCollapsed: false,
         reducedMotion: false
@@ -128,32 +178,85 @@ describe('project sidebar motion', () => {
     for (let frame = 0; frame < 12; frame += 1) regularScheduler.advanceNextFrame()
     delayedScheduler.advanceNextFrame(100)
 
-    expect(readWidth(delayedRoot)).toBeCloseTo(readWidth(regularRoot), 4)
-    expect(readOffset(delayedRoot)).toBeCloseTo(readOffset(regularRoot), 4)
+    expect(readTranslation(delayedElements.spatial)).toBeCloseTo(
+      readTranslation(regularElements.spatial),
+      4
+    )
+    expect(readTranslation(delayedElements.sidebar)).toBeCloseTo(
+      readTranslation(regularElements.sidebar),
+      4
+    )
+    expect(readTranslation(delayedElements.titlebar)).toBeCloseTo(
+      readTranslation(regularElements.titlebar),
+      4
+    )
+  })
+
+  it('publishes one interaction window for opening, reversal, and settlement', () => {
+    const scheduler = createFrameScheduler()
+    const elements = createElements()
+    const activity: boolean[] = []
+    const controller = createProjectSidebarMotionController({
+      onMotionActiveChange: (isActive) => activity.push(isActive),
+      scheduler
+    })
+
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: true,
+      reducedMotion: false
+    })
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: false,
+      reducedMotion: false
+    })
+    scheduler.advanceNextFrame()
+    controller.intentChanged(elements, {
+      expandedWidth: 280,
+      isCollapsed: true,
+      reducedMotion: false
+    })
+    scheduler.advanceUntilIdle()
+
+    expect(activity).toEqual([true, false])
   })
 })
 
-function readWidth(root: ReturnType<typeof createRoot>): number {
-  return Number.parseFloat(root.properties.get('--cc-sidebar-motion-width') ?? '0')
+function readTranslation(surface: ReturnType<typeof createSurface>): number {
+  const transform = surface.properties.get('transform') ?? 'translate3d(0px, 0, 0)'
+  return Number.parseFloat(transform.slice(transform.indexOf('(') + 1))
 }
 
-function readOffset(root: ReturnType<typeof createRoot>): number {
-  return Number.parseFloat(root.properties.get('--cc-sidebar-motion-offset') ?? '0')
-}
-
-function advanceAndReadOffsets(
+function advanceAndReadTranslations(
   scheduler: ReturnType<typeof createFrameScheduler>,
-  root: ReturnType<typeof createRoot>
+  surface: ReturnType<typeof createSurface>
 ): number[] {
   const values: number[] = []
   for (let frame = 0; frame < 240 && scheduler.pendingFrames() > 0; frame += 1) {
     scheduler.advanceNextFrame()
-    values.push(readOffset(root))
+    values.push(readTranslation(surface))
   }
   return values
 }
 
-function createRoot(): ProjectSidebarMotionRoot & {
+function createElements(): ProjectSidebarMotionElements & {
+  readonly sidebar: ReturnType<typeof createSurface>
+  readonly titlebar: ReturnType<typeof createSurface>
+  readonly spatial: ReturnType<typeof createSurface>
+  readonly center: ReturnType<typeof createSurface>
+  readonly statusbar: ReturnType<typeof createSurface>
+} {
+  return {
+    sidebar: createSurface(),
+    titlebar: createSurface(),
+    spatial: createSurface(),
+    center: createSurface(),
+    statusbar: createSurface()
+  }
+}
+
+function createSurface(): ProjectSidebarMotionSurface & {
   readonly attributes: Map<string, string>
   readonly properties: Map<string, string>
 } {

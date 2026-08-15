@@ -16,6 +16,8 @@ export interface FakeCodexCliReport {
   readonly exitReason?: 'interrupt' | 'quit' | 'signal'
   readonly kind:
     | 'app-server'
+    | 'color-query-response'
+    | 'color-query-timeout'
     | 'draw'
     | 'exit'
     | 'hook-error'
@@ -23,6 +25,7 @@ export interface FakeCodexCliReport {
     | 'resume'
     | 'session'
     | 'session-end-hook'
+    | 'unexpected-color-response-input'
   readonly pid: number
   readonly sessionEndHookTrusted?: boolean
   readonly sessionId?: string
@@ -111,6 +114,9 @@ let activeSessionId =
   resumeIndex >= 0 ? args[resumeIndex + 1] : process.env.CLEANCODE_FAKE_CODEX_SESSION_ID
 const initialSessionId = activeSessionId
 let commandInput = ''
+let colorQueryProbeBuffer = ''
+let colorQueryProbeState = 'idle'
+let colorQueryProbeTimer = null
 let terminalResponseBuffer = ''
 let sourceTheme = null
 
@@ -314,6 +320,46 @@ function adoptReportedBackground() {
   draw()
 }
 
+function beginColorQueryProbe() {
+  if (colorQueryProbeState !== 'idle') return
+  colorQueryProbeBuffer = ''
+  colorQueryProbeState = 'awaiting'
+  colorQueryProbeTimer = setTimeout(() => {
+    colorQueryProbeTimer = null
+    if (colorQueryProbeState !== 'awaiting') return
+    colorQueryProbeState = 'timed-out'
+    report('color-query-timeout')
+  }, 100)
+  process.stdout.write(OSC + '10;?' + ST + OSC + '11;?' + ST)
+}
+
+function handleColorQueryProbeInput(input) {
+  if (colorQueryProbeState === 'idle') return false
+  colorQueryProbeBuffer = (colorQueryProbeBuffer + input).slice(-4096)
+  if (!hasCompleteColorResponse(colorQueryProbeBuffer, 11)) {
+    return colorQueryProbeState === 'awaiting'
+  }
+
+  if (colorQueryProbeState === 'awaiting') {
+    clearTimeout(colorQueryProbeTimer)
+    colorQueryProbeTimer = null
+    colorQueryProbeState = 'completed'
+    colorQueryProbeBuffer = ''
+    report('color-query-response')
+    return true
+  }
+
+  colorQueryProbeBuffer = ''
+  report('unexpected-color-response-input')
+  return false
+}
+
+function hasCompleteColorResponse(buffer, code) {
+  const payloadStart = buffer.indexOf(OSC + code + ';rgb:')
+  if (payloadStart < 0) return false
+  return buffer.indexOf('\\x07', payloadStart) >= 0 || buffer.indexOf(ST, payloadStart) >= 0
+}
+
 let exiting = false
 function exitWithoutSessionEnd(exitReason) {
   if (exiting) return
@@ -378,8 +424,10 @@ function handleTerminalInput(data) {
     exitWithoutSessionEnd('interrupt')
     return
   }
+  const input = data.toString('latin1')
+  if (handleColorQueryProbeInput(input)) return
   if (!sourceTheme) {
-    terminalResponseBuffer = (terminalResponseBuffer + data.toString('latin1')).slice(-4096)
+    terminalResponseBuffer = (terminalResponseBuffer + input).slice(-4096)
     adoptReportedBackground()
     return
   }
@@ -398,6 +446,8 @@ function handleTerminalInput(data) {
         publishTerminalTitle(true)
       } else if (command === '/quit') {
         void exitThroughSessionEnd()
+      } else if (command === '/color-query') {
+        beginColorQueryProbe()
       }
       continue
     }
