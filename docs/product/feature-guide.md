@@ -40,7 +40,7 @@ pnpm install
 pnpm dev
 ```
 
-也可以直接从 [GitHub Releases](https://github.com/chen-985211/cleancode/releases) 下载 Preview。安装、签名提示和本地打包方式见根目录 [README 快速开始](../../README.md#快速开始)。
+也可以直接从 [GitHub Releases](https://github.com/chen-985211/cleancode/releases) 下载 Preview。安装、签名提示和本地打包方式见根目录 [中文 README 快速开始](../../README_ZH.md#快速开始)。
 
 ## 核心对象速览
 
@@ -282,7 +282,7 @@ Agent 是画布内固定 Provider 的本地 CLI 控制台，不是普通终端�
 - 选择 `Yolo` 或手动权限模式，并设置新 Agent 是否默认启用 CleanCode MCP。
 - 在工作区之间切换时隔离 Agent；同一工作区的多个 Agent 共享目录和文件。
 
-cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录 README 的 [Agent Provider 列表](../../README.md#带上你喜欢的-agent)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
+cleancode 当前内建 33 个 Coding Agent Provider，完整列表见根目录中文 README 的 [Agent Provider 列表](../../README_ZH.md#带上你喜欢的-agent)。Codex、Claude Code、OpenCode 和 Gemini 当前提供正式会话引用与恢复，并支持 CleanCode MCP；其他 Provider 按各自声明的能力工作。
 
 #### CleanCode MCP
 

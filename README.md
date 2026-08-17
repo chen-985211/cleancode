@@ -1,5 +1,5 @@
 <p align="right">
-  <strong>简体中文</strong> · <a href="./README_EN.md">English</a>
+  <a href="./README_ZH.md">简体中文</a> · <strong>English</strong>
 </p>
 
 <div align="center">
@@ -7,68 +7,80 @@
 
   <h1>cleancode</h1>
 
-  <p><strong>像搭积木一样，DIY 你的 AI 开发工作流。</strong></p>
+  <p><strong>Give every development branch its own Agents, terminals, and executable workflow.</strong></p>
 
-  <p>组合你的工具，带上你的 Agent，运行属于你的开发现场。</p>
+  <p>Keep parallel work isolated, organize scattered development tools, and run them according to real dependencies.</p>
 
-  <p><em>Compose your tools. Bring your agents. Run your workflow.</em></p>
+  <p><em>One branch. One visible, executable workspace.</em></p>
 
   <p>
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
     <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
-    <a href="#环境要求"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-    <a href="#带上你喜欢的-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-    <a href="#画出来也运行起来"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+    <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
+    <a href="#bring-your-favorite-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+    <a href="#draw-it-and-run-it"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
   </p>
 
   <p>
-    <strong><a href="https://github.com/chen-985211/cleancode/releases">下载 CleanCode Preview（macOS / Windows / Linux）</a></strong>
+    <strong><a href="https://github.com/chen-985211/cleancode/releases">Download CleanCode Preview (macOS / Windows / Linux)</a></strong>
   </p>
 </div>
 
 <p align="center">
-  <img src="./docs/assets/cleancode-workflow-demo.png" alt="cleancode 画布中的多 Agent、终端工作流与 Git 分支工作区" />
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the cleancode canvas" />
 </p>
+
+<p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
 
 ---
 
-你的开发方式不应该被某一个 Agent、IDE 或固定脚本定义。
+When you work on several changes at once, Coding Agents, terminals, development services, and working directories quickly scatter across different windows. After switching branches, you still have to confirm where each command is running, which services are already up, and which change each Agent is handling.
 
-**cleancode 是一个画布优先、本地优先的可执行开发工作空间。** 你可以把终端、服务、依赖关系、Git 分支工作区和喜欢的 Coding Agent 组合到同一个开发现场，再按自己的方式运行它、调整它、继续它。
+**cleancode is a canvas-first, local-first executable development workspace.** It keeps a separate canvas for local projects and Git branch workspaces, bringing interactive terminals, dependency workflows, and the Coding Agents you already use together so each change stays isolated, visible, and runnable.
+
+cleancode is not a full IDE and does not provide a file tree or code editor. Keep using your existing editor, command-line tools, and Coding Agents; cleancode organizes the workspace around them and runs real local commands.
+
+## One Branch, One Isolated Workspace
+
+Create a branch workspace for `feature/auth`, and cleancode gives it a dedicated Git worktree. The canvas, terminals, execution scope, and Agent sessions all switch together with that workspace:
 
 ```txt
-feature/auth
-├── Agent：Codex
-└── Workflow
-    ├── Build shared
-    └── API server ──> Web app
-                   └─> Tests
+feature/auth (isolated worktree)
+├── Coding Agent
+└── Executable workflow
+    └── Install dependencies ──> API service ──> Web app
+                                               └─> Tests
 ```
 
-画布不是一张静态流程图。你搭出来的工作流拥有真实命令、启动顺序、就绪条件、运行状态和作用范围。
+Work on `feature/auth`, `fix/search`, and `experiment/new-ui` at the same time. When you return to a workspace, you do not need to clear terminals, recheck the working directory, or remind an Agent that you switched branches.
 
-## 按你的方式搭建
+Running ordinary terminals keep working and retain their output while you switch to another change. If two branches need to start the same development service, preferred or automatic ports avoid manual conflicts: cleancode allocates an available port, injects it through the launch environment or command arguments, and shows the actual address for that run on the canvas.
 
-从一块终端开始，也可以搭出一整套开发工作台：
+## Draw It and Run It
 
-- 用终端积木承载构建、测试、开发服务器和日常命令。
-- 把有限任务与长驻服务配置成不同的执行模式。
-- 用终端组合整理属于同一部分的工具。
-- 用有向连接声明真实依赖，而不只是画一条装饰线。
-- 在同一张画布上放置多个固定 Provider 的 Agent 控制台。
-- 保存每个分支工作区自己的画布、终端定义和 Agent 身份。
-- 把终端、完整流程或组合收藏为项目级或全局模板，再选择放置或放置并运行。
-- 把常用终端、流程或组合绑定到 `1` 至 `5` 快捷执行位。
+A development environment usually takes more than one command: install or build first, wait for the API service to become ready, then start the web app and tests. cleancode makes those startup conditions part of the workflow instead of leaving them in script comments or human memory.
 
-**你的工具、你的 Agent、你的工作流。**
+- Terminal blocks run real builds, tests, development servers, and everyday commands.
+- Directed connections declare real dependencies. Tasks without upstream dependencies can start in parallel; downstream tasks wait until every direct dependency has completed or become ready.
+- Finite tasks succeed or fail according to their exit codes, while long-running services become ready after matching output text or opening a TCP listener.
+- Services can use fixed, preferred, or automatic ports; the runtime allocates and injects the final endpoint.
+- An upstream failure explicitly blocks its descendants; stopping a workflow cleans up active processes in reverse dependency order.
 
-## 带上你喜欢的 Agent
+The canvas shows node state, failure reasons, and actual service addresses, but it is not a static flowchart pretending to be runtime truth. Every run produces an immutable execution plan from the current terminal graph.
 
-**换 Agent，不必换工作方式。** cleancode 让不同 Coding Agent 进入同一个可见开发现场；终端、服务、分支和运行状态不再围绕某个 Provider 重新组织。
+If the API service does not become ready in time, the web app and tests that depend on it do not start blindly. The canvas identifies the failed node, its blocked descendants, and the actual reason, so you can see where the workflow stopped without searching every terminal.
+
+## Bring Your Favorite Agent
+
+**Switch Agents without changing how you work.** cleancode does not introduce another built-in Coding Agent. It brings the local Agent CLIs you already use into the current branch workspace.
+
+Agent integration has two levels: every built-in Provider can have its own console, while Agents that support the native cleancode MCP can also read, inspect, and build terminal workflows on the current canvas.
+
+When you create an Agent, cleancode detects the Provider CLIs installed on your machine and only shows the Agents currently available.
 
 <!-- agent-provider-wall:start -->
 
-cleancode 内建 **33 个 Coding Agent Provider**。它们都可以进入同一个可见、可执行的开发世界，与终端、服务、分支和运行状态一起工作。
+cleancode includes **33 Coding Agent Providers**. Each Agent runs the corresponding real local CLI in the current workspace directory; one workspace can host multiple Agents from the same or different Providers.
 
 <p>
   <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="./docs/assets/agent-providers/claude-code.svg" width="18" height="18" alt="" /> Claude Code</kbd></a>
@@ -106,91 +118,66 @@ cleancode 内建 **33 个 Coding Agent Provider**。它们都可以进入同一�
   <a href="https://support.atlassian.com/rovo/docs/install-and-run-rovo-dev-cli-on-your-device/"><kbd><img src="./docs/assets/agent-providers/rovo.png" width="18" height="18" alt="" /> Rovo Dev</kbd></a>
 </p>
 
-**33 个主流 Coding Agent，全部可以在 cleancode 中拥有一个真正的开发现场。**
+**Keep using the Agents you already know, with the current branch, terminals, and runtime state in the same workspace.**
 
 <!-- agent-provider-wall:end -->
 
-## 一个分支，一个完整工作面
+## Let Agents Help You Build
 
-为需求创建分支工作区后，cleancode 用独立 Git worktree 隔离它的目录，并让画布、终端、运行作用域和 Agent 会话跟随工作区一起切换。
+Agents that support the native cleancode MCP understand and organize the same workspace through stable tools instead of editing internal canvas data. For example, you can tell an Agent:
 
-你可以同时推进 `feature/auth`、`fix/search` 和 `experiment/new-ui`，而不必反复清空终端、确认工作目录或提醒 Agent“我们已经换分支了”。
+> Inspect the current project and create terminals for installing dependencies, starting the API, and starting the web app. Configure the correct dependencies, service readiness conditions, and ports.
 
-## 画出来，也运行起来
+The Agent first inspects the existing canvas and, when needed, reads the project to confirm the real startup commands. It then uses MCP to create, configure, connect, and validate the complete workflow. The result lands on the canvas as one atomic change; inspect the terminals, dependencies, ports, and execution plan before deciding whether to run it.
 
-连接代表真实依赖，配置代表真实执行意图。cleancode 会把当前终端图转换成一次不可变的执行计划：
+Deleting blocks, dissolving groups, and disconnecting dependencies require approval in the cleancode UI. Starting and stopping workflows remain under human control. Agents can help build the environment, but actions that change your local development setup stay visible to you.
 
-- 没有上游的任务可以并行启动，下游等待全部直接依赖完成或就绪。
-- 有限任务按真实退出码判断成功，长驻服务按输出文本或 TCP 监听判断就绪。
-- 服务可以声明固定、优选或自动端口，由运行时分配并注入最终端点。
-- 上游失败会明确阻塞后代；停止时按反向依赖顺序清理活动进程。
+## Build Once, Reuse Anytime
 
-节点状态、失败原因和实际访问地址都来自运行时。画布展示发生了什么，但不会用静态标签冒充事实。
+Once the “install dependencies → API service → web app and tests” workflow is proven, save it as a project template. In the next branch, choose **Place** or **Place and run** to create a new set of terminals and connections with independent identities—without re-entering commands, ports, or startup order. Move the template to global favorites when you want to reuse it across projects.
 
-## 搭一次，随时复用
+Templates preserve configuration, dependencies, and relative layout, but they do not copy terminal output, runtime state, actual endpoints, Agents, or Agent conversations. You can also bind frequently used terminals, complete workflows, or combinations to slots `1` through `5` in the current workspace, then run them with `Command/Ctrl + 1` through `5`.
 
-独立终端、完整依赖流程和终端组合都可以保存为收藏模板。项目模板留在当前项目，全局模板可以放置到任意项目；每次放置都会生成一套新的终端、连接和可选组合，同时保留模板中的配置、依赖和相对布局。选择“放置并运行”还会把新实例的精确作用域交给同一套工作流调度器。
+## Start with One Feature
 
-每个工作区还有固定编号 `1` 至 `5` 的快捷执行位。你可以从对象列表、拖动或右键菜单绑定终端、完整流程或组合；点击快捷位只定位画布，按 `Command/Ctrl + 1` 至 `5` 才会运行对应对象。
+1. Add a local project and create an isolated branch workspace for the feature.
+2. Add the Coding Agent you use.
+3. Turn installation, builds, tests, and development servers into terminal blocks.
+4. Separate finite tasks from long-running services, then configure readiness conditions, ports, and dependencies.
+5. Run the workflow from its root terminal and inspect startup order, state, failure reasons, and actual endpoints on the same canvas.
+6. Save the proven terminal, workflow, or combination as a template, or bind it to a quick execution slot for next time.
 
-## 让 Agent 参与搭建
+## Quick Start
 
-支持原生 cleancode MCP 的 Agent 可以通过稳定工具理解和整理同一个工作空间，而不是直接修改画布内部数据。当前工具覆盖：
+### Download the Preview
 
-- 读取画布、终端积木、连接和执行计划。
-- 一次性创建、配置、连接、组合、排列并校验完整的新终端工作流。
-- 对既有终端积木进行创建、更新、删除和连接等增量调整。
-- 验证依赖并检查启动计划。
-- 确定性排列相关终端与完整组合，同时避让画布上的既有对象。
+Download the installer for your platform from [GitHub Releases](https://github.com/chen-985211/cleancode/releases):
 
-Agent 完整创建的工作流会作为一次完整变更落到画布，再按“逐步搭建”或“并行进入”连续呈现。用户拖动对象、平移或缩放画布时可以立即接管；启用减少动态效果后则直接显示最终布局。
-
-删除积木、解散组合和断开依赖需要在 cleancode 界面中审批；启动与停止工作流仍由人控制。这让 Agent 能够参与搭建，同时让改变开发现场的动作保持可见。
-
-## 从一个需求开始
-
-1. 为需求创建独立分支工作区。
-2. 加入你常用的 Coding Agent。
-3. 把构建、测试、开发服务器和辅助命令做成终端积木。
-4. 配置任务、服务、端口和依赖关系。
-5. 把常用终端、流程或组合收藏为模板，或绑定到快捷执行位。
-6. 从终端、组合、模板或快捷键运行工作流，在同一张画布上查看结果。
-
-## 快速开始
-
-### 下载 Preview
-
-从 [GitHub Releases](https://github.com/chen-985211/cleancode/releases) 下载对应平台的安装包：
-
-- macOS：Universal DMG/ZIP，同时支持 Apple Silicon 和 Intel。
-- Windows：x64 NSIS 安装程序。
-- Linux：x64 AppImage/DEB。
+- macOS: Universal DMG/ZIP for both Apple Silicon and Intel.
+- Windows: x64 NSIS installer.
+- Linux: x64 AppImage/DEB.
 
 > [!WARNING]
-> 当前 Preview 尚未使用正式开发者证书签名。请只从本仓库的 GitHub Releases 下载，并先使用
-> 同一 Release 中的 `SHA256SUMS.txt` 核对安装包。
+> The current Preview is not signed with official developer certificates. Download it only from this repository's GitHub Releases, and verify the package against `SHA256SUMS.txt` from the same release.
 
-macOS 会因为应用尚未完成 Developer ID 签名和 Apple notarization 而阻止首次打开。把
-`CleanCode.app` 拖入 `/Applications`，确认安装包来源和 SHA-256 校验值无误后，可以只为这个
-应用移除下载隔离属性并启动：
+Because the app has not yet completed Developer ID signing and Apple notarization, macOS will block it the first time it opens. After moving `CleanCode.app` to `/Applications` and verifying the source and SHA-256 checksum, you can remove the download quarantine attribute for this app only and launch it:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/CleanCode.app
 open /Applications/CleanCode.app
 ```
 
-这条命令会绕过该应用的首次 Gatekeeper 检查。不要把目标路径替换为 `/Applications`、下载目录或
-用户目录等宽泛范围。也可以按照
-[Apple 官方说明](https://support.apple.com/en-asia/102445)，在“系统设置 → 隐私与安全性”中选择
-“仍要打开”。
+This command bypasses the initial Gatekeeper check for this app. Do not replace the target with a broad path such as `/Applications`, your Downloads folder, or your home directory. Alternatively, follow [Apple's official instructions](https://support.apple.com/en-asia/102445) and choose **Open Anyway** under **System Settings → Privacy & Security**.
 
-### 环境要求
+### Source Development Requirements
+
+These requirements apply only when running from source or contributing to development. You do not need to install these development dependencies before downloading the Preview.
 
 - Node.js `>= 24`
 - pnpm `>= 10`
-- macOS、Windows 或 Linux
+- macOS, Windows, or Linux
 
-### 本地运行
+### Run Locally
 
 ```bash
 git clone https://github.com/chen-985211/cleancode.git
@@ -199,7 +186,7 @@ pnpm install
 pnpm dev
 ```
 
-### 常用检查
+### Common Checks
 
 ```bash
 pnpm typecheck
@@ -207,79 +194,76 @@ pnpm test
 pnpm pre-commit
 ```
 
-### 本地打包
+### Build Locally
 
 ```bash
-# 当前平台的 unpacked 应用，用于本地验证
+# Unpacked app for the current platform, intended for local verification
 pnpm package
 
-# 当前平台的发行安装包
+# Distribution installer for the current platform
 pnpm dist
 
-# 也可以在对应操作系统上显式选择平台
+# You can also select a target explicitly on the corresponding operating system
 pnpm dist:mac
 pnpm dist:win
 pnpm dist:linux
 ```
 
-产物统一写入 `release/`。macOS 生成 Universal DMG/ZIP，Windows 生成 x64 NSIS
-安装程序，Linux 生成 x64 AppImage/DEB。应用的用户可见名称为 **CleanCode**，内部包名仍为
-`cleancode`。
+All artifacts are written to `release/`. macOS builds Universal DMG/ZIP packages, Windows builds an x64 NSIS installer, and Linux builds x64 AppImage/DEB packages. The user-facing app name is **CleanCode**, while the internal package name remains `cleancode`.
 
-推送与 `package.json` 版本一致的 `v*` tag 后，GitHub Actions 会在三个目标系统分别构建、
-运行打包后终端冒烟测试，并创建公开的 Preview Pre-release。Preview 尚未使用正式开发者证书：
-macOS 使用 ad-hoc 签名且未 notarize，Windows 安装程序未签名，因此操作系统可能显示安全警告。
-正式签名完成前，这些产物只作为公开测试版本。
+When you push a `v*` tag that matches the version in `package.json`, GitHub Actions builds on all three target operating systems, runs a packaged-terminal smoke test, and creates a public Preview Pre-release. The Preview does not yet use official developer certificates: macOS uses ad-hoc signing without notarization, and the Windows installer is unsigned, so the operating system may display security warnings. Until official signing is available, these artifacts are public testing builds.
 
-## 当前边界
+## Current Limitations
 
-cleancode 正在积极开发，当前版本需要注意：
+cleancode is under active development. Keep these current limitations in mind:
 
-- 当前可执行积木类型仍以终端为核心，并支持终端依赖流程与终端组合；Preview、HTTP、Test、File 和 Plugin 等独立积木类型仍在路线图中。
-- Agent 可以通过 MCP 搭建、编排和检查终端依赖，但暂不能启动、查询或停止工作流。
-- 应用退出后，活动工作流和 Agent 终端进程不会自动继续运行；可恢复的终端与上游对话会按各自能力重新连接。
-- 插件扩展体系尚未公开，暂不承诺第三方插件兼容性。
-- GitHub Releases 中的预构建安装包当前属于未正式签名的 Preview，不是已签名正式发行版。
+- Executable block types currently remain terminal-centered, with terminal dependency workflows and terminal combinations. Preview, HTTP, Test, File, Plugin, and other standalone block types remain on the roadmap.
+- Connections between terminals express startup dependencies only; they do not pass standard output, files, or structured artifacts between nodes.
+- Agents can build, organize, and inspect terminal dependencies through MCP, but they cannot yet start, query, or stop workflows.
+- Active workflows and Agent terminal processes do not continue running after the app exits. Recoverable terminals and upstream conversations reconnect according to their individual capabilities.
+- Remote hosts, distributed execution, and cross-project workflows are not currently supported.
+- The plugin extension system is not yet public, and third-party plugin compatibility is not guaranteed.
+- The prebuilt packages on GitHub Releases are unsigned Preview builds, not signed production releases.
 
-## 设计原则
+## Design Principles
 
-- **画布不是事实来源。** 它只投影领域模型与运行状态。
-- **人和 Agent 共享用例。** Agent 不绕过应用边界直接操纵内部实现。
-- **工作区隔离优先。** 分支、目录、端口和会话都必须有明确归属。
-- **危险操作必须可见。** 改变进程、文件或工作区状态的能力需要审批和审计。
-- **失败必须能够解释。** 计划、就绪、端点和错误都应回到用户可理解的对象上。
+- **The canvas is not the source of truth.** It only projects the domain model and runtime state.
+- **People and Agents share the same use cases.** Agents do not bypass application boundaries to manipulate internal implementations.
+- **Workspace isolation comes first.** Branches, directories, ports, and sessions must have explicit ownership.
+- **Dangerous actions must be visible.** Capabilities that change processes, files, or workspace state require approval and auditing.
+- **Failures must be explainable.** Plans, readiness, endpoints, and errors should map back to objects users can understand.
 
-架构和领域边界详见 [架构文档](./docs/engineering/architecture.md) 与 [上下文地图](./docs/engineering/context-map.md)。
+For architecture and domain boundaries, see the [Architecture Guide](./docs/engineering/architecture.md) and [Context Map](./docs/engineering/context-map.md).
 
-## 文档
+## Documentation
 
-- [产品功能与快速上手](./docs/product/feature-guide.md)
-- [文档中心](./docs/README.md)
-- [UI 契约](./docs/product/ui-contract.md)
-- [终端依赖工作流](./docs/contexts/run/terminal-workflow.md)
-- [Agent 与会话生命周期](./docs/contexts/agent/agent-session.md)
-- [cleancode 原生 MCP](./docs/contexts/agent/cleancode-mcp.md)
-- [开发协作规范](./docs/engineering/development.md)
+- [Product Features and Quick Start](./docs/product/feature-guide.md)
+- [Documentation Center](./docs/README.md)
+- [UI Contract](./docs/product/ui-contract.md)
+- [Terminal Dependency Workflows](./docs/contexts/run/terminal-workflow.md)
+- [Agent and Session Lifecycle](./docs/contexts/agent/agent-session.md)
+- [Native cleancode MCP](./docs/contexts/agent/cleancode-mcp.md)
+- [Development Guidelines](./docs/engineering/development.md)
 
-## 参与贡献
+## Contributing
 
-欢迎提交 Issue、讨论和 Pull Request。开始前请阅读 [贡献指南](./CONTRIBUTING.md) 与 [开发协作规范](./docs/engineering/development.md)。
+Issues, discussions, and pull requests are welcome. Before you begin, read the [Contributing Guide](./CONTRIBUTING.md) and [Development Guidelines](./docs/engineering/development.md).
 
-## 许可证
+## License
 
 [MIT](./LICENSE)
 
 ---
 
 <div align="center">
-  <h2>加入 CleanCode 社区</h2>
+  <h2>Join the CleanCode Community</h2>
 
-  <p>交流工作流搭建、Agent 使用和开发体验，也欢迎分享反馈与建议。</p>
+  <p>Talk workflows, Coding Agents, and developer experience—and share your feedback and ideas.</p>
 
-  <img src="./docs/assets/cleancode-qq-group.png" alt="扫码加入 CleanCode QQ 群（群号：186885114）" width="320" />
+  <img src="./docs/assets/cleancode-qq-group.png" alt="Scan to join the CleanCode QQ group (group number: 186885114)" width="320" />
 
   <p>
-    <strong>QQ 群：186885114</strong><br />
-    <sub>打开 QQ 扫码，或搜索群号加入</sub>
+    <strong>QQ group: 186885114</strong><br />
+    <sub>Scan with QQ, or search for the group number to join</sub>
   </p>
 </div>
