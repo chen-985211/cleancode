@@ -6,7 +6,10 @@ import { createServer } from 'vite'
 const catalogModulePath =
   '/src/contexts/agent/infrastructure/providers/catalog/BuiltinAgentProviderCatalog.ts'
 const outputDirectoryPath = 'docs/assets/agent-providers'
-const readmePath = 'README.md'
+const readmeTargets = [
+  { locale: 'en', path: 'README.md' },
+  { locale: 'zh-CN', path: 'README_ZH.md' }
+]
 const wallStartMarker = '<!-- agent-provider-wall:start -->'
 const wallEndMarker = '<!-- agent-provider-wall:end -->'
 
@@ -25,18 +28,22 @@ async function main() {
       ]
     })
   )
-  const expectedWall = renderProviderWall(providers)
+  const expectedWalls = new Map(
+    readmeTargets.map(({ locale, path }) => [path, renderProviderWall(providers, locale)])
+  )
 
   if (shouldCheck) {
-    await checkGeneratedState(cwd, generatedAssets, expectedWall)
+    await checkGeneratedState(cwd, generatedAssets, expectedWalls)
     console.log(
-      `Agent README wall and ${providers.length} generated icons match the built-in Provider catalog.`
+      `Agent README walls and ${providers.length} generated icons match the built-in Provider catalog.`
     )
     return
   }
 
-  await writeGeneratedState(cwd, generatedAssets, expectedWall)
-  console.log(`Generated ${providers.length} Agent README icons and synchronized the README wall.`)
+  await writeGeneratedState(cwd, generatedAssets, expectedWalls)
+  console.log(
+    `Generated ${providers.length} Agent README icons and synchronized both README walls.`
+  )
 }
 
 async function loadProviderDescriptors(cwd) {
@@ -66,7 +73,7 @@ async function loadProviderDescriptors(cwd) {
   }
 }
 
-async function writeGeneratedState(cwd, generatedAssets, expectedWall) {
+async function writeGeneratedState(cwd, generatedAssets, expectedWalls) {
   const outputDirectory = join(cwd, outputDirectoryPath)
   await mkdir(outputDirectory, { recursive: true })
   await Promise.all(
@@ -75,13 +82,17 @@ async function writeGeneratedState(cwd, generatedAssets, expectedWall) {
     )
   )
 
-  const absoluteReadmePath = join(cwd, readmePath)
-  const readme = await readFile(absoluteReadmePath, 'utf8')
-  const synchronizedReadme = replaceGeneratedWall(readme, expectedWall)
-  await writeFile(absoluteReadmePath, synchronizedReadme)
+  await Promise.all(
+    [...expectedWalls].map(async ([readmePath, expectedWall]) => {
+      const absoluteReadmePath = join(cwd, readmePath)
+      const readme = await readFile(absoluteReadmePath, 'utf8')
+      const synchronizedReadme = replaceGeneratedWall(readme, expectedWall)
+      await writeFile(absoluteReadmePath, synchronizedReadme)
+    })
+  )
 }
 
-async function checkGeneratedState(cwd, generatedAssets, expectedWall) {
+async function checkGeneratedState(cwd, generatedAssets, expectedWalls) {
   const outputDirectory = join(cwd, outputDirectoryPath)
   const actualFiles = new Set(await readdir(outputDirectory))
   const expectedFiles = new Set(generatedAssets.keys())
@@ -101,9 +112,11 @@ async function checkGeneratedState(cwd, generatedAssets, expectedWall) {
     if (!expectedFiles.has(fileName)) violations.push(`unexpected generated icon: ${fileName}`)
   }
 
-  const readme = await readFile(join(cwd, readmePath), 'utf8')
-  if (replaceGeneratedWall(readme, expectedWall) !== readme) {
-    violations.push('README Agent Provider wall is stale')
+  for (const [readmePath, expectedWall] of expectedWalls) {
+    const readme = await readFile(join(cwd, readmePath), 'utf8')
+    if (replaceGeneratedWall(readme, expectedWall) !== readme) {
+      violations.push(`${readmePath} Agent Provider wall is stale`)
+    }
   }
   if (violations.length > 0) {
     throw new Error(
@@ -123,11 +136,12 @@ function replaceGeneratedWall(readme, expectedWall) {
   return `${readme.slice(0, start)}${expectedWall}${readme.slice(end + wallEndMarker.length)}`
 }
 
-function renderProviderWall(providers) {
+function renderProviderWall(providers, locale) {
+  const copy = renderProviderWallCopy(locale, providers.length)
   return [
     wallStartMarker,
     '',
-    `cleancode 内建 **${providers.length} 个 Coding Agent Provider**。它们都可以进入同一个可见、可执行的开发世界，与终端、服务、分支和运行状态一起工作。`,
+    copy.introduction,
     '',
     '<p>',
     ...providers.map((provider) => {
@@ -137,10 +151,28 @@ function renderProviderWall(providers) {
     }),
     '</p>',
     '',
-    `**${providers.length} 个主流 Coding Agent，全部可以在 cleancode 中拥有一个真正的开发现场。**`,
+    copy.conclusion,
     '',
     wallEndMarker
   ].join('\n')
+}
+
+function renderProviderWallCopy(locale, providerCount) {
+  if (locale === 'en') {
+    return {
+      introduction: `cleancode includes **${providerCount} Coding Agent Providers**. Each Agent runs the corresponding real local CLI in the current workspace directory; one workspace can host multiple Agents from the same or different Providers.`,
+      conclusion:
+        '**Keep using the Agents you already know, with the current branch, terminals, and runtime state in the same workspace.**'
+    }
+  }
+  if (locale === 'zh-CN') {
+    return {
+      introduction: `cleancode 内建 **${providerCount} 个 Coding Agent Provider**。每个 Agent 都使用对应的真实本地 CLI，并在当前工作区目录中运行；同一个工作区可以同时创建多个相同或不同 Provider 的 Agent。`,
+      conclusion:
+        '**继续使用你熟悉的 Agent，同时让它们与当前分支、终端和运行状态保持在同一个工作区。**'
+    }
+  }
+  throw new Error(`Unsupported README locale: ${locale}`)
 }
 
 function decodeRasterIcon(imageDataUrl) {
