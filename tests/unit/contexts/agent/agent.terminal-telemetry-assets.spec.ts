@@ -85,11 +85,14 @@ describe('terminal Agent telemetry assets', () => {
 
       const commandShim = await readFile(join(assets.shimDirectory, 'codex.cmd'), 'utf8')
       const powerShellShim = await readFile(join(assets.shimDirectory, 'codex.ps1'), 'utf8')
-      expect(commandShim).toContain('set "ELECTRON_RUN_AS_NODE=1"')
-      expect(commandShim).toContain('set "ELECTRON_NO_ATTACH_CONSOLE="')
-      expect(commandShim).toContain('shim-launcher.mjs')
+      expect(commandShim).toContain('powershell.exe -NoLogo -NoProfile')
+      expect(commandShim).toContain('codex.ps1')
+      expect(commandShim).not.toContain('CleanCode.exe')
       expect(powerShellShim).toContain('$previousElectronRunAsNode')
       expect(powerShellShim).toContain('$previousElectronNoAttachConsole')
+      expect(powerShellShim).toContain("'--prepare-windows'")
+      expect(powerShellShim).toContain('& $plan.executable @($plan.arguments)')
+      expect(powerShellShim).toContain("'--complete-windows'")
       expect(powerShellShim).toContain(
         'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue'
       )
@@ -108,9 +111,9 @@ describe('terminal Agent telemetry assets', () => {
       expect(shimLauncher).toContain('gracefulSignalTimeoutMs = 750')
       expect(shimLauncher).toContain('forcedExitTimeoutMs = 500')
       expect(shimLauncher).toContain("type: 'invocation_exited'")
-      expect(shimLauncher).toContain('windowsVerbatimArguments: true')
-      expect(shimLauncher).toContain('escapeWindowsArgument(arg, true)')
-      expect(shimLauncher).toContain("openSync('CONIN$', 'r')")
+      expect(shimLauncher).toContain("operation === '--prepare-windows'")
+      expect(shimLauncher).toContain("operation === '--complete-windows'")
+      expect(shimLauncher).not.toContain("openSync('CONIN$', 'r')")
       expect(
         await readFile(join(assets.rootDirectory, 'assets-v1', 'hook-relay.cmd'), 'utf8')
       ).toContain('hook-relay.mjs')

@@ -8,9 +8,6 @@ import {
   createPosixHookRelayLauncher,
   createPosixShim,
   createTerminalAgentLaunchSpecs,
-  createWindowsCmdShim,
-  createWindowsHookRelayLauncher,
-  createWindowsPowerShellShim,
   terminalAgentBashRcScript,
   terminalAgentHookRelayScript,
   terminalAgentOpenCodePluginScript,
@@ -21,6 +18,11 @@ import {
   terminalAgentZshProfileScript,
   terminalAgentZshRcScript
 } from './TerminalAgentTelemetryScripts'
+import {
+  createWindowsCmdShim,
+  createWindowsHookRelayLauncher,
+  createWindowsPowerShellShim
+} from './TerminalAgentTelemetryWindowsScripts'
 
 export interface TerminalAgentTelemetryAssets {
   readonly gatewayManifestPath: string

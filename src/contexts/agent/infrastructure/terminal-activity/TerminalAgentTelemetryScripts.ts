@@ -85,43 +85,6 @@ export function createPosixShim(input: {
   ].join('\n')
 }
 
-export function createWindowsCmdShim(input: {
-  readonly commandName: string
-  readonly providerId: string
-  readonly runtimeExecutable: string
-  readonly shimLauncherPath: string
-}): string {
-  return [
-    '@echo off',
-    'setlocal',
-    'set "ELECTRON_RUN_AS_NODE=1"',
-    'set "ELECTRON_NO_ATTACH_CONSOLE="',
-    `"${escapeCmdPath(input.runtimeExecutable)}" "${escapeCmdPath(input.shimLauncherPath)}" "${escapeCmdPath(input.providerId)}" "${escapeCmdPath(input.commandName)}" %*`,
-    'exit /b %ERRORLEVEL%',
-    ''
-  ].join('\r\n')
-}
-
-export function createWindowsPowerShellShim(input: {
-  readonly commandName: string
-  readonly providerId: string
-  readonly runtimeExecutable: string
-  readonly shimLauncherPath: string
-}): string {
-  return [
-    '$previousElectronRunAsNode = $env:ELECTRON_RUN_AS_NODE',
-    '$previousElectronNoAttachConsole = $env:ELECTRON_NO_ATTACH_CONSOLE',
-    "$env:ELECTRON_RUN_AS_NODE = '1'",
-    'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue',
-    `& '${escapePowerShell(input.runtimeExecutable)}' '${escapePowerShell(input.shimLauncherPath)}' '${escapePowerShell(input.providerId)}' '${escapePowerShell(input.commandName)}' @args`,
-    '$exitCode = $LASTEXITCODE',
-    'if ($null -eq $previousElectronNoAttachConsole) { Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue } else { $env:ELECTRON_NO_ATTACH_CONSOLE = $previousElectronNoAttachConsole }',
-    'if ($null -eq $previousElectronRunAsNode) { Remove-Item Env:ELECTRON_RUN_AS_NODE } else { $env:ELECTRON_RUN_AS_NODE = $previousElectronRunAsNode }',
-    'exit $exitCode',
-    ''
-  ].join('\r\n')
-}
-
 export function createPosixHookRelayLauncher(
   runtimeExecutable: string,
   hookRelayPath: string
@@ -229,20 +192,6 @@ function createZshStartupRelay(
   ].join('\n')
 }
 
-export function createWindowsHookRelayLauncher(
-  runtimeExecutable: string,
-  hookRelayPath: string
-): string {
-  return [
-    '@echo off',
-    'setlocal',
-    'set "ELECTRON_RUN_AS_NODE=1"',
-    `"${escapeCmdPath(runtimeExecutable)}" "${escapeCmdPath(hookRelayPath)}" %*`,
-    'exit /b %ERRORLEVEL%',
-    ''
-  ].join('\r\n')
-}
-
 function createHookHandler(hookRelayLauncherPath: string, providerId: string) {
   return {
     hooks: [
@@ -268,83 +217,124 @@ function quotePosix(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`
 }
 
-function escapeCmdPath(value: string): string {
-  return value.replaceAll('"', '""')
-}
-
-function escapePowerShell(value: string): string {
-  return value.replaceAll("'", "''")
-}
-
 export const terminalAgentShimLauncherScript = String.raw`
 import { randomUUID } from 'node:crypto';
-import { accessSync, closeSync, constants, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, delimiter, dirname, extname, join, resolve } from 'node:path';
+import { basename, delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-const windowsCommandMetaCharacters = /([()\][%!^"<>&|;, *?])/g;
-const [providerId, commandName, ...originalArgs] = process.argv.slice(2);
 const assetDirectory = dirname(fileURLToPath(import.meta.url));
 const specs = JSON.parse(readFileSync(join(assetDirectory, 'launch-specs.json'), 'utf8'));
-const spec = specs.providers?.[providerId];
 const shimDirectory = join(assetDirectory, 'bin');
-const executable = findExecutable(commandName, shimDirectory);
-if (!spec || !executable) process.exit(127);
+const [operation, ...input] = process.argv.slice(2);
+if (operation === '--prepare-windows') await prepareWindowsLaunch(input);
+else if (operation === '--complete-windows') await completeWindowsLaunch(input);
+else await runProvider([operation, ...input]);
 
-const environment = { ...process.env };
-delete environment.ELECTRON_RUN_AS_NODE;
-environment.CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID = providerId;
-environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID = randomUUID();
-let args = [...originalArgs];
-let temporaryDirectory = null;
-try {
-  if (Array.isArray(spec.appendArgs)) args.push(...spec.appendArgs);
-  if (spec.mergeJsonEnvironment) {
-    const variable = spec.mergeJsonEnvironment.variable;
-    const inherited = parseObject(environment[variable]);
-    environment[variable] = JSON.stringify(mergeConfig(inherited, spec.mergeJsonEnvironment.append));
+async function prepareWindowsLaunch([providerId, commandName, ...originalArgs]) {
+  const launch = createLaunch(providerId, commandName, originalArgs);
+  if (!launch) {
+    process.exitCode = 127;
+    return;
   }
-  if (spec.mergeJsonFileEnvironment) {
-    const { basePath, variable } = spec.mergeJsonFileEnvironment;
-    const base = parseObject(readFileSync(basePath, 'utf8'));
-    const inheritedPath = environment[variable];
-    if (inheritedPath && resolve(inheritedPath) !== resolve(basePath)) {
-      const inherited = parseObject(readFileSync(inheritedPath, 'utf8'));
-      temporaryDirectory = mkdtempSync(join(tmpdir(), 'cleancode-gemini-hooks-'));
-      const mergedPath = join(temporaryDirectory, 'settings.json');
-      writeFileSync(mergedPath, JSON.stringify(mergeConfig(inherited, base)), { mode: 0o600 });
-      environment[variable] = mergedPath;
-    } else {
-      environment[variable] = basePath;
-    }
-  }
-} catch {
-  args = [...originalArgs];
+  const initialStatus = launch.spec.statusTracking === 'full' ? 'idle' : 'unavailable';
+  await reportAgentActivity(providerId, launch.environment, { status: initialStatus, type: 'status_changed' }, 250);
+  process.stdout.write(JSON.stringify({
+    arguments: launch.args,
+    environment: providerEnvironment(launch.spec, launch.environment),
+    executable: launch.executable,
+    invocationId: launch.environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID,
+    temporaryDirectory: launch.temporaryDirectory
+  }));
 }
 
-const signalForwarder = createSignalForwarder();
-let result = { error: null, signal: null, status: null };
-try {
-  const initialStatus = spec.statusTracking === 'full' ? 'idle' : 'unavailable';
-  await reportAgentActivity(providerId, environment, { status: initialStatus, type: 'status_changed' }, 250);
-  const pendingSignal = signalForwarder.readSignal();
-  result = pendingSignal
-    ? { error: null, signal: pendingSignal, status: null }
-    : await spawnProvider(executable, args, environment, signalForwarder);
-} catch (error) {
-  result = { error, signal: null, status: null };
-} finally {
+async function completeWindowsLaunch([providerId, invocationId, temporaryDirectory]) {
+  const environment = { ...process.env };
+  delete environment.ELECTRON_RUN_AS_NODE;
+  environment.CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID = providerId;
+  environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID = invocationId;
   await reportAgentActivity(providerId, environment, { type: 'invocation_exited' }, 500);
-  signalForwarder.dispose();
   if (temporaryDirectory) rmSync(temporaryDirectory, { force: true, recursive: true });
 }
-if (result.error) {
-  process.stderr.write(String(result.error.message || result.error) + '\n');
-  process.exit(126);
+
+async function runProvider([providerId, commandName, ...originalArgs]) {
+  const launch = createLaunch(providerId, commandName, originalArgs);
+  if (!launch) {
+    process.exitCode = 127;
+    return;
+  }
+  const signalForwarder = createSignalForwarder();
+  let result = { error: null, signal: null, status: null };
+  try {
+    const initialStatus = launch.spec.statusTracking === 'full' ? 'idle' : 'unavailable';
+    await reportAgentActivity(providerId, launch.environment, { status: initialStatus, type: 'status_changed' }, 250);
+    const pendingSignal = signalForwarder.readSignal();
+    result = pendingSignal
+      ? { error: null, signal: pendingSignal, status: null }
+      : await spawnProvider(launch.executable, launch.args, launch.environment, signalForwarder);
+  } catch (error) {
+    result = { error, signal: null, status: null };
+  } finally {
+    await reportAgentActivity(providerId, launch.environment, { type: 'invocation_exited' }, 500);
+    signalForwarder.dispose();
+    if (launch.temporaryDirectory) rmSync(launch.temporaryDirectory, { force: true, recursive: true });
+  }
+  if (result.error) {
+    process.stderr.write(String(result.error.message || result.error) + '\n');
+    process.exitCode = 126;
+    return;
+  }
+  process.exitCode = result.status ?? signalExitCode(result.signal);
 }
-process.exit(result.status ?? signalExitCode(result.signal));
+
+function createLaunch(providerId, commandName, originalArgs) {
+  const spec = specs.providers?.[providerId];
+  const executable = spec && findExecutable(commandName, shimDirectory);
+  if (!spec || !executable) return null;
+  const environment = { ...process.env };
+  delete environment.ELECTRON_RUN_AS_NODE;
+  environment.CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID = providerId;
+  environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID = randomUUID();
+  let args = [...originalArgs];
+  let temporaryDirectory = null;
+  try {
+    if (Array.isArray(spec.appendArgs)) args.push(...spec.appendArgs);
+    if (spec.mergeJsonEnvironment) {
+      const variable = spec.mergeJsonEnvironment.variable;
+      const inherited = parseObject(environment[variable]);
+      environment[variable] = JSON.stringify(mergeConfig(inherited, spec.mergeJsonEnvironment.append));
+    }
+    if (spec.mergeJsonFileEnvironment) {
+      const { basePath, variable } = spec.mergeJsonFileEnvironment;
+      const base = parseObject(readFileSync(basePath, 'utf8'));
+      const inheritedPath = environment[variable];
+      if (inheritedPath && resolve(inheritedPath) !== resolve(basePath)) {
+        const inherited = parseObject(readFileSync(inheritedPath, 'utf8'));
+        temporaryDirectory = mkdtempSync(join(tmpdir(), 'cleancode-gemini-hooks-'));
+        const mergedPath = join(temporaryDirectory, 'settings.json');
+        writeFileSync(mergedPath, JSON.stringify(mergeConfig(inherited, base)), { mode: 0o600 });
+        environment[variable] = mergedPath;
+      } else {
+        environment[variable] = basePath;
+      }
+    }
+  } catch {
+    args = [...originalArgs];
+  }
+  return { args, environment, executable, spec, temporaryDirectory };
+}
+
+function providerEnvironment(spec, environment) {
+  const names = [
+    'CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID',
+    'CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID',
+    spec.mergeJsonEnvironment?.variable,
+    spec.mergeJsonFileEnvironment?.variable
+  ].filter(Boolean);
+  return Object.fromEntries(names.map((name) => [name, environment[name]]));
+}
 
 async function reportAgentActivity(provider, environment, signal, timeoutMs) {
   const timeout = new AbortController();
@@ -367,25 +357,7 @@ async function reportAgentActivity(provider, environment, signal, timeoutMs) {
 }
 
 function spawnProvider(executable, args, environment, signalForwarder) {
-  const extension = extname(executable).toLowerCase();
-  const standardIo = createProviderStandardIo();
-  let child;
-  try {
-    if (process.platform !== 'win32' || !['.bat', '.cmd'].includes(extension)) {
-      child = spawn(executable, args, { env: environment, stdio: standardIo.value });
-    } else {
-      const command = escapeWindowsCommand(executable);
-      const escapedArgs = args.map((arg) => escapeWindowsArgument(arg, true));
-      const shellCommand = [command, ...escapedArgs].join(' ');
-      child = spawn(environment.comspec || environment.ComSpec || 'cmd.exe', ['/d', '/s', '/c', '"' + shellCommand + '"'], {
-        env: environment,
-        stdio: standardIo.value,
-        windowsVerbatimArguments: true
-      });
-    }
-  } finally {
-    standardIo.dispose();
-  }
+  const child = spawn(executable, args, { env: environment, stdio: 'inherit' });
   return new Promise((resolve) => {
     let error = null;
     let settled = false;
@@ -404,16 +376,6 @@ function spawnProvider(executable, args, environment, signalForwarder) {
     });
     child.once('close', (status, signal) => settle({ error, signal, status }));
   });
-}
-
-function createProviderStandardIo() {
-  if (process.platform !== 'win32' || process.stdin.isTTY) return { dispose() {}, value: 'inherit' };
-  try {
-    const consoleInput = openSync('CONIN$', 'r');
-    return { dispose() { closeSync(consoleInput); }, value: [consoleInput, 'inherit', 'inherit'] };
-  } catch {
-    return { dispose() {}, value: 'inherit' };
-  }
 }
 
 function createSignalForwarder() {
@@ -519,20 +481,6 @@ function signalExitCode(signal) {
   if (signal === 'SIGINT') return 130;
   if (signal === 'SIGTERM') return 143;
   return signal ? 128 : 0;
-}
-
-function escapeWindowsCommand(value) {
-  return String(value).replace(windowsCommandMetaCharacters, '^$1');
-}
-function escapeWindowsArgument(value, doubleEscapeMetaCharacters) {
-  let escaped = String(value);
-  escaped = escaped.replace(/(?=(\\+?)?)\1"/g, '$1$1\\"');
-  escaped = escaped.replace(/(?=(\\+?)?)\1$/, '$1$1');
-  escaped = '"' + escaped + '"';
-  escaped = escaped.replace(windowsCommandMetaCharacters, '^$1');
-  return doubleEscapeMetaCharacters
-    ? escaped.replace(windowsCommandMetaCharacters, '^$1')
-    : escaped;
 }
 
 function findExecutable(name, ownShimDirectory) {

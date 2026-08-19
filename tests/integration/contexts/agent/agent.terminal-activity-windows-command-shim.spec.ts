@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
@@ -11,36 +11,24 @@ import { TerminalAgentTelemetryAssetStore } from '../../../../src/contexts/agent
 const require = createRequire(import.meta.url)
 const electronExecutable = require('electron') as string
 
-const windowsCommandCases = [
-  { exitCode: 0, extension: '.cmd' },
-  { exitCode: 7, extension: '.bat' }
-] as const
+const windowsCommandCases = [{ extension: '.cmd' }, { extension: '.bat' }] as const
 
 describe('ordinary terminal Windows command Agent activity integration', () => {
   it.each(windowsCommandCases)(
-    'launches an npm-style Provider through a real $extension command path',
-    async ({ exitCode, extension }) => {
+    'prepares an npm-style Provider at a real $extension command path',
+    async ({ extension }) => {
       const root = await mkdtemp(join(tmpdir(), 'cleancode-agent-windows-command-'))
       const providerDirectory = join(root, 'provider bin')
       const stateDirectory = join(root, 'state')
-      const capturePath = join(root, 'provider-capture.json')
-      const commandCapturePath = join(root, 'command-capture.json')
-      const providerProgramPath = join(root, 'fake-provider.cjs')
       const platformPreloadPath = join(root, 'force-win32.cjs')
-      const fakeCommandInterpreterPath = join(root, 'fake-cmd.exe')
       const providerArgs = ['--profile', 'test profile']
       await Promise.all([mkdir(providerDirectory), mkdir(stateDirectory)])
 
       try {
         await Promise.all([
-          writeFile(join(providerDirectory, `opencode${extension}`), windowsProviderCommandScript),
-          writeFile(providerProgramPath, providerProgramScript),
+          writeFile(join(providerDirectory, `opencode${extension}`), '@echo off\r\n'),
           writeFile(platformPreloadPath, forceWindowsPlatformScript)
         ])
-        if (process.platform !== 'win32') {
-          await writeFile(fakeCommandInterpreterPath, fakeCommandInterpreterScript)
-          await chmod(fakeCommandInterpreterPath, 0o700)
-        }
 
         const store = new TerminalAgentTelemetryAssetStore({
           platform: 'win32',
@@ -51,18 +39,13 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
         const launcherPath = join(dirname(assets.launchSpecsPath), 'shim-launcher.mjs')
         const environment = createLauncherEnvironment({
           assetsShimDirectory: assets.shimDirectory,
-          capturePath,
-          commandCapturePath,
           extension,
-          exitCode,
-          fakeCommandInterpreterPath,
-          providerArgs,
-          providerDirectory,
-          providerProgramPath
+          providerDirectory
         })
         const launcherArgs = [
           ...(process.platform === 'win32' ? [] : ['--require', platformPreloadPath]),
           launcherPath,
+          '--prepare-windows',
           'opencode',
           'opencode',
           ...providerArgs
@@ -71,17 +54,18 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
         const result = await execute(process.execPath, launcherArgs, environment)
 
         expect(result.stderr).toBe('')
-        expect(result).toMatchObject({ exitCode, signal: null })
-        expect(JSON.parse(await readFile(capturePath, 'utf8'))).toEqual({
-          args: process.platform === 'win32' ? providerArgs : [],
-          electronRunAsNode: null,
-          invocationId: expect.any(String)
+        expect(result).toMatchObject({ exitCode: 0, signal: null })
+        expect(JSON.parse(result.stdout)).toMatchObject({
+          arguments: providerArgs,
+          environment: {
+            CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID: expect.any(String),
+            CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID: 'opencode',
+            OPENCODE_CONFIG_CONTENT: expect.stringContaining('opencode-plugin.mjs')
+          },
+          executable: join(providerDirectory, `opencode${extension}`),
+          invocationId: expect.any(String),
+          temporaryDirectory: null
         })
-        if (process.platform !== 'win32') {
-          const commandArgs = JSON.parse(await readFile(commandCapturePath, 'utf8')) as string[]
-          expect(commandArgs.slice(0, 3)).toEqual(['/d', '/s', '/c'])
-          expect(commandArgs.at(-1)).toContain(`opencode${extension}`)
-        }
       } finally {
         await rm(root, { force: true, recursive: true })
       }
@@ -93,7 +77,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
 describe.runIf(process.platform === 'win32')(
   'ordinary terminal Windows Agent activity ConPTY integration',
   () => {
-    it('preserves the terminal while launching an npm-style Provider through Electron', async () => {
+    it('keeps the shell as terminal owner while launching an npm-style Provider', async () => {
       const root = await mkdtemp(join(tmpdir(), 'cleancode-agent-windows-conpty-'))
       const providerDirectory = join(root, 'provider bin')
       const stateDirectory = join(root, 'state')
@@ -138,19 +122,24 @@ describe.runIf(process.platform === 'win32')(
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_TTY:'), 20_000)
         expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
         expect(output).toContain('CLEANCODE_PROVIDER_ARGS:["--profile","test profile"')
+        expect(output).toContain('CLEANCODE_PROVIDER_ENV:false|true')
 
         shell.write('interactive input\r')
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'), 10_000)
         shell.write(
-          'Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
+          'Write-Output ("CLEANCODE_PROVIDER_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
         )
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_EXIT:0'), 10_000)
         await waitUntil(() => output.includes('CLEANCODE_SHELL_STILL_WRITABLE:1'), 10_000)
 
         shell.write("$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
         shell.write('\x03')
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
-        shell.write("Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'\r")
+        shell.write(
+          'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output \'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT\'\r'
+        )
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_EXIT:130'), 10_000)
         await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'), 10_000)
       } finally {
         if (!exited) {
@@ -163,13 +152,6 @@ describe.runIf(process.platform === 'win32')(
   }
 )
 
-const windowsProviderCommandScript = [
-  '@echo off',
-  '"%CLEANCODE_TEST_NODE%" "%CLEANCODE_TEST_PROVIDER_PROGRAM%" %*',
-  'exit /b %ERRORLEVEL%',
-  ''
-].join('\r\n')
-
 const windowsInteractiveProviderCommandScript = [
   '@echo off',
   '"%CLEANCODE_TEST_NODE%" "%CLEANCODE_TEST_PROVIDER_PROGRAM%" %*',
@@ -181,6 +163,7 @@ const interactiveProviderProgramScript = `
 const tty = [process.stdin, process.stdout, process.stderr].map((stream) => Boolean(stream.isTTY))
 process.stdout.write('CLEANCODE_PROVIDER_TTY:' + tty.join('|') + '\\r\\n')
 process.stdout.write('CLEANCODE_PROVIDER_ARGS:' + JSON.stringify(process.argv.slice(2)) + '\\r\\n')
+process.stdout.write('CLEANCODE_PROVIDER_ENV:' + Boolean(process.env.ELECTRON_RUN_AS_NODE) + '|' + Boolean(process.env.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID) + '\\r\\n')
 if (!tty.every(Boolean)) process.exit(86)
 if (process.env.CLEANCODE_TEST_PROVIDER_MODE === 'signal') {
   process.on('SIGINT', () => {
@@ -199,49 +182,19 @@ if (process.env.CLEANCODE_TEST_PROVIDER_MODE === 'signal') {
 }
 `.trimStart()
 
-const providerProgramScript = `
-const { writeFileSync } = require('node:fs')
-writeFileSync(process.env.CLEANCODE_TEST_CAPTURE_PATH, JSON.stringify({
-  args: process.argv.slice(2),
-  electronRunAsNode: process.env.ELECTRON_RUN_AS_NODE ?? null,
-  invocationId: process.env.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID ?? null
-}))
-process.exit(Number(process.env.CLEANCODE_TEST_PROVIDER_EXIT_CODE || 0))
-`.trimStart()
-
 const forceWindowsPlatformScript = `
 const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')
 if (!descriptor?.configurable) throw new Error('Expected process.platform to be configurable')
 Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' })
 `.trimStart()
 
-const fakeCommandInterpreterScript = `#!${process.execPath}
-const { spawnSync } = require('node:child_process')
-const { writeFileSync } = require('node:fs')
-writeFileSync(process.env.CLEANCODE_TEST_COMMAND_CAPTURE_PATH, JSON.stringify(process.argv.slice(2)))
-const result = spawnSync(
-  process.env.CLEANCODE_TEST_NODE,
-  [process.env.CLEANCODE_TEST_PROVIDER_PROGRAM],
-  { env: process.env, stdio: 'inherit' }
-)
-if (result.error) throw result.error
-process.exit(result.status ?? 1)
-`
-
 function createLauncherEnvironment(input: {
   readonly assetsShimDirectory: string
-  readonly capturePath: string
-  readonly commandCapturePath: string
   readonly extension: '.bat' | '.cmd'
-  readonly exitCode: number
-  readonly fakeCommandInterpreterPath: string
-  readonly providerArgs: readonly string[]
   readonly providerDirectory: string
-  readonly providerProgramPath: string
 }): NodeJS.ProcessEnv {
   const environment = { ...process.env }
   const replacedKeys = new Set([
-    'comspec',
     'electron_run_as_node',
     'opencode_config_content',
     'path',
@@ -252,15 +205,6 @@ function createLauncherEnvironment(input: {
   }
   return {
     ...environment,
-    CLEANCODE_TEST_CAPTURE_PATH: input.capturePath,
-    CLEANCODE_TEST_COMMAND_CAPTURE_PATH: input.commandCapturePath,
-    CLEANCODE_TEST_NODE: process.execPath,
-    CLEANCODE_TEST_PROVIDER_EXIT_CODE: String(input.exitCode),
-    CLEANCODE_TEST_PROVIDER_PROGRAM: input.providerProgramPath,
-    ComSpec:
-      process.platform === 'win32'
-        ? process.env.ComSpec || 'cmd.exe'
-        : input.fakeCommandInterpreterPath,
     ELECTRON_RUN_AS_NODE: '1',
     PATH: [input.assetsShimDirectory, input.providerDirectory, process.env.PATH]
       .filter(Boolean)
@@ -308,20 +252,25 @@ function execute(
   readonly exitCode: number | null
   readonly signal: NodeJS.Signals | null
   readonly stderr: string
+  readonly stdout: string
 }> {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, [...args], {
       env: environment,
       killSignal: 'SIGTERM',
-      stdio: ['ignore', 'ignore', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       timeout: 10_000
     })
     let stderr = ''
+    let stdout = ''
     child.stderr.on('data', (chunk) => {
       stderr += String(chunk)
     })
+    child.stdout.on('data', (chunk) => {
+      stdout += String(chunk)
+    })
     child.once('error', reject)
-    child.once('close', (exitCode, signal) => resolve({ exitCode, signal, stderr }))
+    child.once('close', (exitCode, signal) => resolve({ exitCode, signal, stderr, stdout }))
   })
 }
 
