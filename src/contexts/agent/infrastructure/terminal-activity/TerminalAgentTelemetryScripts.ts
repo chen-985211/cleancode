@@ -280,6 +280,7 @@ import { basename, delimiter, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
+const windowsCommandMetaCharacters = /([()\][%!^"<>&|;, *?])/g;
 const [providerId, commandName, ...originalArgs] = process.argv.slice(2);
 const assetDirectory = dirname(fileURLToPath(import.meta.url));
 const specs = JSON.parse(readFileSync(join(assetDirectory, 'launch-specs.json'), 'utf8'));
@@ -501,7 +502,6 @@ function signalExitCode(signal) {
   return signal ? 128 : 0;
 }
 
-const windowsCommandMetaCharacters = /([()\][%!^"<>&|;, *?])/g;
 function escapeWindowsCommand(value) {
   return String(value).replace(windowsCommandMetaCharacters, '^$1');
 }
