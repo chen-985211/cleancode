@@ -23,7 +23,8 @@ export function createTerminalAgentLaunchSpecs(paths: TerminalAgentTelemetryScri
       codex: {
         appendArgs: ['--config', `notify=${serializeTomlArray([...relay, 'codex'])}`],
         commandName: 'codex',
-        statusTracking: 'completion_only'
+        statusTracking: 'completion_only',
+        windowsConsoleThemeProbe: true
       },
       gemini: {
         commandName: 'gemini',
@@ -251,7 +252,8 @@ async function prepareWindowsLaunch([planPath]) {
     executable: launch.executable,
     invocationId: launch.environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID,
     providerId,
-    temporaryDirectory: launch.temporaryDirectory
+    temporaryDirectory: launch.temporaryDirectory,
+    ...(launch.spec.windowsConsoleThemeProbe === true ? { windowsConsoleThemeProbe: true } : {})
   }), { mode: 0o600 });
 }
 

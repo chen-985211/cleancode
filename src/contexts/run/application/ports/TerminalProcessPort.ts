@@ -1,5 +1,6 @@
 import type { TerminalRunScope } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
+import type { TerminalPrivateOutputControl } from '../dto/TerminalPrivateOutputControl'
 
 export type TerminalLaunchMode = 'command' | 'interactive'
 
@@ -35,6 +36,7 @@ export interface StartTerminalProcessCommand {
   readonly launchMode?: TerminalLaunchMode
   readonly sessionKind?: 'interactive' | 'direct' | 'workflow'
   readonly environment?: Readonly<Record<string, string>>
+  readonly privateOutputControl?: TerminalPrivateOutputControl
   readonly columns: number
   readonly rows: number
   readonly onOutput: (event: TerminalProcessOutputEvent) => void

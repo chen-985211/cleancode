@@ -192,6 +192,7 @@ export class PersistentTerminalProviderClient
           launchMode: command.launchMode,
           sessionKind: command.sessionKind,
           environment: command.environment,
+          privateOutputControl: command.privateOutputControl,
           columns: command.columns,
           rows: command.rows
         }

@@ -7,6 +7,7 @@ import { delimiter, dirname, join } from 'node:path'
 import { spawn as spawnPtyProcess } from 'node-pty'
 
 import { TerminalAgentTelemetryAssetStore } from '../../../../src/contexts/agent/infrastructure/terminal-activity/TerminalAgentTelemetryAssetStore'
+import { NodePtyTerminalProcessAdapter } from '../../../../src/contexts/run/infrastructure/pty/NodePtyTerminalProcessAdapter'
 
 const require = createRequire(import.meta.url)
 const electronExecutable = require('electron') as string
@@ -160,6 +161,7 @@ describe.runIf(process.platform === 'win32')(
           () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'),
           10_000
         )
+        expect(signalOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
         expect(signalOutput()).not.toContain('Terminate batch job')
       } finally {
         if (!exited) {
@@ -169,6 +171,149 @@ describe.runIf(process.platform === 'win32')(
         await rm(root, { force: true, recursive: true })
       }
     }, 40_000)
+
+    it.each([
+      {
+        expectedBackground: 'White',
+        expectedForeground: 'Black',
+        terminalSourceTheme: 'light' as const
+      },
+      {
+        expectedBackground: 'Black',
+        expectedForeground: 'Gray',
+        terminalSourceTheme: 'dark' as const
+      }
+    ])(
+      'bridges $terminalSourceTheme console colors only around each Codex invocation',
+      async ({ expectedBackground, expectedForeground, terminalSourceTheme }) => {
+        const root = await mkdtemp(join(tmpdir(), 'cleancode-agent-windows-console-theme-'))
+        const providerDirectory = join(root, 'provider bin')
+        const stateDirectory = join(root, 'state')
+        const providerProgramPath = join(root, 'interactive-provider.cjs')
+        const sessionId = `windows-console-theme-${terminalSourceTheme}`
+        const token = `0123456789abcdef0123456789abcdef0123456789abcde${terminalSourceTheme === 'light' ? 'f' : '0'}`
+        await Promise.all([mkdir(providerDirectory), mkdir(stateDirectory)])
+        await Promise.all([
+          writeFile(join(providerDirectory, 'codex.cmd'), windowsInteractiveProviderCommandScript),
+          writeFile(
+            join(providerDirectory, 'codex.ps1'),
+            windowsInteractiveProviderPowerShellScript
+          ),
+          writeFile(providerProgramPath, interactiveProviderProgramScript)
+        ])
+
+        const store = new TerminalAgentTelemetryAssetStore({
+          platform: 'win32',
+          runtimeExecutable: electronExecutable,
+          stateDirectory
+        })
+        const assets = await store.ensure()
+        const environment = createConptyEnvironment({
+          assetsShimDirectory: assets.shimDirectory,
+          providerDirectory,
+          providerProgramPath
+        })
+        let output = ''
+        let rawOutput = ''
+        const adapter = new NodePtyTerminalProcessAdapter({
+          runtimePlatform: 'win32',
+          spawnPty: (executable, args, options) => {
+            const process = spawnPtyProcess(executable, args, options)
+            process.onData((data) => {
+              rawOutput += data
+            })
+            return process
+          }
+        })
+
+        try {
+          await adapter.start({
+            columns: 100,
+            environment,
+            onExit: () => undefined,
+            onOutput: (event) => {
+              output += event.data
+            },
+            privateOutputControl: {
+              environment: {
+                CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN: token,
+                CLEANCODE_TERMINAL_SOURCE_THEME: terminalSourceTheme
+              },
+              protocol: 'osc-633-span-v1',
+              token
+            },
+            rows: 30,
+            scope: windowsBlockRunScope(sessionId, root),
+            shell: 'powershell.exe',
+            terminalSourceTheme,
+            workingDirectory: root
+          })
+
+          adapter.write(
+            sessionId,
+            [
+              "Write-Output ('CLEANCODE_OUTER_COLORS_BEFORE:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
+              "$env:CLEANCODE_TEST_PROVIDER_MODE = 'nonzero'",
+              'codex',
+              "Write-Output ('CLEANCODE_PROVIDER_NONZERO_EXIT:' + $LASTEXITCODE)",
+              "Write-Output ('CLEANCODE_OUTER_COLORS_AFTER:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
+              "Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO'"
+            ].join('; ') + '\r'
+          )
+          await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO'), 20_000)
+
+          expect(output).toContain(
+            `CLEANCODE_PROVIDER_CONSOLE_COLORS:${expectedForeground}|${expectedBackground}`
+          )
+          expect(output).toContain('CLEANCODE_PROVIDER_PRIVATE_CONTROL_ENV:False|False')
+          expect(output).toContain('CLEANCODE_PROVIDER_NONZERO_EXIT:23')
+          expect(output).toContain('\x1b[38;2;12;34;56mCLEANCODE_PROVIDER_TRUECOLOR\r\n\x1b[0m')
+          expect(readColorPair(output, 'CLEANCODE_OUTER_COLORS_AFTER')).toEqual(
+            readColorPair(output, 'CLEANCODE_OUTER_COLORS_BEFORE')
+          )
+
+          const signalOutputStart = output.length
+          const signalOutput = () => output.slice(signalOutputStart)
+          adapter.write(sessionId, "$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
+          await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
+          adapter.write(sessionId, '\x03')
+          await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
+          await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
+          adapter.write(
+            sessionId,
+            "Write-Output ('CLEANCODE_PROVIDER_SIGNAL_EXIT:' + $LASTEXITCODE); Write-Output ('CLEANCODE_OUTER_COLORS_AFTER_SIGNAL:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor); Write-Output ('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME); Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL'\r"
+          )
+          await waitUntil(
+            () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL'),
+            10_000
+          )
+
+          expect(signalOutput()).toContain(
+            `CLEANCODE_PROVIDER_CONSOLE_COLORS:${expectedForeground}|${expectedBackground}`
+          )
+          expect(signalOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
+          expect(signalOutput()).toContain('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:True|True')
+          expect(readColorPair(output, 'CLEANCODE_OUTER_COLORS_AFTER_SIGNAL')).toEqual(
+            readColorPair(output, 'CLEANCODE_OUTER_COLORS_BEFORE')
+          )
+          expect(readOutputControlPhases(rawOutput, token)).toEqual([
+            'begin',
+            'end',
+            'begin',
+            'end',
+            'begin',
+            'end',
+            'begin',
+            'end'
+          ])
+          expect(output).not.toContain('CLEANCODE_OUTPUT_CONTROL:')
+        } finally {
+          await adapter.disposeAll()
+          await rm(root, { force: true, recursive: true })
+        }
+      },
+      60_000
+    )
   }
 )
 
@@ -180,6 +325,10 @@ const windowsInteractiveProviderCommandScript = [
 ].join('\r\n')
 
 const windowsInteractiveProviderPowerShellScript = [
+  "[Console]::WriteLine(('CLEANCODE_PROVIDER_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))",
+  "[Console]::WriteLine(('CLEANCODE_PROVIDER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME))",
+  '[Console]::Write(([char]27) + \'[38;2;12;34;56mCLEANCODE_PROVIDER_TRUECOLOR\' + "`r`n")',
+  "if ($env:CLEANCODE_TEST_PROVIDER_MODE -eq 'nonzero') { exit 23 }",
   '& $env:CLEANCODE_TEST_NODE $env:CLEANCODE_TEST_PROVIDER_PROGRAM @args',
   'exit $LASTEXITCODE',
   ''
@@ -269,6 +418,41 @@ function createConptyEnvironment(input: {
       .join(delimiter),
     PATHEXT: '.COM;.EXE;.BAT;.CMD'
   }
+}
+
+function windowsBlockRunScope(sessionId: string, directory: string) {
+  return {
+    blockId: 'terminal-block-1',
+    generation: 1,
+    gitBranch: 'main',
+    owner: { id: 'terminal-block-1', kind: 'block' as const },
+    projectDirectory: directory,
+    projectId: 'project-1',
+    runId: `${sessionId}-run`,
+    sessionId,
+    workspaceDirectory: directory,
+    workspaceId: 'main'
+  }
+}
+
+function readColorPair(output: string, marker: string): readonly [string, string] {
+  const match = output.match(new RegExp(`${marker}:([A-Za-z]+)\\|([A-Za-z]+)`))
+  if (!match?.[1] || !match[2]) {
+    throw new Error(`Missing ${marker} in ConPTY output: ${JSON.stringify(output)}`)
+  }
+  return [match[1], match[2]]
+}
+
+function readOutputControlPhases(output: string, token: string): string[] {
+  const prefix = `\x1b]633;CLEANCODE_OUTPUT_CONTROL:${token}:`
+  return output
+    .split(prefix)
+    .slice(1)
+    .flatMap((suffix) => {
+      if (suffix.startsWith('begin\x07')) return ['begin']
+      if (suffix.startsWith('end\x07')) return ['end']
+      return []
+    })
 }
 
 function execute(

@@ -24,12 +24,19 @@ export class TerminalAgentActivityIntegrationAdapter implements TerminalLaunchEn
     command: Parameters<TerminalLaunchEnvironmentPreparationPort['prepare']>[0]
   ): Promise<PreparedTerminalLaunchEnvironment> {
     try {
-      return await this.input.environment.prepare({
+      const prepared = await this.input.environment.prepare({
         environment: command.environment,
         launchCommand: command.launchCommand,
         shell: command.shell,
+        terminalSourceTheme: command.terminalSourceTheme,
         terminal: toAgentTerminalScope(command.scope)
       })
+      return {
+        environment: prepared.environment,
+        launchCommand: prepared.launchCommand,
+        privateOutputControl: prepared.privateOutputControl,
+        shell: prepared.shell
+      }
     } catch (error) {
       try {
         this.input.logger.warn({

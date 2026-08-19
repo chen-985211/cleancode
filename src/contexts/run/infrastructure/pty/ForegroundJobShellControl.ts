@@ -324,6 +324,17 @@ export function acceptForegroundJobOutput(
   return output
 }
 
+export function acceptForegroundJobFinalOutput(
+  control: ForegroundJobShellControl | null,
+  data: string
+): string {
+  if (!control) return data
+  return acceptForegroundJobOutput(control, data, {
+    onStarted: () => undefined,
+    onExit: () => undefined
+  })
+}
+
 function longestSuffixPrefix(value: string, prefix: string): number {
   const maximum = Math.min(value.length, prefix.length - 1)
   for (let length = maximum; length > 0; length -= 1) {

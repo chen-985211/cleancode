@@ -119,6 +119,11 @@ describe('terminal session service', () => {
     const prepare = vi.fn<TerminalLaunchEnvironmentPreparationPort['prepare']>(async (command) => ({
       environment: { ...command.environment, CLEANCODE_AGENT_ACTIVITY: 'enabled' },
       launchCommand: command.launchCommand,
+      privateOutputControl: {
+        protocol: 'osc-633-span-v1',
+        token: 'private-output-token',
+        environment: { CLEANCODE_PRIVATE_OUTPUT_TOKEN: 'private-output-token' }
+      },
       shell: '/private/activity-shell'
     }))
     const service = new TerminalSessionService(
@@ -135,6 +140,7 @@ describe('terminal session service', () => {
       agentActivityIntegration: true,
       environment: { EXISTING: 'value' },
       terminalBlockId: 'block-1',
+      terminalSourceTheme: 'light',
       onOutput: () => undefined,
       onExit: () => undefined
     })
@@ -153,11 +159,20 @@ describe('terminal session service', () => {
         workspaceId: 'main'
       }),
       sessionKind: 'interactive',
+      terminalSourceTheme: 'light',
       workingDirectory: '/work/app'
     })
     expect(terminalProcessPort.starts[0]?.environment).toMatchObject({
       CLEANCODE_AGENT_ACTIVITY: 'enabled',
       EXISTING: 'value'
+    })
+    expect(terminalProcessPort.starts[0]?.environment).not.toHaveProperty(
+      'CLEANCODE_PRIVATE_OUTPUT_TOKEN'
+    )
+    expect(terminalProcessPort.starts[0]?.privateOutputControl).toEqual({
+      protocol: 'osc-633-span-v1',
+      token: 'private-output-token',
+      environment: { CLEANCODE_PRIVATE_OUTPUT_TOKEN: 'private-output-token' }
     })
     expect(terminalProcessPort.starts[0]?.shell).toBe('/private/activity-shell')
   })
