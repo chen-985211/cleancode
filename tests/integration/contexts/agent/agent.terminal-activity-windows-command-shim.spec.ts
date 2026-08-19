@@ -119,7 +119,9 @@ describe.runIf(process.platform === 'win32')(
 
       try {
         shell.write('codex --profile "test profile"\r')
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_TTY:'), 20_000)
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_TTY:'), 20_000).catch(() => {
+          throw new Error(`Provider did not start. ConPTY output: ${JSON.stringify(output)}`)
+        })
         expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
         expect(output).toContain('CLEANCODE_PROVIDER_ARGS:["--profile","test profile"')
         expect(output).toContain('CLEANCODE_PROVIDER_ENV:false|true')
