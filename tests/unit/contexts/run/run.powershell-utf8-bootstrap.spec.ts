@@ -54,8 +54,41 @@ describe('PowerShell UTF-8 bootstrap', () => {
     const arguments_ = createWindowsPowerShellLaunchArguments(undefined, sample.keepOpen)
 
     expect(arguments_.slice(0, sample.expectedPrefix.length)).toEqual(sample.expectedPrefix)
-    expect(decodeEncodedCommand(arguments_)).toBe(expectedBootstrap)
+    expect(decodeEncodedCommand(arguments_).startsWith(`${expectedBootstrap}\n`)).toBe(true)
   })
+
+  it.each([
+    {
+      terminalSourceTheme: 'light' as const,
+      expectedForeground: 'Black',
+      expectedBackground: 'White'
+    },
+    {
+      terminalSourceTheme: 'dark' as const,
+      expectedForeground: 'Gray',
+      expectedBackground: 'Black'
+    }
+  ])(
+    'pins $terminalSourceTheme console colors in an ordinary Windows shell bootstrap',
+    ({ terminalSourceTheme, expectedForeground, expectedBackground }) => {
+      const arguments_ = createWindowsPowerShellLaunchArguments(
+        undefined,
+        true,
+        terminalSourceTheme
+      )
+      const startupScript = decodeEncodedCommand(arguments_)
+      const outputEncodingIndex = startupScript.indexOf('[Console]::OutputEncoding')
+      const foregroundIndex = startupScript.indexOf(
+        `[Console]::ForegroundColor = [ConsoleColor]::${expectedForeground}`
+      )
+      const backgroundIndex = startupScript.indexOf(
+        `[Console]::BackgroundColor = [ConsoleColor]::${expectedBackground}`
+      )
+
+      expect(foregroundIndex).toBeGreaterThan(outputEncodingIndex)
+      expect(backgroundIndex).toBeGreaterThan(foregroundIndex)
+    }
+  )
 
   it('falls back to the unchanged raw command when the encoded wrapper exceeds its limit', () => {
     const command = `Write-Output '${'x'.repeat(11_000)}'`

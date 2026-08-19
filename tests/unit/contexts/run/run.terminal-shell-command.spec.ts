@@ -18,6 +18,34 @@ describe('terminal shell command', () => {
     }
   )
 
+  it.each([
+    {
+      terminalSourceTheme: 'light' as const,
+      expectedForeground: 'Black',
+      expectedBackground: 'White'
+    },
+    {
+      terminalSourceTheme: 'dark' as const,
+      expectedForeground: 'Gray',
+      expectedBackground: 'Black'
+    }
+  ])(
+    'passes the $terminalSourceTheme into an ordinary Windows PowerShell shell',
+    ({ terminalSourceTheme, expectedForeground, expectedBackground }) => {
+      const launch = createTerminalProcessLaunch(
+        'powershell.exe',
+        undefined,
+        'command',
+        'win32',
+        terminalSourceTheme
+      )
+      const script = decodePowerShellCommand(launch.arguments)
+
+      expect(script).toContain(`[Console]::ForegroundColor = [ConsoleColor]::${expectedForeground}`)
+      expect(script).toContain(`[Console]::BackgroundColor = [ConsoleColor]::${expectedBackground}`)
+    }
+  )
+
   it('does not add Windows PowerShell startup arguments on a non-Windows platform', () => {
     expect(createTerminalProcessLaunch('pwsh', undefined, 'command', 'darwin')).toEqual({
       executable: 'pwsh',

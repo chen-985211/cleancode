@@ -16,7 +16,7 @@ import { resolveTerminalShellExecutable } from '../../../../src/contexts/run/inf
 import { WindowsConptyWarmup } from '../../../../src/contexts/run/infrastructure/pty/WindowsConptyWarmup'
 import { createDeferred } from '../../../fixtures/deferred'
 
-describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process adapter', () => {
+describe.runIf(process.platform === 'win32')('Windows pty terminal process adapter', () => {
   let adapter: NodePtyTerminalProcessAdapter
   let model: HeadlessTerminalModelAdapter
   let workingDirectory: string
@@ -172,6 +172,42 @@ describe.runIf(process.platform === 'win32')('Windows Agent pty terminal process
       }
     },
     40_000
+  )
+
+  it.each([
+    { terminalSourceTheme: 'light' as const, expectedConsoleColors: 'Black|White' },
+    { terminalSourceTheme: 'dark' as const, expectedConsoleColors: 'Gray|Black' }
+  ])(
+    'pins the $terminalSourceTheme Windows console fallback for an ordinary terminal shell',
+    async ({ terminalSourceTheme, expectedConsoleColors }) => {
+      const sessionId = `windows-terminal-${terminalSourceTheme}-console-colors`
+      let output = ''
+
+      try {
+        await startTerminal({
+          scope: blockRunScope(sessionId),
+          workingDirectory,
+          shell: 'powershell.exe',
+          terminalSourceTheme,
+          columns: 80,
+          rows: 24,
+          onOutput: (event) => {
+            output += event.data
+          },
+          onExit: () => undefined
+        })
+        adapter.write(
+          sessionId,
+          "[Console]::WriteLine(('CLEANCODE_TERMINAL_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))\r"
+        )
+
+        await waitUntil(() => output.includes('CLEANCODE_TERMINAL_CONSOLE_COLORS:'))
+        expect(output).toContain(`CLEANCODE_TERMINAL_CONSOLE_COLORS:${expectedConsoleColors}`)
+      } finally {
+        await adapter.stop(sessionId)
+      }
+    },
+    20_000
   )
 
   it.each([

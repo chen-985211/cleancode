@@ -309,13 +309,15 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
             shell,
             windowsAgentShellReadyCommand,
             'interactive',
-            this.runtimePlatform
+            this.runtimePlatform,
+            command.terminalSourceTheme
           )
         : createTerminalProcessLaunch(
             shell,
             command.launchCommand,
             command.launchMode,
-            this.runtimePlatform
+            this.runtimePlatform,
+            command.terminalSourceTheme
           )
       const spawnOptions = {
         name: terminalEmulationName,

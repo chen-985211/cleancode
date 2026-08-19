@@ -2,6 +2,7 @@ import { platform } from 'node:os'
 
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalLaunchMode } from '../../application/ports/TerminalProcessPort'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createWindowsPowerShellLaunchArguments } from './PowerShellUtf8Bootstrap'
 
 export interface TerminalProcessLaunch {
@@ -13,13 +14,15 @@ export function createTerminalProcessLaunch(
   shell: string,
   launchCommand: string | undefined,
   launchMode: TerminalLaunchMode = 'command',
-  runtimePlatform: NodeJS.Platform = platform()
+  runtimePlatform: NodeJS.Platform = platform(),
+  terminalSourceTheme: TerminalSourceTheme = 'dark'
 ): TerminalProcessLaunch {
   const arguments_ = createTerminalShellCommandArguments(
     shell,
     launchCommand,
     launchMode,
-    runtimePlatform
+    runtimePlatform,
+    terminalSourceTheme
   )
   if (!launchCommand || launchMode === 'command') {
     return { executable: shell, arguments: arguments_ }
@@ -49,13 +52,14 @@ function createTerminalShellCommandArguments(
   shell: string,
   launchCommand: string | undefined,
   launchMode: TerminalLaunchMode,
-  runtimePlatform: NodeJS.Platform
+  runtimePlatform: NodeJS.Platform,
+  terminalSourceTheme: TerminalSourceTheme
 ): readonly string[] {
   const shellName = getShellName(shell)
 
   if (!launchCommand) {
     return runtimePlatform === 'win32' && (shellName === 'powershell' || shellName === 'pwsh')
-      ? createWindowsPowerShellLaunchArguments(undefined, true)
+      ? createWindowsPowerShellLaunchArguments(undefined, true, terminalSourceTheme)
       : []
   }
 
@@ -67,7 +71,11 @@ function createTerminalShellCommandArguments(
   }
   if (shellName === 'powershell' || shellName === 'pwsh') {
     return runtimePlatform === 'win32'
-      ? createWindowsPowerShellLaunchArguments(launchCommand, launchMode === 'interactive')
+      ? createWindowsPowerShellLaunchArguments(
+          launchCommand,
+          launchMode === 'interactive',
+          terminalSourceTheme
+        )
       : ['-NoLogo', ...(launchMode === 'interactive' ? ['-NoExit'] : []), '-Command', launchCommand]
   }
   if (shellName === 'cmd') {
