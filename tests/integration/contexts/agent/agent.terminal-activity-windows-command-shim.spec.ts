@@ -28,7 +28,15 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
       try {
         await Promise.all([
           writeFile(join(providerDirectory, `opencode${extension}`), '@echo off\r\n'),
-          writeFile(platformPreloadPath, forceWindowsPlatformScript)
+          writeFile(platformPreloadPath, forceWindowsPlatformScript),
+          writeFile(
+            planPath,
+            JSON.stringify({
+              arguments: providerArgs,
+              commandName: 'opencode',
+              providerId: 'opencode'
+            })
+          )
         ])
 
         const store = new TerminalAgentTelemetryAssetStore({
@@ -47,10 +55,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
           ...(process.platform === 'win32' ? [] : ['--require', platformPreloadPath]),
           launcherPath,
           '--prepare-windows',
-          planPath,
-          'opencode',
-          'opencode',
-          ...providerArgs
+          planPath
         ]
 
         const result = await execute(process.execPath, launcherArgs, environment)
@@ -66,6 +71,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
           },
           executable: join(providerDirectory, `opencode${extension}`),
           invocationId: expect.any(String),
+          providerId: 'opencode',
           temporaryDirectory: null
         })
       } finally {

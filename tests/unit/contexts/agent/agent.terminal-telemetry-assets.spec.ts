@@ -91,11 +91,13 @@ describe('terminal Agent telemetry assets', () => {
       expect(powerShellShim).toContain('$previousElectronRunAsNode')
       expect(powerShellShim).toContain('$previousElectronNoAttachConsole')
       expect(powerShellShim).toContain('$planPath = [IO.Path]::GetTempFileName()')
-      expect(powerShellShim).toContain("'--prepare-windows'")
+      expect(powerShellShim).toContain('"--prepare-windows"')
+      expect(powerShellShim).toContain('Start-Process')
+      expect(powerShellShim).toContain('-NoNewWindow -PassThru -Wait')
       expect(powerShellShim).toContain('Get-Content -LiteralPath $planPath -Raw')
       expect(powerShellShim).toContain('$providerArguments = @($plan.arguments)')
       expect(powerShellShim).toContain('& $providerExecutable @providerArguments')
-      expect(powerShellShim).toContain("'--complete-windows'")
+      expect(powerShellShim).toContain('"--complete-windows"')
       expect(powerShellShim).toContain(
         'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue'
       )

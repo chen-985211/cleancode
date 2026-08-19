@@ -233,7 +233,11 @@ if (operation === '--prepare-windows') await prepareWindowsLaunch(input);
 else if (operation === '--complete-windows') await completeWindowsLaunch(input);
 else await runProvider([operation, ...input]);
 
-async function prepareWindowsLaunch([planPath, providerId, commandName, ...originalArgs]) {
+async function prepareWindowsLaunch([planPath]) {
+  const request = JSON.parse(readFileSync(planPath, 'utf8'));
+  const providerId = String(request.providerId || '');
+  const commandName = String(request.commandName || '');
+  const originalArgs = Array.isArray(request.arguments) ? request.arguments.map(String) : [];
   const launch = createLaunch(providerId, commandName, originalArgs);
   if (!launch) {
     process.exitCode = 127;
@@ -246,11 +250,13 @@ async function prepareWindowsLaunch([planPath, providerId, commandName, ...origi
     environment: providerEnvironment(launch.spec, launch.environment),
     executable: launch.executable,
     invocationId: launch.environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID,
+    providerId,
     temporaryDirectory: launch.temporaryDirectory
   }), { mode: 0o600 });
 }
 
-async function completeWindowsLaunch([providerId, invocationId, temporaryDirectory]) {
+async function completeWindowsLaunch([planPath]) {
+  const { invocationId, providerId, temporaryDirectory } = JSON.parse(readFileSync(planPath, 'utf8'));
   const environment = { ...process.env };
   delete environment.ELECTRON_RUN_AS_NODE;
   environment.CLEANCODE_AGENT_ACTIVITY_PROVIDER_ID = providerId;
