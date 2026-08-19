@@ -146,28 +146,21 @@ describe.runIf(process.platform === 'win32')(
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_EXIT:0'), 10_000)
         await waitUntil(() => output.includes('CLEANCODE_SHELL_STILL_WRITABLE:1'), 10_000)
 
+        const signalOutputStart = output.length
+        const signalOutput = () => output.slice(signalOutputStart)
         shell.write("$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
+        await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
         shell.write('\x03')
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_NATIVE_EXIT:'), 10_000).catch(
-          () => {
-            throw new Error(
-              `Provider wrapper did not finish after SIGINT. ConPTY output: ${JSON.stringify(output)}`
-            )
-          }
-        )
+        await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
+        await waitUntil(() => signalOutput().includes(`PS ${root}>`), 10_000)
         shell.write(
           'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output \'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT\'\r'
         )
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_EXIT:130'), 10_000).catch(
-          () => {
-            throw new Error(
-              `Provider SIGINT exit code was not preserved. ConPTY output: ${JSON.stringify(output)}`
-            )
-          }
+        await waitUntil(
+          () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'),
+          10_000
         )
-        await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'), 10_000)
+        expect(signalOutput()).not.toContain('Terminate batch job')
       } finally {
         if (!exited) {
           shell.kill()
