@@ -152,7 +152,7 @@ describe.runIf(process.platform === 'win32')(
         await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
         shell.write('\x03')
         await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
-        await waitUntil(() => signalOutput().includes(`PS ${root}>`), 10_000)
+        await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
         shell.write(
           'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output \'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT\'\r'
         )
