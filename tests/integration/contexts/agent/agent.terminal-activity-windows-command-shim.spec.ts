@@ -129,7 +129,7 @@ describe.runIf(process.platform === 'win32')(
         shell.write(
           '$resolved = Get-Command codex; Write-Output ("CLEANCODE_RESOLVED:" + $resolved.CommandType + "|" + $resolved.Source); codex --profile "test profile"; Write-Output ("CLEANCODE_WRAPPER_EXIT:" + $LASTEXITCODE)\r'
         )
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_TTY:'), 20_000).catch(() => {
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_ENV:'), 20_000).catch(() => {
           throw new Error(`Provider did not start. ConPTY output: ${JSON.stringify(output)}`)
         })
         expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
