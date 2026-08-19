@@ -148,10 +148,23 @@ describe.runIf(process.platform === 'win32')(
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
         shell.write('\x03')
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_NATIVE_EXIT:'), 10_000).catch(
+          () => {
+            throw new Error(
+              `Provider wrapper did not finish after SIGINT. ConPTY output: ${JSON.stringify(output)}`
+            )
+          }
+        )
         shell.write(
           'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output \'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT\'\r'
         )
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_EXIT:130'), 10_000)
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_EXIT:130'), 10_000).catch(
+          () => {
+            throw new Error(
+              `Provider SIGINT exit code was not preserved. ConPTY output: ${JSON.stringify(output)}`
+            )
+          }
+        )
         await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'), 10_000)
       } finally {
         if (!exited) {
