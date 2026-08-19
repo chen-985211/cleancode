@@ -47,7 +47,7 @@ idle -> running -> stopping -> exited
 
 会话还记录 `kind`、退出保留策略、恢复类型和不可变的 `terminalSourceTheme`。新 generation 从当前有效应用主题取得 `dark` 或 `light`；同一 generation 的普通启动、快速启动、受管服务、工作流、可见重挂载和恢复都必须沿用该值，应用主题切换不得改写它。`interactive` 与非工作流 `direct` 会话默认使用 `terminate-on-application-exit`，用户只可对当前运行的 block-owned 会话明确切换为 `keep-after-application-exit`。replacement 通常创建使用默认策略的新会话；唯一继承入口是用户从已保留的当前普通会话执行“启动命令”，此时新建的非工作流 `direct` 会话在自身 checkpoint 成功后继承保留策略。重开空会话、新建终端、工作流启动及其他 replacement 不继承。`workflow` 和 agent-owned terminal 永远不能启用退出保留；领域聚合必须同时拒绝新设置与携带非法策略的 live 恢复资料。恢复类型固定为 `fresh`、`warm`、`historical`、`ended`：只有 `warm` 可以同时声称进程仍运行；`historical` 必须没有进程 ID、不能写入或中断。
 
-终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，Windows 普通 PowerShell bootstrap 和 Agent 前台启动则共用只选择会被同一 xterm palette 映射的 ConsoleColor 索引的脚本生成器，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
+终端完整浅色/深色色板只在 `src/presentation/app-shell/styles/theme.css` 中维护一次；`node scripts/check-theme.mjs --write-terminal-palette` 从这些声明确定性生成 `TerminalPalette.generated.ts`，`pnpm check:theme` 拒绝缺失或陈旧产物。Run 的隐藏模型与 Presentation 的 xterm 都消费该生成模块，Windows Agent 前台启动则只选择会被同一 xterm palette 映射的 ConsoleColor 索引，不能再各自手写默认前景、背景或 ANSI 色值。`terminalSourceTheme` 只选择固定 generation 对应的 canonical palette，不把当前应用主题或 Provider CLI 的用户主题变成 Run 会话事实。
 
 ## 会话身份与隔离
 
@@ -129,7 +129,7 @@ Provider Client 的全局普通终端输出投影只接收 block-owned terminal�
 
 因此，普通终端与 Agent terminal 的 renderer xterm 都是可丢弃投影，不是输出历史、屏幕状态或恢复资格的事实来源。隐藏终端不接收逐字节输出；macOS/Linux 的 terminal query 在任意时刻只能有一个响应者。OSC 10/11 默认前景色和背景色查询始终由权威 headless model 使用固定源主题回答，使协议响应不依赖可延迟的 renderer workload；可见 renderer xterm 必须消费同一查询但不再次响应。其他 terminal query 在视图接管期间继续由模型消费但不响应，并由当前 renderer xterm 唯一响应。
 
-Windows 系统 ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的 OSC 查询和鼠标模式，只输出 screen buffer 差异；这会同时破坏默认颜色查询和可见 xterm 的鼠标输入。Run 因此固定启用 node-pty 随包的 ConPTY DLL，使完整 VT 序列进入既有模型/视图交接链路；OSC 10/11 由权威 headless model 唯一响应，其他查询由隐藏模型或当前 renderer xterm 中的一个响应。Codex 等客户端只有很短的查询窗口，若响应未及时返回，会通过 `GetConsoleScreenBufferInfoEx` 同步读取 ConsoleColor；Windows 普通 PowerShell 必须在接受用户命令之前、Agent foreground transport 必须在 Provider 进程 started 之前，分别通过同一生成器把 ConsoleColor 固定到 generation 的源主题。该 fallback 必须立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。普通 shell 的颜色准备属于无输出 bootstrap；Agent 的准备发生在 `awaiting_started` 内且不得进入模型或视图。两条路径都不得向尚未查询的进程输入预置 OSC 响应。
+Windows 系统 ConPTY 会在 `node-pty.onData` 之前消费部分原生 TUI 通过 Console handle 发出的 OSC 查询和鼠标模式，只输出 screen buffer 差异；这会同时破坏默认颜色查询和可见 xterm 的鼠标输入。Run 因此固定启用 node-pty 随包的 ConPTY DLL，使完整 VT 序列进入既有模型/视图交接链路；OSC 10/11 由权威 headless model 唯一响应，其他查询由隐藏模型或当前 renderer xterm 中的一个响应。Windows Agent foreground transport 仍必须在 Provider 进程 started 之前把 ConsoleColor 固定到 generation 的源主题：Codex 等客户端只有很短的查询窗口，若响应未及时返回，会通过 `GetConsoleScreenBufferInfoEx` 同步读取 ConsoleColor。该 fallback 必须立即得到浅色 `Black`/`White` 或深色 `Gray`/`Black`，并由可见 xterm 的 canonical ANSI palette 映射为实际颜色。颜色准备发生在 `awaiting_started` 内，不得进入模型或视图；不得向尚未查询的进程输入预置 OSC 响应。
 
 ## 输入与安全打开边界
 

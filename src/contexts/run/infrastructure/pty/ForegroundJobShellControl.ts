@@ -8,7 +8,6 @@ import type {
   LaunchForegroundJobProcessCommand
 } from '../../application/ports/TerminalProcessPort'
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
-import { createPowerShellConsoleThemeScript } from './PowerShellConsoleTheme'
 import { getPowerShellUtf8Bootstrap } from './PowerShellUtf8Bootstrap'
 
 const posixMarkerStart = '\x1eCLEANCODE_JOB:'
@@ -165,6 +164,10 @@ function createPowerShellLaunchScript(
     (argument) => `  (Decode-CleancodeJobValue '${encodePowerShellValue(argument)}')`
   )
   const nativeArguments = encodePowerShellValue(createWindowsProcessArguments(command.args))
+  const consoleColors =
+    terminalSourceTheme === 'light'
+      ? { background: 'White', foreground: 'Black' }
+      : { background: 'Black', foreground: 'Gray' }
   return (
     [
       '$cleancodeJobEncoding = [System.Text.Encoding]::UTF8',
@@ -182,9 +185,8 @@ function createPowerShellLaunchScript(
       ...getPowerShellUtf8Bootstrap()
         .split('\n')
         .map((line) => `  ${line}`),
-      ...createPowerShellConsoleThemeScript(terminalSourceTheme)
-        .split('\n')
-        .map((line) => `  ${line}`),
+      `  [Console]::ForegroundColor = [ConsoleColor]::${consoleColors.foreground}`,
+      `  [Console]::BackgroundColor = [ConsoleColor]::${consoleColors.background}`,
       `  [Console]::Write(([char]27) + ']633;CLEANCODE_JOB:${token}:started' + ([char]7))`,
       '  $cleancodeJobCommand = Get-Command -Name $cleancodeJobExecutable -ErrorAction Stop | Select-Object -First 1',
       '  $cleancodeJobInvocation = $cleancodeJobCommand.Path',

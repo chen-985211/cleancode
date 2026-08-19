@@ -1,6 +1,3 @@
-import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
-import { createPowerShellConsoleThemeScript } from './PowerShellConsoleTheme'
-
 // Preserve margin below CreateProcess' 32,767-character command-line boundary.
 const encodedCommandLengthLimit = 28_000
 const powerShellUtf8Bootstrap = [
@@ -25,16 +22,14 @@ export function encodePowerShellCommand(script: string): string {
 
 export function createWindowsPowerShellLaunchArguments(
   command: string | undefined,
-  keepOpen: boolean,
-  terminalSourceTheme: TerminalSourceTheme = 'dark'
+  keepOpen: boolean
 ): readonly string[] {
   const prefix = keepOpen ? ['-NoLogo', '-NoExit'] : ['-NoLogo']
-  const terminalBootstrap = createPowerShellTerminalBootstrap(terminalSourceTheme)
   if (command === undefined) {
-    return [...prefix, '-EncodedCommand', encodePowerShellCommand(terminalBootstrap)]
+    return [...prefix, '-EncodedCommand', encodePowerShellCommand(powerShellUtf8Bootstrap)]
   }
 
-  const startupScript = createPowerShellStartupScript(command, terminalBootstrap)
+  const startupScript = createPowerShellStartupScript(command)
   const encodedCommand = encodePowerShellCommand(startupScript)
   if (encodedCommand.length <= encodedCommandLengthLimit) {
     return [...prefix, '-EncodedCommand', encodedCommand]
@@ -42,19 +37,13 @@ export function createWindowsPowerShellLaunchArguments(
   return [...prefix, '-Command', command]
 }
 
-function createPowerShellTerminalBootstrap(terminalSourceTheme: TerminalSourceTheme): string {
-  return [powerShellUtf8Bootstrap, createPowerShellConsoleThemeScript(terminalSourceTheme)].join(
-    '\n'
-  )
-}
-
-function createPowerShellStartupScript(command: string, terminalBootstrap: string): string {
+function createPowerShellStartupScript(command: string): string {
   // Invoke-Expression parses the user's source independently, so leading
   // using/param declarations stay valid and execution remains in local scope.
   // Unlike ScriptBlock.Create, the built-in cmdlet remains usable in
   // ConstrainedLanguage sessions enforced by AppLocker or App Control.
   const invocation = `Microsoft.PowerShell.Utility\\Invoke-Expression -Command ${quotePowerShellString(command)}`
-  return `${terminalBootstrap}\n${invocation}`
+  return `${powerShellUtf8Bootstrap}\n${invocation}`
 }
 
 function quotePowerShellString(value: string): string {

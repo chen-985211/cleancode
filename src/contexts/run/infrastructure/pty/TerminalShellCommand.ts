@@ -2,7 +2,6 @@ import { platform } from 'node:os'
 
 import { createExpectedAppError } from '../../../../shared-kernel/application/errors/AppError'
 import type { TerminalLaunchMode } from '../../application/ports/TerminalProcessPort'
-import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createWindowsPowerShellLaunchArguments } from './PowerShellUtf8Bootstrap'
 
 export interface TerminalProcessLaunch {
@@ -14,15 +13,13 @@ export function createTerminalProcessLaunch(
   shell: string,
   launchCommand: string | undefined,
   launchMode: TerminalLaunchMode = 'command',
-  runtimePlatform: NodeJS.Platform = platform(),
-  terminalSourceTheme: TerminalSourceTheme = 'dark'
+  runtimePlatform: NodeJS.Platform = platform()
 ): TerminalProcessLaunch {
   const arguments_ = createTerminalShellCommandArguments(
     shell,
     launchCommand,
     launchMode,
-    runtimePlatform,
-    terminalSourceTheme
+    runtimePlatform
   )
   if (!launchCommand || launchMode === 'command') {
     return { executable: shell, arguments: arguments_ }
@@ -52,14 +49,13 @@ function createTerminalShellCommandArguments(
   shell: string,
   launchCommand: string | undefined,
   launchMode: TerminalLaunchMode,
-  runtimePlatform: NodeJS.Platform,
-  terminalSourceTheme: TerminalSourceTheme
+  runtimePlatform: NodeJS.Platform
 ): readonly string[] {
   const shellName = getShellName(shell)
 
   if (!launchCommand) {
     return runtimePlatform === 'win32' && (shellName === 'powershell' || shellName === 'pwsh')
-      ? createWindowsPowerShellLaunchArguments(undefined, true, terminalSourceTheme)
+      ? createWindowsPowerShellLaunchArguments(undefined, true)
       : []
   }
 
@@ -71,11 +67,7 @@ function createTerminalShellCommandArguments(
   }
   if (shellName === 'powershell' || shellName === 'pwsh') {
     return runtimePlatform === 'win32'
-      ? createWindowsPowerShellLaunchArguments(
-          launchCommand,
-          launchMode === 'interactive',
-          terminalSourceTheme
-        )
+      ? createWindowsPowerShellLaunchArguments(launchCommand, launchMode === 'interactive')
       : ['-NoLogo', ...(launchMode === 'interactive' ? ['-NoExit'] : []), '-Command', launchCommand]
   }
   if (shellName === 'cmd') {
