@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
@@ -20,6 +20,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
       const root = await mkdtemp(join(tmpdir(), 'cleancode-agent-windows-command-'))
       const providerDirectory = join(root, 'provider bin')
       const stateDirectory = join(root, 'state')
+      const planPath = join(root, 'launch-plan.json')
       const platformPreloadPath = join(root, 'force-win32.cjs')
       const providerArgs = ['--profile', 'test profile']
       await Promise.all([mkdir(providerDirectory), mkdir(stateDirectory)])
@@ -46,6 +47,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
           ...(process.platform === 'win32' ? [] : ['--require', platformPreloadPath]),
           launcherPath,
           '--prepare-windows',
+          planPath,
           'opencode',
           'opencode',
           ...providerArgs
@@ -55,7 +57,7 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
 
         expect(result.stderr).toBe('')
         expect(result).toMatchObject({ exitCode: 0, signal: null })
-        expect(JSON.parse(result.stdout)).toMatchObject({
+        expect(JSON.parse(await readFile(planPath, 'utf8'))).toMatchObject({
           arguments: providerArgs,
           environment: {
             CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID: expect.any(String),

@@ -90,7 +90,9 @@ describe('terminal Agent telemetry assets', () => {
       expect(commandShim).not.toContain('CleanCode.exe')
       expect(powerShellShim).toContain('$previousElectronRunAsNode')
       expect(powerShellShim).toContain('$previousElectronNoAttachConsole')
+      expect(powerShellShim).toContain('$planPath = [IO.Path]::GetTempFileName()')
       expect(powerShellShim).toContain("'--prepare-windows'")
+      expect(powerShellShim).toContain('Get-Content -LiteralPath $planPath -Raw')
       expect(powerShellShim).toContain('& $plan.executable @($plan.arguments)')
       expect(powerShellShim).toContain("'--complete-windows'")
       expect(powerShellShim).toContain(

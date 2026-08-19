@@ -233,7 +233,7 @@ if (operation === '--prepare-windows') await prepareWindowsLaunch(input);
 else if (operation === '--complete-windows') await completeWindowsLaunch(input);
 else await runProvider([operation, ...input]);
 
-async function prepareWindowsLaunch([providerId, commandName, ...originalArgs]) {
+async function prepareWindowsLaunch([planPath, providerId, commandName, ...originalArgs]) {
   const launch = createLaunch(providerId, commandName, originalArgs);
   if (!launch) {
     process.exitCode = 127;
@@ -241,13 +241,13 @@ async function prepareWindowsLaunch([providerId, commandName, ...originalArgs]) 
   }
   const initialStatus = launch.spec.statusTracking === 'full' ? 'idle' : 'unavailable';
   await reportAgentActivity(providerId, launch.environment, { status: initialStatus, type: 'status_changed' }, 250);
-  process.stdout.write(JSON.stringify({
+  writeFileSync(planPath, JSON.stringify({
     arguments: launch.args,
     environment: providerEnvironment(launch.spec, launch.environment),
     executable: launch.executable,
     invocationId: launch.environment.CLEANCODE_AGENT_ACTIVITY_INVOCATION_ID,
     temporaryDirectory: launch.temporaryDirectory
-  }));
+  }), { mode: 0o600 });
 }
 
 async function completeWindowsLaunch([providerId, invocationId, temporaryDirectory]) {
