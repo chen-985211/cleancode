@@ -93,7 +93,8 @@ describe('terminal Agent telemetry assets', () => {
       expect(powerShellShim).toContain('$planPath = [IO.Path]::GetTempFileName()')
       expect(powerShellShim).toContain("'--prepare-windows'")
       expect(powerShellShim).toContain('Get-Content -LiteralPath $planPath -Raw')
-      expect(powerShellShim).toContain('& $plan.executable @($plan.arguments)')
+      expect(powerShellShim).toContain('$providerArguments = @($plan.arguments)')
+      expect(powerShellShim).toContain('& $providerExecutable @providerArguments')
       expect(powerShellShim).toContain("'--complete-windows'")
       expect(powerShellShim).toContain(
         'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue'
