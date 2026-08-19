@@ -278,7 +278,7 @@ function escapePowerShell(value: string): string {
 
 export const terminalAgentShimLauncherScript = String.raw`
 import { randomUUID } from 'node:crypto';
-import { accessSync, constants, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, closeSync, constants, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, delimiter, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -368,18 +368,23 @@ async function reportAgentActivity(provider, environment, signal, timeoutMs) {
 
 function spawnProvider(executable, args, environment, signalForwarder) {
   const extension = extname(executable).toLowerCase();
+  const standardIo = createProviderStandardIo();
   let child;
-  if (process.platform !== 'win32' || !['.bat', '.cmd'].includes(extension)) {
-    child = spawn(executable, args, { env: environment, stdio: 'inherit' });
-  } else {
-    const command = escapeWindowsCommand(executable);
-    const escapedArgs = args.map((arg) => escapeWindowsArgument(arg, true));
-    const shellCommand = [command, ...escapedArgs].join(' ');
-    child = spawn(environment.comspec || environment.ComSpec || 'cmd.exe', ['/d', '/s', '/c', '"' + shellCommand + '"'], {
-      env: environment,
-      stdio: 'inherit',
-      windowsVerbatimArguments: true
-    });
+  try {
+    if (process.platform !== 'win32' || !['.bat', '.cmd'].includes(extension)) {
+      child = spawn(executable, args, { env: environment, stdio: standardIo.value });
+    } else {
+      const command = escapeWindowsCommand(executable);
+      const escapedArgs = args.map((arg) => escapeWindowsArgument(arg, true));
+      const shellCommand = [command, ...escapedArgs].join(' ');
+      child = spawn(environment.comspec || environment.ComSpec || 'cmd.exe', ['/d', '/s', '/c', '"' + shellCommand + '"'], {
+        env: environment,
+        stdio: standardIo.value,
+        windowsVerbatimArguments: true
+      });
+    }
+  } finally {
+    standardIo.dispose();
   }
   return new Promise((resolve) => {
     let error = null;
@@ -399,6 +404,21 @@ function spawnProvider(executable, args, environment, signalForwarder) {
     });
     child.once('close', (status, signal) => settle({ error, signal, status }));
   });
+}
+
+function createProviderStandardIo() {
+  if (process.platform !== 'win32' || process.stdin.isTTY) {
+    return { dispose() {}, value: 'inherit' };
+  }
+  try {
+    const consoleInput = openSync('CONIN$', 'r');
+    return {
+      dispose() { closeSync(consoleInput); },
+      value: [consoleInput, 'inherit', 'inherit']
+    };
+  } catch {
+    return { dispose() {}, value: 'inherit' };
+  }
 }
 
 function createSignalForwarder() {

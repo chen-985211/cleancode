@@ -110,6 +110,7 @@ describe('terminal Agent telemetry assets', () => {
       expect(shimLauncher).toContain("type: 'invocation_exited'")
       expect(shimLauncher).toContain('windowsVerbatimArguments: true')
       expect(shimLauncher).toContain('escapeWindowsArgument(arg, true)')
+      expect(shimLauncher).toContain("openSync('CONIN$', 'r')")
       expect(
         await readFile(join(assets.rootDirectory, 'assets-v1', 'hook-relay.cmd'), 'utf8')
       ).toContain('hook-relay.mjs')
