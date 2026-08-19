@@ -109,6 +109,9 @@ describe.runIf(process.platform === 'win32')(
         providerDirectory,
         providerProgramPath
       })
+      const completionToken = 'shell-owner'
+      const promptMarker = `CLEANCODE_TEST_PROMPT:${completionToken}`
+      environment.CLEANCODE_TEST_COMPLETION_TOKEN = completionToken
       let output = ''
       let exited = false
       const shell = spawnPtyProcess('powershell.exe', ['-NoLogo', '-NoProfile'], {
@@ -128,41 +131,100 @@ describe.runIf(process.platform === 'win32')(
       })
 
       try {
+        shell.write(windowsPowerShellReadinessCommand)
+        await waitUntil(
+          () => includesInOrder(output, `CLEANCODE_SHELL_READY:${completionToken}`, promptMarker),
+          10_000,
+          () => ({ output: outputTail(output) })
+        )
         shell.write(
-          '$resolved = Get-Command codex; Write-Output ("CLEANCODE_RESOLVED:" + $resolved.CommandType + "|" + $resolved.Source); codex --profile "test profile"; Write-Output ("CLEANCODE_WRAPPER_EXIT:" + $LASTEXITCODE)\r'
+          '$resolved = Get-Command codex; Write-Output ("CLEANCODE_RESOLVED:" + $resolved.CommandType + "|" + $resolved.Source); codex --profile "test profile"; $cleancodeProviderExit = $LASTEXITCODE; Write-Output ("CLEANCODE_WRAPPER_EXIT:" + $cleancodeProviderExit); Write-Output ("CLEANCODE_WRAPPER_DONE:" + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r'
         )
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_ENV:'), 20_000).catch(() => {
-          throw new Error(`Provider did not start. ConPTY output: ${JSON.stringify(output)}`)
+          throw new Error(
+            `Provider did not start. ConPTY output: ${JSON.stringify(outputTail(output))}`
+          )
         })
         expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
         expect(output).toContain('CLEANCODE_PROVIDER_ARGS:["--profile","test profile"')
         expect(output).toContain('CLEANCODE_PROVIDER_ENV:false|true')
         expect(output).toContain('provider bin\\codex.ps1|True')
 
+        const wrapperCompletionStart = output.length
+        const wrapperCompletionOutput = () => output.slice(wrapperCompletionStart)
         shell.write('interactive input\r')
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'), 10_000)
-        await waitUntil(() => output.includes('CLEANCODE_WRAPPER_EXIT:0'), 10_000)
-        shell.write(
-          'Write-Output ("CLEANCODE_PROVIDER_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
+        await waitUntil(
+          () => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'),
+          10_000,
+          () => ({ output: outputTail(output) })
         )
-        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_EXIT:0'), 10_000)
-        await waitUntil(() => output.includes('CLEANCODE_SHELL_STILL_WRITABLE:1'), 10_000)
+        await waitUntil(
+          () =>
+            includesInOrder(
+              wrapperCompletionOutput(),
+              `CLEANCODE_WRAPPER_DONE:${completionToken}`,
+              promptMarker
+            ),
+          10_000,
+          () => ({ output: outputTail(wrapperCompletionOutput()) })
+        )
+        expect(wrapperCompletionOutput()).toContain('CLEANCODE_WRAPPER_EXIT:0')
+
+        const followUpStart = output.length
+        const followUpOutput = () => output.slice(followUpStart)
+        shell.write(
+          'Write-Output ("CLEANCODE_PROVIDER_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE); Write-Output ("CLEANCODE_FOLLOW_UP_DONE:" + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r'
+        )
+        await waitUntil(
+          () =>
+            includesInOrder(
+              followUpOutput(),
+              `CLEANCODE_FOLLOW_UP_DONE:${completionToken}`,
+              promptMarker
+            ),
+          10_000,
+          () => ({ output: outputTail(followUpOutput()) })
+        )
+        expect(followUpOutput()).toContain('CLEANCODE_PROVIDER_EXIT:0')
+        expect(followUpOutput()).toContain('CLEANCODE_SHELL_STILL_WRITABLE:1')
 
         const signalOutputStart = output.length
         const signalOutput = () => output.slice(signalOutputStart)
         shell.write("$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
-        await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
+        await waitUntil(
+          () => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'),
+          10_000,
+          () => ({ output: outputTail(signalOutput()) })
+        )
         shell.write('\x03')
-        await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
-        await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
-        shell.write(
-          'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:" + $LASTEXITCODE)\r'
+        await waitUntil(
+          () => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'),
+          10_000,
+          () => ({ output: outputTail(signalOutput()) })
         )
         await waitUntil(
-          () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:130'),
-          10_000
+          () => includesInOrder(signalOutput(), 'CLEANCODE_PROVIDER_SIGNAL:SIGINT', promptMarker),
+          10_000,
+          () => ({ output: outputTail(signalOutput()) })
         )
-        expect(signalOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
+
+        const signalInspectionStart = output.length
+        const signalInspectionOutput = () => output.slice(signalInspectionStart)
+        shell.write(
+          '$cleancodeProviderExit = $LASTEXITCODE; Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $cleancodeProviderExit); Write-Output ("CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:" + $cleancodeProviderExit); Write-Output ("CLEANCODE_SIGNAL_INSPECTION_DONE:" + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r'
+        )
+        await waitUntil(
+          () =>
+            includesInOrder(
+              signalInspectionOutput(),
+              `CLEANCODE_SIGNAL_INSPECTION_DONE:${completionToken}`,
+              promptMarker
+            ),
+          10_000,
+          () => ({ output: outputTail(signalInspectionOutput()) })
+        )
+        expect(signalInspectionOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
+        expect(signalInspectionOutput()).toContain('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:130')
         expect(signalOutput()).not.toContain('Terminate batch job')
       } finally {
         if (!exited) {
@@ -214,6 +276,9 @@ describe.runIf(process.platform === 'win32')(
           providerDirectory,
           providerProgramPath
         })
+        const completionToken = `console-theme-${terminalSourceTheme}`
+        const promptMarker = `CLEANCODE_TEST_PROMPT:${completionToken}`
+        environment.CLEANCODE_TEST_COMPLETION_TOKEN = completionToken
         let output = ''
         let rawOutput = ''
         const adapter = new NodePtyTerminalProcessAdapter({
@@ -250,53 +315,166 @@ describe.runIf(process.platform === 'win32')(
             workingDirectory: root
           })
 
+          adapter.write(sessionId, windowsPowerShellReadinessCommand)
+          await waitUntil(
+            () => includesInOrder(output, `CLEANCODE_SHELL_READY:${completionToken}`, promptMarker),
+            10_000,
+            () => ({ output: outputTail(output), rawOutput: outputTail(rawOutput) })
+          )
+
+          const setupOutputStart = output.length
+          const setupOutput = () => output.slice(setupOutputStart)
           adapter.write(
             sessionId,
             [
-              "Write-Output ('CLEANCODE_OUTER_COLORS_BEFORE:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
               "$env:CLEANCODE_TEST_PROVIDER_MODE = 'nonzero'",
-              'codex',
-              "Write-Output ('CLEANCODE_PROVIDER_NONZERO_EXIT:' + $LASTEXITCODE)",
-              "Write-Output ('CLEANCODE_OUTER_COLORS_AFTER:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
-              "Write-Output ('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO:' + $LASTEXITCODE)"
+              "Write-Output ('CLEANCODE_OUTER_COLORS_BEFORE:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
+              "Write-Output ('CLEANCODE_NONZERO_SETUP_DONE:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)"
             ].join('; ') + '\r'
           )
           await waitUntil(
-            () => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO:23'),
-            20_000
+            () =>
+              includesInOrder(
+                setupOutput(),
+                `CLEANCODE_NONZERO_SETUP_DONE:${completionToken}`,
+                promptMarker
+              ),
+            10_000,
+            () => ({ output: outputTail(setupOutput()), rawOutput: outputTail(rawOutput) })
           )
 
-          expect(output).toContain(
+          const nonzeroInvocationStart = output.length
+          const nonzeroInvocationOutput = () => output.slice(nonzeroInvocationStart)
+          adapter.write(
+            sessionId,
+            [
+              'codex',
+              '$cleancodeProviderExit = $LASTEXITCODE',
+              "Write-Output ('CLEANCODE_PROVIDER_NONZERO_EXIT:' + $cleancodeProviderExit)",
+              "Write-Output ('CLEANCODE_NONZERO_INVOCATION_DONE:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)"
+            ].join('; ') + '\r'
+          )
+          await waitUntil(
+            () =>
+              includesInOrder(
+                nonzeroInvocationOutput(),
+                `CLEANCODE_NONZERO_INVOCATION_DONE:${completionToken}`,
+                promptMarker
+              ),
+            20_000,
+            () => ({
+              output: outputTail(nonzeroInvocationOutput()),
+              rawOutput: outputTail(rawOutput)
+            })
+          )
+
+          const nonzeroInspectionStart = output.length
+          const nonzeroInspectionOutput = () => output.slice(nonzeroInspectionStart)
+          adapter.write(
+            sessionId,
+            [
+              "Write-Output ('CLEANCODE_OUTER_COLORS_AFTER:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
+              "Write-Output ('CLEANCODE_NONZERO_INSPECTION_DONE:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)"
+            ].join('; ') + '\r'
+          )
+          await waitUntil(
+            () =>
+              includesInOrder(
+                nonzeroInspectionOutput(),
+                `CLEANCODE_NONZERO_INSPECTION_DONE:${completionToken}`,
+                promptMarker
+              ),
+            10_000,
+            () => ({
+              output: outputTail(nonzeroInspectionOutput()),
+              rawOutput: outputTail(rawOutput)
+            })
+          )
+
+          expect(nonzeroInvocationOutput()).toContain(
             `CLEANCODE_PROVIDER_CONSOLE_COLORS:${expectedForeground}|${expectedBackground}`
           )
-          expect(output).toContain('CLEANCODE_PROVIDER_PRIVATE_CONTROL_ENV:False|False')
-          expect(output).toContain('CLEANCODE_PROVIDER_NONZERO_EXIT:23')
-          expect(output).toContain('\x1b[38;2;12;34;56mCLEANCODE_PROVIDER_TRUECOLOR\r\n\x1b[0m')
+          expect(nonzeroInvocationOutput()).toContain(
+            'CLEANCODE_PROVIDER_PRIVATE_CONTROL_ENV:False|False'
+          )
+          expect(nonzeroInvocationOutput()).toContain('CLEANCODE_PROVIDER_NONZERO_EXIT:23')
+          expect(nonzeroInvocationOutput()).toContain(
+            '\x1b[38;2;12;34;56mCLEANCODE_PROVIDER_TRUECOLOR\r\n\x1b[0m'
+          )
           expect(readColorPair(output, 'CLEANCODE_OUTER_COLORS_AFTER')).toEqual(
             readColorPair(output, 'CLEANCODE_OUTER_COLORS_BEFORE')
           )
 
-          const signalOutputStart = output.length
-          const signalOutput = () => output.slice(signalOutputStart)
-          adapter.write(sessionId, "$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
-          await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
-          adapter.write(sessionId, '\x03')
-          await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
-          await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
+          const signalSetupStart = output.length
+          const signalSetupOutput = () => output.slice(signalSetupStart)
           adapter.write(
             sessionId,
-            "Write-Output ('CLEANCODE_PROVIDER_SIGNAL_EXIT:' + $LASTEXITCODE); Write-Output ('CLEANCODE_OUTER_COLORS_AFTER_SIGNAL:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor); Write-Output ('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME); Write-Output ('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL:' + $LASTEXITCODE)\r"
+            "$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; Write-Output ('CLEANCODE_SIGNAL_SETUP_DONE:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r"
           )
           await waitUntil(
-            () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL:130'),
-            10_000
+            () =>
+              includesInOrder(
+                signalSetupOutput(),
+                `CLEANCODE_SIGNAL_SETUP_DONE:${completionToken}`,
+                promptMarker
+              ),
+            10_000,
+            () => ({ output: outputTail(signalSetupOutput()), rawOutput: outputTail(rawOutput) })
+          )
+
+          const signalOutputStart = output.length
+          const signalOutput = () => output.slice(signalOutputStart)
+          adapter.write(sessionId, 'codex\r')
+          await waitUntil(
+            () => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL_READY'),
+            10_000,
+            () => ({ output: outputTail(signalOutput()), rawOutput: outputTail(rawOutput) })
+          )
+          adapter.write(sessionId, '\x03')
+          await waitUntil(
+            () => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'),
+            10_000,
+            () => ({ output: outputTail(signalOutput()), rawOutput: outputTail(rawOutput) })
+          )
+          await waitUntil(
+            () => includesInOrder(signalOutput(), 'CLEANCODE_PROVIDER_SIGNAL:SIGINT', promptMarker),
+            10_000,
+            () => ({ output: outputTail(signalOutput()), rawOutput: outputTail(rawOutput) })
+          )
+
+          const signalInspectionStart = output.length
+          const signalInspectionOutput = () => output.slice(signalInspectionStart)
+          adapter.write(
+            sessionId,
+            [
+              '$cleancodeProviderExit = $LASTEXITCODE',
+              "Write-Output ('CLEANCODE_PROVIDER_SIGNAL_EXIT:' + $cleancodeProviderExit)",
+              "Write-Output ('CLEANCODE_OUTER_COLORS_AFTER_SIGNAL:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
+              "Write-Output ('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME)",
+              "Write-Output ('CLEANCODE_SIGNAL_INSPECTION_DONE:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)"
+            ].join('; ') + '\r'
+          )
+          await waitUntil(
+            () =>
+              includesInOrder(
+                signalInspectionOutput(),
+                `CLEANCODE_SIGNAL_INSPECTION_DONE:${completionToken}`,
+                promptMarker
+              ),
+            10_000,
+            () => ({
+              output: outputTail(signalInspectionOutput()),
+              rawOutput: outputTail(rawOutput)
+            })
           )
 
           expect(signalOutput()).toContain(
             `CLEANCODE_PROVIDER_CONSOLE_COLORS:${expectedForeground}|${expectedBackground}`
           )
-          expect(signalOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
-          expect(signalOutput()).toContain('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:True|True')
+          expect(signalInspectionOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
+          expect(signalInspectionOutput()).toContain(
+            'CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:True|True'
+          )
           expect(readColorPair(output, 'CLEANCODE_OUTER_COLORS_AFTER_SIGNAL')).toEqual(
             readColorPair(output, 'CLEANCODE_OUTER_COLORS_BEFORE')
           )
@@ -320,6 +498,9 @@ describe.runIf(process.platform === 'win32')(
     )
   }
 )
+
+const windowsPowerShellReadinessCommand =
+  "function global:prompt { [Console]::WriteLine(('CLEANCODE_TEST_PROMPT:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)); return ('PS ' + $PWD.Path + '> ') }; Write-Output ('CLEANCODE_SHELL_READY:' + $env:CLEANCODE_TEST_COMPLETION_TOKEN)\r"
 
 const windowsInteractiveProviderCommandScript = [
   '@echo off',
@@ -459,6 +640,15 @@ function readOutputControlPhases(output: string, token: string): string[] {
     })
 }
 
+function outputTail(output: string): string {
+  return output.slice(-16_384)
+}
+
+function includesInOrder(output: string, first: string, second: string): boolean {
+  const firstIndex = output.indexOf(first)
+  return firstIndex >= 0 && output.indexOf(second, firstIndex + first.length) >= 0
+}
+
 function execute(
   executable: string,
   args: readonly string[],
@@ -489,11 +679,16 @@ function execute(
   })
 }
 
-async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitUntil(
+  predicate: () => boolean,
+  timeoutMs: number,
+  diagnostic?: () => unknown
+): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
     if (Date.now() >= deadline) {
-      throw new Error('Timed out waiting for Windows Agent ConPTY output.')
+      const details = diagnostic ? ` Details: ${JSON.stringify(diagnostic())}` : ''
+      throw new Error(`Timed out waiting for Windows Agent ConPTY output.${details}`)
     }
     await new Promise((resolve) => setTimeout(resolve, 25))
   }

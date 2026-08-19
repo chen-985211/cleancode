@@ -122,6 +122,7 @@ describe('terminal Agent telemetry assets', () => {
       const providerInvocationIndex = powerShellShim.indexOf(
         '& $providerExecutable @providerArguments'
       )
+      const clearGlobalExitCodeIndex = powerShellShim.indexOf('$global:LASTEXITCODE = $null')
       const providerCleanupTryIndex = powerShellShim.indexOf(
         '    try {\r\n      if ($consoleThemeControlEnabled)'
       )
@@ -131,7 +132,7 @@ describe('terminal Agent telemetry assets', () => {
       )
       const resetRenditionIndex = powerShellShim.indexOf("[Console]::Write(([char]27) + '[0m')")
       const captureExitCodeIndex = powerShellShim.indexOf(
-        'if ($providerInvoked -and ($null -ne $LASTEXITCODE)) { $exitCode = $LASTEXITCODE }'
+        '$providerExitCode = $global:LASTEXITCODE'
       )
       const restoreForegroundIndex = powerShellShim.indexOf(
         '[Console]::ForegroundColor = $previousConsoleForegroundColor'
@@ -146,7 +147,13 @@ describe('terminal Agent telemetry assets', () => {
       expect(setForegroundIndex).toBeGreaterThan(prepareBeginIndex)
       expect(prepareEndIndex).toBeGreaterThan(setForegroundIndex)
       expect(providerInvocationIndex).toBeGreaterThan(prepareEndIndex)
+      expect(clearGlobalExitCodeIndex).toBeGreaterThan(prepareEndIndex)
+      expect(providerInvocationIndex).toBeGreaterThan(clearGlobalExitCodeIndex)
       expect(captureExitCodeIndex).toBeGreaterThan(providerInvocationIndex)
+      expect(powerShellShim).not.toContain('$LASTEXITCODE = $null')
+      expect(powerShellShim).toContain(
+        'if ($providerInvoked -and ($null -eq $providerExitCode)) { $providerExitCode = $global:LASTEXITCODE }'
+      )
       expect(resetRenditionIndex).toBeGreaterThan(captureExitCodeIndex)
       expect(restoreBeginIndex).toBeGreaterThan(resetRenditionIndex)
       expect(restoreForegroundIndex).toBeGreaterThan(restoreBeginIndex)
