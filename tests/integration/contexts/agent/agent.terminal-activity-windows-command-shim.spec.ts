@@ -240,6 +240,7 @@ function createConptyEnvironment(input: {
   }
   return {
     ...environment,
+    CLEANCODE_AGENT_ACTIVITY_TRACE: '1',
     CLEANCODE_TEST_NODE: process.execPath,
     CLEANCODE_TEST_PROVIDER_PROGRAM: input.providerProgramPath,
     ELECTRON_NO_ATTACH_CONSOLE: '1',
