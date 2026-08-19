@@ -141,6 +141,7 @@ describe.runIf(process.platform === 'win32')(
 
         shell.write('interactive input\r')
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'), 10_000)
+        await waitUntil(() => output.includes('CLEANCODE_WRAPPER_EXIT:0'), 10_000)
         shell.write(
           'Write-Output ("CLEANCODE_PROVIDER_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
         )
@@ -155,10 +156,10 @@ describe.runIf(process.platform === 'win32')(
         await waitUntil(() => signalOutput().includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
         await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
         shell.write(
-          'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output \'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT\'\r'
+          'Write-Output ("CLEANCODE_PROVIDER_SIGNAL_EXIT:" + $LASTEXITCODE); Write-Output ("CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:" + $LASTEXITCODE)\r'
         )
         await waitUntil(
-          () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'),
+          () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT:130'),
           10_000
         )
         expect(signalOutput()).toContain('CLEANCODE_PROVIDER_SIGNAL_EXIT:130')
@@ -257,10 +258,13 @@ describe.runIf(process.platform === 'win32')(
               'codex',
               "Write-Output ('CLEANCODE_PROVIDER_NONZERO_EXIT:' + $LASTEXITCODE)",
               "Write-Output ('CLEANCODE_OUTER_COLORS_AFTER:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor)",
-              "Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO'"
+              "Write-Output ('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO:' + $LASTEXITCODE)"
             ].join('; ') + '\r'
           )
-          await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO'), 20_000)
+          await waitUntil(
+            () => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_NONZERO:23'),
+            20_000
+          )
 
           expect(output).toContain(
             `CLEANCODE_PROVIDER_CONSOLE_COLORS:${expectedForeground}|${expectedBackground}`
@@ -281,10 +285,10 @@ describe.runIf(process.platform === 'win32')(
           await waitUntil(() => /PS [^\r\n]+> $/.test(signalOutput()), 10_000)
           adapter.write(
             sessionId,
-            "Write-Output ('CLEANCODE_PROVIDER_SIGNAL_EXIT:' + $LASTEXITCODE); Write-Output ('CLEANCODE_OUTER_COLORS_AFTER_SIGNAL:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor); Write-Output ('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME); Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL'\r"
+            "Write-Output ('CLEANCODE_PROVIDER_SIGNAL_EXIT:' + $LASTEXITCODE); Write-Output ('CLEANCODE_OUTER_COLORS_AFTER_SIGNAL:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor); Write-Output ('CLEANCODE_OUTER_PRIVATE_CONTROL_ENV:{0}|{1}' -f [bool]$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN, [bool]$env:CLEANCODE_TERMINAL_SOURCE_THEME); Write-Output ('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL:' + $LASTEXITCODE)\r"
           )
           await waitUntil(
-            () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL'),
+            () => signalOutput().includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGNAL:130'),
             10_000
           )
 
