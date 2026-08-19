@@ -189,9 +189,6 @@ describe.runIf(process.platform === 'win32')('Windows pty terminal process adapt
           workingDirectory,
           shell: 'powershell.exe',
           terminalSourceTheme,
-          launchCommand:
-            "[Console]::WriteLine(('CLEANCODE_TERMINAL_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))",
-          launchMode: 'interactive',
           columns: 80,
           rows: 24,
           onOutput: (event) => {
@@ -199,6 +196,10 @@ describe.runIf(process.platform === 'win32')('Windows pty terminal process adapt
           },
           onExit: () => undefined
         })
+        adapter.write(
+          sessionId,
+          "[Console]::WriteLine(('CLEANCODE_TERMINAL_CONSOLE_COLORS:{0}|{1}' -f [Console]::ForegroundColor, [Console]::BackgroundColor))\r"
+        )
 
         await waitUntil(() => output.includes('CLEANCODE_TERMINAL_CONSOLE_COLORS:'))
         expect(output).toContain(`CLEANCODE_TERMINAL_CONSOLE_COLORS:${expectedConsoleColors}`)
