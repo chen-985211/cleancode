@@ -407,15 +407,10 @@ function spawnProvider(executable, args, environment, signalForwarder) {
 }
 
 function createProviderStandardIo() {
-  if (process.platform !== 'win32' || process.stdin.isTTY) {
-    return { dispose() {}, value: 'inherit' };
-  }
+  if (process.platform !== 'win32' || process.stdin.isTTY) return { dispose() {}, value: 'inherit' };
   try {
     const consoleInput = openSync('CONIN$', 'r');
-    return {
-      dispose() { closeSync(consoleInput); },
-      value: [consoleInput, 'inherit', 'inherit']
-    };
+    return { dispose() { closeSync(consoleInput); }, value: [consoleInput, 'inherit', 'inherit'] };
   } catch {
     return { dispose() {}, value: 'inherit' };
   }
