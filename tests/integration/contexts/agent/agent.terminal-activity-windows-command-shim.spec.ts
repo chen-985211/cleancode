@@ -1,9 +1,15 @@
 import { spawn } from 'node:child_process'
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 
+import { spawn as spawnPtyProcess } from 'node-pty'
+
 import { TerminalAgentTelemetryAssetStore } from '../../../../src/contexts/agent/infrastructure/terminal-activity/TerminalAgentTelemetryAssetStore'
+
+const require = createRequire(import.meta.url)
+const electronExecutable = require('electron') as string
 
 const windowsCommandCases = [
   { exitCode: 0, extension: '.cmd' },
@@ -84,12 +90,98 @@ describe('ordinary terminal Windows command Agent activity integration', () => {
   )
 })
 
+describe.runIf(process.platform === 'win32')(
+  'ordinary terminal Windows Agent activity ConPTY integration',
+  () => {
+    it('preserves the terminal while launching an npm-style Provider through Electron', async () => {
+      const root = await mkdtemp(join(tmpdir(), 'cleancode-agent-windows-conpty-'))
+      const providerDirectory = join(root, 'provider bin')
+      const stateDirectory = join(root, 'state')
+      const providerProgramPath = join(root, 'interactive-provider.cjs')
+      await Promise.all([mkdir(providerDirectory), mkdir(stateDirectory)])
+      await Promise.all([
+        writeFile(join(providerDirectory, 'codex.cmd'), windowsInteractiveProviderCommandScript),
+        writeFile(providerProgramPath, interactiveProviderProgramScript)
+      ])
+
+      const store = new TerminalAgentTelemetryAssetStore({
+        platform: 'win32',
+        runtimeExecutable: electronExecutable,
+        stateDirectory
+      })
+      const assets = await store.ensure()
+      const environment = createConptyEnvironment({
+        assetsShimDirectory: assets.shimDirectory,
+        providerDirectory,
+        providerProgramPath
+      })
+      let output = ''
+      let exited = false
+      const shell = spawnPtyProcess('powershell.exe', ['-NoLogo', '-NoProfile'], {
+        cols: 100,
+        cwd: root,
+        env: environment,
+        name: 'xterm-256color',
+        rows: 30,
+        useConpty: true,
+        useConptyDll: true
+      })
+      shell.onData((data) => {
+        output += data
+      })
+      shell.onExit(() => {
+        exited = true
+      })
+
+      try {
+        shell.write('codex --profile "test profile"\r')
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_TTY:'), 20_000)
+        expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
+        expect(output).toContain('CLEANCODE_PROVIDER_ARGS:["--profile","test profile"')
+
+        shell.write('interactive input\r')
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'), 10_000)
+        shell.write(
+          'Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
+        )
+        await waitUntil(() => output.includes('CLEANCODE_SHELL_STILL_WRITABLE:1'), 10_000)
+      } finally {
+        if (!exited) {
+          shell.kill()
+          await waitUntil(() => exited, 5_000).catch(() => undefined)
+        }
+        await rm(root, { force: true, recursive: true })
+      }
+    }, 40_000)
+  }
+)
+
 const windowsProviderCommandScript = [
   '@echo off',
   '"%CLEANCODE_TEST_NODE%" "%CLEANCODE_TEST_PROVIDER_PROGRAM%" %*',
   'exit /b %ERRORLEVEL%',
   ''
 ].join('\r\n')
+
+const windowsInteractiveProviderCommandScript = [
+  '@echo off',
+  '"%CLEANCODE_TEST_NODE%" "%CLEANCODE_TEST_PROVIDER_PROGRAM%" %*',
+  'exit /b %ERRORLEVEL%',
+  ''
+].join('\r\n')
+
+const interactiveProviderProgramScript = `
+const tty = [process.stdin, process.stdout, process.stderr].map((stream) => Boolean(stream.isTTY))
+process.stdout.write('CLEANCODE_PROVIDER_TTY:' + tty.join('|') + '\\r\\n')
+process.stdout.write('CLEANCODE_PROVIDER_ARGS:' + JSON.stringify(process.argv.slice(2)) + '\\r\\n')
+if (!tty.every(Boolean)) process.exit(86)
+process.stdin.setEncoding('utf8')
+process.stdin.once('data', (input) => {
+  process.stdout.write('CLEANCODE_PROVIDER_INPUT:' + input.trim() + '\\r\\n')
+  process.exit(0)
+})
+setTimeout(() => process.exit(87), 15_000)
+`.trimStart()
 
 const providerProgramScript = `
 const { writeFileSync } = require('node:fs')
@@ -161,6 +253,37 @@ function createLauncherEnvironment(input: {
   }
 }
 
+function createConptyEnvironment(input: {
+  readonly assetsShimDirectory: string
+  readonly providerDirectory: string
+  readonly providerProgramPath: string
+}): Record<string, string> {
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => {
+      return typeof entry[1] === 'string'
+    })
+  )
+  const replacedKeys = new Set([
+    'electron_no_attach_console',
+    'electron_run_as_node',
+    'path',
+    'pathext'
+  ])
+  for (const key of Object.keys(environment)) {
+    if (replacedKeys.has(key.toLowerCase())) delete environment[key]
+  }
+  return {
+    ...environment,
+    CLEANCODE_TEST_NODE: process.execPath,
+    CLEANCODE_TEST_PROVIDER_PROGRAM: input.providerProgramPath,
+    ELECTRON_NO_ATTACH_CONSOLE: '1',
+    PATH: [input.assetsShimDirectory, input.providerDirectory, process.env.PATH]
+      .filter(Boolean)
+      .join(delimiter),
+    PATHEXT: '.COM;.EXE;.BAT;.CMD'
+  }
+}
+
 function execute(
   executable: string,
   args: readonly string[],
@@ -184,4 +307,14 @@ function execute(
     child.once('error', reject)
     child.once('close', (exitCode, signal) => resolve({ exitCode, signal, stderr }))
   })
+}
+
+async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!predicate()) {
+    if (Date.now() >= deadline) {
+      throw new Error('Timed out waiting for Windows Agent ConPTY output.')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
 }
