@@ -86,8 +86,13 @@ describe('terminal Agent telemetry assets', () => {
       const commandShim = await readFile(join(assets.shimDirectory, 'codex.cmd'), 'utf8')
       const powerShellShim = await readFile(join(assets.shimDirectory, 'codex.ps1'), 'utf8')
       expect(commandShim).toContain('set "ELECTRON_RUN_AS_NODE=1"')
+      expect(commandShim).toContain('set "ELECTRON_NO_ATTACH_CONSOLE="')
       expect(commandShim).toContain('shim-launcher.mjs')
       expect(powerShellShim).toContain('$previousElectronRunAsNode')
+      expect(powerShellShim).toContain('$previousElectronNoAttachConsole')
+      expect(powerShellShim).toContain(
+        'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue'
+      )
       expect(powerShellShim).toContain('Remove-Item Env:ELECTRON_RUN_AS_NODE')
       const shimLauncher = await readFile(
         join(assets.rootDirectory, 'assets-v1', 'shim-launcher.mjs'),

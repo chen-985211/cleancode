@@ -145,6 +145,13 @@ describe.runIf(process.platform === 'win32')(
           'Write-Output ("CLEANCODE_SHELL_STILL_WRITABLE:" + $env:ELECTRON_NO_ATTACH_CONSOLE)\r'
         )
         await waitUntil(() => output.includes('CLEANCODE_SHELL_STILL_WRITABLE:1'), 10_000)
+
+        shell.write("$env:CLEANCODE_TEST_PROVIDER_MODE = 'signal'; codex\r")
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL_READY'), 10_000)
+        shell.write('\x03')
+        await waitUntil(() => output.includes('CLEANCODE_PROVIDER_SIGNAL:SIGINT'), 10_000)
+        shell.write("Write-Output 'CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'\r")
+        await waitUntil(() => output.includes('CLEANCODE_SHELL_WRITABLE_AFTER_SIGINT'), 10_000)
       } finally {
         if (!exited) {
           shell.kill()
@@ -175,12 +182,21 @@ const tty = [process.stdin, process.stdout, process.stderr].map((stream) => Bool
 process.stdout.write('CLEANCODE_PROVIDER_TTY:' + tty.join('|') + '\\r\\n')
 process.stdout.write('CLEANCODE_PROVIDER_ARGS:' + JSON.stringify(process.argv.slice(2)) + '\\r\\n')
 if (!tty.every(Boolean)) process.exit(86)
-process.stdin.setEncoding('utf8')
-process.stdin.once('data', (input) => {
-  process.stdout.write('CLEANCODE_PROVIDER_INPUT:' + input.trim() + '\\r\\n')
-  process.exit(0)
-})
-setTimeout(() => process.exit(87), 15_000)
+if (process.env.CLEANCODE_TEST_PROVIDER_MODE === 'signal') {
+  process.on('SIGINT', () => {
+    process.stdout.write('CLEANCODE_PROVIDER_SIGNAL:SIGINT\\r\\n')
+    process.exit(130)
+  })
+  process.stdout.write('CLEANCODE_PROVIDER_SIGNAL_READY\\r\\n')
+  setInterval(() => {}, 1_000)
+} else {
+  process.stdin.setEncoding('utf8')
+  process.stdin.once('data', (input) => {
+    process.stdout.write('CLEANCODE_PROVIDER_INPUT:' + input.trim() + '\\r\\n')
+    process.exit(0)
+  })
+  setTimeout(() => process.exit(87), 15_000)
+}
 `.trimStart()
 
 const providerProgramScript = `

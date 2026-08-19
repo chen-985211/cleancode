@@ -95,6 +95,7 @@ export function createWindowsCmdShim(input: {
     '@echo off',
     'setlocal',
     'set "ELECTRON_RUN_AS_NODE=1"',
+    'set "ELECTRON_NO_ATTACH_CONSOLE="',
     `"${escapeCmdPath(input.runtimeExecutable)}" "${escapeCmdPath(input.shimLauncherPath)}" "${escapeCmdPath(input.providerId)}" "${escapeCmdPath(input.commandName)}" %*`,
     'exit /b %ERRORLEVEL%',
     ''
@@ -109,9 +110,12 @@ export function createWindowsPowerShellShim(input: {
 }): string {
   return [
     '$previousElectronRunAsNode = $env:ELECTRON_RUN_AS_NODE',
+    '$previousElectronNoAttachConsole = $env:ELECTRON_NO_ATTACH_CONSOLE',
     "$env:ELECTRON_RUN_AS_NODE = '1'",
+    'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue',
     `& '${escapePowerShell(input.runtimeExecutable)}' '${escapePowerShell(input.shimLauncherPath)}' '${escapePowerShell(input.providerId)}' '${escapePowerShell(input.commandName)}' @args`,
     '$exitCode = $LASTEXITCODE',
+    'if ($null -eq $previousElectronNoAttachConsole) { Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue } else { $env:ELECTRON_NO_ATTACH_CONSOLE = $previousElectronNoAttachConsole }',
     'if ($null -eq $previousElectronRunAsNode) { Remove-Item Env:ELECTRON_RUN_AS_NODE } else { $env:ELECTRON_RUN_AS_NODE = $previousElectronRunAsNode }',
     'exit $exitCode',
     ''
