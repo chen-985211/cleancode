@@ -118,6 +118,7 @@ describe('terminal Agent telemetry assets', () => {
       expect(shimLauncher).toContain("type: 'invocation_exited'")
       expect(shimLauncher).toContain("operation === '--prepare-windows'")
       expect(shimLauncher).toContain("operation === '--complete-windows'")
+      expect(shimLauncher).toContain("['.PS1', ...String(process.env.PATHEXT")
       expect(shimLauncher).not.toContain("openSync('CONIN$', 'r')")
       expect(
         await readFile(join(assets.rootDirectory, 'assets-v1', 'hook-relay.cmd'), 'utf8')

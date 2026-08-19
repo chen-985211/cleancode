@@ -93,6 +93,7 @@ describe.runIf(process.platform === 'win32')(
       await Promise.all([mkdir(providerDirectory), mkdir(stateDirectory)])
       await Promise.all([
         writeFile(join(providerDirectory, 'codex.cmd'), windowsInteractiveProviderCommandScript),
+        writeFile(join(providerDirectory, 'codex.ps1'), windowsInteractiveProviderPowerShellScript),
         writeFile(providerProgramPath, interactiveProviderProgramScript)
       ])
 
@@ -135,6 +136,7 @@ describe.runIf(process.platform === 'win32')(
         expect(output).toContain('CLEANCODE_PROVIDER_TTY:true|true|true')
         expect(output).toContain('CLEANCODE_PROVIDER_ARGS:["--profile","test profile"')
         expect(output).toContain('CLEANCODE_PROVIDER_ENV:false|true')
+        expect(output).toContain('provider bin\\codex.ps1|True')
 
         shell.write('interactive input\r')
         await waitUntil(() => output.includes('CLEANCODE_PROVIDER_INPUT:interactive input'), 10_000)
@@ -181,6 +183,12 @@ const windowsInteractiveProviderCommandScript = [
   '@echo off',
   '"%CLEANCODE_TEST_NODE%" "%CLEANCODE_TEST_PROVIDER_PROGRAM%" %*',
   'exit /b %ERRORLEVEL%',
+  ''
+].join('\r\n')
+
+const windowsInteractiveProviderPowerShellScript = [
+  '& $env:CLEANCODE_TEST_NODE $env:CLEANCODE_TEST_PROVIDER_PROGRAM @args',
+  'exit $LASTEXITCODE',
   ''
 ].join('\r\n')
 

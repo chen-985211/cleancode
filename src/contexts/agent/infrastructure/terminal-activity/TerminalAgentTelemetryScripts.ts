@@ -492,7 +492,7 @@ function signalExitCode(signal) {
 function findExecutable(name, ownShimDirectory) {
   const pathEntries = String(process.env.PATH || '').split(delimiter).filter(Boolean);
   const extensions = process.platform === 'win32'
-    ? String(process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';')
+    ? ['.PS1', ...String(process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';')]
     : [''];
   for (const directory of pathEntries) {
     if (canonicalPath(directory) === canonicalPath(ownShimDirectory)) continue;
