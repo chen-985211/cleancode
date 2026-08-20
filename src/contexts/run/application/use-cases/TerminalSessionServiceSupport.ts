@@ -7,8 +7,10 @@ import type { TerminalModelPort } from '../ports/TerminalModelPort'
 import type { TerminalModelDiagnosticsSnapshot } from '../dto/TerminalModelSnapshot'
 import type { TerminalLinkIdentity } from '../dto/TerminalLink'
 import type { TerminalSession } from '../../domain/aggregates/TerminalSession'
+import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { resolveTerminalOwnerRef } from '../../domain/value-objects/TerminalRunScope'
 import type { TerminalSessionSnapshot } from '../dto/TerminalSessionSnapshot'
+import type { TerminalPrivateOutputControl } from '../dto/TerminalPrivateOutputControl'
 import type { TerminalLaunchEnvironmentPreparationPort } from '../ports/TerminalLaunchEnvironmentPreparationPort'
 import type { TerminalSessionLifecycleObserverPort } from '../ports/TerminalSessionLifecycleObserverPort'
 import type { StartTerminalSessionCommand } from './TerminalSessionCommands'
@@ -80,13 +82,16 @@ export async function prepareTerminalSessionLaunch(input: {
     readonly sessionId: string
   }
   readonly sessionKind: TerminalSessionSnapshot['kind']
+  readonly terminalSourceTheme: TerminalSourceTheme
 }): Promise<{
   readonly environment: Readonly<Record<string, string>> | undefined
   readonly launchCommand: string | undefined
+  readonly privateOutputControl: TerminalPrivateOutputControl | undefined
   readonly shell: string | undefined
 }> {
   let launchCommand = input.command.launchCommand
   let environment = input.command.environment
+  let privateOutputControl: TerminalPrivateOutputControl | undefined
   let shell = input.command.shell
 
   if (input.command.prepareLaunch) {
@@ -102,14 +107,16 @@ export async function prepareTerminalSessionLaunch(input: {
       shell,
       scope: input.scope,
       sessionKind: input.sessionKind,
+      terminalSourceTheme: input.terminalSourceTheme,
       workingDirectory: input.command.workingDirectory
     })
     launchCommand = prepared.launchCommand
     environment = prepared.environment
+    privateOutputControl = prepared.privateOutputControl
     shell = prepared.shell ?? shell
   }
 
-  return { environment, launchCommand, shell }
+  return { environment, launchCommand, privateOutputControl, shell }
 }
 
 export function throwTerminalSessionCleanupFailures(

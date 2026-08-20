@@ -305,14 +305,14 @@ export class TerminalSessionService {
     this.sessions.set(session.id, session)
     this.sessionIdsBySlot.set(slotKey, session.id)
     this.restorableSessionIdsBySlot.set(slotKey, session.id)
-
     let preparedLaunch
     try {
       preparedLaunch = await prepareTerminalSessionLaunch({
         command,
         launchEnvironmentPreparation: this.launchEnvironmentPreparation,
         scope: session.scope,
-        sessionKind: session.kind
+        sessionKind: session.kind,
+        terminalSourceTheme: session.terminalSourceTheme
       })
     } catch (error) {
       session.markFailed({ reason: getTerminalSessionErrorMessage(error) })
@@ -324,7 +324,7 @@ export class TerminalSessionService {
       }
       throw error
     }
-    const { environment, launchCommand, shell } = preparedLaunch
+    const { environment, launchCommand, privateOutputControl, shell } = preparedLaunch
 
     let processHandle
 
@@ -356,6 +356,7 @@ export class TerminalSessionService {
         launchMode: command.launchMode,
         sessionKind: session.kind,
         environment: createTerminalCapabilityEnvironment(environment, session.terminalSourceTheme),
+        privateOutputControl,
         columns: command.columns ?? 88,
         rows: command.rows ?? 24,
         onOutput: (event) => {

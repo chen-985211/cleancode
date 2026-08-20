@@ -27,14 +27,22 @@ describe('terminal Agent telemetry assets', () => {
         await access(shimPath, constants.X_OK)
         expect(await readFile(shimPath, 'utf8')).toContain('shim-launcher.mjs')
       }
-      expect(JSON.parse(await readFile(assets.launchSpecsPath, 'utf8'))).toMatchObject({
+      const launchSpecs = JSON.parse(await readFile(assets.launchSpecsPath, 'utf8'))
+      expect(launchSpecs).toMatchObject({
         providers: {
           'claude-code': { commandName: 'claude', statusTracking: 'full' },
-          codex: { commandName: 'codex', statusTracking: 'completion_only' },
+          codex: {
+            commandName: 'codex',
+            statusTracking: 'completion_only',
+            windowsConsoleThemeProbe: true
+          },
           gemini: { commandName: 'gemini', statusTracking: 'full' },
           opencode: { commandName: 'opencode', statusTracking: 'full' }
         }
       })
+      for (const providerId of ['claude-code', 'gemini', 'opencode']) {
+        expect(launchSpecs.providers[providerId].windowsConsoleThemeProbe).toBeUndefined()
+      }
       expect(
         JSON.parse(
           await readFile(join(assets.rootDirectory, 'assets-v1', 'claude-settings.json'), 'utf8')
@@ -85,9 +93,86 @@ describe('terminal Agent telemetry assets', () => {
 
       const commandShim = await readFile(join(assets.shimDirectory, 'codex.cmd'), 'utf8')
       const powerShellShim = await readFile(join(assets.shimDirectory, 'codex.ps1'), 'utf8')
-      expect(commandShim).toContain('set "ELECTRON_RUN_AS_NODE=1"')
-      expect(commandShim).toContain('shim-launcher.mjs')
+      expect(commandShim).toContain('powershell.exe -NoLogo -NoProfile')
+      expect(commandShim).toContain('codex.ps1')
+      expect(commandShim).not.toContain('CleanCode.exe')
       expect(powerShellShim).toContain('$previousElectronRunAsNode')
+      expect(powerShellShim).toContain('$previousElectronNoAttachConsole')
+      expect(powerShellShim).toContain('$planPath = [IO.Path]::GetTempFileName()')
+      expect(powerShellShim).toContain('"--prepare-windows"')
+      expect(powerShellShim).toContain('Start-Process')
+      expect(powerShellShim).toContain('-NoNewWindow -PassThru -Wait')
+      expect(powerShellShim).toContain('Get-Content -LiteralPath $planPath -Raw')
+      expect(powerShellShim).toContain('$providerArguments = @($plan.arguments)')
+      expect(powerShellShim).toContain('& $providerExecutable @providerArguments')
+      expect(powerShellShim).toContain('$plan.windowsConsoleThemeProbe -eq $true')
+      expect(powerShellShim).toContain('$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN')
+      expect(powerShellShim).toContain('$env:CLEANCODE_TERMINAL_SOURCE_THEME')
+      expect(powerShellShim).toContain(
+        "[Console]::Write(([char]27) + ']633;CLEANCODE_OUTPUT_CONTROL:' + $terminalOutputControlToken + ':' + $phase + ([char]7))"
+      )
+      expect(powerShellShim).toContain("-cmatch '^[0-9a-f]{48}$'")
+      expect(powerShellShim).toContain('[Console]::ForegroundColor = [ConsoleColor]::Black')
+      expect(powerShellShim).toContain('[Console]::BackgroundColor = [ConsoleColor]::White')
+      expect(powerShellShim).toContain('[Console]::ForegroundColor = [ConsoleColor]::Gray')
+      expect(powerShellShim).toContain('[Console]::BackgroundColor = [ConsoleColor]::Black')
+      const prepareBeginIndex = powerShellShim.indexOf("Write-CleancodeOutputControlSpan 'begin'")
+      const setForegroundIndex = powerShellShim.indexOf('[Console]::ForegroundColor =')
+      const prepareEndIndex = powerShellShim.indexOf("Write-CleancodeOutputControlSpan 'end'")
+      const providerInvocationIndex = powerShellShim.indexOf(
+        '& $providerExecutable @providerArguments'
+      )
+      const clearGlobalExitCodeIndex = powerShellShim.indexOf('$global:LASTEXITCODE = $null')
+      const providerCleanupTryIndex = powerShellShim.indexOf(
+        '    try {\r\n      if ($consoleThemeControlEnabled)'
+      )
+      const restoreBeginIndex = powerShellShim.indexOf(
+        "Write-CleancodeOutputControlSpan 'begin'",
+        prepareBeginIndex + 1
+      )
+      const resetRenditionIndex = powerShellShim.indexOf("[Console]::Write(([char]27) + '[0m')")
+      const captureExitCodeIndex = powerShellShim.indexOf(
+        '$providerExitCode = $global:LASTEXITCODE'
+      )
+      const restoreForegroundIndex = powerShellShim.indexOf(
+        '[Console]::ForegroundColor = $previousConsoleForegroundColor'
+      )
+      const restoreEndIndex = powerShellShim.indexOf(
+        "Write-CleancodeOutputControlSpan 'end'",
+        prepareEndIndex + 1
+      )
+      expect(prepareBeginIndex).toBeGreaterThan(-1)
+      expect(providerCleanupTryIndex).toBeGreaterThan(-1)
+      expect(prepareBeginIndex).toBeGreaterThan(providerCleanupTryIndex)
+      expect(setForegroundIndex).toBeGreaterThan(prepareBeginIndex)
+      expect(prepareEndIndex).toBeGreaterThan(setForegroundIndex)
+      expect(providerInvocationIndex).toBeGreaterThan(prepareEndIndex)
+      expect(clearGlobalExitCodeIndex).toBeGreaterThan(prepareEndIndex)
+      expect(providerInvocationIndex).toBeGreaterThan(clearGlobalExitCodeIndex)
+      expect(captureExitCodeIndex).toBeGreaterThan(providerInvocationIndex)
+      expect(powerShellShim).not.toContain('$LASTEXITCODE = $null')
+      expect(powerShellShim).toContain(
+        'if ($providerInvoked -and ($null -eq $providerExitCode)) { $providerExitCode = $global:LASTEXITCODE }'
+      )
+      expect(resetRenditionIndex).toBeGreaterThan(captureExitCodeIndex)
+      expect(restoreBeginIndex).toBeGreaterThan(resetRenditionIndex)
+      expect(restoreForegroundIndex).toBeGreaterThan(restoreBeginIndex)
+      expect(restoreEndIndex).toBeGreaterThan(restoreForegroundIndex)
+      expect(powerShellShim).toContain(
+        "try { Write-CleancodeOutputControlSpan 'begin'; $restoreSpanStarted = $true } catch {}\r\n        try {\r\n          if ($restoreConsoleForegroundColor)"
+      )
+      const removePrivateEnvironmentIndex = powerShellShim.indexOf(
+        'Remove-Item Env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN'
+      )
+      const restorePrivateEnvironmentIndex = powerShellShim.indexOf(
+        '$env:CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN = $terminalOutputControlToken'
+      )
+      expect(removePrivateEnvironmentIndex).toBeLessThan(providerInvocationIndex)
+      expect(restorePrivateEnvironmentIndex).toBeGreaterThan(providerInvocationIndex)
+      expect(powerShellShim).toContain('"--complete-windows"')
+      expect(powerShellShim).toContain(
+        'Remove-Item Env:ELECTRON_NO_ATTACH_CONSOLE -ErrorAction SilentlyContinue'
+      )
       expect(powerShellShim).toContain('Remove-Item Env:ELECTRON_RUN_AS_NODE')
       const shimLauncher = await readFile(
         join(assets.rootDirectory, 'assets-v1', 'shim-launcher.mjs'),
@@ -103,8 +188,13 @@ describe('terminal Agent telemetry assets', () => {
       expect(shimLauncher).toContain('gracefulSignalTimeoutMs = 750')
       expect(shimLauncher).toContain('forcedExitTimeoutMs = 500')
       expect(shimLauncher).toContain("type: 'invocation_exited'")
-      expect(shimLauncher).toContain('windowsVerbatimArguments: true')
-      expect(shimLauncher).toContain('escapeWindowsArgument(arg, true)')
+      expect(shimLauncher).toContain("operation === '--prepare-windows'")
+      expect(shimLauncher).toContain("operation === '--complete-windows'")
+      expect(shimLauncher).toContain(
+        '...(launch.spec.windowsConsoleThemeProbe === true ? { windowsConsoleThemeProbe: true } : {})'
+      )
+      expect(shimLauncher).toContain("['.PS1', ...String(process.env.PATHEXT")
+      expect(shimLauncher).not.toContain("openSync('CONIN$', 'r')")
       expect(
         await readFile(join(assets.rootDirectory, 'assets-v1', 'hook-relay.cmd'), 'utf8')
       ).toContain('hook-relay.mjs')

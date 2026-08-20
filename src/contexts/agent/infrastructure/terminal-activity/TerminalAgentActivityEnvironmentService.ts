@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { posix, win32, type PlatformPath } from 'node:path'
 
 import type { AgentActivityTerminalScope } from '../../application/dto/AgentActivityProtocol'
@@ -21,7 +22,17 @@ export interface PrepareTerminalAgentActivityEnvironmentCommand {
   readonly environment: Readonly<Record<string, string>> | undefined
   readonly launchCommand: string | undefined
   readonly shell?: string
+  readonly terminalSourceTheme: 'dark' | 'light'
   readonly terminal: AgentActivityTerminalScope
+}
+
+export interface TerminalAgentPrivateOutputControl {
+  readonly environment: Readonly<{
+    CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN: string
+    CLEANCODE_TERMINAL_SOURCE_THEME: 'dark' | 'light'
+  }>
+  readonly protocol: 'osc-633-span-v1'
+  readonly token: string
 }
 
 export class TerminalAgentActivityEnvironmentService {
@@ -45,6 +56,7 @@ export class TerminalAgentActivityEnvironmentService {
   async prepare(command: PrepareTerminalAgentActivityEnvironmentCommand): Promise<{
     readonly environment: Readonly<Record<string, string>>
     readonly launchCommand: string | undefined
+    readonly privateOutputControl?: TerminalAgentPrivateOutputControl
     readonly shell: string | undefined
   }> {
     const assets = await this.options.assets.ensure()
@@ -61,6 +73,10 @@ export class TerminalAgentActivityEnvironmentService {
       this.platform !== 'win32' &&
       command.launchCommand === undefined &&
       isSupportedPosixInteractiveShell(realShell, this.path)
+    const privateOutputControl =
+      this.platform === 'win32'
+        ? createPrivateOutputControl(command.terminalSourceTheme)
+        : undefined
     return {
       environment: {
         ...environment,
@@ -82,8 +98,23 @@ export class TerminalAgentActivityEnvironmentService {
         PATH: prependUniquePath(currentPath, assets.shimDirectory, this.path)
       },
       launchCommand: command.launchCommand,
+      privateOutputControl,
       shell: shouldUsePrivateShellLauncher ? assets.shellLauncherPath : command.shell
     }
+  }
+}
+
+function createPrivateOutputControl(
+  terminalSourceTheme: 'dark' | 'light'
+): TerminalAgentPrivateOutputControl {
+  const token = randomBytes(24).toString('hex')
+  return {
+    environment: {
+      CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN: token,
+      CLEANCODE_TERMINAL_SOURCE_THEME: terminalSourceTheme
+    },
+    protocol: 'osc-633-span-v1',
+    token
   }
 }
 

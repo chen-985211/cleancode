@@ -6,6 +6,11 @@ describe('terminal Agent activity integration adapter', () => {
     const prepare = vi.fn(async (command) => ({
       environment: { ...command.environment, INTEGRATED: '1' },
       launchCommand: command.launchCommand,
+      privateOutputControl: {
+        protocol: 'osc-633-span-v1' as const,
+        token: 'private-output-token',
+        environment: { CLEANCODE_PRIVATE_OUTPUT_TOKEN: 'private-output-token' }
+      },
       shell: '/private/activity-shell'
     }))
     const adapter = new TerminalAgentActivityIntegrationAdapter({
@@ -16,12 +21,18 @@ describe('terminal Agent activity integration adapter', () => {
     await expect(adapter.prepare(runCommand)).resolves.toEqual({
       environment: { EXISTING: 'value', INTEGRATED: '1' },
       launchCommand: undefined,
+      privateOutputControl: {
+        protocol: 'osc-633-span-v1',
+        token: 'private-output-token',
+        environment: { CLEANCODE_PRIVATE_OUTPUT_TOKEN: 'private-output-token' }
+      },
       shell: '/private/activity-shell'
     })
     expect(prepare).toHaveBeenCalledWith({
       environment: { EXISTING: 'value' },
       launchCommand: undefined,
       shell: undefined,
+      terminalSourceTheme: 'light',
       terminal: runCommand.scope
     })
   })
@@ -70,6 +81,7 @@ const runCommand = {
     workspaceId: 'workspace-1'
   },
   sessionKind: 'interactive' as const,
+  terminalSourceTheme: 'light' as const,
   workingDirectory: '/workspace'
 }
 

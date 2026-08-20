@@ -31,6 +31,7 @@ describe('terminal Agent activity environment', () => {
     const prepared = await service.prepare({
       environment: { EXISTING: 'value', PATH: '/custom/bin:/usr/bin', ZDOTDIR: '/user/zsh' },
       launchCommand: undefined,
+      terminalSourceTheme: 'light',
       terminal
     })
 
@@ -45,6 +46,7 @@ describe('terminal Agent activity environment', () => {
       PATH: `/state/agent-activity/assets-v1/bin${posix.delimiter}/custom/bin:/usr/bin`
     })
     expect(prepared.environment?.ELECTRON_RUN_AS_NODE).toBeUndefined()
+    expect(prepared.privateOutputControl).toBeUndefined()
     const encodedScope = prepared.environment?.CLEANCODE_AGENT_ACTIVITY_SCOPE
     expect(JSON.parse(Buffer.from(encodedScope ?? '', 'base64url').toString('utf8'))).toEqual(
       terminal
@@ -64,6 +66,7 @@ describe('terminal Agent activity environment', () => {
       environment: { PATH: '/custom/bin:/usr/bin' },
       launchCommand: undefined,
       shell: '/usr/local/bin/fish',
+      terminalSourceTheme: 'light',
       terminal
     })
     expect(unsupportedShell.shell).toBe('/usr/local/bin/fish')
@@ -73,46 +76,64 @@ describe('terminal Agent activity environment', () => {
       environment: { PATH: '/custom/bin:/usr/bin' },
       launchCommand: 'printf ready',
       shell: '/bin/zsh',
+      terminalSourceTheme: 'light',
       terminal
     })
     expect(commandLaunch.shell).toBe('/bin/zsh')
     expect(commandLaunch.launchCommand).toBe('printf ready')
   })
 
-  it('preserves a case-insensitive Windows Path override without duplicate keys', async () => {
-    const service = new TerminalAgentActivityEnvironmentService({
-      assets: {
-        ensure: async () => ({
-          bashRcPath: 'C:\\state\\agent-activity\\assets-v1\\shell\\bashrc',
-          gatewayManifestPath: 'C:\\state\\agent-activity\\gateway.json',
-          hookRelayPath: 'C:\\state\\agent-activity\\assets-v1\\hook-relay.mjs',
-          launchSpecsPath: 'C:\\state\\agent-activity\\assets-v1\\launch-specs.json',
-          rootDirectory: 'C:\\state\\agent-activity',
-          shimDirectory: 'C:\\state\\agent-activity\\assets-v1\\bin',
-          shellLauncherPath: 'C:\\state\\agent-activity\\assets-v1\\shell\\launch',
-          zshDotDirectory: 'C:\\state\\agent-activity\\assets-v1\\shell\\zsh'
-        }),
-        publishGateway: vi.fn(async () => undefined)
-      },
-      inheritedPath: 'C:\\Windows\\System32',
-      platform: 'win32',
-      signer: new AgentHookIdentitySigner(Buffer.alloc(32, 7))
-    })
+  it.each(['light', 'dark'] as const)(
+    'preserves a case-insensitive Windows Path override and prepares a private %s output control',
+    async (terminalSourceTheme) => {
+      const service = new TerminalAgentActivityEnvironmentService({
+        assets: {
+          ensure: async () => ({
+            bashRcPath: 'C:\\state\\agent-activity\\assets-v1\\shell\\bashrc',
+            gatewayManifestPath: 'C:\\state\\agent-activity\\gateway.json',
+            hookRelayPath: 'C:\\state\\agent-activity\\assets-v1\\hook-relay.mjs',
+            launchSpecsPath: 'C:\\state\\agent-activity\\assets-v1\\launch-specs.json',
+            rootDirectory: 'C:\\state\\agent-activity',
+            shimDirectory: 'C:\\state\\agent-activity\\assets-v1\\bin',
+            shellLauncherPath: 'C:\\state\\agent-activity\\assets-v1\\shell\\launch',
+            zshDotDirectory: 'C:\\state\\agent-activity\\assets-v1\\shell\\zsh'
+          }),
+          publishGateway: vi.fn(async () => undefined)
+        },
+        inheritedPath: 'C:\\Windows\\System32',
+        platform: 'win32',
+        signer: new AgentHookIdentitySigner(Buffer.alloc(32, 7))
+      })
 
-    const prepared = await service.prepare({
-      environment: { EXISTING: 'value', Path: 'C:\\custom;C:\\Windows\\System32' },
-      launchCommand: undefined,
-      terminal: createTerminalScope()
-    })
+      const prepared = await service.prepare({
+        environment: { EXISTING: 'value', Path: 'C:\\custom;C:\\Windows\\System32' },
+        launchCommand: undefined,
+        terminalSourceTheme,
+        terminal: createTerminalScope()
+      })
 
-    expect(prepared.environment.PATH).toBe(
-      'C:\\state\\agent-activity\\assets-v1\\bin;C:\\custom;C:\\Windows\\System32'
-    )
-    expect(Object.keys(prepared.environment).filter((key) => key.toLowerCase() === 'path')).toEqual(
-      ['PATH']
-    )
-    expect(prepared.shell).toBeUndefined()
-  })
+      expect(prepared.environment.PATH).toBe(
+        'C:\\state\\agent-activity\\assets-v1\\bin;C:\\custom;C:\\Windows\\System32'
+      )
+      expect(
+        Object.keys(prepared.environment).filter((key) => key.toLowerCase() === 'path')
+      ).toEqual(['PATH'])
+      expect(prepared.shell).toBeUndefined()
+      expect(prepared.privateOutputControl).toEqual({
+        environment: {
+          CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN: expect.stringMatching(/^[a-f0-9]{48}$/),
+          CLEANCODE_TERMINAL_SOURCE_THEME: terminalSourceTheme
+        },
+        protocol: 'osc-633-span-v1',
+        token: expect.stringMatching(/^[a-f0-9]{48}$/)
+      })
+      expect(prepared.privateOutputControl?.token).toBe(
+        prepared.privateOutputControl?.environment.CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN
+      )
+      expect(prepared.environment.CLEANCODE_TERMINAL_OUTPUT_CONTROL_TOKEN).toBeUndefined()
+      expect(prepared.environment.CLEANCODE_TERMINAL_SOURCE_THEME).toBeUndefined()
+    }
+  )
 })
 
 function createTerminalScope(): AgentActivityTerminalScope {

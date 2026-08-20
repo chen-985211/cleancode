@@ -423,6 +423,7 @@ const runCommand = {
     workspaceId: 'workspace-1'
   },
   sessionKind: 'interactive' as const,
+  terminalSourceTheme: 'dark' as const,
   workingDirectory: '/workspace'
 }
 

@@ -23,6 +23,7 @@ import {
 import type { TerminalSourceTheme } from '../../domain/aggregates/TerminalSession'
 import { createTerminalProcessLaunch } from './TerminalShellCommand'
 import {
+  acceptForegroundJobFinalOutput,
   acceptForegroundJobOutput,
   createForegroundJobProbe,
   createForegroundJobShellControl,
@@ -31,6 +32,14 @@ import {
   type ForegroundJobShellControl
 } from './ForegroundJobShellControl'
 import { createTerminalProcessEnvironment } from './TerminalProcessEnvironment'
+import type { TerminalPrivateOutputControl } from './TerminalPrivateOutputControl'
+import {
+  acceptTerminalPrivateOutputControl,
+  applyTerminalPrivateOutputControlEnvironment,
+  createTerminalPrivateOutputControlLaunch,
+  flushTerminalPrivateOutputControl,
+  type TerminalPrivateOutputControlLaunch
+} from './TerminalPrivateOutputControlLaunch'
 import { interruptWindowsForegroundJob } from './WindowsForegroundJobInterrupt'
 import {
   WindowsAgentShellReadiness,
@@ -73,10 +82,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     this.runtimePlatform = options.runtimePlatform ?? platform()
     this.spawnPty = options.spawnPty ?? spawnPtyProcess
   }
-
   async start(command: StartTerminalProcessCommand): Promise<TerminalProcessHandle> {
     ensureNodePtySpawnHelperIsExecutable()
-
+    const privateOutputControlLaunch = createTerminalPrivateOutputControlLaunch(
+      command,
+      this.runtimePlatform
+    )
     const resolutionOptions: TerminalShellExecutableResolutionOptions = {
       explicitShell: command.shell,
       platform: this.runtimePlatform,
@@ -87,8 +98,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       process: ptyProcess,
       shell,
       shouldWaitForWindowsAgentShell
-    } = this.spawnTerminalProcess(command, resolvedShell)
-
+    } = this.spawnTerminalProcess(command, resolvedShell, privateOutputControlLaunch)
     let resolveExit: () => void = () => undefined
     const exited = new Promise<void>((resolve) => {
       resolveExit = resolve
@@ -101,6 +111,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       foregroundJobInterruptPromise: null,
       hasObservedShellOutput: false,
       pendingForegroundProbe: null,
+      privateOutputControl: privateOutputControlLaunch?.control ?? null,
       process: ptyProcess,
       shell,
       scope: command.scope,
@@ -115,8 +126,12 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       managedProcess.hasObservedShellOutput = true
       const pendingForegroundProbe = managedProcess.pendingForegroundProbe
       managedProcess.pendingForegroundProbe = null
+      const visibleData = acceptTerminalPrivateOutputControl(
+        managedProcess.privateOutputControl,
+        data
+      )
       const output = managedProcess.foregroundJob
-        ? acceptForegroundJobOutput(managedProcess.foregroundJob, data, {
+        ? acceptForegroundJobOutput(managedProcess.foregroundJob, visibleData, {
             onStarted: (identity) => managedProcess.foregroundJob?.command.onStarted(identity),
             onExit: (event) => {
               const control = managedProcess.foregroundJob
@@ -129,7 +144,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
               })
             }
           })
-        : data
+        : visibleData
       if (output) {
         command.onOutput({
           scope: command.scope,
@@ -143,6 +158,17 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
     })
     ptyProcess.onExit((event) => {
       windowsAgentShellReadiness?.acceptExit()
+      const visiblePendingOutput = acceptForegroundJobFinalOutput(
+        managedProcess.foregroundJob,
+        flushTerminalPrivateOutputControl(managedProcess.privateOutputControl)
+      )
+      if (visiblePendingOutput) {
+        command.onOutput({
+          scope: command.scope,
+          sessionId: command.scope.sessionId,
+          data: visiblePendingOutput
+        })
+      }
       if (this.processes.get(command.scope.sessionId) === managedProcess) {
         this.processes.delete(command.scope.sessionId)
       }
@@ -174,7 +200,6 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
       processId: ptyProcess.pid
     }
   }
-
   write(sessionId: string, input: string): void {
     const terminalProcess = this.requireProcess(sessionId)
 
@@ -288,7 +313,8 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
 
   private spawnTerminalProcess(
     command: StartTerminalProcessCommand,
-    resolvedShell: string
+    resolvedShell: string,
+    privateOutputControlLaunch: TerminalPrivateOutputControlLaunch | null
   ): SpawnedTerminalProcess {
     const candidates = createTerminalShellSpawnCandidates({
       environment: this.environment ?? process.env,
@@ -317,6 +343,17 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
             command.launchMode,
             this.runtimePlatform
           )
+      const processEnvironment = createTerminalProcessEnvironment({
+        explicit: command.environment,
+        inherited: process.env,
+        platform: this.runtimePlatform,
+        terminalSourceTheme: command.terminalSourceTheme
+      })
+      applyTerminalPrivateOutputControlEnvironment(
+        processEnvironment,
+        privateOutputControlLaunch,
+        this.runtimePlatform
+      )
       const spawnOptions = {
         name: terminalEmulationName,
         cols: command.columns,
@@ -324,12 +361,7 @@ export class NodePtyTerminalProcessAdapter implements TerminalProcessPort {
         cwd: command.workingDirectory,
         // The bundled ConPTY preserves VT queries and mouse modes on supported Windows 10 builds.
         ...(this.runtimePlatform === 'win32' ? { useConpty: true, useConptyDll: true } : {}),
-        env: createTerminalProcessEnvironment({
-          explicit: command.environment,
-          inherited: process.env,
-          platform: this.runtimePlatform,
-          terminalSourceTheme: command.terminalSourceTheme
-        })
+        env: processEnvironment
       }
       let ptyProcess: IPty
 
@@ -417,6 +449,7 @@ interface ManagedTerminalProcess {
   foregroundJobInterruptPromise: Promise<void> | null
   hasObservedShellOutput: boolean
   pendingForegroundProbe: string | null
+  readonly privateOutputControl: TerminalPrivateOutputControl | null
   readonly process: IPty
   readonly shell: string
   readonly scope: StartTerminalProcessCommand['scope']

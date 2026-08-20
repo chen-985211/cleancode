@@ -46,6 +46,11 @@ Agent application
   -> Run TerminalSessionService / ForegroundJob
 
 Run application
+  -> TerminalLaunchEnvironmentPreparationPort
+  -> Platform adapter
+  -> Agent ordinary-terminal launch decoration
+
+Run application
   -> RunRuntimeScopeValidationPort
   -> Platform adapter
   -> ValidateProjectWorkspaceScopeUseCase
@@ -144,6 +149,22 @@ CanvasArrangement 只引用 BlockGraph 与 Agent 已公开 DTO 中的稳定对�
 | 禁止             | Run 导入 Agent 聚合或 Provider 类型；Agent 访问 Run 会话表/PTY map；agent owner 参与 BlockGraph 工作流、组合或端口治理 |
 
 Provider CLI 退出只结束 Agent launch，不能被解释为 `TerminalSession` 退出。Agent 删除、挂起和项目生命周期清理通过该端口终止 terminal；普通键盘输入和原始 `Ctrl+C` 仍由 Run 写入当前 PTY。
+
+## Run 到 Agent：普通终端 launch decoration
+
+| 项目             | 说明                                                                                                                                                                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 发起方           | Run                                                                                                                                                                                                                                                         |
+| 调用方拥有的端口 | `TerminalLaunchEnvironmentPreparationPort`                                                                                                                                                                                                                  |
+| 提供方           | Agent 的 `TerminalAgentActivityEnvironmentService`                                                                                                                                                                                                          |
+| 适配器           | Platform 的 `TerminalAgentActivityIntegrationAdapter`                                                                                                                                                                                                       |
+| 触发条件         | 用户创建明确启用 Agent activity integration 的普通终端 generation                                                                                                                                                                                           |
+| 契约             | Run 传入完整 terminal scope 与固定 `terminalSourceTheme`；Agent 返回稳定 command shim 环境和可选 provider-neutral private output-control descriptor。Run 只在理解该 descriptor 时原子注入私有环境，并在输出进入权威模型前消费匹配 token 的显式 control span |
+| Agent 所有权     | CLI launch spec、shim、Hook、activity invocation，以及 Codex 是否需要 Win32 console-theme probe 的声明                                                                                                                                                      |
+| Run 所有权       | `terminalSourceTheme`、PTY、Console bridge 的激活、输出 gate、权威模型、持久化和 view 广播                                                                                                                                                                  |
+| 禁止             | Run 按 Provider ID 分支；Agent 读取或解析 PTY 输出；Agent 取得 xterm palette 或模型所有权；普通 PowerShell bootstrap 全局固定 ConsoleColor；把随机 token、环境变量或终端输出写入诊断日志                                                                    |
+
+该协作把“哪个 CLI 需要宿主 probe”与“如何安全提供宿主 probe”分开：当前只有 Windows Codex launch spec 声明该能力，Run gate 只理解版本化 transport descriptor，不理解 Codex 或 activity。descriptor 的私有环境不并入公开 process environment；旧 Terminal Provider 或旧 NodePty adapter 忽略未知字段时不会触发 shim setter，因此保持安全降级而不是产生未过滤的 ConPTY SGR。shim 只发送显式技术控制帧，不从 Provider 正文推断 activity；绝对路径或绕过稳定 `PATH` shim 的命令继续诚实降级。
 
 ## Run 到 Project：终端运行作用域有效性
 
