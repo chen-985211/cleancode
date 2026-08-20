@@ -29,7 +29,7 @@ mac:
         - universal
 
 win:
-  icon: public/app-icon.png
+  icon: public/app-icon-windows.png
   target:
     - target: nsis
       arch:
