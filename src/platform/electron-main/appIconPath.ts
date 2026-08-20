@@ -4,13 +4,20 @@ export interface ResolveAppIconPathOptions {
   readonly fileExists: (path: string) => boolean
   readonly isDevelopment: boolean
   readonly mainDirectory: string
+  readonly platform?: NodeJS.Platform
   readonly projectDirectory: string
 }
 
 export function resolveAppIconPath(options: ResolveAppIconPathOptions): string | undefined {
-  const candidatePath = options.isDevelopment
-    ? join(options.projectDirectory, 'public', 'app-icon.png')
-    : join(options.mainDirectory, '..', 'renderer', 'app-icon.png')
+  const iconDirectory = options.isDevelopment
+    ? join(options.projectDirectory, 'public')
+    : join(options.mainDirectory, '..', 'renderer')
+  const candidateFileNames =
+    (options.platform ?? process.platform) === 'win32'
+      ? ['app-icon-windows.png', 'app-icon.png']
+      : ['app-icon.png']
 
-  return options.fileExists(candidatePath) ? candidatePath : undefined
+  return candidateFileNames
+    .map((fileName) => join(iconDirectory, fileName))
+    .find(options.fileExists)
 }
