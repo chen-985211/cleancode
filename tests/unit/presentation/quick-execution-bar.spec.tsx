@@ -254,7 +254,7 @@ describe('quick execution bar', () => {
     expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBe(popover)
   })
 
-  it('clears a filled slot when it is dropped into the temporary black-hole target', () => {
+  it('clears a filled slot while its intact proxy springs into the black hole', () => {
     const onClear = vi.fn()
     render(
       <QuickExecutionBar
@@ -339,11 +339,36 @@ describe('quick execution bar', () => {
     fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 340, clientY: 198 }))
     expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
 
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 576, clientY: 198 }))
     fireEvent.dragEnter(blackHole)
     fireEvent.drop(blackHole)
 
     expect(onClear).toHaveBeenCalledWith(2)
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-quick-execution-drag-proxy]')).not.toBeInTheDocument()
+    const clearAnimation = document.querySelector<HTMLElement>(
+      '[data-quick-execution-clear-animation]'
+    )!
+    expect(clearAnimation).toBeInTheDocument()
+    expect(clearAnimation).toHaveClass(
+      'workbench-object-motion--delete',
+      'workbench-object-motion--spatial'
+    )
+    expect(clearAnimation).toHaveStyle({
+      height: '36px',
+      left: '481.5px',
+      top: '0px',
+      width: '85px'
+    })
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-48px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-scale')).toBe('1')
+    expect(clearAnimation).toHaveTextContent('2Worker')
+    expect(blackHole).toHaveClass(
+      'quick-execution__black-hole--visible',
+      'quick-execution__black-hole--target',
+      'quick-execution__black-hole--clearing'
+    )
   })
 
   it('restores the source slot when a black-hole drag is cancelled', () => {

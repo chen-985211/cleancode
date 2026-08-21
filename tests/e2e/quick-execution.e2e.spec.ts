@@ -433,6 +433,60 @@ describe('quick execution e2e', () => {
         })
       }
       await page.mouse.up()
+      const clearAnimation = page.locator('[data-quick-execution-clear-animation]')
+      await clearAnimation.waitFor({ state: 'attached', timeout: 2_000 })
+      const clearAnimationState = await clearAnimation.evaluate((element) => {
+        const style = getComputedStyle(element)
+        const root = element.closest<HTMLElement>('[data-quick-execution-bar]')
+        const rootBounds = root?.getBoundingClientRect()
+        const blackHoleBounds = root
+          ?.querySelector<HTMLElement>('[data-quick-execution-trash]')
+          ?.getBoundingClientRect()
+        const width = Number.parseFloat(style.width)
+        const height = Number.parseFloat(style.height)
+        const left = Number.parseFloat(style.left)
+        const top = Number.parseFloat(style.top)
+        return {
+          classNames: [...element.classList],
+          height,
+          motionId: element.getAttribute('data-quick-execution-clear-motion'),
+          scale: Number.parseFloat(style.getPropertyValue('--workbench-object-motion-scale')),
+          blackHoleCenter: blackHoleBounds
+            ? {
+                x: blackHoleBounds.left + blackHoleBounds.width / 2,
+                y: blackHoleBounds.top + blackHoleBounds.height / 2
+              }
+            : null,
+          targetCenter:
+            rootBounds && Number.isFinite(left) && Number.isFinite(top)
+              ? {
+                  x: rootBounds.left + left + width / 2,
+                  y: rootBounds.top + top + height / 2
+                }
+              : null,
+          width
+        }
+      })
+      expect(clearAnimationState.classNames).toEqual(
+        expect.arrayContaining([
+          'quick-execution__clear-animation',
+          'workbench-object-motion--delete',
+          'workbench-object-motion--spatial'
+        ])
+      )
+      expect(clearAnimationState.motionId).toMatch(/^quick-execution-clear:/)
+      expect(clearAnimationState.width).toBeCloseTo(quickSlotBox.width, 0)
+      expect(clearAnimationState.height).toBeCloseTo(quickSlotBox.height, 0)
+      expect(clearAnimationState.scale).toBeGreaterThanOrEqual(0)
+      expect(clearAnimationState.scale).toBeLessThanOrEqual(1)
+      expect(clearAnimationState.targetCenter?.x).toBeCloseTo(
+        clearAnimationState.blackHoleCenter?.x ?? Number.NaN,
+        0
+      )
+      expect(clearAnimationState.targetCenter?.y).toBeCloseTo(
+        clearAnimationState.blackHoleCenter?.y ?? Number.NaN,
+        0
+      )
       const clearedTarget = await pollUntilState({
         description: 'quick execution slot 2 target to be cleared',
         observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target,
@@ -441,6 +495,12 @@ describe('quick execution e2e', () => {
       })
       expect(clearedTarget).toBeNull()
       await restoredSlot.waitFor({ state: 'detached' })
+      await clearAnimation.waitFor({ state: 'detached', timeout: 5_000 })
+      expect(
+        await trashTarget.evaluate((element) =>
+          element.classList.contains('quick-execution__black-hole--clearing')
+        )
+      ).toBe(false)
     },
     electronScenarioTimeoutMs
   )

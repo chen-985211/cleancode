@@ -266,6 +266,13 @@
   transform-origin: 0 0;
 }
 
+.quick-execution__clear-animation {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  transform-origin: center;
+}
+
 .quick-execution__drag-proxy-card {
   width: 100%;
   height: 100%;
@@ -337,6 +344,10 @@
 .quick-execution__black-hole--target {
   opacity: 1;
   transform: translateY(0);
+}
+
+.quick-execution__black-hole--clearing {
+  pointer-events: none;
 }
 
 .quick-execution__black-hole-hint {
