@@ -1,48 +1,45 @@
-<p align="right">
-  <strong>简体中文</strong> · <a href="./README.md">English</a>
-</p>
-
-<div align="center">
-  <img src="./public/app-icon.png" alt="cleancode" width="112" />
-
-  <h1>cleancode</h1>
-
-  <p><strong>让每个开发分支拥有自己的 Agent、终端和可执行工作流。</strong></p>
-
-  <p>隔离同时推进的需求，组织零散的开发工具，并按真实依赖运行它们。</p>
-
-  <p><em>One branch. One visible, executable workspace.</em></p>
-
-  <p>
-    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
-    <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
-    <a href="#快速开始"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-    <a href="#带上你喜欢的-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-    <a href="#画出来也运行起来"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
-  </p>
-
-  <p>
-    <strong><a href="https://github.com/chen-985211/cleancode/releases">下载 CleanCode Preview（macOS / Windows / Linux）</a></strong>
-  </p>
-</div>
+<h1 align="center">
+  <img src="./public/app-icon.png" alt="CleanCode" width="96" valign="middle" /> CleanCode
+</h1>
 
 <p align="center">
-  <img src="./docs/assets/cleancode-workflow-demo.png" alt="cleancode 画布中的多 Agent、终端工作流与 Git 分支工作区" />
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
+  <a href="#带上你喜欢的-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+  <a href="#画出来也运行起来"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+</p>
+
+<p align="center">
+  <sub><strong>简体中文</strong> · <a href="./README.md">English</a></sub>
+</p>
+
+<p align="center">
+  <strong>让每个开发分支拥有自己的 Agent、终端和可执行工作流。</strong><br />
+  隔离同时推进的需求，组织零散的开发工具，并按真实依赖运行它们。
+</p>
+
+<p align="center"><em>一个分支，一个可见、可执行的工作空间。</em></p>
+
+<h3 align="center">
+  <a href="https://github.com/chen-985211/cleancode/releases"><ins>下载 CleanCode Preview（macOS / Windows / Linux）</ins></a>
+</h3>
+
+<p align="center">
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="CleanCode 画布中的多 Agent、终端工作流与 Git 分支工作区" width="960" />
 </p>
 
 <p align="center"><sub>同一分支工作区中的 Coding Agent、终端任务、长驻服务与真实依赖连线。</sub></p>
 
 ---
 
-同时推进多个需求时，Coding Agent、终端、开发服务和工作目录很容易散落在不同窗口里。切换分支之后，你还要重新确认命令在哪个目录运行、哪些服务已经启动，以及 Agent 仍在处理哪一个需求。
+软件开发正在从“一个人写代码”，变成“人和 Agent 一起推进多个开发现场”。一个需求可能有自己的分支、终端、服务、测试命令、端口和 Agent 对话；另一个需求也有一套类似的现场。问题不在于工具不够多，而是这些现场一旦散落到不同窗口里，人就必须不断靠记忆把它们重新拼起来：这个终端属于哪个分支，服务是否还活着，端口有没有冲突，依赖有没有就绪，Agent 现在理解的上下文是否还是当前需求。所以我越来越觉得，开发环境不应该只围绕代码文件和编辑器组织，而应该围绕一次正在推进的需求组织。它需要同时记住分支、终端、服务、端口、依赖顺序和 Agent 上下文，并且让这些东西以一种人能看懂、Agent 也能操作的方式存在。
 
-**cleancode 是一个画布优先、本地优先的可执行开发工作空间。** 它为本地项目和 Git 分支工作区保留独立画布，把交互式终端、依赖工作流和你熟悉的 Coding Agent 组织在一起，让每个需求的开发环境保持隔离、可见、可运行。
-
-cleancode 不是完整 IDE，也不提供文件树或代码编辑器。你继续使用现有编辑器、命令行工具和 Coding Agent；cleancode 负责组织它们所在的工作区，并运行真实的本地命令。
+**CleanCode 是一个画布式 ADE（Agentic Development Environment）。** 它为本地项目和 Git 分支工作区保留独立画布，把交互式终端、依赖工作流和你熟悉的 Coding Agent 组织在一起，让每个需求的开发环境保持隔离、可见、可运行；跑通的开发现场，也可以沉淀为项目内或全局可复用的资产。
 
 ## 一个需求，一个独立工作区
 
-为 `feature/auth` 创建分支工作区后，cleancode 会用独立 Git worktree 隔离它的目录，并让画布、终端、运行作用域和 Agent 会话跟随这个工作区一起切换：
+为 `feature/auth` 创建分支工作区后，CleanCode 会用独立 Git worktree 隔离它的目录，并让画布、终端、运行作用域和 Agent 会话跟随这个工作区一起切换：
 
 ```txt
 feature/auth（独立 worktree）
@@ -54,11 +51,11 @@ feature/auth（独立 worktree）
 
 你可以同时推进 `feature/auth`、`fix/search` 和 `experiment/new-ui`。返回任一工作区时，不必先清空终端、重新确认工作目录，或再次提醒 Agent“我们已经换分支了”。
 
-切换到另一个需求后，仍在运行的普通终端会继续工作并保留输出。两个分支需要同时启动同一个开发服务时，还可以使用优选或自动端口：cleancode 会分配可用端口、把结果注入启动环境或命令参数，并在画布上显示本次运行的实际地址。
+切换到另一个需求后，仍在运行的普通终端会继续工作并保留输出。两个分支需要同时启动同一个开发服务时，还可以使用优选或自动端口：CleanCode 会分配可用端口、把结果注入启动环境或命令参数，并在画布上显示本次运行的实际地址。
 
 ## 画出来，也运行起来
 
-一套开发环境通常不只需要一条命令：先安装或构建，再等待 API 服务就绪，最后启动 Web 应用和测试。cleancode 让这些启动条件成为工作流的一部分，而不是留在脚本注释或人的记忆里。
+一套开发环境通常不只需要一条命令：先安装或构建，再等待 API 服务就绪，最后启动 Web 应用和测试。CleanCode 让这些启动条件成为工作流的一部分，而不是留在脚本注释或人的记忆里。
 
 - 终端积木运行真实的构建、测试、开发服务器和日常命令。
 - 有向连接声明真实依赖；没有上游的任务可以并行启动，下游等待全部直接依赖完成或就绪。
@@ -72,15 +69,15 @@ feature/auth（独立 worktree）
 
 ## 带上你喜欢的 Agent
 
-**换 Agent，不必换工作方式。** cleancode 不内置一个新的 Coding Agent，而是让你已经在使用的本地 Agent CLI 进入当前分支工作区。
+**换 Agent，不必换工作方式。** CleanCode 不内置一个新的 Coding Agent，而是让你已经在使用的本地 Agent CLI 进入当前分支工作区。
 
-Agent 接入分为两层：所有内建 Provider 都可以拥有独立控制台；支持原生 cleancode MCP 的 Agent 还可以读取、检查和搭建当前画布中的终端工作流。
+Agent 接入分为两层：所有内建 Provider 都可以拥有独立控制台；支持原生 CleanCode MCP 的 Agent 还可以读取、检查和搭建当前画布中的终端工作流。
 
-新建 Agent 时，cleancode 会检查本机已经安装的 Provider CLI，只把当前可用的 Agent 放入新建菜单。
+新建 Agent 时，CleanCode 会检查本机已经安装的 Provider CLI，只把当前可用的 Agent 放入新建菜单。
 
 <!-- agent-provider-wall:start -->
 
-cleancode 内建 **33 个 Coding Agent Provider**。每个 Agent 都使用对应的真实本地 CLI，并在当前工作区目录中运行；同一个工作区可以同时创建多个相同或不同 Provider 的 Agent。
+CleanCode 内建 **33 个 Coding Agent Provider**。每个 Agent 都使用对应的真实本地 CLI，并在当前工作区目录中运行；同一个工作区可以同时创建多个相同或不同 Provider 的 Agent。
 
 <p>
   <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="./docs/assets/agent-providers/claude-code.svg" width="18" height="18" alt="" /> Claude Code</kbd></a>
@@ -124,17 +121,19 @@ cleancode 内建 **33 个 Coding Agent Provider**。每个 Agent 都使用对应
 
 ## 让 Agent 参与搭建
 
-支持原生 cleancode MCP 的 Agent 通过稳定工具理解和整理同一个工作空间，而不是直接修改画布内部数据。例如，你可以直接告诉 Agent：
+支持原生 CleanCode MCP 的 Agent 通过稳定工具理解和整理同一个工作空间，而不是直接修改画布内部数据。例如，你可以直接告诉 Agent：
 
 > 查看当前项目，帮我创建安装依赖、启动 API 和启动 Web 的终端，配置正确的依赖、服务就绪条件和端口。
 
 Agent 会先检查现有画布，必要时读取项目以确认真实启动命令，再通过 MCP 创建、配置、连接并校验完整工作流。结果会作为一次完整变更落到画布；你可以检查终端、依赖、端口和执行计划，再决定是否运行。
 
-删除积木、解散组合和断开依赖需要在 cleancode 界面中审批；启动与停止工作流仍由人控制。Agent 可以参与搭建，但改变本地开发环境的动作始终对人可见。
+删除积木、解散组合和断开依赖需要在 CleanCode 界面中审批；启动与停止工作流仍由人控制。Agent 可以参与搭建，但改变本地开发环境的动作始终对人可见。
 
 ## 搭一次，随时复用
 
-当“安装依赖 → API 服务 → Web 应用与测试”这套流程验证通过后，可以把它保存为项目模板。下一个分支只需选择“放置”或“放置并运行”，cleancode 就会创建一套拥有独立身份的新终端和连接，不必重新填写命令、端口与启动顺序。需要跨项目使用时，也可以把模板移到全局收藏。
+很多开发现场并不是一次性的。你第一次把“安装依赖 → API 服务 → Web 应用与测试”跑通，后面真正想保存的，其实不只是一条命令，而是命令、依赖关系、端口策略和相对布局共同组成的一整套经验。
+
+在 CleanCode 里，验证过的终端、流程或组合可以保存为项目模板；如果它适合更多项目，也可以移到全局收藏。下一个分支只需要选择“放置”或“放置并运行”，CleanCode 就会创建一套拥有独立身份的新终端和连接，不必重新填写命令、端口与启动顺序。
 
 模板保存配置、依赖和相对布局，但不会复制终端输出、运行状态、实际端点、Agent 或 Agent 对话。你也可以把常用终端、完整流程或组合绑定到当前工作区的 `1` 至 `5` 快捷执行位，再用 `Command/Ctrl + 1` 至 `5` 启动。
 
@@ -226,7 +225,7 @@ macOS 使用 ad-hoc 签名且未 notarize，Windows 安装程序未签名，因�
 
 ## 当前边界
 
-cleancode 正在积极开发，当前版本需要注意：
+CleanCode 正在积极开发，当前版本需要注意：
 
 - 当前可执行积木类型仍以终端为核心，并支持终端依赖流程与终端组合；Preview、HTTP、Test、File 和 Plugin 等独立积木类型仍在路线图中。
 - 终端之间的连接只表达启动依赖，不会在节点之间传递标准输出、文件或结构化产物。
@@ -253,7 +252,7 @@ cleancode 正在积极开发，当前版本需要注意：
 - [UI 契约](./docs/product/ui-contract.md)
 - [终端依赖工作流](./docs/contexts/run/terminal-workflow.md)
 - [Agent 与会话生命周期](./docs/contexts/agent/agent-session.md)
-- [cleancode 原生 MCP](./docs/contexts/agent/cleancode-mcp.md)
+- [CleanCode 原生 MCP](./docs/contexts/agent/cleancode-mcp.md)
 - [开发协作规范](./docs/engineering/development.md)
 
 ## 参与贡献

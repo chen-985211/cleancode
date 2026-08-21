@@ -160,14 +160,14 @@ function renderProviderWall(providers, locale) {
 function renderProviderWallCopy(locale, providerCount) {
   if (locale === 'en') {
     return {
-      introduction: `cleancode includes **${providerCount} Coding Agent Providers**. Each Agent runs the corresponding real local CLI in the current workspace directory; one workspace can host multiple Agents from the same or different Providers.`,
+      introduction: `CleanCode includes **${providerCount} Coding Agent Providers**. Each Agent runs the corresponding real local CLI in the current workspace directory; one workspace can host multiple Agents from the same or different Providers.`,
       conclusion:
         '**Keep using the Agents you already know, with the current branch, terminals, and runtime state in the same workspace.**'
     }
   }
   if (locale === 'zh-CN') {
     return {
-      introduction: `cleancode 内建 **${providerCount} 个 Coding Agent Provider**。每个 Agent 都使用对应的真实本地 CLI，并在当前工作区目录中运行；同一个工作区可以同时创建多个相同或不同 Provider 的 Agent。`,
+      introduction: `CleanCode 内建 **${providerCount} 个 Coding Agent Provider**。每个 Agent 都使用对应的真实本地 CLI，并在当前工作区目录中运行；同一个工作区可以同时创建多个相同或不同 Provider 的 Agent。`,
       conclusion:
         '**继续使用你熟悉的 Agent，同时让它们与当前分支、终端和运行状态保持在同一个工作区。**'
     }
