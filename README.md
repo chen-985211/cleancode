@@ -1,33 +1,30 @@
-<p align="right">
-  <a href="./README_ZH.md">简体中文</a> · <strong>English</strong>
-</p>
-
-<div align="center">
-  <img src="./public/app-icon.png" alt="cleancode" width="112" />
-
-  <h1>cleancode</h1>
-
-  <p><strong>Give every development branch its own Agents, terminals, and executable workflow.</strong></p>
-
-  <p>Keep parallel work isolated, organize scattered development tools, and run them according to real dependencies.</p>
-
-  <p><em>One branch. One visible, executable workspace.</em></p>
-
-  <p>
-    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
-    <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
-    <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
-    <a href="#bring-your-favorite-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
-    <a href="#draw-it-and-run-it"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
-  </p>
-
-  <p>
-    <strong><a href="https://github.com/chen-985211/cleancode/releases">Download CleanCode Preview (macOS / Windows / Linux)</a></strong>
-  </p>
-</div>
+<h1 align="center">
+  <img src="./public/app-icon.png" alt="CleanCode" width="80" valign="middle" /> CleanCode
+</h1>
 
 <p align="center">
-  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the cleancode canvas" />
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><img src="https://img.shields.io/badge/download-Preview-orange.svg" alt="Download Preview" /></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg" alt="macOS, Windows and Linux" /></a>
+  <a href="#bring-your-favorite-agent"><img src="https://img.shields.io/badge/agents-33%20providers-blueviolet.svg" alt="33 Coding Agent Providers" /></a>
+  <a href="#draw-it-and-run-it"><img src="https://img.shields.io/badge/workflow-visual%20%26%20executable-brightgreen.svg" alt="Visual and executable workflows" /></a>
+</p>
+
+<p align="center">
+  <sub><a href="./README_ZH.md">简体中文</a> · <strong>English</strong></sub>
+</p>
+
+<p align="center">
+  <strong>Give every development branch its own Agents, terminals, and executable workflow.</strong><br />
+  Keep parallel work isolated, organize scattered development tools, and run them according to real dependencies.
+</p>
+
+<h3 align="center">
+  <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview</ins></a>
+</h3>
+
+<p align="center">
+  <img src="./docs/assets/cleancode-workflow-demo.png" alt="Multiple Agents, terminal workflows, and Git branch workspaces on the cleancode canvas" width="960" />
 </p>
 
 <p align="center"><sub>Coding Agents, terminal tasks, long-running services, and real dependency connections in one branch workspace.</sub></p>
