@@ -107,6 +107,7 @@ export type WorkbenchObjectMotionKind =
   | 'group-join'
   | 'group-leave'
   | 'group-reflow'
+  | 'move'
 
 interface WorkbenchObjectMotionRect {
   readonly x: number

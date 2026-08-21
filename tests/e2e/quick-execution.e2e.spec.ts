@@ -319,6 +319,20 @@ describe('quick execution e2e', () => {
       })
       expect(settledFarState).toEqual({ animationName: 'none', isNear: false })
 
+      await page.mouse.move(quickSlotBox.x + quickSlotBox.width / 2, quickSlotBox.y - 180, {
+        steps: 8
+      })
+      await page.mouse.up()
+      const returningProxy = page.locator('[data-quick-execution-return-animation]')
+      await returningProxy.waitFor({ state: 'visible' })
+      await returningProxy.waitFor({ state: 'detached' })
+      expect(await quickSlot.getAttribute('class')).not.toContain('quick-execution__slot--dragging')
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2,
+        quickSlotBox.y + quickSlotBox.height / 2
+      )
+      await page.mouse.down()
+
       await page.mouse.move(trashBox.x + 8, trashBox.y + trashBox.height / 2, {
         steps: 8
       })

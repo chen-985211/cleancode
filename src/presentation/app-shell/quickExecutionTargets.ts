@@ -1,5 +1,6 @@
 import type {
   BlockGraphSnapshot,
+  QuickExecutionSlotNumber,
   QuickExecutionTargetSnapshot,
   TerminalBlockSnapshot
 } from '../../contexts/block-graph/application/dto/BlockGraphSnapshot'
@@ -18,6 +19,19 @@ export interface QuickExecutionCandidate {
 
 export interface QuickExecutionBindingProjection extends QuickExecutionCandidate {
   readonly isAvailable: boolean
+}
+
+export function readQuickExecutionSlots(graph: BlockGraphSnapshot): readonly {
+  readonly number: QuickExecutionSlotNumber
+  readonly target: QuickExecutionTargetSnapshot | null
+}[] {
+  return (
+    graph.quickExecutionSlots ??
+    [1, 2, 3, 4, 5].map((number) => ({
+      number: number as QuickExecutionSlotNumber,
+      target: null
+    }))
+  )
 }
 
 export function listQuickExecutionCandidates(graph: BlockGraphSnapshot): QuickExecutionCandidate[] {
