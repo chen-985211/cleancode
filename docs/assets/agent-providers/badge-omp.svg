@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="30" viewBox="0 0 72 30" role="img" aria-label="OMP">
+<rect x="0.5" y="0.5" width="71" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<defs><linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.7 0.24 340)"/><stop offset=".5" stop-color="oklch(0.62 0.21 295)"/><stop offset="1" stop-color="oklch(0.81 0.14 200)"/></linearGradient></defs><g color="#e6edf3" transform="translate(8 6) scale(0.281) translate(0 0)"><path d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" fill="url(#brand)"/></g>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">OMP</text>
+</svg>

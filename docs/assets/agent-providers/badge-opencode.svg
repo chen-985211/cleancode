@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="112" height="30" viewBox="0 0 112 30" role="img" aria-label="OpenCode">
+<rect x="0.5" y="0.5" width="111" height="29" rx="6" fill="#24292f" stroke="#444d56"/>
+<g color="#e6edf3" transform="translate(8 6) scale(0.035) translate(0 0)"><path d="M0 0H512V512H0Z" fill="#131010"/><path d="M320 224V352H192V224H320Z" fill="#5A5858"/><path d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="#FFFFFF" fill-rule="evenodd"/></g>
+<text x="34" y="15.5" fill="#e6edf3" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="600" dominant-baseline="middle">OpenCode</text>
+</svg>
