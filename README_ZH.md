@@ -15,11 +15,11 @@
 </p>
 
 <p align="center">
-  <strong>让每个开发分支拥有自己的 Agent、终端和可执行工作流。</strong><br />
-  隔离同时推进的需求，组织零散的开发工具，并按真实依赖运行它们。
+  <strong>一个画布式 ADE，把每个需求的 Agent、终端和工作流放进同一张可运行的开发现场。</strong><br />
+  从分支隔离开始，保留上下文、运行状态和可以复用的开发经验。
 </p>
 
-<p align="center"><em>一个分支，一个可见、可执行的工作空间。</em></p>
+<p align="center"><em>一个需求，一张可见、可执行的开发现场。</em></p>
 
 <h3 align="center">
   <a href="https://github.com/chen-985211/cleancode/releases"><ins>下载 CleanCode Preview（macOS / Windows / Linux）</ins></a>
@@ -156,6 +156,8 @@ Agent 会先检查现有画布，再读取项目，判断这个项目应该先�
 
 ## 快速开始
 
+如果你只是想先把 CleanCode 跑起来，不需要先理解所有概念，按下面几步就够了。
+
 ### 下载 Preview
 
 从 [GitHub Releases](https://github.com/chen-985211/cleancode/releases) 下载对应平台的安装包：
@@ -233,7 +235,7 @@ macOS 使用 ad-hoc 签名且未 notarize，Windows 安装程序未签名，因�
 
 ## 当前边界
 
-CleanCode 正在积极开发，当前版本需要注意：
+也需要直接说清楚：CleanCode 现在还是 Preview。它已经能把终端、Agent、分支工作区和可执行工作流组织到一起，但有些边界还没有完全打开。
 
 - 当前可执行积木类型仍以终端为核心，并支持终端依赖流程与终端组合；Preview、HTTP、Test、File 和 Plugin 等独立积木类型仍在路线图中。
 - 终端之间的连接只表达启动依赖，不会在节点之间传递标准输出、文件或结构化产物。
@@ -244,6 +246,8 @@ CleanCode 正在积极开发，当前版本需要注意：
 - GitHub Releases 中的预构建安装包当前属于未正式签名的 Preview，不是已签名正式发行版。
 
 ## 设计原则
+
+这些原则不是装饰性的口号，而是为了保证画布看起来自由，但运行起来仍然可信。
 
 - **画布不是事实来源。** 它只投影领域模型与运行状态。
 - **人和 Agent 共享用例。** Agent 不绕过应用边界直接操纵内部实现。
@@ -276,7 +280,7 @@ CleanCode 正在积极开发，当前版本需要注意：
 <div align="center">
   <h2>加入 CleanCode 社区</h2>
 
-  <p>交流工作流搭建、Agent 使用和开发体验，也欢迎分享反馈与建议。</p>
+  <p>分享你搭出来的工作流、Agent 使用方式和 Preview 反馈。</p>
 
   <img src="./docs/assets/cleancode-qq-group.png" alt="扫码加入 CleanCode QQ 群（群号：186885114）" width="320" />
 

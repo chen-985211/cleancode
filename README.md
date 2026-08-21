@@ -15,11 +15,11 @@
 </p>
 
 <p align="center">
-  <strong>Give every development branch its own Agents, terminals, and executable workflow.</strong><br />
-  Keep parallel work isolated, organize scattered development tools, and run them according to real dependencies.
+  <strong>A canvas-based ADE that puts each feature's Agents, terminals, and workflows into one runnable development context.</strong><br />
+  Start with branch isolation, keep context and runtime state, and turn proven setups into reusable development assets.
 </p>
 
-<p align="center"><em>One branch. One visible, executable workspace.</em></p>
+<p align="center"><em>One feature. One visible, executable development context.</em></p>
 
 <h3 align="center">
   <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview (macOS / Windows / Linux)</ins></a>
@@ -156,6 +156,8 @@ Once the workflow runs, start it from the root terminal and inspect startup orde
 
 ## Quick Start
 
+If you just want to get CleanCode running, you do not need to understand every concept first. The steps below are enough.
+
 ### Download the Preview
 
 Download the installer for your platform from [GitHub Releases](https://github.com/chen-985211/cleancode/releases):
@@ -222,7 +224,7 @@ When you push a `v*` tag that matches the version in `package.json`, GitHub Acti
 
 ## Current Limitations
 
-CleanCode is under active development. Keep these current limitations in mind:
+It is worth saying this directly: CleanCode is still a Preview. It can already organize terminals, Agents, branch workspaces, and executable workflows together, but some boundaries are not fully open yet.
 
 - Executable block types currently remain terminal-centered, with terminal dependency workflows and terminal combinations. Preview, HTTP, Test, File, Plugin, and other standalone block types remain on the roadmap.
 - Connections between terminals express startup dependencies only; they do not pass standard output, files, or structured artifacts between nodes.
@@ -233,6 +235,8 @@ CleanCode is under active development. Keep these current limitations in mind:
 - The prebuilt packages on GitHub Releases are unsigned Preview builds, not signed production releases.
 
 ## Design Principles
+
+These principles are not decorative slogans. They exist so the canvas can feel free while the runtime stays trustworthy.
 
 - **The canvas is not the source of truth.** It only projects the domain model and runtime state.
 - **People and Agents share the same use cases.** Agents do not bypass application boundaries to manipulate internal implementations.
@@ -265,7 +269,7 @@ Issues, discussions, and pull requests are welcome. Before you begin, read the [
 <div align="center">
   <h2>Join the CleanCode Community</h2>
 
-  <p>Talk workflows, Coding Agents, and developer experience—and share your feedback and ideas.</p>
+  <p>Share the workflows you build, the way you use Agents, and Preview feedback.</p>
 
   <img src="./docs/assets/cleancode-qq-group.png" alt="Scan to join the CleanCode QQ group (group number: 186885114)" width="320" />
 
