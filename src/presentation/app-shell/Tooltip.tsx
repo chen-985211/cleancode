@@ -90,17 +90,23 @@ export function TooltipContent({
 export function TooltipLabel({
   children,
   content,
+  dismissOnDragStart = false,
   ...contentProps
 }: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
+  readonly dismissOnDragStart?: boolean
 }) {
   const inputModeRef = useContext(TooltipInputModeContext)
 
   if (!inputModeRef) {
     return (
       <TooltipProvider>
-        <TooltipLabelWithInputMode content={content} {...contentProps}>
+        <TooltipLabelWithInputMode
+          content={content}
+          dismissOnDragStart={dismissOnDragStart}
+          {...contentProps}
+        >
           {children}
         </TooltipLabelWithInputMode>
       </TooltipProvider>
@@ -108,7 +114,12 @@ export function TooltipLabel({
   }
 
   return (
-    <TooltipLabelWithInputMode inputModeRef={inputModeRef} content={content} {...contentProps}>
+    <TooltipLabelWithInputMode
+      inputModeRef={inputModeRef}
+      content={content}
+      dismissOnDragStart={dismissOnDragStart}
+      {...contentProps}
+    >
       {children}
     </TooltipLabelWithInputMode>
   )
@@ -117,15 +128,18 @@ export function TooltipLabel({
 function TooltipLabelWithInputMode({
   children,
   content,
+  dismissOnDragStart,
   inputModeRef,
   ...contentProps
 }: Omit<ComponentProps<typeof TooltipContent>, 'children' | 'content'> & {
   readonly children: ReactElement
   readonly content: ReactNode
+  readonly dismissOnDragStart: boolean
   readonly inputModeRef?: MutableRefObject<TooltipInputMode>
 }) {
   const contextInputModeRef = useContext(TooltipInputModeContext)
   const resolvedInputModeRef = inputModeRef ?? contextInputModeRef
+  const dragInProgressRef = useRef(false)
   const pointerInsideRef = useRef(false)
   const [isOpen, setIsOpen] = useState(false)
 
@@ -142,7 +156,17 @@ function TooltipLabelWithInputMode({
     >
       <TooltipTrigger
         asChild
+        onDragStart={() => {
+          if (!dismissOnDragStart) return
+          dragInProgressRef.current = true
+          pointerInsideRef.current = false
+          setIsOpen(false)
+        }}
+        onDragEnd={() => {
+          dragInProgressRef.current = false
+        }}
         onPointerMove={() => {
+          if (dragInProgressRef.current) return
           pointerInsideRef.current = true
         }}
         onPointerLeave={() => {

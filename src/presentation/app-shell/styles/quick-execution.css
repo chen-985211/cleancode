@@ -38,8 +38,7 @@
   backdrop-filter: blur(10px);
   transition:
     border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    background var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+    background var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
 .quick-execution__slot--filled {
@@ -54,7 +53,7 @@
 
 .quick-execution__slot--dragging {
   cursor: grabbing;
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .quick-execution__slot--reorder-target {
@@ -248,44 +247,187 @@
   text-align: center;
 }
 
-.quick-execution__trash {
+.quick-execution__native-drag-image {
   position: absolute;
-  bottom: -2px;
-  left: calc(100% + 8px);
-  display: flex;
-  width: 38px;
-  height: 38px;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.quick-execution__drag-proxy {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+
+.quick-execution__clear-animation {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  transform-origin: center;
+}
+
+.quick-execution__drag-proxy-card {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 8px;
+  background: var(--cc-surface-overlay);
+  box-shadow: var(--cc-shadow-floating);
+}
+
+.quick-execution__drag-proxy-card--unavailable {
+  border-color: var(--cc-warning-border);
+}
+
+.quick-execution__drag-proxy-content {
+  cursor: grabbing;
+}
+
+.quick-execution__drag-proxy--near-black-hole .quick-execution__drag-proxy-card {
+  animation: quick-execution-card-tremble var(--cc-motion-duration-feedback)
+    var(--cc-easing-standard) infinite;
+  transform-origin: 68% 58%;
+  will-change: transform;
+}
+
+@keyframes quick-execution-card-tremble {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0);
+  }
+
+  25% {
+    transform: translate3d(-0.75px, 0.35px, 0) rotate(-0.22deg);
+  }
+
+  50% {
+    transform: translate3d(0.65px, -0.4px, 0) rotate(0.18deg);
+  }
+
+  75% {
+    transform: translate3d(-0.4px, -0.25px, 0) rotate(-0.14deg);
+  }
+}
+
+.quick-execution__black-hole {
+  position: absolute;
+  bottom: -7px;
+  left: calc(100% + 28px);
+  z-index: 4;
+  display: grid;
+  width: 112px;
+  height: 58px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--cc-danger-border);
-  border-radius: 9px;
-  background: var(--cc-danger-soft);
-  color: var(--cc-danger);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(3px) scale(0.88);
+  transform: translateY(4px) scale(0.88);
   transition:
-    border-color var(--cc-motion-duration-feedback) var(--cc-easing-standard),
-    box-shadow var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     opacity var(--cc-motion-duration-feedback) var(--cc-easing-standard),
     transform var(--cc-motion-duration-feedback) var(--cc-easing-standard);
 }
 
-.quick-execution__trash--visible {
-  opacity: 0.82;
+.quick-execution__black-hole--visible {
+  opacity: 0.86;
   pointer-events: auto;
   transform: translateY(0) scale(1);
 }
 
-.quick-execution__trash--target {
-  border-color: var(--cc-danger);
-  box-shadow: 0 0 0 3px var(--cc-danger-border);
+.quick-execution__black-hole--target {
   opacity: 1;
-  transform: translateY(0) scale(1.05);
+  transform: translateY(0);
 }
 
-.quick-execution__trash svg {
+.quick-execution__black-hole--clearing {
   pointer-events: none;
+}
+
+.quick-execution__black-hole-hint {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 2;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(240px, calc(100vw - 24px));
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--cc-tooltip);
+  box-shadow: none;
+  color: var(--cc-tooltip-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  text-align: center;
+  transform: translateX(-50%);
+  user-select: none;
+  white-space: normal;
+}
+
+.quick-execution__black-hole-hint::before {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: var(--cc-tooltip);
+  content: '';
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.quick-execution__black-hole-hint::after {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  width: 1px;
+  height: 24px;
+  background: var(--cc-border-strong);
+  content: '';
+  opacity: 0.72;
+}
+
+.quick-execution__black-hole-visual {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 42px;
+  pointer-events: none;
+}
+
+.quick-execution__black-hole-image,
+.quick-execution__black-hole-motion {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.quick-execution__black-hole-image {
+  opacity: 1;
+}
+
+.quick-execution__black-hole-motion {
+  filter: brightness(1.04) saturate(1.06) drop-shadow(0 0 2px var(--cc-primary-ring));
+  object-fit: fill;
+  transition: filter var(--cc-motion-duration-feedback) var(--cc-easing-standard);
+  will-change: filter;
+}
+
+.quick-execution__black-hole--target .quick-execution__black-hole-motion {
+  filter: brightness(1.2) saturate(1.1) drop-shadow(0 0 8px var(--cc-primary));
 }
 
 @starting-style {
@@ -298,8 +440,22 @@
 @media (prefers-reduced-motion: reduce) {
   .quick-execution__slots,
   .quick-execution__slot,
-  .quick-execution__trash {
+  .quick-execution__black-hole {
     transition: none;
+  }
+
+  .quick-execution__drag-proxy--near-black-hole .quick-execution__drag-proxy-card {
+    animation: none;
+    border-color: var(--cc-primary);
+    box-shadow: 0 0 0 2px var(--cc-primary-ring);
+  }
+
+  .quick-execution__black-hole--target {
+    transform: translateY(0) scale(1);
+  }
+
+  .quick-execution__black-hole-motion {
+    display: none;
   }
 }
 
@@ -312,5 +468,9 @@
     grid-template-columns: 16px 12px minmax(0, 1fr);
     gap: 2px;
     padding-inline: 3px;
+  }
+
+  .quick-execution__black-hole {
+    left: calc(100% + 12px);
   }
 }

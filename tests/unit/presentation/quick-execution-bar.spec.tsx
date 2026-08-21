@@ -157,6 +157,30 @@ describe('quick execution bar', () => {
     )
   })
 
+  it('dismisses the slot tooltip when a drag begins', async () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+      />
+    )
+
+    const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    fireEvent.pointerMove(source, { pointerType: 'mouse' })
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument()
+
+    fireEvent.dragStart(source)
+
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+
+    fireEvent.dragEnd(source)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
   it('reorders filled slots by dragging one shortcut assignment onto another', () => {
     const onReorder = vi.fn()
     render(
@@ -230,7 +254,7 @@ describe('quick execution bar', () => {
     expect(screen.getByRole('dialog', { name: '快捷位操作' })).toBe(popover)
   })
 
-  it('clears a filled slot when it is dropped on the temporary trash target', () => {
+  it('clears a filled slot while its intact proxy springs into the black hole', () => {
     const onClear = vi.fn()
     render(
       <QuickExecutionBar
@@ -246,20 +270,127 @@ describe('quick execution bar', () => {
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
 
     const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
-    fireEvent.dragStart(source)
-    const trash = screen.getByRole('region', { name: '拖到此处清空快捷位 2' })
-    expect(trash).not.toHaveAttribute('data-state')
-    expect(trash).not.toHaveAttribute('aria-describedby')
-    expect(trash.querySelector('[data-trash-icon-variant="outline"]')).toBeInTheDocument()
-    expect(trash.querySelector('[data-icon-role="delete"]')).toHaveAttribute(
-      'data-icon-glyph',
-      'trash'
+    const bar = document.querySelector<HTMLElement>('[data-quick-execution-bar]')!
+    const hiddenBlackHole = document.querySelector<HTMLElement>('[data-quick-execution-trash]')!
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue(
+      createDomRect({ height: 36, left: 100, top: 180, width: 440 })
     )
-    fireEvent.dragOver(trash)
-    expect(trash.querySelector('[data-trash-icon-variant="filled"]')).toBeInTheDocument()
-    fireEvent.drop(trash)
+    vi.spyOn(source, 'getBoundingClientRect').mockReturnValue(
+      createDomRect({ height: 36, left: 190, top: 180, width: 85 })
+    )
+    vi.spyOn(hiddenBlackHole, 'getBoundingClientRect').mockReturnValue(
+      createDomRect({ height: 58, left: 568, top: 169, width: 112 })
+    )
+    const dataTransfer = {
+      dropEffect: 'none',
+      effectAllowed: 'none',
+      setData: vi.fn(),
+      setDragImage: vi.fn()
+    }
+    fireEvent.dragStart(source, { clientX: 230, clientY: 198, dataTransfer })
+    const blackHole = screen.getByRole('region', { name: '拖到此处清空快捷位 2' })
+    const dragProxy = document.querySelector<HTMLElement>('[data-quick-execution-drag-proxy]')!
+    const nativeDragImage = document.querySelector<HTMLCanvasElement>(
+      '[data-quick-execution-native-drag-image]'
+    )!
+    expect(source).toHaveClass('quick-execution__slot--dragging')
+    expect(dragProxy).toBeInTheDocument()
+    expect(dragProxy).toHaveStyle({
+      height: '36px',
+      transform: 'translate3d(90px, 0px, 0)',
+      width: '85px'
+    })
+    expect(dragProxy).toHaveTextContent('2Worker')
+    expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-cleancode-quick-execution-slot',
+      '2'
+    )
+    expect(nativeDragImage).toBeInstanceOf(HTMLCanvasElement)
+    expect(nativeDragImage).toHaveAttribute('width', '1')
+    expect(nativeDragImage).toHaveAttribute('height', '1')
+    expect(nativeDragImage).toBe(dataTransfer.setDragImage.mock.calls[0]?.[0])
+    expect(dataTransfer.setDragImage).toHaveBeenCalledWith(nativeDragImage, 0, 0)
+    expect(blackHole).toHaveAttribute('data-quick-execution-clear-target', 'black-hole')
+    expect(blackHole.querySelector('[data-quick-execution-black-hole]')).toBeInTheDocument()
+    const blackHoleMotion = blackHole.querySelector('[data-quick-execution-black-hole-motion]')
+    expect(blackHoleMotion).toBeInstanceOf(HTMLVideoElement)
+    expect(blackHoleMotion).toHaveProperty('autoplay', true)
+    expect(blackHoleMotion).toHaveProperty('loop', true)
+    expect(blackHoleMotion).toHaveProperty('muted', true)
+    expect(blackHole.querySelector('[data-icon-role="delete"]')).not.toBeInTheDocument()
+
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 520, clientY: 198 }))
+    expect(dragProxy).toHaveStyle({ transform: 'translate3d(377.5px, 0px, 0)' })
+    expect(dragProxy).toHaveClass('quick-execution__drag-proxy--near-black-hole')
+
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 340, clientY: 198 }))
+    expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
+
+    fireEvent.dragEnter(blackHole, { clientX: 576, clientY: 198 })
+    expect(blackHole).toHaveClass('quick-execution__black-hole--target')
+    expect(dragProxy).toHaveClass('quick-execution__drag-proxy--near-black-hole')
+    expect(screen.getByText('松开以清空 2 号快捷位')).toBeInTheDocument()
+
+    fireEvent.dragLeave(blackHole)
+    expect(blackHole).not.toHaveClass('quick-execution__black-hole--target')
+    expect(screen.queryByText('松开以清空 2 号快捷位')).not.toBeInTheDocument()
+
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 340, clientY: 198 }))
+    expect(dragProxy).not.toHaveClass('quick-execution__drag-proxy--near-black-hole')
+
+    fireEvent(source, new MouseEvent('drag', { bubbles: true, clientX: 576, clientY: 198 }))
+    fireEvent.dragEnter(blackHole)
+    fireEvent.drop(blackHole)
 
     expect(onClear).toHaveBeenCalledWith(2)
+    expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-quick-execution-drag-proxy]')).not.toBeInTheDocument()
+    const clearAnimation = document.querySelector<HTMLElement>(
+      '[data-quick-execution-clear-animation]'
+    )!
+    expect(clearAnimation).toBeInTheDocument()
+    expect(clearAnimation).toHaveClass(
+      'workbench-object-motion--delete',
+      'workbench-object-motion--spatial'
+    )
+    expect(clearAnimation).toHaveStyle({
+      height: '36px',
+      left: '481.5px',
+      top: '0px',
+      width: '85px'
+    })
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-x')).toBe('-48px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-y')).toBe('0px')
+    expect(clearAnimation.style.getPropertyValue('--workbench-object-motion-scale')).toBe('1')
+    expect(clearAnimation).toHaveTextContent('2Worker')
+    expect(blackHole).toHaveClass(
+      'quick-execution__black-hole--visible',
+      'quick-execution__black-hole--target',
+      'quick-execution__black-hole--clearing'
+    )
+  })
+
+  it('restores the source slot when a black-hole drag is cancelled', () => {
+    render(
+      <QuickExecutionBar
+        graph={createGraph()}
+        onAdd={vi.fn()}
+        onBind={vi.fn()}
+        onClear={vi.fn()}
+        onFocus={vi.fn()}
+        onReorder={vi.fn()}
+      />
+    )
+
+    const source = document.querySelector<HTMLElement>('[data-quick-execution-slot="2"]')!
+    fireEvent.dragStart(source)
+    expect(source).toHaveClass('quick-execution__slot--dragging')
+    expect(screen.getByRole('region', { name: '拖到此处清空快捷位 2' })).toBeInTheDocument()
+
+    fireEvent.dragEnd(source)
+
+    expect(source).not.toHaveClass('quick-execution__slot--dragging')
     expect(screen.queryByRole('region', { name: '拖到此处清空快捷位 2' })).not.toBeInTheDocument()
   })
 })
@@ -303,5 +434,29 @@ function createBlock(id: string, name: string) {
     position: { x: 0, y: 0 },
     size: { width: 720, height: 460 },
     type: 'terminal' as const
+  }
+}
+
+function createDomRect({
+  height,
+  left,
+  top,
+  width
+}: {
+  readonly height: number
+  readonly left: number
+  readonly top: number
+  readonly width: number
+}): DOMRect {
+  return {
+    bottom: top + height,
+    height,
+    left,
+    right: left + width,
+    toJSON: () => ({}),
+    top,
+    width,
+    x: left,
+    y: top
   }
 }

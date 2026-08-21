@@ -207,9 +207,30 @@ describe('quick execution e2e', () => {
       await waitForCanvasViewportToSettle(page)
       expect(await readCanvasViewportTransform(page)).toBe(unfollowedViewport)
 
+      if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
+        await selectTheme(page, 'light')
+      }
+
       const quickSlot = page.locator('[data-quick-execution-slot="2"]')
       const quickSlotBox = await quickSlot.boundingBox()
       if (!quickSlotBox) throw new Error('Quick execution slot 2 is not visible')
+      expect(
+        await page.locator('[data-quick-execution-native-drag-image]').evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return {
+            height: bounds.height,
+            isConnected: element.isConnected,
+            isTransparentCanvas:
+              element instanceof HTMLCanvasElement && element.width === 1 && element.height === 1,
+            width: bounds.width
+          }
+        })
+      ).toEqual({
+        height: 1,
+        isConnected: true,
+        isTransparentCanvas: true,
+        width: 1
+      })
 
       await page.mouse.move(
         quickSlotBox.x + quickSlotBox.width / 2,
@@ -232,10 +253,240 @@ describe('quick execution e2e', () => {
 
       const trashBox = await trashTarget.boundingBox()
       if (!trashBox) throw new Error('Quick execution trash target is not visible')
-      await page.mouse.move(trashBox.x + trashBox.width / 2, trashBox.y + trashBox.height / 2, {
+      const quickExecutionBarBox = await page.locator('[data-quick-execution-bar]').boundingBox()
+      if (!quickExecutionBarBox) throw new Error('Quick execution bar is not visible')
+      expect(trashBox.x - (quickExecutionBarBox.x + quickExecutionBarBox.width)).toBeGreaterThan(0)
+      expect(
+        trashBox.x - (quickExecutionBarBox.x + quickExecutionBarBox.width)
+      ).toBeLessThanOrEqual(40)
+
+      await page.emulateMedia({ reducedMotion: 'no-preference' })
+      await page.mouse.move(
+        trashBox.x - quickSlotBox.width / 2 - 24,
+        trashBox.y + trashBox.height / 2,
+        { steps: 8 }
+      )
+      const proximityState = await pollUntilState({
+        description: 'intact dragged shortcut card to tremble near the black hole',
+        observe: async () => {
+          const proxy = page.locator('[data-quick-execution-drag-proxy]')
+          const proxyCard = proxy.locator('.quick-execution__drag-proxy-card')
+          return {
+            animationName: await proxyCard.evaluate(
+              (element) => getComputedStyle(element).animationName
+            ),
+            hasHint: (await page.locator('.quick-execution__black-hole-hint').count()) === 1,
+            hasTargetState: await trashTarget.evaluate((target) =>
+              target.classList.contains('quick-execution__black-hole--target')
+            ),
+            isNear: await proxy.evaluate((element) =>
+              element.classList.contains('quick-execution__drag-proxy--near-black-hole')
+            ),
+            proxyBox: await proxy.boundingBox()
+          }
+        },
+        accept: (state) =>
+          state.animationName === 'quick-execution-card-tremble' &&
+          !state.hasHint &&
+          !state.hasTargetState &&
+          state.isNear &&
+          Boolean(state.proxyBox),
+        timeoutMs: 5_000
+      })
+      expect(proximityState.proxyBox?.width).toBeCloseTo(quickSlotBox.width, 0)
+      expect(proximityState.proxyBox?.height).toBeCloseTo(quickSlotBox.height, 0)
+
+      await page.mouse.move(
+        quickSlotBox.x + quickSlotBox.width / 2,
+        quickSlotBox.y + quickSlotBox.height / 2,
+        { steps: 8 }
+      )
+      const settledFarState = await pollUntilState({
+        description: 'dragged shortcut card to stop trembling away from the black hole',
+        observe: async () => {
+          const proxy = page.locator('[data-quick-execution-drag-proxy]')
+          return {
+            animationName: await proxy
+              .locator('.quick-execution__drag-proxy-card')
+              .evaluate((element) => getComputedStyle(element).animationName),
+            isNear: await proxy.evaluate((element) =>
+              element.classList.contains('quick-execution__drag-proxy--near-black-hole')
+            )
+          }
+        },
+        accept: (state) => state.animationName === 'none' && !state.isNear,
+        timeoutMs: 5_000
+      })
+      expect(settledFarState).toEqual({ animationName: 'none', isNear: false })
+
+      await page.mouse.move(trashBox.x + 8, trashBox.y + trashBox.height / 2, {
         steps: 8
       })
+      const activeClearState = await pollUntilState({
+        description: 'black-hole clear target to keep the intact card trembling over the target',
+        observe: async () => ({
+          hasHint: (await page.locator('.quick-execution__black-hole-hint').count()) === 1,
+          hasTargetState: await trashTarget.evaluate((target) =>
+            target.classList.contains('quick-execution__black-hole--target')
+          ),
+          nearProxyCount: await page
+            .locator(
+              '.quick-execution__drag-proxy--near-black-hole[data-quick-execution-drag-proxy]'
+            )
+            .count(),
+          proxyCount: await page.locator('[data-quick-execution-drag-proxy]').count()
+        }),
+        accept: (state) =>
+          state.hasHint &&
+          state.hasTargetState &&
+          state.nearProxyCount === 1 &&
+          state.proxyCount === 1,
+        timeoutMs: 5_000
+      })
+      expect(activeClearState).toEqual({
+        hasHint: true,
+        hasTargetState: true,
+        nearProxyCount: 1,
+        proxyCount: 1
+      })
+      expect(
+        await page.locator('.quick-execution__black-hole-hint').evaluate((element) => {
+          const style = getComputedStyle(element)
+          return {
+            borderRadius: style.borderRadius,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            paddingBlock: `${style.paddingTop} ${style.paddingBottom}`,
+            paddingInline: `${style.paddingLeft} ${style.paddingRight}`
+          }
+        })
+      ).toEqual({
+        borderRadius: '6px',
+        fontSize: '12px',
+        fontWeight: '500',
+        paddingBlock: '6px 6px',
+        paddingInline: '12px 12px'
+      })
+      const blackHoleVisual = trashTarget.locator('.quick-execution__black-hole-visual')
+      const blackHoleVisualBox = await pollUntilState({
+        description: 'black-hole visual to resolve to a visible rendered size',
+        observe: () => blackHoleVisual.boundingBox(),
+        accept: (box) => Boolean(box && box.width >= 105 && box.height > 36),
+        timeoutMs: 5_000
+      })
+      expect(blackHoleVisualBox?.width).toBeGreaterThanOrEqual(105)
+      expect(blackHoleVisualBox?.height).toBeGreaterThan(36)
+      expect(
+        await trashTarget
+          .locator('[data-quick-execution-black-hole]')
+          .evaluate((element) => element instanceof HTMLImageElement && element.naturalWidth > 0)
+      ).toBe(true)
+      expect(
+        await trashTarget.locator('[data-quick-execution-black-hole]').evaluate((element) => {
+          const style = getComputedStyle(element)
+          return {
+            animationName: style.animationName,
+            opacity: style.opacity,
+            transform: style.transform
+          }
+        })
+      ).toEqual({
+        animationName: 'none',
+        opacity: '1',
+        transform: 'none'
+      })
+      const blackHoleMotion = trashTarget.locator('[data-quick-execution-black-hole-motion]')
+      expect(
+        await blackHoleMotion.evaluate((element) => getComputedStyle(element).animationName)
+      ).toBe('none')
+      const blackHolePlayback = await pollUntilState({
+        description: 'black-hole video to play at its active capture speed',
+        observe: () =>
+          blackHoleMotion.evaluate((element) => {
+            if (!(element instanceof HTMLVideoElement)) throw new Error('Expected black-hole video')
+            return {
+              currentTime: element.currentTime,
+              duration: element.duration,
+              paused: element.paused,
+              playbackRate: element.playbackRate,
+              readyState: element.readyState
+            }
+          }),
+        accept: (playback) =>
+          playback.readyState >= 2 &&
+          !playback.paused &&
+          playback.playbackRate === 1.75 &&
+          playback.duration >= 1.7,
+        timeoutMs: 5_000
+      })
+      const advancedBlackHoleTime = await pollUntilState({
+        description: 'black-hole video timeline to advance visibly',
+        observe: () =>
+          blackHoleMotion.evaluate((element) => (element as HTMLVideoElement).currentTime),
+        accept: (currentTime) => Math.abs(currentTime - blackHolePlayback.currentTime) > 0.08,
+        timeoutMs: 5_000
+      })
+      expect(Math.abs(advancedBlackHoleTime - blackHolePlayback.currentTime)).toBeGreaterThan(0.08)
+      if (process.env.CLEANCODE_CAPTURE_QUICK_EXECUTION_VISUAL === '1') {
+        await page.screenshot({
+          path: join(process.cwd(), 'test-results', 'quick-execution-black-hole-target.png')
+        })
+      }
       await page.mouse.up()
+      const clearAnimation = page.locator('[data-quick-execution-clear-animation]')
+      await clearAnimation.waitFor({ state: 'attached', timeout: 2_000 })
+      const clearAnimationState = await clearAnimation.evaluate((element) => {
+        const style = getComputedStyle(element)
+        const root = element.closest<HTMLElement>('[data-quick-execution-bar]')
+        const rootBounds = root?.getBoundingClientRect()
+        const blackHoleBounds = root
+          ?.querySelector<HTMLElement>('[data-quick-execution-trash]')
+          ?.getBoundingClientRect()
+        const width = Number.parseFloat(style.width)
+        const height = Number.parseFloat(style.height)
+        const left = Number.parseFloat(style.left)
+        const top = Number.parseFloat(style.top)
+        return {
+          classNames: [...element.classList],
+          height,
+          motionId: element.getAttribute('data-quick-execution-clear-motion'),
+          scale: Number.parseFloat(style.getPropertyValue('--workbench-object-motion-scale')),
+          blackHoleCenter: blackHoleBounds
+            ? {
+                x: blackHoleBounds.left + blackHoleBounds.width / 2,
+                y: blackHoleBounds.top + blackHoleBounds.height / 2
+              }
+            : null,
+          targetCenter:
+            rootBounds && Number.isFinite(left) && Number.isFinite(top)
+              ? {
+                  x: rootBounds.left + left + width / 2,
+                  y: rootBounds.top + top + height / 2
+                }
+              : null,
+          width
+        }
+      })
+      expect(clearAnimationState.classNames).toEqual(
+        expect.arrayContaining([
+          'quick-execution__clear-animation',
+          'workbench-object-motion--delete',
+          'workbench-object-motion--spatial'
+        ])
+      )
+      expect(clearAnimationState.motionId).toMatch(/^quick-execution-clear:/)
+      expect(clearAnimationState.width).toBeCloseTo(quickSlotBox.width, 0)
+      expect(clearAnimationState.height).toBeCloseTo(quickSlotBox.height, 0)
+      expect(clearAnimationState.scale).toBeGreaterThanOrEqual(0)
+      expect(clearAnimationState.scale).toBeLessThanOrEqual(1)
+      expect(clearAnimationState.targetCenter?.x).toBeCloseTo(
+        clearAnimationState.blackHoleCenter?.x ?? Number.NaN,
+        0
+      )
+      expect(clearAnimationState.targetCenter?.y).toBeCloseTo(
+        clearAnimationState.blackHoleCenter?.y ?? Number.NaN,
+        0
+      )
       const clearedTarget = await pollUntilState({
         description: 'quick execution slot 2 target to be cleared',
         observe: async () => (await readE2eBlockGraph(workbench)).quickExecutionSlots?.[1]?.target,
@@ -244,6 +495,12 @@ describe('quick execution e2e', () => {
       })
       expect(clearedTarget).toBeNull()
       await restoredSlot.waitFor({ state: 'detached' })
+      await clearAnimation.waitFor({ state: 'detached', timeout: 5_000 })
+      expect(
+        await trashTarget.evaluate((element) =>
+          element.classList.contains('quick-execution__black-hole--clearing')
+        )
+      ).toBe(false)
     },
     electronScenarioTimeoutMs
   )
