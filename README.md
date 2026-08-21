@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./public/app-icon.png" alt="CleanCode" width="80" valign="middle" /> CleanCode
+  <img src="./public/app-icon.png" alt="CleanCode" width="96" valign="middle" /> CleanCode
 </h1>
 
 <p align="center">
