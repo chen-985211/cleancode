@@ -20,7 +20,7 @@
 </p>
 
 <h3 align="center">
-  <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview</ins></a>
+  <a href="https://github.com/chen-985211/cleancode/releases"><ins>Download CleanCode Preview (macOS / Windows / Linux)</ins></a>
 </h3>
 
 <p align="center">
